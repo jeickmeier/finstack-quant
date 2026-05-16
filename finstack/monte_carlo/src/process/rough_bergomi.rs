@@ -1,9 +1,10 @@
 //! Rough Bergomi (rBergomi) stochastic volatility model.
 //!
 //! The rBergomi model (Bayer, Friz, Gatheral 2016) extends classical stochastic
-//! volatility by driving the variance process with a fractional Brownian motion
-//! of Hurst exponent H < 0.5, reproducing the power-law explosion of the
-//! at-the-money implied volatility skew observed in equity markets.
+//! volatility by driving the variance process with a Riemann-Liouville
+//! Volterra process of Hurst exponent H < 0.5, reproducing the power-law
+//! explosion of the at-the-money implied volatility skew observed in equity
+//! markets.
 //!
 //! # Stochastic Differential Equations
 //!
@@ -11,30 +12,36 @@
 //!
 //! ```text
 //! dS_t = (r - q) S_t dt + √V_t S_t dW(t)
-//! V_t  = ξ₀(t) exp(η Ŵ_H(t) - ½ η² t^{2H})
+//! V_t  = ξ₀(t) exp(η Ỹ_t - ½ η² t^{2H})
 //!
-//! Ŵ_H(t) = ∫₀ᵗ (t - s)^{H - ½} dW̃(s)   (Volterra fBM)
+//! Ỹ_t = √(2H) ∫₀ᵗ (t - s)^{H - ½} dW̃(s)   (Riemann-Liouville Volterra process)
 //! dW · dW̃ = ρ dt
 //! ```
 //!
 //! where:
 //! - **S_t**: Spot price at time t
-//! - **V_t**: Instantaneous variance (stochastic, driven by fBM)
+//! - **V_t**: Instantaneous variance (stochastic, driven by `Ỹ`)
 //! - **ξ₀(t)**: Forward variance curve (market-implied)
 //! - **η**: Vol-of-vol scaling parameter
 //! - **H**: Hurst exponent, typically 0.07–0.12 for equity indices
 //! - **ρ**: Spot-vol correlation (typically negative for equity)
-//! - **Ŵ_H(t)**: Volterra representation of fractional Brownian motion
+//! - **Ỹ_t**: Riemann-Liouville Volterra process, `Var(Ỹ_t) = t^{2H}`
+//!
+//! Note that `Ỹ` is the *Riemann-Liouville* (truncated, non-stationary-increment)
+//! Volterra process — **not** true fractional Brownian motion. The two share
+//! the marginal variance `t^{2H}` but have different autocovariance; the
+//! Bayer-Friz-Gatheral rBergomi model is defined with `Ỹ`. See
+//! [`RiemannLiouvilleVolterra`](super::super::rng::volterra::RiemannLiouvilleVolterra).
 //!
 //! # Design Notes
 //!
-//! The variance process V_t is a *functional* of the entire fBM path, not a
-//! diffusive state variable. The standard `drift`/`diffusion` interface cannot
-//! express this non-Markovian dependence on path history. Accordingly, `drift`
-//! and `diffusion` are implemented as formal no-ops — the actual dynamics are
-//! handled entirely by the dedicated
+//! The variance process V_t is a *functional* of the entire Volterra path, not
+//! a diffusive state variable. The standard `drift`/`diffusion` interface
+//! cannot express this non-Markovian dependence on path history. Accordingly,
+//! `drift` and `diffusion` are implemented as formal no-ops — the actual
+//! dynamics are handled entirely by the dedicated
 //! [`RoughBergomiEuler`](super::super::discretization::rough_bergomi::RoughBergomiEuler)
-//! discretization, which tracks the accumulated Volterra integral internally.
+//! discretization, which tracks the accumulated Volterra process internally.
 //!
 //! This is analogous to how the Heston process provides `drift`/`diffusion` for
 //! generic Euler schemes but is typically paired with the QE discretization that
@@ -72,7 +79,7 @@
 //!
 //! let process = RoughBergomiProcess::new(params);
 //! assert_eq!(process.dim(), 1);
-//! assert_eq!(process.num_factors(), 2);
+//! assert_eq!(process.num_factors(), 3);
 //! ```
 
 use super::super::paths::ProcessParams;
@@ -173,12 +180,14 @@ impl RoughBergomiParams {
 
 /// Rough Bergomi stochastic volatility process.
 ///
-/// State: \[S\] (spot only; variance is a functional of the fBM path and is
-/// reconstructed by the discretization).
+/// State: \[S\] (spot only; variance is a functional of the Volterra path and
+/// is reconstructed by the discretization).
 ///
-/// Factors: 2 — one independent standard normal for the uncorrelated spot
-/// component and one fBM increment supplied by the engine's fractional noise
-/// integration.
+/// Factors: 3 — one independent standard normal for the uncorrelated spot
+/// component, one Riemann-Liouville Volterra increment `ΔỸ` (accumulated into
+/// the variance), and one unit-variance driving Brownian normal (used for the
+/// exact spot–vol correlation). The latter two are supplied by the engine's
+/// fractional noise integration.
 #[derive(Debug, Clone)]
 pub struct RoughBergomiProcess {
     params: RoughBergomiParams,
@@ -218,7 +227,10 @@ impl StochasticProcess for RoughBergomiProcess {
     }
 
     fn num_factors(&self) -> usize {
-        2 // z[0] = independent normal (uncorrelated spot), z[1] = fBM increment
+        // z[0] = independent normal (uncorrelated spot component),
+        // z[1] = RL Volterra increment ΔỸ (accumulated into the variance),
+        // z[2] = unit-variance driving Brownian normal (spot–vol correlation).
+        3
     }
 
     /// Formal no-op: actual drift is applied by the rBergomi discretization.
@@ -332,7 +344,7 @@ mod tests {
         let process = RoughBergomiProcess::new(params);
 
         assert_eq!(process.dim(), 1);
-        assert_eq!(process.num_factors(), 2);
+        assert_eq!(process.num_factors(), 3);
     }
 
     #[test]

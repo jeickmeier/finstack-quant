@@ -23,7 +23,7 @@
 //! // …then simulate with injection into z[fbm_z_index].
 //! let pv = simulate_path_fractional(
 //!     &mut path_rng, time_grid, process, disc, initial_state,
-//!     &mut payoff, currency, &fbm_increments, fbm_z_index,
+//!     &mut payoff, currency, &fbm_increments, fbm_z_index, None,
 //!     &mut state, &mut z, &mut work,
 //! )?;
 //! ```
@@ -52,8 +52,11 @@ use finstack_core::Result;
 /// * `initial_state` — initial state vector (length = `process.dim()`)
 /// * `payoff` — payoff accumulator (must be pre-reset by caller)
 /// * `currency` — result currency
-/// * `fbm_increments` — pre-generated fBM increments (length = `num_steps`)
-/// * `fbm_z_index` — index in `z` where the fBM increment is injected
+/// * `fbm_increments` — pre-generated fractional increments (length = `num_steps`)
+/// * `fbm_z_index` — index in `z` where the fractional increment is injected
+/// * `aux` — optional second injection `(z_index, values)`; rBergomi uses it to
+///   inject the unit-variance driving Brownian normal for the exact spot–vol
+///   correlation. Pass `None` for schemes that need only the single increment.
 /// * `state` — reusable state buffer (length = `process.dim()`)
 /// * `z` — reusable noise buffer (length = `process.num_factors()`)
 /// * `work` — reusable work buffer (length = `disc.work_size(process)`); the
@@ -74,6 +77,7 @@ pub fn simulate_path_fractional<R, P, D, F>(
     currency: Currency,
     fbm_increments: &[f64],
     fbm_z_index: usize,
+    aux: Option<(usize, &[f64])>,
     state: &mut [f64],
     z: &mut [f64],
     work: &mut [f64],
@@ -101,6 +105,7 @@ where
         NoiseHook::InjectFbm {
             z_index: fbm_z_index,
             increments: fbm_increments,
+            aux,
         },
         currency,
     )
@@ -214,6 +219,7 @@ mod tests {
             Currency::USD,
             &fbm_increments,
             1,
+            None,
             &mut state,
             &mut z,
             &mut work,
@@ -261,6 +267,7 @@ mod tests {
             Currency::USD,
             &fbm_increments,
             1,
+            None,
             &mut state,
             &mut z,
             &mut work,
