@@ -16,8 +16,12 @@
 //! For a CMS **floorlet** (pays `(K - S_T)^+` at `T_pay`):
 //!
 //! ```text
-//! V = g(K) × P_sw(K) + ∫_{K_min}^K g'(k) × P_sw(k) dk
+//! V = g(K) × P_sw(K) − ∫_{K_min}^K g'(k) × P_sw(k) dk
 //! ```
+//!
+//! Note the **minus** sign — unlike the caplet, the floorlet integral runs
+//! *below* `K`, and integration by parts yields a subtractive correction
+//! (`g'(k) > 0`, integral positive). See the `OptionType::Put` branch below.
 //!
 //! where:
 //! - `g(k) = DF(T_pay) / A_par(k)` — ratio of payment discount factor to the
