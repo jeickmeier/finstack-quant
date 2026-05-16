@@ -5,6 +5,7 @@
 mod pricing;
 mod pricing_common;
 mod runner;
+mod sabr;
 mod schema;
 mod source_validation;
 mod tolerance;
