@@ -59,7 +59,7 @@ impl SABRModel {
         let f_mid_beta = if beta_is_zero {
             1.0 // Special case for normal model
         } else {
-            f_mid.powf(beta)
+            f_mid.powf(1.0 - beta)
         };
 
         // Enhanced log-moneyness calculation
@@ -157,8 +157,6 @@ impl SABRModel {
         let nu = self.params.nu;
         let rho = self.params.rho;
         let beta_is_zero = beta.abs() < 1e-12;
-        let beta_is_one = (beta - 1.0).abs() < 1e-12;
-        let beta_is_half = (beta - 0.5).abs() < 1e-12;
 
         // Handle degenerate cases
         if alpha.abs() < 1e-14 {
@@ -166,31 +164,26 @@ impl SABRModel {
         }
 
         // ATM volatility formula with numerical protection
+        // Hagan et al. (2002) eq. 2.18:
+        //   σ_ATM = α / F^(1-β) · [1 + ((1-β)²α²/24/F^(2(1-β)) + ρβνα/4/F^(1-β) + (2-3ρ²)ν²/24) · T]
         let vol = if beta_is_zero {
-            // Normal SABR: vol = alpha * (1 + T * (2-3*rho²)/24 * nu²)
+            // Normal SABR (β=0): F^(1-β) = F, but the α·T·(...) time correction
+            // collapses to the normal-SABR form with no F dependence.
+            // Hagan eq. 2.18 at β=0: σ_ATM = α · (1 + (2-3ρ²)ν²/24 · T)
             alpha * (1.0 + time_to_expiry * (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2))
-        } else if beta_is_one {
-            // Lognormal SABR: vol = alpha/F * (1 + T * (alpha²/(24*F²) + rho*nu*alpha/(4*F) + (2-3*rho²)*nu²/24))
-            let alpha_term = alpha.powi(2) / (24.0 * forward.powi(2));
-            let rho_term = 0.25 * rho * nu * alpha / forward;
-            let nu_term = (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
-
-            alpha / forward * (1.0 + time_to_expiry * (alpha_term + rho_term + nu_term))
         } else {
-            // General beta case with numerical protection
+            // General β ∈ (0,1] case, including β=1.
+            // At β=1: F^(1-β)=1, (1-β)²=0, so alpha_term→0 and rho_term→ρνα/4.
+            // At β=0.5: covered by (1-β)²/24·α²/F^(2(1-β)) = α²/(24·F) which
+            //           matches the original beta_is_half shortcut (redundant, removed).
             let f_beta = if forward.abs() < 1e-14 {
-                1e-14_f64.powf(beta) // Avoid zero to very small power
+                1e-14_f64.powf(1.0 - beta) // Avoid zero to very small power
             } else {
-                forward.powf(beta)
+                forward.powf(1.0 - beta)
             };
 
-            let alpha_term = if beta_is_half {
-                // Special handling for beta = 0.5 (sqrt case)
-                alpha.powi(2) / (24.0 * forward)
-            } else {
-                (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / forward.powf(2.0 * (1.0 - beta))
-            };
-
+            let alpha_term =
+                (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / forward.powf(2.0 * (1.0 - beta));
             let rho_term = 0.25 * rho * beta * nu * alpha / f_beta;
             let nu_term = (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
 
