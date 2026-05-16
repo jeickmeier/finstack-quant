@@ -33,6 +33,7 @@ mod failure_modes;
 mod finstack_config;
 mod hazard_curve;
 mod inflation;
+mod parametric;
 mod quote_construction;
 mod reference_envelopes;
 mod repricing;

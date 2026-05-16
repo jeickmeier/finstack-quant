@@ -33,6 +33,12 @@ pub(crate) struct ParametricCurveTargetParams {
     pub(crate) initial_params: Option<NelsonSiegelModel>,
     /// Base market context.
     pub(crate) base_context: MarketContext,
+    /// Residual normalization notional (used to scale PV residuals to per-unit notional).
+    ///
+    /// Calibration tolerances are interpreted in **per-notional** residual units, so
+    /// a realistic notional can be used for instrument construction without making
+    /// solver tolerances unrealistically tight in absolute currency terms.
+    pub(crate) residual_notional: f64,
 }
 
 /// Calibration target for parametric (NS/NSS) curves.
@@ -47,6 +53,11 @@ pub(crate) struct ParametricCurveTarget {
     sample_times: Vec<f64>,
     /// Reusable scratch context (see [`ContextScratch`]).
     scratch: ContextScratch,
+    /// Residual normalization notional, mirroring the notional used to build
+    /// the calibration instruments. Residuals are divided by this value so that
+    /// the solver works in per-notional units and `validation_tolerance` (default
+    /// `1e-8`) is comparable to the sibling targets.
+    residual_notional: f64,
 }
 
 impl ParametricCurveTarget {
@@ -57,10 +68,12 @@ impl ParametricCurveTarget {
         config: &CalibrationConfig,
     ) -> Self {
         let scratch = ContextScratch::from_config(params.base_context.clone(), config);
+        let residual_notional = params.residual_notional;
         Self {
             params,
             sample_times,
             scratch,
+            residual_notional,
         }
     }
 
@@ -127,12 +140,13 @@ impl ParametricCurveTarget {
             .discount_curve_id
             .as_ref()
             .unwrap_or(&schema_params.curve_id);
+        let residual_notional: f64 = 1_000_000.0;
         let prepared = prepare_rate_calibration_quotes(
             quotes,
             schema_params.base_date,
             discount_only_curve_ids(discount_id.as_ref()),
             None,
-            1_000_000.0,
+            residual_notional,
         )?;
         let prepared_quotes = prepared.quotes;
 
@@ -163,6 +177,7 @@ impl ParametricCurveTarget {
                 variant: schema_params.model,
                 initial_params: initial_params.clone(),
                 base_context: context.clone(),
+                residual_notional,
             },
             Self::build_sample_times(&prepared_quotes),
             &config,
@@ -251,7 +266,8 @@ impl GlobalSolveTarget for ParametricCurveTarget {
 
         self.scratch.with_curve(&disc_curve, |ctx| {
             for (i, q) in quotes.iter().enumerate() {
-                residuals[i] = q.get_instrument().value_raw(ctx, self.params.base_date)?;
+                let pv = q.get_instrument().value_raw(ctx, self.params.base_date)?;
+                residuals[i] = pv / self.residual_notional;
             }
             Ok(())
         })
