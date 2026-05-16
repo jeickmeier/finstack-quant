@@ -1,0 +1,26 @@
+{
+  "skill_name": "systems-architecture-reviewer",
+  "evals": [
+    {
+      "id": 1,
+      "name": "bindings-canonical-path-review",
+      "prompt": "Please do a senior architecture review of finstack/scenarios and the associated Python/WASM bindings. I care less about local style and more about whether there is one canonical pathway for scenario execution, whether bindings are honest, and whether any stale API paths could survive future fixes. Read the whole requested scope before reporting. Do not edit code.",
+      "expected_output": "A full architecture review with findings first, a coverage ledger that includes Rust core plus Python/WASM binding surfaces, an architecture map for scenario execution, duplicate pathway inventory, and a consolidation plan. It should not perform edits. It should explicitly check generated declarations/contracts and stale binding or parity surfaces.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "plugin-registry-linkage-review",
+      "prompt": "Audit the architecture of our plugin registry and marketplace install flow. I want to know if native skills and plugin-backed skills have one canonical list path, whether pagination/filtering happens in the right layer, and whether there are stale routes or schema fields that only some callers use. Full review of the touched subsystem, not a quick PR glance.",
+      "expected_output": "A senior architecture report covering topology, public/API surface, linkage and call paths, duplicate pathways, stale schema or route references, and verification/doc/test alignment. It should use a coverage ledger and produce PR-sized consolidation slices.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "generic-library-architecture-review",
+      "prompt": "Can you review src/payments/ as a systems architect? There are PaymentProcessor, PaymentService, processor_v2, a Stripe adapter, and a couple of helper modules. I want the library to be easy to extend but not have three ways to charge/refund. Please map the architecture, identify the canonical pathway, and tell me what to collapse. No code changes yet.",
+      "expected_output": "A complete read-only architecture review of the requested directory. It should inventory charge/refund capabilities, identify canonical and alternate pathways, flag over-abstracted or stale wrappers, explain extension risks, and provide a consolidation plan with verification steps.",
+      "files": []
+    }
+  ]
+}
