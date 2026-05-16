@@ -14,6 +14,7 @@ use crate::instruments::fixed_income::structured_credit::types::{StructuredCredi
 use finstack_core::dates::{Date, DayCount, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::random::{Pcg64Rng, RandomNumberGenerator};
+use finstack_core::math::stats::OnlineStats;
 use finstack_core::money::Money;
 use finstack_core::Result;
 use rayon::prelude::*;
@@ -596,10 +597,8 @@ struct TrancheScenarioStats {
     seniority: String,
     attachment: f64,
     detachment: f64,
-    pv_sum: f64,
-    pv_sq_sum: f64,
-    loss_sum: f64,
-    loss_sq_sum: f64,
+    pv_stats: OnlineStats,
+    loss_stats: OnlineStats,
     losses: Vec<f64>,
     wal_sum: f64,
     duration_sum: f64,
@@ -612,10 +611,8 @@ impl TrancheScenarioStats {
             seniority: format!("{:?}", tranche.seniority),
             attachment: tranche.attachment_point / 100.0,
             detachment: tranche.detachment_point / 100.0,
-            pv_sum: 0.0,
-            pv_sq_sum: 0.0,
-            loss_sum: 0.0,
-            loss_sq_sum: 0.0,
+            pv_stats: OnlineStats::new(),
+            loss_stats: OnlineStats::new(),
             losses: Vec::with_capacity(num_paths),
             wal_sum: 0.0,
             duration_sum: 0.0,
@@ -623,10 +620,8 @@ impl TrancheScenarioStats {
     }
 
     fn record(&mut self, metrics: PathTrancheMetrics) {
-        self.pv_sum += metrics.pv;
-        self.pv_sq_sum += metrics.pv * metrics.pv;
-        self.loss_sum += metrics.loss;
-        self.loss_sq_sum += metrics.loss * metrics.loss;
+        self.pv_stats.update(metrics.pv);
+        self.loss_stats.update(metrics.loss);
         self.losses.push(metrics.loss);
         self.wal_sum += metrics.wal;
         self.duration_sum += metrics.duration;
@@ -639,9 +634,12 @@ impl TrancheScenarioStats {
         es_confidence: f64,
     ) -> TranchePricingResult {
         let paths = num_paths.max(1) as f64;
-        let mean_pv = self.pv_sum / paths;
-        let mean_loss = self.loss_sum / paths;
-        let loss_variance = (self.loss_sq_sum / paths) - mean_loss * mean_loss;
+        let mean_pv = self.pv_stats.mean();
+        let mean_loss = self.loss_stats.mean();
+        // Use population variance (n denominator) to match the sibling
+        // `StochasticMetricsCalculator::weighted_variance` convention and
+        // the INVARIANTS §3 requirement for MC estimators.
+        let loss_std = self.loss_stats.population_variance().sqrt();
         let es = expected_shortfall(&mut self.losses, es_confidence);
 
         TranchePricingResult::new(
@@ -652,7 +650,7 @@ impl TrancheScenarioStats {
         .with_subordination(self.attachment, self.detachment)
         .with_risk_metrics(
             Money::new(mean_loss, currency),
-            Money::new(loss_variance.max(0.0).sqrt(), currency),
+            Money::new(loss_std, currency),
             Money::new(es, currency),
         )
         .with_average_life(self.wal_sum / paths)
@@ -663,10 +661,8 @@ impl TrancheScenarioStats {
 struct ScenarioCollector {
     currency: finstack_core::currency::Currency,
     num_paths: usize,
-    deal_pv_sum: f64,
-    deal_pv_sq_sum: f64,
-    deal_loss_sum: f64,
-    deal_loss_sq_sum: f64,
+    deal_pv_stats: OnlineStats,
+    deal_loss_stats: OnlineStats,
     deal_losses: Vec<f64>,
     tranche_stats: Vec<TrancheScenarioStats>,
 }
@@ -681,10 +677,8 @@ impl ScenarioCollector {
         Ok(Self {
             currency: instrument.pool.base_currency(),
             num_paths,
-            deal_pv_sum: 0.0,
-            deal_pv_sq_sum: 0.0,
-            deal_loss_sum: 0.0,
-            deal_loss_sq_sum: 0.0,
+            deal_pv_stats: OnlineStats::new(),
+            deal_loss_stats: OnlineStats::new(),
             deal_losses: Vec::with_capacity(num_paths),
             tranche_stats: instrument
                 .tranches
@@ -702,10 +696,8 @@ impl ScenarioCollector {
     }
 
     fn record_deal(&mut self, pv: f64, loss: f64) {
-        self.deal_pv_sum += pv;
-        self.deal_pv_sq_sum += pv * pv;
-        self.deal_loss_sum += loss;
-        self.deal_loss_sq_sum += loss * loss;
+        self.deal_pv_stats.update(pv);
+        self.deal_loss_stats.update(loss);
         self.deal_losses.push(loss);
     }
 
@@ -722,11 +714,15 @@ impl ScenarioCollector {
         pricing_mode: &str,
     ) -> StochasticPricingResult {
         let paths = self.num_paths as f64;
-        let mean_pv = self.deal_pv_sum / paths;
-        let mean_loss = self.deal_loss_sum / paths;
-        let pv_variance = (self.deal_pv_sq_sum / paths) - mean_pv * mean_pv;
-        let loss_variance = (self.deal_loss_sq_sum / paths) - mean_loss * mean_loss;
-        let std_error = pv_variance.max(0.0).sqrt() / paths.sqrt();
+        let mean_pv = self.deal_pv_stats.mean();
+        let mean_loss = self.deal_loss_stats.mean();
+        // Welford population variance avoids catastrophic cancellation when
+        // tranche PVs are large (≥ 1e7) and relative dispersion is small.
+        // The sibling `StochasticMetricsCalculator::weighted_variance` uses
+        // the same population-variance convention.
+        let pv_pop_var = self.deal_pv_stats.population_variance();
+        let loss_pop_var = self.deal_loss_stats.population_variance();
+        let std_error = pv_pop_var.sqrt() / paths.sqrt();
         let es = expected_shortfall(&mut self.deal_losses, pricer.config.es_confidence);
 
         let mut result = StochasticPricingResult::new(
@@ -734,7 +730,7 @@ impl ScenarioCollector {
             Money::new(mean_loss, self.currency),
             self.num_paths,
         )
-        .with_unexpected_loss(Money::new(loss_variance.max(0.0).sqrt(), self.currency))
+        .with_unexpected_loss(Money::new(loss_pop_var.sqrt(), self.currency))
         .with_expected_shortfall(Money::new(es, self.currency), pricer.config.es_confidence);
 
         let notional = pricer.config.tree_config.initial_balance;
@@ -885,5 +881,84 @@ mod tests {
         assert_eq!(result.tranche_results.len(), 1);
         assert!(result.npv.amount().is_finite());
         assert!(result.pricing_mode.contains("Hybrid"));
+    }
+
+    /// Regression test: catastrophic cancellation in MC variance accumulation.
+    ///
+    /// The `E[X²] - E[X]²` form (`sq_sum / paths - mean * mean`) loses 8–12
+    /// significant digits when the PV is large and relative dispersion is small.
+    /// Concretely, when `mean ≈ 5e7` and path-to-path variation is sub-dollar,
+    /// `sq_sum / n ≈ mean²` to within f64 precision, and the subtraction can
+    /// yield zero or a negative number.
+    ///
+    /// This test drives `ScenarioCollector` directly with synthetic path outputs
+    /// whose population variance is known exactly, then verifies that the
+    /// computed `pv_variance` and `loss_variance` are accurate.
+    ///
+    /// For the buggy `E[X²] - E[X]²` form: with mean ≈ 5e7 and sigma ≈ 5 (1e-7
+    /// relative), the computed variance will be zero (catastrophically cancelled)
+    /// even though the true variance is 25. The Welford fix recovers the correct
+    /// value.
+    #[test]
+    fn scenario_collector_variance_no_catastrophic_cancellation() {
+        let instrument = test_instrument();
+        let n = 1000usize;
+        let mut collector = ScenarioCollector::new(&instrument, n).expect("collector");
+
+        // Synthetic PVs: alternating mean ± delta where delta is tiny relative to mean.
+        // True population variance = delta² = 25.0.
+        // True population std      = 5.0.
+        let mean_pv: f64 = 50_000_000.0; // $50 M — large enough for cancellation
+        let delta: f64 = 5.0; // $5 spread → sigma/mean ≈ 1e-7
+
+        for i in 0..n {
+            let pv = if i % 2 == 0 {
+                mean_pv + delta
+            } else {
+                mean_pv - delta
+            };
+            // Feed as deal-level output (no tranche sub-paths needed here).
+            collector.record_deal(pv, 0.0);
+        }
+
+        // Extract the deal-level variance directly via the finalize path.
+        // We use a minimal StochasticPricer config just to call finalize.
+        use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::{
+            BranchingSpec, ScenarioTreeConfig,
+        };
+        use crate::instruments::fixed_income::structured_credit::pricing::stochastic::pricer::config::StochasticPricerConfig;
+        let config = StochasticPricerConfig::new(
+            test_date(),
+            test_discount_curve(),
+            ScenarioTreeConfig::new(12, 1.0, BranchingSpec::fixed(2)),
+        );
+        let pricer = StochasticPricer::new(config);
+        let result = collector.finalize(&pricer, "Test");
+
+        // True population variance = delta² = 25.0
+        // True std_error of the mean = sqrt(25) / sqrt(1000) ≈ 0.1581
+        let true_pop_var: f64 = delta * delta; // = 25.0
+        let true_std_error = true_pop_var.sqrt() / (n as f64).sqrt();
+
+        // The E[X²]-E[X]² form with mean=5e7, sigma/mean≈1e-7 collapses to 0
+        // due to catastrophic cancellation. The Welford form preserves the result.
+        assert!(
+            result.pv_std_error > 0.0,
+            "pv_std_error must be strictly positive (true value ≈ {true_std_error:.6}); \
+             got {}. Catastrophic cancellation in sq_sum/n - mean² collapses to 0 \
+             when sigma/mean ≈ 1e-7.",
+            result.pv_std_error
+        );
+
+        // Relative error must be small (< 0.5%). The E[X²]-E[X]² form
+        // produces ~100% relative error here; Welford is accurate to rounding.
+        let rel_err = (result.pv_std_error - true_std_error).abs() / true_std_error;
+        assert!(
+            rel_err < 0.005,
+            "pv_std_error relative error {rel_err:.4} exceeds 0.5%: \
+             computed={}, true={true_std_error:.8}. \
+             This indicates the E[X²]-E[X]² form is being used instead of Welford.",
+            result.pv_std_error
+        );
     }
 }

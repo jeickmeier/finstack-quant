@@ -7,8 +7,8 @@ use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::PricingMode;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    CorrelationStructure, DealType, Pool, PoolAsset, StochasticDefaultSpec, StochasticPrepaySpec,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
+    CorrelationStructure, DealType, Pool, PoolAsset, Seniority, StochasticDefaultSpec,
+    StochasticPrepaySpec, StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
 };
 use time::Month;
 
@@ -294,6 +294,111 @@ fn hedge_valuation_helpers_return_zero_when_no_swaps_are_attached() {
     assert_eq!(hedge_npv.amount(), 0.0);
     assert_eq!(hedges.amount(), 0.0);
     assert_eq!(deal_npv, total);
+}
+
+/// Regression: the `pv_std_error` of a large-PV deal stays accurate when using
+/// the Welford variance form.
+///
+/// Exercises the `E[X²] - E[X]²` catastrophic-cancellation fix (N1): runs a
+/// 500-path MC on a $50 M pool and asserts that `pv_std_error` is positive,
+/// finite, and not spuriously collapsed. The companion internal unit test in
+/// `engine.rs` uses synthetic controlled PVs for a tighter accuracy assertion.
+#[test]
+fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
+    // 24-month ABS, $50 M notional → mean PV in the $47–49 M range.
+    let close = Date::from_calendar_date(2024, Month::January, 1).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 1).unwrap();
+
+    let mut pool = Pool::new("POOL-LARGE", DealType::ABS, Currency::USD);
+    pool.assets.push(PoolAsset::fixed_rate_bond(
+        "A1",
+        Money::new(50_000_000.0, Currency::USD),
+        0.07,
+        maturity,
+        finstack_core::dates::DayCount::Thirty360,
+    ));
+
+    let tranche = Tranche::new(
+        "SR",
+        0.0,
+        100.0,
+        Seniority::Senior,
+        Money::new(50_000_000.0, Currency::USD),
+        TrancheCoupon::Fixed { rate: 0.05 },
+        maturity,
+    )
+    .unwrap();
+
+    let mut sc = StructuredCredit::new_abs(
+        "ABS-LARGE-PV",
+        pool,
+        TrancheStructure::new(vec![tranche]).unwrap(),
+        close,
+        maturity,
+        "USD-OIS",
+    )
+    .with_payment_calendar("nyse");
+
+    // Factor-correlated default spec: moderate base CDR with inter-path
+    // dispersion driven by the systemic factor. Correlation=0.5 means paths
+    // span a wide range of CDR outcomes → non-trivial PV variance.
+    use finstack_cashflows::builder::DefaultModelSpec;
+    sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
+    sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::factor_correlated(
+        sc.credit_model.default_spec.clone(),
+        1.0, // factor_loading: full single-factor exposure
+        0.5, // correlation: 50% systemic loading → meaningful path spread
+    ));
+    sc.credit_model.stochastic_prepay_spec = Some(StochasticPrepaySpec::deterministic(
+        sc.credit_model.prepayment_spec.clone(),
+    ));
+    sc.credit_model.correlation_structure = Some(CorrelationStructure::flat(0.3, 0.0));
+
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder("USD-OIS")
+            .base_date(close)
+            .knots(vec![(0.0, 1.0), (2.0, 0.96), (5.0, 0.90)])
+            .build()
+            .unwrap(),
+    );
+
+    let result = sc
+        .price_stochastic_with_mode(
+            &market,
+            close,
+            PricingMode::MonteCarlo {
+                num_paths: 500,
+                antithetic: false,
+            },
+        )
+        .expect("stochastic pricing on large-PV deal");
+
+    let mean_pv = result.npv.amount();
+    let std_error = result.pv_std_error;
+
+    // (a) std_error must be strictly positive and finite.
+    assert!(
+        std_error > 0.0,
+        "pv_std_error must be strictly positive (not clamped to 0); got {std_error}."
+    );
+    assert!(
+        std_error.is_finite(),
+        "pv_std_error must be finite; got {std_error}"
+    );
+
+    // (b) Coefficient of variation of the mean must be in a sane range.
+    //     A collapsed std_error of ~0 fails the lower bound.
+    let cv = std_error / mean_pv.abs().max(1.0);
+    assert!(
+        cv > 1e-7,
+        "pv_std_error / mean_pv = {cv:.3e} is suspiciously small; \
+         expected meaningful dispersion from factor-correlated defaults."
+    );
+    assert!(
+        cv < 0.5,
+        "pv_std_error / mean_pv = {cv:.3e} is unreasonably large; \
+         got mean_pv={mean_pv:.0}, std_error={std_error:.0}"
+    );
 }
 
 /// All three pricing modes (Tree / MonteCarlo / Hybrid) must successfully
