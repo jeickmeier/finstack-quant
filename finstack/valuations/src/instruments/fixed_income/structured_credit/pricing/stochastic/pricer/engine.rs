@@ -885,20 +885,21 @@ mod tests {
 
     /// Regression test: catastrophic cancellation in MC variance accumulation.
     ///
-    /// The `E[X²] - E[X]²` form (`sq_sum / paths - mean * mean`) loses 8–12
-    /// significant digits when the PV is large and relative dispersion is small.
-    /// Concretely, when `mean ≈ 5e7` and path-to-path variation is sub-dollar,
-    /// `sq_sum / n ≈ mean²` to within f64 precision, and the subtraction can
-    /// yield zero or a negative number.
+    /// The `E[X²] - E[X]²` form (`sq_sum / paths - mean * mean`) suffers
+    /// catastrophic cancellation when `delta² ≪ ULP(mean²)`.  For `mean = 5e7`
+    /// the ULP of `mean²` is `≈ 0.555` (since `2^−52 · (5e7)² ≈ 0.555`).
+    /// When `delta = 0.05` (`delta² = 0.0025 ≪ 0.555`) the two terms in the
+    /// subtraction are identical in f64, so the naive form returns **exactly
+    /// zero**, collapsing `pv_std_error` to zero even though the true value is
+    /// `0.05 / √1000 ≈ 0.00158`.
     ///
     /// This test drives `ScenarioCollector` directly with synthetic path outputs
     /// whose population variance is known exactly, then verifies that the
-    /// computed `pv_variance` and `loss_variance` are accurate.
+    /// computed `pv_std_error` is accurate.
     ///
-    /// For the buggy `E[X²] - E[X]²` form: with mean ≈ 5e7 and sigma ≈ 5 (1e-7
-    /// relative), the computed variance will be zero (catastrophically cancelled)
-    /// even though the true variance is 25. The Welford fix recovers the correct
-    /// value.
+    /// For the buggy `E[X²] - E[X]²` form the computed variance is exactly
+    /// **0.0** (collapsed), making `pv_std_error = 0.0` even though the true
+    /// variance is `0.0025`.  The Welford fix recovers the correct value.
     #[test]
     fn scenario_collector_variance_no_catastrophic_cancellation() {
         let instrument = test_instrument();
@@ -906,10 +907,13 @@ mod tests {
         let mut collector = ScenarioCollector::new(&instrument, n).expect("collector");
 
         // Synthetic PVs: alternating mean ± delta where delta is tiny relative to mean.
-        // True population variance = delta² = 25.0.
-        // True population std      = 5.0.
+        // True population variance = delta² = 0.0025.
+        // True population std      = 0.05.
+        //
+        // At mean = 5e7, ULP(mean²) ≈ 0.555.  delta² = 0.0025 ≪ 0.555, so the
+        // naive sq_sum/n − mean² subtraction cancels completely to 0.0 in f64.
         let mean_pv: f64 = 50_000_000.0; // $50 M — large enough for cancellation
-        let delta: f64 = 5.0; // $5 spread → sigma/mean ≈ 1e-7
+        let delta: f64 = 0.05; // $0.05 spread → sigma/mean = 1e-9, delta² ≪ ULP(mean²)
 
         for i in 0..n {
             let pv = if i % 2 == 0 {
@@ -935,23 +939,25 @@ mod tests {
         let pricer = StochasticPricer::new(config);
         let result = collector.finalize(&pricer, "Test");
 
-        // True population variance = delta² = 25.0
-        // True std_error of the mean = sqrt(25) / sqrt(1000) ≈ 0.1581
-        let true_pop_var: f64 = delta * delta; // = 25.0
+        // True population variance = delta² = 0.0025
+        // True std_error of the mean = 0.05 / sqrt(1000) ≈ 0.001581
+        let true_pop_var: f64 = delta * delta; // = 0.0025
         let true_std_error = true_pop_var.sqrt() / (n as f64).sqrt();
 
-        // The E[X²]-E[X]² form with mean=5e7, sigma/mean≈1e-7 collapses to 0
-        // due to catastrophic cancellation. The Welford form preserves the result.
+        // The E[X²]-E[X]² form collapses sq_sum/n − mean² to exactly 0.0 here:
+        // delta² = 0.0025 is below the ~0.555 ULP of mean², so the subtraction
+        // rounds to zero, making pv_std_error = 0. The Welford form is immune.
         assert!(
             result.pv_std_error > 0.0,
-            "pv_std_error must be strictly positive (true value ≈ {true_std_error:.6}); \
+            "pv_std_error must be strictly positive (true value ≈ {true_std_error:.8}); \
              got {}. Catastrophic cancellation in sq_sum/n - mean² collapses to 0 \
-             when sigma/mean ≈ 1e-7.",
-            result.pv_std_error
+             when delta²={:.6} ≪ ULP(mean²)≈0.555.",
+            result.pv_std_error,
+            delta * delta,
         );
 
         // Relative error must be small (< 0.5%). The E[X²]-E[X]² form
-        // produces ~100% relative error here; Welford is accurate to rounding.
+        // produces 100% relative error here; Welford is accurate to rounding.
         let rel_err = (result.pv_std_error - true_std_error).abs() / true_std_error;
         assert!(
             rel_err < 0.005,
