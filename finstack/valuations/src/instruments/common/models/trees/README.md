@@ -173,16 +173,16 @@ let config = RatesCreditConfig {
     steps: 100,
     rate_vol: 0.01,
     hazard_vol: 0.20,
-    base_rate: 0.02,
-    base_hazard: 0.01,
     correlation: 0.3,
-    rate_mean_reversion: 0.0,
-    hazard_mean_reversion: 0.0,
+    rate_mean_reversion: 0.0,  // must be <= KAPPA_MAX (0.15)
+    hazard_mean_reversion: 0.0, // must be <= KAPPA_MAX (0.15)
 };
 let mut tree = RatesCreditTree::new(config);
-tree.calibrate(&market_context, &curve_id, &hazard_curve, time_to_maturity)?;
+tree.calibrate(&disc, &hazard_curve, time_to_maturity)?;
 let price = tree.price(initial_vars, time_to_maturity, &market_context, &valuator)?;
 ```
+
+**Mean reversion limit:** `rate_mean_reversion` and `hazard_mean_reversion` are capped at `KAPPA_MAX = 0.15`. Above that threshold the fixed-geometry binomial lattice collapses the conditional variance of the factor, degrading option-value accuracy for callable bonds and term loans (discount-curve repricing remains exact for any κ). Use `HullWhiteTree` for κ > 0.15.
 
 ## Barrier Options
 
