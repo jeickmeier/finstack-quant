@@ -118,6 +118,7 @@ fn record_taylor_factor_result(
 /// | Factor kind | `sensitivity` unit      | `market_move` unit   |
 /// |-------------|-------------------------|----------------------|
 /// | Rates       | $ per basis point       | basis points         |
+/// | Forward     | $ per basis point       | basis points         |
 /// | Credit      | $ per basis point       | basis points         |
 /// | Vol         | $ per vol point         | vol points (= 1 % of absolute vol) |
 /// | FX          | $ (explained directly)  | 1.0 (dimensionless)  |
