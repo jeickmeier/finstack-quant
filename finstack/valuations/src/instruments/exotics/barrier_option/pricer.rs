@@ -115,8 +115,11 @@ impl BarrierOptionMcPricer {
         // barrier monitoring - this ensures time steps align with volatility assumptions)
         let steps_per_year = self.config.steps_per_year;
         let num_steps = ((t_vol * steps_per_year).round() as usize).max(self.config.min_steps);
-        let maturity_step = num_steps - 1;
         let time_grid = finstack_monte_carlo::time_grid::TimeGrid::uniform(t_vol, num_steps)?;
+        // `maturity_step` must equal `time_grid.num_steps()` (= num_steps): the engine
+        // calls `on_event` with `state.step = num_steps` on the last iteration, so the
+        // terminal-spot capture guard `state.step == maturity_step` must fire there.
+        let maturity_step = num_steps;
 
         // Create payoff (using vol surface time for barrier adjustment calculations)
         let mc_barrier_type: McBarrierType = inst.barrier_type.into();
@@ -223,8 +226,9 @@ impl BarrierOptionMcPricer {
         // Steps and payoff (using vol surface time basis)
         let steps_per_year = self.config.steps_per_year;
         let num_steps = ((t_vol * steps_per_year).round() as usize).max(self.config.min_steps);
-        let maturity_step = num_steps - 1;
         let time_grid = finstack_monte_carlo::time_grid::TimeGrid::uniform(t_vol, num_steps)?;
+        // See `price_internal` for the maturity_step = num_steps rationale.
+        let maturity_step = num_steps;
         let mc_barrier_type: McBarrierType = inst.barrier_type.into();
         let payoff = BarrierOptionPayoff::new(
             inst.strike,
@@ -897,5 +901,115 @@ mod tests {
         let expected = barrier_put_continuous(&p, AnalyticalBarrierType::UpOut);
 
         assert!((pv - expected).abs() < 1e-12);
+    }
+
+    /// Verify that the MC pricer captures the terminal spot at the correct maturity step.
+    ///
+    /// A degenerate up-and-out call with barrier >> spot is effectively a vanilla call
+    /// (zero knockout probability). Its MC price must therefore equal the Black-Scholes
+    /// call price within MC standard error.
+    ///
+    /// To make the off-by-one detectable, we use `steps_per_year = 2.0` / `min_steps = 2`
+    /// so the time grid has exactly 2 steps (dt = 0.5 years each).  With
+    /// `maturity_step = num_steps - 1 = 1`, the payoff reads the spot at t = 0.5
+    /// instead of t = 1.0 — a 50% underestimate of the horizon.  The resulting MC
+    /// price would equal the BS call at T = 0.5 (≈ 6.89) rather than at T = 1.0
+    /// (≈ 10.47), a gap of ~3.6 that is far outside 5 MC standard errors (≈ 0.22).
+    ///
+    /// After the fix (`maturity_step = num_steps = 2`), the terminal spot is correctly
+    /// read at step 2 (t = 1.0) and the MC price converges to the 1-year BS call.
+    /// Black-Scholes call price (norm_cdf via Horner rational approximation; max err < 7.5e-8).
+    fn bs_call_price(spot: f64, strike: f64, t: f64, r: f64, q: f64, sigma: f64) -> f64 {
+        fn n(x: f64) -> f64 {
+            if x < -8.0 { return 0.0; }
+            if x > 8.0 { return 1.0; }
+            let tt = 1.0 / (1.0 + 0.2316419 * x.abs());
+            let poly = tt * (0.319_381_53 + tt * (-0.356_563_782 + tt * (1.781_477_937
+                + tt * (-1.821_255_978 + tt * 1.330_274_429))));
+            let phi = (-0.5 * x * x).exp() / (2.0 * std::f64::consts::PI).sqrt();
+            let c = 1.0 - phi * poly;
+            if x >= 0.0 { c } else { 1.0 - c }
+        }
+        let d1 = ((spot / strike).ln() + (r - q + 0.5 * sigma * sigma) * t) / (sigma * t.sqrt());
+        let d2 = d1 - sigma * t.sqrt();
+        spot * (-q * t).exp() * n(d1) - strike * (-r * t).exp() * n(d2)
+    }
+
+    #[test]
+    fn barrier_uao_degenerate_matches_bs() {
+        use finstack_monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
+
+        let as_of = date(2024, 1, 1);
+        let expiry = date(2025, 1, 1); // 1-year
+        let spot = 100.0_f64;
+        let strike = 100.0_f64;
+        let barrier = 10_000.0_f64; // Far above spot: knockout probability ≈ 0
+        let vol = 0.20_f64;
+        let rate = 0.05_f64;
+        let q = 0.0_f64;
+
+        let t = DayCount::Act365F
+            .year_fraction(as_of, expiry, DayCountContext::default())
+            .expect("year fraction");
+
+        // Analytic Black-Scholes call at T = 1 year
+        let bs_price_t1 = bs_call_price(spot, strike, t, rate, q, vol);
+
+        // 2-step grid: num_steps = max(round(t * 2.0), 2) = 2.
+        // Bug: maturity_step = 1 → spot read at t = 0.5 → price ≈ bs_call(t=0.5) ≈ 6.89.
+        // Fix: maturity_step = 2 → spot read at t = 1.0 → price ≈ bs_call(t=1.0) ≈ 10.47.
+        let mc_pricer = BarrierOptionMcPricer {
+            config: PathDependentPricerConfig {
+                num_paths: 200_000,
+                seed: 20240101,
+                steps_per_year: 2.0, // forces num_steps = 2
+                min_steps: 2,
+                ..Default::default()
+            },
+        };
+
+        let option = BarrierOption {
+            id: InstrumentId::new("BARRIER-UAO-DEGEN-UNIT"),
+            underlying_ticker: "SPX".to_string(),
+            strike,
+            barrier: Money::new(barrier, Currency::USD),
+            rebate: None,
+            option_type: OptionType::Call,
+            barrier_type: BarrierType::UpAndOut,
+            expiry,
+            observed_barrier_breached: None,
+            notional: Money::new(1.0, Currency::USD),
+            day_count: DayCount::Act365F,
+            use_gobet_miri: false,
+            discount_curve_id: "USD_DISC".into(),
+            spot_id: "SPX".into(),
+            vol_surface_id: "SPX_VOL".into(),
+            div_yield_id: Some("SPX_DIV".into()),
+            pricing_overrides: PricingOverrides::default(),
+            monitoring_frequency: None,
+            attributes: Attributes::new(),
+        };
+
+        let mkt = market(as_of, spot, vol, rate, q);
+        let mc_pv = mc_pricer
+            .price_internal(&option, &mkt, as_of)
+            .expect("mc price")
+            .amount();
+
+        // MC std error ≈ BS/sqrt(N) ≈ 10.47/sqrt(200_000) ≈ 0.023.
+        // Off-by-one bias with 2 steps ≈ bs_call(T=1) - bs_call(T=0.5) ≈ 3.58.
+        // Tight tolerance: 0.25 (≈ 11 std errors).  Bug fails spectacularly; fix passes.
+        let tolerance = 0.25_f64;
+        println!("BS call (T=1): {bs_price_t1:.6}");
+        println!("MC call:       {mc_pv:.6}");
+        println!("Difference:    {:.6}", (mc_pv - bs_price_t1).abs());
+        println!("Tolerance:     {tolerance:.6}");
+        assert!(
+            (mc_pv - bs_price_t1).abs() < tolerance,
+            "MC up-and-out call with far barrier must match BS call at T=1 within {tolerance}: \
+             mc={mc_pv:.6}, bs={bs_price_t1:.6}, diff={:.6}. \
+             Likely cause: maturity_step is set one step too early.",
+            (mc_pv - bs_price_t1).abs()
+        );
     }
 }

@@ -76,7 +76,10 @@ impl FxBarrierOptionMcPricer {
         let steps_per_year = self.config.steps_per_year;
         let num_steps = ((t * steps_per_year).round() as usize).max(self.config.min_steps);
         let dt = t / num_steps as f64;
-        let maturity_step = num_steps - 1;
+        // `maturity_step` must equal `num_steps`: the engine fires `on_event` with
+        // `state.step = num_steps` on the last iteration, so the terminal-spot capture
+        // guard `state.step == maturity_step` must fire at that step.
+        let maturity_step = num_steps;
 
         // Quanto adjustment removed as standard FX barriers don't need it.
         // If Quanto is needed, it should be explicit.
