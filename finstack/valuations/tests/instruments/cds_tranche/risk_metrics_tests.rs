@@ -595,6 +595,84 @@ fn test_par_spread_gives_zero_npv() {
     );
 }
 
+/// Test that par spread is strictly positive and finite for BOTH protection sides and that the two
+/// values agree to within a small relative tolerance (par spread is a tranche property, independent
+/// of side).  Also verifies that pricing each tranche at its computed par spread yields ~0 NPV.
+///
+/// This guards the fix to `calculate_par_spread` where the Newton-Raphson initial guess is formed
+/// from unsigned magnitudes (`protection_pv.abs() / premium_per_bp.abs()`).  Without the fix the
+/// seed is always negative and is clamped to 0; Newton must then recover in subsequent iterations
+/// solely from the DV01 step, which fails for very lightly stressed tranches where NPV at spread=0
+/// is already within the convergence tolerance and the solver returns 0 prematurely.
+#[test]
+fn test_par_spread_positive_and_side_invariant() {
+    let pricer = CDSTranchePricer::new();
+    let market = standard_market_context();
+    let as_of = base_date();
+
+    // Same mezzanine tranche, two sides
+    let tranche_sell = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
+    let tranche_buy = custom_tranche(3.0, 7.0, 500.0, TrancheSide::BuyProtection);
+
+    let par_sell = pricer
+        .calculate_par_spread(&tranche_sell, &market, as_of)
+        .expect("par spread SellProtection should succeed");
+    let par_buy = pricer
+        .calculate_par_spread(&tranche_buy, &market, as_of)
+        .expect("par spread BuyProtection should succeed");
+
+    // (a) Both must be strictly positive and finite
+    assert!(
+        par_sell.is_finite() && par_sell > 0.0,
+        "SellProtection par spread must be strictly positive and finite, got {}",
+        par_sell
+    );
+    assert!(
+        par_buy.is_finite() && par_buy > 0.0,
+        "BuyProtection par spread must be strictly positive and finite, got {}",
+        par_buy
+    );
+
+    // (b) Both sides must agree to within 0.1% relative tolerance — par spread is a
+    //     property of the tranche, not of who holds the protection.
+    assert_relative_eq(
+        par_buy,
+        par_sell,
+        0.001,
+        "BuyProtection and SellProtection par spreads must agree",
+    );
+
+    // (c) Pricing at the computed par spread must yield ~0 NPV for each side
+    let notional = tranche_sell.notional.amount();
+    let npv_tol = notional * 0.001; // 0.1% of notional
+
+    let mut at_par_sell = tranche_sell.clone();
+    at_par_sell.running_coupon_bp = par_sell;
+    let npv_sell = pricer
+        .price_tranche(&at_par_sell, &market, as_of)
+        .unwrap()
+        .amount();
+    assert_absolute_eq(
+        npv_sell,
+        0.0,
+        npv_tol,
+        "SellProtection: NPV at par spread should be ~0",
+    );
+
+    let mut at_par_buy = tranche_buy.clone();
+    at_par_buy.running_coupon_bp = par_buy;
+    let npv_buy = pricer
+        .price_tranche(&at_par_buy, &market, as_of)
+        .unwrap()
+        .amount();
+    assert_absolute_eq(
+        npv_buy,
+        0.0,
+        npv_tol,
+        "BuyProtection: NPV at par spread should be ~0",
+    );
+}
+
 // ==================== Upfront Tests ====================
 
 #[test]

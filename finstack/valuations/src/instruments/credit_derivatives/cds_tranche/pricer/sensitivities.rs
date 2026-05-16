@@ -308,16 +308,20 @@ impl CDSTranchePricer {
 
     /// Calculate the par spread (running coupon in bp that sets PV = 0).
     ///
+    /// The par spread is always a positive basis-point number regardless of protection side.
+    ///
     /// # Algorithm
     ///
     /// Uses Newton-Raphson iteration to find the spread that makes NPV = 0:
-    /// 1. Start with ratio approximation as initial guess
-    /// 2. Iterate: spread_new = spread - NPV(spread) / Spread_DV01
-    /// 3. Converge when |NPV| < tolerance or max iterations reached
+    /// 1. Seed with `|protection_pv| / |premium_per_bp|` — both legs are signed by
+    ///    `project_discountable_rows` (opposite polarities per side), so unsigned magnitudes
+    ///    give a correct positive starting point for both `BuyProtection` and `SellProtection`.
+    /// 2. Iterate: `spread_new = spread - NPV(spread) / Spread_DV01`
+    /// 3. Converge when `|NPV| < tolerance` or max iterations reached.
     ///
-    /// This is more accurate than simple ratio method because it accounts for
-    /// the non-linear relationship between spread and premium leg PV due to
-    /// accrual-on-default and notional write-down effects.
+    /// This is more accurate than a plain ratio method because it accounts for the non-linear
+    /// relationship between spread and premium leg PV due to accrual-on-default and notional
+    /// write-down effects.
     #[must_use = "par spread result should be used"]
     pub fn calculate_par_spread(
         &self,
@@ -327,7 +331,10 @@ impl CDSTranchePricer {
     ) -> Result<f64> {
         let discount_curve = market_ctx.get_discount(&tranche.discount_curve_id)?;
 
-        // Initial guess using ratio method (protection PV / premium per bp)
+        // Initial guess: unsigned magnitude of protection PV divided by premium per bp.
+        // Both quantities are signed by project_discountable_rows (opposite polarities for
+        // BuyProtection vs SellProtection), so we use their absolute values to guarantee a
+        // positive seed for both protection sides.
         let mut unit_tranche = tranche.clone();
         unit_tranche.running_coupon_bp = 1.0;
         let premium_per_bp_rows =
@@ -357,8 +364,15 @@ impl CDSTranchePricer {
             as_of,
         )?;
 
-        // Initial guess from ratio method
-        let mut spread = protection_pv / premium_per_bp;
+        // Initial guess: unsigned ratio of protection PV magnitude to premium per bp magnitude.
+        //
+        // `project_discountable_rows` applies a side-dependent sign to every cashflow
+        // (`premium_sign = -1 / +1` and `protection_sign = +1 / -1` for
+        // `BuyProtection` / `SellProtection`).  Consequently both `protection_pv` and
+        // `premium_per_bp` are signed with opposite polarities, making their raw ratio
+        // always negative.  Taking unsigned magnitudes produces the correct positive
+        // initial guess for both sides.
+        let mut spread = protection_pv.abs() / premium_per_bp.abs().max(NUMERICAL_TOLERANCE);
 
         // Newton-Raphson iteration to refine the par spread
         for _iter in 0..PAR_SPREAD_MAX_ITER {
@@ -384,8 +398,9 @@ impl CDSTranchePricer {
                 break;
             }
 
-            // Newton step: spread_new = spread - NPV / DV01
-            // Note: For buy protection, NPV > 0 means spread is too low
+            // Newton step: spread_new = spread - NPV / DV01.
+            // The seed is always positive, so the clamp keeps subsequent iterates
+            // non-negative for both protection sides.
             let adjustment = npv / spread_dv01;
             spread -= adjustment;
 
