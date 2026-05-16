@@ -595,15 +595,31 @@ fn test_par_spread_gives_zero_npv() {
     );
 }
 
-/// Test that par spread is strictly positive and finite for BOTH protection sides and that the two
-/// values agree to within a small relative tolerance (par spread is a tranche property, independent
-/// of side).  Also verifies that pricing each tranche at its computed par spread yields ~0 NPV.
+/// Invariant/property guard for `calculate_par_spread`: verifies that par spread is strictly
+/// positive and finite for both protection sides and that the two sides agree to within a small
+/// relative tolerance (par spread is a tranche property, independent of side).  Also verifies
+/// that pricing each tranche at its computed par spread yields ~0 NPV.
 ///
-/// This guards the fix to `calculate_par_spread` where the Newton-Raphson initial guess is formed
-/// from unsigned magnitudes (`protection_pv.abs() / premium_per_bp.abs()`).  Without the fix the
-/// seed is always negative and is clamped to 0; Newton must then recover in subsequent iterations
-/// solely from the DV01 step, which fails for very lightly stressed tranches where NPV at spread=0
-/// is already within the convergence tolerance and the solver returns 0 prematurely.
+/// # Note: invariant guard, not a fail-on-parent regression test (M14 investigation)
+///
+/// This test passes on BOTH the pre-fix and post-fix code for the 3-7% mezzanine tranche
+/// used here. The fix changed the Newton-Raphson seed from `protection_pv / premium_per_bp`
+/// (which is negative for SellProtection, clamped to 0 by the loop's `.clamp(0, 100000)`) to
+/// `protection_pv.abs() / premium_per_bp.abs()` (always positive).
+///
+/// The wrong seed can only produce a wrong result when `|NPV(spread=0)| < PAR_SPREAD_TOLERANCE
+/// * notional = 1e-6 * notional`.  Since `NPV(spread=0) ≈ protection_pv` (premium leg is 0 at
+/// zero coupon), this requires `|protection_pv| < 1e-6 * notional`.
+///
+/// In practice (verified for IG spreads 12–140 bp, tenors 1.25–5Y, attachments 10–60%,
+/// 125-name pool, recovery 40%), the protection PV is either exactly $0 (EL below the model's
+/// numerical floor, implying the correct par spread truly is 0) or comfortably above the $10
+/// threshold on a $10M notional (smallest observed: ~$4,400 for a 20-100% tranche with very
+/// tight spreads).  The latent false-convergence path therefore cannot be triggered by any
+/// realistic market inputs: Newton always recovers from the wrong seed in subsequent iterations.
+///
+/// The seed fix is nonetheless correct hardening: it removes a latent code smell, makes the
+/// sign intent explicit, and eliminates an unnecessary iteration for all non-degenerate inputs.
 #[test]
 fn test_par_spread_positive_and_side_invariant() {
     let pricer = CDSTranchePricer::new();
