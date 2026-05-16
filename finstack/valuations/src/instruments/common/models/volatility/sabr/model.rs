@@ -174,8 +174,9 @@ impl SABRModel {
         } else {
             // General β ∈ (0,1] case, including β=1.
             // At β=1: F^(1-β)=1, (1-β)²=0, so alpha_term→0 and rho_term→ρνα/4.
-            // At β=0.5: covered by (1-β)²/24·α²/F^(2(1-β)) = α²/(24·F) which
-            //           matches the original beta_is_half shortcut (redundant, removed).
+            // At β=0.5: the general term (1-β)²/24·α²/F^(2(1-β)) evaluates to α²/(96·F).
+            //           The removed beta_is_half shortcut used α²/(24·F) — a 4× error
+            //           this fix also corrects.
             let f_beta = if forward.abs() < 1e-14 {
                 1e-14_f64.powf(1.0 - beta) // Avoid zero to very small power
             } else {
