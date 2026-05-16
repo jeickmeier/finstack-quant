@@ -844,4 +844,88 @@ mod tests {
         let err = expired_lookback_payoff(&option, 100.0).expect_err("missing strike should error");
         assert!(err.to_string().contains("requires a strike"));
     }
+
+    /// Verify that the lookback MC pricer includes the terminal step in the running extremum.
+    ///
+    /// A fixed-strike lookback call tracks S_max over the whole path; with a 2-step grid
+    /// (`steps_per_year=2`, `min_steps=2`, T=1yr) the engine fires `on_event` at steps
+    /// {0, 1, 2}.  The payoff struct gates on `step <= maturity_step`:
+    ///
+    /// - **Pre-fix** (`maturity_step = num_steps - 1 = 1`): extremum tracked only at steps
+    ///   {0, 1}; terminal spot S_T (step 2) is excluded from the running maximum.
+    ///   Measured pre-fix MC price (200k paths, seed 20240101): ≈ 6.72.
+    /// - **Post-fix** (`maturity_step = num_steps = 2`): all three steps {0, 1, 2} included.
+    ///   Measured post-fix MC price (200k paths, seed 20240101): ≈ 12.21.
+    ///
+    /// Gap ≈ 5.5 price units; 5-σ MC noise ≈ 12/sqrt(200_000) * 5 ≈ 0.13.
+    /// The sentinel floor at 9.0 (midpoint) is 24 σ above the pre-fix result
+    /// and 12 σ below the post-fix result — a clean, noise-immune pass/fail boundary.
+    ///
+    /// Note: the 2-step MC (discrete monitoring at 3 points) is naturally below the
+    /// analytical continuous-monitoring price (≈ 17.24); both the floor and ceiling
+    /// are calibrated to the discrete-monitoring regime, not the continuous formula.
+    #[test]
+    fn lookback_mc_includes_terminal_step_in_extremum() {
+        use finstack_monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
+
+        let as_of = date(2024, 1, 1);
+        let expiry = date(2025, 1, 1); // 1-year
+        let spot = 100.0_f64;
+        let strike = 100.0_f64;
+        let vol = 0.20_f64;
+        let rate = 0.05_f64;
+        let q = 0.0_f64;
+
+        // Analytical continuous-monitoring reference for context only (Goldman-Sosin-Gatto).
+        // The 2-step MC price is below this because discrete monitoring observes fewer highs.
+        let t_analytical = DayCount::Act365F
+            .year_fraction(as_of, expiry, DayCountContext::default())
+            .expect("year fraction");
+        let analytical_ref =
+            fixed_strike_lookback_call(spot, strike, t_analytical, rate, q, vol, spot);
+
+        // 2-step grid: num_steps = max(round(t * 2.0), 2) = 2.
+        // Pre-fix (maturity_step=1): S_T at step 2 excluded from max. MC price ≈ 6.72.
+        // Post-fix (maturity_step=2): S_T included. MC price ≈ 12.21.
+        let mc_pricer = LookbackOptionMcPricer {
+            config: PathDependentPricerConfig {
+                num_paths: 200_000,
+                seed: 20240101,
+                steps_per_year: 2.0, // forces num_steps = 2
+                min_steps: 2,
+                ..Default::default()
+            },
+        };
+
+        let option = fixed_strike_call(expiry, strike, None);
+        let mkt = market(as_of, spot, vol, rate, q);
+
+        let mc_pv = mc_pricer
+            .price_internal(&option, &mkt, as_of)
+            .expect("mc price")
+            .amount();
+
+        // Floor at 9.0: midpoint of [6.72, 12.21]; fails on pre-fix, passes on post-fix.
+        // Ceiling at 16.0: sanity bound well above post-fix (≈ 12.21).
+        let floor = 9.0_f64;
+        let ceil = 16.0_f64;
+
+        println!("Analytical (continuous) ref:    {analytical_ref:.6}");
+        println!("MC price (2-step, 200k paths):  {mc_pv:.6}");
+        println!("Floor (pre-fix ≈ 6.72 fails):   {floor:.6}");
+        println!("Ceil  (sanity, pre-fix passes):  {ceil:.6}");
+
+        assert!(
+            mc_pv > floor,
+            "MC fixed-strike lookback call {mc_pv:.6} is at or below floor {floor:.6}. \
+             Likely cause: maturity_step set one step too early (pre-fix ≈ 6.72), \
+             so terminal spot S_T is excluded from the running maximum. \
+             Analytical continuous-monitoring ref: {analytical_ref:.6}",
+        );
+        assert!(
+            mc_pv < ceil,
+            "MC fixed-strike lookback call {mc_pv:.6} exceeds ceiling {ceil:.6}; \
+             possible model error. Analytical ref: {analytical_ref:.6}"
+        );
+    }
 }
