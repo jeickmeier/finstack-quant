@@ -13,11 +13,11 @@ use crate::instruments::fixed_income::structured_credit::pricing::{
 use crate::instruments::fixed_income::structured_credit::types::{StructuredCredit, Tranche};
 use finstack_core::dates::{Date, DayCount, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
-use finstack_monte_carlo::rng::philox::PhiloxRng;
-use finstack_monte_carlo::traits::RandomStream;
 use finstack_core::math::stats::OnlineStats;
 use finstack_core::money::Money;
 use finstack_core::Result;
+use finstack_monte_carlo::rng::philox::PhiloxRng;
+use finstack_monte_carlo::traits::RandomStream;
 use rayon::prelude::*;
 use std::cmp::Ordering;
 
@@ -534,7 +534,6 @@ impl StochasticPricer {
         (factor_var * (prepay_loading.abs() + default_loading.abs() + recovery_loading.abs()))
             .clamp(0.0, 1.0)
     }
-
 }
 
 struct PathScenarioOutput {
