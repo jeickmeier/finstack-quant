@@ -182,7 +182,29 @@ impl ParametricCurveTarget {
             Self::build_sample_times(&prepared_quotes),
             &config,
         );
-        let success_tolerance = Some(config.discount_curve.validation_tolerance);
+        // A parametric (Nelson-Siegel / NSS) curve is a LEAST-SQUARES fit: with N > 4 (or
+        // N > 6 for NSS) market quotes, the optimizer minimises ‖residuals‖² but cannot
+        // drive every residual to zero.  The irreducible least-squares floor — the gap
+        // between the best-achievable parametric fit and exact repricing — is typically
+        // ~1e-4 per-notional for a well-specified NS curve on deposit/swap quotes.
+        //
+        // The bootstrap `validation_tolerance` default (1e-8) is designed for exact
+        // root-finding where every quote IS repriced to machine precision; applying it to a
+        // least-squares fit would cause every realistic NS/NSS calibration to report
+        // `success = false` even after full LM convergence.
+        //
+        // Mirror the precedent in `hazard.rs:139-140` (distressed CDS tolerance relaxation):
+        // take the maximum of the configured tolerance and a parametric-fit floor of 1e-3.
+        // The floor is ~10× the observed least-squares residual floor (~1e-4), providing
+        // headroom for a well-converged fit while still flagging a genuinely poor NS fit
+        // (e.g. badly mis-specified initial parameters or an inconsistent quote set).
+        const PARAMETRIC_LS_TOLERANCE_FLOOR: f64 = 1e-3;
+        let success_tolerance = Some(
+            config
+                .discount_curve
+                .validation_tolerance
+                .max(PARAMETRIC_LS_TOLERANCE_FLOOR),
+        );
         let (curve, report) =
             GlobalFitOptimizer::optimize(&target, &prepared_quotes, &config, success_tolerance)?;
 
