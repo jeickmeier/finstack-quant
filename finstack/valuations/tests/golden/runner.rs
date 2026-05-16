@@ -35,6 +35,11 @@ fn is_pricing_domain(domain: &str) -> bool {
             | "rates.ir_future"
             | "rates.inflation_swap"
             | "rates.swaption"
+            | "exotics.barrier_option"
+            | "exotics.lookback_option"
+            | "rates.cms_option"
+            | "rates.cms_swap"
+            | "rates.cms_spread_option"
     )
 }
 
