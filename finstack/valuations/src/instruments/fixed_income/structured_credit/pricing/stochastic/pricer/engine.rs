@@ -13,7 +13,8 @@ use crate::instruments::fixed_income::structured_credit::pricing::{
 use crate::instruments::fixed_income::structured_credit::types::{StructuredCredit, Tranche};
 use finstack_core::dates::{Date, DayCount, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
-use finstack_core::math::random::{Pcg64Rng, RandomNumberGenerator};
+use finstack_monte_carlo::rng::philox::PhiloxRng;
+use finstack_monte_carlo::traits::RandomStream;
 use finstack_core::math::stats::OnlineStats;
 use finstack_core::money::Money;
 use finstack_core::Result;
@@ -164,7 +165,10 @@ impl StochasticPricer {
                 self.tree_path_factors(prefix_index, prefix_count, branch_count, prefix_months);
             for suffix_index in 0..mc_paths {
                 let path_index = prefix_index * mc_paths + suffix_index;
-                let mut rng = Pcg64Rng::new(self.path_seed(path_index));
+                // Per-path counter-based substream: Philox(seed).substream(path_id)
+                // is statistically independent for any pair of distinct path_ids,
+                // so the hybrid suffix factors carry no inter-path correlation.
+                let mut rng = PhiloxRng::new(self.config.seed).substream(path_index as u64);
                 // Pre-size to exact total length so neither the prefix copy nor
                 // the suffix push triggers a Vec re-grow. Each path needs its
                 // own owned Vec because `factor_sets` is consumed by a parallel
@@ -173,7 +177,7 @@ impl StochasticPricer {
                 factors.extend_from_slice(&prefix);
                 for _ in 0..suffix_months {
                     factors.push(if has_stochastic_rates {
-                        rng.normal(0.0, 1.0)
+                        rng.next_std_normal()
                     } else {
                         0.0
                     });
@@ -221,27 +225,39 @@ impl StochasticPricer {
         num_paths: usize,
         antithetic: bool,
     ) -> Vec<Vec<f64>> {
-        let mut rng = Pcg64Rng::new(self.config.seed);
-        let mut paired_factors: Option<Vec<f64>> = None;
+        // One base Philox RNG seeded from config.seed.  Each (logical) path
+        // index gets its own counter-based substream via `substream(path_id)`.
+        //
+        // For antithetic pairs path 2k+1 is the negation of path 2k.  Both
+        // members of a pair share the same Philox stream (stream_id = k) so
+        // the antithetic pair is perfectly correlated by construction; all
+        // pairs are independent of one another because they have distinct
+        // stream IDs.
+        let base_rng = PhiloxRng::new(self.config.seed);
         let mut factor_sets = Vec::with_capacity(num_paths);
 
-        for path_index in 0..num_paths {
-            let factors = if antithetic && path_index % 2 == 1 {
-                paired_factors
-                    .take()
-                    .unwrap_or_else(|| self.random_factors(instrument, &mut rng))
-                    .into_iter()
-                    .map(|z| -z)
-                    .collect()
-            } else {
+        let mut path_index = 0usize;
+        while path_index < num_paths {
+            if antithetic && path_index + 1 < num_paths {
+                // Stream ID is the pair index (path_index / 2) so each pair
+                // draws from a stream that is independent of all other pairs.
+                let stream_id = (path_index / 2) as u64;
+                let mut rng = base_rng.substream(stream_id);
                 let factors = self.random_factors(instrument, &mut rng);
-                if antithetic {
-                    paired_factors = Some(factors.clone());
-                }
-                factors
-            };
-            factor_sets.push(factors);
+                let antithetic_factors = factors.iter().map(|z| -z).collect();
+                factor_sets.push(factors);
+                factor_sets.push(antithetic_factors);
+                path_index += 2;
+            } else {
+                // Non-antithetic path: stream_id equals the path index so
+                // every path is independent regardless of execution order.
+                let mut rng = base_rng.substream(path_index as u64);
+                let factors = self.random_factors(instrument, &mut rng);
+                factor_sets.push(factors);
+                path_index += 1;
+            }
         }
+
         factor_sets
     }
 
@@ -285,12 +301,12 @@ impl StochasticPricer {
         })
     }
 
-    fn random_factors(&self, instrument: &StructuredCredit, rng: &mut Pcg64Rng) -> Vec<f64> {
+    fn random_factors(&self, instrument: &StructuredCredit, rng: &mut PhiloxRng) -> Vec<f64> {
         let month_count = self.month_count(instrument);
         if !self.has_stochastic_rates() {
             return vec![0.0; month_count];
         }
-        (0..month_count).map(|_| rng.normal(0.0, 1.0)).collect()
+        (0..month_count).map(|_| rng.next_std_normal()).collect()
     }
 
     fn tree_path_shocks(
@@ -519,11 +535,6 @@ impl StochasticPricer {
             .clamp(0.0, 1.0)
     }
 
-    fn path_seed(&self, path_index: usize) -> u64 {
-        self.config
-            .seed
-            .wrapping_add((path_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
-    }
 }
 
 struct PathScenarioOutput {
