@@ -112,13 +112,27 @@ fn record_taylor_factor_result(
 }
 
 /// Per-factor result from Taylor attribution.
+///
+/// # Unit conventions
+///
+/// | Factor kind | `sensitivity` unit      | `market_move` unit   |
+/// |-------------|-------------------------|----------------------|
+/// | Rates       | $ per basis point       | basis points         |
+/// | Credit      | $ per basis point       | basis points         |
+/// | Vol         | $ per vol point         | vol points (= 1 % of absolute vol) |
+/// | FX          | $ (explained directly)  | 1.0 (dimensionless)  |
+///
+/// For vol factors `sensitivity` is $ per vol point and `market_move` is in
+/// vol points (percentage points of absolute vol), matching the convention of
+/// `measure_vol_surface_shift` which multiplies the absolute move by 100.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct TaylorFactorResult {
     /// Human-readable factor name (e.g. "Rates:USD-OIS").
     pub factor_name: String,
-    /// First-order sensitivity (DV01, CS01, vega, theta, etc.).
+    /// First-order sensitivity (DV01, CS01, vega per vol point, etc.).
     pub sensitivity: f64,
-    /// Observed market move between T0 and T1.
+    /// Observed market move between T0 and T1 (basis points for rates/credit,
+    /// vol points for vol factors).
     pub market_move: f64,
     /// First-order explained P&L: sensitivity × move.
     pub explained_pnl: f64,
@@ -677,17 +691,30 @@ fn compute_vol_factor(
     let bumped_down = bump_surface_vol_absolute(market_t0, surface_id.as_str(), -config.vol_bump)?;
     let pv_down = reprice_instrument(instrument, &bumped_down, as_of_t0)?;
 
-    // Central difference vega: O(h²) accuracy
-    let vega_per_point = (pv_up.amount() - pv_down.amount()) / (2.0 * config.vol_bump);
+    // Central difference vega in $ per vol point.
+    //
+    // `measure_vol_surface_shift` returns the move in *percentage points* (absolute
+    // move × 100). To keep units consistent we must express vega in the same
+    // per-point basis: divide by `vol_bump_abs × 100` rather than `vol_bump_abs`.
+    //
+    //   vega_per_point [$/vol-point] = ΔPV / (2 × vol_bump_abs × 100)
+    //   explained [$]               = vega_per_point × vol_move_points
+    let vol_bump_points = config.vol_bump * 100.0; // convert bump to vol-point units
+    let vega_per_point =
+        (pv_up.amount() - pv_down.amount()) / (2.0 * vol_bump_points);
 
+    // vol_move is in vol points (percentage points of absolute vol).
     let vol_move =
         measure_vol_surface_shift(surface_id.as_str(), market_t0, market_t1, None, None)?;
 
     let explained = vega_per_point * vol_move;
 
     let gamma_pnl = if config.include_gamma {
+        // Volga in $ per vol-point²: use vol_bump_points consistently.
+        //   volga [$/pt²] = ΔΔP / (vol_bump_points)²
+        //   gamma_pnl [$] = 0.5 × volga × vol_move_points²
         let volga = (pv_up.amount() - 2.0 * pv_t0.amount() + pv_down.amount())
-            / (config.vol_bump * config.vol_bump);
+            / (vol_bump_points * vol_bump_points);
         Some(0.5 * volga * vol_move * vol_move)
     } else {
         None
