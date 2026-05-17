@@ -314,6 +314,191 @@ pub fn add_payment_delay(date: Date, delay_days: i32, calendar_id: Option<&str>)
     }
 }
 
+/// Step a date forward/backward by `n` business days, using a holiday calendar
+/// when one is supplied and weekday-only stepping otherwise.
+///
+/// This mirrors the calendar policy of [`add_payment_delay`]: a `Some` calendar
+/// id must resolve (a missing calendar is a hard error, not a silent
+/// weekday-only fallback) so that overnight compounding cannot silently drift
+/// onto a different observation grid than the rest of the swap.
+#[inline]
+fn shift_business_days(date: Date, n: i32, calendar_id: Option<&str>) -> Result<Date> {
+    if n == 0 {
+        return Ok(date);
+    }
+    match calendar_id {
+        Some(id) => match CalendarRegistry::global().resolve_str(id) {
+            Some(cal) => date.add_business_days(n, cal).map_err(|e| {
+                finstack_core::Error::Validation(format!(
+                    "Failed to step {} business days from {} using calendar '{}': {}",
+                    n, date, id, e
+                ))
+            }),
+            None => Err(finstack_core::Error::Validation(format!(
+                "Overnight-compounding calendar '{}' not found in registry; \
+                 cannot step {} business days from {}. \
+                 Either register the calendar or use None for weekday-only stepping.",
+                id, n, date
+            ))),
+        },
+        None => Ok(date.add_weekdays(n)),
+    }
+}
+
+/// Project the daily-compounded equivalent rate for a future-reset OIS / RFR leg.
+///
+/// Implements the ISDA 2021 "Overnight Rate Compounding" convention for a leg
+/// whose reset is entirely in the future (every daily fixing is projected from
+/// the forward curve — no historical fixings are needed). The overnight
+/// compound factor is
+///
+/// ```text
+/// CF = ∏ᵢ (1 + rᵢ · dᵢ)
+/// ```
+///
+/// over the daily sub-periods of `[accrual_start, accrual_end)`, where `rᵢ` is
+/// the overnight forward for sub-period `i` and `dᵢ` its day-count fraction.
+/// The function returns the **equivalent simple rate** `R` such that
+/// `R · period_year_fraction = CF − 1` — i.e. `R = (CF − 1) / τ` with `τ` the
+/// caller's period year fraction. Returning a rate (rather than the compound
+/// interest directly) lets the surrounding `pv_floating_leg` framework apply
+/// spread, gearing and the all-in floor/cap uniformly; multiplying `R` back by
+/// `period_year_fraction` reproduces the exact OIS coupon `notional · (CF − 1)`.
+///
+/// This is **not** the same as the simple arithmetic average forward
+/// `ForwardCurve::rate_period`: on an upward-sloping curve daily compounding
+/// adds the (positive) compounding convexity — typically 12–15 bp of rate for a
+/// semi-annual coupon at current rate levels — which the arithmetic average
+/// drops.
+///
+/// # Observation shift
+///
+/// `observation_shift_days` (the ISDA lookback) shifts the **observation**
+/// window back by that many business days while the day-count weights stay
+/// anchored to the accrual sub-period. A shift of 0 means observe in-period.
+///
+/// # Per-fixing index floor / cap
+///
+/// `index_floor` / `index_cap` (decimal rates, already converted from bp), when
+/// present, are applied to **each daily fixing `rᵢ`** before it enters the
+/// product — the economically correct treatment for an RFR cap/floor, which is
+/// a strip of daily caplets/floorlets. Applying a floor/cap to the period
+/// average instead understates the option value.
+///
+/// # Arguments
+///
+/// * `fwd` — forward (projection) curve for the overnight index
+/// * `accrual_start` / `accrual_end` — accrual period; `accrual_end` must be
+///   strictly after `accrual_start`
+/// * `period_year_fraction` — the period's year fraction `τ`; must be `> 0`
+/// * `observation_shift_days` — ISDA lookback in business days (>= 0)
+/// * `calendar_id` — optional holiday calendar for the daily/observation grid
+/// * `index_floor` / `index_cap` — optional per-fixing floor/cap (decimal)
+///
+/// # Errors
+///
+/// Returns a validation error if the accrual period is malformed
+/// (`accrual_end <= accrual_start`), if `period_year_fraction` is non-positive,
+/// if a daily/observation date step fails, or if the day-count fraction of a
+/// sub-period is non-positive.
+#[allow(clippy::too_many_arguments)]
+fn compounded_forward_projection(
+    fwd: &ForwardCurve,
+    accrual_start: Date,
+    accrual_end: Date,
+    period_year_fraction: f64,
+    observation_shift_days: i32,
+    calendar_id: Option<&str>,
+    index_floor: Option<f64>,
+    index_cap: Option<f64>,
+) -> Result<f64> {
+    // A zero- or negative-length accrual period is a malformed instrument, not
+    // a "use the spot rate" signal. Fail loudly rather than silently emitting a
+    // zero coupon (item P3-1/4).
+    if accrual_end <= accrual_start {
+        return Err(finstack_core::Error::Validation(format!(
+            "Compounded OIS leg has a malformed accrual period: accrual_end ({}) \
+             is not strictly after accrual_start ({}). A zero- or negative-length \
+             period cannot be daily-compounded; check the schedule generation.",
+            accrual_end, accrual_start
+        )));
+    }
+    // The equivalent rate normalizes the compound interest by the period year
+    // fraction; a non-finite or non-positive `τ` is itself a malformed period
+    // (the same negative-year-fraction corruption guarded elsewhere).
+    if !period_year_fraction.is_finite() || period_year_fraction <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "Compounded OIS leg has a non-positive or non-finite period year \
+             fraction ({:.3e}) for {} -> {}; cannot normalize the \
+             daily-compounded coupon. This indicates a corrupt or inverted \
+             accrual period.",
+            period_year_fraction, accrual_start, accrual_end
+        )));
+    }
+
+    let fwd_dc = fwd.day_count();
+    let fwd_base = fwd.base_date();
+    let curve_time = |d: Date| -> Result<f64> {
+        if d <= fwd_base {
+            Ok(0.0)
+        } else {
+            fwd_dc.year_fraction(fwd_base, d, DayCountContext::default())
+        }
+    };
+
+    // ∏(1 + rᵢ·dᵢ) over the daily sub-periods.
+    let mut compound_factor = 1.0_f64;
+
+    let mut d = accrual_start;
+    while d < accrual_end {
+        let next_d = shift_business_days(d, 1, calendar_id)?.min(accrual_end);
+
+        // Day-count weight dᵢ is anchored to the accrual sub-period (lookback
+        // semantics: observation dates shift, weights do not).
+        let dcf = fwd_dc.year_fraction(d, next_d, DayCountContext::default())?;
+        if dcf <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Compounded OIS leg produced a non-positive day-count fraction \
+                 ({:.3e}) for the daily sub-period {} -> {}. This usually means \
+                 the daily/observation calendar collapsed two steps onto one date.",
+                dcf, d, next_d
+            )));
+        }
+
+        // Observation window: shift back by the lookback.
+        let (obs_start, obs_end) = if observation_shift_days == 0 {
+            (d, next_d)
+        } else {
+            (
+                shift_business_days(d, -observation_shift_days, calendar_id)?,
+                shift_business_days(next_d, -observation_shift_days, calendar_id)?,
+            )
+        };
+
+        let ts = curve_time(obs_start)?;
+        let te = curve_time(obs_end)?;
+        let mut r = if te > ts {
+            fwd.rate_period(ts, te)
+        } else {
+            fwd.rate(ts)
+        };
+
+        // Per-fixing floor/cap: each daily caplet/floorlet, not the average.
+        if let Some(floor) = index_floor {
+            r = r.max(floor);
+        }
+        if let Some(cap) = index_cap {
+            r = r.min(cap);
+        }
+
+        compound_factor *= 1.0 + r * dcf;
+        d = next_d;
+    }
+
+    // Equivalent simple rate: R · τ = CF − 1.
+    Ok((compound_factor - 1.0) / period_year_fraction)
+}
+
 /// Parameters for pricing a floating rate leg.
 ///
 /// This struct wraps [`FloatingRateParams`] and adds swap-specific fields for
@@ -726,6 +911,15 @@ where
 
         let reset_date = period.reset_date.unwrap_or(period.accrual_start);
 
+        // Compounded / RFR legs apply the index floor and cap to **each daily
+        // fixing** (a strip of daily caplets/floorlets), so `index_rate` for
+        // those legs already has the per-fixing floor/cap baked in. The
+        // index-level floor/cap must then be stripped from the params handed to
+        // `calculate_floating_rate` to avoid applying them a second time to the
+        // period-average rate. Term-rate (`Simple`) legs keep the original
+        // single-fixing floor/cap path.
+        let is_compounded = !matches!(params.compounding_method, CompoundingMethod::Simple);
+
         // Determine the index rate: use historical fixing if reset is in the past,
         // otherwise project from the forward curve
         let index_rate = if reset_date < as_of {
@@ -740,54 +934,73 @@ where
                 reset_date,
                 as_of,
             )?
-        } else {
-            // Future reset: project from the forward curve.
-            //
-            // The projection differs by index type:
-            //
-            // - Term-rate legs (`CompoundingMethod::Simple`, e.g. EURIBOR-6M):
-            //   the rate is *set* at `reset_date` as the index-tenor forward
-            //   observed on that date. The forward curve's `rate(t)` is exactly
-            //   "the forward starting at time `t` for the curve's tenor", so we
-            //   anchor at the fixing date. When a reset lag places `reset_date`
-            //   materially before `accrual_start`, projecting over the accrual
-            //   interval instead would read the wrong forward window — on a
-            //   steep curve a 2-business-day lag is worth ~1-3 bp of rate.
-            //
-            // - OIS / genuinely-compounding legs (`Compounded`,
-            //   `CompoundedWithShift`, `Average`): the rate genuinely accrues
-            //   over the period, so the accrual-interval projection is correct
-            //   and avoids systematic bias from any nominal reset lag.
-            let fwd_dc = fwd.day_count();
+        } else if !is_compounded {
+            // Future reset, term-rate leg (`CompoundingMethod::Simple`, e.g.
+            // EURIBOR-6M): the rate is *set* at `reset_date` as the index-tenor
+            // forward observed on that date. The forward curve's `rate(t)` is
+            // exactly "the forward starting at time `t` for the curve's tenor",
+            // so we anchor at the fixing date. When a reset lag places
+            // `reset_date` materially before `accrual_start`, projecting over
+            // the accrual interval instead would read the wrong forward window
+            // — on a steep curve a 2-business-day lag is worth ~1-3 bp of rate.
             let fwd_base = fwd.base_date();
-            let year_fraction_from_base = |d: Date| -> Result<f64> {
-                if d <= fwd_base {
-                    Ok(0.0)
-                } else {
-                    fwd_dc.year_fraction(fwd_base, d, DayCountContext::default())
-                }
-            };
-            if matches!(params.compounding_method, CompoundingMethod::Simple) {
-                // Term-rate leg: fixing-date-anchored index-tenor forward.
-                let t_reset = year_fraction_from_base(reset_date)?;
-                fwd.rate(t_reset)
+            let t_reset = if reset_date <= fwd_base {
+                0.0
             } else {
-                // Genuinely-compounding leg: average forward over the accrual interval.
-                let t0 = year_fraction_from_base(period.accrual_start)?;
-                let t1 = year_fraction_from_base(period.accrual_end)?;
-                if t1 > t0 {
-                    fwd.rate_period(t0, t1)
-                } else {
-                    fwd.rate(t0)
-                }
-            }
+                fwd.day_count()
+                    .year_fraction(fwd_base, reset_date, DayCountContext::default())?
+            };
+            fwd.rate(t_reset)
+        } else {
+            // Future reset, OIS / genuinely-compounding leg (`Compounded`,
+            // `CompoundedWithShift`, `Average`): the coupon is true daily
+            // compounding `(∏(1+rᵢ·dᵢ)−1)/τ` with the ISDA observation shift
+            // applied. The simple arithmetic-average forward used previously
+            // dropped the daily-compounding convexity and the lookback.
+            //
+            // The index floor/cap (if any) are applied per daily fixing here;
+            // they are stripped below so `calculate_floating_rate` does not
+            // re-apply them to the period-average rate.
+            compounded_forward_projection(
+                fwd,
+                period.accrual_start,
+                period.accrual_end,
+                period.year_fraction,
+                params.observation_shift_days,
+                params.calendar_id.as_deref(),
+                params
+                    .rate_params
+                    .index_floor_bp
+                    .map(|bp| bp * crate::constants::ONE_BASIS_POINT),
+                params
+                    .rate_params
+                    .index_cap_bp
+                    .map(|bp| bp * crate::constants::ONE_BASIS_POINT),
+            )?
         };
 
-        // Apply floors, caps, gearing, and spread using the rate helpers
-        let all_in_rate = crate::cashflow::builder::rate_helpers::calculate_floating_rate(
-            index_rate,
-            &params.rate_params,
-        );
+        // Apply floors, caps, gearing, and spread using the rate helpers.
+        //
+        // For compounded legs the index floor/cap have already been applied
+        // per-fixing inside `compounded_forward_projection`; strip them from the
+        // rate params so they are not applied a second time to the now-averaged
+        // period rate. Spread, gearing, and the all-in floor/cap still apply.
+        let all_in_rate = if is_compounded {
+            let rate_params_no_index_bounds = crate::cashflow::builder::rate_helpers::FloatingRateParams {
+                index_floor_bp: None,
+                index_cap_bp: None,
+                ..params.rate_params.clone()
+            };
+            crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                index_rate,
+                &rate_params_no_index_bounds,
+            )
+        } else {
+            crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                index_rate,
+                &params.rate_params,
+            )
+        };
 
         // Coupon amount
         let coupon_amount = notional * all_in_rate * period.year_fraction;
@@ -971,7 +1184,31 @@ where
 
     let annuity = acc.total();
 
-    // Guard against zero annuity which would cause divide-by-zero in par spread calculations
+    // Guard against a near-zero annuity, which would cause divide-by-zero in
+    // par spread / par rate calculations.
+    //
+    // The diagnostic distinguishes two genuinely different failure modes — the
+    // previous single message claimed "periods expired or extreme discounting"
+    // for *every* sub-threshold annuity, which mis-describes a corrupt leg:
+    //
+    //  * `annuity < 0`: discount factors are always strictly positive, so the
+    //    only way the sum `Σ year_fraction · DF` goes negative is a negative
+    //    `year_fraction` — an inverted / malformed accrual period. This is data
+    //    corruption, not expiry (expiry yields exactly 0) and not extreme
+    //    discounting (that yields a tiny *positive* value).
+    //  * `0 <= annuity < ANNUITY_EPSILON`: a legitimately tiny annuity — all
+    //    periods expired (annuity 0) or an extreme-rate / long-horizon scenario
+    //    discounted every coupon to near zero.
+    if annuity < 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "Annuity ({:.2e}) is negative. A discounted annuity sums \
+             year_fraction × discount_factor, and discount factors are always \
+             positive, so a negative annuity means at least one period has a \
+             negative year fraction — a corrupt or inverted accrual period \
+             (accrual_end before accrual_start). Check the schedule generation.",
+            annuity
+        )));
+    }
     if annuity < ANNUITY_EPSILON {
         return Err(finstack_core::Error::Validation(format!(
             "Annuity ({:.2e}) is below minimum threshold ({:.2e}). \
@@ -1644,10 +1881,23 @@ mod tests {
         );
     }
 
-    /// W-48: OIS / genuinely-compounding legs keep the accrual-interval
-    /// projection — the rate genuinely accrues over the period.
+    /// W-48 (re-blessed for [P3-1]): OIS / genuinely-compounding legs project
+    /// over the **accrual interval** (not the fixing-date-anchored forward), and
+    /// — per the [P3-1] fix — do so by **true daily compounding**, not the
+    /// simple arithmetic-average forward.
+    ///
+    /// Re-bless rationale: W-48 originally asserted the OIS leg equals
+    /// `fwd.rate_period(t0, t1)` (the simple arithmetic average). The [P3-1]
+    /// quant audit found that projection drops the daily-compounding convexity
+    /// (~4-5 bp on this steep half-year window; 12-15 bp at typical rate
+    /// levels), under-projecting every forward coupon. The library-self
+    /// regression value therefore moves intentionally:
+    ///   old expected (simple average)        ≈ 0.0580556
+    ///   new expected (daily compounding)     ≈ 0.0585068
+    /// W-48's actual concern — that OIS legs must NOT anchor at the reset/fixing
+    /// date the way term-rate legs do — is preserved and still asserted below.
     #[test]
-    fn pv_floating_leg_ois_keeps_accrual_interval_projection() {
+    fn pv_floating_leg_ois_uses_daily_compounded_accrual_interval_projection() {
         let base_date = date(2024, 1, 1);
         let disc = test_discount_curve(base_date);
         let fwd = steep_forward_curve(base_date);
@@ -1664,8 +1914,8 @@ mod tests {
             year_fraction,
         }];
 
-        // OIS-style leg: compounding method is not Simple.
-        let params = FloatingLegParams::with_ois_compounding(0.0, 2, 0);
+        // OIS-style leg, no observation shift (isolates the compounding effect).
+        let params = FloatingLegParams::with_ois_compounding(0.0, 0, 0);
 
         let pv = pv_floating_leg(
             periods.into_iter(),
@@ -1688,12 +1938,59 @@ mod tests {
         let t1 = fwd_dc
             .year_fraction(base_date, accrual_end, DayCountContext::default())
             .expect("yf");
-        let accrual_interval_rate = fwd.rate_period(t0, t1);
+        // The simple arithmetic-average forward over the accrual interval — the
+        // OLD (pre-P3-1) projection.
+        let simple_avg_rate = fwd.rate_period(t0, t1);
+        // The fixing-date-anchored forward — the projection W-48 guards AGAINST
+        // for OIS legs.
+        let t_reset = fwd_dc
+            .year_fraction(base_date, reset_date, DayCountContext::default())
+            .expect("yf");
+        let fixing_anchored_rate = fwd.rate(t_reset);
 
+        // Independent daily-compounding reference over the accrual interval.
+        let mut acc = 1.0_f64;
+        let mut d = accrual_start;
+        while d < accrual_end {
+            let nxt = d.add_weekdays(1).min(accrual_end);
+            let dcf = fwd_dc
+                .year_fraction(d, nxt, DayCountContext::default())
+                .expect("dcf");
+            let ts = fwd_dc
+                .year_fraction(base_date, d, DayCountContext::default())
+                .expect("ts");
+            let te = fwd_dc
+                .year_fraction(base_date, nxt, DayCountContext::default())
+                .expect("te");
+            let r = if te > ts {
+                fwd.rate_period(ts, te)
+            } else {
+                fwd.rate(ts)
+            };
+            acc *= 1.0 + r * dcf;
+            d = nxt;
+        }
+        let daily_compounded_rate = (acc - 1.0) / year_fraction;
+
+        // The leg must match the daily-compounded projection.
         assert!(
-            (implied_rate - accrual_interval_rate).abs() < 1e-12,
-            "OIS-style leg must keep the accrual-interval projection: \
-             implied={implied_rate}, expected={accrual_interval_rate}"
+            (implied_rate - daily_compounded_rate).abs() < 1e-9,
+            "OIS leg must use the daily-compounded accrual-interval projection: \
+             implied={implied_rate}, expected={daily_compounded_rate}"
+        );
+        // It must EXCEED the simple-average projection (positive compounding
+        // convexity on this upward-sloping curve) — the [P3-1] fix.
+        assert!(
+            implied_rate > simple_avg_rate + 1e-6,
+            "daily compounding must exceed the simple-average forward: \
+             implied={implied_rate}, simple_avg={simple_avg_rate}"
+        );
+        // And it must NOT collapse to the fixing-date-anchored forward — W-48's
+        // original guard, still in force.
+        assert!(
+            (implied_rate - fixing_anchored_rate).abs() > 1e-4,
+            "OIS leg must not anchor at the reset/fixing date: \
+             implied={implied_rate}, fixing_anchored={fixing_anchored_rate}"
         );
     }
 
@@ -1762,5 +2059,342 @@ mod tests {
         let target = date(2025, 1, 1);
         let df = robust_relative_df(&disc, base_date, target).expect("should succeed");
         assert!(df > 0.0, "DF must be positive: {}", df);
+    }
+
+    // ==================== OIS COMPOUNDING PROJECTION TESTS ====================
+
+    /// Regression for [P3-1]: a future-reset OIS / RFR leg
+    /// (`Compounded` / `CompoundedWithShift` / `Average`) must project the
+    /// coupon by **true daily compounding** `(∏(1+rᵢ·dᵢ)−1)/τ`, not by the
+    /// simple arithmetic-average forward `rate_period`.
+    ///
+    /// Failure mode locked in: on an upward-sloping curve the daily-compounded
+    /// rate exceeds the arithmetic average by the daily-compounding convexity.
+    /// The old code used `fwd.rate_period(t0, t1)` (the arithmetic average) and
+    /// under-projected every forward coupon. The compounded rate must be
+    /// strictly greater here, and must match an independent product loop.
+    #[test]
+    fn pv_floating_leg_compounded_uses_daily_compounding_not_simple_average() {
+        let base_date = date(2024, 1, 1);
+        let disc = test_discount_curve(base_date);
+        let fwd = steep_forward_curve(base_date);
+
+        let accrual_start = date(2024, 7, 1);
+        let accrual_end = date(2025, 1, 1);
+        let year_fraction = fwd
+            .day_count()
+            .year_fraction(accrual_start, accrual_end, DayCountContext::default())
+            .expect("yf");
+
+        let periods = vec![LegPeriod {
+            accrual_start,
+            accrual_end,
+            reset_date: Some(accrual_start),
+            year_fraction,
+        }];
+
+        // Compounded leg, no observation shift.
+        let params = FloatingLegParams::with_spread(0.0).with_compounding(CompoundingMethod::Compounded);
+
+        let pv = pv_floating_leg(
+            periods.into_iter(),
+            1_000_000.0,
+            &params,
+            &disc,
+            &fwd,
+            base_date,
+            None,
+        )
+        .expect("should price");
+
+        let df = robust_relative_df(&disc, base_date, accrual_end).expect("df");
+        let implied_rate = pv / (1_000_000.0 * year_fraction * df);
+
+        // The simple arithmetic-average forward (the OLD, buggy projection).
+        let fwd_dc = fwd.day_count();
+        let t0 = fwd_dc
+            .year_fraction(base_date, accrual_start, DayCountContext::default())
+            .expect("yf");
+        let t1 = fwd_dc
+            .year_fraction(base_date, accrual_end, DayCountContext::default())
+            .expect("yf");
+        let simple_avg_rate = fwd.rate_period(t0, t1);
+
+        // Daily compounding must produce a STRICTLY HIGHER rate than the simple
+        // average on this upward-sloping curve (positive compounding convexity).
+        assert!(
+            implied_rate > simple_avg_rate + 1e-6,
+            "compounded OIS leg must exceed the simple-average projection: \
+             compounded={implied_rate}, simple_avg={simple_avg_rate}"
+        );
+
+        // Independently recompute the compounded rate with a weekday product
+        // loop and confirm the leg matches it.
+        let mut acc = 1.0_f64;
+        let mut d = accrual_start;
+        while d < accrual_end {
+            let nxt = d.add_weekdays(1).min(accrual_end);
+            let dcf = fwd_dc
+                .year_fraction(d, nxt, DayCountContext::default())
+                .expect("dcf");
+            let ts = fwd_dc
+                .year_fraction(base_date, d, DayCountContext::default())
+                .expect("ts");
+            let te = fwd_dc
+                .year_fraction(base_date, nxt, DayCountContext::default())
+                .expect("te");
+            let r = if te > ts {
+                fwd.rate_period(ts, te)
+            } else {
+                fwd.rate(ts)
+            };
+            acc *= 1.0 + r * dcf;
+            d = nxt;
+        }
+        let expected_compounded = (acc - 1.0) / year_fraction;
+        assert!(
+            (implied_rate - expected_compounded).abs() < 1e-9,
+            "compounded OIS projection must match an independent daily product: \
+             implied={implied_rate}, expected={expected_compounded}"
+        );
+    }
+
+    /// Regression for [P3-1]: `observation_shift_days` must be honored for
+    /// future OIS periods. The old code dropped the shift entirely.
+    ///
+    /// Failure mode locked in: on a steep curve, shifting the observation
+    /// window back by 5 business days reads lower forwards, so the projected
+    /// coupon must differ from the unshifted projection.
+    #[test]
+    fn pv_floating_leg_compounded_applies_observation_shift() {
+        let base_date = date(2024, 1, 1);
+        let disc = test_discount_curve(base_date);
+        let fwd = steep_forward_curve(base_date);
+
+        let accrual_start = date(2024, 7, 1);
+        let accrual_end = date(2025, 1, 1);
+        let year_fraction = fwd
+            .day_count()
+            .year_fraction(accrual_start, accrual_end, DayCountContext::default())
+            .expect("yf");
+        let period = LegPeriod {
+            accrual_start,
+            accrual_end,
+            reset_date: Some(accrual_start),
+            year_fraction,
+        };
+
+        let price = |shift: i32| -> f64 {
+            let params = FloatingLegParams::with_ois_compounding(0.0, shift, 0);
+            pv_floating_leg(
+                std::iter::once(period.clone()),
+                1_000_000.0,
+                &params,
+                &disc,
+                &fwd,
+                base_date,
+                None,
+            )
+            .expect("should price")
+        };
+
+        let pv_no_shift = price(0);
+        let pv_shifted = price(5);
+
+        // A 5-business-day lookback on a steep upward curve reads lower
+        // forwards → strictly lower projected coupon → strictly lower PV.
+        assert!(
+            pv_shifted < pv_no_shift - 1.0,
+            "observation shift must change the projected coupon: \
+             pv_no_shift={pv_no_shift}, pv_shifted={pv_shifted}"
+        );
+    }
+
+    /// Regression for [P3-1] item 4: a malformed accrual period
+    /// (`accrual_end <= accrual_start`) on a compounded leg must return a
+    /// validation error, not silently fall back to a zero-length coupon.
+    #[test]
+    fn pv_floating_leg_compounded_rejects_malformed_period() {
+        let base_date = date(2024, 1, 1);
+        let disc = test_discount_curve(base_date);
+        let fwd = steep_forward_curve(base_date);
+
+        // accrual_end == accrual_start: zero-length period.
+        let degenerate = LegPeriod {
+            accrual_start: date(2024, 7, 1),
+            accrual_end: date(2024, 7, 1),
+            reset_date: Some(date(2024, 7, 1)),
+            year_fraction: 0.0,
+        };
+        let params = FloatingLegParams::with_spread(0.0).with_compounding(CompoundingMethod::Compounded);
+        let result = pv_floating_leg(
+            vec![degenerate].into_iter(),
+            1_000_000.0,
+            &params,
+            &disc,
+            &fwd,
+            base_date,
+            None,
+        );
+        assert!(
+            result.is_err(),
+            "a zero-length accrual period on a compounded leg must Err, \
+             not silently produce a zero coupon"
+        );
+
+        // accrual_end < accrual_start: inverted period.
+        let inverted = LegPeriod {
+            accrual_start: date(2025, 1, 1),
+            accrual_end: date(2024, 7, 1),
+            reset_date: Some(date(2025, 1, 1)),
+            year_fraction: -0.5,
+        };
+        let result = pv_floating_leg(
+            vec![inverted].into_iter(),
+            1_000_000.0,
+            &params,
+            &disc,
+            &fwd,
+            base_date,
+            None,
+        );
+        assert!(
+            result.is_err(),
+            "an inverted accrual period (end < start) on a compounded leg must Err"
+        );
+    }
+
+    /// Regression for [P3-1] item 3: the index floor on a compounded OIS leg
+    /// must be applied **per daily fixing**, not to the period-average rate.
+    ///
+    /// Failure mode locked in: with a floor set ABOVE every daily forward, a
+    /// per-fixing floor lifts every fixing to the floor so the compounded
+    /// period rate equals the daily-compounded floor — strictly above what the
+    /// raw (unfloored) forwards would compound to. Applying the floor only to
+    /// the period average would give a different (lower-resolution) result;
+    /// here we assert the per-fixing flooring is in effect by checking the
+    /// floored leg compounds the floor rate.
+    #[test]
+    fn pv_floating_leg_compounded_floors_each_daily_fixing() {
+        let base_date = date(2024, 1, 1);
+        let disc = test_discount_curve(base_date);
+        let fwd = steep_forward_curve(base_date);
+
+        let accrual_start = date(2024, 7, 1);
+        let accrual_end = date(2025, 1, 1);
+        let fwd_dc = fwd.day_count();
+        let year_fraction = fwd_dc
+            .year_fraction(accrual_start, accrual_end, DayCountContext::default())
+            .expect("yf");
+        let periods = vec![LegPeriod {
+            accrual_start,
+            accrual_end,
+            reset_date: Some(accrual_start),
+            year_fraction,
+        }];
+
+        // Floor at 10% — far above every daily forward on the steep curve over
+        // this window (forwards there are well under 10%).
+        let floor_bp = 1000.0; // 10%
+        let params = FloatingLegParams::full_with_compounding(
+            0.0,
+            1.0,
+            true,
+            Some(floor_bp), // index floor
+            None,
+            None,
+            None,
+            0,
+            None,
+            CompoundingMethod::Compounded,
+            0,
+        );
+
+        let pv = pv_floating_leg(
+            periods.into_iter(),
+            1_000_000.0,
+            &params,
+            &disc,
+            &fwd,
+            base_date,
+            None,
+        )
+        .expect("should price");
+
+        let df = robust_relative_df(&disc, base_date, accrual_end).expect("df");
+        let implied_rate = pv / (1_000_000.0 * year_fraction * df);
+
+        // With every daily fixing floored to 10%, the compounded period rate is
+        // the daily-compounding of a flat 10% — strictly above 10% (convexity).
+        let floor = floor_bp * 1e-4;
+        assert!(
+            implied_rate > floor,
+            "per-fixing-floored compounded rate must exceed the flat floor by \
+             daily-compounding convexity: implied={implied_rate}, floor={floor}"
+        );
+
+        // Independently compound a flat floor rate over the daily grid.
+        let mut acc = 1.0_f64;
+        let mut d = accrual_start;
+        while d < accrual_end {
+            let nxt = d.add_weekdays(1).min(accrual_end);
+            let dcf = fwd_dc
+                .year_fraction(d, nxt, DayCountContext::default())
+                .expect("dcf");
+            acc *= 1.0 + floor * dcf;
+            d = nxt;
+        }
+        let expected = (acc - 1.0) / year_fraction;
+        assert!(
+            (implied_rate - expected).abs() < 1e-9,
+            "per-fixing-floored compounded rate must equal the daily-compounded \
+             floor: implied={implied_rate}, expected={expected}"
+        );
+    }
+
+    // ==================== ANNUITY GUARD DIAGNOSTIC TEST ====================
+
+    /// Regression for [P3-1] item 6: when `leg_annuity` rejects a corrupt leg,
+    /// the error message must describe the actual failure mode.
+    ///
+    /// A discounted annuity is `Σ year_fraction · DF` and discount factors are
+    /// always strictly positive, so a **negative** annuity can only arise from
+    /// a negative year fraction — i.e. an inverted / malformed accrual period,
+    /// NOT "all periods expired" (that gives exactly zero) and NOT "extreme
+    /// discounting" (that gives a tiny *positive* value). The old message
+    /// claimed the former two causes for every sub-threshold annuity, which
+    /// mis-describes the negative-year-fraction corruption. The error message
+    /// must name the year-fraction corruption when the annuity is negative.
+    #[test]
+    fn leg_annuity_negative_year_fraction_reports_corruption_not_expiry() {
+        let base_date = date(2024, 1, 1);
+        let disc = test_discount_curve(base_date);
+
+        // A future-dated period (so it is NOT skipped as expired) but with a
+        // negative year fraction — a corrupt, inverted accrual period.
+        let corrupt = LegPeriod {
+            accrual_start: date(2024, 7, 1),
+            accrual_end: date(2025, 1, 1),
+            reset_date: Some(date(2024, 7, 1)),
+            year_fraction: -0.5,
+        };
+
+        let err = leg_annuity(vec![corrupt].into_iter(), &disc, base_date, 0, None)
+            .expect_err("a negative-year-fraction leg must be rejected");
+        let msg = err.to_string();
+
+        // The diagnostic must point at the year-fraction corruption, not at
+        // expiry / extreme-discounting (the misdescription being fixed).
+        let lower = msg.to_lowercase();
+        assert!(
+            lower.contains("year fraction") || lower.contains("year-fraction"),
+            "annuity error for a negative-year-fraction leg must name the \
+             year-fraction corruption; got: {msg}"
+        );
+        assert!(
+            !lower.contains("expired"),
+            "annuity error for a NEGATIVE annuity must not claim periods \
+             expired (expiry yields a zero annuity, not a negative one); got: {msg}"
+        );
     }
 }
