@@ -16,8 +16,12 @@
 //! For a CMS **floorlet** (pays `(K - S_T)^+` at `T_pay`):
 //!
 //! ```text
-//! V = g(K) × P_sw(K) + ∫_{K_min}^K g'(k) × P_sw(k) dk
+//! V = g(K) × P_sw(K) − ∫_{K_min}^K g'(k) × P_sw(k) dk
 //! ```
+//!
+//! Note the **minus** sign — unlike the caplet, the floorlet integral runs
+//! *below* `K`, and integration by parts yields a subtractive correction
+//! (`g'(k) > 0`, integral positive). See the `OptionType::Put` branch below.
 //!
 //! where:
 //! - `g(k) = DF(T_pay) / A_par(k)` — ratio of payment discount factor to the
@@ -283,12 +287,15 @@ impl CmsReplicationPricer {
                     }
 
                     OptionType::Put => {
-                        // Floorlet formula:
-                        //   V = g(K) · P_sw(K) + ∫_{K_min}^K g'(k) · P_sw(k) dk
+                        // Floorlet formula (Andersen-Piterbarg §16.2, IBP derivation):
+                        //   V = g(K) · P_sw(K) − ∫_{K_min}^K g'(k) · P_sw(k) dk
                         //
-                        // g'(k) < 0 for k > 0, so the integral is negative (correct:
-                        // the payment-measure CMS forward exceeds the annuity-measure
-                        // forward, reducing the floorlet value below the plain swaption).
+                        // Note the MINUS sign.  g(k) = DF_pay / A_par(k) is strictly
+                        // INCREASING in k (because A_par(k) is strictly decreasing), so
+                        // g'(k) > 0 and the integral is positive.  The minus sign ensures
+                        // V_floor < g(K)·P_sw(K), consistent with CMS convexity raising
+                        // the payment-measure forward above the swap forward and thereby
+                        // reducing the in-the-money probability for a floorlet.
                         let k_min = (strike - N_STD_CUTOFF * std_dev).max(K_FLOOR);
 
                         // Boundary term: g(K) × P_sw(K)
@@ -315,7 +322,7 @@ impl CmsReplicationPricer {
                         )
                         .unwrap_or(0.0);
 
-                        g_at_k * p_boundary + integral
+                        g_at_k * p_boundary - integral
                     }
                 }
             };

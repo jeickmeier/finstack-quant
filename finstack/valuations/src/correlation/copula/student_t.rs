@@ -52,10 +52,11 @@
 //!   `docs/REFERENCES.md#hull-predescu-white-2005`
 
 use super::{get_cached_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
+use finstack_core::math::distributions::chi_squared_quantile;
 #[cfg(test)]
 use finstack_core::math::student_t_inv_cdf;
 use finstack_core::math::{
-    ln_gamma, student_t_cdf, GaussHermiteQuadrature, GaussLaguerreQuadrature,
+    ln_gamma, norm_cdf, student_t_cdf, GaussHermiteQuadrature, GaussLaguerreQuadrature,
 };
 use std::sync::Arc;
 
@@ -328,6 +329,46 @@ impl Copula for StudentTCopula {
         student_t_cdf(conditional_threshold, nu + 1.0)
     }
 
+    fn conditional_default_prob_given_systematic_and_mixing(
+        &self,
+        default_threshold: f64,
+        systematic: f64,
+        mixing: f64,
+        correlation: f64,
+    ) -> f64 {
+        // LHP (N → ∞) limit of the per-name Student-t latent construction
+        //   Aᵢ = (√ρ·Z + √(1−ρ)·εᵢ) / √W,   default ⟺ Aᵢ ≤ c = t_ν⁻¹(PD)
+        // conditioned on the SAME (Z, W) as `latent_variable`. With εᵢ ~ N(0,1):
+        //   Aᵢ ≤ c  ⟺  √(1−ρ)·εᵢ ≤ c·√W − √ρ·Z  ⟺  εᵢ ≤ (c·√W − √ρ·Z)/√(1−ρ)
+        // so the conditional default fraction is
+        //   P(default | Z, W) = Φ( (c·√W − √ρ·Z) / √(1−ρ) ).
+        //
+        // This is NOT `conditional_default_prob`: that method conditions on
+        // the t(ν) systematic factor M = Z/√W (with W integrated out via the
+        // ν+1 scaling), whereas the per-name engine draws a Gaussian Z and an
+        // explicit shared W. Feeding Z into the M-slot is a distribution and
+        // a sigma-algebra mismatch — it biases the pool default rate low.
+        let z = systematic;
+        let w = mixing.max(1e-12);
+
+        if correlation <= MIN_CORRELATION {
+            // No systematic channel: Aᵢ = εᵢ/√W, so default ⟺ εᵢ ≤ c·√W.
+            return norm_cdf((default_threshold * w.sqrt()).clamp(-CDF_CLIP, CDF_CLIP));
+        }
+
+        // Smoothing clamp mirrors `conditional_default_prob`: at ρ → 1 the
+        // 1/√(1−ρ) factor plus CDF_CLIP yields the correct indicator limit
+        // 1{√ρ·Z ≤ c·√W}.
+        let rho = self.smooth_correlation(correlation);
+        let sqrt_rho = rho.sqrt();
+        let sqrt_1mr = (1.0 - rho).sqrt();
+
+        let conditional_threshold =
+            ((default_threshold * w.sqrt() - sqrt_rho * z) / sqrt_1mr).clamp(-CDF_CLIP, CDF_CLIP);
+
+        norm_cdf(conditional_threshold)
+    }
+
     fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
         // Two-layer integration using variance-gamma mixing:
         // M ~ t(ν) can be represented as M = Z/√W where Z ~ N(0,1), W ~ Gamma(ν/2, ν/2)
@@ -350,6 +391,40 @@ impl Copula for StudentTCopula {
         }
 
         result
+    }
+
+    fn sample_mixing(&self, u01: f64) -> f64 {
+        // Variance-mixture representation of the multivariate t-copula:
+        // every name shares W = χ²(ν)/ν. Inverse-CDF sampling from a single
+        // uniform keeps the draw deterministic and order-stable (no rejection
+        // loop), which is required for bit-identical serial/parallel results.
+        let p = u01.clamp(1e-12, 1.0 - 1e-12);
+        let nu = self.degrees_of_freedom;
+        // chi_squared_quantile only fails for p ∉ [0,1) or df ≤ 0; both are
+        // excluded by the clamp and the ν > 2 invariant, so the fallback is
+        // unreachable. The `unwrap_or` form satisfies `clippy::expect_used`.
+        let chi2 = chi_squared_quantile(p, nu).unwrap_or(nu);
+        // Guard against a degenerate W ≈ 0 (would blow up M = Z/√W).
+        (chi2 / nu).max(1e-12)
+    }
+
+    fn latent_variable(
+        &self,
+        systematic: f64,
+        idiosyncratic: f64,
+        mixing: f64,
+        correlation: f64,
+    ) -> f64 {
+        // Standard multivariate t-copula latent variable (Demarta & McNeil
+        // 2005), the sampling counterpart of `conditional_default_prob`:
+        //   M  = Z_M / √W,  εᵢ = Zᵢ / √W,  Aᵢ = √ρ·M + √(1−ρ)·εᵢ
+        // The shared mixing W (drawn once per period via `sample_mixing`)
+        // induces tail dependence: a small W makes every name's |Aᵢ| large
+        // simultaneously. Default occurs when Aᵢ ≤ t_ν⁻¹(PD).
+        let rho = correlation.clamp(0.0, 1.0);
+        let w = mixing.max(1e-12);
+        let gaussian_part = rho.sqrt() * systematic + (1.0 - rho).sqrt() * idiosyncratic;
+        gaussian_part / w.sqrt()
     }
 
     fn num_factors(&self) -> usize {
@@ -710,6 +785,46 @@ mod tests {
 
         assert_contract(&[]);
         assert_contract(&[0.5, 1.0]);
+    }
+
+    #[test]
+    fn test_latent_variable_marginal_recovers_pd() {
+        // The per-name Student-t latent Aᵢ = (√ρ·Z + √(1−ρ)·εᵢ)/√W with
+        // W = χ²(ν)/ν must be marginally t(ν): the fraction of draws below
+        // t_ν⁻¹(PD) must equal PD. Each period draws one shared mixing W and
+        // per-name idiosyncratic εᵢ.
+        use finstack_monte_carlo::rng::philox::PhiloxRng;
+        use finstack_monte_carlo::traits::RandomStream;
+
+        let nu = 6.0;
+        let copula = StudentTCopula::new(nu);
+        let pd = 0.05;
+        let threshold = student_t_inv_cdf(pd, nu);
+        let rho = 0.30;
+
+        let mut rng = PhiloxRng::new(11);
+        // Outer loop = periods (one shared W each); inner = names.
+        let periods = 8_000usize;
+        let names = 64usize;
+        let mut defaults = 0usize;
+        for _ in 0..periods {
+            let w = copula.sample_mixing(rng.next_u01());
+            let z = rng.next_std_normal();
+            for _ in 0..names {
+                let eps = rng.next_std_normal();
+                let a = copula.latent_variable(z, eps, w, rho);
+                if a <= threshold {
+                    defaults += 1;
+                }
+            }
+        }
+        let realized = defaults as f64 / (periods * names) as f64;
+        // Heavier-tailed and correlated draws → wider MC error; 0.004 covers
+        // the ~512k correlated sample at p=0.05.
+        assert!(
+            (realized - pd).abs() < 0.004,
+            "Student-t latent marginal {realized} should recover PD {pd}"
+        );
     }
 
     #[test]

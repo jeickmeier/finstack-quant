@@ -29,3 +29,4 @@ mod scalars_attribution;
 mod serialization_roundtrip;
 mod spec_tests;
 mod types_pnl;
+mod vol_factor_attribution;

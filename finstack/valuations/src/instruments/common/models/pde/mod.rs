@@ -13,7 +13,7 @@
 //! ```text
 //! PdeProblem2D (2D coefficients + cross-derivative + 4-edge boundaries)
 //!   → Operators2D (directional tridiag per axis + explicit cross-derivative)
-//!     → CraigSneydStepper (ADI splitting: x-sweep + y-sweep)
+//!     → CraigSneydStepper (Modified Craig-Sneyd ADI splitting)
 //!       → PdeSolution2D (bilinear interpolation + Greeks)
 //! ```
 //!
@@ -75,4 +75,4 @@ pub use problem::PdeProblem1D;
 pub use problem2d::PdeProblem2D;
 pub use solver::{PdeSolution, PdeSolverError, Solver1D, Solver1DBuilder};
 pub use solver2d::{PdeSolution2D, PdeSolver2DError, Solver2D, Solver2DBuilder};
-pub use stepper::{RannacherStepper, ThetaStepper, TimeStepper};
+pub use stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};

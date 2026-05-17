@@ -58,6 +58,8 @@ impl MetricCalculator for Haircut01Calculator {
         repo_down.haircut = (repo.haircut - HAIRCUT_BUMP).max(0.0);
         let pv_down = repo_down.value(context.curves.as_ref(), as_of)?.amount();
 
-        Ok(central_diff_by_half_bump(pv_up, pv_down, HAIRCUT_BUMP))
+        // `HAIRCUT_BUMP` is a fixed positive constant, so the bump width is
+        // never degenerate; the helper's error path cannot trigger here.
+        central_diff_by_half_bump(pv_up, pv_down, HAIRCUT_BUMP)
     }
 }

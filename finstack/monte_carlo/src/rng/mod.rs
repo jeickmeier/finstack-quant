@@ -48,6 +48,10 @@
 //! - [`philox::PhiloxRng`]: Counter-based PRNG for parallel pseudo-random simulation
 //! - [`sobol::SobolRng`]: Low-discrepancy sequence for quasi-Monte Carlo
 //! - [`brownian_bridge::BrownianBridge`]: Path construction with variance reduction
+//! - [`fbm`]: True fractional-Brownian-motion increment generators
+//!   (Molchan-Golosov kernel)
+//! - [`volterra`]: Riemann-Liouville Volterra process increment generator for
+//!   the rough Bergomi model (Bennedsen-Lunde-Pakkanen hybrid scheme)
 //!
 //! For Sobol PCA utilities, see [`finstack_core::math::random::sobol_pca`].
 //!
@@ -64,6 +68,7 @@ pub mod fbm;
 pub mod philox;
 pub mod poisson;
 pub mod sobol;
+pub mod volterra;
 
 pub use brownian_bridge::BrownianBridge;
 pub use philox::PhiloxRng;

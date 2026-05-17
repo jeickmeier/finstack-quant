@@ -1,0 +1,47 @@
+{
+  "schema_version": "finstack.golden/1",
+  "name": "beta_half_smile",
+  "domain": "volatility.sabr",
+  "description": "Rates-standard SABR (beta=0.5) smile across five strikes ITM/ATM/OTM with Obloj (2008) z correction. Guards the mixed normal/lognormal branch that was accidentally correct before Task-1.",
+  "provenance": {
+    "as_of": "2026-05-16",
+    "source": "formula",
+    "source_detail": "Hagan et al. (2002) 'Managing Smile Risk', Wilmott Magazine, eq. 2.17b with Obloj (2008) arXiv:0708.0998v2 correction. For beta=0.5: z = (nu/alpha)*f_mid^(1-beta)*ln(F/K) (Obloj corrected); chi(z) = ln((sqrt(1-2*rho*z+z^2)+z-rho)/(1-rho)); correction_term = 1 + (1-beta)^2/24*ln(F/K)^2 + (1-beta)^4/1920*ln(F/K)^4; factor1 = alpha/(f_mid^(1-beta)*correction_term); factor2 = z/chi(z); time_correction uses f_mid (same as Rust): alpha_term=(1-beta)^2/24*alpha^2/f_mid^(2*(1-beta)), rho_term=0.25*rho*beta*nu*alpha/f_mid^(1-beta), nu_term=(2-3*rho^2)*nu^2/24; vol = factor1*factor2*(1+T*time_correction). Derived independently in Python; NOT copied from SABRModel output. Parameters: alpha=0.05, beta=0.5, nu=0.40, rho=-0.10, F=0.05, T=2.0. Manual derivation for K=0.04: f_mid=0.044721359549996, z(Obloj)=0.377512926050753, chi(z)=0.362843340414050, f_mid_beta=0.211474252688113, correction=1.000518758254723, factor1=0.236312813028339, factor2=1.040429529779884, alpha_term=0.000582309, rho_term=-0.001182177, nu_term=0.013133333, time_correction=0.012473465, factor3=1.024946930, vol=0.252029955870294.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-05-16",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-05-16",
+    "review_interval_months": 6,
+    "regen_command": "",
+    "screenshots": []
+  },
+  "inputs": {
+    "alpha": 0.05,
+    "beta": 0.5,
+    "nu": 0.40,
+    "rho": -0.10,
+    "forward": 0.05,
+    "time_to_expiry": 2.0,
+    "strikes": [
+      {"key": "vol_k0030", "strike": 0.03},
+      {"key": "vol_k0040", "strike": 0.04},
+      {"key": "vol_k0050", "strike": 0.05},
+      {"key": "vol_k0060", "strike": 0.06},
+      {"key": "vol_k0070", "strike": 0.07}
+    ]
+  },
+  "expected_outputs": {
+    "vol_k0030": 0.292124159861480,
+    "vol_k0040": 0.252029955870294,
+    "vol_k0050": 0.229213126718535,
+    "vol_k0060": 0.219418973702401,
+    "vol_k0070": 0.217908605764939
+  },
+  "tolerances": {
+    "vol_k0030": {"abs": 1e-9, "tolerance_reason": "Hagan 2002 + Obloj 2008 closed-form; numerical precision only"},
+    "vol_k0040": {"abs": 1e-9, "tolerance_reason": "Hagan 2002 + Obloj 2008 closed-form; numerical precision only"},
+    "vol_k0050": {"abs": 1e-9, "tolerance_reason": "ATM case uses eq. 2.18 directly; exact"},
+    "vol_k0060": {"abs": 1e-9, "tolerance_reason": "Hagan 2002 + Obloj 2008 closed-form; numerical precision only"},
+    "vol_k0070": {"abs": 1e-9, "tolerance_reason": "Hagan 2002 + Obloj 2008 closed-form; numerical precision only"}
+  }
+}

@@ -31,9 +31,9 @@ pub(crate) use calibrations::{
     clo_standard, cmbs_standard, rmbs_standard, CloCalibration, CmbsCalibration, RmbsCalibration,
 };
 pub use correlation::CorrelationStructure;
-pub use default::StochasticDefaultSpec;
 #[allow(unused_imports)]
 pub(crate) use default::{CopulaBasedDefault, IntensityProcessDefault, StochasticDefault};
+pub use default::{PoolGranularity, StochasticDefaultSpec};
 #[allow(unused_imports)]
 pub(crate) use metrics::{
     CorrelationSensitivities, SensitivityConfig, StochasticMetrics, StochasticMetricsCalculator,

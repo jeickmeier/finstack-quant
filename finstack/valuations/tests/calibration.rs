@@ -11,6 +11,7 @@
 //! - **hazard_curve**: Hazard/credit curve calibration
 //! - **inflation**: Inflation curve calibration and conventions
 //! - **swaption_vol**: Swaption volatility surface calibration
+//! - **svi_surface**: SVI equity volatility surface calibration
 //! - **base_correlation**: Base correlation surface calibration
 //! - **failure_modes**: Engine error handling and failure scenarios
 //! - **explainability**: Explanation trace generation

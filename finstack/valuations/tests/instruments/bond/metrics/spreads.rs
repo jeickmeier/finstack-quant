@@ -971,6 +971,183 @@ fn test_z_spread_missing_discount_curve_returns_error() {
     }
 }
 
+/// Z-spread round-trip when a coupon falls exactly on the settlement/quote date.
+///
+/// `ZSpreadCalculator` filters cashflows with `d > quote_date` (strictly after),
+/// so it DROPS a coupon dated exactly on `quote_date`. `price_from_z_spread` must
+/// apply the same filter — `d <= as_of` skip — so the forward solve and inversion
+/// are anchored at the same set of cashflows and round-trip without error.
+///
+/// Setup: bond issued and priced on 2025-01-01 with no settlement lag, whose
+/// first annual coupon falls exactly on that date. Any remaining coupons beyond
+/// `as_of` are unaffected; only the on-date coupon is the discriminator.
+#[test]
+fn test_z_spread_roundtrip_coupon_exactly_on_settlement_date() {
+    use finstack_core::dates::{DayCount, Tenor};
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread;
+    use finstack_valuations::instruments::fixed_income::bond::CashflowSpec;
+
+    // The settlement/quote date equals `as_of` because no settlement lag is set.
+    let as_of = date!(2025 - 01 - 01);
+    // Issue one year before so there is a coupon falling exactly on `as_of`.
+    let issue_date = date!(2024 - 01 - 01);
+    let maturity = date!(2030 - 01 - 01);
+    let notional = Money::new(1_000_000.0, Currency::USD);
+    let coupon_rate = 0.05;
+
+    let mut bond = Bond::fixed(
+        "ZSPR-ON-DATE-COUPON",
+        notional,
+        coupon_rate,
+        issue_date,
+        maturity,
+        "USD-OIS",
+    )
+    .expect("bond should build");
+    // Explicit annual day-count to make the on-date coupon unambiguous.
+    bond.cashflow_spec =
+        CashflowSpec::fixed_rate(coupon_rate.into(), Tenor::annual(), DayCount::Act365F);
+    // No settlement lag: quote_date == as_of.
+    bond.settlement_convention = None;
+
+    // Flat discount curve based at `as_of`.
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 1.0), (6.0, 0.82)])
+        .build()
+        .expect("curve");
+    let market = MarketContext::new().insert(disc);
+
+    // Quote the bond at a clean price that is off-par so the Z-spread is non-zero.
+    let clean_pct = 98.5_f64;
+    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_pct);
+
+    // Forward path: solve Z-spread from the quoted clean price.
+    let res = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ZSpread],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("Z-spread metric should solve");
+    let z = *res.measures.get("z_spread").expect("z_spread measure");
+
+    // Inversion path: recover dirty price from z.
+    // `price_from_z_spread` is called with `as_of` as the time origin — exactly
+    // the same anchor the ZSpreadCalculator used for its objective function.
+    let dirty_inverted =
+        price_from_z_spread(&bond, &market, as_of, z).expect("price_from_z_spread should invert");
+
+    // The ZSpreadCalculator target was: dirty = clean% * notional / 100 + accrued.
+    // Accrued at `as_of` is zero for an annual bond on its coupon date, so:
+    // target_dirty = clean_pct * notional / 100.
+    let accrued_at_as_of = 0.0_f64; // first coupon is exactly on as_of, accrual resets.
+    let target_dirty = clean_pct * notional.amount() / 100.0 + accrued_at_as_of;
+
+    // Round-trip tolerance: 1e-8 currency units (well below $0.01 per $1M).
+    assert!(
+        (dirty_inverted - target_dirty).abs() < 1e-8,
+        "Z-spread price round-trip mismatch for coupon on settlement date: \
+         target_dirty={target_dirty:.10}, inverted={dirty_inverted:.10}, \
+         error={:.6e}",
+        (dirty_inverted - target_dirty).abs()
+    );
+}
+
+/// YTM price round-trip when settlement lag places the quote date after the
+/// valuation date.
+///
+/// `price_from_ytm` (the quote-override inversion) must use the same cashflow
+/// set and time origin as the YTM metric solver so that `solve_YTM(flows,
+/// quote_date, dirty) = y` implies `price_from_ytm(flows, quote_date, y) =
+/// dirty`.
+///
+/// Both paths build flows via `pricing_dated_cashflows(as_of=trade_date)` and
+/// anchor discounting at `quote_date`, so any flow in `(trade_date, quote_date]`
+/// must be filtered by both in the same way.  `price_from_ytm_compounded_params`
+/// already skips `date <= as_of (= quote_date)`, which is the correct behaviour.
+/// This test documents and guards that symmetry.
+#[test]
+fn test_ytm_roundtrip_settlement_lag_two_days() {
+    use finstack_core::dates::{DayCount, Tenor};
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{
+        compute_quotes, BondQuoteInput,
+    };
+    use finstack_valuations::instruments::fixed_income::bond::CashflowSpec;
+
+    // Trade date / valuation date.
+    let as_of = date!(2024 - 12 - 30);
+    // T+2 settlement: quote_date = 2025-01-01.
+    let quote_date = date!(2025 - 01 - 01);
+    // Bond with a coupon exactly on quote_date: tests flows in (as_of, quote_date].
+    let issue_date = date!(2024 - 01 - 01);
+    let maturity = date!(2030 - 01 - 01);
+    let notional = Money::new(1_000_000.0, Currency::USD);
+    let coupon_rate = 0.05;
+
+    let mut bond = Bond::fixed(
+        "YTM-SETTLE-LAG",
+        notional,
+        coupon_rate,
+        issue_date,
+        maturity,
+        "USD-OIS",
+    )
+    .expect("bond should build");
+    bond.cashflow_spec =
+        CashflowSpec::fixed_rate(coupon_rate.into(), Tenor::annual(), DayCount::Act365F);
+    // 2 settlement days so that quote_date = as_of + 2 weekdays = 2025-01-01.
+    bond.settlement_convention = Some(BondSettlementConvention {
+        settlement_days: 2,
+        ex_coupon_days: 0,
+        ex_coupon_calendar_id: None,
+    });
+
+    // Discount curve based at quote_date (standard for settlement-date pricing).
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(quote_date)
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 1.0), (6.0, 0.82)])
+        .build()
+        .expect("curve");
+    let market = MarketContext::new().insert(disc);
+
+    // Choose an explicit YTM and derive the implied clean price.
+    let target_ytm = 0.055_f64;
+    let quotes = compute_quotes(&bond, &market, as_of, BondQuoteInput::Ytm(target_ytm))
+        .expect("compute_quotes from YTM should succeed");
+    let clean_pct = quotes.clean_price_pct;
+
+    // Feed the clean price back and re-solve YTM.
+    let mut bond_with_price = bond.clone();
+    bond_with_price.pricing_overrides =
+        PricingOverrides::default().with_quoted_clean_price(clean_pct);
+    let res = bond_with_price
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Ytm],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("YTM metric should solve");
+    let recovered_ytm = *res.measures.get("ytm").expect("ytm measure");
+
+    // Round-trip tolerance: 0.01 bp = 1e-6 in decimal.
+    assert!(
+        (recovered_ytm - target_ytm).abs() < 1e-6,
+        "YTM price round-trip mismatch with settlement lag: \
+         target={target_ytm:.10}, recovered={recovered_ytm:.10}, \
+         error={:.6e}",
+        (recovered_ytm - target_ytm).abs()
+    );
+}
+
 /// Z-spread solver should converge for IG, HY, and distressed fixed-rate bonds
 /// with realistic spreads up to ~3000 bp and maintain tight price residuals.
 #[test]

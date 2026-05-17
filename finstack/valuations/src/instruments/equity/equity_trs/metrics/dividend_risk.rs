@@ -63,12 +63,9 @@ impl MetricCalculator for Dividend01Calculator {
         let pv_down = trs.value(&curves_down, as_of)?.amount();
 
         // MetricId contract: Dividend01 is $/bp (dPV for a 1bp absolute q move).
-        // Use actual bump width since the downside bump is clamped at 0.
-        Ok(scaled_central_diff_by_width(
-            pv_up,
-            pv_down,
-            actual_width,
-            DIVIDEND_BUMP_BP,
-        ))
+        // Use actual bump width since the downside bump is clamped at 0; the
+        // up-bump always lifts the width by `DIVIDEND_BUMP_BP`, so it is
+        // non-degenerate. A degenerate width surfaces as an `Err`.
+        scaled_central_diff_by_width(pv_up, pv_down, actual_width, DIVIDEND_BUMP_BP)
     }
 }

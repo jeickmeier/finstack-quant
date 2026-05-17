@@ -21,5 +21,6 @@ mod test_moneyness;
 mod test_near_expiry;
 mod test_pricing;
 mod test_put_call_parity;
+mod test_rough_bergomi;
 
 mod test_option_pricing;

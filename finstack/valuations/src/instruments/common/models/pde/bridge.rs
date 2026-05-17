@@ -225,7 +225,9 @@ mod tests {
             .build()
             .expect("valid solver");
 
-        let solution = solver.solve(&pde, t);
+        let solution = solver
+            .solve(&pde, t)
+            .expect("Crank-Nicolson solve is unconditionally stable");
         let computed = solution.interpolate(s.ln());
 
         let rel_error = (computed - exact).abs() / exact;
@@ -264,7 +266,9 @@ mod tests {
             .build()
             .expect("valid solver");
 
-        let solution = solver.solve(&pde, t);
+        let solution = solver
+            .solve(&pde, t)
+            .expect("Crank-Nicolson solve is unconditionally stable");
         let computed = solution.interpolate(s.ln());
 
         let rel_error = (computed - exact).abs() / exact;
@@ -301,7 +305,9 @@ mod tests {
             .build()
             .expect("valid solver");
 
-        let solution = solver.solve(&pde, t);
+        let solution = solver
+            .solve(&pde, t)
+            .expect("Crank-Nicolson solve is unconditionally stable");
 
         // Delta in log-spot space: dV/dx. To get dV/dS, divide by S.
         let delta_log = solution.delta(s.ln());
@@ -343,7 +349,9 @@ mod tests {
             .build()
             .expect("valid solver");
 
-        let solution = solver.solve(&pde, t);
+        let solution = solver
+            .solve(&pde, t)
+            .expect("Crank-Nicolson solve is unconditionally stable");
         let computed = solution.interpolate(s.ln());
 
         let rel_error = (computed - exact).abs() / exact;

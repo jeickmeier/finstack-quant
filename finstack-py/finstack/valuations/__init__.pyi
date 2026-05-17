@@ -384,7 +384,7 @@ def validate_instrument_json(json: str) -> str:
 
 def price_instrument(
     instrument_json: str,
-    market_json: str,
+    market: MarketContext | str,
     as_of: str,
     model: str = "default",
 ) -> str:
@@ -392,7 +392,7 @@ def price_instrument(
 
     Args:
         instrument_json: Tagged instrument JSON.
-        market_json: JSON-serialized ``MarketContext``.
+        market: ``MarketContext`` instance or JSON string.
         as_of: Valuation date in ISO 8601 format.
         model: Model key: ``default`` (instrument-native default), ``discounting``, ``black76``, ``hazard_rate``,
             ``hull_white_1f``, ``tree``, ``normal``, ``monte_carlo_gbm``, etc.
@@ -409,7 +409,7 @@ def price_instrument(
 
 def price_instrument_with_metrics(
     instrument_json: str,
-    market_json: str,
+    market: MarketContext | str,
     as_of: str,
     model: str = "default",
     metrics: list[str] = [],
@@ -420,7 +420,7 @@ def price_instrument_with_metrics(
 
     Args:
         instrument_json: Tagged instrument JSON.
-        market_json: JSON-serialized ``MarketContext``.
+        market: ``MarketContext`` instance or JSON string.
         as_of: Valuation date in ISO 8601 format.
         model: Model key string (same vocabulary as ``price_instrument``).
         metrics: Metric names to compute (default empty list).
@@ -939,7 +939,7 @@ class FactorPnlProfile:
 def compute_factor_sensitivities(
     positions_json: str,
     factors_json: str,
-    market_json: str,
+    market: MarketContext | str,
     as_of: str,
     bump_config_json: str | None = None,
 ) -> SensitivityMatrix:
@@ -949,7 +949,7 @@ def compute_factor_sensitivities(
         positions_json: JSON array of position objects, each with ``id`` (str),
             ``instrument`` (tagged instrument JSON), and ``weight`` (float).
         factors_json: JSON array of ``FactorDefinition`` objects.
-        market_json: JSON-serialized ``MarketContext``.
+        market: ``MarketContext`` instance or JSON string.
         as_of: Valuation date in ISO 8601 format.
         bump_config_json: Optional JSON-serialized ``BumpSizeConfig``.
             Defaults to 1 bp / 1 % per factor type.
@@ -967,7 +967,7 @@ def compute_factor_sensitivities(
 def compute_pnl_profiles(
     positions_json: str,
     factors_json: str,
-    market_json: str,
+    market: MarketContext | str,
     as_of: str,
     bump_config_json: str | None = None,
     n_scenario_points: int = 5,
@@ -978,7 +978,7 @@ def compute_pnl_profiles(
         positions_json: JSON array of position objects (same schema as
             :func:`compute_factor_sensitivities`).
         factors_json: JSON array of ``FactorDefinition`` objects.
-        market_json: JSON-serialized ``MarketContext``.
+        market: ``MarketContext`` instance or JSON string.
         as_of: Valuation date in ISO 8601 format.
         bump_config_json: Optional JSON-serialized ``BumpSizeConfig``.
         n_scenario_points: Number of scenario grid points
@@ -1721,89 +1721,6 @@ def callable_range_accrual_accrued(
 
     The call provision is not applied here — this is the coupon that
     would accrue assuming the note is not called before period end.
-    """
-    ...
-
-# ---------------------------------------------------------------------------
-# Credit events / restructuring
-# ---------------------------------------------------------------------------
-
-def execute_recovery_waterfall(
-    total_value: float,
-    currency: str,
-    claims: list[dict],
-    allocation_mode: str = "pro_rata",
-) -> dict:
-    """Run a recovery waterfall over an ordered claim stack.
-
-    Distributes ``total_value`` across ``claims`` in priority order
-    following the Absolute Priority Rule (APR). Secured claims first
-    recover from their collateral; any shortfall becomes a deficiency
-    claim in the unsecured pool.
-
-    Args:
-        total_value: Total enterprise value or liquidation proceeds.
-        currency: ISO currency code (e.g. ``"USD"``).
-        claims: Ordered list of claim dicts. Each supports ``seniority``
-            (str: ``first_lien``, ``second_lien``, ``senior_unsecured``,
-            ``subordinated``, ``equity``, etc.), ``principal`` (float),
-            optional ``accrued``, ``penalties``, ``collateral_value``,
-            ``haircut``, ``id``, ``label``.
-        allocation_mode: Intra-class allocation; ``"pro_rata"`` (default)
-            or ``"strict_priority"``.
-
-    Returns:
-        Dict with ``total_distributed``, ``residual``, ``apr_satisfied``,
-        ``apr_violations``, and ``per_claim_recovery``.
-    """
-    ...
-
-def analyze_exchange_offer(
-    old_pv: float,
-    new_pv: float,
-    consent_fee: float = 0.0,
-    equity_sweetener_value: float = 0.0,
-    exchange_type: str = "par_for_par",
-) -> dict:
-    """Compare hold-vs-tender economics for a distressed exchange offer.
-
-    Args:
-        old_pv: Present value of the existing claim (hold scenario).
-        new_pv: Present value of the new instrument (tender scenario).
-        consent_fee: Consent / early-tender fee paid to participants.
-        equity_sweetener_value: Estimated value of any equity kicker.
-        exchange_type: One of ``par_for_par``, ``discount``, ``uptier``,
-            ``downtier`` (audit only).
-
-    Returns:
-        Dict with ``old_npv``, ``new_npv``, ``tender_total``,
-        ``delta_npv``, ``breakeven_recovery``, ``tender_recommended``.
-    """
-    ...
-
-def analyze_lme(
-    lme_type: str,
-    notional: float,
-    repurchase_price_pct: float,
-    opt_acceptance_pct: float = 1.0,
-    ebitda: float | None = None,
-) -> dict:
-    """Analyze a liability management exercise.
-
-    Args:
-        lme_type: One of ``open_market`` / ``open_market_repurchase``,
-            ``tender_offer``, ``amend_and_extend`` / ``ae``, ``dropdown``.
-        notional: Outstanding notional of the target instrument.
-        repurchase_price_pct: Price fraction for repurchases/tenders;
-            extension fee fraction for A&E; transferred-asset fraction
-            for dropdown.
-        opt_acceptance_pct: Fraction of holders participating (0.0-1.0).
-        ebitda: If provided, a ``leverage_impact`` block is returned.
-
-    Returns:
-        Dict with ``cost``, ``notional_reduction``, ``discount_capture``,
-        ``discount_capture_pct``, ``remaining_holder_impact_pct``, and
-        optional ``leverage_impact``.
     """
     ...
 

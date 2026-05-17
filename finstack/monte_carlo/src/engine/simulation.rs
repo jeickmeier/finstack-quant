@@ -18,15 +18,22 @@ use smallvec::SmallVec;
 /// - `Correlation` — draw i.i.d. shocks and (optionally) Cholesky-transform
 ///   them with `factor`. The standard McEngine path loop uses this.
 /// - `InjectFbm` — draw i.i.d. shocks then overwrite `z[z_index]` with
-///   `increments[step]`. The rough-volatility / fractional Monte Carlo path
-///   loop uses this to splice pre-generated fBM increments into a single
-///   factor slot. Correlation is always `None` in this mode because rough
+///   `increments[step]`, and optionally a second slot `z[aux_index]` with
+///   `aux[step]`. The rough-volatility / fractional Monte Carlo path loop uses
+///   this to splice pre-generated fractional increments into one factor slot
+///   (and, for rBergomi, the unit-variance driving Brownian normal into a
+///   second slot). Correlation is always `None` in this mode because rough
 ///   schemes encode their factor structure inside `disc.step`.
 pub(crate) enum NoiseHook<'a> {
     Correlation(Option<&'a CorrelationFactor>),
     InjectFbm {
         z_index: usize,
         increments: &'a [f64],
+        /// Optional second injection: `(aux_index, aux_values)`. When present,
+        /// `z[aux_index]` is overwritten with `aux_values[step]`. Used by the
+        /// rBergomi path to inject the unit-variance driving Brownian normal
+        /// alongside the Riemann-Liouville Volterra increment.
+        aux: Option<(usize, &'a [f64])>,
     },
 }
 
@@ -48,6 +55,7 @@ fn fill_shocks<R: RandomStream>(
         NoiseHook::InjectFbm {
             z_index,
             increments,
+            aux,
         } => {
             rng.fill_std_normals(z);
             debug_assert!(
@@ -61,6 +69,19 @@ fn fill_shocks<R: RandomStream>(
                 z.len()
             );
             z[*z_index] = increments[step];
+            if let Some((aux_index, aux_values)) = aux {
+                debug_assert!(
+                    step < aux_values.len(),
+                    "fBM aux values shorter than time grid: step {step} >= len {}",
+                    aux_values.len()
+                );
+                debug_assert!(
+                    *aux_index < z.len(),
+                    "fbm aux_index {aux_index} out of bounds for z len {}",
+                    z.len()
+                );
+                z[*aux_index] = aux_values[step];
+            }
         }
     }
 }

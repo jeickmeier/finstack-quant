@@ -375,6 +375,39 @@ mod tests {
     }
 
     #[test]
+    fn test_latent_variable_marginal_recovers_pd() {
+        // Per-name latent draw Aᵢ = √ρ·Z + √(1−ρ)·εᵢ must be marginally
+        // N(0,1): the fraction of draws below Φ⁻¹(PD) must equal PD. This is
+        // the correctness anchor for finite-pool simulation — without it the
+        // realized default count would be biased.
+        use finstack_monte_carlo::rng::philox::PhiloxRng;
+        use finstack_monte_carlo::traits::RandomStream;
+
+        let copula = GaussianCopula::new();
+        let pd = 0.05;
+        let threshold = standard_normal_inv_cdf(pd);
+        let rho = 0.30;
+
+        let mut rng = PhiloxRng::new(7);
+        let trials = 400_000usize;
+        let mut defaults = 0usize;
+        for _ in 0..trials {
+            let z = rng.next_std_normal();
+            let eps = rng.next_std_normal();
+            let a = copula.latent_variable(z, eps, 1.0, rho);
+            if a <= threshold {
+                defaults += 1;
+            }
+        }
+        let realized = defaults as f64 / trials as f64;
+        // 3-sigma binomial MC error at p=0.05, n=4e5 is ≈ 0.001.
+        assert!(
+            (realized - pd).abs() < 0.0015,
+            "latent-variable marginal {realized} should recover PD {pd}"
+        );
+    }
+
+    #[test]
     fn test_low_correlation_branch_matches_smoothing_floor() {
         let copula = GaussianCopula::new();
         let pd = 0.05;

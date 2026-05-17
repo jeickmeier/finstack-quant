@@ -22,6 +22,7 @@ mod copula_based;
 mod factor_correlated;
 mod hazard_curve_adapter;
 mod intensity_process;
+mod per_name;
 mod spec;
 mod traits;
 
@@ -29,5 +30,7 @@ pub(crate) use copula_based::CopulaBasedDefault;
 pub(crate) use factor_correlated::FactorCorrelatedDefault;
 pub(crate) use hazard_curve_adapter::HazardCurveDefault;
 pub(crate) use intensity_process::IntensityProcessDefault;
+pub(crate) use per_name::PerNameCopulaDefault;
+pub use per_name::PoolGranularity;
 pub use spec::StochasticDefaultSpec;
 pub(crate) use traits::{MacroCreditFactors, StochasticDefault};

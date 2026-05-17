@@ -101,6 +101,52 @@ pub trait Copula: Send + Sync {
         self.conditional_default_prob(default_threshold, factor_realization, correlation)
     }
 
+    /// LHP conditional default probability given the *Gaussian* systematic
+    /// draw `z` and the shared mixing draw `w`.
+    ///
+    /// This is the large-homogeneous-pool (`N → ∞`) limit of the per-name
+    /// latent construction [`Self::latent_variable`] — the sampling
+    /// counterpart computed in the **same** `(Z, W)` sigma-algebra as
+    /// [`Self::latent_variable`], so a per-name pool and the LHP fast-path
+    /// converge as `N → ∞`.
+    ///
+    /// It differs from [`Self::conditional_default_prob`]: that method takes
+    /// the copula's *own systematic factor* (for the Student-t copula the
+    /// `t(ν)`-distributed `M = Z/√W`, with `W` already integrated out). Here
+    /// the caller passes the raw Gaussian `Z` and the explicitly-drawn `W`,
+    /// matching how [`Self::latent_variable`] is fed by the per-name engine.
+    ///
+    /// # Arguments
+    ///
+    /// * `default_threshold` — the per-name default barrier `c` (`Φ⁻¹(PD)`
+    ///   for Gaussian-marginal copulas, `t_ν⁻¹(PD)` for the Student-t copula).
+    /// * `systematic` — the Gaussian systematic draw `Z ~ N(0,1)` for the
+    ///   period, shared by every name.
+    /// * `mixing` — the shared mixing variable `W` drawn via
+    ///   [`Self::sample_mixing`] (`1.0` for copulas without a mixing
+    ///   variable). The default implementation ignores it.
+    /// * `correlation` — the asset correlation `ρ`.
+    ///
+    /// # Default implementation
+    ///
+    /// Copulas whose latent variable is `Aᵢ = √ρ·Z + √(1−ρ)·εᵢ` with a
+    /// Gaussian systematic `Z` (Gaussian, RFL, multi-factor) have
+    /// `P(default | Z) = Φ((c − √ρ·Z)/√(1−ρ))`, which is exactly what
+    /// [`Self::conditional_default_prob`] already computes from a single
+    /// factor — so the default implementation delegates to it and ignores
+    /// `mixing`. The Student-t copula, whose latent variable divides by `√W`,
+    /// overrides this with the `W`-conditional closed form.
+    fn conditional_default_prob_given_systematic_and_mixing(
+        &self,
+        default_threshold: f64,
+        systematic: f64,
+        mixing: f64,
+        correlation: f64,
+    ) -> f64 {
+        let _ = mixing;
+        self.conditional_default_prob(default_threshold, &[systematic], correlation)
+    }
+
     /// Integrate expected value E[f(L)] over the factor distribution.
     ///
     /// Uses appropriate quadrature for the copula's factor distribution.
@@ -110,6 +156,57 @@ pub trait Copula: Send + Sync {
     ///
     /// The factor-space expectation of the supplied integrand.
     fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64;
+
+    /// Per-name latent variable `Aᵢ` for a finite-pool Monte Carlo draw.
+    ///
+    /// This realizes the copula's *own* latent-variable construction (the
+    /// one documented in each model's module header) so a finite pool can be
+    /// simulated name-by-name rather than collapsed to the large-homogeneous
+    /// pool (LHP) limit. It is the sampling counterpart of
+    /// [`Self::conditional_default_prob`], which only returns the analytic
+    /// `P(default | Z)` and therefore cannot capture name-level lumpiness.
+    ///
+    /// # Arguments
+    ///
+    /// * `systematic` — a standard-normal draw `Z ~ N(0,1)` shared by every
+    ///   name in the pool for this period.
+    /// * `idiosyncratic` — a standard-normal draw `εᵢ ~ N(0,1)` unique to
+    ///   name `i`.
+    /// * `mixing` — the shared positive mixing variable `W` for copulas with
+    ///   a variance-mixture representation (Student-t: `W ~ Gamma(ν/2, ν/2)`).
+    ///   Pass `1.0` for copulas without a mixing variable (Gaussian); the
+    ///   default implementation ignores it.
+    /// * `correlation` — the asset correlation `ρ`.
+    ///
+    /// # Default implementation
+    ///
+    /// The Gaussian one-factor construction
+    /// `Aᵢ = √ρ · Z + √(1−ρ) · εᵢ`.
+    /// Copulas with a different latent structure (Student-t) override this.
+    /// A name defaults when `Aᵢ ≤ threshold` where `threshold` is the copula's
+    /// default threshold (`Φ⁻¹(PD)` for Gaussian, `t_ν⁻¹(PD)` for Student-t).
+    fn latent_variable(
+        &self,
+        systematic: f64,
+        idiosyncratic: f64,
+        mixing: f64,
+        correlation: f64,
+    ) -> f64 {
+        let _ = mixing;
+        let rho = correlation.clamp(0.0, 1.0);
+        rho.sqrt() * systematic + (1.0 - rho).sqrt() * idiosyncratic
+    }
+
+    /// Draw the shared mixing variable `W` for variance-mixture copulas.
+    ///
+    /// `u01` is a uniform `[0,1)` draw. The default implementation returns
+    /// `1.0` (no mixing — Gaussian). The Student-t copula overrides this to
+    /// sample `W ~ Gamma(ν/2, ν/2)` so that `M = Z/√W` is `t(ν)`-distributed
+    /// and the shared `W` induces tail dependence across every name.
+    fn sample_mixing(&self, u01: f64) -> f64 {
+        let _ = u01;
+        1.0
+    }
 
     /// Number of systematic factors in the model.
     ///

@@ -645,6 +645,31 @@ fn test_sabr_validate_inputs_covers_standard_and_shifted_branches() {
 }
 
 #[test]
+fn test_sabr_implied_volatility_rejects_nonpositive_time_to_expiry() {
+    // `implied_volatility` must wire in `validate_inputs`: a non-positive
+    // `time_to_expiry` is rejected up front with a clear error rather than
+    // flowing silently into the time-correction factor.
+    let model =
+        SABRModel::new(SABRParameters::new(0.2, 0.5, 0.3, -0.2).expect("valid standard params"));
+
+    let forward = 100.0;
+    let strike = 110.0;
+
+    for bad_expiry in [0.0, -1.0] {
+        let err = model
+            .implied_volatility(forward, strike, bad_expiry)
+            .expect_err("non-positive time_to_expiry must error");
+        assert!(
+            err.to_string().contains("time_to_expiry"),
+            "error should name the degenerate input, got: {err}"
+        );
+    }
+
+    // A positive expiry on the same model still succeeds.
+    assert!(model.implied_volatility(forward, strike, 1.0).is_ok());
+}
+
+#[test]
 fn test_sabr_nu_zero_short_circuit_matches_atm_vol_off_atm() {
     let params = SABRParameters::new(0.24, 0.6, 0.0, -0.35).expect("valid params");
     let model = SABRModel::new(params);
@@ -807,4 +832,109 @@ fn test_sabr_strike_from_delta_half_delta_returns_forward() {
 
     assert!((call_strike - 100.0).abs() < 1e-12);
     assert!((put_strike - 100.0).abs() < 1e-12);
+}
+
+// ===================================================================
+// M1 Bug-Fix Tests: Hagan (1-beta) exponent in the vol denominator
+// ===================================================================
+
+/// At β=1 (lognormal SABR), ν=0 (no vol-of-vol), ρ=0, the model reduces to
+/// dF = α·F·dW, i.e. a pure GBM with constant log-vol α.
+///
+/// Hagan et al. (2002) eq. 2.18 (ATM formula):
+///
+///   σ_ATM = α / F^(1-β) · [1 + ((1-β)²α²/(24·F^(2(1-β))) + ρβνα/(4·F^(1-β)) + (2-3ρ²)ν²/24)·T]
+///
+/// At β=1: F^(1-β) = F^0 = 1, (1-β)² = 0, ν=0 so all time-correction terms vanish:
+///
+///   σ_ATM = α · 1 · [1 + 0] = α   (for any forward F)
+///
+/// The buggy code uses F^β = F^1 = F in the denominator instead of F^(1-β) = 1,
+/// so it returns α/F, which equals α only at F=1.
+#[test]
+fn sabr_beta_one_atm_recovers_alpha() {
+    let alpha = 0.20_f64;
+    let beta = 1.0_f64;
+    let nu = 0.0_f64; // no vol-of-vol: forces ATM path, pure GBM
+    let rho = 0.0_f64;
+
+    let params = SABRParameters::new(alpha, beta, nu, rho)
+        .expect("β=1 lognormal SABR params should be valid");
+    let model = SABRModel::new(params);
+
+    for &fwd in &[0.01_f64, 1.0, 100.0, 4000.0] {
+        let vol = model
+            .implied_volatility(fwd, fwd, 1.0)
+            .expect("ATM vol should compute for β=1, ν=0");
+        assert!(
+            (vol - alpha).abs() < 1e-10,
+            "β=1, ν=0 ATM vol should equal α={alpha} for F={fwd}, got {vol}"
+        );
+    }
+}
+
+/// Reference value derivation for α=0.20, β=1, ν=0.30, ρ=-0.30, F=100, K=120, T=1.
+///
+/// Hagan et al. (2002) eq. 2.17a (off-ATM, with Obloj correction absorbed into
+/// the β=1 exact formula):
+///
+///   σ_B = (α / f_mid^(1-β)) · (z / χ(z)) · factor3
+///
+///   where:
+///     f_mid = sqrt(F·K)    = sqrt(100·120) = 109.5445115...
+///     At β=1: f_mid^(1-β) = f_mid^0       = 1.0
+///     z      = (ν/α)·ln(F/K)               = (0.30/0.20)·ln(100/120)
+///            = 1.5·(-0.18232155...)         = -0.27348233519...
+///     disc   = 1 - 2ρz + z²  = 1 - 2(-0.30)(-0.27348...) + (-0.27348...)²
+///            = 1 - 0.16409...  + 0.07479... = 0.91071...
+///     χ(z)   = ln((sqrt(disc) + z - ρ)/(1-ρ))
+///            = ln((0.95431...  + (-0.27348...) - (-0.30)) / (1 - (-0.30)))
+///            = ln(0.98083... / 1.30)          = ln(0.75448...)
+///            = -0.28173...
+///     z/χ(z) = (-0.27348...) / (-0.28173...) = 0.97074...
+///
+///   factor3 at β=1 (the (1-β)² and (1-β)⁴ log-moneyness terms vanish):
+///     term_a = (1-β)²α²/(24·f_mid^(2(1-β))) = 0
+///     term_b = 0.25·ρ·β·ν·α / f_mid^(1-β)   = 0.25·(-0.30)·1·0.30·0.20 / 1
+///            = -0.0045
+///     term_c = (2 - 3ρ²)·ν² / 24             = (2 - 3·0.09)·0.09/24
+///            = 1.73·0.09/24                   = 0.0064875
+///     time_correction = 0 + (-0.0045) + 0.0064875 = 0.0019875
+///     factor3 = 1 + 1.0 · 0.0019875           = 1.0019875
+///
+///   σ_B = (0.20 / 1.0) · 0.97074... · 1.0019875 = 0.19453422...
+///
+/// Computed independently in Python (no codebase dependency):
+///   >>> import math
+///   >>> alpha,beta,nu,rho,F,K,T = 0.20,1.0,0.30,-0.30,100.0,120.0,1.0
+///   >>> f_mid=math.sqrt(F*K); z=(nu/alpha)*math.log(F/K)
+///   >>> disc=1-2*rho*z+z*z; chi=math.log((disc**0.5+z-rho)/(1-rho))
+///   >>> tc=0.25*rho*beta*nu*alpha+(2-3*rho**2)*nu**2/24
+///   >>> vol=(alpha/(f_mid**(1-beta)))*(z/chi)*(1+T*tc)
+///   >>> round(vol,10)   →  0.1945342213
+#[test]
+fn sabr_beta_one_smile_matches_hagan_reference() {
+    let alpha = 0.20_f64;
+    let beta = 1.0_f64;
+    let nu = 0.30_f64;
+    let rho = -0.30_f64;
+    let forward = 100.0_f64;
+    let strike = 120.0_f64;
+    let expiry = 1.0_f64;
+
+    // Reference: 0.1945342213 (see derivation in doc-comment above)
+    let reference_vol = 0.194_534_221_258_664_37_f64;
+
+    let params = SABRParameters::new(alpha, beta, nu, rho)
+        .expect("β=1 lognormal SABR params should be valid");
+    let model = SABRModel::new(params);
+
+    let vol = model
+        .implied_volatility(forward, strike, expiry)
+        .expect("OTM vol should compute for β=1");
+
+    assert!(
+        (vol - reference_vol).abs() < 1e-6,
+        "β=1 Hagan reference mismatch: got {vol:.10}, expected {reference_vol:.10}"
+    );
 }

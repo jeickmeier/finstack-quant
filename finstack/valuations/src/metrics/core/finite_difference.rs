@@ -73,29 +73,60 @@ pub(crate) fn replace_scalar_value(
 }
 
 /// Compute a central difference normalized by the full bump width.
+///
+/// # Errors
+///
+/// Returns [`InputError::NonPositiveValue`](finstack_core::InputError::NonPositiveValue)
+/// if `width` is non-finite or its magnitude is at or below
+/// [`MIN_FINITE_DIFF_WIDTH`]. A degenerate bump width cannot yield a meaningful
+/// sensitivity; returning a silent `0.0` would be indistinguishable from a true
+/// zero Greek, so the degenerate case is surfaced as an error instead.
 #[inline]
-pub(crate) fn central_diff_by_width(pv_up: f64, pv_down: f64, width: f64) -> f64 {
+pub(crate) fn central_diff_by_width(
+    pv_up: f64,
+    pv_down: f64,
+    width: f64,
+) -> finstack_core::Result<f64> {
     if !width.is_finite() || width.abs() <= MIN_FINITE_DIFF_WIDTH {
-        return 0.0;
+        tracing::warn!(
+            width,
+            min_width = MIN_FINITE_DIFF_WIDTH,
+            "finite-difference bump width is degenerate; cannot normalize sensitivity"
+        );
+        return Err(finstack_core::InputError::NonPositiveValue.into());
     }
-    (pv_up - pv_down) / width
+    Ok((pv_up - pv_down) / width)
 }
 
 /// Compute a central difference normalized by a symmetric half-bump.
+///
+/// # Errors
+///
+/// Propagates the degenerate-width error from [`central_diff_by_width`] when
+/// `2 * half_bump` is non-finite or negligibly small.
 #[inline]
-pub(crate) fn central_diff_by_half_bump(pv_up: f64, pv_down: f64, half_bump: f64) -> f64 {
+pub(crate) fn central_diff_by_half_bump(
+    pv_up: f64,
+    pv_down: f64,
+    half_bump: f64,
+) -> finstack_core::Result<f64> {
     central_diff_by_width(pv_up, pv_down, 2.0 * half_bump)
 }
 
 /// Compute a scaled central difference using the actual bump width.
+///
+/// # Errors
+///
+/// Propagates the degenerate-width error from [`central_diff_by_width`] when
+/// `width` is non-finite or negligibly small.
 #[inline]
 pub(crate) fn scaled_central_diff_by_width(
     pv_up: f64,
     pv_down: f64,
     width: f64,
     scale: f64,
-) -> f64 {
-    central_diff_by_width(pv_up, pv_down, width) * scale
+) -> finstack_core::Result<f64> {
+    Ok(central_diff_by_width(pv_up, pv_down, width)? * scale)
 }
 
 /// Helper to bump a scalar price in MarketContext.
@@ -161,11 +192,17 @@ pub(crate) fn bump_scalar_price(
 /// a single scalar price (typically a spot rate / underlying level), using a
 /// **relative** bump.
 ///
-/// Returns `(PV(s * (1 + h)) - PV(s * (1 - h))) / (2 * s * h)`. Returns `0.0`
-/// if the implied bump width is non-positive (e.g. when `s == 0`).
+/// Returns `(PV(s * (1 + h)) - PV(s * (1 - h))) / (2 * s * h)`.
 ///
 /// Used by FX/equity delta calculators that share the "look up scalar, bump
 /// up/down by relative %, central difference" pattern.
+///
+/// # Errors
+///
+/// Returns [`InputError::NonPositiveValue`](finstack_core::InputError::NonPositiveValue)
+/// if the implied bump width `s * h` is non-finite or non-positive (e.g. when
+/// the spot `s` is zero). A degenerate bump width cannot yield a meaningful
+/// sensitivity, so it is surfaced as an error rather than a silent `0.0`.
 pub(crate) fn central_diff_scalar_relative<I>(
     inst: &I,
     market: &finstack_core::market_data::context::MarketContext,
@@ -180,13 +217,21 @@ where
     let current = scalar_numeric_value(scalar);
     let bump_size = current * bump_pct;
     if !bump_size.is_finite() || bump_size <= 0.0 {
-        return Ok(0.0);
+        tracing::warn!(
+            scalar_id,
+            spot = current,
+            bump_pct,
+            bump_size,
+            "relative finite-difference bump width is degenerate (zero/negative spot?); \
+             cannot compute sensitivity"
+        );
+        return Err(finstack_core::InputError::NonPositiveValue.into());
     }
     let up = bump_scalar_price(market, scalar_id, bump_pct)?;
     let down = bump_scalar_price(market, scalar_id, -bump_pct)?;
     let pv_up = inst.value(&up, as_of)?.amount();
     let pv_dn = inst.value(&down, as_of)?.amount();
-    Ok(central_diff_by_width(pv_up, pv_dn, 2.0 * bump_size))
+    central_diff_by_width(pv_up, pv_dn, 2.0 * bump_size)
 }
 
 /// Helper to bump a discount curve with parallel shift.
@@ -444,12 +489,36 @@ mod tests {
     }
 
     #[test]
-    fn central_difference_helpers_guard_small_width() {
-        assert_eq!(central_diff_by_width(2.0, 1.0, 0.0), 0.0);
-        assert_eq!(central_diff_by_half_bump(2.0, 1.0, 0.0), 0.0);
-        assert_eq!(scaled_central_diff_by_width(2.0, 1.0, 0.0, 1e-4), 0.0);
+    fn central_difference_helpers_error_on_degenerate_width() {
+        // A degenerate bump width must surface as an `Err`, never a silent
+        // `0.0` (which is indistinguishable from a true zero Greek).
+        for err in [
+            central_diff_by_width(2.0, 1.0, 0.0).expect_err("zero width must error"),
+            central_diff_by_width(2.0, 1.0, 1e-13).expect_err("sub-tolerance width must error"),
+            central_diff_by_width(2.0, 1.0, f64::NAN).expect_err("non-finite width must error"),
+            central_diff_by_half_bump(2.0, 1.0, 0.0).expect_err("zero half-bump must error"),
+            scaled_central_diff_by_width(2.0, 1.0, 0.0, 1e-4).expect_err("zero width must error"),
+        ] {
+            match err {
+                finstack_core::Error::Input(finstack_core::InputError::NonPositiveValue) => {}
+                e => panic!("unexpected error variant for degenerate width: {e:?}"),
+            }
+        }
+    }
 
-        assert_eq!(central_diff_by_half_bump(3.0, 1.0, 0.5), 2.0);
-        assert_eq!(scaled_central_diff_by_width(3.0, 1.0, 4.0, 0.5), 0.25);
+    #[test]
+    fn central_difference_helpers_compute_known_values() {
+        assert_eq!(
+            central_diff_by_width(3.0, 1.0, 4.0).expect("non-degenerate width"),
+            0.5
+        );
+        assert_eq!(
+            central_diff_by_half_bump(3.0, 1.0, 0.5).expect("non-degenerate half-bump"),
+            2.0
+        );
+        assert_eq!(
+            scaled_central_diff_by_width(3.0, 1.0, 4.0, 0.5).expect("non-degenerate width"),
+            0.25
+        );
     }
 }

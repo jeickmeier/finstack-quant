@@ -43,16 +43,33 @@ use nalgebra::DMatrix;
 /// the precomputed correlation structure for a specific time grid and Hurst
 /// exponent.
 pub trait FractionalNoiseGenerator: Send + Sync {
-    /// Transform i.i.d. standard normals into correlated fBM increments.
+    /// Transform i.i.d. standard normals into correlated fractional increments.
     ///
     /// # Arguments
     ///
-    /// * `normals` — input slice of [`num_steps()`](Self::num_steps) i.i.d. N(0,1) values
-    /// * `out` — output slice of [`num_steps()`](Self::num_steps) correlated fBM increments
+    /// * `normals` — input slice of
+    ///   [`num_steps()`](Self::num_steps)·[`normals_per_step()`](Self::normals_per_step)
+    ///   i.i.d. N(0,1) values
+    /// * `out` — output slice of [`num_steps()`](Self::num_steps) correlated
+    ///   fractional increments
     fn generate(&self, normals: &[f64], out: &mut [f64]);
 
-    /// Number of time steps (length of both `normals` and `out` slices).
+    /// Number of time steps (length of the `out` slice).
     fn num_steps(&self) -> usize;
+
+    /// Number of i.i.d. N(0,1) inputs consumed per time step.
+    ///
+    /// The input `normals` slice passed to [`generate`](Self::generate) must
+    /// have length `num_steps() * normals_per_step()`. The default is 1: the
+    /// Cholesky and Molchan-Golosov hybrid fBM generators draw exactly one
+    /// normal per step. The Bennedsen-Lunde-Pakkanen hybrid scheme for the
+    /// Riemann-Liouville Volterra process draws two per step (one for the
+    /// driving Brownian increment, one for the exact near-field innovation),
+    /// so [`RiemannLiouvilleVolterra`](super::volterra::RiemannLiouvilleVolterra)
+    /// overrides this to 2.
+    fn normals_per_step(&self) -> usize {
+        1
+    }
 
     /// Hurst exponent H used by this generator.
     fn hurst(&self) -> f64;

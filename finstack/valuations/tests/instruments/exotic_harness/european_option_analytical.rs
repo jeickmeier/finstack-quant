@@ -20,10 +20,10 @@
 use finstack_core::currency::Currency;
 use finstack_core::math::special_functions::norm_cdf;
 use finstack_core::money::Money;
+use finstack_monte_carlo::process::ou::HullWhite1FParams;
 use finstack_monte_carlo::traits::{PathState, Payoff, StateKey};
 use finstack_valuations::instruments::rates::exotics_shared::hw1f_mc::RateExoticHw1fMcPricer;
 use finstack_valuations::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig;
-use finstack_valuations::instruments::rates::swaption::HullWhiteParams;
 
 /// Standard-normal PDF φ(x) = exp(−x²/2) / √(2π).
 fn normal_pdf(x: f64) -> f64 {
@@ -66,10 +66,10 @@ fn short_rate_european_call_matches_analytical() {
     let d = (mu - strike) / sig_r;
     let expected = notional * ((mu - strike) * norm_cdf(d) + sig_r * normal_pdf(d));
 
+    // Constant θ = 0 ⇒ pure Ornstein-Uhlenbeck, matching the analytical μ above.
     let pricer = RateExoticHw1fMcPricer {
-        hw_params: HullWhiteParams::new(kappa, sigma).expect("valid HW params"),
+        process_params: HullWhite1FParams::new(kappa, sigma, 0.0),
         r0,
-        theta: 0.0,
         event_times: vec![t],
         config: RateExoticMcConfig {
             num_paths: 200_000,

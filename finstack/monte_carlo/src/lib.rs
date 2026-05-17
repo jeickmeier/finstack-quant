@@ -190,6 +190,7 @@ pub mod prelude {
 
     // --- Fractional noise ---
     pub use super::rng::fbm::{create_fbm_generator, FractionalNoiseGenerator};
+    pub use super::rng::volterra::RiemannLiouvilleVolterra;
     // --- Pricing results ---
     pub use super::results::{MoneyEstimate, MonteCarloResult};
     pub use super::traits::Payoff;

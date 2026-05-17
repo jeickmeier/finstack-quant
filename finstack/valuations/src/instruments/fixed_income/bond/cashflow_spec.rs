@@ -748,6 +748,26 @@ impl CashflowSpec {
             Self::Amortizing { base, .. } => base.day_count(),
         }
     }
+
+    /// Get the fixed annual coupon rate, if this specification has one.
+    ///
+    /// # Returns
+    ///
+    /// - `Some(rate)` for fixed-rate bonds (the coupon as a decimal, e.g. `0.05`).
+    /// - `Some(initial_rate)` for step-up bonds (the rate in force at issue).
+    /// - `Some(..)` for amortizing bonds whose base leg is fixed/step-up.
+    /// - `None` for floating-rate bonds, which have no contractual fixed coupon.
+    ///
+    /// This is used by conventions (e.g. the CME bond-future conversion factor)
+    /// that require the security's stated annual coupon.
+    pub fn fixed_coupon_rate(&self) -> Option<f64> {
+        match self {
+            Self::Fixed(spec) => f64::try_from(spec.rate).ok(),
+            Self::StepUp(spec) => f64::try_from(spec.initial_rate).ok(),
+            Self::Floating(_) => None,
+            Self::Amortizing { base, .. } => base.fixed_coupon_rate(),
+        }
+    }
 }
 
 impl Default for CashflowSpec {

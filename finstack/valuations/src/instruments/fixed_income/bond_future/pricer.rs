@@ -10,7 +10,6 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::Result;
 
-use crate::cashflow::traits::CashflowProvider;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::Bond;
 use crate::instruments::rates::ir_future::Position;
@@ -22,126 +21,159 @@ use crate::instruments::rates::ir_future::Position;
 pub struct BondFuturePricer;
 
 impl BondFuturePricer {
-    /// Calculate conversion factor for a bond in the deliverable basket.
+    /// Calculate the CME/CBOT standard conversion factor for a deliverable bond.
     ///
-    /// The conversion factor normalizes bonds with different coupons and maturities
-    /// to make them comparable for delivery against a futures contract.
+    /// The conversion factor normalizes bonds with different coupons and
+    /// maturities so they can be compared for delivery against a futures
+    /// contract. It is a **fixed contractual quantity** for a given
+    /// (security, delivery month) pair — it is the decimal price at which
+    /// $1 par of the security would trade if it yielded the contract's
+    /// notional coupon rate. It does **not** depend on the caller's
+    /// valuation date.
     ///
-    /// # Formula
+    /// # CME standard formula
     ///
-    /// CF = PV(bond cashflows at standard coupon rate) / 100
+    /// Source: CME Group, "Calculating U.S. Treasury Futures Conversion
+    /// Factors" (Interest Rate Resource Center, IR232). For a security with
+    /// annual coupon `coupon` (rounded to the nearest 1/8 of 1%) and a
+    /// notional yield `r` (6% for all U.S. Treasury futures, so the
+    /// per-period rate is `r/2`):
+    ///
+    /// ```text
+    /// factor = a × [ (coupon/2) + c + d ] − b      (rounded to 4 dp)
+    ///
+    ///   n = whole years from the first day of the delivery month to the
+    ///       maturity (or first call) date.
+    ///   z = whole months between n and maturity, rounded DOWN to the
+    ///       nearest quarter (10Y/30Y contracts) or the nearest month
+    ///       (2Y/3Y/5Y contracts).
+    ///   v = z                       if z < 7
+    ///     = 3                       if z ≥ 7   (10Y / 30Y contracts)
+    ///     = z − 6                   if z ≥ 7   (2Y / 3Y / 5Y contracts)
+    ///   a = 1 / (1 + r/2)^(v/6)
+    ///   b = (coupon/2) × (6 − v) / 6
+    ///   c = 1 / (1 + r/2)^(2n)      if z < 7
+    ///     = 1 / (1 + r/2)^(2n + 1)  if z ≥ 7
+    ///   d = (coupon / r) × (1 − c)
+    /// ```
     ///
     /// # Important
     ///
-    /// This is an **approximate** calculation for educational/testing purposes.
-    /// For production use, always source conversion factors from the exchange
-    /// (CME, Eurex, ICE). Exchange CFs use specific rounding rules and
-    /// first-day-of-delivery-month conventions that this implementation
-    /// may not exactly replicate.
-    ///
-    /// For semi-annual bonds (UST):
-    /// - Discount factor: DF(t) = 1 / (1 + r/2)^(2*t)
-    /// - PV = Σ(cashflow_i × DF(t_i))
-    /// - CF = PV / 100 (per $100 face value)
+    /// When the exchange publishes a conversion factor for a deliverable, use
+    /// that value: it is carried on [`super::DeliverableBond::conversion_factor`]
+    /// and is what the pricing path (`base_value`, the futures-price and
+    /// conversion-factor metrics) actually uses. This function reproduces the
+    /// published CME methodology and is the fallback when no exchange value is
+    /// supplied.
     ///
     /// # Parameters
     ///
-    /// - `bond`: The deliverable bond to calculate the conversion factor for
-    /// - `standard_coupon`: The standard coupon rate used by the futures contract (e.g., 0.06 for 6%)
-    /// - `standard_maturity_years`: The standard maturity in years (e.g., 10.0 for UST 10Y)
-    /// - `market`: Market context for getting bond cashflows
-    /// - `as_of`: The calculation date (typically first day of delivery month)
+    /// - `bond`: The deliverable bond. Must be fixed-rate (or step-up); the
+    ///   stated annual coupon is read from the bond's cashflow spec.
+    /// - `standard_coupon`: The contract's notional coupon / yield (e.g.
+    ///   `0.06` for the 6% U.S. Treasury contracts).
+    /// - `standard_maturity_years`: The contract's standard maturity in years.
+    ///   Selects the rounding convention: `>= 6` years uses the 10Y/30Y rules
+    ///   (quarterly `z`, `v = 3` when `z ≥ 7`); otherwise the 2Y/3Y/5Y rules
+    ///   (monthly `z`, `v = z − 6` when `z ≥ 7`).
+    /// - `delivery_month_first_day`: Any date within the delivery month; the
+    ///   CME anchor (the first day of that month) is derived internally.
     ///
     /// # Returns
     ///
-    /// Conversion factor rounded to 4 decimal places
+    /// Conversion factor rounded to 4 decimal places.
     ///
-    /// # Example
+    /// # Errors
     ///
-    /// ```text
-    /// use finstack_core::currency::Currency;
-    /// use finstack_core::market_data::context::MarketContext;
-    /// use finstack_core::money::Money;
-    /// use finstack_valuations::instruments::Bond;
-    /// use finstack_valuations::instruments::fixed_income::bond_future::pricer::BondFuturePricer;
-    /// use time::macros::date;
-    ///
-    /// # fn main() -> finstack_core::Result<()> {
-    /// let market = MarketContext::new();
-    /// let bond = Bond::fixed(
-    ///     "US-CTD",
-    ///     Money::new(100_000.0, Currency::USD),
-    ///     0.05,
-    ///     date!(2020-01-15),
-    ///     date!(2030-01-15),
-    ///     "USD-OIS",
-    /// )?;
-    /// let cf = BondFuturePricer::calculate_conversion_factor(
-    ///     &bond,
-    ///     0.06,  // 6% standard coupon
-    ///     10.0,  // 10-year maturity
-    ///     &market,
-    ///     date!(2025-03-01),
-    /// )?;
-    /// // cf might be 0.8234 for a bond with 5% coupon
-    /// # let _ = cf;
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// Returns [`finstack_core::Error::Validation`] if the bond has no fixed
+    /// coupon (e.g. a floating-rate note), if the notional coupon is
+    /// non-positive, or if the bond matures before the delivery month.
     pub fn calculate_conversion_factor(
         bond: &Bond,
         standard_coupon: f64,
-        _standard_maturity_years: f64,
-        market: &MarketContext,
-        as_of: Date,
+        standard_maturity_years: f64,
+        delivery_month_first_day: Date,
     ) -> Result<f64> {
-        // Get bond's cashflows (holder view: all positive)
-        let cashflows = bond.dated_cashflows(market, as_of)?;
+        use finstack_core::dates::DateExt;
 
-        // Calculate present value using standard coupon rate as discount rate
-        // For semi-annual bonds: DF(t) = 1 / (1 + r/2)^(2*t)
-        let mut pv = 0.0;
-        let half_rate = standard_coupon / 2.0;
-
-        for (flow_date, amount) in cashflows {
-            // Only include future cashflows (as_of date or later)
-            // Past cashflows have already been paid and should not be included
-            if flow_date < as_of {
-                continue;
-            }
-
-            // ACT/ACT (ISDA) day count for conversion factor per exchange standards
-            let years = finstack_core::dates::DayCount::ActAct.year_fraction(
-                as_of,
-                flow_date,
-                finstack_core::dates::DayCountContext::default(),
-            )?;
-
-            // Calculate discount factor for semi-annual compounding
-            // DF(t) = 1 / (1 + r/2)^(2*t)
-            let periods = 2.0 * years;
-            if half_rate <= -1.0 {
-                return Err(finstack_core::Error::Validation(format!(
-                    "Standard coupon rate {} yields half_rate {} <= -1.0, cannot compute conversion factor",
-                    standard_coupon, half_rate
-                )));
-            }
-            let discount_factor = 1.0 / (1.0 + half_rate).powf(periods);
-
-            // Add discounted cashflow to PV
-            pv += amount.amount() * discount_factor;
+        if !standard_coupon.is_finite() || standard_coupon <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "standard (notional) coupon must be a positive, finite rate to compute a conversion factor, got {standard_coupon}"
+            )));
         }
 
-        // Conversion factor = PV / Par Value
-        // This gives a multiplier (e.g., 0.8234 for a discount bond)
-        // For a $100,000 bond, we divide by 100,000 to get the factor
-        let notional = bond.notional.amount();
-        let cf_raw = pv / notional;
+        // Stated annual coupon of the deliverable, rounded to the nearest
+        // 1/8 of 1% (0.00125) per the CME methodology footnote.
+        let raw_coupon = bond.cashflow_spec.fixed_coupon_rate().ok_or_else(|| {
+            finstack_core::Error::Validation(format!(
+                "bond '{}' has no fixed coupon; the CME conversion factor is only defined for fixed-rate deliverables",
+                bond.id.as_str()
+            ))
+        })?;
+        let coupon = (raw_coupon / 0.00125).round() * 0.00125;
 
-        // Round to 4 decimal places (standard for conversion factors)
-        let cf = (cf_raw * 10000.0).round() / 10000.0;
+        // CME anchor: the first calendar day of the delivery month.
+        let month_start = Date::from_calendar_date(
+            delivery_month_first_day.year(),
+            delivery_month_first_day.month(),
+            1,
+        )
+        .map_err(|e| {
+            finstack_core::Error::Validation(format!("invalid delivery month date: {e}"))
+        })?;
 
-        Ok(cf)
+        // For callable issues the CME measures time to the first call date;
+        // straight notes/bonds use the maturity date.
+        let redemption_date = bond
+            .call_put
+            .as_ref()
+            .and_then(|cp| cp.calls.iter().map(|c| c.start_date).min())
+            .unwrap_or(bond.maturity);
+        if redemption_date <= month_start {
+            return Err(finstack_core::Error::Validation(format!(
+                "bond '{}' redemption date {redemption_date} is not after the delivery month start {month_start}",
+                bond.id.as_str()
+            )));
+        }
+
+        // Whole months from the first day of the delivery month to redemption.
+        let total_months = month_start.months_until(redemption_date);
+        // Round the *months* component down to the contract's granularity:
+        // 3 months for the 10Y/30Y contracts, 1 month for 2Y/3Y/5Y.
+        let is_long_contract = standard_maturity_years >= 6.0;
+        let n: i64 = (total_months / 12) as i64;
+        let z_raw = total_months % 12;
+        let z: i64 = if is_long_contract {
+            (z_raw - z_raw % 3) as i64
+        } else {
+            z_raw as i64
+        };
+
+        // v: months from the delivery-month start to the first coupon.
+        let v: f64 = if z < 7 {
+            z as f64
+        } else if is_long_contract {
+            3.0
+        } else {
+            (z - 6) as f64
+        };
+
+        // Per-period discount rate at the notional yield (r/2 per half-year).
+        let period_base = 1.0 + standard_coupon / 2.0;
+
+        let a = 1.0 / period_base.powf(v / 6.0);
+        let b = (coupon / 2.0) * (6.0 - v) / 6.0;
+        let c = if z < 7 {
+            1.0 / period_base.powi((2 * n) as i32)
+        } else {
+            1.0 / period_base.powi((2 * n + 1) as i32)
+        };
+        let d = (coupon / standard_coupon) * (1.0 - c);
+
+        let factor = a * (coupon / 2.0 + c + d) - b;
+
+        // CME publishes conversion factors to 4 decimal places.
+        Ok((factor * 10_000.0).round() / 10_000.0)
     }
 
     /// Calculate model futures price from the CTD bond.
@@ -430,6 +462,7 @@ mod tests {
     use finstack_core::types::{CurveId, InstrumentId};
     use time::macros::date;
 
+    use crate::cashflow::traits::CashflowProvider;
     use crate::instruments::fixed_income::bond::Bond;
 
     /// Helper to create a simple market context with a flat discount curve
@@ -502,122 +535,221 @@ mod tests {
         println!("Expected for 100k notional with 6% coupon: ~$103,000 (coupons) + $100,000 (redemption)");
     }
 
+    // ========== Conversion Factor Tests (CME standard formula) ==========
+    //
+    // The five reference values below are the published CME conversion
+    // factors from CME Group, "Calculating U.S. Treasury Futures Conversion
+    // Factors" (IR232) — the worked examples in that brochure. Each is a
+    // real, identified U.S. Treasury issue with a specific delivery month.
+
+    /// CME IR232 Example #1 — 2-Year U.S. Treasury Note futures.
+    /// CUSIP 912828JP6, the 1-1/2s of October 31, 2010, December 2008 expiry.
+    /// Published CME conversion factor: 0.9229.
     #[test]
-    fn test_conversion_factor_par_bond() {
-        // For a bond with coupon equal to standard coupon, CF should be ~1.0
+    fn test_conversion_factor_cme_2y_example() {
+        let bond = create_test_bond(
+            100_000.0,
+            0.015,
+            date!(2008 - 10 - 31),
+            date!(2010 - 10 - 31),
+        );
+        // standard_maturity_years = 2.0 -> monthly z rounding, v = z - 6.
+        let cf =
+            BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 2.0, date!(2008 - 12 - 01))
+                .expect("CME 2Y conversion factor should compute");
+        assert!(
+            (cf - 0.9229).abs() <= 1e-4,
+            "CME-published CF for 912828JP6 (Dec-2008) is 0.9229, got {cf}"
+        );
+    }
+
+    /// CME IR232 Example #2 — 3-Year U.S. Treasury Note futures.
+    /// CUSIP 912828KB5, the 1-1/8s of January 15, 2012, March 2009 expiry.
+    /// Published CME conversion factor: 0.8747.
+    #[test]
+    fn test_conversion_factor_cme_3y_example() {
+        let bond = create_test_bond(
+            100_000.0,
+            0.01125,
+            date!(2009 - 01 - 15),
+            date!(2012 - 01 - 15),
+        );
+        let cf =
+            BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 3.0, date!(2009 - 03 - 01))
+                .expect("CME 3Y conversion factor should compute");
+        assert!(
+            (cf - 0.8747).abs() <= 1e-4,
+            "CME-published CF for 912828KB5 (Mar-2009) is 0.8747, got {cf}"
+        );
+    }
+
+    /// CME IR232 Example #3 — 5-Year U.S. Treasury Note futures.
+    /// CUSIP 912828JQ4, the 2-3/4s of October 31, 2013, December 2008 expiry.
+    /// Published CME conversion factor: 0.8653.
+    #[test]
+    fn test_conversion_factor_cme_5y_example() {
+        let bond = create_test_bond(
+            100_000.0,
+            0.0275,
+            date!(2008 - 10 - 31),
+            date!(2013 - 10 - 31),
+        );
+        let cf =
+            BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 5.0, date!(2008 - 12 - 01))
+                .expect("CME 5Y conversion factor should compute");
+        assert!(
+            (cf - 0.8653).abs() <= 1e-4,
+            "CME-published CF for 912828JQ4 5Y (Dec-2008) is 0.8653, got {cf}"
+        );
+    }
+
+    /// CME IR232 Example #4 — 10-Year U.S. Treasury Note futures.
+    /// CUSIP 912828JR2, the 3-3/4s of November 15, 2018, December 2008 expiry.
+    /// Published CME conversion factor: 0.8357.
+    #[test]
+    fn test_conversion_factor_cme_10y_example() {
+        let bond = create_test_bond(
+            100_000.0,
+            0.0375,
+            date!(2008 - 11 - 15),
+            date!(2018 - 11 - 15),
+        );
+        // standard_maturity_years = 10.0 -> quarterly z rounding, v = 3 when z >= 7.
+        let cf =
+            BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, date!(2008 - 12 - 01))
+                .expect("CME 10Y conversion factor should compute");
+        assert!(
+            (cf - 0.8357).abs() <= 1e-4,
+            "CME-published CF for 912828JR2 (Dec-2008) is 0.8357, got {cf}"
+        );
+    }
+
+    /// CME IR232 Example #5 — 30-Year U.S. Treasury Bond futures.
+    /// CUSIP 912810PX0, the 4-1/2s of May 15, 2038, December 2008 expiry.
+    /// Published CME conversion factor: 0.7943.
+    #[test]
+    fn test_conversion_factor_cme_30y_example() {
+        let bond = create_test_bond(
+            1_000_000.0,
+            0.045,
+            date!(2008 - 05 - 15),
+            date!(2038 - 05 - 15),
+        );
+        let cf =
+            BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 30.0, date!(2008 - 12 - 01))
+                .expect("CME 30Y conversion factor should compute");
+        assert!(
+            (cf - 0.7943).abs() <= 1e-4,
+            "CME-published CF for 912810PX0 (Dec-2008) is 0.7943, got {cf}"
+        );
+    }
+
+    /// A 6%-coupon note with a whole number of years to delivery prices at
+    /// exactly par under the 6% notional yield, so its CF must be 1.0000.
+    #[test]
+    fn test_conversion_factor_par_bond_is_one() {
         let bond = create_test_bond(
             100_000.0,
             0.06,
-            date!(2020 - 01 - 15),
-            date!(2030 - 01 - 15),
+            date!(2020 - 12 - 15),
+            date!(2030 - 12 - 15),
         );
-
-        let market = create_test_market(0.06);
-        let as_of = date!(2025 - 01 - 15);
-
-        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, &market, as_of)
-            .expect("Failed to calculate conversion factor");
-
-        // For a bond with coupon = standard coupon and ~10 years to maturity,
-        // CF should be close to 1.0
+        let cf =
+            BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, date!(2025 - 12 - 01))
+                .expect("par-bond conversion factor should compute");
         assert!(
-            (cf - 1.0).abs() < 0.05,
-            "Par bond CF should be near 1.0, got {}",
-            cf
+            (cf - 1.0).abs() <= 1e-4,
+            "6% coupon bond with whole-year maturity should have CF 1.0000, got {cf}"
         );
     }
 
+    /// The conversion factor must not depend on the caller's valuation
+    /// date: only the delivery month enters the CME formula. Two dates in
+    /// the same delivery month must produce the identical factor.
     #[test]
-    fn test_conversion_factor_discount_bond() {
-        // For a bond with coupon < standard coupon, CF should be < 1.0
+    fn test_conversion_factor_independent_of_valuation_date() {
         let bond = create_test_bond(
             100_000.0,
-            0.04,
-            date!(2020 - 01 - 15),
-            date!(2030 - 01 - 15),
+            0.0375,
+            date!(2008 - 11 - 15),
+            date!(2018 - 11 - 15),
         );
-
-        let market = create_test_market(0.04);
-        let as_of = date!(2025 - 01 - 15);
-
-        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, &market, as_of)
-            .expect("Failed to calculate conversion factor");
-
-        // Lower coupon bond should have CF < 1.0
-        assert!(cf < 1.0, "Discount bond CF should be < 1.0, got {}", cf);
-        assert!(cf > 0.7, "CF should be reasonable, got {}", cf);
+        let cf_first =
+            BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, date!(2008 - 12 - 01))
+                .expect("conversion factor should compute");
+        let cf_mid =
+            BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, date!(2008 - 12 - 19))
+                .expect("conversion factor should compute");
+        assert!(
+            (cf_first - cf_mid).abs() <= 1e-12,
+            "CF must be anchored to the delivery month, not the valuation date: {cf_first} vs {cf_mid}"
+        );
     }
 
+    /// Discount (low-coupon) bonds have CF < 1, premium bonds CF > 1.
     #[test]
-    fn test_conversion_factor_premium_bond() {
-        // For a bond with coupon > standard coupon, CF should be > 1.0
-        let bond = create_test_bond(
+    fn test_conversion_factor_discount_vs_premium() {
+        let discount = create_test_bond(
             100_000.0,
-            0.08,
-            date!(2020 - 01 - 15),
-            date!(2030 - 01 - 15),
+            0.03,
+            date!(2020 - 06 - 15),
+            date!(2032 - 06 - 15),
         );
-
-        let market = create_test_market(0.08);
-        let as_of = date!(2025 - 01 - 15);
-
-        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, &market, as_of)
-            .expect("Failed to calculate conversion factor");
-
-        // Higher coupon bond should have CF > 1.0
-        assert!(cf > 1.0, "Premium bond CF should be > 1.0, got {}", cf);
-        assert!(cf < 1.3, "CF should be reasonable, got {}", cf);
-    }
-
-    #[test]
-    fn test_conversion_factor_rounding() {
-        // Test that CF is rounded to 4 decimal places
-        let bond = create_test_bond(
+        let premium = create_test_bond(
             100_000.0,
-            0.055,
-            date!(2020 - 01 - 15),
-            date!(2030 - 01 - 15),
+            0.09,
+            date!(2020 - 06 - 15),
+            date!(2032 - 06 - 15),
         );
-
-        let market = create_test_market(0.055);
-        let as_of = date!(2025 - 01 - 15);
-
-        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, &market, as_of)
-            .expect("Failed to calculate conversion factor");
-
-        // Check that CF has at most 4 decimal places
-        let cf_scaled = (cf * 10000.0).round();
-        let cf_rounded = cf_scaled / 10000.0;
-        assert_eq!(cf, cf_rounded, "CF should be rounded to 4 decimal places");
+        let cf_discount = BondFuturePricer::calculate_conversion_factor(
+            &discount,
+            0.06,
+            10.0,
+            date!(2025 - 06 - 01),
+        )
+        .expect("conversion factor should compute");
+        let cf_premium = BondFuturePricer::calculate_conversion_factor(
+            &premium,
+            0.06,
+            10.0,
+            date!(2025 - 06 - 01),
+        )
+        .expect("conversion factor should compute");
+        assert!(
+            cf_discount < 1.0,
+            "discount-bond CF should be < 1, got {cf_discount}"
+        );
+        assert!(
+            cf_premium > 1.0,
+            "premium-bond CF should be > 1, got {cf_premium}"
+        );
     }
 
+    /// Floating-rate deliverables have no fixed coupon; the CME factor is
+    /// undefined and must surface a validation error rather than a number.
     #[test]
-    fn test_conversion_factor_short_maturity() {
-        // Test CF for a bond with shorter remaining maturity
-        let bond = create_test_bond(
+    fn test_conversion_factor_rejects_floating_bond() {
+        use crate::instruments::fixed_income::bond::CashflowSpec;
+        use finstack_core::dates::{DayCount, Tenor};
+
+        let mut bond = create_test_bond(
             100_000.0,
             0.05,
-            date!(2023 - 01 - 15),
-            date!(2027 - 01 - 15),
+            date!(2020 - 06 - 15),
+            date!(2032 - 06 - 15),
+        );
+        bond.cashflow_spec = CashflowSpec::floating(
+            CurveId::new("USD-SOFR-3M"),
+            50.0,
+            Tenor::quarterly(),
+            DayCount::Act360,
         );
 
-        let market = create_test_market(0.05);
-        let as_of = date!(2025 - 01 - 15);
-
-        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, &market, as_of)
-            .expect("Failed to calculate conversion factor");
-
-        // Shorter maturity discount bond should have CF very close to 1.0
-        // With only 2 years remaining, the coupon difference has minimal impact
+        let result =
+            BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, date!(2025 - 06 - 01));
         assert!(
-            (cf - 1.0).abs() < 0.02,
-            "Short maturity bond CF should be very close to 1.0, got {}",
-            cf
-        );
-        assert!(
-            cf > 0.98,
-            "CF should be close to par for short maturity, got {}",
-            cf
+            result.is_err(),
+            "conversion factor must reject a floating-rate deliverable"
         );
     }
 
@@ -637,7 +769,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
 
         // Calculate CF (should be ~1.0 for par bond)
-        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, &market, as_of)
+        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, as_of)
             .expect("Failed to calculate conversion factor for par bond");
 
         // Calculate model futures price
@@ -665,7 +797,7 @@ mod tests {
         let market = create_test_market(0.06); // Higher market rate than coupon
         let as_of = date!(2025 - 01 - 15);
 
-        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, &market, as_of)
+        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, as_of)
             .expect("Failed to calculate conversion factor for discount bond");
 
         let model_price = BondFuturePricer::calculate_model_price(&bond, cf, &market, as_of)
@@ -689,7 +821,7 @@ mod tests {
         let market = create_test_market(0.06); // Lower market rate than coupon
         let as_of = date!(2025 - 01 - 15);
 
-        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, &market, as_of)
+        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, as_of)
             .expect("Failed to calculate conversion factor for premium bond");
 
         let model_price = BondFuturePricer::calculate_model_price(&bond, cf, &market, as_of)
@@ -716,7 +848,7 @@ mod tests {
         let market = create_test_market(0.05);
         let as_of = date!(2025 - 01 - 15);
 
-        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, &market, as_of)
+        let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, as_of)
             .expect("Failed to calculate conversion factor for manual verification");
         let model_price = BondFuturePricer::calculate_model_price(&bond, cf, &market, as_of)
             .expect("Failed to calculate model futures price for manual verification");
@@ -793,9 +925,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
 
         // Calculate conversion factor
-        let cf =
-            BondFuturePricer::calculate_conversion_factor(&ctd_bond, 0.06, 10.0, &market, as_of)
-                .expect("Failed to calculate conversion factor");
+        let cf = BondFuturePricer::calculate_conversion_factor(&ctd_bond, 0.06, 10.0, as_of)
+            .expect("Failed to calculate conversion factor");
 
         // Calculate NPV
         let npv = BondFuturePricer::calculate_npv(&future, &ctd_bond, cf, &market, as_of)
@@ -851,9 +982,8 @@ mod tests {
         let market = create_test_market(0.06);
         let as_of = date!(2025 - 01 - 15);
 
-        let cf =
-            BondFuturePricer::calculate_conversion_factor(&ctd_bond, 0.06, 10.0, &market, as_of)
-                .expect("Failed to calculate conversion factor");
+        let cf = BondFuturePricer::calculate_conversion_factor(&ctd_bond, 0.06, 10.0, as_of)
+            .expect("Failed to calculate conversion factor");
 
         let npv_short = BondFuturePricer::calculate_npv(&future, &ctd_bond, cf, &market, as_of)
             .expect("Failed to calculate NPV for short position");
@@ -904,9 +1034,8 @@ mod tests {
         let as_of = date!(2025 - 01 - 15);
 
         // Calculate components
-        let cf =
-            BondFuturePricer::calculate_conversion_factor(&ctd_bond, 0.06, 10.0, &market, as_of)
-                .expect("Failed to calculate conversion factor");
+        let cf = BondFuturePricer::calculate_conversion_factor(&ctd_bond, 0.06, 10.0, as_of)
+            .expect("Failed to calculate conversion factor");
 
         let model_price = BondFuturePricer::calculate_model_price(&ctd_bond, cf, &market, as_of)
             .expect("Failed to calculate model price");
@@ -1010,22 +1139,12 @@ mod tests {
 
         let market = create_test_market(0.05);
 
-        let cf_a = BondFuturePricer::calculate_conversion_factor(
-            &bond_a,
-            0.06,
-            10.0,
-            &market,
-            delivery_start,
-        )
-        .expect("Failed to calculate conversion factor for bond A");
-        let cf_b = BondFuturePricer::calculate_conversion_factor(
-            &bond_b,
-            0.06,
-            10.0,
-            &market,
-            delivery_start,
-        )
-        .expect("Failed to calculate conversion factor for bond B");
+        let cf_a =
+            BondFuturePricer::calculate_conversion_factor(&bond_a, 0.06, 10.0, delivery_start)
+                .expect("Failed to calculate conversion factor for bond A");
+        let cf_b =
+            BondFuturePricer::calculate_conversion_factor(&bond_b, 0.06, 10.0, delivery_start)
+                .expect("Failed to calculate conversion factor for bond B");
 
         let future = BondFuture::builder()
             .id(InstrumentId::new("TYH5"))

@@ -24,19 +24,18 @@ impl SABRModel {
         strike: f64,
         time_to_expiry: f64,
     ) -> Result<f64> {
-        // Apply shift if using shifted SABR for negative rates
-        let (effective_forward, effective_strike) = if let Some(shift) = self.params.shift {
-            (forward + shift, strike + shift)
-        } else {
-            // Validate non-negative rates for standard SABR
-            if forward <= 0.0 || strike <= 0.0 {
-                return Err(Error::Validation(format!(
-                    "Standard SABR requires positive rates. Got forward={:.6}, strike={:.6}. \
-                     Use shifted SABR (new_with_shift) for negative rates.",
-                    forward, strike
-                )));
-            }
-            (forward, strike)
+        // Reject degenerate inputs up front so callers get a clear early error:
+        //   - non-positive `time_to_expiry` (otherwise it flows silently into
+        //     the time-correction factor),
+        //   - non-positive rates / effective rates (otherwise `f_mid.sqrt()`
+        //     of a negative argument silently produces NaN).
+        self.validate_inputs(forward, strike, time_to_expiry)?;
+
+        // Apply shift if using shifted SABR for negative rates. Rate positivity
+        // has already been enforced by `validate_inputs` above.
+        let (effective_forward, effective_strike) = match self.params.shift {
+            Some(shift) => (forward + shift, strike + shift),
+            None => (forward, strike),
         };
 
         let alpha = self.params.alpha;
@@ -59,7 +58,7 @@ impl SABRModel {
         let f_mid_beta = if beta_is_zero {
             1.0 // Special case for normal model
         } else {
-            f_mid.powf(beta)
+            f_mid.powf(1.0 - beta)
         };
 
         // Enhanced log-moneyness calculation
@@ -157,8 +156,6 @@ impl SABRModel {
         let nu = self.params.nu;
         let rho = self.params.rho;
         let beta_is_zero = beta.abs() < 1e-12;
-        let beta_is_one = (beta - 1.0).abs() < 1e-12;
-        let beta_is_half = (beta - 0.5).abs() < 1e-12;
 
         // Handle degenerate cases
         if alpha.abs() < 1e-14 {
@@ -166,31 +163,27 @@ impl SABRModel {
         }
 
         // ATM volatility formula with numerical protection
+        // Hagan et al. (2002) eq. 2.18:
+        //   σ_ATM = α / F^(1-β) · [1 + ((1-β)²α²/24/F^(2(1-β)) + ρβνα/4/F^(1-β) + (2-3ρ²)ν²/24) · T]
         let vol = if beta_is_zero {
-            // Normal SABR: vol = alpha * (1 + T * (2-3*rho²)/24 * nu²)
+            // Normal SABR (β=0): F^(1-β) = F, but the α·T·(...) time correction
+            // collapses to the normal-SABR form with no F dependence.
+            // Hagan eq. 2.18 at β=0: σ_ATM = α · (1 + (2-3ρ²)ν²/24 · T)
             alpha * (1.0 + time_to_expiry * (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2))
-        } else if beta_is_one {
-            // Lognormal SABR: vol = alpha/F * (1 + T * (alpha²/(24*F²) + rho*nu*alpha/(4*F) + (2-3*rho²)*nu²/24))
-            let alpha_term = alpha.powi(2) / (24.0 * forward.powi(2));
-            let rho_term = 0.25 * rho * nu * alpha / forward;
-            let nu_term = (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
-
-            alpha / forward * (1.0 + time_to_expiry * (alpha_term + rho_term + nu_term))
         } else {
-            // General beta case with numerical protection
+            // General β ∈ (0,1] case, including β=1.
+            // At β=1: F^(1-β)=1, (1-β)²=0, so alpha_term→0 and rho_term→ρνα/4.
+            // At β=0.5: the general term (1-β)²/24·α²/F^(2(1-β)) evaluates to α²/(96·F).
+            //           The removed beta_is_half shortcut used α²/(24·F) — a 4× error
+            //           this fix also corrects.
             let f_beta = if forward.abs() < 1e-14 {
-                1e-14_f64.powf(beta) // Avoid zero to very small power
+                1e-14_f64.powf(1.0 - beta) // Avoid zero to very small power
             } else {
-                forward.powf(beta)
+                forward.powf(1.0 - beta)
             };
 
-            let alpha_term = if beta_is_half {
-                // Special handling for beta = 0.5 (sqrt case)
-                alpha.powi(2) / (24.0 * forward)
-            } else {
-                (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / forward.powf(2.0 * (1.0 - beta))
-            };
-
+            let alpha_term =
+                (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / forward.powf(2.0 * (1.0 - beta));
             let rho_term = 0.25 * rho * beta * nu * alpha / f_beta;
             let nu_term = (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2);
 

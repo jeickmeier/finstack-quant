@@ -3,6 +3,15 @@
 //! Uses the calibrated LMM process with predictor-corrector discretization and
 //! Longstaff-Schwartz backward induction for optimal exercise decisions.
 //!
+//! # Product
+//!
+//! This prices the standard **co-terminal** Bermudan swaption: the right, at
+//! each exercise date `T_k`, to enter the *remaining* swap `[T_k, T_N]`. Every
+//! exercise date shares the common terminal date `T_N`. The exercise intrinsic
+//! is therefore the genuine time-`T_k` value of the co-terminal swap, computed
+//! from the forwards still alive at `T_k` (`start_idx = first_alive(T_k)`), not
+//! the value of a fixed `[T_0, T_N]` swap.
+//!
 //! The payoff is evaluated entirely from forward rates in the path state,
 //! making it naturally multi-curve-consistent (no short-rate reconstruction
 //! needed). The simulation is conducted under the terminal measure with
@@ -171,29 +180,71 @@ pub fn price_bermudan_lmm(
 
     // --- Phase 2: LSMC backward induction ---
     //
-    // cashflow[path_idx] = discounted payoff at the optimal exercise time
+    // The simulation is under the terminal measure with numéraire
+    // `P(t, T_N)`. The per-path estimator of a payoff realised at exercise
+    // time `t` is therefore `payoff / P(t, T_N)`, deflated by the
+    // *pathwise* terminal numéraire — and `cashflow[path_idx]` carries that
+    // deflated, terminal-measure value. Because every entry is expressed in
+    // the common `P(·, T_N)` accounting unit, deflated values from
+    // different exercise dates are directly comparable in the
+    // Longstaff-Schwartz continuation regression, and Phase 3 recovers the
+    // time-0 price with a single `× P(0, T_N)`.
     let mut cashflow = vec![0.0_f64; total_paths];
 
     // Iterate backward through exercise dates
     for ex_idx in (0..exercise_step_indices.len()).rev() {
         let step = exercise_step_indices[ex_idx];
+        let t_exercise = time_grid.time(step);
 
         // Compute exercise value at each path
         let mut exercise_values = Vec::with_capacity(total_paths);
         let mut basis_inputs = Vec::with_capacity(total_paths);
 
+        // Index of the first forward still alive at this exercise date.
+        // A forward `j` is alive while its fixing date `T_j >= t`. The
+        // co-terminal swap entered on exercise at `T_k` covers exactly the
+        // periods `[T_{first_alive}, T_N]`.
+        let first_alive = params.tenors[..n].partition_point(|&tenor| tenor < t_exercise);
+
         for path in &all_paths {
             let forwards = &path[step];
+            // Numerator: the *genuine time-`t`* co-terminal swap value.
+            //
+            // A Bermudan SWAPTION exercised at `T_k` confers the right to
+            // enter the swap `[T_k, T_N]` — the *remaining* swap, not the
+            // full `[T_0, T_N]` swap. `compute_swap_rate_and_annuity` with
+            // `start_idx = first_alive` returns `S_t` and the annuity
+            // `A_t = Σ_{j>=first_alive} τ_j P(t,T_{j+1})`, both discounted
+            // to time `t`. Hence `intrinsic = (S_t-K)·A_t·N` is a genuine
+            // *time-`t`* quantity (reference date `t`).
             let (swap_rate, annuity) =
-                compute_swap_rate_and_annuity(forwards, &params.accrual_factors, 0, n);
+                compute_swap_rate_and_annuity(forwards, &params.accrual_factors, first_alive, n);
             let intrinsic = if payer {
                 (swap_rate - strike) * annuity * notional
             } else {
                 (strike - swap_rate) * annuity * notional
             };
-            exercise_values.push(intrinsic);
+            // Deflator: the pathwise terminal-measure numéraire
+            // `P(t,T_N) = Π_{j>=first_alive} 1/(1+τ_j F_j)` — also a
+            // *time-`t`* quantity, built from the same `first_alive`
+            // forwards. Numerator and deflator therefore share reference
+            // date `t`, so the terminal-measure identity
+            //   V_0 = P(0,T_N) · E^{T_N}[ H_t / P(t,T_N) ]
+            // holds with `H_t` the genuine time-`t` co-terminal swap value:
+            //   intrinsic / P(t,T_N) = (S_t-K)·A_t·N / P(t,T_N).
+            // (Hard-coding `start_idx = 0` would make the numerator the
+            // `T_0`-referenced `P(T_0,t)·Swap_t`, leaving a spurious
+            // `P(T_0,t)` factor against this `t`-referenced deflator.)
+            let numeraire = pathwise_terminal_numeraire(forwards, params, t_exercise);
+            let deflated = if numeraire > 0.0 {
+                intrinsic / numeraire
+            } else {
+                0.0
+            };
+            exercise_values.push(deflated);
 
-            // Basis: swap rate, annuity, swap_rate^2
+            // Regression features are the (un-deflated) state variables:
+            // forward swap rate and annuity.
             basis_inputs.push((swap_rate, annuity));
         }
 
@@ -205,15 +256,14 @@ pub fn price_bermudan_lmm(
                 }
             }
         } else {
-            // Interior exercise date: regression for continuation value
-
-            // Discount cashflows from next step to this step
-            let _t_now = time_grid.time(step);
-            let _t_next = if ex_idx + 1 < exercise_step_indices.len() {
-                time_grid.time(exercise_step_indices[ex_idx + 1])
-            } else {
-                maturity
-            };
+            // Interior exercise date: regress the continuation value.
+            //
+            // No explicit time-stepping discount factor is applied here:
+            // `cashflow[i]` already holds the terminal-measure-deflated
+            // value `payoff / P(t', T_N)` from the future exercise step,
+            // and the current `exercise_values[i]` are deflated the same
+            // way, so exercise vs continuation is compared in a single
+            // consistent accounting unit.
 
             // Collect ITM paths for regression
             let mut itm_indices = Vec::new();
@@ -278,7 +328,13 @@ pub fn price_bermudan_lmm(
         }
     }
 
-    // --- Phase 3: Average discounted cashflows ---
+    // --- Phase 3: Recover the time-0 price ---
+    //
+    // `cashflow[i]` is the terminal-measure-deflated payoff
+    // `payoff / P(t, T_N)`. The terminal-measure pricing identity
+    // `V(0) = P(0, T_N) · E^{T_N}[ payoff / P(t, T_N) ]` then recovers the
+    // present value with a single multiplication by the constant
+    // `discount_factor_terminal = P(0, T_N)`.
     let mut stats = OnlineStats::new();
     for &cf in &cashflow {
         stats.update(cf * discount_factor_terminal);
@@ -313,7 +369,10 @@ pub fn price_bermudan_lmm(
 }
 
 /// Build a time grid with steps aligned to exercise dates.
-fn build_exercise_aligned_grid(
+///
+/// Public so reference simulations (e.g. no-arbitrage bound tests) can
+/// replay the *identical* grid the [`price_bermudan_lmm`] engine uses.
+pub fn build_exercise_aligned_grid(
     exercise_times: &[f64],
     maturity: f64,
     min_steps_between: usize,
@@ -404,6 +463,34 @@ fn compute_swap_rate_and_annuity(
     };
 
     (swap_rate, annuity)
+}
+
+/// Pathwise terminal-measure numéraire `P(t, T_N)` at time `t`.
+///
+/// Under the LMM terminal measure the numéraire is the zero-coupon bond
+/// `P(t, T_N)`. From the forward rates still *alive* at time `t` it is the
+/// product of single-period discount factors
+///
+/// ```text
+/// P(t, T_N) = Π_{j = first_alive(t)}^{N-1} 1 / (1 + τ_j F_j(t))
+/// ```
+///
+/// A forward `j` is alive while its fixing date `T_j >= t`. This matches
+/// the numéraire `LmmProcess::populate_path_state` records as
+/// `"lmm_numeraire"`; it is recomputed here because the engine works with
+/// raw forward-rate path states rather than `PathState`.
+fn pathwise_terminal_numeraire(forwards: &[f64], params: &LmmParams, t: f64) -> f64 {
+    let n = params.num_forwards;
+    // First alive forward: the first index with tenor T_j >= t.
+    let first_alive = params.tenors[..n].partition_point(|&tenor| tenor < t);
+    let mut numeraire = 1.0;
+    for (fwd, tau) in forwards[first_alive..n]
+        .iter()
+        .zip(&params.accrual_factors[first_alive..n])
+    {
+        numeraire /= 1.0 + tau * fwd;
+    }
+    numeraire
 }
 
 #[cfg(test)]

@@ -135,14 +135,25 @@ fn validate_confidence_level(confidence_level: f64) -> Result<()> {
 }
 
 /// VaR calculation results.
+///
+/// VaR and Expected Shortfall are both derived from a single quantile
+/// definition: the R type-7 / numpy-default linear-interpolated empirical
+/// quantile function (see [`VarResult::from_distribution`]). This guarantees
+/// the two measures are mutually consistent.
 #[derive(Debug, Clone)]
 pub struct VarResult {
-    /// Value-at-Risk at specified confidence level (always positive)
+    /// Value-at-Risk at specified confidence level (always positive).
+    ///
+    /// The loss at the `(1 - α)` quantile of the P&L distribution, computed
+    /// by linear interpolation between bracketing order statistics.
     pub var: f64,
 
-    /// Expected Shortfall (CVaR) at specified confidence level (always positive)
+    /// Expected Shortfall (CVaR) at specified confidence level (always positive).
     ///
-    /// Average of all losses exceeding VaR threshold.
+    /// The conditional tail expectation: the average loss over the worst
+    /// `(1 - α)` fraction of the distribution, computed as the mean of the
+    /// interpolated quantile function over `[0, 1 - α]`. By construction
+    /// `expected_shortfall >= var`.
     pub expected_shortfall: f64,
 
     /// Full P&L distribution from historical simulation (sorted, worst first)
@@ -190,37 +201,21 @@ impl VarResult {
             });
         }
 
-        // Calculate VaR at confidence level using ceiling-based (conservative) quantile method
+        // VaR and ES are both derived from ONE quantile definition: the R
+        // type-7 / numpy-default linear-interpolated empirical quantile (see
+        // `Jorion, Value at Risk, 3rd ed.`). This avoids the discontinuous
+        // step in `n` of an integer-index estimator and keeps VaR and ES
+        // mutually consistent.
         //
-        // Method choice rationale:
-        // - We use ceil((1 - α) * n) to determine the tail size, which is a conservative approach
-        // - For 95% VaR with 100 scenarios: ceil(0.05 * 100) = 5 scenarios in the tail
-        // - For 95% VaR with 8 scenarios: ceil(0.05 * 8) = ceil(0.4) = 1 scenario in the tail
-        //
-        // Alternative methods (not used here):
-        // - Floor-based: floor((1 - α) * n) - less conservative, may understate risk
-        // - Interpolation (e.g., linear): more accurate for small samples but adds complexity
-        //
-        // The ceiling method ensures we never underestimate risk, which aligns with
-        // regulatory and risk management best practices.
-        let var_index = ((1.0 - confidence_level) * num_scenarios as f64).ceil() as usize;
-        let var_index = var_index.saturating_sub(1).min(num_scenarios - 1);
-        let var = (-pnl_distribution[var_index]).max(0.0);
-
-        // Calculate Expected Shortfall (CVaR) as the average of tail losses
-        // ES is always >= VaR and captures the expected loss given that losses exceed VaR
-        let tail_size = var_index + 1;
-        let expected_shortfall = if tail_size > 0 {
-            let sum: f64 = neumaier_sum(
-                pnl_distribution
-                    .iter()
-                    .take(tail_size)
-                    .map(|pnl| (-*pnl).max(0.0)),
-            );
-            sum / tail_size as f64
-        } else {
-            0.0
-        };
+        // * VaR is the loss at the lower tail probability `p = 1 - α`,
+        //   interpolated between the two bracketing order statistics.
+        // * ES is the conditional tail expectation: the mean of the quantile
+        //   function over the tail `[0, p]`, i.e. the genuine average loss
+        //   beyond the `p` quantile. Because it integrates the SAME quantile
+        //   function used for VaR, `ES >= VaR` holds by construction.
+        let p = 1.0 - confidence_level;
+        let var = (-tail_quantile(&pnl_distribution, p)).max(0.0);
+        let expected_shortfall = (-tail_quantile_mean(&pnl_distribution, p)).max(0.0);
 
         // Warn about statistical reliability for small sample sizes
         // With fewer than 20 scenarios, the quantile estimates may be unreliable
@@ -233,7 +228,7 @@ impl VarResult {
                 var = var,
                 expected_shortfall = expected_shortfall,
                 "VaR calculated with fewer than {} scenarios. Statistical reliability is limited: \
-                 quantile estimates may be unstable and ES may not be well-defined. \
+                 the interpolated tail quantile and ES have high sampling variance. \
                  Consider using more historical observations or stress scenarios.",
                 MIN_RELIABLE_SCENARIOS
             );
@@ -247,6 +242,88 @@ impl VarResult {
             confidence_level,
         })
     }
+}
+
+/// Evaluate the R type-7 / numpy-default linear-interpolated empirical
+/// quantile function `Q(u)` of an ascending-sorted sample.
+///
+/// For `n` observations the quantile at probability `u in [0, 1]` is found at
+/// fractional rank `h = (n - 1) * u`: linearly interpolating between order
+/// statistics `sorted[floor(h)]` and `sorted[floor(h) + 1]`. This is the
+/// estimator used by `numpy.quantile` (default) and R's `quantile(type = 7)`.
+///
+/// `sorted` must be non-empty and sorted ascending; `u` is clamped to `[0, 1]`.
+fn type7_quantile(sorted: &[f64], u: f64) -> f64 {
+    let n = sorted.len();
+    // Single observation: the quantile function is the constant `sorted[0]`.
+    if n <= 1 {
+        return sorted[0];
+    }
+    let n_minus_1 = (n - 1) as f64;
+    let h = (n_minus_1 * u.clamp(0.0, 1.0)).clamp(0.0, n_minus_1);
+    // `lo` indexes the lower bracketing order statistic; clamping to `n - 2`
+    // keeps `lo + 1` in range when `h` lands exactly on the last knot.
+    let lo = (h.floor() as usize).min(n - 2);
+    let frac = h - lo as f64;
+    sorted[lo] + frac * (sorted[lo + 1] - sorted[lo])
+}
+
+/// Lower-tail quantile of the P&L distribution at tail probability `p`.
+///
+/// Uses the [`type7_quantile`] estimator. `sorted` must be the ascending
+/// (worst-loss-first) P&L distribution; `p = 1 - confidence_level`.
+fn tail_quantile(sorted: &[f64], p: f64) -> f64 {
+    type7_quantile(sorted, p)
+}
+
+/// Mean of the type-7 quantile function over the tail `[0, p]` — the genuine
+/// Expected Shortfall of the empirical distribution at tail probability `p`.
+///
+/// `ES = (1 / p) * integral over [0, p] of Q(u) du`, where `Q` is the
+/// piecewise-linear [`type7_quantile`] function. The integral is evaluated
+/// exactly by summing the trapezoidal area of each linear piece of `Q` that
+/// the interval `[0, p]` crosses (knots sit at `u = i / (n - 1)`).
+///
+/// This integrates the SAME quantile function used by [`tail_quantile`], so
+/// VaR and ES are mutually consistent: ES is the average of `Q` over `[0, p]`
+/// and VaR is `Q(p)`, the least-extreme point of that interval. Since `Q` is
+/// non-decreasing, the tail average is at least as extreme as its endpoint,
+/// hence (with the positive-loss sign convention) `ES >= VaR` always holds.
+///
+/// `sorted` must be non-empty and sorted ascending; `p` must lie in `(0, 1)`.
+fn tail_quantile_mean(sorted: &[f64], p: f64) -> f64 {
+    let n = sorted.len();
+    // Single observation: the quantile function is constant, so its tail mean
+    // is that single value.
+    if n <= 1 {
+        return sorted[0];
+    }
+    let n_minus_1 = (n - 1) as f64;
+    let p = p.clamp(0.0, 1.0);
+    let h_p = n_minus_1 * p;
+
+    // Accumulate the exact area under `Q` over `[0, p]` piece by piece. Each
+    // linear piece `j` of `Q` spans `u in [j / (n-1), (j+1) / (n-1)]`; the
+    // contributing sub-interval is its intersection with `[0, p]`.
+    let segment_area = (0..n - 1).map_while(|j| {
+        let seg_start = j as f64;
+        if seg_start >= h_p {
+            return None;
+        }
+        // Sub-interval `[a, b]` of segment `j`, expressed in fractional-rank
+        // units `h = (n-1) * u`, then in probability units for the width.
+        let a_h = seg_start;
+        let b_h = h_p.min(seg_start + 1.0);
+        let q_a = sorted[j] + (a_h - seg_start) * (sorted[j + 1] - sorted[j]);
+        let q_b = sorted[j] + (b_h - seg_start) * (sorted[j + 1] - sorted[j]);
+        // Width in probability units: (b_h - a_h) / (n - 1). Trapezoid area.
+        let width = (b_h - a_h) / n_minus_1;
+        Some(width * 0.5 * (q_a + q_b))
+    });
+    let integral = neumaier_sum(segment_area);
+
+    // `p` is strictly positive (confidence_level is validated to (0, 1)).
+    integral / p
 }
 
 /// Calculate Historical VaR for a single instrument using full revaluation.
@@ -1760,7 +1837,7 @@ mod tests {
 
     #[test]
     fn test_var_result_from_distribution() {
-        // Create synthetic P&L distribution with known values
+        // Create synthetic P&L distribution with known values.
         let pnls = vec![
             100.0,  // gain
             50.0,   // gain
@@ -1774,14 +1851,35 @@ mod tests {
 
         let result = VarResult::from_distribution(pnls, 0.95).expect("pnl distribution is finite");
 
-        // With 8 scenarios and 95% confidence:
-        // Tail size = ceil((1-0.95) * 8) = ceil(0.4) = 1
-        // So VaR should be the worst loss = 200
-        assert_eq!(result.var, 200.0);
         assert_eq!(result.num_scenarios, 8);
 
-        // ES should be average of tail (just the worst loss in this case)
-        assert_eq!(result.expected_shortfall, 200.0);
+        // Sorted ascending: [-200, -150, -100, -50, -25, 0, 50, 100]; n = 8.
+        // 95% VaR uses the R type-7 linear-interpolated quantile at p = 0.05:
+        //   h = (n - 1) * p = 7 * 0.05 = 0.35  ->  lo = 0, frac = 0.35
+        //   Q(p) = pnl[0] + 0.35 * (pnl[1] - pnl[0])
+        //        = -200 + 0.35 * 50 = -182.5  ->  VaR = 182.5
+        // (The previous ceil-index estimator reported the worst loss, 200.0.)
+        assert!(
+            (result.var - 182.5).abs() < 1e-9,
+            "interpolated 95% VaR should be 182.5, got {}",
+            result.var
+        );
+
+        // ES is the mean of Q over the tail [0, 0.05]; that interval lies
+        // entirely within the first linear segment (knot at 1/7 ~= 0.1429),
+        // so the integral is a single trapezoid:
+        //   integral = p * (Q(0) + Q(p)) / 2 = 0.05 * (-200 + -182.5) / 2
+        //            = 0.05 * -191.25 = -9.5625
+        //   ES = integral / p = -9.5625 / 0.05 = -191.25  ->  191.25
+        assert!(
+            (result.expected_shortfall - 191.25).abs() < 1e-9,
+            "interpolated 95% ES should be 191.25, got {}",
+            result.expected_shortfall
+        );
+
+        // VaR and ES come from one quantile definition: ES averages Q over
+        // [0, p] and VaR is its least-extreme endpoint Q(p), so ES >= VaR.
+        assert!(result.expected_shortfall >= result.var);
     }
 
     #[test]

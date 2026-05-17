@@ -10,13 +10,12 @@
 //! HW1F process + exact discretization, RNG streams with antithetic
 //! variates, and cross-path averaging with 95% CIs.
 
-use crate::calibration::hull_white::HullWhiteParams;
 use crate::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig;
 use finstack_core::currency::Currency;
 use finstack_core::Result;
 use finstack_monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
 use finstack_monte_carlo::online_stats::OnlineStats;
-use finstack_monte_carlo::process::ou::HullWhite1FProcess;
+use finstack_monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use finstack_monte_carlo::results::MoneyEstimate;
 use finstack_monte_carlo::rng::philox::PhiloxRng;
 use finstack_monte_carlo::time_grid::TimeGrid;
@@ -29,19 +28,17 @@ use finstack_monte_carlo::traits::{Discretization, PathState, Payoff, RandomStre
 /// product-specific cashflow accumulation (including discounting); the pricer
 /// only aggregates the per-path PVs into a [`MoneyEstimate`].
 pub struct RateExoticHw1fMcPricer {
-    /// HW1F short-rate parameters (κ, σ).
-    pub hw_params: HullWhiteParams,
+    /// Fully-specified HW1F short-rate parameters: κ, σ, and the
+    /// time-dependent mean-reversion level θ(t).
+    ///
+    /// The simulated short rate follows `dr_t = κ·(θ(t) - r_t)·dt + σ·dW_t`.
+    /// θ(t) MUST be bootstrapped from the product's discount curve (see
+    /// [`crate::instruments::rates::exotics_shared::calibrate_hw1f_params`])
+    /// so the simulated short rate reprices the initial curve — a constant θ
+    /// makes the process a plain Vasicek that mis-reprices any non-flat curve.
+    pub process_params: HullWhite1FParams,
     /// Initial short rate r(0).
     pub r0: f64,
-    /// Constant mean-reversion level θ for the HW1F short-rate process.
-    ///
-    /// The simulated short rate follows `dr_t = κ·(θ - r_t)·dt + σ·dW_t`.
-    /// Use `0.0` for a pure Ornstein-Uhlenbeck process (mean-reverts to
-    /// zero); use `r0` for a classic Vasicek process (mean-reverts to
-    /// the initial rate). Curve-calibrated products should replace this
-    /// single-θ constant with a time-dependent θ(t) schedule; the
-    /// flat-θ harness is a deliberate stepping stone.
-    pub theta: f64,
     /// Event times (year fractions), strictly increasing and strictly positive.
     pub event_times: Vec<f64>,
     /// Runtime Monte Carlo configuration (paths, seed, antithetic, step density).
@@ -82,8 +79,7 @@ impl RateExoticHw1fMcPricer {
             self.config.min_steps_between_events,
         )?;
 
-        let process =
-            HullWhite1FProcess::vasicek(self.hw_params.kappa, self.theta, self.hw_params.sigma);
+        let process = HullWhite1FProcess::new(self.process_params.clone());
         let disc = ExactHullWhite1F;
         let num_steps = grid.num_steps();
         let work_size = disc.work_size(&process);
@@ -238,9 +234,8 @@ mod tests {
     #[test]
     fn trivial_payoff_equals_one() {
         let pricer = RateExoticHw1fMcPricer {
-            hw_params: HullWhiteParams::new(0.05, 0.01).expect("valid HW params"),
+            process_params: HullWhite1FParams::new(0.05, 0.01, 0.0),
             r0: 0.03,
-            theta: 0.0,
             event_times: vec![1.0],
             config: RateExoticMcConfig {
                 num_paths: 200,

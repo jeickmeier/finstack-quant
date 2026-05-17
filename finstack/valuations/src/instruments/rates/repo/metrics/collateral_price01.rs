@@ -62,8 +62,10 @@ impl MetricCalculator for CollateralPrice01Calculator {
         // Result is PV change per 1% change in collateral price
         // bump_size = current_price * 0.01, so dividing by (2 * bump_size) normalizes
         // to "per unit price move" and then multiplying by 0.01 gives "per 1% move"
+        // `COLLATERAL_PRICE_BUMP_PCT` is a fixed positive constant, so the bump
+        // width is never degenerate; the helper's error path cannot trigger here.
         let collateral_price01 = if current_price.abs() > 1e-10 {
-            central_diff_by_half_bump(pv_up, pv_down, COLLATERAL_PRICE_BUMP_PCT)
+            central_diff_by_half_bump(pv_up, pv_down, COLLATERAL_PRICE_BUMP_PCT)?
         } else {
             0.0
         };

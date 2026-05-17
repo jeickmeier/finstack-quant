@@ -195,8 +195,16 @@ impl SviSurfaceTarget {
             let forward = forward_fn(target_expiry);
             Self::validate_positive_input("SVI forward", forward)?;
             for &target_strike in &params.target_strikes {
-                let log_moneyness = (target_strike / forward).ln();
-                let vol = interpolate_svi_vol(target_expiry, log_moneyness, &params_by_expiry)?;
+                // Pass the absolute strike (not a single pre-computed
+                // log-moneyness): each bracketing slice was calibrated in its
+                // own forward-moneyness coordinate, so `interpolate_svi_vol`
+                // must re-derive `k_i = ln(K / F(Tᵢ))` per slice.
+                let vol = interpolate_svi_vol(
+                    target_expiry,
+                    target_strike,
+                    &forward_fn,
+                    &params_by_expiry,
+                )?;
                 if !vol.is_finite() || vol <= 0.0 {
                     return Err(finstack_core::Error::Validation(format!(
                         "SVI surface produced invalid implied vol at t={target_expiry:.6}, strike={target_strike:.6}",
@@ -264,19 +272,29 @@ impl SviSurfaceTarget {
 }
 
 /// Interpolate implied volatility between calibrated SVI expiry slices using
-/// Gatheral's total-variance recipe: `w(k, T) = (1 − τ)·w(k, T₁) + τ·w(k, T₂)`
-/// where `τ = (T − T₁) / (T₂ − T₁)` and `w(k, Tᵢ) = σ²(k, Tᵢ)·Tᵢ` is the
-/// per-slice total variance at log-moneyness `k`. Returns
-/// `σ(k, T) = √(w(k, T) / T)`.
+/// Gatheral's total-variance recipe: `w(T) = (1 − τ)·w₁(k₁) + τ·w₂(k₂)`
+/// where `τ = (T − T₁) / (T₂ − T₁)` and `wᵢ(kᵢ) = σ²·Tᵢ` is the per-slice
+/// total variance. Returns `σ(T) = √(w(T) / T)`.
+///
+/// # Per-slice forward-moneyness
+///
+/// Each SVI slice is calibrated in *its own* forward-moneyness coordinate
+/// `kᵢ = ln(K / F(Tᵢ))`. With a non-flat discount curve `F(T)` varies with
+/// `T`, so a single `k` computed at the target expiry does **not** address
+/// the same absolute strike on the neighbouring slices. To keep the
+/// interpolation calendar-arbitrage-free at a *fixed absolute strike* `K`,
+/// this function takes `target_strike` and `forward_fn` and re-derives the
+/// log-moneyness per slice before evaluating its total variance.
 ///
 /// This preserves calendar-spread monotonicity of `w` by construction:
 /// if the calibrated slices at `T₁ < T₂` are themselves calendar-monotone
-/// (i.e. `w(k, T₁) ≤ w(k, T₂)` for all `k`), linear interpolation in `w`
-/// keeps the surface arbitrage-free between them.
+/// at every absolute strike (i.e. `w₁(k₁) ≤ w₂(k₂)`), linear interpolation
+/// in `w` keeps the surface arbitrage-free between them.
 ///
 /// Extrapolation (outside the calibrated range) falls back to the nearest
-/// slice's `implied_vol` — the standard approach when there's no data to
-/// constrain the surface beyond the outermost expiries.
+/// slice's `implied_vol`, evaluated at *that slice's* forward-moneyness —
+/// the standard approach when there's no data to constrain the surface
+/// beyond the outermost expiries.
 ///
 /// A naive parameter-space interpolation (linear in `a`, `b`, `ρ`,
 /// `m`, `σ`) makes no calendar-spread guarantees; Gatheral (2004,
@@ -284,7 +302,8 @@ impl SviSurfaceTarget {
 /// conditions, which motivates the total-variance form used here.
 fn interpolate_svi_vol(
     target_expiry: f64,
-    log_moneyness: f64,
+    target_strike: f64,
+    forward_fn: &impl Fn(f64) -> f64,
     params_by_expiry: &BTreeMap<OrderedF64, finstack_core::math::volatility::svi::SviParams>,
 ) -> Result<f64> {
     if target_expiry <= 0.0 {
@@ -293,6 +312,18 @@ fn interpolate_svi_vol(
         )));
     }
 
+    // Log-moneyness of `target_strike` in the forward-moneyness coordinate of
+    // the SVI slice calibrated at expiry `slice_expiry`.
+    let slice_log_moneyness = |slice_expiry: f64| -> Result<f64> {
+        let forward = forward_fn(slice_expiry);
+        if !forward.is_finite() || forward <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "SVI interpolation: non-positive forward {forward} at T={slice_expiry:.6}"
+            )));
+        }
+        Ok((target_strike / forward).ln())
+    };
+
     let Some((&first_key, &first_params)) = params_by_expiry.iter().next() else {
         return Err(finstack_core::Error::Input(
             finstack_core::InputError::TooFewPoints,
@@ -300,14 +331,17 @@ fn interpolate_svi_vol(
     };
 
     if params_by_expiry.len() == 1 || target_expiry <= first_key.into_inner() {
-        return Ok(first_params.implied_vol(log_moneyness, target_expiry));
+        let k = slice_log_moneyness(first_key.into_inner())?;
+        return Ok(first_params.implied_vol(k, target_expiry));
     }
 
     let Some((&last_key, &last_params)) = params_by_expiry.iter().next_back() else {
-        return Ok(first_params.implied_vol(log_moneyness, target_expiry));
+        let k = slice_log_moneyness(first_key.into_inner())?;
+        return Ok(first_params.implied_vol(k, target_expiry));
     };
     if target_expiry >= last_key.into_inner() {
-        return Ok(last_params.implied_vol(log_moneyness, target_expiry));
+        let k = slice_log_moneyness(last_key.into_inner())?;
+        return Ok(last_params.implied_vol(k, target_expiry));
     }
 
     let mut lower = (first_key.into_inner(), first_params);
@@ -324,22 +358,27 @@ fn interpolate_svi_vol(
     }
 
     if (upper.0 - lower.0).abs() < f64::EPSILON {
-        return Ok(lower.1.implied_vol(log_moneyness, target_expiry));
+        let k = slice_log_moneyness(lower.0)?;
+        return Ok(lower.1.implied_vol(k, target_expiry));
     }
 
-    // Total-variance interpolation per Gatheral.
-    let w_lower = lower.1.total_variance(log_moneyness);
-    let w_upper = upper.1.total_variance(log_moneyness);
+    // Total-variance interpolation per Gatheral. Each slice is evaluated at
+    // its OWN forward-moneyness so the interpolated total variance refers to
+    // a fixed absolute strike across `T₁`, `T`, and `T₂`.
+    let k_lower = slice_log_moneyness(lower.0)?;
+    let k_upper = slice_log_moneyness(upper.0)?;
+    let w_lower = lower.1.total_variance(k_lower);
+    let w_upper = upper.1.total_variance(k_upper);
     if w_lower < 0.0 || w_upper < 0.0 {
         return Err(finstack_core::Error::Validation(format!(
-            "SVI negative total variance at k={log_moneyness:.4}: w_lower={w_lower:.6}, w_upper={w_upper:.6}"
+            "SVI negative total variance at K={target_strike:.4} (k_lower={k_lower:.4}, k_upper={k_upper:.4}): w_lower={w_lower:.6}, w_upper={w_upper:.6}"
         )));
     }
     let tau = (target_expiry - lower.0) / (upper.0 - lower.0);
     let w_interp = w_lower + tau * (w_upper - w_lower);
     if !w_interp.is_finite() || w_interp < 0.0 {
         return Err(finstack_core::Error::Validation(format!(
-            "SVI total-variance interpolation produced invalid w={w_interp:.6} at T={target_expiry:.6}, k={log_moneyness:.4}"
+            "SVI total-variance interpolation produced invalid w={w_interp:.6} at T={target_expiry:.6}, K={target_strike:.4}"
         )));
     }
     Ok((w_interp / target_expiry).sqrt())
@@ -456,7 +495,12 @@ mod tests {
         by_expiry.insert(OrderedF64::from(0.5), slice_a);
         by_expiry.insert(OrderedF64::from(1.0), slice_b);
 
-        let vol = interpolate_svi_vol(0.75, 0.0, &by_expiry).expect("interpolation ok");
+        // Flat forward F = 100 ⇒ ATM strike K = 100 maps to k = 0 on
+        // every slice, so the per-slice forward-moneyness recomputation is
+        // a no-op here and the assertion still pins the Gatheral value.
+        let forward_fn = |_t: f64| -> f64 { 100.0 };
+        let vol =
+            interpolate_svi_vol(0.75, 100.0, &forward_fn, &by_expiry).expect("interpolation ok");
         let expected = (0.04_f64 / 0.75).sqrt();
         assert!(
             (vol - expected).abs() < 1e-9,
@@ -464,43 +508,153 @@ mod tests {
         );
     }
 
+    /// Calendar-spread no-arbitrage (`∂w/∂T ≥ 0` at a fixed *absolute*
+    /// strike) must hold for the cross-expiry interpolation even when the
+    /// discount curve is non-flat and the smile genuinely depends on `k`
+    /// (`b > 0`).
+    ///
+    /// # The defect this guards (M11)
+    ///
+    /// Each SVI slice is fitted in its OWN forward-moneyness coordinate
+    /// `kᵢ = ln(K / F(Tᵢ))`. The pre-fix `interpolate_svi_vol` evaluated
+    /// every bracketing slice at a SINGLE `k` derived from the target
+    /// expiry's forward, so with a non-flat curve (`F(T₁) ≠ F(T₂) ≠ …`)
+    /// the two slices were compared at *different absolute strikes*. The
+    /// resulting interpolated total variance can DECREASE in `T` at a fixed
+    /// absolute strike — a calendar-spread arbitrage.
+    ///
+    /// `single_k_total_variance` below replicates that buggy recipe and the
+    /// test first asserts it genuinely produces a violation (so the fixture
+    /// truly exercises the bug), then asserts the production
+    /// `interpolate_svi_vol` — which recomputes `kᵢ` per slice — is
+    /// calendar-monotone at every strike. With the old `b = 0` fixture the
+    /// smile was flat in `k`, so the single-`k` mismatch was invisible;
+    /// `b > 0` and a non-flat curve are both required.
     #[test]
     fn interpolate_svi_vol_preserves_calendar_monotonicity() {
         use finstack_core::math::volatility::svi::SviParams;
 
-        // Build two slices where w(k=0) is strictly increasing in T.
-        // Gatheral interpolation must keep total variance monotone in T
-        // at k=0 for any interpolated target expiry.
-        let t1 = 0.5;
-        let t2 = 2.0;
-        let slice_a = SviParams {
-            a: 0.02,
-            b: 0.0,
-            rho: 0.0,
+        // Three SVI slices, each calibrated in its own forward-moneyness.
+        // b > 0 ⇒ total variance genuinely depends on k. Parameters are
+        // arbitrage-valid (SviParams::validate) and the slices are
+        // calendar-monotone at every fixed absolute strike on the test grid.
+        let t1 = 0.5_f64;
+        let t2 = 1.5_f64;
+        let t3 = 3.0_f64;
+        let slice_1 = SviParams {
+            a: 0.015,
+            b: 0.50,
+            rho: 0.6,
+            m: 0.20,
+            sigma: 0.10,
+        };
+        let slice_2 = SviParams {
+            a: 0.060,
+            b: 0.525,
+            rho: 0.6,
+            m: 0.08,
+            sigma: 0.10,
+        };
+        let slice_3 = SviParams {
+            a: 0.180,
+            b: 0.55,
+            rho: 0.6,
             m: 0.0,
             sigma: 0.10,
         };
-        let slice_b = SviParams {
-            a: 0.10,
-            b: 0.0,
-            rho: 0.0,
-            m: 0.0,
-            sigma: 0.10,
-        };
-        let mut by_expiry: BTreeMap<OrderedF64, SviParams> = BTreeMap::new();
-        by_expiry.insert(OrderedF64::from(t1), slice_a);
-        by_expiry.insert(OrderedF64::from(t2), slice_b);
+        slice_1.validate().expect("slice 1 arbitrage-valid");
+        slice_2.validate().expect("slice 2 arbitrage-valid");
+        slice_3.validate().expect("slice 3 arbitrage-valid");
 
-        let mut prev_w = 0.0;
-        for i in 1..20 {
-            let t = t1 + (t2 - t1) * (i as f64) / 20.0;
-            let vol = interpolate_svi_vol(t, 0.0, &by_expiry).expect("interpolation ok");
-            let w = vol * vol * t;
-            assert!(
-                w >= prev_w - 1e-12,
-                "calendar monotonicity violated at T={t:.4}: w={w:.6} vs prev={prev_w:.6}"
-            );
-            prev_w = w;
+        let mut by_expiry: BTreeMap<OrderedF64, SviParams> = BTreeMap::new();
+        by_expiry.insert(OrderedF64::from(t1), slice_1);
+        by_expiry.insert(OrderedF64::from(t2), slice_2);
+        by_expiry.insert(OrderedF64::from(t3), slice_3);
+
+        // Non-flat discount curve: zero rate rises with T, so the forward
+        // F(T) = S·exp(r(T)·T) is genuinely T-dependent and F(T₁) ≠ F(T₂).
+        let spot = 100.0_f64;
+        let forward_fn = |t: f64| -> f64 { spot * ((0.01 + 0.09 * t) * t).exp() };
+        assert!(
+            (forward_fn(t1) - forward_fn(t2)).abs() > 1.0,
+            "test fixture must use a non-flat forward curve"
+        );
+
+        // Pre-fix recipe: BOTH bracketing slices evaluated at one `k`
+        // computed from the *target* expiry's forward.
+        let single_k_total_variance = |t: f64, strike: f64| -> f64 {
+            let k_target = (strike / forward_fn(t)).ln();
+            let mut lower = (t1, slice_1);
+            let mut upper = (t3, slice_3);
+            for (&ek, &p) in &by_expiry {
+                let e = ek.into_inner();
+                if e <= t {
+                    lower = (e, p);
+                }
+                if e >= t {
+                    upper = (e, p);
+                    break;
+                }
+            }
+            if (upper.0 - lower.0).abs() < f64::EPSILON {
+                return lower.1.total_variance(k_target);
+            }
+            let w_l = lower.1.total_variance(k_target);
+            let w_u = upper.1.total_variance(k_target);
+            let tau = (t - lower.0) / (upper.0 - lower.0);
+            w_l + tau * (w_u - w_l)
+        };
+
+        // ITM / ATM / OTM grid (relative to the front forward ≈ 102.8).
+        let strikes = [80.0_f64, 95.0, 103.0, 115.0, 135.0];
+        let n_steps = 50;
+
+        // (a) The buggy single-`k` recipe must genuinely violate calendar
+        // monotonicity off-ATM — otherwise the fixture would not exercise
+        // the defect and the test below would be vacuous.
+        let mut buggy_violation = None;
+        for &strike in &strikes {
+            let mut prev_w = f64::NEG_INFINITY;
+            let mut prev_t = t1;
+            for i in 0..=n_steps {
+                let t = t1 + (t3 - t1) * (i as f64) / (n_steps as f64);
+                let w = single_k_total_variance(t, strike);
+                if prev_w.is_finite() && w < prev_w - 1e-9 && buggy_violation.is_none() {
+                    buggy_violation = Some((strike, prev_t, prev_w, t, w));
+                }
+                prev_w = w;
+                prev_t = t;
+            }
+        }
+        let (vk, vt0, vw0, vt1, vw1) = buggy_violation.expect(
+            "single-k SVI interpolation must produce a calendar-arbitrage \
+             violation for this non-flat-curve fixture",
+        );
+        println!(
+            "single-k recipe calendar arbitrage: strike={vk:.1} \
+             w(T={vt0:.4})={vw0:.6} -> w(T={vt1:.4})={vw1:.6} (decrease {:.3e})",
+            vw0 - vw1
+        );
+
+        // (b) The production interpolation recomputes kᵢ per slice and must
+        // therefore stay calendar-monotone at every fixed absolute strike.
+        for &strike in &strikes {
+            let mut prev_w = f64::NEG_INFINITY;
+            let mut prev_t = t1;
+            for i in 0..=n_steps {
+                let t = t1 + (t3 - t1) * (i as f64) / (n_steps as f64);
+                let vol = interpolate_svi_vol(t, strike, &forward_fn, &by_expiry)
+                    .expect("interpolation ok");
+                let w = vol * vol * t;
+                assert!(
+                    w >= prev_w - 1e-9,
+                    "calendar-spread arbitrage in interpolate_svi_vol at \
+                     strike={strike:.1}: w(T={prev_t:.4})={prev_w:.6} > \
+                     w(T={t:.4})={w:.6}"
+                );
+                prev_w = w;
+                prev_t = t;
+            }
         }
     }
 

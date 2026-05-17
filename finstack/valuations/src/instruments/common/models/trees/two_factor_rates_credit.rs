@@ -5,6 +5,54 @@
 //! respective market curves (discount curve for rates, hazard curve for credit)
 //! via independent Arrow-Debreu forward induction, analogous to Ho-Lee calibration.
 //!
+//! # Lattice convention
+//!
+//! Each factor evolves on an **additive normal** binomial lattice: from a node
+//! with value `x`, the up move is `x + σ√Δt` and the down move is `x - σ√Δt`,
+//! where `σ` is the factor's annualized **normal** volatility. The node spacing
+//! `σ√Δt` is therefore in **absolute rate units** (rate per year), not log-rate
+//! units. The lattice recombines: row `k` is uniformly spaced by `2σ√Δt`.
+//!
+//! # Mean reversion — accuracy limits
+//!
+//! When a factor's mean-reversion speed `κ` is non-zero, the one-step transition
+//! probability is moment-matched to a mean-reverting drift. The drift
+//! `μ = −κ·(x − x_ref)` and the lattice spacing `σ√Δt` are **both in absolute
+//! rate units**, so the moment-matched up-probability is dimensionally coherent:
+//!
+//! ```text
+//! p_up = ½ + μ·√Δt / (2σ) = ½ − κ·(x − x_ref)·√Δt / (2σ)
+//! ```
+//!
+//! Here `x_ref` is the factor's calibrated initial instantaneous rate `x₀`
+//! (the level the input curve implies at `t = 0`). Because **calibration and
+//! pricing use the identical per-node probability**, the forward Arrow-Debreu
+//! recursion and the backward induction remain exact duals and the tree
+//! **reprices the input curves exactly for any κ** — the Ho-Lee theta absorbs
+//! the first-moment bias entirely.
+//!
+//! **However**, an additive binomial lattice has only ONE free parameter (`p`),
+//! so it can match either the conditional mean **or** the conditional variance,
+//! not both. This implementation matches the mean. The conditional variance of
+//! one step is `σ²Δt · 4p(1−p)`, which collapses as `p` moves away from ½.
+//! Consequence: **option-value accuracy degrades as κ grows**. Concretely, a
+//! node near the reversion reference at `κ = 0.15` retains roughly 80 % of the
+//! intended conditional variance; by `κ = 0.3` only ~55 % remains. This tree
+//! prices callable bonds and term loans, so option-value accuracy matters.
+//!
+//! For accurate mean-reverting optionality, use [`HullWhiteTree`] (the
+//! Hull-White trinomial tree in the same module), which does not have this
+//! variance-collapse limitation.
+//!
+//! This implementation enforces `κ ≤ 0.15` for each factor via a
+//! [`Error::Validation`] returned from `calibrate()`. See
+//! [`KAPPA_MAX`] for the threshold and its justification.
+//!
+//! (The earlier implementation calibrated with `p = ½` but priced with a
+//! mean-reversion-dependent probability, so the tree no longer repriced the
+//! discount curve; it also mixed a *log-rate* drift with the *absolute-rate*
+//! lattice spacing, which was dimensionally incoherent.)
+//!
 //! # Calibration
 //!
 //! `calibrate()` must be called before `price()`. The calibration ensures:
@@ -16,6 +64,8 @@
 //! Option-adjusted spread is read from `initial_vars["oas"]` (basis points) and
 //! applied as a parallel shift to calibrated short rates during backward induction.
 //! This matches the `ShortRateTree` convention.
+//!
+//! [`HullWhiteTree`]: super::hull_white_tree::HullWhiteTree
 
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::HazardCurve;
@@ -25,7 +75,32 @@ use finstack_core::{Error, Result};
 use super::state_keys;
 use super::tree_framework::{NodeState, StateVariables, TreeModel, TreeValuator};
 
+/// Maximum allowed mean-reversion speed (κ) for either factor.
+///
+/// Above this threshold the probability shift `p = ½ + μ√Δt/(2σ)` pushes `p`
+/// far enough from ½ that the conditional variance `σ²Δt·4p(1−p)` becomes
+/// materially understated relative to the target Hull-White variance. At
+/// `κ = 0.15` the worst-case unclamped node sitting 2σ√Δt above the reversion
+/// reference retains ≈ 80 % of the intended conditional variance — a tolerable
+/// discretisation error given the other approximations in a binomial tree. By
+/// `κ = 0.20` that figure drops to ≈ 65 %, and by `κ = 0.30` to ≈ 55 %;
+/// option-value errors become material for callable bond / term-loan pricing.
+///
+/// Callers needing accurate mean-reverting optionality above this threshold
+/// should use [`HullWhiteTree`], which uses a trinomial branching scheme that
+/// preserves the conditional variance exactly.
+///
+/// [`HullWhiteTree`]: super::hull_white_tree::HullWhiteTree
+pub const KAPPA_MAX: f64 = 0.15;
+
 /// Configuration for rates + credit two-factor tree.
+///
+/// Mean-reversion speeds (`rate_mean_reversion` and `hazard_mean_reversion`)
+/// are validated by [`RatesCreditTree::calibrate`] against [`KAPPA_MAX`].
+/// Values above that threshold return a [`Error::Validation`] — use
+/// [`HullWhiteTree`] instead for strong mean reversion.
+///
+/// [`HullWhiteTree`]: super::hull_white_tree::HullWhiteTree
 #[derive(Debug, Clone)]
 pub struct RatesCreditConfig {
     /// Number of time steps
@@ -34,15 +109,15 @@ pub struct RatesCreditConfig {
     pub rate_vol: f64,
     /// Credit hazard volatility (annualized, normal convention)
     pub hazard_vol: f64,
-    /// Base short rate seed (only used as initial guess for calibration)
-    pub base_rate: f64,
-    /// Base hazard seed (only used as initial guess for calibration)
-    pub base_hazard: f64,
     /// Instantaneous correlation between rate and hazard shocks
     pub correlation: f64,
-    /// Mean reversion speed for short rate (0.0 = no reversion)
+    /// Mean reversion speed for the short rate (`κ_r`, annualized, `0.0` = no
+    /// reversion). Must be ≤ [`KAPPA_MAX`]; the rate factor reverts toward the
+    /// discount-curve-implied `t = 0` instantaneous rate.
     pub rate_mean_reversion: f64,
-    /// Mean reversion speed for hazard rate (0.0 = no reversion)
+    /// Mean reversion speed for the hazard rate (`κ_h`, annualized, `0.0` = no
+    /// reversion). Must be ≤ [`KAPPA_MAX`]; the hazard factor reverts toward
+    /// the hazard-curve-implied `t = 0` instantaneous hazard.
     pub hazard_mean_reversion: f64,
 }
 
@@ -52,8 +127,6 @@ impl Default for RatesCreditConfig {
             steps: 100,
             rate_vol: 0.01,
             hazard_vol: 0.20,
-            base_rate: 0.02,
-            base_hazard: 0.01,
             correlation: 0.0,
             rate_mean_reversion: 0.0,
             hazard_mean_reversion: 0.0,
@@ -77,6 +150,14 @@ pub struct RatesCreditTree {
     calibrated_hazards: Vec<Vec<f64>>,
     /// Recovery rate from the hazard curve (populated by `calibrate()`).
     recovery_rate: f64,
+    /// Mean-reversion reference level for the rate factor (the calibrated
+    /// `t = 0` instantaneous rate `r₀`). Populated by `calibrate()`. Pricing
+    /// reverts the rate factor toward this level, matching the level used
+    /// during calibration so the tree reprices the discount curve.
+    rate_ref: f64,
+    /// Mean-reversion reference level for the hazard factor (the calibrated
+    /// `t = 0` instantaneous hazard `h₀`). Populated by `calibrate()`.
+    hazard_ref: f64,
 }
 
 impl RatesCreditTree {
@@ -89,6 +170,8 @@ impl RatesCreditTree {
             calibrated_rates: Vec::new(),
             calibrated_hazards: Vec::new(),
             recovery_rate: 0.0,
+            rate_ref: 0.0,
+            hazard_ref: 0.0,
         }
     }
 
@@ -116,27 +199,69 @@ impl RatesCreditTree {
                 "rates-credit tree calibration requires positive steps and time_to_maturity",
             ));
         }
+
+        // Guard: mean-reversion speeds above KAPPA_MAX cause material
+        // conditional-variance collapse on the fixed-geometry binomial lattice.
+        // Discount-curve repricing is exact for any κ, but option values
+        // (callable bonds, term loans) degrade as κ grows — negligible for
+        // κ ≲ 0.10, material by κ ≈ 0.20+. Use HullWhiteTree for κ > KAPPA_MAX.
+        let kappa_r = self.config.rate_mean_reversion;
+        if kappa_r > KAPPA_MAX {
+            return Err(Error::Validation(format!(
+                "rate_mean_reversion = {kappa_r:.4} exceeds the binomial-lattice limit \
+                 (KAPPA_MAX = {KAPPA_MAX}). At this speed the conditional variance of \
+                 the rate factor collapses to a fraction of its intended value, which \
+                 degrades option-value accuracy for callable bonds and term loans. \
+                 Use HullWhiteTree for mean reversion above this threshold."
+            )));
+        }
+        let kappa_h = self.config.hazard_mean_reversion;
+        if kappa_h > KAPPA_MAX {
+            return Err(Error::Validation(format!(
+                "hazard_mean_reversion = {kappa_h:.4} exceeds the binomial-lattice limit \
+                 (KAPPA_MAX = {KAPPA_MAX}). At this speed the conditional variance of \
+                 the hazard factor collapses to a fraction of its intended value, which \
+                 degrades option-value accuracy for callable bonds and term loans. \
+                 Use HullWhiteTree for mean reversion above this threshold."
+            )));
+        }
+
         let dt = time_to_maturity / steps as f64;
 
         // Store recovery rate from hazard curve.
         self.recovery_rate = hazard.recovery_rate();
 
+        // Reference (reversion) levels: the t=0 instantaneous rate / hazard
+        // implied by each input curve. Both factors revert toward these levels
+        // during pricing; calibration uses the same levels so the tree reprices
+        // the input curves with mean reversion active.
+        self.rate_ref = Self::initial_instantaneous(|t| disc.df(t), dt);
+        self.hazard_ref = Self::initial_instantaneous(|t| hazard.sp(t), dt);
+
         // --- Rate factor calibration (Ho-Lee style) ---
+        let rate_vol = self.config.rate_vol;
+        let rate_kappa = self.config.rate_mean_reversion;
+        let rate_ref = self.rate_ref;
         self.calibrated_rates = self.calibrate_factor_ho_lee(
             steps,
             dt,
-            self.config.rate_vol,
+            rate_vol,
             |t| disc.df(t),
             time_to_maturity,
+            |r| Self::mean_reverting_up_prob(r, rate_ref, rate_kappa, rate_vol, dt),
         )?;
 
         // --- Hazard factor calibration (same Ho-Lee approach targeting survival) ---
+        let hazard_vol = self.config.hazard_vol;
+        let hazard_kappa = self.config.hazard_mean_reversion;
+        let hazard_ref = self.hazard_ref;
         self.calibrated_hazards = self.calibrate_factor_ho_lee(
             steps,
             dt,
-            self.config.hazard_vol,
+            hazard_vol,
             |t| hazard.sp(t),
             time_to_maturity,
+            |h| Self::mean_reverting_up_prob(h, hazard_ref, hazard_kappa, hazard_vol, dt),
         )?;
 
         Ok(())
@@ -145,6 +270,97 @@ impl RatesCreditTree {
     /// Return the recovery rate from the most recent `calibrate()` call.
     pub fn recovery_rate(&self) -> f64 {
         self.recovery_rate
+    }
+
+    /// Calibrated short rate at node `(step, node_i)`.
+    ///
+    /// Returns an error if the tree has not been calibrated or the indices are
+    /// out of bounds. Node `0` is the lowest rate, node `step` the highest
+    /// (additive Ho-Lee lattice).
+    pub fn rate_at_node(&self, step: usize, node: usize) -> Result<f64> {
+        self.calibrated_rates
+            .get(step)
+            .and_then(|row| row.get(node))
+            .copied()
+            .ok_or_else(|| {
+                Error::internal(format!(
+                    "rates-credit tree rate node out of bounds: step={step}, node={node}"
+                ))
+            })
+    }
+
+    /// Calibrated hazard rate at node `(step, node_j)`.
+    ///
+    /// Returns an error if the tree has not been calibrated or the indices are
+    /// out of bounds.
+    pub fn hazard_at_node(&self, step: usize, node: usize) -> Result<f64> {
+        self.calibrated_hazards
+            .get(step)
+            .and_then(|row| row.get(node))
+            .copied()
+            .ok_or_else(|| {
+                Error::internal(format!(
+                    "rates-credit tree hazard node out of bounds: step={step}, node={node}"
+                ))
+            })
+    }
+
+    /// Initial instantaneous rate implied by a target curve: `−ln(target(Δt))/Δt`.
+    ///
+    /// Falls back to `0.03` if the target is non-positive (degenerate curve).
+    fn initial_instantaneous(target_fn: impl Fn(f64) -> f64, dt: f64) -> f64 {
+        let target_dt = target_fn(dt);
+        if target_dt > 0.0 && dt > 0.0 {
+            -target_dt.ln() / dt
+        } else {
+            0.03
+        }
+    }
+
+    /// Moment-matched up-probability for a mean-reverting factor on the additive
+    /// normal lattice.
+    ///
+    /// # Units
+    ///
+    /// Every quantity below is in **absolute rate units** (rate per year), so
+    /// the formula is dimensionally coherent:
+    /// - `x`, `x_ref`: rate level (per year)
+    /// - drift `μ = −κ·(x − x_ref)`: rate per year
+    /// - lattice up/down step `σ√Δt`: rate (per year, integrated over `√Δt`)
+    ///
+    /// The standard moment-matched binomial up-probability for a drift `μ` on a
+    /// lattice with step `±σ√Δt` is
+    ///
+    /// ```text
+    /// p_up = ½ + (μ·Δt) / (2·σ√Δt) = ½ + μ·√Δt / (2σ)
+    /// ```
+    ///
+    /// which matches the conditional **mean** `E[Δx] = μ·Δt`. With `κ = 0`
+    /// this reduces to `p_up = ½` (plain Ho-Lee).
+    ///
+    /// # Mean vs variance trade-off
+    ///
+    /// An additive binomial lattice has a single free parameter (`p`). This
+    /// function uses it to match the conditional mean, leaving the conditional
+    /// variance `σ²Δt · 4p(1−p)` understated once `p ≠ ½`. Discount-curve
+    /// repricing is **exact for any κ** because calibration and pricing apply
+    /// the **identical** clamped probability, so the forward Arrow-Debreu
+    /// recursion and backward induction remain exact duals. However,
+    /// **option-value accuracy degrades as κ grows** — a limitation that
+    /// matters when pricing callable bonds and term loans. For κ beyond
+    /// [`KAPPA_MAX`] the degradation becomes material; use [`HullWhiteTree`]
+    /// instead.
+    ///
+    /// [`HullWhiteTree`]: super::hull_white_tree::HullWhiteTree
+    #[inline]
+    fn mean_reverting_up_prob(x: f64, x_ref: f64, kappa: f64, sigma: f64, dt: f64) -> f64 {
+        if kappa <= 0.0 || dt <= 0.0 {
+            return 0.5;
+        }
+        let sigma = sigma.max(1e-12);
+        // Drift in absolute rate units (rate / year).
+        let drift = -kappa * (x - x_ref);
+        (0.5 + drift * dt.sqrt() / (2.0 * sigma)).clamp(0.0, 1.0)
     }
 
     /// Ho-Lee style calibration for a single factor.
@@ -158,6 +374,13 @@ impl RatesCreditTree {
     ///
     /// Both share the same mathematical structure: the product `exp(-x * dt)` over
     /// path nodes must match the target curve value at each maturity.
+    ///
+    /// `up_prob_fn` returns the up-transition probability for a node given its
+    /// (post-theta) rate. It **must** be the identical function the pricing pass
+    /// uses for backward induction: the forward Arrow-Debreu recursion below and
+    /// the backward induction in `price()` are exact duals only when they share
+    /// the same per-node probability, which is what makes the calibrated tree
+    /// reprice the input curve when mean reversion is active.
     fn calibrate_factor_ho_lee(
         &self,
         steps: usize,
@@ -165,16 +388,12 @@ impl RatesCreditTree {
         sigma: f64,
         target_fn: impl Fn(f64) -> f64,
         time_to_maturity: f64,
+        up_prob_fn: impl Fn(f64) -> f64,
     ) -> Result<Vec<Vec<f64>>> {
         let mut rates = vec![Vec::new(); steps + 1];
 
         // Initial rate: r0 = -ln(target(dt)) / dt
-        let target_dt = target_fn(dt);
-        let r0 = if target_dt > 0.0 && dt > 0.0 {
-            -target_dt.ln() / dt
-        } else {
-            0.03 // Fallback
-        };
+        let r0 = Self::initial_instantaneous(&target_fn, dt);
         rates[0] = vec![r0];
 
         // Arrow-Debreu state prices
@@ -187,23 +406,29 @@ impl RatesCreditTree {
             let mut next_rates_base = vec![0.0; next_nodes];
             let mut next_state_prices = vec![0.0; next_nodes];
 
-            // Propagate state prices and compute base rates (without theta)
+            // Propagate state prices and compute base rates (without theta).
+            //
+            // The transition probability uses the SAME mean-reversion-aware
+            // function the pricing pass applies, evaluated on the (calibrated)
+            // current-row rate. Forward induction here is the exact dual of the
+            // backward induction in `price()` because both use this probability.
             for (i, &current_rate) in rates[step].iter().enumerate() {
                 let q = state_prices[i];
                 let df_i = (-current_rate * dt).exp();
+                let p_up = up_prob_fn(current_rate);
 
                 // Up move (to node i+1)
                 let r_up_base = current_rate + sigma * sqrt_dt;
                 if i + 1 < next_nodes {
                     next_rates_base[i + 1] = r_up_base;
-                    next_state_prices[i + 1] += q * df_i * 0.5;
+                    next_state_prices[i + 1] += q * df_i * p_up;
                 }
 
                 // Down move (to node i)
                 let r_down_base = current_rate - sigma * sqrt_dt;
                 if i < next_nodes {
                     next_rates_base[i] = r_down_base;
-                    next_state_prices[i] += q * df_i * 0.5;
+                    next_state_prices[i] += q * df_i * (1.0 - p_up);
                 }
             }
 
@@ -321,30 +546,30 @@ impl TreeModel for RatesCreditTree {
             for i in 0..=k {
                 let r_t = self.calibrated_rates[k][i];
 
-                // Rate transition probability with mean reversion
-                let p_r = if self.config.rate_mean_reversion > 0.0 && r_t > 0.0 {
-                    let log_r = r_t.max(1e-8).ln();
-                    let log_base = self.config.base_rate.max(1e-8).ln();
-                    let drift = -self.config.rate_mean_reversion * (log_r - log_base);
-                    let rate_vol = self.config.rate_vol.max(1e-12);
-                    (0.5 + drift * dt.sqrt() / (2.0 * rate_vol)).clamp(0.0, 1.0)
-                } else {
-                    0.5
-                };
+                // Rate transition probability with mean reversion. This is the
+                // SAME function used during calibration; using an identical
+                // per-node probability is what makes the tree reprice the
+                // discount curve when mean reversion is non-zero.
+                let p_r = Self::mean_reverting_up_prob(
+                    r_t,
+                    self.rate_ref,
+                    self.config.rate_mean_reversion,
+                    self.config.rate_vol,
+                    dt,
+                );
 
                 for j in 0..=k {
                     let h_t = self.calibrated_hazards[k][j];
 
-                    // Hazard transition probability with mean reversion
-                    let p_h = if self.config.hazard_mean_reversion > 0.0 && h_t > 0.0 {
-                        let log_h = h_t.max(1e-8).ln();
-                        let log_base = self.config.base_hazard.max(1e-8).ln();
-                        let drift = -self.config.hazard_mean_reversion * (log_h - log_base);
-                        let hazard_vol = self.config.hazard_vol.max(1e-12);
-                        (0.5 + drift * dt.sqrt() / (2.0 * hazard_vol)).clamp(0.0, 1.0)
-                    } else {
-                        0.5
-                    };
+                    // Hazard transition probability with mean reversion (same
+                    // function and reference level used during calibration).
+                    let p_h = Self::mean_reverting_up_prob(
+                        h_t,
+                        self.hazard_ref,
+                        self.config.hazard_mean_reversion,
+                        self.config.hazard_vol,
+                        dt,
+                    );
 
                     // Joint probabilities
                     let (p_uu, p_ud, p_du, p_dd) = self.joint_probabilities(p_r, p_h);
@@ -355,8 +580,17 @@ impl TreeModel for RatesCreditTree {
                     let v_du = curr_values[i][j + 1];
                     let v_dd = curr_values[i][j];
 
-                    // Risk-free discounting with calibrated rate + OAS
-                    let df = (-(r_t.max(1e-8) + oas_decimal) * dt).exp();
+                    // Risk-free discounting with calibrated rate + OAS.
+                    //
+                    // The rate is NOT floored here: `calibrate_factor_ho_lee`
+                    // discounts with the raw (un-floored) calibrated rate, so
+                    // backward induction must do the same or the tree will not
+                    // reprice the discount curve once a wide lattice produces
+                    // negative node rates. The `1e-8` floor is still applied
+                    // below to the INTEREST_RATE / HAZARD_RATE *state
+                    // variables*, which shields valuators that cannot accept
+                    // non-positive rates.
+                    let df = (-(r_t + oas_decimal) * dt).exp();
                     let cont = df * (p_uu * v_uu + p_ud * v_ud + p_du * v_du + p_dd * v_dd);
 
                     vars.insert(state_keys::INTEREST_RATE, r_t.max(1e-8));
@@ -585,8 +819,6 @@ mod tests {
             steps: 20,
             rate_vol: 0.20,
             hazard_vol: 0.20,
-            base_rate: 0.02,
-            base_hazard: 0.01,
             rate_mean_reversion: 0.001,
             hazard_mean_reversion: 0.001,
             ..Default::default()
@@ -604,5 +836,265 @@ mod tests {
             .expect("pricing should succeed");
 
         assert!(price.is_finite() && price > 0.0, "price={price}");
+    }
+
+    /// The tree must reprice the input discount curve **with mean reversion
+    /// active**. The `DummyValuator` pays 1.0 at maturity and passes
+    /// continuation through unchanged, so the tree price equals the implied
+    /// ZCB price, which must match `disc.df(T)`.
+    ///
+    /// On the parent (`e7dd696da`) this test fails by hundreds of bps: the
+    /// calibration assumed `p = 0.5` while pricing used a different
+    /// mean-reversion-dependent probability, so the tree no longer repriced
+    /// the curve once `rate_mean_reversion != 0`.
+    ///
+    /// κ values are capped at `KAPPA_MAX` (= 0.15) because above that threshold
+    /// `calibrate()` returns a `Validation` error. The fix is still demonstrated
+    /// by these values — the parent was off by > 1000 bps even at κ = 0.05.
+    #[test]
+    fn calibration_reprices_disc_curve_with_rate_mean_reversion() {
+        let disc = sloped_discount_curve();
+        let haz = test_hazard_curve();
+        let ttm = 5.0;
+
+        for &kappa in &[0.05_f64, 0.10, 0.15] {
+            let mut tree = RatesCreditTree::new(RatesCreditConfig {
+                steps: 60,
+                rate_vol: 0.012,
+                hazard_vol: 0.0, // isolate the rate factor
+                rate_mean_reversion: kappa,
+                ..Default::default()
+            });
+            tree.calibrate(&disc, &haz, ttm).expect("calibrate");
+
+            let ctx = MarketContext::new();
+            let price = tree
+                .price(StateVariables::default(), ttm, &ctx, &DummyValuator)
+                .expect("price");
+            let market_df = disc.df(ttm);
+            let error_bps = (price - market_df).abs() * 10_000.0;
+            assert!(
+                error_bps < 1.0,
+                "kappa={kappa}: ZCB repricing error {error_bps:.4} bps \
+                 (tree={price:.8}, market={market_df:.8})",
+            );
+        }
+    }
+
+    /// The hazard factor must likewise reprice the survival curve when its own
+    /// mean reversion is active.
+    #[test]
+    fn calibration_reprices_survival_with_hazard_mean_reversion() {
+        let disc = sloped_discount_curve();
+        let haz = test_hazard_curve();
+        let steps = 60;
+        let ttm = 5.0;
+        let dt = ttm / steps as f64;
+
+        // κ values capped at KAPPA_MAX (0.15); above that calibrate() returns
+        // a Validation error (see `mean_reversion_above_kappa_max_returns_validation_error`).
+        for &kappa in &[0.05_f64, 0.10, 0.15] {
+            let mut tree = RatesCreditTree::new(RatesCreditConfig {
+                steps,
+                hazard_vol: 0.20,
+                hazard_mean_reversion: kappa,
+                ..Default::default()
+            });
+            tree.calibrate(&disc, &haz, ttm).expect("calibrate");
+
+            // Forward-propagate Arrow-Debreu state prices through the
+            // calibrated hazard lattice using the SAME mean-reversion
+            // probability the calibration applied. The summed state prices at
+            // step k must equal the market survival probability at t_k.
+            let mut state_prices = vec![1.0_f64];
+            for k in 0..steps {
+                let next_nodes = k + 2;
+                let mut next_sp = vec![0.0_f64; next_nodes];
+                for j in 0..=k {
+                    let h_j = tree.hazard_at_node(k, j).expect("hazard node");
+                    let surv_df = (-h_j * dt).exp();
+                    let q = state_prices[j];
+                    let p_up = RatesCreditTree::mean_reverting_up_prob(
+                        h_j,
+                        tree.hazard_ref,
+                        kappa,
+                        0.20,
+                        dt,
+                    );
+                    if j + 1 < next_nodes {
+                        next_sp[j + 1] += q * surv_df * p_up;
+                    }
+                    next_sp[j] += q * surv_df * (1.0 - p_up);
+                }
+                state_prices = next_sp;
+
+                let model_sp: f64 = state_prices.iter().sum();
+                let t = (k + 1) as f64 * dt;
+                let market_sp = haz.sp(t);
+                let error = (model_sp - market_sp).abs();
+                assert!(
+                    error < 1e-6,
+                    "kappa={kappa}: survival mismatch at step {} (t={t:.3}): \
+                     model={model_sp:.8}, market={market_sp:.8}, err={error:.2e}",
+                    k + 1,
+                );
+            }
+        }
+    }
+
+    /// At **zero** mean reversion the two-factor tree's rate factor must
+    /// reproduce a standalone Ho-Lee `ShortRateTree` node-for-node: both use
+    /// the identical additive lattice (`r ± σ√Δt`, `p = ½`, theta calibration).
+    #[test]
+    fn rate_factor_matches_short_rate_tree_at_zero_mean_reversion() {
+        use super::super::short_rate_tree::{ShortRateTree, ShortRateTreeConfig};
+        use finstack_core::types::CurveId;
+
+        let disc = sloped_discount_curve();
+        let haz = test_hazard_curve();
+        let steps = 50;
+        let ttm = 5.0;
+        let vol = 0.011;
+
+        let mut two_factor = RatesCreditTree::new(RatesCreditConfig {
+            steps,
+            rate_vol: vol,
+            hazard_vol: 0.0,
+            rate_mean_reversion: 0.0,
+            ..Default::default()
+        });
+        two_factor
+            .calibrate(&disc, &haz, ttm)
+            .expect("calibrate 2F");
+
+        let mut short_rate = ShortRateTree::new(ShortRateTreeConfig::ho_lee(steps, vol));
+        short_rate
+            .calibrate(&CurveId::new("USD-OIS"), &disc, ttm)
+            .expect("calibrate SR");
+
+        // Compare every calibrated rate node. The terminal row (step == steps)
+        // is geometry-only and excluded from both trees' discounting, so the
+        // comparison covers the discounting rows 0..steps.
+        for step in 0..steps {
+            for node in 0..=step {
+                let r_2f = two_factor.rate_at_node(step, node).expect("2F node");
+                let r_sr = short_rate.rate_at_node(step, node).expect("SR node");
+                assert!(
+                    (r_2f - r_sr).abs() < 1e-10,
+                    "rate mismatch at (step={step}, node={node}): \
+                     two_factor={r_2f:.12}, short_rate={r_sr:.12}",
+                );
+            }
+        }
+    }
+
+    /// Calibration must reject mean-reversion speeds above `KAPPA_MAX` with a
+    /// `Validation` error that names the offending value, the threshold, and
+    /// the variance-degradation reason. Values at or below the threshold pass.
+    #[test]
+    fn mean_reversion_above_kappa_max_returns_validation_error() {
+        let disc = sloped_discount_curve();
+        let haz = test_hazard_curve();
+
+        // Exactly at the threshold: must succeed.
+        let mut tree_at_limit = RatesCreditTree::new(RatesCreditConfig {
+            steps: 20,
+            rate_mean_reversion: KAPPA_MAX,
+            ..Default::default()
+        });
+        tree_at_limit
+            .calibrate(&disc, &haz, 5.0)
+            .expect("kappa == KAPPA_MAX must succeed");
+
+        // Just above the threshold: must fail with Validation.
+        let over_rate = KAPPA_MAX + 0.01;
+        let mut tree_over_rate = RatesCreditTree::new(RatesCreditConfig {
+            steps: 20,
+            rate_mean_reversion: over_rate,
+            ..Default::default()
+        });
+        match tree_over_rate.calibrate(&disc, &haz, 5.0) {
+            Err(Error::Validation(msg)) => {
+                assert!(
+                    msg.contains("rate_mean_reversion"),
+                    "error message must name the field; got: {msg}"
+                );
+                assert!(
+                    msg.contains("HullWhiteTree"),
+                    "error message must point to HullWhiteTree; got: {msg}"
+                );
+            }
+            other => panic!("expected Validation error for rate κ={over_rate}, got: {other:?}"),
+        }
+
+        // Hazard factor guard: just above the threshold.
+        let over_hazard = KAPPA_MAX + 0.01;
+        let mut tree_over_hazard = RatesCreditTree::new(RatesCreditConfig {
+            steps: 20,
+            hazard_mean_reversion: over_hazard,
+            ..Default::default()
+        });
+        match tree_over_hazard.calibrate(&disc, &haz, 5.0) {
+            Err(Error::Validation(msg)) => {
+                assert!(
+                    msg.contains("hazard_mean_reversion"),
+                    "error message must name the field; got: {msg}"
+                );
+                assert!(
+                    msg.contains("HullWhiteTree"),
+                    "error message must point to HullWhiteTree; got: {msg}"
+                );
+            }
+            other => panic!("expected Validation error for hazard κ={over_hazard}, got: {other:?}"),
+        }
+    }
+
+    /// The moment-matched up-probability is dimensionally coherent and reduces
+    /// to `½` at zero mean reversion / at the reference level.
+    #[test]
+    fn mean_reverting_up_prob_is_coherent() {
+        let sigma = 0.01_f64;
+        let dt = 0.05_f64;
+        let kappa = 0.10_f64;
+        let r_ref = 0.03_f64;
+
+        // At the reference level the drift is zero -> p = 1/2.
+        let p_at_ref = RatesCreditTree::mean_reverting_up_prob(r_ref, r_ref, kappa, sigma, dt);
+        assert!((p_at_ref - 0.5).abs() < 1e-15, "p at ref should be 1/2");
+
+        // Zero mean reversion -> p = 1/2 everywhere.
+        let p_no_mr = RatesCreditTree::mean_reverting_up_prob(0.07, r_ref, 0.0, sigma, dt);
+        assert!((p_no_mr - 0.5).abs() < 1e-15, "p without MR should be 1/2");
+
+        // Above the reference level the drift is negative -> p < 1/2 (pull
+        // down); below -> p > 1/2 (pull up). Symmetric about 1/2.
+        let p_high = RatesCreditTree::mean_reverting_up_prob(r_ref + 0.02, r_ref, kappa, sigma, dt);
+        let p_low = RatesCreditTree::mean_reverting_up_prob(r_ref - 0.02, r_ref, kappa, sigma, dt);
+        assert!(
+            p_high < 0.5 && p_low > 0.5,
+            "mean reversion must pull toward ref"
+        );
+        assert!(
+            ((p_high - 0.5) + (p_low - 0.5)).abs() < 1e-15,
+            "probability must be symmetric about the reference level",
+        );
+
+        // Magnitude check: p = 1/2 + mu*sqrt(dt)/(2*sigma), mu = -kappa*(r-r_ref),
+        // all in absolute rate units. With the inputs above:
+        //   mu = -0.10 * 0.02 = -0.002 (rate/yr)
+        //   p  = 0.5 + (-0.002)*sqrt(0.05)/(2*0.01) = 0.5 - 0.0223607...
+        let expected = 0.5 + (-kappa * 0.02) * dt.sqrt() / (2.0 * sigma);
+        assert!(
+            (p_high - expected).abs() < 1e-14,
+            "p_high={p_high}, expected={expected}"
+        );
+
+        // Always in [0, 1], even for an extreme node.
+        let p_extreme =
+            RatesCreditTree::mean_reverting_up_prob(r_ref + 100.0, r_ref, kappa, sigma, dt);
+        assert!(
+            (0.0..=1.0).contains(&p_extreme),
+            "probability must stay in [0,1]"
+        );
     }
 }

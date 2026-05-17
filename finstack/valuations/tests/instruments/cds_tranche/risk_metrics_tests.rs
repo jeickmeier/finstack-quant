@@ -595,6 +595,100 @@ fn test_par_spread_gives_zero_npv() {
     );
 }
 
+/// Invariant/property guard for `calculate_par_spread`: verifies that par spread is strictly
+/// positive and finite for both protection sides and that the two sides agree to within a small
+/// relative tolerance (par spread is a tranche property, independent of side).  Also verifies
+/// that pricing each tranche at its computed par spread yields ~0 NPV.
+///
+/// # Note: invariant guard, not a fail-on-parent regression test (M14 investigation)
+///
+/// This test passes on BOTH the pre-fix and post-fix code for the 3-7% mezzanine tranche
+/// used here. The fix changed the Newton-Raphson seed from `protection_pv / premium_per_bp`
+/// (which is negative for SellProtection, clamped to 0 by the loop's `.clamp(0, 100000)`) to
+/// `protection_pv.abs() / premium_per_bp.abs()` (always positive).
+///
+/// The wrong seed can only produce a wrong result when `|NPV(spread=0)| < PAR_SPREAD_TOLERANCE
+/// * notional = 1e-6 * notional`.  Since `NPV(spread=0) ≈ protection_pv` (premium leg is 0 at
+/// zero coupon), this requires `|protection_pv| < 1e-6 * notional`.
+///
+/// In practice (verified for IG spreads 12–140 bp, tenors 1.25–5Y, attachments 10–60%,
+/// 125-name pool, recovery 40%), the protection PV is either exactly $0 (EL below the model's
+/// numerical floor, implying the correct par spread truly is 0) or comfortably above the $10
+/// threshold on a $10M notional (smallest observed: ~$4,400 for a 20-100% tranche with very
+/// tight spreads).  The latent false-convergence path therefore cannot be triggered by any
+/// realistic market inputs: Newton always recovers from the wrong seed in subsequent iterations.
+///
+/// The seed fix is nonetheless correct hardening: it removes a latent code smell, makes the
+/// sign intent explicit, and eliminates an unnecessary iteration for all non-degenerate inputs.
+#[test]
+fn test_par_spread_positive_and_side_invariant() {
+    let pricer = CDSTranchePricer::new();
+    let market = standard_market_context();
+    let as_of = base_date();
+
+    // Same mezzanine tranche, two sides
+    let tranche_sell = custom_tranche(3.0, 7.0, 500.0, TrancheSide::SellProtection);
+    let tranche_buy = custom_tranche(3.0, 7.0, 500.0, TrancheSide::BuyProtection);
+
+    let par_sell = pricer
+        .calculate_par_spread(&tranche_sell, &market, as_of)
+        .expect("par spread SellProtection should succeed");
+    let par_buy = pricer
+        .calculate_par_spread(&tranche_buy, &market, as_of)
+        .expect("par spread BuyProtection should succeed");
+
+    // (a) Both must be strictly positive and finite
+    assert!(
+        par_sell.is_finite() && par_sell > 0.0,
+        "SellProtection par spread must be strictly positive and finite, got {}",
+        par_sell
+    );
+    assert!(
+        par_buy.is_finite() && par_buy > 0.0,
+        "BuyProtection par spread must be strictly positive and finite, got {}",
+        par_buy
+    );
+
+    // (b) Both sides must agree to within 0.1% relative tolerance — par spread is a
+    //     property of the tranche, not of who holds the protection.
+    assert_relative_eq(
+        par_buy,
+        par_sell,
+        0.001,
+        "BuyProtection and SellProtection par spreads must agree",
+    );
+
+    // (c) Pricing at the computed par spread must yield ~0 NPV for each side
+    let notional = tranche_sell.notional.amount();
+    let npv_tol = notional * 0.001; // 0.1% of notional
+
+    let mut at_par_sell = tranche_sell.clone();
+    at_par_sell.running_coupon_bp = par_sell;
+    let npv_sell = pricer
+        .price_tranche(&at_par_sell, &market, as_of)
+        .unwrap()
+        .amount();
+    assert_absolute_eq(
+        npv_sell,
+        0.0,
+        npv_tol,
+        "SellProtection: NPV at par spread should be ~0",
+    );
+
+    let mut at_par_buy = tranche_buy.clone();
+    at_par_buy.running_coupon_bp = par_buy;
+    let npv_buy = pricer
+        .price_tranche(&at_par_buy, &market, as_of)
+        .unwrap()
+        .amount();
+    assert_absolute_eq(
+        npv_buy,
+        0.0,
+        npv_tol,
+        "BuyProtection: NPV at par spread should be ~0",
+    );
+}
+
 // ==================== Upfront Tests ====================
 
 #[test]

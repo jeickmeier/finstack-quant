@@ -234,6 +234,22 @@ pub fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> Vec<f64> {
     vec![p11, p10, p01, p00]
 }
 
+/// Validate a flat row-major correlation matrix.
+///
+/// Accepts a `Float64Array`/`number[]` of `n * n` row-major entries and
+/// checks unit diagonal, off-diagonal in `[-1, 1]`, symmetry, and positive
+/// semi-definiteness. Returns nothing on success; raises a descriptive error
+/// (including the failing dimension or constraint) otherwise.
+///
+/// Unique wasm export name (`validateValuationsCorrelationMatrix`) so it does
+/// not collide with `core/math`'s nested-array `validateCorrelationMatrix`;
+/// the `valuations.correlation` JS facade re-exports it as
+/// `validateCorrelationMatrix`.
+#[wasm_bindgen(js_name = validateValuationsCorrelationMatrix)]
+pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<(), JsValue> {
+    corr::validate_correlation_matrix(matrix, n).map_err(to_js_err)
+}
+
 /// Nearest correlation matrix (Higham 2002).
 ///
 /// Given a flat row-major `n*n` matrix that is approximately a correlation
@@ -327,6 +343,28 @@ mod tests {
         assert_eq!(j.len(), 4);
         let sum: f64 = j.iter().sum();
         assert!((sum - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn validate_correlation_matrix_accepts_valid_and_rejects_invalid() {
+        #[rustfmt::skip]
+        let good = vec![
+            1.0, 0.5, 0.3,
+            0.5, 1.0, 0.4,
+            0.3, 0.4, 1.0,
+        ];
+        assert!(validate_correlation_matrix(&good, 3).is_ok());
+
+        // Off-diagonal outside [-1, 1] must be rejected.
+        #[rustfmt::skip]
+        let bad = vec![
+            1.0, 1.5,
+            1.5, 1.0,
+        ];
+        assert!(validate_correlation_matrix(&bad, 2).is_err());
+
+        // Length / dimension mismatch must be rejected, not panic.
+        assert!(validate_correlation_matrix(&good, 2).is_err());
     }
 
     #[test]

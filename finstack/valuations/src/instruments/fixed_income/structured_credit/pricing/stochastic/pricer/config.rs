@@ -3,6 +3,7 @@
 use finstack_core::dates::Date;
 use finstack_core::market_data::term_structures::DiscountCurve;
 
+use crate::instruments::fixed_income::structured_credit::pricing::stochastic::default::PoolGranularity;
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::ScenarioTreeConfig;
 use std::sync::Arc;
 
@@ -90,6 +91,17 @@ pub(crate) struct StochasticPricerConfig {
 
     /// Maximum terminal paths allowed for explicit path-preserving tree mode.
     pub max_tree_paths: usize,
+
+    /// Pool-granularity policy for copula-based default models.
+    ///
+    /// [`PoolGranularity::PerName`] (the default) realizes each pool asset's
+    /// default individually — the correct treatment for concentrated CLOs
+    /// where name-level lumpiness dominates mezzanine/equity risk.
+    /// [`PoolGranularity::LargeHomogeneous`] is an explicit opt-in fast-path
+    /// that applies the closed-form large-homogeneous-pool limit, acceptable
+    /// only for genuinely granular pools. Ignored by non-copula default
+    /// models.
+    pub pool_granularity: PoolGranularity,
 }
 
 impl StochasticPricerConfig {
@@ -108,6 +120,7 @@ impl StochasticPricerConfig {
             es_confidence: 0.95,
             seed: 42,
             max_tree_paths: 100_000,
+            pool_granularity: PoolGranularity::default(),
         }
     }
 
@@ -131,6 +144,7 @@ impl StochasticPricerConfig {
             es_confidence: 0.95,
             seed: 42,
             max_tree_paths: 100_000,
+            pool_granularity: PoolGranularity::default(),
         }
     }
 
@@ -153,7 +167,19 @@ impl StochasticPricerConfig {
             es_confidence: 0.95,
             seed: 42,
             max_tree_paths: 100_000,
+            pool_granularity: PoolGranularity::default(),
         }
+    }
+
+    /// Select the pool-granularity policy for copula-based default models.
+    ///
+    /// Defaults to [`PoolGranularity::PerName`]; pass
+    /// [`PoolGranularity::LargeHomogeneous`] to opt into the closed-form LHP
+    /// fast-path for genuinely granular pools.
+    #[allow(dead_code)] // builder for the LHP fast-path; exercised by tests.
+    pub(crate) fn with_pool_granularity(mut self, granularity: PoolGranularity) -> Self {
+        self.pool_granularity = granularity;
+        self
     }
 
     /// Set maximum terminal paths for explicit tree mode.

@@ -1096,6 +1096,21 @@
                 }
               ]
             },
+            "PoolGranularity": {
+              "description": "Pool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
+              "oneOf": [
+                {
+                  "const": "PerName",
+                  "description": "Simulate each name's default independently conditional on the\nsystematic factor (finite-pool copula). Captures name-level lumpiness;\nthe correct default for concentrated pools. This is the default.",
+                  "type": "string"
+                },
+                {
+                  "const": "LargeHomogeneous",
+                  "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools.",
+                  "type": "string"
+                }
+              ]
+            },
             "PricingOverrides": {
               "description": "Optional parameters that override model pricing with market quotes.\n\nFields are organized into focused sub-structs:\n- [`market_quotes`](MarketQuoteOverrides): quoted prices, implied vol, spreads, upfront payments\n- [`metrics`](MetricPricingOverrides): bump sizes, theta period, deterministic MC seeds\n- [`model_config`](ModelConfig): vol model selection, tree pricing, exercise friction\n- [`scenario`](ScenarioPricingOverrides): scenario-only revaluation adjustments\n\n# Serde Compatibility\n\nSub-struct fields are flattened so existing JSON payloads with flat field names\ncontinue to round-trip correctly.",
               "properties": {
@@ -1334,6 +1349,17 @@
                     "number",
                     "null"
                   ]
+                },
+                "structured_credit_pool_granularity": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/PoolGranularity"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Pool-granularity policy for structured-credit copula default models.\n\nWhen set, overrides the default\n[`PoolGranularity::PerName`](crate::instruments::fixed_income::structured_credit::PoolGranularity)\nfinite-pool simulation. Pass\n`PoolGranularity::LargeHomogeneous` to opt into the closed-form LHP\nfast-path for genuinely granular pools. Ignored by non-copula default\nmodels and by non-structured-credit instruments."
                 },
                 "term_loan": {
                   "anyOf": [

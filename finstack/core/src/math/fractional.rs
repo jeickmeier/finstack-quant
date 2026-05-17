@@ -98,7 +98,9 @@ impl HurstExponent {
 /// where c_H = √(2H). Returns 0 when t ≤ s.
 ///
 /// This is the simplest Volterra kernel that reproduces the correct fBM
-/// covariance structure and is widely used in the rBergomi model.
+/// covariance structure. Rough-volatility models that require the
+/// Riemann-Liouville Volterra process (e.g. rough Bergomi) use the dedicated
+/// `finstack_monte_carlo::rng::volterra` generator rather than this kernel.
 #[derive(Debug, Clone, Copy)]
 pub struct MolchanGolosovKernel {
     /// The Hurst exponent.

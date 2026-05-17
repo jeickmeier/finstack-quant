@@ -853,7 +853,14 @@ pub fn price_from_z_spread(
 
     let mut pv = NeumaierAccumulator::new();
     for (d, a) in &flows {
-        if *d < as_of {
+        // Mirror the ZSpreadCalculator convention: strictly-future cashflows only.
+        // A flow dated exactly on `as_of` (the settlement/quote anchor) has
+        // t = 0, df_z = 1, and would be added at full face value — but the
+        // canonical solver excludes it via `d > quote_date`. Using `<=` here
+        // keeps both paths on the same cashflow set and ensures round-trip
+        // consistency: compute_z_spread → price_from_z_spread recovers the
+        // original price within floating-point precision.
+        if *d <= as_of {
             continue;
         }
         // Time from as_of used for the exponential z-spread term is measured
