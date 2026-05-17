@@ -358,6 +358,14 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
         // balance) drops below the cleanup threshold (typically 10%), the equity
         // holder may exercise an optional redemption. Redemption pays tranches
         // in seniority order (senior first), bounded by the remaining pool value.
+        //
+        // A real cleanup-call redemption settles each note at its *full claim*:
+        // par balance + accrued interest for the stub period + any deferred
+        // (PIK) interest carried forward (+ an optional call premium). Booking
+        // the whole amount as principal — as the engine previously did —
+        // understates the holder's interest income and overstates principal
+        // repayment. The interest portion is recorded as an interest flow and
+        // does NOT retire notional; only the principal portion does.
         if let Some(cleanup_threshold) = instrument.cleanup_call_pct {
             let pool_factor = if state.total_pool_balance.amount() > 0.0 {
                 state.pool_outstanding.amount() / state.total_pool_balance.amount()
@@ -374,6 +382,10 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                 let pending_losses = state.recovery_queue.pending_amount(state.base_ccy);
                 available_for_redemption =
                     (available_for_redemption - pending_losses.amount()).max(0.0);
+
+                // Stub-period start for accrued-interest calculation: the last
+                // payment date (or closing) up to this cleanup-call date.
+                let cleanup_period_start = state.prev_date.unwrap_or(state.closing_date);
 
                 // Pay tranches in seniority order (Senior=0 first, Equity=3 last)
                 let mut redemption_order: Vec<usize> = (0..state.tranches.tranches.len()).collect();
@@ -395,20 +407,72 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                         continue;
                     }
 
-                    let redemption = Money::new(
-                        balance.amount().min(available_for_redemption),
-                        state.base_ccy,
-                    );
-                    available_for_redemption -= redemption.amount();
+                    // Accrued interest for the stub period on the current
+                    // (post-writedown) balance, using the tranche coupon and
+                    // its own day-count convention.
+                    let coupon_rate = tranche
+                        .coupon
+                        .try_current_rate_with_index(pay_date, context)?;
+                    let accrual_factor = tranche.day_count.year_fraction(
+                        cleanup_period_start,
+                        pay_date,
+                        DayCountContext::default(),
+                    )?;
+                    let accrued = balance.amount() * coupon_rate * accrual_factor;
+
+                    // Deferred / PIK interest carried forward into this period.
+                    let deferred = state
+                        .deferred_interest
+                        .get(tranche_id_str)
+                        .map(|m| m.amount())
+                        .unwrap_or(0.0);
+
+                    // Optional call premium (currently always par-flat; routed
+                    // through one helper so a future premium is a one-line
+                    // change without touching the StructuredCredit type).
+                    let premium = cleanup_call_premium(instrument, balance.amount());
+
+                    // Full redemption claim, bounded by available cash.
+                    let total_claim = balance.amount() + accrued + deferred + premium;
+                    let redemption_amt = total_claim.min(available_for_redemption);
+                    available_for_redemption -= redemption_amt;
+
+                    // Split the bounded redemption: interest (accrued +
+                    // deferred + premium) is satisfied first as the senior
+                    // claim within the redemption, the remainder retires
+                    // principal. Only the principal portion reduces notional.
+                    let interest_claim = accrued + deferred + premium;
+                    let interest_paid = redemption_amt.min(interest_claim).max(0.0);
+                    let principal_paid = (redemption_amt - interest_paid).max(0.0);
+
+                    let redemption = Money::new(redemption_amt, state.base_ccy);
+                    let interest_money = Money::new(interest_paid, state.base_ccy);
+                    let principal_money = Money::new(principal_paid, state.base_ccy);
 
                     if let Some(res) = state.results.get_mut(tranche_id_str) {
-                        res.principal_flows.push((pay_date, redemption));
                         res.cashflows.push((pay_date, redemption));
-                        res.total_principal = res.total_principal.checked_add(redemption)?;
+                        if interest_paid > 0.0 {
+                            res.interest_flows.push((pay_date, interest_money));
+                            res.total_interest =
+                                res.total_interest.checked_add(interest_money)?;
+                        }
+                        if principal_paid > 0.0 {
+                            res.principal_flows.push((pay_date, principal_money));
+                            res.total_principal =
+                                res.total_principal.checked_add(principal_money)?;
+                        }
                     }
+                    // Deferred interest cured by this redemption is cleared.
+                    if let Some(def) = state.deferred_interest.get_mut(tranche_id_str) {
+                        let cured = interest_paid.min(deferred).max(0.0);
+                        *def = def
+                            .checked_sub(Money::new(cured, state.base_ccy))
+                            .unwrap_or(Money::new(0.0, state.base_ccy));
+                    }
+                    // Only the principal portion retires notional.
                     if let Some(bal) = state.tranche_balances.get_mut(tranche_id_str) {
                         *bal = bal
-                            .checked_sub(redemption)
+                            .checked_sub(principal_money)
                             .unwrap_or(Money::new(0.0, state.base_ccy));
                     }
                 }
@@ -477,6 +541,10 @@ pub(crate) fn take_tranche_cashflows(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::fixed_income::structured_credit::{
+        DealType, DefaultModelSpec, Pool, PoolAsset, PrepaymentModelSpec, RecoveryModelSpec,
+        Seniority, Tranche, TrancheCoupon, TrancheStructure,
+    };
     use finstack_core::currency::Currency;
     use time::Month;
 
@@ -517,6 +585,146 @@ mod tests {
 
         assert!(matches!(err, finstack_core::Error::CurrencyMismatch { .. }));
     }
+
+    // ── W-25: cleanup-call redemption must include accrued interest ──────
+
+    fn cleanup_test_date() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).expect("valid date")
+    }
+
+    fn cleanup_discount_curve() -> finstack_core::market_data::term_structures::DiscountCurve {
+        finstack_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+            .base_date(cleanup_test_date())
+            .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.88)])
+            .build()
+            .expect("curve")
+    }
+
+    /// A single-tranche ABS with a high CPR so the pool amortizes below the
+    /// 10% cleanup threshold partway through its life, triggering an optional
+    /// cleanup-call redemption mid-period.
+    fn cleanup_call_deal() -> StructuredCredit {
+        let maturity = Date::from_calendar_date(2029, Month::January, 1).expect("valid date");
+        let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(10_000_000.0, Currency::USD),
+            0.06,
+            maturity,
+            DayCount::Thirty360,
+        ));
+        let tranche = Tranche::new(
+            "A",
+            0.0,
+            100.0,
+            Seniority::Senior,
+            Money::new(10_000_000.0, Currency::USD),
+            // Non-zero coupon so the stub-period accrued interest is non-zero.
+            TrancheCoupon::Fixed { rate: 0.05 },
+            maturity,
+        )
+        .expect("tranche");
+        let mut instrument = StructuredCredit::new_abs(
+            "ABS-CLEANUP",
+            pool,
+            TrancheStructure::new(vec![tranche]).expect("structure"),
+            cleanup_test_date(),
+            maturity,
+            "USD-OIS",
+        )
+        .with_payment_calendar("nyse")
+        .with_cleanup_call(0.10)
+        .expect("cleanup call");
+        // 60% CPR: the pool factor crosses below 10% within ~4 years, well
+        // before maturity, so a cleanup call genuinely fires mid-life.
+        instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.60);
+        instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        instrument
+    }
+
+    /// W-25 — a cleanup-call redemption must settle the note at par PLUS
+    /// accrued interest for the stub period, not at par balance only.
+    ///
+    /// The pre-fix code booked the entire redemption as principal and recorded
+    /// no interest flow on the cleanup date. This test runs a deal that hits
+    /// its cleanup call mid-period and asserts (a) an interest flow IS recorded
+    /// on the final (cleanup) date, and (b) the total cashflow on that date
+    /// strictly exceeds the principal retired — the difference being accrued
+    /// interest.
+    #[test]
+    fn cleanup_call_redemption_includes_accrued_interest() {
+        let instrument = cleanup_call_deal();
+        let market = MarketContext::new().insert(cleanup_discount_curve());
+
+        let results = run_simulation_with_source(
+            &instrument,
+            &market,
+            cleanup_test_date(),
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("simulation");
+
+        let tranche = results.get("A").expect("tranche A result");
+
+        // The cleanup call terminates the simulation: the last cashflow date
+        // is the cleanup-call date. Identify it.
+        let cleanup_date = tranche
+            .cashflows
+            .iter()
+            .map(|(d, _)| *d)
+            .max()
+            .expect("at least one cashflow");
+
+        // Principal retired on the cleanup date.
+        let principal_on_cleanup: f64 = tranche
+            .principal_flows
+            .iter()
+            .filter(|(d, _)| *d == cleanup_date)
+            .map(|(_, m)| m.amount())
+            .sum();
+
+        // Interest paid on the cleanup date — the defect: this was 0.0.
+        let interest_on_cleanup: f64 = tranche
+            .interest_flows
+            .iter()
+            .filter(|(d, _)| *d == cleanup_date)
+            .map(|(_, m)| m.amount())
+            .sum();
+
+        // Total cash on the cleanup date.
+        let total_on_cleanup: f64 = tranche
+            .cashflows
+            .iter()
+            .filter(|(d, _)| *d == cleanup_date)
+            .map(|(_, m)| m.amount())
+            .sum();
+
+        assert!(
+            principal_on_cleanup > WRITEDOWN_DE_MINIMIS,
+            "cleanup call should retire principal; got {principal_on_cleanup}"
+        );
+        assert!(
+            interest_on_cleanup > WRITEDOWN_DE_MINIMIS,
+            "cleanup-call redemption must record accrued interest on the \
+             cleanup date; got {interest_on_cleanup} (pre-fix booked the whole \
+             redemption as principal and recorded no interest)"
+        );
+        // Total redemption cash must exceed the par balance retired by exactly
+        // the accrued-interest component.
+        assert!(
+            total_on_cleanup > principal_on_cleanup + WRITEDOWN_DE_MINIMIS,
+            "total cleanup cashflow {total_on_cleanup} must exceed principal \
+             {principal_on_cleanup} by the accrued interest"
+        );
+        assert!(
+            (total_on_cleanup - principal_on_cleanup - interest_on_cleanup).abs()
+                < WRITEDOWN_DE_MINIMIS,
+            "cleanup cashflow must split exactly into principal + interest: \
+             total={total_on_cleanup}, principal={principal_on_cleanup}, \
+             interest={interest_on_cleanup}"
+        );
+    }
 }
 
 // ============================================================================
@@ -525,6 +733,18 @@ mod tests {
 
 /// De minimis threshold for write-down recording (avoids noise from fp rounding).
 const WRITEDOWN_DE_MINIMIS: f64 = 0.01;
+
+/// Optional cleanup-call premium paid on top of par + accrued interest.
+///
+/// Real cleanup calls sometimes carry a small make-whole-style premium that
+/// senior holders are effectively short. The [`StructuredCredit`] type carries
+/// no call-premium field today, so this helper returns `0.0` (redeem at par).
+/// Routing the premium through a single function keeps a future premium a
+/// one-line change here, without threading a new field through the public
+/// instrument type.
+fn cleanup_call_premium(_instrument: &StructuredCredit, _tranche_balance: f64) -> f64 {
+    0.0
+}
 
 /// Internal state for period-by-period simulation.
 pub(crate) struct SimulationState<'a> {

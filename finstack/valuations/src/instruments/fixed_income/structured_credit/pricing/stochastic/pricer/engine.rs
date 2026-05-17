@@ -95,7 +95,9 @@ impl StochasticPricer {
             .max(1);
         let path_count = terminal_paths.max(1);
         let per_name_simulator = self.per_name_simulator();
-        let mut collector = ScenarioCollector::new(instrument, path_count)?;
+        // Tree mode draws no antithetic pairs: every path is an independent
+        // stratified node, so the std-error is the plain i.i.d. estimator.
+        let mut collector = ScenarioCollector::new(instrument, path_count, false)?;
         for path_index in 0..path_count {
             let shocks = self.tree_path_shocks(instrument, path_index, path_count, branch_count)?;
             let per_name_engine = per_name_simulator
@@ -121,12 +123,25 @@ impl StochasticPricer {
         }
 
         let factor_sets = self.monte_carlo_factor_sets(instrument, num_paths, antithetic);
+        // Antithetic pairing is only effective when `num_paths` is even — an
+        // odd trailing path is drawn independently (see `monte_carlo_factor_sets`)
+        // and cannot be paired. Pair-aware std-error therefore requires an even
+        // path count; with an odd count the antithetic flag is dropped so the
+        // collector falls back to the plain i.i.d. estimator.
+        let antithetic_paired = antithetic && num_paths.is_multiple_of(2);
         let mode = if antithetic {
             format!("MonteCarlo({}, antithetic)", num_paths)
         } else {
             format!("MonteCarlo({num_paths})")
         };
-        self.price_factor_sets(instrument, context, factor_sets, num_paths, &mode)
+        self.price_factor_sets(
+            instrument,
+            context,
+            factor_sets,
+            num_paths,
+            antithetic_paired,
+            &mode,
+        )
     }
 
     fn price_hybrid(
@@ -209,6 +224,8 @@ impl StochasticPricer {
             context,
             factor_sets,
             total_paths,
+            // Hybrid mode draws no antithetic pairs.
+            false,
             &format!("Hybrid(tree_periods={tree_periods}, mc_paths={mc_paths})"),
         )
     }
@@ -219,6 +236,7 @@ impl StochasticPricer {
         context: &MarketContext,
         factor_sets: Vec<Vec<f64>>,
         num_paths: usize,
+        antithetic: bool,
         pricing_mode: &str,
     ) -> Result<StochasticPricingResult> {
         let per_name_simulator = self.per_name_simulator();
@@ -240,7 +258,7 @@ impl StochasticPricer {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let mut collector = ScenarioCollector::new(instrument, num_paths)?;
+        let mut collector = ScenarioCollector::new(instrument, num_paths, antithetic)?;
         for output in outputs {
             collector.record_output(output);
         }
@@ -800,14 +818,23 @@ impl TrancheScenarioStats {
 struct ScenarioCollector {
     currency: finstack_core::currency::Currency,
     num_paths: usize,
+    /// `true` when paths were generated as antithetic pairs `(2k, 2k+1)`.
+    /// Each pair is one negatively-correlated draw, *not* two i.i.d. samples,
+    /// so the deal-PV std-error must be computed over the `n/2` pair means.
+    antithetic: bool,
     deal_pv_stats: OnlineStats,
     deal_loss_stats: OnlineStats,
     deal_losses: Vec<f64>,
+    /// Per-path deal PVs, recorded in path order. Retained so the std-error
+    /// can be recomputed pair-aware under antithetic mode; the order matches
+    /// the antithetic pairing `(2k, 2k+1)` because `record_output` is fed in
+    /// path order (see `price_factor_sets`).
+    deal_pvs: Vec<f64>,
     tranche_stats: Vec<TrancheScenarioStats>,
 }
 
 impl ScenarioCollector {
-    fn new(instrument: &StructuredCredit, num_paths: usize) -> Result<Self> {
+    fn new(instrument: &StructuredCredit, num_paths: usize, antithetic: bool) -> Result<Self> {
         if num_paths == 0 {
             return Err(finstack_core::Error::Validation(
                 "stochastic scenario collector requires at least one path".to_string(),
@@ -816,9 +843,11 @@ impl ScenarioCollector {
         Ok(Self {
             currency: instrument.pool.base_currency(),
             num_paths,
+            antithetic,
             deal_pv_stats: OnlineStats::new(),
             deal_loss_stats: OnlineStats::new(),
             deal_losses: Vec::with_capacity(num_paths),
+            deal_pvs: Vec::with_capacity(num_paths),
             tranche_stats: instrument
                 .tranches
                 .tranches
@@ -838,6 +867,7 @@ impl ScenarioCollector {
         self.deal_pv_stats.update(pv);
         self.deal_loss_stats.update(loss);
         self.deal_losses.push(loss);
+        self.deal_pvs.push(pv);
     }
 
     fn record_output(&mut self, output: PathScenarioOutput) {
@@ -852,16 +882,20 @@ impl ScenarioCollector {
         pricer: &StochasticPricer,
         pricing_mode: &str,
     ) -> StochasticPricingResult {
-        let paths = self.num_paths as f64;
         let mean_pv = self.deal_pv_stats.mean();
         let mean_loss = self.deal_loss_stats.mean();
         // Welford population variance avoids catastrophic cancellation when
         // tranche PVs are large (≥ 1e7) and relative dispersion is small.
         // The sibling `StochasticMetricsCalculator::weighted_variance` uses
         // the same population-variance convention.
-        let pv_pop_var = self.deal_pv_stats.population_variance();
         let loss_pop_var = self.deal_loss_stats.population_variance();
-        let std_error = pv_pop_var.sqrt() / paths.sqrt();
+        // Std-error: under antithetic mode each pair `(2k, 2k+1)` is one
+        // negatively-correlated draw — dividing the per-path variance by
+        // `√num_paths` would treat the `n/2` pairs as `n` i.i.d. samples and
+        // report a CI that is wrong (typically too narrow). `deal_pv_std_error`
+        // collapses each pair to its mean and computes the SE over the `n/2`
+        // pair means, the genuine i.i.d. unit under antithetic sampling.
+        let std_error = deal_pv_std_error(&self.deal_pvs, self.antithetic);
         let es = expected_shortfall(&mut self.deal_losses, pricer.config.es_confidence);
 
         let mut result = StochasticPricingResult::new(
@@ -888,6 +922,49 @@ impl ScenarioCollector {
 
         result
     }
+}
+
+/// Standard error of the deal-PV Monte Carlo mean.
+///
+/// In plain (non-antithetic) mode every path is an i.i.d. sample and the SE
+/// is `√(population_variance / n)`.
+///
+/// Under antithetic mode the paths are generated as negatively-correlated
+/// pairs `(2k, 2k+1)`: `path 2k+1` negates the systematic factors of `path 2k`.
+/// The pair is *not* two independent samples — the genuine i.i.d. unit is the
+/// pair mean `(pv_2k + pv_2k+1)/2`. Treating the `n` paths as `n` i.i.d.
+/// samples (`√(per-path variance / n)`) misstates the SE and the reported
+/// 95% CI. This routine collapses each complete pair to its mean and computes
+/// the SE over the `n/2` pair means; a lone trailing path (odd `n`) is treated
+/// as its own one-element "pair". When every pair averages to the same value
+/// the pair-mean variance — and hence the SE — is zero even if per-path
+/// dispersion is large.
+fn deal_pv_std_error(deal_pvs: &[f64], antithetic: bool) -> f64 {
+    if !antithetic {
+        return sample_std_error(deal_pvs);
+    }
+    let pair_means: Vec<f64> = deal_pvs
+        .chunks(2)
+        .map(|pair| pair.iter().sum::<f64>() / pair.len() as f64)
+        .collect();
+    sample_std_error(&pair_means)
+}
+
+/// Standard error of the mean of an i.i.d. sample: `√(population_variance / n)`.
+///
+/// Population variance is accumulated with Welford's algorithm to avoid the
+/// catastrophic cancellation of the `E[X²] − E[X]²` form when PVs are large
+/// relative to their dispersion.
+fn sample_std_error(samples: &[f64]) -> f64 {
+    let n = samples.len();
+    if n == 0 {
+        return 0.0;
+    }
+    let mut stats = OnlineStats::new();
+    for &x in samples {
+        stats.update(x);
+    }
+    (stats.population_variance() / n as f64).sqrt()
 }
 
 fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
@@ -1043,7 +1120,7 @@ mod tests {
     fn scenario_collector_variance_no_catastrophic_cancellation() {
         let instrument = test_instrument();
         let n = 1000usize;
-        let mut collector = ScenarioCollector::new(&instrument, n).expect("collector");
+        let mut collector = ScenarioCollector::new(&instrument, n, false).expect("collector");
 
         // Synthetic PVs: alternating mean ± delta where delta is tiny relative to mean.
         // True population variance = delta² = 0.0025.
@@ -1104,6 +1181,87 @@ mod tests {
              computed={}, true={true_std_error:.8}. \
              This indicates the E[X²]-E[X]² form is being used instead of Welford.",
             result.pv_std_error
+        );
+    }
+
+    /// W-23 — antithetic pairs are negatively-correlated draws, not i.i.d.
+    /// samples; the deal-PV std-error must be computed over the `n/2` pair
+    /// means, not over the `n` per-path values.
+    ///
+    /// Pathology: per-path PVs alternate `mean ± delta`. Each antithetic pair
+    /// `(2k, 2k+1)` therefore averages to *exactly* `mean` — the pair-mean
+    /// variance is zero even though the per-path population variance is
+    /// `delta²`. The plain i.i.d. estimator `√(delta²/n)` is non-zero and
+    /// hence wrong; the pair-aware estimator must report `SE = 0`.
+    #[test]
+    fn antithetic_std_error_uses_pair_means_not_per_path() {
+        let pvs: Vec<f64> = (0..1000)
+            .map(|i| if i % 2 == 0 { 1.0e7 + 5.0 } else { 1.0e7 - 5.0 })
+            .collect();
+
+        // Plain i.i.d. estimator treats all 1000 paths as independent: it
+        // sees per-path population variance = 25 and reports a non-zero SE.
+        let iid_se = deal_pv_std_error(&pvs, false);
+        assert!(
+            iid_se > 0.0,
+            "i.i.d. estimator should see per-path dispersion (got {iid_se})"
+        );
+
+        // Pair-aware estimator: every pair averages to exactly 1e7, so the
+        // pair-mean variance — and therefore the SE — is zero.
+        let pair_se = deal_pv_std_error(&pvs, true);
+        assert!(
+            pair_se.abs() < 1e-9,
+            "antithetic SE must be ~0 when every pair averages identically; \
+             got {pair_se} (i.i.d. estimator would wrongly report {iid_se})"
+        );
+
+        // The two estimators must genuinely disagree on this pathology — the
+        // whole point of the fix.
+        assert!(
+            iid_se > 1e-3,
+            "the i.i.d. and pair-aware estimators must differ materially here"
+        );
+    }
+
+    /// W-23 — the pair-aware std-error must match an independent recomputation
+    /// over the pair-mean sample, and antithetic mode must not *increase* the
+    /// reported estimator variance versus the i.i.d. interpretation when the
+    /// pairs carry genuine negative correlation.
+    #[test]
+    fn antithetic_std_error_matches_pair_mean_recomputation() {
+        // Negatively-correlated pairs: within each pair the two paths move in
+        // opposite directions about a slowly-drifting pair mean. This is the
+        // regime antithetic sampling targets.
+        let n_pairs = 500usize;
+        let mut pvs = Vec::with_capacity(2 * n_pairs);
+        for k in 0..n_pairs {
+            let pair_mean = 1.0e7 + (k as f64) * 0.01;
+            let spread = 100.0; // large per-path swing, cancels within the pair
+            pvs.push(pair_mean + spread);
+            pvs.push(pair_mean - spread);
+        }
+
+        let reported = deal_pv_std_error(&pvs, true);
+
+        // Independent recomputation: collapse each pair to its mean, then take
+        // the plain SE over the n/2 pair means.
+        let pair_means: Vec<f64> = pvs
+            .chunks(2)
+            .map(|p| (p[0] + p[1]) / 2.0)
+            .collect();
+        let expected = sample_std_error(&pair_means);
+        assert!(
+            (reported - expected).abs() < 1e-9,
+            "pair-aware SE {reported} must match pair-mean recomputation {expected}"
+        );
+
+        // The i.i.d. estimator sees the huge ±100 per-path swing and reports a
+        // far larger SE; antithetic mode must NOT inflate variance beyond it.
+        let iid = deal_pv_std_error(&pvs, false);
+        assert!(
+            reported <= iid,
+            "antithetic SE {reported} must not exceed the i.i.d. SE {iid}"
         );
     }
 }
