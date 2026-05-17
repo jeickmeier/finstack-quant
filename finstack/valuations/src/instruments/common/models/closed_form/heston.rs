@@ -342,7 +342,21 @@ pub struct HestonStripPricer {
     psi1_over_iphi: Vec<Complex<f64>>,
     /// Cached `psi_2(phi) / (i * phi)` values on the grid.
     psi2_over_iphi: Vec<Complex<f64>>,
+    /// `true` when too many grid nodes had a non-finite / overflow-zeroed
+    /// characteristic function, so the cached integral is unreliable and
+    /// pricing must fall back to Black-Scholes (mirrors the scalar path).
+    integrand_corrupted: bool,
 }
+
+/// Maximum fraction of integration nodes that may be non-finite / zeroed before
+/// the cached strip integral is deemed unreliable and pricing falls back to BS.
+///
+/// A Heston characteristic function that overflows at a node makes
+/// [`heston_pj_characteristic_function`] return exactly `Complex::ZERO`. A few
+/// such nodes (typically in the tail, where the integrand is already tiny) are
+/// harmless, but when a large fraction of nodes are corrupted the Gil-Pelaez
+/// integral silently loses mass and yields a plausible-but-wrong probability.
+const HESTON_STRIP_MAX_CORRUPT_FRACTION: f64 = 0.05;
 
 impl HestonStripPricer {
     /// Build a strip pricer with characteristic-function values cached on the
@@ -361,6 +375,14 @@ impl HestonStripPricer {
         let mut psi1_over_iphi = Vec::with_capacity(grid.len());
         let mut psi2_over_iphi = Vec::with_capacity(grid.len());
 
+        // Count interior nodes (φ away from the singularity) and how many of
+        // them returned a non-finite / overflow-zeroed characteristic function.
+        // `heston_pj_characteristic_function` signals overflow by returning
+        // exactly `Complex::ZERO`, so a zero psi at a genuine φ is treated as a
+        // corrupted node.
+        let mut interior_nodes = 0_usize;
+        let mut corrupted_nodes = 0_usize;
+
         for (phi, _) in &grid {
             if phi.abs() < settings.phi_eps {
                 psi1_over_iphi.push(Complex::new(0.0, 0.0));
@@ -368,9 +390,17 @@ impl HestonStripPricer {
                 continue;
             }
 
+            interior_nodes += 1;
             let denom = i * *phi;
             let psi1 = heston_pj_characteristic_function(1, *phi, time, log_spot, params);
             let psi2 = heston_pj_characteristic_function(2, *phi, time, log_spot, params);
+
+            let psi1_ok = psi1.is_finite() && psi1.norm_sqr() > 0.0;
+            let psi2_ok = psi2.is_finite() && psi2.norm_sqr() > 0.0;
+            if !psi1_ok || !psi2_ok {
+                corrupted_nodes += 1;
+            }
+
             psi1_over_iphi.push(if psi1.is_finite() {
                 psi1 / denom
             } else {
@@ -383,6 +413,10 @@ impl HestonStripPricer {
             });
         }
 
+        let integrand_corrupted = interior_nodes > 0
+            && (corrupted_nodes as f64) / (interior_nodes as f64)
+                > HESTON_STRIP_MAX_CORRUPT_FRACTION;
+
         Some(Self {
             spot,
             time,
@@ -390,6 +424,7 @@ impl HestonStripPricer {
             grid,
             psi1_over_iphi,
             psi2_over_iphi,
+            integrand_corrupted,
         })
     }
 
@@ -409,13 +444,42 @@ impl HestonStripPricer {
     }
 
     /// Price a single European call using the cached strip pricer.
+    ///
+    /// If too many integration nodes had a non-finite / overflow-zeroed
+    /// characteristic function (see [`HESTON_STRIP_MAX_CORRUPT_FRACTION`]), the
+    /// cached Gil-Pelaez integral is unreliable and this degrades to a
+    /// Black-Scholes price at the integrated vol `sqrt(v0)` — mirroring the
+    /// scalar [`heston_call_price_fourier_with_settings`] fallback rather than
+    /// returning a plausible-but-wrong finite number.
     #[must_use]
     pub fn price_call(&self, strike: f64) -> f64 {
+        if self.integrand_corrupted {
+            return black_scholes_call(
+                self.spot,
+                strike,
+                self.time,
+                self.params.r,
+                self.params.q,
+                self.params.v0.sqrt(),
+            );
+        }
+
         let log_strike = strike.ln();
         let p1 = self.probability(log_strike, &self.psi1_over_iphi);
         let p2 = self.probability(log_strike, &self.psi2_over_iphi);
         let call_price = self.spot * (-self.params.q * self.time).exp() * p1
             - strike * (-self.params.r * self.time).exp() * p2;
+
+        if !call_price.is_finite() {
+            return black_scholes_call(
+                self.spot,
+                strike,
+                self.time,
+                self.params.r,
+                self.params.q,
+                self.params.v0.sqrt(),
+            );
+        }
 
         call_price.max(0.0)
     }
@@ -1508,6 +1572,64 @@ mod tests {
         assert!(HestonFourierSettings::new(f64::NAN, 100, 16, 1e-8).is_err());
         // The default settings must always be valid.
         assert!(HestonFourierSettings::default().validate().is_ok());
+    }
+
+    /// W-03: with extreme parameters that overflow the characteristic function
+    /// on a large fraction of grid nodes, the strip pricer must degrade to a
+    /// Black-Scholes fallback (like the scalar Fourier path) rather than return
+    /// a plausible-but-wrong finite number from a mass-losing integral.
+    #[test]
+    fn strip_pricer_falls_back_to_bs_on_corrupted_nodes() {
+        // Extreme κ/θ/σᵥ with positive correlation and long maturity drives the
+        // characteristic-function exponent past its real-part overflow limit on
+        // the bulk of the integration grid, so `heston_pj_characteristic_function`
+        // returns `Complex::ZERO` for those nodes.
+        let params = HestonParams::new(0.05, 0.0, 10.0, 100.0, 90.0, 0.99, 90.0).expect("valid");
+        let settings = HestonFourierSettings::default();
+        let spot = 100.0;
+        let strike = 100.0;
+        let time = 30.0;
+
+        let pricer =
+            HestonStripPricer::new(spot, time, &params, &settings).expect("grid constructs");
+        assert!(
+            pricer.integrand_corrupted,
+            "extreme params should corrupt a large fraction of integration nodes"
+        );
+
+        let strip_price = pricer.price_call(strike);
+        let bs = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+
+        // The strip price must equal the BS fallback exactly (same code path),
+        // not a finite-but-wrong value from the corrupted Fourier integral.
+        // Before the W-03 fix the strip path had no mass-loss fallback: the
+        // corrupted Gil-Pelaez integral lost most of its mass and produced a
+        // plausible-but-wrong call price with no diagnostic.
+        assert!(
+            (strip_price - bs).abs() < 1e-9,
+            "corrupted strip pricer should return the BS fallback {bs}, got {strip_price}"
+        );
+        assert!(strip_price.is_finite(), "fallback price must be finite");
+    }
+
+    /// W-03: a well-behaved parameter set must NOT trip the corruption fallback
+    /// — the strip price must still match the per-strike Fourier price.
+    #[test]
+    fn strip_pricer_no_false_corruption_on_normal_params() {
+        let params = HestonParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+        let settings = HestonFourierSettings::default();
+        let pricer = HestonStripPricer::new(100.0, 1.0, &params, &settings).expect("constructs");
+        assert!(
+            !pricer.integrand_corrupted,
+            "benign parameters must not be flagged as corrupted"
+        );
+        let strip = pricer.price_call(100.0);
+        let scalar =
+            heston_call_price_fourier_with_settings(100.0, 100.0, 1.0, &params, &settings);
+        assert!(
+            (strip - scalar).abs() < 1e-9,
+            "uncorrupted strip price {strip} should match scalar path {scalar}"
+        );
     }
 
     #[test]
