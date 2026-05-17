@@ -22,10 +22,13 @@ impl MetricCalculator for ExpectedVarianceCalculator {
             return swap.remaining_forward_variance(&context.curves, as_of);
         }
 
-        // Partially observed: blend realized-to-date with forward for remaining
+        // Partially observed: blend realized-to-date with forward for the
+        // remaining period. Both variances are already annualized, so the
+        // accrued-variance identity time-weights them by elapsed/remaining
+        // day-count fractions, not observation counts (W-32).
         let realized = swap.partial_realized_variance(&context.curves, as_of)?;
         let forward = swap.remaining_forward_variance(&context.curves, as_of)?;
-        let w = swap.realized_fraction_by_observations(as_of);
+        let w = swap.time_elapsed_fraction(as_of);
 
         Ok(realized * w + forward * (1.0 - w))
     }

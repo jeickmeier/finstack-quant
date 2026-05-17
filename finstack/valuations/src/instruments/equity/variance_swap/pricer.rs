@@ -110,7 +110,13 @@ pub(crate) fn compute_pv(
 
     let realized = partial_realized_variance(inst, curves, as_of)?;
     let forward = remaining_forward_variance(inst, curves, as_of)?;
-    let w = realized_fraction_by_observations(inst, as_of);
+    // Seasoned MTM blends already-annualized realized and forward variance.
+    // The accrued-variance identity time-weights the un-annualized total
+    // variance: σ²_expected = (V_accrued + E[V_fwd]·τ) / T, which reduces to
+    // realized·(t_elapsed/T) + forward·(τ_remaining/T). Use the day-count
+    // `time_elapsed_fraction` rather than an observation-count fraction, which
+    // only coincides for perfectly uniform schedules (W-32).
+    let w = inst.time_elapsed_fraction(as_of);
     let expected_var = realized * w + forward * (1.0 - w);
     let undiscounted = inst.payoff(expected_var);
     let t = inst
@@ -577,6 +583,94 @@ mod tests {
             msg.contains("no historical price data") || msg.contains("realised variance"),
             "expected explicit data-availability error, got: {}",
             msg
+        );
+    }
+
+    /// W-32: a seasoned variance swap on a weekend-skipping daily schedule
+    /// near maturity must blend realized and forward variance by the
+    /// day-count `time_elapsed_fraction`, not by observation count. The two
+    /// fractions diverge for non-uniform schedules and the MTM error is
+    /// first-order near maturity.
+    #[test]
+    fn seasoned_mtm_uses_time_weighting_not_observation_count() {
+        use finstack_core::dates::{DayCount, Tenor};
+        use finstack_core::market_data::scalars::ScalarTimeSeries;
+        use finstack_core::money::Money;
+        use finstack_core::types::{CurveId, InstrumentId};
+        use crate::instruments::equity::variance_swap::types::PayReceive;
+        use crate::instruments::common_impl::traits::Attributes;
+
+        // Weekend-skipping daily schedule, ~6 months, valued near maturity.
+        let start = date!(2025 - 01 - 06); // Monday
+        let maturity = date!(2025 - 06 - 30); // Monday
+        let as_of = date!(2025 - 06 - 27); // Friday, near maturity
+
+        let swap = VarianceSwap::builder()
+            .id(InstrumentId::new("VARSPX-SEASONED"))
+            .underlying_ticker("SPX".to_string())
+            .notional(Money::new(1_000_000.0, finstack_core::currency::Currency::USD))
+            .strike_variance(0.04)
+            .start_date(start)
+            .maturity(maturity)
+            .observation_freq(Tenor::daily())
+            .realized_var_method(finstack_core::math::stats::RealizedVarMethod::CloseToClose)
+            .side(PayReceive::Receive)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .attributes(Attributes::new())
+            .build()
+            .expect("seasoned swap");
+
+        // The count fraction must genuinely diverge from the time fraction;
+        // otherwise the test would not distinguish the two weightings.
+        let count_w = realized_fraction_by_observations(&swap, as_of);
+        let time_w = swap.time_elapsed_fraction(as_of);
+        assert!(
+            (count_w - time_w).abs() > 1e-4,
+            "schedule must make count weight ({count_w}) differ from time weight ({time_w})"
+        );
+
+        // Close series on every past observation date with a non-trivial
+        // return path so realized variance != forward variance (= strike, as
+        // no vol surface is supplied).
+        let past: Vec<Date> = observation_dates(&swap)
+            .into_iter()
+            .filter(|&d| d <= as_of)
+            .collect();
+        let obs: Vec<(Date, f64)> = past
+            .iter()
+            .enumerate()
+            .map(|(i, &d)| (d, 100.0 * (1.0 + 0.001 * (i as f64 % 3.0 - 1.0))))
+            .collect();
+        let series = ScalarTimeSeries::new("SPX", obs, None).expect("series");
+        let market = build_market(as_of).insert_series(series);
+
+        let pv = compute_pv(&swap, &market, as_of).expect("seasoned pv");
+
+        // Recompute the identity from the same building blocks.
+        let realized = partial_realized_variance(&swap, &market, as_of).expect("realized");
+        let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
+        let expected_var = realized * time_w + forward * (1.0 - time_w);
+        let t = swap
+            .day_count
+            .year_fraction(as_of, swap.maturity, Default::default())
+            .expect("yf");
+        let disc = market.get_discount("USD-OIS").expect("curve");
+        let expected_pv = swap.payoff(expected_var) * disc.df(t);
+
+        assert!(
+            (pv.amount() - expected_pv.amount()).abs() < 1e-6,
+            "seasoned MTM must use time-weighted identity: pv={} expected={}",
+            pv.amount(),
+            expected_pv.amount()
+        );
+
+        // And it must NOT match the (wrong) observation-count weighting.
+        let count_var = realized * count_w + forward * (1.0 - count_w);
+        let count_pv = swap.payoff(count_var) * disc.df(t);
+        assert!(
+            (pv.amount() - count_pv.amount()).abs() > 1e-6,
+            "seasoned MTM must differ from observation-count weighting"
         );
     }
 
