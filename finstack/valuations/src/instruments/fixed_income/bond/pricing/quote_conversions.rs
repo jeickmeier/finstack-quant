@@ -598,7 +598,53 @@ pub fn df_from_yield(
     })
 }
 
+/// `TreasuryActual` discount factor with a schedule-flagged first-period length.
+///
+/// Unlike [`df_from_yield`], which infers the first (stub) period purely from time
+/// (`t <= 1/m`), this variant takes the **actual** first-coupon period length
+/// `first_period_len` derived from the bond's cashflow schedule. Simple interest
+/// is applied over the whole first period — long, short, or regular — and periodic
+/// compounding over the remaining full periods. This avoids the 1-2bp
+/// misclassification on new issues with irregular (notably long) first coupons.
+fn df_treasury_actual_with_first_period(
+    ytm: f64,
+    t: f64,
+    m: f64,
+    first_period_len: f64,
+) -> finstack_core::Result<f64> {
+    // First-period simple-interest leg over `min(t, first_period_len)`.
+    let stub_t = t.min(first_period_len);
+    let stub_denom = 1.0 + ytm * stub_t;
+    if stub_denom <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "TreasuryActual simple interest denom (1 + y*t) = {stub_denom} is non-positive for ytm={ytm}, t={stub_t}"
+        )));
+    }
+    let df_stub = 1.0 / stub_denom;
+
+    if t <= first_period_len {
+        return Ok(df_stub);
+    }
+
+    // Periodic compounding over the remaining time after the first period.
+    let periodic_base = 1.0 + ytm / m;
+    if periodic_base <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "TreasuryActual periodic base (1 + y/m) = {periodic_base} is non-positive for ytm={ytm}, m={m}"
+        )));
+    }
+    let remaining = t - first_period_len;
+    Ok(df_stub * periodic_base.powf(-m * remaining))
+}
+
 /// Price from yield using explicit day count and frequency (no `Bond` borrow required).
+///
+/// For the [`YieldCompounding::TreasuryActual`] convention the first (potentially
+/// irregular) coupon period is flagged from the **cashflow schedule** — the
+/// year-fraction to the first post-`as_of` flow — rather than inferred from time.
+/// This keeps the YTM↔price conversion correct for new issues with long first
+/// coupons, where the time-based `t <= 1/m` heuristic in [`df_from_yield`] would
+/// misapply simple interest to the wrong horizon.
 #[inline]
 pub fn price_from_ytm_compounded_params(
     day_count: finstack_core::dates::DayCount,
@@ -610,6 +656,25 @@ pub fn price_from_ytm_compounded_params(
 ) -> finstack_core::Result<f64> {
     use finstack_core::math::summation::NeumaierAccumulator;
 
+    // Schedule-aware first-period length for the TreasuryActual stub: the
+    // year-fraction from `as_of` to the first cashflow strictly after `as_of`.
+    let treasury_first_period = if matches!(comp, YieldCompounding::TreasuryActual) {
+        let mut first: Option<f64> = None;
+        for &(date, _) in flows {
+            if date <= as_of {
+                continue;
+            }
+            let yf = day_count.year_fraction(as_of, date, DayCountContext::default())?;
+            if yf > 0.0 {
+                first = Some(yf);
+                break;
+            }
+        }
+        first
+    } else {
+        None
+    };
+
     let mut pv = NeumaierAccumulator::new();
     for &(date, amount) in flows {
         if date <= as_of {
@@ -617,7 +682,13 @@ pub fn price_from_ytm_compounded_params(
         }
         let t = day_count.year_fraction(as_of, date, DayCountContext::default())?;
         if t > 0.0 {
-            let df = df_from_yield(ytm, t, comp, freq)?;
+            let df = match (comp, treasury_first_period) {
+                (YieldCompounding::TreasuryActual, Some(first_period_len)) => {
+                    let m = periods_per_year(freq)?.max(1.0);
+                    df_treasury_actual_with_first_period(ytm, t, m, first_period_len)?
+                }
+                _ => df_from_yield(ytm, t, comp, freq)?,
+            };
             pv.add(amount.amount() * df);
         }
     }
@@ -1425,6 +1496,74 @@ mod tests {
     use finstack_core::market_data::term_structures::DiscountCurve;
     use finstack_core::money::Money;
     use time::macros::date;
+
+    /// W-30: a Treasury with a LONG first coupon period (8 months on a
+    /// semi-annual bond) must have its first-period stub flagged from the
+    /// cashflow schedule. The price returned by `price_from_ytm_compounded_params`
+    /// for `TreasuryActual` must apply simple interest over the actual 8-month
+    /// first period — not the time-based `t <= 1/m` heuristic which would
+    /// split it into a regular 6-month period plus a 2-month stub.
+    #[test]
+    fn treasury_actual_long_first_coupon_uses_schedule_stub() {
+        use finstack_core::dates::{DayCount, Tenor};
+
+        let as_of = date!(2025 - 01 - 01);
+        let day_count = DayCount::Act365F;
+        let freq = Tenor::semi_annual();
+        let ytm = 0.05;
+
+        // Long first coupon: ~8 months to first flow, then semi-annual.
+        let flows: Vec<(finstack_core::dates::Date, Money)> = vec![
+            (date!(2025 - 09 - 01), Money::new(3.0, Currency::USD)),
+            (date!(2026 - 03 - 01), Money::new(3.0, Currency::USD)),
+            (date!(2026 - 09 - 01), Money::new(103.0, Currency::USD)),
+        ];
+
+        let price_actual = price_from_ytm_compounded_params(
+            day_count,
+            freq,
+            &flows,
+            as_of,
+            ytm,
+            YieldCompounding::TreasuryActual,
+        )
+        .expect("treasury-actual price");
+
+        // First-period length flagged from the schedule (yf to first flow).
+        let first_period_len = day_count
+            .year_fraction(as_of, flows[0].0, DayCountContext::default())
+            .expect("first period yf");
+        assert!(
+            first_period_len > 0.5,
+            "test precondition: first coupon must be a LONG stub (>1 regular period), got {first_period_len}"
+        );
+        let m = periods_per_year(freq).expect("m").max(1.0);
+
+        // Schedule-aware reference: simple interest over the actual first period.
+        let mut expected_schedule = 0.0;
+        // Buggy time-based reference: the old `df_from_yield` heuristic.
+        let mut buggy_time_based = 0.0;
+        for &(date, amount) in &flows {
+            let t = day_count
+                .year_fraction(as_of, date, DayCountContext::default())
+                .expect("yf");
+            expected_schedule += amount.amount()
+                * df_treasury_actual_with_first_period(ytm, t, m, first_period_len)
+                    .expect("schedule df");
+            buggy_time_based += amount.amount()
+                * df_from_yield(ytm, t, YieldCompounding::TreasuryActual, freq)
+                    .expect("time-based df");
+        }
+
+        assert!(
+            (price_actual - expected_schedule).abs() < 1e-9,
+            "price {price_actual} must use the schedule-flagged stub {expected_schedule}"
+        );
+        assert!(
+            (price_actual - buggy_time_based).abs() > 1e-4,
+            "price {price_actual} must NOT match the time-based heuristic {buggy_time_based}"
+        );
+    }
 
     #[test]
     fn compute_quotes_returns_zeroes_for_effectively_zero_notional() {
