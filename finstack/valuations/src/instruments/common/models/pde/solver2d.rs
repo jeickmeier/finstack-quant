@@ -48,13 +48,13 @@ impl Solver2DBuilder {
         self
     }
 
-    /// Use Craig-Sneyd ADI with `n_steps` time steps.
+    /// Use Modified Craig-Sneyd (MCS) ADI with `n_steps` time steps.
     pub fn craig_sneyd(mut self, n_steps: usize) -> Self {
         self.stepper = Some(CraigSneydStepper::new(n_steps));
         self
     }
 
-    /// Use Craig-Sneyd with Rannacher-style smoothing.
+    /// Use Modified Craig-Sneyd (MCS) ADI with Rannacher-style smoothing.
     pub fn craig_sneyd_rannacher(mut self, implicit_start: usize, n_steps: usize) -> Self {
         self.stepper = Some(CraigSneydStepper::with_rannacher(implicit_start, n_steps));
         self
@@ -68,7 +68,7 @@ impl Solver2DBuilder {
     }
 }
 
-/// Two-dimensional PDE solver using Craig-Sneyd ADI splitting.
+/// Two-dimensional PDE solver using Modified Craig-Sneyd (MCS) ADI splitting.
 pub struct Solver2D {
     /// Tensor-product grid.
     grid: Grid2D,

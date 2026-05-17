@@ -1,30 +1,54 @@
-//! Craig-Sneyd ADI time-stepping for 2D PDEs.
+//! Modified Craig-Sneyd (MCS) ADI time-stepping for 2D PDEs.
 //!
-//! Implements the modified Craig-Sneyd (MCS) scheme from In 't Hout & Welfert
-//! (2009) for solving 2D convection-diffusion-reaction PDEs. Each time step
-//! splits into fractional steps along each spatial direction, with the
-//! cross-derivative term treated explicitly.
+//! Implements the Modified Craig-Sneyd (MCS) scheme of In 't Hout & Welfert
+//! (2009) for solving 2D convection-diffusion-reaction PDEs with a mixed
+//! (cross-derivative) term. Each time step splits into fractional steps along
+//! each spatial direction; the cross-derivative term is treated explicitly.
 //!
 //! # Algorithm
 //!
-//! Given operators `A_x`, `A_y` (directional tridiag) and `A_xy` (cross-deriv):
+//! Write the spatial operator as `F = F_0 + F_1 + F_2`, where `F_0` is the
+//! mixed (cross-derivative) term `A_xy`, `F_1` is the x-direction term `A_x`,
+//! and `F_2` is the y-direction term `A_y`. With a fixed parameter `theta`,
+//! one MCS step from `u^n` (at `t_n`) to `u^{n+1}` (at `t_{n+1}`) is
+//! (In 't Hout & Welfert 2009; In 't Hout & Mishra 2010, eq. 1.4):
 //!
 //! ```text
-//! Y_0 = u^n + dt * (A_x + A_y + A_xy) * u^n          [explicit predictor]
-//! Y_1 = Y_0 + theta * dt * (A_x * Y_1 - A_x * u^n)   [implicit x-sweep]
-//! Y_2 = Y_1 + theta * dt * (A_y * Y_2 - A_y * u^n)   [implicit y-sweep]
-//! u^{n+1} = Y_2
+//! Y_0   = u^n + dt * F(t_n, u^n)                                  [predictor]
+//! Y_j   = Y_{j-1} + theta*dt * (F_j(t_{n+1},Y_j) - F_j(t_n,u^n))   j = 1,2
+//! Yhat0 = Y_0 + theta*dt * (F_0(t_{n+1},Y_2) - F_0(t_n,u^n))       [mixed corr.]
+//! Ytld0 = Yhat0 + (1/2 - theta)*dt * (F(t_{n+1},Y_2) - F(t_n,u^n)) [MCS corr.]
+//! Ytld_j = Ytld_{j-1} + theta*dt * (F_j(t_{n+1},Ytld_j) - F_j(t_n,u^n))  j = 1,2
+//! u^{n+1} = Ytld_2
 //! ```
 //!
-//! For theta = 0.5 this gives the standard Craig-Sneyd scheme (second-order
-//! in time). The implicit sweeps are tridiagonal solves reusing the 1D
-//! Thomas algorithm from Phase 1.
+//! The `Y_j` lines (first predictor plus two implicit unidirectional
+//! correctors) alone are the first-order Douglas scheme. The `Yhat0`
+//! mixed-term corrector plus the second pair of implicit sweeps `Ytld_j`
+//! upgrade Douglas to the second-order MCS scheme. With `theta = 1/2` the
+//! `Ytld0` line vanishes and MCS reduces to the plain Craig-Sneyd (CS) scheme.
+//!
+//! # Stability and the choice of `theta`
+//!
+//! Plain CS (and Douglas) with a mixed-derivative term is only
+//! *conditionally* stable for strongly correlated problems. The MCS scheme is
+//! unconditionally stable (von Neumann) for `theta >= 1/3` in the pure
+//! 2D-diffusion case, and for `theta >= 2/5` in the general
+//! convection-diffusion case (In 't Hout & Mishra 2010). This stepper uses
+//! `theta = 1/3`: it is second-order accurate and robust for the Heston PDE
+//! over the correlation range used in practice.
+//!
+//! The implicit sweeps are tridiagonal solves reusing the 1D Thomas algorithm.
 //!
 //! # References
 //!
 //! - In 't Hout, K. J. & Welfert, B. D. (2009). "Unconditional stability of
 //!   second-order ADI schemes applied to multi-dimensional diffusion equations
 //!   with mixed derivative terms." *Applied Numerical Mathematics*, 59(3-4).
+//! - In 't Hout, K. J. & Mishra, C. (2010). "Stability of the Modified
+//!   Craig-Sneyd scheme for two-dimensional convection-diffusion equations
+//!   with mixed derivative term." (arXiv:1011.6528) — gives the MCS scheme in
+//!   the form (eq. 1.4) reproduced above.
 //! - Craig, I. J. D. & Sneyd, A. D. (1988). "An alternating-direction implicit
 //!   scheme for parabolic equations with mixed derivatives."
 
@@ -33,11 +57,11 @@ use super::grid2d::Grid2D;
 use super::operator2d::{apply_cross_derivative, Operators2D};
 use super::problem2d::PdeProblem2D;
 
-/// Reusable per-step scratch buffers for Craig-Sneyd ADI.
+/// Reusable per-step scratch buffers for the Modified Craig-Sneyd ADI stepper.
 ///
 /// Sized to the largest grid the caller intends to step. Reusing this across
 /// timesteps (and across grids of identical shape) lets `Solver2D` skip the
-/// six allocations the previous implementation performed every call to
+/// per-call allocations the previous implementation performed every call to
 /// [`CraigSneydStepper::step_with_buffers`].
 #[derive(Clone, Default)]
 pub struct AdiWorkBuffers {
@@ -45,10 +69,22 @@ pub struct AdiWorkBuffers {
     y_line: Vec<f64>,
     line_out: Vec<f64>,
     rhs_buf: Vec<f64>,
+    /// Predictor `Y_0` (interior).
     y0: Vec<f64>,
+    /// First x-sweep result `Y_1` (interior).
     y1: Vec<f64>,
+    /// First y-sweep result `Y_2` (interior).
+    y2: Vec<f64>,
+    /// MCS corrector iterate `Ytld` (interior): `Ytld_0`, then `Ytld_1`.
+    ytld: Vec<f64>,
+    /// `F_1(t_n, u^n) = A_x * u^n` (interior).
     ax_u: Vec<f64>,
+    /// `F_2(t_n, u^n) = A_y * u^n` (interior).
     ay_u: Vec<f64>,
+    /// `F_1(t_{n+1}, Y_2) = A_x * Y_2` (interior), for the MCS corrector.
+    ax_y2: Vec<f64>,
+    /// `F_2(t_{n+1}, Y_2) = A_y * Y_2` (interior), for the MCS corrector.
+    ay_y2: Vec<f64>,
 }
 
 impl AdiWorkBuffers {
@@ -65,8 +101,12 @@ impl AdiWorkBuffers {
             rhs_buf: vec![0.0; line_max],
             y0: vec![0.0; interior],
             y1: vec![0.0; interior],
+            y2: vec![0.0; interior],
+            ytld: vec![0.0; interior],
             ax_u: vec![0.0; interior],
             ay_u: vec![0.0; interior],
+            ax_y2: vec![0.0; interior],
+            ay_y2: vec![0.0; interior],
         }
     }
 
@@ -94,46 +134,91 @@ impl AdiWorkBuffers {
         if self.y1.len() != interior {
             self.y1.resize(interior, 0.0);
         }
+        if self.y2.len() != interior {
+            self.y2.resize(interior, 0.0);
+        }
+        if self.ytld.len() != interior {
+            self.ytld.resize(interior, 0.0);
+        }
         if self.ax_u.len() != interior {
             self.ax_u.resize(interior, 0.0);
         }
         if self.ay_u.len() != interior {
             self.ay_u.resize(interior, 0.0);
         }
+        if self.ax_y2.len() != interior {
+            self.ax_y2.resize(interior, 0.0);
+        }
+        if self.ay_y2.len() != interior {
+            self.ay_y2.resize(interior, 0.0);
+        }
     }
 }
 
-/// Craig-Sneyd ADI time stepper for 2D problems.
+/// Default MCS `theta`: second-order accurate and unconditionally stable for
+/// `theta >= 1/3` (pure diffusion) / `theta >= 2/5` (general
+/// convection-diffusion), per In 't Hout & Mishra (2010). `1/3` is the
+/// standard choice for the Heston PDE.
+const MCS_THETA: f64 = 1.0 / 3.0;
+
+/// Modified Craig-Sneyd (MCS) ADI time stepper for 2D problems.
 ///
-/// Supports both standard Craig-Sneyd (`theta = 0.5`) and a Rannacher-like
-/// variant that uses `theta = 1.0` for the first few steps to smooth
-/// discontinuities near the terminal condition.
+/// Uses `theta = 1/3` (see [`MCS_THETA`]). Optionally applies Rannacher-style
+/// smoothing: fully-implicit (`theta = 1.0`) steps near the terminal condition
+/// to damp the non-smooth payoff, then `theta = 1/3` for the remaining steps.
+///
+/// The type name is retained for API stability; the implemented scheme is the
+/// Modified Craig-Sneyd scheme (plain Craig-Sneyd is the `theta = 1/2` special
+/// case — see the module documentation).
 pub struct CraigSneydStepper {
-    /// Theta parameter for the implicit weight (0.5 = standard CS).
+    /// MCS `theta` parameter for the implicit weight.
     theta: f64,
     /// Number of initial fully-implicit steps (Rannacher smoothing).
     implicit_start_steps: usize,
     /// Total number of time steps.
     n_steps: usize,
+    /// Whether to apply the MCS corrector stages (`Yhat0` / `Ytld_j`).
+    ///
+    /// Always `true` in production: the full Modified Craig-Sneyd scheme.
+    /// A test-only constructor sets this `false` to obtain the bare
+    /// first-order Douglas scheme, which is used to demonstrate that the MCS
+    /// corrector is what delivers accuracy at strong correlation.
+    apply_mcs_corrector: bool,
 }
 
 impl CraigSneydStepper {
-    /// Standard Craig-Sneyd with `theta = 0.5`.
+    /// Modified Craig-Sneyd ADI stepper with the standard `theta = 1/3`.
     pub fn new(n_steps: usize) -> Self {
         Self {
-            theta: 0.5,
+            theta: MCS_THETA,
             implicit_start_steps: 0,
             n_steps,
+            apply_mcs_corrector: true,
         }
     }
 
-    /// Craig-Sneyd with Rannacher-style smoothing: use `theta = 1.0` for the
-    /// first `implicit_start` steps, then switch to `theta = 0.5`.
+    /// Modified Craig-Sneyd with Rannacher-style smoothing: use `theta = 1.0`
+    /// (fully implicit) for the first `implicit_start` steps, then switch to
+    /// `theta = 1/3`.
     pub fn with_rannacher(implicit_start: usize, n_steps: usize) -> Self {
         Self {
-            theta: 0.5,
+            theta: MCS_THETA,
             implicit_start_steps: implicit_start,
             n_steps,
+            apply_mcs_corrector: true,
+        }
+    }
+
+    /// Test-only: bare first-order Douglas scheme (predictor + two implicit
+    /// unidirectional correctors, no MCS corrector). Used by tests to show
+    /// that the MCS corrector is required for accuracy at high correlation.
+    #[cfg(test)]
+    pub(super) fn douglas_for_test(n_steps: usize) -> Self {
+        Self {
+            theta: MCS_THETA,
+            implicit_start_steps: 0,
+            n_steps,
+            apply_mcs_corrector: false,
         }
     }
 
@@ -149,7 +234,8 @@ impl CraigSneydStepper {
         (0..=n).map(|i| maturity - i as f64 * dt).collect()
     }
 
-    /// Execute one Craig-Sneyd ADI step from `t_from` to `t_to` (backward).
+    /// Execute one Modified Craig-Sneyd ADI step from `t_from` to `t_to`
+    /// (backward).
     ///
     /// Allocates fresh work buffers on every call; prefer
     /// [`CraigSneydStepper::step_with_buffers`] when stepping in a loop.
@@ -182,7 +268,7 @@ impl CraigSneydStepper {
     }
 
     /// Like [`CraigSneydStepper::step`], but reuses caller-owned scratch
-    /// buffers instead of allocating six fresh `Vec`s on every call.
+    /// buffers instead of allocating fresh `Vec`s on every call.
     #[allow(clippy::too_many_arguments)]
     pub fn step_with_buffers(
         &self,
@@ -207,6 +293,8 @@ impl CraigSneydStepper {
         let nx_int = grid.nx_interior();
         let ny_int = grid.ny_interior();
 
+        let interior = nx_int * ny_int;
+
         buffers.resize_for(grid);
         let AdiWorkBuffers {
             x_line,
@@ -215,95 +303,204 @@ impl CraigSneydStepper {
             rhs_buf,
             y0,
             y1,
+            y2,
+            ytld,
             ax_u,
             ay_u,
+            ax_y2,
+            ay_y2,
         } = buffers;
 
-        // Assemble operators at t_from (for the explicit evaluation)
+        // Assemble operators at t_from (for the explicit evaluation of F at u^n).
         let ops = Operators2D::assemble(problem, grid, t_from);
 
-        // --- Step 0: Explicit predictor ---
-        // Y_0 = u^n + dt * (A_x * u^n + A_y * u^n + A_xy * u^n + c * u^n)
+        // F_0(t_n, u^n): the mixed (cross-derivative) term applied to u^n.
         let cross = apply_cross_derivative(&ops.cross_deriv, u_full, grid);
 
-        // Compute A_x * u^n for each y-line
-        for jj in 0..ny_int {
-            for ii in 0..nx_int {
-                x_line[ii] = u_int[ii * ny_int + jj];
-            }
-            ops.op_x[jj].apply_into(x_line, &mut line_out[..nx_int]);
-            for ii in 0..nx_int {
-                ax_u[ii * ny_int + jj] = line_out[ii];
-            }
-        }
+        // F_1(t_n, u^n) = A_x * u^n  (for each y-line).
+        apply_x_operator(&ops, u_int, nx_int, ny_int, x_line, line_out, ax_u);
+        // F_2(t_n, u^n) = A_y * u^n  (for each x-line).
+        apply_y_operator(&ops, u_int, nx_int, ny_int, y_line, line_out, ay_u);
 
-        // Compute A_y * u^n for each x-line
-        for ii in 0..nx_int {
-            for jj in 0..ny_int {
-                y_line[jj] = u_int[ii * ny_int + jj];
-            }
-            ops.op_y[ii].apply_into(y_line, &mut line_out[..ny_int]);
-            for jj in 0..ny_int {
-                ay_u[ii * ny_int + jj] = line_out[jj];
-            }
-        }
-
-        // Y_0 = u^n + dt * (A_x*u^n + A_y*u^n + A_xy*u^n)
-        // Note: the reaction term c(x,y,t)*u is already split into the
-        // directional operators (c/2 in A_x, c/2 in A_y), so ax_u + ay_u
-        // already includes the full reaction contribution.
-        for idx in 0..nx_int * ny_int {
+        // --- Predictor: Y_0 = u^n + dt * F(t_n, u^n) ---
+        // The reaction term c*u is split into the directional operators
+        // (c/2 in A_x, c/2 in A_y), so ax_u + ay_u already carries the full
+        // reaction contribution; cross carries the mixed term.
+        for idx in 0..interior {
             y0[idx] = u_int[idx] + dt * (ax_u[idx] + ay_u[idx] + cross[idx]);
         }
 
-        // --- Step 1: Implicit x-sweep ---
-        // Reassemble operators at t_to for the implicit side
+        // Operators for the implicit side (evaluated at t_{n+1} = t_to).
         let ops_impl = if problem.is_time_homogeneous() {
             ops
         } else {
             Operators2D::assemble(problem, grid, t_to)
         };
 
-        let alpha_x = theta * dt;
+        let alpha = theta * dt;
 
-        for jj in 0..ny_int {
-            for ii in 0..nx_int {
-                rhs_buf[ii] = y0[ii * ny_int + jj] - theta * dt * ax_u[ii * ny_int + jj];
-            }
-            ops_impl.op_x[jj].add_implicit_corrections(alpha_x, &mut rhs_buf[..nx_int]);
-            ops_impl.op_x[jj].solve_thomas_into(
-                alpha_x,
-                &rhs_buf[..nx_int],
-                &mut line_out[..nx_int],
-            );
-            for ii in 0..nx_int {
-                y1[ii * ny_int + jj] = line_out[ii];
-            }
+        // --- CS corrector 1: implicit x-sweep ---
+        // Y_1 = Y_0 + theta*dt * (F_1(t_{n+1}, Y_1) - F_1(t_n, u^n))
+        // <=> (I - theta*dt*A_x) Y_1 = Y_0 - theta*dt*ax_u  (+ implicit corr.)
+        implicit_x_sweep(
+            &ops_impl, alpha, y0, ax_u, nx_int, ny_int, rhs_buf, line_out, y1,
+        );
+
+        // --- CS corrector 2: implicit y-sweep ---
+        // Y_2 = Y_1 + theta*dt * (F_2(t_{n+1}, Y_2) - F_2(t_n, u^n))
+        implicit_y_sweep(
+            &ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, y2,
+        );
+
+        if !self.apply_mcs_corrector {
+            // Bare Douglas scheme (test path): u^{n+1} = Y_2.
+            u_int.copy_from_slice(y2);
+            fill_boundaries(problem, grid, u_full, u_int, t_to);
+            return;
         }
 
-        // --- Step 2: Implicit y-sweep ---
-        let alpha_y = theta * dt;
-        // Reuse y0 as output for y-sweep (y0 is fully consumed by x-sweep)
-        for ii in 0..nx_int {
-            for jj in 0..ny_int {
-                rhs_buf[jj] = y1[ii * ny_int + jj] - theta * dt * ay_u[ii * ny_int + jj];
-            }
-            ops_impl.op_y[ii].add_implicit_corrections(alpha_y, &mut rhs_buf[..ny_int]);
-            ops_impl.op_y[ii].solve_thomas_into(
-                alpha_y,
-                &rhs_buf[..ny_int],
-                &mut line_out[..ny_int],
-            );
-            for jj in 0..ny_int {
-                y0[ii * ny_int + jj] = line_out[jj];
-            }
+        // Reconstruct the boundary-inclusive Y_2 in u_full so that the mixed
+        // (cross-derivative) corrector can use the four-point stencil.
+        fill_boundaries(problem, grid, u_full, y2, t_to);
+
+        // --- MCS mixed-term corrector ---
+        // F_0(t_{n+1}, Y_2): mixed term applied to Y_2.
+        let cross_y2 = apply_cross_derivative(&ops_impl.cross_deriv, u_full, grid);
+        // F_1(t_{n+1}, Y_2) = A_x * Y_2 and F_2(t_{n+1}, Y_2) = A_y * Y_2,
+        // needed for the full-operator difference in the Ytld_0 line.
+        apply_x_operator(&ops_impl, y2, nx_int, ny_int, x_line, line_out, ax_y2);
+        apply_y_operator(&ops_impl, y2, nx_int, ny_int, y_line, line_out, ay_y2);
+
+        // Yhat_0 = Y_0 + theta*dt * (F_0(t_{n+1},Y_2) - F_0(t_n,u^n))
+        // Ytld_0 = Yhat_0 + (1/2 - theta)*dt * (F(t_{n+1},Y_2) - F(t_n,u^n))
+        // with F = F_0 + F_1 + F_2. Both corrections are folded into `ytld`.
+        let half_minus_theta = 0.5 - theta;
+        for idx in 0..interior {
+            let f_old = cross[idx] + ax_u[idx] + ay_u[idx];
+            let f_new = cross_y2[idx] + ax_y2[idx] + ay_y2[idx];
+            ytld[idx] = y0[idx]
+                + theta * dt * (cross_y2[idx] - cross[idx])
+                + half_minus_theta * dt * (f_new - f_old);
         }
 
-        // Update interior solution
-        u_int.copy_from_slice(y0);
+        // --- MCS corrector 1: second implicit x-sweep ---
+        // Ytld_1 = Ytld_0 + theta*dt * (F_1(t_{n+1},Ytld_1) - F_1(t_n,u^n))
+        implicit_x_sweep(
+            &ops_impl, alpha, ytld, ax_u, nx_int, ny_int, rhs_buf, line_out, y1,
+        );
 
-        // Reconstruct full solution from interior + boundary conditions
+        // --- MCS corrector 2: second implicit y-sweep ---
+        // Ytld_2 = Ytld_1 + theta*dt * (F_2(t_{n+1},Ytld_2) - F_2(t_n,u^n))
+        implicit_y_sweep(
+            &ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, ytld,
+        );
+
+        // u^{n+1} = Ytld_2.
+        u_int.copy_from_slice(ytld);
         fill_boundaries(problem, grid, u_full, u_int, t_to);
+    }
+}
+
+/// Apply the x-direction operator `A_x` (plus source/boundary corrections) to
+/// an interior solution `u_int`, writing `A_x * u_int` into `out`.
+///
+/// `u_int` and `out` are row-major interior vectors of length `nx_int*ny_int`;
+/// `x_line` (length `nx_int`) and `line_out` (length `>= nx_int`) are scratch.
+fn apply_x_operator(
+    ops: &Operators2D,
+    u_int: &[f64],
+    nx_int: usize,
+    ny_int: usize,
+    x_line: &mut [f64],
+    line_out: &mut [f64],
+    out: &mut [f64],
+) {
+    for jj in 0..ny_int {
+        for ii in 0..nx_int {
+            x_line[ii] = u_int[ii * ny_int + jj];
+        }
+        ops.op_x[jj].apply_into(x_line, &mut line_out[..nx_int]);
+        for ii in 0..nx_int {
+            out[ii * ny_int + jj] = line_out[ii];
+        }
+    }
+}
+
+/// Apply the y-direction operator `A_y` (plus source/boundary corrections) to
+/// an interior solution `u_int`, writing `A_y * u_int` into `out`.
+fn apply_y_operator(
+    ops: &Operators2D,
+    u_int: &[f64],
+    nx_int: usize,
+    ny_int: usize,
+    y_line: &mut [f64],
+    line_out: &mut [f64],
+    out: &mut [f64],
+) {
+    for ii in 0..nx_int {
+        for jj in 0..ny_int {
+            y_line[jj] = u_int[ii * ny_int + jj];
+        }
+        ops.op_y[ii].apply_into(y_line, &mut line_out[..ny_int]);
+        for jj in 0..ny_int {
+            out[ii * ny_int + jj] = line_out[jj];
+        }
+    }
+}
+
+/// One implicit x-sweep `(I - alpha*A_x) out = rhs - alpha*ax_u (+ corr.)`.
+///
+/// `rhs` is the previous iterate (`Y_0` or `Ytld_0`), `ax_u` is `A_x` applied
+/// to the explicit-side solution `u^n`. Both are row-major interior vectors;
+/// `rhs_buf`/`line_out` (length `>= nx_int`) are scratch. Result into `out`.
+#[allow(clippy::too_many_arguments)]
+fn implicit_x_sweep(
+    ops: &Operators2D,
+    alpha: f64,
+    rhs: &[f64],
+    ax_u: &[f64],
+    nx_int: usize,
+    ny_int: usize,
+    rhs_buf: &mut [f64],
+    line_out: &mut [f64],
+    out: &mut [f64],
+) {
+    for jj in 0..ny_int {
+        for ii in 0..nx_int {
+            rhs_buf[ii] = rhs[ii * ny_int + jj] - alpha * ax_u[ii * ny_int + jj];
+        }
+        ops.op_x[jj].add_implicit_corrections(alpha, &mut rhs_buf[..nx_int]);
+        ops.op_x[jj].solve_thomas_into(alpha, &rhs_buf[..nx_int], &mut line_out[..nx_int]);
+        for ii in 0..nx_int {
+            out[ii * ny_int + jj] = line_out[ii];
+        }
+    }
+}
+
+/// One implicit y-sweep `(I - alpha*A_y) out = rhs - alpha*ay_u (+ corr.)`.
+///
+/// Mirror of [`implicit_x_sweep`] along the y-direction.
+#[allow(clippy::too_many_arguments)]
+fn implicit_y_sweep(
+    ops: &Operators2D,
+    alpha: f64,
+    rhs: &[f64],
+    ay_u: &[f64],
+    nx_int: usize,
+    ny_int: usize,
+    rhs_buf: &mut [f64],
+    line_out: &mut [f64],
+    out: &mut [f64],
+) {
+    for ii in 0..nx_int {
+        for jj in 0..ny_int {
+            rhs_buf[jj] = rhs[ii * ny_int + jj] - alpha * ay_u[ii * ny_int + jj];
+        }
+        ops.op_y[ii].add_implicit_corrections(alpha, &mut rhs_buf[..ny_int]);
+        ops.op_y[ii].solve_thomas_into(alpha, &rhs_buf[..ny_int], &mut line_out[..ny_int]);
+        for jj in 0..ny_int {
+            out[ii * ny_int + jj] = line_out[jj];
+        }
     }
 }
 

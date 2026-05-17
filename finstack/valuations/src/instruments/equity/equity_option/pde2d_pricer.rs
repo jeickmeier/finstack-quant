@@ -1,8 +1,9 @@
-//! Equity option Heston PDE pricer using 2D Craig-Sneyd ADI finite differences.
+//! Equity option Heston PDE pricer using 2D Modified Craig-Sneyd ADI finite
+//! differences.
 //!
 //! Solves the Heston PDE in (log-spot, variance) coordinates on a tensor-product
-//! grid using the Craig-Sneyd ADI splitting scheme. Heston model parameters are
-//! sourced from market scalars with sensible defaults.
+//! grid using the Modified Craig-Sneyd (MCS) ADI splitting scheme. Heston model
+//! parameters are sourced from market scalars with sensible defaults.
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::equity_option::pricer::collect_inputs_extended;
@@ -19,8 +20,8 @@ use crate::instruments::common_impl::models::closed_form::heston::HestonParams a
 use crate::instruments::common_impl::models::pde::{Grid1D, Grid2D, HestonPde, Solver2D};
 use crate::instruments::common_impl::parameters::OptionType;
 
-/// Equity option pricer using 2D ADI PDE (Craig-Sneyd) with Heston stochastic
-/// volatility dynamics.
+/// Equity option pricer using 2D ADI PDE (Modified Craig-Sneyd) with Heston
+/// stochastic volatility dynamics.
 ///
 /// Solves the Heston PDE on a tensor-product (log-spot x variance) grid.
 /// Heston parameters are read from market scalars using the same convention

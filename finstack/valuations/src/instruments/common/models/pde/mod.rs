@@ -13,7 +13,7 @@
 //! ```text
 //! PdeProblem2D (2D coefficients + cross-derivative + 4-edge boundaries)
 //!   → Operators2D (directional tridiag per axis + explicit cross-derivative)
-//!     → CraigSneydStepper (ADI splitting: x-sweep + y-sweep)
+//!     → CraigSneydStepper (Modified Craig-Sneyd ADI splitting)
 //!       → PdeSolution2D (bilinear interpolation + Greeks)
 //! ```
 //!

@@ -122,6 +122,7 @@ impl PdeProblem2D for HestonPde {
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::panic, clippy::too_many_arguments)]
 mod tests {
+    use super::super::adi::{fill_boundaries, CraigSneydStepper};
     use super::super::grid::Grid1D;
     use super::super::grid2d::Grid2D;
     use super::super::solver2d::Solver2D;
@@ -277,6 +278,148 @@ mod tests {
         assert!(
             rel_parity < 0.02,
             "Put-call parity: C={call_price:.4}, P={put_price:.4}, diff={forward_diff:.4}, error={parity_error:.6e}"
+        );
+    }
+
+    /// Solve the Heston PDE for a call with a caller-supplied ADI stepper and
+    /// return the interpolated price at `(ln spot, v0)`.
+    ///
+    /// Mirrors [`Solver2D::solve`] but takes the stepper directly so a test
+    /// can drive either the full MCS scheme or the bare Douglas scheme over an
+    /// identical grid.
+    fn solve_heston_call(
+        stepper: &CraigSneydStepper,
+        pde: &HestonPde,
+        grid: &Grid2D,
+        spot: f64,
+        v0: f64,
+        maturity: f64,
+    ) -> f64 {
+        let nx = grid.nx();
+        let ny = grid.ny();
+        let nx_int = grid.nx_interior();
+        let ny_int = grid.ny_interior();
+
+        let mut u_full = vec![0.0; nx * ny];
+        for i in 0..nx {
+            for j in 0..ny {
+                u_full[i * ny + j] =
+                    pde.terminal_condition(grid.x().points()[i], grid.y().points()[j]);
+            }
+        }
+        let mut u_int = vec![0.0; nx_int * ny_int];
+        for ii in 0..nx_int {
+            for jj in 0..ny_int {
+                u_int[ii * ny_int + jj] = u_full[(ii + 1) * ny + (jj + 1)];
+            }
+        }
+
+        let levels = stepper.time_levels(maturity);
+        for step in 0..stepper.n_steps() {
+            stepper.step(
+                pde,
+                grid,
+                &mut u_full,
+                &mut u_int,
+                levels[step],
+                levels[step + 1],
+                step,
+            );
+        }
+        fill_boundaries(pde, grid, &mut u_full, &u_int, 0.0);
+        grid.interpolate(&u_full, spot.ln(), v0)
+    }
+
+    /// At strong correlation (|rho| = 0.9) the mixed-derivative term dominates.
+    /// The Modified Craig-Sneyd corrector is what makes the ADI scheme robust
+    /// here: the bare Douglas scheme (predictor + two implicit unidirectional
+    /// correctors, no MCS corrector) is only *conditionally* stable in the
+    /// presence of a mixed-derivative term and, on this grid and step count,
+    /// is numerically unstable — it diverges by many orders of magnitude.
+    ///
+    /// This test pins the MCS price against the independent Heston Fourier
+    /// reference within a tight tolerance, and confirms that the MCS corrector
+    /// is what delivers a usable price where bare Douglas blows up.
+    #[test]
+    #[ignore = "slow: covered by mise rust-test-slow"]
+    fn heston_pde_mcs_vs_douglas_high_correlation() {
+        let spot: f64 = 100.0;
+        let strike = 100.0;
+        let maturity = 1.0;
+        let r = 0.03;
+        let q = 0.0;
+        let kappa = 1.5;
+        let theta_v = 0.04;
+        let sigma_v = 0.3;
+        let rho = -0.9; // strong correlation: large mixed-derivative term
+        let v0 = 0.04;
+
+        let exact = heston_call_reference(
+            spot, strike, maturity, r, q, kappa, theta_v, sigma_v, rho, v0,
+        );
+
+        let pde = HestonPde {
+            r,
+            q,
+            kappa,
+            theta_v,
+            sigma_v,
+            rho,
+            strike,
+            is_call: true,
+        };
+
+        // One grid shared by both schemes so the comparison isolates the
+        // time-stepping scheme.
+        let x_min = (spot * 0.05).ln();
+        let x_max = (spot * 10.0).ln();
+        let v_min = 0.001;
+        let v_max = 1.5;
+        let gx =
+            Grid1D::sinh_concentrated(x_min, x_max, 201, spot.ln(), 0.1).expect("valid x-grid");
+        let gy = Grid1D::sinh_concentrated(v_min, v_max, 81, theta_v, 0.15).expect("valid v-grid");
+
+        let n_steps = 200;
+
+        // Full Modified Craig-Sneyd scheme with Rannacher smoothing.
+        let mcs_price = solve_heston_call(
+            &CraigSneydStepper::with_rannacher(4, n_steps),
+            &pde,
+            &Grid2D::new(gx.clone(), gy.clone()),
+            spot,
+            v0,
+            maturity,
+        );
+
+        // Bare Douglas scheme (no MCS corrector), same grid and step count.
+        let douglas_price = solve_heston_call(
+            &CraigSneydStepper::douglas_for_test(n_steps),
+            &pde,
+            &Grid2D::new(gx, gy),
+            spot,
+            v0,
+            maturity,
+        );
+
+        let mcs_err = (mcs_price - exact).abs() / exact;
+        let douglas_err = (douglas_price - exact).abs() / exact;
+
+        // MCS matches the Fourier reference tightly even at |rho| = 0.9.
+        assert!(
+            mcs_err < 0.02,
+            "MCS vs Fourier at rho=-0.9: mcs={mcs_price:.6}, exact={exact:.6}, rel_err={mcs_err:.4e}"
+        );
+
+        // Bare Douglas (no MCS corrector) is only conditionally stable with a
+        // mixed-derivative term: on this configuration it is unstable and
+        // diverges far outside any plausible price band (a non-finite or
+        // wildly large value). The MCS corrector is exactly what removes this
+        // failure mode.
+        let douglas_unstable = !douglas_price.is_finite() || douglas_err > 1.0;
+        assert!(
+            douglas_unstable,
+            "expected bare Douglas to be unstable at rho=-0.9 (the defect MCS fixes): \
+             douglas={douglas_price:.6}, exact={exact:.6}, rel_err={douglas_err:.4e}"
         );
     }
 }
