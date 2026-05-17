@@ -528,8 +528,12 @@ impl MertonModel {
     /// Uses Brent's method to solve for sigma_V such that the model's
     /// implied spread equals the target CDS spread. The calibration uses
     /// the terminal-barrier (classic Merton) default probability formula
-    /// `PD = N(-DD)` and the resulting model has `BarrierType::Terminal`
-    /// with `AssetDynamics::GeometricBrownian` and `payout_rate = 0`.
+    /// `PD = N(-DD)`, with the distance-to-default drift
+    /// `mu = r - q - sigma^2/2` (consistent with
+    /// [`distance_to_default`](Self::distance_to_default) and
+    /// [`implied_equity`](Self::implied_equity)). The resulting model has
+    /// `BarrierType::Terminal` with `AssetDynamics::GeometricBrownian` and
+    /// the supplied `payout_rate`.
     ///
     /// To use first-passage barriers after calibration, construct a new
     /// model via [`new_with_dynamics`](Self::new_with_dynamics) using the
@@ -543,6 +547,8 @@ impl MertonModel {
     /// * `risk_free_rate` - Risk-free rate r
     /// * `maturity` - Time to maturity T in years
     /// * `asset_value` - Assumed initial asset value V
+    /// * `payout_rate` - Continuous dividend / payout yield q (pass `0.0`
+    ///   for a firm with no asset payout)
     ///
     /// # Errors
     ///
@@ -555,6 +561,7 @@ impl MertonModel {
         risk_free_rate: f64,
         maturity: f64,
         asset_value: f64,
+        payout_rate: f64,
     ) -> Result<Self> {
         if total_debt <= 0.0 || maturity <= 0.0 || asset_value <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
@@ -571,8 +578,10 @@ impl MertonModel {
                 let v = asset_value;
                 let b = total_debt;
                 let r = risk_free_rate;
+                let q = payout_rate;
                 let sig = sigma;
-                let mu = r - 0.5 * sig * sig;
+                // Drift includes the payout term, matching distance_to_default.
+                let mu = r - q - 0.5 * sig * sig;
                 let sqrt_t = maturity.sqrt();
                 let dd = ((v / b).ln() + mu * maturity) / (sig * sqrt_t);
                 let pd = norm_cdf(-dd);
@@ -583,7 +592,15 @@ impl MertonModel {
             0.20, // initial guess
         )?;
 
-        Self::new(asset_value, sigma_v, total_debt, risk_free_rate)
+        Self::new_with_dynamics(
+            asset_value,
+            sigma_v,
+            total_debt,
+            risk_free_rate,
+            payout_rate,
+            BarrierType::Terminal,
+            AssetDynamics::GeometricBrownian,
+        )
     }
 
     /// Calibrate the debt barrier to match a target cumulative default
@@ -1169,12 +1186,47 @@ mod tests {
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).expect("valid");
         let spread = m.implied_spread(5.0, 0.40);
         let spread_bp = spread * 10_000.0;
-        let m2 =
-            MertonModel::from_cds_spread(spread_bp, 0.40, 80.0, 0.04, 5.0, 100.0).expect("cds cal");
+        let m2 = MertonModel::from_cds_spread(spread_bp, 0.40, 80.0, 0.04, 5.0, 100.0, 0.0)
+            .expect("cds cal");
         assert!(
             (m2.asset_vol() - 0.25).abs() < 0.02,
             "Asset vol should recover: got {}",
             m2.asset_vol()
+        );
+    }
+
+    #[test]
+    fn from_cds_spread_roundtrips_with_payout_rate() {
+        // Calibrate a firm with a real asset payout q > 0. The spread is
+        // produced by a model carrying that payout; from_cds_spread must
+        // thread the same q into its calibration drift so the recovered
+        // sigma_V matches. Dropping q biases sigma_V.
+        let q = 0.04;
+        let m_known = MertonModel::new_with_dynamics(
+            100.0,
+            0.25,
+            80.0,
+            0.04,
+            q,
+            BarrierType::Terminal,
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid");
+        let spread = m_known.implied_spread(5.0, 0.40);
+        let spread_bp = spread * 10_000.0;
+
+        let m_cal = MertonModel::from_cds_spread(spread_bp, 0.40, 80.0, 0.04, 5.0, 100.0, q)
+            .expect("cds cal");
+
+        assert!(
+            (m_cal.asset_vol() - 0.25).abs() < 0.01,
+            "Asset vol should recover with q={q}: got {}",
+            m_cal.asset_vol()
+        );
+        assert!(
+            (m_cal.payout_rate() - q).abs() < 1e-12,
+            "Payout rate should be preserved: got {}",
+            m_cal.payout_rate()
         );
     }
 
