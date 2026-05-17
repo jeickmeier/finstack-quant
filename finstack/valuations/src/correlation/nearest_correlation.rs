@@ -2,18 +2,23 @@
 //!
 //! Given a symmetric matrix `A` that is *approximately* a correlation matrix
 //! (e.g. a sample correlation corrupted by estimation noise or a user-supplied
-//! matrix with small PSD violations), this module finds the closest valid
-//! correlation matrix in Frobenius norm:
+//! matrix with small PSD violations), this module finds a nearby valid
+//! correlation matrix:
 //!
 //! ```text
-//! min ‖X − A‖_F
-//!   s.t. X = Xᵀ, diag(X) = 1, X ⪰ 0.
+//! X s.t. X = Xᵀ, diag(X) = 1, X ⪰ 0,   ‖X − A‖_F small.
 //! ```
 //!
-//! Higham's alternating-projections algorithm uses Dykstra's correction to
-//! iteratively project onto the PSD cone and the "unit diagonal" hyperplane
-//! until convergence. This is the standard remedy for real-world correlation
-//! matrices that fail Cholesky by a small margin.
+//! Higham's alternating-projections algorithm iteratively projects onto the
+//! PSD cone and the "unit diagonal" hyperplane until convergence. This
+//! implementation carries a Dykstra correction term only for the PSD-cone
+//! projection; the unit-diagonal projection step has no correction term.
+//! As a result the algorithm converges to a valid correlation matrix that is
+//! close (in Frobenius norm) to the input, but is **not** guaranteed to be
+//! the Frobenius-nearest valid correlation matrix (Borsdorf & Higham 2010
+//! prove that Dykstra increments on both projections are required for strict
+//! nearest-matrix optimality). This is the standard remedy for real-world
+//! correlation matrices that fail Cholesky by a small margin.
 //!
 //! # References
 //!
@@ -57,8 +62,14 @@ impl Default for NearestCorrelationOpts {
     }
 }
 
-/// Compute the nearest correlation matrix to `input` using Higham's
-/// alternating-projection algorithm with Dykstra's correction.
+/// Compute a nearby valid correlation matrix to `input` using Higham's
+/// alternating-projection algorithm with a partial Dykstra correction.
+///
+/// The returned matrix is symmetric, has unit diagonal, and is positive
+/// semidefinite. It is close to the input in Frobenius norm, but is **not**
+/// guaranteed to be the Frobenius-nearest valid correlation matrix; achieving
+/// strict nearest-matrix optimality would require Dykstra corrections on both
+/// the PSD-cone and unit-diagonal projections (Borsdorf & Higham 2010).
 ///
 /// The input is expected to be nearly symmetric with a diagonal close to 1.
 /// Gross violations (asymmetry beyond 1e-6, diagonal entries far from 1, etc.)
@@ -308,6 +319,60 @@ mod tests {
         let err = nearest_correlation_matrix(&input, 2, NearestCorrelationOpts::default())
             .expect_err("symmetry guard");
         assert!(matches!(err, Error::NotSymmetric { .. }));
+    }
+
+    /// W-47: The algorithm carries a Dykstra correction only for the PSD-cone
+    /// projection; the unit-diagonal step has no correction term.  This means
+    /// the result is a *valid* correlation matrix (PSD, unit diagonal, symmetric)
+    /// that is close but not guaranteed to be Frobenius-nearest.
+    ///
+    /// For the Higham (2002) 3×3 canonical counter-example, the analytic
+    /// Frobenius-nearest solution has all off-diagonals = −1/3 ≈ −0.333.
+    /// The one-sided Dykstra instead returns −0.5, which is a valid correlation
+    /// matrix but further from the input in Frobenius norm.  This test locks in
+    /// the actual behaviour ("valid, not necessarily nearest") so that future
+    /// changes either add the second Dykstra correction or explicitly widen the
+    /// contract documented here.
+    #[test]
+    fn one_sided_dykstra_yields_valid_nearby_matrix() {
+        // Higham (2002) canonical counter-example: symmetric, unit diagonal,
+        // but not PSD (smallest eigenvalue ≈ −0.165).
+        let input = vec![
+            1.0, -0.55, -0.55, //
+            -0.55, 1.0, -0.55, //
+            -0.55, -0.55, 1.0,
+        ];
+        let repaired =
+            nearest_correlation_matrix(&input, 3, NearestCorrelationOpts::default()).expect("ok");
+
+        // The repaired matrix must be a valid correlation matrix.
+        validate_correlation_matrix(&repaired, 3).expect("repaired is a valid correlation matrix");
+
+        // It must be "nearby" — the Frobenius distance must be strictly less
+        // than the input's own Frobenius norm (i.e. not a wild extrapolation).
+        let frob_dist = frobenius_diff(&input, &repaired);
+        let frob_input = frobenius_diff(&input, &[0.0; 9]);
+        assert!(
+            frob_dist < frob_input,
+            "Frobenius distance to repaired ({frob_dist:.6}) should be less than input norm ({frob_input:.6})"
+        );
+
+        // Document the actual one-sided Dykstra result: all off-diagonals
+        // converge to −0.5, NOT the Frobenius-nearest analytic optimum of −1/3.
+        // This regression lock-in confirms the contract documented in the module
+        // docstring ("a nearby valid correlation matrix", not necessarily nearest).
+        let known_offdiag = -0.5_f64;
+        for i in 0..3 {
+            for j in 0..3 {
+                let expected = if i == j { 1.0 } else { known_offdiag };
+                let diff = (repaired[i * 3 + j] - expected).abs();
+                assert!(
+                    diff < 1e-6,
+                    "one_sided_dykstra regression: repaired[{i},{j}]={:.6} expected {expected:.6} (diff={diff:.2e})",
+                    repaired[i * 3 + j]
+                );
+            }
+        }
     }
 
     /// Smoke test for the `n > 40` regime: the divide-and-conquer

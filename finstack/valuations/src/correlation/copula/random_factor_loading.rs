@@ -285,6 +285,17 @@ impl Copula for RandomFactorLoadingCopula {
         factor_realization: &[f64],
         correlation: f64,
     ) -> f64 {
+        // Length mismatch is a programmer error. In debug, fail loudly so
+        // integration tests catch it immediately — consistent with
+        // GaussianCopula, StudentTCopula, and MultiFactorCopula. In release,
+        // fall through with η defaulted to 0.0 (mean-loading scenario) and
+        // emit a one-time tracing::warn! so the discrepancy appears in logs.
+        debug_assert_eq!(
+            factor_realization.len(),
+            2,
+            "RandomFactorLoadingCopula expects exactly 2 factors [Z, η], got {}",
+            factor_realization.len()
+        );
         if factor_realization.len() != 2 {
             tracing::warn!(
                 expected = 2,
@@ -486,6 +497,38 @@ mod tests {
         // Realized correlation reflects the floor.
         assert!((copula.realized_correlation(0.01) - 0.04).abs() < 1e-12);
         assert!((copula.realized_correlation(0.30) - 0.30).abs() < 1e-12);
+    }
+
+    /// W-49: `RandomFactorLoadingCopula` must panic in debug builds (via
+    /// `debug_assert_eq!`) when the caller passes a factor vector of the wrong
+    /// length, consistent with `GaussianCopula`, `StudentTCopula`, and
+    /// `MultiFactorCopula`.  Before this fix, only a `tracing::warn!` was
+    /// emitted and `η` silently defaulted to `0.0`, providing no test-time signal.
+    #[test]
+    fn test_factor_length_mismatch_panics_in_debug() {
+        let copula = RandomFactorLoadingCopula::new(0.15);
+        let threshold = standard_normal_inv_cdf(0.05);
+        let correlation = 0.30;
+
+        let assert_contract = |factors: &[f64]| {
+            if cfg!(debug_assertions) {
+                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    copula.conditional_default_prob(threshold, factors, correlation)
+                }));
+                assert!(
+                    outcome.is_err(),
+                    "debug build should panic on factor length mismatch for {:?}",
+                    factors
+                );
+            }
+            // Release build: no panic contract tested here (warn-only).
+        };
+
+        // A 1-element vector is the most likely caller mistake (Z passed
+        // without η, analogous to passing a Gaussian factor to the RFL copula).
+        assert_contract(&[0.0]);
+        // Empty vector also exercises the guard.
+        assert_contract(&[]);
     }
 
     #[test]
