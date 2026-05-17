@@ -84,6 +84,30 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
                 )
             })?;
 
+        // W-31: `collect_inputs_extended` applies the escrowed-dividend model
+        // (spot shift + `q = 0`) when `discrete_dividends` is non-empty. The
+        // escrowed-dividend identity holds only under Black-Scholes; under the
+        // rough Heston stochastic-vol dynamics it is invalid, so feeding the
+        // escrowed spot into the MC silently mis-prices a single-stock option
+        // with discrete dividends. Reject it explicitly rather than price it
+        // wrong.
+        if equity_option
+            .discrete_dividends
+            .iter()
+            .any(|(ex_date, _)| *ex_date > as_of && *ex_date <= equity_option.expiry)
+        {
+            return Err(crate::pricer::PricingError::model_failure_with_context(
+                "rough Heston Monte Carlo pricing does not support discrete \
+                 dividends: the escrowed-dividend spot adjustment is a \
+                 Black-Scholes-only construct and is invalid under stochastic \
+                 volatility. Use the Black-Scholes pricer for discrete \
+                 dividends, or supply a continuous dividend yield instead."
+                    .to_string(),
+                crate::pricer::PricingErrorContext::from_instrument(equity_option)
+                    .model(crate::pricer::ModelKey::MonteCarloRoughHeston),
+            ));
+        }
+
         let inputs = collect_inputs_extended(equity_option, market, as_of).map_err(|e| {
             crate::pricer::PricingError::model_failure_with_context(
                 e.to_string(),
@@ -210,5 +234,101 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
                 .insert(crate::metrics::MetricId::custom("mc_stderr"), result.stderr);
         }
         Ok(vr)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::common_impl::parameters::ExerciseStyle;
+    use crate::instruments::{Attributes, PricingOverrides, SettlementType};
+    use crate::pricer::Pricer;
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::DayCount;
+    use finstack_core::market_data::scalars::MarketScalar;
+    use finstack_core::market_data::surfaces::VolSurface;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_core::types::{CurveId, InstrumentId};
+    use time::Month;
+
+    fn date(year: i32, month: u8, day: u8) -> Date {
+        Date::from_calendar_date(year, Month::try_from(month).expect("month"), day)
+            .expect("valid date")
+    }
+
+    fn market(as_of: Date) -> MarketContext {
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+            .build()
+            .expect("curve");
+        let surface = VolSurface::builder("SPX-VOL")
+            .expiries(&[0.25, 1.0, 2.0])
+            .strikes(&[80.0, 100.0, 120.0])
+            .row(&[0.2, 0.2, 0.2])
+            .row(&[0.2, 0.2, 0.2])
+            .row(&[0.2, 0.2, 0.2])
+            .build()
+            .expect("surface");
+        MarketContext::new()
+            .insert(curve)
+            .insert_surface(surface)
+            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
+    }
+
+    fn option(expiry: Date) -> EquityOption {
+        EquityOption::builder()
+            .id(InstrumentId::new("EQ-OPT-ROUGH-HESTON-TEST"))
+            .underlying_ticker("SPX".to_string())
+            .strike(100.0)
+            .option_type(OptionType::Call)
+            .exercise_style(ExerciseStyle::European)
+            .expiry(expiry)
+            .notional(Money::new(100.0, Currency::USD))
+            .day_count(DayCount::Act365F)
+            .settlement(SettlementType::Cash)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .pricing_overrides(PricingOverrides::default())
+            .attributes(Attributes::new())
+            .build()
+            .expect("equity option")
+    }
+
+    /// W-31: a single-stock rough Heston MC option with a future discrete
+    /// dividend must be rejected — the escrowed-dividend model is BS-only.
+    #[test]
+    fn rejects_future_discrete_dividend() {
+        let as_of = date(2025, 1, 1);
+        let mut inst = option(date(2025, 12, 31));
+        inst.discrete_dividends = vec![(date(2025, 6, 15), 2.0)];
+
+        let err = EquityOptionRoughHestonMcPricer::default()
+            .price_dyn(&inst, &market(as_of), as_of)
+            .expect_err("discrete dividend must be rejected");
+        assert!(
+            err.to_string().contains("discrete dividends"),
+            "unexpected error message: {err}"
+        );
+    }
+
+    /// W-31: an out-of-window (past) discrete dividend must NOT trigger the
+    /// rejection.
+    #[test]
+    fn past_discrete_dividend_does_not_trigger_rejection() {
+        let as_of = date(2025, 1, 1);
+        let mut inst = option(date(2025, 12, 31));
+        inst.discrete_dividends = vec![(date(2024, 6, 15), 2.0)];
+
+        if let Err(e) =
+            EquityOptionRoughHestonMcPricer::default().price_dyn(&inst, &market(as_of), as_of)
+        {
+            assert!(
+                !e.to_string().contains("discrete dividends"),
+                "out-of-window dividend wrongly rejected: {e}"
+            );
+        }
     }
 }
