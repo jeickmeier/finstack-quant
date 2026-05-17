@@ -288,10 +288,13 @@ impl SABRSmile {
     /// let repaired_vols = smile.repair_arbitrage(&strikes, 0.05, 0.02, 10)?;
     /// ```
     ///
-    /// # References
+    /// # Algorithm Detail
     ///
-    /// - Fengler, M. (2009). "Arbitrage-free smoothing of the implied volatility surface."
-    ///   Quantitative Finance, 9(4), 417-428.
+    /// The repair is a best-effort greedy projection, **not** a full Fengler (2009) QP.
+    /// Fengler uses a constrained quadratic program to project onto the set of
+    /// arbitrage-free call-price curves; this implementation instead performs a simple
+    /// forward-pass clamp, which is faster but may alter prices further from the
+    /// violation than the Fengler solution would.
     pub fn repair_arbitrage(
         &self,
         strikes: &[f64],
@@ -318,10 +321,13 @@ impl SABRSmile {
             let mut changed = false;
 
             // Repair monotonicity: C(K₁) > C(K₂) for K₁ < K₂
+            // Use an absolute epsilon so a single low-strike violation does not
+            // compound by 0.9999^k and drag down the entire upper wing.
+            let price_eps = 1e-8_f64;
             for i in 1..prices.len() {
                 if prices[i] > prices[i - 1] {
-                    // Project to monotonic: set to slightly below previous
-                    prices[i] = prices[i - 1] * 0.9999;
+                    // Clamp to slightly below the previous price (absolute, not relative).
+                    prices[i] = (prices[i - 1] - price_eps).max(0.0);
                     changed = true;
                 }
             }
