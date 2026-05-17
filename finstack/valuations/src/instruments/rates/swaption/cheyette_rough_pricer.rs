@@ -112,17 +112,59 @@ impl BermudanSwaptionCheyetteRoughPricer {
         points
     }
 
-    /// Compute the swap intrinsic value from the short rate state and market data.
+    /// Cheyette bond-reconstruction factor `B(t, T) = (1 - exp(-kappa*tau)) / kappa`.
     ///
-    /// Uses the Cheyette short rate r(t) = x(t) + phi(t) to bootstrap a
-    /// discount curve and compute the forward swap rate at the exercise date.
-    fn compute_swap_value(x_state: f64, phi_t: f64, inputs: &SwapValueInputs) -> f64 {
-        let r_t = x_state + phi_t;
+    /// `tau = T - t`. As `kappa -> 0` the limit is `B = tau`.
+    fn b_factor(kappa: f64, tau: f64) -> f64 {
+        if kappa.abs() < 1e-12 {
+            tau
+        } else {
+            (1.0 - (-kappa * tau).exp()) / kappa
+        }
+    }
 
-        // Simple approximation: discount future cashflows using the current
-        // short rate.  A full implementation would rebuild the curve from
-        // the Cheyette state, but for LSMC exercise decisions this linear
-        // approximation is standard practice.
+    /// Reconstruct the time-`t` zero-coupon bond `P(t, T; x, y)` from the
+    /// Cheyette `[x, y]` state.
+    ///
+    /// For the quasi-Gaussian (Cheyette) model the bond price is exactly
+    ///
+    /// ```text
+    /// P(t, T; x, y) = [P_M(0, T) / P_M(0, t)]
+    ///                 * exp(-B(t, T)*x - 0.5*B(t, T)^2*y)
+    /// ```
+    ///
+    /// where `P_M(0, .)` is the market discount curve and `B(t, T)` the
+    /// reconstruction factor above (Andersen & Piterbarg 2010, Vol. II, §12).
+    fn reconstruct_bond(
+        kappa: f64,
+        x_state: f64,
+        y_state: f64,
+        df_t: f64,
+        df_cap_t: f64,
+        tau: f64,
+    ) -> f64 {
+        if df_t.abs() < 1e-15 {
+            return 0.0;
+        }
+        let b = Self::b_factor(kappa, tau);
+        (df_cap_t / df_t) * (-b * x_state - 0.5 * b * b * y_state).exp()
+    }
+
+    /// Compute the swap value from the Cheyette `[x, y]` state and market data.
+    ///
+    /// The realized swap value is reconstructed from the full Cheyette term
+    /// structure: each future bond `P(T_ex, T_j)` is rebuilt from the `[x, y]`
+    /// state via [`Self::reconstruct_bond`], rather than discounting with a
+    /// flat short rate `exp(-r_t * t_j)`.  The flat-rate approximation is
+    /// materially biased on steep curves because it ignores both the shape of
+    /// `phi(t)` and the variance state `y`.
+    fn compute_swap_value(
+        x_state: f64,
+        y_state: f64,
+        kappa: f64,
+        disc: &dyn Discounting,
+        inputs: &SwapValueInputs,
+    ) -> f64 {
         let remaining = inputs.swap_end_time - inputs.exercise_time;
         if remaining < inputs.period * 0.5 {
             return 0.0;
@@ -132,19 +174,35 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let n_periods = ((remaining / inputs.period).round() as usize).max(1);
         let actual_period = remaining / n_periods as f64;
 
-        // Build discount factors using the current short rate
+        // Market discount factor at the exercise date (curve origin for the
+        // reconstruction).  All absolute times are measured from `as_of` (0),
+        // consistent with `disc.df(.)`.
+        let df_cap_t = disc.df(inputs.exercise_time);
+        if df_cap_t.abs() < 1e-15 {
+            return 0.0;
+        }
+
+        // Reconstruct annuity and terminal bond from the Cheyette term structure.
         let mut annuity = 0.0;
         let mut df_end = 1.0;
         for j in 1..=n_periods {
-            let t_j = j as f64 * actual_period;
-            let df_j = (-r_t * t_j).exp();
-            annuity += actual_period * df_j;
+            let t_j = inputs.exercise_time + j as f64 * actual_period;
+            let df_market_tj = disc.df(t_j);
+            let p_j = Self::reconstruct_bond(
+                kappa,
+                x_state,
+                y_state,
+                df_cap_t,
+                df_market_tj,
+                t_j - inputs.exercise_time,
+            );
+            annuity += actual_period * p_j;
             if j == n_periods {
-                df_end = df_j;
+                df_end = p_j;
             }
         }
 
-        // Forward swap rate
+        // Forward swap rate: P(t, T_0) = 1 since T_0 = exercise date.
         let swap_rate = if annuity.abs() > 1e-15 {
             (1.0 - df_end) / annuity
         } else {
@@ -399,9 +457,16 @@ impl BermudanSwaptionCheyetteRoughPricer {
             let mut basis_inputs: Vec<(f64, f64)> = Vec::with_capacity(num_paths);
 
             for &(x_val, y_val) in states_at_exercise[ex_idx].iter().take(num_paths) {
-                let phi_t = params.phi(ex_time);
-
-                let ev = Self::compute_swap_value(x_val, phi_t, &swap_value_inputs);
+                // Reconstruct the realized swap value from the full Cheyette
+                // term structure (W-16): the prior flat-rate discounting
+                // `exp(-r_t * t_j)` is materially biased on steep curves.
+                let ev = Self::compute_swap_value(
+                    x_val,
+                    y_val,
+                    kappa,
+                    disc.as_ref(),
+                    &swap_value_inputs,
+                );
 
                 exercise_values.push(ev);
                 basis_inputs.push((x_val, y_val));
@@ -552,5 +617,141 @@ impl Pricer for BermudanSwaptionCheyetteRoughPricer {
                 .insert(crate::metrics::MetricId::custom("mc_stderr"), stderr);
         }
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_core::dates::Date;
+    use finstack_core::market_data::traits::{Discounting, TermStructure};
+    use finstack_core::types::CurveId;
+    use time::macros::date;
+
+    /// Steep discount curve: instantaneous forward rises linearly from
+    /// `f0` at t=0 to `f0 + slope*t`, so `P(0, t) = exp(-(f0*t + 0.5*slope*t^2))`.
+    struct SteepCurve {
+        id: CurveId,
+        f0: f64,
+        slope: f64,
+    }
+
+    impl TermStructure for SteepCurve {
+        fn id(&self) -> &CurveId {
+            &self.id
+        }
+    }
+
+    impl Discounting for SteepCurve {
+        fn base_date(&self) -> Date {
+            date!(2025 - 01 - 01)
+        }
+        fn df(&self, t: f64) -> f64 {
+            (-(self.f0 * t + 0.5 * self.slope * t * t)).exp()
+        }
+    }
+
+    /// On a steep curve, the realized swap value at the zero Cheyette state
+    /// `[x, y] = [0, 0]` must equal the genuine market forward swap rate
+    /// implied by the discount curve.  The prior flat-rate discounting
+    /// `exp(-r_t * t_j)` does NOT reproduce this — it ignores curve slope.
+    #[test]
+    fn cheyette_realized_swap_value_matches_term_structure_on_steep_curve() {
+        let curve = SteepCurve {
+            id: CurveId::from("STEEP"),
+            f0: 0.01,
+            slope: 0.02, // 2% per year of curve steepness
+        };
+
+        let inputs = SwapValueInputs {
+            exercise_time: 2.0,
+            swap_end_time: 7.0,
+            period: 1.0,
+            strike: 0.03,
+            is_payer: true,
+            notional: 1.0,
+        };
+        let kappa = 0.03;
+
+        // Production value at the zero state (x = y = 0).
+        let value = BermudanSwaptionCheyetteRoughPricer::compute_swap_value(
+            0.0, 0.0, kappa, &curve, &inputs,
+        );
+
+        // Independent term-structure reconstruction: at x = y = 0 the
+        // reconstructed bonds collapse to the market discount factors, so the
+        // swap rate is the curve's true forward swap rate.
+        let n = 5usize; // (7 - 2) / 1
+        let df_t = curve.df(inputs.exercise_time);
+        let mut annuity = 0.0;
+        let mut df_end = 1.0;
+        for j in 1..=n {
+            let t_j = inputs.exercise_time + j as f64;
+            let p_j = curve.df(t_j) / df_t;
+            annuity += p_j;
+            if j == n {
+                df_end = p_j;
+            }
+        }
+        let swap_rate = (1.0 - df_end) / annuity;
+        let expected = (swap_rate - inputs.strike) * annuity * inputs.notional;
+
+        assert!(
+            (value - expected).abs() < 1e-10,
+            "term-structure realized value {value} != reconstruction {expected}"
+        );
+
+        // Sanity: the flat-rate approximation (old behaviour) discounts with
+        // exp(-r_t * t_j) using r_t = phi(exercise_time). On this steep curve
+        // that is materially different, confirming the fix is load-bearing.
+        let r_flat = curve.f0 + curve.slope * inputs.exercise_time; // phi(2) = 0.05
+        let mut flat_annuity = 0.0;
+        let mut flat_df_end = 1.0;
+        for j in 1..=n {
+            let df_j = (-r_flat * j as f64).exp();
+            flat_annuity += df_j;
+            if j == n {
+                flat_df_end = df_j;
+            }
+        }
+        let flat_rate = (1.0 - flat_df_end) / flat_annuity;
+        let flat_value = (flat_rate - inputs.strike) * flat_annuity * inputs.notional;
+        assert!(
+            (flat_value - expected).abs() > 1e-3,
+            "flat-rate value should be materially biased on a steep curve"
+        );
+    }
+
+    /// At a non-zero `[x, y]` state the reconstruction must still be
+    /// curve-consistent: a positive rate shock `x > 0` lowers all bond prices
+    /// and therefore raises a payer swap value relative to the zero state.
+    #[test]
+    fn cheyette_realized_swap_value_responds_to_state() {
+        let curve = SteepCurve {
+            id: CurveId::from("STEEP"),
+            f0: 0.02,
+            slope: 0.01,
+        };
+        let inputs = SwapValueInputs {
+            exercise_time: 1.0,
+            swap_end_time: 6.0,
+            period: 1.0,
+            strike: 0.03,
+            is_payer: true,
+            notional: 1.0,
+        };
+        let kappa = 0.05;
+
+        let base = BermudanSwaptionCheyetteRoughPricer::compute_swap_value(
+            0.0, 0.0, kappa, &curve, &inputs,
+        );
+        let shocked = BermudanSwaptionCheyetteRoughPricer::compute_swap_value(
+            0.01, 0.0, kappa, &curve, &inputs,
+        );
+        assert!(
+            shocked > base,
+            "payer swap value should rise under a positive rate shock: \
+             base={base}, shocked={shocked}"
+        );
     }
 }
