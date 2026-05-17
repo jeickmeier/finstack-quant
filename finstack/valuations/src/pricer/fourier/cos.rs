@@ -144,9 +144,18 @@ impl<'a> CosPricer<'a> {
         // Cumulants of Y = ln(S_T/S_0) for truncation range.
         let cumulants = self.cf.cumulants(t);
 
-        // The variable X = ln(S_T/K) = Y + ln(S/K).
-        // The truncation range is for Y; it works for X after shifting by x0 = ln(S/K).
-        // We compute [a, b] from the cumulants of Y.
+        // The Fang-Oosterlee derivation is in the moneyness variable
+        // X = ln(S_T/K) = Y + x0, with x0 = ln(S/K). The cumulants describe
+        // the *shape* of the distribution (it differs from Y's only by the
+        // deterministic shift x0), so the truncation half-width is the same;
+        // but the *centre* of the support of X is x0 to the right of Y's.
+        //
+        // `truncation_range` returns the Y-centred window [a, b]. For each
+        // strike we must integrate the payoff over the X-centred window
+        // [a + x0, b + x0], otherwise deep ITM/OTM strikes (large |x0|) push
+        // the true payoff region outside the integration window and prices
+        // collapse. The width b - a is unchanged, so u_k and the CF values
+        // stay strike-independent; only the payoff coefficients shift.
         let (a, b) = truncation_range(&cumulants, self.config.truncation_l);
 
         if !(a.is_finite() && b.is_finite()) || b <= a {
@@ -168,36 +177,42 @@ impl<'a> CosPricer<'a> {
             cf_vals.push(self.cf.cf(Complex64::new(u_k, 0.0), t));
         }
 
-        // Pre-compute payoff coefficients (strike-independent in the [a,b] domain).
-        let mut payoff_k: Vec<f64> = Vec::with_capacity(n);
-        for k in 0..n {
-            let v_k = if is_call {
-                chi_k(k, a, b, 0.0, b) - psi_k(k, a, b, 0.0, b)
-            } else {
-                -chi_k(k, a, b, a, 0.0) + psi_k(k, a, b, a, 0.0)
-            };
-            payoff_k.push(v_k);
-        }
-
         let prices = strikes
             .iter()
             .map(|&strike| {
-                // x0 = ln(S/K): shift from Y to X = Y + x0
+                // x0 = ln(S/K): shift from Y to X = Y + x0.
+                // Integration window in X-space, following the moneyness shift.
                 let x0 = (spot / strike).ln();
+                let a_x = a + x0;
+                let b_x = b + x0;
 
                 let mut sum = 0.0;
-                for k in 0..n {
+                for (k, &cf_val) in cf_vals.iter().enumerate() {
                     let k_f = k as f64;
                     let u_k = k_f * PI / bma;
 
+                    // Payoff coefficient over the X-centred window [a_x, b_x].
+                    // Call payoff (e^x - 1)^+ is supported on X >= 0; put
+                    // payoff (1 - e^x)^+ on X <= 0. The payoff sub-interval is
+                    // the intersection of that half-line with [a_x, b_x] — for
+                    // deep OTM/ITM strikes the whole window can lie on one side
+                    // of zero, so the limits must be clamped, not fixed at 0.
+                    let v_k = if is_call {
+                        let lo = 0.0_f64.clamp(a_x, b_x);
+                        chi_k(k, a_x, b_x, lo, b_x) - psi_k(k, a_x, b_x, lo, b_x)
+                    } else {
+                        let hi = 0.0_f64.clamp(a_x, b_x);
+                        -chi_k(k, a_x, b_x, a_x, hi) + psi_k(k, a_x, b_x, a_x, hi)
+                    };
+
                     // phi_X(u_k) = exp(i*u_k*x0) * phi_Y(u_k)
-                    // We need: Re[phi_X(u_k) * exp(-i*u_k*a)]
-                    //        = Re[phi_Y(u_k) * exp(i*u_k*(x0 - a))]
-                    let phase = Complex64::new(0.0, u_k * (x0 - a)).exp();
-                    let ak = (cf_vals[k] * phase).re;
+                    // We need: Re[phi_X(u_k) * exp(-i*u_k*a_x)]
+                    //        = Re[phi_Y(u_k) * exp(-i*u_k*a)]   since a_x - x0 = a.
+                    let phase = Complex64::new(0.0, -u_k * a).exp();
+                    let ak = (cf_val * phase).re;
 
                     let weight = if k == 0 { 0.5 } else { 1.0 };
-                    sum += weight * (2.0 / bma) * ak * payoff_k[k];
+                    sum += weight * (2.0 / bma) * ak * v_k;
                 }
 
                 let raw = strike * df * sum;
@@ -436,6 +451,45 @@ mod tests {
         let call = pricer.price_call(100.0, 100.0, 0.05, 1.0)?;
         assert!(call > 0.0, "VG call should be positive: {call}");
         assert!(call < 100.0, "VG call should be < spot: {call}");
+        Ok(())
+    }
+
+    /// W-42 regression: deep ITM/OTM strikes on a low-vol, short-dated
+    /// underlying. The cumulant half-width of `Y = ln(S_T/S_0)` is tiny, so
+    /// the moneyness shift `x0 = ln(S/K)` pushes the true support of
+    /// `X = ln(S_T/K)` entirely outside a `Y`-centred truncation window.
+    /// The integration window must follow the per-strike moneyness shift.
+    #[test]
+    fn cos_deep_itm_otm_low_vol_short_dated(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let sigma = 0.05;
+        let r = 0.05;
+        let q = 0.0;
+        let t = 0.05;
+        let cf = BlackScholesCf { r, q, sigma };
+        let config = CosConfig::default();
+        let pricer = CosPricer::new(&cf, config);
+        let spot = 100.0;
+
+        // Strikes span deep ITM through deep OTM. |x0| reaches ~0.69, far
+        // beyond the ~0.11 cumulant half-width at this vol/maturity.
+        for strike in [50.0, 70.0, 90.0, 100.0, 110.0, 130.0, 150.0, 200.0] {
+            let cos_call = pricer.price_call(spot, strike, r, t)?;
+            let bs_call = bs_call_price(spot, strike, r, q, t, sigma);
+            assert!(
+                (cos_call - bs_call).abs() < 1e-6,
+                "call K={strike}: COS={cos_call:.10}, BS={bs_call:.10}, diff={}",
+                (cos_call - bs_call).abs()
+            );
+
+            let cos_put = pricer.price_put(spot, strike, r, t)?;
+            let bs_put = bs_put_price(spot, strike, r, q, t, sigma);
+            assert!(
+                (cos_put - bs_put).abs() < 1e-6,
+                "put K={strike}: COS={cos_put:.10}, BS={bs_put:.10}, diff={}",
+                (cos_put - bs_put).abs()
+            );
+        }
         Ok(())
     }
 
