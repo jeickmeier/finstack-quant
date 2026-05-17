@@ -53,9 +53,14 @@ pub enum AssetDynamics {
     /// CreditGrades model extension with stochastic-barrier survival adjustment.
     ///
     /// `default_probability()` applies the standard approximate CreditGrades
-    /// survival function using the barrier uncertainty parameter.
+    /// survival function using the log-barrier volatility parameter.
     CreditGrades {
-        /// Uncertainty in the default barrier level (reserved for future use).
+        /// Log-normal barrier volatility `λ`: the standard deviation of the
+        /// natural log of the default barrier (Finger et al. 2002,
+        /// "CreditGrades Technical Document"). Despite the field name, this
+        /// is *not* a generic uncertainty scalar — it is the lognormal
+        /// dispersion of the global recovery rate, entering the survival
+        /// formula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.
         barrier_uncertainty: f64,
         /// Mean recovery rate at default.
         mean_recovery: f64,
@@ -76,6 +81,12 @@ pub enum BarrierType {
     },
 }
 
+/// Approximate CreditGrades survival probability (Finger et al. 2002).
+///
+/// `barrier_uncertainty` is the log-barrier volatility `λ` — the standard
+/// deviation of the natural log of the default barrier, *not* a generic
+/// uncertainty scalar. It enters the time-scaled variance as
+/// `a_t² = σ²t + λ²` and shifts the effective leverage by `exp(λ²)`.
 fn credit_grades_default_probability(
     asset_value: f64,
     asset_vol: f64,
@@ -87,6 +98,7 @@ fn credit_grades_default_probability(
         return 0.0;
     }
 
+    // `lambda` is the log-barrier volatility (lognormal barrier std dev).
     let lambda = barrier_uncertainty.max(0.0);
     let a_t = (asset_vol.mul_add(asset_vol, lambda * lambda / horizon) * horizon).sqrt();
     if a_t <= 0.0 {
@@ -296,7 +308,19 @@ impl MertonModel {
     // Calibration methods
     // -----------------------------------------------------------------------
 
-    /// Compute implied equity value and equity volatility from the structural model.
+    /// Minimum equity value (in asset-value units) for which the equity-vol
+    /// relation `sigma_E = N(d1) * exp(-qT) * sigma_V * V / E` is numerically
+    /// well posed. Below this, `E` is treated as effectively zero (the firm is
+    /// economically in default) and the division is rejected.
+    const MIN_EQUITY: f64 = 1.0e-8;
+
+    /// Minimum `N(d1)` for which the KMV / equity-vol inversion is well posed.
+    /// Below this, the equity is deep-out-of-the-money on the firm's assets
+    /// and the inversion is numerically unstable.
+    const MIN_ND1: f64 = 1.0e-12;
+
+    /// Compute implied equity value and equity volatility from the structural
+    /// model, rejecting numerically degenerate (near-default) configurations.
     ///
     /// Uses the Black-Scholes call option formula where equity is a call on
     /// the firm's assets with strike equal to the debt barrier, accounting
@@ -306,6 +330,57 @@ impl MertonModel {
     /// - d2 = d1 - sigma * sqrt(T)
     /// - E = V * exp(-q*T) * N(d1) - B * exp(-r*T) * N(d2)
     /// - sigma_E = N(d1) * exp(-q*T) * sigma_V * V / E
+    ///
+    /// For a deeply distressed firm `E -> 0+`, so `sigma_E` would diverge to
+    /// `+inf`. This method rejects such inputs up front with a descriptive
+    /// error instead of returning `inf`/`NaN`.
+    ///
+    /// # Arguments
+    ///
+    /// * `horizon` - Time horizon T in years (must be > 0)
+    ///
+    /// # Returns
+    ///
+    /// A tuple `(equity_value, equity_vol)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InputError::Invalid`] if the implied equity value or `N(d1)`
+    /// is below the well-posed floor (the firm is economically in default).
+    pub fn try_implied_equity(&self, horizon: f64) -> Result<(f64, f64)> {
+        let v = self.asset_value;
+        let sigma = self.asset_vol;
+        let b = self.debt_barrier;
+        let r = self.risk_free_rate;
+        let q = self.payout_rate;
+        let sqrt_t = horizon.sqrt();
+
+        let d1 = ((v / b).ln() + (r - q + 0.5 * sigma * sigma) * horizon) / (sigma * sqrt_t);
+        let d2 = d1 - sigma * sqrt_t;
+
+        let nd1 = norm_cdf(d1);
+        let nd2 = norm_cdf(d2);
+
+        let exp_neg_qt = (-q * horizon).exp();
+        let equity = v * exp_neg_qt * nd1 - b * (-r * horizon).exp() * nd2;
+
+        if !equity.is_finite() || equity <= Self::MIN_EQUITY || nd1 <= Self::MIN_ND1 {
+            return Err(InputError::Invalid.into());
+        }
+
+        let equity_vol = nd1 * exp_neg_qt * sigma * v / equity;
+        Ok((equity, equity_vol))
+    }
+
+    /// Compute implied equity value and equity volatility from the structural
+    /// model (infallible variant).
+    ///
+    /// This is the unguarded form of [`try_implied_equity`](Self::try_implied_equity)
+    /// and is only well posed for a solvent firm whose implied equity is
+    /// comfortably positive. For a deeply distressed firm the returned
+    /// `equity_vol` may be non-finite (`inf`/`NaN`); prefer
+    /// [`try_implied_equity`](Self::try_implied_equity), which rejects such
+    /// inputs with a descriptive error.
     ///
     /// # Arguments
     ///
@@ -357,7 +432,9 @@ impl MertonModel {
     ///
     /// # Errors
     ///
-    /// Returns an error if inputs are invalid or iteration fails to converge.
+    /// Returns an error if inputs are invalid (including a near-zero
+    /// `equity_value`, or a deep-out-of-the-money configuration where
+    /// `N(d1)` collapses to zero) or if iteration fails to converge.
     pub fn from_equity(
         equity_value: f64,
         equity_vol: f64,
@@ -371,6 +448,13 @@ impl MertonModel {
         }
         if equity_vol < 0.0 {
             return Err(InputError::NegativeValue.into());
+        }
+        // A near-zero equity value makes the KMV volatility inversion
+        // `sigma_V = sigma_E * E / (N(d1) * exp(-qT) * V)` ill-conditioned and
+        // can drive intermediate iterates to inf/NaN, silently defeating the
+        // convergence test. Reject it up front with a descriptive error.
+        if equity_value <= Self::MIN_EQUITY {
+            return Err(InputError::Invalid.into());
         }
 
         let e = equity_value;
@@ -397,6 +481,13 @@ impl MertonModel {
 
             let nd1 = norm_cdf(d1);
             let nd2 = norm_cdf(d2);
+
+            // Deep-OTM: N(d1) -> 0 makes the V / sigma_V updates blow up to
+            // inf/NaN, which makes the relative-change test silently never
+            // fire. Reject explicitly rather than burning all iterations.
+            if nd1 <= Self::MIN_ND1 {
+                return Err(InputError::Invalid.into());
+            }
 
             // Update V from the call pricing equation: E = V*exp(-qT)*N(d1) - B*exp(-rT)*N(d2)
             v = (e + b * (-r * t).exp() * nd2) / (exp_neg_qt * nd1);
@@ -437,8 +528,12 @@ impl MertonModel {
     /// Uses Brent's method to solve for sigma_V such that the model's
     /// implied spread equals the target CDS spread. The calibration uses
     /// the terminal-barrier (classic Merton) default probability formula
-    /// `PD = N(-DD)` and the resulting model has `BarrierType::Terminal`
-    /// with `AssetDynamics::GeometricBrownian` and `payout_rate = 0`.
+    /// `PD = N(-DD)`, with the distance-to-default drift
+    /// `mu = r - q - sigma^2/2` (consistent with
+    /// [`distance_to_default`](Self::distance_to_default) and
+    /// [`implied_equity`](Self::implied_equity)). The resulting model has
+    /// `BarrierType::Terminal` with `AssetDynamics::GeometricBrownian` and
+    /// the supplied `payout_rate`.
     ///
     /// To use first-passage barriers after calibration, construct a new
     /// model via [`new_with_dynamics`](Self::new_with_dynamics) using the
@@ -452,6 +547,8 @@ impl MertonModel {
     /// * `risk_free_rate` - Risk-free rate r
     /// * `maturity` - Time to maturity T in years
     /// * `asset_value` - Assumed initial asset value V
+    /// * `payout_rate` - Continuous dividend / payout yield q (pass `0.0`
+    ///   for a firm with no asset payout)
     ///
     /// # Errors
     ///
@@ -464,6 +561,7 @@ impl MertonModel {
         risk_free_rate: f64,
         maturity: f64,
         asset_value: f64,
+        payout_rate: f64,
     ) -> Result<Self> {
         if total_debt <= 0.0 || maturity <= 0.0 || asset_value <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
@@ -480,8 +578,10 @@ impl MertonModel {
                 let v = asset_value;
                 let b = total_debt;
                 let r = risk_free_rate;
+                let q = payout_rate;
                 let sig = sigma;
-                let mu = r - 0.5 * sig * sig;
+                // Drift includes the payout term, matching distance_to_default.
+                let mu = r - q - 0.5 * sig * sig;
                 let sqrt_t = maturity.sqrt();
                 let dd = ((v / b).ln() + mu * maturity) / (sig * sqrt_t);
                 let pd = norm_cdf(-dd);
@@ -492,7 +592,15 @@ impl MertonModel {
             0.20, // initial guess
         )?;
 
-        Self::new(asset_value, sigma_v, total_debt, risk_free_rate)
+        Self::new_with_dynamics(
+            asset_value,
+            sigma_v,
+            total_debt,
+            risk_free_rate,
+            payout_rate,
+            BarrierType::Terminal,
+            AssetDynamics::GeometricBrownian,
+        )
     }
 
     /// Calibrate the debt barrier to match a target cumulative default
@@ -560,9 +668,9 @@ impl MertonModel {
     /// - Asset volatility: `sigma_V = sigma_E * E / V_0`
     /// - Barrier: `B = D * R_mean` (deterministic)
     ///
-    /// The `barrier_uncertainty` parameter is stored but does not currently
-    /// modify the default probability calculation. The full CreditGrades
-    /// stochastic barrier term may be added in a future release.
+    /// The `barrier_uncertainty` parameter is the log-barrier volatility `λ`
+    /// (the lognormal standard deviation of the default barrier) and feeds the
+    /// `CreditGrades` survival function via `a_t² = σ²t + λ²`.
     ///
     /// # Arguments
     ///
@@ -570,7 +678,8 @@ impl MertonModel {
     /// * `equity_vol` - Observed equity volatility sigma_E
     /// * `total_debt` - Face value of debt
     /// * `risk_free_rate` - Risk-free rate r
-    /// * `barrier_uncertainty` - Uncertainty in the default barrier level (reserved)
+    /// * `barrier_uncertainty` - Log-barrier volatility `λ` (lognormal std dev
+    ///   of the default barrier; Finger et al. 2002)
     /// * `mean_recovery` - Mean recovery rate at default
     ///
     /// # Errors
@@ -1077,12 +1186,47 @@ mod tests {
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).expect("valid");
         let spread = m.implied_spread(5.0, 0.40);
         let spread_bp = spread * 10_000.0;
-        let m2 =
-            MertonModel::from_cds_spread(spread_bp, 0.40, 80.0, 0.04, 5.0, 100.0).expect("cds cal");
+        let m2 = MertonModel::from_cds_spread(spread_bp, 0.40, 80.0, 0.04, 5.0, 100.0, 0.0)
+            .expect("cds cal");
         assert!(
             (m2.asset_vol() - 0.25).abs() < 0.02,
             "Asset vol should recover: got {}",
             m2.asset_vol()
+        );
+    }
+
+    #[test]
+    fn from_cds_spread_roundtrips_with_payout_rate() {
+        // Calibrate a firm with a real asset payout q > 0. The spread is
+        // produced by a model carrying that payout; from_cds_spread must
+        // thread the same q into its calibration drift so the recovered
+        // sigma_V matches. Dropping q biases sigma_V.
+        let q = 0.04;
+        let m_known = MertonModel::new_with_dynamics(
+            100.0,
+            0.25,
+            80.0,
+            0.04,
+            q,
+            BarrierType::Terminal,
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid");
+        let spread = m_known.implied_spread(5.0, 0.40);
+        let spread_bp = spread * 10_000.0;
+
+        let m_cal = MertonModel::from_cds_spread(spread_bp, 0.40, 80.0, 0.04, 5.0, 100.0, q)
+            .expect("cds cal");
+
+        assert!(
+            (m_cal.asset_vol() - 0.25).abs() < 0.01,
+            "Asset vol should recover with q={q}: got {}",
+            m_cal.asset_vol()
+        );
+        assert!(
+            (m_cal.payout_rate() - q).abs() < 1e-12,
+            "Payout rate should be preserved: got {}",
+            m_cal.payout_rate()
         );
     }
 
@@ -1208,6 +1352,46 @@ mod tests {
             (m_cal.payout_rate() - 0.02).abs() < 1e-10,
             "Payout rate should be preserved: got {}",
             m_cal.payout_rate()
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Near-zero equity guards (W-10)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn implied_equity_rejects_near_zero_equity() {
+        // A deeply distressed firm: V far below B with low vol drives the
+        // call-option equity value to ~0, so the equity-vol division would
+        // otherwise blow up to inf/NaN.
+        let m = MertonModel::new(1.0, 0.05, 1.0e9, 0.05).expect("valid");
+        let res = m.try_implied_equity(1.0);
+        assert!(
+            res.is_err(),
+            "near-zero implied equity should be rejected, got {res:?}"
+        );
+    }
+
+    #[test]
+    fn implied_equity_ok_for_healthy_firm() {
+        let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
+        let (equity, equity_vol) = m.try_implied_equity(1.0).expect("healthy firm");
+        assert!(equity.is_finite() && equity > 0.0);
+        assert!(equity_vol.is_finite() && equity_vol > 0.0);
+    }
+
+    #[test]
+    fn from_equity_rejects_near_zero_equity() {
+        // A near-zero equity input must be rejected up front with a
+        // descriptive `Invalid` error, not silently churned through the
+        // fixed-point loop until `SolverConvergenceFailed` (which would
+        // burn all 100 iterations and report a misleading reason).
+        let res = MertonModel::from_equity(1.0e-12, 0.30, 80.0, 0.05, 0.0, 1.0);
+        let err = res.expect_err("near-zero equity input should be rejected");
+        let msg = err.to_string();
+        assert!(
+            !msg.contains("did not converge"),
+            "should be an up-front input rejection, not a convergence failure: {msg}"
         );
     }
 
