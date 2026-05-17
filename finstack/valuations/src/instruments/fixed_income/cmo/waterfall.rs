@@ -631,6 +631,312 @@ mod tests {
         );
     }
 
+    /// Test 1: Order-permutation guard.
+    ///
+    /// The bug fixed by commit 8a3b125ef was ORDER-DEPENDENCE: the old code
+    /// drained a single `remaining_scheduled_principal` counter in
+    /// `priority_order` iteration, so the tranche visited first consumed as
+    /// much scheduled principal as possible, leaving none for later tranches.
+    /// The fix attributes scheduled/prepayment at source (pro-rata, not
+    /// sequential drain), making the breakdown independent of insertion order.
+    ///
+    /// This test builds the same PAC + SR structure in both orders and asserts
+    /// that every tranche's `scheduled_principal` / `prepayment_principal`
+    /// breakdown is identical regardless of insertion order.
+    ///
+    /// # Why this would fail on the parent's logic
+    ///
+    /// In the parent, `priority_order` was built from the tranche `Vec` index,
+    /// so "SR first" and "PAC first" produced different iteration sequences.
+    /// Whichever tranche was visited first received `principal.min(remaining)`
+    /// of scheduled principal.  In the `[SR, PAC]` order SR (which receives
+    /// 5 000 from the support allocation) drained 5 000 from a pool of
+    /// 6 000 scheduled, leaving only 1 000 for the PAC — but the PAC
+    /// genuinely received 4 000 scheduled principal.  In the `[PAC, SR]`
+    /// order the PAC was first, so it correctly claimed 4 000 scheduled.
+    /// The two orderings therefore produced different `scheduled_principal`
+    /// values for both SR and PAC, and this test would have caught that.
+    #[test]
+    fn test_order_permutation_scheduled_prepayment_identical() {
+        use crate::instruments::fixed_income::cmo::tranches::pac_support::PacSchedule;
+        use crate::instruments::fixed_income::cmo::types::PacCollar;
+
+        let pac_schedule = PacSchedule {
+            scheduled_payments: vec![4_000.0; 12],
+            collar: PacCollar::standard(),
+        };
+        let pac_context = PacContext {
+            schedule: Some(pac_schedule),
+            period_index: 0,
+            actual_psa: 2.0, // within the 100-300 collar
+        };
+
+        // Waterfall A: [SR, PAC]
+        let tranches_a = vec![
+            CmoTranche::sequential("SR", Money::new(50_000.0, Currency::USD), 0.04, 1),
+            CmoTranche::pac(
+                "PAC",
+                Money::new(50_000.0, Currency::USD),
+                0.04,
+                1,
+                PacCollar::standard(),
+            ),
+        ];
+        let mut waterfall_a = CmoWaterfall::new(tranches_a);
+        let result_a = execute_waterfall_with_principal_breakdown(
+            &mut waterfall_a,
+            6_000.0,
+            3_000.0,
+            5_000.0,
+            Some(&pac_context),
+        );
+
+        // Waterfall B: [PAC, SR]  — reversed insertion order
+        let tranches_b = vec![
+            CmoTranche::pac(
+                "PAC",
+                Money::new(50_000.0, Currency::USD),
+                0.04,
+                1,
+                PacCollar::standard(),
+            ),
+            CmoTranche::sequential("SR", Money::new(50_000.0, Currency::USD), 0.04, 1),
+        ];
+        let mut waterfall_b = CmoWaterfall::new(tranches_b);
+        let result_b = execute_waterfall_with_principal_breakdown(
+            &mut waterfall_b,
+            6_000.0,
+            3_000.0,
+            5_000.0,
+            Some(&pac_context),
+        );
+
+        // Helper to extract (scheduled, prepayment) for a given tranche ID.
+        let find = |res: &WaterfallPeriodResult, id: &str| {
+            res.allocations
+                .iter()
+                .find(|a| a.tranche_id == id)
+                .map(|a| (a.scheduled_principal, a.prepayment_principal))
+                .expect("tranche not found")
+        };
+
+        let (pac_sched_a, pac_prepay_a) = find(&result_a, "PAC");
+        let (pac_sched_b, pac_prepay_b) = find(&result_b, "PAC");
+        let (sr_sched_a, sr_prepay_a) = find(&result_a, "SR");
+        let (sr_sched_b, sr_prepay_b) = find(&result_b, "SR");
+
+        const TOL: f64 = 1e-9;
+        assert!(
+            (pac_sched_a - pac_sched_b).abs() < TOL,
+            "PAC scheduled_principal differs by order: order=[SR,PAC] gave {pac_sched_a}, \
+             order=[PAC,SR] gave {pac_sched_b}"
+        );
+        assert!(
+            (pac_prepay_a - pac_prepay_b).abs() < TOL,
+            "PAC prepayment_principal differs by order: order=[SR,PAC] gave {pac_prepay_a}, \
+             order=[PAC,SR] gave {pac_prepay_b}"
+        );
+        assert!(
+            (sr_sched_a - sr_sched_b).abs() < TOL,
+            "SR scheduled_principal differs by order: order=[SR,PAC] gave {sr_sched_a}, \
+             order=[PAC,SR] gave {sr_sched_b}"
+        );
+        assert!(
+            (sr_prepay_a - sr_prepay_b).abs() < TOL,
+            "SR prepayment_principal differs by order: order=[SR,PAC] gave {sr_prepay_a}, \
+             order=[PAC,SR] gave {sr_prepay_b}"
+        );
+
+        // The per-tranche totals should also agree with the pool buckets.
+        assert!(
+            (result_a.total_scheduled_principal - 6_000.0).abs() < 1e-9,
+            "total scheduled should equal pool's 6,000, got {}",
+            result_a.total_scheduled_principal
+        );
+        assert!(
+            (result_a.total_prepayment_principal - 3_000.0).abs() < 1e-9,
+            "total prepayment should equal pool's 3,000, got {}",
+            result_a.total_prepayment_principal
+        );
+    }
+
+    /// Test 2: Residual-conservation assertion.
+    ///
+    /// When tranches are balance-capped so that some principal goes
+    /// undistributed (residual > 0), the per-tranche breakdown must still
+    /// conserve the distributed amounts: `total_scheduled_principal +
+    /// total_prepayment_principal == total_principal_actually_distributed`.
+    /// Additionally each total must be ≤ the corresponding pool bucket
+    /// (scheduled and prepayment shrink pro-rata on a residual).
+    #[test]
+    fn test_residual_conservation_scheduled_prepayment() {
+        // Two sequential tranches with small balances so most principal is
+        // left as residual.
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(1_000.0, Currency::USD), 0.04, 1),
+            CmoTranche::sequential("B", Money::new(500.0, Currency::USD), 0.04, 2),
+        ];
+        let mut waterfall = CmoWaterfall::new(tranches);
+
+        // Pool delivers 6,000 scheduled + 4,000 prepayment = 10,000 total,
+        // but the tranches can only absorb 1,500 (A's 1,000 + B's 500).
+        let scheduled_pool = 6_000.0_f64;
+        let prepayment_pool = 4_000.0_f64;
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            scheduled_pool,
+            prepayment_pool,
+            0.0, // interest irrelevant here
+            None,
+        );
+
+        // Residual must be positive (most principal undistributed).
+        assert!(
+            result.residual_principal > 0.0,
+            "expected residual principal > 0, got {}",
+            result.residual_principal
+        );
+
+        let total_distributed = result.total_principal;
+        let tol = 1e-9;
+
+        // Conservation: scheduled + prepayment == total distributed.
+        assert!(
+            (result.total_scheduled_principal + result.total_prepayment_principal
+                - total_distributed)
+                .abs()
+                < tol,
+            "scheduled {} + prepayment {} != distributed {total_distributed}",
+            result.total_scheduled_principal,
+            result.total_prepayment_principal
+        );
+
+        // Each bucket must not exceed the pool amount.
+        assert!(
+            result.total_scheduled_principal <= scheduled_pool + tol,
+            "distributed scheduled {} exceeds pool scheduled {scheduled_pool}",
+            result.total_scheduled_principal
+        );
+        assert!(
+            result.total_prepayment_principal <= prepayment_pool + tol,
+            "distributed prepayment {} exceeds pool prepayment {prepayment_pool}",
+            result.total_prepayment_principal
+        );
+
+        // Both buckets are strictly positive (since 1,500 < 10,000 total the
+        // distribution is non-trivial in both dimensions).
+        assert!(
+            result.total_scheduled_principal > 0.0,
+            "expected some scheduled principal distributed"
+        );
+        assert!(
+            result.total_prepayment_principal > 0.0,
+            "expected some prepayment principal distributed"
+        );
+    }
+
+    /// Test 3: PAC excess branch — allocation above PAC schedule is prepayment.
+    ///
+    /// `attribute_scheduled_principal` contains an explicit excess branch:
+    /// when a PAC tranche's total principal allocation exceeds the PAC
+    /// schedule amount (`total_pac_alloc > pac_scheduled`), the excess is
+    /// prepayment-eligible rather than scheduled.  This branch is exercised
+    /// when the PAC receives principal via the balance-limited fallback path
+    /// (no amortization schedule in the PAC context), which means
+    /// `pac_scheduled = 0`.  In that case the entire PAC allocation is
+    /// "excess" and must be split pro-rata from the remaining-scheduled +
+    /// prepayment pool — none of it is automatically labeled scheduled.
+    ///
+    /// Structure: PAC (priority 1) alone — no support tranche.  A
+    /// `PacContext` with `schedule = None` is provided so the waterfall uses
+    /// the fallback allocation (gives the PAC its balance-limited amount) and
+    /// the attribution sees `pac_scheduled = 0.0`, triggering the excess
+    /// path for the full allocation.
+    ///
+    /// Expected labeling: because `pac_scheduled_claimed = 0`, ALL of the
+    /// PAC's allocation is prepayment-eligible and receives a pro-rata share
+    /// of both the pool scheduled and prepayment buckets.  The PAC's
+    /// `scheduled_principal` equals `scheduled_pool` (it is the only
+    /// eligible tranche) and `prepayment_principal` equals `prepayment_pool`,
+    /// with both pool buckets fully conserved.
+    #[test]
+    fn test_pac_excess_over_schedule_labeled_prepayment() {
+        // No schedule → pac_scheduled = 0 in attribution → full allocation is
+        // excess → entire allocation is prepayment-eligible.
+        let pac_context = PacContext {
+            schedule: None, // triggers balance-limited fallback allocation
+            period_index: 0,
+            actual_psa: 5.0,
+        };
+
+        let tranches = vec![CmoTranche::pac(
+            "PAC",
+            Money::new(50_000.0, Currency::USD),
+            0.04,
+            1,
+            crate::instruments::fixed_income::cmo::types::PacCollar::standard(),
+        )];
+        let mut waterfall = CmoWaterfall::new(tranches);
+
+        // Pool: 4,000 scheduled + 8,000 prepayment = 12,000 total.
+        // Fallback allocation: PAC receives 12,000 (balance >> available).
+        // Attribution: pac_scheduled = 0 → PAC excess = 12,000 → entire
+        // 12,000 splits pro-rata from (4,000 scheduled + 8,000 prepay).
+        // Since the PAC is the only eligible tranche (fraction = 1.0):
+        //   PAC.scheduled_principal = 4,000
+        //   PAC.prepayment_principal = 8,000
+        let scheduled_pool = 4_000.0_f64;
+        let prepayment_pool = 8_000.0_f64;
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            scheduled_pool,
+            prepayment_pool,
+            0.0,
+            Some(&pac_context),
+        );
+
+        let pac = result
+            .allocations
+            .iter()
+            .find(|a| a.tranche_id == "PAC")
+            .expect("PAC allocation");
+
+        // Fallback path: PAC receives the full 12,000.
+        assert!(
+            (pac.principal - 12_000.0).abs() < 1.0,
+            "PAC should receive all 12,000 via fallback, got {}",
+            pac.principal
+        );
+
+        // With pac_scheduled = 0, entire allocation is excess → the split
+        // takes from both pool buckets pro-rata.  The PAC is the sole eligible
+        // tranche so it absorbs the full scheduled pool (4,000).
+        assert!(
+            (pac.scheduled_principal - 4_000.0).abs() < 1.0,
+            "PAC.scheduled_principal should equal pool scheduled 4,000 (excess path, \
+             single eligible tranche), got {}",
+            pac.scheduled_principal
+        );
+
+        // And the full prepayment pool (8,000) goes to the PAC as well.
+        assert!(
+            (pac.prepayment_principal - 8_000.0).abs() < 1.0,
+            "PAC.prepayment_principal should equal pool prepayment 8,000 (excess path, \
+             single eligible tranche), got {}",
+            pac.prepayment_principal
+        );
+
+        // Both pool buckets conserved.
+        let tol = 1e-9;
+        assert!(
+            (result.total_scheduled_principal + result.total_prepayment_principal - 12_000.0).abs()
+                < tol,
+            "scheduled {} + prepayment {} should equal 12,000",
+            result.total_scheduled_principal,
+            result.total_prepayment_principal
+        );
+    }
+
     /// Defect (b): scheduled-vs-prepayment principal must be attributed per
     /// tranche at source, not by draining one shared counter in priority
     /// order. A PAC tranche that genuinely receives PAC-scheduled principal
