@@ -354,6 +354,13 @@ const KAPPA_MAX: f64 = 1.0;
 
 /// Vega floor: 1 bp of annuity-year. Protects against division by a
 /// near-zero vega at extreme expiries or zero quoted vol.
+///
+/// The vega used here is evaluated once at the *market* quote and used to
+/// scale `(price_model − price_mkt)` into an approximate vol-error
+/// residual. That linearisation is a first-order Taylor approximation
+/// valid only near the solution; see the residual computation in
+/// `HullWhiteSwaptionTarget::calculate_residuals` for the full
+/// approximation-regime discussion (W-38).
 const SWAPTION_VEGA_FLOOR: f64 = 1e-8;
 
 /// Number of deterministic multi-start restarts used for HW1F calibration.
@@ -453,10 +460,25 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
                     q.expiry, q.tenor, curve.kappa, curve.sigma
                 )));
             }
-            // Vega-weighted price residual: algebraically the
-            // first-order approximation to (σ_model − σ_market),
-            // so all quotes enter the objective on an implied-
-            // vol scale. See Gilli–Maringer–Schumann §13.4.
+            // Vega-weighted price residual: `(price_model − price_mkt)/vega`
+            // is, by a first-order Taylor expansion of price in vol, the
+            // approximation `σ_model − σ_market`, so all quotes enter the
+            // objective on a common implied-vol scale (Gilli–Maringer–
+            // Schumann §13.4).
+            //
+            // APPROXIMATION REGIME (W-38): this linearisation is accurate
+            // only NEAR the solution, where `price_model ≈ price_mkt` and
+            // the vega evaluated at the *market* quote is a good proxy for
+            // the local price/vol slope. Far from the solution — during LM
+            // exploration or multi-start restarts — the true price/vol
+            // map is nonlinear and the fixed market vega mis-scales the
+            // residual, so the LM objective is a distorted (but still
+            // descent-compatible) surface rather than a true vol-error
+            // objective. Andersen–Piterbarg (*Interest Rate Modeling*,
+            // Vol. III) instead iterate implied-vol residuals directly.
+            // The vega-scaled form is retained here because it avoids a
+            // per-iteration implied-vol inversion and converges to the
+            // same minimiser once the iterates enter the valid regime.
             residuals[idx] = (model_price - pre.market_price) / pre.vega;
         }
         Ok(())
@@ -1516,19 +1538,37 @@ fn infer_hw_initial_guess(quotes: &[SwaptionQuote], fwd_swap_rates: &[f64]) -> (
     } else {
         quotes.iter().map(|q| q.expiry + 0.5 * q.tenor).sum::<f64>() / quotes.len() as f64
     };
-    let avg_vol = if quotes.is_empty() {
-        0.01
+    // Average ABSOLUTE-rate vol, branched per quote on the vol regime so
+    // the σ seed never conflates Bachelier and Black quotes (W-39):
+    //  - normal (Bachelier) quote: the vol is already an absolute-rate
+    //    vol, so it contributes directly;
+    //  - lognormal (Black) quote: the vol is dimensionless, so `vol·fwd`
+    //    recovers an absolute-rate scale.
+    // The HW1F σ is an absolute short-rate vol, so this average is the
+    // right order of magnitude for the seed.
+    let avg_abs_vol = if quotes.is_empty() {
+        0.01 * 0.02 // fallback: ~1% Black vol at a 2% forward.
     } else {
-        quotes.iter().map(|q| q.volatility.abs()).sum::<f64>() / quotes.len() as f64
-    };
-    let avg_fwd = if fwd_swap_rates.is_empty() {
-        0.02
-    } else {
-        fwd_swap_rates.iter().map(|r| r.abs()).sum::<f64>() / fwd_swap_rates.len() as f64
+        let sum: f64 = quotes
+            .iter()
+            .enumerate()
+            .map(|(i, q)| {
+                let v = q.volatility.abs();
+                if q.is_normal_vol {
+                    v
+                } else {
+                    // fwd_swap_rates is built quote-aligned by the callers;
+                    // fall back to a 2% forward if the slice is short.
+                    let fwd = fwd_swap_rates.get(i).map_or(0.02, |r| r.abs()).max(0.005);
+                    v * fwd
+                }
+            })
+            .sum();
+        sum / quotes.len() as f64
     };
 
     let kappa_init = (1.0 / horizon.max(0.5)).clamp(0.01, 0.30);
-    let sigma_init = (avg_vol * avg_fwd.max(0.005)).clamp(0.001, 0.05);
+    let sigma_init = avg_abs_vol.clamp(0.001, 0.05);
     (kappa_init, sigma_init)
 }
 
@@ -2296,6 +2336,77 @@ mod tests {
             calib.is_err() || calib.as_ref().is_ok_and(|(_, report)| !report.success),
             "calibration on a degenerate (NaN-priced) curve must report \
              non-convergence rather than accept a 1e6-dominated minimum"
+        );
+    }
+
+    /// W-39: the σ seed must not conflate Bachelier (normal) and Black
+    /// (lognormal) vol regimes. For NORMAL swaption quotes the quoted vol
+    /// is already an absolute short-rate-scale vol; multiplying it by the
+    /// forward swap rate (`avg_fwd ≈ 0.03`) wrongly shrinks it by ~30×,
+    /// and the `clamp(0.001, …)` floor then masks the bug while still
+    /// leaving the seed an order of magnitude too small.
+    #[test]
+    fn infer_hw_initial_guess_normal_vol_seed_is_right_order_of_magnitude() {
+        // A normal-vol swaption set with ~80 bp absolute-rate vol.
+        let quotes = vec![
+            SwaptionQuote {
+                expiry: 1.0,
+                tenor: 5.0,
+                volatility: 0.0080,
+                is_normal_vol: true,
+            },
+            SwaptionQuote {
+                expiry: 5.0,
+                tenor: 5.0,
+                volatility: 0.0085,
+                is_normal_vol: true,
+            },
+            SwaptionQuote {
+                expiry: 10.0,
+                tenor: 5.0,
+                volatility: 0.0075,
+                is_normal_vol: true,
+            },
+        ];
+        let fwd_swap_rates = vec![0.03, 0.032, 0.031];
+        let (_kappa, sigma) = infer_hw_initial_guess(&quotes, &fwd_swap_rates);
+
+        // The HW1F σ is an absolute short-rate vol; for normal quotes the
+        // seed should track the quoted absolute vol (~80 bp), i.e. land in
+        // roughly [3e-3, 3e-2]. The buggy `avg_vol·avg_fwd` product yields
+        // ~2.4e-4, clamped up to the 1e-3 floor — still ~8× too small.
+        assert!(
+            (3e-3..=3e-2).contains(&sigma),
+            "normal-vol σ seed out of order of magnitude: {sigma}"
+        );
+    }
+
+    /// W-39 companion: for LOGNORMAL quotes the σ seed *should* still
+    /// multiply by the forward rate, since a Black vol is dimensionless
+    /// and `vol·fwd` recovers an absolute-rate scale.
+    #[test]
+    fn infer_hw_initial_guess_lognormal_vol_seed_uses_forward_rate() {
+        // 25% Black vol at a 3% forward → absolute vol ≈ 0.75%.
+        let quotes = vec![
+            SwaptionQuote {
+                expiry: 1.0,
+                tenor: 5.0,
+                volatility: 0.25,
+                is_normal_vol: false,
+            },
+            SwaptionQuote {
+                expiry: 5.0,
+                tenor: 5.0,
+                volatility: 0.25,
+                is_normal_vol: false,
+            },
+        ];
+        let fwd_swap_rates = vec![0.03, 0.03];
+        let (_kappa, sigma) = infer_hw_initial_guess(&quotes, &fwd_swap_rates);
+        // 0.25 · 0.03 = 0.0075 — within the valid σ band.
+        assert!(
+            (3e-3..=3e-2).contains(&sigma),
+            "lognormal-vol σ seed out of order of magnitude: {sigma}"
         );
     }
 }

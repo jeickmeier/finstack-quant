@@ -1615,19 +1615,28 @@ mod tests {
         let lb = vec![0.9, 1.7];
         let ub = vec![1.1, 2.5];
 
+        // restart_idx 2 → halton(3, 2) = 0.75 on dim 0, halton(3, 3) = 1/9
+        // on dim 1. Additive perturbation (scale 0.5):
+        //   dim 0: 1.0 + 0.5·(2·0.75 − 1) = 1.0 + 0.25 = 1.25 → clamps to 1.1
+        //   dim 1: 2.0 + 0.5·(2·(1/9) − 1) ≈ 2.0 − 0.389 = 1.611 → clamps to 1.7
         let first =
-            perturb_initial_guess(&initials, 0.5, 0, Some(lb.as_slice()), Some(ub.as_slice()));
+            perturb_initial_guess(&initials, 0.5, 2, Some(lb.as_slice()), Some(ub.as_slice()));
         let second =
-            perturb_initial_guess(&initials, 0.5, 0, Some(lb.as_slice()), Some(ub.as_slice()));
+            perturb_initial_guess(&initials, 0.5, 2, Some(lb.as_slice()), Some(ub.as_slice()));
 
         assert_eq!(
             first, second,
             "Halton-based perturbations should be deterministic"
         );
-        assert!((first[0] - 1.0).abs() < 1e-12);
+        assert!(
+            (first[0] - 1.1).abs() < 1e-12,
+            "first coordinate should clamp to upper bound, got {}",
+            first[0]
+        );
         assert!(
             (first[1] - 1.7).abs() < 1e-12,
-            "second coordinate should clamp to lower bound"
+            "second coordinate should clamp to lower bound, got {}",
+            first[1]
         );
     }
 }
