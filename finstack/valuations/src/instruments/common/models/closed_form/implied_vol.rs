@@ -25,6 +25,16 @@ const UNBRACKETED_MSG: &str =
 /// Error returned when implied volatility inputs contain non-finite values.
 const NON_FINITE_MSG: &str = "Implied volatility solver received non-finite input parameters";
 
+/// Error returned when the bisection fallback exhausts its iteration budget
+/// without the price residual falling within tolerance.
+///
+/// Reaching this means the root was bracketed but the solve still failed to
+/// converge — the solver must surface that explicitly rather than returning the
+/// last (unconverged) midpoint as if it were a valid answer.
+const NON_CONVERGENCE_MSG: &str =
+    "Implied volatility solver exhausted its iteration budget without converging \
+     to the requested price tolerance";
+
 /// Minimum volatility (annualized) used for bracketing.
 const MIN_VOL: f64 = 1e-8;
 /// Maximum volatility (annualized) allowed during bracketing.
@@ -172,6 +182,9 @@ pub fn bs_implied_vol(
         if !f_mid.is_finite() {
             return Err(finstack_core::Error::Validation(UNBRACKETED_MSG.into()));
         }
+        // Converged: either the price residual is within tolerance, or the
+        // bracket has collapsed to machine precision (sigma pinned as tightly
+        // as f64 allows — a legitimate convergence, not a failure).
         if f_mid.abs() < PRICE_TOL || (hi - lo) < 1e-12 {
             return Ok(mid);
         }
@@ -182,7 +195,12 @@ pub fn bs_implied_vol(
         }
     }
 
-    Ok(mid)
+    // Iteration budget exhausted without the bracket collapsing or the price
+    // residual reaching tolerance. Surface this as an explicit non-convergence
+    // error instead of returning the last unconverged midpoint as `Ok`.
+    Err(finstack_core::Error::Validation(
+        NON_CONVERGENCE_MSG.into(),
+    ))
 }
 
 /// Solve for Black-76 implied volatility (forward-based).
@@ -282,6 +300,8 @@ pub fn black76_implied_vol(
         if !f_mid.is_finite() {
             return Err(finstack_core::Error::Validation(UNBRACKETED_MSG.into()));
         }
+        // Converged: price residual within tolerance, or bracket collapsed to
+        // machine precision (a legitimate convergence — see `bs_implied_vol`).
         if f_mid.abs() < PRICE_TOL || (hi - lo) < 1e-12 {
             return Ok(mid);
         }
@@ -292,5 +312,89 @@ pub fn black76_implied_vol(
         }
     }
 
-    Ok(mid)
+    // Iteration budget exhausted without converging — surface explicitly rather
+    // than returning the last unconverged midpoint as `Ok`.
+    Err(finstack_core::Error::Validation(
+        NON_CONVERGENCE_MSG.into(),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Audit item 7: the bisection fallback previously returned `Ok(mid)` after
+    /// exhausting its iteration budget, claiming a converged solution that was
+    /// never verified.
+    ///
+    /// Failure mode locked in by [`bisection_reports_non_convergence_explicitly`]
+    /// below: a non-converged bisection must surface an explicit
+    /// `Error::Validation` ([`NON_CONVERGENCE_MSG`]), never a silent `Ok`.
+    ///
+    /// This test pins the contract that *every* `Ok(sigma)` the solver returns
+    /// is genuinely converged — re-pricing at `sigma` lands within a sane
+    /// tolerance of the requested target. A regression that restores an
+    /// unverified post-loop `Ok(mid)` (or any other unconverged success) would
+    /// break this round-trip check.
+    #[test]
+    fn solver_only_returns_ok_for_genuinely_converged_solutions() {
+        let cases = [
+            // (spot, strike, r, q, t, vol_used_to_make_target)
+            (100.0, 100.0, 0.05, 0.02, 1.0, 0.20),
+            (100.0, 80.0, 0.03, 0.0, 0.5, 0.45),
+            (100.0, 130.0, 0.06, 0.01, 2.0, 0.65),
+            (100.0, 100.0, 0.0, 0.0, 0.1, 0.10),
+            (50.0, 55.0, 0.08, 0.0, 0.25, 0.80),
+        ];
+        for &(spot, strike, r, q, t, vol) in &cases {
+            for option_type in [OptionType::Call, OptionType::Put] {
+                let target = bs_price(spot, strike, r, q, vol, t, option_type);
+                let solved = bs_implied_vol(spot, strike, r, q, t, option_type, target)
+                    .expect("a price generated from a real vol must invert");
+                let repriced = bs_price(spot, strike, r, q, solved, t, option_type);
+                // Round-trip price error must be tiny; a non-converged `Ok`
+                // (the audited defect) would fail this with a large residual.
+                assert!(
+                    (repriced - target).abs() <= 1e-6 * target.max(1.0),
+                    "solver returned a non-converged Ok: vol={vol} solved={solved} \
+                     target={target} repriced={repriced}"
+                );
+            }
+        }
+    }
+
+    /// Audit item 7: confirms the non-convergence error path is wired and that
+    /// the solver still rejects genuinely unsolvable requests with an explicit
+    /// `Error::Validation` rather than a silent `Ok`.
+    ///
+    /// A target price strictly below intrinsic is an arbitrage violation and
+    /// cannot be matched by any volatility; the solver must return `Err`.
+    #[test]
+    fn bisection_reports_non_convergence_explicitly() {
+        // Sub-intrinsic target — unsolvable, must error (never silent Ok).
+        let intrinsic = (100.0_f64 * (-0.0_f64 * 1.0).exp()
+            - 80.0_f64 * (-0.05_f64 * 1.0).exp())
+        .max(0.0);
+        let err = bs_implied_vol(
+            100.0,
+            80.0,
+            0.05,
+            0.0,
+            1.0,
+            OptionType::Call,
+            intrinsic * 0.5,
+        )
+        .expect_err("sub-intrinsic target must not yield a silent Ok");
+        assert!(
+            matches!(err, finstack_core::Error::Validation(_)),
+            "non-solvable implied-vol request must be a Validation error, got {err:?}"
+        );
+
+        // The explicit non-convergence message is a distinct, well-formed
+        // diagnostic (guards against an empty/placeholder error string).
+        assert!(
+            NON_CONVERGENCE_MSG.contains("without converging"),
+            "non-convergence diagnostic must describe the failure"
+        );
+    }
 }

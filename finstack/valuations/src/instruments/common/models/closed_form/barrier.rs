@@ -185,8 +185,18 @@ impl BarrierParams {
     }
 
     /// Create barrier parameters from a discount factor, deriving the
-    /// continuously-compounded rate as `-ln(df)/t`. Returns a rate of `0.0`
-    /// when `time <= 0` or `df <= 0`.
+    /// continuously-compounded rate as `-ln(df)/t`.
+    ///
+    /// When `time <= 0` the option is expired and discounting is moot, so the
+    /// rate is set to `0.0` as a harmless convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`finstack_core::Error::Validation`] when `df` is not a
+    /// strictly positive finite number. A non-positive discount factor implies
+    /// a corrupt or inverted curve; deriving `rate = -ln(df)/t` is undefined
+    /// (`ln` of a non-positive value), so the previous behaviour of coercing
+    /// such a `df` to `rate = 0.0` silently mispriced the barrier on bad input.
     pub fn with_df(
         spot: f64,
         strike: f64,
@@ -195,13 +205,16 @@ impl BarrierParams {
         df: f64,
         div_yield: f64,
         vol: f64,
-    ) -> Self {
-        let rate = if time > 0.0 && df > 0.0 {
-            -df.ln() / time
-        } else {
-            0.0
-        };
-        Self::new(spot, strike, barrier, time, rate, div_yield, vol)
+    ) -> finstack_core::Result<Self> {
+        if !df.is_finite() || df <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "BarrierParams::with_df requires a strictly positive finite discount \
+                 factor (corrupt/inverted curve otherwise), got df={df}"
+            )));
+        }
+        // `time <= 0` ⇒ expired: discounting is irrelevant, rate is unused.
+        let rate = if time > 0.0 { -df.ln() / time } else { 0.0 };
+        Ok(Self::new(spot, strike, barrier, time, rate, div_yield, vol))
     }
 }
 
@@ -319,12 +332,44 @@ fn barrier_helper_zero_vol(
     }
 }
 
+/// Validate that the price-like barrier inputs are strictly positive finite
+/// numbers.
+///
+/// `spot`, `strike` and `barrier` all flow into `ln(...)` terms; a non-positive
+/// or non-finite value would produce a `NaN` price. Release builds previously
+/// only had a `debug_assert` here, so such corrupt inputs silently yielded a
+/// `NaN` with no diagnostic. This returns an explicit validation error instead.
+fn validate_barrier_inputs(spot: f64, strike: f64, barrier: f64) -> finstack_core::Result<()> {
+    if !spot.is_finite() || spot <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "barrier pricing requires a strictly positive finite spot, got {spot}"
+        )));
+    }
+    if !strike.is_finite() || strike <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "barrier pricing requires a strictly positive finite strike, got {strike}"
+        )));
+    }
+    if !barrier.is_finite() || barrier <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "barrier pricing requires a strictly positive finite barrier, got {barrier}"
+        )));
+    }
+    Ok(())
+}
+
 /// Helper function for barrier pricing.
+///
+/// # Errors
+///
+/// Returns a [`finstack_core::Error::Validation`] when `spot`, `strike` or
+/// `barrier` is not a strictly positive finite number (such inputs would feed a
+/// `NaN` into the `ln`-based Reiner-Rubinstein terms).
 fn barrier_helper(
     params: &BarrierParams,
     eta: f64, // 1 for call, -1 for put
     phi: f64, // 1 for up, -1 for down
-) -> f64 {
+) -> finstack_core::Result<f64> {
     let BarrierParams {
         spot,
         strike,
@@ -335,16 +380,14 @@ fn barrier_helper(
         vol,
     } = *params;
 
-    debug_assert!(spot > 0.0, "spot must be positive, got {spot}");
-    debug_assert!(strike > 0.0, "strike must be positive, got {strike}");
-    debug_assert!(barrier > 0.0, "barrier must be positive, got {barrier}");
+    validate_barrier_inputs(spot, strike, barrier)?;
 
     if time <= 0.0 {
-        return 0.0;
+        return Ok(0.0);
     }
 
     if vol <= 0.0 {
-        return barrier_helper_zero_vol(params, eta, phi);
+        return Ok(barrier_helper_zero_vol(params, eta, phi));
     }
 
     let mu = (rate - div_yield - 0.5 * vol * vol) / (vol * vol);
@@ -358,7 +401,7 @@ fn barrier_helper(
     let max_exponent = (2.0 * (mu + 1.0).abs() * log_barrier_spot.abs())
         .max(2.0 * mu.abs() * log_barrier_spot.abs());
     if !max_exponent.is_finite() || max_exponent > 700.0 {
-        return barrier_helper_zero_vol(params, eta, phi);
+        return Ok(barrier_helper_zero_vol(params, eta, phi));
     }
 
     // d1/d2 intentionally inline: Merton barrier x,x1,y,y1 terms — not d1/d2
@@ -414,7 +457,7 @@ fn barrier_helper(
     //
     // Notation: A = vanilla, B = vanilla capped at barrier, C = reflected term,
     //           D = reflected capped term.
-    if spot > barrier {
+    let knock_in = if spot > barrier {
         // DOWN barrier
         if is_call {
             if strike >= barrier {
@@ -440,7 +483,8 @@ fn barrier_helper(
         } else {
             a - b + d
         }
-    }
+    };
+    Ok(knock_in)
 }
 
 /// Calculate probability of hitting the barrier before T (Touch Probability).
@@ -570,6 +614,11 @@ pub fn barrier_rebate_continuous(
 }
 
 /// Price a continuous up-and-out call.
+///
+/// Returns a non-finite (`NaN`) sentinel — never a plausible finite price — if
+/// `spot`, `strike` or `barrier` is not strictly positive and finite. Such
+/// corrupt inputs cannot produce a meaningful barrier price; the `NaN` is
+/// rejected by downstream `is_finite()` guards rather than silently mispriced.
 pub fn up_out_call(
     spot: f64,
     strike: f64,
@@ -579,6 +628,9 @@ pub fn up_out_call(
     div_yield: f64,
     vol: f64,
 ) -> f64 {
+    if validate_barrier_inputs(spot, strike, barrier).is_err() {
+        return f64::NAN;
+    }
     if spot >= barrier {
         return 0.0; // Already knocked out
     }
@@ -589,12 +641,16 @@ pub fn up_out_call(
     let vanilla = vanilla_option_price(spot, strike, time, rate, div_yield, vol, 1.0);
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    let up_in = barrier_helper(&params, 1.0, 1.0);
-
-    (vanilla - up_in).max(0.0)
+    match barrier_helper(&params, 1.0, 1.0) {
+        Ok(up_in) => (vanilla - up_in).max(0.0),
+        Err(_) => f64::NAN,
+    }
 }
 
 /// Price a continuous up-and-in call.
+///
+/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
+/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
 pub fn up_in_call(
     spot: f64,
     strike: f64,
@@ -604,16 +660,22 @@ pub fn up_in_call(
     div_yield: f64,
     vol: f64,
 ) -> f64 {
+    if validate_barrier_inputs(spot, strike, barrier).is_err() {
+        return f64::NAN;
+    }
     if spot >= barrier {
         // Already knocked in, price as vanilla
         return vanilla_option_price(spot, strike, time, rate, div_yield, vol, 1.0);
     }
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    barrier_helper(&params, 1.0, 1.0)
+    barrier_helper(&params, 1.0, 1.0).unwrap_or(f64::NAN)
 }
 
 /// Price a continuous down-and-out call.
+///
+/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
+/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
 pub fn down_out_call(
     spot: f64,
     strike: f64,
@@ -623,6 +685,9 @@ pub fn down_out_call(
     div_yield: f64,
     vol: f64,
 ) -> f64 {
+    if validate_barrier_inputs(spot, strike, barrier).is_err() {
+        return f64::NAN;
+    }
     if spot <= barrier {
         return 0.0; // Already knocked out
     }
@@ -632,12 +697,16 @@ pub fn down_out_call(
     let vanilla = vanilla_option_price(spot, strike, time, rate, div_yield, vol, 1.0);
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    let down_in = barrier_helper(&params, 1.0, -1.0);
-
-    (vanilla - down_in).max(0.0)
+    match barrier_helper(&params, 1.0, -1.0) {
+        Ok(down_in) => (vanilla - down_in).max(0.0),
+        Err(_) => f64::NAN,
+    }
 }
 
 /// Price a continuous down-and-in call.
+///
+/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
+/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
 pub fn down_in_call(
     spot: f64,
     strike: f64,
@@ -647,13 +716,16 @@ pub fn down_in_call(
     div_yield: f64,
     vol: f64,
 ) -> f64 {
+    if validate_barrier_inputs(spot, strike, barrier).is_err() {
+        return f64::NAN;
+    }
     if spot <= barrier {
         // Already knocked in, price as vanilla
         return vanilla_option_price(spot, strike, time, rate, div_yield, vol, 1.0);
     }
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    barrier_helper(&params, 1.0, -1.0)
+    barrier_helper(&params, 1.0, -1.0).unwrap_or(f64::NAN)
 }
 
 /// Generic barrier call price dispatcher.
@@ -676,6 +748,9 @@ pub fn barrier_call_continuous(params: &BarrierParams, barrier_type: BarrierType
 }
 
 /// Price a continuous down-and-in put.
+///
+/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
+/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
 pub fn down_in_put(
     spot: f64,
     strike: f64,
@@ -685,16 +760,22 @@ pub fn down_in_put(
     div_yield: f64,
     vol: f64,
 ) -> f64 {
+    if validate_barrier_inputs(spot, strike, barrier).is_err() {
+        return f64::NAN;
+    }
     if spot <= barrier {
         // Already knocked in, price as vanilla put
         return vanilla_option_price(spot, strike, time, rate, div_yield, vol, -1.0);
     }
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    barrier_helper(&params, -1.0, -1.0)
+    barrier_helper(&params, -1.0, -1.0).unwrap_or(f64::NAN)
 }
 
 /// Price a continuous down-and-out put.
+///
+/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
+/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
 pub fn down_out_put(
     spot: f64,
     strike: f64,
@@ -704,6 +785,9 @@ pub fn down_out_put(
     div_yield: f64,
     vol: f64,
 ) -> f64 {
+    if validate_barrier_inputs(spot, strike, barrier).is_err() {
+        return f64::NAN;
+    }
     if spot <= barrier {
         return 0.0; // Already knocked out
     }
@@ -713,12 +797,16 @@ pub fn down_out_put(
     let vanilla = vanilla_option_price(spot, strike, time, rate, div_yield, vol, -1.0);
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    let down_in = barrier_helper(&params, -1.0, -1.0);
-
-    (vanilla - down_in).max(0.0)
+    match barrier_helper(&params, -1.0, -1.0) {
+        Ok(down_in) => (vanilla - down_in).max(0.0),
+        Err(_) => f64::NAN,
+    }
 }
 
 /// Price a continuous up-and-in put.
+///
+/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
+/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
 pub fn up_in_put(
     spot: f64,
     strike: f64,
@@ -728,16 +816,22 @@ pub fn up_in_put(
     div_yield: f64,
     vol: f64,
 ) -> f64 {
+    if validate_barrier_inputs(spot, strike, barrier).is_err() {
+        return f64::NAN;
+    }
     if spot >= barrier {
         // Already knocked in, price as vanilla put
         return vanilla_option_price(spot, strike, time, rate, div_yield, vol, -1.0);
     }
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    barrier_helper(&params, -1.0, 1.0)
+    barrier_helper(&params, -1.0, 1.0).unwrap_or(f64::NAN)
 }
 
 /// Price a continuous up-and-out put.
+///
+/// Returns a non-finite (`NaN`) sentinel for non-positive / non-finite
+/// `spot`/`strike`/`barrier` (see [`up_out_call`]).
 pub fn up_out_put(
     spot: f64,
     strike: f64,
@@ -747,6 +841,9 @@ pub fn up_out_put(
     div_yield: f64,
     vol: f64,
 ) -> f64 {
+    if validate_barrier_inputs(spot, strike, barrier).is_err() {
+        return f64::NAN;
+    }
     if spot >= barrier {
         return 0.0; // Already knocked out
     }
@@ -756,9 +853,10 @@ pub fn up_out_put(
     let vanilla = vanilla_option_price(spot, strike, time, rate, div_yield, vol, -1.0);
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-    let up_in = barrier_helper(&params, -1.0, 1.0);
-
-    (vanilla - up_in).max(0.0)
+    match barrier_helper(&params, -1.0, 1.0) {
+        Ok(up_in) => (vanilla - up_in).max(0.0),
+        Err(_) => f64::NAN,
+    }
 }
 
 /// Generic barrier put price dispatcher.
@@ -912,7 +1010,8 @@ mod tests {
             };
 
             let p_rate = BarrierParams::new(spot, strike, b, time, rate, div_yield, vol);
-            let p_df = BarrierParams::with_df(spot, strike, b, time, df, div_yield, vol);
+            let p_df = BarrierParams::with_df(spot, strike, b, time, df, div_yield, vol)
+                .expect("positive df constructs");
             let price_rate = barrier_call_continuous(&p_rate, barrier_type);
             let price_df = barrier_call_continuous(&p_df, barrier_type);
 
@@ -950,7 +1049,8 @@ mod tests {
             };
 
             let p_rate = BarrierParams::new(spot, strike, b, time, rate, div_yield, vol);
-            let p_df = BarrierParams::with_df(spot, strike, b, time, df, div_yield, vol);
+            let p_df = BarrierParams::with_df(spot, strike, b, time, df, div_yield, vol)
+                .expect("positive df constructs");
             let price_rate = barrier_put_continuous(&p_rate, barrier_type);
             let price_df = barrier_put_continuous(&p_df, barrier_type);
 
@@ -990,7 +1090,8 @@ mod tests {
             // barrier_rebate_continuous does not use strike; pass barrier as a
             // convention-preserving sentinel.
             let p_rate = BarrierParams::new(spot, b, b, time, rate, div_yield, vol);
-            let p_df = BarrierParams::with_df(spot, b, b, time, df, div_yield, vol);
+            let p_df = BarrierParams::with_df(spot, b, b, time, df, div_yield, vol)
+                .expect("positive df constructs");
             let price_rate = barrier_rebate_continuous(&p_rate, rebate, barrier_type);
             let price_df = barrier_rebate_continuous(&p_df, rebate, barrier_type);
 
@@ -1815,7 +1916,8 @@ mod tests {
     fn test_rebate_is_not_discounted_after_expiry() {
         let p_rate = BarrierParams::new(130.0, 120.0, 120.0, -0.25, 0.05, 0.0, 0.2);
         let rate_rebate = barrier_rebate_continuous(&p_rate, 5.0, BarrierType::UpOut);
-        let p_df = BarrierParams::with_df(130.0, 120.0, 120.0, -0.25, 0.95, 0.0, 0.2);
+        let p_df = BarrierParams::with_df(130.0, 120.0, 120.0, -0.25, 0.95, 0.0, 0.2)
+            .expect("positive df is valid");
         let df_rebate = barrier_rebate_continuous(&p_df, 5.0, BarrierType::UpOut);
 
         assert_eq!(
@@ -1826,5 +1928,74 @@ mod tests {
             df_rebate, 5.0,
             "df-first rebate should match the same expired settlement convention"
         );
+    }
+
+    /// Audit item 1: `BarrierParams::with_df` previously coerced a non-positive
+    /// discount factor (corrupt / inverted curve) to `rate = 0.0`, silently
+    /// mispricing the barrier rather than surfacing the bad input.
+    ///
+    /// Failure mode locked in: `df <= 0` must produce a validation `Err`, not a
+    /// `BarrierParams` carrying a fabricated zero rate.
+    #[test]
+    fn with_df_rejects_non_positive_discount_factor() {
+        assert!(
+            BarrierParams::with_df(100.0, 100.0, 120.0, 1.0, 0.0, 0.02, 0.2).is_err(),
+            "df == 0 must be rejected, not coerced to rate=0"
+        );
+        assert!(
+            BarrierParams::with_df(100.0, 100.0, 120.0, 1.0, -0.5, 0.02, 0.2).is_err(),
+            "negative df (inverted curve) must be rejected, not coerced to rate=0"
+        );
+        // A NaN discount factor is also unrepresentable as a rate.
+        assert!(
+            BarrierParams::with_df(100.0, 100.0, 120.0, 1.0, f64::NAN, 0.02, 0.2).is_err(),
+            "non-finite df must be rejected"
+        );
+        // Positive df still constructs successfully.
+        assert!(
+            BarrierParams::with_df(100.0, 100.0, 120.0, 1.0, 0.95, 0.02, 0.2).is_ok(),
+            "positive df must still construct"
+        );
+    }
+
+    /// Audit item 2: barrier inputs (spot/strike/barrier) were validated only by
+    /// `debug_assert`, so release builds fed a non-positive spot/strike/barrier
+    /// straight into `.ln()` and produced a silent NaN price with no diagnostic.
+    ///
+    /// Failure mode locked in: non-positive spot/strike/barrier must NOT yield a
+    /// plausible finite price — `barrier_helper` returns `Err`, and the public
+    /// wrappers surface a non-finite (NaN) sentinel rather than a quiet number.
+    #[test]
+    fn barrier_helper_rejects_non_positive_market_inputs() {
+        // Non-positive spot.
+        let bad_spot = BarrierParams::new(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2);
+        assert!(barrier_helper(&bad_spot, 1.0, -1.0).is_err());
+        // Non-positive strike.
+        let bad_strike = BarrierParams::new(100.0, 0.0, 90.0, 1.0, 0.05, 0.02, 0.2);
+        assert!(barrier_helper(&bad_strike, 1.0, -1.0).is_err());
+        // Non-positive barrier.
+        let bad_barrier = BarrierParams::new(100.0, 100.0, -90.0, 1.0, 0.05, 0.02, 0.2);
+        assert!(barrier_helper(&bad_barrier, 1.0, -1.0).is_err());
+        // Valid inputs still succeed.
+        let good = BarrierParams::new(100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2);
+        assert!(barrier_helper(&good, 1.0, -1.0).is_ok());
+    }
+
+    /// Audit item 2: the public barrier wrappers must not return a plausible
+    /// finite price for a corrupt non-positive spot/strike/barrier. They surface
+    /// a non-finite value (NaN) — a loud poison that downstream `is_finite()`
+    /// checks reject — instead of the previous silent release-build NaN with no
+    /// validation path at all.
+    #[test]
+    fn public_wrappers_do_not_return_finite_price_for_non_positive_inputs() {
+        // Negative spot through every call/put wrapper.
+        assert!(!down_out_call(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2).is_finite());
+        assert!(!down_in_call(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2).is_finite());
+        assert!(!up_out_call(100.0, 100.0, -120.0, 1.0, 0.05, 0.02, 0.2).is_finite());
+        assert!(!up_in_call(100.0, 0.0, 120.0, 1.0, 0.05, 0.02, 0.2).is_finite());
+        assert!(!down_out_put(100.0, -100.0, 90.0, 1.0, 0.05, 0.02, 0.2).is_finite());
+        assert!(!down_in_put(-100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.2).is_finite());
+        assert!(!up_out_put(100.0, 100.0, -120.0, 1.0, 0.05, 0.02, 0.2).is_finite());
+        assert!(!up_in_put(0.0, 100.0, 120.0, 1.0, 0.05, 0.02, 0.2).is_finite());
     }
 }

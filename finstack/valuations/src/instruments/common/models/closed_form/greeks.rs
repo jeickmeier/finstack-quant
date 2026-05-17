@@ -353,7 +353,13 @@ pub fn bs_gamma(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vo
 /// ```
 #[must_use]
 pub fn bs_vega(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vol: f64) -> f64 {
-    if time <= 0.0 {
+    // At expiry, or at zero/negative volatility, the option value is the
+    // deterministic intrinsic — it carries no volatility sensitivity, so vega
+    // is exactly 0. The `vol <= 0` guard is required because `d1_d2` returns a
+    // finite `d1 = 0` for an ATM option at `σ = 0`, and `norm_pdf(0) ≈ 0.399`
+    // would otherwise yield a spurious non-zero vega. This mirrors the
+    // `vol <= 0` guard already present in `bs_gamma`.
+    if time <= 0.0 || vol <= 0.0 {
         return 0.0;
     }
 
@@ -490,7 +496,14 @@ pub fn bs_call_greeks(
     } else {
         exp_q_t * pdf_d1 / (spot * vol * sqrt_t)
     };
-    let vega = 0.01 * spot * exp_q_t * sqrt_t * pdf_d1;
+    // `vol <= 0` guard: at zero vol the value is deterministic intrinsic with no
+    // volatility sensitivity, and `norm_pdf(d1)` at the ATM `d1 = 0` limit is
+    // non-zero, so vega must be explicitly zeroed (consistent with `bs_vega`).
+    let vega = if vol <= 0.0 {
+        0.0
+    } else {
+        0.01 * spot * exp_q_t * sqrt_t * pdf_d1
+    };
     let theta = {
         let term1 = -spot * pdf_d1 * vol * exp_q_t / (2.0 * sqrt_t);
         let term2 = -rate * strike * exp_r_t * cdf_d2;
@@ -548,7 +561,12 @@ pub fn bs_put_greeks(
     } else {
         exp_q_t * pdf_d1 / (spot * vol * sqrt_t)
     };
-    let vega = 0.01 * spot * exp_q_t * sqrt_t * pdf_d1;
+    // `vol <= 0` guard: see `bs_call_greeks` — vega is zero at zero volatility.
+    let vega = if vol <= 0.0 {
+        0.0
+    } else {
+        0.01 * spot * exp_q_t * sqrt_t * pdf_d1
+    };
     let theta = {
         let term1 = -spot * pdf_d1 * vol * exp_q_t / (2.0 * sqrt_t);
         let term2 = rate * strike * exp_r_t * cdf_m_d2;
@@ -658,6 +676,36 @@ mod tests {
 
         assert!(near_call_theta < far_call_theta);
         assert!(far_vega > near_vega);
+    }
+
+    /// Audit item 8: `bs_vega` returned a spurious non-zero vega for an exactly
+    /// `σ = 0` ATM option.
+    ///
+    /// Failure mode: with `σ = 0` the `d1_d2` helper returns `(0, 0)` for an ATM
+    /// option (spot == strike), and `norm_pdf(0) ≈ 0.399` is non-zero, so
+    /// `bs_vega` produced `0.01·S·e^(-qT)·√T·0.399 > 0`. At zero volatility the
+    /// option value is deterministic intrinsic — it has no volatility
+    /// sensitivity — so vega must be exactly `0`.
+    #[test]
+    fn bs_vega_is_zero_for_zero_sigma() {
+        // Exactly-ATM, zero vol: the failure case from the audit.
+        let v_atm = bs_vega(100.0, 100.0, 1.0, 0.05, 0.02, 0.0);
+        assert_eq!(v_atm, 0.0, "σ=0 ATM vega must be 0, got {v_atm}");
+
+        // The guard must be consistent across moneyness, not just ATM.
+        assert_eq!(bs_vega(100.0, 90.0, 1.0, 0.05, 0.02, 0.0), 0.0);
+        assert_eq!(bs_vega(100.0, 110.0, 1.0, 0.05, 0.02, 0.0), 0.0);
+        // Negative vol is also non-physical and must be guarded.
+        assert_eq!(bs_vega(100.0, 100.0, 1.0, 0.05, 0.02, -0.1), 0.0);
+
+        // The aggregator vega must apply the same guard.
+        let call = bs_call_greeks(100.0, 100.0, 1.0, 0.05, 0.02, 0.0);
+        let put = bs_put_greeks(100.0, 100.0, 1.0, 0.05, 0.02, 0.0);
+        assert_eq!(call.vega, 0.0, "σ=0 call aggregator vega must be 0");
+        assert_eq!(put.vega, 0.0, "σ=0 put aggregator vega must be 0");
+
+        // Positive vol still yields a strictly positive vega (no over-zealous guard).
+        assert!(bs_vega(100.0, 100.0, 1.0, 0.05, 0.02, 0.2) > 0.0);
     }
 
     #[test]

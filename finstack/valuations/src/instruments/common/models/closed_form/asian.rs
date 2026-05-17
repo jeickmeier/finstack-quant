@@ -154,6 +154,24 @@
 
 use finstack_core::math::special_functions::norm_cdf;
 use finstack_core::math::NeumaierAccumulator;
+use finstack_core::Result;
+
+/// Validate a discount factor supplied to a DF-first Asian pricer.
+///
+/// A discount factor must be strictly positive and finite. A non-positive
+/// `df` implies a corrupt or inverted curve; deriving `rate = -ln(df)/t` from
+/// it is undefined. Coercing such a `df` to `rate = 0.0` (the previous
+/// behaviour) silently mispriced the option, so this rejects it outright.
+#[inline]
+fn validate_discount_factor(df: f64) -> Result<()> {
+    if !df.is_finite() || df <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "Asian DF-first pricer requires a strictly positive finite discount \
+             factor (corrupt/inverted curve otherwise), got df={df}"
+        )));
+    }
+    Ok(())
+}
 
 /// Pricing result for Asian options.
 #[derive(Debug, Clone, Copy)]
@@ -214,8 +232,10 @@ pub fn geometric_asian_call(
     vol: f64,
     num_fixings: usize,
 ) -> f64 {
+    // `df` is derived from a finite `rate`, so it is always strictly positive;
+    // call the shared infallible core directly (no `df` validation needed).
     let df = (-rate * time).exp();
-    geometric_asian_call_df(spot, strike, time, df, div_yield, vol, num_fixings)
+    geometric_asian_call_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
 }
 
 /// Price a geometric Asian call with explicit discount factor (DF-first API).
@@ -224,6 +244,11 @@ pub fn geometric_asian_call(
 /// date-based curve lookup). Derives `r_eff = -ln(df)/t` internally.
 ///
 /// See [`geometric_asian_call`] for formula details.
+///
+/// # Errors
+///
+/// Returns a [`finstack_core::Error::Validation`] when `df` is not a strictly
+/// positive finite number (corrupt or inverted curve).
 pub fn geometric_asian_call_df(
     spot: f64,
     strike: f64,
@@ -232,17 +257,43 @@ pub fn geometric_asian_call_df(
     div_yield: f64,
     vol: f64,
     num_fixings: usize,
+) -> Result<f64> {
+    if time <= 0.0 {
+        return Ok((spot - strike).max(0.0));
+    }
+    validate_discount_factor(df)?;
+    // Derive rate from DF (df validated strictly positive above).
+    let rate = -df.ln() / time;
+    Ok(geometric_asian_call_core(
+        spot,
+        strike,
+        time,
+        rate,
+        df,
+        div_yield,
+        vol,
+        num_fixings,
+    ))
+}
+
+/// Shared infallible core for the geometric Asian call.
+///
+/// `rate` and `df` are assumed consistent (`df = exp(-rate·time)`); callers
+/// derive them from each other, having already validated `df > 0`.
+#[allow(clippy::too_many_arguments)]
+fn geometric_asian_call_core(
+    spot: f64,
+    strike: f64,
+    time: f64,
+    rate: f64,
+    df: f64,
+    div_yield: f64,
+    vol: f64,
+    num_fixings: usize,
 ) -> f64 {
     if time <= 0.0 {
         return (spot - strike).max(0.0);
     }
-
-    // Derive rate from DF
-    let rate = if time > 0.0 && df > 0.0 {
-        -df.ln() / time
-    } else {
-        0.0
-    };
 
     // Zero-vol degenerate case: the geometric average is deterministic, so the
     // option is worth the discounted forward intrinsic. Guarding here avoids
@@ -303,7 +354,7 @@ pub fn geometric_asian_put(
     num_fixings: usize,
 ) -> f64 {
     let df = (-rate * time).exp();
-    geometric_asian_put_df(spot, strike, time, df, div_yield, vol, num_fixings)
+    geometric_asian_put_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
 }
 
 /// Price a geometric Asian put with explicit discount factor (DF-first API).
@@ -312,10 +363,45 @@ pub fn geometric_asian_put(
 /// date-based curve lookup). Derives `r_eff = -ln(df)/t` internally.
 ///
 /// See [`geometric_asian_call`] for formula details.
+///
+/// # Errors
+///
+/// Returns a [`finstack_core::Error::Validation`] when `df` is not a strictly
+/// positive finite number (corrupt or inverted curve).
 pub fn geometric_asian_put_df(
     spot: f64,
     strike: f64,
     time: f64,
+    df: f64,
+    div_yield: f64,
+    vol: f64,
+    num_fixings: usize,
+) -> Result<f64> {
+    if time <= 0.0 {
+        return Ok((strike - spot).max(0.0));
+    }
+    validate_discount_factor(df)?;
+    let rate = -df.ln() / time;
+    Ok(geometric_asian_put_core(
+        spot,
+        strike,
+        time,
+        rate,
+        df,
+        div_yield,
+        vol,
+        num_fixings,
+    ))
+}
+
+/// Shared infallible core for the geometric Asian put. See
+/// [`geometric_asian_call_core`] for the `rate`/`df` consistency contract.
+#[allow(clippy::too_many_arguments)]
+fn geometric_asian_put_core(
+    spot: f64,
+    strike: f64,
+    time: f64,
+    rate: f64,
     df: f64,
     div_yield: f64,
     vol: f64,
@@ -325,14 +411,7 @@ pub fn geometric_asian_put_df(
         return (strike - spot).max(0.0);
     }
 
-    // Derive rate from DF
-    let rate = if time > 0.0 && df > 0.0 {
-        -df.ln() / time
-    } else {
-        0.0
-    };
-
-    // Zero-vol degenerate: see `geometric_asian_call_df` for rationale.
+    // Zero-vol degenerate: see `geometric_asian_call_core` for rationale.
     if vol <= 0.0 {
         return df
             * (strike - deterministic_geometric_forward(spot, time, rate, div_yield, num_fixings))
@@ -405,7 +484,7 @@ pub fn arithmetic_asian_call_tw(
     num_fixings: usize,
 ) -> f64 {
     let df = (-rate * time).exp();
-    arithmetic_asian_call_tw_df(spot, strike, time, df, div_yield, vol, num_fixings)
+    arithmetic_asian_call_tw_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
 }
 
 /// Price an arithmetic Asian call with explicit discount factor (DF-first API).
@@ -415,10 +494,48 @@ pub fn arithmetic_asian_call_tw(
 /// calculations that require a rate.
 ///
 /// See [`arithmetic_asian_call_tw`] for formula details.
+///
+/// # Errors
+///
+/// Returns a [`finstack_core::Error::Validation`] when `df` is not a strictly
+/// positive finite number (corrupt or inverted curve).
 pub fn arithmetic_asian_call_tw_df(
     spot: f64,
     strike: f64,
     time: f64,
+    df: f64,
+    div_yield: f64,
+    vol: f64,
+    num_fixings: usize,
+) -> Result<f64> {
+    if time <= 0.0 {
+        return Ok((spot - strike).max(0.0));
+    }
+    if num_fixings == 0 {
+        return Ok(0.0); // Need at least one fixing
+    }
+    validate_discount_factor(df)?;
+    let rate = -df.ln() / time;
+    Ok(arithmetic_asian_call_tw_core(
+        spot,
+        strike,
+        time,
+        rate,
+        df,
+        div_yield,
+        vol,
+        num_fixings,
+    ))
+}
+
+/// Shared infallible core for the Turnbull-Wakeman arithmetic Asian call. See
+/// [`geometric_asian_call_core`] for the `rate`/`df` consistency contract.
+#[allow(clippy::too_many_arguments)]
+fn arithmetic_asian_call_tw_core(
+    spot: f64,
+    strike: f64,
+    time: f64,
+    rate: f64,
     df: f64,
     div_yield: f64,
     vol: f64,
@@ -430,13 +547,6 @@ pub fn arithmetic_asian_call_tw_df(
     if num_fixings == 0 {
         return 0.0; // Need at least one fixing
     }
-
-    // Derive rate from DF for moment calculations
-    let rate = if time > 0.0 && df > 0.0 {
-        -df.ln() / time
-    } else {
-        0.0
-    };
 
     // Zero-vol degenerate: arithmetic average is deterministic, so the option
     // is the discounted forward intrinsic. The downstream `m2 <= m1*m1` guard
@@ -454,6 +564,13 @@ pub fn arithmetic_asian_call_tw_df(
     // Compute second moment: E[A²]
     let m2 = compute_arithmetic_mean_second_moment(spot, time, rate, div_yield, vol, num_fixings);
 
+    // No-arbitrage upper bound: an arithmetic-average call cannot be worth more
+    // than the discounted expected average `df * m1` (a call struck at 0 — i.e.
+    // the forward-average claim paid with certainty). The Turnbull-Wakeman
+    // lognormal moment-matching is only an approximation and can overshoot this
+    // bound for deep-ITM / high-vol inputs, so every return path is capped.
+    let upper_bound = df * m1;
+
     // Match to lognormal distribution
     // For X ~ LogNormal(μ*, σ*²):
     // - E[X] = m1 = exp(μ* + σ*²/2)
@@ -462,13 +579,13 @@ pub fn arithmetic_asian_call_tw_df(
 
     if m2 <= m1 * m1 {
         // Degenerate case (no variance): treat as forward, price = df * max(m1 - K, 0)
-        return df * (m1 - strike).max(0.0);
+        return (df * (m1 - strike).max(0.0)).min(upper_bound);
     }
 
     let var = (m2 / (m1 * m1)).ln();
     if var <= 0.0 {
         // Degenerate case (numerical issues): same treatment
-        return df * (m1 - strike).max(0.0);
+        return (df * (m1 - strike).max(0.0)).min(upper_bound);
     }
 
     let sigma_star = var.sqrt();
@@ -483,10 +600,10 @@ pub fn arithmetic_asian_call_tw_df(
     let d1 = (mu_star - strike.ln() + var) / sigma_star;
     let d2 = d1 - sigma_star;
 
-    // Price = df * (m1 * N(d1) - K * N(d2))
+    // Price = df * (m1 * N(d1) - K * N(d2)), floored at 0 and capped at df*m1.
     let call_price = df * (m1 * norm_cdf(d1) - strike * norm_cdf(d2));
 
-    call_price.max(0.0)
+    call_price.max(0.0).min(upper_bound)
 }
 
 /// Price an arithmetic average Asian put option using Turnbull-Wakeman approximation.
@@ -502,7 +619,7 @@ pub fn arithmetic_asian_put_tw(
     num_fixings: usize,
 ) -> f64 {
     let df = (-rate * time).exp();
-    arithmetic_asian_put_tw_df(spot, strike, time, df, div_yield, vol, num_fixings)
+    arithmetic_asian_put_tw_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
 }
 
 /// Price an arithmetic Asian put with explicit discount factor (DF-first API).
@@ -512,10 +629,48 @@ pub fn arithmetic_asian_put_tw(
 /// calculations that require a rate.
 ///
 /// See [`arithmetic_asian_call_tw`] for formula details.
+///
+/// # Errors
+///
+/// Returns a [`finstack_core::Error::Validation`] when `df` is not a strictly
+/// positive finite number (corrupt or inverted curve).
 pub fn arithmetic_asian_put_tw_df(
     spot: f64,
     strike: f64,
     time: f64,
+    df: f64,
+    div_yield: f64,
+    vol: f64,
+    num_fixings: usize,
+) -> Result<f64> {
+    if time <= 0.0 {
+        return Ok((strike - spot).max(0.0));
+    }
+    if num_fixings == 0 {
+        return Ok(0.0);
+    }
+    validate_discount_factor(df)?;
+    let rate = -df.ln() / time;
+    Ok(arithmetic_asian_put_tw_core(
+        spot,
+        strike,
+        time,
+        rate,
+        df,
+        div_yield,
+        vol,
+        num_fixings,
+    ))
+}
+
+/// Shared infallible core for the Turnbull-Wakeman arithmetic Asian put. See
+/// [`geometric_asian_call_core`] for the `rate`/`df` consistency contract.
+#[allow(clippy::too_many_arguments)]
+fn arithmetic_asian_put_tw_core(
+    spot: f64,
+    strike: f64,
+    time: f64,
+    rate: f64,
     df: f64,
     div_yield: f64,
     vol: f64,
@@ -528,17 +683,17 @@ pub fn arithmetic_asian_put_tw_df(
         return 0.0;
     }
 
-    // Derive rate from DF for moment calculations
-    let rate = if time > 0.0 && df > 0.0 {
-        -df.ln() / time
-    } else {
-        0.0
-    };
+    // No-arbitrage upper bound: an arithmetic-average put pays max(K - A, 0),
+    // which is at most K (the average A is non-negative), so the put is worth
+    // at most the discounted strike `df * K`. The Turnbull-Wakeman lognormal
+    // moment-matching is only an approximation and can overshoot this bound, so
+    // every return path is capped.
+    let upper_bound = df * strike;
 
-    // Zero-vol degenerate: see `arithmetic_asian_call_tw_df` for rationale.
+    // Zero-vol degenerate: see `arithmetic_asian_call_tw_core` for rationale.
     if vol <= 0.0 {
         let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
-        return df * (strike - m1).max(0.0);
+        return (df * (strike - m1).max(0.0)).min(upper_bound);
     }
 
     let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
@@ -546,12 +701,12 @@ pub fn arithmetic_asian_put_tw_df(
 
     if m2 <= m1 * m1 {
         // Degenerate case: df * max(K - m1, 0)
-        return df * (strike - m1).max(0.0);
+        return (df * (strike - m1).max(0.0)).min(upper_bound);
     }
 
     let var = (m2 / (m1 * m1)).ln();
     if var <= 0.0 {
-        return df * (strike - m1).max(0.0);
+        return (df * (strike - m1).max(0.0)).min(upper_bound);
     }
 
     let sigma_star = var.sqrt();
@@ -563,7 +718,7 @@ pub fn arithmetic_asian_put_tw_df(
 
     let put_price = df * (strike * norm_cdf(-d2) - m1 * norm_cdf(-d1));
 
-    put_price.max(0.0)
+    put_price.max(0.0).min(upper_bound)
 }
 
 /// Deterministic geometric average of `S * exp((r - q) t_i)` over discrete
@@ -806,7 +961,8 @@ mod tests {
 
         let price_rate =
             geometric_asian_call(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let price_df = geometric_asian_call_df(spot, strike, time, df, div_yield, vol, num_fixings);
+        let price_df = geometric_asian_call_df(spot, strike, time, df, div_yield, vol, num_fixings)
+            .expect("positive df");
 
         assert!(
             (price_rate - price_df).abs() < 1e-10,
@@ -830,7 +986,8 @@ mod tests {
         let price_rate =
             arithmetic_asian_call_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
         let price_df =
-            arithmetic_asian_call_tw_df(spot, strike, time, df, div_yield, vol, num_fixings);
+            arithmetic_asian_call_tw_df(spot, strike, time, df, div_yield, vol, num_fixings)
+                .expect("positive df");
 
         assert!(
             (price_rate - price_df).abs() < 1e-10,
@@ -854,8 +1011,8 @@ mod tests {
         // Geometric put
         let geo_put_rate =
             geometric_asian_put(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let geo_put_df =
-            geometric_asian_put_df(spot, strike, time, df, div_yield, vol, num_fixings);
+        let geo_put_df = geometric_asian_put_df(spot, strike, time, df, div_yield, vol, num_fixings)
+            .expect("positive df");
         assert!(
             (geo_put_rate - geo_put_df).abs() < 1e-10,
             "geo put rate {} vs df {}",
@@ -867,7 +1024,8 @@ mod tests {
         let arith_put_rate =
             arithmetic_asian_put_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
         let arith_put_df =
-            arithmetic_asian_put_tw_df(spot, strike, time, df, div_yield, vol, num_fixings);
+            arithmetic_asian_put_tw_df(spot, strike, time, df, div_yield, vol, num_fixings)
+                .expect("positive df");
         assert!(
             (arith_put_rate - arith_put_df).abs() < 1e-10,
             "arith put rate {} vs df {}",
@@ -1079,6 +1237,119 @@ mod tests {
             (1.0..10.0).contains(&var_ratio),
             "W-51 variance ratio out of range for {num_fixings} fixings: {var_ratio:.6}"
         );
+    }
+
+    /// Audit item 1: the `*_df` Asian helpers previously coerced a non-positive
+    /// discount factor (corrupt / inverted curve) to `rate = 0.0`, silently
+    /// mispricing rather than surfacing the bad input.
+    ///
+    /// Failure mode locked in: `df <= 0` (or non-finite) must produce a
+    /// validation `Err`, not a price computed from a fabricated zero rate.
+    #[test]
+    fn asian_df_helpers_reject_non_positive_discount_factor() {
+        for df in [0.0_f64, -0.5, f64::NAN, f64::INFINITY] {
+            assert!(
+                geometric_asian_call_df(100.0, 100.0, 1.0, df, 0.02, 0.2, 12).is_err(),
+                "geometric_asian_call_df must reject df={df}"
+            );
+            assert!(
+                geometric_asian_put_df(100.0, 100.0, 1.0, df, 0.02, 0.2, 12).is_err(),
+                "geometric_asian_put_df must reject df={df}"
+            );
+            assert!(
+                arithmetic_asian_call_tw_df(100.0, 100.0, 1.0, df, 0.02, 0.2, 12).is_err(),
+                "arithmetic_asian_call_tw_df must reject df={df}"
+            );
+            assert!(
+                arithmetic_asian_put_tw_df(100.0, 100.0, 1.0, df, 0.02, 0.2, 12).is_err(),
+                "arithmetic_asian_put_tw_df must reject df={df}"
+            );
+        }
+        // Positive df still prices successfully.
+        assert!(geometric_asian_call_df(100.0, 100.0, 1.0, 0.95, 0.02, 0.2, 12).is_ok());
+        assert!(arithmetic_asian_call_tw_df(100.0, 100.0, 1.0, 0.95, 0.02, 0.2, 12).is_ok());
+    }
+
+    /// Audit item 3: the Turnbull-Wakeman arithmetic-Asian price had only a
+    /// `.max(0.0)` floor and no no-arbitrage upper cap. A call cannot be worth
+    /// more than the discounted expected average `df * m1` (the price of the
+    /// average paid with certainty); the lognormal moment-matching approximation
+    /// can violate this for deep-ITM / high-vol inputs.
+    ///
+    /// Failure mode locked in: the TW call price must never exceed `df * m1`,
+    /// and the put must never exceed `df * K`.
+    #[test]
+    fn tw_arithmetic_call_respects_no_arbitrage_upper_bound() {
+        // Deep-ITM + high vol — the regime where the lognormal approximation is
+        // most prone to overshoot the discounted forward-average value.
+        let spot = 100.0_f64;
+        let time = 2.0_f64;
+        let rate = 0.05_f64;
+        let div_yield = 0.0_f64;
+        let df = (-rate * time).exp();
+
+        for &strike in &[10.0, 25.0, 40.0, 50.0] {
+            for &vol in &[0.6, 0.9, 1.2, 1.5] {
+                for &num_fixings in &[4_usize, 12, 52] {
+                    let m1 = compute_arithmetic_mean_first_moment(
+                        spot,
+                        time,
+                        rate,
+                        div_yield,
+                        num_fixings,
+                    );
+                    let upper = df * m1;
+                    let call = arithmetic_asian_call_tw(
+                        spot,
+                        strike,
+                        time,
+                        rate,
+                        div_yield,
+                        vol,
+                        num_fixings,
+                    );
+                    // Allow a tiny relative slack for f64 rounding only.
+                    assert!(
+                        call <= upper * (1.0 + 1e-12),
+                        "TW call {call} exceeds no-arbitrage cap df*m1={upper} \
+                         (K={strike}, vol={vol}, n={num_fixings})"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Audit item 3 (put analogue): a put cannot be worth more than the
+    /// discounted strike `df * K` (paid only when the average is zero).
+    #[test]
+    fn tw_arithmetic_put_respects_no_arbitrage_upper_bound() {
+        let spot = 100.0_f64;
+        let time = 2.0_f64;
+        let rate = 0.05_f64;
+        let div_yield = 0.08_f64; // strong negative drift pushes the average down
+        let df = (-rate * time).exp();
+
+        for &strike in &[100.0, 200.0, 400.0] {
+            for &vol in &[0.6, 0.9, 1.2, 1.5] {
+                for &num_fixings in &[4_usize, 12, 52] {
+                    let upper = df * strike;
+                    let put = arithmetic_asian_put_tw(
+                        spot,
+                        strike,
+                        time,
+                        rate,
+                        div_yield,
+                        vol,
+                        num_fixings,
+                    );
+                    assert!(
+                        put <= upper * (1.0 + 1e-12),
+                        "TW put {put} exceeds no-arbitrage cap df*K={upper} \
+                         (K={strike}, vol={vol}, n={num_fixings})"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

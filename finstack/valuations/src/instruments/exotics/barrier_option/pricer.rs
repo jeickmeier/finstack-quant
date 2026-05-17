@@ -514,7 +514,13 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         };
 
         let params =
-            BarrierParams::with_df(spot, barrier_opt.strike, effective_barrier, t, df, q, sigma);
+            BarrierParams::with_df(spot, barrier_opt.strike, effective_barrier, t, df, q, sigma)
+                .map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?;
         let price = match barrier_opt.option_type {
             crate::instruments::OptionType::Call => {
                 barrier_call_continuous(&params, analytical_barrier_type)
@@ -749,7 +755,8 @@ mod tests {
             .expect("year fraction");
         let df = (-rate * t).exp();
         let shifted_barrier = barrier * (-(BG_BETA * vol * monitoring_dt.sqrt())).exp();
-        let p = BarrierParams::with_df(spot, strike, shifted_barrier, t, df, div_yield, vol);
+        let p = BarrierParams::with_df(spot, strike, shifted_barrier, t, df, div_yield, vol)
+            .expect("positive df constructs");
         let expected = barrier_call_continuous(&p, AnalyticalBarrierType::DownOut);
 
         assert!((pv - expected).abs() < 1e-12);
@@ -897,7 +904,8 @@ mod tests {
             .year_fraction(as_of, expiry, DayCountContext::default())
             .expect("year fraction");
         let df = (-rate * t).exp();
-        let p = BarrierParams::with_df(spot, strike, barrier, t, df, div_yield, vol);
+        let p = BarrierParams::with_df(spot, strike, barrier, t, df, div_yield, vol)
+            .expect("positive df constructs");
         let expected = barrier_put_continuous(&p, AnalyticalBarrierType::UpOut);
 
         assert!((pv - expected).abs() < 1e-12);
