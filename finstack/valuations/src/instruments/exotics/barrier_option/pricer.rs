@@ -921,14 +921,24 @@ mod tests {
     /// Black-Scholes call price (norm_cdf via Horner rational approximation; max err < 7.5e-8).
     fn bs_call_price(spot: f64, strike: f64, t: f64, r: f64, q: f64, sigma: f64) -> f64 {
         fn n(x: f64) -> f64 {
-            if x < -8.0 { return 0.0; }
-            if x > 8.0 { return 1.0; }
+            if x < -8.0 {
+                return 0.0;
+            }
+            if x > 8.0 {
+                return 1.0;
+            }
             let tt = 1.0 / (1.0 + 0.2316419 * x.abs());
-            let poly = tt * (0.319_381_53 + tt * (-0.356_563_782 + tt * (1.781_477_937
-                + tt * (-1.821_255_978 + tt * 1.330_274_429))));
+            let poly = tt
+                * (0.319_381_53
+                    + tt * (-0.356_563_782
+                        + tt * (1.781_477_937 + tt * (-1.821_255_978 + tt * 1.330_274_429))));
             let phi = (-0.5 * x * x).exp() / (2.0 * std::f64::consts::PI).sqrt();
             let c = 1.0 - phi * poly;
-            if x >= 0.0 { c } else { 1.0 - c }
+            if x >= 0.0 {
+                c
+            } else {
+                1.0 - c
+            }
         }
         let d1 = ((spot / strike).ln() + (r - q + 0.5 * sigma * sigma) * t) / (sigma * t.sqrt());
         let d2 = d1 - sigma * t.sqrt();

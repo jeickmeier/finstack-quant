@@ -574,10 +574,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
     // The single-path NPV must be finite and in a plausible range
     // (within 20% of par for a 2-year 5%-coupon ABS near fair value).
     let npv = single_run_a.npv.amount();
-    assert!(
-        npv.is_finite(),
-        "single-path NPV must be finite, got {npv}"
-    );
+    assert!(npv.is_finite(), "single-path NPV must be finite, got {npv}");
     assert!(
         npv > 800_000.0 && npv < 1_200_000.0,
         "single-path NPV must be near par (800k–1200k), got {npv}"

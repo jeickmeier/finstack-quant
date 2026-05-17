@@ -66,7 +66,10 @@ fn build_market(vol: f64) -> MarketContext {
     MarketContext::new()
         .insert(disc)
         .insert_surface(surface)
-        .insert_price("EQ-SPOT", MarketScalar::Price(Money::new(SPOT, Currency::USD)))
+        .insert_price(
+            "EQ-SPOT",
+            MarketScalar::Price(Money::new(SPOT, Currency::USD)),
+        )
         .insert_price("EQ-DIV", MarketScalar::Unitless(DIV_YIELD))
 }
 
@@ -253,11 +256,7 @@ fn taylor_vol_factor_gamma_matches_full_revaluation() {
     eprintln!(
         "full_reval_pnl = {:.4}, explained = {:.4}, gamma_pnl = {:?}, \
          combined = {:.4}, vol_move_points = {:.4}",
-        full_reval_pnl,
-        explained,
-        gamma_pnl,
-        combined,
-        vol_factor.market_move,
+        full_reval_pnl, explained, gamma_pnl, combined, vol_factor.market_move,
     );
 
     // 1. gamma_pnl must be present and non-zero.

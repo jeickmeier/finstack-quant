@@ -15,7 +15,6 @@
 
 mod bond_attribution;
 mod carry_credit_factor;
-mod vol_factor_attribution;
 mod credit_factor_linear;
 mod credit_factor_waterfall_parallel;
 mod factors_snapshot;
@@ -30,3 +29,4 @@ mod scalars_attribution;
 mod serialization_roundtrip;
 mod spec_tests;
 mod types_pnl;
+mod vol_factor_attribution;

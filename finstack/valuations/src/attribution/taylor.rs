@@ -701,8 +701,7 @@ fn compute_vol_factor(
     //   vega_per_point [$/vol-point] = ΔPV / (2 × vol_bump_abs × 100)
     //   explained [$]               = vega_per_point × vol_move_points
     let vol_bump_points = config.vol_bump * 100.0; // convert bump to vol-point units
-    let vega_per_point =
-        (pv_up.amount() - pv_down.amount()) / (2.0 * vol_bump_points);
+    let vega_per_point = (pv_up.amount() - pv_down.amount()) / (2.0 * vol_bump_points);
 
     // vol_move is in vol points (percentage points of absolute vol).
     let vol_move =
