@@ -82,8 +82,19 @@ impl Grid1D {
         let a_range = a_max - a_min;
 
         if a_range.abs() < 1e-15 {
-            // Degenerate: center is outside domain or d is too large → uniform
-            return Self::uniform(x_min, x_max, n);
+            // Degenerate: the sinh parameter range has collapsed, so the
+            // mapping is effectively linear and the requested concentration
+            // near `center` is lost. This happens when `intensity` is so
+            // large that `d` dwarfs the domain width, or when `center` sits
+            // far outside the domain. Silently returning a uniform grid would
+            // hand back a grid with none of the requested strike resolution
+            // and no signal — so this is reported as an error instead.
+            return Err(PdeGridError::DegenerateConcentration {
+                intensity,
+                center,
+                x_min,
+                x_max,
+            });
         }
 
         let mut points = Vec::with_capacity(n);
@@ -260,6 +271,30 @@ pub enum PdeGridError {
         /// Reason it is invalid.
         reason: &'static str,
     },
+    /// A `sinh_concentrated` grid degenerated to (effectively) uniform.
+    ///
+    /// The sinh parameter range collapsed below numerical resolution, so the
+    /// transformation is effectively linear and the requested concentration
+    /// near `center` is entirely lost. This happens when `intensity` is so
+    /// large that the local scale dwarfs the domain width, or when `center`
+    /// lies far outside `[x_min, x_max]`. Use a smaller `intensity`, place
+    /// `center` inside the domain, or call [`Grid1D::uniform`] explicitly.
+    #[error(
+        "sinh_concentrated grid degenerated to uniform: intensity={intensity} with \
+         center={center} on domain [{x_min}, {x_max}] collapses the sinh range — \
+         the requested strike concentration is lost; use a smaller intensity, a \
+         center inside the domain, or Grid1D::uniform"
+    )]
+    DegenerateConcentration {
+        /// The `intensity` argument that produced the degenerate grid.
+        intensity: f64,
+        /// The `center` argument.
+        center: f64,
+        /// Lower domain bound.
+        x_min: f64,
+        /// Upper domain bound.
+        x_max: f64,
+    },
 }
 
 #[cfg(test)]
@@ -295,6 +330,58 @@ mod tests {
     #[test]
     fn from_points_rejects_unsorted() {
         assert!(Grid1D::from_points(vec![1.0, 0.5, 2.0]).is_err());
+    }
+
+    /// [P6-7] `sinh_concentrated` must **error** when the sinh parameter range
+    /// collapses, rather than silently returning a uniform grid that has none
+    /// of the requested strike concentration.
+    ///
+    /// An enormous `intensity` makes the local scale `d` dwarf the domain
+    /// width, collapsing `a_range` below `1e-15`. The old code silently
+    /// returned `Grid1D::uniform` here; the fix reports
+    /// [`PdeGridError::DegenerateConcentration`].
+    #[test]
+    fn sinh_concentrated_errors_on_degenerate_concentration() {
+        // intensity = 1e16 on a unit domain with a centred concentration
+        // point collapses the sinh range (a_range ≈ 1e-16 < 1e-15).
+        let result = Grid1D::sinh_concentrated(0.0, 1.0, 51, 0.5, 1e16);
+        match result {
+            Err(PdeGridError::DegenerateConcentration {
+                intensity,
+                center,
+                x_min,
+                x_max,
+            }) => {
+                assert!(
+                    (intensity - 1e16).abs() < 1.0,
+                    "the error must cite the offending intensity"
+                );
+                assert!(
+                    (center - 0.5).abs() < 1e-12
+                        && x_min.abs() < 1e-12
+                        && (x_max - 1.0).abs() < 1e-12,
+                    "the error must cite the center and domain bounds"
+                );
+            }
+            other => panic!("expected DegenerateConcentration error, got {other:?}"),
+        }
+    }
+
+    /// [P6-7] A genuine, well-posed concentration request must still succeed
+    /// and actually concentrate near the center — the new error path must not
+    /// false-positive on normal `intensity` values.
+    #[test]
+    fn sinh_concentrated_still_succeeds_for_normal_intensity() {
+        // intensity = 0.1 is a typical strike-concentration value.
+        let g = Grid1D::sinh_concentrated(-5.0, 5.0, 101, 0.0, 0.1)
+            .expect("a normal intensity must produce a valid concentrated grid");
+        assert_eq!(g.n(), 101);
+        // Concentration: spacing near the center is tighter than near the edge.
+        let mid = g.n() / 2;
+        assert!(
+            g.h_right(mid) < g.h_right(0),
+            "spacing near the concentration point must be smaller than at the edge"
+        );
     }
 
     #[test]

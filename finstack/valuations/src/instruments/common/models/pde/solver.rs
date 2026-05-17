@@ -6,7 +6,7 @@
 //! Greeks (delta, gamma) read directly from the grid.
 
 use super::exercise::PenaltyExercise;
-use super::grid::{find_interval, Grid1D, PdeGridError};
+use super::grid::{find_nearest, Grid1D, PdeGridError};
 use super::problem::PdeProblem1D;
 use super::stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};
 
@@ -115,15 +115,34 @@ impl Solver1D {
 
     /// Solve the PDE problem and return the solution at `t = 0`.
     ///
-    /// Returns [`PdeSolverError::Stepper`] if the time stepper fails — in
-    /// practice, an explicit / under-damped (`theta < 0.5`) scheme whose time
-    /// step violates the CFL stability condition. Implicit and Crank-Nicolson
-    /// schemes are unconditionally stable and never trigger this.
+    /// # Errors
+    ///
+    /// - [`PdeSolverError::NonPositiveMaturity`] if `maturity <= 0`.
+    /// - [`PdeSolverError::ZeroTimeSteps`] if the stepper has no time steps
+    ///   (the backward march would never run, leaving the bare terminal
+    ///   payoff as the "solution").
+    /// - [`PdeSolverError::Stepper`] if the time stepper fails — in practice,
+    ///   an explicit / under-damped (`theta < 0.5`) scheme whose time step
+    ///   violates the CFL stability condition, or a degenerate tridiagonal
+    ///   solve. Implicit and Crank-Nicolson schemes are unconditionally
+    ///   stable and never trigger the CFL case.
     pub fn solve(
         &self,
         problem: &dyn PdeProblem1D,
         maturity: f64,
     ) -> Result<PdeSolution, PdeSolverError> {
+        // Validate maturity / step count up front — a non-positive or
+        // non-finite maturity, or zero steps, would otherwise yield a
+        // degenerate "solution" (a NaN time grid, or the bare terminal payoff
+        // with no time evolution). The `is_finite` check also rejects NaN.
+        if !maturity.is_finite() || maturity <= 0.0 {
+            return Err(PdeSolverError::NonPositiveMaturity { maturity });
+        }
+        let n_steps = self.stepper.n_steps();
+        if n_steps == 0 {
+            return Err(PdeSolverError::ZeroTimeSteps);
+        }
+
         // Initialize terminal condition at interior points
         let mut u: Vec<f64> = self.grid.points()[1..self.grid.n() - 1]
             .iter()
@@ -132,7 +151,6 @@ impl Solver1D {
 
         // Time levels: T → 0
         let levels = self.stepper.time_levels(maturity);
-        let n_steps = self.stepper.n_steps();
 
         let mut exercise_boundary: Vec<(f64, f64)> = Vec::new();
 
@@ -269,9 +287,15 @@ impl PdeSolution {
         self.grid.interpolate(&self.values, x)
     }
 
-    /// Compute delta (first derivative) at point `x` via central finite differences.
+    /// Compute delta (first derivative) at point `x` via finite differences.
     ///
-    /// Uses the two nearest grid nodes straddling `x`.
+    /// The stencil is centred on the grid node *nearest* `x` rather than on
+    /// the left node of the containing interval: a left-anchored forward
+    /// difference evaluates the slope at the cell midpoint, which on a
+    /// strike-concentrated grid can sit up to a full grid cell away from `x`
+    /// and misstates a fast-varying delta. At an interior nearest node the
+    /// second-order non-uniform central stencil is used; at the first/last
+    /// node a one-sided difference is used.
     pub fn delta(&self, x: f64) -> f64 {
         let pts = self.grid.points();
         let n = pts.len();
@@ -280,30 +304,44 @@ impl PdeSolution {
             return 0.0;
         }
 
-        // Find the interval containing x
-        let idx = find_interval(pts, x);
+        // Node nearest x — the stencil is centred here.
+        let i = find_nearest(pts, x);
 
-        if idx == 0 {
-            // Forward difference at left boundary
-            (self.values[1] - self.values[0]) / (pts[1] - pts[0])
-        } else if idx >= n - 1 {
-            // Backward difference at right boundary
-            (self.values[n - 1] - self.values[n - 2]) / (pts[n - 1] - pts[n - 2])
-        } else if idx + 1 < n {
-            // Central difference using straddling nodes
-            let h = pts[idx + 1] - pts[idx];
+        if i == 0 {
+            // Forward difference at the left boundary node.
+            let h = pts[1] - pts[0];
             if h.abs() < 1e-30 {
                 return 0.0;
             }
-            (self.values[idx + 1] - self.values[idx]) / h
+            (self.values[1] - self.values[0]) / h
+        } else if i >= n - 1 {
+            // Backward difference at the right boundary node.
+            let h = pts[n - 1] - pts[n - 2];
+            if h.abs() < 1e-30 {
+                return 0.0;
+            }
+            (self.values[n - 1] - self.values[n - 2]) / h
         } else {
-            0.0
+            // Second-order non-uniform central stencil centred on node i.
+            let h_m = pts[i] - pts[i - 1];
+            let h_p = pts[i + 1] - pts[i];
+            let h_sum = h_m + h_p;
+            if h_m.abs() < 1e-30 || h_p.abs() < 1e-30 {
+                return 0.0;
+            }
+            -h_p / (h_m * h_sum) * self.values[i - 1]
+                + (h_p - h_m) / (h_m * h_p) * self.values[i]
+                + h_m / (h_p * h_sum) * self.values[i + 1]
         }
     }
 
     /// Compute gamma (second derivative) at point `x` via finite differences.
     ///
-    /// Uses three grid points centered near `x`.
+    /// Uses the three-point non-uniform second-derivative stencil centred on
+    /// the grid node *nearest* `x`. Centring on the nearest node (rather than
+    /// on the left node of the containing interval) keeps the stencil within
+    /// half a grid cell of `x`; a left-anchored stencil can sit a full cell
+    /// away and misstate a peaked gamma on a strike-concentrated grid.
     pub fn gamma(&self, x: f64) -> f64 {
         let pts = self.grid.points();
         let n = pts.len();
@@ -312,10 +350,9 @@ impl PdeSolution {
             return 0.0;
         }
 
-        // Find the interval containing x
-        let idx = find_interval(pts, x);
-        // Use three points centered near idx
-        let i = idx.clamp(1, n - 2);
+        // Centre the three-point stencil on the node nearest x, clamped so the
+        // stencil stays within the interior.
+        let i = find_nearest(pts, x).clamp(1, n - 2);
 
         let h_m = pts[i] - pts[i - 1];
         let h_p = pts[i + 1] - pts[i];
@@ -340,6 +377,16 @@ pub enum PdeSolverError {
     /// No time stepper was specified in the builder.
     #[error("PDE solver requires a time stepper")]
     MissingStepper,
+    /// The maturity passed to `solve` was not strictly positive.
+    #[error("PDE solve requires a strictly positive maturity, got {maturity:e}")]
+    NonPositiveMaturity {
+        /// The offending maturity.
+        maturity: f64,
+    },
+    /// The stepper was configured with zero time steps, so the backward time
+    /// march never runs and the "solution" would be the bare terminal payoff.
+    #[error("PDE solve requires at least one time step, got n_steps = 0")]
+    ZeroTimeSteps,
     /// Grid construction error.
     #[error(transparent)]
     Grid(#[from] PdeGridError),
@@ -511,6 +558,230 @@ mod tests {
              by {:.2}% — exceeds 0.5% discretisation budget. \
              This may indicate CN oscillation from post-exercise kink.",
             rel_diff * 100.0
+        );
+    }
+
+    /// Build a [`PdeSolution`] from a grid and an explicit value vector
+    /// (one value per grid node), bypassing the time march. Lets the Greek
+    /// stencil tests pin `delta` / `gamma` against an analytically known
+    /// function.
+    fn solution_from_values(grid: Grid1D, values: Vec<f64>) -> PdeSolution {
+        assert_eq!(values.len(), grid.n());
+        PdeSolution {
+            grid,
+            values,
+            exercise_boundary: None,
+            n_time_steps: 0,
+        }
+    }
+
+    /// [P6-4] `gamma` must centre its three-point stencil on the grid node
+    /// **nearest** `x`, not on the left node of the containing interval.
+    ///
+    /// Failure mode being guarded: `find_interval` returns the left node of
+    /// `[x_{k-1}, x_k]`, so for a query `x` in the *upper* half of an interval
+    /// the old code centred the second-derivative stencil on `x_{k-1}` — up to
+    /// a full grid cell below `x`. On a coarse / strike-concentrated grid this
+    /// reports the curvature at the wrong node.
+    ///
+    /// With `u(x) = exp(x)` the exact gamma is `exp(x)`. Two checks:
+    ///   1. On a coarse non-uniform grid, a query in the upper half of an
+    ///      interval must be centred on the right (nearest) node — the stencil
+    ///      tracks `exp(x_nearest)` and is strictly closer to it than to
+    ///      `exp(x_left)`. This is the direct off-centre-bug assertion.
+    ///   2. On a refined grid, the nearest-node stencil converges to the true
+    ///      `exp(x)`; the left-node stencil retains an O(cell) bias.
+    #[test]
+    fn gamma_stencil_is_centred_on_nearest_node_not_left_node() {
+        // (1) Coarse, non-uniform grid: large cells so the gap between
+        // adjacent-node curvature values is unmistakable.
+        let grid =
+            Grid1D::from_points(vec![0.0, 0.9, 2.0, 3.2, 4.5]).expect("valid non-uniform grid");
+        let values: Vec<f64> = grid.points().iter().map(|&x| x.exp()).collect();
+        let solution = solution_from_values(grid.clone(), values);
+
+        // Query in the upper part of the interval [x_2=2.0, x_3=3.2]:
+        // nearest node is x_3 = 3.2, the left node of the interval is x_2.
+        let x = 3.1_f64;
+        let nearest = grid.points()[3]; // 3.2
+        let left = grid.points()[2]; //  2.0
+
+        let computed = solution.gamma(x);
+
+        // Centred on the nearest node, the 3-point stencil approximates the
+        // curvature at x_3; centred on the left node it would approximate the
+        // curvature at x_2 ≈ exp(x_2). The stencil value must be strictly
+        // closer to exp(x_3) than to exp(x_2).
+        let err_nearest = (computed - nearest.exp()).abs();
+        let err_left = (computed - left.exp()).abs();
+        assert!(
+            err_nearest < err_left,
+            "gamma({x}) = {computed:.4} should track exp(x_nearest)=exp({nearest})={:.4} \
+             not exp(x_left)=exp({left})={:.4} (err_nearest={err_nearest:.4}, err_left={err_left:.4})",
+            nearest.exp(),
+            left.exp(),
+        );
+
+        // (2) On a refined grid the nearest-node stencil converges to exp(x);
+        // a stencil centred on the left node would keep an O(cell) bias.
+        let fine = Grid1D::uniform(0.0, 5.0, 501).expect("valid fine grid");
+        let fine_values: Vec<f64> = fine.points().iter().map(|&x| x.exp()).collect();
+        let fine_solution = solution_from_values(fine.clone(), fine_values);
+        // Query just below an interior node so the old left-node centring
+        // would have used the cell to the left.
+        let xf = 3.1_f64;
+        let nearest_idx = find_nearest(fine.points(), xf);
+        let g_fine = fine_solution.gamma(xf);
+        let rel = (g_fine - xf.exp()).abs() / xf.exp();
+        assert!(
+            rel < 5e-3,
+            "on a refined grid gamma({xf}) = {g_fine:.6} should converge to exp({xf}) = {:.6} \
+             (rel err {rel:.3e}); query nearest node x_{nearest_idx} = {:.6}",
+            xf.exp(),
+            fine.points()[nearest_idx],
+        );
+    }
+
+    /// [P6-4] `delta` must centre its stencil on the grid node nearest `x`.
+    ///
+    /// The old code took a left-anchored forward difference
+    /// `(u[idx+1]-u[idx])/h`, which estimates the slope at the *midpoint* of
+    /// the cell `[x_idx, x_{idx+1}]` — up to a full cell from `x`. The fixed
+    /// code uses the second-order non-uniform central stencil centred on the
+    /// node nearest `x`.
+    ///
+    /// Two checks with `u(x) = exp(x)` (exact delta `exp(x)`):
+    ///   1. Coarse non-uniform grid: a query in the upper half of an interval
+    ///      yields a centred-stencil delta — it equals neither the old
+    ///      left-cell chord nor the right-cell chord, confirming the reader is
+    ///      no longer just returning a one-sided cell chord.
+    ///   2. Refined grid: the nearest-node stencil converges to `exp(x)`.
+    #[test]
+    fn delta_stencil_is_centred_on_nearest_node() {
+        // (1) Coarse non-uniform grid.
+        let grid =
+            Grid1D::from_points(vec![0.0, 0.9, 2.0, 3.2, 4.5]).expect("valid non-uniform grid");
+        let values: Vec<f64> = grid.points().iter().map(|&x| x.exp()).collect();
+        let solution = solution_from_values(grid.clone(), values);
+
+        // Query just below interior node x_3 = 3.2 (nearest node is x_3).
+        let x = 3.15_f64;
+        let computed = solution.delta(x);
+
+        // Old behaviour: left-anchored forward difference over the containing
+        // cell [x_2, x_3].
+        let left_chord = (grid.points()[3].exp() - grid.points()[2].exp())
+            / (grid.points()[3] - grid.points()[2]);
+        // The other one-sided cell chord, [x_3, x_4].
+        let right_chord = (grid.points()[4].exp() - grid.points()[3].exp())
+            / (grid.points()[4] - grid.points()[3]);
+
+        // The centred stencil at x_3 is a genuine two-sided combination — it
+        // must differ from both one-sided cell chords (in particular it is no
+        // longer the old left-anchored chord).
+        assert!(
+            (computed - left_chord).abs() > 1e-6,
+            "delta({x}) = {computed:.6} must not be the old left-anchored chord {left_chord:.6}"
+        );
+        assert!(
+            (computed - right_chord).abs() > 1e-6,
+            "delta({x}) = {computed:.6} must not be the right-cell chord {right_chord:.6}"
+        );
+        // A two-sided central stencil lies between the two one-sided chords.
+        let (lo, hi) = (left_chord.min(right_chord), left_chord.max(right_chord));
+        assert!(
+            computed > lo && computed < hi,
+            "centred delta({x}) = {computed:.6} should lie between the bracketing cell \
+             chords [{lo:.6}, {hi:.6}]"
+        );
+
+        // (2) Refined grid: the centred stencil converges to the analytic
+        // derivative exp(x).
+        let fine = Grid1D::uniform(0.0, 5.0, 501).expect("valid fine grid");
+        let fine_values: Vec<f64> = fine.points().iter().map(|&x| x.exp()).collect();
+        let fine_solution = solution_from_values(fine, fine_values);
+        let xf = 3.15_f64;
+        let d_fine = fine_solution.delta(xf);
+        let rel = (d_fine - xf.exp()).abs() / xf.exp();
+        assert!(
+            rel < 5e-3,
+            "on a refined grid delta({xf}) = {d_fine:.6} should converge to exp({xf}) = {:.6} \
+             (rel err {rel:.3e})",
+            xf.exp(),
+        );
+    }
+
+    /// [P6-6] `Solver1D::solve` must reject a non-positive maturity and a
+    /// zero-step stepper instead of returning a degenerate "solution".
+    ///
+    /// With `n_steps = 0` the backward time march never runs, so the old code
+    /// would return the *terminal payoff* — undiscounted, undiffused — as the
+    /// price. With `maturity <= 0` the time grid is degenerate / NaN.
+    #[test]
+    fn solver_rejects_invalid_maturity_and_zero_steps() {
+        let grid = Grid1D::uniform(0.0, std::f64::consts::PI, 21).expect("valid grid");
+
+        // Non-positive maturity.
+        let solver = Solver1D::builder()
+            .grid(grid.clone())
+            .crank_nicolson(50)
+            .build()
+            .expect("valid solver");
+        assert!(
+            matches!(
+                solver.solve(&HeatSin, 0.0),
+                Err(PdeSolverError::NonPositiveMaturity { .. })
+            ),
+            "maturity = 0 must be rejected"
+        );
+        assert!(
+            matches!(
+                solver.solve(&HeatSin, -0.5),
+                Err(PdeSolverError::NonPositiveMaturity { .. })
+            ),
+            "negative maturity must be rejected"
+        );
+
+        // Zero time steps.
+        let zero_step_solver = Solver1D::builder()
+            .grid(grid)
+            .crank_nicolson(0)
+            .build()
+            .expect("valid solver");
+        assert!(
+            matches!(
+                zero_step_solver.solve(&HeatSin, 1.0),
+                Err(PdeSolverError::ZeroTimeSteps)
+            ),
+            "a zero-step stepper must be rejected"
+        );
+    }
+
+    /// [P6-8] Dead-branch removal: `find_interval`/`find_nearest` clamp the
+    /// returned index, so for a query *above* the grid the Greek readers must
+    /// fall through to the boundary (one-sided) branch and return a finite,
+    /// correct one-sided difference — never the unreachable `0.0` fallback
+    /// that the old dead `else` arm produced.
+    #[test]
+    fn delta_above_domain_uses_boundary_difference_not_dead_fallback() {
+        let grid = Grid1D::uniform(0.0, 4.0, 5).expect("valid grid");
+        // u(x) = 3x  → delta = 3 everywhere, including the one-sided edges.
+        let values: Vec<f64> = grid.points().iter().map(|&x| 3.0 * x).collect();
+        let solution = solution_from_values(grid, values);
+
+        // Query far above the domain: nearest node is the last node.
+        let d = solution.delta(100.0);
+        assert!(d.is_finite(), "delta above domain must be finite");
+        assert!(
+            (d - 3.0).abs() < 1e-9,
+            "delta above domain must equal the boundary one-sided slope 3.0, got {d}"
+        );
+
+        // Query far below the domain: nearest node is node 0.
+        let d_lo = solution.delta(-100.0);
+        assert!(
+            (d_lo - 3.0).abs() < 1e-9,
+            "delta below domain must equal the boundary one-sided slope 3.0, got {d_lo}"
         );
     }
 }

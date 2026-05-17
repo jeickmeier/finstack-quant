@@ -5,13 +5,20 @@
 //! spurious oscillations near payoff discontinuities.
 
 use super::grid::Grid1D;
-use super::operator::TridiagOperator;
+use super::operator::{ThomasError, TridiagOperator};
 use super::problem::PdeProblem1D;
 
-/// Error raised by a time stepper.
+/// Error raised by a time stepper (1D theta scheme or 2D MCS ADI).
 ///
-/// Currently the only failure mode is a violation of the CFL / von-Neumann
-/// stability condition by an explicit or under-damped (`theta < 0.5`) scheme.
+/// Failure modes:
+/// - [`StepperError::CflViolation`] — an explicit / under-damped 1D theta
+///   scheme stepped past its CFL / von-Neumann stability limit.
+/// - [`StepperError::PecletViolation`] — the 2D Modified Craig-Sneyd ADI
+///   stepper was handed a convection-dominated grid whose cell Péclet number
+///   exceeds the regime in which `theta = 1/3` MCS is reliably stable.
+/// - [`StepperError::NonPositiveStep`] — a non-positive time step `dt`
+///   (e.g. a non-positive maturity, or `n_steps` so small the step is
+///   degenerate) was requested.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum StepperError {
     /// An explicit or under-damped (`theta < 0.5`) theta scheme was asked to
@@ -41,6 +48,58 @@ pub enum StepperError {
         /// Largest absolute diffusion coefficient over the interior grid.
         max_diffusion: f64,
     },
+    /// The 2D Modified Craig-Sneyd ADI stepper was handed a grid whose largest
+    /// cell Péclet number `Pe = |b| * h / (2 * a)` exceeds the threshold
+    /// inside which the `theta = 1/3` scheme is reliably stable.
+    ///
+    /// MCS at `theta = 1/3` is unconditionally stable for *pure 2D diffusion*,
+    /// but for the *general convection-diffusion* case the von Neumann bound
+    /// rises to `theta >= 2/5` (In 't Hout & Mishra 2010). In the strongly
+    /// convection-dominated regime — large Heston `kappa`, very wide variance
+    /// grids, or coarse spacing where convection swamps diffusion — the
+    /// `theta = 1/3` scheme leaves its proven-stable envelope and can diverge
+    /// silently to inf / NaN. This guard reports it instead.
+    #[error(
+        "Péclet stability violated: 2D MCS ADI (theta=1/3) requires the cell Péclet number \
+         Pe = |b|*h/(2*a) <= {pe_max} for reliable stability, but the {direction}-direction \
+         grid reaches Pe = {peclet:e} (convection |b| = {convection:e}, diffusion a = {diffusion:e}, \
+         spacing h = {spacing:e}); refine the grid in that direction, narrow the domain, or \
+         reduce the convection dominance"
+    )]
+    PecletViolation {
+        /// Direction the violation occurred on (`"x"` or `"y"`).
+        direction: &'static str,
+        /// The largest cell Péclet number found on that direction.
+        peclet: f64,
+        /// Threshold above which the scheme is considered convection-dominated.
+        pe_max: f64,
+        /// Absolute convection coefficient at the offending node.
+        convection: f64,
+        /// Diffusion coefficient at the offending node.
+        diffusion: f64,
+        /// Grid spacing at the offending node.
+        spacing: f64,
+    },
+    /// A non-positive time step `dt` was requested.
+    ///
+    /// The backward time march requires `dt = t_from - t_to > 0`. A
+    /// non-positive `dt` arises from a non-positive maturity, or from a
+    /// degenerate time grid; in release builds it would otherwise propagate
+    /// silently as NaN / inf rather than being caught by the `debug_assert`.
+    #[error("invalid time step: dt = {dt:e} must be strictly positive (t_from={t_from:e}, t_to={t_to:e})")]
+    NonPositiveStep {
+        /// The non-positive step size.
+        dt: f64,
+        /// Step start time (closer to maturity).
+        t_from: f64,
+        /// Step end time (closer to t=0).
+        t_to: f64,
+    },
+    /// The tridiagonal Thomas solve underlying the implicit step failed —
+    /// in practice, a degenerate pivot in `(I - theta*dt*A)` from eroded
+    /// diagonal dominance.
+    #[error(transparent)]
+    ThomasFailure(#[from] ThomasError),
 }
 
 /// Time-stepping strategy for advancing the PDE solution backward from maturity.
@@ -198,7 +257,8 @@ impl TimeStepper for RannacherStepper {
 }
 
 /// Largest time step permitted by the CFL / von-Neumann stability condition
-/// for an explicit / under-damped theta scheme on the given grid at time `t`.
+/// for an explicit / under-damped theta scheme on the given grid, with the
+/// diffusion coefficient maximised over the step interval `[t_to, t_from]`.
 ///
 /// For `theta < 0.5` the theta scheme is only conditionally stable. The
 /// von-Neumann bound for the pure-diffusion part `a * u_xx` on a (possibly
@@ -211,9 +271,18 @@ impl TimeStepper for RannacherStepper {
 /// than its average) and `max|a|` is the largest absolute diffusion
 /// coefficient over the interior nodes.
 ///
+/// # Time dependence
+///
+/// For a time-dependent diffusion (`LocalVolPde`) the coefficient at `t_to`
+/// or partway through the step can exceed its value at `t_from`; evaluating
+/// the bound only at `t_from` would understate `max|a|` and let an unstable
+/// step through. The diffusion is therefore sampled at `t_from`, `t_to`, and
+/// the step midpoint, and the *largest* of the three is used — the most
+/// restrictive (smallest) CFL bound over the interval.
+///
 /// Returns `f64::INFINITY` when the diffusion vanishes everywhere (a
 /// degenerate, convection/reaction-only problem has no diffusive CFL limit).
-fn cfl_max_dt(problem: &dyn PdeProblem1D, grid: &Grid1D, t: f64) -> (f64, f64, f64) {
+fn cfl_max_dt(problem: &dyn PdeProblem1D, grid: &Grid1D, t_from: f64, t_to: f64) -> (f64, f64, f64) {
     let pts = grid.points();
 
     // Smallest spacing between any two adjacent grid points.
@@ -225,13 +294,17 @@ fn cfl_max_dt(problem: &dyn PdeProblem1D, grid: &Grid1D, t: f64) -> (f64, f64, f
         }
     }
 
-    // Largest absolute diffusion coefficient over the interior nodes
-    // (boundary rows do not carry an interior diffusion stencil).
+    // Largest absolute diffusion coefficient over the interior nodes, sampled
+    // across the step interval so a time-dependent vol surface that peaks at
+    // (or within) t_to is not missed. Boundary rows carry no interior stencil.
+    let t_mid = 0.5 * (t_from + t_to);
     let mut max_diffusion = 0.0_f64;
     for &x in &pts[1..pts.len().saturating_sub(1)] {
-        let a = problem.diffusion(x, t).abs();
-        if a > max_diffusion {
-            max_diffusion = a;
+        for &t in &[t_from, t_to, t_mid] {
+            let a = problem.diffusion(x, t).abs();
+            if a > max_diffusion {
+                max_diffusion = a;
+            }
         }
     }
 
@@ -263,6 +336,9 @@ fn cfl_max_dt(problem: &dyn PdeProblem1D, grid: &Grid1D, t: f64) -> (f64, f64, f
 /// [`StepperError::CflViolation`] rather than producing silent NaN /
 /// oscillation. For `theta >= 0.5` (Crank-Nicolson and fully implicit) the
 /// scheme is unconditionally stable and no check is performed.
+///
+/// Returns [`StepperError::NonPositiveStep`] if `dt = t_from - t_to` is not
+/// strictly positive (a non-positive maturity or a degenerate time grid).
 fn theta_step(
     problem: &dyn PdeProblem1D,
     grid: &Grid1D,
@@ -272,13 +348,18 @@ fn theta_step(
     theta: f64,
 ) -> Result<(), StepperError> {
     let dt = t_from - t_to;
-    debug_assert!(dt > 0.0);
+    // A non-positive or non-finite dt would otherwise propagate as silent
+    // NaN / inf in release builds (the previous `debug_assert` was compiled
+    // out). The `is_finite` check also rejects a NaN dt.
+    if !dt.is_finite() || dt <= 0.0 {
+        return Err(StepperError::NonPositiveStep { dt, t_from, t_to });
+    }
 
     // Explicit / under-damped schemes (theta < 0.5) are only conditionally
     // stable — enforce the CFL bound. Crank-Nicolson and fully implicit
     // (theta >= 0.5) are unconditionally stable and are not gated.
     if theta < 0.5 {
-        let (cfl_limit, dx_min, max_diffusion) = cfl_max_dt(problem, grid, t_from);
+        let (cfl_limit, dx_min, max_diffusion) = cfl_max_dt(problem, grid, t_from, t_to);
         if dt > cfl_limit {
             return Err(StepperError::CflViolation {
                 theta,
@@ -310,8 +391,10 @@ fn theta_step(
     let alpha = theta * dt;
     op_to.add_implicit_corrections(alpha, &mut rhs);
 
-    // Solve (I - theta*dt * A_to) * u_new = rhs
-    let u_new = op_to.solve_thomas(alpha, &rhs);
+    // Solve (I - theta*dt * A_to) * u_new = rhs. A degenerate pivot (eroded
+    // diagonal dominance) surfaces as StepperError::ThomasFailure rather than
+    // a silent inf / NaN.
+    let u_new = op_to.solve_thomas(alpha, &rhs)?;
     u.copy_from_slice(&u_new);
 
     Ok(())
@@ -453,7 +536,7 @@ mod tests {
         let dt = levels[0] - levels[1];
 
         // Sanity: this dt really does violate CFL on this grid.
-        let (cfl_limit, dx_min, max_a) = cfl_max_dt(&problem, &grid, t_mat);
+        let (cfl_limit, dx_min, max_a) = cfl_max_dt(&problem, &grid, levels[0], levels[1]);
         assert!(
             dt > cfl_limit,
             "test misconfigured: dt={dt:e} should exceed CFL bound {cfl_limit:e} \
@@ -531,7 +614,9 @@ mod tests {
         let grid = Grid1D::uniform(0.0, std::f64::consts::PI, n_space).expect("valid grid");
 
         // Choose a time-step count comfortably inside the CFL limit.
-        let (cfl_limit, _, _) = cfl_max_dt(&problem, &grid, t_mat);
+        // HeatSinProblem has a constant (time-independent) diffusion, so the
+        // CFL bound is the same for any (t_from, t_to) pair.
+        let (cfl_limit, _, _) = cfl_max_dt(&problem, &grid, t_mat, 0.0);
         let n_time = ((t_mat / cfl_limit).ceil() as usize + 5).max(10);
         let stepper = ThetaStepper::explicit(n_time);
         let levels = stepper.time_levels(t_mat);
@@ -583,7 +668,7 @@ mod tests {
         // Confirm this grid + step count would break an explicit scheme.
         let n_time = 4;
         let dt = 0.5 / n_time as f64;
-        let (cfl_limit, _, _) = cfl_max_dt(&problem, &grid, 0.5);
+        let (cfl_limit, _, _) = cfl_max_dt(&problem, &grid, 0.5, 0.0);
         assert!(
             dt > cfl_limit,
             "test misconfigured: dt should exceed the explicit CFL bound"
@@ -612,5 +697,159 @@ mod tests {
                 "theta >= 0.5 is unconditionally stable and must not be CFL-gated"
             );
         }
+    }
+
+    /// Heat equation with a *time-dependent* diffusion that peaks **inside**
+    /// the step interval `[0, 0.5]`: a tent function `a(t)` with `a(0.5) =
+    /// a(0.0) = 0.05` at the endpoints and `a(0.25) = 1.0` at the midpoint.
+    /// This mimics a `LocalVolPde` surface whose vol spikes part-way through a
+    /// time step — a peak that endpoint-only sampling cannot see.
+    struct TentDiffusion;
+
+    impl TentDiffusion {
+        /// Tent peaking at `t = 0.25`: 0.05 at t∈{0,0.5}, 1.0 at t=0.25.
+        fn a(t: f64) -> f64 {
+            let peak = 1.0_f64;
+            let base = 0.05_f64;
+            // Distance from the peak time, normalised to [0, 1] over a half-width.
+            let d = (t - 0.25).abs() / 0.25;
+            base + (peak - base) * (1.0 - d).max(0.0)
+        }
+    }
+
+    impl PdeProblem1D for TentDiffusion {
+        fn diffusion(&self, _x: f64, t: f64) -> f64 {
+            Self::a(t)
+        }
+        fn convection(&self, _x: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn reaction(&self, _x: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn terminal_condition(&self, x: f64) -> f64 {
+            x.sin()
+        }
+        fn lower_boundary(&self, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Dirichlet(0.0)
+        }
+        fn upper_boundary(&self, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Dirichlet(0.0)
+        }
+        // Deliberately time-INhomogeneous.
+        fn is_time_homogeneous(&self) -> bool {
+            false
+        }
+    }
+
+    /// [P6-2] The CFL bound for a time-dependent diffusion must be evaluated
+    /// as the **max of the diffusion over the whole step interval**, not only
+    /// at `t_from`.
+    ///
+    /// Failure mode being guarded: `theta_step` used to call
+    /// `cfl_max_dt(.., t_from)` only. For [`TentDiffusion`] the diffusion at
+    /// `t_from = 0.5` is `a = 0.05` (a loose CFL bound), but it spikes to
+    /// `a = 1.0` at the step midpoint `t = 0.25` — a 20× tighter bound. A
+    /// `t_from`-only check (and even a two-endpoint check, since both
+    /// endpoints are `0.05`) under-samples the diffusion and lets an
+    /// over-large explicit step through.
+    ///
+    /// The fixed code samples `t_from`, `t_to`, **and the midpoint** and uses
+    /// the largest diffusion. Two assertions:
+    ///   1. `cfl_max_dt` over the interval returns the midpoint-peak diffusion
+    ///      `a = 1.0`, collapsing the bound from ≈ 0.99 to ≈ 0.049.
+    ///   2. The explicit stepper rejects the over-large step with
+    ///      [`StepperError::CflViolation`] citing that tighter bound.
+    #[test]
+    fn cfl_bound_uses_max_diffusion_over_step_interval_not_just_t_from() {
+        let problem = TentDiffusion;
+        // n = 11 over [0, pi]: dx = pi/10, dx^2 ≈ 0.0987.
+        let grid = Grid1D::uniform(0.0, std::f64::consts::PI, 11).expect("valid grid");
+
+        // A single explicit step over the whole interval [0, 0.5]: dt = 0.5.
+        let t_from = 0.5_f64;
+        let t_to = 0.0_f64;
+        let dt = t_from - t_to;
+
+        // Endpoint-only sampling sees a = 0.05 at BOTH ends → loose bound that
+        // dt = 0.5 satisfies. (This is what the old t_from-only check did, and
+        // even a naive two-endpoint check would miss the interior spike.)
+        let (bound_endpoints, _, a_endpoint) = cfl_max_dt(&problem, &grid, t_from, t_from);
+        assert!(
+            (a_endpoint - 0.05).abs() < 1e-12,
+            "at the endpoints the diffusion is 0.05, got {a_endpoint}"
+        );
+        assert!(
+            dt < bound_endpoints,
+            "precondition: endpoint diffusion gives a LOOSE CFL bound {bound_endpoints:e} \
+             that dt={dt:e} satisfies — endpoint-only sampling passed the step"
+        );
+
+        // Interval sampling catches the midpoint spike a = 1.0 → tight bound.
+        let (bound_interval, _, a_interval) = cfl_max_dt(&problem, &grid, t_from, t_to);
+        assert!(
+            (a_interval - 1.0).abs() < 1e-12,
+            "interval-max diffusion should be the midpoint spike a=1.0, got {a_interval}"
+        );
+        assert!(
+            dt > bound_interval,
+            "the interval-max CFL bound {bound_interval:e} must be violated by dt={dt:e}"
+        );
+
+        // The explicit stepper must now reject the step. Under the old
+        // t_from-only bound it was silently accepted despite the interior
+        // diffusion spike exceeding the explicit stability limit.
+        let stepper = ThetaStepper::explicit(1);
+        let mut u: Vec<f64> = grid.points()[1..grid.n() - 1]
+            .iter()
+            .map(|&x| problem.terminal_condition(x))
+            .collect();
+        let result = stepper.step(&problem, &grid, &mut u, t_from, t_to, 0);
+        match result {
+            Err(StepperError::CflViolation {
+                max_diffusion,
+                cfl_max_dt: reported_bound,
+                ..
+            }) => {
+                assert!(
+                    (max_diffusion - 1.0).abs() < 1e-12,
+                    "the violation must cite the interval-max diffusion 1.0, got {max_diffusion}"
+                );
+                assert!(
+                    dt > reported_bound,
+                    "the violation must cite the tighter interval CFL bound"
+                );
+            }
+            other => panic!(
+                "expected CflViolation from the interval-max CFL bound, got {other:?}"
+            ),
+        }
+    }
+
+    /// [P6-6] A non-positive time step must be rejected with
+    /// [`StepperError::NonPositiveStep`] rather than producing silent NaN.
+    ///
+    /// In release builds the old `debug_assert!(dt > 0.0)` was compiled out,
+    /// so a non-positive maturity (here `t_from == t_to`, giving `dt = 0`)
+    /// would have flowed through as a degenerate / NaN-producing step.
+    #[test]
+    fn theta_step_rejects_non_positive_dt() {
+        let problem = HeatSinProblem;
+        let grid = Grid1D::uniform(0.0, std::f64::consts::PI, 11).expect("valid grid");
+        let mut u = vec![1.0; grid.n_interior()];
+
+        // dt = 0 (t_from == t_to).
+        let zero = ThetaStepper::implicit(1).step(&problem, &grid, &mut u, 0.3, 0.3, 0);
+        assert!(
+            matches!(zero, Err(StepperError::NonPositiveStep { dt, .. }) if dt == 0.0),
+            "dt = 0 must be rejected as NonPositiveStep, got {zero:?}"
+        );
+
+        // dt < 0 (t_from < t_to — a backward march with non-positive maturity).
+        let neg = ThetaStepper::implicit(1).step(&problem, &grid, &mut u, 0.1, 0.4, 0);
+        assert!(
+            matches!(neg, Err(StepperError::NonPositiveStep { dt, .. }) if dt < 0.0),
+            "dt < 0 must be rejected as NonPositiveStep, got {neg:?}"
+        );
     }
 }

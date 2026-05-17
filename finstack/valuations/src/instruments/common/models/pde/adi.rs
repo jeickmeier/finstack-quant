@@ -61,6 +61,7 @@ use super::boundary::BoundaryCondition;
 use super::grid2d::Grid2D;
 use super::operator2d::{apply_cross_derivative, Operators2D};
 use super::problem2d::PdeProblem2D;
+use super::stepper::StepperError;
 
 /// Reusable per-step scratch buffers for the Modified Craig-Sneyd ADI stepper.
 ///
@@ -166,6 +167,96 @@ impl AdiWorkBuffers {
 /// standard choice for the Heston PDE.
 const MCS_THETA: f64 = 1.0 / 3.0;
 
+/// Cell-Péclet ceiling for the 2D MCS ADI stepper.
+///
+/// The cell Péclet number `Pe = |b| * h / (2 * a)` measures local
+/// convection-vs-diffusion. MCS at `theta = 1/3` is unconditionally stable
+/// for *pure 2D diffusion*, but for the *general convection-diffusion* case
+/// the von Neumann stability bound rises to `theta >= 2/5` (In 't Hout &
+/// Mishra 2010). In the strongly convection-dominated regime — large Heston
+/// `kappa`, very wide variance grids, or coarse spacing — the `theta = 1/3`
+/// scheme leaves its proven-stable envelope and can diverge silently.
+///
+/// `4.0` is chosen empirically. Representative production Heston grids
+/// (ATM 1y, put-call parity, strong-correlation reconciliation cases) peak at
+/// `Pe ≈ 1` — comfortably below this ceiling. A pathological large-`kappa`
+/// configuration (`kappa = 10`) reaches `Pe ≈ 5` and `kappa = 20` reaches
+/// `Pe ≈ 10`; both are flagged. The ceiling therefore sits well above the
+/// convection-dominated onset (`Pe ~ 1`, where a central-difference
+/// off-diagonal first changes sign) yet below the genuinely pathological
+/// regime, so it never false-positives a normal Heston solve while catching
+/// the cases the scheme cannot reliably handle.
+const MCS_PECLET_MAX: f64 = 4.0;
+
+/// Check the 2D grid is not so convection-dominated that the `theta = 1/3`
+/// MCS scheme leaves its reliably-stable regime.
+///
+/// Scans every interior node and computes the cell Péclet number in each
+/// direction, `Pe = |b| * h / (2 * a)`, using the *larger* of the two
+/// neighbour spacings (the conservative cell width — it is the spacing that
+/// governs whether a central-difference off-diagonal flips sign). If the
+/// largest `Pe` exceeds [`MCS_PECLET_MAX`] the step is rejected with
+/// [`StepperError::PecletViolation`] rather than risking silent divergence.
+///
+/// A node whose diffusion `a` is exactly zero while convection is non-zero
+/// is treated as infinitely convection-dominated and flagged.
+fn check_peclet(problem: &dyn PdeProblem2D, grid: &Grid2D, t: f64) -> Result<(), StepperError> {
+    let x_pts = grid.x().points();
+    let y_pts = grid.y().points();
+
+    let mut worst: Option<(&'static str, f64, f64, f64, f64)> = None;
+    let mut consider = |dir: &'static str, b: f64, a: f64, h: f64| {
+        let b = b.abs();
+        if b == 0.0 {
+            return; // no convection here — no Péclet constraint
+        }
+        // Pe = |b| h / (2a); a == 0 with b != 0 is infinite Péclet.
+        let pe = if a > 0.0 {
+            b * h / (2.0 * a)
+        } else {
+            f64::INFINITY
+        };
+        if worst.map(|(_, w, ..)| pe > w).unwrap_or(true) {
+            worst = Some((dir, pe, b, a, h));
+        }
+    };
+
+    // Iterate the interior nodes (grid indices 1..n-1). `x` / `y` come from
+    // the point iterators; the index is used only for the spacing helpers.
+    for (i, &x) in x_pts.iter().enumerate().take(grid.nx() - 1).skip(1) {
+        let hx = grid.x().h_left(i).max(grid.x().h_right(i));
+        for (j, &y) in y_pts.iter().enumerate().take(grid.ny() - 1).skip(1) {
+            let hy = grid.y().h_left(j).max(grid.y().h_right(j));
+            consider(
+                "x",
+                problem.convection_x(x, y, t),
+                problem.diffusion_xx(x, y, t),
+                hx,
+            );
+            consider(
+                "y",
+                problem.convection_y(x, y, t),
+                problem.diffusion_yy(x, y, t),
+                hy,
+            );
+        }
+    }
+
+    if let Some((direction, peclet, convection, diffusion, spacing)) = worst {
+        if peclet > MCS_PECLET_MAX {
+            return Err(StepperError::PecletViolation {
+                direction,
+                peclet,
+                pe_max: MCS_PECLET_MAX,
+                convection,
+                diffusion,
+                spacing,
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Modified Craig-Sneyd (MCS) ADI time stepper for 2D problems.
 ///
 /// Uses `theta = 1/3` (see [`MCS_THETA`]). Optionally applies Rannacher-style
@@ -254,6 +345,10 @@ impl CraigSneydStepper {
     /// `u_full` is the full (boundary-inclusive) solution of length `nx * ny`.
     /// `u_int` is the interior solution of length `nx_int * ny_int` (row-major).
     /// Both are updated in place.
+    ///
+    /// Returns a [`StepperError`] if the step cannot be taken reliably — a
+    /// non-positive `dt`, a convection-dominated grid outside the MCS
+    /// stable regime, or a degenerate tridiagonal solve.
     #[allow(clippy::too_many_arguments)]
     pub fn step(
         &self,
@@ -264,7 +359,7 @@ impl CraigSneydStepper {
         t_from: f64,
         t_to: f64,
         step_index: usize,
-    ) {
+    ) -> Result<(), StepperError> {
         let mut buffers = AdiWorkBuffers::for_grid(grid);
         self.step_with_buffers(
             problem,
@@ -275,7 +370,7 @@ impl CraigSneydStepper {
             t_to,
             step_index,
             &mut buffers,
-        );
+        )
     }
 
     /// Like [`CraigSneydStepper::step`], but reuses caller-owned scratch
@@ -291,9 +386,21 @@ impl CraigSneydStepper {
         t_to: f64,
         step_index: usize,
         buffers: &mut AdiWorkBuffers,
-    ) {
+    ) -> Result<(), StepperError> {
         let dt = t_from - t_to;
-        debug_assert!(dt > 0.0);
+        // A non-positive or non-finite dt would otherwise propagate as silent
+        // NaN / inf in release builds (the previous `debug_assert` was
+        // compiled out). The `is_finite` check also rejects a NaN dt.
+        if !dt.is_finite() || dt <= 0.0 {
+            return Err(StepperError::NonPositiveStep { dt, t_from, t_to });
+        }
+
+        // Convection-dominated guard: the `theta = 1/3` MCS scheme is reliably
+        // stable only when the cell Péclet number is bounded. The 1D path
+        // enforces a CFL bound; the 2D path enforces this Péclet bound.
+        // Evaluated at t_from (coefficients are time-homogeneous for the
+        // Heston PDE, the production user of this stepper).
+        check_peclet(problem, grid, t_from)?;
 
         let theta = if step_index < self.implicit_start_steps {
             1.0
@@ -355,19 +462,19 @@ impl CraigSneydStepper {
         // <=> (I - theta*dt*A_x) Y_1 = Y_0 - theta*dt*ax_u  (+ implicit corr.)
         implicit_x_sweep(
             &ops_impl, alpha, y0, ax_u, nx_int, ny_int, rhs_buf, line_out, y1,
-        );
+        )?;
 
         // --- CS corrector 2: implicit y-sweep ---
         // Y_2 = Y_1 + theta*dt * (F_2(t_{n+1}, Y_2) - F_2(t_n, u^n))
         implicit_y_sweep(
             &ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, y2,
-        );
+        )?;
 
         if !self.apply_mcs_corrector {
             // Bare Douglas scheme (test path): u^{n+1} = Y_2.
             u_int.copy_from_slice(y2);
             fill_boundaries(problem, grid, u_full, u_int, t_to);
-            return;
+            return Ok(());
         }
 
         // Reconstruct the boundary-inclusive Y_2 in u_full so that the mixed
@@ -398,17 +505,18 @@ impl CraigSneydStepper {
         // Ytld_1 = Ytld_0 + theta*dt * (F_1(t_{n+1},Ytld_1) - F_1(t_n,u^n))
         implicit_x_sweep(
             &ops_impl, alpha, ytld, ax_u, nx_int, ny_int, rhs_buf, line_out, y1,
-        );
+        )?;
 
         // --- MCS corrector 2: second implicit y-sweep ---
         // Ytld_2 = Ytld_1 + theta*dt * (F_2(t_{n+1},Ytld_2) - F_2(t_n,u^n))
         implicit_y_sweep(
             &ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, ytld,
-        );
+        )?;
 
         // u^{n+1} = Ytld_2.
         u_int.copy_from_slice(ytld);
         fill_boundaries(problem, grid, u_full, u_int, t_to);
+        Ok(())
     }
 }
 
@@ -464,6 +572,9 @@ fn apply_y_operator(
 /// `rhs` is the previous iterate (`Y_0` or `Ytld_0`), `ax_u` is `A_x` applied
 /// to the explicit-side solution `u^n`. Both are row-major interior vectors;
 /// `rhs_buf`/`line_out` (length `>= nx_int`) are scratch. Result into `out`.
+///
+/// Returns [`StepperError::ThomasFailure`] if any per-line tridiagonal solve
+/// hits a degenerate pivot.
 #[allow(clippy::too_many_arguments)]
 fn implicit_x_sweep(
     ops: &Operators2D,
@@ -475,17 +586,18 @@ fn implicit_x_sweep(
     rhs_buf: &mut [f64],
     line_out: &mut [f64],
     out: &mut [f64],
-) {
+) -> Result<(), StepperError> {
     for jj in 0..ny_int {
         for ii in 0..nx_int {
             rhs_buf[ii] = rhs[ii * ny_int + jj] - alpha * ax_u[ii * ny_int + jj];
         }
         ops.op_x[jj].add_implicit_corrections(alpha, &mut rhs_buf[..nx_int]);
-        ops.op_x[jj].solve_thomas_into(alpha, &rhs_buf[..nx_int], &mut line_out[..nx_int]);
+        ops.op_x[jj].solve_thomas_into(alpha, &rhs_buf[..nx_int], &mut line_out[..nx_int])?;
         for ii in 0..nx_int {
             out[ii * ny_int + jj] = line_out[ii];
         }
     }
+    Ok(())
 }
 
 /// One implicit y-sweep `(I - alpha*A_y) out = rhs - alpha*ay_u (+ corr.)`.
@@ -502,17 +614,18 @@ fn implicit_y_sweep(
     rhs_buf: &mut [f64],
     line_out: &mut [f64],
     out: &mut [f64],
-) {
+) -> Result<(), StepperError> {
     for ii in 0..nx_int {
         for jj in 0..ny_int {
             rhs_buf[jj] = rhs[ii * ny_int + jj] - alpha * ay_u[ii * ny_int + jj];
         }
         ops.op_y[ii].add_implicit_corrections(alpha, &mut rhs_buf[..ny_int]);
-        ops.op_y[ii].solve_thomas_into(alpha, &rhs_buf[..ny_int], &mut line_out[..ny_int]);
+        ops.op_y[ii].solve_thomas_into(alpha, &rhs_buf[..ny_int], &mut line_out[..ny_int])?;
         for jj in 0..ny_int {
             out[ii * ny_int + jj] = line_out[jj];
         }
     }
+    Ok(())
 }
 
 /// Fill boundary values in the full grid from boundary conditions and the
@@ -752,15 +865,17 @@ mod tests {
         let levels = stepper.time_levels(t_mat);
 
         for step in 0..n_time {
-            stepper.step(
-                &problem,
-                &grid,
-                &mut u_full,
-                &mut u_int,
-                levels[step],
-                levels[step + 1],
-                step,
-            );
+            stepper
+                .step(
+                    &problem,
+                    &grid,
+                    &mut u_full,
+                    &mut u_int,
+                    levels[step],
+                    levels[step + 1],
+                    step,
+                )
+                .expect("pure-diffusion 2D heat step is stable");
         }
 
         // Check at (pi/2, pi/2)
@@ -770,6 +885,192 @@ mod tests {
         assert!(
             error < 0.01,
             "2D heat CS error = {error:.6e}, exact = {exact:.6}, computed = {computed:.6}"
+        );
+    }
+
+    /// A convection-dominated 2D problem: small diffusion, large convection.
+    /// The convection magnitude `conv` is a tunable knob so a test can dial
+    /// the cell Péclet number across [`MCS_PECLET_MAX`].
+    struct ConvectionDominated2D {
+        /// Diffusion coefficient on both axes.
+        diff: f64,
+        /// Convection coefficient on both axes.
+        conv: f64,
+    }
+
+    impl PdeProblem2D for ConvectionDominated2D {
+        fn diffusion_xx(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            self.diff
+        }
+        fn diffusion_yy(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            self.diff
+        }
+        fn mixed_diffusion(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn convection_x(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            self.conv
+        }
+        fn convection_y(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            self.conv
+        }
+        fn reaction(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn terminal_condition(&self, x: f64, y: f64) -> f64 {
+            x.sin() * y.sin()
+        }
+        fn boundary_x_lower(&self, _y: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Dirichlet(0.0)
+        }
+        fn boundary_x_upper(&self, _y: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Dirichlet(0.0)
+        }
+        fn boundary_y_lower(&self, _x: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Dirichlet(0.0)
+        }
+        fn boundary_y_upper(&self, _x: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Dirichlet(0.0)
+        }
+        fn is_time_homogeneous(&self) -> bool {
+            true
+        }
+    }
+
+    /// [P6-1] The 2D MCS stepper must reject a strongly convection-dominated
+    /// grid with [`StepperError::PecletViolation`] rather than running the
+    /// `theta = 1/3` scheme silently outside its proven-stable regime.
+    ///
+    /// Failure mode being guarded: unlike the 1D path (which enforces a CFL
+    /// bound), the 2D MCS stepper hard-coded `theta = 1/3` with no stability
+    /// guard. MCS at `theta = 1/3` is unconditionally stable for *pure
+    /// diffusion* but only for `theta >= 2/5` in the general
+    /// convection-diffusion case (In 't Hout & Mishra 2010); a
+    /// convection-dominated grid can therefore diverge silently to inf / NaN.
+    ///
+    /// On a 41x41 grid over `[0, pi]^2` (spacing h ≈ pi/40 ≈ 0.0785) with
+    /// diffusion `a = 0.01` and convection `b = 5.0`, the cell Péclet number
+    /// is `Pe = |b|*h/(2a) ≈ 5*0.0785/0.02 ≈ 19.6` — far above the
+    /// `MCS_PECLET_MAX = 4.0` ceiling. The step must error.
+    #[test]
+    fn mcs_step_rejects_convection_dominated_grid() {
+        let pi = std::f64::consts::PI;
+        let problem = ConvectionDominated2D {
+            diff: 0.01,
+            conv: 5.0,
+        };
+        let gx = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
+        let gy = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
+        let grid = Grid2D::new(gx, gy);
+
+        // The Péclet check itself flags the grid.
+        match check_peclet(&problem, &grid, 0.0) {
+            Err(StepperError::PecletViolation {
+                peclet,
+                pe_max,
+                convection,
+                diffusion,
+                ..
+            }) => {
+                assert!(
+                    (pe_max - MCS_PECLET_MAX).abs() < 1e-12,
+                    "the error must cite the MCS_PECLET_MAX ceiling"
+                );
+                assert!(
+                    peclet > MCS_PECLET_MAX,
+                    "the reported Péclet {peclet:e} must exceed the ceiling {pe_max}"
+                );
+                assert!(
+                    (convection - 5.0).abs() < 1e-12 && (diffusion - 0.01).abs() < 1e-12,
+                    "the error must cite the offending convection / diffusion coefficients"
+                );
+            }
+            other => panic!("expected PecletViolation from check_peclet, got {other:?}"),
+        }
+
+        // A full MCS step must surface the same error.
+        let nx = grid.nx();
+        let ny = grid.ny();
+        let nx_int = grid.nx_interior();
+        let ny_int = grid.ny_interior();
+        let mut u_full = vec![0.0; nx * ny];
+        for i in 0..nx {
+            for j in 0..ny {
+                u_full[i * ny + j] =
+                    problem.terminal_condition(grid.x().points()[i], grid.y().points()[j]);
+            }
+        }
+        let mut u_int = vec![0.0; nx_int * ny_int];
+        for ii in 0..nx_int {
+            for jj in 0..ny_int {
+                u_int[ii * ny_int + jj] = u_full[(ii + 1) * ny + (jj + 1)];
+            }
+        }
+        let stepper = CraigSneydStepper::new(100);
+        let result = stepper.step(&problem, &grid, &mut u_full, &mut u_int, 0.25, 0.245, 0);
+        assert!(
+            matches!(result, Err(StepperError::PecletViolation { .. })),
+            "a convection-dominated MCS step must be rejected, got {result:?}"
+        );
+    }
+
+    /// [P6-1] The Péclet guard must NOT false-positive a benign grid: pure
+    /// 2D diffusion (zero convection — MCS at `theta = 1/3` is
+    /// unconditionally stable here) and a mildly convective grid well within
+    /// the ceiling both pass.
+    #[test]
+    fn mcs_peclet_guard_accepts_diffusion_dominated_grids() {
+        let pi = std::f64::consts::PI;
+        let gx = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
+        let gy = Grid1D::uniform(0.0, pi, 41).expect("valid grid");
+        let grid = Grid2D::new(gx, gy);
+
+        // Pure diffusion: zero convection → no Péclet constraint at all.
+        assert!(
+            check_peclet(&Heat2D, &grid, 0.0).is_ok(),
+            "pure-diffusion grid must pass the Péclet guard"
+        );
+
+        // Mild convection: with a = 1.0, b = 1.0, h ≈ 0.0785 the cell Péclet
+        // is ≈ 0.04 — far inside the ceiling.
+        let mild = ConvectionDominated2D {
+            diff: 1.0,
+            conv: 1.0,
+        };
+        assert!(
+            check_peclet(&mild, &grid, 0.0).is_ok(),
+            "a mildly convective, diffusion-dominated grid must pass the Péclet guard"
+        );
+    }
+
+    /// [P6-6] The 2D MCS stepper must reject a non-positive time step with
+    /// [`StepperError::NonPositiveStep`] rather than producing silent NaN
+    /// (the old `debug_assert!(dt > 0.0)` was compiled out in release).
+    #[test]
+    fn mcs_step_rejects_non_positive_dt() {
+        let pi = std::f64::consts::PI;
+        let gx = Grid1D::uniform(0.0, pi, 11).expect("valid grid");
+        let gy = Grid1D::uniform(0.0, pi, 11).expect("valid grid");
+        let grid = Grid2D::new(gx, gy);
+        let nx = grid.nx();
+        let ny = grid.ny();
+        let nx_int = grid.nx_interior();
+        let ny_int = grid.ny_interior();
+        let mut u_full = vec![1.0; nx * ny];
+        let mut u_int = vec![1.0; nx_int * ny_int];
+
+        let stepper = CraigSneydStepper::new(10);
+        // dt = 0: t_from == t_to.
+        let zero = stepper.step(&Heat2D, &grid, &mut u_full, &mut u_int, 0.3, 0.3, 0);
+        assert!(
+            matches!(zero, Err(StepperError::NonPositiveStep { dt, .. }) if dt == 0.0),
+            "dt = 0 must be rejected as NonPositiveStep, got {zero:?}"
+        );
+        // dt < 0: t_from < t_to.
+        let neg = stepper.step(&Heat2D, &grid, &mut u_full, &mut u_int, 0.1, 0.4, 0);
+        assert!(
+            matches!(neg, Err(StepperError::NonPositiveStep { dt, .. }) if dt < 0.0),
+            "dt < 0 must be rejected as NonPositiveStep, got {neg:?}"
         );
     }
 }
