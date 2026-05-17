@@ -68,7 +68,13 @@ pub struct InstrumentCashflowEnvelope {
     pub flows: Vec<CashflowRow>,
     /// Sum of `flows[i].pv`. Matches `base_value` for supported products.
     pub total_pv: f64,
-    /// Always `true` for the two supported models; reserved for future guards.
+    /// `true` when `total_pv` agrees with the instrument's canonical
+    /// `base_value` (`Instrument::value`) within rounding tolerance.
+    ///
+    /// This is verified per call, not assumed: it is `false` when the per-flow
+    /// PV sum does not reconcile with `base_value` (for example, when the
+    /// requested `model` differs from the instrument's default pricing model)
+    /// or when `base_value` itself cannot be computed.
     pub reconciles_with_base_value: bool,
 }
 
@@ -230,6 +236,31 @@ fn build_envelope(
     let curve_dc = discount.day_count();
     let dc_ctx = DayCountContext::default();
 
+    // Survival probability at `as_of` under the hazard curve's own time origin.
+    // The exporter must report *conditional* survival Q(as_of, T) = S(T)/S(as_of)
+    // so the PV is correct even when the hazard curve's base date differs from
+    // `as_of` (a seasoned instrument or a reused prior-day curve). This mirrors
+    // `HazardBondEngine::price_raw`, which renormalizes by S(as_of).
+    let survival_at_as_of = match hazard_arc.as_ref() {
+        Some(h) => {
+            let s0 = h.sp_on_date(as_of_date)?;
+            if !s0.is_finite() || s0 <= 0.0 {
+                return Err(Error::Validation(format!(
+                    "instrument_cashflows: hazard curve '{}' implies survival probability {s0} \
+                     at as_of {as_of_date}; an already-defaulted name cannot be exported as a \
+                     surviving cashflow stream — value recovery proceeds instead. \
+                     Check the hazard curve's base date and calibration.",
+                    hazard_curve_id
+                        .as_ref()
+                        .map(|id| id.as_str())
+                        .unwrap_or("<unknown>")
+                )));
+            }
+            Some(s0)
+        }
+        None => None,
+    };
+
     let mut rows = Vec::with_capacity(schedule.flows.len());
     let mut envelope_currency: Option<Currency> = None;
     let mut prev_sp = 1.0_f64;
@@ -249,12 +280,12 @@ fn build_envelope(
 
         let year_fraction = curve_dc.signed_year_fraction(as_of_date, flow.date, dc_ctx)?;
 
-        // Past-dated flows (date < as_of) are already settled. Calling
-        // `discount.df(t)` with negative t extrapolates the curve backwards and
-        // can return DF > 1, overstating the export's PV column. Survival
-        // probability has the same problem.  Treat past flows as undiscounted
-        // face value with no default adjustment so the audit trail matches the
-        // holder-view PV semantics used by `Instrument::value`.
+        // Past-dated flows (date < as_of) are already settled. Discounting them
+        // would extrapolate the curve backwards and can return DF > 1,
+        // overstating the export's PV column. Survival probability has the same
+        // problem. Treat past flows as undiscounted face value with no default
+        // adjustment so the audit trail matches the holder-view PV semantics
+        // used by `Instrument::value`.
         let (discount_factor, survival_probability, conditional_default_prob) =
             if year_fraction < 0.0 {
                 let sp = if hazard_arc.is_some() {
@@ -265,15 +296,23 @@ fn build_envelope(
                 let cond_pd = sp.map(|_| 0.0);
                 (1.0, sp, cond_pd)
             } else {
-                let df = discount.df(year_fraction);
-                let (sp, cond_pd) = match hazard_arc.as_ref() {
-                    Some(h) => {
-                        let sp = h.sp(year_fraction);
+                // Date-based discounting: `DiscountCurve::df` expects time from
+                // the curve's own `base_date`, not from `as_of`. For a seasoned
+                // instrument (`as_of != base_date`), feeding an `as_of`-relative
+                // year fraction into `df` lands on the wrong time origin and
+                // breaks reconciliation with `Instrument::value`, which uses
+                // `df_between_dates`. Use the same date-based helper here.
+                let df = discount.df_between_dates(as_of_date, flow.date)?;
+                let (sp, cond_pd) = match (hazard_arc.as_ref(), survival_at_as_of) {
+                    (Some(h), Some(s0)) => {
+                        // Conditional survival Q(as_of, T) = S(T) / S(as_of).
+                        let s_t = h.sp_on_date(flow.date)?;
+                        let sp = (s_t / s0).clamp(0.0, 1.0);
                         let cond_pd = (prev_sp - sp).max(0.0);
                         prev_sp = sp;
                         (Some(sp), Some(cond_pd))
                     }
-                    None => (None, None),
+                    _ => (None, None),
                 };
                 (df, sp, cond_pd)
             };
@@ -324,6 +363,29 @@ fn build_envelope(
 
     let total_pv = sum_pvs(rows.iter().map(|row| row.pv));
 
+    // Honest reconciliation flag: compare `total_pv` against the instrument's
+    // canonical `base_value` (`Instrument::value`) rather than asserting `true`
+    // unconditionally. The flag is only `true` when the per-flow PV sum
+    // actually agrees with `base_value` within rounding. This catches genuine
+    // mismatches — e.g. a model whose `base_value` pricer diverges from the
+    // discounting/hazard cashflow sum, or a future change that re-introduces a
+    // discounting bug — instead of silently claiming a reconciliation that
+    // does not hold.
+    let reconciles_with_base_value = match instrument.value(market, as_of_date) {
+        Ok(base_value) => {
+            let base = base_value.amount();
+            // Relative tolerance with an absolute floor: per-flow PVs and
+            // `base_value` are summed by different (compensated) accumulators,
+            // so exact equality is not expected, but any real time-origin or
+            // model mismatch is orders of magnitude larger than this bound.
+            let tol = (base.abs() * 1e-6).max(1e-6);
+            (total_pv - base).abs() <= tol
+        }
+        // If the instrument cannot be priced via `Instrument::value` we cannot
+        // assert reconciliation; report `false` rather than an unverified `true`.
+        Err(_) => false,
+    };
+
     Ok(InstrumentCashflowEnvelope {
         instrument_id,
         currency,
@@ -334,7 +396,7 @@ fn build_envelope(
         recovery_rate,
         flows: rows,
         total_pv,
-        reconciles_with_base_value: true,
+        reconciles_with_base_value,
     })
 }
 
@@ -418,7 +480,7 @@ mod tests {
 
     #[test]
     fn discounting_reconciles_with_schedule_pv_for_fixed_bond() {
-        use crate::instruments::common_impl::helpers::schedule_pv_using_curve_dc;
+        use crate::instruments::common_impl::helpers::schedule_pv_using_curve_dc_raw;
 
         let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
         let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
@@ -434,7 +496,9 @@ mod tests {
 
         // Use as_of strictly after issue so the initial notional outflow is
         // unambiguously in the past and excluded by both the schedule-based
-        // engine and `base_value`.
+        // engine and `base_value`. Note this makes the instrument *seasoned*
+        // (as_of != curve base_date), which is exactly the case where a wrong
+        // time origin in the exporter's discount factors would surface.
         let as_of_date = Date::from_calendar_date(2025, Month::July, 1).expect("date");
 
         let disc = DiscountCurve::builder("USD-OIS")
@@ -450,7 +514,13 @@ mod tests {
         let envelope: InstrumentCashflowEnvelope =
             serde_json::from_str(&payload).expect("parse envelope");
 
-        // Reference PV uses the same schedule-based engine as the exporter.
+        // Reference PV uses `schedule_pv_using_curve_dc_raw`, which discounts via
+        // the date-based `df_between_dates(as_of, date)` helper — the same time
+        // origin used by the discounting `BondEngine` (and therefore by
+        // `base_value`). The previous reference, `schedule_pv_using_curve_dc`,
+        // routes through `core::npv`, which discounts with `df(t)` for `t`
+        // measured from `as_of`; for this seasoned bond that lands on the wrong
+        // time origin and disagrees with `base_value` by ~$3.5k on $1M notional.
         let discount_curve_id = bond
             .market_dependencies()
             .expect("deps")
@@ -459,9 +529,9 @@ mod tests {
             .first()
             .cloned()
             .expect("bond should declare a discount curve");
-        let reference = schedule_pv_using_curve_dc(&bond, &market, as_of_date, &discount_curve_id)
-            .expect("schedule pv")
-            .amount();
+        let reference =
+            schedule_pv_using_curve_dc_raw(&bond, &market, as_of_date, &discount_curve_id)
+                .expect("schedule pv");
 
         let diff = (envelope.total_pv - reference).abs();
         assert!(
@@ -479,6 +549,83 @@ mod tests {
             assert!(row.survival_probability.is_none());
             assert!(row.discount_factor > 0.0);
         }
+    }
+
+    #[test]
+    fn seasoned_instrument_discount_factors_use_correct_time_origin() {
+        // Failure mode: `discount.df(year_fraction)` measures `year_fraction`
+        // from `as_of`, but `DiscountCurve::df` expects time from the curve's
+        // own `base_date`. When `as_of != base_date` (a seasoned instrument)
+        // every exported discount factor and PV lands on the wrong time origin,
+        // and `total_pv` no longer reconciles with `base_value`
+        // (`Instrument::value`), which uses date-based `df_between_dates`.
+        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
+        let bond = Bond::fixed(
+            "BOND-SEASONED-TIME-ORIGIN",
+            Money::new(1_000_000.0, Currency::USD),
+            0.05,
+            issue,
+            maturity,
+            "USD-OIS",
+        )
+        .expect("bond");
+
+        // as_of strictly after the curve base_date => seasoned instrument.
+        let as_of_date = Date::from_calendar_date(2025, Month::July, 1).expect("date");
+
+        // Curve base_date == issue, deliberately != as_of.
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(issue)
+            .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+            .build()
+            .expect("discount curve");
+        let market = MarketContext::new().insert(disc.clone());
+
+        // base_value: the canonical price from Instrument::value, which the
+        // discounting BondEngine computes via df_between_dates(as_of, date).
+        let base_value = bond
+            .value(&market, as_of_date)
+            .expect("bond base value")
+            .amount();
+
+        let json = serialize_bond(&bond);
+        let payload = instrument_cashflows_json(&json, &market, "2025-07-01", "discounting")
+            .expect("cashflows envelope");
+        let envelope: InstrumentCashflowEnvelope =
+            serde_json::from_str(&payload).expect("parse envelope");
+
+        // total_pv must reconcile with base_value within rounding.
+        let diff = (envelope.total_pv - base_value).abs();
+        assert!(
+            diff < 1e-2,
+            "seasoned-instrument total_pv {} must reconcile with base_value {} (diff={}); \
+             a wrong time origin in the exported discount factors breaks reconciliation",
+            envelope.total_pv,
+            base_value,
+            diff,
+        );
+
+        // Each exported discount factor must equal df_between_dates(as_of, date).
+        for row in &envelope.flows {
+            if row.year_fraction < 0.0 {
+                continue;
+            }
+            let expected_df = disc
+                .df_between_dates(as_of_date, row.date)
+                .expect("df_between_dates");
+            assert!(
+                (row.discount_factor - expected_df).abs() < 1e-12,
+                "discount_factor for flow {} is {}, expected df_between_dates(as_of, date)={}",
+                row.date,
+                row.discount_factor,
+                expected_df,
+            );
+        }
+
+        // The reconciliation flag must be honest: it is only `true` here
+        // because the export actually reconciles.
+        assert!(envelope.reconciles_with_base_value);
     }
 
     #[test]

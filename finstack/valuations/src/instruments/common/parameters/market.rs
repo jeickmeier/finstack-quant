@@ -180,7 +180,12 @@ pub struct EquityOptionParams {
 }
 
 impl EquityOptionParams {
-    /// Create new equity option parameters
+    /// Create new equity option parameters.
+    ///
+    /// Validation is provided separately by [`EquityOptionParams::validate`] so
+    /// this constructor's signature stays infallible; callers that need the
+    /// invariants enforced should call `validate` (instrument constructors do
+    /// so before pricing).
     pub fn new(strike: f64, expiry: Date, option_type: OptionType, notional: Money) -> Self {
         Self {
             strike,
@@ -203,15 +208,40 @@ impl EquityOptionParams {
     }
 
     /// Set exercise style
+    #[must_use]
     pub fn with_exercise_style(mut self, style: ExerciseStyle) -> Self {
         self.exercise_style = style;
         self
     }
 
     /// Set settlement type
+    #[must_use]
     pub fn with_settlement(mut self, settlement: SettlementType) -> Self {
         self.settlement = settlement;
         self
+    }
+
+    /// Validate the structural invariants of these option parameters.
+    ///
+    /// Enforces `strike > 0`: a non-positive strike makes the lognormal option
+    /// payoff ill-defined.
+    ///
+    /// The `notional` is a [`Money`], whose constructor already rejects
+    /// non-finite amounts, so no separate notional-finiteness check is needed
+    /// here — the type guarantees it.
+    ///
+    /// The constructors ([`EquityOptionParams::new`] and friends) do not call
+    /// this — the struct also has public fields and is built by serde — so
+    /// call `validate` after construction to enforce the invariant.
+    ///
+    /// # Errors
+    /// Returns an error stating the attempted value when the strike is not
+    /// strictly positive.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            self.strike,
+            "EquityOptionParams.strike",
+        )
     }
 }
 
@@ -234,7 +264,11 @@ pub struct FxOptionParams {
 }
 
 impl FxOptionParams {
-    /// Create new FX option parameters
+    /// Create new FX option parameters.
+    ///
+    /// Validation is provided separately by [`FxOptionParams::validate`] so
+    /// this constructor's signature stays infallible; callers that need the
+    /// invariants enforced should call `validate`.
     pub fn new(strike: f64, expiry: Date, option_type: OptionType, notional: Money) -> Self {
         Self {
             strike,
@@ -257,15 +291,40 @@ impl FxOptionParams {
     }
 
     /// Set exercise style
+    #[must_use]
     pub fn with_exercise_style(mut self, style: ExerciseStyle) -> Self {
         self.exercise_style = style;
         self
     }
 
     /// Set settlement type
+    #[must_use]
     pub fn with_settlement(mut self, settlement: SettlementType) -> Self {
         self.settlement = settlement;
         self
+    }
+
+    /// Validate the structural invariants of these FX option parameters.
+    ///
+    /// Enforces `strike > 0`: the strike is an FX rate, which is strictly
+    /// positive.
+    ///
+    /// The `notional` is a [`Money`], whose constructor already rejects
+    /// non-finite amounts, so no separate notional-finiteness check is needed
+    /// here — the type guarantees it.
+    ///
+    /// The constructors ([`FxOptionParams::new`] and friends) do not call this
+    /// — the struct also has public fields and is built by serde — so call
+    /// `validate` after construction to enforce the invariant.
+    ///
+    /// # Errors
+    /// Returns an error stating the attempted value when the strike is not
+    /// strictly positive.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            self.strike,
+            "FxOptionParams.strike",
+        )
     }
 }
 
@@ -281,7 +340,13 @@ pub struct CreditParams {
 }
 
 impl CreditParams {
-    /// Create new credit parameters
+    /// Create new credit parameters.
+    ///
+    /// Recovery-rate validation is provided separately by
+    /// [`CreditParams::validate`] so this constructor's signature stays
+    /// infallible. Callers that need the `recovery_rate ∈ [0.0, 1.0)`
+    /// invariant enforced — consistently with `ProtectionLegSpec` — should
+    /// call `validate`.
     pub fn new(
         reference_entity: impl Into<String>,
         recovery_rate: f64,
@@ -322,6 +387,24 @@ impl CreditParams {
     ) -> Self {
         Self::new(reference_entity, 0.30, credit_curve_id)
     }
+
+    /// Validate that the recovery rate is within valid bounds `[0.0, 1.0)`.
+    ///
+    /// Delegates to the shared internal recovery-rate validator — the same one
+    /// used by `ProtectionLegSpec::new` — so credit instruments enforce a
+    /// single, consistent recovery-rate invariant.
+    ///
+    /// `CreditParams::new` does not call this (the struct also has public
+    /// fields and is built by serde), which is why the audit flagged
+    /// `CreditParams` as inconsistent with `ProtectionLegSpec::new`. Call
+    /// `validate` after construction to close that gap.
+    ///
+    /// # Errors
+    /// Returns an error stating the attempted value and the required range when
+    /// `recovery_rate` is not finite or lies outside `[0.0, 1.0)`.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        crate::instruments::common_impl::validation::validate_recovery_rate(self.recovery_rate)
+    }
 }
 
 /// Interest rate option parameters (caps/floors)
@@ -343,7 +426,11 @@ pub struct InterestRateOptionParams {
 }
 
 impl InterestRateOptionParams {
-    /// Create new IR option parameters
+    /// Create new IR option parameters.
+    ///
+    /// Validation is provided separately by
+    /// [`InterestRateOptionParams::validate`] so this constructor's signature
+    /// stays infallible.
     pub fn new(
         strike: f64,
         expiry: Date,
@@ -377,6 +464,31 @@ impl InterestRateOptionParams {
             day_count: DayCount::Act360,
             notional,
         }
+    }
+
+    /// Validate the structural invariants of these IR option parameters.
+    ///
+    /// Enforces a finite `strike`. The strike is a rate (cap/floor strike) and
+    /// may legitimately be zero or negative in a negative-rate regime, so only
+    /// finiteness is required — not positivity. A deserialized `f64` strike
+    /// can be `NaN`/`inf`, so the check is meaningful.
+    ///
+    /// The `notional` is a [`Money`], whose constructor already rejects
+    /// non-finite amounts, so no separate notional-finiteness check is needed
+    /// here — the type guarantees it.
+    ///
+    /// The constructors do not call this — the struct also has public fields
+    /// and is built by serde — so call `validate` after construction to
+    /// enforce the invariant.
+    ///
+    /// # Errors
+    /// Returns an error stating the attempted value when the strike is not
+    /// finite.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        crate::instruments::common_impl::validation::validate_f64_finite(
+            self.strike,
+            "InterestRateOptionParams.strike",
+        )
     }
 }
 
@@ -427,6 +539,7 @@ mod tests {
         assert_eq!(equity.option_type, OptionType::Call);
         assert_eq!(equity.exercise_style, ExerciseStyle::American);
         assert_eq!(equity.settlement, SettlementType::Cash);
+        assert!(equity.validate().is_ok());
 
         let fx = FxOptionParams::european_put(1.12, expiry, notional)
             .with_exercise_style(ExerciseStyle::Bermudan)
@@ -434,6 +547,7 @@ mod tests {
         assert_eq!(fx.option_type, OptionType::Put);
         assert_eq!(fx.exercise_style, ExerciseStyle::Bermudan);
         assert_eq!(fx.settlement, SettlementType::Physical);
+        assert!(fx.validate().is_ok());
     }
 
     #[test]
@@ -459,6 +573,140 @@ mod tests {
         assert_eq!(ir.option_type, OptionType::Put);
         assert_eq!(ir.tenor, "6M");
         assert_eq!(ir.day_count, DayCount::Act360);
+    }
+
+    #[test]
+    fn equity_option_validate_rejects_non_positive_strike() {
+        // Failure mode: a non-positive strike makes the lognormal option payoff
+        // ill-defined; it was previously unvalidated.
+        let expiry = date!(2026 - 06 - 15);
+        let notional = Money::new(1_000_000.0, Currency::USD);
+
+        let zero = EquityOptionParams::new(0.0, expiry, OptionType::Call, notional);
+        let err = zero
+            .validate()
+            .expect_err("strike 0.0 must be rejected by validate");
+        assert!(
+            err.to_string().contains("strike"),
+            "error should name the strike: {err}"
+        );
+        assert!(EquityOptionParams::new(-10.0, expiry, OptionType::Call, notional)
+            .validate()
+            .is_err());
+        assert!(EquityOptionParams::european_put(-1.0, expiry, notional)
+            .validate()
+            .is_err());
+        // A well-formed equity option passes validation.
+        assert!(EquityOptionParams::new(100.0, expiry, OptionType::Call, notional)
+            .validate()
+            .is_ok());
+    }
+
+    #[test]
+    fn option_notional_finiteness_is_guaranteed_by_money_type() {
+        // The `notional` field is a `Money`; `Money::new` itself rejects
+        // non-finite amounts, so an `EquityOptionParams`/`FxOptionParams`
+        // notional cannot be NaN/inf and needs no separate check in
+        // `validate`. A finite (incl. zero/negative) notional is accepted.
+        let expiry = date!(2026 - 06 - 15);
+        let zero_notional = Money::new(0.0, Currency::USD);
+        assert!(EquityOptionParams::new(100.0, expiry, OptionType::Call, zero_notional)
+            .validate()
+            .is_ok());
+        assert!(FxOptionParams::new(1.10, expiry, OptionType::Put, zero_notional)
+            .validate()
+            .is_ok());
+    }
+
+    #[test]
+    fn fx_option_validate_rejects_non_positive_strike() {
+        // An FX option strike is an FX rate and must be strictly positive.
+        let expiry = date!(2026 - 06 - 15);
+        let notional = Money::new(1_000_000.0, Currency::USD);
+        assert!(FxOptionParams::new(0.0, expiry, OptionType::Call, notional)
+            .validate()
+            .is_err());
+        assert!(FxOptionParams::european_call(-1.20, expiry, notional)
+            .validate()
+            .is_err());
+        assert!(FxOptionParams::new(1.10, expiry, OptionType::Call, notional)
+            .validate()
+            .is_ok());
+    }
+
+    #[test]
+    fn credit_params_validate_enforces_recovery_rate_bounds() {
+        // Failure mode: `CreditParams::new` skips `validate_recovery_rate`,
+        // unlike `ProtectionLegSpec::new`. `CreditParams::validate` closes the
+        // gap with the same shared validator.
+        let above = CreditParams::new("ACME", 1.5, "ACME-CDS");
+        let err = above
+            .validate()
+            .expect_err("recovery rate 1.5 must be rejected by validate");
+        assert!(
+            err.to_string().to_lowercase().contains("recovery rate"),
+            "error should name the recovery rate: {err}"
+        );
+        // R = 1.0 is rejected (zero LGD degenerates protection legs), matching
+        // the shared validator used by ProtectionLegSpec.
+        assert!(CreditParams::new("ACME", 1.0, "ACME-CDS").validate().is_err());
+        assert!(CreditParams::new("ACME", -0.1, "ACME-CDS")
+            .validate()
+            .is_err());
+        assert!(CreditParams::new("ACME", f64::NAN, "ACME-CDS")
+            .validate()
+            .is_err());
+        // Valid mid-range recovery is accepted.
+        assert!(CreditParams::new("ACME", 0.4, "ACME-CDS").validate().is_ok());
+        // The shared corporate/sovereign presets are within bounds.
+        assert!(CreditParams::corporate_standard("CORP", "CORP-CDS")
+            .validate()
+            .is_ok());
+        assert!(CreditParams::sovereign_standard("UST", "UST-CDS")
+            .validate()
+            .is_ok());
+        // A struct-literal spec that bypassed `new` is still checkable.
+        let bad = CreditParams {
+            reference_entity: "X".to_string(),
+            recovery_rate: 1.2,
+            credit_curve_id: CurveId::new("X-CDS"),
+        };
+        assert!(bad.validate().is_err());
+    }
+
+    #[test]
+    fn ir_option_validate_accepts_negative_strike_but_rejects_non_finite() {
+        // An interest-rate option strike is a rate; negative strikes are valid
+        // in negative-rate regimes and must NOT be rejected.
+        let expiry = date!(2026 - 06 - 15);
+        let notional = Money::new(1_000_000.0, Currency::USD);
+        assert!(
+            InterestRateOptionParams::new(-0.005, expiry, OptionType::Put, "3M", notional)
+                .validate()
+                .is_ok(),
+            "negative cap/floor strike must be accepted"
+        );
+        // A non-finite f64 strike (possible via deserialization) is rejected.
+        assert!(
+            InterestRateOptionParams::new(f64::NAN, expiry, OptionType::Put, "3M", notional)
+                .validate()
+                .is_err()
+        );
+        assert!(
+            InterestRateOptionParams::new(f64::INFINITY, expiry, OptionType::Put, "3M", notional)
+                .validate()
+                .is_err()
+        );
+        // A struct-literal spec that bypassed `new` is still checkable.
+        let bad = InterestRateOptionParams {
+            strike: f64::NAN,
+            expiry,
+            option_type: OptionType::Put,
+            tenor: "3M".to_string(),
+            day_count: DayCount::Act360,
+            notional,
+        };
+        assert!(bad.validate().is_err());
     }
 
     #[test]
