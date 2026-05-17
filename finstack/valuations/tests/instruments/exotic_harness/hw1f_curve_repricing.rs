@@ -222,9 +222,10 @@ fn flat_theta_misreprices_sloped_curve() {
 /// The residual is *not* a model bias — it is the discretization floor of this
 /// Monte-Carlo ZCB estimator: (a) the trapezoidal accumulation of `∫r dt`,
 /// which on an OU path has an O(dt²) bias amplified by the convexity of
-/// `exp(−·)`; (b) the midpoint-rule piecewise-constant θ(t) bootstrap; and
-/// (c) the log-linear interpolation of the knot-based discount curve. All
-/// shrink under refinement (see `theta_repricing_error_converges_with_grid`).
+/// `exp(−·)`; (b) the grid-discretization error of the piecewise-constant θ(t)
+/// bootstrap; and (c) the log-linear interpolation of the knot-based discount
+/// curve. Term (a) shrinks as the simulation time grid is refined — the
+/// companion `theta_repricing_error_converges_with_grid` confirms exactly this.
 /// The measured bias is ≤ 3 bp at every maturity; we bound it at 12 bp — clear
 /// of the ~3·se Monte-Carlo noise yet ~100× below the flat-θ drift bias the
 /// companion test pins.

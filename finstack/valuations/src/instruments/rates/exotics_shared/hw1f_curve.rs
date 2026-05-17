@@ -171,9 +171,11 @@ pub fn calibrate_hw1f_params(
 /// simulated short rate offset from `f(0,0)` and the model no longer reprices
 /// the discount curve — the defect this M6 fix removes.
 ///
-/// `f(0,0)` is taken by a one-sided forward difference of `−ln P` on the
-/// `as_of`-rebased curve, the same approximation `calibrate_theta_from_curve`
-/// uses at `t = 0`, so `r(0)` and the bootstrapped θ(t) are mutually consistent.
+/// `f(0,0)` is taken by an instantaneous-forward finite difference of `−ln P`
+/// on the `as_of`-rebased curve — a one-sided forward difference at `t = 0`.
+/// This is the *same kind* of estimator the θ-bootstrap relies on, so `r(0)`
+/// and the bootstrapped θ(t) are consistent in construction; the finite-
+/// difference step sizes are chosen independently and need not coincide.
 ///
 /// # Errors
 ///

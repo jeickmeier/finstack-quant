@@ -28,12 +28,24 @@ use finstack_monte_carlo::traits::{PathState, Payoff, StateKey};
 struct SnowballCouponEvent {
     accrual_fraction: f64,
     discount_factor: f64,
-    /// HW1F bond-reconstruction coefficients for the period's term forward.
+    /// HW1F bond-reconstruction coefficients for the coupon's floating index.
     ///
-    /// The coupon's floating index is the τ-tenor simple forward (not the raw
-    /// instantaneous short rate); this turns the simulated `r(t)` at the event
-    /// date into that term rate via the affine HW1F bond formula.
+    /// A snowball / inverse-floater coupon fixes **in advance**: the floating
+    /// rate `L` is set at the period start and applies over `[start, end]`. The
+    /// index is therefore the `[start, end]`-tenor simple forward (not the raw
+    /// instantaneous short rate), reconstructed via the affine HW1F bond formula
+    /// from the short rate sampled **at the period start** — which is when this
+    /// event fires.
     forward_coeffs: PeriodForwardCoeffs,
+    /// Whether this coupon's fixing is sampled from a simulated short-rate path.
+    ///
+    /// `true` for a forward-starting coupon (period start strictly after
+    /// `as_of`): the simulation fires one `on_event` at the period start and
+    /// the payoff reads the short rate there. `false` for an already-seasoned
+    /// first coupon (period start at or before `as_of`): its fixing is the
+    /// deterministic `r(0) = f(0,0)` reconstruction, so `forward_coeffs`
+    /// degenerates to a flat rate and the event consumes no path sample.
+    needs_path_sample: bool,
 }
 
 /// Path-local snowball coupon accumulator.
@@ -85,23 +97,51 @@ impl SnowballCouponSpec {
     }
 }
 
-impl Payoff for SnowballPayoff {
-    fn on_event(&mut self, state: &mut PathState) {
-        if self.next_event >= self.events.len() {
-            return;
-        }
-
+impl SnowballPayoff {
+    /// Settle coupon `self.next_event` using the supplied short rate, threading
+    /// the running `prev_coupon` for the snowball recursion.
+    ///
+    /// `short_rate` is ignored for an already-seasoned first coupon, whose
+    /// `forward_coeffs` are a short-rate-independent flat rate.
+    fn settle_next(&mut self, short_rate: f64) {
         let event = self.events[self.next_event];
-        // Reconstruct the period's term simple forward from the simulated
+        // Reconstruct the coupon's in-advance term simple forward from the
         // short rate via the HW1F affine bond formula, instead of using the
         // instantaneous short rate r(t) directly as a term index rate.
-        let short_rate = state.get_key(StateKey::ShortRate).unwrap_or(0.0);
         let floating_rate = event.forward_coeffs.simple_forward(short_rate);
         let coupon_rate = self.compute_coupon(floating_rate);
         self.discounted_pv +=
             coupon_rate * event.accrual_fraction * self.notional * event.discount_factor;
         self.prev_coupon = coupon_rate;
         self.next_event += 1;
+    }
+
+    /// Drain the leading run of already-seasoned coupons (in-advance fixings at
+    /// or before `as_of`), which carry no path events. Their `forward_coeffs`
+    /// are short-rate-independent, so the sampled rate passed in is irrelevant.
+    fn settle_seasoned_prefix(&mut self) {
+        while self
+            .events
+            .get(self.next_event)
+            .is_some_and(|e| !e.needs_path_sample)
+        {
+            self.settle_next(0.0);
+        }
+    }
+}
+
+impl Payoff for SnowballPayoff {
+    fn on_event(&mut self, state: &mut PathState) {
+        // The simulation fires one event per *forward-starting* coupon, at that
+        // coupon's period start (the in-advance fixing date). A leading
+        // already-seasoned coupon carries no path event, so drain any such
+        // coupons that precede this path-fixed one before settling it.
+        self.settle_seasoned_prefix();
+        if self.next_event >= self.events.len() {
+            return;
+        }
+        let short_rate = state.get_key(StateKey::ShortRate).unwrap_or(0.0);
+        self.settle_next(short_rate);
     }
 
     fn value(&self, currency: finstack_core::currency::Currency) -> Money {
@@ -143,10 +183,12 @@ impl SnowballDiscountingPricer {
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
         let forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
         // The discounting pricer projects rates from the forward curve, so the
-        // term-forward coefficients are unused here; default HW params suffice.
+        // term-forward coefficients (and the `r0` seasoned-fixing argument) are
+        // unused here; default HW params and `r0 = 0.0` suffice. Only the
+        // `accrual_fraction` / `discount_factor` fields are consumed below.
         let term_forward =
             Hw1fTermForward::new(HullWhiteParams::default(), discount_curve.as_ref(), as_of)?;
-        let events = coupon_events(inst, market, as_of, &term_forward)?;
+        let events = coupon_events(inst, market, as_of, &term_forward, 0.0)?;
         if events.is_empty() {
             return Ok(Money::new(0.0, inst.notional.currency()));
         }
@@ -315,9 +357,23 @@ impl SnowballHw1fMcPricer {
         let _forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
         let hw_params = self.effective_hw_params(inst)?;
         // HW1F bond-reconstruction built from the discount curve; turns the
-        // simulated short rate at each event into the period term forward.
+        // short rate sampled at each coupon's in-advance fixing date into that
+        // coupon's term forward.
         let term_forward = Hw1fTermForward::new(hw_params, discount_curve.as_ref(), as_of)?;
-        let events = coupon_events(inst, market, as_of, &term_forward)?;
+        // Initial short rate = discount-curve instantaneous forward f(0,0).
+        // HW1F reprices the discount curve only when r(0) = f(0,0); seeding it
+        // from a separate forward-curve projection would offset the simulated
+        // short rate from the curve and break the M6 repricing property. It is
+        // also the deterministic fixing of an already-seasoned first coupon.
+        let r0 = initial_short_rate_from_curve(discount_curve.as_ref(), as_of)?;
+        if !r0.is_finite() {
+            return Err(finstack_core::Error::Validation(format!(
+                "Snowball {} initial short rate is not finite",
+                inst.id.as_str()
+            )));
+        }
+
+        let events = coupon_events(inst, market, as_of, &term_forward, r0)?;
         if events.is_empty() {
             let zero = Money::new(0.0, inst.notional.currency());
             return Ok(MoneyEstimate {
@@ -336,24 +392,33 @@ impl SnowballHw1fMcPricer {
             });
         }
 
-        // A future coupon period must exist for the simulation to have any
-        // events; `event_times` below would otherwise be empty.
-        first_future_period(inst, as_of)?;
-        // Initial short rate = discount-curve instantaneous forward f(0,0).
-        // HW1F reprices the discount curve only when r(0) = f(0,0); seeding it
-        // from a separate forward-curve projection would offset the simulated
-        // short rate from the curve and break the M6 repricing property.
-        let r0 = initial_short_rate_from_curve(discount_curve.as_ref(), as_of)?;
-        if !r0.is_finite() {
-            return Err(finstack_core::Error::Validation(format!(
-                "Snowball {} initial short rate is not finite",
-                inst.id.as_str()
-            )));
-        }
+        let spec = SnowballCouponSpec {
+            variant: inst.variant,
+            initial_coupon: inst.initial_coupon,
+            fixed_rate: inst.fixed_rate,
+            leverage: inst.leverage,
+            coupon_floor: inst.coupon_floor,
+            coupon_cap: inst.coupon_cap,
+        };
+        let config = self.effective_config(inst);
 
         let event_times = event_times(inst, as_of)?;
+        // No forward-starting coupon: every fixing is the deterministic
+        // `r(0) = f(0,0)` reconstruction, so the price has no Monte-Carlo
+        // component. Settle the (fully seasoned) schedule directly.
+        if event_times.is_empty() {
+            return Ok(deterministic_estimate(
+                spec,
+                inst.notional,
+                &events,
+                config.effective_path_count(),
+            ));
+        }
+
         // Bootstrap a time-dependent θ(t) from the discount curve so the
         // simulated short rate reprices the initial curve (HW1F, not Vasicek).
+        // The grid covers up to the last fixing — no coupon fixes after it and
+        // redemption discounting is deterministic.
         let horizon = event_times.last().copied().unwrap_or(0.0);
         let process_params =
             calibrate_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
@@ -361,22 +426,11 @@ impl SnowballHw1fMcPricer {
             process_params,
             r0,
             event_times,
-            config: self.effective_config(inst),
+            config,
             currency: inst.notional.currency(),
         };
 
-        let payoff = SnowballPayoff::new(
-            SnowballCouponSpec {
-                variant: inst.variant,
-                initial_coupon: inst.initial_coupon,
-                fixed_rate: inst.fixed_rate,
-                leverage: inst.leverage,
-                coupon_floor: inst.coupon_floor,
-                coupon_cap: inst.coupon_cap,
-            },
-            inst.notional.amount(),
-            events,
-        );
+        let payoff = SnowballPayoff::new(spec, inst.notional.amount(), events);
         mc.price(|| payoff.clone())
     }
 
@@ -478,18 +532,28 @@ fn ensure_not_callable(inst: &Snowball) -> Result<()> {
     Ok(())
 }
 
-/// Build the per-coupon event schedule.
+/// Build the per-coupon event schedule, one [`SnowballCouponEvent`] per coupon
+/// period surviving past `as_of`.
 ///
-/// `term_forward` is the HW1F bond-reconstruction used to populate each event's
-/// term-forward coefficients. The HW1F MC pricer reads those coefficients; the
-/// path-independent discounting pricer ignores them (it projects rates from the
-/// forward curve directly) but still supplies a reconstruction for one code
-/// path.
+/// Snowball / inverse-floater coupons fix **in advance**: the floating rate for
+/// `[start, end]` is set at the period start. For a forward-starting coupon the
+/// event's `forward_coeffs` reconstruct that `[start, end]`-tenor simple forward
+/// from the short rate sampled at the period start (`needs_path_sample = true`).
+/// For an already-seasoned first coupon (`start ≤ as_of`) the fixing is the
+/// deterministic `r(0) = f(0,0)` reconstruction projected over the remaining
+/// `[as_of, end]` window; `forward_coeffs` then degenerates to that flat rate
+/// (`needs_path_sample = false`).
+///
+/// `term_forward` is the HW1F bond-reconstruction. The HW1F MC pricer reads the
+/// resulting coefficients; the path-independent discounting pricer ignores them
+/// (it projects rates from the forward curve directly) but still consumes the
+/// `accrual_fraction` / `discount_factor` fields.
 fn coupon_events(
     inst: &Snowball,
     market: &MarketContext,
     as_of: Date,
     term_forward: &Hw1fTermForward<'_>,
+    r0: f64,
 ) -> Result<Vec<SnowballCouponEvent>> {
     let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
     let mut events = Vec::new();
@@ -509,28 +573,58 @@ fn coupon_events(
                 inst.id.as_str()
             )));
         }
-        let event_time = inst
-            .day_count
-            .year_fraction(as_of, end, DayCountContext::default())?;
         let discount_factor = relative_df_discount_curve(discount_curve.as_ref(), as_of, end)?;
+
+        let (forward_coeffs, needs_path_sample) = if start > as_of {
+            // Forward-starting coupon: in-advance fixing sampled from the
+            // simulated short rate at the period start `t_fix`.
+            let fixing_time =
+                inst.day_count
+                    .year_fraction(as_of, start, DayCountContext::default())?;
+            (
+                term_forward.period_coeffs(fixing_time, accrual_fraction),
+                true,
+            )
+        } else {
+            // Already-seasoned first coupon: deterministic `r(0) = f(0,0)`
+            // fixing, projected over the remaining `[as_of, end]` window
+            // (accrual stays the full `[start, end]`).
+            let remaining = inst
+                .day_count
+                .year_fraction(as_of, end, DayCountContext::default())?;
+            let seasoned_rate = term_forward
+                .period_coeffs(0.0, remaining.max(0.0))
+                .simple_forward(r0);
+            (
+                PeriodForwardCoeffs::from_flat_rate(seasoned_rate, accrual_fraction),
+                false,
+            )
+        };
+
         events.push(SnowballCouponEvent {
             accrual_fraction,
             discount_factor,
-            forward_coeffs: term_forward.period_coeffs(event_time, accrual_fraction),
+            forward_coeffs,
+            needs_path_sample,
         });
     }
     Ok(events)
 }
 
+/// In-advance fixing event times (years from `as_of`), one per forward-starting
+/// coupon — i.e. each coupon whose period *start* lies strictly after `as_of`.
+/// An already-seasoned first coupon contributes no path event.
 fn event_times(inst: &Snowball, as_of: Date) -> Result<Vec<f64>> {
     let mut times = Vec::new();
-    for &date in inst.coupon_dates.iter().skip(1) {
-        if date <= as_of {
+    for period in inst.coupon_dates.windows(2) {
+        let start = period[0];
+        let end = period[1];
+        if end <= as_of || start <= as_of {
             continue;
         }
         let t = inst
             .day_count
-            .year_fraction(as_of, date, DayCountContext::default())?;
+            .year_fraction(as_of, start, DayCountContext::default())?;
         if t > 0.0 {
             times.push(t);
         }
@@ -538,20 +632,35 @@ fn event_times(inst: &Snowball, as_of: Date) -> Result<Vec<f64>> {
     Ok(times)
 }
 
-fn first_future_period(inst: &Snowball, as_of: Date) -> Result<(Date, Date)> {
-    inst.coupon_dates
-        .windows(2)
-        .find_map(|period| {
-            let start = period[0];
-            let end = period[1];
-            (end > as_of).then_some((start.max(as_of), end))
-        })
-        .ok_or_else(|| {
-            finstack_core::Error::Validation(format!(
-                "Snowball {} has no future coupon period after {as_of}",
-                inst.id.as_str()
-            ))
-        })
+/// PV of a fully-seasoned snowball schedule whose every coupon fixes off the
+/// deterministic `r(0) = f(0,0)`, so there is no Monte-Carlo component.
+///
+/// The returned [`MoneyEstimate`] reports the exact PV with zero dispersion.
+/// `num_paths` mirrors what an MC run with this configuration would have
+/// reported, keeping the result shape consistent for callers.
+fn deterministic_estimate(
+    spec: SnowballCouponSpec,
+    notional: Money,
+    events: &[SnowballCouponEvent],
+    num_paths: usize,
+) -> MoneyEstimate {
+    let mut payoff = SnowballPayoff::new(spec, notional.amount(), events.to_vec());
+    payoff.settle_seasoned_prefix();
+    let pv = payoff.value(notional.currency());
+    MoneyEstimate {
+        mean: pv,
+        stderr: 0.0,
+        ci_95: (pv, pv),
+        num_paths,
+        num_simulated_paths: num_paths,
+        std_dev: Some(0.0),
+        median: None,
+        percentile_25: None,
+        percentile_75: None,
+        min: Some(pv.amount()),
+        max: Some(pv.amount()),
+        num_skipped: 0,
+    }
 }
 
 #[cfg(test)]
@@ -607,21 +716,85 @@ mod tests {
         }
     }
 
+    /// Sloped zero rate `R(t) = base + 3%·(1 − e^{−0.6 t})` and its discount
+    /// factor `P(0,t) = exp(−R(t)·t)`.
+    fn sloped_zero(base: f64, t: f64) -> f64 {
+        base + 0.03 * (1.0 - (-0.6 * t).exp())
+    }
+
+    /// Test market with an **upward-sloping** discount curve.
+    ///
+    /// The slope is deliberate: on a flat curve the simple forward over a
+    /// coupon's in-advance window `[start, end]` equals the forward over the
+    /// in-arrears window `[end, end+τ]`, so a flat curve cannot tell a correct
+    /// in-advance fixing from the (incorrect) in-arrears one. The sloped curve
+    /// makes the two windows give measurably different forwards.
+    ///
+    /// `forward_rate` populates a *flat* projection curve (the declared floating
+    /// index): the HW1F MC ignores it (single-curve), and the discounting
+    /// pricer's own dedicated test supplies a flat rate it can reproduce
+    /// exactly. The cross-pricer consistency test instead builds a projection
+    /// curve consistent with the discount curve via [`consistent_market`].
     fn market(as_of: Date, discount_rate: f64, forward_rate: f64) -> MarketContext {
+        let knots: Vec<(f64, f64)> = (0..=12)
+            .map(|i| {
+                let t = i as f64 * 0.25;
+                (t, (-sloped_zero(discount_rate, t) * t).exp())
+            })
+            .collect();
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
-            .knots([
-                (0.0, 1.0),
-                (0.5, (-discount_rate * 0.5).exp()),
-                (1.5, (-discount_rate * 1.5).exp()),
-            ])
+            .knots(knots)
             .build()
             .expect("discount curve");
         let forward = ForwardCurve::builder("USD-SOFR-6M", 0.5)
             .base_date(as_of)
             .day_count(DayCount::Act365F)
-            .knots([(0.0, forward_rate), (1.5, forward_rate)])
+            .knots([(0.0, forward_rate), (3.0, forward_rate)])
+            .build()
+            .expect("forward curve");
+        MarketContext::new().insert(discount).insert(forward)
+    }
+
+    /// Test market whose projection curve is consistent with the discount curve.
+    ///
+    /// Both curves are built from the same sloped zero rate: the discount curve
+    /// holds `P(0,t)`; the projection curve's knot rates are the discount
+    /// curve's **instantaneous forward** `f(0,t) = R(t) + t·R'(t)`. With
+    /// consistent curves the discounting pricer (which projects in-advance from
+    /// the projection curve) and the HW1F MC pricer (which reconstructs the
+    /// in-advance forward from the discount curve) must price the *same*
+    /// instrument to within a small simple-vs-continuous-compounding gap — the
+    /// basis for the cross-pricer consistency check.
+    fn consistent_market(as_of: Date, base_rate: f64) -> MarketContext {
+        let knots: Vec<(f64, f64)> = (0..=16)
+            .map(|i| {
+                let t = i as f64 * 0.25;
+                (t, (-sloped_zero(base_rate, t) * t).exp())
+            })
+            .collect();
+        let discount = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots(knots)
+            .build()
+            .expect("discount curve");
+        // Instantaneous forward of the sloped zero: with
+        // R(t) = base + 0.03·(1 − e^{−0.6t}), R'(t) = 0.03·0.6·e^{−0.6t}, so
+        // f(0,t) = R(t) + t·R'(t).
+        let fwd_knots: Vec<(f64, f64)> = (0..=16)
+            .map(|i| {
+                let t = i as f64 * 0.25;
+                let r = sloped_zero(base_rate, t);
+                let r_prime = 0.03 * 0.6 * (-0.6 * t).exp();
+                (t, r + t * r_prime)
+            })
+            .collect();
+        let forward = ForwardCurve::builder("USD-SOFR-6M", 0.5)
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots(fwd_knots)
             .build()
             .expect("forward curve");
         MarketContext::new().insert(discount).insert(forward)
@@ -637,16 +810,25 @@ mod tests {
             })
     }
 
-    /// Expected deterministic-path PV.
+    /// Independent in-advance ground-truth PV for the deterministic-σ limit.
+    ///
+    /// This is **not** a copy of either pricer's accumulation — it is derived
+    /// from the in-advance contract directly. A snowball / inverse-floater
+    /// coupon over `[start, end]` fixes its floating rate *at the period start*
+    /// and the rate applies over `[start, end]`.
     ///
     /// `floating_rate`:
-    /// - `Some(r)` — every period uses the flat rate `r` (the discounting
-    ///   pricer, which projects from the forward curve).
-    /// - `None` — each period uses the discount curve's τ-tenor simple forward
-    ///   observed at the coupon's event date `end`. This is the deterministic-σ
-    ///   limit of the HW1F MC path with the M6/M7 fixes (the simulated short
-    ///   rate collapses to the curve forward, and M7 reconstructs the term
-    ///   rate from the discount curve).
+    /// - `Some(r)` — every coupon fixes at the flat rate `r`. The discounting
+    ///   pricer projects the rate from the (flat) forward curve, so the fixing
+    ///   window is immaterial and a single `r` is the exact ground truth.
+    /// - `None` — each coupon fixes at the **discount curve's own model-free
+    ///   simple forward** over its in-advance window `[max(start, as_of), end]`:
+    ///   `L_i = (P(0,start_i) / P(0,end_i) − 1) / accrual_i`. At σ → 0 the
+    ///   simulated HW1F short rate is exactly the curve's instantaneous forward,
+    ///   so the M7 reconstruction over `[start, end]` collapses to this. Using
+    ///   `P_start / P_end` (rather than the in-arrears `P_end / P_{end+τ}`) is
+    ///   what pins the in-advance convention: revert the pricer to sampling at
+    ///   `end` and this mirror no longer matches.
     fn expected_deterministic_pv(
         inst: &Snowball,
         market: &MarketContext,
@@ -664,15 +846,21 @@ mod tests {
         for period in inst.coupon_dates.windows(2) {
             let start = period[0];
             let end = period[1];
+            if end <= as_of {
+                continue;
+            }
             let accrual = dc.year_fraction(start, end, ctx).expect("accrual");
             let rate = match floating_rate {
                 Some(r) => r,
                 None => {
-                    // Term forward over [end, end+accrual] from the curve.
-                    let t_end = dc.year_fraction(as_of, end, ctx).expect("t_end");
-                    let p_end = disc.df(t_end);
-                    let p_end_tau = disc.df(t_end + accrual);
-                    (p_end / p_end_tau - 1.0) / accrual
+                    // In-advance fixing: simple forward over the fixing window
+                    // [max(start, as_of), end] implied by the discount curve.
+                    let fixing_start = start.max(as_of);
+                    let p_start = relative_df_discount_curve(disc.as_ref(), as_of, fixing_start)
+                        .expect("p_start");
+                    let p_end =
+                        relative_df_discount_curve(disc.as_ref(), as_of, end).expect("p_end");
+                    (p_start / p_end - 1.0) / accrual
                 }
             };
             let df = relative_df_discount_curve(disc.as_ref(), as_of, end).expect("df");
@@ -702,6 +890,53 @@ mod tests {
         assert!((price.amount() - expected).abs() < 1e-8);
     }
 
+    /// Cross-pricer consistency: the HW1F MC and the discounting pricer must
+    /// agree on the **fixing convention** for the *same* inverse floater.
+    ///
+    /// Both pricers fix the floating index *in advance* — the discounting
+    /// pricer via `rate_period_on_dates(forward_curve, start.max(as_of), end)`,
+    /// the HW1F MC via the term-forward reconstruction at the short rate
+    /// sampled at the period start. On [`consistent_market`] the projection
+    /// curve carries the discount curve's own instantaneous forward, so with a
+    /// near-zero σ (the two models coincide) they must price to within a small
+    /// residual gap (empirically ≈ $2k): the simple-vs-continuous-compounding
+    /// difference between the discount curve's *simple* forward and the
+    /// projection curve's *integral-averaged* rate, amplified by the inverse
+    /// floater's 1.5× leverage, plus the θ(t)-bootstrap discretization residual.
+    ///
+    /// This guards the two code paths against silently drifting apart on the
+    /// fixing window again: reverting either pricer to an in-arrears
+    /// `[end, end+τ]` fixing widens the gap to ≈ $10k on this sloped curve, so
+    /// the 4,000 bound — ~2× the legitimate residual, ~2.4× below the
+    /// regression — cleanly separates the two.
+    #[test]
+    fn hw1f_mc_and_discounting_agree_on_inverse_floater() {
+        let as_of = date(2025, Month::January, 1);
+        let market = consistent_market(as_of, 0.02);
+        let inst = test_inverse_floater();
+
+        // Discounting pricer: in-advance projection from the forward curve.
+        let discounting = SnowballDiscountingPricer
+            .price_internal(&inst, &market, as_of)
+            .expect("discounting price");
+
+        // HW1F MC at near-zero σ — the deterministic-σ limit where the
+        // short-rate model and the discounting projection coincide.
+        let mc = deterministic_mc_pricer(4_096)
+            .price_estimate(&inst, &market, as_of)
+            .expect("mc price");
+
+        let diff = (mc.mean.amount() - discounting.amount()).abs();
+        assert!(
+            diff < 4_000.0,
+            "HW1F MC ({}) and discounting ({}) disagree on the inverse-floater \
+             fixing convention: |Δ|={diff:.2} > $4k — the two pricers have \
+             drifted apart on the in-advance fixing window",
+            mc.mean.amount(),
+            discounting.amount(),
+        );
+    }
+
     #[test]
     fn discounting_rejects_path_dependent_snowball_variant() {
         let as_of = date(2025, Month::January, 1);
@@ -729,13 +964,32 @@ mod tests {
         assert!(err.to_string().contains("call provision"));
     }
 
+    /// Deterministic-σ snowball PV must match the **independent in-advance**
+    /// ground truth, pinning the in-advance fixing convention.
+    ///
+    /// `expected_deterministic_pv(.., None)` derives each coupon's floating
+    /// rate from the discount curve's simple forward over the *in-advance*
+    /// window `[start, end]`. The HW1F MC, at σ = 1e-12, samples the short rate
+    /// at each coupon's period start and reconstructs the same window.
+    ///
+    /// # Tolerance
+    ///
+    /// On the *sloped* test curve the residual is the θ(t)-bootstrap
+    /// discretization error (the monthly-grid piecewise-constant θ reprices
+    /// bonds to O(spacing²), so the σ → 0 short rate equals the curve forward
+    /// only to a few bp). The snowball coupon is path-dependent
+    /// (`prev + fixed − L`) so this residual compounds across coupons —
+    /// empirically ≲ $1k of notional. The 3,000 bound clears that yet is ~8×
+    /// below the ≈ $26k PV shift an in-arrears `[end, end+τ]` fixing produces,
+    /// so the test genuinely fails if the pricer reverts to sampling at the
+    /// period end.
     #[test]
     fn deterministic_mc_snowball_matches_discounted_coupon_formula() {
         let as_of = date(2025, Month::January, 1);
         let market = market(as_of, 0.02, 0.03);
         let inst = test_snowball();
         // None: the deterministic-σ HW1F path reconstructs the floating index
-        // from the discount curve (M7), not from the forward curve.
+        // from the discount curve (M7), in-advance over [start, end].
         let expected = expected_deterministic_pv(&inst, &market, as_of, None);
 
         let estimate = deterministic_mc_pricer(32)
@@ -743,8 +997,9 @@ mod tests {
             .expect("price");
 
         assert!(
-            (estimate.mean.amount() - expected).abs() < 1.0,
-            "mc={}, expected={expected}",
+            (estimate.mean.amount() - expected).abs() < 3_000.0,
+            "mc={}, expected={expected} (in-advance fixing); a >$3k gap \
+             indicates the pricer fixed in-arrears",
             estimate.mean.amount()
         );
     }

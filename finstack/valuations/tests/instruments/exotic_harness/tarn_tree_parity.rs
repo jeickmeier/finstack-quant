@@ -21,10 +21,11 @@
 //! coupon is set unreachably high (never knocks out), and with `fixed = 6%`
 //! against a ~2-4% forward every period coupon `(fixed − Lᵢ)` stays well above
 //! the `0` floor, so the `max` never binds. The payoff is then
-//! `Σᵢ (fixed − Lᵢ)·τᵢ·DF(0,tᵢ) + DF(0,T)`, with `Lᵢ` the τ-tenor simple
-//! forward at coupon date `tᵢ`. This isolates the M6/M7 machinery (the forward
-//! reconstruction and the calibrated short-rate distribution) from TARN-
-//! specific path dependence, which a backward-induction tree cannot represent.
+//! `Σᵢ (fixed − Lᵢ)·τᵢ·DF(0,tᵢ) + DF(0,T)`, with `Lᵢ` the in-advance floating
+//! fixing — the `[startᵢ, endᵢ]`-tenor simple forward observed at the coupon's
+//! *start* date. This isolates the M6/M7 machinery (the forward reconstruction
+//! and the calibrated short-rate distribution) from TARN-specific path
+//! dependence, which a backward-induction tree cannot represent.
 //!
 //! # Residual sources
 //!
@@ -120,12 +121,16 @@ fn floating_note_tarn(coupon_dates: Vec<Date>) -> Tarn {
 
 /// Price the floating-note TARN on a calibrated [`HullWhiteTree`].
 ///
-/// The tree re-derives, at each coupon date, the τ-tenor simple forward
-/// `Lᵢ = (1/P(tᵢ,tᵢ+τ) − 1)/τ` from its own analytic bond price `P(t,T) =
-/// A(t,T)·exp(−B(t,T)·r)`. Each coupon's value is the tᵢ-forward-measure
-/// expectation `Ê[(fixed − Lᵢ)·τᵢ]` — the state-price-weighted node average
-/// `Σⱼ Q(tᵢ,j)·c(j) / Σⱼ Q(tᵢ,j)` — discounted with the curve DF, matching the
-/// MC pricer's discounting convention so the two values are directly comparable.
+/// The TARN coupon fixes **in advance**: each coupon over `[start, end]` is set
+/// by the floating rate observed *at the period start*. The tree therefore
+/// re-derives, at each coupon's *start* date `tₛ`, the `[start, end]`-tenor
+/// simple forward `Lᵢ = (1/P(tₛ, tₑ) − 1)/τᵢ` from its own analytic bond price
+/// `P(t,T) = A(t,T)·exp(−B(t,T)·r)`. Each coupon's value is the tₛ-forward-
+/// measure expectation `Ê[(fixed − Lᵢ)·τᵢ]` — the state-price-weighted node
+/// average `Σⱼ Q(tₛ,j)·c(j) / Σⱼ Q(tₛ,j)` — discounted with the curve DF to the
+/// payment date, matching the MC pricer's discounting convention so the two
+/// values are directly comparable. The first coupon is already seasoned
+/// (`start == as_of`): its fixing collapses to the deterministic root node.
 fn tree_floating_note_pv(
     tarn: &Tarn,
     discount_curve: &DiscountCurve,
@@ -153,15 +158,22 @@ fn tree_floating_note_pv(
         }
         let t_end = dc.year_fraction(as_of, end, ctx).expect("t_end");
         let accrual = dc.year_fraction(start, end, ctx).expect("accrual");
-        let step = tree.time_to_step(t_end);
+        // In-advance fixing: sample the short rate at the period start. A
+        // seasoned coupon (start ≤ as_of) fixes at the deterministic root.
+        let t_fix = dc
+            .year_fraction(as_of, start, ctx)
+            .expect("t_start")
+            .max(0.0);
+        let fix_step = tree.time_to_step(t_fix);
 
-        // State-price-weighted (tᵢ-forward-measure) expectation of the coupon.
+        // State-price-weighted (tₛ-forward-measure) expectation of the coupon.
         let mut q_sum = 0.0_f64;
         let mut q_coupon = 0.0_f64;
-        for node in 0..tree.num_nodes(step) {
-            let q = tree.state_price(step, node);
-            // τ-tenor simple forward from the tree's analytic HW1F bond price.
-            let p = tree.bond_price(step, node, t_end + accrual, discount_curve);
+        for node in 0..tree.num_nodes(fix_step) {
+            let q = tree.state_price(fix_step, node);
+            // [start, end]-tenor simple forward from the tree's analytic
+            // HW1F bond price, reconstructed at the in-advance fixing node.
+            let p = tree.bond_price(fix_step, node, t_end, discount_curve);
             let fwd = (1.0 / p - 1.0) / accrual;
             let coupon = (tarn.fixed_rate - fwd).max(tarn.coupon_floor) * accrual;
             q_sum += q;
