@@ -189,7 +189,7 @@ pub use pricing::{
 
 pub use pricing::coverage_tests::{CoverageTest, TestContext, TestResult};
 pub use pricing::diversion::{DiversionCondition, DiversionEngine, DiversionRule};
-pub use pricing::stochastic::PricingMode;
+pub use pricing::stochastic::{PoolGranularity, PricingMode};
 pub use pricing::stochastic::{StochasticPricingResult, TranchePricingResult};
 pub use pricing::waterfall::execute_waterfall_with_explanation;
 pub use pricing::waterfall::WaterfallContext;

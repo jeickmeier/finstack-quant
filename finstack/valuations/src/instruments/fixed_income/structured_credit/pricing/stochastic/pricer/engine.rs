@@ -2,11 +2,14 @@
 
 use super::config::{PricingMode, StochasticPricerConfig};
 use super::result::{StochasticPricingResult, TranchePricingResult};
-use crate::correlation::{FactorSpec, RecoverySpec};
+use crate::correlation::{CopulaSpec, FactorSpec, RecoverySpec};
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::{
-    run_simulation_with_source, PeriodPoolShock, StochasticPathFlowSource,
+    run_simulation_with_source, PerNameDefaultEngine, PerNamePeriodInput, PeriodPoolShock,
+    StochasticPathFlowSource,
 };
-use crate::instruments::fixed_income::structured_credit::pricing::stochastic::default::MacroCreditFactors;
+use crate::instruments::fixed_income::structured_credit::pricing::stochastic::default::{
+    MacroCreditFactors, PerNameCopulaDefault,
+};
 use crate::instruments::fixed_income::structured_credit::pricing::{
     StochasticDefaultSpec, StochasticPrepaySpec,
 };
@@ -20,6 +23,17 @@ use finstack_monte_carlo::rng::philox::PhiloxRng;
 use finstack_monte_carlo::traits::RandomStream;
 use rayon::prelude::*;
 use std::cmp::Ordering;
+use std::sync::Arc;
+
+/// Seed salt for the per-name idiosyncratic-draw RNG.
+///
+/// Per-name copula simulation draws each name's idiosyncratic shock `εᵢ` from
+/// a Philox stream seeded with `config.seed ^ PER_NAME_SEED_SALT`. XOR-salting
+/// the seed places the idiosyncratic streams in a stream space fully disjoint
+/// from the systematic-factor streams (which use the unsalted seed), so the
+/// two never collide regardless of path count or pricing mode. The salt value
+/// itself is arbitrary; only its disjointness from `0` matters.
+const PER_NAME_SEED_SALT: u64 = 0x5350_4552_4E41_4D45; // "SPERNAME"
 
 /// Stochastic pricing engine for structured credit.
 ///
@@ -80,10 +94,14 @@ impl StochasticPricer {
             .branches_at_node(self.branching_variance_proxy())
             .max(1);
         let path_count = terminal_paths.max(1);
+        let per_name_simulator = self.per_name_simulator();
         let mut collector = ScenarioCollector::new(instrument, path_count)?;
         for path_index in 0..path_count {
             let shocks = self.tree_path_shocks(instrument, path_index, path_count, branch_count)?;
-            let output = self.price_path(instrument, context, shocks)?;
+            let per_name_engine = per_name_simulator
+                .as_ref()
+                .map(|sim| self.per_name_engine(sim, path_index));
+            let output = self.price_path(instrument, context, shocks, per_name_engine)?;
             collector.record_output(output);
         }
         Ok(collector.finalize(self, "Tree"))
@@ -203,11 +221,22 @@ impl StochasticPricer {
         num_paths: usize,
         pricing_mode: &str,
     ) -> Result<StochasticPricingResult> {
+        let per_name_simulator = self.per_name_simulator();
+        // `into_par_iter().enumerate()` on a `Vec` is an order-preserving
+        // `IndexedParallelIterator`: `collect()` returns outputs in path
+        // order regardless of rayon scheduling, and each path keeps a stable
+        // index for its idiosyncratic-draw substream. Both properties are
+        // required for bit-identical serial/parallel results (the downstream
+        // Welford accumulation is order-sensitive).
         let outputs: Vec<PathScenarioOutput> = factor_sets
             .into_par_iter()
-            .map(|factors| {
+            .enumerate()
+            .map(|(path_index, factors)| {
                 let shocks = self.path_shocks_from_factors(instrument, &factors)?;
-                self.price_path(instrument, context, shocks)
+                let per_name_engine = per_name_simulator
+                    .as_ref()
+                    .map(|sim| self.per_name_engine(sim, path_index));
+                self.price_path(instrument, context, shocks, per_name_engine)
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -261,13 +290,56 @@ impl StochasticPricer {
         factor_sets
     }
 
+    /// Extract the copula specification and asset correlation when the
+    /// scenario default model is a copula.
+    ///
+    /// Per-name simulation only applies to copula default models; other
+    /// stochastic default models (factor-correlated, intensity-process,
+    /// hazard-curve) keep the pool-wide MDR path.
+    fn copula_default(&self) -> Option<(CopulaSpec, f64)> {
+        match &self.config.tree_config.default_spec {
+            StochasticDefaultSpec::Copula {
+                copula_spec,
+                correlation,
+                ..
+            } => Some((copula_spec.clone(), *correlation)),
+            _ => None,
+        }
+    }
+
+    /// Build the per-name copula default simulator, if the scenario uses a
+    /// copula default model. Shared (cheap `Arc` clone) across all paths.
+    fn per_name_simulator(&self) -> Option<Arc<PerNameCopulaDefault>> {
+        self.copula_default()
+            .map(|(spec, correlation)| Arc::new(PerNameCopulaDefault::new(&spec, correlation)))
+    }
+
+    /// Construct the per-path per-name default engine.
+    ///
+    /// Each path draws its idiosyncratic `εᵢ` shocks from its own Philox
+    /// substream, seeded with the salted seed so the idiosyncratic stream
+    /// space is disjoint from the systematic-factor streams.
+    fn per_name_engine(
+        &self,
+        simulator: &Arc<PerNameCopulaDefault>,
+        path_index: usize,
+    ) -> PerNameDefaultEngine {
+        let rng =
+            PhiloxRng::new(self.config.seed ^ PER_NAME_SEED_SALT).substream(path_index as u64);
+        PerNameDefaultEngine::new(Arc::clone(simulator), self.config.pool_granularity, rng)
+    }
+
     fn price_path(
         &self,
         instrument: &StructuredCredit,
         context: &MarketContext,
         shocks: Vec<PeriodPoolShock>,
+        per_name_engine: Option<PerNameDefaultEngine>,
     ) -> Result<PathScenarioOutput> {
-        let mut source = StochasticPathFlowSource::new(shocks);
+        let mut source = match per_name_engine {
+            Some(engine) => StochasticPathFlowSource::with_per_name(shocks, engine),
+            None => StochasticPathFlowSource::new(shocks),
+        };
         let path_results = run_simulation_with_source(
             instrument,
             context,
@@ -368,6 +440,15 @@ impl StochasticPricer {
         let payment_periods = self.payment_period_count(instrument);
         let mut shocks = Vec::with_capacity(payment_periods);
 
+        // When the default model is a copula, build it once to source the
+        // per-period *unconditional* marginal default probability used to set
+        // each name's copula barrier `Φ⁻¹(PDₜ)`.
+        let copula_model = if self.copula_default().is_some() {
+            self.config.tree_config.default_spec.build()
+        } else {
+            None
+        };
+
         for period in 0..payment_periods {
             let start = period * months_per_period;
             let end = (start + months_per_period).min(factors.len());
@@ -376,10 +457,58 @@ impl StochasticPricer {
             } else {
                 &[][..]
             };
-            shocks.push(self.aggregate_monthly_shocks(start as u32, month_slice));
+            let mut shock = self.aggregate_monthly_shocks(start as u32, month_slice);
+            shock.per_name =
+                self.copula_period_input(copula_model.as_deref(), start as u32, month_slice);
+            shocks.push(shock);
         }
 
         Ok(shocks)
+    }
+
+    /// Build the per-name copula plan for one payment period.
+    ///
+    /// Returns the period systematic factor `Z` and the *unconditional*
+    /// period marginal default probability `PDₜ`. The period systematic
+    /// factor is the period's first monthly factor — for a monthly-pay deal
+    /// that is exactly one fresh `N(0,1)` per period; for multi-month periods
+    /// it is the period-representative systematic shock, still `N(0,1)`. The
+    /// marginal PD compounds the model's unconditional monthly MDR
+    /// (`expected_mdr`) over the period's months.
+    fn copula_period_input(
+        &self,
+        copula_model: Option<&dyn crate::instruments::fixed_income::structured_credit::pricing::stochastic::default::StochasticDefault>,
+        start_month: u32,
+        factors: &[f64],
+    ) -> Option<PerNamePeriodInput> {
+        let model = copula_model?;
+        let months = factors.len().max(1) as u32;
+
+        // Unconditional period marginal PD: 1 − ∏(1 − monthly_unconditional_MDR).
+        let mut survival = 1.0;
+        for offset in 0..months {
+            let seasoning = self
+                .config
+                .tree_config
+                .initial_seasoning
+                .saturating_add(start_month)
+                .saturating_add(offset + 1);
+            survival *= 1.0 - model.expected_mdr(seasoning).clamp(0.0, 1.0);
+        }
+        let marginal_pd = (1.0 - survival).clamp(0.0, 1.0);
+
+        // Period systematic factor: the period's first monthly factor (zero
+        // when the scenario carries no stochastic rates).
+        let systematic_z = if self.has_stochastic_rates() {
+            factors.first().copied().unwrap_or(0.0)
+        } else {
+            0.0
+        };
+
+        Some(PerNamePeriodInput {
+            systematic_z,
+            marginal_pd,
+        })
     }
 
     fn aggregate_monthly_shocks(&self, start_month: u32, factors: &[f64]) -> PeriodPoolShock {
@@ -398,11 +527,11 @@ impl StochasticPricer {
         }
 
         let months = factors.len() as f64;
-        PeriodPoolShock {
-            smm: 1.0 - prepay_survival.powf(1.0 / months),
-            mdr: 1.0 - default_survival.powf(1.0 / months),
-            recovery_rate: recovery_sum / months,
-        }
+        PeriodPoolShock::pool_wide(
+            1.0 - prepay_survival.powf(1.0 / months),
+            1.0 - default_survival.powf(1.0 / months),
+            recovery_sum / months,
+        )
     }
 
     fn monthly_shock(&self, month_offset: u32, z: f64) -> PeriodPoolShock {
@@ -414,11 +543,11 @@ impl StochasticPricer {
             .saturating_add(month_offset);
         let factors = [factor];
 
-        PeriodPoolShock {
-            smm: self.conditional_smm(seasoning, &factors),
-            mdr: self.conditional_mdr(seasoning, &factors),
-            recovery_rate: self.recovery_rate(factor),
-        }
+        PeriodPoolShock::pool_wide(
+            self.conditional_smm(seasoning, &factors),
+            self.conditional_mdr(seasoning, &factors),
+            self.recovery_rate(factor),
+        )
     }
 
     fn conditional_smm(&self, seasoning: u32, factors: &[f64]) -> f64 {
@@ -975,6 +1104,311 @@ mod tests {
              computed={}, true={true_std_error:.8}. \
              This indicates the E[X²]-E[X]² form is being used instead of Welford.",
             result.pv_std_error
+        );
+    }
+}
+
+/// Tests for per-name copula default simulation (finite-pool Monte Carlo).
+///
+/// These exercise the path that replaced the pool-wide-MDR-applied-to-all-
+/// names defect: the engine now realizes each pool asset's default
+/// individually via the copula latent variable, with a documented LHP
+/// fast-path for genuinely granular pools.
+#[cfg(test)]
+mod per_name_copula_tests {
+    use super::*;
+    use crate::instruments::fixed_income::structured_credit::pricing::stochastic::default::PoolGranularity;
+    use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::{
+        BranchingSpec, ScenarioTreeConfig,
+    };
+    use crate::instruments::fixed_income::structured_credit::{
+        CorrelationStructure, DealType, DefaultModelSpec, Pool, PoolAsset, RecoveryModelSpec,
+        Seniority, Tranche, TrancheCoupon, TrancheStructure,
+    };
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::{Date, DayCount};
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_core::money::Money;
+    use time::Month;
+
+    fn close() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).expect("valid date")
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2027, Month::January, 1).expect("valid date")
+    }
+
+    fn discount_curve() -> std::sync::Arc<DiscountCurve> {
+        std::sync::Arc::new(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(close())
+                .knots([(0.0, 1.0), (1.0, 0.97), (3.0, 0.91), (5.0, 0.85)])
+                .build()
+                .expect("curve"),
+        )
+    }
+
+    /// Build a CLO-style deal: `n_assets` identical fixed-rate loans summing
+    /// to $100M, tranched senior (0-80%) / mezzanine (80-92%) / equity
+    /// (92-100%). Larger `n_assets` ⇒ more granular pool.
+    fn clo_deal(n_assets: usize) -> StructuredCredit {
+        let total = 100_000_000.0;
+        let per_asset = total / n_assets as f64;
+        let mut pool = Pool::new("CLO-POOL", DealType::CLO, Currency::USD);
+        for i in 0..n_assets {
+            pool.assets.push(PoolAsset::fixed_rate_bond(
+                format!("L{i}"),
+                Money::new(per_asset, Currency::USD),
+                0.07,
+                maturity(),
+                DayCount::Thirty360,
+            ));
+        }
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                Seniority::Senior,
+                Money::new(total * 0.80, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity(),
+            )
+            .expect("senior"),
+            Tranche::new(
+                "MEZZ",
+                80.0,
+                92.0,
+                Seniority::Mezzanine,
+                Money::new(total * 0.12, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.08 },
+                maturity(),
+            )
+            .expect("mezz"),
+            Tranche::new(
+                "EQ",
+                92.0,
+                100.0,
+                Seniority::Equity,
+                Money::new(total * 0.08, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .expect("equity"),
+        ])
+        .expect("structure");
+        let mut sc = StructuredCredit::new_abs(
+            "CLO-PER-NAME",
+            pool,
+            tranches,
+            close(),
+            maturity(),
+            "USD-OIS",
+        )
+        .with_payment_calendar("nyse");
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        sc
+    }
+
+    /// Build a pricer config with a Gaussian-copula default model.
+    fn copula_config(
+        base_cdr: f64,
+        correlation: f64,
+        num_periods: usize,
+        granularity: PoolGranularity,
+        num_paths: usize,
+    ) -> StochasticPricerConfig {
+        let mut tree_config = ScenarioTreeConfig::new(
+            num_periods,
+            num_periods as f64 / 12.0,
+            BranchingSpec::fixed(2),
+        );
+        tree_config.default_spec = StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
+        tree_config.correlation = CorrelationStructure::flat(correlation, 0.0);
+        tree_config.initial_balance = 100_000_000.0;
+        StochasticPricerConfig::new(close(), discount_curve(), tree_config)
+            .with_pricing_mode(PricingMode::MonteCarlo {
+                num_paths,
+                antithetic: false,
+            })
+            .with_pool_granularity(granularity)
+    }
+
+    fn tranche_pv(result: &StochasticPricingResult, id: &str) -> f64 {
+        result
+            .tranche_results
+            .iter()
+            .find(|t| t.tranche_id == id)
+            .map(|t| t.npv.amount())
+            .unwrap_or_else(|| panic!("tranche {id} missing"))
+    }
+
+    /// **LHP-limit parity** — the correctness anchor.
+    ///
+    /// A large, granular, homogeneous pool priced per-name must converge to
+    /// the closed-form LHP result for the *same* pool: per-name → LHP as
+    /// `N → ∞`. This both validates the per-name engine and shows the LHP
+    /// fast-path is the genuine large-pool limit.
+    #[test]
+    fn large_granular_pool_per_name_converges_to_lhp() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        // 600 names ⇒ granular: per-name realized fraction ≈ LHP conditional.
+        let deal = clo_deal(600);
+
+        let per_name = StochasticPricer::new(copula_config(
+            0.03,
+            0.20,
+            36,
+            PoolGranularity::PerName,
+            1_500,
+        ))
+        .price(&deal, &market)
+        .expect("per-name pricing");
+        let lhp = StochasticPricer::new(copula_config(
+            0.03,
+            0.20,
+            36,
+            PoolGranularity::LargeHomogeneous,
+            1_500,
+        ))
+        .price(&deal, &market)
+        .expect("LHP pricing");
+
+        // Each tranche PV must agree within a few MC standard errors. The
+        // per-name engine has its own idiosyncratic dispersion, but for a
+        // 600-name pool that dispersion is small relative to the systematic
+        // channel, so the means converge.
+        for id in ["SR", "MEZZ", "EQ"] {
+            let pn = tranche_pv(&per_name, id);
+            let lh = tranche_pv(&lhp, id);
+            let tol = (0.01 * lh.abs()).max(150_000.0);
+            assert!(
+                (pn - lh).abs() < tol,
+                "{id}: per-name PV {pn:.0} should converge to LHP PV {lh:.0} \
+                 (|diff|={:.0}, tol={tol:.0})",
+                (pn - lh).abs()
+            );
+        }
+    }
+
+    /// **Concentration sensitivity** — the test that genuinely fails on the
+    /// parent (parent = LHP-only).
+    ///
+    /// A concentrated pool (60 names) priced per-name must produce a
+    /// materially different mezzanine/equity tranche value than the
+    /// pool-wide LHP approach, because name-level lumpiness now dominates.
+    #[test]
+    fn concentrated_pool_per_name_differs_from_lhp() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        // 40 names ⇒ concentrated: a single default is 2.5% of the pool,
+        // well inside the 8%-thick equity and 12%-thick mezz tranches.
+        let deal = clo_deal(40);
+
+        let per_name = StochasticPricer::new(copula_config(
+            0.05,
+            0.25,
+            36,
+            PoolGranularity::PerName,
+            8_000,
+        ))
+        .price(&deal, &market)
+        .expect("per-name pricing");
+        let lhp = StochasticPricer::new(copula_config(
+            0.05,
+            0.25,
+            36,
+            PoolGranularity::LargeHomogeneous,
+            8_000,
+        ))
+        .price(&deal, &market)
+        .expect("LHP pricing");
+
+        // Mezzanine and equity tranches must show a material PV gap: the LHP
+        // limit smooths away the discrete-default lumpiness that a 60-name
+        // pool genuinely carries. The parent engine (LHP-only) produces the
+        // SAME value for both, so this assertion fails on the parent.
+        let mezz_pn = tranche_pv(&per_name, "MEZZ");
+        let mezz_lhp = tranche_pv(&lhp, "MEZZ");
+        let eq_pn = tranche_pv(&per_name, "EQ");
+        let eq_lhp = tranche_pv(&lhp, "EQ");
+
+        let mezz_gap = (mezz_pn - mezz_lhp).abs();
+        let eq_gap = (eq_pn - eq_lhp).abs();
+        // Gap must exceed the MC noise floor by a wide margin. At 8 000 paths
+        // the per-tranche MC standard error is ≈ $30 k; the observed gaps
+        // ($0.29 M mezz, $0.38 M equity) clear the $100 k floor by ~3-4×.
+        assert!(
+            mezz_gap > 100_000.0 || eq_gap > 100_000.0,
+            "concentrated-pool per-name pricing must differ materially from \
+             LHP: mezz per-name={mezz_pn:.0} LHP={mezz_lhp:.0} (gap {mezz_gap:.0}); \
+             equity per-name={eq_pn:.0} LHP={eq_lhp:.0} (gap {eq_gap:.0})"
+        );
+    }
+
+    /// Per-name simulation must be deterministic and bit-identical between
+    /// repeated runs (seeded `PhiloxRng` substreams).
+    #[test]
+    fn per_name_pricing_is_deterministic() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(80);
+
+        let run = || {
+            StochasticPricer::new(copula_config(0.04, 0.25, 24, PoolGranularity::PerName, 500))
+                .price(&deal, &market)
+                .expect("per-name pricing")
+        };
+        let a = run();
+        let b = run();
+
+        assert_eq!(
+            a.npv.amount(),
+            b.npv.amount(),
+            "repeated per-name MC runs must be bit-identical"
+        );
+        for id in ["SR", "MEZZ", "EQ"] {
+            assert_eq!(
+                tranche_pv(&a, id),
+                tranche_pv(&b, id),
+                "{id}: repeated per-name runs must produce bit-identical tranche PV"
+            );
+        }
+    }
+
+    /// Concentrated pools must carry strictly more loss dispersion than
+    /// granular pools under per-name simulation: with fewer names, the same
+    /// correlation, name-level lumpiness fattens the loss tail.
+    #[test]
+    fn concentration_increases_loss_dispersion() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+
+        let granular = StochasticPricer::new(copula_config(
+            0.05,
+            0.20,
+            36,
+            PoolGranularity::PerName,
+            3_000,
+        ))
+        .price(&clo_deal(600), &market)
+        .expect("granular per-name pricing");
+        let concentrated = StochasticPricer::new(copula_config(
+            0.05,
+            0.20,
+            36,
+            PoolGranularity::PerName,
+            3_000,
+        ))
+        .price(&clo_deal(40), &market)
+        .expect("concentrated per-name pricing");
+
+        assert!(
+            concentrated.unexpected_loss.amount() > granular.unexpected_loss.amount(),
+            "concentrated pool (40 names) loss dispersion {:.0} must exceed \
+             granular pool (600 names) dispersion {:.0}",
+            concentrated.unexpected_loss.amount(),
+            granular.unexpected_loss.amount()
         );
     }
 }

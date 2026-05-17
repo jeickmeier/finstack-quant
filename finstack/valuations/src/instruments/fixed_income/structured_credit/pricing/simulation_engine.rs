@@ -7,6 +7,9 @@
 
 use crate::cashflow::traits::DatedFlows;
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry;
+use crate::instruments::fixed_income::structured_credit::pricing::stochastic::default::{
+    PerNameCopulaDefault, PoolGranularity,
+};
 use crate::instruments::fixed_income::structured_credit::types::{
     Pool, PoolState, RecipientType, StructuredCredit, TrancheCashflows, TrancheSeniority,
     TrancheStructure, Waterfall,
@@ -24,6 +27,8 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::HashMap;
 use finstack_core::Result;
+use finstack_monte_carlo::rng::philox::PhiloxRng;
+use std::sync::Arc;
 
 // ============================================================================
 // POOL FLOW SOURCES
@@ -68,8 +73,25 @@ impl PoolFlowSource for DeterministicPoolFlowSource {
                 mdr,
                 recovery_rate: request.instrument.credit_model.recovery_spec.rate,
             },
+            copula_outcome: None,
         })
     }
+}
+
+/// Per-period systematic inputs for finite-pool per-name copula default
+/// simulation.
+///
+/// When present on a [`PeriodPoolShock`], the engine realizes each pool
+/// asset's default individually (latent variable `Aᵢ = √ρ·Z + √(1−ρ)·εᵢ`)
+/// instead of applying the pool-wide MDR uniformly.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PerNamePeriodInput {
+    /// Systematic factor `Z` for the payment period, shared by every name.
+    pub(crate) systematic_z: f64,
+    /// Per-name *unconditional* marginal default probability for the period.
+    /// Homogeneous pools share one value; the threshold `Φ⁻¹(PDₜ)` is
+    /// recomputed per name to support heterogeneous pools.
+    pub(crate) marginal_pd: f64,
 }
 
 /// Aggregated scenario assumptions for a legal payment period.
@@ -78,23 +100,89 @@ pub(crate) struct PeriodPoolShock {
     /// Equivalent monthly SMM for the payment period.
     pub(crate) smm: f64,
     /// Equivalent monthly MDR for the payment period.
+    ///
+    /// Used as the pool-wide default rate when `per_name` is `None` (the LHP
+    /// fast-path), and ignored for assets when per-name simulation is active.
     pub(crate) mdr: f64,
     /// Recovery rate applied to defaults in the payment period.
     pub(crate) recovery_rate: f64,
+    /// Per-name copula inputs. `Some` ⇒ realize defaults name-by-name;
+    /// `None` ⇒ apply the pool-wide LHP MDR.
+    pub(crate) per_name: Option<PerNamePeriodInput>,
+}
+
+impl PeriodPoolShock {
+    /// Construct a pool-wide (LHP / non-copula) shock with no per-name plan.
+    pub(crate) fn pool_wide(smm: f64, mdr: f64, recovery_rate: f64) -> Self {
+        Self {
+            smm,
+            mdr,
+            recovery_rate,
+            per_name: None,
+        }
+    }
+}
+
+/// Per-path per-name copula default engine carried by a scenario flow source.
+///
+/// Owns the path's idiosyncratic-draw RNG substream so that per-name `εᵢ`
+/// draws are deterministic and order-stable (period → name index). The
+/// `simulator` is shared (cheap `Arc` clone of the copula kernel) across
+/// paths; only the RNG is per-path.
+pub(crate) struct PerNameDefaultEngine {
+    simulator: Arc<PerNameCopulaDefault>,
+    granularity: PoolGranularity,
+    rng: PhiloxRng,
+}
+
+impl PerNameDefaultEngine {
+    /// Create a per-name engine for one scenario path.
+    pub(crate) fn new(
+        simulator: Arc<PerNameCopulaDefault>,
+        granularity: PoolGranularity,
+        rng: PhiloxRng,
+    ) -> Self {
+        Self {
+            simulator,
+            granularity,
+            rng,
+        }
+    }
 }
 
 /// Stochastic path pool-flow source using pre-generated period shocks.
 pub(crate) struct StochasticPathFlowSource {
     shocks: Vec<PeriodPoolShock>,
     next_period: usize,
+    /// Per-name copula engine. `Some` when the scenario uses finite-pool
+    /// per-name default simulation.
+    per_name: Option<PerNameDefaultEngine>,
+    /// Scratch buffer for per-name default indicators, reused each period to
+    /// avoid per-period allocation.
+    default_scratch: Vec<bool>,
 }
 
 impl StochasticPathFlowSource {
-    /// Create a flow source for one scenario path.
+    /// Create a flow source for one scenario path (pool-wide / LHP shocks).
     pub(crate) fn new(shocks: Vec<PeriodPoolShock>) -> Self {
         Self {
             shocks,
             next_period: 0,
+            per_name: None,
+            default_scratch: Vec::new(),
+        }
+    }
+
+    /// Create a flow source that realizes per-name copula defaults.
+    pub(crate) fn with_per_name(
+        shocks: Vec<PeriodPoolShock>,
+        per_name: PerNameDefaultEngine,
+    ) -> Self {
+        Self {
+            shocks,
+            next_period: 0,
+            per_name: Some(per_name),
+            default_scratch: Vec::new(),
         }
     }
 }
@@ -109,6 +197,47 @@ impl PoolFlowSource for StochasticPathFlowSource {
         })?;
         self.next_period += 1;
 
+        // Copula default resolution: when the per-name engine and the
+        // period's per-name plan are both present, the copula owns the
+        // period's default rate. `PerName` granularity realizes each asset
+        // individually (latent variable `Aᵢ`); `LargeHomogeneous` applies the
+        // closed-form LHP conditional default probability uniformly — the
+        // `N → ∞` limit of the per-name model.
+        let copula_outcome = match (self.per_name.as_mut(), shock.per_name) {
+            (Some(engine), Some(plan)) => match engine.granularity {
+                PoolGranularity::PerName => {
+                    // One marginal-PD entry per still-performing asset, in
+                    // the pool's intrinsic asset order, so the per-name εᵢ
+                    // draws are order-stable.
+                    let alive = request
+                        .state
+                        .pool_state
+                        .is_defaulted
+                        .iter()
+                        .zip(request.state.pool_state.balances.iter())
+                        .filter(|(defaulted, balance)| !**defaulted && **balance > 0.0)
+                        .count();
+                    let marginal = vec![plan.marginal_pd; alive];
+                    engine.simulator.simulate_period(
+                        plan.systematic_z,
+                        &marginal,
+                        &mut engine.rng,
+                        &mut self.default_scratch,
+                    );
+                    Some(PeriodDefaultOutcome::PerName(&self.default_scratch))
+                }
+                PoolGranularity::LargeHomogeneous => {
+                    // Closed-form LHP limit: apply E[1{Aᵢ ≤ c} | Z] to the
+                    // whole pool as a period-level default rate.
+                    let rate = engine
+                        .simulator
+                        .conditional_default_prob(plan.systematic_z, plan.marginal_pd);
+                    Some(PeriodDefaultOutcome::PoolWidePeriodRate(rate))
+                }
+            },
+            _ => None,
+        };
+
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
             pay_date: request.pay_date,
@@ -120,6 +249,7 @@ impl PoolFlowSource for StochasticPathFlowSource {
                 mdr: shock.mdr,
                 recovery_rate: shock.recovery_rate,
             },
+            copula_outcome,
         })
     }
 }
@@ -969,6 +1099,23 @@ struct PoolFlowRates {
     recovery_rate: f64,
 }
 
+/// Copula-resolved default outcome for one payment period.
+///
+/// Present only when the scenario default model is a copula; otherwise the
+/// engine uses the legacy monthly-equivalent `PoolFlowRates::mdr`.
+enum PeriodDefaultOutcome<'a> {
+    /// Per-name finite-pool simulation. `indicators[k]` is the default
+    /// outcome for the `k`-th still-performing asset (`!is_defaulted &&
+    /// balance > 0`) in the pool's intrinsic asset order; `true` ⇒ the asset
+    /// defaults in full this period.
+    PerName(&'a [bool]),
+
+    /// LHP fast-path: a single **period-level** default rate (already
+    /// aggregated over the period — *not* a monthly-equivalent rate) applied
+    /// uniformly to every performing asset.
+    PoolWidePeriodRate(f64),
+}
+
 struct RatedPoolFlowRequest<'a, 's> {
     state: &'a mut SimulationState<'s>,
     pay_date: Date,
@@ -976,6 +1123,9 @@ struct RatedPoolFlowRequest<'a, 's> {
     months_per_period: f64,
     context: &'a MarketContext,
     rates: PoolFlowRates,
+    /// `Some` when the scenario default model is a copula (per-name or LHP);
+    /// `None` for the legacy pool-wide MDR / deterministic path.
+    copula_outcome: Option<PeriodDefaultOutcome<'a>>,
 }
 
 fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Result<PoolFlows> {
@@ -1007,6 +1157,20 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         resolved_rates.push(r);
     }
 
+    // Copula default resolution. For `PerName`, `per_name_mask[k]` is the
+    // realized default outcome of the k-th still-performing asset (in pool
+    // order); `alive_idx` advances for every asset that passes the
+    // performing-asset gate below — including matured assets — so the
+    // indicator slice stays index-aligned with the simulator's draw order.
+    // For the LHP fast-path, `lhp_period_rate` is a single period-level rate
+    // applied to every performing asset.
+    let (per_name_mask, lhp_period_rate) = match &request.copula_outcome {
+        Some(PeriodDefaultOutcome::PerName(mask)) => (Some(*mask), None),
+        Some(PeriodDefaultOutcome::PoolWidePeriodRate(rate)) => (None, Some(*rate)),
+        None => (None, None),
+    };
+    let mut alive_idx = 0usize;
+
     let n = state.pool_state.len();
     for i in 0..n {
         let balance = state.pool_state.balances[i];
@@ -1021,6 +1185,15 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         if state.pool_state.is_defaulted[i] {
             continue;
         }
+
+        // This asset is performing at period start; claim its per-name
+        // default indicator (consumed even if the asset matures below, so the
+        // slice index never drifts from the simulator's draw order).
+        let per_name_default = per_name_mask.map(|mask| {
+            let defaulted = mask.get(alive_idx).copied().unwrap_or(false);
+            alive_idx += 1;
+            defaulted
+        });
 
         // 1. Interest -- computed first so matured assets still pay their final coupon
         let rate = if let Some(curve_idx) = state.pool_state.curve_indices[i] {
@@ -1107,9 +1280,29 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         let balance_after_sched = balance - scheduled_principal;
 
         // m2 fix: Apply default first, then prepayment to post-default balance
-        // (market convention per Intex/Moody's Analytics)
+        // (market convention per Intex/Moody's Analytics).
+        //
+        // Default-rate precedence:
+        //   1. Per-asset `mdr_override` (explicit user input) — always wins.
+        //   2. Per-name copula realization — when finite-pool simulation is
+        //      active, the asset either defaults in full (indicator `true`)
+        //      or not at all (`false`). This injects name-level lumpiness:
+        //      the realized default count carries genuine idiosyncratic
+        //      dispersion rather than the deterministic LHP fraction.
+        //   3. LHP fast-path period rate — the closed-form `N → ∞` copula
+        //      limit, already a period-level rate (no re-aggregation).
+        //   4. Legacy pool-wide MDR (`global_period_mdr`) — the
+        //      monthly-equivalent rate for non-copula / deterministic models.
         let period_mdr = if let Some(mdr) = state.pool_state.mdr_overrides[i] {
             1.0 - (1.0 - mdr).powf(request.months_per_period)
+        } else if let Some(defaulted) = per_name_default {
+            if defaulted {
+                1.0
+            } else {
+                0.0
+            }
+        } else if let Some(rate) = lhp_period_rate {
+            rate.clamp(0.0, 1.0)
         } else {
             global_period_mdr
         };

@@ -496,6 +496,17 @@ pub struct ModelConfig {
     /// so this is not the default for production single-name CDS pricing.
     #[serde(default)]
     pub cds_act360_include_last_day: bool,
+    /// Pool-granularity policy for structured-credit copula default models.
+    ///
+    /// When set, overrides the default
+    /// [`PoolGranularity::PerName`](crate::instruments::fixed_income::structured_credit::PoolGranularity)
+    /// finite-pool simulation. Pass
+    /// `PoolGranularity::LargeHomogeneous` to opt into the closed-form LHP
+    /// fast-path for genuinely granular pools. Ignored by non-copula default
+    /// models and by non-structured-credit instruments.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structured_credit_pool_granularity:
+        Option<crate::instruments::fixed_income::structured_credit::PoolGranularity>,
 }
 
 impl ModelConfig {

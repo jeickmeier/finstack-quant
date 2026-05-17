@@ -6328,7 +6328,7 @@
                 },
                 {
                   "additionalProperties": false,
-                  "description": "Student-t copula with specified degrees of freedom.\n\nCaptures tail dependence - joint extreme defaults are more likely\nthan Gaussian predicts. Lower df = more tail dependence.\n\nTypical calibration: df ∈ [4, 10] for CDX tranches.\n\n# Invariant\n\n`degrees_of_freedom` **must** be finite and `> 2`. The programmatic\nconstructor [`CopulaSpec::student_t`] panics on invalid input, but\ndeserialized specs (from config files, JSON, etc.) cannot panic —\n[`CopulaSpec::build`] and [`CopulaSpec::build_student_t`] silently\nclamp an out-of-range or non-finite value to `2.01` and emit a\n`tracing::warn!`. This is deliberate: it preserves forward\ncompatibility for serialized specs but means callers that round-trip\na spec may observe a changed `degrees_of_freedom`. Validate at the\nconfig-loading boundary if strict rejection is required.",
+                  "description": "Student-t copula with specified degrees of freedom.\n\nCaptures tail dependence - joint extreme defaults are more likely\nthan Gaussian predicts. Lower df = more tail dependence.\n\nTypical calibration: df ∈ [4, 10] for CDX tranches.\n\n# Invariant\n\n`degrees_of_freedom` **must** be finite and `> 2`. The programmatic\nconstructor [`CopulaSpec::student_t`] panics on invalid input, but\ndeserialized specs (from config files, JSON, etc.) cannot panic —\n[`CopulaSpec::build`] silently clamps an out-of-range or non-finite\nvalue to `2.01` and emits a `tracing::warn!`. This is deliberate: it\npreserves forward\ncompatibility for serialized specs but means callers that round-trip\na spec may observe a changed `degrees_of_freedom`. Validate at the\nconfig-loading boundary if strict rejection is required.",
                   "properties": {
                     "degrees_of_freedom": {
                       "description": "Degrees of freedom (must be > 2 for finite variance)",
@@ -15105,6 +15105,21 @@
               ],
               "type": "object"
             },
+            "PoolGranularity": {
+              "description": "Pool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
+              "oneOf": [
+                {
+                  "const": "PerName",
+                  "description": "Simulate each name's default independently conditional on the\nsystematic factor (finite-pool copula). Captures name-level lumpiness;\nthe correct default for concentrated pools. This is the default.",
+                  "type": "string"
+                },
+                {
+                  "const": "LargeHomogeneous",
+                  "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools.",
+                  "type": "string"
+                }
+              ]
+            },
             "PoolType": {
               "description": "Pool type classification.\n\nDistinguishes between generic (TBA-eligible) pools and specified pools\nwith known characteristics.",
               "oneOf": [
@@ -15530,6 +15545,17 @@
                     "number",
                     "null"
                   ]
+                },
+                "structured_credit_pool_granularity": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/PoolGranularity"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Pool-granularity policy for structured-credit copula default models.\n\nWhen set, overrides the default\n[`PoolGranularity::PerName`](crate::instruments::fixed_income::structured_credit::PoolGranularity)\nfinite-pool simulation. Pass\n`PoolGranularity::LargeHomogeneous` to opt into the closed-form LHP\nfast-path for genuinely granular pools. Ignored by non-copula default\nmodels and by non-structured-credit instruments."
                 },
                 "term_loan": {
                   "anyOf": [
