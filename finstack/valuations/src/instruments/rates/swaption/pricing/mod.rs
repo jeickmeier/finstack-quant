@@ -23,4 +23,7 @@ pub mod monte_carlo_payoff;
 pub mod swap_rate_utils;
 pub(crate) mod tree_valuator;
 
+#[cfg(test)]
+mod numeraire_tests;
+
 pub use tree_valuator::BermudanSwaptionTreeValuator;

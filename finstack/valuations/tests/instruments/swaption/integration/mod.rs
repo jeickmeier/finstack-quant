@@ -3,6 +3,5 @@
 pub mod bermudan_integration;
 pub mod bermudan_pricing;
 pub mod end_to_end;
-pub mod numeraire_bounds;
 pub mod payer_receiver;
 pub mod quantlib_parity;

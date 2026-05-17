@@ -3,6 +3,15 @@
 //! Uses the calibrated LMM process with predictor-corrector discretization and
 //! Longstaff-Schwartz backward induction for optimal exercise decisions.
 //!
+//! # Product
+//!
+//! This prices the standard **co-terminal** Bermudan swaption: the right, at
+//! each exercise date `T_k`, to enter the *remaining* swap `[T_k, T_N]`. Every
+//! exercise date shares the common terminal date `T_N`. The exercise intrinsic
+//! is therefore the genuine time-`T_k` value of the co-terminal swap, computed
+//! from the forwards still alive at `T_k` (`start_idx = first_alive(T_k)`), not
+//! the value of a fixed `[T_0, T_N]` swap.
+//!
 //! The payoff is evaluated entirely from forward rates in the path state,
 //! making it naturally multi-curve-consistent (no short-rate reconstruction
 //! needed). The simulation is conducted under the terminal measure with
@@ -191,19 +200,41 @@ pub fn price_bermudan_lmm(
         let mut exercise_values = Vec::with_capacity(total_paths);
         let mut basis_inputs = Vec::with_capacity(total_paths);
 
+        // Index of the first forward still alive at this exercise date.
+        // A forward `j` is alive while its fixing date `T_j >= t`. The
+        // co-terminal swap entered on exercise at `T_k` covers exactly the
+        // periods `[T_{first_alive}, T_N]`.
+        let first_alive = params.tenors[..n].partition_point(|&tenor| tenor < t_exercise);
+
         for path in &all_paths {
             let forwards = &path[step];
+            // Numerator: the *genuine time-`t`* co-terminal swap value.
+            //
+            // A Bermudan SWAPTION exercised at `T_k` confers the right to
+            // enter the swap `[T_k, T_N]` — the *remaining* swap, not the
+            // full `[T_0, T_N]` swap. `compute_swap_rate_and_annuity` with
+            // `start_idx = first_alive` returns `S_t` and the annuity
+            // `A_t = Σ_{j>=first_alive} τ_j P(t,T_{j+1})`, both discounted
+            // to time `t`. Hence `intrinsic = (S_t-K)·A_t·N` is a genuine
+            // *time-`t`* quantity (reference date `t`).
             let (swap_rate, annuity) =
-                compute_swap_rate_and_annuity(forwards, &params.accrual_factors, 0, n);
+                compute_swap_rate_and_annuity(forwards, &params.accrual_factors, first_alive, n);
             let intrinsic = if payer {
                 (swap_rate - strike) * annuity * notional
             } else {
                 (strike - swap_rate) * annuity * notional
             };
-            // Reweight by the pathwise terminal-measure numéraire P(t, T_N).
-            // The intrinsic is a time-`t` swap value; under the terminal
-            // measure the estimator deflates it by the pathwise numéraire
-            // P(t, T_N) computed from the alive forwards on this path.
+            // Deflator: the pathwise terminal-measure numéraire
+            // `P(t,T_N) = Π_{j>=first_alive} 1/(1+τ_j F_j)` — also a
+            // *time-`t`* quantity, built from the same `first_alive`
+            // forwards. Numerator and deflator therefore share reference
+            // date `t`, so the terminal-measure identity
+            //   V_0 = P(0,T_N) · E^{T_N}[ H_t / P(t,T_N) ]
+            // holds with `H_t` the genuine time-`t` co-terminal swap value:
+            //   intrinsic / P(t,T_N) = (S_t-K)·A_t·N / P(t,T_N).
+            // (Hard-coding `start_idx = 0` would make the numerator the
+            // `T_0`-referenced `P(T_0,t)·Swap_t`, leaving a spurious
+            // `P(T_0,t)` factor against this `t`-referenced deflator.)
             let numeraire = pathwise_terminal_numeraire(forwards, params, t_exercise);
             let deflated = if numeraire > 0.0 {
                 intrinsic / numeraire

@@ -117,12 +117,12 @@ pub(crate) mod parameters;
 pub(crate) mod pricer;
 /// Bermudan swaption pricing engines (tree, LSMC, LMM).
 ///
-/// The Monte Carlo engines ([`pricing::monte_carlo_lsmc`],
-/// [`pricing::lmm_bermudan`]) and their payoff / rate helpers are public so
-/// they can be driven directly by no-arbitrage validation tests; the
-/// tree valuator stays crate-private and is re-exported as
-/// [`BermudanSwaptionTreeValuator`].
-pub mod pricing;
+/// Crate-private: the tree valuator is re-exported as
+/// [`BermudanSwaptionTreeValuator`]; the Monte Carlo engines
+/// ([`pricing::monte_carlo_lsmc`], [`pricing::lmm_bermudan`]) are exercised by
+/// no-arbitrage numéraire tests living in-crate under `#[cfg(test)]`, so the
+/// engines need no public visibility.
+pub(crate) mod pricing;
 pub(crate) mod types;
 
 pub use crate::calibration::hull_white::HullWhiteParams;

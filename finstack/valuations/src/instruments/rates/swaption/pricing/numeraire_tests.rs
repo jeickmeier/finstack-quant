@@ -1,19 +1,22 @@
 //! No-arbitrage numéraire-discounting bound tests for the Monte Carlo
 //! Bermudan swaption engines (LSMC HW1F and LMM/BGM).
 //!
-//! These tests pin two facts that a *pathwise-numéraire* discounting bug
-//! violates but a deterministic-discount-factor implementation cannot
-//! satisfy:
+//! These tests live **in-crate** under `#[cfg(test)]` so they can reach the
+//! crate-private pricing engines without widening the public API. They pin
+//! two facts that a *pathwise-numéraire* discounting bug violates but a
+//! deterministic-discount-factor implementation cannot satisfy:
 //!
-//! 1. **LMM co-terminal lower bound.** A Bermudan swaption can always
-//!    replicate the strategy "exercise only at date `t_k`", so its price
-//!    must be `>=` the most valuable single co-terminal European
-//!    swaption. The European reference here is computed with the
-//!    *correct* terminal-measure estimator
-//!    `E^{T_N}[ payoff(t)/P(t,T_N) ] * P(0,T_N)` — i.e. dividing by the
-//!    *pathwise* numéraire `P(t,T_N)`. An LMM engine that multiplies the
-//!    path cashflow only by the constant `P(0,T_N)` (omitting the
-//!    pathwise `1/P(t,T_N)`) under-prices the Bermudan below this bound.
+//! 1. **LMM numéraire-consistency / co-terminal lower bound.** A Bermudan
+//!    swaption can always replicate the strategy "exercise only at date
+//!    `t_k`", so its price must be `>=` the most valuable single co-terminal
+//!    European swaption. The European reference here is built
+//!    *convention-independently* (see [`lmm_reference_european`]): the
+//!    exercise payoff and the terminal-measure deflator are derived from one
+//!    and the same forward-bond identity, so the reference cannot share a
+//!    numerator/deflator reference-date bias with the engine. A correct
+//!    single-exercise engine matches the reference to a tiny relative
+//!    epsilon; an engine whose numerator is `T_0`-referenced while its
+//!    deflator is `t`-referenced is off by the spurious factor `P(T_0,t)`.
 //!
 //! 2. **LSMC pathwise-numéraire consistency.** A single-exercise Bermudan
 //!    is a European swaption, whose price obeys the model-free identity
@@ -30,8 +33,6 @@
 //! discrepancy is attributable to the discounting convention, not to a
 //! different model or different random numbers.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-
 use finstack_core::currency::Currency;
 use finstack_monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
 use finstack_monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
@@ -41,22 +42,16 @@ use finstack_monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_monte_carlo::process::lmm::{LmmParams, LmmProcess};
 use finstack_monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use finstack_monte_carlo::rng::philox::PhiloxRng;
+use finstack_monte_carlo::time_grid::TimeGrid;
 use finstack_monte_carlo::traits::{Discretization, RandomStream};
-use finstack_valuations::instruments::rates::swaption::pricing::lmm_bermudan::{
-    build_exercise_aligned_grid, price_bermudan_lmm, LmmBermudanConfig,
-};
-use finstack_valuations::instruments::rates::swaption::pricing::monte_carlo_lsmc::{
-    SwaptionLsmcConfig, SwaptionLsmcPricer,
-};
-use finstack_valuations::instruments::rates::swaption::pricing::monte_carlo_payoff::{
-    BermudanSwaptionPayoff, SwapSchedule, SwaptionType,
-};
-use finstack_valuations::instruments::rates::swaption::pricing::swap_rate_utils::{
-    ForwardSwapRate, HullWhiteBondPrice,
-};
+
+use super::lmm_bermudan::{build_exercise_aligned_grid, price_bermudan_lmm, LmmBermudanConfig};
+use super::monte_carlo_lsmc::{SwaptionLsmcConfig, SwaptionLsmcPricer};
+use super::monte_carlo_payoff::{BermudanSwaptionPayoff, SwapSchedule, SwaptionType};
+use super::swap_rate_utils::{ForwardSwapRate, HullWhiteBondPrice};
 
 // ===========================================================================
-// LMM / BGM — co-terminal lower bound
+// LMM / BGM — numéraire-consistent co-terminal European reference
 // ===========================================================================
 
 /// 4 annual forwards, 2 factors, ~12% loadings — mirrors the `lmm_bermudan`
@@ -81,40 +76,57 @@ fn lmm_params() -> LmmParams {
     .expect("valid LMM params")
 }
 
-/// Forward swap rate and annuity for the swap covering periods `[0, n)`,
-/// expressed relative to the first tenor `T_0`. This duplicates the
-/// (crate-private) `compute_swap_rate_and_annuity` helper of `lmm_bermudan`
-/// so the reference uses the *identical* payoff definition as the engine.
-fn lmm_swap_rate_and_annuity(forwards: &[f64], accrual: &[f64], n: usize) -> (f64, f64) {
-    let mut df = vec![1.0; n + 1];
-    for k in 1..=n {
-        df[k] = df[k - 1] / (1.0 + accrual[k - 1] * forwards[k - 1]);
-    }
-    let mut annuity = 0.0;
-    for j in 0..n {
-        annuity += accrual[j] * df[j + 1];
-    }
-    let swap_rate = if annuity.abs() > 1e-15 {
-        (1.0 - df[n]) / annuity
-    } else {
-        0.0
-    };
-    (swap_rate, annuity)
-}
+/// Minimum sub-steps between critical dates, shared by the engine config and
+/// the reference grid so both price on the *identical* time grid.
+const LMM_MIN_STEPS: usize = 8;
 
-/// Correct-numéraire reference price of a single co-terminal European
-/// swaption under the LMM terminal measure:
-/// `P(0,T_N) * E^{T_N}[ (S(t)-K)^+ A(t) N / P(t,T_N) ]`.
+/// Convention-independent terminal-measure value of a single co-terminal
+/// European swaption, expressed as the deflated estimand
+/// `E^{T_N}[ H_t / P(t,T_N) ]` (multiply by `P(0,T_N)` for the price).
 ///
-/// `P(t,T_N)` is the *pathwise* terminal numéraire, the product of
-/// `1/(1+τ_j F_j)` over the forwards still alive at time `t` — exactly the
-/// quantity `LmmProcess::populate_path_state` stores as `"lmm_numeraire"`.
+/// # Why this reference is convention-independent
+///
+/// The engine computes the exercise value as `intrinsic / P(t,T_N)`. To
+/// detect a numerator/deflator *reference-date* mismatch, the reference must
+/// derive its numerator and its deflator from a route that does **not** reuse
+/// the engine's `start_idx` / `first_alive` discount-factor convention.
+///
+/// Here the entire payoff is assembled as a ratio to the numéraire bond
+/// `P(t,T_N)` from the model-free forward-bond identity
+///
+/// ```text
+/// P(t,T_j) / P(t,T_{j+1}) = 1 + τ_j F_j(t)            (definition of F_j)
+///   ⇒  D_j := P(t,T_j)/P(t,T_N) = Π_{m=j}^{N-1} (1 + τ_m F_m(t)),   D_N = 1.
+/// ```
+///
+/// The co-terminal swap entered on exercise at `t` covers exactly the periods
+/// whose accrual *starts on or after* `t` — a physical product definition,
+/// `T_j >= t`, not a borrowed code convention. Writing `κ` for the first such
+/// period, with `Â := A_t/P(t,T_N) = Σ_{j>=κ} τ_j D_{j+1}`:
+///
+/// ```text
+/// S_t          = (D_κ - 1) / Â                         (forward swap rate)
+/// H_t/P(t,T_N) = max(0, S_t - K) · Â · N                (payer; A_t > 0)
+/// ```
+///
+/// Because the numerator `H_t` and the deflator `P(t,T_N)` are *inseparable*
+/// in this construction — there is no distinct "divide by the numéraire"
+/// step, the payoff is built as a ratio from the start — the reference cannot
+/// carry a numerator/deflator reference-date bias. If the engine's numerator
+/// is instead `T_0`-referenced (`P(T_0,t)·Swap_t`, the `start_idx = 0` bug)
+/// while its deflator stays `t`-referenced, the engine's deflated value
+/// carries a spurious `P(T_0,t) ≠ 1` factor and *disagrees with this
+/// reference*, which `lmm_single_exercise_matches_numeraire_correct_reference`
+/// asserts against.
+///
+/// The grid + SDE discretization + Philox RNG are replayed identically to the
+/// engine: that is the *model and numerics*, not the payoff convention, so
+/// reusing them does not reintroduce circularity.
 fn lmm_reference_european(
     params: &LmmParams,
     exercise_time: f64,
     strike: f64,
     notional: f64,
-    df0_terminal: f64,
     num_paths: usize,
     seed: u64,
 ) -> f64 {
@@ -123,13 +135,21 @@ fn lmm_reference_european(
     let disc = LmmPredictorCorrector::new();
     let maturity = *params.tenors.last().expect("tenors");
 
-    // Build the exercise-aligned grid the same way the engine does.
+    // Same exercise-aligned grid the engine builds for this single date.
     let (grid, exercise_idx) =
-        build_exercise_aligned_grid(&[exercise_time], maturity, 8).expect("grid");
+        build_exercise_aligned_grid(&[exercise_time], maturity, LMM_MIN_STEPS).expect("grid");
     let ex_step = exercise_idx[0];
+    let t_ex = grid.time(ex_step);
     let work_size = disc.work_size(&process);
     let base = PhiloxRng::new(seed);
     let mut stats = OnlineStats::new();
+
+    // Physical co-terminal swap membership: period `[T_j, T_{j+1}]` belongs
+    // to the swap entered at `t` iff its accrual starts on or after `t`.
+    // This is the product definition; it does not borrow the engine helper.
+    let first_period = (0..n)
+        .find(|&j| params.tenors[j] >= t_ex - 1e-12)
+        .unwrap_or(n);
 
     for path_id in 0..num_paths {
         let mut rng = base.substream(path_id as u64);
@@ -147,39 +167,104 @@ fn lmm_reference_european(
             }
         }
 
-        let (swap_rate, annuity) = lmm_swap_rate_and_annuity(&x, &params.accrual_factors, n);
-        let intrinsic = ((swap_rate - strike).max(0.0)) * annuity * notional;
-
-        // Pathwise terminal numéraire P(t, T_N) from the alive forwards.
-        let t_ex = grid.time(ex_step);
-        let first_alive = params.tenors[..n].partition_point(|&tenor| tenor < t_ex);
-        let mut p_t_tn = 1.0;
-        for (fwd, tau) in x[first_alive..n]
-            .iter()
-            .zip(&params.accrual_factors[first_alive..n])
-        {
-            p_t_tn /= 1.0 + tau * fwd;
+        // Forward-bond ratios D_j = P(t,T_j)/P(t,T_N), built bottom-up from
+        // the forward-rate identity. D_N = 1 by construction.
+        let mut d = vec![1.0_f64; n + 1];
+        for j in (first_period..n).rev() {
+            d[j] = d[j + 1] * (1.0 + params.accrual_factors[j] * x[j]);
         }
 
-        // Terminal-measure deflated payoff.
-        stats.update(intrinsic / p_t_tn * df0_terminal);
+        // Annuity / numéraire and forward swap rate of the co-terminal swap.
+        let mut annuity_ratio = 0.0;
+        for j in first_period..n {
+            annuity_ratio += params.accrual_factors[j] * d[j + 1];
+        }
+        let payoff_over_numeraire = if annuity_ratio > 1e-15 {
+            let swap_rate = (d[first_period] - 1.0) / annuity_ratio;
+            (swap_rate - strike).max(0.0) * annuity_ratio * notional
+        } else {
+            0.0
+        };
+
+        // E^{T_N}[ H_t / P(t,T_N) ]; the caller scales by P(0,T_N).
+        stats.update(payoff_over_numeraire);
     }
 
     stats.mean()
 }
 
+/// The single-exercise LMM engine **is** a European swaption: its terminal-
+/// measure estimator must equal the numéraire-correct reference.
+///
+/// Engine and reference run on the *identical* exercise-aligned grid (same
+/// `min_steps`), with `antithetic: false` so both consume bit-identical
+/// Philox draws and simulate bit-identical forward-rate paths. A
+/// numéraire-consistent engine then reproduces the reference to a tiny
+/// relative epsilon — the only residual is floating-point operation
+/// ordering. An engine that deflates a `T_0`-referenced numerator
+/// (`compute_swap_rate_and_annuity(.., 0, n)`) by the `t`-referenced
+/// numéraire `P(t,T_N)` carries a spurious `P(T_0,t)` factor (~3% at
+/// `t = 1y` here) and fails this assertion.
+#[test]
+fn lmm_single_exercise_matches_numeraire_correct_reference() {
+    let params = lmm_params();
+    let strike = 0.025; // ITM payer (forwards ≈ 3.0–3.6%)
+    let notional = 1_000_000.0;
+    let maturity = 4.0_f64;
+    let df0_terminal = (-0.03 * maturity).exp();
+    let num_paths = 40_000;
+    let seed = 7;
+
+    // Non-antithetic ⇒ engine and reference draw bit-identical paths, so the
+    // comparison isolates the discounting convention exactly.
+    let config = LmmBermudanConfig {
+        num_paths,
+        seed,
+        basis_degree: 2,
+        antithetic: false,
+        min_steps_between_exercises: LMM_MIN_STEPS,
+    };
+
+    for &ex_t in &[1.0, 2.0, 3.0] {
+        let engine = price_bermudan_lmm(
+            &params,
+            &[ex_t], // single exercise date ⇒ European
+            strike,
+            true, // payer
+            notional,
+            df0_terminal,
+            Currency::USD,
+            &config,
+        )
+        .expect("LMM single-exercise pricing");
+        let engine_pv = engine.mean.amount();
+
+        // Reference returns the deflated estimand; scale to a price.
+        let reference =
+            lmm_reference_european(&params, ex_t, strike, notional, num_paths, seed) * df0_terminal;
+
+        // A correct engine matches the convention-independent reference to a
+        // tiny relative epsilon. The `T_0`/`t` reference-date mismatch is a
+        // ~3% bias — far outside this tolerance.
+        let tol = 1e-6 * reference.abs().max(1.0);
+        assert!(
+            (engine_pv - reference).abs() <= tol,
+            "LMM single-exercise swaption at t={ex_t} ({engine_pv:.4}) must equal the \
+             numéraire-correct co-terminal reference ({reference:.4}); gap {:.6}. A \
+             non-trivial gap is a numerator/deflator reference-date mismatch — the \
+             exercise intrinsic deflated by P(t,T_N) is not a genuine time-t value.",
+            (engine_pv - reference).abs()
+        );
+    }
+}
+
 /// A Bermudan swaption must price `>=` the most valuable single co-terminal
 /// European swaption: exercising only on that one date is always available.
 ///
-/// The European reference uses the correct terminal-measure estimator that
-/// divides the path payoff by the *pathwise* numéraire `P(t,T_N)`. The LMM
-/// engine (`price_bermudan_lmm`) multiplies the path cashflow only by the
-/// constant `P(0,T_N)` and never divides by the pathwise `P(t,T_N)` — so on
-/// the pre-fix code it under-prices the Bermudan well below this bound.
-///
-/// Pre-fix observation (40k+ paths, seed 7): the Bermudan prices ≈ 25.9k
-/// while the correct co-terminal European at `t=1` is ≈ 28.7k — a ~11%
-/// lower-bound violation, far outside Monte Carlo error.
+/// The European references are the convention-independent
+/// [`lmm_reference_european`] values. Each European reference uses its own
+/// single-date grid, so it does not sample the same paths as the multi-date
+/// Bermudan engine grid — hence a small Monte Carlo slack on the bound.
 #[test]
 fn lmm_bermudan_respects_coterminal_lower_bound() {
     let params = lmm_params();
@@ -195,7 +280,7 @@ fn lmm_bermudan_respects_coterminal_lower_bound() {
         seed,
         basis_degree: 2,
         antithetic: true,
-        min_steps_between_exercises: 8,
+        min_steps_between_exercises: LMM_MIN_STEPS,
     };
 
     let exercise_times = [1.0, 2.0, 3.0];
@@ -212,32 +297,27 @@ fn lmm_bermudan_respects_coterminal_lower_bound() {
     .expect("bermudan pricing");
     let bermudan_pv = bermudan.mean.amount();
 
-    // Most valuable co-terminal European, correctly numéraire-discounted.
+    // Most valuable co-terminal European, numéraire-correctly priced.
     let mut best_european = f64::MIN;
     for &ex_t in &exercise_times {
-        let euro = lmm_reference_european(
-            &params,
-            ex_t,
-            strike,
-            notional,
-            df0_terminal,
-            num_paths,
-            seed,
-        );
+        let euro =
+            lmm_reference_european(&params, ex_t, strike, notional, num_paths, seed) * df0_terminal;
         if euro > best_european {
             best_european = euro;
         }
     }
 
-    // Generous Monte Carlo slack: the engine and reference share RNG seed
-    // and model, so sampling noise is small; the slack only guards against
-    // legitimate residual MC error, not the ~11% discounting bias.
+    // Monte Carlo slack: the Bermudan engine and the per-date European
+    // references run on different (single- vs multi-date) grids and — with
+    // `antithetic: true` on the engine — do not sample identical paths, so a
+    // small slack guards legitimate residual MC error. It is far below the
+    // ~11% shortfall a missing/mismatched pathwise numéraire produces.
     let mc_slack = 0.02 * best_european;
     assert!(
         bermudan_pv >= best_european - mc_slack,
         "Bermudan ({bermudan_pv:.2}) violates the co-terminal lower bound: it must be \
          >= the best single co-terminal European ({best_european:.2}). A shortfall this \
-         large is the missing pathwise terminal numéraire P(t,T_N) in the LMM engine."
+         large is a numéraire-inconsistent LMM exercise value."
     );
 
     // Sanity: a positive ITM price.
@@ -292,7 +372,7 @@ fn hw1f_intrinsic(
 fn simulate_hw1f_paths(
     hw: &HullWhite1FProcess,
     r0: f64,
-    grid: &finstack_monte_carlo::time_grid::TimeGrid,
+    grid: &TimeGrid,
     num_paths: usize,
     seed: u64,
 ) -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
@@ -340,7 +420,7 @@ fn simulate_hw1f_paths(
 fn hw1f_reference_european(
     hw: &HullWhite1FProcess,
     r0: f64,
-    grid: &finstack_monte_carlo::time_grid::TimeGrid,
+    grid: &TimeGrid,
     exercise_step: usize,
     schedule: &SwapSchedule,
     strike: f64,
@@ -377,7 +457,7 @@ fn hw1f_reference_european(
 fn hw1f_reference_bermudan(
     hw: &HullWhite1FProcess,
     r0: f64,
-    grid: &finstack_monte_carlo::time_grid::TimeGrid,
+    grid: &TimeGrid,
     exercise_steps: &[usize],
     schedule: &SwapSchedule,
     strike: f64,

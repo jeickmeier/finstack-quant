@@ -545,9 +545,11 @@ impl SwaptionLsmcPricer {
         let mut bank = Vec::with_capacity(num_steps + 1);
         bank.push(1.0); // B(t_0) = 1
         let mut acc = 1.0;
-        for step in 0..num_steps {
-            // r(t_step) is the rate at the start of the interval.
-            let r_step = rate_path.get(step).copied().unwrap_or(0.0);
+        // `rate_path` carries one rate per grid point (`num_steps + 1`
+        // entries). `r(t_step)`, the rate at the start of the interval,
+        // drives `B` over `[t_step, t_{step+1})`; iterate the first
+        // `num_steps` rates directly so no fallible bounds check is needed.
+        for (step, &r_step) in rate_path.iter().take(num_steps).enumerate() {
             acc *= (r_step * time_grid.dt(step)).exp();
             bank.push(acc);
         }
