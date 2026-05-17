@@ -227,11 +227,15 @@ impl PoolFlowSource for StochasticPathFlowSource {
                     Some(PeriodDefaultOutcome::PerName(&self.default_scratch))
                 }
                 PoolGranularity::LargeHomogeneous => {
-                    // Closed-form LHP limit: apply E[1{Aᵢ ≤ c} | Z] to the
-                    // whole pool as a period-level default rate.
-                    let rate = engine
-                        .simulator
-                        .conditional_default_prob(plan.systematic_z, plan.marginal_pd);
+                    // Closed-form LHP limit: apply E[1{Aᵢ ≤ c} | Z, W] to the
+                    // whole pool as a period-level default rate. The simulator
+                    // draws the same shared mixing `W` per period as the
+                    // per-name path, so this is the genuine `N → ∞` limit.
+                    let rate = engine.simulator.conditional_default_prob(
+                        plan.systematic_z,
+                        plan.marginal_pd,
+                        &mut engine.rng,
+                    );
                     Some(PeriodDefaultOutcome::PoolWidePeriodRate(rate))
                 }
             },

@@ -1221,12 +1221,47 @@ mod per_name_copula_tests {
         granularity: PoolGranularity,
         num_paths: usize,
     ) -> StochasticPricerConfig {
+        copula_config_with_spec(
+            StochasticDefaultSpec::gaussian_copula(base_cdr, correlation),
+            correlation,
+            num_periods,
+            granularity,
+            num_paths,
+        )
+    }
+
+    /// Build a pricer config with a Student-t-copula default model.
+    fn student_t_copula_config(
+        base_cdr: f64,
+        correlation: f64,
+        degrees_of_freedom: f64,
+        num_periods: usize,
+        granularity: PoolGranularity,
+        num_paths: usize,
+    ) -> StochasticPricerConfig {
+        copula_config_with_spec(
+            StochasticDefaultSpec::student_t_copula(base_cdr, correlation, degrees_of_freedom),
+            correlation,
+            num_periods,
+            granularity,
+            num_paths,
+        )
+    }
+
+    /// Build a pricer config from an explicit copula default spec.
+    fn copula_config_with_spec(
+        default_spec: StochasticDefaultSpec,
+        correlation: f64,
+        num_periods: usize,
+        granularity: PoolGranularity,
+        num_paths: usize,
+    ) -> StochasticPricerConfig {
         let mut tree_config = ScenarioTreeConfig::new(
             num_periods,
             num_periods as f64 / 12.0,
             BranchingSpec::fixed(2),
         );
-        tree_config.default_spec = StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
+        tree_config.default_spec = default_spec;
         tree_config.correlation = CorrelationStructure::flat(correlation, 0.0);
         tree_config.initial_balance = 100_000_000.0;
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)
@@ -1409,6 +1444,192 @@ mod per_name_copula_tests {
              granular pool (600 names) dispersion {:.0}",
             concentrated.unexpected_loss.amount(),
             granular.unexpected_loss.amount()
+        );
+    }
+
+    /// Sum of realized pool credit losses across all tranches, used as a
+    /// granularity-independent proxy for the pool's total default experience.
+    fn deal_credit_loss(result: &StochasticPricingResult) -> f64 {
+        result
+            .tranche_results
+            .iter()
+            .map(|t| t.expected_loss.amount())
+            .sum()
+    }
+
+    /// **Student-t LHP-limit parity** — the regression anchor for the
+    /// corrected Student-t LHP conditional default probability.
+    ///
+    /// A large, granular, homogeneous pool priced through the stochastic
+    /// engine with a **Student-t** copula must produce the same tranche PVs
+    /// under [`PoolGranularity::PerName`] and [`PoolGranularity::LargeHomogeneous`]:
+    /// per-name → LHP as `N → ∞`.
+    ///
+    /// On the parent commit this FAILS. The pre-fix LHP fast-path fed the
+    /// Gaussian systematic `Z` into the Student-t `conditional_default_prob`
+    /// slot that expects the `t(ν)` factor `M = Z/√W`, understating pool
+    /// defaults ~14-17% (per-name rate ≈ 0.050 vs LHP ≈ 0.043) and thereby
+    /// overstating the mezzanine/equity tranche values. There was zero test
+    /// coverage of the Student-t copula through the engine — this closes it.
+    #[test]
+    fn student_t_large_granular_pool_per_name_converges_to_lhp() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(600);
+
+        let per_name = StochasticPricer::new(student_t_copula_config(
+            0.05,
+            0.30,
+            6.0,
+            36,
+            PoolGranularity::PerName,
+            2_000,
+        ))
+        .price(&deal, &market)
+        .expect("Student-t per-name pricing");
+        let lhp = StochasticPricer::new(student_t_copula_config(
+            0.05,
+            0.30,
+            6.0,
+            36,
+            PoolGranularity::LargeHomogeneous,
+            2_000,
+        ))
+        .price(&deal, &market)
+        .expect("Student-t LHP pricing");
+
+        // Total realized credit loss must agree: the per-name and LHP paths
+        // now condition on the same (Z, W), so the pool default experience
+        // converges as N → ∞. The pre-fix LHP path understates losses ~14%.
+        let loss_pn = deal_credit_loss(&per_name);
+        let loss_lhp = deal_credit_loss(&lhp);
+        let loss_tol = (0.05 * loss_pn.abs()).max(250_000.0);
+        assert!(
+            (loss_pn - loss_lhp).abs() < loss_tol,
+            "Student-t per-name credit loss {loss_pn:.0} should converge to \
+             LHP credit loss {loss_lhp:.0} (|diff|={:.0}, tol={loss_tol:.0}); \
+             pre-fix LHP understates losses ~14-17%",
+            (loss_pn - loss_lhp).abs()
+        );
+
+        // Each tranche PV must agree within a few MC standard errors.
+        for id in ["SR", "MEZZ", "EQ"] {
+            let pn = tranche_pv(&per_name, id);
+            let lh = tranche_pv(&lhp, id);
+            let tol = (0.015 * lh.abs()).max(250_000.0);
+            assert!(
+                (pn - lh).abs() < tol,
+                "{id}: Student-t per-name PV {pn:.0} should converge to LHP \
+                 PV {lh:.0} (|diff|={:.0}, tol={tol:.0}); pre-fix LHP \
+                 overstates mezz/equity",
+                (pn - lh).abs()
+            );
+        }
+    }
+
+    /// Student-t copula default tail dependence: at a fixed correlation, a
+    /// concentrated pool priced per-name with a Student-t copula must carry
+    /// strictly more loss dispersion than a granular one — the per-name
+    /// engine must work end-to-end for the Student-t copula, not just
+    /// Gaussian.
+    #[test]
+    fn student_t_concentration_increases_loss_dispersion() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+
+        let granular = StochasticPricer::new(student_t_copula_config(
+            0.05,
+            0.25,
+            6.0,
+            36,
+            PoolGranularity::PerName,
+            3_000,
+        ))
+        .price(&clo_deal(600), &market)
+        .expect("Student-t granular per-name pricing");
+        let concentrated = StochasticPricer::new(student_t_copula_config(
+            0.05,
+            0.25,
+            6.0,
+            36,
+            PoolGranularity::PerName,
+            3_000,
+        ))
+        .price(&clo_deal(40), &market)
+        .expect("Student-t concentrated per-name pricing");
+
+        assert!(
+            concentrated.unexpected_loss.amount() > granular.unexpected_loss.amount(),
+            "Student-t concentrated pool (40 names) loss dispersion {:.0} \
+             must exceed granular pool (600 names) dispersion {:.0}",
+            concentrated.unexpected_loss.amount(),
+            granular.unexpected_loss.amount()
+        );
+    }
+
+    /// Student-t per-name pricing must be deterministic and bit-identical
+    /// between repeated runs — the shared mixing `W` is drawn from a seeded
+    /// per-path stream.
+    #[test]
+    fn student_t_per_name_pricing_is_deterministic() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(80);
+
+        let run = || {
+            StochasticPricer::new(student_t_copula_config(
+                0.04,
+                0.25,
+                6.0,
+                24,
+                PoolGranularity::PerName,
+                500,
+            ))
+            .price(&deal, &market)
+            .expect("Student-t per-name pricing")
+        };
+        let a = run();
+        let b = run();
+
+        assert_eq!(
+            a.npv.amount(),
+            b.npv.amount(),
+            "repeated Student-t per-name MC runs must be bit-identical"
+        );
+        for id in ["SR", "MEZZ", "EQ"] {
+            assert_eq!(
+                tranche_pv(&a, id),
+                tranche_pv(&b, id),
+                "{id}: repeated Student-t per-name runs must produce \
+                 bit-identical tranche PV"
+            );
+        }
+    }
+
+    /// Student-t LHP pricing must be deterministic: the LHP fast-path now
+    /// draws a shared mixing `W` per period from the seeded per-path stream,
+    /// so repeated runs must stay bit-identical.
+    #[test]
+    fn student_t_lhp_pricing_is_deterministic() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(600);
+
+        let run = || {
+            StochasticPricer::new(student_t_copula_config(
+                0.04,
+                0.25,
+                6.0,
+                24,
+                PoolGranularity::LargeHomogeneous,
+                500,
+            ))
+            .price(&deal, &market)
+            .expect("Student-t LHP pricing")
+        };
+        let a = run();
+        let b = run();
+
+        assert_eq!(
+            a.npv.amount(),
+            b.npv.amount(),
+            "repeated Student-t LHP MC runs must be bit-identical"
         );
     }
 }

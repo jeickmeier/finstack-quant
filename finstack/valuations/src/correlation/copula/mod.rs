@@ -101,6 +101,52 @@ pub trait Copula: Send + Sync {
         self.conditional_default_prob(default_threshold, factor_realization, correlation)
     }
 
+    /// LHP conditional default probability given the *Gaussian* systematic
+    /// draw `z` and the shared mixing draw `w`.
+    ///
+    /// This is the large-homogeneous-pool (`N → ∞`) limit of the per-name
+    /// latent construction [`Self::latent_variable`] — the sampling
+    /// counterpart computed in the **same** `(Z, W)` sigma-algebra as
+    /// [`Self::latent_variable`], so a per-name pool and the LHP fast-path
+    /// converge as `N → ∞`.
+    ///
+    /// It differs from [`Self::conditional_default_prob`]: that method takes
+    /// the copula's *own systematic factor* (for the Student-t copula the
+    /// `t(ν)`-distributed `M = Z/√W`, with `W` already integrated out). Here
+    /// the caller passes the raw Gaussian `Z` and the explicitly-drawn `W`,
+    /// matching how [`Self::latent_variable`] is fed by the per-name engine.
+    ///
+    /// # Arguments
+    ///
+    /// * `default_threshold` — the per-name default barrier `c` (`Φ⁻¹(PD)`
+    ///   for Gaussian-marginal copulas, `t_ν⁻¹(PD)` for the Student-t copula).
+    /// * `systematic` — the Gaussian systematic draw `Z ~ N(0,1)` for the
+    ///   period, shared by every name.
+    /// * `mixing` — the shared mixing variable `W` drawn via
+    ///   [`Self::sample_mixing`] (`1.0` for copulas without a mixing
+    ///   variable). The default implementation ignores it.
+    /// * `correlation` — the asset correlation `ρ`.
+    ///
+    /// # Default implementation
+    ///
+    /// Copulas whose latent variable is `Aᵢ = √ρ·Z + √(1−ρ)·εᵢ` with a
+    /// Gaussian systematic `Z` (Gaussian, RFL, multi-factor) have
+    /// `P(default | Z) = Φ((c − √ρ·Z)/√(1−ρ))`, which is exactly what
+    /// [`Self::conditional_default_prob`] already computes from a single
+    /// factor — so the default implementation delegates to it and ignores
+    /// `mixing`. The Student-t copula, whose latent variable divides by `√W`,
+    /// overrides this with the `W`-conditional closed form.
+    fn conditional_default_prob_given_systematic_and_mixing(
+        &self,
+        default_threshold: f64,
+        systematic: f64,
+        mixing: f64,
+        correlation: f64,
+    ) -> f64 {
+        let _ = mixing;
+        self.conditional_default_prob(default_threshold, &[systematic], correlation)
+    }
+
     /// Integrate expected value E[f(L)] over the factor distribution.
     ///
     /// Uses appropriate quadrature for the copula's factor distribution.

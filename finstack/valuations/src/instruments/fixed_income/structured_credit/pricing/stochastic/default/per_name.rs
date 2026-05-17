@@ -165,13 +165,41 @@ impl PerNameCopulaDefault {
 
     /// LHP conditional default probability for one period.
     ///
-    /// This is `E[1{Aᵢ ≤ c} | Z]` — the `N → ∞` limit of
-    /// [`Self::simulate_period`] — used by the [`PoolGranularity::LargeHomogeneous`]
-    /// fast-path. Delegates to [`Copula::conditional_default_prob`].
-    pub(crate) fn conditional_default_prob(&self, systematic: f64, marginal_pd: f64) -> f64 {
+    /// This is `E[1{Aᵢ ≤ c} | Z, W]` — the `N → ∞` limit of
+    /// [`Self::simulate_period`] — used by the
+    /// [`PoolGranularity::LargeHomogeneous`] fast-path.
+    ///
+    /// It draws the **same** shared mixing variable `W` that
+    /// [`Self::simulate_period`] draws (one uniform via
+    /// [`Copula::sample_mixing`], `1.0` for Gaussian) and conditions on the
+    /// same `(Z, W)` sigma-algebra, so a per-name pool and this fast-path
+    /// converge as `N → ∞`. The conditional fraction is delegated to
+    /// [`Copula::conditional_default_prob_given_systematic_and_mixing`]:
+    ///
+    /// - Gaussian / RFL / multi-factor: `Φ((Φ⁻¹(PD) − √ρ·Z)/√(1−ρ))`.
+    /// - Student-t: `Φ((c·√W − √ρ·Z)/√(1−ρ))` with `c = t_ν⁻¹(PD)`.
+    ///
+    /// The `W` draw mirrors [`Self::simulate_period`] exactly (one
+    /// [`RandomStream::next_u01`] per period, before any other consumption),
+    /// so the LHP and per-name RNG streams stay consistent for a fixed seed.
+    pub(crate) fn conditional_default_prob(
+        &self,
+        systematic: f64,
+        marginal_pd: f64,
+        rng: &mut PhiloxRng,
+    ) -> f64 {
         let threshold = self.threshold_kind.threshold(marginal_pd);
+        // One shared mixing draw per period — identical to `simulate_period`
+        // (1.0 for Gaussian). Conditioning the LHP limit on this same `W`
+        // makes it the genuine `N → ∞` limit of the per-name model.
+        let mixing = self.copula.sample_mixing(rng.next_u01());
         self.copula
-            .conditional_default_prob(threshold, &[systematic], self.correlation)
+            .conditional_default_prob_given_systematic_and_mixing(
+                threshold,
+                systematic,
+                mixing,
+                self.correlation,
+            )
             .clamp(0.0, 1.0)
     }
 }
@@ -220,7 +248,7 @@ mod tests {
         for &z in &[-1.5_f64, 0.0, 1.5] {
             sim.simulate_period(z, &names, &mut rng, &mut out);
             let realized = out.iter().filter(|d| **d).count() as f64 / n as f64;
-            let lhp = sim.conditional_default_prob(z, pd);
+            let lhp = sim.conditional_default_prob(z, pd, &mut rng);
             assert!(
                 (realized - lhp).abs() < 0.01,
                 "z={z}: realized fraction {realized} should converge to LHP {lhp}"
@@ -304,6 +332,99 @@ mod tests {
         assert!(
             (realized - pd).abs() < 0.004,
             "Student-t per-name marginal {realized} should recover PD {pd}"
+        );
+    }
+
+    /// The Student-t LHP fast-path, averaged over the systematic factor,
+    /// must recover the unconditional marginal PD.
+    ///
+    /// `conditional_default_prob` draws a fresh shared mixing `W` per call and
+    /// returns `Φ((c·√W − √ρ·Z)/√(1−ρ))`; averaging over `(Z, W)` must equal
+    /// PD. The pre-fix path fed the Gaussian `Z` into the slot expecting the
+    /// `t(ν)` factor `M = Z/√W`, biasing this average ~14-17% low.
+    #[test]
+    fn student_t_lhp_marginal_recovers_pd() {
+        let sim = PerNameCopulaDefault::new(
+            &CopulaSpec::StudentT {
+                degrees_of_freedom: 6.0,
+            },
+            0.30,
+        );
+        let pd = 0.05;
+        let mut rng = PhiloxRng::new(909);
+
+        let periods = 400_000usize;
+        let mut sum = 0.0;
+        for _ in 0..periods {
+            let z = rng.next_std_normal();
+            sum += sim.conditional_default_prob(z, pd, &mut rng);
+        }
+        let realized = sum / periods as f64;
+        // E[Φ((c·√W − √ρ·Z)/√(1−ρ))] = PD. 3σ MC error at p≈0.05, n=4e5 ≈ 0.001.
+        assert!(
+            (realized - pd).abs() < 0.0015,
+            "Student-t LHP marginal {realized} should recover PD {pd}"
+        );
+    }
+
+    /// **Student-t LHP-limit parity** — the regression anchor for the
+    /// corrected Student-t LHP conditional default probability.
+    ///
+    /// A large granular pool simulated per-name and the Student-t LHP
+    /// fast-path must agree: per-name → LHP as `N → ∞`, because both now
+    /// realize the *same* `(Z, W)` latent construction
+    /// `Aᵢ = (√ρ·Z + √(1−ρ)·εᵢ)/√W`. The two streams share the period `Z`
+    /// but draw `W` independently — both `W` draws are `χ²(ν)/ν`, so the
+    /// period-averaged rates estimate the same `PD` and must converge.
+    ///
+    /// On the pre-fix engine the bug this anchors FAILS empirically: the LHP
+    /// path fed the Gaussian `Z` into the slot expecting the `t(ν)` factor
+    /// `M = Z/√W`, so the LHP rate (≈ 0.0423) sat ~17% below the per-name
+    /// rate (≈ 0.0513) — both verified by a scratch Monte Carlo run.
+    #[test]
+    fn student_t_lhp_limit_parity() {
+        let sim = PerNameCopulaDefault::new(
+            &CopulaSpec::StudentT {
+                degrees_of_freedom: 6.0,
+            },
+            0.30,
+        );
+        let pd = 0.05;
+        let n = 8_192usize;
+        let names = vec![pd; n];
+
+        // Per-name engine: one shared W + n idiosyncratic εᵢ per period.
+        let mut pn_rng = PhiloxRng::new(4242);
+        let mut out = Vec::new();
+        // LHP fast-path: independent stream, one shared W per period.
+        let mut lhp_rng = PhiloxRng::new(7171);
+
+        let periods = 8_000usize;
+        let mut pn_defaults = 0usize;
+        let mut lhp_sum = 0.0;
+        for _ in 0..periods {
+            let z = pn_rng.next_std_normal();
+            sim.simulate_period(z, &names, &mut pn_rng, &mut out);
+            pn_defaults += out.iter().filter(|d| **d).count();
+            lhp_sum += sim.conditional_default_prob(z, pd, &mut lhp_rng);
+        }
+        let pn_rate = pn_defaults as f64 / (periods * n) as f64;
+        let lhp_rate = lhp_sum / periods as f64;
+
+        // Both recover PD, and per-name ⇄ LHP agree within MC error. The
+        // pre-fix LHP rate was ~0.043 — a ~14% gap that blows this tolerance.
+        assert!(
+            (pn_rate - pd).abs() < 0.0025,
+            "Student-t per-name rate {pn_rate} should recover PD {pd}"
+        );
+        assert!(
+            (lhp_rate - pd).abs() < 0.0025,
+            "Student-t LHP rate {lhp_rate} should recover PD {pd}"
+        );
+        assert!(
+            (pn_rate - lhp_rate).abs() < 0.0025,
+            "Student-t per-name rate {pn_rate} and LHP rate {lhp_rate} must \
+             converge (N → ∞ limit); pre-fix LHP ≈ 0.043 fails this"
         );
     }
 

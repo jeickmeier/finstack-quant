@@ -56,7 +56,7 @@ use finstack_core::math::distributions::chi_squared_quantile;
 #[cfg(test)]
 use finstack_core::math::student_t_inv_cdf;
 use finstack_core::math::{
-    ln_gamma, student_t_cdf, GaussHermiteQuadrature, GaussLaguerreQuadrature,
+    ln_gamma, norm_cdf, student_t_cdf, GaussHermiteQuadrature, GaussLaguerreQuadrature,
 };
 use std::sync::Arc;
 
@@ -327,6 +327,46 @@ impl Copula for StudentTCopula {
         let conditional_threshold = (base_arg * scaling).clamp(-CDF_CLIP, CDF_CLIP);
 
         student_t_cdf(conditional_threshold, nu + 1.0)
+    }
+
+    fn conditional_default_prob_given_systematic_and_mixing(
+        &self,
+        default_threshold: f64,
+        systematic: f64,
+        mixing: f64,
+        correlation: f64,
+    ) -> f64 {
+        // LHP (N → ∞) limit of the per-name Student-t latent construction
+        //   Aᵢ = (√ρ·Z + √(1−ρ)·εᵢ) / √W,   default ⟺ Aᵢ ≤ c = t_ν⁻¹(PD)
+        // conditioned on the SAME (Z, W) as `latent_variable`. With εᵢ ~ N(0,1):
+        //   Aᵢ ≤ c  ⟺  √(1−ρ)·εᵢ ≤ c·√W − √ρ·Z  ⟺  εᵢ ≤ (c·√W − √ρ·Z)/√(1−ρ)
+        // so the conditional default fraction is
+        //   P(default | Z, W) = Φ( (c·√W − √ρ·Z) / √(1−ρ) ).
+        //
+        // This is NOT `conditional_default_prob`: that method conditions on
+        // the t(ν) systematic factor M = Z/√W (with W integrated out via the
+        // ν+1 scaling), whereas the per-name engine draws a Gaussian Z and an
+        // explicit shared W. Feeding Z into the M-slot is a distribution and
+        // a sigma-algebra mismatch — it biases the pool default rate low.
+        let z = systematic;
+        let w = mixing.max(1e-12);
+
+        if correlation <= MIN_CORRELATION {
+            // No systematic channel: Aᵢ = εᵢ/√W, so default ⟺ εᵢ ≤ c·√W.
+            return norm_cdf((default_threshold * w.sqrt()).clamp(-CDF_CLIP, CDF_CLIP));
+        }
+
+        // Smoothing clamp mirrors `conditional_default_prob`: at ρ → 1 the
+        // 1/√(1−ρ) factor plus CDF_CLIP yields the correct indicator limit
+        // 1{√ρ·Z ≤ c·√W}.
+        let rho = self.smooth_correlation(correlation);
+        let sqrt_rho = rho.sqrt();
+        let sqrt_1mr = (1.0 - rho).sqrt();
+
+        let conditional_threshold =
+            ((default_threshold * w.sqrt() - sqrt_rho * z) / sqrt_1mr).clamp(-CDF_CLIP, CDF_CLIP);
+
+        norm_cdf(conditional_threshold)
     }
 
     fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
