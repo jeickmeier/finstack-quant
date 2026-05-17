@@ -187,11 +187,18 @@ pub(crate) fn theta(
     let r = -df.ln() / t;
     let d1 = d1_black76(forward, option.strike, sigma, t);
     let n_prime_d1 = (-0.5 * d1 * d1).exp() / (2.0 * std::f64::consts::PI).sqrt();
-    let time_decay = -forward * n_prime_d1 * sigma / (2.0 * t.sqrt());
-    let option_price = black_price(option, forward, sigma, t);
-    let carry_cost = -r * option_price;
+
+    // PV(t) = df(t)·black(t), with df = e^{-r·t}. The (negative) time
+    // derivative — i.e. theta as time-to-expiry t shrinks — is
+    //   -∂PV/∂t = df·(-∂black/∂t) + r·df·black.
+    // `time_decay` is the discounted Black decay term df·(-∂black/∂t); the
+    // carry term must be built from the *discounted* PV (r·df·black), NOT the
+    // undiscounted Black forward price. Each term carries exactly one `df`.
+    let time_decay = -forward * n_prime_d1 * sigma / (2.0 * t.sqrt()) * df;
+    let discounted_pv = black_price(option, forward, sigma, t) * df;
+    let carry_cost = r * discounted_pv;
     let theta_per_day = (time_decay + carry_cost) / 365.0;
-    Ok(theta_per_day * option.contract_specs.multiplier * option.num_contracts() * df)
+    Ok(theta_per_day * option.contract_specs.multiplier * option.num_contracts())
 }
 
 pub(crate) fn intrinsic_value(
@@ -323,5 +330,59 @@ mod tests {
         let via_instrument = option.value(&market, as_of).expect("instrument pv");
 
         assert_eq!(via_pricer, via_instrument);
+    }
+
+    /// W-34: the analytic theta must equal the finite-difference theta of the
+    /// *discounted* PV. The carry term `-r·V` must be consistent with the final
+    /// `∂PV/∂t = ∂(df·black)/∂t`.
+    ///
+    /// This isolates the time-to-expiry component (Black decay + discount roll)
+    /// by holding the forward and vol-of-vol fixed and differencing only `t` —
+    /// the analytic Black/Greeks formulas likewise hold the forward fixed, so a
+    /// curve-roll FD theta would not be a like-for-like comparison.
+    #[test]
+    fn analytic_theta_matches_fd_theta_of_discounted_pv() {
+        let market = setup_market();
+        let option = sample_option();
+        let as_of = date!(2025 - 01 - 01);
+
+        let analytic = theta(&option, &market, as_of).expect("analytic theta");
+
+        // Reconstruct the discounted PV as a closed-form function of `t` only,
+        // with the forward, vol-of-vol and short rate held at their as-of
+        // values — exactly the quantities the analytic theta differentiates.
+        let vol_curve = market
+            .get_vol_index_curve(&option.vol_index_curve_id)
+            .expect("vix");
+        let vol_surface = market
+            .get_surface(&option.vol_of_vol_surface_id)
+            .expect("volvol");
+        let disc = market
+            .get_discount(&option.discount_curve_id)
+            .expect("disc");
+        let t0 = option
+            .day_count
+            .year_fraction(as_of, option.expiry, DayCountContext::default())
+            .expect("t")
+            .max(0.0);
+        let forward = vol_curve.forward_level(t0);
+        let sigma = vol_surface.value_clamped(t0, option.strike);
+        let df0 = disc.df_between_dates(as_of, option.expiry).expect("df");
+        let r = -df0.ln() / t0;
+
+        // Discounted PV per contract-point as a function of t.
+        let pv_of_t = |t: f64| -> f64 {
+            black_price(&option, forward, sigma, t) * (-r * t).exp()
+        };
+        let scale = option.contract_specs.multiplier * option.num_contracts();
+        let one_day = 1.0 / 365.0;
+        // theta-per-day: PV decays as t (time-to-expiry) falls by one day.
+        let fd_theta = (pv_of_t(t0 - one_day) - pv_of_t(t0)) * scale;
+
+        let denom = analytic.abs().max(fd_theta.abs()).max(1e-9);
+        assert!(
+            (analytic - fd_theta).abs() / denom < 0.02,
+            "analytic theta {analytic} disagrees with FD theta of discounted PV {fd_theta}",
+        );
     }
 }
