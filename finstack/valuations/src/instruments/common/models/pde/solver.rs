@@ -470,7 +470,9 @@ mod tests {
             .american(payoff.clone())
             .build()
             .expect("valid rannacher solver");
-        let rannacher_sol = rannacher_solver.solve(&pde, maturity);
+        let rannacher_sol = rannacher_solver
+            .solve(&pde, maturity)
+            .expect("rannacher solve");
         let rannacher_price = rannacher_sol.interpolate(spot.ln());
 
         // Pure implicit solver (reference)
@@ -480,7 +482,9 @@ mod tests {
             .american(payoff)
             .build()
             .expect("valid implicit solver");
-        let implicit_sol = implicit_solver.solve(&pde, maturity);
+        let implicit_sol = implicit_solver
+            .solve(&pde, maturity)
+            .expect("implicit solve");
         let implicit_price = implicit_sol.interpolate(spot.ln());
 
         // Both prices must be finite and positive
