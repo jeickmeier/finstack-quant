@@ -161,6 +161,32 @@ pub struct FixedLegSpec {
     pub end_of_month: bool,
 }
 
+impl FixedLegSpec {
+    /// Validate the structural invariants of this fixed-leg specification.
+    ///
+    /// Enforces that the accrual period is well-formed: `start < end`. A leg
+    /// with `start >= end` produces an empty or reversed schedule, which yields
+    /// a silently wrong (typically zero) PV instead of an error.
+    ///
+    /// The `rate` field is a [`Decimal`], which is finite by construction
+    /// (`rust_decimal` has no `NaN`/`infinity` representation), so no separate
+    /// finiteness check is required for it.
+    ///
+    /// This struct is normally built from its public fields (e.g. via serde),
+    /// so call `validate` after construction to enforce the invariant that a
+    /// constructor would otherwise guarantee.
+    ///
+    /// # Errors
+    /// Returns an error stating both dates when `start >= end`.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        crate::instruments::common_impl::validation::validate_date_range_strict(
+            self.start,
+            self.end,
+            "FixedLegSpec",
+        )
+    }
+}
+
 /// Specification for floating rate legs in interest rate swaps
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct FloatLegSpec {
@@ -232,6 +258,32 @@ pub struct FloatLegSpec {
     /// Most professional systems (QuantLib, Bloomberg SWDF) default to `true`.
     #[serde(default)]
     pub end_of_month: bool,
+}
+
+impl FloatLegSpec {
+    /// Validate the structural invariants of this floating-leg specification.
+    ///
+    /// Enforces that the accrual period is well-formed: `start < end`. A leg
+    /// with `start >= end` produces an empty or reversed schedule, which yields
+    /// a silently wrong (typically zero) PV instead of an error.
+    ///
+    /// The `spread_bp` field is a [`Decimal`], which is finite by construction
+    /// (`rust_decimal` has no `NaN`/`infinity` representation), so no separate
+    /// finiteness check is required for it.
+    ///
+    /// This struct is normally built from its public fields (e.g. via serde),
+    /// so call `validate` after construction to enforce the invariant that a
+    /// constructor would otherwise guarantee.
+    ///
+    /// # Errors
+    /// Returns an error stating both dates when `start >= end`.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        crate::instruments::common_impl::validation::validate_date_range_strict(
+            self.start,
+            self.end,
+            "FloatLegSpec",
+        )
+    }
 }
 
 /// Specification for basis swap legs (floating vs floating)
@@ -437,4 +489,89 @@ pub struct TotalReturnLegSpec {
     pub initial_level: Option<f64>,
     /// Whether to include dividends/distributions in the return calculation
     pub include_distributions: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use time::macros::date;
+
+    fn fixed_leg(start: Date, end: Date) -> FixedLegSpec {
+        FixedLegSpec {
+            discount_curve_id: CurveId::new("USD-OIS"),
+            rate: Decimal::new(5, 2),
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            bdc: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: None,
+            stub: StubKind::ShortFront,
+            start,
+            end,
+            par_method: None,
+            compounding_simple: true,
+            payment_lag_days: 0,
+            end_of_month: false,
+        }
+    }
+
+    fn float_leg(start: Date, end: Date) -> FloatLegSpec {
+        FloatLegSpec {
+            discount_curve_id: CurveId::new("USD-OIS"),
+            forward_curve_id: CurveId::new("USD-SOFR"),
+            spread_bp: Decimal::ZERO,
+            frequency: Tenor::quarterly(),
+            day_count: DayCount::Act360,
+            bdc: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: None,
+            stub: StubKind::ShortFront,
+            reset_lag_days: 0,
+            fixing_calendar_id: None,
+            start,
+            end,
+            compounding: crate::instruments::rates::irs::FloatingLegCompounding::default(),
+            payment_lag_days: 0,
+            end_of_month: false,
+        }
+    }
+
+    #[test]
+    fn fixed_leg_validate_rejects_non_increasing_dates() {
+        // Failure mode: a leg with start >= end produces an empty or reversed
+        // schedule and a silently wrong (typically zero) PV.
+        let start = date!(2025 - 03 - 15);
+        let end = date!(2030 - 03 - 15);
+
+        // start == end
+        let equal = fixed_leg(start, start)
+            .validate()
+            .expect_err("start == end must be rejected");
+        assert!(
+            equal.to_string().contains("FixedLegSpec"),
+            "error should name the leg: {equal}"
+        );
+
+        // start > end (reversed)
+        assert!(fixed_leg(end, start).validate().is_err());
+
+        // well-formed leg passes
+        assert!(fixed_leg(start, end).validate().is_ok());
+    }
+
+    #[test]
+    fn float_leg_validate_rejects_non_increasing_dates() {
+        // Failure mode: same as the fixed leg — a reversed/empty accrual window.
+        let start = date!(2025 - 03 - 15);
+        let end = date!(2030 - 03 - 15);
+
+        let equal = float_leg(start, start)
+            .validate()
+            .expect_err("start == end must be rejected");
+        assert!(
+            equal.to_string().contains("FloatLegSpec"),
+            "error should name the leg: {equal}"
+        );
+
+        assert!(float_leg(end, start).validate().is_err());
+        assert!(float_leg(start, end).validate().is_ok());
+    }
 }
