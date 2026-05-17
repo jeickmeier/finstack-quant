@@ -272,7 +272,9 @@ impl BarrierOptionPdePricer {
                 )
             })?;
 
-        let solution = solver.solve(&pde, inputs.maturity);
+        let solution = solver.solve(&pde, inputs.maturity).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
         Ok(solution.interpolate(ln_spot))
     }
 
@@ -314,7 +316,9 @@ impl BarrierOptionPdePricer {
                 )
             })?;
 
-        let solution = solver.solve(&pde, inputs.maturity);
+        let solution = solver.solve(&pde, inputs.maturity).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
         Ok(solution.interpolate(inputs.spot.ln()))
     }
 }

@@ -131,7 +131,12 @@ impl EquityOptionPdePricer {
             )
         })?;
 
-        let solution = solver.solve(&pde, t);
+        let solution = solver.solve(&pde, t).map_err(|e| {
+            PricingError::model_failure_with_context(
+                e.to_string(),
+                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeCrankNicolson1D),
+            )
+        })?;
         let price = solution.interpolate(spot.ln());
 
         Ok(Money::new(price * inst.notional.amount(), ccy))

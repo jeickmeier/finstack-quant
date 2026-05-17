@@ -75,4 +75,4 @@ pub use problem::PdeProblem1D;
 pub use problem2d::PdeProblem2D;
 pub use solver::{PdeSolution, PdeSolverError, Solver1D, Solver1DBuilder};
 pub use solver2d::{PdeSolution2D, PdeSolver2DError, Solver2D, Solver2DBuilder};
-pub use stepper::{RannacherStepper, ThetaStepper, TimeStepper};
+pub use stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};

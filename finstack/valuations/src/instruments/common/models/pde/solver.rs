@@ -8,7 +8,7 @@
 use super::exercise::PenaltyExercise;
 use super::grid::{find_interval, Grid1D, PdeGridError};
 use super::problem::PdeProblem1D;
-use super::stepper::{RannacherStepper, ThetaStepper, TimeStepper};
+use super::stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};
 
 /// Builder for constructing a [`Solver1D`] with a fluent API.
 ///
@@ -114,7 +114,16 @@ impl Solver1D {
     }
 
     /// Solve the PDE problem and return the solution at `t = 0`.
-    pub fn solve(&self, problem: &dyn PdeProblem1D, maturity: f64) -> PdeSolution {
+    ///
+    /// Returns [`PdeSolverError::Stepper`] if the time stepper fails — in
+    /// practice, an explicit / under-damped (`theta < 0.5`) scheme whose time
+    /// step violates the CFL stability condition. Implicit and Crank-Nicolson
+    /// schemes are unconditionally stable and never trigger this.
+    pub fn solve(
+        &self,
+        problem: &dyn PdeProblem1D,
+        maturity: f64,
+    ) -> Result<PdeSolution, PdeSolverError> {
         // Initialize terminal condition at interior points
         let mut u: Vec<f64> = self.grid.points()[1..self.grid.n() - 1]
             .iter()
@@ -134,7 +143,7 @@ impl Solver1D {
             let dt = t_from - t_to;
 
             self.stepper
-                .step(problem, &self.grid, &mut u, t_from, t_to, i);
+                .step(problem, &self.grid, &mut u, t_from, t_to, i)?;
 
             // Apply early exercise constraint
             if let Some(ref exercise) = self.exercise {
@@ -170,12 +179,12 @@ impl Solver1D {
             Some(exercise_boundary)
         };
 
-        PdeSolution {
+        Ok(PdeSolution {
             grid: self.grid.clone(),
             values,
             exercise_boundary: exercise_boundary_out,
             n_time_steps: n_steps,
-        }
+        })
     }
 }
 
@@ -305,7 +314,7 @@ impl PdeSolution {
     }
 }
 
-/// Errors during solver construction.
+/// Errors during solver construction or execution.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum PdeSolverError {
     /// No grid was specified in the builder.
@@ -317,6 +326,10 @@ pub enum PdeSolverError {
     /// Grid construction error.
     #[error(transparent)]
     Grid(#[from] PdeGridError),
+    /// Time-stepping error — e.g. an explicit / under-damped scheme whose
+    /// time step violates the CFL stability condition.
+    #[error(transparent)]
+    Stepper(#[from] StepperError),
 }
 
 #[cfg(test)]
@@ -363,7 +376,9 @@ mod tests {
             .build()
             .expect("valid solver");
 
-        let solution = solver.solve(&HeatSin, 0.5);
+        let solution = solver
+            .solve(&HeatSin, 0.5)
+            .expect("CN solve is unconditionally stable");
 
         // Check at x = pi/2
         let x = std::f64::consts::FRAC_PI_2;
