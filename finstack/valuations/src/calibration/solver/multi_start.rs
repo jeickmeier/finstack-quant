@@ -31,9 +31,17 @@
 pub(crate) struct MultiStartConfig {
     /// Number of additional restarts beyond the initial point.
     pub(crate) num_restarts: usize,
-    /// Perturbation magnitude as a fraction of the initial parameter
-    /// values, applied via `x' = x · (1 + scale · (2·h − 1))` where
-    /// `h ∈ [0, 1)` is a Halton draw.
+    /// Additive perturbation half-width, applied via
+    /// `x' = x + scale · (2·h − 1)` where `h ∈ [0, 1)` is a Halton draw.
+    ///
+    /// The perturbation is ADDITIVE (not multiplicative) so the restart
+    /// spread is symmetric and independent of the initial-guess magnitude.
+    /// All current callers parameterise in log-space (`[ln κ, ln σ]` for
+    /// HW1F), so `scale` is a log-space half-width: `scale = 0.5` explores
+    /// a multiplicative `[e^{−0.5}, e^{0.5}] ≈ [0.61×, 1.65×]` band around
+    /// each natural parameter, regardless of whether `ln κ ≈ −3.5` or
+    /// `ln σ ≈ −4.6`. A multiplicative form would make the spread
+    /// proportional to `|x|` and collapse to zero near `x = 0`.
     pub(crate) perturbation_scale: f64,
 }
 
@@ -71,9 +79,16 @@ pub(crate) fn halton(mut n: usize, base: usize) -> f64 {
     result
 }
 
-/// Produce a deterministic multiplicative perturbation of `initials` for the
+/// Produce a deterministic additive perturbation of `initials` for the
 /// given `restart_idx` (≥ 0). Each parameter gets a separate Halton stream
 /// so that restarts do not cluster along coordinate axes.
+///
+/// The perturbation is additive — `x' = x + scale · (2·h − 1)` — so the
+/// restart spread is symmetric around each initial value and independent of
+/// that value's magnitude. Callers that want a multiplicative band should
+/// parameterise in log-space (as HW1F does with `[ln κ, ln σ]`); the
+/// additive log-space perturbation then maps to a symmetric multiplicative
+/// band in the natural parameters.
 ///
 /// The perturbed vector is clamped elementwise to `[lb, ub]` when those
 /// bounds are supplied; dimensions beyond the bound vector's length are
@@ -96,7 +111,7 @@ pub(crate) fn perturb_initial_guess(
             let base = HALTON_BASES[i % HALTON_BASES.len()];
             let h = halton(restart_idx + 1, base);
             let perturbation = perturbation_scale * (2.0 * h - 1.0);
-            let mut v = x * (1.0 + perturbation);
+            let mut v = x + perturbation;
             if let Some(lower) = lb {
                 if i < lower.len() {
                     v = v.max(lower[i]);
@@ -246,5 +261,66 @@ mod tests {
         let cfg = MultiStartConfig::default();
         assert_eq!(cfg.num_restarts, 5);
         assert!((cfg.perturbation_scale - 0.5).abs() < 1e-15);
+    }
+
+    /// W-37: the perturbation must be ADDITIVE in the parameter space the
+    /// callers operate in (log-space for HW1F). The restart spread must be
+    /// the SAME regardless of the initial-guess magnitude — a multiplicative
+    /// `x·(1+scale·(2h−1))` makes the spread proportional to `|x|` and
+    /// collapses to zero near `x = 0`, so it barely explores `ln κ ≈ −3.5`.
+    #[test]
+    fn perturbation_spread_is_initial_guess_independent() {
+        let scale = 0.5;
+        // Two very different initial log-space guesses.
+        let guess_a = [-3.5_f64];
+        let guess_b = [-0.1_f64];
+        let n = 24;
+        let span = |guess: &[f64]| {
+            let mut lo = f64::INFINITY;
+            let mut hi = f64::NEG_INFINITY;
+            for r in 0..n {
+                let v = perturb_initial_guess(guess, scale, r, None, None)[0];
+                let delta = v - guess[0];
+                lo = lo.min(delta);
+                hi = hi.max(delta);
+            }
+            hi - lo
+        };
+        let span_a = span(&guess_a);
+        let span_b = span(&guess_b);
+        // Additive perturbation: the spread of (v − x) is identical for
+        // every initial guess. Multiplicative scaling would make span_a
+        // ~35x span_b (proportional to |x|).
+        assert!(
+            (span_a - span_b).abs() < 1e-12,
+            "restart spread must be initial-guess independent: \
+             span_a={span_a}, span_b={span_b}"
+        );
+        // And the spread must be symmetric around the initial guess.
+        let mut sum = 0.0;
+        for r in 0..n {
+            sum += perturb_initial_guess(&guess_a, scale, r, None, None)[0] - guess_a[0];
+        }
+        let mean_delta = sum / n as f64;
+        assert!(
+            mean_delta.abs() < 0.05,
+            "perturbation must be symmetric around the guess, mean_delta={mean_delta}"
+        );
+    }
+
+    /// W-37: a near-zero log-parameter must still be perturbed. The old
+    /// multiplicative form `x·(1+…)` yields exactly `x` when `x = 0`.
+    #[test]
+    fn perturbation_moves_a_near_zero_parameter() {
+        let initials = [0.0_f64];
+        let mut moved = false;
+        for r in 0..16 {
+            let v = perturb_initial_guess(&initials, 0.5, r, None, None)[0];
+            if v.abs() > 1e-9 {
+                moved = true;
+                break;
+            }
+        }
+        assert!(moved, "a zero-valued parameter must still get perturbed");
     }
 }
