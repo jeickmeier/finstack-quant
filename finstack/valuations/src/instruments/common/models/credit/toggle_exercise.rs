@@ -150,7 +150,13 @@ pub struct OptimalToggle {
     /// Number of nested Monte Carlo paths for continuation value estimation.
     /// Recommended range: 100–500.
     pub nested_paths: usize,
-    /// Equity holder discount rate for NPV of toggle decision.
+    /// Equity holder discount rate applied to the nested-MC payoff.
+    ///
+    /// Note: the nested simulation drifts under the risk-neutral measure
+    /// (`risk_free_rate`) but discounts here, so the intermediate equity
+    /// figures are decision inputs, not measure-consistent prices. The
+    /// rate cancels in the cash-vs-PIK comparison and does not bias the
+    /// elected branch.
     pub equity_discount_rate: f64,
     /// Annualised asset volatility for the nested GBM simulation.
     pub asset_vol: f64,
@@ -190,6 +196,21 @@ const NESTED_STEPS_PER_YEAR: usize = 12;
 ///
 /// Returns `true` (elect PIK) when the estimated equity value under PIK
 /// exceeds the equity value under cash.
+///
+/// # Measure note
+///
+/// The nested simulation uses a risk-neutral GBM drift (`risk_free_rate`)
+/// but discounts the resulting payoff at the equity holder's
+/// `equity_discount_rate`. These two rates need not agree, so the
+/// `avg_equity_*` figures are **decision-only quantities, not equity
+/// prices** — a measure-consistent valuation would discount at the same
+/// rate used for the drift. Because the cash and PIK branches share an
+/// identical model (same drift, same discount, same paths), the
+/// measure inconsistency is a common factor that cancels in the
+/// `pik > cash` comparison, so the toggle *decision* is unaffected. The
+/// `equity_discount_rate` is therefore retained as a tunable knob that
+/// does not bias the elected branch (see the `discount_rate_invariant`
+/// test).
 fn optimal_toggle_decision(
     o: &OptimalToggle,
     state: &CreditState,
@@ -692,6 +713,60 @@ mod tests {
             !model.should_pik(&state, &mut rng),
             "Zero notional should return false (nothing to toggle)"
         );
+    }
+
+    #[test]
+    fn optimal_toggle_decision_invariant_to_discount_rate() {
+        // The nested MC drifts risk-neutrally but discounts at
+        // equity_discount_rate. That discount factor scales the cash and PIK
+        // averages by an identical positive constant, so the cash-vs-PIK
+        // decision must not depend on the discount rate. Verify across a
+        // grid of states and discount rates.
+        let states = [
+            CreditState {
+                hazard_rate: 0.10,
+                leverage: 0.60,
+                accreted_notional: 100.0,
+                coupon_due: 2.0,
+                asset_value: Some(166.67),
+                ..Default::default()
+            },
+            CreditState {
+                hazard_rate: 0.25,
+                leverage: 0.85,
+                accreted_notional: 100.0,
+                coupon_due: 4.0,
+                asset_value: Some(120.0),
+                ..Default::default()
+            },
+            CreditState {
+                hazard_rate: 0.05,
+                leverage: 0.40,
+                accreted_notional: 100.0,
+                coupon_due: 1.0,
+                asset_value: Some(250.0),
+                ..Default::default()
+            },
+        ];
+
+        for state in &states {
+            let mut decisions = Vec::new();
+            for &discount in &[0.0_f64, 0.02, 0.05, 0.10, 0.20] {
+                let o = OptimalToggle {
+                    nested_paths: 256,
+                    equity_discount_rate: discount,
+                    asset_vol: 0.30,
+                    risk_free_rate: 0.03,
+                    horizon: 1.0,
+                };
+                // Use a fixed seed so only the discount rate varies.
+                decisions.push(optimal_toggle_decision_seeded(&o, state, 777));
+            }
+            assert!(
+                decisions.windows(2).all(|w| w[0] == w[1]),
+                "Toggle decision must be invariant to equity_discount_rate; got {decisions:?}"
+            );
+        }
     }
 
     #[test]
