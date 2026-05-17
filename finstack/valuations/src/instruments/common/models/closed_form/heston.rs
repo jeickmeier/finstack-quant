@@ -61,6 +61,15 @@ pub mod heston_defaults {
 const HESTON_G_DENOM_EPS: f64 = 1e-8;
 const HESTON_EXPONENT_REAL_LIMIT: f64 = 700.0;
 
+/// Truncated-tail mass (on the probability scale) above which the Gil-Pelaez
+/// integral is considered mis-truncated and a diagnostic is surfaced.
+///
+/// A well-resolved Heston Fourier integral has a tail far below this; the
+/// `[0, 1]` probability clamp would otherwise silently hide truncation error
+/// from too small a `u_max` (audit item 4). `1e-4` ≈ 1bp on the probability,
+/// which feeds into a price error worth flagging for risk use.
+const HESTON_TAIL_DIAGNOSTIC_THRESHOLD: f64 = 1e-4;
+
 #[derive(Debug, Clone, Copy)]
 /// Heston stochastic volatility model parameters.
 ///
@@ -186,17 +195,29 @@ impl HestonParams {
     }
 }
 
-impl From<finstack_monte_carlo::process::heston::HestonParams> for HestonParams {
-    fn from(value: finstack_monte_carlo::process::heston::HestonParams) -> Self {
-        Self {
-            r: value.r,
-            q: value.q,
-            kappa: value.kappa,
-            theta: value.theta,
-            sigma_v: value.sigma_v,
-            rho: value.rho,
-            v0: value.v0,
-        }
+/// Convert Monte Carlo Heston parameters into closed-form Fourier parameters.
+///
+/// This is a [`TryFrom`] (not `From`) because the conversion must re-run
+/// [`HestonParams::new`] validation: the Monte Carlo `HestonParams` accepts a
+/// correlation `ρ ∈ [-1, 1]` (inclusive), whereas the closed-form Fourier
+/// pricer requires `ρ ∈ (-1, 1)` (exclusive). A plain `From` impl bypassed all
+/// validation and could fabricate a closed-form parameter set the Fourier
+/// pricer cannot handle.
+impl TryFrom<finstack_monte_carlo::process::heston::HestonParams> for HestonParams {
+    type Error = finstack_core::Error;
+
+    fn try_from(
+        value: finstack_monte_carlo::process::heston::HestonParams,
+    ) -> finstack_core::Result<Self> {
+        Self::new(
+            value.r,
+            value.q,
+            value.kappa,
+            value.theta,
+            value.sigma_v,
+            value.rho,
+            value.v0,
+        )
     }
 }
 
@@ -428,19 +449,41 @@ impl HestonStripPricer {
         })
     }
 
-    fn probability(&self, log_strike: f64, cached_values: &[Complex<f64>]) -> f64 {
+    /// Evaluate one Gil-Pelaez probability on the cached grid.
+    ///
+    /// Returns `(clamped_probability, raw_probability, tail_estimate)`. The raw
+    /// (pre-clamp) probability and the truncated-tail estimate let the caller
+    /// detect `u_max` truncation error that the `[0, 1]` clamp would otherwise
+    /// hide (audit item 4). The tail estimate is the absolute integrand mass in
+    /// the last [`HESTON_TAIL_WINDOW_FRACTION`] of the integration range,
+    /// divided by π.
+    fn probability(&self, log_strike: f64, cached_values: &[Complex<f64>]) -> (f64, f64, f64) {
         let i = Complex::new(0.0, 1.0);
         let mut integral = 0.0;
+        let mut tail_abs_mass = 0.0;
+
+        // `u_max` is the largest grid abscissa; the tail window is its last
+        // `HESTON_TAIL_WINDOW_FRACTION`.
+        let u_max = self
+            .grid
+            .iter()
+            .map(|(phi, _)| *phi)
+            .fold(0.0_f64, f64::max);
+        let tail_window_start = u_max * (1.0 - HESTON_TAIL_WINDOW_FRACTION);
 
         for ((phi, weight), cached) in self.grid.iter().zip(cached_values.iter()) {
             let exp_term = (-i * *phi * log_strike).exp();
             let value = (exp_term * *cached).re;
             if value.is_finite() {
                 integral += *weight * value;
+                if *phi >= tail_window_start {
+                    tail_abs_mass += weight.abs() * value.abs();
+                }
             }
         }
 
-        (0.5 + integral / PI).clamp(0.0, 1.0)
+        let raw = 0.5 + integral / PI;
+        (raw.clamp(0.0, 1.0), raw, tail_abs_mass / PI)
     }
 
     /// Price a single European call using the cached strip pricer.
@@ -465,8 +508,31 @@ impl HestonStripPricer {
         }
 
         let log_strike = strike.ln();
-        let p1 = self.probability(log_strike, &self.psi1_over_iphi);
-        let p2 = self.probability(log_strike, &self.psi2_over_iphi);
+        let (p1, raw_p1, tail_p1) = self.probability(log_strike, &self.psi1_over_iphi);
+        let (p2, raw_p2, tail_p2) = self.probability(log_strike, &self.psi2_over_iphi);
+
+        // Audit item 4: surface a diagnostic when the truncated-tail estimate or
+        // a pre-clamp probability excursion shows the integral was mis-truncated
+        // at `u_max`, instead of silently relying on the `[0, 1]` clamp.
+        let tail = tail_p1.max(tail_p2);
+        let raw_excursion = (raw_p1 - raw_p1.clamp(0.0, 1.0))
+            .abs()
+            .max((raw_p2 - raw_p2.clamp(0.0, 1.0)).abs());
+        if tail > HESTON_TAIL_DIAGNOSTIC_THRESHOLD
+            || raw_excursion > HESTON_TAIL_DIAGNOSTIC_THRESHOLD
+        {
+            warn!(
+                spot = self.spot,
+                strike,
+                time = self.time,
+                tail_estimate = tail,
+                raw_probability_excursion = raw_excursion,
+                "Heston strip Gil-Pelaez integral truncated at u_max with a \
+                 non-negligible residual tail; the price may be mis-truncated — \
+                 consider a larger u_max"
+            );
+        }
+
         let call_price = self.spot * (-self.params.q * self.time).exp() * p1
             - strike * (-self.params.r * self.time).exp() * p2;
 
@@ -714,9 +780,45 @@ fn heston_pj_characteristic_function(
     }
 }
 
-/// Compute Pj probability for Heston call pricing via Fourier inversion.
+/// Fraction of the upper integration range whose absolute integrand mass is
+/// used to estimate the truncated Gil-Pelaez tail (audit item 4).
+const HESTON_TAIL_WINDOW_FRACTION: f64 = 0.1;
+
+/// Diagnostics from a single Gil-Pelaez probability inversion.
+///
+/// Carries the information needed to detect the two silent failure modes the
+/// audit flagged: characteristic-function corruption (item 5) and truncation
+/// of the Fourier integral at a fixed `u_max` (item 4).
+#[derive(Debug, Clone, Copy)]
+struct HestonPjDiagnostics {
+    /// Probability clamped to `[0, 1]` — the value used for pricing.
+    probability: f64,
+    /// Probability *before* the `[0, 1]` clamp. A value materially outside
+    /// `[0, 1]` is direct evidence that the truncated integral lost or gained
+    /// mass; the clamp would otherwise hide it.
+    raw_probability: f64,
+    /// Estimated magnitude of the truncated tail beyond `u_max`, expressed on
+    /// the probability scale. Computed from the absolute integrand mass in the
+    /// last [`HESTON_TAIL_WINDOW_FRACTION`] of the integration range — if the
+    /// integrand has genuinely decayed this is tiny; if `u_max` is too small
+    /// for the maturity it stays large.
+    tail_estimate: f64,
+    /// `true` when too many interior integration nodes had a non-finite /
+    /// overflow-zeroed characteristic function (see
+    /// [`HESTON_STRIP_MAX_CORRUPT_FRACTION`]); the integral is then unreliable
+    /// and pricing must fall back to Black-Scholes — mirroring the strip pricer.
+    corrupted: bool,
+}
+
+/// Compute the Pj probability for Heston call pricing via Fourier inversion,
+/// returning full diagnostics alongside the value.
 ///
 /// P_j = 0.5 + (1/π) ∫_0^∞ Re[exp(-i*φ*ln(K)) * ψ_j(φ) / (i*φ)] dφ
+///
+/// The integral is evaluated on the explicit composite Gauss-Legendre grid so
+/// that, in a single pass, the routine can also:
+/// - count overflow-zeroed characteristic-function nodes (audit item 5), and
+/// - estimate the truncated tail mass beyond `u_max` (audit item 4).
 ///
 /// # Arguments
 ///
@@ -726,6 +828,102 @@ fn heston_pj_characteristic_function(
 /// * `time` - Time to maturity
 /// * `params` - Heston model parameters
 /// * `settings` - Integration settings
+fn heston_pj_with_diagnostics(
+    j: u8,
+    spot: f64,
+    strike: f64,
+    time: f64,
+    params: &HestonParams,
+    settings: &HestonFourierSettings,
+) -> HestonPjDiagnostics {
+    let log_spot = spot.ln();
+    let log_strike = strike.ln();
+    let i = Complex::new(0.0, 1.0);
+
+    // Build the same composite Gauss-Legendre grid the strip pricer uses, so we
+    // can inspect per-node behaviour rather than treating the quadrature as a
+    // black box.
+    let grid = composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels);
+    let Some(grid) = grid else {
+        // Degenerate settings: fall back to the library quadrature with no
+        // node-level diagnostics available.
+        let integrand = |phi: f64| {
+            if phi.abs() < settings.phi_eps {
+                return 0.0;
+            }
+            let psi = heston_pj_characteristic_function(j, phi, time, log_spot, params);
+            let exp_term = (-i * phi * log_strike).exp();
+            (exp_term * psi / (i * phi)).re
+        };
+        let integral = gauss_legendre_integrate_composite(
+            integrand,
+            0.0,
+            settings.u_max,
+            settings.gl_order,
+            settings.panels,
+        )
+        .unwrap_or(0.0);
+        let raw = 0.5 + integral / PI;
+        return HestonPjDiagnostics {
+            probability: raw.clamp(0.0, 1.0),
+            raw_probability: raw,
+            tail_estimate: f64::INFINITY,
+            corrupted: false,
+        };
+    };
+
+    // The tail window starts at this φ; absolute integrand mass beyond it
+    // estimates the error from truncating the integral at `u_max`.
+    let tail_window_start = settings.u_max * (1.0 - HESTON_TAIL_WINDOW_FRACTION);
+
+    let mut integral = 0.0;
+    let mut tail_abs_mass = 0.0;
+    let mut interior_nodes = 0_usize;
+    let mut corrupted_nodes = 0_usize;
+
+    for (phi, weight) in &grid {
+        // Handle singularity at φ=0.
+        if phi.abs() < settings.phi_eps {
+            continue;
+        }
+        interior_nodes += 1;
+
+        let psi = heston_pj_characteristic_function(j, *phi, time, log_spot, params);
+        // `heston_pj_characteristic_function` signals overflow by returning
+        // exactly `Complex::ZERO`; a zero psi at a genuine φ is a corrupted node.
+        if !(psi.is_finite() && psi.norm_sqr() > 0.0) {
+            corrupted_nodes += 1;
+        }
+
+        let exp_term = (-i * *phi * log_strike).exp();
+        let value = (exp_term * psi / (i * *phi)).re;
+        if value.is_finite() {
+            integral += *weight * value;
+            if *phi >= tail_window_start {
+                tail_abs_mass += weight.abs() * value.abs();
+            }
+        }
+    }
+
+    let corrupted = interior_nodes > 0
+        && (corrupted_nodes as f64) / (interior_nodes as f64) > HESTON_STRIP_MAX_CORRUPT_FRACTION;
+
+    let raw_probability = 0.5 + integral / PI;
+    HestonPjDiagnostics {
+        probability: raw_probability.clamp(0.0, 1.0),
+        raw_probability,
+        tail_estimate: tail_abs_mass / PI,
+        corrupted,
+    }
+}
+
+/// Compute the Pj probability for Heston call pricing via Fourier inversion.
+///
+/// Thin wrapper over [`heston_pj_with_diagnostics`] returning only the clamped
+/// probability. Production callers need the corruption / truncation diagnostics
+/// (e.g. [`heston_call_price_fourier_with_settings`]) and use the diagnostics
+/// variant directly, so this convenience form is exercised only by tests.
+#[cfg(test)]
 fn heston_pj(
     j: u8,
     spot: f64,
@@ -734,38 +932,7 @@ fn heston_pj(
     params: &HestonParams,
     settings: &HestonFourierSettings,
 ) -> f64 {
-    let log_spot = spot.ln();
-    let log_strike = strike.ln();
-    let i = Complex::new(0.0, 1.0);
-
-    // Integrand: Re[exp(-i*φ*ln(K)) * ψ_j(φ) / (i*φ)]
-    let integrand = |phi: f64| {
-        // Handle singularity at φ=0
-        if phi.abs() < settings.phi_eps {
-            return 0.0;
-        }
-
-        let psi = heston_pj_characteristic_function(j, phi, time, log_spot, params);
-        let exp_term = (-i * phi * log_strike).exp();
-        let integrand_complex = exp_term * psi / (i * phi);
-
-        integrand_complex.re
-    };
-
-    // Use composite Gauss-Legendre integration over [0, u_max]
-    let integral = gauss_legendre_integrate_composite(
-        integrand,
-        0.0,
-        settings.u_max,
-        settings.gl_order,
-        settings.panels,
-    )
-    .unwrap_or(0.0);
-
-    let prob = 0.5 + integral / PI;
-
-    // Clamp to [0, 1] to handle small numerical errors
-    prob.clamp(0.0, 1.0)
+    heston_pj_with_diagnostics(j, spot, strike, time, params, settings).probability
 }
 
 /// Price a European call option under the Heston model using Fourier inversion.
@@ -950,12 +1117,64 @@ pub fn heston_call_price_fourier_with_settings(
         return black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
     }
 
-    // Compute P1 and P2 via Fourier inversion
-    let p1 = heston_pj(1, spot, strike, time, params, settings);
-    let p2 = heston_pj(2, spot, strike, time, params, settings);
+    // Compute P1 and P2 via Fourier inversion, with diagnostics.
+    let d1 = heston_pj_with_diagnostics(1, spot, strike, time, params, settings);
+    let d2 = heston_pj_with_diagnostics(2, spot, strike, time, params, settings);
+
+    // Audit item 5: characteristic-function overflow corruption fallback.
+    // `heston_pj_characteristic_function` returns `Complex::ZERO` on overflow;
+    // when a large fraction of integration nodes are zeroed the Gil-Pelaez
+    // integral silently loses mass and yields a plausible-but-wrong probability.
+    // The strip pricer already detects this and falls back to Black-Scholes —
+    // the scalar path must do the same rather than integrating zeros into a
+    // finite-but-wrong price.
+    if d1.corrupted || d2.corrupted {
+        warn!(
+            spot,
+            strike,
+            time,
+            kappa = params.kappa,
+            theta = params.theta,
+            sigma_v = params.sigma_v,
+            rho = params.rho,
+            v0 = params.v0,
+            "Heston scalar Fourier integrand corrupted (characteristic function \
+             overflowed on too many integration nodes); falling back to a \
+             Black-Scholes price at sqrt(v0)"
+        );
+        return black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+    }
+
+    // Audit item 4: truncation-tail diagnostic. The Gil-Pelaez integral is
+    // truncated at a fixed `u_max`; a non-negligible tail beyond `u_max`, or a
+    // pre-clamp probability materially outside `[0, 1]`, means the truncated
+    // integral mis-priced and the `[0, 1]` clamp is hiding it. Surface a
+    // diagnostic so the mis-truncation is observable (short-dated wings are the
+    // typical trigger) instead of being silently clamped away.
+    let tail = d1.tail_estimate.max(d2.tail_estimate);
+    let raw_p1_excursion = (d1.raw_probability - d1.raw_probability.clamp(0.0, 1.0)).abs();
+    let raw_p2_excursion = (d2.raw_probability - d2.raw_probability.clamp(0.0, 1.0)).abs();
+    let raw_excursion = raw_p1_excursion.max(raw_p2_excursion);
+    if tail > HESTON_TAIL_DIAGNOSTIC_THRESHOLD
+        || raw_excursion > HESTON_TAIL_DIAGNOSTIC_THRESHOLD
+    {
+        warn!(
+            spot,
+            strike,
+            time,
+            u_max = settings.u_max,
+            tail_estimate = tail,
+            raw_probability_excursion = raw_excursion,
+            "Heston Gil-Pelaez integral truncated at u_max with a non-negligible \
+             residual tail (or a pre-clamp probability outside [0,1]); the price \
+             may be mis-truncated — consider a larger u_max (e.g. \
+             HestonFourierSettings::for_maturity for short maturities)"
+        );
+    }
 
     // C = S * exp(-qT) * P1 - K * exp(-rT) * P2
-    let call_price = spot * (-params.q * time).exp() * p1 - strike * (-params.r * time).exp() * p2;
+    let call_price = spot * (-params.q * time).exp() * d1.probability
+        - strike * (-params.r * time).exp() * d2.probability;
 
     // Defensive fallback: if the Fourier integration produced a non-finite result
     // (extreme parameters, characteristic-function overflow across the integration
@@ -1638,6 +1857,149 @@ mod tests {
         assert!(
             psi.is_finite(),
             "characteristic function should stay finite"
+        );
+    }
+
+    /// Audit item 6: `From<monte_carlo::HestonParams>` bypassed
+    /// `HestonParams::new` validation entirely.
+    ///
+    /// Failure mode locked in: the Monte Carlo `HestonParams` accepts
+    /// `ρ ∈ [-1, 1]` (inclusive), but the closed-form Fourier pricer requires
+    /// `ρ ∈ (-1, 1)` (exclusive). A `ρ = ±1` Monte Carlo parameter set must NOT
+    /// convert into a closed-form `HestonParams` silently — the conversion is
+    /// now a `TryFrom` that re-runs the full validation.
+    #[test]
+    fn try_from_monte_carlo_params_revalidates_correlation_bound() {
+        // ρ = 1.0 is valid for the MC process but invalid for the closed-form
+        // Fourier pricer; the boundary value must be rejected on conversion.
+        let mc_rho_one = finstack_monte_carlo::process::heston::HestonParams::new(
+            0.05, 0.02, 2.0, 0.04, 0.3, 1.0, 0.04,
+        )
+        .expect("rho=1 is accepted by the Monte Carlo constructor");
+        let converted: Result<HestonParams, _> = HestonParams::try_from(mc_rho_one);
+        assert!(
+            converted.is_err(),
+            "rho=1 MC params must fail conversion to closed-form HestonParams"
+        );
+
+        let mc_rho_neg_one = finstack_monte_carlo::process::heston::HestonParams::new(
+            0.05, 0.02, 2.0, 0.04, 0.3, -1.0, 0.04,
+        )
+        .expect("rho=-1 is accepted by the Monte Carlo constructor");
+        assert!(
+            HestonParams::try_from(mc_rho_neg_one).is_err(),
+            "rho=-1 MC params must fail conversion to closed-form HestonParams"
+        );
+
+        // A well-formed MC parameter set still converts successfully.
+        let mc_ok = finstack_monte_carlo::process::heston::HestonParams::new(
+            0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04,
+        )
+        .expect("valid MC params");
+        let cf = HestonParams::try_from(mc_ok).expect("valid MC params must convert");
+        assert_eq!(cf.rho, -0.7);
+        assert_eq!(cf.kappa, 2.0);
+    }
+
+    /// Audit item 5: the scalar `heston_pj` Fourier path silently integrated
+    /// overflow-zeroed characteristic-function nodes (`Complex::ZERO`) into a
+    /// finite-but-wrong probability — unlike the strip pricer, which counts
+    /// corrupted nodes and falls back to Black-Scholes.
+    ///
+    /// Failure mode locked in: with parameters that overflow the characteristic
+    /// function on a large fraction of integration nodes, the scalar
+    /// `heston_call_price_fourier_with_settings` must degrade to the same
+    /// Black-Scholes fallback the strip pricer uses, not return a plausible
+    /// mass-losing Fourier price.
+    #[test]
+    fn scalar_fourier_falls_back_to_bs_on_corrupted_nodes() {
+        // Same extreme parameter set the strip-pricer corruption test uses:
+        // huge κ/θ/σᵥ + ρ≈1 + long maturity overflow the char-function
+        // exponent on the bulk of the integration grid.
+        let params = HestonParams::new(0.05, 0.0, 10.0, 100.0, 90.0, 0.99, 90.0).expect("valid");
+        let settings = HestonFourierSettings::default();
+        let spot = 100.0;
+        let strike = 100.0;
+        let time = 30.0;
+
+        let scalar_price =
+            heston_call_price_fourier_with_settings(spot, strike, time, &params, &settings);
+        let bs = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+
+        // The corrupted scalar path must return the BS fallback exactly, the
+        // same way the strip pricer does — not a finite-but-wrong number from
+        // a mass-losing Gil-Pelaez integral.
+        assert!(
+            (scalar_price - bs).abs() < 1e-9,
+            "corrupted scalar Fourier pricer should return the BS fallback {bs}, \
+             got {scalar_price}"
+        );
+        assert!(scalar_price.is_finite());
+    }
+
+    /// Audit item 5: a benign parameter set must NOT trip the scalar corruption
+    /// fallback — the scalar Fourier price must still match the strip price.
+    #[test]
+    fn scalar_fourier_no_false_corruption_on_normal_params() {
+        let params = HestonParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+        let settings = HestonFourierSettings::default();
+        let scalar =
+            heston_call_price_fourier_with_settings(100.0, 100.0, 1.0, &params, &settings);
+        let strip = HestonStripPricer::new(100.0, 1.0, &params, &settings)
+            .expect("constructs")
+            .price_call(100.0);
+        assert!(
+            (scalar - strip).abs() < 1e-9,
+            "benign params: scalar {scalar} should match strip {strip}, no false fallback"
+        );
+    }
+
+    /// Audit item 4: the Gil-Pelaez probability integral was truncated at a
+    /// fixed `u_max` with no residual-tail check, and the `[0, 1]` clamp hid the
+    /// resulting truncation error.
+    ///
+    /// Failure mode locked in: `heston_pj_with_diagnostics` exposes the
+    /// pre-clamp probability and an estimated truncation-tail mass. For a
+    /// short-dated option (rapidly oscillating, slowly decaying integrand) the
+    /// diagnostic must remain finite and the tail-mass estimate must be
+    /// available so a caller can detect mis-truncation instead of silently
+    /// trusting a clamped value.
+    #[test]
+    fn gil_pelaez_exposes_truncation_tail_diagnostic() {
+        let params = HestonParams::new(0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+
+        // Short maturity with a deliberately too-small u_max: the integrand has
+        // not decayed by u_max, so the truncation tail is non-negligible.
+        let coarse = HestonFourierSettings::new(8.0, 40, 16, 1e-8).expect("valid settings");
+        let diag = heston_pj_with_diagnostics(1, 100.0, 100.0, 0.02, &params, &coarse);
+        assert!(
+            diag.probability.is_finite() && diag.raw_probability.is_finite(),
+            "diagnostic probabilities must be finite"
+        );
+        assert!(
+            diag.tail_estimate.is_finite() && diag.tail_estimate >= 0.0,
+            "tail-mass estimate must be a finite non-negative number, got {}",
+            diag.tail_estimate
+        );
+        // The clamped probability is always a valid probability.
+        assert!((0.0..=1.0).contains(&diag.probability));
+        // A coarse/short-dated truncation must register a non-trivial tail so
+        // the mis-truncation is observable rather than hidden by the clamp.
+        assert!(
+            diag.tail_estimate > 1e-6,
+            "coarse u_max on a short-dated option must flag a non-negligible \
+             truncation tail, got {}",
+            diag.tail_estimate
+        );
+
+        // With a well-resolved grid the tail estimate must be small (the
+        // integrand has genuinely decayed) — no false positive.
+        let fine = HestonFourierSettings::for_maturity(1.0);
+        let diag_fine = heston_pj_with_diagnostics(1, 100.0, 100.0, 1.0, &params, &fine);
+        assert!(
+            diag_fine.tail_estimate < 1e-3,
+            "well-resolved integral must have a small truncation tail, got {}",
+            diag_fine.tail_estimate
         );
     }
 }
