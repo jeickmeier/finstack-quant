@@ -133,7 +133,12 @@ impl EquityOptionHestonPdePricer {
                 )
             })?;
 
-        let solution = solver.solve(&pde, t);
+        let solution = solver.solve(&pde, t).map_err(|e| {
+            PricingError::model_failure_with_context(
+                e.to_string(),
+                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
+            )
+        })?;
         let price = solution.interpolate(spot.ln(), v0);
 
         Ok(Money::new(price * inst.notional.amount(), ccy))

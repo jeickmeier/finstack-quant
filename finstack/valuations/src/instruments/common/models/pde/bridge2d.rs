@@ -197,7 +197,9 @@ mod tests {
             .build()
             .expect("valid solver");
 
-        let solution = solver.solve(&pde, maturity);
+        let solution = solver
+            .solve(&pde, maturity)
+            .expect("Heston ATM grid is within the MCS stability regime");
         let computed = solution.interpolate(spot.ln(), v0);
 
         let rel_error = (computed - exact).abs() / exact;
@@ -246,7 +248,9 @@ mod tests {
             .craig_sneyd(200)
             .build()
             .expect("valid");
-        let sol_call = solver_call.solve(&pde_call, maturity);
+        let sol_call = solver_call
+            .solve(&pde_call, maturity)
+            .expect("Heston call grid is within the MCS stability regime");
         let call_price = sol_call.interpolate(spot.ln(), v0);
 
         // Solve put
@@ -266,7 +270,9 @@ mod tests {
             .craig_sneyd(200)
             .build()
             .expect("valid");
-        let sol_put = solver_put.solve(&pde_put, maturity);
+        let sol_put = solver_put
+            .solve(&pde_put, maturity)
+            .expect("Heston put grid is within the MCS stability regime");
         let put_price = sol_put.interpolate(spot.ln(), v0);
 
         // Put-call parity: C - P = S*exp(-qT) - K*exp(-rT)
@@ -316,15 +322,17 @@ mod tests {
 
         let levels = stepper.time_levels(maturity);
         for step in 0..stepper.n_steps() {
-            stepper.step(
-                pde,
-                grid,
-                &mut u_full,
-                &mut u_int,
-                levels[step],
-                levels[step + 1],
-                step,
-            );
+            stepper
+                .step(
+                    pde,
+                    grid,
+                    &mut u_full,
+                    &mut u_int,
+                    levels[step],
+                    levels[step + 1],
+                    step,
+                )
+                .expect("Heston test grid is within the MCS stability regime");
         }
         fill_boundaries(pde, grid, &mut u_full, &u_int, 0.0);
         grid.interpolate(&u_full, spot.ln(), v0)
