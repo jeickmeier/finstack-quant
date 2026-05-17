@@ -53,9 +53,14 @@ pub enum AssetDynamics {
     /// CreditGrades model extension with stochastic-barrier survival adjustment.
     ///
     /// `default_probability()` applies the standard approximate CreditGrades
-    /// survival function using the barrier uncertainty parameter.
+    /// survival function using the log-barrier volatility parameter.
     CreditGrades {
-        /// Uncertainty in the default barrier level (reserved for future use).
+        /// Log-normal barrier volatility `λ`: the standard deviation of the
+        /// natural log of the default barrier (Finger et al. 2002,
+        /// "CreditGrades Technical Document"). Despite the field name, this
+        /// is *not* a generic uncertainty scalar — it is the lognormal
+        /// dispersion of the global recovery rate, entering the survival
+        /// formula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.
         barrier_uncertainty: f64,
         /// Mean recovery rate at default.
         mean_recovery: f64,
@@ -76,6 +81,12 @@ pub enum BarrierType {
     },
 }
 
+/// Approximate CreditGrades survival probability (Finger et al. 2002).
+///
+/// `barrier_uncertainty` is the log-barrier volatility `λ` — the standard
+/// deviation of the natural log of the default barrier, *not* a generic
+/// uncertainty scalar. It enters the time-scaled variance as
+/// `a_t² = σ²t + λ²` and shifts the effective leverage by `exp(λ²)`.
 fn credit_grades_default_probability(
     asset_value: f64,
     asset_vol: f64,
@@ -87,6 +98,7 @@ fn credit_grades_default_probability(
         return 0.0;
     }
 
+    // `lambda` is the log-barrier volatility (lognormal barrier std dev).
     let lambda = barrier_uncertainty.max(0.0);
     let a_t = (asset_vol.mul_add(asset_vol, lambda * lambda / horizon) * horizon).sqrt();
     if a_t <= 0.0 {
@@ -560,9 +572,9 @@ impl MertonModel {
     /// - Asset volatility: `sigma_V = sigma_E * E / V_0`
     /// - Barrier: `B = D * R_mean` (deterministic)
     ///
-    /// The `barrier_uncertainty` parameter is stored but does not currently
-    /// modify the default probability calculation. The full CreditGrades
-    /// stochastic barrier term may be added in a future release.
+    /// The `barrier_uncertainty` parameter is the log-barrier volatility `λ`
+    /// (the lognormal standard deviation of the default barrier) and feeds the
+    /// `CreditGrades` survival function via `a_t² = σ²t + λ²`.
     ///
     /// # Arguments
     ///
@@ -570,7 +582,8 @@ impl MertonModel {
     /// * `equity_vol` - Observed equity volatility sigma_E
     /// * `total_debt` - Face value of debt
     /// * `risk_free_rate` - Risk-free rate r
-    /// * `barrier_uncertainty` - Uncertainty in the default barrier level (reserved)
+    /// * `barrier_uncertainty` - Log-barrier volatility `λ` (lognormal std dev
+    ///   of the default barrier; Finger et al. 2002)
     /// * `mean_recovery` - Mean recovery rate at default
     ///
     /// # Errors
