@@ -124,6 +124,10 @@ pub fn decompose_factor_risk(
         .map(finstack_core::factor_model::FactorId::new)
         .collect();
 
+    let n_positions = input.position_ids.len();
+    let n_factors = factor_ids.len();
+    validate_sensitivity_data(&input.data, n_positions, n_factors).map_err(to_js_err)?;
+
     let mut matrix =
         finstack_valuations::factor_model::SensitivityMatrix::zeros(input.position_ids, factor_ids);
     for (pi, row) in input.data.iter().enumerate() {
@@ -170,4 +174,110 @@ pub fn decompose_factor_risk(
         }).collect::<Vec<_>>(),
     });
     serde_json::to_string(&output).map_err(to_js_err)
+}
+
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+/// Validate that `data` has exactly `n_positions` rows and that every row has
+/// exactly `n_factors` columns.
+///
+/// This must be called before populating a `SensitivityMatrix` from JSON
+/// input.  `SensitivityMatrix::set_delta` is only guarded by a
+/// `debug_assert!`, which is compiled out in release WASM builds, so
+/// out-of-bounds access in production would be an out-of-bounds Vec index —
+/// an abort across the WASM boundary rather than a catchable JS error.
+fn validate_sensitivity_data(
+    data: &[Vec<f64>],
+    n_positions: usize,
+    n_factors: usize,
+) -> Result<(), String> {
+    if data.len() != n_positions {
+        return Err(format!(
+            "sensitivity data has {} row(s) but position_ids declares {} position(s)",
+            data.len(),
+            n_positions,
+        ));
+    }
+    for (pi, row) in data.iter().enumerate() {
+        if row.len() != n_factors {
+            return Err(format!(
+                "sensitivity data row {} has {} element(s) but factor_ids declares {} factor(s)",
+                pi,
+                row.len(),
+                n_factors,
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_sensitivity_data;
+
+    #[test]
+    fn validate_rejects_too_many_rows() {
+        // 3 data rows but only 2 positions declared — must error
+        let data = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]];
+        let result = validate_sensitivity_data(&data, 2, 2);
+        assert!(result.is_err());
+        let msg = result.unwrap_err();
+        assert!(
+            msg.contains("3"),
+            "error should mention actual row count: {msg}"
+        );
+        assert!(
+            msg.contains("2"),
+            "error should mention declared positions: {msg}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_row_wider_than_factor_count() {
+        // Row 1 has 3 elements but only 2 factors declared — must error
+        let data = vec![vec![1.0, 2.0], vec![3.0, 4.0, 5.0]];
+        let result = validate_sensitivity_data(&data, 2, 2);
+        assert!(result.is_err());
+        let msg = result.unwrap_err();
+        assert!(
+            msg.contains("row 1"),
+            "error should name the offending row: {msg}"
+        );
+        assert!(
+            msg.contains("3"),
+            "error should mention actual column count: {msg}"
+        );
+        assert!(
+            msg.contains("2"),
+            "error should mention declared factor count: {msg}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_row_narrower_than_factor_count() {
+        // Row 0 has 1 element but 2 factors declared — must error
+        let data = vec![vec![1.0]];
+        let result = validate_sensitivity_data(&data, 1, 2);
+        assert!(result.is_err());
+        let msg = result.unwrap_err();
+        assert!(
+            msg.contains("row 0"),
+            "error should name the offending row: {msg}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_well_formed_data() {
+        let data = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
+        assert!(validate_sensitivity_data(&data, 2, 2).is_ok());
+    }
+
+    #[test]
+    fn validate_accepts_empty_matrix() {
+        // Zero positions, zero factors, zero data rows — valid degenerate case
+        let data: Vec<Vec<f64>> = vec![];
+        assert!(validate_sensitivity_data(&data, 0, 0).is_ok());
+    }
 }
