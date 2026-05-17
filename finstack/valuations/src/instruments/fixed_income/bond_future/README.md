@@ -155,28 +155,35 @@ let deliverable = DeliverableBond {
 
 ### Conversion Factor Calculation
 
-While exchanges publish conversion factors, you can calculate them using:
+Exchanges publish conversion factors; prefer the published value when one is
+available (it is carried on `DeliverableBond.conversion_factor`). When no
+exchange value is supplied, `calculate_conversion_factor` reproduces the CME
+standard formula:
 
 ```rust
-let market = create_market_context();
 let bond = create_ust_bond();
 
 let cf = BondFuturePricer::calculate_conversion_factor(
     &bond,
-    0.06,   // 6% standard coupon for UST
-    10.0,   // 10-year standard maturity
-    &market,
-    date!(2025-03-01),  // First day of delivery month
+    0.06,   // notional coupon / yield (6% for all UST contracts)
+    10.0,   // contract standard maturity (selects 10Y/30Y vs 2Y/3Y/5Y rules)
+    date!(2025-03-01),  // any date within the delivery month
 ).expect("Failed to calculate conversion factor");
 
 println!("Calculated conversion factor: {:.4}", cf);
 ```
 
-The calculation uses:
+The calculation follows CME Group, "Calculating U.S. Treasury Futures
+Conversion Factors" (IR232):
 
-- **Standard coupon**: 6% for UST/Bund, 4% for Gilt
-- **Standard maturity**: Varies by contract (2Y, 5Y, 10Y)
-- **Discounting**: Semi-annual compounding at standard coupon rate
+- **Notional yield**: 6% for UST/Bund, 4% for Gilt — the conversion factor is
+  the decimal price at which $1 par yields this rate.
+- **Delivery-month anchor**: time to maturity (or first call) is measured from
+  the first day of the delivery month, so the factor does **not** depend on
+  the caller's valuation date.
+- **Rounding**: the maturity is rounded down to the nearest three months for
+  the 10Y/30Y contracts (nearest month for 2Y/3Y/5Y); the result is rounded
+  to four decimal places.
 
 ### Position Types
 
@@ -499,19 +506,20 @@ pub enum Position {
 
 #### `BondFuturePricer::calculate_conversion_factor()`
 
-Calculate conversion factor for a bond.
+Compute the CME standard conversion factor for a fixed-rate deliverable.
 
 ```rust
 pub fn calculate_conversion_factor(
     bond: &Bond,
     standard_coupon: f64,
     standard_maturity_years: f64,
-    market: &MarketContext,
-    as_of: Date,
+    delivery_month_first_day: Date,
 ) -> Result<f64>
 ```
 
-**Returns**: Conversion factor rounded to 4 decimal places
+**Returns**: Conversion factor rounded to 4 decimal places. The factor depends
+only on the bond's coupon/maturity and the delivery month — not on any
+valuation date.
 
 #### `BondFuturePricer::calculate_model_price()`
 
@@ -1004,15 +1012,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "USD-TREASURY",
     );
 
-    // 3. Calculate conversion factors
+    // 3. Calculate conversion factors (delivery-month anchor, not a valuation date)
     let cf_1 = BondFuturePricer::calculate_conversion_factor(
-        &bond_1, 0.06, 10.0, &market, as_of,
+        &bond_1, 0.06, 10.0, delivery_month_start,
     )?;
     let cf_2 = BondFuturePricer::calculate_conversion_factor(
-        &bond_2, 0.06, 10.0, &market, as_of,
+        &bond_2, 0.06, 10.0, delivery_month_start,
     )?;
     let cf_3 = BondFuturePricer::calculate_conversion_factor(
-        &bond_3, 0.06, 10.0, &market, as_of,
+        &bond_3, 0.06, 10.0, delivery_month_start,
     )?;
 
     println!("Conversion Factors:");

@@ -118,7 +118,6 @@ fn bench_conversion_factor(c: &mut Criterion) {
     let mut group = c.benchmark_group("bond_future_conversion_factor");
 
     let ctd_bond = create_ctd_bond();
-    let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let specs = BondFutureSpecs::ust_10y();
 
@@ -128,7 +127,6 @@ fn bench_conversion_factor(c: &mut Criterion) {
                 black_box(&ctd_bond),
                 black_box(specs.standard_coupon),
                 black_box(specs.standard_maturity_years),
-                black_box(&market),
                 black_box(as_of),
             )
         });
