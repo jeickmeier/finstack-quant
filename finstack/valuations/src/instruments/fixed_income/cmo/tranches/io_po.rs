@@ -4,6 +4,17 @@
 //! interest and principal components of MBS cashflows.
 
 use crate::instruments::fixed_income::cmo::types::CmoTranche;
+use crate::instruments::fixed_income::structured_credit::{cpr_to_smm, psa_to_cpr};
+
+/// Single monthly mortality (SMM) at a PSA speed for a given month.
+///
+/// Delegates to the registry-backed canonical PSA curve
+/// (`utils::rates::psa_to_cpr`) and the canonical CPR→SMM conversion,
+/// so IO/PO valuations stay consistent with the rest of the workspace.
+#[inline]
+fn psa_to_smm(psa_speed: f64, month: u32) -> f64 {
+    cpr_to_smm(psa_to_cpr(psa_speed, month))
+}
 
 /// IO strip characteristics.
 #[derive(Debug, Clone)]
@@ -130,14 +141,8 @@ pub fn theoretical_io_value(
             break;
         }
 
-        // SMM from PSA
-        let base_cpr = if month <= 30 {
-            0.06 * (month as f64 / 30.0)
-        } else {
-            0.06
-        };
-        let cpr = base_cpr * psa;
-        let smm = 1.0 - (1.0 - cpr).powf(1.0 / 12.0);
+        // SMM from PSA (registry-backed canonical curve)
+        let smm = psa_to_smm(psa, month);
 
         // Interest payment this month
         let interest = remaining_notional * monthly_coupon;
@@ -216,14 +221,9 @@ pub fn theoretical_po_value_with_wac(
             remaining / remaining_months as f64
         };
 
-        // SMM from PSA (applied to post-scheduled balance per Fabozzi Ch. 4)
-        let base_cpr = if month <= 30 {
-            0.06 * (month as f64 / 30.0)
-        } else {
-            0.06
-        };
-        let cpr = base_cpr * psa;
-        let smm = 1.0 - (1.0 - cpr).powf(1.0 / 12.0);
+        // SMM from PSA (registry-backed canonical curve), applied to the
+        // post-scheduled balance per Fabozzi Ch. 4.
+        let smm = psa_to_smm(psa, month);
         let prepayment = (remaining - scheduled).max(0.0) * smm;
 
         // PO receives all principal: scheduled + prepaid
@@ -320,6 +320,25 @@ mod tests {
         // PO should be worth less than face (time value of money)
         assert!(value > 0.0);
         assert!(value < 100.0);
+    }
+
+    #[test]
+    fn test_psa_to_smm_matches_canonical_helper() {
+        // The IO/PO SMM conversion must match the registry-backed canonical
+        // helper across a PSA grid, including ramp, terminal, and high-speed
+        // points. The previous hard-coded copy diverged at high PSA where the
+        // unclamped CPR exceeded 1.0 and produced NaN via `.powf`.
+        for &psa in &[0.0, 0.5, 1.0, 1.5, 3.0, 18.0] {
+            for &month in &[1u32, 15, 30, 60, 360] {
+                let canonical = cpr_to_smm(psa_to_cpr(psa, month));
+                let got = psa_to_smm(psa, month);
+                assert!(
+                    (got - canonical).abs() < 1e-12,
+                    "PSA→SMM drift at psa={psa}, month={month}: got {got}, canonical {canonical}"
+                );
+                assert!(got.is_finite(), "SMM not finite at psa={psa}, month={month}");
+            }
+        }
     }
 
     #[test]

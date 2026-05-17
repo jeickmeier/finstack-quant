@@ -6,6 +6,7 @@
 //! the PAC.
 
 use crate::instruments::fixed_income::cmo::types::PacCollar;
+use crate::instruments::fixed_income::structured_credit::{cpr_to_smm, psa_to_cpr};
 
 /// PAC amortization schedule.
 #[derive(Debug, Clone)]
@@ -110,19 +111,12 @@ fn project_principal_stream(initial_balance: f64, wam: u32, wac: f64, psa_speed:
 
 /// Convert PSA speed to SMM for a given month.
 ///
-/// PSA model: CPR ramps from 0% to 6% over first 30 months,
-/// then stays at 6%. Speed multiplier scales this.
+/// Delegates to the registry-backed canonical PSA curve
+/// (`utils::rates::psa_to_cpr`) and the canonical CPR→SMM conversion,
+/// keeping PAC/Support projection consistent with the rest of the workspace.
+#[inline]
 fn psa_to_smm(psa_speed: f64, month: u32) -> f64 {
-    let base_cpr = if month <= 30 {
-        0.06 * (month as f64 / 30.0)
-    } else {
-        0.06
-    };
-
-    let cpr = base_cpr * psa_speed;
-
-    // Convert CPR to SMM
-    1.0 - (1.0 - cpr).powf(1.0 / 12.0)
+    cpr_to_smm(psa_to_cpr(psa_speed, month))
 }
 
 /// Allocate principal between PAC and support tranches.
@@ -253,5 +247,22 @@ mod tests {
         // 200% PSA should be about double
         let smm_200 = psa_to_smm(2.0, 30);
         assert!(smm_200 > smm * 1.5);
+    }
+
+    #[test]
+    fn test_psa_to_smm_matches_canonical_helper() {
+        // PAC/Support SMM conversion must match the registry-backed canonical
+        // helper across a PSA grid, including high-speed clamping behavior.
+        for &psa in &[0.0, 0.5, 1.0, 2.0, 3.0, 18.0] {
+            for &month in &[1u32, 15, 30, 60, 360] {
+                let canonical = cpr_to_smm(psa_to_cpr(psa, month));
+                let got = psa_to_smm(psa, month);
+                assert!(
+                    (got - canonical).abs() < 1e-12,
+                    "PSA→SMM drift at psa={psa}, month={month}: got {got}, canonical {canonical}"
+                );
+                assert!(got.is_finite(), "SMM not finite at psa={psa}, month={month}");
+            }
+        }
     }
 }
