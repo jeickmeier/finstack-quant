@@ -1,11 +1,12 @@
 //! Hull-White 1F Monte Carlo pricer for TARNs.
 
 use crate::calibration::hull_white::HullWhiteParams;
-use crate::instruments::common_impl::pricing::time::{
-    rate_period_on_dates, relative_df_discount_curve,
-};
+use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::exotics_shared::cumulative_coupon::CumulativeCouponTracker;
+use crate::instruments::rates::exotics_shared::hw1f_curve::{
+    calibrate_hw1f_params, initial_short_rate_from_curve, Hw1fTermForward, PeriodForwardCoeffs,
+};
 use crate::instruments::rates::exotics_shared::hw1f_mc::RateExoticHw1fMcPricer;
 use crate::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig;
 use crate::instruments::rates::tarn::Tarn;
@@ -27,6 +28,12 @@ use std::sync::Arc;
 struct TarnCouponEvent {
     accrual_fraction: f64,
     discount_factor: f64,
+    /// HW1F bond-reconstruction coefficients for the period's term forward.
+    ///
+    /// The coupon's floating index is the τ-tenor simple forward (not the raw
+    /// instantaneous short rate); this turns the simulated `r(t)` at the event
+    /// date into that term rate via the affine HW1F bond formula.
+    forward_coeffs: PeriodForwardCoeffs,
 }
 
 /// Path-local TARN payoff accumulator.
@@ -81,7 +88,11 @@ impl Payoff for TarnPayoff {
         }
 
         let event = self.events[self.next_event];
-        let floating_rate = state.get_key(StateKey::ShortRate).unwrap_or(0.0);
+        // Reconstruct the period's term simple forward from the simulated
+        // short rate via the HW1F affine bond formula, instead of using the
+        // instantaneous short rate r(t) directly as a term index rate.
+        let short_rate = state.get_key(StateKey::ShortRate).unwrap_or(0.0);
+        let floating_rate = event.forward_coeffs.simple_forward(short_rate);
         let coupon_rate = (self.fixed_rate - floating_rate).max(self.coupon_floor);
         let period_coupon = coupon_rate * event.accrual_fraction;
         let actual_coupon = self.tracker.add_coupon(period_coupon);
@@ -181,11 +192,20 @@ impl TarnPricer {
         inst.validate()?;
 
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
-        let forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
+        // The HW1F MC path is single-curve: both the period term forwards (M7)
+        // and the simulated short rate are reconstructed from `discount_curve`.
+        // The declared floating index is still required to exist in the market
+        // as an instrument-contract precondition, but is not otherwise read.
+        let _forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
+
+        let hw_params = self.effective_hw_params(inst)?;
+        // HW1F bond-reconstruction built from the discount curve; turns the
+        // simulated short rate at each event into the period term forward.
+        let term_forward = Hw1fTermForward::new(hw_params, discount_curve.as_ref(), as_of)?;
 
         let mut events = Vec::new();
         let mut event_times = Vec::new();
-        let mut first_future_period = None;
+        let mut has_future_period = false;
 
         for period in inst.coupon_dates.windows(2) {
             let start = period[0];
@@ -193,9 +213,7 @@ impl TarnPricer {
             if end <= as_of {
                 continue;
             }
-            if first_future_period.is_none() {
-                first_future_period = Some((start.max(as_of), end));
-            }
+            has_future_period = true;
 
             let event_time =
                 inst.day_count
@@ -218,6 +236,7 @@ impl TarnPricer {
             events.push(TarnCouponEvent {
                 accrual_fraction,
                 discount_factor,
+                forward_coeffs: term_forward.period_coeffs(event_time, accrual_fraction),
             });
             event_times.push(event_time);
         }
@@ -240,26 +259,34 @@ impl TarnPricer {
             });
         }
 
-        let (r0_start, r0_end) = first_future_period.ok_or_else(|| {
-            finstack_core::Error::Validation(format!(
-                "TARN {} has no future coupon period after {as_of}",
-                inst.id.as_str()
-            ))
-        })?;
-        let r0 = rate_period_on_dates(forward_curve.as_ref(), r0_start, r0_end)?;
-        if !r0.is_finite() {
+        if !has_future_period {
             return Err(finstack_core::Error::Validation(format!(
-                "TARN {} initial forward rate is not finite",
+                "TARN {} has no future coupon period after {as_of}",
                 inst.id.as_str()
             )));
         }
 
-        let hw_params = self.effective_hw_params(inst)?;
+        // Initial short rate = discount-curve instantaneous forward f(0,0).
+        // HW1F reprices the discount curve only when r(0) = f(0,0); seeding it
+        // from a separate forward-curve projection would offset the simulated
+        // short rate from the curve and break the M6 repricing property.
+        let r0 = initial_short_rate_from_curve(discount_curve.as_ref(), as_of)?;
+        if !r0.is_finite() {
+            return Err(finstack_core::Error::Validation(format!(
+                "TARN {} initial short rate is not finite",
+                inst.id.as_str()
+            )));
+        }
+
+        // Bootstrap a time-dependent θ(t) from the discount curve so the
+        // simulated short rate reprices the initial curve (HW1F, not Vasicek).
+        let horizon = event_times.last().copied().unwrap_or(0.0);
+        let process_params =
+            calibrate_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
         let config = self.effective_config(inst);
         let mc = RateExoticHw1fMcPricer {
-            hw_params,
+            process_params,
             r0,
-            theta: r0,
             event_times,
             config,
             currency: inst.notional.currency(),
@@ -421,15 +448,19 @@ mod tests {
             })
     }
 
-    fn expected_deterministic_pv(
-        tarn: &Tarn,
-        market: &MarketContext,
-        as_of: Date,
-        floating_rate: f64,
-    ) -> f64 {
+    /// Expected deterministic-path PV.
+    ///
+    /// With a near-zero σ the simulated HW1F short rate collapses to the
+    /// curve's instantaneous forward, so the M7 term-forward reconstruction
+    /// (built on the discount curve) returns the curve's own τ-tenor simple
+    /// forward observed at each coupon's event date `end`. This mirror
+    /// reconstructs that period forward exactly the way the pricer does.
+    fn expected_deterministic_pv(tarn: &Tarn, market: &MarketContext, as_of: Date) -> f64 {
         let disc = market
             .get_discount(tarn.discount_curve_id.as_ref())
             .expect("discount");
+        let dc = tarn.day_count;
+        let ctx = DayCountContext::default();
         let mut tracker = CumulativeCouponTracker::with_target(tarn.target_coupon);
         let mut pv = 0.0;
         let mut redeemed = false;
@@ -437,10 +468,14 @@ mod tests {
         for period in tarn.coupon_dates.windows(2) {
             let start = period[0];
             let end = period[1];
-            let accrual = tarn
-                .day_count
-                .year_fraction(start, end, DayCountContext::default())
-                .expect("accrual");
+            let accrual = dc.year_fraction(start, end, ctx).expect("accrual");
+            // Term forward over [end, end+accrual] reconstructed from the
+            // discount curve — the deterministic-σ limit of the HW1F M7 path.
+            let t_end = dc.year_fraction(as_of, end, ctx).expect("t_end");
+            let p_end = disc.df(t_end);
+            let p_end_tau = disc.df(t_end + accrual);
+            let floating_rate = (p_end / p_end_tau - 1.0) / accrual;
+
             let df = relative_df_discount_curve(disc.as_ref(), as_of, end).expect("df");
             let coupon = (tarn.fixed_rate - floating_rate).max(tarn.coupon_floor) * accrual;
             let actual = tracker.add_coupon(coupon);
@@ -462,14 +497,19 @@ mod tests {
 
     #[test]
     fn payoff_caps_final_coupon_and_redeems() {
+        // Fixed 1% floating index via degenerate (B=0) reconstruction coeffs:
+        // exercises payoff mechanics (coupon cap + knock-out) only.
+        let coeffs = PeriodForwardCoeffs::from_flat_rate(0.01, 1.0);
         let events = vec![
             TarnCouponEvent {
                 accrual_fraction: 1.0,
                 discount_factor: 1.0,
+                forward_coeffs: coeffs,
             },
             TarnCouponEvent {
                 accrual_fraction: 1.0,
                 discount_factor: 1.0,
+                forward_coeffs: coeffs,
             },
         ];
         let mut payoff = TarnPayoff::new(0.06, 0.0, 0.10, 1_000_000.0, Arc::from(events));
@@ -485,10 +525,9 @@ mod tests {
     #[test]
     fn deterministic_path_matches_discounted_coupon_formula() {
         let as_of = date(2025, Month::January, 1);
-        let floating_rate = 0.03;
-        let market = market(as_of, 0.02, floating_rate);
+        let market = market(as_of, 0.02, 0.03);
         let tarn = test_tarn(1.0);
-        let expected = expected_deterministic_pv(&tarn, &market, as_of, floating_rate);
+        let expected = expected_deterministic_pv(&tarn, &market, as_of);
 
         let estimate = deterministic_pricer(32)
             .price_estimate(&tarn, &market, as_of)
@@ -507,7 +546,7 @@ mod tests {
         let as_of = date(2025, Month::January, 1);
         let market = market(as_of, 0.02, 0.03);
         let tarn = test_tarn(0.0);
-        let expected = expected_deterministic_pv(&tarn, &market, as_of, 0.03);
+        let expected = expected_deterministic_pv(&tarn, &market, as_of);
 
         let estimate = deterministic_pricer(16)
             .price_estimate(&tarn, &market, as_of)

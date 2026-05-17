@@ -16,6 +16,12 @@ pub use mc_config::RateExoticMcConfig;
 pub mod hw1f_calibration;
 pub use hw1f_calibration::{resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fResolveRequest};
 
+/// HW1F θ(t) curve calibration and term-forward bond reconstruction.
+pub mod hw1f_curve;
+pub use hw1f_curve::{
+    calibrate_hw1f_params, initial_short_rate_from_curve, Hw1fTermForward, PeriodForwardCoeffs,
+};
+
 /// Exercise-boundary protocol and basis helpers for LSMC-priced rate exotics.
 pub mod exercise;
 pub use exercise::{extended_basis, standard_basis, ExerciseBoundaryPayoff};

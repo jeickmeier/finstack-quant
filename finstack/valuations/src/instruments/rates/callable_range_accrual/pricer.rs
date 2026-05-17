@@ -5,7 +5,8 @@ use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::callable_range_accrual::CallableRangeAccrual;
 use crate::instruments::rates::exotics_shared::{
-    standard_basis, ExerciseBoundaryPayoff, RateExoticHw1fLsmcPricer, RateExoticHw1fMcPricer,
+    calibrate_hw1f_params, initial_short_rate_from_curve, standard_basis, ExerciseBoundaryPayoff,
+    Hw1fTermForward, PeriodForwardCoeffs, RateExoticHw1fLsmcPricer, RateExoticHw1fMcPricer,
     RateExoticMcConfig,
 };
 use crate::instruments::rates::range_accrual::BoundsType;
@@ -23,9 +24,29 @@ use finstack_monte_carlo::seed;
 use finstack_monte_carlo::traits::{PathState, Payoff, StateKey};
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 struct CallableRangeAccrualEvent {
     is_observation: bool,
+    /// HW1F bond-reconstruction coefficients for the reference rate tested
+    /// against the accrual range.
+    ///
+    /// A range accrual checks a *term* reference rate (its tenor tracks the
+    /// observation frequency), not the instantaneous short rate. These
+    /// coefficients turn the simulated `r(t)` at the observation date into
+    /// that term rate via the HW1F affine bond formula. Call-only events
+    /// (`is_observation == false`) carry an unused passthrough.
+    forward_coeffs: PeriodForwardCoeffs,
+}
+
+impl Default for CallableRangeAccrualEvent {
+    fn default() -> Self {
+        Self {
+            is_observation: false,
+            // Replaced with a real reconstruction for observation events in
+            // `build_schedule`; harmless passthrough for call-only events.
+            forward_coeffs: PeriodForwardCoeffs::from_flat_rate(0.0, 0.0),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -113,8 +134,12 @@ impl Payoff for CallableRangeAccrualPayoff {
 
         let event = self.events[self.next_event];
         if event.is_observation {
+            // The accrual range is tested against the *term* reference rate
+            // reconstructed from the simulated short rate via the HW1F affine
+            // bond formula, not the instantaneous short rate r(t) directly.
             let short_rate = state.get_key(StateKey::ShortRate).unwrap_or(0.0);
-            if self.is_in_range(short_rate) {
+            let reference_rate = event.forward_coeffs.simple_forward(short_rate);
+            if self.is_in_range(reference_rate) {
                 self.days_in_range += 1;
             }
             self.observations_seen += 1;
@@ -222,14 +247,28 @@ impl CallableRangeAccrualPricer {
         as_of: Date,
     ) -> Result<MoneyEstimate> {
         inst.validate()?;
-        let schedule = build_schedule(inst, market, as_of)?;
+
+        let discount_curve = market.get_discount(inst.range_accrual.discount_curve_id.as_ref())?;
+        let hw_params = self.effective_hw_params(inst)?;
+        // HW1F bond-reconstruction built from the discount curve; turns the
+        // simulated short rate at each observation into the term reference rate.
+        let term_forward = Hw1fTermForward::new(hw_params, discount_curve.as_ref(), as_of)?;
+        let schedule = build_schedule(inst, market, as_of, &term_forward)?;
         if schedule.event_times.is_empty() {
             return Ok(zero_estimate(inst.range_accrual.notional.currency()));
         }
 
+        // The observed spot reference rate (e.g. today's SOFR fixing) scales
+        // `RelativeToInitialSpot` accrual bounds — a *contractual* spot, distinct
+        // from the HW1F simulation's initial short rate `r0` below.
         let initial_rate = initial_short_rate(inst, market)?;
         let lower_bound = effective_lower_bound(inst, initial_rate);
         let upper_bound = effective_upper_bound(inst, initial_rate);
+        // Initial short rate = discount-curve instantaneous forward f(0,0).
+        // HW1F reprices the discount curve only when r(0) = f(0,0); seeding it
+        // from the spot fixing would offset the simulated short rate from the
+        // curve and break the M6 repricing property.
+        let r0 = initial_short_rate_from_curve(discount_curve.as_ref(), as_of)?;
         let payoff = CallableRangeAccrualPayoff::new(
             lower_bound,
             upper_bound,
@@ -244,13 +283,16 @@ impl CallableRangeAccrualPricer {
             schedule.future_observations,
         );
 
-        let hw_params = self.effective_hw_params(inst)?;
         let config = self.effective_config(inst);
+        // Bootstrap a time-dependent θ(t) from the discount curve so the
+        // simulated short rate reprices the initial curve (HW1F, not Vasicek).
+        let horizon = schedule.event_times.last().copied().unwrap_or(0.0);
+        let process_params =
+            calibrate_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
         if schedule.exercise_times.is_empty() {
             let mc = RateExoticHw1fMcPricer {
-                hw_params,
-                r0: initial_rate,
-                theta: initial_rate,
+                process_params,
+                r0,
                 event_times: schedule.event_times,
                 config,
                 currency: inst.range_accrual.notional.currency(),
@@ -259,9 +301,8 @@ impl CallableRangeAccrualPricer {
         }
 
         let lsmc = RateExoticHw1fLsmcPricer {
-            hw_params,
-            r0: initial_rate,
-            theta: initial_rate,
+            process_params,
+            r0,
             event_times: schedule.event_times,
             exercise_times: schedule.exercise_times,
             call_prices: schedule.call_prices,
@@ -363,10 +404,35 @@ impl Pricer for CallableRangeAccrualPricer {
     }
 }
 
+/// Reference-rate tenor used by the range-accrual term-forward reconstruction.
+///
+/// A range accrual checks a term rate whose tenor conventionally tracks the
+/// observation frequency. This returns the *median* gap between consecutive
+/// observation dates (years), which is robust to a leading/trailing stub.
+/// Falls back to 0.25y (quarterly) when fewer than two observations exist.
+fn observation_tenor_years(
+    observation_dates: &[Date],
+    day_count: finstack_core::dates::DayCount,
+) -> Result<f64> {
+    let mut gaps = Vec::new();
+    for pair in observation_dates.windows(2) {
+        let g = day_count.year_fraction(pair[0], pair[1], DayCountContext::default())?;
+        if g.is_finite() && g > 0.0 {
+            gaps.push(g);
+        }
+    }
+    if gaps.is_empty() {
+        return Ok(0.25);
+    }
+    gaps.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    Ok(gaps[gaps.len() / 2])
+}
+
 fn build_schedule(
     inst: &CallableRangeAccrual,
     market: &MarketContext,
     as_of: Date,
+    term_forward: &Hw1fTermForward<'_>,
 ) -> Result<CallableRangeAccrualSchedule> {
     let range = &inst.range_accrual;
     let discount_curve = market.get_discount(range.discount_curve_id.as_ref())?;
@@ -381,6 +447,9 @@ fn build_schedule(
         })?;
     let final_payment_discount_factor =
         relative_df_discount_curve(discount_curve.as_ref(), as_of, final_payment_date)?;
+
+    // Tenor of the range-accrual reference rate (tracks observation frequency).
+    let reference_tenor = observation_tenor_years(&range.observation_dates, range.day_count)?;
 
     let mut event_dates: BTreeMap<Date, CallableRangeAccrualEvent> = BTreeMap::new();
     for &date in &range.observation_dates {
@@ -400,11 +469,15 @@ fn build_schedule(
 
     let mut events = Vec::with_capacity(event_dates.len());
     let mut event_times = Vec::with_capacity(event_dates.len());
-    for (date, event) in event_dates {
+    for (date, mut event) in event_dates {
         let t = range
             .day_count
             .year_fraction(as_of, date, DayCountContext::default())?;
         if t > 0.0 {
+            if event.is_observation {
+                // Term reference rate over [t, t + reference_tenor].
+                event.forward_coeffs = term_forward.period_coeffs(t, reference_tenor);
+            }
             events.push(event);
             event_times.push(t);
         }

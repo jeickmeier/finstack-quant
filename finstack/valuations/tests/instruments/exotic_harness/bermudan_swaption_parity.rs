@@ -25,13 +25,13 @@
 
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
+use finstack_monte_carlo::process::ou::HullWhite1FParams;
 use finstack_monte_carlo::traits::{PathState, Payoff};
 use finstack_valuations::instruments::rates::exotics_shared::exercise::{
     standard_basis, ExerciseBoundaryPayoff,
 };
 use finstack_valuations::instruments::rates::exotics_shared::hw1f_lsmc::RateExoticHw1fLsmcPricer;
 use finstack_valuations::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig;
-use finstack_valuations::instruments::rates::swaption::HullWhiteParams;
 
 /// Simplified swaption-proxy payoff: records no path-dependent cashflows
 /// (deterministic PV = 0) and exposes a receiver-style intrinsic via the
@@ -70,9 +70,8 @@ impl ExerciseBoundaryPayoff for SwaptionProxy {
 #[test]
 fn lsmc_proxy_price_is_nonnegative_and_stable() {
     let pricer = RateExoticHw1fLsmcPricer {
-        hw_params: HullWhiteParams::new(0.05, 0.012).expect("valid HW params"),
+        process_params: HullWhite1FParams::new(0.05, 0.012, 0.0),
         r0: 0.025,
-        theta: 0.0,
         event_times: vec![1.0, 2.0, 3.0, 4.0],
         exercise_times: vec![1.0, 2.0, 3.0, 4.0],
         call_prices: vec![1.0; 4],
