@@ -243,11 +243,25 @@ impl BinomialTree {
                 // Cox-Ross-Rubinstein parameters
                 let u = (sigma * dt.sqrt()).exp();
                 let d = 1.0 / u;
-                let p = (((r - q) * dt).exp() - d) / (u - d);
+                let spread = u - d;
+                // Guard: if σ√dt is so small that u ≈ d (spread underflows to 0),
+                // the probability formula produces 0/0 = NaN.  Catch it explicitly
+                // before the division so the error message is descriptive.
+                if spread < 1e-14 {
+                    return Err(Error::Validation(format!(
+                        "CRR tree is degenerate: u ≈ d (spread = {spread:.3e}). \
+                         σ√dt = {:.3e} is too small — increase volatility or maturity.",
+                        sigma * dt.sqrt()
+                    )));
+                }
+                let p = (((r - q) * dt).exp() - d) / spread;
 
                 // Validate probability
                 if !(0.0..=1.0).contains(&p) {
-                    return Err(Error::internal("CRR probability fell outside [0, 1]"));
+                    return Err(Error::Validation(format!(
+                        "CRR probability p={p:.6} fell outside [0, 1]; \
+                         check parameters: sigma={sigma}, r={r}, q={q}, dt={dt:.3e}"
+                    )));
                 }
 
                 (u, d, p)
@@ -282,16 +296,34 @@ impl BinomialTree {
                 // p = (M1 - d) / (u - d)
                 let m1 = ((r - q) * dt).exp();
                 let v = (sigma * sigma * dt).exp();
-                let disc = (v * v + 2.0 * v - 3.0).sqrt();
+                // Guard: when σ²dt → 0, V → 1 and disc → 0, collapsing u = d.
+                // Catch this before the division so the error is descriptive.
+                let var_term = v * v + 2.0 * v - 3.0;
+                if var_term < 1e-28 {
+                    return Err(Error::Validation(format!(
+                        "Tian tree is degenerate: σ²·dt = {:.3e} is too small — \
+                         up/down factors collapse (V ≈ 1, discriminant ≈ 0). \
+                         Increase volatility or maturity.",
+                        sigma * sigma * dt
+                    )));
+                }
+                let disc = var_term.sqrt();
                 let half_m1v = m1 * v / 2.0;
                 let u = half_m1v * (v + 1.0 + disc);
                 let d = half_m1v * (v + 1.0 - disc);
-                let p = (m1 - d) / (u - d);
+                let spread = u - d;
+                if spread < 1e-14 {
+                    return Err(Error::Validation(format!(
+                        "Tian tree is degenerate: u ≈ d (spread = {spread:.3e}). \
+                         σ√dt is too small — increase volatility or maturity."
+                    )));
+                }
+                let p = (m1 - d) / spread;
 
                 if !(0.0..=1.0).contains(&p) {
                     return Err(Error::Validation(format!(
-                        "Tian probability p={p} out of bounds. \
-                         Check parameters: sigma={sigma}, r={r}, q={q}, dt={dt}"
+                        "Tian probability p={p:.6} out of bounds. \
+                         Check parameters: sigma={sigma}, r={r}, q={q}, dt={dt:.3e}"
                     )));
                 }
 
@@ -1212,6 +1244,39 @@ mod tests {
             .calculate_parameters(100.0, 100.0, 0.05, 0.0, 1.0, 0.0)
             .expect_err("zero volatility should fail");
         assert!(vol_err.to_string().contains("positive time_to_maturity"));
+    }
+
+    /// W-07: CRR/Tian with σ·√dt underflowing to 0 must return a descriptive
+    /// "degenerate" error, not silently produce NaN or a misleading probability
+    /// range error.
+    #[test]
+    fn test_w07_degenerate_vol_times_sqrt_dt_returns_descriptive_error() {
+        // sigma so small that sigma * sqrt(dt) underflows to 0.0 in f64,
+        // causing u = d = 1.0 and division-by-zero in the probability formula.
+        let epsilon_vol = 5e-162; // sqrt(dt=1/100) = 0.1; 5e-162 * 0.1 = 5e-163, underflows
+        let steps = 100;
+
+        // CRR: must return an explicit degenerate error
+        let crr_tree = BinomialTree::crr(steps);
+        let crr_err = crr_tree
+            .calculate_parameters(100.0, 100.0, 0.05, epsilon_vol, 1.0, 0.0)
+            .expect_err("CRR with degenerate vol should fail");
+        let msg = crr_err.to_string();
+        assert!(
+            msg.contains("degenerate"),
+            "CRR degenerate error must mention 'degenerate', got: {msg}"
+        );
+
+        // Tian: must return an explicit degenerate error
+        let tian_tree = BinomialTree::new(steps, TreeType::Tian);
+        let tian_err = tian_tree
+            .calculate_parameters(100.0, 100.0, 0.05, epsilon_vol, 1.0, 0.0)
+            .expect_err("Tian with degenerate vol should fail");
+        let msg_tian = tian_err.to_string();
+        assert!(
+            msg_tian.contains("degenerate"),
+            "Tian degenerate error must mention 'degenerate', got: {msg_tian}"
+        );
     }
 
     #[test]

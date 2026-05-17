@@ -61,19 +61,29 @@ impl EvolutionParams {
     ) -> finstack_core::Result<Self> {
         let u = (volatility * dt.sqrt()).exp();
         let d = 1.0 / u;
+        let spread = u - d;
+        // Guard: if vol*sqrt(dt) is so small that u ≈ d (spread underflows to 0),
+        // the probability formula produces 0/0 = NaN.  Catch it explicitly
+        // before the division so the error message is descriptive.
+        if spread < 1e-14 {
+            return Err(finstack_core::Error::Validation(format!(
+                "CRR evolution is degenerate: u ≈ d (spread = {spread:.3e}). \
+                 vol·√dt = {:.3e} is too small — increase volatility or time step.",
+                volatility * dt.sqrt()
+            )));
+        }
         let drift = risk_free_rate - dividend_yield;
-        let p = ((drift * dt).exp() - d) / (u - d);
+        let p = ((drift * dt).exp() - d) / spread;
 
         if !(0.0..=1.0).contains(&p) {
             return Err(finstack_core::Error::Validation(format!(
-                "CRR probability p={} out of bounds [0,1] for vol={}, r={}, q={}, dt={}",
-                p, volatility, risk_free_rate, dividend_yield, dt
+                "CRR probability p={p:.6} out of bounds [0,1] for vol={volatility}, \
+                 r={risk_free_rate}, q={dividend_yield}, dt={dt:.3e}"
             )));
         }
         if !(u > 0.0 && d > 0.0) {
             return Err(finstack_core::Error::Validation(format!(
-                "CRR up/down factors must be positive: u={}, d={}",
-                u, d
+                "CRR up/down factors must be positive: u={u}, d={d}"
             )));
         }
 
@@ -141,6 +151,27 @@ impl EvolutionParams {
             prob_down: p_d,
             prob_middle: Some(p_m),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// W-07: equity_crr with vol·√dt underflowing to 0 must return a descriptive
+    /// "degenerate" error, not silently NaN-poison the probability.
+    #[test]
+    fn test_w07_equity_crr_degenerate_vol_sqrt_dt_returns_descriptive_error() {
+        // vol so small that vol * sqrt(dt) underflows to 0 in f64
+        let epsilon_vol = 5e-162; // * sqrt(0.01) = 5e-163 → underflows
+        let dt = 0.01_f64;
+        let err = EvolutionParams::equity_crr(epsilon_vol, 0.05, 0.0, dt)
+            .expect_err("equity_crr with degenerate vol should fail");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("degenerate"),
+            "equity_crr degenerate error must mention 'degenerate', got: {msg}"
+        );
     }
 }
 
