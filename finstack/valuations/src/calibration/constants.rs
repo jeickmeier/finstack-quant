@@ -61,6 +61,18 @@ pub(crate) const OBJECTIVE_VALID_ABS_MAX: f64 = PENALTY / 10.0;
 ///
 /// If the final residual exceeds this value, the calibration is considered to have
 /// hit a hard constraint or failed significantly.
+///
+/// # W-41: Known threshold gap
+///
+/// The global solver's `fill_penalty` computes `PENALTY * (d / (1 + d))` for bound
+/// violations, where `d = sqrt(sum_squared_outside)`. For very small violations
+/// (`d ≪ 1`), this penalty value is proportional to `d * PENALTY`, which can be
+/// far below this threshold. Magnitude-based detection alone cannot catch these
+/// "small penalty" residuals.
+///
+/// Callers that KNOW bound violations occurred (e.g., because they track clamp
+/// counts) MUST call [`CalibrationReport::with_has_penalty_residuals`] to explicitly
+/// propagate the penalty flag, bypassing the magnitude threshold.
 pub(crate) const RESIDUAL_PENALTY_ABS_MIN: f64 = PENALTY * 0.5;
 
 /// Newtype wrapper for `f64` that implements `Ord` for use as `BTreeMap` keys.

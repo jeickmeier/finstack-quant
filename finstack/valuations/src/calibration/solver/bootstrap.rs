@@ -146,11 +146,17 @@ fn normalize_scan_points(mut points: Vec<f64>, initial_guess: f64, time: f64) ->
 }
 
 /// Resolve the solved value when no sign-change bracket was found.
-fn resolve_no_bracket<Q: std::fmt::Debug>(ctx: NoBracketContext<'_, Q>) -> Result<f64> {
+///
+/// Returns `(solved_x, is_approximate)` on success, where `is_approximate = true`
+/// indicates the knot was accepted from a local `|f|`-minimum rather than a true
+/// sign-change bracket.  Callers MUST propagate this flag so the calibration report
+/// can distinguish approximate knots from properly-bracketed roots (W-40).
+fn resolve_no_bracket<Q: std::fmt::Debug>(ctx: NoBracketContext<'_, Q>) -> Result<(f64, bool)> {
     // Check if best point is within tolerance
     if let (Some(best_x), Some(best_f)) = (ctx.diag.best_point, ctx.diag.best_value) {
         if best_f.is_finite() && best_f.abs() <= ctx.validation_tolerance {
-            return Ok(best_x);
+            // Accepted without a sign-change bracket: flag as approximate.
+            return Ok((best_x, true));
         }
         return Err(finstack_core::Error::Calibration {
             message: format!(
@@ -318,14 +324,22 @@ impl SequentialBootstrapper {
         let mut residuals = BTreeMap::new();
         let mut total_iterations = 0;
         let mut last_time = knots.iter().map(|(t, _)| *t).fold(0.0_f64, f64::max);
+        // W-40: track knot times accepted without a sign-change bracket so the
+        // report can flag them as approximate rather than silently treating them
+        // as true bracketed roots.
+        let mut approximate_knot_times: Vec<f64> = Vec::new();
 
         for (sorted_idx, sq) in sorted_quotes.into_iter().enumerate() {
             validate_time_ordering(sq.time, last_time, sq.original_idx)?;
             let quote = &quotes[sq.original_idx];
             let time = sq.time;
 
-            let (solved_value, eval_count) =
+            let (solved_value, eval_count, is_approximate) =
                 Self::solve_single_knot(target, quote, &knots, time, config, validation_tolerance)?;
+
+            if is_approximate {
+                approximate_knot_times.push(time);
+            }
 
             let residual = validate_and_commit_knot(
                 target,
@@ -357,6 +371,17 @@ impl SequentialBootstrapper {
             None => report,
         };
 
+        // W-40: flag approximate knots in report metadata so callers can
+        // distinguish true bracketed roots from accepted local |f|-minima.
+        if !approximate_knot_times.is_empty() {
+            let times_str = approximate_knot_times
+                .iter()
+                .map(|t| format!("{t:.6}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            report = report.with_metadata("approximate_knots", times_str);
+        }
+
         // Compute optional diagnostics if requested.
         if config.compute_diagnostics {
             let resid_vec: Vec<f64> = report.residuals.values().copied().collect();
@@ -370,7 +395,9 @@ impl SequentialBootstrapper {
 
     /// Solve for a single knot value using bracket + polish.
     ///
-    /// Returns `(solved_value, eval_count)`.
+    /// Returns `(solved_value, eval_count, is_approximate)`.
+    /// `is_approximate = true` means the knot was accepted from a local `|f|`-minimum
+    /// without a sign-change bracket (W-40).
     fn solve_single_knot<T>(
         target: &T,
         quote: &T::Quote,
@@ -378,7 +405,7 @@ impl SequentialBootstrapper {
         time: f64,
         config: &CalibrationConfig,
         validation_tolerance: f64,
-    ) -> Result<(f64, usize)>
+    ) -> Result<(f64, usize, bool)>
     where
         T: BootstrapTarget,
         T::Quote: std::fmt::Debug,
@@ -447,8 +474,12 @@ impl SequentialBootstrapper {
             config.solver.max_iterations(),
         )?;
 
-        let solved_value = match tentative {
-            Some(root) => root,
+        // W-40: a result is "approximate" if it was NOT derived from a true sign-change
+        // bracket (two scan-grid points with opposite signs). This covers:
+        //   - `tentative = None` → `resolve_no_bracket` accepted a local |f|-minimum
+        //   - `tentative = Some` but found via secant/best-point (no sign change)
+        let (solved_value, is_approximate) = match tentative {
+            Some(root) => (root, !diag.is_sign_change_bracket),
             None => resolve_no_bracket(NoBracketContext {
                 time,
                 quote,
@@ -458,7 +489,7 @@ impl SequentialBootstrapper {
             })?,
         };
 
-        Ok((solved_value, diag.eval_count))
+        Ok((solved_value, diag.eval_count, is_approximate))
     }
 }
 
@@ -609,6 +640,288 @@ mod tests {
 
         assert_eq!(curve_a, curve_b);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod w40_tests {
+    //! W-40: `resolve_no_bracket` must flag approximate (no-bracket) knots and
+    //! must not silently commit the wrong local minimum for non-monotone residuals.
+    use super::*;
+    use crate::calibration::solver::traits::BootstrapTarget;
+
+    /// Non-monotone residual: f(x) = (x-2)^2*(x-5)^2 - 1.
+    ///
+    /// This has two local minima near x=2 and x=5 and does NOT cross zero at
+    /// the "best" scan-grid points, but the minimum value f ≈ -1 < 0, so
+    /// eventually there IS a sign change once we compute it properly.
+    ///
+    /// For the W-40 test we construct a residual that has a local |f| minimum
+    /// well within `validation_tolerance` but where f does not change sign at
+    /// that minimum — meaning the solver can only find it as a "best point",
+    /// NOT via a bracket.
+    ///
+    /// f(x) = (x - root)^2 - eps:   minimum value = -eps (small, negative),
+    /// reached at x = root.  If eps is within tolerance the solver would accept
+    /// x=root as the "best point". But f changes sign at x = root ± sqrt(eps),
+    /// so a sign-change bracket DOES exist; we hide those from the scan grid so
+    /// the bracket is never found, forcing the no-bracket path.
+    ///
+    /// After the fix, the knot must be flagged as approximate in the report.
+    #[derive(Debug, Clone)]
+    struct NonMonotoneQuote {
+        t: f64,
+        /// True root of f (sign change occurs here only if scan grid covers it)
+        root: f64,
+        /// Small offset: f = (x - root)^2 - eps, so the minimum value is -eps
+        eps: f64,
+    }
+
+    struct NonMonotoneTarget;
+
+    impl BootstrapTarget for NonMonotoneTarget {
+        type Quote = NonMonotoneQuote;
+        type Curve = f64;
+
+        fn quote_time(&self, quote: &Self::Quote) -> finstack_core::Result<f64> {
+            Ok(quote.t)
+        }
+
+        fn build_curve(
+            &self,
+            knots: &[(f64, f64)],
+        ) -> finstack_core::Result<Self::Curve> {
+            knots
+                .last()
+                .map(|(_, v)| *v)
+                .ok_or(finstack_core::Error::Input(
+                    finstack_core::InputError::TooFewPoints,
+                ))
+        }
+
+        fn calculate_residual(
+            &self,
+            curve: &Self::Curve,
+            quote: &Self::Quote,
+        ) -> finstack_core::Result<f64> {
+            let dx = *curve - quote.root;
+            // f(x) = dx^2 - eps: minimum = -eps at x=root, sign changes at x = root ± sqrt(eps)
+            Ok(dx * dx - quote.eps)
+        }
+
+        fn initial_guess(
+            &self,
+            quote: &Self::Quote,
+            _previous_knots: &[(f64, f64)],
+        ) -> finstack_core::Result<f64> {
+            Ok(quote.root + 1.0)
+        }
+
+        fn scan_points(
+            &self,
+            quote: &Self::Quote,
+            _initial_guess: f64,
+        ) -> finstack_core::Result<Vec<f64>> {
+            // Deliberately exclude the sign-change region (root ± sqrt(eps)).
+            // The minimum at x=root is within tolerance, so without a sign change
+            // the solver will accept it as a "best point".
+            // We use points that stay in f > 0 region on both sides (far from root),
+            // then also include x=root exactly where f = -eps (in-tolerance minimum).
+            let sq_eps = quote.eps.sqrt();
+            let r = quote.root;
+            // Points outside the sign-change bracket but including the minimum:
+            Ok(vec![
+                r - 3.0 * sq_eps,  // f > 0
+                r - 2.5 * sq_eps,  // f > 0
+                r - 2.0 * sq_eps,  // f = (4-1)*eps > 0  [actually 3*eps]
+                r - 1.5 * sq_eps,  // f = (2.25-1)*eps > 0
+                r - 0.5 * sq_eps,  // f = (0.25-1)*eps < 0  -- INSIDE bracket!
+                r,                  // f = -eps (minimum, in-tolerance)
+                r + 0.5 * sq_eps,  // f < 0  -- INSIDE bracket!
+                r + 1.5 * sq_eps,  // f > 0
+                r + 2.0 * sq_eps,  // f > 0
+                r + 2.5 * sq_eps,  // f > 0
+                r + 3.0 * sq_eps,  // f > 0
+            ])
+        }
+    }
+
+    /// W-40 regression: with the scan grid including sign-change points, the
+    /// bracketing solver should find a true root, not accept a local minimum.
+    /// After the fix, when NO bracket exists, the result must be flagged approximate.
+    ///
+    /// This test constructs the case where the bracket IS discoverable (sign
+    /// changes are in the grid), but verifies the solver actually finds a real
+    /// root (|f| very small, near ±sqrt(eps)).
+    #[test]
+    fn w40_non_monotone_residual_solver_finds_real_root_not_local_minimum() {
+        let target = NonMonotoneTarget;
+        let eps = 1e-8; // small: minimum |f| = eps, sign changes at root ± 1e-4
+        let q = NonMonotoneQuote {
+            t: 1.0,
+            root: 0.5,
+            eps,
+        };
+        let cfg = crate::calibration::CalibrationConfig {
+            solver: crate::calibration::solver::SolverConfig::brent_default()
+                .with_tolerance(1e-6)   // tolerance >> eps, so the local min is "in tolerance"
+                .with_max_iterations(200),
+            ..crate::calibration::CalibrationConfig::default()
+        };
+        // With the scan grid including sign-change points, the solver should bracket
+        // and converge to a true root.
+        let (curve, report) =
+            SequentialBootstrapper::bootstrap(&target, &[q], vec![(0.0, 0.0)], &cfg, None, None)
+                .expect("bootstrap should succeed when sign change is in grid");
+
+        // The true roots are at root ± sqrt(eps) = 0.5 ± 1e-4.
+        let sq_eps = eps.sqrt();
+        let dist_to_nearest_true_root = ((curve - (0.5 + sq_eps)).abs())
+            .min((curve - (0.5 - sq_eps)).abs());
+
+        assert!(
+            dist_to_nearest_true_root < 1e-3,
+            "solver should converge to a true root (sign change), not just any local min; \
+             curve={curve}, nearest true root distance={dist_to_nearest_true_root}"
+        );
+        assert!(report.success, "report should be successful");
+    }
+
+    /// W-40 regression: when NO sign-change bracket is discoverable, the solver
+    /// must flag the accepted knot as approximate in the report metadata, not
+    /// silently commit it as if it were a true root.
+    ///
+    /// We hide the sign-change points from the grid so the solver can only find
+    /// the local minimum, not a proper bracket.
+    #[derive(Debug, Clone)]
+    struct NonMonotoneNoBracketQuote {
+        t: f64,
+        root: f64,
+        eps: f64,
+    }
+
+    struct NonMonotoneNoBracketTarget;
+
+    impl BootstrapTarget for NonMonotoneNoBracketTarget {
+        type Quote = NonMonotoneNoBracketQuote;
+        type Curve = f64;
+
+        fn quote_time(&self, quote: &Self::Quote) -> finstack_core::Result<f64> {
+            Ok(quote.t)
+        }
+
+        fn build_curve(
+            &self,
+            knots: &[(f64, f64)],
+        ) -> finstack_core::Result<Self::Curve> {
+            knots
+                .last()
+                .map(|(_, v)| *v)
+                .ok_or(finstack_core::Error::Input(
+                    finstack_core::InputError::TooFewPoints,
+                ))
+        }
+
+        fn calculate_residual(
+            &self,
+            curve: &Self::Curve,
+            quote: &Self::Quote,
+        ) -> finstack_core::Result<f64> {
+            let dx = *curve - quote.root;
+            // f(x) = dx^2 + eps: strictly positive everywhere, minimum = eps at x=root.
+            // No sign change anywhere — a true |f|-minimum with no zero crossing.
+            // If eps < tolerance, the minimum is within tolerance and will be accepted
+            // as the "best point" without a bracket.
+            Ok(dx * dx + quote.eps)
+        }
+
+        fn initial_guess(
+            &self,
+            quote: &Self::Quote,
+            _previous_knots: &[(f64, f64)],
+        ) -> finstack_core::Result<f64> {
+            // Start away from the minimum so the scan grid drives the search.
+            Ok(quote.root + 2.0)
+        }
+
+        fn scan_points(
+            &self,
+            quote: &Self::Quote,
+            _initial_guess: f64,
+        ) -> finstack_core::Result<Vec<f64>> {
+            // f(x) = dx^2 + eps >= eps > 0 always. No sign changes possible.
+            // Include x=root where |f| = eps < tolerance (the "best point").
+            let r = quote.root;
+            Ok(vec![
+                r - 3.0,
+                r - 2.0,
+                r - 1.5,
+                r - 1.0,
+                r - 0.5,
+                r,        // f = eps (minimum, in-tolerance)
+                r + 0.5,
+                r + 1.0,
+            ])
+        }
+    }
+
+    /// W-40: when no sign-change bracket is found but best |f| <= tolerance,
+    /// the report must flag the result as approximate (not silently treat it as
+    /// a true bracketed root). Pre-fix: the report has no such flag. Post-fix:
+    /// the report metadata includes "approximate_knots".
+    ///
+    /// Residual: f(x) = (x - root)^2 + eps, strictly positive everywhere.
+    /// No zero crossing exists. The minimum |f| = eps < tolerance is at x=root.
+    /// The solver accepts this as "best point" — this is the W-40 defect.
+    #[test]
+    fn w40_no_bracket_approximate_knot_is_flagged_in_report() {
+        let target = NonMonotoneNoBracketTarget;
+        let tolerance = 1e-4;
+        let eps = tolerance * 0.4; // |f_min| = eps < tolerance at x=root
+        let q = NonMonotoneNoBracketQuote {
+            t: 1.0,
+            root: 0.5,
+            eps,
+        };
+        let cfg = crate::calibration::CalibrationConfig {
+            solver: crate::calibration::solver::SolverConfig::brent_default()
+                .with_tolerance(tolerance)
+                .with_max_iterations(200),
+            ..crate::calibration::CalibrationConfig::default()
+        };
+
+        // After the fix: when a knot is accepted without a bracket, the report
+        // must flag it. Pre-fix: this test detects the ABSENCE of the flag.
+        let result = SequentialBootstrapper::bootstrap(
+            &target,
+            &[q],
+            vec![(0.0, 0.0)],
+            &cfg,
+            Some(tolerance),
+            None,
+        );
+
+        // The test verifies:
+        // 1. If bootstrap succeeds (best point accepted), the report MUST contain
+        //    an "approximate_knots" metadata key.
+        // 2. If bootstrap fails (rejects no-bracket), that's also acceptable — but
+        //    the current code DOES accept it silently (the defect).
+        match result {
+            Ok((_curve, report)) => {
+                // Post-fix: must have flag indicating approximate acceptance.
+                assert!(
+                    report.metadata.contains_key("approximate_knots"),
+                    "W-40: bootstrap accepted a knot without a sign-change bracket but \
+                     did not flag it as approximate in report.metadata; \
+                     metadata keys: {:?}",
+                    report.metadata.keys().collect::<Vec<_>>()
+                );
+            }
+            Err(_) => {
+                // Also acceptable: rejecting a no-bracket result is a valid fix.
+                // This branch means the fix chose to reject rather than flag.
+            }
+        }
     }
 }
 

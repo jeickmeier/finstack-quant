@@ -406,6 +406,56 @@ impl CalibrationReport {
         self
     }
 
+    /// Explicitly mark the report as having encountered penalty residuals during
+    /// the solve (W-41: provenance-based penalty detection).
+    ///
+    /// The magnitude-based threshold in [`compute_residual_diagnostics`] cannot
+    /// detect small penalty values produced by [`fill_penalty`](super::solver::GlobalFitOptimizer)
+    /// when bound violations are tiny (e.g., `PENALTY * d/(1+d) ≪ RESIDUAL_PENALTY_ABS_MIN`).
+    /// Callers that KNOW bound violations occurred during solving (e.g., because their
+    /// `clamp_to_bounds` count was non-zero) MUST call `with_has_penalty_residuals(true)` so
+    /// the report is correctly flagged.
+    ///
+    /// When `has_penalty` is `true`:
+    /// - `success` is set to `false`.
+    /// - `convergence_reason` is updated to mention "penalty residuals encountered".
+    ///
+    /// When `has_penalty` is `false`, this is a no-op (does not reset a previously
+    /// detected penalty).
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use finstack_valuations::calibration::CalibrationReport;
+    /// use std::collections::BTreeMap;
+    ///
+    /// # let residuals = BTreeMap::new();
+    /// # let n_clamped = 1usize;
+    /// // If the solver clamped any params to bounds, flag the report.
+    /// let report = CalibrationReport::for_type_with_tolerance("global_fit", residuals, 10, 1e-6)
+    ///     .with_has_penalty_residuals(n_clamped > 0);
+    /// ```
+    #[must_use]
+    pub fn with_has_penalty_residuals(mut self, has_penalty: bool) -> Self {
+        if !has_penalty {
+            return self;
+        }
+        self.success = false;
+        if !self.convergence_reason.contains("penalty") {
+            if self.convergence_reason.contains("converged") {
+                self.convergence_reason = format!(
+                    "{}: penalty residuals encountered during solve (bound violations detected)",
+                    self.convergence_reason
+                );
+            } else {
+                self.convergence_reason = format!(
+                    "{}; penalty residuals encountered during solve (bound violations detected)",
+                    self.convergence_reason
+                );
+            }
+        }
+        self
+    }
+
     /// Update solver configuration on an existing report.
     pub fn update_solver_config(&mut self, config: SolverConfig) {
         self.solver_config = config;
@@ -863,6 +913,118 @@ mod tests {
         let cloned = qq.clone();
         assert_eq!(cloned.quote_label, qq.quote_label);
         assert!((cloned.residual - qq.residual).abs() < 1e-15);
+    }
+
+    // W-41 regression tests.
+    //
+    // `fill_penalty` in `global.rs` computes `PENALTY * (d/(1+d))` for a small
+    // bound violation `d`. For tiny `d`, this value can be much less than
+    // `RESIDUAL_PENALTY_ABS_MIN = PENALTY * 0.5 = 5e5`. The threshold-only
+    // detection in `compute_residual_diagnostics` then misses these "small penalty"
+    // residuals and reports a successful calibration with a misleading RMSE.
+    //
+    // The fix adds `CalibrationReport::with_has_penalty_residuals(bool)` so that
+    // callers who KNOW bounds were violated can mark the report explicitly, without
+    // relying on magnitude alone. The report honors this flag over the threshold.
+
+    /// W-41: a residual value smaller than `RESIDUAL_PENALTY_ABS_MIN` but produced
+    /// by `fill_penalty` is not recognized by the threshold check alone.
+    #[test]
+    fn w41_small_penalty_residual_not_recognized_without_explicit_flag() {
+        // Simulate a tiny bound violation: d=1e-4, penalty = PENALTY * d/(1+d) ≈ 100.
+        let d = 1e-4_f64;
+        let small_penalty = PENALTY * (d / (1.0 + d));
+
+        // Verify this value is below the threshold (confirming the gap exists).
+        assert!(
+            small_penalty < crate::calibration::constants::RESIDUAL_PENALTY_ABS_MIN,
+            "test setup: small_penalty={small_penalty} should be below RESIDUAL_PENALTY_ABS_MIN={}",
+            crate::calibration::constants::RESIDUAL_PENALTY_ABS_MIN
+        );
+
+        let mut residuals = BTreeMap::new();
+        residuals.insert("quote_1Y".to_string(), 1e-10); // normal
+        residuals.insert("quote_2Y_penalty".to_string(), small_penalty); // small penalty
+
+        // Without the fix: report does NOT flag this as a penalty; it shows a
+        // "large residual" failure but the convergence_reason says "exceeds tolerance",
+        // not "penalty values detected". The user cannot distinguish a genuine bad fit
+        // from a bound violation.
+        let report = CalibrationReport::for_type_with_tolerance(
+            "global_fit",
+            residuals,
+            10,
+            1e-8, // small_penalty (≈100) >> tolerance (1e-8)
+        );
+
+        // Post-fix (threshold path): still fails (residual > tolerance), but the
+        // convergence_reason should NOT say "penalty" for the threshold-only path.
+        // This confirms the threshold gap still exists (it requires explicit flagging).
+        assert!(
+            !report.success,
+            "report should fail since small_penalty >> tolerance"
+        );
+        // The gap: without an explicit flag, the report doesn't say "penalty".
+        assert!(
+            !report.convergence_reason.contains("penalty"),
+            "W-41 gap: threshold-based detection missed small penalty residual; \
+             convergence_reason says: {}",
+            report.convergence_reason
+        );
+    }
+
+    /// W-41: `with_has_penalty_residuals(true)` must override threshold detection
+    /// and flag the calibration as having penalty residuals.
+    #[test]
+    fn w41_explicit_has_penalty_flag_overrides_threshold_detection() {
+        let d = 1e-4_f64;
+        let small_penalty = PENALTY * (d / (1.0 + d));
+
+        let mut residuals = BTreeMap::new();
+        residuals.insert("quote_1Y".to_string(), 1e-10);
+        residuals.insert("quote_2Y_penalty".to_string(), small_penalty);
+
+        // With explicit flag: report must mark success=false and explain penalty.
+        let report = CalibrationReport::for_type_with_tolerance(
+            "global_fit",
+            residuals,
+            10,
+            1e-8,
+        )
+        .with_has_penalty_residuals(true);
+
+        assert!(
+            !report.success,
+            "with_has_penalty_residuals(true) should mark calibration as failed"
+        );
+        assert!(
+            report.convergence_reason.contains("penalty"),
+            "with_has_penalty_residuals(true) should produce a penalty-mentioning reason; got: {}",
+            report.convergence_reason
+        );
+    }
+
+    /// W-41: `with_has_penalty_residuals(false)` must not change the outcome for
+    /// a normal calibration (no regression on clean path).
+    #[test]
+    fn w41_explicit_no_penalty_flag_does_not_regress_clean_calibration() {
+        let mut residuals = BTreeMap::new();
+        residuals.insert("quote_1Y".to_string(), 1e-10);
+        residuals.insert("quote_5Y".to_string(), 2e-10);
+
+        let report =
+            CalibrationReport::for_type_with_tolerance("yield_curve", residuals, 10, 1e-8)
+                .with_has_penalty_residuals(false);
+
+        assert!(
+            report.success,
+            "with_has_penalty_residuals(false) should not break a clean calibration"
+        );
+        assert!(
+            report.convergence_reason.contains("converged"),
+            "clean calibration should still converge: {}",
+            report.convergence_reason
+        );
     }
 
     #[test]
