@@ -33,8 +33,14 @@ use finstack_core::Result;
 /// best points observed if formal convergence fails.
 #[derive(Debug, Clone)]
 pub(crate) struct BracketDiagnostics {
-    /// Whether a sign-change bracket was found.
+    /// Whether the solver returned a candidate (via bracket, secant, or best-point).
     pub bracket_found: bool,
+    /// Whether the returned candidate came from a true sign-change bracket
+    /// (i.e., two scan-grid points with opposite-sign objective values were found
+    /// and used to converge). When `false` but `bracket_found` is `true`, the
+    /// candidate was accepted via the no-bracket secant fallback or as a local
+    /// |f|-minimum — it should be treated as approximate (W-40).
+    pub is_sign_change_bracket: bool,
     /// Best candidate point (minimum |f|) observed during the scan.
     pub best_point: Option<f64>,
     /// Best objective value (minimum |f|) observed during the scan.
@@ -56,6 +62,7 @@ impl BracketDiagnostics {
             .fold(f64::NEG_INFINITY, f64::max);
         Self {
             bracket_found: false,
+            is_sign_change_bracket: false,
             best_point: None,
             best_value: None,
             eval_count: 0,
@@ -170,7 +177,8 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
 
     let Some(((mut a, mut fa), (mut b, mut fb), _)) = best_bracket else {
         // No sign-change found. Run a bounded secant fallback from the best
-        // observed point.
+        // observed point. NOTE: any result from this fallback is NOT a true
+        // sign-change root; callers check `is_sign_change_bracket` to detect this.
         //
         // S3: previously this used Newton-with-central-FD, costing 3 objective
         // evaluations per step (the iterate plus two FD probes). Each call
@@ -249,6 +257,11 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
 
         return Ok((None, diag));
     };
+
+    // W-40: a sign-change bracket was found (two consecutive scan points with
+    // opposite signs). Mark this before entering bisection/false-position so
+    // callers can distinguish true bracketed roots from approximate |f|-minima.
+    diag.is_sign_change_bracket = true;
 
     // Market-standard: bracket is valid; converge primarily on f-space (|f| < tol).
     // We prefer a simple bisection on the bracket to guarantee reduction in |f|
