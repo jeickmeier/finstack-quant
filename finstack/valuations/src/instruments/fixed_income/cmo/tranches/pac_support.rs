@@ -20,23 +20,58 @@ pub struct PacSchedule {
 impl PacSchedule {
     /// Generate PAC schedule from collateral characteristics.
     ///
-    /// The PAC schedule is the minimum principal at each period
-    /// across the collar range. For each period, we project total
-    /// principal (scheduled amortization + prepayment) at both the
-    /// lower and upper PSA speeds and take the minimum.
+    /// The PAC schedule is the minimum principal **the collateral pool**
+    /// throws off at each period across the collar range. For each period,
+    /// we project total principal (scheduled amortization + prepayment) off
+    /// the *collateral* balance at both the lower and upper PSA speeds and
+    /// take the minimum. The resulting collateral-derived stream is then
+    /// carved to the PAC tranche: cumulative scheduled principal is capped
+    /// at the PAC balance (the PAC cannot receive more principal than its
+    /// own face), with any excess flowing to the support tranche.
+    ///
+    /// Projecting off the (smaller) PAC balance — as a prior implementation
+    /// did — understates absolute scheduled principal and shifts the
+    /// effective collar, so the collateral balance is the correct basis.
+    ///
+    /// # Arguments
+    ///
+    /// * `collateral_balance` - Current balance of the underlying collateral pool
+    /// * `pac_balance` - Current balance of the PAC tranche being carved
+    /// * `wam` - Weighted average maturity in months
+    /// * `wac` - Weighted average coupon (annual)
+    /// * `collar` - PAC collar (lower/upper PSA bounds)
     ///
     /// Reference: Fabozzi "Handbook of Mortgage-Backed Securities" Ch. 8
-    pub fn generate(pac_balance: f64, wam: u32, wac: f64, collar: PacCollar) -> Self {
-        // Project principal at lower PSA
-        let lower_principals = project_principal_stream(pac_balance, wam, wac, collar.lower_psa);
-        // Project principal at upper PSA
-        let upper_principals = project_principal_stream(pac_balance, wam, wac, collar.upper_psa);
+    pub fn generate(
+        collateral_balance: f64,
+        pac_balance: f64,
+        wam: u32,
+        wac: f64,
+        collar: PacCollar,
+    ) -> Self {
+        // Project collateral principal at lower PSA
+        let lower_principals =
+            project_principal_stream(collateral_balance, wam, wac, collar.lower_psa);
+        // Project collateral principal at upper PSA
+        let upper_principals =
+            project_principal_stream(collateral_balance, wam, wac, collar.upper_psa);
 
-        // PAC schedule = minimum principal at each period
-        let schedule: Vec<f64> = lower_principals
+        // Collateral-derived PAC band = minimum principal at each period.
+        let collateral_schedule = lower_principals
             .iter()
             .zip(upper_principals.iter())
-            .map(|(lo, hi)| lo.min(*hi))
+            .map(|(lo, hi)| lo.min(*hi));
+
+        // Carve to the PAC tranche: cap cumulative scheduled principal at the
+        // PAC balance so the PAC never receives more than its own face.
+        let mut cumulative = 0.0;
+        let schedule: Vec<f64> = collateral_schedule
+            .map(|principal| {
+                let room = (pac_balance - cumulative).max(0.0);
+                let carved = principal.min(room);
+                cumulative += carved;
+                carved
+            })
             .collect();
 
         Self {
@@ -182,16 +217,18 @@ mod tests {
 
     #[test]
     fn test_pac_schedule_generation() {
-        let schedule = PacSchedule::generate(100_000.0, 360, 0.045, PacCollar::standard());
+        // Collateral pool of 100k, PAC tranche of 60k carved from it.
+        let schedule = PacSchedule::generate(100_000.0, 60_000.0, 360, 0.045, PacCollar::standard());
 
         assert!(!schedule.scheduled_payments.is_empty());
         assert!(schedule.total_scheduled() > 0.0);
-        assert!(schedule.total_scheduled() <= 100_000.0);
+        // Carved PAC schedule cannot exceed the PAC balance.
+        assert!(schedule.total_scheduled() <= 60_000.0 + 1e-6);
     }
 
     #[test]
     fn test_within_collar() {
-        let schedule = PacSchedule::generate(100_000.0, 360, 0.045, PacCollar::standard());
+        let schedule = PacSchedule::generate(100_000.0, 100_000.0, 360, 0.045, PacCollar::standard());
 
         // 100% PSA is within 100-300 collar
         assert!(schedule.is_within_collar(1.0));
@@ -204,6 +241,56 @@ mod tests {
 
         // 400% PSA is above collar
         assert!(!schedule.is_within_collar(4.0));
+    }
+
+    #[test]
+    fn test_pac_schedule_generated_off_collateral_not_pac_balance() {
+        // A PAC tranche smaller than the collateral pool.
+        let collateral_balance = 100_000.0;
+        let pac_balance = 40_000.0;
+        let wam = 360;
+        let wac = 0.05;
+        let collar = PacCollar::standard();
+        let lower_psa = collar.lower_psa;
+        let upper_psa = collar.upper_psa;
+
+        let schedule = PacSchedule::generate(collateral_balance, pac_balance, wam, wac, collar);
+
+        // The carved schedule's early-period principal must equal the
+        // collateral-derived minimum-principal stream (before the PAC
+        // balance cap binds), NOT a PAC-balance-derived stream.
+        let lo = project_principal_stream(collateral_balance, wam, wac, lower_psa);
+        let hi = project_principal_stream(collateral_balance, wam, wac, upper_psa);
+        let collateral_min: Vec<f64> =
+            lo.iter().zip(hi.iter()).map(|(l, h)| l.min(*h)).collect();
+
+        // The (incorrect) PAC-balance-derived stream, for contrast.
+        let pac_lo = project_principal_stream(pac_balance, wam, wac, lower_psa);
+        let pac_hi = project_principal_stream(pac_balance, wam, wac, upper_psa);
+        let pac_balance_min: Vec<f64> = pac_lo
+            .iter()
+            .zip(pac_hi.iter())
+            .map(|(l, h)| l.min(*h))
+            .collect();
+
+        // Month 1: cap (40k) far exceeds first-period principal, so the carve
+        // is a no-op. Schedule must equal the collateral-derived value and be
+        // strictly larger than the PAC-balance-derived value.
+        assert!(
+            (schedule.scheduled_payments[0] - collateral_min[0]).abs() < 1e-9,
+            "period 0: expected collateral-derived {}, got {}",
+            collateral_min[0],
+            schedule.scheduled_payments[0]
+        );
+        assert!(
+            schedule.scheduled_payments[0] > pac_balance_min[0] * 1.5,
+            "collateral-derived principal ({}) should dwarf PAC-balance-derived ({})",
+            schedule.scheduled_payments[0],
+            pac_balance_min[0]
+        );
+
+        // Carved cumulative principal never exceeds the PAC balance.
+        assert!(schedule.total_scheduled() <= pac_balance + 1e-6);
     }
 
     #[test]
