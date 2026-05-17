@@ -145,10 +145,10 @@ struct OvernightProjectionInputs<'a> {
 
 fn builder_overnight_method(
     compounding: FloatingLegCompounding,
-) -> Option<crate::cashflow::builder::OvernightCompoundingMethod> {
+) -> Result<Option<crate::cashflow::builder::OvernightCompoundingMethod>> {
     use crate::cashflow::builder::OvernightCompoundingMethod;
 
-    match compounding {
+    Ok(match compounding {
         FloatingLegCompounding::Simple => None,
         FloatingLegCompounding::CompoundedInArrears {
             lookback_days,
@@ -167,10 +167,20 @@ fn builder_overnight_method(
                     shift_days: observation_shift.unwrap_or(0) as u32,
                 })
             } else {
-                // The generic builder does not yet model this hybrid convention exactly.
-                Some(OvernightCompoundingMethod::CompoundedWithLookback {
-                    lookback_days: lookback_days as u32,
-                })
+                // The canonical-schedule builder cannot model the hybrid
+                // lookback + observation-shift convention. Silently degrading
+                // to lookback-only would drop the observation shift and
+                // diverge from the in-module compounding loop, which handles
+                // the combined `total_shift` correctly. Reject explicitly
+                // rather than mispricing.
+                return Err(finstack_core::Error::Validation(format!(
+                    "Compounded-in-arrears with both a lookback ({} days) and an \
+                     observation shift ({} days) is not supported on the \
+                     canonical-schedule pricing path. Use a lookback-only or \
+                     observation-shift-only convention.",
+                    lookback_days,
+                    observation_shift.unwrap_or(0),
+                )));
             }
         }
         FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => {
@@ -183,7 +193,7 @@ fn builder_overnight_method(
                 lockout_days: cutoff_days as u32,
             })
         }
-    }
+    })
 }
 
 fn resolve_compounded_fixing_calendar(
@@ -654,7 +664,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 fixing_calendar_id: float.fixing_calendar_id.clone(),
                 end_of_month: float.end_of_month,
                 payment_lag_days: float.payment_lag_days,
-                overnight_compounding: builder_overnight_method(float.compounding.clone()),
+                overnight_compounding: builder_overnight_method(float.compounding.clone())?,
                 overnight_basis: None,
                 fallback: if curves.is_some() {
                     crate::cashflow::builder::FloatingRateFallback::Error
@@ -850,7 +860,8 @@ mod tests {
     fn rate_cutoff_maps_to_overnight_lockout() {
         let method = builder_overnight_method(FloatingLegCompounding::CompoundedWithRateCutoff {
             cutoff_days: 1,
-        });
+        })
+        .expect("rate cut-off is a supported canonical-schedule convention");
 
         assert_eq!(
             method,
@@ -860,6 +871,36 @@ mod tests {
                 }
             )
         );
+    }
+
+    /// W-14: The canonical-schedule path cannot model the hybrid
+    /// lookback + observation-shift convention. It must error explicitly
+    /// rather than silently degrading to lookback-only (which drops the
+    /// observation shift and diverges from the in-module compounding loop).
+    #[test]
+    fn hybrid_lookback_and_observation_shift_errors() {
+        let hybrid = FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 2,
+            observation_shift: Some(2),
+        };
+        let result = builder_overnight_method(hybrid);
+        assert!(
+            result.is_err(),
+            "hybrid lookback + observation-shift must be rejected on the \
+             canonical-schedule path, got {result:?}"
+        );
+
+        // Lookback-only and shift-only remain supported.
+        assert!(builder_overnight_method(FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 2,
+            observation_shift: None,
+        })
+        .is_ok());
+        assert!(builder_overnight_method(FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 0,
+            observation_shift: Some(2),
+        })
+        .is_ok());
     }
 
     #[test]
