@@ -25,12 +25,17 @@ impl BilinearInterp {
     /// Create a new Bilinear Interpolator.
     ///
     /// # Arguments
-    /// * `xs`: Grid points for X dimension (must be sorted)
-    /// * `ys`: Grid points for Y dimension (must be sorted)
-    /// * `z_flat`: Values at grid points, flattened (row-major: x varies slowest, y varies fastest? Or vice versa?)
-    ///   Let's assume: z corresponds to `xs[i]`, `ys[j]`.
-    ///   If we iterate xs then ys, it's x-major?
-    ///   Let's stick to: index = i * ys.len() + j
+    /// * `xs`: Grid points for the X (slow) dimension, sorted ascending.
+    /// * `ys`: Grid points for the Y (fast) dimension, sorted ascending.
+    /// * `z_flat`: Values at all grid points in **row-major order**: X varies
+    ///   slowest, Y varies fastest.  Concretely, `z_flat[i * ys.len() + j]`
+    ///   is the value at `(xs[i], ys[j])`.
+    ///
+    /// # Axis-order contract
+    ///
+    /// The caller must fill `z_flat` in the same `for x { for y { ... } }` order that
+    /// this struct expects.  `LocalVolBuilder::from_implied_vol` fills its grid as
+    /// `for t { for k { ... } }` (times = X, strikes = Y), matching this contract.
     pub fn new(xs: Vec<f64>, ys: Vec<f64>, z_flat: Vec<f64>) -> Result<Self> {
         if xs.len() < 2 || ys.len() < 2 {
             return Err(finstack_core::Error::Validation(
@@ -227,6 +232,9 @@ impl LocalVolBuilder {
             }
         }
 
+        // Axis order: times = X (slow), strikes = Y (fast).
+        // `local_vols` was filled in `for t { for k { ... } }` order above,
+        // so index = i_time * strikes.len() + i_strike — matching BilinearInterp's contract.
         let surface = BilinearInterp::new(times.to_vec(), strikes.to_vec(), local_vols)?;
 
         Ok(LocalVolSurface::new(base_date, Arc::new(surface)))
