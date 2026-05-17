@@ -115,8 +115,14 @@ pub(crate) mod metrics;
 pub(crate) mod parameters;
 /// Swaption pricer implementation using Black (1976) model
 pub(crate) mod pricer;
-/// Bermudan swaption pricing engines (tree, LSMC)
-pub(crate) mod pricing;
+/// Bermudan swaption pricing engines (tree, LSMC, LMM).
+///
+/// The Monte Carlo engines ([`pricing::monte_carlo_lsmc`],
+/// [`pricing::lmm_bermudan`]) and their payoff / rate helpers are public so
+/// they can be driven directly by no-arbitrage validation tests; the
+/// tree valuator stays crate-private and is re-exported as
+/// [`BermudanSwaptionTreeValuator`].
+pub mod pricing;
 pub(crate) mod types;
 
 pub use crate::calibration::hull_white::HullWhiteParams;

@@ -521,24 +521,65 @@ impl SwaptionLsmcPricer {
         Ok(paths)
     }
 
+    /// Accumulate the pathwise money-market numéraire `B(t)` along a
+    /// simulated short-rate path.
+    ///
+    /// `B(t)` is the value of the money-market account
+    /// `B(t) = exp(∫₀ᵗ r(s) ds)`, discretised on the simulation grid with
+    /// the left-endpoint (Riemann) rule:
+    ///
+    /// ```text
+    /// B(t_0) = 1,   B(t_{k+1}) = B(t_k) · exp(r(t_k) · Δt_k)
+    /// ```
+    ///
+    /// The returned vector has one entry per grid point (`num_steps + 1`).
+    /// LSM continuation values and the final present value are discounted
+    /// by *ratios* of these pathwise factors — the stochastic discount
+    /// factor the Hull-White model produces — rather than by the
+    /// deterministic market discount curve. Discounting by the
+    /// deterministic curve would ignore the correlation between the
+    /// stochastic discount factor and the swap payoff and bias the
+    /// exercise boundary.
+    fn accumulate_bank_factors(rate_path: &[f64], time_grid: &TimeGrid) -> Vec<f64> {
+        let num_steps = time_grid.num_steps();
+        let mut bank = Vec::with_capacity(num_steps + 1);
+        bank.push(1.0); // B(t_0) = 1
+        let mut acc = 1.0;
+        for step in 0..num_steps {
+            // r(t_step) is the rate at the start of the interval.
+            let r_step = rate_path.get(step).copied().unwrap_or(0.0);
+            acc *= (r_step * time_grid.dt(step)).exp();
+            bank.push(acc);
+        }
+        bank
+    }
+
     /// Perform backward induction for swaptions using a time grid.
     ///
     /// # Discounting Convention
     ///
-    /// This pricer uses **discount factor ratios from a yield curve**: `df_t / df_0`.
-    /// This approach properly handles the term structure embedded in the discount curve
-    /// and is appropriate for swaptions where rates vary across maturities.
+    /// This pricer discounts realised cashflows by the **pathwise
+    /// money-market numéraire** `B(t)` (see [`accumulate_bank_factors`]),
+    /// consistently with the Hull-White short-rate dynamics used to
+    /// simulate the paths. A continuation value carried back from a future
+    /// exercise step `t'` to the current step `t` is multiplied by the
+    /// pathwise ratio `B(t) / B(t')`, and the time-0 present value is
+    /// `X(t_exercise) / B(t_exercise)` (with `B(0) = 1`).
     ///
-    /// **Contrast with American LSMC**: The equity/American option pricer uses exponential
-    /// discounting (`exp(-r * t)`) with a flat rate. Both approaches produce present values
-    /// at time 0, but differ in their input assumptions:
-    /// - **American LSMC**: Flat rate input → exponential discounting
-    /// - **Swaption LSMC**: Discount curve input → ratio of discount factors
+    /// Discounting instead by the deterministic market discount factor
+    /// would replace the stochastic discount factor with its expectation
+    /// `E[1/B(t)] ≈ DF(t)`, dropping the payoff/numéraire correlation that
+    /// a short-rate model exists to capture and biasing the optimal
+    /// exercise boundary.
     ///
-    /// The discount factor at time 0 (`df_0`) is asserted to be positive to prevent
-    /// division by zero and ensure well-defined present values.
+    /// The market discount curve is still consulted inside
+    /// [`HullWhiteBondPrice`] / [`ForwardSwapRate`] to reconstruct the
+    /// model-consistent zero-coupon bond prices `P(t, T)` — that use is a
+    /// curve calibration input, not a payoff-discounting choice.
     ///
     /// See `lsmc.rs` for the flat-rate discounting approach.
+    ///
+    /// [`accumulate_bank_factors`]: Self::accumulate_bank_factors
     #[allow(clippy::too_many_arguments)]
     fn backward_induction_swaption_grid<B, F>(
         &self,
@@ -556,10 +597,22 @@ impl SwaptionLsmcPricer {
         let num_paths = paths.len();
         let params = self.hw_process.params();
 
-        // Cashflow and exercise time tracking
+        // Pathwise money-market numéraire B(t) at every grid point, one
+        // accumulator per simulated path. Discounting uses ratios of these
+        // factors (the stochastic discount factor), not the deterministic
+        // market discount curve.
+        let bank_factors: Vec<Vec<f64>> = paths
+            .iter()
+            .map(|path| Self::accumulate_bank_factors(path, time_grid))
+            .collect();
+
+        // Cashflow tracking. `exercise_step` is the grid step of the
+        // currently-optimal exercise decision for each path; it indexes
+        // `bank_factors` to fetch the pathwise numéraire B(t_exercise).
+        // Unexercised paths keep a zero cashflow, so their B(t_exercise)
+        // is irrelevant — seed the step with 0 (B = 1) as a safe default.
         let mut cashflows = vec![0.0; num_paths];
-        let mut exercise_times =
-            vec![payoff.exercise_dates.last().copied().unwrap_or(0.0); num_paths];
+        let mut exercise_step_of = vec![0usize; num_paths];
 
         // Initialize with terminal values (if not exercised, value is zero)
         // For swaptions, terminal value is zero if not exercised
@@ -627,10 +680,17 @@ impl SwaptionLsmcPricer {
 
                 // Only regress on ITM paths
                 if immediate_value > 1e-6 {
-                    // Discount cashflow to this exercise date
-                    let discount_factor = discount_curve_fn(t);
-                    let discounted_cf = if discount_factor > 0.0 {
-                        cashflows[i] * discount_curve_fn(exercise_times[i]) / discount_factor
+                    // Discount the realised future cashflow back to this
+                    // exercise step by the PATHWISE numéraire ratio
+                    // B(t) / B(t_future). Both B values are taken from the
+                    // same path, so this is the stochastic discount factor
+                    // the Hull-White model produces — not the deterministic
+                    // market discount factor, which would drop the
+                    // payoff/numéraire correlation.
+                    let b_now = bank_factors[i][exercise_step];
+                    let b_future = bank_factors[i][exercise_step_of[i]];
+                    let discounted_cf = if b_future > 0.0 {
+                        cashflows[i] * b_now / b_future
                     } else {
                         0.0
                     };
@@ -687,30 +747,27 @@ impl SwaptionLsmcPricer {
                     let immediate_value = swap_value.max(0.0) * annuity * payoff.notional;
                     let continuation = continuation_values[j];
 
-                    // Exercise if immediate value > continuation value
+                    // Exercise if immediate value > continuation value.
+                    // Record the exercise *step* so the final present value
+                    // can fetch the pathwise numéraire B(t_exercise).
                     if immediate_value > continuation {
                         cashflows[i] = immediate_value;
-                        exercise_times[i] = t;
+                        exercise_step_of[i] = exercise_step;
                     }
                 }
             }
         }
 
-        // Discount all cashflows to present using discount factor ratios
+        // Discount all cashflows to present by the pathwise money-market
+        // numéraire: PV = X(t_exercise) / B(t_exercise), with B(0) = 1.
         let mut present_values = vec![0.0; num_paths];
-        let df_0 = discount_curve_fn(0.0);
-
-        // Ensure df_0 is positive to prevent division by zero and ensure well-defined PV
-        if df_0 <= 0.0 {
-            return Err(finstack_core::Error::Validation(format!(
-                "Discount factor at time 0 must be positive, got df_0 = {}",
-                df_0
-            )));
-        }
-
         for i in 0..num_paths {
-            let df_t = discount_curve_fn(exercise_times[i]);
-            present_values[i] = cashflows[i] * df_t / df_0;
+            let b_exercise = bank_factors[i][exercise_step_of[i]];
+            present_values[i] = if b_exercise > 0.0 {
+                cashflows[i] / b_exercise
+            } else {
+                0.0
+            };
         }
 
         Ok(present_values)
