@@ -819,7 +819,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
             .or(bond_calendar_id);
 
         let quote_ctx = QuoteDateContext::new(bond, &context.curves, context.as_of)?;
-        if let Some(clean_px) = quoted_clean {
+        if quoted_clean.is_some() {
             let flows = bond.pricing_dated_cashflows(&context.curves, context.as_of)?;
             if let Some((_, workout_flows, workout_quote_date)) =
                 crate::instruments::fixed_income::bond::metrics::quoted_workout_path(
@@ -885,8 +885,12 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                                     .to_string(),
                             ));
                         }
+                        // Use the DIRTY price (clean + accrued), consistent with the
+                        // bullet branch below which uses `price_pct = dirty_ccy / notional`.
+                        // The asset-swap upfront is conventionally on the dirty price.
+                        let price_pct = dirty_ccy / notional_amt;
                         return Ok(
-                            (coupon * fixed_ann + 1.0 - clean_px / 100.0 - float_pv) / float_ann
+                            (coupon * fixed_ann + 1.0 - price_pct - float_pv) / float_ann
                         );
                     } else {
                         let (par_rate, ann) = par_rate_and_annuity_from_discount(
@@ -900,7 +904,10 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                                     .to_string(),
                             ));
                         }
-                        return Ok((coupon - par_rate) + (1.0 - clean_px / 100.0) / ann);
+                        // Use the DIRTY price (clean + accrued), consistent with the
+                        // bullet branch below which uses `price_pct = dirty_ccy / notional`.
+                        let price_pct = dirty_ccy / notional_amt;
+                        return Ok((coupon - par_rate) + (1.0 - price_pct) / ann);
                     }
                 }
             }
@@ -972,5 +979,155 @@ impl MetricCalculator for AssetSwapMarketCalculator {
             (eq_coupon - par_rate) + (1.0 - price_pct) / ann
         };
         Ok(asw_mkt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::common_impl::traits::Instrument;
+    use crate::instruments::fixed_income::bond::{
+        BondSettlementConvention, CallPut, CallPutSchedule,
+    };
+    use crate::instruments::{PricingOptions, PricingOverrides};
+    use finstack_core::currency::Currency;
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_core::math::interp::InterpStyle;
+    use finstack_core::money::Money;
+    use time::macros::date;
+
+    /// W-29: a seasoned callable bond priced through the ASW *workout* branch must
+    /// build the upfront `(1 - price)` on the DIRTY price (clean + accrued),
+    /// matching the bullet branch convention — not the clean price.
+    #[test]
+    fn asw_workout_branch_uses_dirty_price() {
+        // Seasoned: as_of well past issue, mid-coupon-period -> non-zero accrued.
+        let issue = date!(2024 - 01 - 01);
+        let as_of = date!(2025 - 04 - 15);
+        let call_date = date!(2027 - 01 - 01);
+        let maturity = date!(2030 - 01 - 01);
+
+        // Curve base date at issue so the ASW workout effective date (a prior
+        // coupon date, before `as_of`) is still a valid discount-curve query.
+        let discount = DiscountCurve::builder("USD-OIS")
+            .base_date(issue)
+            .knots([(0.0, 1.0), (1.0, 0.97), (3.0, 0.90), (7.0, 0.74)])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("discount curve");
+        let market = MarketContext::new().insert(discount);
+
+        let mut call_put = CallPutSchedule::default();
+        call_put.calls.push(CallPut {
+            start_date: call_date,
+            end_date: call_date,
+            price_pct_of_par: 100.0,
+            make_whole: None,
+        });
+
+        // Priced above par -> the call is the worst case, so the workout path
+        // resolves to the call date (< maturity) and the workout branch is taken.
+        let clean_px = 105.0;
+        let notional = 1_000_000.0;
+        let bond = Bond::builder()
+            .id("ASW-WORKOUT".into())
+            .notional(Money::new(notional, Currency::USD))
+            .issue_date(issue)
+            .maturity(maturity)
+            .cashflow_spec(CashflowSpec::fixed(
+                0.06,
+                Tenor::semi_annual(),
+                DayCount::Thirty360,
+            ))
+            .discount_curve_id("USD-OIS".into())
+            .credit_curve_id_opt(None)
+            .pricing_overrides(
+                PricingOverrides::default().with_quoted_clean_price(clean_px),
+            )
+            .call_put_opt(Some(call_put))
+            .custom_cashflows_opt(None)
+            .attributes(Default::default())
+            .settlement_convention_opt(Some(BondSettlementConvention::default()))
+            .build()
+            .expect("bond");
+
+        // Confirm the workout path is actually taken (call < maturity).
+        let flows = bond
+            .pricing_dated_cashflows(&market, as_of)
+            .expect("flows");
+        let (_, workout_flows, workout_quote_date) =
+            crate::instruments::fixed_income::bond::metrics::quoted_workout_path(
+                &bond, &market, as_of, &flows,
+            )
+            .expect("workout path")
+            .expect("callable bond resolves a workout");
+        let workout_maturity = workout_flows
+            .last()
+            .map(|(d, _)| *d)
+            .expect("workout flows non-empty");
+        assert!(
+            workout_maturity < maturity,
+            "test precondition: workout must resolve to the call date, got {workout_maturity}"
+        );
+
+        // Compute ASW + accrued via the metric pipeline.
+        let result = bond
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::ASWMarket, MetricId::Accrued],
+                PricingOptions::default(),
+            )
+            .expect("price with metrics");
+        let asw = *result.measures.get("asw_market").expect("asw_market");
+        let accrued = *result.measures.get("accrued").expect("accrued");
+        assert!(
+            accrued.abs() > 1.0,
+            "test precondition: bond must be seasoned with non-zero accrued, got {accrued}"
+        );
+
+        // Recompute the workout-branch ASW with both conventions.
+        let freq = Tenor::semi_annual();
+        let dc = DayCount::Thirty360;
+        let effective_date = asw_effective_date(
+            issue,
+            workout_quote_date,
+            workout_maturity,
+            freq,
+            StubKind::None,
+            BusinessDayConvention::Following,
+            None,
+        )
+        .expect("effective date");
+        let fixed_schedule = build_asw_schedule(
+            effective_date,
+            workout_maturity,
+            freq,
+            StubKind::None,
+            BusinessDayConvention::Following,
+            None,
+        )
+        .expect("schedule");
+        let disc = market.get_discount("USD-OIS").expect("discount");
+        let (par_rate, ann) =
+            par_rate_and_annuity_from_discount(disc.as_ref(), dc, &fixed_schedule)
+                .expect("par rate");
+
+        let coupon = 0.06;
+        let clean_pct = clean_px / 100.0;
+        let dirty_pct = clean_px / 100.0 + accrued / notional;
+
+        let expected_dirty = (coupon - par_rate) + (1.0 - dirty_pct) / ann;
+        let expected_clean = (coupon - par_rate) + (1.0 - clean_pct) / ann;
+
+        assert!(
+            (asw - expected_dirty).abs() < 1e-9,
+            "workout ASW {asw} must match the dirty-price convention {expected_dirty}"
+        );
+        assert!(
+            (asw - expected_clean).abs() > 1e-7,
+            "workout ASW {asw} must NOT match the clean-price convention {expected_clean}"
+        );
     }
 }
