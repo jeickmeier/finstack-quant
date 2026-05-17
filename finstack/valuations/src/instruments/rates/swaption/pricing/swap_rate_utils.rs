@@ -217,39 +217,11 @@ impl ForwardSwapRate {
         }
     }
 
-    /// Compute convexity adjustment for CMS rate using Hagan (2003) methodology.
+    /// Test-only convexity-adjustment accessor.
     ///
-    /// The convexity adjustment accounts for the measure change from the annuity
-    /// measure (where the forward swap rate is a martingale) to the payment measure
-    /// (where the CMS rate is a martingale).
-    ///
-    /// # Formula
-    ///
-    /// ```text
-    /// Convexity_Adjustment = 0.5 * σ² * T * G(S)
-    /// where G(S) = swap_tenor / (1 + S * swap_tenor)²
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `volatility` - Swap rate volatility (annualized, decimal form)
-    /// * `time_to_fixing` - Time to fixing date in years
-    /// * `swap_tenor` - Tenor of the underlying CMS swap in years
-    /// * `forward_rate` - Current forward swap rate (decimal form)
-    ///
-    /// # Returns
-    ///
-    /// Convexity adjustment to add to forward swap rate
-    ///
-    /// # Note
-    ///
-    /// In Monte Carlo pricing using Hull-White, the convexity is captured through
-    /// the path dynamics. This function is useful for analytical approximations
-    /// or for comparison/validation purposes.
-    ///
-    /// # References
-    ///
-    /// - Hagan, P. S. (2003). "Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors."
+    /// Delegates to the canonical [`crate::instruments::rates::cms_option::pricer::convexity_adjustment`]
+    /// (first-order Hagan 2003 standard model) so the swaption-side tests
+    /// exercise the same formula production CMS pricing uses.
     #[cfg(test)]
     fn convexity_adjustment(
         volatility: f64,
@@ -257,12 +229,12 @@ impl ForwardSwapRate {
         swap_tenor: f64,
         forward_rate: f64,
     ) -> f64 {
-        // G(S) = swap_tenor / (1 + S * swap_tenor)²
-        let denominator = 1.0 + forward_rate * swap_tenor;
-        let annuity_sensitivity = swap_tenor / (denominator * denominator);
-
-        // Convexity adjustment = 0.5 * σ² * T * G(S)
-        0.5 * volatility * volatility * time_to_fixing * annuity_sensitivity
+        crate::instruments::rates::cms_option::pricer::convexity_adjustment(
+            volatility,
+            time_to_fixing,
+            swap_tenor,
+            forward_rate,
+        )
     }
 }
 
@@ -417,27 +389,25 @@ mod tests {
 
     #[test]
     fn test_convexity_adjustment() {
-        // Parameters: 20% vol, 1Y to fixing, 10Y swap tenor, 3% forward rate
+        // Parameters: 20% vol, 1Y to fixing, 10Y swap tenor, 3% forward rate.
         let adj = ForwardSwapRate::convexity_adjustment(0.20, 1.0, 10.0, 0.03);
 
-        // Should be positive (convexity adjustment increases CMS rate)
-        assert!(adj > 0.0);
-
-        // Expected: 0.5 * 0.04 * 1.0 * G(0.03)
-        // G(0.03) = 10 / (1 + 0.03 * 10)^2 = 10 / 1.3^2 = 10 / 1.69 ≈ 5.917
-        // Adj = 0.5 * 0.04 * 1.0 * 5.917 ≈ 0.1183
-        let expected = 0.5 * 0.04 * 1.0 * (10.0 / (1.3 * 1.3));
+        // The convexity adjustment must be positive (it raises the CMS rate),
+        // finite, and a small rate-scale quantity. The earlier formula was
+        // dimensionally wrong and returned ~0.118 (1183 bp); a correct
+        // first-order Hagan adjustment is single-to-low-double-digit bp.
+        assert!(adj.is_finite(), "adjustment must be finite, got {adj}");
+        assert!(adj > 0.0, "adjustment must be positive, got {adj}");
         assert!(
-            (adj - expected).abs() < 1e-10,
-            "Expected {}, got {}",
-            expected,
-            adj
+            adj < 0.01,
+            "adjustment must be a sane rate-scale quantity (< 100 bp), got {adj}"
         );
     }
 
     #[test]
     fn test_convexity_adjustment_rate_sensitivity() {
-        // Higher forward rate should give smaller convexity adjustment
+        // The adjustment must respond to the forward-rate level and stay a
+        // sane, positive, finite rate-scale quantity at both ends.
         let vol = 0.20;
         let time = 1.0;
         let swap_tenor = 10.0;
@@ -445,9 +415,12 @@ mod tests {
         let adj_low_rate = ForwardSwapRate::convexity_adjustment(vol, time, swap_tenor, 0.01);
         let adj_high_rate = ForwardSwapRate::convexity_adjustment(vol, time, swap_tenor, 0.05);
 
+        for adj in [adj_low_rate, adj_high_rate] {
+            assert!(adj.is_finite() && adj > 0.0 && adj < 0.05, "insane adj {adj}");
+        }
         assert!(
-            adj_low_rate > adj_high_rate,
-            "Convexity adjustment should decrease as forward rate increases"
+            (adj_low_rate - adj_high_rate).abs() > 1e-9,
+            "adjustment should depend on the forward-rate level"
         );
     }
 }

@@ -297,7 +297,18 @@ impl CDSTranchePricer {
     ) -> Result<f64> {
         let k = detachment_pct / 100.0;
         let grid_step = self.params.grid_step.max(GRID_STEP_MIN);
-        let max_points = (k / grid_step).ceil() as usize + 2;
+        // The convolved portfolio-loss PMF has support up to total LGD
+        // (Σ wᵢ·lgdᵢ), which is far beyond the tranche detachment `k` for any
+        // non-super-senior tranche. The buffer must span the full reachable
+        // loss: `expected_loss_capped` computes `E[min(L,k)]`, whose dominant
+        // term for an equity tranche is `k·P(L>k)` — sizing the buffer to `k`
+        // alone silently drops that tail mass and biases tranche EL low.
+        let total_lgd: f64 = weight_i
+            .iter()
+            .zip(lgd_i.iter())
+            .map(|(&w, &l)| w * l)
+            .sum();
+        let max_points = (total_lgd / grid_step).ceil() as usize + 2;
 
         let use_gaussian = self.params.copula_spec.is_gaussian();
         let copula_ref: Option<&dyn Copula> = if use_gaussian {

@@ -191,7 +191,10 @@ fn test_volatility_impact() {
 }
 
 #[test]
-fn test_black_pricing_rejects_non_positive_forward() {
+fn test_black_pricing_falls_back_to_bachelier_for_non_positive_forward() {
+    // A non-positive forward swap rate is undefined for the Black (lognormal)
+    // model; pricing must fall back to the Bachelier (normal) model so
+    // negative-rate swaptions remain priceable rather than erroring.
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     let market = MarketContext::new()
@@ -199,27 +202,31 @@ fn test_black_pricing_rejects_non_positive_forward() {
         .insert(build_flat_forward_curve(-0.005, as_of, "USD_LIBOR_3M"))
         .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_SWAPTION_VOL"));
 
-    let err = swaption
+    let pv = swaption
         .value(&market, as_of)
-        .expect_err("unshifted Black pricing should reject non-positive forwards");
+        .expect("Black pricing should fall back to Bachelier for a negative forward")
+        .amount();
     assert!(
-        err.to_string().contains("Black"),
-        "expected Black-domain error, got: {err}"
+        pv.is_finite() && pv >= 0.0,
+        "Bachelier-fallback swaption PV should be finite and non-negative, got {pv}"
     );
 }
 
 #[test]
-fn test_black_pricing_rejects_non_positive_strike() {
+fn test_black_pricing_falls_back_to_bachelier_for_non_positive_strike() {
+    // A non-positive strike is undefined for the Black model; pricing must
+    // fall back to the Bachelier (normal) model rather than erroring.
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.0);
     let market = create_flat_market(as_of, 0.03, 0.30);
 
-    let err = swaption
+    let pv = swaption
         .value(&market, as_of)
-        .expect_err("unshifted Black pricing should reject non-positive strikes");
+        .expect("Black pricing should fall back to Bachelier for a non-positive strike")
+        .amount();
     assert!(
-        err.to_string().contains("Black"),
-        "expected Black-domain error, got: {err}"
+        pv.is_finite() && pv >= 0.0,
+        "Bachelier-fallback swaption PV should be finite and non-negative, got {pv}"
     );
 }
 

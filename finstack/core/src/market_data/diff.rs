@@ -470,6 +470,50 @@ pub fn measure_scalar_shift(
     Ok(pct_change)
 }
 
+/// Compute the **absolute** change in a market scalar between two market states.
+///
+/// Unlike [`measure_scalar_shift`], which returns a percentage change, this
+/// returns `value_t1 - value_t0` in the scalar's native units. Use this when
+/// applying a sensitivity defined per unit of underlying move — e.g. an option
+/// delta `dPV/dS` or a dividend sensitivity `dPV/d(dividend)` — where
+/// multiplying by a percentage shift would introduce a `100 / level` scaling
+/// error.
+///
+/// # Errors
+///
+/// Returns `Err` if either market lacks the scalar or the computed shift is
+/// non-finite.
+pub fn measure_scalar_absolute_shift(
+    scalar_id: impl AsRef<str>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    use crate::market_data::scalars::MarketScalar;
+
+    let scalar_t0 = market_t0.get_price(&scalar_id)?;
+    let scalar_t1 = market_t1.get_price(&scalar_id)?;
+
+    let value_t0 = match scalar_t0 {
+        MarketScalar::Unitless(v) => *v,
+        MarketScalar::Price(m) => m.amount(),
+    };
+    let value_t1 = match scalar_t1 {
+        MarketScalar::Unitless(v) => *v,
+        MarketScalar::Price(m) => m.amount(),
+    };
+
+    let abs_change = value_t1 - value_t0;
+    if !abs_change.is_finite() {
+        return Err(crate::Error::Validation(format!(
+            "Non-finite absolute shift computed for scalar '{}': t0={}, t1={}",
+            scalar_id.as_ref(),
+            value_t0,
+            value_t1
+        )));
+    }
+    Ok(abs_change)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

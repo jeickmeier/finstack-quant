@@ -383,10 +383,21 @@ impl PricerRegistry {
             )
             .map_err(|e| PricingError::model_failure_with_context(e.to_string(), err_ctx.clone()))?
         } else {
+            // Risk-only path: `build_with_metrics_dyn` (above) applies scenario
+            // overrides internally, but this `stamped_with_meta` branch builds
+            // the result from the raw `base_result.value` directly. Apply the
+            // overrides here so the documented contract ("scenario price
+            // overrides are always applied to the returned value") holds on the
+            // risk-only non-discounting path too.
+            let value = instrument
+                .scenario_overrides()
+                .map_or(base_result.value, |overrides| {
+                    overrides.apply_to_value(base_result.value)
+                });
             crate::results::ValuationResult::stamped_with_meta(
                 instrument.id(),
                 as_of,
-                base_result.value,
+                value,
                 base_result.meta.clone(),
             )
         };

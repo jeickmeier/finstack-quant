@@ -12,7 +12,7 @@
 //! P = DF * annuity * [K * N(-d2) - F * N(-d1)]
 //! ```
 //! where:
-//! - F = forward swap rate (average of forward prices over swap periods)
+//! - F = forward swap rate (annuity-weighted average of forward prices over swap periods)
 //! - K = fixed price (strike)
 //! - annuity = sum of discount factors x period lengths
 //! - d1 = [ln(F/K) + 0.5*sigma^2*T] / (sigma*sqrt(T))
@@ -191,11 +191,20 @@ impl CommoditySwaption {
 
     /// Compute the forward swap rate from the commodity forward curve.
     ///
-    /// The forward swap rate is the equally-weighted average of forward commodity
-    /// prices at each swap payment period midpoint. This is the fair fixed price
-    /// that makes the swap NPV zero at inception.
-    pub fn forward_swap_rate(&self, market: &MarketContext) -> Result<f64> {
+    /// The forward swap rate is the **annuity-weighted** average of forward
+    /// commodity prices at each swap payment period midpoint:
+    /// ```text
+    /// F_swap = Σ (F_i · DF_i · τ_i) / Σ (DF_i · τ_i)
+    /// ```
+    /// This is the fair fixed price consistent with the `annuity · Black76`
+    /// pricing identity: the swaption is priced as `annuity · Black76(F_swap, K)`
+    /// where `annuity = Σ DF_i · τ_i`, so the fair swap rate must be averaged
+    /// with the same `DF_i · τ_i` weights. It reduces to the equal-weighted mean
+    /// when `DF_i · τ_i` is constant across periods. If the annuity denominator
+    /// is zero (degenerate schedule), the equal-weighted mean is returned.
+    pub fn forward_swap_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let schedule = self.swap_payment_schedule()?;
 
         if schedule.is_empty() {
@@ -205,6 +214,8 @@ impl CommoditySwaption {
         }
 
         let mut sum_fwd = 0.0;
+        let mut weighted_fwd = 0.0;
+        let mut weight_total = 0.0;
         let mut prev = self.swap_start;
         for &payment_date in &schedule {
             // Use the midpoint of each period for forward price lookup
@@ -212,11 +223,28 @@ impl CommoditySwaption {
             let fwd = price_curve
                 .price_on_date(mid)
                 .unwrap_or_else(|_| price_curve.spot_price());
+
+            // Annuity weight DF_i * tau_i — identical to the per-period term
+            // accumulated in `annuity()`.
+            let df = disc.df_between_dates(as_of, payment_date)?;
+            let period_frac =
+                self.day_count
+                    .year_fraction(prev, payment_date, DayCountContext::default())?;
+            let weight = df * period_frac;
+
             sum_fwd += fwd;
+            weighted_fwd += fwd * weight;
+            weight_total += weight;
             prev = payment_date;
         }
 
-        Ok(sum_fwd / schedule.len() as f64)
+        // Guard against a zero (or negative) annuity denominator: fall back to
+        // the equal-weighted mean.
+        if weight_total <= 0.0 {
+            return Ok(sum_fwd / schedule.len() as f64);
+        }
+
+        Ok(weighted_fwd / weight_total)
     }
 
     /// Compute the annuity factor for the underlying swap.
@@ -283,7 +311,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
         }
 
         let t = self.time_to_expiry(as_of)?;
-        let forward = self.forward_swap_rate(market)?;
+        let forward = self.forward_swap_rate(market, as_of)?;
         let annuity = self.annuity(market, as_of)?;
 
         // At or past expiry: return intrinsic value
@@ -348,7 +376,7 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for CommodityS
             .year_fraction(as_of, self.expiry, DayCountContext::default())?
             .max(0.0);
 
-        let forward = self.forward_swap_rate(market)?;
+        let forward = self.forward_swap_rate(market, as_of)?;
         let annuity = self.annuity(market, as_of)?;
 
         if t <= 0.0 {
@@ -406,7 +434,7 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for CommodityS
         };
 
         let bump_pct = crate::metrics::bump_sizes::SPOT;
-        let forward_price = self.forward_swap_rate(market)?;
+        let forward_price = self.forward_swap_rate(market, as_of)?;
         let bump_size = forward_price * bump_pct;
         if bump_size <= 0.0 {
             return Ok(0.0);
@@ -494,7 +522,7 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for CommoditySw
             return Ok(0.0);
         }
 
-        let forward = self.forward_swap_rate(market)?;
+        let forward = self.forward_swap_rate(market, as_of)?;
         let annuity = self.annuity(market, as_of)?;
         let d1 = crate::instruments::common_impl::models::d1_black76(
             forward,

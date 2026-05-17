@@ -723,15 +723,20 @@ impl Ndf {
             return Ok(rate);
         }
 
-        // Determine which direction to query based on convention
+        // Determine which direction to query based on convention.
+        //
+        // The `FxProvider::rate` contract is: the returned rate `r` satisfies
+        // `amount_in_from * r = amount_in_to`, i.e. `rate(from, to)` is quoted
+        // as units of `to` per unit of `from`. To obtain "base per settlement"
+        // we must therefore query `(from = settlement, to = base)`.
         let (from_ccy, to_ccy) = match self.quote_convention {
             NdfQuoteConvention::BasePerSettlement => {
-                // Rate is base/settlement, query base->settlement (returns base per settlement)
-                (self.base_currency, self.settlement_currency)
+                // Want base per settlement -> query settlement->base.
+                (self.settlement_currency, self.base_currency)
             }
             NdfQuoteConvention::SettlementPerBase => {
-                // Rate is settlement/base, query settlement->base (returns settlement per base)
-                (self.settlement_currency, self.base_currency)
+                // Want settlement per base -> query base->settlement.
+                (self.base_currency, self.settlement_currency)
             }
         };
 

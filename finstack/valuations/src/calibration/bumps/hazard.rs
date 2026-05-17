@@ -167,6 +167,8 @@ pub fn bump_hazard_spreads_with_doc_clause_and_valuation_convention(
         cds_valuation_convention,
     };
 
+    // Re-calibration uses the default CalibrationConfig — see the "Calibration
+    // config — known limitation" note in this module's docs (`bumps/mod.rs`).
     let cfg = CalibrationConfig::default();
     let step = StepParams::Hazard(params.clone());
     let (ctx, _report) =
@@ -328,6 +330,8 @@ pub fn recalibrate_hazard_with_recovery_and_doc_clause_and_valuation_convention(
         cds_valuation_convention,
     };
 
+    // Re-calibration uses the default CalibrationConfig — see the "Calibration
+    // config — known limitation" note in this module's docs (`bumps/mod.rs`).
     let cfg = CalibrationConfig::default();
     let step = StepParams::Hazard(params.clone());
     let (ctx, _report) =

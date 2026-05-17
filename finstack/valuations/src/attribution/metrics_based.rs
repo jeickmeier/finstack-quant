@@ -74,8 +74,8 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::diff::{
     measure_discount_curve_shift, measure_fx_shift, measure_hazard_curve_shift,
-    measure_inflation_curve_shift, measure_scalar_shift, measure_vol_surface_shift,
-    TenorSamplingMethod,
+    measure_inflation_curve_shift, measure_scalar_absolute_shift, measure_scalar_shift,
+    measure_vol_surface_shift, TenorSamplingMethod,
 };
 #[cfg(test)]
 use finstack_core::market_data::term_structures::DiscountCurve;
@@ -551,7 +551,17 @@ pub fn attribute_pnl_metrics_based(
 
         if let Some(&convexity) = convexity_opt {
             // Convexity term: ½ × P × Convexity × (Δr)²
-            // where P is the instrument value/price
+            // where P is the instrument value/price.
+            //
+            // UNIT CONTRACT: `Convexity` / `IrConvexity` must be the
+            // dimensionless percentage second derivative. The debug assertion
+            // guards against a non-finite metric silently corrupting the
+            // attributed P&L (it cannot enforce units — that is a documented
+            // contract on `MetricId::Convexity`).
+            debug_assert!(
+                convexity.is_finite(),
+                "Convexity metric must be finite for P&L attribution, got {convexity}"
+            );
             let shift_decimal = avg_shift / 10_000.0;
             let p0 = val_t0.value.amount();
             let convexity_pnl = 0.5 * p0 * convexity * shift_decimal * shift_decimal;
@@ -712,10 +722,12 @@ pub fn attribute_pnl_metrics_based(
 
     // 6. Market scalars: spot price Delta/Gamma attribution
     //
-    // METRIC DEFINITION:
-    // - Delta: Dollar change per 1% spot move ($ / %)
-    // - Gamma: Dollar second derivative per (%)² spot move
-    // - Formula: PnL = Delta × Δspot + ½ × Gamma × (Δspot)²
+    // METRIC DEFINITION (see MetricId::Delta / MetricId::Gamma):
+    // - Delta: dPV/dS — currency per UNIT of underlying move
+    // - Gamma: d²PV/dS² — currency per (unit underlying)²
+    // - Formula: PnL = Delta × ΔS + ½ × Gamma × (ΔS)², with ΔS the ABSOLUTE
+    //   spot move. Multiplying by a percentage shift would mis-scale the P&L
+    //   by 100/S₀ (resp. (100/S₀)²), exact only when S₀ = 100.
     //
     // Uses spot_ids from MarketDependencies to identify underlying spot prices.
     {
@@ -724,22 +736,35 @@ pub fn attribute_pnl_metrics_based(
         let gamma_opt = val_t0.measures.get(MetricId::Gamma.as_str());
 
         if let Some(&delta) = delta_opt {
+            // Guard against a non-finite Delta silently corrupting attributed
+            // P&L. `MetricId::Delta` is contractually dPV/dS (currency per unit
+            // underlying move) — see the unit note above.
+            debug_assert!(
+                delta.is_finite(),
+                "Delta metric must be finite for P&L attribution, got {delta}"
+            );
             let mut total_spot_pnl = 0.0;
-            let mut total_spot_shift_pct = 0.0;
+            let mut total_spot_abs_shift = 0.0;
             let mut spots_found = 0;
 
             for spot_id in spot_ids {
-                if let Ok(spot_shift_pct) = measure_scalar_shift(spot_id, market_t0, market_t1) {
-                    total_spot_pnl += delta * spot_shift_pct;
-                    total_spot_shift_pct += spot_shift_pct;
+                if let Ok(spot_abs_shift) =
+                    measure_scalar_absolute_shift(spot_id, market_t0, market_t1)
+                {
+                    total_spot_pnl += delta * spot_abs_shift;
+                    total_spot_abs_shift += spot_abs_shift;
                     spots_found += 1;
                 }
             }
 
-            // Second-order: Gamma
+            // Second-order: Gamma applied to the absolute spot move.
             if let Some(&gamma) = gamma_opt {
+                debug_assert!(
+                    gamma.is_finite(),
+                    "Gamma metric must be finite for P&L attribution, got {gamma}"
+                );
                 if spots_found > 0 {
-                    let avg_shift = total_spot_shift_pct / spots_found as f64;
+                    let avg_shift = total_spot_abs_shift / spots_found as f64;
                     total_spot_pnl += 0.5 * gamma * avg_shift * avg_shift;
                 }
             }
@@ -874,10 +899,12 @@ pub fn attribute_pnl_metrics_based(
     // 7. Dividend attribution (accumulates into market_scalars_pnl alongside spot Delta/Gamma)
     if let Some(dividend01) = val_t0.measures.get(MetricId::Dividend01.as_str()) {
         if let Some(scalar_id) = instrument.dividend_schedule_id() {
-            if let Ok(div_shift_pct) =
-                measure_scalar_shift(scalar_id.as_str(), market_t0, market_t1)
+            // Dividend01 is dPV/d(dividend) — a per-unit sensitivity, so it must
+            // be applied to the absolute dividend shift, not a percentage shift.
+            if let Ok(div_abs_shift) =
+                measure_scalar_absolute_shift(scalar_id.as_str(), market_t0, market_t1)
             {
-                let div_amount = dividend01 * div_shift_pct;
+                let div_amount = dividend01 * div_abs_shift;
                 attribution.market_scalars_pnl = Money::new(
                     attribution.market_scalars_pnl.amount() + div_amount,
                     val_t1.value.currency(),

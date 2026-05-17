@@ -45,24 +45,20 @@ impl MetricCalculator for GammaCalculator {
             return Ok(0.0);
         }
 
-        let gamma = match option.vol_model {
-            VolatilityModel::Black => {
-                if inputs.forward <= 0.0 || strike <= 0.0 {
-                    return Err(finstack_core::Error::Validation(format!(
-                        "Black swaption gamma requires positive forward and strike, got forward={} strike={}",
-                        inputs.forward, strike
-                    )));
-                }
-                use crate::instruments::common_impl::models::d1_black76;
-                let d1 = d1_black76(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
-                finstack_core::math::norm_pdf(d1)
-                    / (inputs.forward * inputs.sigma * inputs.time_to_expiry.sqrt())
-            }
-            VolatilityModel::Normal => {
-                use crate::instruments::common_impl::models::volatility::normal::d_bachelier;
-                let d = d_bachelier(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
-                finstack_core::math::norm_pdf(d) / (inputs.sigma * inputs.time_to_expiry.sqrt())
-            }
+        // Black (lognormal) Greeks are undefined for non-positive forward or
+        // strike; fall back to Bachelier (normal) for negative-rate regimes.
+        let use_normal = matches!(option.vol_model, VolatilityModel::Normal)
+            || inputs.forward <= 0.0
+            || strike <= 0.0;
+        let gamma = if use_normal {
+            use crate::instruments::common_impl::models::volatility::normal::d_bachelier;
+            let d = d_bachelier(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
+            finstack_core::math::norm_pdf(d) / (inputs.sigma * inputs.time_to_expiry.sqrt())
+        } else {
+            use crate::instruments::common_impl::models::d1_black76;
+            let d1 = d1_black76(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
+            finstack_core::math::norm_pdf(d1)
+                / (inputs.forward * inputs.sigma * inputs.time_to_expiry.sqrt())
         };
 
         // Scale by notional and annuity for cash gamma

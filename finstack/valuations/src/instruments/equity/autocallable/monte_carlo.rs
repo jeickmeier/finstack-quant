@@ -243,9 +243,14 @@ impl Payoff for AutocallablePayoff {
             FinalPayoffType::KnockInPut { strike } => {
                 let barrier_level = self.initial_spot * self.final_barrier;
                 if self.min_spot_observed <= barrier_level {
+                    // Knocked in: the note holder is short a down-and-in put, so
+                    // they receive principal reduced by the put loss, floored at
+                    // zero — NOT the bare put intrinsic. A knocked-in path ending
+                    // at-the-money returns full principal (put worth ~0).
                     let strike_ratio = strike / self.initial_spot;
                     let spot_ratio = self.final_spot / self.initial_spot;
-                    (strike_ratio - spot_ratio).max(0.0)
+                    let put_loss = (strike_ratio - spot_ratio).max(0.0);
+                    (1.0 - put_loss).max(0.0)
                 } else {
                     1.0
                 }
@@ -452,10 +457,13 @@ mod tests {
         payoff.on_event(&mut state);
 
         let value = payoff.value(Currency::USD);
-        let expected = 0.45 * notional;
+        // Knocked in at spot=55, strike=100, S0=100: put loss = max(1.0 - 0.55, 0)
+        // = 0.45, and the note pays principal - put_loss = 1.0 - 0.45 = 0.55.
+        let expected = 0.55 * notional;
         assert!(
             (value.amount() - expected).abs() < 1e-6,
-            "A 60% final barrier should knock in when spot hits 55 on a 100 initial spot; got {}",
+            "A 60% final barrier should knock in when spot hits 55 on a 100 initial spot, \
+             paying principal minus the put loss (0.55 x notional); got {}",
             value.amount()
         );
     }

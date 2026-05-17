@@ -123,6 +123,13 @@ impl CmsSwapPricer {
                     .year_fraction(as_of, fixing_date, DayCountContext::default())?;
 
             let adj = if time_to_fixing > 0.0 {
+                // ASSUMPTION: `vol_surface` must be the swaption volatility
+                // surface for the CMS reference swap tenor (`inst.cms_tenor`),
+                // keyed by (expiry, strike). The lookup below uses
+                // `(time_to_fixing, forward_swap_rate)` — i.e. at-the-money on
+                // the forward swap rate — and the surface has no separate
+                // swap-tenor axis, so the caller must supply the surface that
+                // corresponds to the CMS reference swap tenor.
                 convexity_adjustment(
                     vol_surface.value_clamped(time_to_fixing.max(0.0), forward_swap_rate),
                     time_to_fixing,

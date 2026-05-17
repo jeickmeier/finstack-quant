@@ -1,6 +1,7 @@
 use crate::calibration::api::schema::SurfaceExtrapolationPolicy;
 use crate::calibration::api::schema::VolSurfaceParams;
 use crate::calibration::config::CalibrationConfig;
+use crate::calibration::validation::ValidationConfig;
 use crate::calibration::CalibrationReport;
 use crate::instruments::common_impl::models::{SABRCalibrator, SABRModel, SABRParameters};
 use crate::market::quotes::market_quote::MarketQuote;
@@ -12,6 +13,7 @@ use finstack_core::Result;
 use std::collections::BTreeMap;
 
 use crate::calibration::constants::OrderedF64;
+use crate::calibration::validation::surfaces::SurfaceValidator;
 
 /// Bootstrapper for calibrating option volatility surfaces.
 ///
@@ -66,12 +68,21 @@ impl VolSurfaceTarget {
             )));
         }
 
-        // Filter quotes
+        // Filter quotes. Only ingest `OptionVol` quotes whose underlying
+        // matches `params.underlying_ticker` — without this filter the SABR
+        // surface would pool quotes from unrelated underlyings into the same
+        // expiry bucket (mirrors the SVI target's ticker filter).
         let vol_quotes: Vec<&VolQuote> = quotes
             .iter()
             .filter_map(|q| match q {
                 MarketQuote::Vol(vq) => Some(vq),
                 _ => None,
+            })
+            .filter(|vq| match vq {
+                VolQuote::OptionVol { underlying, .. } => {
+                    underlying.as_str() == params.underlying_ticker.as_str()
+                }
+                VolQuote::SwaptionVol { .. } | VolQuote::CapFloorVol { .. } => false,
             })
             .collect();
 
@@ -252,6 +263,26 @@ impl VolSurfaceTarget {
             &grid,
         )?;
 
+        // Sanity-check the produced grid for calendar-spread and butterfly
+        // arbitrage. Mirrors the SVI surface target: the validators operate
+        // on a generic vol grid so they are reusable for SABR-calibrated
+        // surfaces. `lenient_arbitrage = true` keeps a borderline surface
+        // from hard-failing the calibration pipeline; any violation is
+        // surfaced as a diagnostic on the report so strict-mode callers can
+        // promote it to an error.
+        let validation_cfg = ValidationConfig {
+            lenient_arbitrage: true,
+            ..ValidationConfig::default()
+        };
+        let calendar_warning = surface
+            .validate_calendar_spread(&validation_cfg)
+            .err()
+            .map(|e| format!("SABR calendar-spread arbitrage: {e}"));
+        let butterfly_warning = surface
+            .validate_butterfly_spread(&validation_cfg)
+            .err()
+            .map(|e| format!("SABR butterfly-spread arbitrage: {e}"));
+
         let calibrated_expiries: Vec<String> = sabr_params_by_expiry
             .keys()
             .map(|k| format!("{:.6}", k.into_inner()))
@@ -288,6 +319,16 @@ impl VolSurfaceTarget {
         }
 
         report.update_solver_config(config.solver.clone());
+
+        // Surface arbitrage warnings on the report so callers can detect them.
+        let warnings: Vec<String> = [calendar_warning, butterfly_warning]
+            .into_iter()
+            .flatten()
+            .collect();
+        if !warnings.is_empty() {
+            report.validation_passed = false;
+            report.validation_error = Some(warnings.join("; "));
+        }
 
         Ok((surface, report))
     }

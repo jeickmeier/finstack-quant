@@ -476,11 +476,11 @@ impl Swaption {
             )));
         }
 
-        let month_delta = (self.swap_end.year() - self.swap_start.year()) * 12
-            + i32::from(self.swap_end.month() as u8)
-            - i32::from(self.swap_start.month() as u8);
-        let day_delta = f64::from(self.swap_end.day()) - f64::from(self.swap_start.day());
-        Ok(f64::from(month_delta) / 12.0 + day_delta / 365.0)
+        // Use a proper day-count year fraction over [swap_start, swap_end]
+        // rather than an ad-hoc 30-day-month / ACT-365 mix. This value feeds
+        // the vol-surface tenor axis, so it must be consistent with the rest
+        // of the instrument's day-count conventions.
+        year_fraction(self.day_count, self.swap_start, self.swap_end)
     }
 
     /// Set the cash settlement annuity method.
@@ -549,10 +549,12 @@ impl Swaption {
         let strike = self.strike_f64()?;
         let forward = self.forward_swap_rate(curves, as_of)?;
         if forward <= 0.0 || strike <= 0.0 {
-            return Err(finstack_core::Error::Validation(format!(
-                "Black swaption pricing requires positive forward and strike, got forward={} strike={}",
-                forward, strike
-            )));
+            // Black (lognormal) pricing is undefined for a non-positive forward
+            // or strike. In negative-rate regimes (EUR/JPY/CHF) fall back to the
+            // Bachelier (normal) model, which prices negative rates natively.
+            // The supplied `volatility` is interpreted as a normal vol on this
+            // path, consistent with negative-rate market quoting.
+            return self.price_normal(curves, volatility, as_of);
         }
 
         self.price_model_base(curves, volatility, as_of, |fwd, strike, vol, t, annuity| {

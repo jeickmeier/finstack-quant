@@ -315,7 +315,9 @@ fn test_vega_matches_formula() {
     let vega = *result.measures.get(MetricId::Vega.as_str()).unwrap();
 
     // Assert
-    let remaining_fraction = 1.0 - observation_weight(&swap, as_of);
+    // Vega must differentiate the same PV as `compute_pv`, which uses the
+    // day-count `time_elapsed_fraction` (W-32), not an observation-count weight.
+    let remaining_fraction = 1.0 - swap.time_elapsed_fraction(as_of);
     let t = swap
         .day_count
         .year_fraction(as_of, swap.maturity, Default::default())
@@ -383,7 +385,9 @@ fn test_variance_vega_matches_formula() {
         .unwrap();
 
     // Assert
-    let remaining_fraction = 1.0 - observation_weight(&swap, as_of);
+    // Variance vega uses the day-count `time_elapsed_fraction` (W-32) to stay
+    // consistent with `compute_pv`, not an observation-count weight.
+    let remaining_fraction = 1.0 - swap.time_elapsed_fraction(as_of);
     let t = swap
         .day_count
         .year_fraction(as_of, swap.maturity, Default::default())

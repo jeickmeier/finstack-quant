@@ -10,8 +10,10 @@ pub(crate) struct VarianceVegaCalculator;
 impl MetricCalculator for VarianceVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let swap = context.instrument_as::<VarianceSwap>()?;
-        // Remaining fraction and discounting like vega
-        let remaining_fraction = 1.0 - swap.realized_fraction_by_observations(context.as_of);
+        // Remaining fraction and discounting like vega. Uses the day-count
+        // `time_elapsed_fraction` to stay consistent with `compute_pv` (W-32),
+        // not an observation-count fraction.
+        let remaining_fraction = 1.0 - swap.time_elapsed_fraction(context.as_of);
         let t = swap
             .day_count
             .year_fraction(context.as_of, swap.maturity, Default::default())?;

@@ -352,6 +352,22 @@ impl SwapFrequency {
 const KAPPA_MIN: f64 = 0.001;
 const KAPPA_MAX: f64 = 1.0;
 
+/// Short-rate volatility bounds enforced as native LM box constraints in
+/// log-space.
+///
+/// **Lower bound (`1e-5`):** 0.1 bp of annualised short-rate volatility — far
+/// below any economically meaningful HW1F calibration but strictly positive,
+/// so the log-space parameter `ln σ` stays finite. A smaller σ would make the
+/// model degenerate (deterministic short rate) and the vega-scaled residual
+/// ill-conditioned.
+///
+/// **Upper bound (`2.0`):** 200% annualised short-rate volatility. No realistic
+/// rates market calibration approaches this; the cap simply keeps LM iterates
+/// (and multi-start perturbations) from wandering into a regime where the
+/// Jamshidian decomposition loses numerical accuracy.
+const SIGMA_MIN: f64 = 1e-5;
+const SIGMA_MAX: f64 = 2.0;
+
 /// Vega floor: 1 bp of annuity-year. Protects against division by a
 /// near-zero vega at extreme expiries or zero quoted vol.
 ///
@@ -487,6 +503,21 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
         format!("{}Yx{}Y", quote.expiry, quote.tenor)
     }
+
+    /// Log-space lower bounds `[ln(KAPPA_MIN), ln(SIGMA_MIN)]`.
+    ///
+    /// Enforced during the solve so κ cannot approach 0⁺ — at which point
+    /// `B(t,T) = (1 − e^{−κτ})/κ` and the integrated-variance factor blow up.
+    /// Previously `KAPPA_MAX` was only checked post-solve and there was no
+    /// lower κ bound active during iteration.
+    fn lower_bounds(&self) -> Option<Vec<f64>> {
+        Some(vec![KAPPA_MIN.ln(), SIGMA_MIN.ln()])
+    }
+
+    /// Log-space upper bounds `[ln(KAPPA_MAX), ln(SIGMA_MAX)]`.
+    fn upper_bounds(&self) -> Option<Vec<f64>> {
+        Some(vec![KAPPA_MAX.ln(), SIGMA_MAX.ln()])
+    }
 }
 
 /// Pre-computed market data for one cap/floor quote.
@@ -574,6 +605,19 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
             if quote.is_cap { "cap" } else { "floor" },
             quote.strike
         )
+    }
+
+    /// Log-space lower bounds `[ln(KAPPA_MIN), ln(SIGMA_MIN)]`.
+    ///
+    /// Enforced during the solve so κ cannot approach 0⁺ — at which point
+    /// `B(t,T) = (1 − e^{−κτ})/κ` and the integrated-variance factor blow up.
+    fn lower_bounds(&self) -> Option<Vec<f64>> {
+        Some(vec![KAPPA_MIN.ln(), SIGMA_MIN.ln()])
+    }
+
+    /// Log-space upper bounds `[ln(KAPPA_MAX), ln(SIGMA_MAX)]`.
+    fn upper_bounds(&self) -> Option<Vec<f64>> {
+        Some(vec![KAPPA_MAX.ln(), SIGMA_MAX.ln()])
     }
 }
 

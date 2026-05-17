@@ -24,6 +24,7 @@ use finstack_core::{Error, Result};
 ///
 /// - **Finite differences** (default): More robust, works for all parameter ranges
 /// - **Analytical**: Faster but may have numerical issues at parameter boundaries
+#[derive(Clone)]
 pub struct SABRCalibrator {
     /// Tolerance for calibration convergence.
     ///

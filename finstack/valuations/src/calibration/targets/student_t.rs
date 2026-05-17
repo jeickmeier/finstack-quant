@@ -255,6 +255,14 @@ impl StudentTTarget {
             bracket_solve_1d_with_diagnostics(&objective, initial_df, &scan, tolerance, max_iters)?;
 
         // Determine result.
+        //
+        // On non-convergence we return `Err` rather than `Ok` with an
+        // uncalibrated fallback `df`: the previous behaviour stored the
+        // fallback in the context and direct callers (those not routed through
+        // the engine's `fail_on_bad_fit` check) silently received a bad
+        // parameter. Returning `Err` makes the failure impossible to ignore —
+        // it propagates through `StudentTTarget::solve` and the `?` in
+        // `step_runtime.rs`.
         let (calibrated_df, success, reason) = match root {
             Some(df) if df.is_finite() && df > 2.0 => {
                 let residual = objective(df);
@@ -265,26 +273,24 @@ impl StudentTTarget {
                         format!("Student-t df calibration converged: df={:.4}", df),
                     )
                 } else {
-                    (
-                        df,
-                        false,
-                        format!(
-                            "Student-t df calibration: best df={:.4} but residual {:.2e} exceeds tolerance {:.2e}",
+                    return Err(finstack_core::Error::Calibration {
+                        message: format!(
+                            "Student-t df calibration failed: best df={:.4} but residual {:.2e} exceeds tolerance {:.2e}",
                             df, residual.abs(), tolerance
                         ),
-                    )
+                        category: "student_t_df".to_string(),
+                    });
                 }
             }
             _ => {
                 let fallback_df = diagnostics.best_point.unwrap_or(initial_df);
-                (
-                    fallback_df,
-                    false,
-                    format!(
-                        "Student-t df calibration failed to converge (bracket_found={}, fallback df={:.4})",
+                return Err(finstack_core::Error::Calibration {
+                    message: format!(
+                        "Student-t df calibration failed to converge (bracket_found={}, best df={:.4})",
                         diagnostics.bracket_found, fallback_df
                     ),
-                )
+                    category: "student_t_df".to_string(),
+                });
             }
         };
 

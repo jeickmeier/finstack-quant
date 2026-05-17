@@ -213,7 +213,7 @@ mod tests {
             .amount();
 
         let annuity = call.annuity(&market, as_of).expect("annuity");
-        let forward = call.forward_swap_rate(&market).expect("forward");
+        let forward = call.forward_swap_rate(&market, as_of).expect("forward");
         let parity_rhs = annuity * (forward - strike) * call.notional;
 
         let diff = (call_pv - put_pv) - parity_rhs;
@@ -243,7 +243,7 @@ mod tests {
             .expect("pricing should succeed");
 
         let annuity = swaption.annuity(&market, as_of).expect("annuity");
-        let forward = swaption.forward_swap_rate(&market).expect("forward");
+        let forward = swaption.forward_swap_rate(&market, as_of).expect("forward");
         let expected_intrinsic = (forward - strike).max(0.0) * annuity * swaption.notional;
 
         assert!(

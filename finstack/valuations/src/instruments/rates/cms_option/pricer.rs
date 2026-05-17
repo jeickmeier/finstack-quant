@@ -123,7 +123,14 @@ impl CmsOptionPricer {
                 inst.day_count
                     .year_fraction(as_of, fixing_date, DayCountContext::default())?;
 
-            // Get volatility from surface
+            // Get volatility from surface.
+            //
+            // ASSUMPTION: `vol_surface` must be the swaption volatility surface
+            // for the CMS reference swap tenor (`inst.cms_tenor`), keyed by
+            // (expiry, strike). The lookup uses `(time_to_fixing, strike)`;
+            // the surface has no separate swap-tenor axis, so the caller is
+            // responsible for supplying the surface that corresponds to the
+            // CMS reference swap tenor.
             let vol = vol_surface.value_clamped(time_to_fixing.max(0.0), strike);
 
             // Convexity adjustment using Hagan (2003) formula with forward rate
@@ -278,16 +285,27 @@ pub(crate) fn compute_pv(inst: &CmsOption, curves: &MarketContext, as_of: Date) 
 ///
 /// # Formula
 ///
-/// Per Hagan (2003) "Convexity Conundrums", the adjustment is:
+/// The CMS-adjusted forward is `E^{T_pay}[S] = F + CA`. To first order in the
+/// swap-rate variance, the Hagan (2003) standard-model adjustment is:
 ///
 /// ```text
-/// Convexity_Adjustment = 0.5 * σ² * T * G(S)
-/// where G(S) = ∂²(1/A(S))/∂S² ≈ swap_tenor / (1 + S * swap_tenor)²
+/// CA ≈ (g'(F) / g(F)) · Var^A[S] ≈ (g'(F) / g(F)) · F² · σ² · T
 /// ```
 ///
-/// The G(S) term represents the sensitivity of the inverse annuity to the
-/// swap rate. Using the actual forward rate rather than a hardcoded value
-/// ensures the adjustment is state-dependent and more accurate.
+/// where `g(k) = DF_pay / A_par(k)` is the Radon-Nikodym derivative between the
+/// payment measure and the annuity measure. Because `DF_pay` is independent of
+/// `k`, `g'(F)/g(F) = −A_par'(F)/A_par(F)`. The bracket `g'/g` has units of
+/// `1/rate`, so `CA = (g'/g)·F²·σ²T` has units of a rate — dimensionally
+/// consistent.
+///
+/// The earlier `0.5·σ²T·G(S)` form with `G(S) = swap_tenor/(1+S·tenor)²` was
+/// dimensionally wrong: `G(S)` carries units of *years*, so the result was not
+/// a rate and was oversized by one-to-two orders of magnitude.
+///
+/// The fixed-leg payment frequency is assumed semi-annual (`m = 2`), the
+/// dominant market convention. Callers needing the exact schedule should use
+/// the static-replication pricer (`replication_pricer`,
+/// `ModelKey::StaticReplication`), which captures convexity to all orders.
 ///
 /// # Arguments
 ///
@@ -298,23 +316,50 @@ pub(crate) fn compute_pv(inst: &CmsOption, curves: &MarketContext, as_of: Date) 
 ///
 /// # Returns
 ///
-/// Convexity adjustment to add to forward swap rate (in decimal form)
+/// Convexity adjustment to add to the forward swap rate (decimal form).
 ///
 /// # References
 ///
 /// - Hagan, P. S. (2003). "Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors."
 ///   Wilmott Magazine, March, 38-44.
+/// - Andersen, L. B., & Piterbarg, V. V. (2010). *Interest Rate Modeling*, Vol. 3, §16.2.
 pub fn convexity_adjustment(
     volatility: f64,
     time_to_fixing: f64,
     swap_tenor: f64,
     forward_rate: f64,
 ) -> f64 {
-    // G(S) = swap_tenor / (1 + S * swap_tenor)²
-    // This approximates the second derivative of 1/Annuity with respect to swap rate
-    let denominator = 1.0 + forward_rate * swap_tenor;
-    let annuity_sensitivity = swap_tenor / (denominator * denominator);
+    /// Assumed fixed-leg payment frequency (semi-annual market convention).
+    const PAYMENTS_PER_YEAR: f64 = 2.0;
 
-    // Convexity adjustment = 0.5 * σ² * T * G(S)
-    0.5 * volatility * volatility * time_to_fixing * annuity_sensitivity
+    if forward_rate <= 0.0 || time_to_fixing <= 0.0 || swap_tenor <= 0.0 {
+        return 0.0;
+    }
+
+    let a_par = |k: f64| par_annuity_proxy(k, swap_tenor, PAYMENTS_PER_YEAR);
+    let a0 = a_par(forward_rate);
+    if a0.abs() < 1e-12 {
+        return 0.0;
+    }
+
+    // g'(F)/g(F) = −A_par'(F)/A_par(F), with A_par' via a central difference.
+    let h = (forward_rate * 1e-4).max(1e-7);
+    let a_prime = (a_par(forward_rate + h) - a_par(forward_rate - h)) / (2.0 * h);
+    let g_log_deriv = -a_prime / a0;
+
+    g_log_deriv * forward_rate * forward_rate * volatility * volatility * time_to_fixing
+}
+
+/// Closed-form par annuity for a fixed-rate swap.
+///
+/// `A_par(k) = (1 − (1 + k/m)^(−n·m)) / k` for `k > 0`, with the L'Hôpital
+/// limit `A_par(0) = n`. This is the same closed form used by the CMS
+/// static-replication pricer.
+fn par_annuity_proxy(rate: f64, tenor_years: f64, m: f64) -> f64 {
+    if rate.abs() < 1e-12 {
+        return tenor_years;
+    }
+    let nm = tenor_years * m;
+    let discount = (1.0 + rate / m).powf(-nm);
+    (1.0 - discount) / rate
 }

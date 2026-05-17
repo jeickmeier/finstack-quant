@@ -57,28 +57,24 @@ impl MetricCalculator for DeltaCalculator {
             return Ok(intrinsic_delta * option.notional.amount() * inputs.annuity);
         }
 
-        let delta = match option.vol_model {
-            VolatilityModel::Black => {
-                if inputs.forward <= 0.0 || strike <= 0.0 {
-                    return Err(finstack_core::Error::Validation(format!(
-                        "Black swaption delta requires positive forward and strike, got forward={} strike={}",
-                        inputs.forward, strike
-                    )));
-                }
-                use crate::instruments::common_impl::models::d1_black76;
-                let d1 = d1_black76(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
-                match option.option_type {
-                    OptionType::Call => finstack_core::math::norm_cdf(d1),
-                    OptionType::Put => -finstack_core::math::norm_cdf(-d1),
-                }
+        // Black (lognormal) Greeks are undefined for non-positive forward or
+        // strike; fall back to Bachelier (normal) for negative-rate regimes.
+        let use_normal = matches!(option.vol_model, VolatilityModel::Normal)
+            || inputs.forward <= 0.0
+            || strike <= 0.0;
+        let delta = if use_normal {
+            use crate::instruments::common_impl::models::volatility::normal::d_bachelier;
+            let d = d_bachelier(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
+            match option.option_type {
+                OptionType::Call => finstack_core::math::norm_cdf(d),
+                OptionType::Put => -finstack_core::math::norm_cdf(-d),
             }
-            VolatilityModel::Normal => {
-                use crate::instruments::common_impl::models::volatility::normal::d_bachelier;
-                let d = d_bachelier(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
-                match option.option_type {
-                    OptionType::Call => finstack_core::math::norm_cdf(d),
-                    OptionType::Put => -finstack_core::math::norm_cdf(-d),
-                }
+        } else {
+            use crate::instruments::common_impl::models::d1_black76;
+            let d1 = d1_black76(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
+            match option.option_type {
+                OptionType::Call => finstack_core::math::norm_cdf(d1),
+                OptionType::Put => -finstack_core::math::norm_cdf(-d1),
             }
         };
 

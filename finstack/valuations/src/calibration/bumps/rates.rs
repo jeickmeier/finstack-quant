@@ -63,6 +63,8 @@ pub fn bump_discount_curve(
     let market_quotes: Vec<MarketQuote> =
         bumped_quotes.into_iter().map(MarketQuote::Rates).collect();
     let step = StepParams::Discount(params.clone());
+    // Re-calibration uses the default CalibrationConfig — see the "Calibration
+    // config — known limitation" note in this module's docs (`bumps/mod.rs`).
     let cfg = CalibrationConfig::default();
     let (ctx, _report) =
         step_runtime::execute_params_and_apply(&step, &market_quotes, base_context, &cfg)?;

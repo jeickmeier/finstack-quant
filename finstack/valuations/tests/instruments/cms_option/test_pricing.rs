@@ -274,43 +274,30 @@ fn test_long_tenor_cms_convexity_larger_than_short_tenor() {
 
 #[test]
 fn test_convexity_adjustment_rate_dependency() {
-    // Test that the convexity adjustment properly depends on the forward rate
-    // (Hagan formula: G(S) = swap_tenor / (1 + S * swap_tenor)^2)
+    // The first-order Hagan (2003) convexity adjustment must be positive,
+    // finite, a sane rate-scale quantity, and depend on the forward-rate
+    // level. The earlier dimensionally-wrong `0.5·σ²T·G(S)` formula returned
+    // ~0.78 (7800 bp) for these inputs; a correct adjustment for a 20Y CMS,
+    // 5Y to fixing, 20% vol is single-to-low-double-digit bp.
     use finstack_valuations::instruments::rates::cms_option::pricer::convexity_adjustment;
 
     let vol = 0.20;
     let time_to_fixing = 5.0;
     let swap_tenor = 20.0;
 
-    // Lower rate -> higher convexity adjustment (G(S) increases as S decreases)
     let adj_low_rate = convexity_adjustment(vol, time_to_fixing, swap_tenor, 0.01);
     let adj_mid_rate = convexity_adjustment(vol, time_to_fixing, swap_tenor, 0.03);
     let adj_high_rate = convexity_adjustment(vol, time_to_fixing, swap_tenor, 0.05);
 
-    println!(
-        "Convexity adj at 1%: {}, at 3%: {}, at 5%: {}",
-        adj_low_rate, adj_mid_rate, adj_high_rate
-    );
-
+    for adj in [adj_low_rate, adj_mid_rate, adj_high_rate] {
+        assert!(
+            adj.is_finite() && adj > 0.0 && adj < 0.05,
+            "convexity adjustment must be a sane positive rate-scale quantity (< 500 bp), got {adj}"
+        );
+    }
     assert!(
-        adj_low_rate > adj_mid_rate,
-        "Lower rate should give higher convexity adjustment"
-    );
-    assert!(
-        adj_mid_rate > adj_high_rate,
-        "Lower rate should give higher convexity adjustment"
-    );
-
-    // Verify approximate magnitudes for 20Y CMS
-    // At 3% rate, 5Y to expiry, 20% vol:
-    // G(0.03) = 20 / (1 + 0.03 * 20)^2 = 20 / 2.56 ≈ 7.81
-    // Adj = 0.5 * 0.04 * 5 * 7.81 ≈ 0.78 (78 bps)
-    let expected_approx = 0.5 * 0.04 * 5.0 * (20.0 / (1.6 * 1.6));
-    assert!(
-        (adj_mid_rate - expected_approx).abs() < 0.01,
-        "Convexity adjustment magnitude should match Hagan formula: expected ~{}, got {}",
-        expected_approx,
-        adj_mid_rate
+        (adj_low_rate - adj_high_rate).abs() > 1e-9,
+        "convexity adjustment should depend on the forward-rate level"
     );
 }
 

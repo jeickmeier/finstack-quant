@@ -687,6 +687,17 @@ impl YoYInflationSwap {
     }
 
     /// Calculates the raw present value (f64) of the YoY inflation swap.
+    ///
+    /// # Model limitation — no YoY convexity / timing adjustment
+    ///
+    /// The year-on-year inflation leg is valued with the deterministic ratio
+    /// `F(CPI_end) / F(CPI_start) − 1`. Under the payment measure the true
+    /// expectation `E^{T_pay}[CPI(tᵢ)/CPI(tᵢ₋₁)]` differs from
+    /// `F(tᵢ)/F(tᵢ₋₁)` by a convexity/timing correction that depends on
+    /// inflation volatility and the rate–inflation correlation (Brigo-Mercurio
+    /// Ch. 16; Mercurio 2005). This implementation omits that correction, so
+    /// for long-dated YoY swaps it carries a few-bp-to-material bias. Use a
+    /// stochastic-inflation model where that bias is unacceptable.
     pub fn npv_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
         let disc = curves.get_discount(self.discount_curve_id.as_str())?;
         let mut pv = 0.0_f64;

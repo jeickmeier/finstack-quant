@@ -124,14 +124,11 @@ pub mod numerical {
     /// O(0.01) to O(0.1), so relative precision matters more).
     pub const RATE_COMPARISON_TOLERANCE: f64 = 1e-12;
 
-    /// Small epsilon to prevent division by zero.
-    ///
-    /// Add to denominators when there's risk of division by zero:
-    /// `result = numerator / (denominator + DIVISION_EPSILON)`.
-    ///
-    /// Value: 1e-15 (close to but above f64 machine epsilon to ensure
-    /// the addition is numerically meaningful).
-    pub const DIVISION_EPSILON: f64 = 1e-15;
+    // NOTE: A `DIVISION_EPSILON` constant was intentionally removed. The
+    // `numerator / (denominator + epsilon)` idiom it encouraged is a weak
+    // guard — for a denominator of exactly 0 it still yields `numerator * 1e15`
+    // (garbage) rather than a clean error. Guard small denominators with an
+    // explicit `if denom.abs() < tol { ... }` check instead.
 
     /// Minimum threshold for discount factor values to avoid numerical instability.
     ///

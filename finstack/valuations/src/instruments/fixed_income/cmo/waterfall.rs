@@ -107,10 +107,17 @@ pub fn execute_waterfall_with_principal_breakdown(
     let mut remaining_principal = scheduled_principal + prepayment_principal;
     let mut remaining_interest = available_interest;
 
-    // First pass: distribute interest to interest-bearing tranches
+    // First pass: distribute interest to interest-bearing tranches.
+    // Iterate in ascending `priority` order (lower priority value = paid
+    // first) so that on an interest shortfall senior tranches are paid
+    // before juniors, matching the principal pass which sorts by priority.
+    // Use a stable sort so tranches sharing a priority keep insertion order.
     let mut interest_allocations: HashMap<String, f64> = HashMap::default();
 
-    for tranche in &waterfall.tranches {
+    let mut interest_order: Vec<&CmoTranche> = waterfall.tranches.iter().collect();
+    interest_order.sort_by_key(|t| t.priority);
+
+    for tranche in interest_order {
         if tranche.is_interest_bearing() && tranche.current_face.amount() > 0.0 {
             // Interest = balance × coupon / 12
             let monthly_interest = tranche.current_face.amount() * tranche.coupon / 12.0;

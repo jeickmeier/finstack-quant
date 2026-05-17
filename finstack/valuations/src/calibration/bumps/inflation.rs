@@ -128,6 +128,8 @@ pub fn bump_inflation_rates(
         seasonal_factors: None,
     };
 
+    // Re-calibration uses the default CalibrationConfig — see the "Calibration
+    // config — known limitation" note in this module's docs (`bumps/mod.rs`).
     let cfg = CalibrationConfig::default();
     let step = StepParams::Inflation(params.clone());
     let (ctx, _report) =

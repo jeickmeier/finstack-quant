@@ -78,6 +78,26 @@ impl ParametricCurveTarget {
     }
 
     /// Build the sample time grid from a set of prepared quotes.
+    ///
+    /// # Interpolation-error control
+    ///
+    /// [`Self::calculate_residuals`] prices the calibration instruments not
+    /// against the [`ParametricCurve`] itself, but against a knot-interpolated
+    /// `DiscountCurve` rebuilt from this grid. (The instrument pricers resolve
+    /// their discount source via `MarketContext::get_discount`, which performs
+    /// a strict `DiscountCurve` type check and would reject a `ParametricCurve`
+    /// inserted under the same ID — pricing directly against the parametric
+    /// model would require a discounting abstraction the pricers do not yet
+    /// expose.)
+    ///
+    /// Any gap between sample knots is therefore filled by the discount
+    /// curve's interpolation, and that interpolation error contaminates every
+    /// residual. To keep this error well below `validation_tolerance`, the
+    /// grid is densified to **monthly** (1/12-year) knots out to the longest
+    /// instrument maturity. Monthly spacing drives the cubic/log-linear
+    /// interpolation error far below the `1e-3` parametric least-squares
+    /// tolerance floor, so the reported fit reflects the true NS/NSS model
+    /// rather than the interpolant.
     fn build_sample_times(quotes: &[CalibrationQuote]) -> Vec<f64> {
         let mut times = vec![0.0];
         for q in quotes {
@@ -89,10 +109,13 @@ impl ParametricCurveTarget {
         times.sort_by(|a, b| a.total_cmp(b));
         times.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
         let max_t = times.last().copied().unwrap_or(30.0);
-        let mut t = 0.5;
+        // Monthly knots: dense enough that knot-interpolation error is
+        // negligible relative to the parametric least-squares tolerance floor.
+        const KNOT_STEP_YEARS: f64 = 1.0 / 12.0;
+        let mut t = KNOT_STEP_YEARS;
         while t < max_t {
             times.push(t);
-            t += 0.5;
+            t += KNOT_STEP_YEARS;
         }
         times.sort_by(|a, b| a.total_cmp(b));
         times.dedup_by(|a, b| (*a - *b).abs() < 1e-10);

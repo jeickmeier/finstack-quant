@@ -18,8 +18,11 @@ impl MetricCalculator for VegaCalculator {
             .map(|v| v.sqrt())
             .unwrap_or_else(|_| swap.strike_variance.sqrt());
 
-        // Remaining fraction of observations
-        let remaining_fraction = 1.0 - swap.realized_fraction_by_observations(context.as_of);
+        // Remaining fraction of the variance accrual period. Must match the
+        // day-count `time_elapsed_fraction` used by `compute_pv` (W-32) so vega
+        // differentiates the same PV; an observation-count fraction diverges for
+        // non-uniform (e.g. weekend-skipping) schedules.
+        let remaining_fraction = 1.0 - swap.time_elapsed_fraction(context.as_of);
 
         // Discount factor to maturity
         let t = swap

@@ -19,6 +19,22 @@
 //! Rate/spread bumps are specified in basis points. Vol bumps use
 //! `VolBumpRequest` because the semantics differ (absolute vol points vs
 //! relative shifts) — see that type for details.
+//!
+//! # Calibration config — known limitation
+//!
+//! Every bump re-calibrates with `CalibrationConfig::default()`, **not** the
+//! `CalibrationConfig` used to build the original curve. If the original curve
+//! was calibrated with non-default settings (custom solver tolerance, weighting
+//! scheme, `allow_non_monotonic_final`, or solver method), the bumped curve is
+//! recalibrated under different settings, so the bump delta conflates the
+//! market shock with a calibration-config change.
+//!
+//! The original config cannot currently be threaded here: it is not retained on
+//! the calibrated curve, and `CalibrationConfig` lives in `finstack-valuations`
+//! while the curve types live in `finstack-core`, so a curve cannot carry it
+//! without a cross-crate type relocation. Callers that require exact bump
+//! consistency should calibrate with the default config, or recompute risk
+//! through a path that re-runs the original calibration plan.
 
 mod currency;
 pub(crate) mod hazard;

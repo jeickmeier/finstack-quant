@@ -225,7 +225,10 @@ fn test_delta_volatility_independence() {
 }
 
 #[test]
-fn test_delta_errors_for_invalid_black_domain() {
+fn test_delta_falls_back_to_bachelier_for_negative_forward() {
+    // A negative forward swap rate is undefined for the Black (lognormal)
+    // model; the delta calculator must fall back to the Bachelier (normal)
+    // model rather than erroring, so negative-rate swaptions stay priceable.
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     let market = MarketContext::new()
@@ -233,16 +236,21 @@ fn test_delta_errors_for_invalid_black_domain() {
         .insert(build_flat_forward_curve(-0.005, as_of, "USD_LIBOR_3M"))
         .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_SWAPTION_VOL"));
 
-    let err = swaption
+    let result = swaption
         .price_with_metrics(
             &market,
             as_of,
             &[MetricId::Delta],
             finstack_valuations::instruments::PricingOptions::default(),
         )
-        .expect_err("delta should error for invalid unshifted Black domain");
+        .expect("delta should fall back to Bachelier for a negative forward");
+    let delta = result
+        .measures
+        .get(MetricId::Delta.as_str())
+        .copied()
+        .expect("delta measure should be present");
     assert!(
-        err.to_string().contains("Black"),
-        "expected Black-domain error, got: {err}"
+        delta.is_finite(),
+        "Bachelier-fallback delta should be finite, got {delta}"
     );
 }

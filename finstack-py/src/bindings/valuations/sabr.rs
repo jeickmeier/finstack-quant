@@ -349,11 +349,13 @@ impl PySabrCalibrator {
     }
 
     /// Override the convergence tolerance.
+    ///
+    /// Preserves all other previously-set fields (e.g. the ``max_iter=200``
+    /// from :meth:`high_precision`) by cloning the existing calibrator and
+    /// only adjusting the tolerance.
     fn with_tolerance(&self, tolerance: f64) -> Self {
         Self {
-            inner: SABRCalibrator::new()
-                .with_tolerance(tolerance)
-                .with_max_iterations(100),
+            inner: self.inner.clone().with_tolerance(tolerance),
         }
     }
 

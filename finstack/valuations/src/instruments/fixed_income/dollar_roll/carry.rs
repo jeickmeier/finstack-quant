@@ -58,8 +58,10 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
     // Dollar-roll carry uses accrued income, not payment-date cashflows,
     // because the payment delay for agency MBS (55–75 days) typically
     // pushes the first payment past the back settlement date.
-    let months_between = ((days as f64) / 30.0).round().max(1.0);
-    let coupon_income = (roll.coupon / 12.0) * months_between * 100.0;
+    // Accrue on the actual roll horizon (ACT/360) rather than rounding to a
+    // whole number of months — a 28-day roll overstated income ~7% under the
+    // previous `round(days/30)` whole-month convention.
+    let coupon_income = roll.coupon * (days as f64 / 360.0) * 100.0;
 
     // Principal paydown: use the model's projection for the roll period.
     let max_months = ((days as f64 / 28.0).ceil() as u32).max(2) + 1;

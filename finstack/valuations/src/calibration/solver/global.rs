@@ -655,7 +655,20 @@ where
     } else {
         solver.solve_system_with_dim_stats(residuals_func, initials, n_residuals)?
     };
-    let solved_params = solution.params;
+    // The LM core (`solve_system_with_dim_stats` / `solve_system_with_jacobian_stats`)
+    // runs without native box constraints: the residual closure clamps a *local*
+    // pricing copy but LM keeps the unclamped iterate. As a result the converged
+    // `solution.params` can land outside the target's `lower_bounds()`/`upper_bounds()`.
+    // Clamp the returned parameters to the bounds here, BEFORE the residuals are
+    // re-evaluated below, so the reported curve and residuals correspond to the
+    // same (in-bounds) parameter set rather than a stale unclamped one.
+    let solved_params = if lb.is_some() || ub.is_some() {
+        let mut clamped = Vec::with_capacity(solution.params.len());
+        clamp_to_bounds(&solution.params, lb, ub, &mut clamped);
+        clamped
+    } else {
+        solution.params
+    };
     let stats = solution.stats;
 
     // Compute weighted L2 norm of the final residuals for comparison.
