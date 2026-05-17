@@ -26,7 +26,32 @@ use super::tree_framework::{
 pub enum TreeType {
     /// Cox-Ross-Rubinstein (standard binomial)
     CRR,
-    /// Jarrow-Rudd (equal probability)
+    /// Jarrow-Rudd (equal-probability) lattice.
+    ///
+    /// Fixes the up/down probability at `p = 0.5` and pushes the drift into
+    /// the lattice factors:
+    ///
+    /// ```text
+    /// u = exp((r - q - sigma^2/2) * dt + sigma * sqrt(dt))
+    /// d = exp((r - q - sigma^2/2) * dt - sigma * sqrt(dt))
+    /// ```
+    ///
+    /// # Known forward-price bias
+    ///
+    /// JR is **not** risk-neutral exact. The one-step expected gross return is
+    ///
+    /// ```text
+    /// 0.5 * (u + d) = exp((r - q) * dt) * exp(-sigma^2 * dt / 2) * cosh(sigma * sqrt(dt))
+    /// ```
+    ///
+    /// Since `exp(-sigma^2*dt/2) * cosh(sigma*sqrt(dt)) = 1 + O(dt^2)`, the
+    /// per-step expected return differs from the true forward `exp((r-q)*dt)`
+    /// by `O(dt^2)`, i.e. an `O(dt)` bias accumulated over the `1/dt` steps of
+    /// the tree. This is a well-known, accepted property of the equal-
+    /// probability scheme (Jarrow & Rudd, 1983), not a defect: the bias
+    /// vanishes as the step count grows and JR retains first-order
+    /// convergence. Use [`TreeType::CRR`] or [`TreeType::Tian`] when an exact
+    /// per-step forward match is required.
     JR,
     /// Leisen-Reimer (improved convergence)
     LeisenReimer,
@@ -267,14 +292,20 @@ impl BinomialTree {
                 (u, d, p)
             }
             TreeType::JR => {
-                // Jarrow-Rudd (equal probability) parameters
+                // Jarrow-Rudd (equal-probability) parameters: p = 0.5 with the
+                // drift carried in u/d. This scheme carries a known O(dt)
+                // cumulative forward-price bias (see `TreeType::JR` docs); that
+                // is an accepted property of the scheme, intentionally NOT
+                // enforced here. We do, however, validate that u/d are finite
+                // and strictly positive — a non-finite or non-positive lattice
+                // factor would silently corrupt every node price.
                 let u = ((r - q - 0.5 * sigma * sigma) * dt + sigma * dt.sqrt()).exp();
                 let d = ((r - q - 0.5 * sigma * sigma) * dt - sigma * dt.sqrt()).exp();
                 let p = 0.5;
 
                 if !(u.is_finite() && d.is_finite() && u > 0.0 && d > 0.0) {
                     return Err(Error::Validation(format!(
-                        "JR parameters invalid: u={u}, d={d}. \
+                        "JR parameters invalid: u={u}, d={d} (must be finite and > 0). \
                          Check parameters: sigma={sigma}, r={r}, q={q}, dt={dt}"
                     )));
                 }
@@ -1303,6 +1334,62 @@ mod tests {
 
         assert!(price.is_finite());
         assert!((price - 10.4506).abs() < 0.25);
+    }
+
+    #[test]
+    fn jarrow_rudd_up_down_factors_are_positive_and_finite() {
+        // JR sets `p = 0.5` and pushes the drift into `u`/`d`. The parameter
+        // builder must validate that the resulting `u`/`d` are finite and
+        // strictly positive (a lattice factor of zero or `inf` would corrupt
+        // every node price). Exercise a spread of market regimes.
+        let tree = BinomialTree::new(256, TreeType::JR);
+        for &(r, q, sigma, t) in &[
+            (0.05, 0.00, 0.20, 1.0),
+            (0.00, 0.08, 0.40, 2.0),
+            (0.10, 0.02, 0.05, 0.25),
+            (-0.01, 0.03, 0.60, 5.0),
+        ] {
+            let (u, d, p) = tree
+                .calculate_parameters(100.0, 100.0, r, sigma, t, q)
+                .expect("JR parameters should be valid");
+            assert!(u.is_finite() && u > 0.0, "u must be finite and >0, got {u}");
+            assert!(d.is_finite() && d > 0.0, "d must be finite and >0, got {d}");
+            assert!((p - 0.5).abs() < 1e-15, "JR probability must be 0.5");
+        }
+    }
+
+    #[test]
+    fn jarrow_rudd_forward_bias_is_small_and_shrinks_with_steps() {
+        // JR is NOT risk-neutral exact: with `p = 0.5` the one-step expected
+        // gross return `0.5*(u + d)` equals `exp((r-q)*dt) * exp(-sigma^2*dt/2)
+        // * cosh(sigma*sqrt(dt))`, which differs from the true forward
+        // `exp((r-q)*dt)` by an `O(dt^2)`-per-step (hence `O(dt)` cumulative)
+        // bias. This test locks that documented behaviour: the per-step bias
+        // is tiny and shrinks quadratically as `dt` shrinks.
+        let (r, q, sigma, t) = (0.05_f64, 0.01_f64, 0.25_f64, 1.0_f64);
+        let true_fwd_growth = (r - q) * t; // log forward over the whole horizon
+
+        let mut prev_bias = f64::INFINITY;
+        for &steps in &[50_usize, 100, 200, 400] {
+            let tree = BinomialTree::new(steps, TreeType::JR);
+            let (u, d, p) = tree
+                .calculate_parameters(100.0, 100.0, r, sigma, t, q)
+                .expect("JR parameters valid");
+            // Expected gross return per step under the JR measure.
+            let step_return = p * u + (1.0 - p) * d;
+            // Compounded over all steps, compared with the true forward.
+            let tree_fwd_growth = steps as f64 * step_return.ln();
+            let bias = (tree_fwd_growth - true_fwd_growth).abs();
+            assert!(
+                bias < 1e-2,
+                "JR cumulative forward bias must stay small, got {bias} at {steps} steps"
+            );
+            assert!(
+                bias < prev_bias,
+                "JR forward bias must shrink as steps increase: {bias} !< {prev_bias}"
+            );
+            prev_bias = bias;
+        }
     }
 
     #[test]

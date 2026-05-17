@@ -282,10 +282,32 @@ impl MertonModel {
                 let d_plus = (log_v_h + mu * horizon) / sigma_sqrt_t;
                 let d_minus = (log_v_h - mu * horizon) / sigma_sqrt_t;
 
+                // Black-Cox reflection term `(V/H)^(-2*mu/sigma^2) * N(d_minus)`.
+                // The power factor `(V/H)^exponent` overflows to `+inf` for a
+                // large `|exponent|` (e.g. a strongly negative drift, or a low
+                // vol with a high rate). When `N(d_minus)` simultaneously
+                // underflows to `0` the naive product is `inf * 0 = NaN`,
+                // which would survive the final `clamp(0, 1)`.
+                //
+                // The Gaussian tail `N(d_minus)` decays as `exp(-d_minus^2/2)`,
+                // which dominates the (at most exponential-in-`d_minus`) power
+                // factor, so the term tends to `0` whenever `N(d_minus)` does.
+                // Guard that case, then evaluate the surviving product in
+                // log-space so a genuinely large term overflows cleanly to
+                // `+inf` (and clamps to `1`) instead of producing a `NaN`.
                 let exponent = -2.0 * mu / (sigma * sigma);
-                let ratio_term = (self.asset_value / h).powf(exponent);
+                let nd_minus = norm_cdf(d_minus);
+                let reflection_term = if nd_minus <= 0.0 {
+                    0.0
+                } else {
+                    let log_term = exponent * log_v_h + nd_minus.ln();
+                    log_term.exp()
+                };
 
-                let pd = norm_cdf(-d_plus) + ratio_term * norm_cdf(d_minus);
+                let pd = norm_cdf(-d_plus) + reflection_term;
+                if pd.is_nan() {
+                    return 0.0;
+                }
                 pd.clamp(0.0, 1.0)
             }
         }
@@ -375,12 +397,20 @@ impl MertonModel {
     /// Compute implied equity value and equity volatility from the structural
     /// model (infallible variant).
     ///
-    /// This is the unguarded form of [`try_implied_equity`](Self::try_implied_equity)
-    /// and is only well posed for a solvent firm whose implied equity is
-    /// comfortably positive. For a deeply distressed firm the returned
-    /// `equity_vol` may be non-finite (`inf`/`NaN`); prefer
-    /// [`try_implied_equity`](Self::try_implied_equity), which rejects such
-    /// inputs with a descriptive error.
+    /// # Deprecated
+    ///
+    /// This infallible variant divided the equity volatility by the implied
+    /// equity value, so for a deeply distressed firm whose call-option equity
+    /// collapses to `~0` it returned a non-finite `equity_vol` (`+inf`/`NaN`)
+    /// that silently poisoned downstream calculations. Use
+    /// [`try_implied_equity`](Self::try_implied_equity) instead, which rejects
+    /// the degenerate near-default configuration with a descriptive error.
+    ///
+    /// For backward compatibility this method still returns a value, now
+    /// delegating to [`try_implied_equity`](Self::try_implied_equity): on the
+    /// degenerate branch it returns the (finite, possibly tiny or negative)
+    /// implied `equity` paired with an `equity_vol` of `0.0` rather than a
+    /// non-finite number, so existing callers cannot be poisoned by `inf`.
     ///
     /// # Arguments
     ///
@@ -388,26 +418,41 @@ impl MertonModel {
     ///
     /// # Returns
     ///
-    /// A tuple `(equity_value, equity_vol)`.
+    /// A tuple `(equity_value, equity_vol)`. Both components are always finite.
+    #[deprecated(
+        since = "0.4.1",
+        note = "divides by implied equity and can return a non-finite equity vol for a \
+                distressed firm; use `try_implied_equity`, which returns a `Result`"
+    )]
     pub fn implied_equity(&self, horizon: f64) -> (f64, f64) {
-        let v = self.asset_value;
-        let sigma = self.asset_vol;
-        let b = self.debt_barrier;
-        let r = self.risk_free_rate;
-        let q = self.payout_rate;
-        let sqrt_t = horizon.sqrt();
+        match self.try_implied_equity(horizon) {
+            Ok(result) => result,
+            Err(_) => {
+                // Degenerate near-default configuration: recompute the implied
+                // equity value (which is finite) and report a zero equity vol
+                // instead of the `inf`/`NaN` the raw division would produce.
+                let v = self.asset_value;
+                let sigma = self.asset_vol;
+                let b = self.debt_barrier;
+                let r = self.risk_free_rate;
+                let q = self.payout_rate;
+                let sqrt_t = horizon.sqrt();
 
-        let d1 = ((v / b).ln() + (r - q + 0.5 * sigma * sigma) * horizon) / (sigma * sqrt_t);
-        let d2 = d1 - sigma * sqrt_t;
+                let d1 = ((v / b).ln() + (r - q + 0.5 * sigma * sigma) * horizon)
+                    / (sigma * sqrt_t);
+                let d2 = d1 - sigma * sqrt_t;
 
-        let nd1 = norm_cdf(d1);
-        let nd2 = norm_cdf(d2);
+                let exp_neg_qt = (-q * horizon).exp();
+                let equity =
+                    v * exp_neg_qt * norm_cdf(d1) - b * (-r * horizon).exp() * norm_cdf(d2);
 
-        let exp_neg_qt = (-q * horizon).exp();
-        let equity = v * exp_neg_qt * nd1 - b * (-r * horizon).exp() * nd2;
-        let equity_vol = nd1 * exp_neg_qt * sigma * v / equity;
-
-        (equity, equity_vol)
+                // `equity` may be a tiny positive, zero, or (numerically)
+                // slightly negative value; all are finite. Pair it with a
+                // finite `0.0` vol so no caller can be poisoned by `inf`.
+                let equity = if equity.is_finite() { equity } else { 0.0 };
+                (equity, 0.0)
+            }
+        }
     }
 
     /// KMV calibration: recover asset value and asset volatility from observed
@@ -1149,7 +1194,7 @@ mod tests {
     #[test]
     fn implied_equity_from_known_asset() {
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        let (equity, equity_vol) = m.implied_equity(1.0);
+        let (equity, equity_vol) = m.try_implied_equity(1.0).expect("healthy firm");
         // E should be V*N(d1) - B*e^(-rT)*N(d2)
         assert!(equity > 0.0, "Equity should be positive, got {equity}");
         assert!(
@@ -1166,7 +1211,7 @@ mod tests {
     #[test]
     fn from_equity_recovers_known_values() {
         let m_known = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        let (equity, equity_vol) = m_known.implied_equity(1.0);
+        let (equity, equity_vol) = m_known.try_implied_equity(1.0).expect("healthy firm");
         let m_calibrated = MertonModel::from_equity(equity, equity_vol, 80.0, 0.05, 0.0, 1.0)
             .expect("calibration");
         assert!(
@@ -1312,8 +1357,8 @@ mod tests {
         )
         .expect("valid");
 
-        let (eq_no_q, _) = m_no_q.implied_equity(1.0);
-        let (eq_with_q, _) = m_with_q.implied_equity(1.0);
+        let (eq_no_q, _) = m_no_q.try_implied_equity(1.0).expect("healthy firm");
+        let (eq_with_q, _) = m_with_q.try_implied_equity(1.0).expect("healthy firm");
 
         assert!(
             eq_with_q < eq_no_q,
@@ -1333,7 +1378,7 @@ mod tests {
             AssetDynamics::GeometricBrownian,
         )
         .expect("valid");
-        let (equity, equity_vol) = m_known.implied_equity(1.0);
+        let (equity, equity_vol) = m_known.try_implied_equity(1.0).expect("healthy firm");
 
         let m_cal = MertonModel::from_equity(equity, equity_vol, 80.0, 0.05, 0.02, 1.0)
             .expect("calibration");
@@ -1378,6 +1423,37 @@ mod tests {
         let (equity, equity_vol) = m.try_implied_equity(1.0).expect("healthy firm");
         assert!(equity.is_finite() && equity > 0.0);
         assert!(equity_vol.is_finite() && equity_vol > 0.0);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn implied_equity_infallible_never_returns_non_finite() {
+        // P0-2: the deprecated infallible `implied_equity` previously divided
+        // by `equity`, returning `+inf` for a deeply distressed firm whose
+        // implied call-option equity collapses to ~0. The returned equity vol
+        // must always be finite so it cannot silently poison downstream math.
+        let m = MertonModel::new(1.0, 0.05, 1.0e9, 0.05).expect("valid");
+        let (equity, equity_vol) = m.implied_equity(1.0);
+        assert!(
+            equity.is_finite(),
+            "distressed-firm equity must be finite, got {equity}"
+        );
+        assert!(
+            equity_vol.is_finite(),
+            "distressed-firm equity vol must be finite, not inf/NaN, got {equity_vol}"
+        );
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn implied_equity_infallible_agrees_with_try_for_healthy_firm() {
+        // For a solvent firm the deprecated infallible variant must return
+        // exactly what `try_implied_equity` returns.
+        let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
+        let (eq_inf, vol_inf) = m.implied_equity(1.0);
+        let (eq_try, vol_try) = m.try_implied_equity(1.0).expect("healthy firm");
+        assert!((eq_inf - eq_try).abs() < 1e-12, "{eq_inf} vs {eq_try}");
+        assert!((vol_inf - vol_try).abs() < 1e-12, "{vol_inf} vs {vol_try}");
     }
 
     #[test]
@@ -1460,6 +1536,63 @@ mod tests {
         for &t in &[0.5, 1.0, 5.0, 10.0, 30.0] {
             let pd = m.default_probability(t);
             assert!((0.0..=1.0).contains(&pd), "PD({t}) = {pd} out of [0, 1]");
+        }
+    }
+
+    #[test]
+    fn first_passage_pd_finite_under_overflowing_power_term() {
+        // P0-2: the Black-Cox first-passage term `(V/H)^(-2*mu/sigma^2) * N(d-)`
+        // can overflow. With a large positive risk-neutral drift (low vol,
+        // very high rate) the exponent `-2*mu/sigma^2` is a large negative
+        // number; for a firm trading below its barrier `(V/H)^exponent`
+        // overflows to `+inf` while `N(d-)` underflows to `0`, so the naive
+        // product is `inf * 0 = NaN` which survives `clamp(0, 1)`.
+        let m = MertonModel::new_with_dynamics(
+            50.0,
+            0.05,
+            100.0,
+            3.0,
+            0.0,
+            BarrierType::FirstPassage {
+                barrier_growth_rate: 0.0,
+            },
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid");
+        let pd = m.default_probability(1.0);
+        assert!(
+            pd.is_finite(),
+            "first-passage PD must be finite (not NaN from inf*0), got {pd}"
+        );
+        assert!(
+            (0.0..=1.0).contains(&pd),
+            "first-passage PD must lie in [0, 1], got {pd}"
+        );
+    }
+
+    #[test]
+    fn first_passage_pd_finite_under_large_negative_drift() {
+        // The mirror case: a strongly negative drift (very high vol) drives
+        // a large positive exponent; for a firm above its barrier the power
+        // term overflows. PD must still be a finite, clamped value.
+        let m = MertonModel::new_with_dynamics(
+            1.0e6,
+            0.05,
+            1.0,
+            0.0,
+            5.0,
+            BarrierType::FirstPassage {
+                barrier_growth_rate: 0.0,
+            },
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid");
+        for &t in &[0.5, 1.0, 5.0, 30.0] {
+            let pd = m.default_probability(t);
+            assert!(
+                pd.is_finite() && (0.0..=1.0).contains(&pd),
+                "first-passage PD({t}) must be finite in [0, 1], got {pd}"
+            );
         }
     }
 

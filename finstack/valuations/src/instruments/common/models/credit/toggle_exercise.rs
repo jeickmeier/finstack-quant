@@ -220,6 +220,28 @@ fn optimal_toggle_decision(
     optimal_toggle_decision_seeded(o, state, seed_bits)
 }
 
+/// Derive a full-entropy `u64` seed from a uniform draw `u` in `[0, 1)`.
+///
+/// The naive `(u * u64::MAX as f64) as u64` is low-entropy: a `[0, 1)` double
+/// carries at most ~52 mantissa bits, and scaling then truncating leaves the
+/// low ~11 bits of the result effectively zero, so a whole band of distinct
+/// uniforms collapses onto the same seed — weakening the antithetic toggle
+/// pairing in [`should_pik_with_uniform`](ToggleExerciseModel::should_pik_with_uniform).
+///
+/// Instead, capture **every** bit of `u` losslessly via [`f64::to_bits`] and
+/// run it through the SplitMix64 finalizer (Steele, Lea & Flood, 2014), whose
+/// avalanche property diffuses each input bit across all 64 output bits. Two
+/// adjacent doubles therefore produce well-separated, distinct seeds.
+#[inline]
+fn uniform_to_seed(u: f64) -> u64 {
+    // SplitMix64 finalizing mix: a bijection on `u64`, so distinct inputs map
+    // to distinct outputs (no collisions) while achieving full avalanche.
+    let mut z = u.to_bits();
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
 fn optimal_toggle_decision_seeded(o: &OptimalToggle, state: &CreditState, seed_bits: u64) -> bool {
     let v = state.asset_value.unwrap_or_else(|| {
         if state.leverage > 0.0 {
@@ -420,7 +442,10 @@ impl ToggleExerciseModel {
                 u < p
             }
             Self::OptimalExercise(o) => {
-                let seed_bits = (u * u64::MAX as f64) as u64;
+                // Derive the nested-MC seed with full entropy: see
+                // `uniform_to_seed`. The naive `(u * u64::MAX as f64) as u64`
+                // discards the low bits of `u` and weakens antithetic pairing.
+                let seed_bits = uniform_to_seed(u);
                 optimal_toggle_decision_seeded(o, state, seed_bits)
             }
         }
@@ -767,6 +792,52 @@ mod tests {
                 "Toggle decision must be invariant to equity_discount_rate; got {decisions:?}"
             );
         }
+    }
+
+    #[test]
+    fn uniform_to_seed_uses_full_entropy_of_the_mantissa() {
+        // The old derivation `(u * u64::MAX as f64) as u64` collapsed the
+        // ~52-bit mantissa of `u` into a value whose low ~11 bits were always
+        // zero: a whole band of distinct uniforms mapped to the SAME seed,
+        // weakening the antithetic toggle pairing. The fixed derivation must
+        // give every adjacent double its own well-separated seed.
+
+        // (a) The two smallest-distinguishable uniforms either side of 0.5
+        //     must produce distinct seeds.
+        let u0 = 0.5_f64;
+        let u1 = f64::from_bits(u0.to_bits() + 1); // next representable double
+        let u2 = f64::from_bits(u0.to_bits() + 2);
+        let s0 = uniform_to_seed(u0);
+        let s1 = uniform_to_seed(u1);
+        let s2 = uniform_to_seed(u2);
+        assert_ne!(s0, s1, "adjacent uniforms must not collide to one seed");
+        assert_ne!(s1, s2, "adjacent uniforms must not collide to one seed");
+        assert_ne!(s0, s2, "adjacent uniforms must not collide to one seed");
+
+        // (b) A unit change in the low mantissa bit must avalanche across the
+        //     whole 64-bit seed, not merely nudge a few high bits. Require a
+        //     healthy Hamming distance (a poor mixer leaves most bits equal).
+        let hamming = (s0 ^ s1).count_ones();
+        assert!(
+            hamming >= 16,
+            "low-bit change must avalanche across the seed (Hamming distance \
+             {hamming} too small — low-entropy derivation)"
+        );
+
+        // (c) A sweep of many uniforms differing only in their lowest
+        //     mantissa bits must yield all-distinct seeds.
+        let base = 0.123_456_789_f64;
+        let mut seeds: Vec<u64> = (0..512)
+            .map(|k| uniform_to_seed(f64::from_bits(base.to_bits() + k)))
+            .collect();
+        let count = seeds.len();
+        seeds.sort_unstable();
+        seeds.dedup();
+        assert_eq!(
+            seeds.len(),
+            count,
+            "512 distinct low-bit uniforms must map to 512 distinct seeds"
+        );
     }
 
     #[test]
