@@ -317,12 +317,29 @@ impl CoverageTest {
 
         let is_passing = ratio >= required_ratio;
 
+        // W-21: IC cure = cash that must be diverted to senior interest so the
+        // test clears. The IC test passes when
+        //   (interest_collections + X) / total_interest_due >= required_ratio
+        //   => X >= required_ratio * total_interest_due - interest_collections
+        // This is the senior interest shortfall against the required coverage
+        // level; without it an IC-only breach diverts zero cash.
+        let cure_amount = if !is_passing {
+            let shortfall = required_ratio * total_interest_due.amount()
+                - context.interest_collections.amount();
+            Some(Money::new(
+                shortfall.max(0.0),
+                context.interest_collections.currency(),
+            ))
+        } else {
+            None
+        };
+
         Ok(TestResult {
             test_id,
             tranche_id: context.tranche_id.to_string(),
             current_ratio: ratio,
             is_passing,
-            cure_amount: None,
+            cure_amount,
         })
     }
 }
@@ -367,7 +384,9 @@ pub struct TestResult {
     pub current_ratio: f64,
     /// Whether test is currently passing.
     pub is_passing: bool,
-    /// Cure amount if failing (OC tests only).
+    /// Cure amount if failing. For OC tests this is the note paydown needed to
+    /// restore the OC ratio; for IC tests it is the cash to divert to senior
+    /// interest so the test clears.
     pub cure_amount: Option<Money>,
 }
 
@@ -567,4 +586,51 @@ mod tests {
         );
     }
 
+    /// W-21: an IC-test breach must produce a non-`None` cure amount equal to
+    /// the senior interest shortfall, so IC-only breaches actually divert cash.
+    #[test]
+    fn test_ic_breach_yields_senior_interest_shortfall_cure() {
+        let pool = Pool::new("TEST", DealType::CLO, Currency::USD);
+        let required_ratio = 1.20_f64;
+        let test = CoverageTest::new_ic(required_ratio);
+
+        let tranche = Tranche::new(
+            "TEST_TRANCHE",
+            0.0,
+            100.0,
+            Seniority::Senior,
+            Money::new(100_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
+        )
+        .expect("Valid tranche");
+        let tranches = TrancheStructure::new(vec![tranche]).expect("Valid tranche structure");
+
+        // Interest collections far below interest due => IC test breaches.
+        let context = TestContext {
+            pool: &pool,
+            tranches: &tranches,
+            tranche_id: "TEST_TRANCHE",
+            as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            period_start: None,
+            cash_balance: Money::new(0.0, Currency::USD),
+            interest_collections: Money::new(100.0, Currency::USD),
+            haircuts: None,
+            par_value_threshold: None,
+            market: None,
+            tranche_balances: None,
+            current_pool_balance: None,
+        };
+
+        let result = test.calculate(&context).expect("calculation should succeed");
+        assert!(!result.is_passing, "IC test should breach");
+        let cure = result
+            .cure_amount
+            .expect("an IC breach must yield a non-None cure amount");
+        assert!(
+            cure.amount() > 0.0,
+            "IC cure must be positive (the interest shortfall), got {}",
+            cure.amount()
+        );
+    }
 }
