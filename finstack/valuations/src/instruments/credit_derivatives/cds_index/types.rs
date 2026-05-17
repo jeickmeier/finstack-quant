@@ -168,6 +168,19 @@ pub struct CDSIndex {
     pub pricing: IndexPricing,
     /// Optional list of constituents when using `IndexPricing::Constituents`
     pub constituents: Vec<CDSIndexConstituent>,
+    /// Number of reference entities in the index pool.
+    ///
+    /// Required for portfolio-level analytics (e.g. jump-to-default) when
+    /// `constituents` is empty (`SingleCurve` mode), since the per-name
+    /// risk number is `notional / N · LGD`. Index pool sizes drift with
+    /// series — iTraxx Crossover has been 75 names only since Series 9,
+    /// and CDX.NA.HY membership varies — so this is supplied explicitly
+    /// rather than inferred from `index_name`. Standard presets populate
+    /// it via `CDSIndex::from_preset`; set it directly with
+    /// `with_num_constituents` for custom indices.
+    #[serde(default)]
+    #[builder(default)]
+    pub num_constituents: Option<u32>,
     /// Pricing overrides (including upfront payment)
     #[serde(default)]
     #[builder(default)]
@@ -239,6 +252,7 @@ impl CDSIndex {
             },
             pricing: IndexPricing::SingleCurve,
             constituents: Vec::new(),
+            num_constituents: Some(125),
             pricing_overrides: PricingOverrides::default(),
             margin_spec: None,
             attributes: Attributes::new(),
@@ -324,10 +338,21 @@ impl CDSIndex {
             },
             pricing: IndexPricing::SingleCurve,
             constituents: Vec::new(),
+            num_constituents: preset.num_constituents,
             pricing_overrides: PricingOverrides::default(),
             margin_spec: None,
             attributes: Attributes::new(),
         })
+    }
+
+    /// Set the number of reference entities in the index pool.
+    ///
+    /// Use this for custom or off-series indices whose membership count is
+    /// not carried by a standard preset. Required for jump-to-default and
+    /// other per-name analytics when `constituents` is empty.
+    pub fn with_num_constituents(mut self, num_constituents: u32) -> Self {
+        self.num_constituents = Some(num_constituents);
+        self
     }
 
     /// Set the index factor (fraction of original notional surviving).
