@@ -145,10 +145,10 @@ struct OvernightProjectionInputs<'a> {
 
 fn builder_overnight_method(
     compounding: FloatingLegCompounding,
-) -> Option<crate::cashflow::builder::OvernightCompoundingMethod> {
+) -> Result<Option<crate::cashflow::builder::OvernightCompoundingMethod>> {
     use crate::cashflow::builder::OvernightCompoundingMethod;
 
-    match compounding {
+    Ok(match compounding {
         FloatingLegCompounding::Simple => None,
         FloatingLegCompounding::CompoundedInArrears {
             lookback_days,
@@ -167,10 +167,20 @@ fn builder_overnight_method(
                     shift_days: observation_shift.unwrap_or(0) as u32,
                 })
             } else {
-                // The generic builder does not yet model this hybrid convention exactly.
-                Some(OvernightCompoundingMethod::CompoundedWithLookback {
-                    lookback_days: lookback_days as u32,
-                })
+                // The canonical-schedule builder cannot model the hybrid
+                // lookback + observation-shift convention. Silently degrading
+                // to lookback-only would drop the observation shift and
+                // diverge from the in-module compounding loop, which handles
+                // the combined `total_shift` correctly. Reject explicitly
+                // rather than mispricing.
+                return Err(finstack_core::Error::Validation(format!(
+                    "Compounded-in-arrears with both a lookback ({} days) and an \
+                     observation shift ({} days) is not supported on the \
+                     canonical-schedule pricing path. Use a lookback-only or \
+                     observation-shift-only convention.",
+                    lookback_days,
+                    observation_shift.unwrap_or(0),
+                )));
             }
         }
         FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => {
@@ -183,7 +193,7 @@ fn builder_overnight_method(
                 lockout_days: cutoff_days as u32,
             })
         }
-    }
+    })
 }
 
 fn resolve_compounded_fixing_calendar(
@@ -359,13 +369,18 @@ pub(crate) fn projected_compounded_float_leg_schedule(
             continue;
         }
         // A discount-only OIS curve is already calibrated to the market's
-        // compounded-RFR convention. For unseasoned future periods, use the DF
-        // identity rather than applying rate cut-off a second time to synthetic
-        // overnight forwards implied by that same curve.
-        let single_curve_discount_projection = proj.is_none();
+        // plain compounded-RFR convention. For unseasoned future periods, use the
+        // plain DF identity ∏(1 + r_i·dcf_i) = DF(start)/DF(end).
+        //
+        // The fast path is only valid when there is no convention that breaks
+        // the plain compounding identity. A rate cut-off freezes the last
+        // `cutoff_days` overnight rates, so the DF identity no longer holds
+        // (the curve is calibrated to the *non*-cut-off OIS convention). Disable
+        // the fast path whenever a cut-off is configured so the daily loop below
+        // explicitly applies the lockout.
         let allow_fast_path = as_of <= accrual_start
             && total_shift == 0
-            && (cutoff_days.is_none() || single_curve_discount_projection)
+            && cutoff_days.is_none()
             && proj.is_none_or(|p| disc.id() == p.id());
 
         let compound_factor = if allow_fast_path {
@@ -649,7 +664,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 fixing_calendar_id: float.fixing_calendar_id.clone(),
                 end_of_month: float.end_of_month,
                 payment_lag_days: float.payment_lag_days,
-                overnight_compounding: builder_overnight_method(float.compounding.clone()),
+                overnight_compounding: builder_overnight_method(float.compounding.clone())?,
                 overnight_basis: None,
                 fallback: if curves.is_some() {
                     crate::cashflow::builder::FloatingRateFallback::Error
@@ -845,7 +860,8 @@ mod tests {
     fn rate_cutoff_maps_to_overnight_lockout() {
         let method = builder_overnight_method(FloatingLegCompounding::CompoundedWithRateCutoff {
             cutoff_days: 1,
-        });
+        })
+        .expect("rate cut-off is a supported canonical-schedule convention");
 
         assert_eq!(
             method,
@@ -855,6 +871,36 @@ mod tests {
                 }
             )
         );
+    }
+
+    /// W-14: The canonical-schedule path cannot model the hybrid
+    /// lookback + observation-shift convention. It must error explicitly
+    /// rather than silently degrading to lookback-only (which drops the
+    /// observation shift and diverges from the in-module compounding loop).
+    #[test]
+    fn hybrid_lookback_and_observation_shift_errors() {
+        let hybrid = FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 2,
+            observation_shift: Some(2),
+        };
+        let result = builder_overnight_method(hybrid);
+        assert!(
+            result.is_err(),
+            "hybrid lookback + observation-shift must be rejected on the \
+             canonical-schedule path, got {result:?}"
+        );
+
+        // Lookback-only and shift-only remain supported.
+        assert!(builder_overnight_method(FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 2,
+            observation_shift: None,
+        })
+        .is_ok());
+        assert!(builder_overnight_method(FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 0,
+            observation_shift: Some(2),
+        })
+        .is_ok());
     }
 
     #[test]
@@ -967,6 +1013,115 @@ mod tests {
 
         std::fs::write(&report_path, csv).expect("write schedule diagnostic CSV");
         assert!(report_path.exists());
+    }
+
+    /// W-13: A single-curve OIS leg with a non-zero rate cut-off must NOT be
+    /// priced via the plain compounded DF identity. The fast path freezes no
+    /// rates, so on a steep curve it produces the same PV as a no-cut-off leg.
+    /// After the fix, the rate cut-off is explicitly applied and the two legs
+    /// must differ.
+    #[test]
+    fn single_curve_ois_rate_cutoff_differs_from_no_cutoff() {
+        use crate::instruments::common_impl::parameters::legs::{FixedLegSpec, FloatLegSpec};
+        use finstack_core::currency::Currency;
+        use finstack_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+        use finstack_core::money::Money;
+        use finstack_core::types::{CurveId, InstrumentId};
+        use finstack_core::market_data::term_structures::DiscountCurve;
+        use rust_decimal::Decimal;
+        use time::Month;
+
+        let date = |y: i32, m: u8, d: u8| {
+            Date::from_calendar_date(y, Month::try_from(m).expect("month"), d).expect("date")
+        };
+
+        let as_of = date(2024, 1, 1);
+        let start = date(2024, 1, 1);
+        let end = date(2024, 4, 1);
+
+        let disc_id = CurveId::new("USD-OIS");
+        // Steep discount curve: short end ~2%, long end ~8% (steeply upward).
+        let disc = DiscountCurve::builder(disc_id.clone())
+            .base_date(as_of)
+            .knots(vec![
+                (0.0, 1.0),
+                (0.10, (-0.02f64 * 0.10).exp()),
+                (0.25, (-0.08f64 * 0.25).exp()),
+                (1.0, (-0.08f64).exp()),
+            ])
+            .build()
+            .expect("discount curve");
+
+        let build_swap = |id: &str, compounding: FloatingLegCompounding| {
+            InterestRateSwap::builder()
+                .id(InstrumentId::new(id))
+                .notional(Money::new(10_000_000.0, Currency::USD))
+                .side(PayReceive::PayFixed)
+                .fixed(FixedLegSpec {
+                    discount_curve_id: disc_id.clone(),
+                    rate: Decimal::ZERO,
+                    frequency: Tenor::quarterly(),
+                    day_count: DayCount::Act360,
+                    bdc: BusinessDayConvention::ModifiedFollowing,
+                    calendar_id: None,
+                    stub: StubKind::ShortFront,
+                    start,
+                    end,
+                    par_method: None,
+                    compounding_simple: true,
+                    payment_lag_days: 0,
+                    end_of_month: false,
+                })
+                .float(FloatLegSpec {
+                    discount_curve_id: disc_id.clone(),
+                    forward_curve_id: disc_id.clone(), // single-curve OIS
+                    spread_bp: Decimal::ZERO,
+                    frequency: Tenor::quarterly(),
+                    day_count: DayCount::Act360,
+                    bdc: BusinessDayConvention::ModifiedFollowing,
+                    calendar_id: None,
+                    stub: StubKind::ShortFront,
+                    reset_lag_days: 0,
+                    fixing_calendar_id: None,
+                    start,
+                    end,
+                    compounding,
+                    payment_lag_days: 0,
+                    end_of_month: false,
+                })
+                .build()
+                .expect("swap")
+        };
+
+        let swap_no_cutoff = build_swap("OIS-NO-CUTOFF", FloatingLegCompounding::fedfunds());
+        // 5-day rate cut-off freezes the last 5 overnight rates of each period.
+        let swap_cutoff = build_swap(
+            "OIS-CUTOFF-5D",
+            FloatingLegCompounding::rate_cutoff(5),
+        );
+
+        // Single-curve: only the discount curve is loaded (proj is None).
+        let ctx = MarketContext::new().insert(disc);
+
+        let sched_no_cutoff =
+            float_leg_schedule_with_curves_as_of(&swap_no_cutoff, Some(&ctx), Some(as_of))
+                .expect("no-cutoff schedule");
+        let sched_cutoff =
+            float_leg_schedule_with_curves_as_of(&swap_cutoff, Some(&ctx), Some(as_of))
+                .expect("cutoff schedule");
+
+        let pv_no_cutoff: f64 = sched_no_cutoff
+            .flows
+            .iter()
+            .map(|f| f.amount.amount())
+            .sum();
+        let pv_cutoff: f64 = sched_cutoff.flows.iter().map(|f| f.amount.amount()).sum();
+
+        assert!(
+            (pv_no_cutoff - pv_cutoff).abs() > 1.0,
+            "single-curve OIS rate cut-off must change the floating coupon on a \
+             steep curve: no_cutoff={pv_no_cutoff}, cutoff={pv_cutoff}"
+        );
     }
 
     fn load_bloomberg_fixture() -> GoldenFixtureEnvelope {
