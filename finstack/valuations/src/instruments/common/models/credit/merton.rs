@@ -308,7 +308,19 @@ impl MertonModel {
     // Calibration methods
     // -----------------------------------------------------------------------
 
-    /// Compute implied equity value and equity volatility from the structural model.
+    /// Minimum equity value (in asset-value units) for which the equity-vol
+    /// relation `sigma_E = N(d1) * exp(-qT) * sigma_V * V / E` is numerically
+    /// well posed. Below this, `E` is treated as effectively zero (the firm is
+    /// economically in default) and the division is rejected.
+    const MIN_EQUITY: f64 = 1.0e-8;
+
+    /// Minimum `N(d1)` for which the KMV / equity-vol inversion is well posed.
+    /// Below this, the equity is deep-out-of-the-money on the firm's assets
+    /// and the inversion is numerically unstable.
+    const MIN_ND1: f64 = 1.0e-12;
+
+    /// Compute implied equity value and equity volatility from the structural
+    /// model, rejecting numerically degenerate (near-default) configurations.
     ///
     /// Uses the Black-Scholes call option formula where equity is a call on
     /// the firm's assets with strike equal to the debt barrier, accounting
@@ -318,6 +330,57 @@ impl MertonModel {
     /// - d2 = d1 - sigma * sqrt(T)
     /// - E = V * exp(-q*T) * N(d1) - B * exp(-r*T) * N(d2)
     /// - sigma_E = N(d1) * exp(-q*T) * sigma_V * V / E
+    ///
+    /// For a deeply distressed firm `E -> 0+`, so `sigma_E` would diverge to
+    /// `+inf`. This method rejects such inputs up front with a descriptive
+    /// error instead of returning `inf`/`NaN`.
+    ///
+    /// # Arguments
+    ///
+    /// * `horizon` - Time horizon T in years (must be > 0)
+    ///
+    /// # Returns
+    ///
+    /// A tuple `(equity_value, equity_vol)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InputError::Invalid`] if the implied equity value or `N(d1)`
+    /// is below the well-posed floor (the firm is economically in default).
+    pub fn try_implied_equity(&self, horizon: f64) -> Result<(f64, f64)> {
+        let v = self.asset_value;
+        let sigma = self.asset_vol;
+        let b = self.debt_barrier;
+        let r = self.risk_free_rate;
+        let q = self.payout_rate;
+        let sqrt_t = horizon.sqrt();
+
+        let d1 = ((v / b).ln() + (r - q + 0.5 * sigma * sigma) * horizon) / (sigma * sqrt_t);
+        let d2 = d1 - sigma * sqrt_t;
+
+        let nd1 = norm_cdf(d1);
+        let nd2 = norm_cdf(d2);
+
+        let exp_neg_qt = (-q * horizon).exp();
+        let equity = v * exp_neg_qt * nd1 - b * (-r * horizon).exp() * nd2;
+
+        if !equity.is_finite() || equity <= Self::MIN_EQUITY || nd1 <= Self::MIN_ND1 {
+            return Err(InputError::Invalid.into());
+        }
+
+        let equity_vol = nd1 * exp_neg_qt * sigma * v / equity;
+        Ok((equity, equity_vol))
+    }
+
+    /// Compute implied equity value and equity volatility from the structural
+    /// model (infallible variant).
+    ///
+    /// This is the unguarded form of [`try_implied_equity`](Self::try_implied_equity)
+    /// and is only well posed for a solvent firm whose implied equity is
+    /// comfortably positive. For a deeply distressed firm the returned
+    /// `equity_vol` may be non-finite (`inf`/`NaN`); prefer
+    /// [`try_implied_equity`](Self::try_implied_equity), which rejects such
+    /// inputs with a descriptive error.
     ///
     /// # Arguments
     ///
@@ -369,7 +432,9 @@ impl MertonModel {
     ///
     /// # Errors
     ///
-    /// Returns an error if inputs are invalid or iteration fails to converge.
+    /// Returns an error if inputs are invalid (including a near-zero
+    /// `equity_value`, or a deep-out-of-the-money configuration where
+    /// `N(d1)` collapses to zero) or if iteration fails to converge.
     pub fn from_equity(
         equity_value: f64,
         equity_vol: f64,
@@ -383,6 +448,13 @@ impl MertonModel {
         }
         if equity_vol < 0.0 {
             return Err(InputError::NegativeValue.into());
+        }
+        // A near-zero equity value makes the KMV volatility inversion
+        // `sigma_V = sigma_E * E / (N(d1) * exp(-qT) * V)` ill-conditioned and
+        // can drive intermediate iterates to inf/NaN, silently defeating the
+        // convergence test. Reject it up front with a descriptive error.
+        if equity_value <= Self::MIN_EQUITY {
+            return Err(InputError::Invalid.into());
         }
 
         let e = equity_value;
@@ -409,6 +481,13 @@ impl MertonModel {
 
             let nd1 = norm_cdf(d1);
             let nd2 = norm_cdf(d2);
+
+            // Deep-OTM: N(d1) -> 0 makes the V / sigma_V updates blow up to
+            // inf/NaN, which makes the relative-change test silently never
+            // fire. Reject explicitly rather than burning all iterations.
+            if nd1 <= Self::MIN_ND1 {
+                return Err(InputError::Invalid.into());
+            }
 
             // Update V from the call pricing equation: E = V*exp(-qT)*N(d1) - B*exp(-rT)*N(d2)
             v = (e + b * (-r * t).exp() * nd2) / (exp_neg_qt * nd1);
@@ -1221,6 +1300,46 @@ mod tests {
             (m_cal.payout_rate() - 0.02).abs() < 1e-10,
             "Payout rate should be preserved: got {}",
             m_cal.payout_rate()
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Near-zero equity guards (W-10)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn implied_equity_rejects_near_zero_equity() {
+        // A deeply distressed firm: V far below B with low vol drives the
+        // call-option equity value to ~0, so the equity-vol division would
+        // otherwise blow up to inf/NaN.
+        let m = MertonModel::new(1.0, 0.05, 1.0e9, 0.05).expect("valid");
+        let res = m.try_implied_equity(1.0);
+        assert!(
+            res.is_err(),
+            "near-zero implied equity should be rejected, got {res:?}"
+        );
+    }
+
+    #[test]
+    fn implied_equity_ok_for_healthy_firm() {
+        let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
+        let (equity, equity_vol) = m.try_implied_equity(1.0).expect("healthy firm");
+        assert!(equity.is_finite() && equity > 0.0);
+        assert!(equity_vol.is_finite() && equity_vol > 0.0);
+    }
+
+    #[test]
+    fn from_equity_rejects_near_zero_equity() {
+        // A near-zero equity input must be rejected up front with a
+        // descriptive `Invalid` error, not silently churned through the
+        // fixed-point loop until `SolverConvergenceFailed` (which would
+        // burn all 100 iterations and report a misleading reason).
+        let res = MertonModel::from_equity(1.0e-12, 0.30, 80.0, 0.05, 0.0, 1.0);
+        let err = res.expect_err("near-zero equity input should be rejected");
+        let msg = err.to_string();
+        assert!(
+            !msg.contains("did not converge"),
+            "should be an up-front input rejection, not a convergence failure: {msg}"
         );
     }
 
