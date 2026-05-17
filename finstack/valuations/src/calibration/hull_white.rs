@@ -354,6 +354,13 @@ const KAPPA_MAX: f64 = 1.0;
 
 /// Vega floor: 1 bp of annuity-year. Protects against division by a
 /// near-zero vega at extreme expiries or zero quoted vol.
+///
+/// The vega used here is evaluated once at the *market* quote and used to
+/// scale `(price_model − price_mkt)` into an approximate vol-error
+/// residual. That linearisation is a first-order Taylor approximation
+/// valid only near the solution; see the residual computation in
+/// `HullWhiteSwaptionTarget::calculate_residuals` for the full
+/// approximation-regime discussion (W-38).
 const SWAPTION_VEGA_FLOOR: f64 = 1e-8;
 
 /// Number of deterministic multi-start restarts used for HW1F calibration.
@@ -453,10 +460,25 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
                     q.expiry, q.tenor, curve.kappa, curve.sigma
                 )));
             }
-            // Vega-weighted price residual: algebraically the
-            // first-order approximation to (σ_model − σ_market),
-            // so all quotes enter the objective on an implied-
-            // vol scale. See Gilli–Maringer–Schumann §13.4.
+            // Vega-weighted price residual: `(price_model − price_mkt)/vega`
+            // is, by a first-order Taylor expansion of price in vol, the
+            // approximation `σ_model − σ_market`, so all quotes enter the
+            // objective on a common implied-vol scale (Gilli–Maringer–
+            // Schumann §13.4).
+            //
+            // APPROXIMATION REGIME (W-38): this linearisation is accurate
+            // only NEAR the solution, where `price_model ≈ price_mkt` and
+            // the vega evaluated at the *market* quote is a good proxy for
+            // the local price/vol slope. Far from the solution — during LM
+            // exploration or multi-start restarts — the true price/vol
+            // map is nonlinear and the fixed market vega mis-scales the
+            // residual, so the LM objective is a distorted (but still
+            // descent-compatible) surface rather than a true vol-error
+            // objective. Andersen–Piterbarg (*Interest Rate Modeling*,
+            // Vol. III) instead iterate implied-vol residuals directly.
+            // The vega-scaled form is retained here because it avoids a
+            // per-iteration implied-vol inversion and converges to the
+            // same minimiser once the iterates enter the valid regime.
             residuals[idx] = (model_price - pre.market_price) / pre.vega;
         }
         Ok(())
