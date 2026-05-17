@@ -23,6 +23,8 @@ pub(crate) mod forward;
 pub(crate) mod hazard;
 /// Inflation curve bootstrapping from inflation swap quotes.
 pub(crate) mod inflation;
+/// LMM/BGM factor-loading calibration to the swaption volatility surface.
+pub(crate) mod lmm;
 /// Nelson-Siegel / Nelson-Siegel-Svensson parametric curve calibration.
 pub(crate) mod parametric;
 /// Student-t copula degrees of freedom calibration.
