@@ -741,26 +741,45 @@ where
                 as_of,
             )?
         } else {
-            // Future reset: project from forward curve using the accrual period
-            // (reset_date is only used for the fixing decision above; the rate
-            // should span the actual accrual interval to avoid systematic bias
-            // when reset lag places the reset before accrual_start).
+            // Future reset: project from the forward curve.
+            //
+            // The projection differs by index type:
+            //
+            // - Term-rate legs (`CompoundingMethod::Simple`, e.g. EURIBOR-6M):
+            //   the rate is *set* at `reset_date` as the index-tenor forward
+            //   observed on that date. The forward curve's `rate(t)` is exactly
+            //   "the forward starting at time `t` for the curve's tenor", so we
+            //   anchor at the fixing date. When a reset lag places `reset_date`
+            //   materially before `accrual_start`, projecting over the accrual
+            //   interval instead would read the wrong forward window — on a
+            //   steep curve a 2-business-day lag is worth ~1-3 bp of rate.
+            //
+            // - OIS / genuinely-compounding legs (`Compounded`,
+            //   `CompoundedWithShift`, `Average`): the rate genuinely accrues
+            //   over the period, so the accrual-interval projection is correct
+            //   and avoids systematic bias from any nominal reset lag.
             let fwd_dc = fwd.day_count();
             let fwd_base = fwd.base_date();
-            let t0 = if period.accrual_start <= fwd_base {
-                0.0
-            } else {
-                fwd_dc.year_fraction(fwd_base, period.accrual_start, DayCountContext::default())?
+            let year_fraction_from_base = |d: Date| -> Result<f64> {
+                if d <= fwd_base {
+                    Ok(0.0)
+                } else {
+                    fwd_dc.year_fraction(fwd_base, d, DayCountContext::default())
+                }
             };
-            let t1 = if period.accrual_end <= fwd_base {
-                0.0
+            if matches!(params.compounding_method, CompoundingMethod::Simple) {
+                // Term-rate leg: fixing-date-anchored index-tenor forward.
+                let t_reset = year_fraction_from_base(reset_date)?;
+                fwd.rate(t_reset)
             } else {
-                fwd_dc.year_fraction(fwd_base, period.accrual_end, DayCountContext::default())?
-            };
-            if t1 > t0 {
-                fwd.rate_period(t0, t1)
-            } else {
-                fwd.rate(t0)
+                // Genuinely-compounding leg: average forward over the accrual interval.
+                let t0 = year_fraction_from_base(period.accrual_start)?;
+                let t1 = year_fraction_from_base(period.accrual_end)?;
+                if t1 > t0 {
+                    fwd.rate_period(t0, t1)
+                } else {
+                    fwd.rate(t0)
+                }
             }
         };
 
@@ -1533,6 +1552,149 @@ mod tests {
         assert_eq!(leg_params.rate_params.spread_bp, 200.0);
         assert_eq!(leg_params.rate_params.index_floor_bp, Some(100.0));
         assert_eq!(leg_params.payment_lag_days, 2);
+    }
+
+    // ==================== W-48: term-rate fixing-date projection ====================
+
+    /// A steeply-upward-sloping forward curve so that the reset-lag window
+    /// produces a materially different rate from the accrual-interval window.
+    fn steep_forward_curve(base_date: Date) -> ForwardCurve {
+        ForwardCurve::builder(CurveId::new("TEST-STEEP-FWD"), 0.5)
+            .base_date(base_date)
+            .day_count(DayCount::Act360)
+            // ~5% rate slope per year — very steep, exaggerated for testability.
+            .knots(vec![(0.0, 0.02), (1.0, 0.07), (5.0, 0.27)])
+            .build()
+            .expect("steep curve should build")
+    }
+
+    /// W-48: For a term-rate (`Simple`) leg with a non-zero reset lag, the
+    /// projected rate must be the index-tenor forward anchored at the *fixing
+    /// date*, not the average forward over the accrual interval.
+    #[test]
+    fn pv_floating_leg_term_rate_anchors_projection_at_fixing_date() {
+        let base_date = date(2024, 1, 1);
+        let disc = test_discount_curve(base_date);
+        let fwd = steep_forward_curve(base_date);
+
+        // Term-rate leg with a reset materially before accrual_start (reset lag).
+        // accrual_start = Jul 1 2024, accrual_end = Jan 1 2025.
+        // reset_date = Apr 1 2024 — 3 months before accrual_start (exaggerated lag).
+        let accrual_start = date(2024, 7, 1);
+        let accrual_end = date(2025, 1, 1);
+        let reset_date = date(2024, 4, 1);
+        let year_fraction = 0.5;
+
+        let periods = vec![LegPeriod {
+            accrual_start,
+            accrual_end,
+            reset_date: Some(reset_date),
+            year_fraction,
+        }];
+
+        // No spread/gearing so all_in_rate == index_rate.
+        let params = FloatingLegParams::default();
+        assert_eq!(params.compounding_method, CompoundingMethod::Simple);
+
+        let pv = pv_floating_leg(
+            periods.into_iter(),
+            1_000_000.0,
+            &params,
+            &disc,
+            &fwd,
+            base_date,
+            None,
+        )
+        .expect("should price");
+
+        // Recover the implied projected rate: pv = notional * rate * yf * df.
+        let payment_date = accrual_end; // no payment lag
+        let df = robust_relative_df(&disc, base_date, payment_date).expect("df");
+        let implied_rate = pv / (1_000_000.0 * year_fraction * df);
+
+        // Expected: fixing-date-anchored forward.
+        let fwd_dc = fwd.day_count();
+        let t_reset = fwd_dc
+            .year_fraction(base_date, reset_date, DayCountContext::default())
+            .expect("yf");
+        let expected_fixing_anchored = fwd.rate(t_reset);
+
+        // The (incorrect) accrual-interval projection, for contrast.
+        let t0 = fwd_dc
+            .year_fraction(base_date, accrual_start, DayCountContext::default())
+            .expect("yf");
+        let t1 = fwd_dc
+            .year_fraction(base_date, accrual_end, DayCountContext::default())
+            .expect("yf");
+        let accrual_interval_rate = fwd.rate_period(t0, t1);
+
+        // The fix must use the fixing-date-anchored forward.
+        assert!(
+            (implied_rate - expected_fixing_anchored).abs() < 1e-12,
+            "term-rate leg must project the fixing-date-anchored forward: \
+             implied={implied_rate}, expected={expected_fixing_anchored}"
+        );
+
+        // And it must differ from the accrual-interval projection by the
+        // reset-lag amount (on this steep curve the gap is well above 1bp).
+        let gap = (expected_fixing_anchored - accrual_interval_rate).abs();
+        assert!(
+            gap > 1e-4,
+            "reset-lag projection gap should be material on a steep curve: gap={gap}"
+        );
+    }
+
+    /// W-48: OIS / genuinely-compounding legs keep the accrual-interval
+    /// projection — the rate genuinely accrues over the period.
+    #[test]
+    fn pv_floating_leg_ois_keeps_accrual_interval_projection() {
+        let base_date = date(2024, 1, 1);
+        let disc = test_discount_curve(base_date);
+        let fwd = steep_forward_curve(base_date);
+
+        let accrual_start = date(2024, 7, 1);
+        let accrual_end = date(2025, 1, 1);
+        let reset_date = date(2024, 4, 1);
+        let year_fraction = 0.5;
+
+        let periods = vec![LegPeriod {
+            accrual_start,
+            accrual_end,
+            reset_date: Some(reset_date),
+            year_fraction,
+        }];
+
+        // OIS-style leg: compounding method is not Simple.
+        let params = FloatingLegParams::with_ois_compounding(0.0, 2, 0);
+
+        let pv = pv_floating_leg(
+            periods.into_iter(),
+            1_000_000.0,
+            &params,
+            &disc,
+            &fwd,
+            base_date,
+            None,
+        )
+        .expect("should price");
+
+        let df = robust_relative_df(&disc, base_date, accrual_end).expect("df");
+        let implied_rate = pv / (1_000_000.0 * year_fraction * df);
+
+        let fwd_dc = fwd.day_count();
+        let t0 = fwd_dc
+            .year_fraction(base_date, accrual_start, DayCountContext::default())
+            .expect("yf");
+        let t1 = fwd_dc
+            .year_fraction(base_date, accrual_end, DayCountContext::default())
+            .expect("yf");
+        let accrual_interval_rate = fwd.rate_period(t0, t1);
+
+        assert!(
+            (implied_rate - accrual_interval_rate).abs() < 1e-12,
+            "OIS-style leg must keep the accrual-interval projection: \
+             implied={implied_rate}, expected={accrual_interval_rate}"
+        );
     }
 
     // ==================== robust_relative_df EDGE CASE TESTS ====================
