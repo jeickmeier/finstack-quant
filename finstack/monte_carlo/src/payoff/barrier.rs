@@ -1,16 +1,25 @@
 //! Barrier option payoffs with Brownian bridge correction.
 //!
 //! Implements knock-in and knock-out barrier options with:
-//! - Discrete monitoring with bridge correction
-//! - Gobet-Miri barrier adjustment
+//! - Discrete monitoring with exact Brownian-bridge correction
 //! - Up and down barriers
 //! - Rebate support (paid at maturity)
 //!
+//! # Discrete-monitoring correction
+//!
+//! Barrier hits are evaluated with the exact log-Brownian-bridge
+//! conditional-crossing law (see [`crate::barriers::bridge`]). The bridge
+//! already removes essentially all of the discrete-monitoring bias, so the
+//! Broadie–Glasserman–Kou / Gobet–Miri barrier *shift* — an alternative
+//! first-order correction for plain discrete checking — is deliberately
+//! **not** applied on top of it; doing so would double-count the
+//! correction. The true (unshifted) barrier is always passed to the bridge.
+//!
 //! # Local volatility under stochastic-vol models
 //!
-//! The bridge correction and the Gobet-Miri adjustment both need an
-//! instantaneous volatility to turn a (spot, next_spot) pair into a barrier
-//! hit probability. When the [`PathState`] carries a stochastic variance
+//! The bridge correction needs an instantaneous volatility to turn a
+//! (spot, next_spot) pair into a barrier hit probability. When the
+//! [`PathState`] carries a stochastic variance
 //! (e.g. Heston's `VARIANCE` key), [`BarrierOptionPayoff::on_event`]
 //! substitutes `sqrt(variance)` for the configured flat [`BarrierOptionPayoff::sigma`].
 //! This makes the reported payoff consistent with the path-level dynamics
@@ -18,7 +27,6 @@
 //! carries no variance entry and the configured sigma is used unchanged.
 
 use super::super::barriers::bridge::{check_barrier_hit, BarrierDirection};
-use super::super::barriers::corrections::gobet_miri_adjusted_barrier;
 use crate::time_grid::TimeGrid;
 use crate::traits::PathState;
 use crate::traits::Payoff;
@@ -96,7 +104,15 @@ pub struct BarrierOptionPayoff {
     pub sigma: f64,
     /// Time steps for each monitoring interval (for bridge correction)
     pub step_dts: Vec<f64>,
-    /// Use Gobet-Miri adjustment
+    /// Whether the caller requested the discrete-monitoring correction.
+    ///
+    /// Retained as a record of caller intent and for dispatch on the
+    /// valuations side. It does **not** gate a barrier shift inside this
+    /// payoff: barrier hits are always evaluated with the exact Brownian
+    /// bridge (see [`on_event`](Payoff::on_event)), which already removes
+    /// the discrete-monitoring bias. Applying the Broadie–Glasserman–Kou
+    /// barrier shift on top of the bridge would double-count the
+    /// correction, so the true (unshifted) barrier is always used here.
     pub use_gobet_miri: bool,
 
     // State
@@ -134,20 +150,6 @@ impl BarrierOptionPayoff {
             terminal_spot: 0.0,
             barrier_hit: false,
             previous_spot: 0.0,
-        }
-    }
-
-    /// Get effective barrier level (with Gobet-Miri adjustment if enabled).
-    ///
-    /// `local_sigma` is the local per-step volatility to use in the adjustment.
-    /// Under deterministic-vol models this equals [`Self::sigma`]; under
-    /// stochastic-vol models [`on_event`](Payoff::on_event) substitutes
-    /// `sqrt(state.variance())` when the path state exposes it.
-    fn effective_barrier(&self, dt: f64, local_sigma: f64) -> f64 {
-        if self.use_gobet_miri {
-            gobet_miri_adjusted_barrier(self.barrier, local_sigma, dt, !self.barrier_type.is_up())
-        } else {
-            self.barrier
         }
     }
 
@@ -196,12 +198,17 @@ impl Payoff for BarrierOptionPayoff {
                 Some(v) if v.is_finite() && v > 0.0 => v.sqrt(),
                 _ => self.sigma,
             };
-            let effective_barrier = self.effective_barrier(dt, local_sigma);
-
+            // W-43: `check_barrier_hit` applies the exact Brownian-bridge
+            // conditional-crossing law, which already removes the
+            // discrete-monitoring bias. The BGK `exp(±βσ√Δt)` barrier shift
+            // is an *alternative* first-order correction for plain discrete
+            // checking; layering it on top of the bridge over-corrects by
+            // order `βσ√Δt`. The bridge therefore always receives the true,
+            // unshifted barrier.
             let hit = check_barrier_hit(
                 self.previous_spot,
                 current_spot,
-                effective_barrier,
+                self.barrier,
                 self.barrier_type.direction(),
                 local_sigma,
                 dt,
@@ -420,6 +427,66 @@ mod tests {
             (v_low - v_high).abs() > 0.0 || v_low + v_high == 0.0,
             "without variance in PathState the payoff must respond to self.sigma; \
              got v_low={v_low}, v_high={v_high}"
+        );
+    }
+
+    #[test]
+    fn test_bridge_uses_unshifted_barrier_no_double_correction() {
+        // W-43: when the Brownian bridge is active (it always is inside
+        // `check_barrier_hit`), the barrier passed to it must be the TRUE,
+        // unshifted barrier. Layering the BGK `exp(±βσ√Δt)` shift on top of
+        // the exact bridge crossing law over-corrects.
+        //
+        // Construct a down-and-out path whose closing spot is strictly
+        // *below* the true barrier — that is an unconditional discrete
+        // knockout. With `use_gobet_miri = true` the buggy code shifts the
+        // barrier DOWN (away from spot) so the close lands *above* the
+        // shifted barrier, turning a definite hit into a mere bridge
+        // probability that a high uniform draw rejects.
+        let time_grid = TimeGrid::uniform(1.0, 4).expect("grid should build");
+        let mut payoff = BarrierOptionPayoff::new(
+            110.0, // strike (put ITM at terminal spot 95)
+            100.0, // true barrier
+            BarrierType::DownAndOut,
+            OptionKind::Put,
+            None,
+            1.0,
+            4,
+            0.2, // sigma — with dt=0.25 the BGK shift is ~5.7%
+            &time_grid,
+            true, // use_gobet_miri
+        );
+
+        // step 0: spot 105, above barrier (no initial breach).
+        let mut s0 = PathState::new(0, 0.0);
+        s0.set(state_keys::SPOT, 105.0);
+        s0.set_uniform_random(0.999);
+        payoff.on_event(&mut s0);
+
+        // step 1: spot 95 — strictly below the true barrier of 100, so the
+        // option must knock out unconditionally. A high uniform draw of
+        // 0.999 ensures the bridge probability path cannot register the hit
+        // if the (wrongly) shifted barrier were used.
+        let mut s1 = PathState::new(1, 0.25);
+        s1.set(state_keys::SPOT, 95.0);
+        s1.set_uniform_random(0.999);
+        payoff.on_event(&mut s1);
+
+        // Remaining steps stay below barrier; terminal spot 95.
+        for (step, spot) in [(2usize, 96.0), (3, 97.0), (4, 95.0)] {
+            let mut s = PathState::new(step, step as f64 * 0.25);
+            s.set(state_keys::SPOT, spot);
+            s.set_uniform_random(0.999);
+            payoff.on_event(&mut s);
+        }
+
+        // The option is knocked out: value must be 0 (no rebate).
+        let value = payoff.value(Currency::USD).amount();
+        assert_eq!(
+            value, 0.0,
+            "a down-and-out path closing below the true barrier must knock \
+             out; a non-zero value means the BGK shift was applied on top of \
+             the bridge and moved the barrier away from spot (W-43)",
         );
     }
 
