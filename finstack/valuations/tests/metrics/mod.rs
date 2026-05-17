@@ -11,6 +11,7 @@
 //! - `greek_relationships` - Mathematical relationships between Greeks
 //! - `invariants` - Property-based tests for metric invariants
 //! - `sign_conventions` - Correct sign conventions for all Greeks
+//! - `var_quantile` - Historical-simulation VaR/ES quantile-estimator tests
 //!
 //! ## Notes
 //!
@@ -26,3 +27,4 @@ mod invariants;
 mod option_provider_consolidation;
 mod sign_conventions;
 mod vanna_volga_pockets;
+mod var_quantile;
