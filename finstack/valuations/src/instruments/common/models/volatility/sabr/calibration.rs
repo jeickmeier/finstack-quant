@@ -451,21 +451,85 @@ impl SABRCalibrator {
         )
     }
 
-    /// Find ATM volatility from market data
+    /// Find the ATM volatility (volatility at `strike == forward`) from a
+    /// discrete market smile.
+    ///
+    /// The smile rarely carries a quote exactly at the forward, so this
+    /// **interpolates** the two bracketing quotes rather than snapping to the
+    /// nearest strike. Interpolation is linear in total variance `σ²·T`; since
+    /// every quote in a single-expiry slice shares the same `T`, that is
+    /// equivalent to interpolating `σ²` linearly in strike. Snapping to the
+    /// nearest strike (the previous behaviour) pins the ATM-calibration target
+    /// to a genuinely off-ATM quote whenever the grid omits the forward.
+    ///
+    /// Outside the quoted strike range the nearest endpoint vol is used (flat
+    /// extrapolation) — extrapolating an ATM level past the wings is not
+    /// meaningful.
     fn find_atm_vol(&self, forward: f64, strikes: &[f64], vols: &[f64]) -> Result<f64> {
-        // Find the strike closest to forward
-        let mut min_diff = f64::INFINITY;
-        let mut atm_vol = vols[0];
+        if strikes.is_empty() || vols.is_empty() {
+            return Err(Error::Validation(
+                "SABR find_atm_vol: empty strikes/vols".to_string(),
+            ));
+        }
+        if strikes.len() != vols.len() {
+            return Err(Error::Validation(format!(
+                "SABR find_atm_vol: strikes length ({}) must match vols length ({})",
+                strikes.len(),
+                vols.len()
+            )));
+        }
 
-        for (i, &strike) in strikes.iter().enumerate() {
-            let diff = (strike - forward).abs();
-            if diff < min_diff {
-                min_diff = diff;
-                atm_vol = vols[i];
+        // Pair and sort by strike so bracketing works regardless of input order.
+        let mut quotes: Vec<(f64, f64)> = strikes
+            .iter()
+            .copied()
+            .zip(vols.iter().copied())
+            .collect();
+        quotes.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+        // Single quote: nothing to interpolate.
+        let first = quotes
+            .first()
+            .ok_or_else(|| Error::Validation("SABR find_atm_vol: no quotes".to_string()))?;
+        let last = quotes
+            .last()
+            .ok_or_else(|| Error::Validation("SABR find_atm_vol: no quotes".to_string()))?;
+        if quotes.len() == 1 || forward <= first.0 {
+            return Ok(first.1);
+        }
+        if forward >= last.0 {
+            return Ok(last.1);
+        }
+
+        // Find the bracket [k_lo, k_hi] with k_lo <= forward < k_hi.
+        for window in quotes.windows(2) {
+            let (k_lo, v_lo) = window[0];
+            let (k_hi, v_hi) = window[1];
+            if forward >= k_lo && forward <= k_hi {
+                let span = k_hi - k_lo;
+                if span.abs() < 1e-14 {
+                    // Coincident strikes — interpolation weight is undefined;
+                    // both endpoints carry the same level, return either.
+                    return Ok(v_lo);
+                }
+                // Linear-in-variance interpolation.
+                let w = (forward - k_lo) / span;
+                let var_lo = v_lo * v_lo;
+                let var_hi = v_hi * v_hi;
+                let var_atm = var_lo + (var_hi - var_lo) * w;
+                if var_atm < 0.0 {
+                    return Err(Error::Validation(format!(
+                        "SABR find_atm_vol: interpolated variance {var_atm:.6e} is negative \
+                         (k_lo={k_lo}, k_hi={k_hi}, v_lo={v_lo}, v_hi={v_hi})"
+                    )));
+                }
+                return Ok(var_atm.sqrt());
             }
         }
 
-        Ok(atm_vol)
+        // Unreachable given the endpoint guards above, but return a defined
+        // value rather than panicking if invariants are somehow violated.
+        Ok(first.1)
     }
 
     /// Calibrate SABR with ATM volatility pinning (market-standard approach).

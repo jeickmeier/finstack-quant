@@ -39,19 +39,27 @@ impl SABRModel {
         };
 
         let alpha = self.params.alpha;
-        let mut beta = self.params.beta;
         let nu = self.params.nu;
         let rho = self.params.rho;
 
-        // Clamp beta to avoid numerical instability near 0 or 1
-        if beta < 1e-4 {
-            beta = 0.0;
-        } else if (1.0 - beta).abs() < 1e-4 {
-            beta = 1.0;
-        }
-
-        let beta_is_zero = beta.abs() < 1e-12;
-        let beta_is_one = (beta - 1.0).abs() < 1e-12;
+        // Snap β to the exact endpoints 0 or 1 when it is within `BETA_SNAP_TOL`,
+        // so the dedicated normal (β=0) and lognormal (β=1) branches engage and
+        // we avoid the numerical instability of `powf` with a near-zero
+        // exponent. The endpoint flags are decided *once*, with the *same*
+        // single tolerance, during the snap — the previous code snapped at
+        // 1e-4 and then redundantly re-classified the snapped value with a
+        // mismatched 1e-12 threshold.
+        const BETA_SNAP_TOL: f64 = 1e-4;
+        let raw_beta = self.params.beta;
+        let beta_is_zero = raw_beta < BETA_SNAP_TOL;
+        let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
+        let beta = if beta_is_zero {
+            0.0
+        } else if beta_is_one {
+            1.0
+        } else {
+            raw_beta
+        };
 
         // Calculate intermediate values with numerical protection
         let f_mid = (effective_forward * effective_strike).sqrt();
@@ -61,11 +69,17 @@ impl SABRModel {
             f_mid.powf(1.0 - beta)
         };
 
-        // Enhanced log-moneyness calculation
-        let z = if nu.abs() < 1e-14 {
-            // Handle nu ≈ 0 case (pure CEV)
-            return self.atm_volatility(effective_forward, time_to_expiry);
-        } else if beta_is_one {
+        // Enhanced log-moneyness calculation.
+        //
+        // Note: there is intentionally NO `nu ≈ 0` short-circuit here. As ν→0
+        // the general Hagan formula degenerates correctly on its own — z→0,
+        // and the z/χ(z) ratio → 1 (handled by the small-z series in
+        // `calculate_chi_robust` and the z-guard at the ATM check below).
+        // Short-circuiting to `atm_volatility` for *every* strike would
+        // fabricate a perfectly FLAT smile, which is wrong for β≠1: the
+        // SABR/CEV smile is non-flat because `factor1` depends on the strike
+        // through `f_mid`. Reference: Hagan et al. (2002) eq. 2.17a.
+        let z = if beta_is_one {
             (nu / alpha) * (effective_forward / effective_strike).ln()
         } else if beta_is_zero {
             (nu / alpha) * (effective_forward - effective_strike)
@@ -74,11 +88,20 @@ impl SABRModel {
                 / (1.0 - beta)
         };
 
-        // ATM detection using single scale-invariant relative threshold
-        // This ensures consistent behavior regardless of forward/strike scale (rates vs equities)
+        // ATM detection using a single scale-invariant relative-moneyness
+        // threshold. This stays consistent regardless of forward/strike scale
+        // (rates vs equities).
+        //
+        // The previous `z.abs() < 1e-8` clause was removed: `z` is small both
+        // for the genuine ATM degeneracy (F≈K) AND whenever ν→0 — so that
+        // clause short-circuited *every* strike to the flat ATM vol in the
+        // pure-CEV (ν→0) limit, fabricating a flat smile for β≠1. Relative
+        // moneyness alone is the correct ATM detector; the ν→0 limit is
+        // handled by the general formula (z/χ(z)→1, see `calculate_chi_robust`
+        // and the `factor2` z-series).
         let relative_diff =
             (effective_forward - effective_strike).abs() / effective_forward.max(effective_strike);
-        if relative_diff < 1e-8 || z.abs() < 1e-8 {
+        if relative_diff < 1e-8 {
             return self.atm_volatility(effective_forward, time_to_expiry);
         }
 
@@ -115,16 +138,31 @@ impl SABRModel {
             alpha / (f_mid_beta * correction_term)
         };
 
-        // Second factor (z/x correction) with numerical protection
-        let factor2 = if x.abs() < 1e-14 {
-            1.0 // Avoid division by zero
-        } else {
-            z_corrected / x
-        };
+        // Second factor: the z/χ(z) correction.
+        //
+        // The limit z/χ(z) → 1 holds only as z → 0, NOT for an arbitrary tiny
+        // χ. Fabricating `1.0` whenever `χ` underflowed silently produced a
+        // wrong factor for any genuinely-pathological χ. Instead:
+        //   - for small |z| use the Taylor ratio (well-defined, and avoids the
+        //     0/0 cancellation of computing z/χ directly),
+        //   - otherwise divide exactly,
+        //   - and if χ underflowed while z is *not* small, that is a genuine
+        //     numerical pathology — error out with context rather than guess.
+        let factor2 = self.z_over_chi(z_corrected, x)?;
 
-        // Third factor (time correction) with enhanced precision
+        // Third factor (time correction) with enhanced precision.
+        //
+        // NOTE on the β=0 branch: this β=0 path outputs *normal* (Bachelier)
+        // implied vol — `factor1 = α` (because `f_mid_beta = 1`), the
+        // normal-vol prefactor, not the Black-vol prefactor `α/F^(1-β)`. The
+        // β=0 *normal*-SABR time correction is just `(2-3ρ²)/24·ν²`
+        // (Hagan/Obloj normal-vol expansion); it has NO `α²/(24·f_mid²)`
+        // leverage term. That leverage term belongs to the *lognormal/Black*
+        // σ_B expansion (Hagan eq. 2.17a) — applying it here would be a
+        // category error and would break the exact `β=0, ν=0 ⇒ σ_N = α`
+        // Bachelier identity (a pure `dF = α·dW` process has flat normal vol).
         let time_correction = if beta_is_zero {
-            // Normal SABR time correction
+            // Normal SABR (β=0) time correction: vol-of-vol term only.
             (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2)
         } else {
             (1.0 - beta).powi(2) / 24.0 * alpha.powi(2) / f_mid.powf(2.0 * (1.0 - beta))
@@ -166,9 +204,13 @@ impl SABRModel {
         // Hagan et al. (2002) eq. 2.18:
         //   σ_ATM = α / F^(1-β) · [1 + ((1-β)²α²/24/F^(2(1-β)) + ρβνα/4/F^(1-β) + (2-3ρ²)ν²/24) · T]
         let vol = if beta_is_zero {
-            // Normal SABR (β=0): F^(1-β) = F, but the α·T·(...) time correction
-            // collapses to the normal-SABR form with no F dependence.
-            // Hagan eq. 2.18 at β=0: σ_ATM = α · (1 + (2-3ρ²)ν²/24 · T)
+            // Normal SABR (β=0): this branch outputs *normal* (Bachelier) vol
+            // with α the normal vol, so the prefactor is α (not α/F). The
+            // β=0 normal-vol time correction is `(2-3ρ²)ν²/24` ONLY — the
+            // α²/(24·F²) leverage term belongs to the lognormal/Black σ_B
+            // expansion (eq. 2.17a) and does NOT appear in the normal-vol
+            // formula. Including it would break the exact Bachelier identity
+            // `β=0, ν=0 ⇒ σ_N = α` (constant-normal-vol arithmetic BM).
             alpha * (1.0 + time_to_expiry * (2.0 - 3.0 * rho.powi(2)) / 24.0 * nu.powi(2))
         } else {
             // General β ∈ (0,1] case, including β=1.
@@ -300,6 +342,46 @@ impl SABRModel {
             // Linear interpolation with smooth weights
             Ok((1.0 - blend) * series_val + blend * exact_val)
         }
+    }
+
+    /// Compute the `z / χ(z)` correction factor in a numerically robust way.
+    ///
+    /// `chi` must be the already-computed `χ(z)` (via [`Self::calculate_chi_robust`]).
+    ///
+    /// # Behaviour
+    ///
+    /// - For small `|z|` (`< 1e-5`, matching the series region of
+    ///   `calculate_chi_robust`) the Taylor ratio is used:
+    ///   `z/χ(z) = 1 − (ρ/2)z + ((2−ρ²)/12)z² − (ρ/24)z³ + O(z⁴)`.
+    ///   This is the correct `z → 0` limit and also avoids the `0/0`
+    ///   catastrophic cancellation of dividing two near-zero numbers.
+    /// - Otherwise the exact division `z/χ(z)` is returned.
+    /// - If `χ(z)` underflowed (`|χ| < 1e-14`) while `|z|` is *not* small, the
+    ///   ratio is genuinely ill-defined for these parameters — return a
+    ///   `Validation` error rather than fabricating `1.0`.
+    #[inline]
+    pub(crate) fn z_over_chi(&self, z: f64, chi: f64) -> Result<f64> {
+        // Series region threshold mirrors `calculate_chi_robust`'s `z_low`.
+        const Z_SERIES: f64 = 1e-5;
+
+        if z.abs() < Z_SERIES {
+            let rho = self.params.rho;
+            let z2 = z * z;
+            let z3 = z2 * z;
+            // z/χ(z) Taylor coefficients (derived from χ(z) = z + (ρ/2)z²
+            // + ((2ρ²−1)/6)z³ + (ρ(5ρ²−3)/24)z⁴ via 1/(1+u) inversion).
+            return Ok(1.0 - 0.5 * rho * z + (2.0 - rho * rho) / 12.0 * z2 - rho / 24.0 * z3);
+        }
+
+        if chi.abs() < 1e-14 {
+            return Err(Error::Validation(format!(
+                "SABR z/χ(z) correction is undefined: χ(z)={:.3e} underflowed while \
+                 z={:.6e} is not small. Check parameter values (ρ={:.6}).",
+                chi, z, self.params.rho
+            )));
+        }
+
+        Ok(z / chi)
     }
 
     /// Get model parameters

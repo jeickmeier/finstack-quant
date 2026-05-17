@@ -14,6 +14,27 @@ use serde::{Deserialize, Serialize};
 /// `tracing::warn!` when this branch fires.
 const SABR_FLOOR_VOL: f64 = 1e-4;
 
+/// β-snap tolerance — kept identical to `SABRModel`'s internal `BETA_SNAP_TOL`
+/// so the analytical-derivative pathway and the `SABRModel`-backed pathway
+/// classify β (normal / lognormal / general) the same way.
+const DERIV_BETA_SNAP_TOL: f64 = 1e-4;
+
+/// Snap β to the exact endpoints 0 or 1 when it is within `DERIV_BETA_SNAP_TOL`,
+/// mirroring the snap `SABRModel::implied_volatility` applies. Without this the
+/// analytical derivatives use a raw β while the FD path (via `SABRModel`) uses
+/// a snapped β, so the two pathways classify β (normal / lognormal / general)
+/// differently for β just inside the snap band, and their gradients diverge.
+#[inline]
+fn effective_beta(raw_beta: f64) -> f64 {
+    if raw_beta < DERIV_BETA_SNAP_TOL {
+        0.0
+    } else if (1.0 - raw_beta).abs() < DERIV_BETA_SNAP_TOL {
+        1.0
+    } else {
+        raw_beta
+    }
+}
+
 /// Internal parameter bundle for derivative calculations.
 #[derive(Debug, Clone)]
 struct SABRDerivParams {
@@ -194,13 +215,19 @@ impl SABRCalibrationDerivatives {
         let f_raw = self.market_data.forward;
         let k_raw = strike;
         let t = self.market_data.time_to_expiry;
-        let beta = self.market_data.beta;
+        // Snap β to the endpoints with the SAME 1e-4 tolerance `SABRModel`
+        // uses, so the analytical pathway and the `SABRModel`-backed FD
+        // pathway classify β identically — otherwise their base vols (and
+        // hence the calibration residuals and gradients) diverge for β just
+        // inside the snap band around 0 or 1.
+        let beta = effective_beta(self.market_data.beta);
 
         // Negative-rate handling for LogNormal SABR (beta ~ 1.0).
         // Standard LogNormal SABR fails for f <= 0 or K <= 0; if the user did
         // not configure a shift we fall back to a 200 bp default ONLY when
-        // negative rates would otherwise blow up the formula.
-        let shift = if (beta - 1.0).abs() < 1e-5 && (f_raw <= 0.0 || k_raw <= 0.0) {
+        // negative rates would otherwise blow up the formula. `beta` is the
+        // already-snapped value, so the β≈1 test is now an exact `== 1.0`.
+        let shift = if (beta - 1.0).abs() < f64::EPSILON && (f_raw <= 0.0 || k_raw <= 0.0) {
             self.market_data.shift.unwrap_or(0.02)
         } else {
             self.market_data.shift.unwrap_or(0.0)
@@ -247,7 +274,9 @@ impl SABRCalibrationDerivatives {
             ((sqrt_term + z - rho) / (1.0 - rho)).ln()
         };
 
-        // Main volatility formula components
+        // Main volatility formula components. `beta` here is already snapped
+        // (see `effective_beta`) so this pathway and the `SABRModel`-backed FD
+        // pathway classify β identically near β≈0/1.
         let f_mid_power = f_mid.powf(1.0 - beta);
         let term1 = alpha
             / (f_mid_power
@@ -340,7 +369,9 @@ impl SABRCalibrationDerivatives {
     }
 
     /// Compute ATM volatility and derivatives.
-    /// Uses shifted forward 'f' if provided to handle negative rates.
+    ///
+    /// `f` is the *effective* (shift-applied) ATM forward — at ATM the strike
+    /// equals it.
     fn sabr_atm_vol_and_derivatives(
         &self,
         alpha: f64,
@@ -349,7 +380,9 @@ impl SABRCalibrationDerivatives {
         f: f64,
     ) -> (f64, f64, f64, f64) {
         let t = self.market_data.time_to_expiry;
-        let beta = self.market_data.beta;
+        // Snap β consistently with `SABRModel` (see `effective_beta`) so the
+        // ATM analytical pathway classifies β the same way near β≈0/1.
+        let beta = effective_beta(self.market_data.beta);
 
         let f_power = f.powf(1.0 - beta);
 
@@ -394,7 +427,9 @@ impl SABRCalibrationDerivatives {
     ) -> f64 {
         let f = forward;
         let t = self.market_data.time_to_expiry;
-        let beta = self.market_data.beta;
+        // Snap β consistently with `SABRModel` so this gradient term and the
+        // base vol classify β identically.
+        let beta = effective_beta(self.market_data.beta);
 
         let f_mid = (f * strike).sqrt();
         let log_fk = (f / strike).ln();
@@ -446,7 +481,9 @@ impl SABRCalibrationDerivatives {
     ) -> f64 {
         let f = forward;
         let t = self.market_data.time_to_expiry;
-        let beta = self.market_data.beta;
+        // Snap β consistently with `SABRModel` so this gradient term and the
+        // base vol classify β identically.
+        let beta = effective_beta(self.market_data.beta);
 
         let f_mid = (f * strike).sqrt();
         let log_fk = (f / strike).ln();
@@ -496,7 +533,9 @@ impl SABRCalibrationDerivatives {
     ) -> f64 {
         let f = forward;
         let t = self.market_data.time_to_expiry;
-        let beta = self.market_data.beta;
+        // Snap β consistently with `SABRModel` so this gradient term and the
+        // base vol classify β identically.
+        let beta = effective_beta(self.market_data.beta);
 
         let f_mid = (f * strike).sqrt();
         let log_fk = (f / strike).ln();
@@ -797,6 +836,71 @@ mod tests {
         check("d_sigma/d_alpha", d_alpha_provider, d_alpha_fd);
         check("d_sigma/d_nu", d_nu_provider, d_nu_fd);
         check("d_sigma/d_rho", d_rho_provider, d_rho_fd);
+    }
+
+    /// The analytical derivative path must snap β to the endpoints 0/1 with the
+    /// *same* `1e-4` tolerance [`SABRModel`] uses, so it and the FD path (which
+    /// routes through `SABRModel`) classify β consistently near β≈0/1.
+    ///
+    /// Failure mode under test: `SABRModel::implied_volatility` snaps β to 1.0
+    /// when `|1-β| < 1e-4` (and to 0.0 when `β < 1e-4`), but the analytical
+    /// `sabr_vol_and_derivatives` used the *raw* β. So β just inside the snap
+    /// band (e.g. 0.99999) and the exact endpoint (1.0) produced *different*
+    /// analytical results while `SABRModel` treated them identically — the FD
+    /// and analytic gradients then diverged near β≈0/1.
+    ///
+    /// Contract pinned here: the analytical vol+gradients for a β just inside
+    /// the snap band equal those at the exact endpoint (both snap to it).
+    #[test]
+    fn test_analytical_beta_snap_consistent_with_endpoints() {
+        let forward = 100.0;
+        let strike = 110.0;
+        let t = 1.0;
+        let alpha = 0.20;
+        let nu = 0.30;
+        let rho = -0.20;
+
+        let eval = |beta: f64| -> (f64, f64, f64, f64) {
+            let md = SABRMarketData {
+                forward,
+                time_to_expiry: t,
+                strikes: vec![strike],
+                market_vols: vec![0.20],
+                beta,
+                shift: None,
+            };
+            SABRCalibrationDerivatives::new(md).sabr_vol_and_derivatives(strike, alpha, nu, rho)
+        };
+
+        // β just inside the 1e-4 band around 1.0 must snap to exactly 1.0,
+        // producing identical vol + all three gradient components.
+        let near_one = eval(1.0 - 1e-5);
+        let exact_one = eval(1.0);
+        assert!(
+            (near_one.0 - exact_one.0).abs() < 1e-12
+                && (near_one.1 - exact_one.1).abs() < 1e-12
+                && (near_one.2 - exact_one.2).abs() < 1e-12
+                && (near_one.3 - exact_one.3).abs() < 1e-12,
+            "β=1−1e-5 must snap to β=1: near_one={near_one:?}, exact_one={exact_one:?}"
+        );
+
+        // β just inside the 1e-4 band around 0.0 must snap to exactly 0.0.
+        let near_zero = eval(1e-5);
+        let exact_zero = eval(0.0);
+        assert!(
+            (near_zero.0 - exact_zero.0).abs() < 1e-12
+                && (near_zero.1 - exact_zero.1).abs() < 1e-12
+                && (near_zero.2 - exact_zero.2).abs() < 1e-12
+                && (near_zero.3 - exact_zero.3).abs() < 1e-12,
+            "β=1e-5 must snap to β=0: near_zero={near_zero:?}, exact_zero={exact_zero:?}"
+        );
+
+        // `effective_beta` must match SABRModel's snap thresholds exactly.
+        assert!((effective_beta(1.0 - 1e-5) - 1.0).abs() < f64::EPSILON);
+        assert!(effective_beta(1e-5).abs() < f64::EPSILON);
+        // Just OUTSIDE the band: β stays unsnapped.
+        let outside = 1.0 - 2e-4;
+        assert!((effective_beta(outside) - outside).abs() < f64::EPSILON);
     }
 
     /// Verify that the **analytical** derivative path produces correct gradients
