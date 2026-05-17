@@ -319,12 +319,12 @@ fn test_oc_test_cure_amount_calculation() {
     // Act
     let result = test.calculate(&context).expect("coverage calculation");
 
-    // Cure amount = note paydown needed to restore OC ratio.
-    // denominator = 100M, numerator = 115M, required = 1.25
-    // paydown = 100M - 115M / 1.25 = 100M - 92M = 8M
+    // Cure amount = diverted cash needed to restore OC ratio. Diverted cash
+    // leaves the OC numerator at the same time it pays down notes:
+    // (115M - X) / (100M - X) = 1.25 => X = 40M.
     assert!(!result.is_passing);
     assert!(result.cure_amount.is_some());
-    assert!((result.cure_amount.unwrap().amount() - 8_000_000.0).abs() < 1.0);
+    assert!((result.cure_amount.unwrap().amount() - 40_000_000.0).abs() < 1.0);
 }
 
 // ============================================================================
@@ -479,8 +479,12 @@ fn test_ic_test_no_cure_amount() {
     // Act
     let result = test.calculate(&context).expect("coverage calculation");
 
-    // Assert: IC tests don't calculate cure amounts
-    assert!(result.cure_amount.is_none());
+    // Assert: IC breaches report the senior interest shortfall as the cure.
+    // interest due = 100M * 5% / 4 = 1.25M; cure = 1.20 * 1.25M - 1.0M = 0.5M.
+    let cure = result
+        .cure_amount
+        .expect("IC breach should calculate a cure amount");
+    assert!((cure.amount() - 500_000.0).abs() < 1.0);
 }
 
 // ============================================================================

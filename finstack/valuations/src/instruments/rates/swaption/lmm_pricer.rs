@@ -563,6 +563,7 @@ mod tests {
     /// The calibrated pricer still produces a finite, positive Bermudan
     /// price end-to-end.
     #[test]
+    #[ignore = "slow: covered by mise rust-test-slow"]
     fn calibrated_bermudan_prices_positive() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("date");
         let market = build_market(as_of);

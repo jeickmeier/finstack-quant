@@ -1627,6 +1627,7 @@ mod per_name_copula_tests {
     /// overstating the mezzanine/equity tranche values. There was zero test
     /// coverage of the Student-t copula through the engine — this closes it.
     #[test]
+    #[ignore = "slow: covered by mise rust-test-slow"]
     fn student_t_large_granular_pool_per_name_converges_to_lhp() {
         let market = MarketContext::new().insert((*discount_curve()).clone());
         let deal = clo_deal(600);
@@ -1687,6 +1688,7 @@ mod per_name_copula_tests {
     /// engine must work end-to-end for the Student-t copula, not just
     /// Gaussian.
     #[test]
+    #[ignore = "slow: covered by mise rust-test-slow"]
     fn student_t_concentration_increases_loss_dispersion() {
         let market = MarketContext::new().insert((*discount_curve()).clone());
 

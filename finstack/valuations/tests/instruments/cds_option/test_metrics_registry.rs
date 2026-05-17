@@ -128,6 +128,7 @@ fn test_metrics_registry_delta() {
 }
 
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn test_metrics_registry_all_greeks() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
@@ -164,9 +165,10 @@ fn test_metrics_registry_all_greeks() {
 }
 
 #[test]
-fn test_cds_option_dv01_bumps_swap_curve_quotes_and_uses_bloomberg_screen_convention() {
-    // CDSO IR DV01 is a swap-curve quote sensitivity. The Bloomberg screen
-    // reports the symmetric +/-1bp quote-shock PV change in bond sign.
+fn test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention() {
+    // CDSO IR DV01 is a swap-curve quote sensitivity. It uses the same
+    // central-difference sign and scale as CDS IR DV01 so portfolio aggregation
+    // across CDS and CDS options is meaningful.
     let as_of = date!(2025 - 01 - 01);
     let option = CDSOptionBuilder::new().build(as_of);
     let discount = quote_calibrated_discount(0.03, as_of);
@@ -200,12 +202,12 @@ fn test_cds_option_dv01_bumps_swap_curve_quotes_and_uses_bloomberg_screen_conven
         let bumped_market = market.clone().insert(bumped_discount);
         option.value_raw(&bumped_market, as_of).unwrap()
     };
-    let expected = -(bumped_pv(1.0) - bumped_pv(-1.0));
+    let expected = (bumped_pv(1.0) - bumped_pv(-1.0)) / 2.0;
 
     let tol = 1e-6_f64.max(1e-8 * expected.abs());
     assert!(
         (dv01 - expected).abs() <= tol,
-        "CDS option DV01 should bump swap-curve quotes and report the Bloomberg CDSO symmetric quote-shock amount: metric={dv01}, expected={expected}, diff={}, tol={tol}",
+        "CDS option DV01 should bump swap-curve quotes and report the CDS-compatible central-difference amount: metric={dv01}, expected={expected}, diff={}, tol={tol}",
         (dv01 - expected).abs()
     );
 }

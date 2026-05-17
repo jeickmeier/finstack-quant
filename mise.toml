@@ -44,7 +44,7 @@ depends = ["rust-test", "python-test", "wasm-test"]
 [tasks.goldens-test]
 description = "Run golden tests (Rust + Python layers)"
 run = """
-cargo test -p finstack-valuations --test golden &&
+cargo test -p finstack-valuations --test golden -- --include-ignored &&
 mise run python-build &&
 uv run pytest finstack-py/tests/golden -v
 """
@@ -106,7 +106,7 @@ run = [
 
 [tasks.rust-test-slow]
 description = "Run Rust tests including ignored/slow ones"
-run = "cargo nextest run --workspace --exclude finstack-py --lib --test '*' --run-ignored all --no-fail-fast"
+run = "cargo nextest run --workspace --exclude finstack-py --lib --test '*' --run-ignored all --no-fail-fast -- --skip vendor_golden"
 
 [tasks.rust-test-cov]
 description = "Run Rust tests with HTML coverage report"

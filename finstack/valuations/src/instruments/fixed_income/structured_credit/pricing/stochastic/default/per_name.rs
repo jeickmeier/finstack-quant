@@ -382,6 +382,7 @@ mod tests {
     /// `M = Z/√W`, so the LHP rate (≈ 0.0423) sat ~17% below the per-name
     /// rate (≈ 0.0513) — both verified by a scratch Monte Carlo run.
     #[test]
+    #[ignore = "slow: covered by mise rust-test-slow"]
     fn student_t_lhp_limit_parity() {
         let sim = PerNameCopulaDefault::new(
             &CopulaSpec::StudentT {

@@ -339,6 +339,7 @@ mod tests {
     /// well below the forward — this test fails hard on that bug (observed
     /// `E[S_T] ≈ 61` instead of `100` at `η = 1.9`).
     #[test]
+    #[ignore = "slow: covered by mise rust-test-slow"]
     fn rbergomi_spot_is_a_martingale() {
         use super::super::super::rng::fbm::FractionalNoiseGenerator;
         use super::super::super::rng::philox::PhiloxRng;

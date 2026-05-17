@@ -273,7 +273,8 @@ fn test_expected_variance_blends_realized_and_forward_mid_period() {
         .get(MetricId::ExpectedVariance.as_str())
         .unwrap();
 
-    // Assert - should blend realized and forward (252/7 for weekly, equity convention)
+    // Assert - realized and forward variances are annualized, so seasoned MTM
+    // blends them by elapsed day-count fraction.
     let obs_dates = swap.observation_dates();
     let used_prices: Vec<f64> = obs_dates
         .iter()
@@ -284,7 +285,7 @@ fn test_expected_variance_blends_realized_and_forward_mid_period() {
     let realized = realized_variance(&used_prices, RealizedVarMethod::CloseToClose, annualization)
         .expect("CloseToClose should succeed");
     let forward = 0.23_f64.powi(2);
-    let w = observation_weight(&swap, as_of);
+    let w = swap.time_elapsed_fraction(as_of);
     let expected = realized * w + forward * (1.0 - w);
 
     assert!((ev - expected).abs() < LOOSE_EPSILON);

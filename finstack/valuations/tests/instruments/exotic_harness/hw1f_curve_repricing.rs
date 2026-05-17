@@ -230,6 +230,7 @@ fn flat_theta_misreprices_sloped_curve() {
 /// of the ~3·se Monte-Carlo noise yet ~100× below the flat-θ drift bias the
 /// companion test pins.
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn calibrated_theta_reprices_sloped_curve() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let kappa = 0.15_f64;
@@ -285,6 +286,7 @@ fn calibrated_theta_reprices_sloped_curve() {
 /// `calibrated_theta_reprices_sloped_curve` is discretization error, not a
 /// model bias. (The flat-θ bias does NOT shrink with the grid.)
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn theta_repricing_error_converges_with_grid() {
     let kappa = 0.15_f64;
     let sigma = 0.01_f64;

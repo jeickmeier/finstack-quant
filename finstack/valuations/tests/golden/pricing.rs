@@ -4,6 +4,7 @@ use crate::golden::runner::run_golden_at_path;
 use crate::golden::walk::collect_fixture_paths_under;
 
 #[test]
+#[ignore = "slow: covered by mise goldens-test or mise rust-test-slow"]
 fn golden_pricing_fixtures_from_existing_json_files() {
     let mut paths =
         collect_fixture_paths_under("pricing").expect("pricing fixture discovery should succeed");

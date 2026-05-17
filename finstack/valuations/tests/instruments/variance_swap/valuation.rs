@@ -106,7 +106,7 @@ fn test_npv_mid_period_blends_realized_and_forward_components() {
     // Assert - compute expected manually
     let realized = swap.partial_realized_variance(&ctx, as_of).unwrap();
     let forward = swap.remaining_forward_variance(&ctx, as_of).unwrap();
-    let weight = observation_weight(&swap, as_of);
+    let weight = swap.time_elapsed_fraction(as_of);
     let expected_var = realized * weight + forward * (1.0 - weight);
     let t = swap
         .day_count
@@ -153,7 +153,7 @@ fn test_npv_mid_period_discounting_reduces_value() {
     let pv = swap.value(&ctx, as_of).unwrap();
     let realized = swap.partial_realized_variance(&ctx, as_of).unwrap();
     let forward = swap.remaining_forward_variance(&ctx, as_of).unwrap();
-    let weight = observation_weight(&swap, as_of);
+    let weight = swap.time_elapsed_fraction(as_of);
     let expected_var = realized * weight + forward * (1.0 - weight);
     let undiscounted = swap.payoff(expected_var).amount();
 

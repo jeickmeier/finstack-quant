@@ -131,6 +131,7 @@ fn test_cs01_metric_via_price_with_metrics() {
 }
 
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn test_parallel_cs01_reconciles_with_bucketed_cs01() {
     let tranche = mezzanine_tranche();
     let market = standard_market_context();

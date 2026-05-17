@@ -273,6 +273,7 @@ fn test_cs01_hazard_vs_risky_pv01_consistency() {
 }
 
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn test_bucketed_cs01_reconciles_with_parallel_under_cds_convention() {
     let as_of = date!(2026 - 03 - 20);
     let maturity = date!(2031 - 06 - 20);

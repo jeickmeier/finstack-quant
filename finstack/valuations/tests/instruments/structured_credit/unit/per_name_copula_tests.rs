@@ -165,6 +165,7 @@ fn price_with_granularity(
 /// identically and `unexpected_loss` is equal. The strict inequality below
 /// therefore fails on the parent and passes only with per-name simulation.
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn concentration_changes_loss_dispersion() {
     let concentrated = price(&clo_deal(40, 0.05, 0.25), 6_000);
     let granular = price(&clo_deal(600, 0.05, 0.25), 6_000);
@@ -186,6 +187,7 @@ fn concentration_changes_loss_dispersion() {
 /// This isolates the per-name vs LHP difference via the explicit
 /// `PoolGranularity` override.
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn concentrated_pool_per_name_tranche_pv_differs_from_lhp() {
     let deal = clo_deal(40, 0.05, 0.25);
     let per_name = price_with_granularity(&deal, 8_000, PoolGranularity::PerName);
@@ -206,6 +208,7 @@ fn concentrated_pool_per_name_tranche_pv_differs_from_lhp() {
 /// A large, granular, homogeneous pool priced per-name must converge to the
 /// LHP fast-path result for the *same* pool (per-name → LHP as `N → ∞`).
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn large_granular_pool_per_name_matches_lhp() {
     let deal = clo_deal(600, 0.03, 0.20);
     let per_name = price_with_granularity(&deal, 2_000, PoolGranularity::PerName);
@@ -235,6 +238,7 @@ fn large_granular_pool_per_name_matches_lhp() {
 /// the concentrated and granular pools price identically and the strict
 /// `concentrated > granular` inequality there cannot hold.
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn lhp_dispersion_is_independent_of_name_count() {
     let concentrated = price_with_granularity(
         &clo_deal(40, 0.05, 0.25),

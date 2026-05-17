@@ -165,6 +165,7 @@ fn test_dv01_positive() {
 }
 
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn test_all_greeks_together() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
@@ -224,6 +225,7 @@ fn test_delta_moneyness_effect() {
 }
 
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn test_gamma_peaks_atm() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);

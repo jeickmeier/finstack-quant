@@ -86,6 +86,7 @@ fn rbergomi_atm_call_is_positive_and_sane() {
 /// converge to the closed-form Black-Scholes price — a genuine, non-circular
 /// analytic reference (no golden fixture).
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn rbergomi_small_eta_converges_to_black_scholes() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
@@ -135,6 +136,7 @@ fn rbergomi_pricing_is_deterministic() {
 /// the same ballpark — a sanity guard that the RL Volterra generator handles
 /// the full H ∈ (0, ½) range without blowing up.
 #[test]
+#[ignore = "slow: covered by mise rust-test-slow"]
 fn rbergomi_atm_price_stable_across_hurst() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
