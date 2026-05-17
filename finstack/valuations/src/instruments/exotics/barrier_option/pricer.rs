@@ -945,6 +945,72 @@ mod tests {
         spot * (-q * t).exp() * n(d1) - strike * (-r * t).exp() * n(d2)
     }
 
+    /// W-43 / W-44 cross-check: the MC barrier pricer with the Brownian
+    /// bridge active (`use_gobet_miri = true`) estimates the
+    /// *continuously*-monitored barrier price, because the bridge fills in
+    /// between-step crossings. It must therefore agree with the analytical
+    /// continuous-monitoring pricer (`use_gobet_miri = false`,
+    /// `monitoring_frequency = None`) within Monte Carlo error.
+    ///
+    /// Before W-43 the MC payoff layered the Broadie–Glasserman–Kou barrier
+    /// shift on top of the bridge, biasing the price by order `βσ√Δt`; the
+    /// parity below would then fail. Before W-44 the shift also pointed the
+    /// wrong way, compounding the error.
+    #[test]
+    fn mc_bridge_barrier_matches_analytical_continuous() {
+        use finstack_monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
+
+        let as_of = date(2024, 1, 1);
+        let expiry = date(2025, 1, 1); // 1 year
+        let spot = 100.0;
+        let strike = 100.0;
+        let barrier = 80.0;
+        let vol = 0.20;
+        let rate = 0.05;
+        let div_yield = 0.0;
+
+        let market = market(as_of, spot, vol, rate, div_yield);
+
+        // Analytical continuous-monitoring reference.
+        let analytical = down_and_out_call(expiry, strike, barrier);
+        let analytical_pv = analytical
+            .value(&market, as_of)
+            .expect("analytical pv")
+            .amount();
+
+        // MC with the bridge active. A fine time grid keeps the bridge
+        // approximation tight; a large path count keeps MC error small.
+        let mc_option = BarrierOption {
+            use_gobet_miri: true,
+            ..down_and_out_call(expiry, strike, barrier)
+        };
+        let mc_pricer = BarrierOptionMcPricer {
+            config: PathDependentPricerConfig {
+                num_paths: 200_000,
+                seed: 20240101,
+                steps_per_year: 100.0,
+                min_steps: 100,
+                ..Default::default()
+            },
+        };
+        let mc_pv = mc_pricer
+            .price_internal(&mc_option, &market, as_of)
+            .expect("mc pv")
+            .amount();
+
+        // The bridge MC must converge to the continuous-monitoring price.
+        // A double-counted BGK shift of order βσ√Δt with σ=0.2, Δt=0.01
+        // would bias the barrier by ~1.2% — far outside this tolerance.
+        let tol = 0.15;
+        assert!(
+            (mc_pv - analytical_pv).abs() < tol,
+            "MC barrier with bridge must match analytical continuous price \
+             within {tol}: mc={mc_pv:.6}, analytical={analytical_pv:.6}, \
+             diff={:.6}",
+            (mc_pv - analytical_pv).abs()
+        );
+    }
+
     #[test]
     fn barrier_uao_degenerate_matches_bs() {
         use finstack_monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
