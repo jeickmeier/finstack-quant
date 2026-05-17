@@ -738,3 +738,54 @@ impl CDSTranchePricer {
         self.build_el_curve(tranche, index_data.as_ref(), &payment_dates)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// W-20: `conditional_equity_tranche_loss` evaluates `binomial_probability`
+    /// for every `k` in `0..=N`. With `N = 125` a naive factorial-based
+    /// binomial would overflow `C(125, 62)` and yield `inf`/`0`. Confirm the
+    /// binomial is numerically stable: `C(125, 62) * 0.5^125` is a finite
+    /// value matching the exact result `0.07094031336820422`.
+    #[test]
+    fn binomial_probability_finite_for_large_n() {
+        let p = binomial_probability(125, 62, 0.5);
+        assert!(p.is_finite(), "binomial_probability(125,62,0.5) must be finite, got {p}");
+        assert!(p > 0.0, "probability must be strictly positive, got {p}");
+        // Exact: comb(125,62) * 0.5^125.
+        assert!(
+            (p - 0.070_940_313_368_204_22).abs() < 1e-12,
+            "binomial_probability(125,62,0.5) = {p}, expected 0.07094031336820422"
+        );
+    }
+
+    /// W-20: the conditional equity-tranche loss must be a finite, sane number
+    /// for a full 125-name index. A binomial overflow inside the `0..=N` sum
+    /// would propagate `inf`/`NaN` into the expected loss.
+    #[test]
+    fn conditional_equity_tranche_loss_finite_for_full_index() {
+        let pricer = CDSTranchePricer::new();
+        let el = pricer.conditional_equity_tranche_loss(
+            125,   // num_constituents
+            0.03,  // detachment_notional (3% equity tranche)
+            0.10,  // conditional default probability
+            0.40,  // recovery rate
+        );
+        assert!(el.is_finite(), "conditional equity tranche loss must be finite, got {el}");
+        // Expected loss of a [0, 3%] tranche is bounded by the detachment.
+        assert!(
+            (0.0..=0.03 + 1e-12).contains(&el),
+            "equity tranche EL {el} must lie in [0, detachment]"
+        );
+
+        // The binomial pmf over 0..=N must form a valid probability mass.
+        let total: f64 = (0..=125)
+            .map(|k| binomial_probability(125, k, 0.10))
+            .sum();
+        assert!(
+            (total - 1.0).abs() < 1e-9,
+            "binomial pmf over 0..=125 must sum to 1, got {total}"
+        );
+    }
+}
