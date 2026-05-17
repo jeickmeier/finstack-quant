@@ -286,15 +286,25 @@ impl CliquetOptionMcPricer {
         let steps_per_year = self.config.steps_per_year;
         let num_steps = ((t * steps_per_year).round() as usize).max(self.config.min_steps);
 
-        // Payoff reset times
+        // Payoff reset times.
+        //
+        // A reset date at the contract start (t == 0) is a strike-set event,
+        // not a period observation: the payoff already anchors period 1 to
+        // `initial_spot`. The MC engine fires `on_event` at t=0 before any
+        // step, so passing a t=0 reset to the payoff records `initial_spot`
+        // as `reset_spots[0]`, producing a guaranteed-zero period-1 return and
+        // shifting every later period by one. Filter `t > 0` here so the
+        // payoff schedule stays consistent with `check_points` and the grid.
         let reset_times: Vec<f64> = inst
             .reset_dates
             .iter()
             .map(|&date| {
                 inst.day_count
                     .year_fraction(as_of, date, DayCountContext::default())
-                    .unwrap_or(0.0)
             })
+            .collect::<finstack_core::Result<Vec<_>>>()?
+            .into_iter()
+            .filter(|&t| t > 0.0)
             .collect();
 
         let payoff_type = match inst.payoff_type {
@@ -577,5 +587,80 @@ mod tests {
         let pv1 = compute_pv(&option, &good_market, as_of).expect("pv1");
         let pv2 = compute_pv(&option, &good_market, as_of).expect("pv2");
         assert_eq!(pv1.amount(), pv2.amount());
+    }
+
+    /// W-36: a reset date at the contract start (`t == 0`) is a strike-set
+    /// event, not a period observation. The payoff already anchors period 1 to
+    /// `initial_spot`, so a t=0 reset must be economically a no-op: the cliquet
+    /// must price identically to the same contract without that redundant reset.
+    ///
+    /// Before the fix, `reset_times` was built from ALL `reset_dates` with no
+    /// `t > 0` filter, so the t=0 reset recorded `initial_spot` as
+    /// `reset_spots[0]`. With a *positive* `local_floor` that phantom period
+    /// contributes a guaranteed `local_floor` of fake return (`0.max(floor)`),
+    /// inflating every path's payoff and making the two prices diverge.
+    #[test]
+    fn cliquet_t0_reset_is_a_strike_set_not_a_period() {
+        // as_of coincides with the first reset date.
+        let as_of = date(2024, 1, 1);
+
+        // Positive local floor: a guaranteed-zero phantom period would pay
+        // `local_floor`, so the bug is observable as a price difference.
+        let local_floor = 0.01;
+
+        // Contract WITH a redundant strike-set reset at the contract start.
+        let with_t0 = CliquetOption::builder()
+            .id(InstrumentId::new("CLIQ-T0"))
+            .underlying_ticker("SPX".to_string())
+            .reset_dates(vec![as_of, date(2024, 6, 30), date(2024, 12, 31)])
+            .expiry(date(2024, 12, 31))
+            .local_cap(0.05)
+            .local_floor(local_floor)
+            .global_cap(0.50)
+            .global_floor(0.0)
+            .notional(Money::new(100_000.0, Currency::USD))
+            .day_count(finstack_core::dates::DayCount::Act365F)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
+            .pricing_overrides(PricingOverrides::default())
+            .attributes(Attributes::new())
+            .build()
+            .expect("with-t0 cliquet");
+
+        // Same contract WITHOUT the redundant t=0 reset.
+        let without_t0 = CliquetOption::builder()
+            .id(InstrumentId::new("CLIQ-T0"))
+            .underlying_ticker("SPX".to_string())
+            .reset_dates(vec![date(2024, 6, 30), date(2024, 12, 31)])
+            .expiry(date(2024, 12, 31))
+            .local_cap(0.05)
+            .local_floor(local_floor)
+            .global_cap(0.50)
+            .global_floor(0.0)
+            .notional(Money::new(100_000.0, Currency::USD))
+            .day_count(finstack_core::dates::DayCount::Act365F)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
+            .pricing_overrides(PricingOverrides::default())
+            .attributes(Attributes::new())
+            .build()
+            .expect("without-t0 cliquet");
+
+        let mkt = market(as_of);
+        let pv_with = compute_pv(&with_t0, &mkt, as_of).expect("pv with t0 reset");
+        let pv_without = compute_pv(&without_t0, &mkt, as_of).expect("pv without t0 reset");
+
+        assert_eq!(
+            pv_with.amount(),
+            pv_without.amount(),
+            "a t=0 strike-set reset must not change the cliquet price; \
+             with={} without={}",
+            pv_with.amount(),
+            pv_without.amount()
+        );
     }
 }

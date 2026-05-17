@@ -69,7 +69,10 @@ impl CliquetCallPayoff {
     ///
     /// # Arguments
     ///
-    /// * `reset_dates` - Dates when strike resets (must be sorted, includes initial date)
+    /// * `reset_dates` - Period-end observation times in years (must be strictly
+    ///   increasing and strictly positive). Period 1 runs from the contract
+    ///   start to `reset_dates[0]` and is anchored to `initial_spot`; a t=0
+    ///   strike-set reset is NOT a period observation and must be excluded.
     /// * `local_cap` - Maximum return per period (e.g., 0.05)
     /// * `local_floor` - Minimum return per period (e.g., 0.0)
     /// * `global_cap` - Maximum total return (e.g., 0.20)
