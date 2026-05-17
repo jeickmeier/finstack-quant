@@ -30,13 +30,18 @@
 //!
 //! # Stability and the choice of `theta`
 //!
-//! Plain CS (and Douglas) with a mixed-derivative term is only
-//! *conditionally* stable for strongly correlated problems. The MCS scheme is
+//! The corrector-less Douglas scheme is unconditionally stable only for
+//! `theta >= 1/2`; at smaller `theta` it is inadmissible even for pure
+//! diffusion. The MCS corrector lowers the admissible bound: the MCS scheme is
 //! unconditionally stable (von Neumann) for `theta >= 1/3` in the pure
 //! 2D-diffusion case, and for `theta >= 2/5` in the general
 //! convection-diffusion case (In 't Hout & Mishra 2010). This stepper uses
-//! `theta = 1/3`: it is second-order accurate and robust for the Heston PDE
-//! over the correlation range used in practice.
+//! `theta = 1/3`: it is second-order accurate and is the standard literature
+//! choice for the Heston PDE (In 't Hout & Foulon 2010). The `2/5` bound is a
+//! worst-case convection-diffusion result; for the Heston PDE `1/3` remains
+//! stable in practice because the Rannacher start damps the non-smooth payoff,
+//! the Péclet numbers are modest (the convection terms `r - q - v/2` and
+//! `kappa(theta - v)` are mild), and the mixed term is diffusion-like.
 //!
 //! The implicit sweeps are tridiagonal solves reusing the 1D Thomas algorithm.
 //!
@@ -180,9 +185,10 @@ pub struct CraigSneydStepper {
     /// Whether to apply the MCS corrector stages (`Yhat0` / `Ytld_j`).
     ///
     /// Always `true` in production: the full Modified Craig-Sneyd scheme.
-    /// A test-only constructor sets this `false` to obtain the bare
-    /// first-order Douglas scheme, which is used to demonstrate that the MCS
-    /// corrector is what delivers accuracy at strong correlation.
+    /// A test-only constructor sets this `false` to obtain the bare Douglas
+    /// scheme, used to demonstrate that the corrector is what makes
+    /// `theta = 1/3` an admissible, second-order-accurate scheme (bare Douglas
+    /// is only unconditionally stable for `theta >= 1/2`).
     apply_mcs_corrector: bool,
 }
 
@@ -209,13 +215,18 @@ impl CraigSneydStepper {
         }
     }
 
-    /// Test-only: bare first-order Douglas scheme (predictor + two implicit
-    /// unidirectional correctors, no MCS corrector). Used by tests to show
-    /// that the MCS corrector is required for accuracy at high correlation.
+    /// Test-only: bare Douglas scheme (predictor + two implicit unidirectional
+    /// correctors, no MCS corrector) with a caller-chosen `theta`.
+    ///
+    /// The corrector-less Douglas scheme is unconditionally stable only for
+    /// `theta >= 1/2`; at `theta = 1/3` it is an inadmissible (unstable) scheme
+    /// even for pure diffusion. Tests use both values: `theta = 1/3` to show
+    /// that `theta = 1/3` is inadmissible *without* the MCS corrector, and
+    /// `theta = 1/2` (a legitimate scheme) as an accuracy baseline for MCS.
     #[cfg(test)]
-    pub(super) fn douglas_for_test(n_steps: usize) -> Self {
+    pub(super) fn douglas_for_test(theta: f64, n_steps: usize) -> Self {
         Self {
-            theta: MCS_THETA,
+            theta,
             implicit_start_steps: 0,
             n_steps,
             apply_mcs_corrector: false,

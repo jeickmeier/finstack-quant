@@ -330,16 +330,31 @@ mod tests {
         grid.interpolate(&u_full, spot.ln(), v0)
     }
 
-    /// At strong correlation (|rho| = 0.9) the mixed-derivative term dominates.
-    /// The Modified Craig-Sneyd corrector is what makes the ADI scheme robust
-    /// here: the bare Douglas scheme (predictor + two implicit unidirectional
-    /// correctors, no MCS corrector) is only *conditionally* stable in the
-    /// presence of a mixed-derivative term and, on this grid and step count,
-    /// is numerically unstable — it diverges by many orders of magnitude.
+    /// Modified Craig-Sneyd ADI at strong negative correlation (rho = -0.9),
+    /// validated against the independent Heston Fourier closed form.
     ///
-    /// This test pins the MCS price against the independent Heston Fourier
-    /// reference within a tight tolerance, and confirms that the MCS corrector
-    /// is what delivers a usable price where bare Douglas blows up.
+    /// What the MCS corrector buys, stated accurately. The corrector-less
+    /// Douglas scheme (predictor + two implicit unidirectional sweeps) is
+    /// unconditionally stable only for `theta >= 1/2`; at `theta = 1/3` it is
+    /// an *inadmissible* scheme — unstable even for pure diffusion, with or
+    /// without a mixed-derivative term. The production stepper runs MCS at
+    /// `theta = 1/3`, where the MCS corrector stages are exactly what make
+    /// `theta = 1/3` admissible and second-order accurate. The corrector does
+    /// not "stabilize the mixed term": it lowers the admissible `theta` bound.
+    ///
+    /// This test makes three checks on one shared grid (so differences isolate
+    /// the time-stepping scheme):
+    ///
+    /// 1. **Correctness anchor.** MCS (`theta = 1/3`, with corrector) matches
+    ///    the Heston Fourier reference to a tight tolerance at rho = -0.9.
+    /// 2. **Admissibility.** Bare Douglas at `theta = 1/3` (no corrector)
+    ///    diverges by orders of magnitude — demonstrating that `theta = 1/3`
+    ///    *requires* the MCS corrector to be a valid scheme.
+    /// 3. **Honest benefit.** Bare Douglas at `theta = 1/2` is a legitimate,
+    ///    stable scheme; MCS `theta = 1/3` achieves comparable-or-better
+    ///    accuracy against the Fourier reference. Comparing against a valid
+    ///    Douglas baseline isolates the order/admissibility gain rather than a
+    ///    spurious stability cliff.
     #[test]
     #[ignore = "slow: covered by mise rust-test-slow"]
     fn heston_pde_mcs_vs_douglas_high_correlation() {
@@ -351,7 +366,7 @@ mod tests {
         let kappa = 1.5;
         let theta_v = 0.04;
         let sigma_v = 0.3;
-        let rho = -0.9; // strong correlation: large mixed-derivative term
+        let rho = -0.9; // strong negative correlation
         let v0 = 0.04;
 
         let exact = heston_call_reference(
@@ -369,7 +384,7 @@ mod tests {
             is_call: true,
         };
 
-        // One grid shared by both schemes so the comparison isolates the
+        // One grid shared by all schemes so the comparison isolates the
         // time-stepping scheme.
         let x_min = (spot * 0.05).ln();
         let x_max = (spot * 10.0).ln();
@@ -381,7 +396,8 @@ mod tests {
 
         let n_steps = 200;
 
-        // Full Modified Craig-Sneyd scheme with Rannacher smoothing.
+        // Full Modified Craig-Sneyd scheme (theta = 1/3) with Rannacher
+        // smoothing.
         let mcs_price = solve_heston_call(
             &CraigSneydStepper::with_rannacher(4, n_steps),
             &pde,
@@ -391,9 +407,20 @@ mod tests {
             maturity,
         );
 
-        // Bare Douglas scheme (no MCS corrector), same grid and step count.
-        let douglas_price = solve_heston_call(
-            &CraigSneydStepper::douglas_for_test(n_steps),
+        // Bare Douglas at theta = 1/3 (no MCS corrector): inadmissible scheme.
+        let douglas_theta13 = solve_heston_call(
+            &CraigSneydStepper::douglas_for_test(1.0 / 3.0, n_steps),
+            &pde,
+            &Grid2D::new(gx.clone(), gy.clone()),
+            spot,
+            v0,
+            maturity,
+        );
+
+        // Bare Douglas at theta = 1/2 (no MCS corrector): a legitimate,
+        // unconditionally stable scheme — used as an accuracy baseline.
+        let douglas_theta12 = solve_heston_call(
+            &CraigSneydStepper::douglas_for_test(0.5, n_steps),
             &pde,
             &Grid2D::new(gx, gy),
             spot,
@@ -402,24 +429,109 @@ mod tests {
         );
 
         let mcs_err = (mcs_price - exact).abs() / exact;
-        let douglas_err = (douglas_price - exact).abs() / exact;
+        let douglas13_err = (douglas_theta13 - exact).abs() / exact;
+        let douglas12_err = (douglas_theta12 - exact).abs() / exact;
 
-        // MCS matches the Fourier reference tightly even at |rho| = 0.9.
+        // (1) Correctness anchor: MCS matches the Fourier reference tightly
+        // even at rho = -0.9.
         assert!(
-            mcs_err < 0.02,
+            mcs_err < 1e-3,
             "MCS vs Fourier at rho=-0.9: mcs={mcs_price:.6}, exact={exact:.6}, rel_err={mcs_err:.4e}"
         );
 
-        // Bare Douglas (no MCS corrector) is only conditionally stable with a
-        // mixed-derivative term: on this configuration it is unstable and
-        // diverges far outside any plausible price band (a non-finite or
-        // wildly large value). The MCS corrector is exactly what removes this
-        // failure mode.
-        let douglas_unstable = !douglas_price.is_finite() || douglas_err > 1.0;
+        // (2) Admissibility: bare Douglas at theta = 1/3 is an inadmissible
+        // scheme (the corrector-less scheme is unconditionally stable only for
+        // theta >= 1/2). It diverges far outside any plausible price band
+        // (non-finite or wildly large). This demonstrates that theta = 1/3
+        // *requires* the MCS corrector — not that the mixed term destabilizes
+        // Douglas (the corrector-less scheme is unstable at theta = 1/3 even
+        // for pure diffusion).
+        let douglas13_inadmissible = !douglas_theta13.is_finite() || douglas13_err > 1.0;
         assert!(
-            douglas_unstable,
-            "expected bare Douglas to be unstable at rho=-0.9 (the defect MCS fixes): \
-             douglas={douglas_price:.6}, exact={exact:.6}, rel_err={douglas_err:.4e}"
+            douglas13_inadmissible,
+            "expected bare Douglas at theta=1/3 to be inadmissible (unstable without \
+             the MCS corrector): douglas={douglas_theta13:.6}, exact={exact:.6}, \
+             rel_err={douglas13_err:.4e}"
+        );
+
+        // (3) Honest benefit: bare Douglas at theta = 1/2 is a legitimate,
+        // stable scheme and is itself reasonably accurate here. MCS at
+        // theta = 1/3 (second-order) matches the Fourier reference at least as
+        // well as the valid Douglas baseline does — isolating the
+        // order/admissibility gain rather than a spurious stability cliff.
+        assert!(
+            douglas_theta12.is_finite() && douglas12_err < 0.02,
+            "expected bare Douglas at theta=1/2 to be stable and reasonably \
+             accurate: douglas={douglas_theta12:.6}, exact={exact:.6}, \
+             rel_err={douglas12_err:.4e}"
+        );
+        assert!(
+            mcs_err <= douglas12_err + 1e-9,
+            "expected MCS (theta=1/3, second-order) to match the Fourier reference \
+             at least as well as the valid Douglas theta=1/2 baseline: \
+             mcs_err={mcs_err:.4e}, douglas_theta12_err={douglas12_err:.4e}"
+        );
+    }
+
+    /// Modified Craig-Sneyd ADI at strong *positive* correlation (rho = +0.9),
+    /// validated against the Heston Fourier closed form.
+    ///
+    /// Companion to [`heston_pde_mcs_vs_douglas_high_correlation`], which uses
+    /// rho = -0.9. The mixed-derivative term `rho * sigma_v * v` flips sign
+    /// with rho, so the cross-derivative stencil contributes with the opposite
+    /// sign here. Pinning MCS against the independent Fourier reference at
+    /// rho = +0.9 is cheap insurance against a sign-of-rho cross-stencil bug
+    /// that a single-sign test would miss.
+    #[test]
+    #[ignore = "slow: covered by mise rust-test-slow"]
+    fn heston_pde_mcs_positive_correlation() {
+        let spot: f64 = 100.0;
+        let strike = 100.0;
+        let maturity = 1.0;
+        let r = 0.03;
+        let q = 0.0;
+        let kappa = 1.5;
+        let theta_v = 0.04;
+        let sigma_v = 0.3;
+        let rho = 0.9; // strong positive correlation
+        let v0 = 0.04;
+
+        let exact = heston_call_reference(
+            spot, strike, maturity, r, q, kappa, theta_v, sigma_v, rho, v0,
+        );
+
+        let pde = HestonPde {
+            r,
+            q,
+            kappa,
+            theta_v,
+            sigma_v,
+            rho,
+            strike,
+            is_call: true,
+        };
+
+        let x_min = (spot * 0.05).ln();
+        let x_max = (spot * 10.0).ln();
+        let v_min = 0.001;
+        let v_max = 1.5;
+        let gx =
+            Grid1D::sinh_concentrated(x_min, x_max, 201, spot.ln(), 0.1).expect("valid x-grid");
+        let gy = Grid1D::sinh_concentrated(v_min, v_max, 81, theta_v, 0.15).expect("valid v-grid");
+
+        let mcs_price = solve_heston_call(
+            &CraigSneydStepper::with_rannacher(4, 200),
+            &pde,
+            &Grid2D::new(gx, gy),
+            spot,
+            v0,
+            maturity,
+        );
+
+        let mcs_err = (mcs_price - exact).abs() / exact;
+        assert!(
+            mcs_err < 1e-3,
+            "MCS vs Fourier at rho=+0.9: mcs={mcs_price:.6}, exact={exact:.6}, rel_err={mcs_err:.4e}"
         );
     }
 }
