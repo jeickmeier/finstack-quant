@@ -517,3 +517,42 @@ fn test_jtd_per_name_basis() {
     // Both use identical calculations: JTD = (1/125) × Notional × LGD
     assert_relative_eq(jtd, per_name_estimate, 1e-10, "JTD per-name basis");
 }
+
+#[test]
+fn test_jtd_uses_explicit_constituent_count_over_name_inference() {
+    // Regression (W-19): an index whose name maps to a hardcoded pool size
+    // by substring inference but whose actual series has a different
+    // membership must use the explicitly supplied `num_constituents`.
+    //
+    // "CDX.NA.HY" infers 100 names; this off-series index has only 97.
+    // JTD per name must be (1/97) × Notional × LGD, NOT (1/100) × ...
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+
+    let idx = standard_single_curve_index("CDX-HY-OFFSERIES", start, end, 10_000_000.0)
+        .with_num_constituents(97);
+    let ctx = standard_market_context(as_of);
+
+    let result = idx
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::JumpToDefault],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+    let jtd = *result.measures.get("jump_to_default").unwrap();
+
+    // Expected with the supplied count of 97.
+    let expected_97 = 10_000_000.0 * (1.0 - RECOVERY_SENIOR_UNSECURED) / 97.0;
+    assert_relative_eq(jtd, expected_97, 1e-10, "JTD uses explicit count of 97");
+
+    // And it must NOT equal the count the name (or preset default) would imply.
+    let with_default_125 = 10_000_000.0 * (1.0 - RECOVERY_SENIOR_UNSECURED) / 125.0;
+    assert!(
+        (jtd - with_default_125).abs() > 1.0,
+        "JTD must not fall back to the preset/inferred pool size: jtd={jtd}, \
+         default-125={with_default_125}"
+    );
+}

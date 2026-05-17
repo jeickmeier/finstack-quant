@@ -31,6 +31,12 @@ use finstack_core::{Error, Result};
 /// Jump-to-default calculator for CDS Index.
 pub(crate) struct JumpToDefaultCalculator;
 
+/// Last-resort guess of an index's pool size from its name.
+///
+/// Index pool sizes drift with series (iTraxx Crossover has been 75 names
+/// only since Series 9; CDX.NA.HY membership varies), so this is **only** a
+/// fallback when no explicit count was supplied. Prefer
+/// [`CDSIndex::with_num_constituents`] or a standard preset.
 fn infer_constituent_count(index_name: &str) -> Option<f64> {
     let name = index_name.to_ascii_lowercase();
     if name.contains("cdx") && name.contains("na") && name.contains("ig") {
@@ -45,6 +51,41 @@ fn infer_constituent_count(index_name: &str) -> Option<f64> {
         Some(40.0)
     } else {
         None
+    }
+}
+
+/// Resolve the constituent count to use for a `SingleCurve`-mode JTD.
+///
+/// Prefers the explicit `num_constituents` supplied on the index. Falls back
+/// to a name-substring guess only when no explicit count is available,
+/// emitting a `tracing::warn!` because such guesses ignore per-series
+/// membership drift. Errors when neither is available.
+fn resolve_constituent_count(num_constituents: Option<u32>, index_name: &str) -> Result<f64> {
+    if let Some(n) = num_constituents {
+        if n == 0 {
+            return Err(Error::Validation(format!(
+                "CDS index '{index_name}' has num_constituents = 0; jump-to-default \
+                 requires a positive pool size."
+            )));
+        }
+        return Ok(f64::from(n));
+    }
+
+    match infer_constituent_count(index_name) {
+        Some(n) => {
+            tracing::warn!(
+                index_name,
+                inferred_count = n,
+                "CDS index has no explicit num_constituents; jump-to-default is using a \
+                 name-substring guess of the pool size, which ignores per-series membership \
+                 drift. Set CDSIndex::with_num_constituents for an accurate JTD."
+            );
+            Ok(n)
+        }
+        None => Err(Error::Validation(format!(
+            "Cannot determine constituent count for CDS index '{index_name}'. Set \
+             CDSIndex::with_num_constituents (or supply constituents)."
+        ))),
     }
 }
 
@@ -84,13 +125,8 @@ impl MetricCalculator for JumpToDefaultCalculator {
         } else {
             // Simplified calculation using index-level parameters
             // Assume equal-weighted constituents
-            let num_constituents = infer_constituent_count(&index.index_name).ok_or_else(|| {
-                Error::Validation(format!(
-                    "Cannot infer constituent count for index '{}'. Provide constituents or use \
-                     a standard index name (e.g., CDX.NA.IG, CDX.NA.HY, iTraxx Europe).",
-                    index.index_name
-                ))
-            })?;
+            let num_constituents =
+                resolve_constituent_count(index.num_constituents, &index.index_name)?;
             let avg_weight = 1.0 / num_constituents;
             let lgd = 1.0 - index.protection.recovery_rate;
 
@@ -106,5 +142,50 @@ impl MetricCalculator for JumpToDefaultCalculator {
 
             Ok(signed_jtd)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn explicit_count_overrides_name_inference() {
+        // Index named "CDX.NA.HY" maps to a hardcoded 100 by name inference,
+        // but the actual series here has 97 names. The explicit count must win.
+        let resolved = resolve_constituent_count(Some(97), "CDX.NA.HY")
+            .expect("explicit count must resolve");
+        assert!(
+            (resolved - 97.0).abs() < 1e-12,
+            "expected supplied count 97, got {resolved}"
+        );
+        // Confirm the name on its own would have produced the wrong 100.
+        assert_eq!(infer_constituent_count("CDX.NA.HY"), Some(100.0));
+    }
+
+    #[test]
+    fn explicit_count_used_for_off_series_crossover() {
+        // iTraxx Crossover pre-Series-9 had 50 names, not the inferred 75.
+        let resolved = resolve_constituent_count(Some(50), "iTraxx Crossover")
+            .expect("explicit count must resolve");
+        assert!((resolved - 50.0).abs() < 1e-12, "got {resolved}");
+        assert_eq!(infer_constituent_count("iTraxx Crossover"), Some(75.0));
+    }
+
+    #[test]
+    fn falls_back_to_name_inference_when_count_absent() {
+        let resolved = resolve_constituent_count(None, "CDX.NA.IG")
+            .expect("known index name must resolve via fallback");
+        assert!((resolved - 125.0).abs() < 1e-12, "got {resolved}");
+    }
+
+    #[test]
+    fn errors_when_no_count_and_unknown_name() {
+        assert!(resolve_constituent_count(None, "BESPOKE-INDEX-XYZ").is_err());
+    }
+
+    #[test]
+    fn errors_on_zero_explicit_count() {
+        assert!(resolve_constituent_count(Some(0), "CDX.NA.IG").is_err());
     }
 }
