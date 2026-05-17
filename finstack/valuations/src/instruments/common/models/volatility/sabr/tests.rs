@@ -645,6 +645,31 @@ fn test_sabr_validate_inputs_covers_standard_and_shifted_branches() {
 }
 
 #[test]
+fn test_sabr_implied_volatility_rejects_nonpositive_time_to_expiry() {
+    // `implied_volatility` must wire in `validate_inputs`: a non-positive
+    // `time_to_expiry` is rejected up front with a clear error rather than
+    // flowing silently into the time-correction factor.
+    let model =
+        SABRModel::new(SABRParameters::new(0.2, 0.5, 0.3, -0.2).expect("valid standard params"));
+
+    let forward = 100.0;
+    let strike = 110.0;
+
+    for bad_expiry in [0.0, -1.0] {
+        let err = model
+            .implied_volatility(forward, strike, bad_expiry)
+            .expect_err("non-positive time_to_expiry must error");
+        assert!(
+            err.to_string().contains("time_to_expiry"),
+            "error should name the degenerate input, got: {err}"
+        );
+    }
+
+    // A positive expiry on the same model still succeeds.
+    assert!(model.implied_volatility(forward, strike, 1.0).is_ok());
+}
+
+#[test]
 fn test_sabr_nu_zero_short_circuit_matches_atm_vol_off_atm() {
     let params = SABRParameters::new(0.24, 0.6, 0.0, -0.35).expect("valid params");
     let model = SABRModel::new(params);

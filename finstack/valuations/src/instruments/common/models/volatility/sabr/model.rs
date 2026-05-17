@@ -24,19 +24,18 @@ impl SABRModel {
         strike: f64,
         time_to_expiry: f64,
     ) -> Result<f64> {
-        // Apply shift if using shifted SABR for negative rates
-        let (effective_forward, effective_strike) = if let Some(shift) = self.params.shift {
-            (forward + shift, strike + shift)
-        } else {
-            // Validate non-negative rates for standard SABR
-            if forward <= 0.0 || strike <= 0.0 {
-                return Err(Error::Validation(format!(
-                    "Standard SABR requires positive rates. Got forward={:.6}, strike={:.6}. \
-                     Use shifted SABR (new_with_shift) for negative rates.",
-                    forward, strike
-                )));
-            }
-            (forward, strike)
+        // Reject degenerate inputs up front so callers get a clear early error:
+        //   - non-positive `time_to_expiry` (otherwise it flows silently into
+        //     the time-correction factor),
+        //   - non-positive rates / effective rates (otherwise `f_mid.sqrt()`
+        //     of a negative argument silently produces NaN).
+        self.validate_inputs(forward, strike, time_to_expiry)?;
+
+        // Apply shift if using shifted SABR for negative rates. Rate positivity
+        // has already been enforced by `validate_inputs` above.
+        let (effective_forward, effective_strike) = match self.params.shift {
+            Some(shift) => (forward + shift, strike + shift),
+            None => (forward, strike),
         };
 
         let alpha = self.params.alpha;
