@@ -1,17 +1,19 @@
 from __future__ import annotations
 
+from finstack.core.market_data import MarketContext
+
 __all__: list[str]
 
 def validate_instrument_json(json: str) -> str: ...
 def price_instrument(
     instrument_json: str,
-    market_json: str,
+    market: MarketContext | str,
     as_of: str,
     model: str = "default",
 ) -> str: ...
 def price_instrument_with_metrics(
     instrument_json: str,
-    market_json: str,
+    market: MarketContext | str,
     as_of: str,
     model: str = "default",
     metrics: list[str] = [],

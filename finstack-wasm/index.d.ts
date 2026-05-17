@@ -752,9 +752,11 @@ export interface CorrelationNamespace {
   correlationBounds(p1: number, p2: number): number[];
   jointProbabilities(p1: number, p2: number, correlation: number): number[];
   /**
-   * Flat row-major correlation matrix with explicit dimension `n`
-   * (finstack_valuations::correlation). Same wasm export name as core/math; if
-   * both are linked, the generated binding is whichever the linker keeps last.
+   * Validate a flat row-major correlation matrix with explicit dimension `n`
+   * (finstack_valuations::correlation). Checks unit diagonal, off-diagonal in
+   * [-1, 1], symmetry, and positive semi-definiteness; throws a descriptive
+   * error otherwise. Backed by the wasm export `validateValuationsCorrelationMatrix`,
+   * distinct from core/math's nested-array `validateCorrelationMatrix`.
    */
   validateCorrelationMatrix(matrix: number[], n: number): void;
   /**
