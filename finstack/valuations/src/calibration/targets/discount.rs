@@ -57,6 +57,11 @@ pub(crate) struct DiscountCurveTargetParams {
     pub(crate) residual_notional: f64,
     /// Context needed for pricing against OTHER curves (if any).
     pub(crate) base_context: MarketContext,
+    /// OIS rate cut-off (business days) the bootstrap-internal swaps are priced
+    /// under, derived from the step-level `ois_compounding` override. Stamped
+    /// onto every solver and final curve so calibration and pricing agree on
+    /// the compounded fast-path decision. `None` for non-cut-off conventions.
+    pub(crate) calibration_ois_cutoff_days: Option<i32>,
 }
 
 /// Target for discount curve calibration (Bootstrap and Global).
@@ -96,6 +101,9 @@ pub(crate) struct DiscountCurveTarget {
     pub(crate) spot_knot: Option<(f64, f64)>,
     /// Residual normalization notional.
     pub(crate) residual_notional: f64,
+    /// OIS rate cut-off (business days) the bootstrap-internal swaps are priced
+    /// under. Stamped onto every solver/final curve. `None` for non-cut-off.
+    pub(crate) calibration_ois_cutoff_days: Option<i32>,
     /// Reusable scratch context: holds the base market data plus a slot for the
     /// in-progress curve so each residual evaluation does not have to clone the
     /// full `MarketContext`.
@@ -118,6 +126,7 @@ impl DiscountCurveTarget {
             config: params.config,
             curve_day_count: params.curve_day_count,
             residual_notional: params.residual_notional,
+            calibration_ois_cutoff_days: params.calibration_ois_cutoff_days,
             spot_knot: params.spot_knot,
             scratch,
             initial_curve: None,
@@ -389,6 +398,9 @@ Global solve requires strictly increasing times.",
             spot_knot: None,
             residual_notional,
             base_context: context.clone(),
+            calibration_ois_cutoff_days: Self::calibration_ois_cutoff_days(
+                params.conventions.ois_compounding.as_ref(),
+            ),
         });
 
         // Target-specific validation tolerance for discount curves.
@@ -545,6 +557,28 @@ Global solve requires strictly increasing times.",
             quotes: calibration_quotes,
         })
     }
+
+    /// Extract the OIS rate cut-off (business days) from the step-level
+    /// `ois_compounding` override, when it is a `CompoundedWithRateCutoff`
+    /// convention with a positive cut-off.
+    ///
+    /// This value is stamped onto every solver and final discount curve the
+    /// bootstrap produces so that the bootstrap-internal swap repricing and all
+    /// downstream single-curve OIS pricing apply the *same* compounded fast-path
+    /// decision (see `projected_compounded_float_leg_schedule`).
+    fn calibration_ois_cutoff_days(
+        ois_compounding: Option<&crate::instruments::rates::irs::FloatingLegCompounding>,
+    ) -> Option<i32> {
+        use crate::instruments::rates::irs::FloatingLegCompounding;
+        match ois_compounding {
+            Some(FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days })
+                if *cutoff_days > 0 =>
+            {
+                Some(*cutoff_days)
+            }
+            _ => None,
+        }
+    }
 }
 
 impl BootstrapTarget for DiscountCurveTarget {
@@ -608,7 +642,12 @@ impl BootstrapTarget for DiscountCurveTarget {
             .day_count(self.curve_day_count)
             .knots(knots.iter().copied())
             .interp(self.solve_interp)
-            .extrapolation(self.extrapolation);
+            .extrapolation(self.extrapolation)
+            // Stamp the calibration cut-off convention so the bootstrap-internal
+            // swap repricing takes the same compounded fast-path branch that
+            // downstream single-curve OIS pricing will take against the final
+            // curve — keeping calibration and pricing self-consistent.
+            .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days);
 
         builder = if allow_non_monotonic {
             builder.validation(
@@ -655,7 +694,11 @@ Disable allow_non_monotonic_final or choose a compatible interpolation style."
             .day_count(self.curve_day_count)
             .knots(knots.iter().copied())
             .interp(self.solve_interp)
-            .extrapolation(self.extrapolation);
+            .extrapolation(self.extrapolation)
+            // Carry the calibration cut-off convention onto the final curve so
+            // downstream single-curve OIS pricing matches the convention the
+            // bootstrap-internal swaps were repriced under.
+            .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days);
 
         if allow_non_monotonic {
             builder = builder.validation(
@@ -1136,6 +1179,7 @@ mod tests {
             spot_knot: None,
             residual_notional: 1.0,
             base_context: MarketContext::new(),
+            calibration_ois_cutoff_days: None,
         });
 
         // Mock instrument using Deposit with all required fields
@@ -1188,6 +1232,7 @@ mod tests {
             spot_knot: None,
             residual_notional: 1.0,
             base_context: MarketContext::new(),
+            calibration_ois_cutoff_days: None,
         });
 
         // Manual Simple Quote (Deposit)
@@ -1253,6 +1298,7 @@ mod tests {
                 spot_knot: None,
                 residual_notional: notional, // Different notionals
                 base_context: MarketContext::new(),
+                calibration_ois_cutoff_days: None,
             });
 
             // Create a few deposit quotes with different maturities
@@ -1354,6 +1400,7 @@ mod tests {
             spot_knot: None,
             residual_notional: 1.0,
             base_context: MarketContext::new(),
+            calibration_ois_cutoff_days: None,
         });
 
         let maturity = base_date + time::Duration::days(90);

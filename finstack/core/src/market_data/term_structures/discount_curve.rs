@@ -188,6 +188,20 @@ pub struct DiscountCurve {
     pub(crate) min_forward_tenor: f64,
     /// Optional market quotes used to bootstrap this curve.
     pub(crate) rate_calibration: Option<DiscountCurveRateCalibration>,
+    /// Rate cut-off (business days) of the OIS compounding convention this
+    /// curve was *calibrated* under, when bootstrapped with a
+    /// `CompoundedWithRateCutoff` override.
+    ///
+    /// `None` = calibrated under a non-cut-off convention (registry default),
+    /// or not calibrated from instruments at all (hand-built curve).
+    ///
+    /// Stored as a plain scalar (no dependency on the valuations-crate
+    /// `FloatingLegCompounding` enum). Single-curve OIS pricing consults this
+    /// to decide whether the `1/DF(start,end)` compounded fast path is
+    /// self-consistent with the curve's own calibration. It is stamped on
+    /// *both* the intermediate solver curves and the final curve so that the
+    /// bootstrap-internal swap repricing and downstream pricing agree.
+    pub(crate) calibration_ois_cutoff_days: Option<i32>,
 }
 
 /// Raw serializable state of DiscountCurve
@@ -217,6 +231,9 @@ struct RawDiscountCurve {
     /// Optional market quotes used to bootstrap this curve.
     #[serde(default)]
     pub rate_calibration: Option<DiscountCurveRateCalibration>,
+    /// OIS cut-off (business days) the curve was calibrated under, if any.
+    #[serde(default)]
+    pub calibration_ois_cutoff_days: Option<i32>,
 }
 
 fn default_min_forward_tenor() -> f64 {
@@ -247,6 +264,7 @@ impl From<DiscountCurve> for RawDiscountCurve {
             allow_non_monotonic: curve.allow_non_monotonic,
             min_forward_tenor: curve.min_forward_tenor,
             rate_calibration: curve.rate_calibration,
+            calibration_ois_cutoff_days: curve.calibration_ois_cutoff_days,
         }
     }
 }
@@ -263,6 +281,7 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
             .extrapolation(state.interp.extrapolation)
             .min_forward_tenor(state.min_forward_tenor)
             .rate_calibration_opt(state.rate_calibration)
+            .calibration_ois_cutoff_days_opt(state.calibration_ois_cutoff_days)
             .validation(ValidationMode::Raw {
                 allow_non_monotonic: state.allow_non_monotonic,
                 forward_floor: state.min_forward_rate,
@@ -311,6 +330,15 @@ impl DiscountCurve {
     #[inline]
     pub fn rate_calibration(&self) -> Option<&DiscountCurveRateCalibration> {
         self.rate_calibration.as_ref()
+    }
+
+    /// OIS rate cut-off (business days) this curve was calibrated under, if any.
+    ///
+    /// Returns `None` for curves calibrated under a non-cut-off convention or
+    /// hand-built curves with no calibration provenance.
+    #[inline]
+    pub fn calibration_ois_cutoff_days(&self) -> Option<i32> {
+        self.calibration_ois_cutoff_days
     }
 
     /// Number of knot points in the curve.
@@ -812,6 +840,7 @@ impl DiscountCurve {
             .extrapolation(self.extrapolation)
             .min_forward_tenor(self.min_forward_tenor)
             .rate_calibration_opt(self.rate_calibration.clone())
+            .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
             .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
             .build()
     }
@@ -918,6 +947,7 @@ impl DiscountCurve {
             .extrapolation(self.extrapolation)
             .min_forward_tenor(self.min_forward_tenor)
             .rate_calibration_opt(self.rate_calibration.clone())
+            .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
             .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
             .build()
     }
@@ -982,6 +1012,7 @@ impl DiscountCurve {
             .extrapolation(self.extrapolation)
             .min_forward_tenor(self.min_forward_tenor)
             .rate_calibration_opt(self.rate_calibration.clone())
+            .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
             .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
             .build()
     }
@@ -1045,6 +1076,7 @@ impl DiscountCurve {
             allow_non_monotonic: false, // Strict validation by default
             min_forward_tenor: DEFAULT_MIN_FORWARD_TENOR, // Default ~30 seconds
             rate_calibration: None,
+            calibration_ois_cutoff_days: None,
         }
     }
 
@@ -1057,6 +1089,7 @@ impl DiscountCurve {
             .extrapolation(self.extrapolation)
             .min_forward_tenor(self.min_forward_tenor)
             .rate_calibration_opt(self.rate_calibration.clone())
+            .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
             .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
             .knots(self.knots.iter().copied().zip(self.dfs.iter().copied()))
     }
@@ -1255,6 +1288,7 @@ pub struct DiscountCurveBuilder {
     pub(crate) allow_non_monotonic: bool,
     pub(crate) min_forward_tenor: f64,
     pub(crate) rate_calibration: Option<DiscountCurveRateCalibration>,
+    pub(crate) calibration_ois_cutoff_days: Option<i32>,
 }
 
 impl DiscountCurveBuilder {
@@ -1361,6 +1395,14 @@ impl DiscountCurveBuilder {
         self
     }
 
+    /// Record the OIS rate cut-off (business days) this curve was calibrated
+    /// under. Pass `Some(days)` only when the bootstrap used a
+    /// `CompoundedWithRateCutoff` convention; leave unset otherwise.
+    pub fn calibration_ois_cutoff_days_opt(mut self, cutoff_days: Option<i32>) -> Self {
+        self.calibration_ois_cutoff_days = cutoff_days;
+        self
+    }
+
     pub(crate) fn apply_non_monotonic_settings(
         mut self,
         allow_non_monotonic: bool,
@@ -1422,6 +1464,7 @@ impl DiscountCurveBuilder {
             allow_non_monotonic: self.allow_non_monotonic,
             min_forward_tenor: self.min_forward_tenor,
             rate_calibration: self.rate_calibration,
+            calibration_ois_cutoff_days: self.calibration_ois_cutoff_days,
         })
     }
 
@@ -1483,6 +1526,7 @@ impl DiscountCurveBuilder {
             allow_non_monotonic: self.allow_non_monotonic,
             min_forward_tenor: self.min_forward_tenor,
             rate_calibration: self.rate_calibration,
+            calibration_ois_cutoff_days: self.calibration_ois_cutoff_days,
         })
     }
 }

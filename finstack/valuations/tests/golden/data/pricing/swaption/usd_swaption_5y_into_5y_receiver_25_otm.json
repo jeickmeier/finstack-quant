@@ -300,7 +300,8 @@
           "min_forward_rate": null,
           "allow_non_monotonic": false,
           "min_forward_tenor": 1e-06,
-          "rate_calibration": null
+          "rate_calibration": null,
+          "calibration_ois_cutoff_days": 1
         },
         {
           "kind": "vol_surface",

@@ -368,21 +368,43 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         if accrual_end <= accrual_start {
             continue;
         }
-        // A discount-only OIS curve is already calibrated to the market's
-        // plain compounded-RFR convention. For unseasoned future periods, use the
-        // plain DF identity ∏(1 + r_i·dcf_i) = DF(start)/DF(end).
+        // A single-curve OIS leg can be priced via the plain compounded DF
+        // identity ∏(1 + r_i·dcf_i) = DF(start)/DF(end) for unseasoned future
+        // periods — but only when that identity is self-consistent with the
+        // convention the discount curve was *calibrated* under.
         //
-        // The fast path is only valid when there is no convention that breaks
-        // the plain compounding identity. A rate cut-off freezes the last
-        // `cutoff_days` overnight rates, so the DF identity no longer holds
-        // (the curve is calibrated to the *non*-cut-off OIS convention). Disable
-        // the fast path whenever a cut-off is configured so the daily loop below
-        // explicitly applies the lockout.
+        // W-13 narrowing: a rate cut-off freezes the last `cutoff_days`
+        // overnight rates. Whether the `1/DF` fast path is exact then depends
+        // entirely on the curve's own calibration convention:
+        //
+        //  * Curve calibrated WITHOUT the matching cut-off (registry-default
+        //    `CompoundedInArrears`): the curve's forwards encode no lockout, so
+        //    `1/DF` would price the leg as if there were no cut-off. The daily
+        //    loop must explicitly apply the lockout — fast path DISABLED.
+        //    (W-13's genuine bug; kept fixed.)
+        //
+        //  * Curve calibrated WITH the matching cut-off (e.g. Bloomberg SWPM
+        //    SOFR, `ois_compounding: CompoundedWithRateCutoff{cutoff_days}`):
+        //    the curve IS its own cut-off-consistent forward, so `1/DF` is
+        //    exact and self-consistent — re-applying the lockout in a daily
+        //    loop would fail to telescope back to the closed form and break
+        //    par-rate self-consistency. Fast path RE-ENABLED.
+        //
+        // The curve's calibration convention is recovered from
+        // `DiscountCurve::calibration_ois_cutoff_days`, which the bootstrap
+        // stamps onto every solver and final curve. Because the bootstrap-
+        // internal swaps reprice against curves carrying the same stamp, the
+        // calibration and downstream pricing always agree on this branch.
+        let cutoff_matches_calibration = match cutoff_days {
+            None => true,
+            Some(days) => disc
+                .calibration_ois_cutoff_days()
+                .is_some_and(|calibrated_days| calibrated_days == days),
+        };
         let allow_fast_path = as_of <= accrual_start
             && total_shift == 0
-            && cutoff_days.is_none()
+            && cutoff_matches_calibration
             && proj.is_none_or(|p| disc.id() == p.id());
-
         let compound_factor = if allow_fast_path {
             1.0 / crate::instruments::common_impl::pricing::swap_legs::robust_relative_df(
                 disc,
