@@ -173,11 +173,18 @@ impl HullWhiteTree {
     ///
     /// * `config` - Tree configuration (κ, σ, steps)
     /// * `discount_curve` - Initial yield curve for calibration
-    /// * `time_to_maturity` - Total tree horizon in years
+    /// * `time_to_maturity` - Total tree horizon in years (must be finite and
+    ///   strictly positive)
     ///
     /// # Returns
     ///
     /// Calibrated tree ready for pricing
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`](finstack_core::Error::Validation) if the
+    /// configuration is invalid or `time_to_maturity` is not a finite,
+    /// strictly positive number of years.
     ///
     /// # Example
     ///
@@ -196,6 +203,19 @@ impl HullWhiteTree {
         time_to_maturity: f64,
     ) -> Result<Self> {
         config.validate()?;
+
+        // Validate the tree horizon up front. Without this check a
+        // non-positive `time_to_maturity` yields `dt <= 0`, and the failure
+        // only surfaces deep inside `compute_probabilities` as the misleading
+        // "probabilities require finite, positive inputs". The `is_finite`
+        // check runs first so the subsequent `> 0.0` cannot see a `NaN`.
+        let horizon_ok = time_to_maturity.is_finite() && time_to_maturity > 0.0;
+        if !horizon_ok {
+            return Err(finstack_core::Error::Validation(format!(
+                "Hull-White tree requires a finite, strictly positive \
+                 time_to_maturity in years, got {time_to_maturity}"
+            )));
+        }
 
         let dt = time_to_maturity / config.steps as f64;
         // Standard trinomial spacing: dx = σ√(3dt) ensures variance matching
@@ -388,19 +408,20 @@ impl HullWhiteTree {
             ));
         }
 
-        // Final clamp for safety
-        p_up = p_up.clamp(0.0, 1.0);
-        p_mid = p_mid.clamp(0.0, 1.0);
-        p_down = p_down.clamp(0.0, 1.0);
-
-        // Debug assertion for development
-        debug_assert!(
-            (p_up + p_mid + p_down - 1.0).abs() < 1e-10,
-            "Probabilities must sum to 1: p_up={}, p_mid={}, p_down={}",
-            p_up,
-            p_mid,
-            p_down
-        );
+        // Enforce the probability-sum invariant in *all* builds. Each branch
+        // is already non-negative (checked above) and `sum` is strictly
+        // positive, so dividing keeps every branch in `[0, 1]` and the three
+        // sum to 1 up to rounding — no redundant final clamp is needed (a
+        // clamp here could only re-break the sum it is meant to protect).
+        // A release-mode check (rather than `debug_assert!`) guarantees a
+        // mispriced lattice can never escape this function silently.
+        let normalized_sum = p_up + p_mid + p_down;
+        if (normalized_sum - 1.0).abs() > 1.0e-9 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Hull-White probabilities failed the sum-to-one invariant at \
+                 j={j}: p_up={p_up}, p_mid={p_mid}, p_down={p_down} (sum={normalized_sum})"
+            )));
+        }
 
         Ok((p_up, p_mid, p_down))
     }
@@ -1046,6 +1067,67 @@ mod tests {
             target_df,
             error_bps
         );
+    }
+
+    #[test]
+    fn calibrate_rejects_non_positive_time_to_maturity() {
+        // `calibrate` previously never validated `time_to_maturity`: a value
+        // of `0` or negative produced `dt <= 0`, and the failure only
+        // surfaced much later inside `compute_probabilities` with the
+        // confusing message "probabilities require finite, positive inputs".
+        // It must instead fail up front with a clear maturity error.
+        let curve = test_discount_curve();
+        for &bad_t in &[0.0_f64, -1.0, -5.0] {
+            let config = HullWhiteTreeConfig::new(0.03, 0.01, 100);
+            let err = HullWhiteTree::calibrate(config, &curve, bad_t)
+                .expect_err("non-positive time_to_maturity must be rejected");
+            match err {
+                finstack_core::Error::Validation(msg) => {
+                    let lower = msg.to_lowercase();
+                    assert!(
+                        lower.contains("maturity") || lower.contains("time"),
+                        "error must clearly name the maturity input, got: {msg}"
+                    );
+                    assert!(
+                        !lower.contains("probabilit"),
+                        "error must be the up-front maturity check, not the \
+                         downstream probability check: {msg}"
+                    );
+                }
+                other => panic!("expected a validation error, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn calibrate_accepts_small_positive_time_to_maturity() {
+        // A genuinely small-but-positive horizon must still calibrate.
+        let curve = test_discount_curve();
+        let config = HullWhiteTreeConfig::new(0.03, 0.01, 10);
+        let tree = HullWhiteTree::calibrate(config, &curve, 0.25)
+            .expect("small positive maturity should calibrate");
+        assert_eq!(tree.num_steps(), 10);
+    }
+
+    #[test]
+    fn computed_probabilities_sum_to_one_in_release_builds() {
+        // The probability-sum invariant must hold even when `debug_assert!`
+        // is compiled out (release builds). Sweep interior and boundary
+        // nodes across a range of mean-reversion regimes.
+        for &(kappa, dt) in &[(0.03_f64, 0.05_f64), (0.15, 0.05), (0.50, 0.02)] {
+            let dx = 0.01 * (3.0 * dt).sqrt();
+            let j_max = (0.184 / (kappa * dt)).ceil() as usize;
+            for j in -(j_max as i32)..=(j_max as i32) {
+                let (p_up, p_mid, p_down) =
+                    HullWhiteTree::compute_probabilities(kappa, dt, dx, j, j_max)
+                        .expect("probabilities should be valid");
+                let sum = p_up + p_mid + p_down;
+                assert!(
+                    (sum - 1.0).abs() < 1e-12,
+                    "probabilities must sum to 1 (kappa={kappa}, j={j}): sum={sum}"
+                );
+            }
+        }
     }
 
     #[test]

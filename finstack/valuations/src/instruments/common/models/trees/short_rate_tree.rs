@@ -618,6 +618,15 @@ impl ShortRateTree {
     /// Ho-Lee does **not** support mean reversion because the rate-dependent
     /// drift `κ·r` breaks lattice recombination. Use [`HullWhiteTree`] for
     /// mean-reverting normal short-rate models.
+    ///
+    /// Negative short rates are a correct and expected feature of Ho-Lee and
+    /// are not treated as errors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if `mean_reversion` is non-zero, or if an
+    /// extreme volatility drives the lattice to a pathologically extreme node
+    /// discount factor (a numerically degenerate tree unfit for pricing).
     fn calibrate_ho_lee(
         &mut self,
         rates: &mut [Vec<f64>],
@@ -762,6 +771,46 @@ impl ShortRateTree {
             }
         }
 
+        // Diagnostic guard for pathologically extreme node discount factors.
+        //
+        // Ho-Lee legitimately admits negative short rates, so a node discount
+        // factor `exp(-r*dt)` modestly above 1 is expected and is NOT flagged.
+        // But an *extreme* normal volatility drives the lattice to wildly
+        // dispersed node rates: the deeply-negative tail produces a per-step
+        // DF that explodes far above 1, and the deeply-positive tail produces
+        // one that collapses toward 0. Either is a numerical-breakdown signal
+        // — the lattice is unfit for pricing. The two-sided window below spans
+        // ~140 orders of magnitude, so a normal-volatility tree (whose rates
+        // stay within a few percent) never trips it. We do not change the
+        // model (negative rates remain valid); we only refuse to return a
+        // numerically degenerate lattice silently.
+        const MAX_NODE_DISCOUNT_FACTOR: f64 = 1.0e6;
+        const MIN_NODE_DISCOUNT_FACTOR: f64 = 1.0e-30;
+        for (step, rates_step) in rates.iter().enumerate() {
+            for (node, &rate) in rates_step.iter().enumerate() {
+                let node_df = (-rate * dt).exp();
+                // `contains` is `false` for a `NaN` node_df, so the negation
+                // correctly flags non-finite values as pathological too.
+                let df_in_range = (MIN_NODE_DISCOUNT_FACTOR..=MAX_NODE_DISCOUNT_FACTOR)
+                    .contains(&node_df);
+                if !df_in_range {
+                    self.calibration_quality = Some(CalibrationResult {
+                        max_error_bps,
+                        max_error_step,
+                        fallback_count: 0,
+                        converged: false,
+                    });
+                    return Err(Error::Validation(format!(
+                        "Ho-Lee calibration produced a pathologically extreme \
+                         node discount factor {node_df:.3e} at step {step}, \
+                         node {node} (short rate {rate:.4}): the lattice is \
+                         numerically degenerate and unfit for pricing. Reduce \
+                         the volatility, the step count, or the maturity."
+                    )));
+                }
+            }
+        }
+
         self.calibration_quality = Some(CalibrationResult {
             max_error_bps,
             max_error_step,
@@ -780,6 +829,13 @@ impl ShortRateTree {
     /// instead of `σ²Δt`, tightening the rate distribution at longer horizons.
     ///
     /// Bloomberg's OAS1 "L=Lognormal" model defaults to κ = 0.03.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if a discount factor is non-positive, if
+    /// the node-rate clamp `[1e-8, 5.0]` engages materially (a tree too wide
+    /// to calibrate — the lattice would silently misprice the curve), or if
+    /// the calibrated tree fails to reprice the curve within tolerance.
     fn calibrate_bdt(
         &mut self,
         rates: &mut [Vec<f64>],
@@ -809,6 +865,24 @@ impl ShortRateTree {
         // wide trees (high vol, many steps, long maturity).
         let alpha_lb = 1e-8;
         let alpha_ub = 5.0;
+
+        // Relative tolerance for deciding that the `[alpha_lb, alpha_ub]` clamp
+        // has *materially* altered a node rate. A node rate that merely sits
+        // near a bound is fine; one that the clamp has moved by more than this
+        // fraction means the Brent objective no longer responds to `alpha` at
+        // that node, so the tree can no longer reprice the curve. When that
+        // happens the calibration is unsound and is failed below rather than
+        // silently returning a mispriced lattice (`max_error_bps` alone only
+        // *reports* the damage — it does not prevent the tree from escaping).
+        let clamp_rel_tol = 1.0e-6;
+        let materially_clamped = |raw: f64| -> bool {
+            let clamped = raw.clamp(alpha_lb, alpha_ub);
+            // Relative deviation, guarding the (here impossible) zero `raw`.
+            let denom = raw.abs().max(f64::MIN_POSITIVE);
+            (raw - clamped).abs() / denom > clamp_rel_tol
+        };
+        let mut clamp_engaged = false;
+        let mut clamp_engaged_step = 0_usize;
 
         // Initialize first step with initial short rate
         let r0 = if self.time_steps[1] > 0.0 {
@@ -889,6 +963,10 @@ impl ShortRateTree {
             let current_step_rates: Vec<f64> = (0..num_nodes)
                 .map(|j| {
                     let rate = alpha * u.powf(num_nodes as f64 - 1.0 - 2.0 * j as f64);
+                    if materially_clamped(rate) && !clamp_engaged {
+                        clamp_engaged = true;
+                        clamp_engaged_step = step;
+                    }
                     rate.clamp(alpha_lb, alpha_ub)
                 })
                 .collect();
@@ -936,6 +1014,10 @@ impl ShortRateTree {
                 // Up move: j -> j+1
                 if j + 1 < next_nodes {
                     let up_rate = alpha * u.powf(next_nodes as f64 - 1.0 - 2.0 * (j + 1) as f64);
+                    if materially_clamped(up_rate) && !clamp_engaged {
+                        clamp_engaged = true;
+                        clamp_engaged_step = step + 1;
+                    }
                     next_rates[j + 1] = up_rate.clamp(alpha_lb, alpha_ub);
                     next_state_prices[j + 1] += state_price_contribution * p;
                 }
@@ -943,6 +1025,10 @@ impl ShortRateTree {
                 // Down move: j -> j
                 if j < next_nodes {
                     let down_rate = alpha * u.powf(next_nodes as f64 - 1.0 - 2.0 * j as f64);
+                    if materially_clamped(down_rate) && !clamp_engaged {
+                        clamp_engaged = true;
+                        clamp_engaged_step = step + 1;
+                    }
                     next_rates[j] = down_rate.clamp(alpha_lb, alpha_ub);
                     next_state_prices[j] += state_price_contribution * (1.0 - p);
                 }
@@ -966,6 +1052,60 @@ impl ShortRateTree {
                 max_error_bps,
                 max_error_step
             );
+        }
+
+        // Hard repricing tolerance. A well-posed BDT tree calibrates to far
+        // below 1 bp (floating-point accumulation only); the codebase's own
+        // `CalibrationResult::is_acceptable` bar is 1 bp. This *hard error*
+        // gate is set well above that — at 25 bp — so it never rejects a
+        // merely-imperfect tree, only one that has genuinely *stopped*
+        // repricing the curve. Empirically the BDT clamp failure is bimodal:
+        // a wide tree either reprices fine (clamp engages only on vanishing-
+        // weight tail nodes) or breaks catastrophically (thousands of bp), so
+        // 25 bp cleanly separates the two. Unlike the diagnostic
+        // `max_error_bps` field — which only *reports* — this gate *enforces*
+        // the contract so a silently-mispriced tree can never be returned as
+        // `converged`. The milder 1-25 bp band is still surfaced via the
+        // `tracing::warn!` above and the `is_acceptable` / `is_good` flags.
+        const MAX_CALIBRATION_ERROR_BPS: f64 = 25.0;
+
+        // Enforce that the calibrated tree actually reprices the curve.
+        //
+        // The node-rate clamp `[1e-8, 5.0]` is applied inside the Brent
+        // objective. When it engages on a node with material Arrow-Debreu
+        // weight the objective stops responding to `alpha`, the solver settles
+        // on the wrong drift, and the lattice silently stops repricing the
+        // curve — exactly the failure this gate catches. (Clamp engagement on
+        // a deep, vanishing-weight tail node is harmless: it leaves
+        // `max_error_bps` at ~0 and is intentionally *not* failed here.)
+        //
+        // `max_error_bps` is re-derived above by an independent forward pass
+        // over the final `rates`, so it faithfully reflects any clamp-induced
+        // mispricing. When the tolerance is breached, the diagnostic message
+        // reports whether the clamp engaged (the usual root cause for a wide
+        // tree) so the caller knows which knob to turn.
+        if !max_error_bps.is_finite() || max_error_bps > MAX_CALIBRATION_ERROR_BPS {
+            self.calibration_quality = Some(CalibrationResult {
+                max_error_bps,
+                max_error_step,
+                fallback_count,
+                converged: false,
+            });
+            let clamp_note = if clamp_engaged {
+                format!(
+                    " The node-rate clamp [{alpha_lb:.0e}, {alpha_ub}] engaged \
+                     materially (first at step {clamp_engaged_step}) — the tree \
+                     is too wide; lower the volatility, the step count, or the \
+                     maturity."
+                )
+            } else {
+                String::new()
+            };
+            return Err(Error::Validation(format!(
+                "BDT calibration failed to reprice the discount curve: max \
+                 error {max_error_bps:.2} bp at step {max_error_step} exceeds \
+                 the {MAX_CALIBRATION_ERROR_BPS:.1} bp tolerance.{clamp_note}"
+            )));
         }
 
         // Store calibration result for user inspection
@@ -1397,6 +1537,46 @@ mod tests {
     }
 
     #[test]
+    fn ho_lee_calibration_flags_pathologically_extreme_node_discount_factors() {
+        // P0/item-8: Ho-Lee correctly admits negative rates, but with an
+        // extreme normal volatility the lattice produces wildly negative node
+        // rates whose per-step discount factor `exp(-r*dt)` explodes far above
+        // 1. That is a numerical-breakdown signal: the calibration must emit a
+        // diagnostic error rather than silently returning an unusable tree.
+        //
+        // sigma = 8.0 (800%/yr normal vol), 60 steps, T = 30 => dt = 0.5,
+        // sigma*sqrt(dt) ~ 5.66 per step; the lowest node after 60 steps sits
+        // near -300, so its node DF is exp(150) — astronomically extreme.
+        let curve = create_flat_curve(0.03);
+        let mut tree = ShortRateTree::ho_lee(60, 8.0);
+
+        let result = tree.calibrate(&test_curve_id(), &curve, 30.0);
+        assert!(
+            result.is_err(),
+            "Ho-Lee calibration that yields pathologically extreme node \
+             discount factors must report a diagnostic error"
+        );
+        let msg = result.expect_err("must error").to_string().to_lowercase();
+        assert!(
+            msg.contains("discount") || msg.contains("rate") || msg.contains("extreme"),
+            "error should explain the extreme-node diagnostic, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn ho_lee_calibration_succeeds_for_a_normal_volatility_tree() {
+        // The extreme-node guard must not reject ordinary trees: a normal
+        // volatility (1%) Ho-Lee tree must still calibrate cleanly even with
+        // many steps and a long horizon.
+        let curve = create_test_curve();
+        let mut tree = ShortRateTree::ho_lee(60, 0.01);
+        tree.calibrate(&test_curve_id(), &curve, 5.0)
+            .expect("a normal-volatility Ho-Lee tree must calibrate");
+        let quality = tree.calibration_result().expect("quality");
+        assert!(quality.converged, "quality={quality:?}");
+    }
+
+    #[test]
     fn test_rate_access() {
         let mut tree = ShortRateTree::ho_lee(5, 0.01);
         let curve = create_test_curve();
@@ -1822,6 +2002,49 @@ mod tests {
                 assert!(rate.is_finite() && rate > 0.0, "rate={rate}");
             }
         }
+    }
+
+    #[test]
+    fn bdt_calibration_fails_when_node_rate_clamp_engages_materially() {
+        // P0-6: BDT clamps every node rate to `[1e-8, 5.0]` inside the Brent
+        // objective. For a tree that is too wide (high vol, many steps, long
+        // horizon) the clamp saturates nodes with material Arrow-Debreu
+        // weight, the objective stops responding to `alpha`, and the
+        // calibrated tree silently *fails* to reprice the curve (here by many
+        // thousands of basis points). Calibration must NOT report success in
+        // that case — it must return an explicit error rather than a
+        // quietly-mispriced tree.
+        //
+        // sigma = 1.50, 120 steps, T = 60 => step_vol ~ 1.50*sqrt(0.5) ~ 1.06,
+        // u ~ 2.89; the lattice is so wide the clamp wrecks repricing.
+        let curve = create_flat_curve(0.05);
+        let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(120, 1.50, 0.0));
+
+        let result = tree.calibrate(&test_curve_id(), &curve, 60.0);
+        assert!(
+            result.is_err(),
+            "a BDT calibration whose node-rate clamp engages materially must \
+             fail explicitly, not return a silently-mispriced tree"
+        );
+        let msg = result.expect_err("must error").to_string().to_lowercase();
+        assert!(
+            msg.contains("clamp") || msg.contains("reprice") || msg.contains("calibrat"),
+            "error should explain the calibration / clamp failure, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn bdt_calibration_succeeds_for_a_normal_well_posed_tree() {
+        // The clamp-engagement guard must not be over-eager: an ordinary
+        // BDT tree (moderate vol, moderate horizon) whose node rates stay
+        // comfortably inside `[1e-8, 5.0]` must still calibrate cleanly.
+        let curve = create_test_curve();
+        let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(40, 0.20, 0.0));
+        tree.calibrate(&test_curve_id(), &curve, 5.0)
+            .expect("a well-posed BDT tree must calibrate");
+        let quality = tree.calibration_result().expect("quality");
+        assert!(quality.converged, "quality={quality:?}");
+        assert!(quality.is_acceptable(), "quality={quality:?}");
     }
 
     // ========================================================================

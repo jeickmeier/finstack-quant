@@ -9,7 +9,9 @@
 //! - **Tabular**: Linear interpolation from empirical calibration with flat
 //!   extrapolation at the edges.
 //!
-//! All computed hazard rates are floored at 0.0 (never negative).
+//! All computed hazard rates are finite: floored at 0.0 (never negative) and
+//! capped at a large finite ceiling so a divergent exponential / power-law
+//! mapping cannot produce a non-finite (`inf`/`NaN`) rate.
 
 use finstack_core::{InputError, Result};
 use serde::{Deserialize, Serialize};
@@ -132,9 +134,24 @@ impl EndogenousHazardSpec {
 
     // -- Core computation ---------------------------------------------------
 
+    /// Upper bound applied to every computed hazard rate.
+    ///
+    /// The exponential map `lambda_0 * exp(beta * (L - L_0))` overflows to
+    /// `+inf` for a large `beta * delta_L`; the power-law map can likewise
+    /// diverge. A non-finite hazard rate would silently poison every
+    /// downstream survival-probability and expected-loss calculation, so the
+    /// result is capped here. `1.0e6` per year already implies certain,
+    /// effectively instantaneous default (survival `exp(-lambda * dt) ~ 0`
+    /// for any non-trivial `dt`), so the cap does not distort economics.
+    const MAX_HAZARD_RATE: f64 = 1.0e6;
+
     /// Compute the hazard rate at a given leverage level.
     ///
-    /// The result is always floored at 0.0 (never negative).
+    /// The result is always finite, floored at 0.0 (never negative), and
+    /// capped at [`MAX_HAZARD_RATE`](Self::MAX_HAZARD_RATE) so a divergent
+    /// mapping cannot produce a non-finite (`inf`/`NaN`) rate. A degenerate
+    /// tabular table (empty, or with mismatched vector lengths — reachable
+    /// only via `Deserialize`, since the constructor validates) yields `0.0`.
     pub fn hazard_at_leverage(&self, leverage: f64) -> f64 {
         let raw = match &self.leverage_hazard_map {
             LeverageHazardMap::PowerLaw { exponent } => {
@@ -149,7 +166,14 @@ impl EndogenousHazardSpec {
                 hazard_points,
             } => tabular_interpolate(leverage_points, hazard_points, leverage),
         };
-        raw.max(0.0)
+        // Order matters: `clamp` would propagate a `NaN` input, so handle the
+        // non-finite case explicitly first. A `NaN` raw rate (e.g. `0 * inf`)
+        // collapses to `0.0`; `+inf` is capped; finite values are floored.
+        if raw.is_nan() {
+            0.0
+        } else {
+            raw.clamp(0.0, Self::MAX_HAZARD_RATE)
+        }
     }
 
     /// Compute the hazard rate after PIK accrual changes the notional.
@@ -185,35 +209,58 @@ impl EndogenousHazardSpec {
 /// Linear interpolation between tabular points with flat extrapolation at
 /// the edges.
 ///
-/// # Assumptions
+/// # Behaviour
 ///
-/// - `xs` and `ys` have the same length and at least one element.
-/// - `xs` is sorted in ascending order.
+/// - `xs` is expected to be sorted ascending.
+/// - A degenerate table — empty, or with `xs.len() != ys.len()` — has no
+///   well-defined hazard and returns `0.0` rather than panicking. The
+///   [`tabular`](EndogenousHazardSpec::tabular) constructor rejects such
+///   tables, but `#[derive(Deserialize)]` bypasses it, so this function is
+///   defensively total: it never panics and never indexes out of bounds.
 fn tabular_interpolate(xs: &[f64], ys: &[f64], x: f64) -> f64 {
-    assert!(
-        !xs.is_empty() && xs.len() == ys.len(),
-        "tabular_interpolate: xs and ys must be non-empty and equal length"
-    );
-
-    // Flat extrapolation below the first point.
-    if x <= xs[0] {
-        return ys[0];
-    }
-    // Flat extrapolation above the last point.
-    if x >= xs[xs.len() - 1] {
-        return ys[ys.len() - 1];
+    // Degenerate table: no data to interpolate. Walk both slices through the
+    // same bounded range so a length mismatch can never index out of bounds.
+    let n = xs.len();
+    if n == 0 || n != ys.len() {
+        return 0.0;
     }
 
-    // Find the bracketing interval and interpolate.
-    for i in 0..xs.len() - 1 {
-        if x >= xs[i] && x <= xs[i + 1] {
-            let t = (x - xs[i]) / (xs[i + 1] - xs[i]);
-            return ys[i] + t * (ys[i + 1] - ys[i]);
+    // Flat extrapolation below the first point / above the last point.
+    // `get` keeps this panic-free even though `n >= 1` is established above.
+    let (first_x, first_y) = match (xs.first(), ys.first()) {
+        (Some(&fx), Some(&fy)) => (fx, fy),
+        _ => return 0.0,
+    };
+    let (last_x, last_y) = match (xs.get(n - 1), ys.get(n - 1)) {
+        (Some(&lx), Some(&ly)) => (lx, ly),
+        _ => return 0.0,
+    };
+    if x <= first_x {
+        return first_y;
+    }
+    if x >= last_x {
+        return last_y;
+    }
+
+    // Find the bracketing interval and interpolate. `windows(2)` over paired
+    // slices avoids any manual indexing.
+    for (x_pair, y_pair) in xs.windows(2).zip(ys.windows(2)) {
+        let (x0, x1) = (x_pair[0], x_pair[1]);
+        let (y0, y1) = (y_pair[0], y_pair[1]);
+        if x >= x0 && x <= x1 {
+            let span = x1 - x0;
+            // Guard a zero-width interval (duplicate breakpoints): fall back
+            // to the left endpoint instead of dividing by zero.
+            if span.abs() <= f64::EPSILON {
+                return y0;
+            }
+            let t = (x - x0) / span;
+            return y0 + t * (y1 - y0);
         }
     }
 
     // Fallback (should not be reached for valid sorted input).
-    ys[ys.len() - 1]
+    last_y
 }
 
 // ---------------------------------------------------------------------------
@@ -294,5 +341,65 @@ mod tests {
         assert!(EndogenousHazardSpec::exponential(0.10, -1.0, 5.0).is_err());
         assert!(EndogenousHazardSpec::tabular(vec![], vec![]).is_err());
         assert!(EndogenousHazardSpec::tabular(vec![1.0], vec![0.05, 0.10]).is_err());
+    }
+
+    #[test]
+    fn deserialized_empty_tabular_does_not_panic() {
+        // The `tabular()` constructor validates, but `#[derive(Deserialize)]`
+        // bypasses it: a JSON spec with empty `leverage_points` /
+        // `hazard_points` deserialises into a `Tabular` map whose
+        // `hazard_at_leverage` previously hit a panicking `assert!`. It must
+        // instead return a finite, non-negative value.
+        let json = r#"{
+            "base_hazard_rate": 0.05,
+            "base_leverage": 1.5,
+            "leverage_hazard_map": { "Tabular": {
+                "leverage_points": [],
+                "hazard_points": []
+            }}
+        }"#;
+        let spec: EndogenousHazardSpec =
+            serde_json::from_str(json).expect("malformed-but-valid JSON deserialises");
+        let h = spec.hazard_at_leverage(2.0);
+        assert!(
+            h.is_finite() && h >= 0.0,
+            "empty tabular hazard must be finite and non-negative, got {h}"
+        );
+    }
+
+    #[test]
+    fn deserialized_mismatched_tabular_does_not_panic() {
+        // A `Tabular` map whose two vectors differ in length must not panic
+        // (the old `assert!` / panicking indexing path).
+        let json = r#"{
+            "base_hazard_rate": 0.05,
+            "base_leverage": 1.5,
+            "leverage_hazard_map": { "Tabular": {
+                "leverage_points": [1.0, 2.0, 3.0],
+                "hazard_points": [0.05]
+            }}
+        }"#;
+        let spec: EndogenousHazardSpec =
+            serde_json::from_str(json).expect("malformed-but-valid JSON deserialises");
+        let h = spec.hazard_at_leverage(2.5);
+        assert!(
+            h.is_finite() && h >= 0.0,
+            "mismatched tabular hazard must be finite and non-negative, got {h}"
+        );
+    }
+
+    #[test]
+    fn exponential_hazard_does_not_overflow_to_infinity() {
+        // `lambda_0 * exp(beta * (L - L_0))` overflows to `+inf` for a large
+        // `beta * delta_L`. A non-finite hazard rate silently poisons every
+        // downstream survival-probability and expected-loss calculation, so
+        // the model must cap it at a large finite value instead.
+        let spec = EndogenousHazardSpec::exponential(0.05, 1.0, 50.0).unwrap();
+        let h = spec.hazard_at_leverage(100.0);
+        assert!(
+            h.is_finite(),
+            "exponential hazard must stay finite, not overflow to inf, got {h}"
+        );
+        assert!(h >= 0.0, "hazard must be non-negative, got {h}");
     }
 }
