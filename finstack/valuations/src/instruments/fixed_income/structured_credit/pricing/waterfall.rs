@@ -1018,3 +1018,215 @@ mod to_currency_units_tests {
         assert!(to_currency_units(1.0, -1.0).is_err());
     }
 }
+
+#[cfg(test)]
+mod ic_diversion_tests {
+    use super::execute_waterfall;
+    use super::WaterfallContext;
+    use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
+    use crate::instruments::fixed_income::structured_credit::types::{
+        AllocationMode, DealType, PaymentCalculation, PaymentType, Pool, Recipient, RecipientType,
+        Seniority, Tranche, TrancheCoupon, TrancheStructure, WaterfallBuilder, WaterfallTier,
+    };
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::Date;
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::money::Money;
+    use time::Month;
+
+    /// W-21: when only the IC test breaches (OC test passes), the waterfall
+    /// must still divert cash. Before the fix the IC `cure_amount` was always
+    /// `None`, so `total_cure_amount` was zero and nothing was diverted.
+    #[test]
+    fn ic_only_breach_diverts_cash() {
+        let currency = Currency::USD;
+
+        // Pool with a single large performing asset: OC numerator is huge so
+        // the OC test comfortably passes.
+        let mut pool = Pool::new("POOL", DealType::CLO, currency);
+        {
+            use finstack_core::types::{CreditRating, InstrumentId};
+            use crate::instruments::fixed_income::structured_credit::types::{
+                AssetType, PoolAsset,
+            };
+            pool.assets.push(PoolAsset {
+                day_count: finstack_core::dates::DayCount::Act360,
+                id: InstrumentId::new("ASSET_0"),
+                asset_type: AssetType::FirstLienLoan {
+                    industry: Some("Technology".into()),
+                },
+                balance: Money::new(500_000_000.0, currency),
+                rate: 0.08,
+                spread_bps: Some(400.0),
+                index_id: None,
+                maturity: Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+                credit_quality: Some(CreditRating::BB),
+                industry: Some("Technology".into()),
+                obligor_id: Some("OBLIGOR_0".into()),
+                is_defaulted: false,
+                recovery_amount: None,
+                purchase_price: None,
+                acquisition_date: None,
+                smm_override: None,
+                mdr_override: None,
+            });
+        }
+
+        // Two tranches: a senior CLASS_A and a subordinated CLASS_B.
+        let class_a = Tranche::new(
+            "CLASS_A",
+            0.0,
+            70.0,
+            Seniority::Senior,
+            Money::new(100_000_000.0, currency),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+        )
+        .unwrap();
+        let class_b = Tranche::new(
+            "CLASS_B",
+            70.0,
+            100.0,
+            Seniority::Subordinated,
+            Money::new(30_000_000.0, currency),
+            TrancheCoupon::Fixed { rate: 0.08 },
+            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+        )
+        .unwrap();
+        let tranches = TrancheStructure::new(vec![class_a, class_b]).unwrap();
+
+        let waterfall = WaterfallBuilder::new(currency)
+            .add_tier(
+                WaterfallTier::new("interest", 1, PaymentType::Interest)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
+                    .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B")),
+            )
+            // Senior principal tier (CLASS_A) — diversion target. CLASS_A has
+            // a target balance of 95M so absent any breach it only takes a 5M
+            // scheduled paydown, leaving cash for the junior principal tier.
+            .add_tier(
+                WaterfallTier::new("senior_principal", 2, PaymentType::Principal)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_principal(
+                        "class_a_prin",
+                        "CLASS_A",
+                        Some(Money::new(95_000_000.0, currency)),
+                    )),
+            )
+            // Junior principal tier (CLASS_B) — divertible: on a coverage
+            // breach its cash is redirected to the senior principal tier.
+            .add_tier(
+                WaterfallTier::new("junior_principal", 3, PaymentType::Principal)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .divertible(true)
+                    .add_recipient(Recipient::tranche_principal(
+                        "class_b_prin",
+                        "CLASS_B",
+                        None,
+                    )),
+            )
+            .add_tier(
+                WaterfallTier::new("equity", 4, PaymentType::Residual)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::new(
+                        "equity_dist",
+                        RecipientType::Equity,
+                        PaymentCalculation::ResidualCash,
+                    )),
+            )
+            // OC trigger 1.05: numerator ~= 500M+cash, denominator = 130M => OC
+            // ratio ~3.9, passes easily. IC trigger 1.20: interest collections
+            // are deliberately tiny, so the IC test fails.
+            .add_coverage_trigger(CoverageTrigger {
+                tranche_id: "CLASS_A".into(),
+                oc_trigger: Some(1.05),
+                ic_trigger: Some(1.20),
+            })
+            .build()
+            .expect("build waterfall");
+
+        let market = MarketContext::new();
+        let payment_date = Date::from_calendar_date(2024, Month::April, 1).unwrap();
+        let period_start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
+
+        // Plenty of cash to distribute, but interest collections far below the
+        // interest due on the tranches => IC test breaches.
+        let context = WaterfallContext {
+            available_cash: Money::new(20_000_000.0, currency),
+            interest_collections: Money::new(100_000.0, currency),
+            payment_date,
+            period_start,
+            pool_balance: Money::new(500_000_000.0, currency),
+            market: &market,
+            tranche_balances: None,
+            deferred_interest: None,
+            reserve_balance: Money::new(0.0, currency),
+            recovery_proceeds: Money::new(0.0, currency),
+        };
+
+        let result = execute_waterfall(&waterfall, &tranches, &pool, context)
+            .expect("waterfall execution");
+
+        // OC test passes, IC test fails.
+        let oc = result
+            .coverage_tests
+            .iter()
+            .find(|(id, _, _)| id.starts_with("OC_"))
+            .expect("OC test result present");
+        let ic = result
+            .coverage_tests
+            .iter()
+            .find(|(id, _, _)| id.starts_with("IC_"))
+            .expect("IC test result present");
+        assert!(oc.2, "OC test should pass (ratio {})", oc.1);
+        assert!(!ic.2, "IC test should fail (ratio {})", ic.1);
+
+        // W-21: the IC-only breach must divert cash, and the diverted amount
+        // must equal the IC cure (the senior interest shortfall) — i.e. partial
+        // diversion. Before the fix the IC `cure_amount` was `None`, so
+        // `total_cure_amount` was zero, the partial-diversion cap was skipped,
+        // and the FULL junior tier (the entire 5M senior-principal need) was
+        // diverted instead of just the cure.
+        assert!(
+            result.diverted_cash.amount() > 0.0,
+            "IC-only breach must divert cash, got {}",
+            result.diverted_cash.amount()
+        );
+
+        // Independently derive the expected IC cure:
+        //   cure = required_ratio * interest_due(CLASS_A) - interest_collections
+        // CLASS_A has no senior tranches, so total interest due is its own.
+        let class_a = tranches
+            .tranches
+            .iter()
+            .find(|t| t.id.as_str() == "CLASS_A")
+            .expect("CLASS_A present");
+        let yf = class_a
+            .day_count
+            .year_fraction(
+                period_start,
+                payment_date,
+                finstack_core::dates::DayCountContext::default(),
+            )
+            .expect("year fraction");
+        let interest_due = class_a.current_balance.amount()
+            * class_a.coupon.current_rate(payment_date)
+            * yf;
+        let expected_cure = 1.20 * interest_due - 100_000.0;
+        assert!(expected_cure > 0.0, "test setup: IC must breach");
+
+        assert!(
+            (result.diverted_cash.amount() - expected_cure).abs() < 1.0,
+            "diverted cash {} should equal the IC cure {} (partial diversion)",
+            result.diverted_cash.amount(),
+            expected_cure
+        );
+        // Sanity: the cure is strictly smaller than the full junior tier need
+        // (5M senior-principal paydown), so this is genuine partial diversion.
+        assert!(
+            result.diverted_cash.amount() < 5_000_000.0,
+            "diversion must be cure-capped, not the full junior tier"
+        );
+    }
+}

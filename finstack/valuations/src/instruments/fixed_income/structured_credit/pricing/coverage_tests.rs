@@ -186,14 +186,24 @@ impl CoverageTest {
 
         // Cure amount = note paydown needed to restore OC ratio.
         //
-        // After paying down $X from the denominator:
-        //   new_ratio = numerator / (denominator - X) >= required_ratio
-        //   => X >= denominator - numerator / required_ratio
-        //
-        // This is the correct "diversion currency" because OC breaches are
-        // cured by paying down notes, not by adding collateral.
+        // W-22: the numerator includes `cash_balance`. Diverting cash to pay
+        // down notes removes that cash from the numerator at the same time it
+        // pays down the denominator, so the cure solves
+        //   (numerator - X) / (denominator - X) >= required_ratio
+        //   => numerator - X >= required_ratio * (denominator - X)
+        //   => X * (required_ratio - 1) >= required_ratio * denominator - numerator
+        //   => X >= (numerator - required_ratio * denominator) / (1 - required_ratio)
+        // Valid for any required_ratio != 1 (when breaching, both numerator and
+        // denominator of this expression carry the same sign, so X is positive).
+        // At required_ratio == 1 the diversion never changes the ratio, so the
+        // breach is uncurable by self-funding paydown; report a zero cure.
         let cure_amount = if !is_passing && required_ratio > 0.0 {
-            let paydown_needed = denominator.amount() - numerator.amount() / required_ratio;
+            let denom = 1.0 - required_ratio;
+            let paydown_needed = if denom.abs() > f64::EPSILON {
+                (numerator.amount() - required_ratio * denominator.amount()) / denom
+            } else {
+                0.0
+            };
             Some(Money::new(paydown_needed.max(0.0), denominator.currency()))
         } else {
             None
@@ -307,12 +317,29 @@ impl CoverageTest {
 
         let is_passing = ratio >= required_ratio;
 
+        // W-21: IC cure = cash that must be diverted to senior interest so the
+        // test clears. The IC test passes when
+        //   (interest_collections + X) / total_interest_due >= required_ratio
+        //   => X >= required_ratio * total_interest_due - interest_collections
+        // This is the senior interest shortfall against the required coverage
+        // level; without it an IC-only breach diverts zero cash.
+        let cure_amount = if !is_passing {
+            let shortfall = required_ratio * total_interest_due.amount()
+                - context.interest_collections.amount();
+            Some(Money::new(
+                shortfall.max(0.0),
+                context.interest_collections.currency(),
+            ))
+        } else {
+            None
+        };
+
         Ok(TestResult {
             test_id,
             tranche_id: context.tranche_id.to_string(),
             current_ratio: ratio,
             is_passing,
-            cure_amount: None,
+            cure_amount,
         })
     }
 }
@@ -357,7 +384,9 @@ pub struct TestResult {
     pub current_ratio: f64,
     /// Whether test is currently passing.
     pub is_passing: bool,
-    /// Cure amount if failing (OC tests only).
+    /// Cure amount if failing. For OC tests this is the note paydown needed to
+    /// restore the OC ratio; for IC tests it is the cash to divert to senior
+    /// interest so the test clears.
     pub cure_amount: Option<Money>,
 }
 
@@ -493,5 +522,115 @@ mod tests {
 
         assert!((result.current_ratio - 1.2).abs() < 0.01);
         assert!(result.is_passing);
+    }
+
+    /// W-22: the OC cure amount must account for the cash term leaving the
+    /// numerator when it is diverted to pay down notes. Diverting the computed
+    /// cure must bring the OC ratio to exactly the required ratio.
+    #[test]
+    fn test_oc_cure_with_cash_in_numerator_restores_exact_ratio() {
+        // Numerator = collateral (90k, stays) + cash (30k, leaves on diversion).
+        // Denominator = 100k. Ratio = 120k / 100k = 1.20, breaches a 1.25 trigger.
+        let pool = Pool::new("TEST", DealType::CLO, Currency::USD);
+        let required_ratio = 1.25_f64;
+        let test = CoverageTest::new_oc(required_ratio);
+
+        let tranche = Tranche::new(
+            "SENIOR",
+            0.0,
+            100.0,
+            Seniority::Senior,
+            Money::new(100_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
+        )
+        .expect("Valid tranche");
+        let tranches = TrancheStructure::new(vec![tranche]).expect("Valid tranche structure");
+
+        let collateral = 90_000.0_f64;
+        let cash = 30_000.0_f64;
+        let context = TestContext {
+            pool: &pool,
+            tranches: &tranches,
+            tranche_id: "SENIOR",
+            as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            period_start: None,
+            cash_balance: Money::new(cash, Currency::USD),
+            interest_collections: Money::new(0.0, Currency::USD),
+            haircuts: None,
+            par_value_threshold: None,
+            market: None,
+            tranche_balances: None,
+            current_pool_balance: Some(Money::new(collateral, Currency::USD)),
+        };
+
+        let result = test.calculate(&context).expect("calculation should succeed");
+        assert!(!result.is_passing, "OC test should breach (ratio 1.20 < 1.25)");
+
+        let cure = result.cure_amount.expect("breach must yield a cure amount");
+        let x = cure.amount();
+        assert!(
+            x <= cash + 1e-6,
+            "cure {x} should be fundable from available cash {cash}"
+        );
+
+        // numerator = collateral + cash, denominator = 100k.
+        let numerator = collateral + cash;
+        let denominator = 100_000.0_f64;
+        // Diverting X removes cash from the numerator AND pays down the
+        // denominator. The cured ratio must equal the required ratio exactly.
+        let cured_ratio = (numerator - x) / (denominator - x);
+        assert!(
+            (cured_ratio - required_ratio).abs() < 1e-6,
+            "cured ratio {cured_ratio} should equal required {required_ratio}; cure X={x}"
+        );
+    }
+
+    /// W-21: an IC-test breach must produce a non-`None` cure amount equal to
+    /// the senior interest shortfall, so IC-only breaches actually divert cash.
+    #[test]
+    fn test_ic_breach_yields_senior_interest_shortfall_cure() {
+        let pool = Pool::new("TEST", DealType::CLO, Currency::USD);
+        let required_ratio = 1.20_f64;
+        let test = CoverageTest::new_ic(required_ratio);
+
+        let tranche = Tranche::new(
+            "TEST_TRANCHE",
+            0.0,
+            100.0,
+            Seniority::Senior,
+            Money::new(100_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
+        )
+        .expect("Valid tranche");
+        let tranches = TrancheStructure::new(vec![tranche]).expect("Valid tranche structure");
+
+        // Interest collections far below interest due => IC test breaches.
+        let context = TestContext {
+            pool: &pool,
+            tranches: &tranches,
+            tranche_id: "TEST_TRANCHE",
+            as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            period_start: None,
+            cash_balance: Money::new(0.0, Currency::USD),
+            interest_collections: Money::new(100.0, Currency::USD),
+            haircuts: None,
+            par_value_threshold: None,
+            market: None,
+            tranche_balances: None,
+            current_pool_balance: None,
+        };
+
+        let result = test.calculate(&context).expect("calculation should succeed");
+        assert!(!result.is_passing, "IC test should breach");
+        let cure = result
+            .cure_amount
+            .expect("an IC breach must yield a non-None cure amount");
+        assert!(
+            cure.amount() > 0.0,
+            "IC cure must be positive (the interest shortfall), got {}",
+            cure.amount()
+        );
     }
 }
