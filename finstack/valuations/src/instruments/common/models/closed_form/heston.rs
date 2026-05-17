@@ -151,7 +151,10 @@ impl HestonParams {
                 sigma_v = params.sigma_v,
                 rho = params.rho,
                 v0 = params.v0,
-                "Heston Feller condition violated (2κθ ≤ σ²): variance may reach zero"
+                "Heston Feller condition violated (2κθ ≤ σ²): informational only — the \
+                 Fourier pricer never simulates the variance path, so this poses no \
+                 zero-variance pricing risk; relevant only for Monte Carlo simulation \
+                 of the variance process"
             );
         }
 
