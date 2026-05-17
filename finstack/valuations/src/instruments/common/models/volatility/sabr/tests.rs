@@ -318,6 +318,63 @@ fn test_sabr_chi_function_stability() {
     assert!(chi_rho_minus_one.is_ok());
 }
 
+/// The `z/χ(z)` correction (`factor2`) must use the well-defined `z→0` limit
+/// for small z and must NOT fabricate `1.0` for an arbitrary tiny χ.
+///
+/// Failure mode under test: the old `factor2` was `if x.abs() < 1e-14 { 1.0 }`.
+/// `z/χ(z) → 1` only as `z → 0`; a tiny χ with a non-tiny z is a genuine
+/// numerical pathology, not a `1.0` limit. The fix uses the Taylor ratio
+/// `1 − (ρ/2)z + ((2−ρ²)/12)z² − (ρ/24)z³` for small z and errors otherwise.
+#[test]
+fn test_sabr_z_over_chi_uses_series_not_fabricated_one() {
+    let rho = -0.35_f64;
+    let model = SABRModel::new(SABRParameters::new(0.2, 0.5, 0.3, rho).expect("valid params"));
+
+    // For a small but non-zero z, the ratio must follow the Taylor series,
+    // i.e. it must be measurably different from a fabricated 1.0.
+    let z = 1e-6_f64;
+    // χ(z) for this z (exact formula) — well above the 1e-14 underflow guard.
+    let chi = model
+        .calculate_chi_robust(z)
+        .expect("χ(z) should compute for small z");
+    let ratio = model
+        .z_over_chi(z, chi)
+        .expect("z/χ(z) should compute for small z");
+
+    // Expected first-order series value: 1 − (ρ/2)·z.
+    let expected = 1.0 - 0.5 * rho * z + (2.0 - rho * rho) / 12.0 * z * z;
+    assert!(
+        (ratio - expected).abs() < 1e-13,
+        "z/χ(z) small-z branch must use the Taylor ratio: got {ratio:.15}, expected {expected:.15}"
+    );
+    // It must NOT be the fabricated constant 1.0 (ρ≠0 ⇒ first-order term ≠ 0).
+    assert!(
+        (ratio - 1.0).abs() > 1e-9,
+        "z/χ(z) must not fabricate 1.0 for a small but non-zero z (ratio={ratio})"
+    );
+
+    // Genuinely-pathological case: χ underflowed while z is not small ⇒ error,
+    // not a fabricated 1.0.
+    let pathological = model.z_over_chi(0.5, 1e-20);
+    assert!(
+        pathological.is_err(),
+        "z/χ(z) must error when χ underflows for a non-small z, got {pathological:?}"
+    );
+
+    // Exact-division branch for a normal (non-small) z still works.
+    let z_big = 0.3_f64;
+    let chi_big = model
+        .calculate_chi_robust(z_big)
+        .expect("χ should compute for moderate z");
+    let ratio_big = model
+        .z_over_chi(z_big, chi_big)
+        .expect("z/χ(z) should compute for moderate z");
+    assert!(
+        (ratio_big - z_big / chi_big).abs() < 1e-14,
+        "z/χ(z) moderate-z branch must be exact division"
+    );
+}
+
 // ===================================================================
 // Market Standards Validation Tests (Priority 1, Task 1.2)
 // ===================================================================
@@ -669,26 +726,160 @@ fn test_sabr_implied_volatility_rejects_nonpositive_time_to_expiry() {
     assert!(model.implied_volatility(forward, strike, 1.0).is_ok());
 }
 
+/// Regression: the ν→0 (pure CEV) limit must produce a **non-flat** smile for
+/// β≠1.
+///
+/// Failure mode under test (the deleted `test_sabr_nu_zero_short_circuit_*`
+/// asserted the *opposite*, incorrect behavior): the old code short-circuited
+/// `implied_volatility` to `atm_volatility` for *every* strike whenever
+/// `nu.abs() < 1e-14`, fabricating a perfectly flat smile. For β≠1 the SABR/CEV
+/// smile is genuinely non-flat: `factor1 = α/(f_mid^(1-β)·correction)` depends
+/// on the strike through `f_mid`, and the z/χ(z) ratio is a well-defined limit
+/// (→1) as ν→0. Reference: Hagan et al. (2002) eq. 2.17a.
 #[test]
-fn test_sabr_nu_zero_short_circuit_matches_atm_vol_off_atm() {
-    let params = SABRParameters::new(0.24, 0.6, 0.0, -0.35).expect("valid params");
+fn test_sabr_nu_zero_smile_is_non_flat_for_beta_half() {
+    // β = 0.5 (rates-standard CEV), ν exactly 0 → pure CEV smile.
+    let params = SABRParameters::new(0.24, 0.5, 0.0, -0.35).expect("valid params");
     let model = SABRModel::new(params);
 
     let forward = 100.0;
-    let strike = 120.0;
     let expiry = 1.5;
 
-    let off_atm = model
-        .implied_volatility(forward, strike, expiry)
-        .expect("vol should compute");
-    let atm = model
+    let vol_itm = model
+        .implied_volatility(forward, 80.0, expiry)
+        .expect("ITM vol should compute");
+    let vol_atm = model
+        .implied_volatility(forward, forward, expiry)
+        .expect("ATM vol should compute");
+    let vol_otm = model
+        .implied_volatility(forward, 120.0, expiry)
+        .expect("OTM vol should compute");
+
+    // The CEV smile must NOT be flat: a flat-smile short-circuit would make all
+    // three equal. With β=0.5 the backbone slopes — ITM > ATM > OTM here.
+    let spread = vol_itm - vol_otm;
+    assert!(
+        spread > 1e-3,
+        "ν→0 β=0.5 smile must be non-flat: itm={vol_itm}, atm={vol_atm}, otm={vol_otm}"
+    );
+    assert!(
+        (vol_itm - vol_atm).abs() > 1e-4 && (vol_atm - vol_otm).abs() > 1e-4,
+        "ν→0 smile must vary strike-to-strike: itm={vol_itm}, atm={vol_atm}, otm={vol_otm}"
+    );
+
+    // The ν→0 ATM point still coincides with `atm_volatility` (true ATM degeneracy).
+    let atm_direct = model
         .atm_volatility(forward, expiry)
         .expect("ATM vol should compute");
-
     assert!(
-        (off_atm - atm).abs() < 1e-12,
-        "nu == 0 path should fall back to ATM volatility"
+        (vol_atm - atm_direct).abs() < 1e-10,
+        "ATM strike should still match atm_volatility: {vol_atm} vs {atm_direct}"
     );
+}
+
+/// The β=0 (normal SABR) time correction is `(2-3ρ²)/24·ν²` ONLY — it must
+/// NOT carry an `α²/(24·f_mid²)` leverage term.
+///
+/// Context: an audit flagged the β=0 branch as "dropping" the
+/// `(1-β)²α²/(24·f_mid^(2(1-β)))` leverage term of Hagan eq. 2.17a. That is a
+/// false positive — eq. 2.17a is the *lognormal/Black* σ_B expansion. This
+/// β=0 code path outputs *normal* (Bachelier) vol: `factor1 = α` is the
+/// normal-vol prefactor (not the Black-vol prefactor `α/F^(1-β)`). The β=0
+/// *normal*-SABR time correction is the vol-of-vol term only; the α²-leverage
+/// term is the normal→Black convexity conversion and lives solely in the
+/// Black σ_B formula. Including it would break the exact Bachelier identity
+/// (next test) and over-state the normal smile.
+///
+/// Reference (β=0 normal-SABR, Hagan/Obloj normal-vol expansion), computed
+/// independently in Python for α=0.012, β=0, ν=0.25, ρ=-0.20, F=0.03, T=2.0:
+///
+///   OFF-ATM K=0.045:
+///     z       = (ν/α)·(F−K)            = -0.3125
+///     χ(z)    = ln((√disc+z−ρ)/(1−ρ))  = -0.317301581174726
+///     factor1 = α (f_mid^(1-β)=1)      = 0.012
+///     factor2 = z/χ(z)                 = 0.984867452733927
+///     tc      = (2-3ρ²)/24·ν²          = 0.004895833333333  (no leverage term)
+///     vol     = factor1·factor2·(1+T·tc) = 0.011934131358503
+///   ATM K=F=0.03:
+///     vol_atm = α·(1+T·tc)             = 0.012117500000000
+#[test]
+fn test_sabr_beta_zero_time_correction_is_vol_of_vol_only() {
+    let params = SABRParameters::new(0.012, 0.0, 0.25, -0.20).expect("valid β=0 params");
+    let model = SABRModel::new(params);
+
+    let forward = 0.03_f64;
+    let expiry = 2.0_f64;
+
+    // Off-ATM: locks the β=0 branch of `implied_volatility`.
+    let off_atm = model
+        .implied_volatility(forward, 0.045, expiry)
+        .expect("β=0 off-ATM vol should compute");
+    assert!(
+        (off_atm - 0.011_934_131_358_503).abs() < 1e-12,
+        "β=0 off-ATM normal-SABR time correction is vol-of-vol only \
+         (no α²/(24·f_mid²) leverage term): got {off_atm:.15}, expected 0.011934131358503"
+    );
+
+    // ATM: locks the β=0 branch of `atm_volatility`.
+    let atm = model
+        .atm_volatility(forward, expiry)
+        .expect("β=0 ATM vol should compute");
+    assert!(
+        (atm - 0.012_117_500_000_000).abs() < 1e-12,
+        "β=0 ATM normal-SABR time correction is vol-of-vol only: \
+         got {atm:.15}, expected 0.012117500000000"
+    );
+
+    // The off-ATM β=0 path and `atm_volatility` must agree at the ATM strike.
+    let at_strike = model
+        .implied_volatility(forward, forward, expiry)
+        .expect("β=0 ATM-strike vol should compute");
+    assert!(
+        (at_strike - atm).abs() < 1e-12,
+        "β=0 ATM-strike implied vol {at_strike} must match atm_volatility {atm}"
+    );
+}
+
+/// Bachelier identity: β=0, ν=0 ⇒ normal implied vol equals α exactly, flat
+/// across strikes and maturities.
+///
+/// The β=0 SABR SDE is `dF = α·F^0·dW = α·dW` — pure arithmetic Brownian
+/// motion with *constant* normal volatility α. Its normal implied vol is
+/// therefore exactly α everywhere, with NO time correction. This identity is
+/// what makes the (false-positive) "add the α² leverage term to β=0" audit
+/// item provably wrong: a leverage term would push β=0/ν=0 ATM vol away from
+/// α. This test pins the identity so the β=0 normal branch cannot regress.
+#[test]
+fn test_sabr_beta_zero_nu_zero_is_flat_bachelier_alpha() {
+    let alpha = 0.012_f64;
+    let model = SABRModel::new(
+        SABRParameters::new(alpha, 0.0, 0.0, 0.0).expect("β=0, ν=0 params are valid"),
+    );
+
+    for &forward in &[0.02_f64, 0.03, 0.05] {
+        for &expiry in &[0.5_f64, 2.0, 10.0] {
+            // ATM.
+            let atm = model
+                .atm_volatility(forward, expiry)
+                .expect("β=0,ν=0 ATM vol should compute");
+            assert!(
+                (atm - alpha).abs() < 1e-12,
+                "β=0,ν=0 ATM normal vol must equal α={alpha} (Bachelier): \
+                 got {atm} at F={forward}, T={expiry}"
+            );
+            // Off-ATM strikes: the normal smile is flat at α.
+            for &strike in &[forward * 0.7, forward * 1.4] {
+                let vol = model
+                    .implied_volatility(forward, strike, expiry)
+                    .expect("β=0,ν=0 off-ATM vol should compute");
+                assert!(
+                    (vol - alpha).abs() < 1e-12,
+                    "β=0,ν=0 normal vol must be flat at α={alpha}: got {vol} \
+                     at F={forward}, K={strike}, T={expiry}"
+                );
+            }
+        }
+    }
 }
 
 #[test]
@@ -719,6 +910,77 @@ fn test_solve_alpha_for_atm_round_trips_target_vol() {
 
     assert!((solved_alpha - original_alpha).abs() < 1e-8);
     assert!((solved_atm - target_atm).abs() < 1e-10);
+}
+
+/// `calibrate_with_atm_pinning` must pin to the volatility *interpolated to the
+/// forward*, not to the market quote at whatever strike happens to be nearest.
+///
+/// Failure mode under test: the old `find_atm_vol` returned `vols[i]` for the
+/// strike with the smallest `|K − F|`. When the strike grid does not contain F,
+/// that nearest quote is genuinely off-ATM, so the "ATM pin" pinned the model
+/// to the wrong volatility level. The fix interpolates the smile to F linearly
+/// in total variance (σ²·T, equivalently σ² for a fixed-expiry slice).
+///
+/// Construction: synthesize a smile from a known SABR model and drop the ATM
+/// strike from the calibration grid, keeping a *tight* bracket around F so the
+/// linear-in-variance interpolation is accurate. The ATM-pinned calibration
+/// must then land on a model ATM vol that is substantially closer to the true
+/// ATM than the nearest off-ATM market quote — exactly the improvement the
+/// interpolation delivers over the old nearest-strike rule.
+#[test]
+fn test_sabr_atm_pinning_interpolates_when_grid_lacks_forward() {
+    let true_params = SABRParameters::new(0.20, 0.5, 0.30, -0.25).expect("valid params");
+    let true_model = SABRModel::new(true_params);
+
+    let forward = 100.0_f64;
+    let expiry = 1.0_f64;
+
+    // Strike grid deliberately OMITS the forward (100). The inner strikes 98
+    // and 102 bracket F tightly; the nearest quote (98 or 102) is still
+    // off-ATM, which is what the old nearest-strike pin would have used.
+    let strikes = vec![90.0, 98.0, 102.0, 110.0];
+    let market_vols: Vec<f64> = strikes
+        .iter()
+        .map(|&k| {
+            true_model
+                .implied_volatility(forward, k, expiry)
+                .expect("synthetic vol should compute")
+        })
+        .collect();
+
+    let true_atm = true_model
+        .implied_volatility(forward, forward, expiry)
+        .expect("true ATM vol should compute");
+
+    // The nearest-strike quote (K=98) — what the OLD `find_atm_vol` would pin
+    // to. Assert it is measurably off the true ATM so the test is meaningful.
+    let nearest_vol = market_vols[1]; // K = 98
+    let nearest_err = (nearest_vol - true_atm).abs();
+    assert!(
+        nearest_err > 5e-4,
+        "test setup: nearest-strike quote {nearest_vol} must be off true ATM {true_atm}"
+    );
+
+    let calibrated = SABRCalibrator::new()
+        .with_tolerance(1e-10)
+        .with_max_iterations(200)
+        .calibrate_with_atm_pinning(forward, &strikes, &market_vols, expiry, 0.5)
+        .expect("ATM-pinned calibration should succeed");
+    let calibrated_model = SABRModel::new(calibrated);
+
+    let calibrated_atm = calibrated_model
+        .atm_volatility(forward, expiry)
+        .expect("calibrated ATM vol should compute");
+    let interp_err = (calibrated_atm - true_atm).abs();
+
+    // The interpolated pin must be substantially closer to the true ATM than
+    // the nearest-strike quote — the concrete improvement from the fix.
+    assert!(
+        interp_err < nearest_err * 0.5,
+        "interpolated ATM pin must beat the nearest-strike quote: \
+         calibrated_atm={calibrated_atm} (err {interp_err:.6}), \
+         nearest quote={nearest_vol} (err {nearest_err:.6}), true_atm={true_atm}"
+    );
 }
 
 #[test]

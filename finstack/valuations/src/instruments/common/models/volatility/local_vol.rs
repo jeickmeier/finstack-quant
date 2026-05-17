@@ -213,6 +213,19 @@ impl LocalVolBuilder {
                     continue;
                 }
 
+                // Bump sizes for the Dupire finite differences.
+                //
+                // `dk` is a fixed 1%-of-strike relative bump (with an absolute
+                // floor for near-zero strikes). This is a deliberate tradeoff:
+                //   - too small → the second difference `C(K-δ)-2C(K)+C(K+δ)`
+                //     loses precision to catastrophic cancellation;
+                //   - too large → O(δ²) discretization error grows, and far
+                //     OTM the bump spans a non-trivial part of the density.
+                // 1% is a robust middle ground for liquid strike ranges. It is
+                // NOT Richardson-extrapolated; deep in the wings the round-off
+                // floor guard in `dupire_*_point` (`is_curvature_above_roundoff`)
+                // catches points where cancellation has destroyed the signal
+                // and falls back to the implied vol there.
                 let dk = match vol_model {
                     VolatilityModel::Normal => (0.01 * k.abs()).max(1e-4),
                     VolatilityModel::Black => (0.01 * k.abs()).max(1e-8),
@@ -239,6 +252,28 @@ impl LocalVolBuilder {
 
         Ok(LocalVolSurface::new(base_date, Arc::new(surface)))
     }
+}
+
+/// Decide whether a finite-difference second-difference numerator carries a
+/// trustworthy curvature signal, as opposed to being dominated by round-off.
+///
+/// `numer` is `C(K-δ) - 2C(K) + C(K+δ)`; `prices` are the three call prices
+/// that formed it; `cancel_scale` is the magnitude of the O(1) terms that
+/// cancel inside the option-price formula (≈ `max(S₀, K)` for Black-Scholes,
+/// `max(|F|, |K|)` for Bachelier).
+///
+/// Each price carries an absolute round-off error of ≈ `ε · cancel_scale`
+/// (subtraction of two same-scale terms). The numerator therefore has a
+/// round-off floor of a few `ε · cancel_scale`; below it the second difference
+/// is noise. A `16×` safety factor keeps genuine deep-but-resolved curvature
+/// (numerator still ≳ 10× the floor) while rejecting the underflowed wing.
+#[inline]
+fn is_curvature_above_roundoff(numer: f64, prices: &[f64], cancel_scale: f64) -> bool {
+    // Largest price magnitude also contributes round-off; fold it in.
+    let max_price = prices.iter().fold(0.0_f64, |acc, &p| acc.max(p.abs()));
+    let scale = cancel_scale.max(max_price).max(1e-300);
+    let floor = 16.0 * f64::EPSILON * scale;
+    numer.abs() > floor
 }
 
 /// Lognormal (Black-Scholes) Dupire local variance at a single grid point.
@@ -273,7 +308,8 @@ fn dupire_lognormal_point(
     let c_k_minus = bs_call(k - dk, t)?;
 
     let dC_dK = (c_k_plus - c_k_minus) / (2.0 * dk);
-    let d2C_dK2 = (c_k_plus - 2.0 * c_k + c_k_minus) / (dk * dk);
+    let curvature_numer = c_k_plus - 2.0 * c_k + c_k_minus;
+    let d2C_dK2 = curvature_numer / (dk * dk);
 
     if d2C_dK2 <= 0.0 {
         tracing::warn!(
@@ -285,6 +321,30 @@ fn dupire_lognormal_point(
         return Ok(iv * iv);
     }
 
+    // Round-off floor: each discounted call price is a subtraction of two
+    // O(max(S₀,K)) terms (S₀·e^{-qT}·N(d1) − K·e^{-rT}·N(d2)) and so carries an
+    // absolute error of ~ε·max(S₀,K). Deep in the wings the prices underflow
+    // and the second difference `C(K-δ)-2C(K)+C(K+δ)` becomes pure round-off,
+    // which can land slightly positive and slip past the `d2C_dK2 <= 0` guard,
+    // yielding a garbage local vol. When the curvature numerator is below this
+    // noise floor the value is not trustworthy — fall back to the implied vol.
+    if !is_curvature_above_roundoff(curvature_numer, &[c_k_plus, c_k, c_k_minus], S0.max(k)) {
+        tracing::warn!(
+            strike = k,
+            time = t,
+            "d²C/dK² dominated by round-off (deep wing): falling back to implied vol"
+        );
+        let iv = implied_vol(k, t)?;
+        return Ok(iv * iv);
+    }
+
+    // ∂C/∂T. The caller (`from_implied_vol`) sizes `dt = (0.01·t).max(1e-6)`
+    // and short-circuits any slice with `t <= 1e-6`, so in the normal flow
+    // `t > dt` always holds and the *central* O(dt²) difference is used. The
+    // one-sided O(dt) branch is a defensive fallback only (it would engage just
+    // for a degenerate `t <= dt`, which the caller does not produce); it is
+    // kept so a direct call with a tiny `t` still returns a finite derivative
+    // rather than evaluating `bs_call` at a negative time.
     let c_t_plus = bs_call(k, t + dt)?;
     let c_t_minus = if t > dt { bs_call(k, t - dt)? } else { c_k };
     let dC_dT = if t > dt {
@@ -339,7 +399,8 @@ fn dupire_normal_point(
     let c_k_plus = bach_call(k + dk, t, forward)?;
     let c_k_minus = bach_call(k - dk, t, forward)?;
 
-    let d2C_dK2 = (c_k_plus - 2.0 * c_k + c_k_minus) / (dk * dk);
+    let curvature_numer = c_k_plus - 2.0 * c_k + c_k_minus;
+    let d2C_dK2 = curvature_numer / (dk * dk);
 
     if d2C_dK2 <= 0.0 {
         tracing::warn!(
@@ -351,7 +412,31 @@ fn dupire_normal_point(
         return Ok(iv * iv);
     }
 
-    // T derivative at FIXED forward — pure time decay, no drift contamination.
+    // Round-off floor: the Bachelier call price subtracts O(max(|F|,|K|))
+    // terms, so each price carries ~ε·max(|F|,|K|) absolute error. In the deep
+    // wings the second difference degrades into round-off noise that can slip
+    // past the `d2C_dK2 <= 0` guard; fall back to the implied vol there.
+    if !is_curvature_above_roundoff(
+        curvature_numer,
+        &[c_k_plus, c_k, c_k_minus],
+        forward.abs().max(k.abs()),
+    ) {
+        tracing::warn!(
+            strike = k,
+            time = t,
+            "d²C/dK² dominated by round-off (deep wing): falling back to implied vol"
+        );
+        let iv = implied_vol(k, t)?;
+        return Ok(iv * iv);
+    }
+
+    // ∂C/∂T at FIXED forward — pure time decay, no drift contamination.
+    //
+    // As in the lognormal path: the caller sizes `dt = (0.01·t).max(1e-6)` and
+    // skips slices with `t <= 1e-6`, so `t > dt` holds in the normal flow and
+    // the *central* O(dt²) difference is used. The one-sided O(dt) branch is a
+    // defensive fallback for a degenerate `t <= dt` that the caller does not
+    // produce, kept only so a direct call with a tiny `t` stays finite.
     let c_t_plus = bach_call(k, t + dt, forward)?;
     let c_t_minus = if t > dt {
         bach_call(k, t - dt, forward)?
@@ -409,6 +494,58 @@ mod tests {
             lv,
             const_vol
         );
+
+        Ok(())
+    }
+
+    /// Deep-wing Dupire local vol must not collapse to round-off noise.
+    ///
+    /// Failure mode under test: for a deep-OTM strike the discounted call
+    /// prices `C(K-δ), C(K), C(K+δ)` underflow to ~1e-14, while each is itself
+    /// computed as a subtraction of two O(S₀) terms and so carries an absolute
+    /// round-off error of ~ε·S₀ ≈ 2e-14. The second difference
+    /// `C(K-δ) - 2C(K) + C(K+δ)` is then pure round-off — and because it can
+    /// land slightly *positive*, the old `d²C/dK² <= 0` guard did not catch it,
+    /// and Dupire returned a garbage local vol (observed: ~0.0 instead of the
+    /// true flat 0.20). The fix adds a round-off-floor guard: when
+    /// `|second difference|` is below `ROUNDOFF·ε·max(S₀,K)` the curvature is
+    /// unreliable and the point falls back to the implied vol.
+    #[test]
+    fn test_local_vol_deep_wing_no_roundoff_collapse() -> Result<()> {
+        let const_vol = 0.20;
+        let implied_vol_fn = |_: f64, _: f64| Ok(const_vol);
+
+        let base_date =
+            Date::from_ordinal_date(2024, 1).expect("Invalid date: 2024-01-01 should be valid");
+
+        // Deep-wing strikes: 500 and 600 are far enough OTM (S₀=100) that the
+        // discounted call prices underflow into the round-off regime.
+        let strikes = vec![100.0, 300.0, 500.0, 600.0];
+        let times = vec![0.5, 1.0];
+
+        let lv_surface = LocalVolBuilder::from_implied_vol(
+            implied_vol_fn,
+            DupireParams {
+                base_date,
+                spot: 100.0,
+                rate: 0.05,
+                div_yield: 0.0,
+                strikes: &strikes,
+                times: &times,
+                vol_model: VolatilityModel::Black,
+            },
+        )?;
+
+        // At a deep-wing strike the flat-smile local vol must still be ~0.20,
+        // NOT collapsed to round-off noise near zero.
+        for &k in &[500.0, 600.0] {
+            let lv = lv_surface.get_vol(1.0, k)?;
+            assert!(
+                (lv - const_vol).abs() < 0.05,
+                "deep-wing local vol at K={k} collapsed to round-off noise: \
+                 got {lv}, expected ~{const_vol}"
+            );
+        }
 
         Ok(())
     }
