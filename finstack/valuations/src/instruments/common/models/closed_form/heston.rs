@@ -226,7 +226,66 @@ impl Default for HestonFourierSettings {
     }
 }
 
+/// Gauss-Legendre orders supported by [`composite_gauss_legendre_grid`].
+///
+/// A `gl_order` outside this set has no node/weight table, which would make
+/// [`HestonStripPricer::new`] return `None` and silently degrade to the slower
+/// per-strike path. Callers must pick one of these values.
+const SUPPORTED_GL_ORDERS: [usize; 4] = [2, 4, 8, 16];
+
 impl HestonFourierSettings {
+    /// Construct validated Fourier integration settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`finstack_core::Error::Validation`] if `gl_order` is not one
+    /// of the supported composite Gauss-Legendre orders ({2, 4, 8, 16}), if
+    /// `panels == 0`, or if `u_max` is not a positive finite number. An
+    /// unsupported `gl_order` would otherwise cause silent degradation to the
+    /// slower per-strike pricing path.
+    pub fn new(
+        u_max: f64,
+        panels: usize,
+        gl_order: usize,
+        phi_eps: f64,
+    ) -> finstack_core::Result<Self> {
+        let settings = Self {
+            u_max,
+            panels,
+            gl_order,
+            phi_eps,
+        };
+        settings.validate()?;
+        Ok(settings)
+    }
+
+    /// Validate that these settings can drive the composite Gauss-Legendre grid.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`finstack_core::Error::Validation`] if `gl_order` is not in
+    /// {2, 4, 8, 16}, if `panels == 0`, or if `u_max` is not positive finite.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        if !SUPPORTED_GL_ORDERS.contains(&self.gl_order) {
+            return Err(finstack_core::Error::Validation(format!(
+                "HestonFourierSettings.gl_order must be one of {SUPPORTED_GL_ORDERS:?}, got {}",
+                self.gl_order
+            )));
+        }
+        if self.panels == 0 {
+            return Err(finstack_core::Error::Validation(
+                "HestonFourierSettings.panels must be positive, got 0".to_string(),
+            ));
+        }
+        if !self.u_max.is_finite() || self.u_max <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "HestonFourierSettings.u_max must be a positive finite number, got {}",
+                self.u_max
+            )));
+        }
+        Ok(())
+    }
+
     /// Create settings adapted to the option's time to maturity.
     ///
     /// Short-dated options require finer integration grids because
@@ -1418,6 +1477,37 @@ mod tests {
         assert!(HestonParams::new(0.05, 0.02, -1.0, 0.04, 0.3, -0.7, 0.04).is_err());
         assert!(HestonParams::new(0.05, 0.02, 2.0, 0.04, 0.3, 1.1, 0.04).is_err());
         assert!(HestonParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.0).is_err());
+    }
+
+    /// W-02: unsupported `gl_order` must be rejected at the construction
+    /// boundary rather than silently degrading the pricer to the per-strike path.
+    #[test]
+    fn fourier_settings_rejects_unsupported_gl_order() {
+        let err = HestonFourierSettings::new(100.0, 100, 10, 1e-8)
+            .expect_err("gl_order=10 has no Gauss-Legendre table and must be rejected");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("gl_order"),
+            "error should mention gl_order, got: {msg}"
+        );
+
+        // Supported orders construct successfully.
+        for &order in &SUPPORTED_GL_ORDERS {
+            assert!(
+                HestonFourierSettings::new(100.0, 100, order, 1e-8).is_ok(),
+                "gl_order={order} should be accepted"
+            );
+        }
+    }
+
+    /// W-02: `validate` rejects degenerate `panels` / `u_max` too.
+    #[test]
+    fn fourier_settings_rejects_degenerate_grid() {
+        assert!(HestonFourierSettings::new(100.0, 0, 16, 1e-8).is_err());
+        assert!(HestonFourierSettings::new(0.0, 100, 16, 1e-8).is_err());
+        assert!(HestonFourierSettings::new(f64::NAN, 100, 16, 1e-8).is_err());
+        // The default settings must always be valid.
+        assert!(HestonFourierSettings::default().validate().is_ok());
     }
 
     #[test]
