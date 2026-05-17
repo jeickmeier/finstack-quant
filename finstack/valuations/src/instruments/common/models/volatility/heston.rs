@@ -69,10 +69,12 @@ impl HestonParameters {
     ///
     /// # Feller Condition Warning
     ///
-    /// If the Feller condition (2κθ > σ²) is violated, a warning is logged.
-    /// When violated, the variance process can reach zero, potentially causing
-    /// numerical instability. The model will still work but may produce less
-    /// accurate results for certain parameter combinations.
+    /// If the Feller condition (2κθ > σ²) is violated, an informational warning
+    /// is logged. This pricer evaluates the Heston characteristic function via
+    /// Fourier inversion and never simulates the variance path, so a Feller
+    /// violation does **not** create a zero-variance pricing risk here. The
+    /// warning is retained only as a heads-up for callers who also run a Monte
+    /// Carlo simulation of the variance process with the same parameters.
     ///
     /// # Errors
     ///
@@ -118,7 +120,10 @@ impl HestonParameters {
             rho,
         };
 
-        // Warn if Feller condition is violated
+        // Warn if Feller condition is violated. Informational only: this pricer
+        // uses Fourier inversion of the characteristic function and never
+        // simulates the variance path, so a Feller violation poses no
+        // zero-variance pricing risk here.
         if !params.satisfies_feller_condition() {
             warn!(
                 v0 = v0,
@@ -127,8 +132,10 @@ impl HestonParameters {
                 sigma = sigma,
                 feller_lhs = 2.0 * kappa * theta,
                 feller_rhs = sigma * sigma,
-                "Heston Feller condition violated (2κθ ≤ σ²): variance process may reach zero, \
-                 which can cause numerical instability in pricing"
+                "Heston Feller condition violated (2κθ ≤ σ²): informational only — the \
+                 Fourier pricer never simulates the variance path, so this poses no \
+                 zero-variance pricing risk; relevant only for Monte Carlo simulation \
+                 of the variance process"
             );
         }
 
