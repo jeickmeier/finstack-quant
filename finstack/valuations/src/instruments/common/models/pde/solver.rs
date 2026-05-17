@@ -446,8 +446,7 @@ mod tests {
         // Fine enough grid that discretisation error < 1%
         let n_space = 101_usize;
         let n_time = 100_usize;
-        let grid =
-            Grid1D::sinh_concentrated(x_min, x_max, n_space, 0.0, 0.15).expect("valid grid");
+        let grid = Grid1D::sinh_concentrated(x_min, x_max, n_space, 0.0, 0.15).expect("valid grid");
 
         let pde = BlackScholesPde {
             sigma,

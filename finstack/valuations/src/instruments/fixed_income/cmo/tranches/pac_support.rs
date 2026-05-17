@@ -218,7 +218,8 @@ mod tests {
     #[test]
     fn test_pac_schedule_generation() {
         // Collateral pool of 100k, PAC tranche of 60k carved from it.
-        let schedule = PacSchedule::generate(100_000.0, 60_000.0, 360, 0.045, PacCollar::standard());
+        let schedule =
+            PacSchedule::generate(100_000.0, 60_000.0, 360, 0.045, PacCollar::standard());
 
         assert!(!schedule.scheduled_payments.is_empty());
         assert!(schedule.total_scheduled() > 0.0);
@@ -228,7 +229,8 @@ mod tests {
 
     #[test]
     fn test_within_collar() {
-        let schedule = PacSchedule::generate(100_000.0, 100_000.0, 360, 0.045, PacCollar::standard());
+        let schedule =
+            PacSchedule::generate(100_000.0, 100_000.0, 360, 0.045, PacCollar::standard());
 
         // 100% PSA is within 100-300 collar
         assert!(schedule.is_within_collar(1.0));
@@ -261,8 +263,7 @@ mod tests {
         // balance cap binds), NOT a PAC-balance-derived stream.
         let lo = project_principal_stream(collateral_balance, wam, wac, lower_psa);
         let hi = project_principal_stream(collateral_balance, wam, wac, upper_psa);
-        let collateral_min: Vec<f64> =
-            lo.iter().zip(hi.iter()).map(|(l, h)| l.min(*h)).collect();
+        let collateral_min: Vec<f64> = lo.iter().zip(hi.iter()).map(|(l, h)| l.min(*h)).collect();
 
         // The (incorrect) PAC-balance-derived stream, for contrast.
         let pac_lo = project_principal_stream(pac_balance, wam, wac, lower_psa);
@@ -348,7 +349,10 @@ mod tests {
                     (got - canonical).abs() < 1e-12,
                     "PSA→SMM drift at psa={psa}, month={month}: got {got}, canonical {canonical}"
                 );
-                assert!(got.is_finite(), "SMM not finite at psa={psa}, month={month}");
+                assert!(
+                    got.is_finite(),
+                    "SMM not finite at psa={psa}, month={month}"
+                );
             }
         }
     }

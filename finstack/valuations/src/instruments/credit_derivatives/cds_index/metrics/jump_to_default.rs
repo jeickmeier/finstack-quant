@@ -153,8 +153,8 @@ mod tests {
     fn explicit_count_overrides_name_inference() {
         // Index named "CDX.NA.HY" maps to a hardcoded 100 by name inference,
         // but the actual series here has 97 names. The explicit count must win.
-        let resolved = resolve_constituent_count(Some(97), "CDX.NA.HY")
-            .expect("explicit count must resolve");
+        let resolved =
+            resolve_constituent_count(Some(97), "CDX.NA.HY").expect("explicit count must resolve");
         assert!(
             (resolved - 97.0).abs() < 1e-12,
             "expected supplied count 97, got {resolved}"

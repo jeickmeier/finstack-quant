@@ -438,9 +438,8 @@ mod tests {
         let swap_start = Date::from_calendar_date(2026, Month::January, 17).expect("date");
         let swap_end = Date::from_calendar_date(2032, Month::January, 17).expect("date");
         let first_ex = Date::from_calendar_date(2028, Month::January, 17).expect("date");
-        let schedule =
-            BermudanSchedule::co_terminal(first_ex, swap_end, Tenor::semi_annual())
-                .expect("schedule");
+        let schedule = BermudanSchedule::co_terminal(first_ex, swap_end, Tenor::semi_annual())
+            .expect("schedule");
         let mut b = BermudanSwaption::new_payer(
             "BERM-6NC2",
             Money::new(10_000_000.0, Currency::USD),

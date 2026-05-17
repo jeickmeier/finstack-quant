@@ -1246,10 +1246,7 @@ mod tests {
 
         // Independent recomputation: collapse each pair to its mean, then take
         // the plain SE over the n/2 pair means.
-        let pair_means: Vec<f64> = pvs
-            .chunks(2)
-            .map(|p| (p[0] + p[1]) / 2.0)
-            .collect();
+        let pair_means: Vec<f64> = pvs.chunks(2).map(|p| (p[0] + p[1]) / 2.0).collect();
         let expected = sample_std_error(&pair_means);
         assert!(
             (reported - expected).abs() < 1e-9,

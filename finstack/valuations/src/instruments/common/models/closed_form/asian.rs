@@ -1055,7 +1055,8 @@ mod tests {
         );
 
         // --- Second moment: Jensen inequality E[A²] >= (E[A])² ---
-        let m2 = compute_arithmetic_mean_second_moment(spot, time, rate, div_yield, vol, num_fixings);
+        let m2 =
+            compute_arithmetic_mean_second_moment(spot, time, rate, div_yield, vol, num_fixings);
 
         assert!(
             m2 >= m1 * m1,

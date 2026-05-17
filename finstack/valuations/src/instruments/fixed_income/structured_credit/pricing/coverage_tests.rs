@@ -564,8 +564,13 @@ mod tests {
             current_pool_balance: Some(Money::new(collateral, Currency::USD)),
         };
 
-        let result = test.calculate(&context).expect("calculation should succeed");
-        assert!(!result.is_passing, "OC test should breach (ratio 1.20 < 1.25)");
+        let result = test
+            .calculate(&context)
+            .expect("calculation should succeed");
+        assert!(
+            !result.is_passing,
+            "OC test should breach (ratio 1.20 < 1.25)"
+        );
 
         let cure = result.cure_amount.expect("breach must yield a cure amount");
         let x = cure.amount();
@@ -622,7 +627,9 @@ mod tests {
             current_pool_balance: None,
         };
 
-        let result = test.calculate(&context).expect("calculation should succeed");
+        let result = test
+            .calculate(&context)
+            .expect("calculation should succeed");
         assert!(!result.is_passing, "IC test should breach");
         let cure = result
             .cure_amount

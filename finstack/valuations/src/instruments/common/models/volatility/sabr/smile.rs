@@ -443,7 +443,8 @@ mod smile_tests {
         let d1 = 0.5 * vol * vol * t / (vol * t.sqrt()); // = 0.1
         let d2 = d1 - vol * t.sqrt(); // = -0.1
         let df = (-r * t).exp();
-        let expected = df * (f * finstack_core::math::norm_cdf(d1) - k * finstack_core::math::norm_cdf(d2));
+        let expected =
+            df * (f * finstack_core::math::norm_cdf(d1) - k * finstack_core::math::norm_cdf(d2));
 
         let got = bs_call_price(f, k, r, 0.0, vol, t);
         assert!(
@@ -482,8 +483,7 @@ mod smile_tests {
     #[test]
     fn test_repair_arbitrage_no_cascade_on_upper_wing() {
         // Well-behaved SABR smile; we use a non-zero r to exercise the Black-76 path.
-        let params =
-            SABRParameters::new(0.20, 0.5, 0.30, -0.20).expect("valid SABR params");
+        let params = SABRParameters::new(0.20, 0.5, 0.30, -0.20).expect("valid SABR params");
         let model = SABRModel::new(params);
         let forward = 100.0_f64;
         let smile = SABRSmile::new(model, forward, 1.0);
@@ -557,7 +557,9 @@ mod smile_tests {
             "z(0.5,90) = {z_05_90}, expected 0.25"
         );
 
-        let z_10_100 = interp.interpolate(1.0, 100.0).expect("interpolate (1.0,100)");
+        let z_10_100 = interp
+            .interpolate(1.0, 100.0)
+            .expect("interpolate (1.0,100)");
         assert!(
             (z_10_100 - 0.22).abs() < 1e-12,
             "z(1.0,100) = {z_10_100}, expected 0.22"
@@ -567,7 +569,9 @@ mod smile_tests {
         // Expected bilinear average of all four corners:
         //   z11=z(0.5,90)=0.25, z12=z(0.5,100)=0.20, z21=z(1.0,90)=0.28, z22=z(1.0,100)=0.22
         // weights: all equal (mid-point) → average = (0.25+0.20+0.28+0.22)/4 = 0.2375
-        let z_mid = interp.interpolate(0.75, 95.0).expect("interpolate (0.75,95)");
+        let z_mid = interp
+            .interpolate(0.75, 95.0)
+            .expect("interpolate (0.75,95)");
         let expected_mid = (0.25 + 0.20 + 0.28 + 0.22) / 4.0;
         assert!(
             (z_mid - expected_mid).abs() < 1e-12,
@@ -575,4 +579,3 @@ mod smile_tests {
         );
     }
 }
-

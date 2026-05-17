@@ -444,8 +444,8 @@ mod delegation_tests {
         let pv = compute_pv(&option, &market, as_of).expect("pv");
         let target_price = pv.amount();
 
-        let iv_no_guess = implied_vol(&option, &market, as_of, target_price, None)
-            .expect("iv with None guess");
+        let iv_no_guess =
+            implied_vol(&option, &market, as_of, target_price, None).expect("iv with None guess");
         let iv_bad_guess = implied_vol(&option, &market, as_of, target_price, Some(10.0))
             .expect("iv with bad guess (10.0 = 1000% vol)");
         let iv_zero_guess = implied_vol(&option, &market, as_of, target_price, Some(0.0001))

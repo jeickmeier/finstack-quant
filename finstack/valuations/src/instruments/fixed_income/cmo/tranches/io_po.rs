@@ -336,7 +336,10 @@ mod tests {
                     (got - canonical).abs() < 1e-12,
                     "PSA→SMM drift at psa={psa}, month={month}: got {got}, canonical {canonical}"
                 );
-                assert!(got.is_finite(), "SMM not finite at psa={psa}, month={month}");
+                assert!(
+                    got.is_finite(),
+                    "SMM not finite at psa={psa}, month={month}"
+                );
             }
         }
     }

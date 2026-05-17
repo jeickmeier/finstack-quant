@@ -307,11 +307,9 @@ mod tests {
 
         // Pricing may still fail downstream (e.g. missing Heston scalars), but
         // the failure must NOT be the discrete-dividend rejection.
-        if let Err(e) = EquityOptionHestonMcPricer::new().price_internal(
-            &inst,
-            &market(as_of),
-            as_of,
-        ) {
+        if let Err(e) =
+            EquityOptionHestonMcPricer::new().price_internal(&inst, &market(as_of), as_of)
+        {
             assert!(
                 !e.to_string().contains("discrete dividends"),
                 "out-of-window dividend wrongly rejected: {e}"

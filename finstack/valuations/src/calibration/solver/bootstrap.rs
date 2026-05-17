@@ -687,10 +687,7 @@ mod w40_tests {
             Ok(quote.t)
         }
 
-        fn build_curve(
-            &self,
-            knots: &[(f64, f64)],
-        ) -> finstack_core::Result<Self::Curve> {
+        fn build_curve(&self, knots: &[(f64, f64)]) -> finstack_core::Result<Self::Curve> {
             knots
                 .last()
                 .map(|(_, v)| *v)
@@ -731,17 +728,17 @@ mod w40_tests {
             let r = quote.root;
             // Points outside the sign-change bracket but including the minimum:
             Ok(vec![
-                r - 3.0 * sq_eps,  // f > 0
-                r - 2.5 * sq_eps,  // f > 0
-                r - 2.0 * sq_eps,  // f = (4-1)*eps > 0  [actually 3*eps]
-                r - 1.5 * sq_eps,  // f = (2.25-1)*eps > 0
-                r - 0.5 * sq_eps,  // f = (0.25-1)*eps < 0  -- INSIDE bracket!
-                r,                  // f = -eps (minimum, in-tolerance)
-                r + 0.5 * sq_eps,  // f < 0  -- INSIDE bracket!
-                r + 1.5 * sq_eps,  // f > 0
-                r + 2.0 * sq_eps,  // f > 0
-                r + 2.5 * sq_eps,  // f > 0
-                r + 3.0 * sq_eps,  // f > 0
+                r - 3.0 * sq_eps, // f > 0
+                r - 2.5 * sq_eps, // f > 0
+                r - 2.0 * sq_eps, // f = (4-1)*eps > 0  [actually 3*eps]
+                r - 1.5 * sq_eps, // f = (2.25-1)*eps > 0
+                r - 0.5 * sq_eps, // f = (0.25-1)*eps < 0  -- INSIDE bracket!
+                r,                // f = -eps (minimum, in-tolerance)
+                r + 0.5 * sq_eps, // f < 0  -- INSIDE bracket!
+                r + 1.5 * sq_eps, // f > 0
+                r + 2.0 * sq_eps, // f > 0
+                r + 2.5 * sq_eps, // f > 0
+                r + 3.0 * sq_eps, // f > 0
             ])
         }
     }
@@ -764,7 +761,7 @@ mod w40_tests {
         };
         let cfg = crate::calibration::CalibrationConfig {
             solver: crate::calibration::solver::SolverConfig::brent_default()
-                .with_tolerance(1e-6)   // tolerance >> eps, so the local min is "in tolerance"
+                .with_tolerance(1e-6) // tolerance >> eps, so the local min is "in tolerance"
                 .with_max_iterations(200),
             ..crate::calibration::CalibrationConfig::default()
         };
@@ -776,8 +773,8 @@ mod w40_tests {
 
         // The true roots are at root ± sqrt(eps) = 0.5 ± 1e-4.
         let sq_eps = eps.sqrt();
-        let dist_to_nearest_true_root = ((curve - (0.5 + sq_eps)).abs())
-            .min((curve - (0.5 - sq_eps)).abs());
+        let dist_to_nearest_true_root =
+            ((curve - (0.5 + sq_eps)).abs()).min((curve - (0.5 - sq_eps)).abs());
 
         assert!(
             dist_to_nearest_true_root < 1e-3,
@@ -810,10 +807,7 @@ mod w40_tests {
             Ok(quote.t)
         }
 
-        fn build_curve(
-            &self,
-            knots: &[(f64, f64)],
-        ) -> finstack_core::Result<Self::Curve> {
+        fn build_curve(&self, knots: &[(f64, f64)]) -> finstack_core::Result<Self::Curve> {
             knots
                 .last()
                 .map(|(_, v)| *v)
@@ -858,7 +852,7 @@ mod w40_tests {
                 r - 1.5,
                 r - 1.0,
                 r - 0.5,
-                r,        // f = eps (minimum, in-tolerance)
+                r, // f = eps (minimum, in-tolerance)
                 r + 0.5,
                 r + 1.0,
             ])

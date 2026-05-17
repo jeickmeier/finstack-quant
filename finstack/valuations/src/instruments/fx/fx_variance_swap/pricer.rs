@@ -179,11 +179,9 @@ pub(crate) fn time_elapsed_fraction(inst: &FxVarianceSwap, as_of: Date) -> Resul
     if as_of >= inst.maturity {
         return Ok(1.0);
     }
-    let total = inst.day_count.year_fraction(
-        inst.start_date,
-        inst.maturity,
-        DayCountContext::default(),
-    )?;
+    let total =
+        inst.day_count
+            .year_fraction(inst.start_date, inst.maturity, DayCountContext::default())?;
     if total <= 0.0 {
         return Ok(0.0);
     }
@@ -487,13 +485,13 @@ mod tests {
     /// drifts for weekend-skipping daily schedules near maturity.
     #[test]
     fn fx_seasoned_mtm_uses_time_weighting_not_observation_count() {
+        use crate::instruments::common_impl::traits::Attributes;
+        use crate::instruments::fx::fx_variance_swap::types::PayReceive;
         use finstack_core::dates::{DayCount, Tenor};
         use finstack_core::market_data::scalars::ScalarTimeSeries;
         use finstack_core::market_data::surfaces::VolSurface;
         use finstack_core::math::stats::RealizedVarMethod;
         use finstack_core::types::{CurveId, InstrumentId};
-        use crate::instruments::common_impl::traits::Attributes;
-        use crate::instruments::fx::fx_variance_swap::types::PayReceive;
 
         let start = date!(2025 - 01 - 06); // Monday
         let maturity = date!(2025 - 06 - 30); // Monday
@@ -550,8 +548,7 @@ mod tests {
 
         let pv = compute_pv(&swap, &market, as_of).expect("seasoned fx pv");
 
-        let realized =
-            partial_realized_variance(&swap, &market, as_of).expect("realized");
+        let realized = partial_realized_variance(&swap, &market, as_of).expect("realized");
         let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
         let expected_var = realized * time_w + forward * (1.0 - time_w);
         let t = swap

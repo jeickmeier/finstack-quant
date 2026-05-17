@@ -453,8 +453,7 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                         res.cashflows.push((pay_date, redemption));
                         if interest_paid > 0.0 {
                             res.interest_flows.push((pay_date, interest_money));
-                            res.total_interest =
-                                res.total_interest.checked_add(interest_money)?;
+                            res.total_interest = res.total_interest.checked_add(interest_money)?;
                         }
                         if principal_paid > 0.0 {
                             res.principal_flows.push((pay_date, principal_money));

@@ -56,8 +56,7 @@ impl MetricCalculator for InflationConvexityCalculator {
         // InflationConvexity = (PV_up + PV_down - 2×PV_base) / (bump² × PV_base)
         // Normalizing by PV_base yields a dimensionless convexity, consistent with
         // the bond `convexity.rs` definition `Convexity = (1/P) · d²P/dy²`.
-        let inflation_convexity =
-            (pv_up + pv_down - 2.0 * base_pv) / (bump_bp * bump_bp) / base_pv;
+        let inflation_convexity = (pv_up + pv_down - 2.0 * base_pv) / (bump_bp * bump_bp) / base_pv;
 
         Ok(inflation_convexity)
     }

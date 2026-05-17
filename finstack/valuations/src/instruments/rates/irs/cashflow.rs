@@ -913,16 +913,20 @@ mod tests {
         );
 
         // Lookback-only and shift-only remain supported.
-        assert!(builder_overnight_method(FloatingLegCompounding::CompoundedInArrears {
-            lookback_days: 2,
-            observation_shift: None,
-        })
-        .is_ok());
-        assert!(builder_overnight_method(FloatingLegCompounding::CompoundedInArrears {
-            lookback_days: 0,
-            observation_shift: Some(2),
-        })
-        .is_ok());
+        assert!(
+            builder_overnight_method(FloatingLegCompounding::CompoundedInArrears {
+                lookback_days: 2,
+                observation_shift: None,
+            })
+            .is_ok()
+        );
+        assert!(
+            builder_overnight_method(FloatingLegCompounding::CompoundedInArrears {
+                lookback_days: 0,
+                observation_shift: Some(2),
+            })
+            .is_ok()
+        );
     }
 
     #[test]
@@ -1047,9 +1051,9 @@ mod tests {
         use crate::instruments::common_impl::parameters::legs::{FixedLegSpec, FloatLegSpec};
         use finstack_core::currency::Currency;
         use finstack_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+        use finstack_core::market_data::term_structures::DiscountCurve;
         use finstack_core::money::Money;
         use finstack_core::types::{CurveId, InstrumentId};
-        use finstack_core::market_data::term_structures::DiscountCurve;
         use rust_decimal::Decimal;
         use time::Month;
 
@@ -1117,10 +1121,7 @@ mod tests {
 
         let swap_no_cutoff = build_swap("OIS-NO-CUTOFF", FloatingLegCompounding::fedfunds());
         // 5-day rate cut-off freezes the last 5 overnight rates of each period.
-        let swap_cutoff = build_swap(
-            "OIS-CUTOFF-5D",
-            FloatingLegCompounding::rate_cutoff(5),
-        );
+        let swap_cutoff = build_swap("OIS-CUTOFF-5D", FloatingLegCompounding::rate_cutoff(5));
 
         // Single-curve: only the discount curve is loaded (proj is None).
         let ctx = MarketContext::new().insert(disc);

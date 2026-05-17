@@ -985,13 +985,8 @@ mod tests {
         residuals.insert("quote_2Y_penalty".to_string(), small_penalty);
 
         // With explicit flag: report must mark success=false and explain penalty.
-        let report = CalibrationReport::for_type_with_tolerance(
-            "global_fit",
-            residuals,
-            10,
-            1e-8,
-        )
-        .with_has_penalty_residuals(true);
+        let report = CalibrationReport::for_type_with_tolerance("global_fit", residuals, 10, 1e-8)
+            .with_has_penalty_residuals(true);
 
         assert!(
             !report.success,
@@ -1012,9 +1007,8 @@ mod tests {
         residuals.insert("quote_1Y".to_string(), 1e-10);
         residuals.insert("quote_5Y".to_string(), 2e-10);
 
-        let report =
-            CalibrationReport::for_type_with_tolerance("yield_curve", residuals, 10, 1e-8)
-                .with_has_penalty_residuals(false);
+        let report = CalibrationReport::for_type_with_tolerance("yield_curve", residuals, 10, 1e-8)
+            .with_has_penalty_residuals(false);
 
         assert!(
             report.success,

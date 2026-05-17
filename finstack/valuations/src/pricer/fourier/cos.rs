@@ -460,8 +460,8 @@ mod tests {
     /// `X = ln(S_T/K)` entirely outside a `Y`-centred truncation window.
     /// The integration window must follow the per-strike moneyness shift.
     #[test]
-    fn cos_deep_itm_otm_low_vol_short_dated(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn cos_deep_itm_otm_low_vol_short_dated() -> std::result::Result<(), Box<dyn std::error::Error>>
+    {
         let sigma = 0.05;
         let r = 0.05;
         let q = 0.0;

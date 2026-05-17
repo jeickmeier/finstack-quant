@@ -751,7 +751,10 @@ mod tests {
     #[test]
     fn binomial_probability_finite_for_large_n() {
         let p = binomial_probability(125, 62, 0.5);
-        assert!(p.is_finite(), "binomial_probability(125,62,0.5) must be finite, got {p}");
+        assert!(
+            p.is_finite(),
+            "binomial_probability(125,62,0.5) must be finite, got {p}"
+        );
         assert!(p > 0.0, "probability must be strictly positive, got {p}");
         // Exact: comb(125,62) * 0.5^125.
         assert!(
@@ -767,12 +770,15 @@ mod tests {
     fn conditional_equity_tranche_loss_finite_for_full_index() {
         let pricer = CDSTranchePricer::new();
         let el = pricer.conditional_equity_tranche_loss(
-            125,   // num_constituents
-            0.03,  // detachment_notional (3% equity tranche)
-            0.10,  // conditional default probability
-            0.40,  // recovery rate
+            125,  // num_constituents
+            0.03, // detachment_notional (3% equity tranche)
+            0.10, // conditional default probability
+            0.40, // recovery rate
         );
-        assert!(el.is_finite(), "conditional equity tranche loss must be finite, got {el}");
+        assert!(
+            el.is_finite(),
+            "conditional equity tranche loss must be finite, got {el}"
+        );
         // Expected loss of a [0, 3%] tranche is bounded by the detachment.
         assert!(
             (0.0..=0.03 + 1e-12).contains(&el),
@@ -780,9 +786,7 @@ mod tests {
         );
 
         // The binomial pmf over 0..=N must form a valid probability mass.
-        let total: f64 = (0..=125)
-            .map(|k| binomial_probability(125, k, 0.10))
-            .sum();
+        let total: f64 = (0..=125).map(|k| binomial_probability(125, k, 0.10)).sum();
         assert!(
             (total - 1.0).abs() < 1e-9,
             "binomial pmf over 0..=125 must sum to 1, got {total}"

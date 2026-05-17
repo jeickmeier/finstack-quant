@@ -1624,8 +1624,7 @@ mod tests {
             "benign parameters must not be flagged as corrupted"
         );
         let strip = pricer.price_call(100.0);
-        let scalar =
-            heston_call_price_fourier_with_settings(100.0, 100.0, 1.0, &params, &settings);
+        let scalar = heston_call_price_fourier_with_settings(100.0, 100.0, 1.0, &params, &settings);
         assert!(
             (strip - scalar).abs() < 1e-9,
             "uncorrupted strip price {strip} should match scalar path {scalar}"

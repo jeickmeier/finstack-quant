@@ -593,12 +593,12 @@ mod tests {
     /// first-order near maturity.
     #[test]
     fn seasoned_mtm_uses_time_weighting_not_observation_count() {
+        use crate::instruments::common_impl::traits::Attributes;
+        use crate::instruments::equity::variance_swap::types::PayReceive;
         use finstack_core::dates::{DayCount, Tenor};
         use finstack_core::market_data::scalars::ScalarTimeSeries;
         use finstack_core::money::Money;
         use finstack_core::types::{CurveId, InstrumentId};
-        use crate::instruments::equity::variance_swap::types::PayReceive;
-        use crate::instruments::common_impl::traits::Attributes;
 
         // Weekend-skipping daily schedule, ~6 months, valued near maturity.
         let start = date!(2025 - 01 - 06); // Monday
@@ -608,7 +608,10 @@ mod tests {
         let swap = VarianceSwap::builder()
             .id(InstrumentId::new("VARSPX-SEASONED"))
             .underlying_ticker("SPX".to_string())
-            .notional(Money::new(1_000_000.0, finstack_core::currency::Currency::USD))
+            .notional(Money::new(
+                1_000_000.0,
+                finstack_core::currency::Currency::USD,
+            ))
             .strike_variance(0.04)
             .start_date(start)
             .maturity(maturity)

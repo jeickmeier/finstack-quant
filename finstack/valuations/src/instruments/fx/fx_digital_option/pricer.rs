@@ -572,8 +572,18 @@ mod tests {
         let base_pv_call = exp_rd_t * cdf_d2 * payout_amount;
 
         let analytic_theta_call = analytic_theta_cash_or_nothing(
-            d2, r_d, r_f, sigma, t, sqrt_t, exp_rd_t, pdf_d2,
-            base_pv_call, payout_amount, OptionType::Call, theta_days_per_year,
+            d2,
+            r_d,
+            r_f,
+            sigma,
+            t,
+            sqrt_t,
+            exp_rd_t,
+            pdf_d2,
+            base_pv_call,
+            payout_amount,
+            OptionType::Call,
+            theta_days_per_year,
         );
 
         // Fine-step finite difference (1 minute) as "ground truth" for ∂V/∂τ.
@@ -590,8 +600,8 @@ mod tests {
         let fd_theta_fine = (pv_call_t_minus_fine - base_pv_call) / dt_fine / theta_days_per_year;
 
         // The analytic theta must agree with the fine-step FD to within 0.1%.
-        let rel_error = (analytic_theta_call - fd_theta_fine).abs()
-            / fd_theta_fine.abs().max(1e-10);
+        let rel_error =
+            (analytic_theta_call - fd_theta_fine).abs() / fd_theta_fine.abs().max(1e-10);
         assert!(
             rel_error < 0.001,
             "Analytic theta {analytic_theta_call:.6} disagrees with fine-step FD {fd_theta_fine:.6} (rel_error={rel_error:.4})"
@@ -600,10 +610,17 @@ mod tests {
         // Run the full greeks path and verify theta comes from analytic formula.
         // The greeks output theta is ∂V/∂τ×(−1/365) = analytic_theta_call.
         let greeks = greeks_digital(
-            spot, strike, r_d, r_f, sigma, t,
+            spot,
+            strike,
+            r_d,
+            r_f,
+            sigma,
+            t,
             OptionType::Call,
             DigitalPayoutType::CashOrNothing,
-            payout_amount, notional, theta_days_per_year,
+            payout_amount,
+            notional,
+            theta_days_per_year,
         );
 
         let theta_abs_err = (greeks.theta - analytic_theta_call).abs();
@@ -617,14 +634,31 @@ mod tests {
         let cdf_neg_d2 = finstack_core::math::norm_cdf(-d2);
         let base_pv_put = exp_rd_t * cdf_neg_d2 * payout_amount;
         let analytic_theta_put = analytic_theta_cash_or_nothing(
-            d2, r_d, r_f, sigma, t, sqrt_t, exp_rd_t, pdf_d2,
-            base_pv_put, payout_amount, OptionType::Put, theta_days_per_year,
+            d2,
+            r_d,
+            r_f,
+            sigma,
+            t,
+            sqrt_t,
+            exp_rd_t,
+            pdf_d2,
+            base_pv_put,
+            payout_amount,
+            OptionType::Put,
+            theta_days_per_year,
         );
         let greeks_put = greeks_digital(
-            spot, strike, r_d, r_f, sigma, t,
+            spot,
+            strike,
+            r_d,
+            r_f,
+            sigma,
+            t,
             OptionType::Put,
             DigitalPayoutType::CashOrNothing,
-            payout_amount, notional, theta_days_per_year,
+            payout_amount,
+            notional,
+            theta_days_per_year,
         );
         let theta_put_abs_err = (greeks_put.theta - analytic_theta_put).abs();
         assert!(

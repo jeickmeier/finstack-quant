@@ -371,9 +371,7 @@ mod tests {
         let r = -df0.ln() / t0;
 
         // Discounted PV per contract-point as a function of t.
-        let pv_of_t = |t: f64| -> f64 {
-            black_price(&option, forward, sigma, t) * (-r * t).exp()
-        };
+        let pv_of_t = |t: f64| -> f64 { black_price(&option, forward, sigma, t) * (-r * t).exp() };
         let scale = option.contract_specs.multiplier * option.num_contracts();
         let one_day = 1.0 / 365.0;
         // theta-per-day: PV decays as t (time-to-expiry) falls by one day.

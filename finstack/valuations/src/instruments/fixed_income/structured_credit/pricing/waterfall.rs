@@ -1045,10 +1045,10 @@ mod ic_diversion_tests {
         // the OC test comfortably passes.
         let mut pool = Pool::new("POOL", DealType::CLO, currency);
         {
-            use finstack_core::types::{CreditRating, InstrumentId};
             use crate::instruments::fixed_income::structured_credit::types::{
                 AssetType, PoolAsset,
             };
+            use finstack_core::types::{CreditRating, InstrumentId};
             pool.assets.push(PoolAsset {
                 day_count: finstack_core::dates::DayCount::Act360,
                 id: InstrumentId::new("ASSET_0"),
@@ -1165,8 +1165,8 @@ mod ic_diversion_tests {
             recovery_proceeds: Money::new(0.0, currency),
         };
 
-        let result = execute_waterfall(&waterfall, &tranches, &pool, context)
-            .expect("waterfall execution");
+        let result =
+            execute_waterfall(&waterfall, &tranches, &pool, context).expect("waterfall execution");
 
         // OC test passes, IC test fails.
         let oc = result
@@ -1210,9 +1210,8 @@ mod ic_diversion_tests {
                 finstack_core::dates::DayCountContext::default(),
             )
             .expect("year fraction");
-        let interest_due = class_a.current_balance.amount()
-            * class_a.coupon.current_rate(payment_date)
-            * yf;
+        let interest_due =
+            class_a.current_balance.amount() * class_a.coupon.current_rate(payment_date) * yf;
         let expected_cure = 1.20 * interest_due - 100_000.0;
         assert!(expected_cure > 0.0, "test setup: IC must breach");
 

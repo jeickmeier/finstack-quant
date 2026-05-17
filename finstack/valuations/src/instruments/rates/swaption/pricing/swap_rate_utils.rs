@@ -339,8 +339,7 @@ mod tests {
             // -ln DF(t) = ∫₀ᵗ f(0,s) ds with f(0,s) = 0.02 + 0.03·s·e^{-0.4 s}
             // (a smooth humped forward). Closed form of the integral:
             let a = 0.4_f64;
-            let integral_hump =
-                0.03 / (a * a) * (1.0 - (-a * t).exp() * (1.0 + a * t));
+            let integral_hump = 0.03 / (a * a) * (1.0 - (-a * t).exp() * (1.0 + a * t));
             (-(0.02 * t + integral_hump)).exp()
         };
 
@@ -357,10 +356,7 @@ mod tests {
             let recon = HullWhiteBondPrice::bond_price(&params, r_t, t, big_t, discount_fn);
 
             let B = HullWhiteBondPrice::b_factor(kappa, t, big_t);
-            let var = sigma * sigma / (4.0 * kappa)
-                * (1.0 - (-2.0 * kappa * t).exp())
-                * B
-                * B;
+            let var = sigma * sigma / (4.0 * kappa) * (1.0 - (-2.0 * kappa * t).exp()) * B * B;
             let expected = discount_fn(big_t) / discount_fn(t) * (-var).exp();
             assert!(
                 (recon - expected).abs() < 1e-9,

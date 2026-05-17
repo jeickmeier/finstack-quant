@@ -213,7 +213,10 @@ mod tests {
             first_alive: 0,
         };
         let r = rebonato_shape_factor(&slice).expect("shape factor");
-        assert!(r.is_finite() && r > 0.0, "R must be positive finite, got {r}");
+        assert!(
+            r.is_finite() && r > 0.0,
+            "R must be positive finite, got {r}"
+        );
     }
 
     #[test]
