@@ -351,7 +351,7 @@ mod tests {
         // It must be "nearby" — the Frobenius distance must be strictly less
         // than the input's own Frobenius norm (i.e. not a wild extrapolation).
         let frob_dist = frobenius_diff(&input, &repaired);
-        let frob_input = frobenius_diff(&input, &vec![0.0; 9]);
+        let frob_input = frobenius_diff(&input, &[0.0; 9]);
         assert!(
             frob_dist < frob_input,
             "Frobenius distance to repaired ({frob_dist:.6}) should be less than input norm ({frob_input:.6})"
