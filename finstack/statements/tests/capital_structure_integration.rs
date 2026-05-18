@@ -93,10 +93,8 @@ fn test_build_any_instrument_from_bond_spec() {
 
     let spec = DebtInstrumentSpec {
         id: "BOND-001".to_string(),
-        spec: serde_json::to_value(
-            finstack_valuations::instruments::InstrumentJson::Bond(bond),
-        )
-        .expect("bond should serialize"),
+        spec: serde_json::to_value(finstack_valuations::instruments::InstrumentJson::Bond(bond))
+            .expect("bond should serialize"),
     };
 
     let instrument = build_any_instrument_from_spec(&spec).expect("bond should deserialize");

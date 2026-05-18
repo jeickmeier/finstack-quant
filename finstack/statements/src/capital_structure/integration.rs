@@ -41,14 +41,12 @@ pub use crate::capital_structure::period_flows::calculate_period_flows;
 pub fn build_any_instrument_from_spec(
     spec: &crate::types::DebtInstrumentSpec,
 ) -> Result<Arc<dyn CashflowProvider + Send + Sync>> {
-    finstack_valuations::instruments::cashflow_provider_from_value(spec.spec.clone()).map_err(
-        |e| {
-            crate::error::Error::build(format!(
-                "Failed to build debt instrument '{}': {e}",
-                spec.id
-            ))
-        },
-    )
+    finstack_valuations::instruments::cashflow_provider_from_value(spec.spec.clone()).map_err(|e| {
+        crate::error::Error::build(format!(
+            "Failed to build debt instrument '{}': {e}",
+            spec.id
+        ))
+    })
 }
 
 /// Aggregate cashflows from instruments by period using valuations infrastructure.
