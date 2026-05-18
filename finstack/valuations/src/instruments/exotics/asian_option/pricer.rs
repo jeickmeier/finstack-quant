@@ -390,6 +390,21 @@ impl AsianOptionMcPricer {
             base_num_steps,
         )?;
         let num_steps = fixing_grid.num_steps;
+
+        // Time-varying drift: project each MC step with the curve-implied
+        // forward drift so per-fixing spots (which drive the Asian average)
+        // are unbiased on a non-flat rate curve. On a flat curve this is
+        // bit-equivalent to the constant `(r - q)` drift.
+        let process = process.with_drift_schedule(std::sync::Arc::new(
+            crate::instruments::common_impl::helpers::build_gbm_drift_schedule(
+                disc_curve.as_ref(),
+                r,
+                q,
+                t,
+                num_steps,
+            )?,
+        ));
+
         // Effective future-fixing times on the MC grid. The seasoned geometric
         // control variate (W-07) is built on exactly these times, so its
         // implied fixing count is the *effective* future-fixing count — not
@@ -797,6 +812,20 @@ impl AsianOptionMcPricer {
         )?;
         let num_steps = fixing_grid.num_steps;
         let fixing_steps = fixing_grid.fixing_steps;
+
+        // Time-varying drift: project each MC step with the curve-implied
+        // forward drift so per-fixing spots (which drive the Asian average)
+        // are unbiased on a non-flat rate curve. On a flat curve this is
+        // bit-equivalent to the constant `(r - q)` drift.
+        let process = process.with_drift_schedule(std::sync::Arc::new(
+            crate::instruments::common_impl::helpers::build_gbm_drift_schedule(
+                disc_curve.as_ref(),
+                r,
+                q,
+                t,
+                num_steps,
+            )?,
+        ));
 
         let averaging = match inst.averaging_method {
             crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic => {

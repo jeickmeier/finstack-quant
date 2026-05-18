@@ -123,6 +123,7 @@ use super::super::paths::ProcessParams;
 use super::super::traits::{state_keys, PathState, ProportionalDiffusion, StochasticProcess};
 use super::correlation::validate_correlation_matrix;
 use super::metadata::ProcessMetadata;
+use std::sync::Arc;
 
 /// Geometric Brownian Motion parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -164,6 +165,94 @@ impl GbmParams {
     }
 }
 
+/// Deterministic time-varying drift schedule for GBM exact simulation.
+///
+/// Holds the cumulative risk-neutral log-drift `M(t) = ∫₀ᵗ (r(u) − q(u)) du`
+/// sampled at a sorted set of knot times, with linear interpolation between
+/// knots (equivalently: piecewise-constant instantaneous drift). The standard
+/// constant-drift GBM is the special case `M(t) = (r − q)·t`.
+///
+/// Attaching a schedule to a [`GbmProcess`] lets
+/// [`ExactGbm`](crate::discretization::exact::ExactGbm) price path-dependent
+/// payoffs (Asian, lookback) on a non-flat rate curve without the per-fixing
+/// forward bias a single maturity-averaged drift introduces.
+#[derive(Debug, Clone)]
+pub struct DriftSchedule {
+    /// Sorted, strictly increasing knot times (years).
+    times: Vec<f64>,
+    /// Cumulative log-drift `M(t)` at each knot. Only differences are used, so
+    /// the absolute offset is immaterial.
+    cumulative_drift: Vec<f64>,
+}
+
+impl DriftSchedule {
+    /// Build a drift schedule from knot times and cumulative log-drift values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the inputs are inconsistent: mismatched lengths,
+    /// fewer than two knots, times not strictly increasing, or any non-finite
+    /// value.
+    pub fn new(times: Vec<f64>, cumulative_drift: Vec<f64>) -> finstack_core::Result<Self> {
+        if times.len() != cumulative_drift.len() {
+            return Err(finstack_core::Error::Validation(format!(
+                "DriftSchedule: times ({}) and cumulative_drift ({}) length mismatch",
+                times.len(),
+                cumulative_drift.len()
+            )));
+        }
+        if times.len() < 2 {
+            return Err(finstack_core::Error::Validation(
+                "DriftSchedule requires at least two knots".to_string(),
+            ));
+        }
+        for w in times.windows(2) {
+            if w[1] <= w[0] {
+                return Err(finstack_core::Error::Validation(
+                    "DriftSchedule times must be strictly increasing".to_string(),
+                ));
+            }
+        }
+        if times.iter().chain(cumulative_drift.iter()).any(|v| !v.is_finite()) {
+            return Err(finstack_core::Error::Validation(
+                "DriftSchedule times and cumulative_drift values must be finite".to_string(),
+            ));
+        }
+        Ok(Self {
+            times,
+            cumulative_drift,
+        })
+    }
+
+    /// Cumulative log-drift `M(t)`, linearly interpolated between knots and
+    /// flat-slope-extrapolated outside the knot range.
+    pub fn cumulative(&self, t: f64) -> f64 {
+        let times = &self.times;
+        let m = &self.cumulative_drift;
+        match times.binary_search_by(|x| x.partial_cmp(&t).unwrap_or(std::cmp::Ordering::Less)) {
+            Ok(i) => m[i],
+            Err(0) => {
+                let slope = (m[1] - m[0]) / (times[1] - times[0]);
+                m[0] + slope * (t - times[0])
+            }
+            Err(i) if i >= times.len() => {
+                let n = times.len();
+                let slope = (m[n - 1] - m[n - 2]) / (times[n - 1] - times[n - 2]);
+                m[n - 1] + slope * (t - times[n - 1])
+            }
+            Err(i) => {
+                let slope = (m[i] - m[i - 1]) / (times[i] - times[i - 1]);
+                m[i - 1] + slope * (t - times[i - 1])
+            }
+        }
+    }
+
+    /// Risk-neutral log-drift increment `∫_{t0}^{t1} (r − q) du` over a step.
+    pub fn log_drift_increment(&self, t0: f64, t1: f64) -> f64 {
+        self.cumulative(t1) - self.cumulative(t0)
+    }
+}
+
 /// Single-factor GBM process (1D).
 ///
 /// State: S (spot price)
@@ -171,12 +260,18 @@ impl GbmParams {
 #[derive(Debug, Clone)]
 pub struct GbmProcess {
     params: GbmParams,
+    /// Optional deterministic time-varying drift schedule. When present,
+    /// `ExactGbm` uses it instead of the constant `(r − q)` drift.
+    drift_schedule: Option<Arc<DriftSchedule>>,
 }
 
 impl GbmProcess {
     /// Create a new GBM process.
     pub fn new(params: GbmParams) -> Self {
-        Self { params }
+        Self {
+            params,
+            drift_schedule: None,
+        }
     }
 
     /// Create with explicit parameters.
@@ -188,9 +283,27 @@ impl GbmProcess {
         Ok(Self::new(GbmParams::new(r, q, sigma)?))
     }
 
+    /// Attach a deterministic time-varying drift schedule.
+    ///
+    /// When present, [`ExactGbm`](crate::discretization::exact::ExactGbm) uses
+    /// the schedule's per-step log-drift increment instead of the constant
+    /// `(r − q)·Δt`, removing the per-fixing forward bias on a non-flat rate
+    /// curve. The instantaneous [`StochasticProcess::drift`] (used by generic
+    /// Euler / Milstein schemes) keeps the constant `(r − q)` rate, so a
+    /// schedule should be paired with `ExactGbm`.
+    pub fn with_drift_schedule(mut self, schedule: Arc<DriftSchedule>) -> Self {
+        self.drift_schedule = Some(schedule);
+        self
+    }
+
     /// Get parameters.
     pub fn params(&self) -> &GbmParams {
         &self.params
+    }
+
+    /// Time-varying drift schedule, if one is attached.
+    pub fn drift_schedule(&self) -> Option<&DriftSchedule> {
+        self.drift_schedule.as_deref()
     }
 
     /// Risk-neutral drift rate.
@@ -445,5 +558,71 @@ mod tests {
         let corr = vec![1.0, 0.2, 0.4, 1.0];
 
         assert!(MultiGbmProcess::new(params, Some(corr)).is_err());
+    }
+
+    #[test]
+    fn drift_schedule_constant_drift_matches_linear() {
+        // M(t) = (r-q)*t reproduces the constant-drift increment exactly, so a
+        // flat-curve schedule is bit-equivalent to the constant-drift GBM.
+        let rq = 0.03;
+        let times = vec![0.0, 0.25, 0.5, 1.0];
+        let cum: Vec<f64> = times.iter().map(|t| rq * t).collect();
+        let sched = DriftSchedule::new(times, cum).expect("valid schedule");
+
+        for &(t0, t1) in &[(0.0, 0.25), (0.1, 0.4), (0.5, 1.0), (0.3, 0.3)] {
+            let inc = sched.log_drift_increment(t0, t1);
+            assert!(
+                (inc - rq * (t1 - t0)).abs() < 1e-12,
+                "increment {inc} over [{t0},{t1}] should be {}",
+                rq * (t1 - t0)
+            );
+        }
+    }
+
+    #[test]
+    fn drift_schedule_interpolates_and_extrapolates() {
+        // Front-loaded cumulative drift: steeper over the first year.
+        let sched = DriftSchedule::new(vec![0.0, 1.0, 2.0], vec![0.0, 0.06, 0.08])
+            .expect("valid schedule");
+
+        assert!((sched.cumulative(0.5) - 0.03).abs() < 1e-12); // linear in [0,1]
+        assert!((sched.cumulative(1.5) - 0.07).abs() < 1e-12); // linear in [1,2]
+        assert!((sched.cumulative(3.0) - 0.10).abs() < 1e-12); // last-slope extrapolation
+
+        assert!(
+            sched.log_drift_increment(0.0, 1.0) > sched.log_drift_increment(1.0, 2.0),
+            "front-loaded schedule must carry more drift in its first half"
+        );
+    }
+
+    #[test]
+    fn drift_schedule_rejects_invalid_inputs() {
+        assert!(
+            DriftSchedule::new(vec![0.0], vec![0.0]).is_err(),
+            "fewer than two knots must be rejected"
+        );
+        assert!(
+            DriftSchedule::new(vec![0.0, 1.0], vec![0.0]).is_err(),
+            "length mismatch must be rejected"
+        );
+        assert!(
+            DriftSchedule::new(vec![0.0, 1.0, 1.0], vec![0.0, 0.03, 0.05]).is_err(),
+            "non-increasing times must be rejected"
+        );
+        assert!(
+            DriftSchedule::new(vec![0.0, f64::NAN], vec![0.0, 0.03]).is_err(),
+            "non-finite time must be rejected"
+        );
+    }
+
+    #[test]
+    fn gbm_process_carries_optional_drift_schedule() {
+        let process = GbmProcess::with_params(0.05, 0.02, 0.2).expect("valid gbm");
+        assert!(process.drift_schedule().is_none());
+
+        let sched =
+            Arc::new(DriftSchedule::new(vec![0.0, 1.0], vec![0.0, 0.03]).expect("valid schedule"));
+        let with_sched = process.with_drift_schedule(sched);
+        assert!(with_sched.drift_schedule().is_some());
     }
 }

@@ -105,6 +105,21 @@ impl LookbackOptionMcPricer {
 
         let steps_per_year = base_cfg.steps_per_year;
         let num_steps = ((t * steps_per_year).round() as usize).max(base_cfg.min_steps);
+
+        // Time-varying drift: project each MC step with the curve-implied
+        // forward drift, so the running extremum is sampled from unbiased
+        // per-step spots on a non-flat rate curve. On a flat curve this is
+        // bit-equivalent to the constant `(r - q)` drift.
+        let process = process.with_drift_schedule(std::sync::Arc::new(
+            crate::instruments::common_impl::helpers::build_gbm_drift_schedule(
+                disc_curve.as_ref(),
+                r,
+                q,
+                t,
+                num_steps,
+            )?,
+        ));
+
         // `maturity_step` must equal `num_steps`: the engine fires `on_event` with
         // `state.step = num_steps` on the last iteration (after the final diffusion step),
         // so both the terminal-spot capture and the running-extremum update must include

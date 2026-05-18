@@ -13,10 +13,13 @@ use finstack_core::math::linalg::CholeskyError;
 /// Uses the analytical log-normal solution:
 ///
 /// ```text
-/// S_{t+Δt} = S_t exp((r - q - ½σ²)Δt + σ√Δt Z)
+/// S_{t+Δt} = S_t exp((∫(r - q) - ½σ²)Δt + σ√Δt Z)
 /// ```
 ///
-/// where Z ~ N(0,1).
+/// where Z ~ N(0,1) and `∫(r - q)` is the risk-neutral log-drift increment
+/// over `[t, t+Δt]`. When the [`GbmProcess`] carries a
+/// [`DriftSchedule`](crate::process::gbm::DriftSchedule) the increment is read
+/// from it (a non-flat rate curve); otherwise it is the constant `(r - q)·Δt`.
 ///
 /// This is numerically exact and has no discretization error.
 #[derive(Debug, Clone, Default)]
@@ -33,7 +36,7 @@ impl Discretization<GbmProcess> for ExactGbm {
     fn step(
         &self,
         process: &GbmProcess,
-        _t: f64,
+        t: f64,
         dt: f64,
         x: &mut [f64],
         z: &[f64],
@@ -41,8 +44,16 @@ impl Discretization<GbmProcess> for ExactGbm {
     ) {
         let params = process.params();
 
-        // Drift component: (r - q - ½σ²)Δt
-        let drift = (params.r - params.q - 0.5 * params.sigma * params.sigma) * dt;
+        // Risk-neutral log-drift increment ∫(r−q) over [t, t+dt]: the
+        // time-varying schedule when attached (non-flat curve), else the
+        // constant (r−q)·Δt.
+        let drift_increment = match process.drift_schedule() {
+            Some(schedule) => schedule.log_drift_increment(t, t + dt),
+            None => (params.r - params.q) * dt,
+        };
+
+        // Drift component: ∫(r−q) − ½σ²Δt
+        let drift = drift_increment - 0.5 * params.sigma * params.sigma * dt;
 
         // Diffusion component: σ√Δt Z
         let diffusion = params.sigma * dt.sqrt() * z[0];
@@ -335,6 +346,77 @@ mod tests {
         disc.step(&process, 0.0, 1.0, &mut x_single, &z_zero, &mut work);
 
         assert!((x[0] - x_single[0]).abs() < 1e-10);
+    }
+
+    #[test]
+    fn exact_gbm_flat_schedule_matches_constant_drift() {
+        // A schedule with M(t) = (r-q)*t reproduces the constant-drift step
+        // exactly, so flat-curve pricing is unchanged by the schedule path.
+        use super::super::super::process::gbm::DriftSchedule;
+        use std::sync::Arc;
+
+        let params = GbmParams::new(0.05, 0.02, 0.2).unwrap();
+        let rq = 0.05 - 0.02;
+        let times = vec![0.0, 0.5, 1.0];
+        let cum: Vec<f64> = times.iter().map(|t| rq * t).collect();
+        let sched = Arc::new(DriftSchedule::new(times, cum).unwrap());
+
+        let constant = GbmProcess::new(params.clone());
+        let scheduled = GbmProcess::new(params).with_drift_schedule(sched);
+        let disc = ExactGbm::new();
+
+        let z = vec![0.7];
+        let mut work = vec![];
+        for &(t, dt) in &[(0.0, 0.5), (0.5, 0.5)] {
+            let mut xc = vec![100.0];
+            let mut xs = vec![100.0];
+            disc.step(&constant, t, dt, &mut xc, &z, &mut work);
+            disc.step(&scheduled, t, dt, &mut xs, &z, &mut work);
+            assert!(
+                (xc[0] - xs[0]).abs() < 1e-12,
+                "flat M(t)=(r-q)t schedule must match constant drift at t={t}"
+            );
+        }
+    }
+
+    #[test]
+    fn exact_gbm_front_loaded_schedule_shifts_intermediate_step() {
+        // A front-loaded drift schedule (same terminal M, more drift early)
+        // lifts the first-step spot above the constant-drift level, while the
+        // matched terminal M leaves S(T) unchanged.
+        use super::super::super::process::gbm::DriftSchedule;
+        use std::sync::Arc;
+
+        let params = GbmParams::new(0.04, 0.0, 0.2).unwrap();
+        // Constant: M(1) = 0.04. Front-loaded: same M(1) but 0.03 by t = 0.5.
+        let sched =
+            Arc::new(DriftSchedule::new(vec![0.0, 0.5, 1.0], vec![0.0, 0.03, 0.04]).unwrap());
+        let constant = GbmProcess::new(params.clone());
+        let scheduled = GbmProcess::new(params).with_drift_schedule(sched);
+        let disc = ExactGbm::new();
+
+        let z = vec![0.0]; // drift-only
+        let mut work = vec![];
+
+        let mut xc = vec![100.0];
+        let mut xs = vec![100.0];
+        disc.step(&constant, 0.0, 0.5, &mut xc, &z, &mut work);
+        disc.step(&scheduled, 0.0, 0.5, &mut xs, &z, &mut work);
+        assert!(
+            xs[0] > xc[0],
+            "front-loaded schedule must lift the first-step spot: {} vs {}",
+            xs[0],
+            xc[0]
+        );
+
+        disc.step(&constant, 0.5, 0.5, &mut xc, &z, &mut work);
+        disc.step(&scheduled, 0.5, 0.5, &mut xs, &z, &mut work);
+        assert!(
+            (xc[0] - xs[0]).abs() < 1e-12,
+            "equal terminal M(1) must give equal S(1): {} vs {}",
+            xc[0],
+            xs[0]
+        );
     }
 
     #[test]

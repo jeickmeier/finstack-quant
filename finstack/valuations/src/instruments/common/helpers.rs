@@ -167,6 +167,60 @@ pub fn resolve_optional_dividend_yield(
     }
 }
 
+/// Build a time-varying GBM drift schedule from a discount curve.
+///
+/// Samples the cumulative risk-neutral log-drift `M(t) = ∫₀ᵗ (r(u) − q) du` at
+/// `num_steps + 1` evenly-spaced knots over `[0, t]`. The rate term structure
+/// comes from `disc_curve`; its cumulative log-DF shape is rescaled so `M(t)`
+/// matches the maturity-effective rate `r` exactly at `t` (terminal
+/// forward/discount consistency). The dividend leg uses the scalar yield `q`.
+///
+/// Attaching the result to a [`GbmProcess`](finstack_monte_carlo::process::gbm::GbmProcess)
+/// removes the per-fixing forward bias the constant maturity-averaged drift
+/// introduces for path-dependent (Asian, lookback) Monte Carlo pricing on a
+/// non-flat curve. On a flat curve `M(t) = (r − q)·t`, so the schedule is
+/// bit-equivalent to the constant drift.
+///
+/// # Errors
+///
+/// Returns an error if the resulting schedule is degenerate (see
+/// `DriftSchedule::new`) — e.g. a non-finite curve evaluation.
+pub fn build_gbm_drift_schedule(
+    disc_curve: &finstack_core::market_data::term_structures::DiscountCurve,
+    r: f64,
+    q: f64,
+    t: f64,
+    num_steps: usize,
+) -> finstack_core::Result<finstack_monte_carlo::process::gbm::DriftSchedule> {
+    use finstack_monte_carlo::process::gbm::DriftSchedule;
+
+    let knots = num_steps.max(1);
+    // Rescale the curve's cumulative log-DF shape so the terminal cumulative
+    // rate equals r·t exactly — this keeps the simulated terminal forward
+    // consistent with the date-based discount factor used to discount the
+    // payoff. The curve supplies only the *shape* of the term structure.
+    let terminal_rate_cum = -disc_curve.df(t).ln();
+    let scale = if terminal_rate_cum.abs() > 1e-12 {
+        (r * t) / terminal_rate_cum
+    } else {
+        1.0
+    };
+
+    let mut times = Vec::with_capacity(knots + 1);
+    let mut cumulative = Vec::with_capacity(knots + 1);
+    for k in 0..=knots {
+        let tk = t * (k as f64) / (knots as f64);
+        let rate_cum = if tk > 0.0 {
+            -disc_curve.df(tk).ln() * scale
+        } else {
+            0.0
+        };
+        times.push(tk);
+        cumulative.push(rate_cum - q * tk);
+    }
+    DriftSchedule::new(times, cumulative)
+}
+
 /// Workspace-wide Monte Carlo defaults and resource limits.
 ///
 /// These are the single source of truth for MC pricers across the
