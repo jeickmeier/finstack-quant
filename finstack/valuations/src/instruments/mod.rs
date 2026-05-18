@@ -265,4 +265,4 @@ pub use pricing_overrides::{
 // === JSON Import/Export ===
 pub mod json_loader;
 
-pub use json_loader::{InstrumentEnvelope, InstrumentJson};
+pub use json_loader::{cashflow_provider_from_value, InstrumentEnvelope, InstrumentJson};

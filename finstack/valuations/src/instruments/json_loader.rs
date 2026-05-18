@@ -10,6 +10,7 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::io::Read;
+use std::sync::Arc;
 
 /// Versioned envelope for JSON instrument definitions.
 ///
@@ -566,6 +567,27 @@ impl InstrumentEnvelope {
         })?;
         Self::from_reader(file)
     }
+}
+
+/// Construct a runtime cashflow-providing instrument from a canonical tagged
+/// JSON payload, dispatched through the instrument registry.
+///
+/// Accepts either the versioned envelope form
+/// (`{"schema": "finstack.instrument/1", "instrument": {...}}`) or the bare
+/// tagged form (`{"type": "...", "spec": {...}}`). Every instrument type in
+/// [`with_instrument_json_registry!`] is reachable, so callers never maintain
+/// their own instrument-type lists.
+///
+/// # Errors
+///
+/// Returns an error when the payload does not match a registered instrument
+/// type or fails spec validation.
+pub fn cashflow_provider_from_value(
+    value: serde_json::Value,
+) -> Result<Arc<dyn finstack_cashflows::CashflowProvider + Send + Sync>> {
+    let instrument: Box<DynInstrument> = InstrumentEnvelope::from_value(value)?;
+    let provider: Box<dyn finstack_cashflows::CashflowProvider + Send + Sync> = instrument;
+    Ok(Arc::from(provider))
 }
 
 #[cfg(test)]
@@ -1480,5 +1502,31 @@ mod tests {
             schema_types, actual,
             "Schema enum should be alphabetically sorted for maintainability"
         );
+    }
+
+    #[test]
+    fn test_cashflow_provider_from_value_non_legacy_type() {
+        // RevolvingCredit is in the registry but was absent from the old statements
+        // `Generic` brute-force list (Bond/IRS/TermLoan/Deposit/FRA/Repo). It must
+        // build through the canonical registry.
+        let rcf = crate::instruments::RevolvingCredit::example()
+            .expect("example RevolvingCredit should construct");
+        let tagged = serde_json::to_value(InstrumentJson::RevolvingCredit(rcf))
+            .expect("InstrumentJson serialization should succeed in test");
+
+        let provider = cashflow_provider_from_value(tagged);
+        assert!(
+            provider.is_ok(),
+            "revolving_credit must build via the canonical registry"
+        );
+    }
+
+    #[test]
+    fn test_cashflow_provider_from_value_rejects_unknown_type() {
+        let provider = cashflow_provider_from_value(serde_json::json!({
+            "type": "not_a_real_instrument",
+            "spec": {}
+        }));
+        assert!(provider.is_err(), "unknown type tag must error");
     }
 }
