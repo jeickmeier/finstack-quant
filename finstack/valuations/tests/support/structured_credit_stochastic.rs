@@ -157,41 +157,29 @@ mod property_tests {
 
     /// Test that higher correlation leads to higher loss volatility.
     ///
-    /// This is a fundamental property: correlated defaults lead to
-    /// fatter tails and higher loss variance.
+    /// Tree-mode metrics never expose unexpected loss: the recombining lattice
+    /// collapses the loss dispersion that UL measures, at any correlation.
+    /// (The correlation → fatter-tails property is observable only in Monte
+    /// Carlo mode, which preserves per-path loss dispersion.)
     #[test]
-    fn test_higher_correlation_higher_volatility() {
+    fn test_tree_metrics_omit_unexpected_loss() {
         let calc = StochasticMetricsCalculator::new(1_000_000.0);
 
-        // Low correlation
-        let config_low = ScenarioTreeConfig::new(3, 0.25, BranchingSpec::fixed(3))
-            .with_correlation(CorrelationStructure::flat(0.05, -0.20));
-        let tree_low = ScenarioTree::build(&config_low).expect("Low corr tree should build");
-        let metrics_low = calc.compute_from_tree(&tree_low);
+        for corr in [0.05_f64, 0.40] {
+            let config = ScenarioTreeConfig::new(3, 0.25, BranchingSpec::fixed(3))
+                .with_correlation(CorrelationStructure::flat(corr, -0.20));
+            let tree = ScenarioTree::build(&config).expect("tree should build");
+            let metrics = calc.compute_from_tree(&tree);
 
-        // High correlation
-        let config_high = ScenarioTreeConfig::new(3, 0.25, BranchingSpec::fixed(3))
-            .with_correlation(CorrelationStructure::flat(0.40, -0.20));
-        let tree_high = ScenarioTree::build(&config_high).expect("High corr tree should build");
-        let metrics_high = calc.compute_from_tree(&tree_high);
-
-        // The property: higher correlation → higher unexpected loss (std dev)
-        // This may not always hold for small trees, so we check the relative magnitude
-        // is at least in the right direction or within tolerance
-        let ratio = metrics_high.unexpected_loss / (metrics_low.unexpected_loss + 1e-10);
-
-        // Allow for numerical tolerance - the effect should be visible
-        // but small trees may not perfectly exhibit this property
-        assert!(
-            ratio >= 0.8,
-            "Higher correlation should not dramatically decrease UL: low={}, high={}, ratio={}",
-            metrics_low.unexpected_loss,
-            metrics_high.unexpected_loss,
-            ratio
-        );
+            assert!(
+                metrics.unexpected_loss.is_none(),
+                "tree-mode unexpected loss must be unavailable (corr={corr})"
+            );
+        }
     }
 
-    /// Test that metrics calculation produces finite values.
+    /// Tree-mode metrics: the expected-value fields are finite; the tail-risk
+    /// fields are unavailable (`None`) rather than dispersion-collapsed numbers.
     #[test]
     fn test_metrics_produce_finite_values() {
         let notional = 1_000_000.0;
@@ -203,67 +191,20 @@ mod property_tests {
         let tree = ScenarioTree::build(&config).expect("Tree should build");
         let metrics = calc.compute_from_tree(&tree);
 
-        // All metrics should be finite
+        // First-moment fields are exact and finite.
         assert!(
             metrics.expected_loss.is_finite(),
             "Expected loss should be finite: got {}",
             metrics.expected_loss
         );
-        assert!(
-            metrics.unexpected_loss.is_finite(),
-            "Unexpected loss should be finite: got {}",
-            metrics.unexpected_loss
-        );
-        assert!(
-            metrics.var_95.is_finite(),
-            "VaR95 should be finite: got {}",
-            metrics.var_95
-        );
-        assert!(
-            metrics.expected_shortfall_95.is_finite(),
-            "ES95 should be finite: got {}",
-            metrics.expected_shortfall_95
-        );
         assert!(metrics.num_scenarios > 0, "Should have scenarios");
-    }
 
-    /// Test that VaR ordering is preserved: VaR99 ≥ VaR95.
-    #[test]
-    fn test_var_ordering() {
-        let calc = StochasticMetricsCalculator::new(1_000_000.0);
-
-        // Use smaller configs to avoid overflow in tests
-        let configs = [
-            ScenarioTreeConfig::new(4, 0.333, BranchingSpec::fixed(3)),
-            ScenarioTreeConfig::new(3, 0.25, BranchingSpec::fixed(2)),
-        ];
-
-        for config in configs {
-            let tree = ScenarioTree::build(&config).expect("Tree should build");
-            let metrics = calc.compute_from_tree(&tree);
-
-            // VaR99 should be >= VaR95 (99th percentile is more extreme)
-            assert!(
-                metrics.var_99 >= metrics.var_95 - 1e-6,
-                "VaR99 should be >= VaR95: var99={}, var95={}",
-                metrics.var_99,
-                metrics.var_95
-            );
-
-            // ES should be >= VaR at same level (average of tail >= threshold)
-            assert!(
-                metrics.expected_shortfall_95 >= metrics.var_95 - 1e-6,
-                "ES95 should be >= VaR95: es95={}, var95={}",
-                metrics.expected_shortfall_95,
-                metrics.var_95
-            );
-            assert!(
-                metrics.expected_shortfall_99 >= metrics.var_99 - 1e-6,
-                "ES99 should be >= VaR99: es99={}, var99={}",
-                metrics.expected_shortfall_99,
-                metrics.var_99
-            );
-        }
+        // Tail-risk fields are unavailable from a recombining tree.
+        assert!(metrics.unexpected_loss.is_none());
+        assert!(metrics.var_95.is_none());
+        assert!(metrics.var_99.is_none());
+        assert!(metrics.expected_shortfall_95.is_none());
+        assert!(metrics.expected_shortfall_99.is_none());
     }
 
     /// Test factor spec correlation matrix is valid (correlation in [-1, 1]).
@@ -466,14 +407,13 @@ mod integration_tests {
         let calc = StochasticMetricsCalculator::new(1_000_000.0);
         let metrics = calc.compute_from_tree(&tree);
 
-        // All metrics should be computed
+        // Expected-value metrics are computed; tail-risk metrics are `None`
+        // (a recombining tree cannot supply faithful dispersion).
         assert!(metrics.num_scenarios > 0);
         assert!(metrics.expected_loss >= 0.0);
-        assert!(metrics.unexpected_loss >= 0.0);
-        assert!(metrics.var_95 >= 0.0);
-        assert!(metrics.var_99 >= 0.0);
-        assert!(metrics.expected_shortfall_95 >= 0.0);
-        assert!(metrics.expected_shortfall_99 >= 0.0);
+        assert!(metrics.unexpected_loss.is_none());
+        assert!(metrics.var_95.is_none());
+        assert!(metrics.expected_shortfall_99.is_none());
     }
 
     /// Test sensitivity computation integration.

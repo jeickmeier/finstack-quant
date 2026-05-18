@@ -60,11 +60,16 @@ pub(crate) struct CorrelationSensitivities {
     /// Sensitivity of expected loss to 1% asset correlation bump
     pub correlation_01_el: f64,
 
-    /// Sensitivity of unexpected loss to 1% asset correlation bump
-    pub correlation_01_ul: f64,
+    /// Sensitivity of unexpected loss to 1% asset correlation bump.
+    ///
+    /// `None` when the underlying metrics carry no tail risk — UL is a
+    /// dispersion metric and a recombining scenario tree cannot supply it.
+    pub correlation_01_ul: Option<f64>,
 
-    /// Sensitivity of 99% ES to 1% asset correlation bump
-    pub correlation_01_es99: f64,
+    /// Sensitivity of 99% ES to 1% asset correlation bump.
+    ///
+    /// `None` when the underlying metrics carry no tail risk (recombining tree).
+    pub correlation_01_es99: Option<f64>,
 
     // === Recovery correlation sensitivities ===
     /// Sensitivity to 1% recovery-default correlation bump
@@ -85,27 +90,28 @@ pub(crate) struct CorrelationSensitivities {
     /// Base expected loss (for context)
     pub base_el: f64,
 
-    /// Base unexpected loss (for context)
-    pub base_ul: f64,
+    /// Base unexpected loss (for context). `None` from recombining-tree metrics.
+    pub base_ul: Option<f64>,
 
-    /// Base 99% ES (for context)
-    pub base_es99: f64,
+    /// Base 99% ES (for context). `None` from recombining-tree metrics.
+    pub base_es99: Option<f64>,
 }
 
 impl CorrelationSensitivities {
-    /// Create sensitivities with all values set to zero.
+    /// Create sensitivities with all values set to zero (tail-risk-derived
+    /// fields `None`).
     pub(crate) fn zero() -> Self {
         Self {
             correlation_01_el: 0.0,
-            correlation_01_ul: 0.0,
-            correlation_01_es99: 0.0,
+            correlation_01_ul: None,
+            correlation_01_es99: None,
             recovery_correlation_01: 0.0,
             prepay_factor_01: 0.0,
             prepay_vol_01: 0.0,
             correlation_gamma: 0.0,
             base_el: 0.0,
-            base_ul: 0.0,
-            base_es99: 0.0,
+            base_ul: None,
+            base_es99: None,
         }
     }
 
@@ -144,10 +150,19 @@ impl CorrelationSensitivities {
 
         let correlation_01_el =
             (corr_up_metrics.expected_loss - base_metrics.expected_loss) * scale;
-        let correlation_01_ul =
-            (corr_up_metrics.unexpected_loss - base_metrics.unexpected_loss) * scale;
-        let correlation_01_es99 =
-            (corr_up_metrics.expected_shortfall_99 - base_metrics.expected_shortfall_99) * scale;
+        // UL / ES sensitivities need dispersion-preserving metrics; from a
+        // recombining-tree config the base and bumped metrics carry no tail
+        // risk, so these collapse to `None` (see `StochasticMetrics`).
+        let correlation_01_ul = bumped_sensitivity(
+            corr_up_metrics.unexpected_loss,
+            base_metrics.unexpected_loss,
+            scale,
+        );
+        let correlation_01_es99 = bumped_sensitivity(
+            corr_up_metrics.expected_shortfall_99,
+            base_metrics.expected_shortfall_99,
+            scale,
+        );
 
         // Gamma: second derivative
         let correlation_gamma = (corr_up_metrics.expected_loss - 2.0 * base_metrics.expected_loss
@@ -200,6 +215,15 @@ impl CorrelationSensitivities {
 }
 
 // === Helper functions for bumping configurations ===
+
+/// Finite-difference sensitivity of an optional metric.
+///
+/// Returns `Some((bumped − base) · scale)` only when both the bumped and base
+/// metric are available; `None` if either is missing — e.g. a tail-risk metric
+/// from a recombining scenario tree.
+fn bumped_sensitivity(bumped: Option<f64>, base: Option<f64>, scale: f64) -> Option<f64> {
+    Some((bumped? - base?) * scale)
+}
 
 fn bump_asset_correlation(
     config: &ScenarioTreeConfig,
@@ -301,7 +325,10 @@ mod tests {
         // (higher correlation → more extreme scenarios → higher average loss)
         // But this depends on the structure
         assert!(sens.correlation_01_el.is_finite());
-        assert!(sens.correlation_01_ul.is_finite());
+        // UL sensitivity is a tail-risk metric; from a recombining-tree config
+        // it is unavailable (`None`), not a silently-biased number.
+        assert!(sens.correlation_01_ul.is_none());
+        assert!(sens.correlation_01_es99.is_none());
         assert!(sens.base_el >= 0.0);
     }
 

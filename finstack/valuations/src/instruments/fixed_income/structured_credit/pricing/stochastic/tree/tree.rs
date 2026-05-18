@@ -14,6 +14,22 @@ use crate::instruments::common_impl::models::correlation::recovery::RecoverySpec
 use finstack_core::math::standard_normal_inv_cdf;
 use finstack_core::HashMap;
 
+/// Error returned by the recombining `ScenarioTree`'s dispersion / tail-risk
+/// accessors.
+///
+/// Lattice recombination ([`ScenarioTree::merge_nodes`]) probability-averages
+/// each node's path-dependent cumulative losses, collapsing the loss
+/// *distribution* at every node to a conditional mean. Any dispersion or
+/// tail-risk quantity read off the terminal nodes — unexpected loss, VaR,
+/// expected shortfall, a loss percentile — is therefore biased toward the
+/// centre. Rather than return a silently-wrong number, those accessors fail
+/// with this message; tail risk must be priced in Monte Carlo mode.
+const RECOMBINING_TREE_TAIL_RISK_UNAVAILABLE: &str =
+    "tail-risk / dispersion metrics are unavailable from the recombining \
+     scenario tree: lattice recombination collapses path-dependent loss \
+     dispersion to per-node conditional means. Price with \
+     PricingMode::MonteCarlo for unexpected loss, VaR, or expected shortfall.";
+
 /// Recombining scenario tree for structured credit.
 ///
 /// Each node in the tree represents a possible state at a point in time,
@@ -447,47 +463,32 @@ impl ScenarioTree {
         }
     }
 
-    /// Compute variance of a function over terminal nodes.
-    pub(crate) fn variance<F>(&self, f: F) -> f64
+    /// Variance of a function over terminal nodes.
+    ///
+    /// # Errors
+    ///
+    /// Always errors: a variance is a dispersion metric and the recombining
+    /// lattice has collapsed each node's loss distribution to a conditional
+    /// mean (see [`Self::merge_nodes`]). Use Monte Carlo mode.
+    pub(crate) fn variance<F>(&self, _f: F) -> Result<f64, String>
     where
         F: Fn(&ScenarioNode) -> f64,
     {
-        let mean = self.expected_value(&f);
-        self.expected_value(|n| (f(n) - mean).powi(2))
+        Err(RECOMBINING_TREE_TAIL_RISK_UNAVAILABLE.to_string())
     }
 
-    /// Compute percentile of a function over terminal nodes.
-    pub(crate) fn percentile<F>(&self, f: F, p: f64) -> f64
+    /// Percentile of a function over terminal nodes.
+    ///
+    /// # Errors
+    ///
+    /// Always errors: terminal-node values are recombination-collapsed
+    /// conditional means (see [`Self::merge_nodes`]), so a percentile read off
+    /// them does not reflect the true distribution. Use Monte Carlo mode.
+    pub(crate) fn percentile<F>(&self, _f: F, _p: f64) -> Result<f64, String>
     where
         F: Fn(&ScenarioNode) -> f64,
     {
-        let mut values: Vec<(f64, f64)> = self
-            .terminal_indices
-            .iter()
-            .map(|&i| {
-                let node = &self.nodes[i];
-                (f(node), node.cumulative_probability)
-            })
-            .collect();
-
-        // Sort by value
-        values.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Find percentile
-        let total_prob: f64 = values.iter().map(|(_, prob)| prob).sum();
-        let target = p * total_prob;
-
-        let mut cumulative = 0.0;
-        let mut last_value = 0.0;
-        for (value, prob) in &values {
-            last_value = *value;
-            cumulative += prob;
-            if cumulative >= target {
-                return *value;
-            }
-        }
-
-        last_value
+        Err(RECOMBINING_TREE_TAIL_RISK_UNAVAILABLE.to_string())
     }
 
     /// Compute expected loss.
@@ -505,59 +506,26 @@ impl ScenarioTree {
         self.expected_value(|n| n.cumulative_defaults)
     }
 
-    /// Compute unexpected loss (loss standard deviation).
+    /// Unexpected loss (loss standard deviation).
     ///
-    /// **Tail-risk caveat (item 7):** the recombining tree averages
-    /// path-dependent cumulative losses at each lattice node (see
-    /// [`Self::merge_nodes`]), so this UL is biased LOW — it measures the
-    /// dispersion of *conditional-mean* node losses, not of the true loss
-    /// distribution. For tail risk use Monte Carlo mode, which preserves
-    /// per-path loss dispersion.
-    pub(crate) fn unexpected_loss(&self) -> f64 {
-        self.variance(|n| n.cumulative_losses).sqrt()
+    /// # Errors
+    ///
+    /// Always errors: the recombining tree cannot represent loss dispersion
+    /// (see [`Self::merge_nodes`] and [`RECOMBINING_TREE_TAIL_RISK_UNAVAILABLE`]).
+    /// Price in Monte Carlo mode for unexpected loss.
+    pub(crate) fn unexpected_loss(&self) -> Result<f64, String> {
+        Err(RECOMBINING_TREE_TAIL_RISK_UNAVAILABLE.to_string())
     }
 
-    /// Compute expected shortfall (CVaR) at a given confidence level.
+    /// Expected shortfall (CVaR) at a given confidence level.
     ///
-    /// **Tail-risk caveat (item 7):** computed over recombined terminal-node
-    /// losses, which the lattice has collapsed to per-node conditional means
-    /// (see [`Self::merge_nodes`]). The reported ES therefore understates true
-    /// tail loss. Use Monte Carlo mode for a faithful tail estimate.
-    pub(crate) fn expected_shortfall(&self, confidence: f64) -> f64 {
-        let mut values: Vec<(f64, f64)> = self
-            .terminal_indices
-            .iter()
-            .map(|&i| {
-                let node = &self.nodes[i];
-                (node.cumulative_losses, node.cumulative_probability)
-            })
-            .collect();
-
-        // Sort by loss (descending for tail)
-        values.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Average losses in the tail
-        let total_prob: f64 = values.iter().map(|(_, p)| p).sum();
-        let tail_prob = (1.0 - confidence) * total_prob;
-
-        let mut cumulative = 0.0;
-        let mut tail_sum = 0.0;
-        let mut tail_weight = 0.0;
-
-        for (loss, prob) in values {
-            if cumulative < tail_prob {
-                let include_prob = (tail_prob - cumulative).min(prob);
-                tail_sum += loss * include_prob;
-                tail_weight += include_prob;
-            }
-            cumulative += prob;
-        }
-
-        if tail_weight > 0.0 {
-            tail_sum / tail_weight
-        } else {
-            0.0
-        }
+    /// # Errors
+    ///
+    /// Always errors: expected shortfall is a tail-risk metric and the
+    /// recombining lattice collapses the loss dispersion it measures (see
+    /// [`Self::merge_nodes`]). Use Monte Carlo mode for a faithful ES.
+    pub(crate) fn expected_shortfall(&self, _confidence: f64) -> Result<f64, String> {
+        Err(RECOMBINING_TREE_TAIL_RISK_UNAVAILABLE.to_string())
     }
 }
 
@@ -629,28 +597,38 @@ mod tests {
         assert!(expected_balance >= 0.0, "Balance should not be negative");
     }
 
+    /// The recombining tree must refuse to report a loss percentile: lattice
+    /// recombination has collapsed the per-node loss distribution, so any
+    /// percentile would be silently biased — it must error, not guess.
     #[test]
-    fn test_percentile() {
+    fn test_percentile_errors_on_recombining_tree() {
         let config = ScenarioTreeConfig::new(3, 0.25, BranchingSpec::fixed(3));
         let tree = ScenarioTree::build(&config).expect("Failed to build tree");
 
-        let p50_loss = tree.percentile(|n| n.cumulative_losses, 0.50);
-        let p95_loss = tree.percentile(|n| n.cumulative_losses, 0.95);
-
-        // 95th percentile should be >= 50th percentile
-        assert!(p95_loss >= p50_loss);
+        assert!(
+            tree.percentile(|n| n.cumulative_losses, 0.95).is_err(),
+            "recombining-tree percentile must error rather than return a \
+             dispersion-collapsed value"
+        );
     }
 
+    /// Expected shortfall and unexpected loss are tail-risk metrics; the
+    /// recombining tree must error rather than report dispersion-collapsed
+    /// values. Expected loss (a first moment) stays available.
     #[test]
-    fn test_expected_shortfall() {
+    fn test_tail_risk_errors_on_recombining_tree() {
         let config = ScenarioTreeConfig::new(3, 0.25, BranchingSpec::fixed(3));
         let tree = ScenarioTree::build(&config).expect("Failed to build tree");
 
-        let _expected_loss = tree.expected_loss();
-        let es_95 = tree.expected_shortfall(0.95);
-
-        // ES should be >= EL for a loss distribution
-        assert!(es_95 >= 0.0);
+        assert!(tree.expected_loss() >= 0.0, "expected loss stays available");
+        assert!(
+            tree.expected_shortfall(0.95).is_err(),
+            "recombining-tree expected shortfall must error"
+        );
+        assert!(
+            tree.unexpected_loss().is_err(),
+            "recombining-tree unexpected loss must error"
+        );
     }
 
     #[test]
@@ -674,11 +652,9 @@ mod tests {
         // Should have 6 monthly periods
         assert!(tree.num_terminal_nodes() > 0);
 
-        let expected_loss = tree.expected_loss();
-        let unexpected_loss = tree.unexpected_loss();
-
-        // Both should be non-negative
-        assert!(expected_loss >= 0.0);
-        assert!(unexpected_loss >= 0.0);
+        // Expected loss (a first moment) is unbiased under recombination;
+        // unexpected loss is a dispersion metric and must error.
+        assert!(tree.expected_loss() >= 0.0);
+        assert!(tree.unexpected_loss().is_err());
     }
 }

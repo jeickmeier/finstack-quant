@@ -51,8 +51,9 @@
 //! let metrics = calc.compute_from_tree(&tree);
 //!
 //! println!("Expected Loss: ${:.0}", metrics.expected_loss);
-//! println!("Unexpected Loss: ${:.0}", metrics.unexpected_loss);
-//! println!("99% ES: ${:.0}", metrics.expected_shortfall_99);
+//! // Tail-risk fields (`unexpected_loss`, `var_*`, `expected_shortfall_*`) are
+//! // `Option` and are `None` from a recombining tree — it collapses the loss
+//! // dispersion they measure. Price in Monte Carlo mode for tail risk.
 //! // Correlation sensitivities are computed separately via `CorrelationSensitivities`.
 //! ```
 

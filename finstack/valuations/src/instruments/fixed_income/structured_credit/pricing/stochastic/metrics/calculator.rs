@@ -9,33 +9,46 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tr
 };
 
 /// Stochastic risk metrics for structured credit.
+///
+/// # Tree mode vs Monte Carlo mode
+///
+/// The first-moment fields (`expected_loss`, `expected_defaults`,
+/// `expected_prepayments`, `expected_terminal_balance`, the correlations) are
+/// exact under scenario-tree recombination — averaging commutes with the
+/// recombination weighting. The **tail-risk fields are `Option`**: they are
+/// `Some` only when computed from a dispersion-preserving source. A recombining
+/// scenario tree collapses each node's loss distribution to a conditional mean
+/// (see `ScenarioTree::merge_nodes`), so [`StochasticMetricsCalculator::compute_from_tree`]
+/// leaves them `None` rather than report a dispersion-collapsed value. Price in
+/// Monte Carlo mode for faithful tail risk.
 #[derive(Debug, Clone)]
 pub(crate) struct StochasticMetrics {
     // === Loss metrics ===
     /// Expected loss (probability-weighted average)
     pub expected_loss: f64,
 
-    /// Unexpected loss (standard deviation of loss)
-    pub unexpected_loss: f64,
+    /// Unexpected loss (loss standard deviation). `None` from a recombining
+    /// scenario tree — see the type-level note.
+    pub unexpected_loss: Option<f64>,
 
-    /// Loss skewness
-    pub loss_skewness: f64,
+    /// Loss skewness. `None` from a recombining scenario tree.
+    pub loss_skewness: Option<f64>,
 
-    /// Loss kurtosis (excess)
-    pub loss_kurtosis: f64,
+    /// Loss kurtosis (excess). `None` from a recombining scenario tree.
+    pub loss_kurtosis: Option<f64>,
 
     // === Tail risk metrics ===
-    /// Value at Risk at 95% confidence
-    pub var_95: f64,
+    /// Value at Risk at 95% confidence. `None` from a recombining scenario tree.
+    pub var_95: Option<f64>,
 
-    /// Value at Risk at 99% confidence
-    pub var_99: f64,
+    /// Value at Risk at 99% confidence. `None` from a recombining scenario tree.
+    pub var_99: Option<f64>,
 
-    /// Expected Shortfall at 95% confidence
-    pub expected_shortfall_95: f64,
+    /// Expected Shortfall at 95% confidence. `None` from a recombining tree.
+    pub expected_shortfall_95: Option<f64>,
 
-    /// Expected Shortfall at 99% confidence
-    pub expected_shortfall_99: f64,
+    /// Expected Shortfall at 99% confidence. `None` from a recombining tree.
+    pub expected_shortfall_99: Option<f64>,
 
     // === Behavioral metrics ===
     /// Expected prepayment amount
@@ -69,17 +82,17 @@ pub(crate) struct StochasticMetrics {
 }
 
 impl StochasticMetrics {
-    /// Create metrics with all values set to zero.
+    /// Create metrics with all values set to zero (tail-risk fields `None`).
     pub(crate) fn zero() -> Self {
         Self {
             expected_loss: 0.0,
-            unexpected_loss: 0.0,
-            loss_skewness: 0.0,
-            loss_kurtosis: 0.0,
-            var_95: 0.0,
-            var_99: 0.0,
-            expected_shortfall_95: 0.0,
-            expected_shortfall_99: 0.0,
+            unexpected_loss: None,
+            loss_skewness: None,
+            loss_kurtosis: None,
+            var_95: None,
+            var_99: None,
+            expected_shortfall_95: None,
+            expected_shortfall_99: None,
             expected_prepayments: 0.0,
             expected_defaults: 0.0,
             expected_recoveries: 0.0,
@@ -102,12 +115,16 @@ impl StochasticMetrics {
         }
     }
 
-    /// Get coefficient of variation of loss (UL / EL).
-    pub(crate) fn loss_cv(&self) -> f64 {
+    /// Coefficient of variation of loss (UL / EL).
+    ///
+    /// `None` when unexpected loss is unavailable (recombining-tree metrics)
+    /// or when expected loss is effectively zero.
+    pub(crate) fn loss_cv(&self) -> Option<f64> {
+        let ul = self.unexpected_loss?;
         if self.expected_loss > 1e-10 {
-            self.unexpected_loss / self.expected_loss
+            Some(ul / self.expected_loss)
         } else {
-            0.0
+            None
         }
     }
 
@@ -136,21 +153,20 @@ impl StochasticMetricsCalculator {
 
     /// Compute metrics from a scenario tree.
     ///
-    /// # Tail-risk caveat (item 7)
+    /// # Tail-risk fields are `None` (item 7)
     ///
     /// The recombining scenario tree averages path-dependent cumulative losses
     /// at each lattice node, collapsing the loss distribution to per-node
-    /// conditional means. The tail-risk fields of the returned
-    /// [`StochasticMetrics`] — `unexpected_loss`, `var_95`, `var_99`,
+    /// conditional means. A variance / VaR / ES / skew / kurtosis read off the
+    /// terminal nodes would therefore be biased toward the centre. Rather than
+    /// return a silently-wrong number, the tail-risk fields of the returned
+    /// [`StochasticMetrics`] (`unexpected_loss`, `var_95`, `var_99`,
     /// `expected_shortfall_95`, `expected_shortfall_99`, `loss_skewness`,
-    /// `loss_kurtosis` — are therefore biased toward the center: they describe
-    /// the dispersion of *conditional-mean* node losses, not of the true loss
-    /// distribution. The expected-value fields (`expected_loss`,
-    /// `expected_defaults`, `expected_prepayments`, `expected_terminal_balance`)
-    /// are unaffected — averaging is exact for first moments.
+    /// `loss_kurtosis`) are left `None`. The expected-value fields are exact —
+    /// averaging commutes with the recombination weighting for first moments.
     ///
-    /// For faithful tail risk, price in Monte Carlo mode, which runs each
-    /// scenario through the full waterfall and aggregates per-path losses.
+    /// For tail risk, price in Monte Carlo mode, which runs each scenario
+    /// through the full waterfall and aggregates per-path losses.
     pub(crate) fn compute_from_tree(&self, tree: &ScenarioTree) -> StochasticMetrics {
         let n = tree.num_terminal_nodes();
         if n == 0 {
@@ -188,18 +204,11 @@ impl StochasticMetricsCalculator {
         let expected_defaults = self.weighted_mean(&defaults, total_prob);
         let expected_terminal_balance = self.weighted_mean(&balances, total_prob);
 
-        // Compute variance and higher moments for loss
-        let variance = self.weighted_variance(&losses, expected_loss, total_prob);
-        let unexpected_loss = variance.sqrt();
-
-        let (skewness, kurtosis) =
-            self.compute_higher_moments(&losses, expected_loss, unexpected_loss, total_prob);
-
-        // Compute VaR and ES
-        let var_95 = self.compute_var(&losses, 0.95);
-        let var_99 = self.compute_var(&losses, 0.99);
-        let es_95 = self.compute_expected_shortfall(&losses, 0.95);
-        let es_99 = self.compute_expected_shortfall(&losses, 0.99);
+        // Tail-risk metrics are deliberately NOT computed from the tree:
+        // recombination has collapsed each node's loss distribution to a
+        // conditional mean, so a variance / VaR / ES / skew / kurtosis read off
+        // the terminal nodes would be biased toward the centre. They are left
+        // `None` — price in Monte Carlo mode for faithful tail risk.
 
         // Compute correlations
         let implied_corr = self.compute_implied_correlation(&prepayments, &defaults, total_prob);
@@ -217,13 +226,13 @@ impl StochasticMetricsCalculator {
 
         StochasticMetrics {
             expected_loss,
-            unexpected_loss,
-            loss_skewness: skewness,
-            loss_kurtosis: kurtosis,
-            var_95,
-            var_99,
-            expected_shortfall_95: es_95,
-            expected_shortfall_99: es_99,
+            unexpected_loss: None,
+            loss_skewness: None,
+            loss_kurtosis: None,
+            var_95: None,
+            var_99: None,
+            expected_shortfall_95: None,
+            expected_shortfall_99: None,
             expected_prepayments,
             expected_defaults,
             expected_recoveries,
@@ -445,28 +454,32 @@ mod tests {
     fn test_metrics_zero() {
         let metrics = StochasticMetrics::zero();
         assert!((metrics.expected_loss - 0.0).abs() < 1e-10);
-        assert!((metrics.unexpected_loss - 0.0).abs() < 1e-10);
+        assert!(metrics.unexpected_loss.is_none());
     }
 
+    /// `compute_from_tree` returns the unbiased expected-value metrics but
+    /// leaves every tail-risk field `None`: the recombining tree has collapsed
+    /// the loss dispersion those metrics measure.
     #[test]
-    fn test_compute_from_tree() {
+    fn test_compute_from_tree_omits_tail_risk() {
         let config = ScenarioTreeConfig::new(3, 0.25, BranchingSpec::fixed(3));
         let tree = ScenarioTree::build(&config).expect("Tree should build");
 
         let calc = StochasticMetricsCalculator::new(1_000_000.0);
         let metrics = calc.compute_from_tree(&tree);
 
-        // Should have reasonable values
+        // First-moment fields remain available and sane.
         assert!(metrics.num_scenarios > 0);
         assert!(metrics.expected_loss >= 0.0);
-        assert!(metrics.unexpected_loss >= 0.0);
 
-        // VaR should be ordered
-        assert!(metrics.var_99 >= metrics.var_95);
-
-        // ES should be >= VaR at same confidence
-        assert!(metrics.expected_shortfall_95 >= metrics.var_95 - 1e-6);
-        assert!(metrics.expected_shortfall_99 >= metrics.var_99 - 1e-6);
+        // Tail-risk fields are unavailable from a recombining tree.
+        assert!(metrics.unexpected_loss.is_none());
+        assert!(metrics.var_95.is_none());
+        assert!(metrics.var_99.is_none());
+        assert!(metrics.expected_shortfall_95.is_none());
+        assert!(metrics.expected_shortfall_99.is_none());
+        assert!(metrics.loss_skewness.is_none());
+        assert!(metrics.loss_kurtosis.is_none());
     }
 
     /// Item 8 — ES must be ≥ VaR at the same confidence on ANY discrete loss
@@ -521,9 +534,14 @@ mod tests {
     fn test_loss_cv() {
         let mut metrics = StochasticMetrics::zero();
         metrics.expected_loss = 100_000.0;
-        metrics.unexpected_loss = 50_000.0;
+        metrics.unexpected_loss = Some(50_000.0);
 
-        assert!((metrics.loss_cv() - 0.5).abs() < 1e-6);
+        let cv = metrics.loss_cv().expect("loss_cv with UL present");
+        assert!((cv - 0.5).abs() < 1e-6);
+
+        // Without unexpected loss (recombining-tree metrics) CV is unavailable.
+        metrics.unexpected_loss = None;
+        assert!(metrics.loss_cv().is_none());
     }
 
     #[test]
