@@ -57,6 +57,7 @@ mod engine;
 mod expected_loss;
 mod heterogeneous;
 mod registry;
+mod saddlepoint;
 mod sensitivities;
 
 #[cfg(test)]

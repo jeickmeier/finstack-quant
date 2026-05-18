@@ -45,15 +45,24 @@ pub fn standard_hazard_curve() -> HazardCurve {
         .unwrap()
 }
 
-/// Create a standard base correlation curve
+/// Create a standard base correlation curve.
+///
+/// The slope must be gentle enough to stay arbitrage-free at the tranchelet
+/// level: a steeply rising base correlation (e.g. 0.25 → 0.45 over the
+/// 3% → 7% strikes) pushes the equity-tranche EL *down* enough that the
+/// tranchelet decomposition `EL(0,D) − EL(0,A)` goes negative at short
+/// horizons (low PD) — genuine base-correlation arbitrage, which the tranche
+/// pricer now rejects with an explicit error when arbitrage validation is
+/// enabled (the default). The shape below was verified to keep
+/// `EL(0,D) ≥ EL(0,A)` across all payment-date PDs for this index.
 pub fn standard_correlation_curve() -> BaseCorrelationCurve {
     BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
         .knots(vec![
             (3.0, 0.25),  // 0-3% equity
-            (7.0, 0.45),  // 0-7% junior mezzanine
-            (10.0, 0.60), // 0-10% senior mezzanine
-            (15.0, 0.75), // 0-15% senior
-            (30.0, 0.85), // 0-30% super senior
+            (7.0, 0.30),  // 0-7% junior mezzanine
+            (10.0, 0.34), // 0-10% senior mezzanine
+            (15.0, 0.40), // 0-15% senior
+            (30.0, 0.50), // 0-30% super senior
         ])
         .build()
         .unwrap()

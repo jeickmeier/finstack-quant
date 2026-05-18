@@ -233,8 +233,29 @@ impl CDSTranchePricer {
                 finstack_core::dates::DayCountContext::default(),
             )?;
             let payment_time = payment_times[i];
+            let prior_time = if i == 0 { 0.0 } else { payment_times[i - 1] };
+
+            // Survival-weighted mean within-period default fraction.
+            //
+            // A name that defaults at τ ∈ [t_{i-1}, t_i] pays accrued premium
+            // only over [t_{i-1}, τ] and triggers the loss at τ. Both the
+            // accrual-on-default adjustment (Item 5) and the mid-period
+            // protection timing (Item 6) need E[(τ − t_{i-1}) / period | τ in
+            // period]. Default timing is NOT uniform — it follows the index
+            // hazard, so the survival-weighted mean is < 0.5 for a positive
+            // hazard. `within_period_default_fraction` integrates the
+            // piecewise-constant-hazard default density over the period,
+            // which is the discrete-model analogue of the single-name CDS
+            // pricer's analytic accrual-on-default integral. It degrades
+            // gracefully to 0.5 (the uniform limit) when λΔ → 0.
+            let default_fraction = self.within_period_default_fraction(
+                _index_data_arc.as_ref(),
+                prior_time,
+                payment_time,
+            );
+
             let aod_adjustment = if self.params.accrual_on_default_enabled {
-                self.params.aod_allocation_fraction * tranche_notional * delta_el_fraction
+                default_fraction * tranche_notional * delta_el_fraction
             } else {
                 0.0
             };
@@ -271,9 +292,18 @@ impl CDSTranchePricer {
                         accrual_factor: 0.0,
                         rate: None,
                     },
+                    // Discount the loss increment at the time the underlying
+                    // defaults actually occur, not the period end. With
+                    // `mid_period_protection`, the within-period loss is
+                    // discounted at the SURVIVAL-WEIGHTED mean default time
+                    // (Item 6) — `t_{i-1} + default_fraction · period` —
+                    // rather than the flat period midpoint, which
+                    // over-discounted the increment by assuming all loss
+                    // lands at the midpoint. The default fraction is < 0.5
+                    // for a positive hazard, so the loss is correctly
+                    // discounted slightly earlier than mid-period.
                     discount_time: Some(if self.params.mid_period_protection {
-                        let prior_time = if i == 0 { 0.0 } else { payment_times[i - 1] };
-                        0.5 * (prior_time + payment_time)
+                        prior_time + default_fraction * (payment_time - prior_time)
                     } else {
                         payment_time
                     }),
@@ -383,6 +413,77 @@ impl CDSTranchePricer {
         } else {
             Ok(as_of.add_weekdays(settlement_lag))
         }
+    }
+
+    /// Survival-weighted mean within-period default fraction.
+    ///
+    /// Returns `E[(τ − t₀) / (t₁ − t₀) | τ ∈ [t₀, t₁]]` where the default time
+    /// `τ` is distributed according to the index credit curve. This is the
+    /// fraction of the coupon period that a name defaulting inside the period
+    /// is expected to have survived — used both to size the accrual-on-default
+    /// premium reduction and to time the within-period loss for discounting.
+    ///
+    /// # Method
+    ///
+    /// Over `[t₀, t₁]` the index survival is approximated by a piecewise-
+    /// constant hazard `λ = −ln(S(t₁)/S(t₀)) / (t₁ − t₀)`, exact for the
+    /// hazard curves used here (piecewise-constant or log-linear survival).
+    /// The default-time density is `f(t) ∝ −S'(t) = λ·S(t₀)·e^{−λ(t−t₀)}`, so
+    ///
+    /// ```text
+    /// E[(τ−t₀)/Δ | τ∈period] = ( 1/λ − Δ·e^{−λΔ}/(1−e^{−λΔ}) ) / Δ
+    /// ```
+    ///
+    /// which is the standard analytic accrual-on-default factor (consistent
+    /// with the single-name CDS pricer's `accrual_on_default_isda_standard_model_cond`).
+    /// It is bounded in `(0, 0.5]` for `λ ≥ 0` and tends to `0.5` — the
+    /// uniform-default limit — as `λΔ → 0`.
+    ///
+    /// Degenerate inputs (non-positive period, non-finite or non-positive
+    /// survival, `λ ≤ 0`) fall back to the `0.5` midpoint so the caller never
+    /// sees a NaN or an out-of-range fraction.
+    pub(super) fn within_period_default_fraction(
+        &self,
+        index_data: &finstack_core::market_data::term_structures::CreditIndexData,
+        t_start: f64,
+        t_end: f64,
+    ) -> f64 {
+        const UNIFORM_MIDPOINT: f64 = 0.5;
+        // `x` is a finite, strictly-positive number (NaN/∞/≤0 are rejected).
+        // Used in place of negated `>` comparisons so the NaN handling is
+        // explicit (and clippy-clean).
+        let is_finite_positive = |x: f64| x.is_finite() && x > 0.0;
+
+        let dt = t_end - t_start;
+        if !is_finite_positive(dt) {
+            return UNIFORM_MIDPOINT;
+        }
+        let curve = &index_data.index_credit_curve;
+        let s0 = curve.sp(t_start.max(0.0));
+        let s1 = curve.sp(t_end);
+        // Need a genuine, ordered survival drop to define a hazard:
+        // `s1 > s0` or NaN inputs all fall back to the uniform midpoint.
+        let ordered_drop = is_finite_positive(s0) && is_finite_positive(s1) && s1 < s0;
+        if !ordered_drop {
+            return UNIFORM_MIDPOINT;
+        }
+        // Piecewise-constant hazard over the period.
+        let lambda = -(s1 / s0).ln() / dt;
+        if !is_finite_positive(lambda) {
+            return UNIFORM_MIDPOINT;
+        }
+        let lambda_dt = lambda * dt;
+        // Small-λΔ guard: the closed form is 0/0 as λΔ→0; the Taylor limit
+        // is exactly 0.5, and for tiny λΔ the direct formula loses precision.
+        if lambda_dt < 1e-8 {
+            return UNIFORM_MIDPOINT;
+        }
+        let exp_neg = (-lambda_dt).exp();
+        // E[τ−t₀] = 1/λ − Δ·e^{−λΔ}/(1−e^{−λΔ}); fraction = that / Δ.
+        let mean_offset = (1.0 / lambda) - dt * exp_neg / (1.0 - exp_neg);
+        let fraction = mean_offset / dt;
+        // Analytically `fraction ∈ (0, 0.5)`; clamp to absorb fp residue.
+        fraction.clamp(0.0, UNIFORM_MIDPOINT)
     }
 
     /// Calculate effective attachment/detachment points given accumulated losses.

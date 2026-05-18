@@ -76,6 +76,15 @@ pub(crate) fn date_from_hazard_time(surv: &HazardCurve, t: f64) -> Date {
 }
 
 /// Resolve settlement date for a default occurring on `default_date`.
+///
+/// With a holiday calendar the `settlement_delay` business days are applied
+/// exactly via [`DateExt::add_business_days`]. Without a calendar the delay
+/// is approximated as calendar days (`settlement_delay · 365 /
+/// business_days_per_year`); the raw calendar-day jump can land on a
+/// weekend, so the result is then rolled forward to the next weekday
+/// (`BusinessDayConvention::Following`, weekends only). A settlement date is
+/// by definition a business day — the previous implementation could return
+/// a Saturday or Sunday.
 #[inline]
 pub(super) fn settlement_date(
     default_date: Date,
@@ -91,11 +100,16 @@ pub(super) fn settlement_date(
         return default_date.add_business_days(settlement_delay as i32, cal);
     }
 
-    // Fallback: approximate business days into calendar days.
+    // Fallback: approximate business days into calendar days, then roll the
+    // result forward off any weekend so settlement always lands on a weekday.
     let delay_days = ((settlement_delay as f64) * credit::CALENDAR_DAYS_PER_YEAR
         / business_days_per_year)
         .round() as i64;
-    Ok(default_date + Duration::days(delay_days))
+    let mut settle = default_date + Duration::days(delay_days);
+    while settle.is_weekend() {
+        settle += Duration::days(1);
+    }
+    Ok(settle)
 }
 
 /// Bloomberg DOCS 2057273 §3 protection-leg integration spec: "the

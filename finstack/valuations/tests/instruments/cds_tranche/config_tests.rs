@@ -96,10 +96,10 @@ fn test_default_config_accrual_on_default() {
         config.accrual_on_default_enabled,
         "Accrual-on-default should be enabled by default"
     );
-    assert_eq!(
-        config.aod_allocation_fraction, 0.5,
-        "Default AoD allocation should be 50%"
-    );
+    // `aod_allocation_fraction` is deprecated and no longer read by the
+    // pricer: accrual-on-default timing is now survival-weighted (integrated
+    // against the index credit curve), not a fixed mid-period fraction. The
+    // legacy field is intentionally not asserted here.
 }
 
 #[test]

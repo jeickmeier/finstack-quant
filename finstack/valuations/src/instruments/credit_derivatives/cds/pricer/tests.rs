@@ -542,11 +542,29 @@ fn test_time_and_settlement_helpers_match_curve_and_calendar_conventions() {
         credit.base_date() + Duration::days((hazard_time * days_per_year).round() as i64);
     assert_eq!(date_from_hazard_time(&credit, hazard_time), expected_date);
 
+    // 3 business days at 252 bdays/year ≈ 4.35 calendar days → rounds to 4.
+    // base_date is 2025-01-01 (Wednesday), so +4 calendar days lands on
+    // Sunday 2025-01-05; the fallback must then roll forward to the next
+    // weekday — Monday 2025-01-06 — because a settlement date is by
+    // definition a business day.
     let fallback_settlement = settlement_date(base_date, 3, None, 252.0).expect("fallback");
+    assert!(
+        !fallback_settlement.is_weekend(),
+        "fallback settlement must not land on a weekend, got {fallback_settlement:?}"
+    );
+    let raw = base_date + Duration::days(4);
+    let expected = if raw.is_weekend() {
+        let mut d = raw;
+        while d.is_weekend() {
+            d += Duration::days(1);
+        }
+        d
+    } else {
+        raw
+    };
     assert_eq!(
-        fallback_settlement,
-        base_date + Duration::days(4),
-        "3 business days at 252 bdays/year should round to 4 calendar days"
+        fallback_settlement, expected,
+        "fallback settlement = 4 calendar days rolled forward off weekends"
     );
 
     let nyse = finstack_core::dates::fx::resolve_calendar(Some("nyse")).expect("nyse calendar");

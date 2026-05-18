@@ -28,13 +28,12 @@ use crate::instruments::credit_derivatives::cds::{CreditDefaultSwap, PayReceive}
 use crate::instruments::credit_derivatives::cds_index::{
     CDSIndex, ConstituentResult, IndexParSpreadResult, IndexPricing, IndexResult, ParSpreadMethod,
 };
-use finstack_core::dates::Date;
+use finstack_core::dates::{Date, DateExt};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
 use finstack_core::{Error, Result};
-use time::Duration;
 
 /// Tolerance applied to the constituent weight sum when validating that ∑w ≈ 1.
 ///
@@ -834,7 +833,6 @@ impl CDSIndexPricer {
                     let settlement_date = Self::settlement_date_with_delay(
                         default_date,
                         cds.protection.settlement_delay,
-                        self.cds_config.business_days_per_year,
                     );
                     projected_flows.push(CashFlow {
                         date: settlement_date,
@@ -882,18 +880,23 @@ impl CDSIndexPricer {
         Ok(date_from_hazard_time(survival, 0.5 * (t_start + t_end)))
     }
 
-    fn settlement_date_with_delay(
-        default_date: Date,
-        settlement_delay: u16,
-        business_days_per_year: f64,
-    ) -> Date {
+    /// Resolve the cash-settlement date for a default occurring on
+    /// `default_date`, given a business-day settlement delay.
+    ///
+    /// `settlement_delay` is a count of *business days* (T+N per ISDA). With
+    /// no holiday calendar available on this projection path, the delay is
+    /// applied via [`DateExt::add_weekdays`], which advances by whole
+    /// weekdays — so the result is **always a weekday**. The previous
+    /// implementation converted the business-day count to calendar days via
+    /// a `365 / business_days_per_year` ratio and added that as a raw
+    /// `Duration`, which could land the settlement on a Saturday or Sunday.
+    /// `add_weekdays` is both weekend-safe and an exact (rather than
+    /// ratio-approximated) weekday count.
+    fn settlement_date_with_delay(default_date: Date, settlement_delay: u16) -> Date {
         if settlement_delay == 0 {
             return default_date;
         }
-        let delay_days = ((settlement_delay as f64) * credit::CALENDAR_DAYS_PER_YEAR
-            / business_days_per_year)
-            .round() as i64;
-        default_date + Duration::days(delay_days)
+        default_date.add_weekdays(i32::from(settlement_delay))
     }
 }
 
@@ -1437,6 +1440,41 @@ mod tests {
         assert!(
             msg.contains("invalid weight"),
             "expected weight error, got: {msg}"
+        );
+    }
+
+    /// Item 10: the settlement-delay fallback must never land on a weekend.
+    /// `settlement_date_with_delay` applies the business-day delay via
+    /// weekday arithmetic, so the result is always a weekday regardless of
+    /// where the default date falls.
+    #[test]
+    fn settlement_delay_fallback_never_lands_on_weekend() {
+        use finstack_core::dates::DateExt;
+        // Cover every weekday/weekend default date across a fortnight so the
+        // weekend-crossing cases are exercised.
+        let start = date(2025, 1, 1); // Wednesday
+        for offset in 0..14 {
+            let default_date = start + time::Duration::days(offset);
+            for delay in [1_u16, 2, 3, 5] {
+                let settle = CDSIndexPricer::settlement_date_with_delay(default_date, delay);
+                assert!(
+                    !settle.is_weekend(),
+                    "settlement (default {default_date:?}, T+{delay}) must be a \
+                     weekday, got {settle:?}"
+                );
+                // The settlement must be strictly after the default date.
+                assert!(
+                    settle > default_date,
+                    "T+{delay} settlement must follow the default date"
+                );
+            }
+        }
+        // T+0 is a pass-through (same date, no business-day roll).
+        let d = date(2025, 1, 4); // Saturday
+        assert_eq!(
+            CDSIndexPricer::settlement_date_with_delay(d, 0),
+            d,
+            "T+0 settlement is a pass-through of the default date"
         );
     }
 }

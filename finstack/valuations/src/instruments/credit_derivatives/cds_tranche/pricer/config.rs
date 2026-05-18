@@ -34,7 +34,9 @@ const DEFAULT_CORR_BUMP_ABS: f64 = 0.01;
 /// Boundary width for smooth correlation clamping transitions
 const DEFAULT_CORR_BOUNDARY_WIDTH: f64 = 0.005;
 
-/// Fraction of incremental loss allocated to accrual-on-default (0.5 = mid-period)
+/// Default value for the deprecated `aod_allocation_fraction` field. The
+/// engine no longer reads this field (AoD timing is survival-weighted); the
+/// constant is retained only so `Default` populates the legacy field.
 const DEFAULT_AOD_ALLOCATION_FRACTION: f64 = 0.5;
 
 /// Grid step for exact convolution method (fraction of portfolio notional)
@@ -67,11 +69,25 @@ pub(super) const ADAPTIVE_INTEGRATION_LOW: f64 = 0.05;
 /// Rationale: Near ρ=1, integrand approaches step function requiring more points.
 pub(super) const ADAPTIVE_INTEGRATION_HIGH: f64 = 0.95;
 
-/// Minimum variance threshold for SPA to avoid division by zero
-pub(super) const SPA_VARIANCE_FLOOR: f64 = 1e-14;
-
 /// Probability clamp epsilon to avoid 0/1 extremes in probits/CDFs
 pub(super) const PROBABILITY_CLIP: f64 = 1e-12;
+
+/// Homogeneity-detection tolerance for the heterogeneous EL path.
+///
+/// A bespoke pool is treated as "effectively homogeneous" — and routed to the
+/// faster homogeneous binomial path — when its per-issuer default
+/// probabilities, LGDs *and* weights are each uniform to within this
+/// absolute tolerance. The SAME tolerance is applied to all three vectors so
+/// the model-branch switch is consistent: a pool that is uniform in PD must
+/// not be judged heterogeneous in LGD (or vice versa) merely because the
+/// checks used different epsilons.
+///
+/// `1e-9` is appropriate because PD, LGD and weight are all dimensionless
+/// quantities in `[0, 1]`: it is tight enough that any genuinely
+/// heterogeneous pool (issuer dispersion ≫ `1e-9`) is detected, and loose
+/// enough to absorb the floating-point round-off in equal weights built as
+/// `1.0 / n` (worst-case `n·ε ≈ 125 · 2.2e-16 ≈ 3e-14 ≪ 1e-9`).
+pub(super) const HOMOGENEITY_TOLERANCE: f64 = 1e-9;
 
 /// LGD floor to avoid zero exposure in corner cases
 pub(super) const LGD_FLOOR: f64 = 1e-6;
@@ -169,7 +185,20 @@ pub struct CDSTranchePricerConfig {
     pub mid_period_protection: bool,
     /// Whether to include accrual-on-default in the premium leg
     pub accrual_on_default_enabled: bool,
-    /// Fraction of incremental loss allocated to accrual-on-default (AoD)
+    /// Deprecated: fraction of incremental loss allocated to accrual-on-default.
+    ///
+    /// This field is no longer read by the pricer. It previously held a fixed
+    /// `0.5` mid-period fraction; the engine now integrates the within-period
+    /// default timing against the index credit curve
+    /// ([`CDSTranchePricer::within_period_default_fraction`]) — a
+    /// survival-weighted fraction that is `< 0.5` for a positive hazard and
+    /// is consistent with the single-name CDS analytic accrual-on-default.
+    /// The field is retained for struct-construction compatibility and will
+    /// be removed in a future release.
+    #[deprecated(
+        note = "AoD timing is now survival-weighted (see within_period_default_fraction); \
+                this field is ignored"
+    )]
     pub aod_allocation_fraction: f64,
     /// Stub convention for schedule generation
     pub schedule_stub: StubKind,
@@ -196,6 +225,10 @@ pub struct CDSTranchePricerConfig {
 }
 
 impl Default for CDSTranchePricerConfig {
+    // `aod_allocation_fraction` is deprecated but still a (now-ignored) struct
+    // field; populating it in the constructor is intentional for
+    // struct-construction compatibility.
+    #[allow(deprecated)]
     fn default() -> Self {
         Self {
             // Model selection
@@ -330,7 +363,11 @@ impl CDSTranchePricerConfig {
 /// Heterogeneous expected loss evaluation method
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeteroMethod {
-    /// Saddle-point approximation (SPA) method
+    /// Genuine saddle-point approximation (SPA): the conditional tranchelet
+    /// loss `E[min(L,K) | Z]` is evaluated from the exact conditional
+    /// cumulant-generating function via a Lugannani-Rice / Antonov-Mechkov-
+    /// Misirpashaev saddle-point expansion. Captures the true skew of the
+    /// loss distribution and never places mass on `L < 0`.
     Spa,
     /// Exact convolution method (slower but more accurate)
     ExactConvolution,

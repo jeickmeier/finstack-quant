@@ -6,7 +6,15 @@ use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_core::dates::Date;
 use finstack_core::market_data::term_structures::CreditIndexData;
 use finstack_core::math::standard_normal_inv_cdf;
-use finstack_core::Result;
+use finstack_core::{Error, Result};
+
+/// Magnitude below which a negative base-correlation tranchelet difference is
+/// treated as benign numerical noise (quadrature / interpolation rounding)
+/// rather than genuine base-correlation arbitrage. A senior equity
+/// tranchelet `EL(0,D)` should never fall below the junior `EL(0,A)`; a gap
+/// at or below this size is consistent with floating-point integration error
+/// on EL values that are themselves `O(1e-2)`.
+const BASE_CORR_ARBITRAGE_TOL: f64 = 1e-9;
 
 /// Pre-computed invariants for EL fraction evaluation (hoisted out of the date loop).
 struct ElInvariants {
@@ -17,6 +25,11 @@ struct ElInvariants {
     corr_detach: f64,
     orig_width: f64,
     prior_loss: f64,
+    /// Original (contractual) attachment point, percent. Retained for
+    /// base-correlation arbitrage diagnostics.
+    attach_pct: f64,
+    /// Original (contractual) detachment point, percent.
+    detach_pct: f64,
 }
 
 impl CDSTranchePricer {
@@ -68,8 +81,19 @@ impl CDSTranchePricer {
             maturity,
         )?;
 
-        // The [A_eff, D_eff] tranche loss as a fraction of CURRENT portfolio
-        let current_portfolio_loss_fraction = (el_to_detach - el_to_attach).max(0.0);
+        // The [A_eff, D_eff] tranche loss as a fraction of CURRENT portfolio.
+        // EL(0,D) − EL(0,A) is the tranchelet EL; it must be non-negative
+        // because a wider equity tranche cannot lose less than a narrower
+        // one. A negative value signals genuine base-correlation arbitrage
+        // (ρ(D) and ρ(A) inconsistent) — surfaced explicitly rather than
+        // silently clamped to zero protection.
+        let current_portfolio_loss_fraction = self.resolve_tranchelet_difference(
+            el_to_detach,
+            el_to_attach,
+            tranche.attach_pct,
+            tranche.detach_pct,
+            maturity,
+        )?;
 
         // Convert to currency amount:
         // Loss = CurrentPortFrac * CurrentPortNotional
@@ -103,6 +127,8 @@ impl CDSTranchePricer {
                 corr_detach: 0.0,
                 orig_width: 0.0,
                 prior_loss: 0.0,
+                attach_pct: tranche.attach_pct,
+                detach_pct: tranche.detach_pct,
             });
         }
         let corr_attach = self.smooth_correlation_boundary(
@@ -125,6 +151,8 @@ impl CDSTranchePricer {
             corr_detach,
             orig_width,
             prior_loss,
+            attach_pct: tranche.attach_pct,
+            detach_pct: tranche.detach_pct,
         })
     }
 
@@ -151,10 +179,78 @@ impl CDSTranchePricer {
             index_data,
             date,
         )?;
-        let current_portfolio_loss_fraction = (el_to_detach - el_to_attach).max(0.0);
+        // Surface base-correlation arbitrage explicitly (see
+        // `resolve_tranchelet_difference`) instead of silently clamping a
+        // tranche's protection leg to zero.
+        let current_portfolio_loss_fraction = self.resolve_tranchelet_difference(
+            el_to_detach,
+            el_to_attach,
+            inv.attach_pct,
+            inv.detach_pct,
+            date,
+        )?;
         let tranche_loss_fraction =
             (current_portfolio_loss_fraction * inv.survival_factor) / inv.orig_width;
         Ok((tranche_loss_fraction + inv.prior_loss).clamp(0.0, 1.0))
+    }
+
+    /// Reconcile the base-correlation tranchelet difference `EL(0,D) − EL(0,A)`.
+    ///
+    /// The two equity expected losses are computed at *different* correlations
+    /// (`ρ(D)` and `ρ(A)` from the base-correlation curve). A well-formed,
+    /// arbitrage-free base-correlation curve guarantees `EL(0,D) ≥ EL(0,A)` —
+    /// a wider equity tranche must have at least as much expected loss. When
+    /// the difference is negative the curve is *not* arbitrage-free at the
+    /// `[A, D]` strikes.
+    ///
+    /// Behaviour:
+    /// - A negative gap within `BASE_CORR_ARBITRAGE_TOL` is benign quadrature
+    ///   / interpolation noise and is clamped to zero silently.
+    /// - A negative gap *beyond* the tolerance is genuine base-correlation
+    ///   arbitrage. With `validate_arbitrage_free = true` (the default) this
+    ///   returns an explicit [`Error::Validation`] naming the strikes and the
+    ///   magnitude, so the caller cannot unknowingly price a senior tranche
+    ///   with zero protection. With `validate_arbitrage_free = false` it is
+    ///   clamped to zero but logged at `warn` level (not the previous silent
+    ///   `debug`), so the degradation is at least visible in logs.
+    fn resolve_tranchelet_difference(
+        &self,
+        el_to_detach: f64,
+        el_to_attach: f64,
+        attach_pct: f64,
+        detach_pct: f64,
+        date: Date,
+    ) -> Result<f64> {
+        let diff = el_to_detach - el_to_attach;
+        if diff >= -BASE_CORR_ARBITRAGE_TOL {
+            // Non-negative (up to numerical noise) — clamp the tiny residual.
+            return Ok(diff.max(0.0));
+        }
+
+        // Genuine base-correlation arbitrage: EL(0,D) < EL(0,A).
+        if self.params.validate_arbitrage_free {
+            return Err(Error::Validation(format!(
+                "base-correlation arbitrage at strikes [{attach_pct:.4}%, {detach_pct:.4}%] \
+                 on {date:?}: equity EL(0,{detach_pct:.4}%)={el_to_detach:.8} is below \
+                 EL(0,{attach_pct:.4}%)={el_to_attach:.8} (gap {diff:.2e}). The base-correlation \
+                 curve is not arbitrage-free at these detachment points; pricing this tranche \
+                 would assign it negative protection. Re-fit the base-correlation curve (e.g. \
+                 isotonic / PAVA smoothing) or disable validation via \
+                 `CDSTranchePricerConfig::with_arbitrage_validation(false)` to clamp instead."
+            )));
+        }
+
+        // Validation disabled: clamp but make the degradation visible.
+        tracing::warn!(
+            attach_pct,
+            detach_pct,
+            el_to_detach,
+            el_to_attach,
+            gap = diff,
+            "base-correlation arbitrage on {date:?}: equity EL(0,D) < EL(0,A); \
+             clamping tranchelet protection to zero (arbitrage validation disabled)"
+        );
+        Ok(0.0)
     }
 
     /// Build the expected loss curve for all payment dates.

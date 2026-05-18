@@ -89,15 +89,36 @@ impl CDSTranchePricer {
 
     /// Create a bumped base correlation curve for sensitivity analysis.
     ///
-    /// Creates a new BaseCorrelationCurve with correlations shifted by bump_abs,
-    /// clamped to [min_correlation, max_correlation] for numerical stability.
+    /// Applies a **pure parallel shift** of `bump_abs` to every knot
+    /// correlation. This is a genuine symmetric perturbation: the up-bump
+    /// (`+h`) and down-bump (`−h`) are exact mirror images, which is required
+    /// for the central-difference Correlation01
+    /// `(PV(+h) − PV(−h)) / (2h)` to be unbiased.
     ///
-    /// # Monotonicity Enforcement
+    /// # Why no monotonicity repair
     ///
-    /// Base correlation must be monotonically increasing with detachment point
-    /// to avoid arbitrage (senior tranches cannot be riskier than junior).
-    /// After bumping, we enforce this by ensuring each correlation is at least
-    /// as large as the previous point plus a small epsilon.
+    /// A parallel shift of a monotone curve is *itself* monotone — shifting
+    /// every point by the same `h` preserves the ordering exactly. The
+    /// previous implementation ran a monotonicity-repair loop *after*
+    /// bumping; that loop only ever fired because of the additional
+    /// `[min_correlation, max_correlation]` clamp, and when it did fire it
+    /// adjusted the up- and down-bumped curves *differently* — destroying the
+    /// symmetry of the central difference and biasing Correlation01 near
+    /// base-correlation-curve kinks. The repair loop has therefore been
+    /// removed and the curve is built with `allow_non_monotonic()` so the
+    /// pure shift is never silently re-shaped.
+    ///
+    /// # Bounds
+    ///
+    /// Correlations are clamped only to the curve type's hard `[0, 1]`
+    /// domain (a `BaseCorrelationCurve` cannot hold values outside it). For
+    /// realistic curves (`ρ ≈ 0.2–0.9`) and realistic bumps (`h ≈ 0.01`)
+    /// this clamp never fires, so symmetry is preserved. The
+    /// numerical-stability band `[min_correlation, max_correlation]` is *not*
+    /// applied here — it is enforced downstream by
+    /// [`Self::smooth_correlation_boundary`] inside the EL evaluation;
+    /// re-applying it here would double-clamp and re-introduce the
+    /// asymmetry this fix removes.
     pub(super) fn bump_base_correlation(
         &self,
         original_curve: &finstack_core::market_data::term_structures::BaseCorrelationCurve,
@@ -106,49 +127,23 @@ impl CDSTranchePricer {
     {
         use finstack_core::market_data::term_structures::BaseCorrelationCurve;
 
-        // Extract original points and apply bump with clamping
-        let mut bumped_points: Vec<(f64, f64)> = original_curve
+        // Pure parallel shift. Clamp only to the [0, 1] correlation domain
+        // the curve type requires; no min/max-correlation band, no
+        // monotonicity repair — both broke the up/down bump symmetry.
+        let bumped_points: Vec<(f64, f64)> = original_curve
             .detachment_points()
             .iter()
             .zip(original_curve.correlations().iter())
-            .map(|(&detach, &corr)| {
-                let bumped_corr = (corr + bump_abs)
-                    .clamp(self.params.min_correlation, self.params.max_correlation);
-                (detach, bumped_corr)
-            })
+            .map(|(&detach, &corr)| (detach, (corr + bump_abs).clamp(0.0, 1.0)))
             .collect();
 
-        // Enforce monotonicity: each correlation must be >= previous + epsilon
-        // This prevents arbitrage from bumping that violates the base correlation constraint
-        const MONOTONICITY_EPSILON: f64 = 1e-6;
-        for i in 1..bumped_points.len() {
-            let min_corr = bumped_points[i - 1].1 + MONOTONICITY_EPSILON;
-            if bumped_points[i].1 < min_corr {
-                bumped_points[i].1 = min_corr.min(self.params.max_correlation);
-            }
-        }
-
-        // After monotonicity enforcement, check for potential EL arbitrage
-        // (in debug builds only to avoid performance impact in production)
-        #[cfg(debug_assertions)]
-        {
-            // Log warning if bumping created tight correlation spacing
-            // This may indicate potential convexity violations in the EL surface
-            for i in 2..bumped_points.len() {
-                let d_prev = bumped_points[i - 1].1 - bumped_points[i - 2].1;
-                let d_curr = bumped_points[i].1 - bumped_points[i - 1].1;
-                if d_curr < d_prev * 0.5 && d_curr < 0.01 {
-                    tracing::warn!(
-                        "Base correlation bump may violate convexity at {:.1}%: Δρ compressed from {:.4} to {:.4}",
-                        bumped_points[i].0, d_prev, d_curr
-                    );
-                }
-            }
-        }
-
-        // Create temporary ID for bumped curve
+        // `allow_non_monotonic`: a parallel shift of a monotone curve stays
+        // monotone, but a non-monotone *input* curve must not be silently
+        // rejected by the sensitivity path — the bump is a perturbation, not
+        // an arbitrage-free pricing curve.
         BaseCorrelationCurve::builder("TEMP_BUMPED_CORR")
             .knots(bumped_points)
+            .allow_non_monotonic()
             .build()
     }
 
@@ -374,7 +369,13 @@ impl CDSTranchePricer {
         // initial guess for both sides.
         let mut spread = protection_pv.abs() / premium_per_bp.abs().max(NUMERICAL_TOLERANCE);
 
-        // Newton-Raphson iteration to refine the par spread
+        // Newton-Raphson iteration to refine the par spread.
+        //
+        // On non-convergence the solver returns an explicit error rather than
+        // the last (un-converged) iterate: a silently-returned non-par spread
+        // would feed wrong numbers into upfront / breakeven calculations with
+        // no signal that the root-find failed.
+        let mut last_npv = f64::INFINITY;
         for _iter in 0..PAR_SPREAD_MAX_ITER {
             // Create test tranche with current spread guess
             let mut test_tranche = tranche.clone();
@@ -384,6 +385,7 @@ impl CDSTranchePricer {
             let npv = self
                 .price_tranche(&test_tranche, market_ctx, as_of)?
                 .amount();
+            last_npv = npv;
 
             // Check convergence (NPV close to zero)
             if npv.abs() < PAR_SPREAD_TOLERANCE * tranche.notional.amount() {
@@ -394,8 +396,13 @@ impl CDSTranchePricer {
             let spread_dv01 = self.calculate_spread_dv01(&test_tranche, market_ctx, as_of)?;
 
             if spread_dv01.abs() < NUMERICAL_TOLERANCE {
-                // DV01 too small, can't continue iteration
-                break;
+                // Degenerate Jacobian: the Newton step is undefined, so the
+                // par spread cannot be resolved. Fail loudly.
+                return Err(finstack_core::Error::Validation(format!(
+                    "CDS tranche par-spread solve failed: Spread DV01 collapsed to \
+                     {spread_dv01:.3e} at spread {spread:.4} bp (NPV {npv:.3e}); the \
+                     premium leg is insensitive to the coupon so no par spread exists."
+                )));
             }
 
             // Newton step: spread_new = spread - NPV / DV01.
@@ -408,7 +415,14 @@ impl CDSTranchePricer {
             spread = spread.clamp(0.0, 100000.0); // Max 10000% = 100000bp
         }
 
-        Ok(spread)
+        // Exhausted the iteration budget without meeting the NPV tolerance.
+        Err(finstack_core::Error::Validation(format!(
+            "CDS tranche par-spread solve did not converge within {PAR_SPREAD_MAX_ITER} \
+             Newton iterations: last spread {spread:.4} bp leaves NPV {last_npv:.3e} \
+             (tolerance {:.3e}). Inspect the credit/discount curves or widen the \
+             iteration budget.",
+            PAR_SPREAD_TOLERANCE * tranche.notional.amount()
+        )))
     }
 
     /// Calculate expected loss metric (the total expected loss at maturity).
