@@ -319,7 +319,7 @@ mod bond_market_edge {
                 0.06,
                 Tenor::semi_annual(),
                 DayCount::Thirty360,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id("USD-OIS".into())
             .settlement_convention_opt(Some(
                 finstack_valuations::instruments::fixed_income::bond::BondSettlementConvention {
@@ -340,7 +340,7 @@ mod bond_market_edge {
                 0.06,
                 Tenor::semi_annual(),
                 DayCount::Thirty360,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id("USD-OIS".into())
             .settlement_convention_opt(Some(
                 finstack_valuations::instruments::fixed_income::bond::BondSettlementConvention {
@@ -510,7 +510,7 @@ mod bond_market_edge {
                 0.06,
                 Tenor::semi_annual(),
                 DayCount::Thirty360,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id("USD-OIS".into())
             .build()
             .unwrap();
@@ -525,7 +525,7 @@ mod bond_market_edge {
                 0.06,
                 Tenor::semi_annual(),
                 DayCount::Act365F,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id("USD-OIS".into())
             .build()
             .unwrap();

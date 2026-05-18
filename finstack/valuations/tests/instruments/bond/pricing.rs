@@ -289,7 +289,7 @@ fn test_bond_settlement_date_impact() {
             0.05,
             finstack_core::dates::Tenor::semi_annual(),
             DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .settlement_convention_opt(None)
         .pricing_overrides(finstack_valuations::instruments::PricingOverrides::default())
@@ -306,7 +306,7 @@ fn test_bond_settlement_date_impact() {
             0.05,
             finstack_core::dates::Tenor::semi_annual(),
             DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .settlement_convention_opt(Some(
             finstack_valuations::instruments::fixed_income::bond::BondSettlementConvention {
@@ -514,7 +514,7 @@ fn test_bond_different_day_counts() {
                 0.05,
                 finstack_core::dates::Tenor::semi_annual(),
                 dc,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(finstack_valuations::instruments::PricingOverrides::default())
             .build()

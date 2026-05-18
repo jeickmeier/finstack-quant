@@ -104,7 +104,7 @@ fn test_yield_dv01_duration_price_relationship() {
             0.08,
             Tenor::annual(),
             DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())

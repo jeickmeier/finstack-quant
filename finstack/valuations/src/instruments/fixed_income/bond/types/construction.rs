@@ -144,7 +144,7 @@ impl Bond {
                 coupon_rate,
                 finstack_core::dates::Tenor::semi_annual(),
                 DayCount::Thirty360,
-            ))
+            )?)
             .discount_curve_id(discount_curve_id.into())
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())
@@ -221,7 +221,7 @@ impl Bond {
     ) -> finstack_core::Result<Self> {
         let coupon_rate = coupon_rate.into();
         let mut cashflow_spec =
-            CashflowSpec::fixed_rate(coupon_rate, convention.frequency(), convention.day_count());
+            CashflowSpec::fixed_rate(coupon_rate, convention.frequency(), convention.day_count())?;
         if let CashflowSpec::Fixed(spec) = &mut cashflow_spec {
             spec.bdc = convention.business_day_convention();
             spec.calendar_id = convention
@@ -392,7 +392,7 @@ impl Bond {
                 0.0,
                 finstack_core::dates::Tenor::annual(),
                 DayCount::Act365F,
-            ))
+            )?)
             .discount_curve_id(discount_curve_id.into())
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())
@@ -554,7 +554,7 @@ impl Bond {
 
         // Use schedule day count and inferred frequency in the spec so that
         // YTM/YTW/duration/convexity use correct conventions for custom bonds.
-        let cashflow_spec = CashflowSpec::fixed(0.0, inferred_freq, schedule.day_count);
+        let cashflow_spec = CashflowSpec::fixed(0.0, inferred_freq, schedule.day_count)?;
 
         let pricing_overrides = if let Some(price) = quoted_clean {
             PricingOverrides::default().with_quoted_clean_price(price)
@@ -816,7 +816,7 @@ impl Bond {
             0.05,
             finstack_core::dates::Tenor::semi_annual(),
             DayCount::Thirty360,
-        );
+        )?;
 
         let call_put = CallPutSchedule {
             calls: vec![

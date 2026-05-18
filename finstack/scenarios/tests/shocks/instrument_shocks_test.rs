@@ -31,7 +31,7 @@ fn test_instrument_type_price_shock_matching() {
                     0.05,
                     finstack_core::dates::Tenor::annual(),
                     finstack_core::dates::DayCount::Thirty360,
-                ))
+                ).expect("finite test coupon"))
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -49,7 +49,7 @@ fn test_instrument_type_price_shock_matching() {
                     0.04,
                     finstack_core::dates::Tenor::annual(),
                     finstack_core::dates::DayCount::Thirty360,
-                ))
+                ).expect("finite test coupon"))
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -124,7 +124,7 @@ fn test_instrument_type_spread_shock_matching() {
                 0.05,
                 finstack_core::dates::Tenor::annual(),
                 finstack_core::dates::DayCount::Thirty360,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())
@@ -195,7 +195,7 @@ fn test_instrument_attr_price_shock_matching() {
                     0.05,
                     finstack_core::dates::Tenor::annual(),
                     finstack_core::dates::DayCount::Thirty360,
-                ))
+                ).expect("finite test coupon"))
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -217,7 +217,7 @@ fn test_instrument_attr_price_shock_matching() {
                     0.05,
                     finstack_core::dates::Tenor::annual(),
                     finstack_core::dates::DayCount::Thirty360,
-                ))
+                ).expect("finite test coupon"))
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -285,7 +285,7 @@ fn test_instrument_attr_price_shock_no_matches() {
                 0.05,
                 finstack_core::dates::Tenor::annual(),
                 finstack_core::dates::DayCount::Thirty360,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())
@@ -375,7 +375,7 @@ fn test_instrument_shock_no_matching_types() {
                 0.05,
                 finstack_core::dates::Tenor::annual(),
                 finstack_core::dates::DayCount::Thirty360,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())
@@ -464,7 +464,7 @@ fn test_instrument_shock_multiple_types() {
                     0.05,
                     finstack_core::dates::Tenor::annual(),
                     finstack_core::dates::DayCount::Thirty360,
-                ))
+                ).expect("finite test coupon"))
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -482,7 +482,7 @@ fn test_instrument_shock_multiple_types() {
                     0.04,
                     finstack_core::dates::Tenor::annual(),
                     finstack_core::dates::DayCount::Thirty360,
-                ))
+                ).expect("finite test coupon"))
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -573,7 +573,7 @@ fn test_attr_filter_ignores_tags_uses_meta_only() {
                 0.05,
                 finstack_core::dates::Tenor::annual(),
                 finstack_core::dates::DayCount::Thirty360,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())

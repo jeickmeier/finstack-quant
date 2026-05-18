@@ -154,7 +154,7 @@ fn test_accrued_frn_uses_forward_rate() {
             0.0,
             Tenor::quarterly(),
             DayCount::Act360,
-        ))
+        ).expect("finite test rate"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
         .pricing_overrides(PricingOverrides::default())

@@ -53,7 +53,7 @@ fn bucketed_dv01_uses_configured_bucket_grid() {
             0.05,
             Tenor::semi_annual(),
             DayCount::Thirty360,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .build()
         .expect("bond");
@@ -112,7 +112,7 @@ proptest! {
                 coupon_rate,
                 Tenor::semi_annual(),
                 DayCount::Thirty360,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id("USD-OIS".into())
             .build()
             .expect("Bond construction should succeed");
@@ -188,7 +188,7 @@ proptest! {
                 coupon_rate,
                 Tenor::semi_annual(),
                 DayCount::Thirty360,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id("USD-OIS".into())
             .build()
             .expect("Bond construction should succeed");
@@ -772,7 +772,7 @@ mod additional_invariants {
                     0.04,
                     Tenor::semi_annual(),
                     DayCount::Thirty360,
-                ))
+                ).expect("finite test coupon"))
                 .discount_curve_id("USD-OIS".into())
                 .build()
                 .expect("Bond construction should succeed");

@@ -117,7 +117,7 @@ fn test_quarterly_coupon_frequency() {
             0.04,
             Tenor::quarterly(),
             DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(PricingOverrides::default())
         .build()
@@ -145,7 +145,7 @@ fn test_floating_rate_cashflows() {
             150.0,
             Tenor::quarterly(),
             DayCount::Act360,
-        ))
+        ).expect("finite test rate"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .pricing_overrides(PricingOverrides::default())
         .build()
@@ -173,7 +173,7 @@ fn test_amortizing_bond_linear() {
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::amortizing(
-            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F),
+            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F).expect("finite test coupon"),
             AmortizationSpec::LinearTo {
                 final_notional: Money::new(400.0, Currency::USD),
             },
@@ -442,7 +442,7 @@ fn test_cashflow_schedule_floating() {
             100.0,
             Tenor::quarterly(),
             DayCount::Act360,
-        ))
+        ).expect("finite test rate"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .pricing_overrides(PricingOverrides::default())
         .build()
@@ -472,7 +472,7 @@ fn test_cashflows_day_count_conventions() {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(as_of)
             .maturity(maturity)
-            .cashflow_spec(CashflowSpec::fixed(0.05, Tenor::semi_annual(), dc))
+            .cashflow_spec(CashflowSpec::fixed(0.05, Tenor::semi_annual(), dc).expect("finite test coupon"))
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default())
             .build()
@@ -497,7 +497,7 @@ fn test_amortizing_full_redemption() {
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::amortizing(
-            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F),
+            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F).expect("finite test coupon"),
             AmortizationSpec::LinearTo {
                 final_notional: Money::new(0.0, Currency::USD),
             },

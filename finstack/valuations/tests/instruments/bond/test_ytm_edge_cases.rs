@@ -97,7 +97,7 @@ fn test_zero_coupon_bond_ytm() {
             0.0,
             Tenor::annual(),
             DayCount::Thirty360,
-        ))
+        ).expect("finite test coupon"))
         .issue_date(issue)
         .maturity(maturity)
         .discount_curve_id("USD-OIS".into())
@@ -219,7 +219,7 @@ fn test_eom_february_maturity_ytm() {
             0.04,
             Tenor::annual(),
             DayCount::Thirty360,
-        ))
+        ).expect("finite test coupon"))
         .issue_date(issue)
         .maturity(maturity)
         .discount_curve_id("USD-OIS".into())

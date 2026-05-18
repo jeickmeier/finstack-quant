@@ -702,7 +702,7 @@ mod tests {
             "USD-OIS",
         )
         .expect("bond");
-        bond.cashflow_spec = CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F);
+        bond.cashflow_spec = CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
                 start_date: call_date,
@@ -789,7 +789,7 @@ mod tests {
             "USD-OIS",
         )
         .expect("bond");
-        bond.cashflow_spec = CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F);
+        bond.cashflow_spec = CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
                 start_date: call_date,

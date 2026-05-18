@@ -776,7 +776,7 @@ mod tests {
             50.0,
             Tenor::quarterly(),
             DayCount::Act360,
-        );
+        ).expect("finite test rate");
 
         let result =
             BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, date!(2025 - 06 - 01));

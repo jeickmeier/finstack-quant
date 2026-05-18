@@ -20,7 +20,8 @@
 //! use finstack_core::types::Bps;
 //!
 //! // Fixed-rate bond: 5% annual coupon, semi-annual payments
-//! let fixed = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360);
+//! let fixed = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)
+//!     .expect("5% is a finite coupon");
 //!
 //! // Floating-rate note: SOFR + 200bps, quarterly payments
 //! let floating = CashflowSpec::floating_bps(
@@ -53,26 +54,24 @@ fn rate_index_defaults(index_id: &CurveId) -> Option<RateIndexConventions> {
     registry.require_rate_index(&id).ok().cloned()
 }
 
-/// Convert an `f64` rate/margin into a `Decimal` for the infallible
-/// `CashflowSpec` convenience constructors.
+/// Convert an `f64` rate/margin into a `Decimal` for the `CashflowSpec`
+/// convenience constructors.
 ///
-/// `Decimal::try_from` fails only for non-finite input (`NaN`, `±inf`). These
-/// convenience constructors return `Self` (not `Result`), so a hard error
-/// cannot be surfaced here without a breaking API change. To avoid the failure
-/// being **silent**, a non-finite input is logged at `error` level (active in
-/// release builds, unlike the callers' `debug_assert!`) before falling back to
-/// zero. Callers that must reject invalid external data should construct the
-/// typed `FixedCouponSpec` / `StepUpCouponSpec` / `FloatingRateSpec` directly.
+/// `Decimal::try_from` fails for non-finite input (`NaN`, `±inf`) or a
+/// magnitude outside `Decimal`'s range. Such a rate is a malformed input, so
+/// the conversion fails loudly with a validation error rather than being
+/// silently coerced to zero.
+///
+/// # Errors
+///
+/// Returns a validation error if `value` is not a finite, `Decimal`-representable
+/// rate.
 #[inline]
-fn decimal_from_finite_f64(value: f64, context: &str) -> Decimal {
-    Decimal::try_from(value).unwrap_or_else(|_| {
-        tracing::error!(
-            value,
-            context,
-            "non-finite rate passed to an infallible CashflowSpec constructor; \
-             coercing to 0 — construct the typed *Spec directly to reject invalid input"
-        );
-        Decimal::ZERO
+fn decimal_from_finite_f64(value: f64, context: &str) -> finstack_core::Result<Decimal> {
+    Decimal::try_from(value).map_err(|_| {
+        finstack_core::Error::Validation(format!(
+            "{context}: rate must be a finite, representable number, got {value}"
+        ))
     })
 }
 
@@ -177,12 +176,10 @@ impl CashflowSpec {
     ///
     /// A `CashflowSpec::Fixed` variant with the specified coupon rate, frequency, and day count.
     ///
-    /// # Input validation note
+    /// # Errors
     ///
-    /// This convenience constructor keeps existing behavior: after the debug-only
-    /// finite-value assertion above, any failed `f64 -> Decimal` conversion falls
-    /// back to `0`. External callers that need hard validation should prefer the
-    /// typed constructors or builder APIs that accept `Decimal` directly.
+    /// Returns a validation error if `coupon` is not finite (`NaN`, `±inf`) or
+    /// is too large to represent as a `Decimal`.
     ///
     /// # Examples
     ///
@@ -196,21 +193,17 @@ impl CashflowSpec {
     ///     Rate::from_percent(4.0),
     ///     Tenor::semi_annual(),
     ///     DayCount::Thirty360,
-    /// );
+    /// )
+    /// .expect("4% is a finite coupon");
     /// ```
     ///
     /// # See Also
     ///
     /// For full control (PIK, custom calendars, stubs), construct `FixedCouponSpec` directly
     /// and wrap in `CashflowSpec::Fixed(...)`.
-    #[allow(clippy::expect_used)] // Builder with valid inputs should not fail
-    pub fn fixed(coupon: f64, freq: Tenor, dc: DayCount) -> Self {
-        debug_assert!(
-            coupon.is_finite(),
-            "CashflowSpec::fixed: coupon is not finite ({coupon})"
-        );
-        let rate = decimal_from_finite_f64(coupon, "CashflowSpec::fixed coupon");
-        Self::Fixed(FixedCouponSpec {
+    pub fn fixed(coupon: f64, freq: Tenor, dc: DayCount) -> finstack_core::Result<Self> {
+        let rate = decimal_from_finite_f64(coupon, "CashflowSpec::fixed coupon")?;
+        Ok(Self::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate,
             freq,
@@ -220,13 +213,18 @@ impl CashflowSpec {
             stub: StubKind::ShortFront,
             end_of_month: false,
             payment_lag_days: 0,
-        })
+        }))
     }
 
     /// Create a fixed-rate specification using a typed rate.
-    pub fn fixed_rate(coupon: Rate, freq: Tenor, dc: DayCount) -> Self {
-        let rate = decimal_from_finite_f64(coupon.as_decimal(), "CashflowSpec::fixed_rate coupon");
-        Self::Fixed(FixedCouponSpec {
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the rate is not finite or not representable
+    /// as a `Decimal`.
+    pub fn fixed_rate(coupon: Rate, freq: Tenor, dc: DayCount) -> finstack_core::Result<Self> {
+        let rate = decimal_from_finite_f64(coupon.as_decimal(), "CashflowSpec::fixed_rate coupon")?;
+        Ok(Self::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate,
             freq,
@@ -236,7 +234,7 @@ impl CashflowSpec {
             stub: StubKind::ShortFront,
             end_of_month: false,
             payment_lag_days: 0,
-        })
+        }))
     }
 
     /// Create a floating-rate specification with sensible defaults.
@@ -287,16 +285,26 @@ impl CashflowSpec {
     ///     200.0,  // 200 basis points
     ///     Tenor::quarterly(),
     ///     DayCount::Act360,
-    /// );
+    /// )
+    /// .expect("200bps is a finite margin");
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `margin_bp` is not finite or not
+    /// representable as a `Decimal`.
     ///
     /// # See Also
     ///
     /// - `floating_with_reset_lag()` for custom reset lag
     /// - For full control (floors/caps/gearing), construct `FloatingCouponSpec` directly
     ///   and wrap in `CashflowSpec::Floating(...)`.
-    #[allow(clippy::expect_used)] // Builder with valid inputs should not fail
-    pub fn floating(index_id: CurveId, margin_bp: f64, freq: Tenor, dc: DayCount) -> Self {
+    pub fn floating(
+        index_id: CurveId,
+        margin_bp: f64,
+        freq: Tenor,
+        dc: DayCount,
+    ) -> finstack_core::Result<Self> {
         let reset_lag = rate_index_defaults(&index_id)
             .map(|conv| conv.default_reset_lag_days)
             .unwrap_or(2);
@@ -387,7 +395,8 @@ impl CashflowSpec {
     ///     Tenor::quarterly(),
     ///     DayCount::Act365F,
     ///     0,  // T-0 reset for SONIA
-    /// );
+    /// )
+    /// .expect("150bps is a finite margin");
     ///
     /// // SOFR-linked FRN with standard T-2 reset
     /// let sofr_frn = CashflowSpec::floating_with_reset_lag(
@@ -396,25 +405,27 @@ impl CashflowSpec {
     ///     Tenor::quarterly(),
     ///     DayCount::Act360,
     ///     2,  // T-2 reset for SOFR
-    /// );
+    /// )
+    /// .expect("200bps is a finite margin");
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `margin_bp` is not finite or not
+    /// representable as a `Decimal`.
     pub fn floating_with_reset_lag(
         index_id: CurveId,
         margin_bp: f64,
         freq: Tenor,
         dc: DayCount,
         reset_lag_days: i32,
-    ) -> Self {
-        debug_assert!(
-            margin_bp.is_finite(),
-            "CashflowSpec::floating_with_reset_lag: margin_bp is not finite ({margin_bp})"
-        );
+    ) -> finstack_core::Result<Self> {
         let spread_bp =
-            decimal_from_finite_f64(margin_bp, "CashflowSpec::floating_with_reset_lag margin_bp");
+            decimal_from_finite_f64(margin_bp, "CashflowSpec::floating_with_reset_lag margin_bp")?;
         let calendar_id = rate_index_defaults(&index_id)
             .map(|conv| conv.market_calendar_id)
             .unwrap_or_else(|| "weekends_only".to_string());
-        Self::Floating(FloatingCouponSpec {
+        Ok(Self::Floating(FloatingCouponSpec {
             rate_spec: FloatingRateSpec {
                 index_id,
                 spread_bp,
@@ -439,7 +450,7 @@ impl CashflowSpec {
             coupon_type: CouponType::Cash,
             freq,
             stub: StubKind::ShortFront,
-        })
+        }))
     }
 
     /// Create a floating-rate specification with explicit reset lag using a typed margin.
@@ -591,41 +602,32 @@ impl CashflowSpec {
     ///     vec![(step_date, 0.045)],
     ///     Tenor::semi_annual(),
     ///     DayCount::Thirty360,
-    /// );
+    /// )
+    /// .expect("3%/4.5% are finite coupons");
     /// ```
     ///
-    /// # Input validation note
+    /// # Errors
     ///
-    /// This helper intentionally preserves the behavior of coercing any
-    /// failed `f64 -> Decimal` conversion to `0` after debug assertions. Use a
-    /// typed `StepUpCouponSpec` directly when invalid external data must fail
-    /// fast instead of being normalized.
+    /// Returns a validation error if the initial rate or any step rate is not
+    /// finite (`NaN`, `±inf`) or is not representable as a `Decimal`.
     pub fn step_up(
         initial_rate: f64,
         steps: Vec<(finstack_core::dates::Date, f64)>,
         freq: Tenor,
         dc: DayCount,
-    ) -> Self {
-        debug_assert!(
-            initial_rate.is_finite(),
-            "CashflowSpec::step_up: initial_rate is not finite ({initial_rate})"
-        );
-        let initial = decimal_from_finite_f64(initial_rate, "CashflowSpec::step_up initial_rate");
+    ) -> finstack_core::Result<Self> {
+        let initial = decimal_from_finite_f64(initial_rate, "CashflowSpec::step_up initial_rate")?;
         let step_schedule: Vec<(finstack_core::dates::Date, Decimal)> = steps
             .into_iter()
             .map(|(d, r)| {
-                debug_assert!(
-                    r.is_finite(),
-                    "CashflowSpec::step_up: step rate is not finite ({r})"
-                );
-                (
+                Ok((
                     d,
-                    decimal_from_finite_f64(r, "CashflowSpec::step_up step rate"),
-                )
+                    decimal_from_finite_f64(r, "CashflowSpec::step_up step rate")?,
+                ))
             })
-            .collect();
+            .collect::<finstack_core::Result<Vec<_>>>()?;
 
-        Self::StepUp(StepUpCouponSpec {
+        Ok(Self::StepUp(StepUpCouponSpec {
             coupon_type: CouponType::Cash,
             initial_rate: initial,
             step_schedule,
@@ -636,7 +638,7 @@ impl CashflowSpec {
             stub: StubKind::ShortFront,
             end_of_month: false,
             payment_lag_days: 0,
-        })
+        }))
     }
 
     /// Create an amortizing bond specification.
@@ -664,7 +666,8 @@ impl CashflowSpec {
     /// use time::Month;
     ///
     /// // Base fixed-rate spec
-    /// let base = CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F);
+    /// let base = CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F)
+    ///     .expect("5% is a finite coupon");
     ///
     /// // Amortization: 1/3 principal each year
     /// let step1 = Date::from_calendar_date(2026, Month::January, 1).unwrap();
@@ -799,8 +802,21 @@ impl CashflowSpec {
 
 impl Default for CashflowSpec {
     /// Default to semi-annual fixed bond with 30/360 day count (US convention).
+    ///
+    /// Built directly (rather than via [`Self::fixed`]) because a zero coupon
+    /// is trivially finite and the variant must be infallible in `Default`.
     fn default() -> Self {
-        Self::fixed(0.0, Tenor::semi_annual(), DayCount::Thirty360)
+        Self::Fixed(FixedCouponSpec {
+            coupon_type: CouponType::Cash,
+            rate: Decimal::ZERO,
+            freq: Tenor::semi_annual(),
+            dc: DayCount::Thirty360,
+            bdc: BusinessDayConvention::Following,
+            calendar_id: "weekends_only".to_string(),
+            stub: StubKind::ShortFront,
+            end_of_month: false,
+            payment_lag_days: 0,
+        })
     }
 }
 
@@ -826,7 +842,8 @@ mod tests {
             ],
             Tenor::semi_annual(),
             DayCount::Thirty360,
-        );
+        )
+        .expect("step-up coupons are finite");
 
         let json = serde_json::to_string(&original).expect("serialize");
         let deserialized: CashflowSpec = serde_json::from_str(&json).expect("deserialize");
@@ -853,7 +870,8 @@ mod tests {
             )],
             Tenor::semi_annual(),
             DayCount::Thirty360,
-        );
+        )
+        .expect("step-up coupons are finite");
 
         assert_eq!(spec.frequency(), Tenor::semi_annual());
         assert_eq!(spec.day_count(), DayCount::Thirty360);
@@ -866,5 +884,59 @@ mod tests {
             }
             other => panic!("Expected StepUp variant, got {:?}", other),
         }
+    }
+
+    /// The `f64`-taking convenience constructors must reject a non-finite
+    /// coupon with a validation error rather than silently coercing it to
+    /// zero (the pre-fix behavior).
+    #[test]
+    fn non_finite_coupon_is_rejected() {
+        assert!(
+            CashflowSpec::fixed(f64::NAN, Tenor::semi_annual(), DayCount::Thirty360).is_err(),
+            "NaN coupon must be rejected"
+        );
+        assert!(
+            CashflowSpec::fixed(f64::INFINITY, Tenor::annual(), DayCount::Act365F).is_err(),
+            "infinite coupon must be rejected"
+        );
+        assert!(
+            CashflowSpec::floating(
+                CurveId::new("USD-SOFR-3M"),
+                f64::NAN,
+                Tenor::quarterly(),
+                DayCount::Act360,
+            )
+            .is_err(),
+            "NaN floating margin must be rejected"
+        );
+        assert!(
+            CashflowSpec::step_up(
+                f64::NEG_INFINITY,
+                vec![],
+                Tenor::semi_annual(),
+                DayCount::Thirty360,
+            )
+            .is_err(),
+            "non-finite step-up initial rate must be rejected"
+        );
+        // A non-finite rate buried in the step schedule is rejected too.
+        assert!(
+            CashflowSpec::step_up(
+                0.03,
+                vec![(
+                    Date::from_calendar_date(2030, Month::January, 1).unwrap(),
+                    f64::NAN,
+                )],
+                Tenor::semi_annual(),
+                DayCount::Thirty360,
+            )
+            .is_err(),
+            "non-finite step rate must be rejected"
+        );
+        // A finite coupon still constructs successfully.
+        assert!(
+            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360).is_ok(),
+            "a finite coupon must still build"
+        );
     }
 }

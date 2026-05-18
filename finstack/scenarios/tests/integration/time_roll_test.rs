@@ -200,7 +200,7 @@ fn test_time_roll_with_bond_carry() {
                 0.05,
                 finstack_core::dates::Tenor::annual(),
                 finstack_core::dates::DayCount::Thirty360,
-            ))
+            ).expect("finite test coupon"))
             .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())

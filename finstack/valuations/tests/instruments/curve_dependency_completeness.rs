@@ -81,7 +81,7 @@ fn test_bond_curve_dependencies_complete() {
             0.04,
             Tenor::semi_annual(),
             DayCount::Thirty360,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .build()
         .expect("Bond construction should succeed");
@@ -199,7 +199,7 @@ fn test_dependency_count_reasonable() {
             0.04,
             Tenor::semi_annual(),
             DayCount::Thirty360,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .build()
         .expect("Bond construction should succeed");

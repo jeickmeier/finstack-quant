@@ -160,7 +160,7 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
             (maturity, Money::new(0.0, Currency::USD)),
         ],
     };
-    let base_spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360);
+    let base_spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360).expect("finite test coupon");
     let cashflow_spec = CashflowSpec::amortizing(base_spec, amort_spec);
 
     let mut bond = Bond::builder()

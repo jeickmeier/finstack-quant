@@ -154,11 +154,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
@@ -283,11 +282,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.06,
-                Tenor::annual(),
-                DayCount::Act365F,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(overrides)
             .attributes(Attributes::new())
@@ -313,11 +311,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default())
             .settlement_convention_opt(Some(BondSettlementConvention {
@@ -346,11 +343,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default())
             .attributes(attrs)
@@ -371,7 +367,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
-            .cashflow_spec(CashflowSpec::fixed(0.0, Tenor::annual(), DayCount::Act365F))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.0, Tenor::annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
@@ -393,11 +392,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2027 - 01 - 01))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.06,
-                Tenor::monthly(),
-                DayCount::Act360,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.06, Tenor::monthly(), DayCount::Act360)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
@@ -522,11 +520,10 @@ mod tests {
                 .notional(Money::new(1000.0, ccy))
                 .issue_date(date!(2025 - 01 - 01))
                 .maturity(date!(2030 - 01 - 01))
-                .cashflow_spec(CashflowSpec::fixed(
-                    0.04,
-                    Tenor::annual(),
-                    DayCount::Act365F,
-                ))
+                .cashflow_spec(
+                    CashflowSpec::fixed(0.04, Tenor::annual(), DayCount::Act365F)
+                        .expect("finite test coupon"),
+                )
                 .discount_curve_id(CurveId::new(format!("{}-OIS", code)))
                 .pricing_overrides(PricingOverrides::default())
                 .attributes(Attributes::new())
@@ -621,11 +618,10 @@ mod tests {
             .notional(Money::new(100.0, Currency::USD))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.08,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.08, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(105.0))
             .attributes(Attributes::new())
@@ -643,11 +639,10 @@ mod tests {
             .notional(Money::new(100.0, Currency::USD))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.03,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.03, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(95.0))
             .attributes(Attributes::new())
@@ -665,11 +660,10 @@ mod tests {
             .notional(Money::new(100.0, Currency::USD))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(100.0))
             .attributes(Attributes::new())
@@ -689,11 +683,10 @@ mod tests {
             .id("NO_ISSUE".into())
             .notional(Money::new(1000.0, Currency::USD))
             .maturity(maturity)
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
@@ -714,11 +707,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(date!(2024 - 03 - 01))
             .maturity(date!(2030 - 06 - 15))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
@@ -738,11 +730,10 @@ mod tests {
             .notional(Money::new(1_000_000.0, Currency::USD))
             .issue_date(date!(2025 - 01 - 01))
             .maturity(date!(2030 - 01 - 01))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id("USD-OIS".into())
             .pricing_overrides(overrides)
             .attributes(Attributes::new())

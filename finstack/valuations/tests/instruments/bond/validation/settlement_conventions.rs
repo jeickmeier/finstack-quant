@@ -48,7 +48,7 @@ fn test_pv_anchored_at_as_of() {
             0.05,
             Tenor::semi_annual(),
             DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(PricingOverrides::default())
         .settlement_convention_opt(Some(
@@ -106,7 +106,7 @@ fn test_callable_exercise_coupon_always_paid() {
             0.06,
             Tenor::semi_annual(),
             DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(PricingOverrides::default())
         .call_put_opt(Some(call_schedule))
@@ -124,7 +124,7 @@ fn test_callable_exercise_coupon_always_paid() {
             0.06,
             Tenor::semi_annual(),
             DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(PricingOverrides::default())
         .call_put_opt(None)
@@ -177,7 +177,7 @@ fn test_putable_bond_worth_more() {
             0.03,
             Tenor::semi_annual(),
             DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(PricingOverrides::default())
         .call_put_opt(Some(put_schedule))
@@ -195,7 +195,7 @@ fn test_putable_bond_worth_more() {
             0.03,
             Tenor::semi_annual(),
             DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(PricingOverrides::default())
         .call_put_opt(None)
@@ -238,7 +238,7 @@ fn test_bond_pricing_basic() {
             0.05,
             Tenor::semi_annual(),
             DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(PricingOverrides::default())
         .attributes(Default::default())

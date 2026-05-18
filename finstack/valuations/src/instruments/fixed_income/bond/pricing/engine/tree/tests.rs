@@ -25,7 +25,7 @@ fn create_test_bond() -> Bond {
             0.05,
             finstack_core::dates::Tenor::semi_annual(),
             finstack_core::dates::DayCount::Act365F,
-        ))
+        ).expect("finite test coupon"))
         .discount_curve_id("USD-OIS".into())
         .credit_curve_id_opt(None)
         .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(98.5))
