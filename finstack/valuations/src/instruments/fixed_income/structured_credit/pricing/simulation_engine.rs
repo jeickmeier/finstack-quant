@@ -28,6 +28,7 @@ use finstack_core::money::Money;
 use finstack_core::HashMap;
 use finstack_core::Result;
 use finstack_monte_carlo::rng::philox::PhiloxRng;
+use finstack_monte_carlo::traits::RandomStream;
 use std::sync::Arc;
 
 // ============================================================================
@@ -151,6 +152,11 @@ pub(crate) struct PerNameDefaultEngine {
     rng: PhiloxRng,
     /// `true` ⇒ second member of an antithetic pair; negate idiosyncratic draws.
     antithetic: bool,
+    /// Idiosyncratic (name-specific) recovery volatility. When `> 0`, each
+    /// defaulted name recovers at its own rate scattered around the period
+    /// systematic recovery; `0` ⇒ every default recovers at the period rate
+    /// (no per-name dispersion, e.g. constant recovery).
+    idiosyncratic_recovery_vol: f64,
 }
 
 impl PerNameDefaultEngine {
@@ -159,12 +165,14 @@ impl PerNameDefaultEngine {
         simulator: Arc<PerNameCopulaDefault>,
         granularity: PoolGranularity,
         rng: PhiloxRng,
+        idiosyncratic_recovery_vol: f64,
     ) -> Self {
         Self {
             simulator,
             granularity,
             rng,
             antithetic: false,
+            idiosyncratic_recovery_vol,
         }
     }
 
@@ -177,12 +185,14 @@ impl PerNameDefaultEngine {
         simulator: Arc<PerNameCopulaDefault>,
         granularity: PoolGranularity,
         rng: PhiloxRng,
+        idiosyncratic_recovery_vol: f64,
     ) -> Self {
         Self {
             simulator,
             granularity,
             rng,
             antithetic: true,
+            idiosyncratic_recovery_vol,
         }
     }
 }
@@ -197,6 +207,10 @@ pub(crate) struct StochasticPathFlowSource {
     /// Scratch buffer for per-name default indicators, reused each period to
     /// avoid per-period allocation.
     default_scratch: Vec<bool>,
+    /// Scratch buffer for per-name recovery rates, index-aligned with
+    /// `default_scratch`. Entry `k` is the recovery the `k`-th performing
+    /// asset realizes if it defaults this period.
+    recovery_scratch: Vec<f64>,
 }
 
 impl StochasticPathFlowSource {
@@ -207,6 +221,7 @@ impl StochasticPathFlowSource {
             next_period: 0,
             per_name: None,
             default_scratch: Vec::new(),
+            recovery_scratch: Vec::new(),
         }
     }
 
@@ -220,6 +235,7 @@ impl StochasticPathFlowSource {
             next_period: 0,
             per_name: Some(per_name),
             default_scratch: Vec::new(),
+            recovery_scratch: Vec::new(),
         }
     }
 }
@@ -274,7 +290,34 @@ impl PoolFlowSource for StochasticPathFlowSource {
                             &mut self.default_scratch,
                         );
                     }
-                    Some(PeriodDefaultOutcome::PerName(&self.default_scratch))
+
+                    // Per-name idiosyncratic recovery dispersion: each name
+                    // recovers at its own rate, scattered around the period
+                    // systematic recovery `shock.recovery_rate`. A draw is
+                    // taken for every name (not only defaulters) so the RNG
+                    // stream stays order-stable; the antithetic partner negates
+                    // the recovery shock, mirroring the default-shock negation.
+                    // When the recovery model has no idiosyncratic volatility
+                    // no draw is consumed, so a constant-recovery scenario is
+                    // bit-identical to the pre-dispersion engine.
+                    self.recovery_scratch.clear();
+                    self.recovery_scratch.reserve(self.default_scratch.len());
+                    let sigma = engine.idiosyncratic_recovery_vol;
+                    for _ in 0..self.default_scratch.len() {
+                        let recovery = if sigma > 0.0 {
+                            let raw = engine.rng.next_std_normal();
+                            let eps = if engine.antithetic { -raw } else { raw };
+                            (shock.recovery_rate + sigma * eps).clamp(0.0, 1.0)
+                        } else {
+                            shock.recovery_rate
+                        };
+                        self.recovery_scratch.push(recovery);
+                    }
+
+                    Some(PeriodDefaultOutcome::PerName {
+                        defaults: &self.default_scratch,
+                        recoveries: &self.recovery_scratch,
+                    })
                 }
                 PoolGranularity::LargeHomogeneous => {
                     // Closed-form LHP limit: apply E[1{Aᵢ ≤ c} | Z, W] to the
@@ -1700,9 +1743,13 @@ fn simulate_period(
     //   - OC/IC coverage tests see correct post-loss balances
     //   - No risk of paying interest on subsequently written-down principal
     //
-    // Expected net loss = default_amount * (1 - recovery_rate)
+    // Net loss = defaulted principal − realized recovery. Using the actual
+    // recovered amount (rather than `default × (1 − mean_recovery)`) makes the
+    // write-down reflect per-name recovery dispersion; it reduces to the old
+    // formula when every default recovers at the period systematic rate.
     // This is a permanent, irreversible write-down.
-    let period_expected_loss = pool_flows.default.amount() * (1.0 - pool_flows.recovery_rate);
+    let period_expected_loss =
+        (pool_flows.default.amount() - pool_flows.recovery.amount()).max(0.0);
     state.cumulative_expected_loss += period_expected_loss;
 
     if state.cumulative_expected_loss > WRITEDOWN_DE_MINIMIS
@@ -2146,7 +2193,6 @@ pub(crate) struct PoolFlows {
     prepayment: Money,
     default: Money,
     recovery: Money,
-    recovery_rate: f64,
 }
 
 /// Calculate all pool flows for the period.
@@ -2167,11 +2213,16 @@ struct PoolFlowRates {
 /// Present only when the scenario default model is a copula; otherwise the
 /// engine uses the legacy monthly-equivalent `PoolFlowRates::mdr`.
 enum PeriodDefaultOutcome<'a> {
-    /// Per-name finite-pool simulation. `indicators[k]` is the default
-    /// outcome for the `k`-th still-performing asset (`!is_defaulted &&
-    /// balance > 0`) in the pool's intrinsic asset order; `true` ⇒ the asset
-    /// defaults in full this period.
-    PerName(&'a [bool]),
+    /// Per-name finite-pool simulation. Entry `k` of each slice describes the
+    /// `k`-th still-performing asset (`!is_defaulted && balance > 0`) in the
+    /// pool's intrinsic asset order.
+    PerName {
+        /// `true` ⇒ the asset defaults in full this period.
+        defaults: &'a [bool],
+        /// The recovery rate the asset realizes if it defaults this period,
+        /// scattered idiosyncratically around the period systematic recovery.
+        recoveries: &'a [f64],
+    },
 
     /// LHP fast-path: a single **period-level** default rate (already
     /// aggregated over the period — *not* a monthly-equivalent rate) applied
@@ -2227,8 +2278,11 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
     // index-aligned with the simulator's draw order.
     // For the LHP fast-path, `lhp_period_rate` is a single period-level rate
     // applied to every performing asset.
-    let (per_name_mask, lhp_period_rate) = match &request.copula_outcome {
-        Some(PeriodDefaultOutcome::PerName(mask)) => (Some(*mask), None),
+    let (per_name_outcome, lhp_period_rate) = match &request.copula_outcome {
+        Some(PeriodDefaultOutcome::PerName {
+            defaults,
+            recoveries,
+        }) => (Some((*defaults, *recoveries)), None),
         Some(PeriodDefaultOutcome::PoolWidePeriodRate(rate)) => (None, Some(*rate)),
         None => (None, None),
     };
@@ -2253,7 +2307,7 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
     // default realization. Instead, validate the mask length up-front and
     // fail loudly: this makes the deterministic alignment a checked invariant
     // rather than an implicit assumption.
-    if let Some(mask) = per_name_mask {
+    if let Some((mask, recoveries)) = per_name_outcome {
         let performing = (0..n)
             .filter(|&i| state.pool_state.balances[i] > 0.0 && !state.pool_state.is_defaulted[i])
             .count();
@@ -2264,6 +2318,18 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
                  at period start (pay_date {})",
                 mask.len(),
                 performing,
+                request.pay_date,
+            )));
+        }
+        // The recovery slice is built name-aligned with the default mask in
+        // the same period; guard the invariant so a future regression cannot
+        // silently mis-pair recoveries with defaults.
+        if recoveries.len() != mask.len() {
+            return Err(finstack_core::Error::Validation(format!(
+                "per-name recovery slice ({} entries) is misaligned with the \
+                 default mask ({} entries) at pay_date {}",
+                recoveries.len(),
+                mask.len(),
                 request.pay_date,
             )));
         }
@@ -2284,12 +2350,17 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         }
 
         // This asset is performing at period start; claim its per-name
-        // default indicator. The pre-loop length guard proves `alive_idx` is
-        // always in bounds here, so the claim is exact and order-stable.
-        let per_name_default = per_name_mask.map(|mask| {
+        // default indicator and idiosyncratic recovery. The pre-loop length
+        // guard proves `alive_idx` is always in bounds here, so the claim is
+        // exact and order-stable.
+        let per_name_claim = per_name_outcome.map(|(mask, recoveries)| {
             let defaulted = mask.get(alive_idx).copied().unwrap_or(false);
+            let recovery = recoveries
+                .get(alive_idx)
+                .copied()
+                .unwrap_or(request.rates.recovery_rate);
             alive_idx += 1;
-            defaulted
+            (defaulted, recovery)
         });
 
         // Resolve this period's default rate up-front — it is needed both for
@@ -2306,7 +2377,7 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         //   4. Legacy pool-wide MDR (`global_period_mdr`).
         let period_mdr = if let Some(mdr) = state.pool_state.mdr_overrides[i] {
             1.0 - (1.0 - mdr).powf(request.months_per_period)
-        } else if let Some(defaulted) = per_name_default {
+        } else if let Some((defaulted, _)) = per_name_claim {
             if defaulted {
                 1.0
             } else {
@@ -2451,7 +2522,13 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         };
 
         let prepay_amt = balance_after_default * period_smm;
-        let recovery_amt = default_amt * request.rates.recovery_rate;
+        // Per-name defaults recover at their own idiosyncratically-dispersed
+        // rate; the LHP and legacy paths use the period systematic recovery.
+        let asset_recovery_rate = match per_name_claim {
+            Some((_, recovery)) => recovery,
+            None => request.rates.recovery_rate,
+        };
+        let recovery_amt = default_amt * asset_recovery_rate;
 
         total_prepay = total_prepay.checked_add(Money::new(prepay_amt, base_ccy))?;
         total_default = total_default.checked_add(Money::new(default_amt, base_ccy))?;
@@ -2477,6 +2554,5 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         prepayment: total_prepay,
         default: total_default,
         recovery: total_recovery,
-        recovery_rate: request.rates.recovery_rate,
     })
 }

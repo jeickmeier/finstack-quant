@@ -360,6 +360,7 @@ impl StochasticPricer {
         antithetic: bool,
     ) -> PerNameDefaultEngine {
         let base = PhiloxRng::new(self.config.seed ^ PER_NAME_SEED_SALT);
+        let idio_recovery_vol = self.idiosyncratic_recovery_vol();
         if antithetic {
             // Both members of pair k share substream(k); the odd member is
             // the antithetic partner (negates idiosyncratic draws).
@@ -370,13 +371,24 @@ impl StochasticPricer {
                     Arc::clone(simulator),
                     self.config.pool_granularity,
                     rng,
+                    idio_recovery_vol,
                 )
             } else {
-                PerNameDefaultEngine::new(Arc::clone(simulator), self.config.pool_granularity, rng)
+                PerNameDefaultEngine::new(
+                    Arc::clone(simulator),
+                    self.config.pool_granularity,
+                    rng,
+                    idio_recovery_vol,
+                )
             }
         } else {
             let rng = base.substream(path_index as u64);
-            PerNameDefaultEngine::new(Arc::clone(simulator), self.config.pool_granularity, rng)
+            PerNameDefaultEngine::new(
+                Arc::clone(simulator),
+                self.config.pool_granularity,
+                rng,
+                idio_recovery_vol,
+            )
         }
     }
 
@@ -663,6 +675,29 @@ impl StochasticPricer {
                 factor_correlation,
             } => {
                 (mean_recovery + factor_correlation * recovery_volatility * factor).clamp(0.0, 1.0)
+            }
+        }
+    }
+
+    /// Idiosyncratic (name-specific) recovery volatility for the per-name
+    /// engine.
+    ///
+    /// The recovery volatility `σ_R` of the market-correlated recovery model
+    /// splits into a systematic loading and an idiosyncratic residual.
+    /// [`Self::recovery_rate`] already applies the systematic `ρ_R·σ_R·Z`
+    /// channel (shared by every name in a period); this returns the residual
+    /// `σ_R·√(1−ρ_R²)` that the per-name engine scatters independently across
+    /// defaulted obligors. `Constant` recovery has no dispersion.
+    fn idiosyncratic_recovery_vol(&self) -> f64 {
+        match &self.config.tree_config.recovery_spec {
+            RecoverySpec::Constant { .. } => 0.0,
+            RecoverySpec::MarketCorrelated {
+                recovery_volatility,
+                factor_correlation,
+                ..
+            } => {
+                let systematic_share = (factor_correlation * factor_correlation).min(1.0);
+                recovery_volatility * (1.0 - systematic_share).max(0.0).sqrt()
             }
         }
     }
@@ -1828,6 +1863,47 @@ mod per_name_copula_tests {
              granular pool (600 names) dispersion {:.0}",
             concentrated.unexpected_loss.amount(),
             granular.unexpected_loss.amount()
+        );
+    }
+
+    /// Per-name idiosyncratic recovery dispersion must widen the deal-loss
+    /// distribution.
+    ///
+    /// Both runs below use per-name simulation with an identical *systematic*
+    /// recovery: a flat 40 %. The constant model recovers every default at
+    /// exactly 40 %; the market-correlated model with `ρ_R = 0` has the same
+    /// flat 40 % systematic recovery (no factor channel) but adds an
+    /// idiosyncratic per-name scatter `σ_R = 0.30`. The only difference is
+    /// FU4's per-name recovery dispersion, so the dispersed run must carry
+    /// strictly more loss uncertainty. The pre-fix engine applied one
+    /// pool-level recovery to every per-name default, making the two
+    /// indistinguishable.
+    #[test]
+    fn per_name_recovery_dispersion_widens_loss_distribution() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(40); // concentrated pool — name-level scatter shows
+
+        let mut constant_cfg = copula_config(0.06, 0.20, 36, PoolGranularity::PerName, 4_000);
+        constant_cfg.tree_config.recovery_spec = RecoverySpec::Constant { rate: 0.40 };
+
+        let mut dispersed_cfg = copula_config(0.06, 0.20, 36, PoolGranularity::PerName, 4_000);
+        // ρ_R = 0 ⇒ the systematic recovery is a flat 0.40, bit-identical to
+        // the constant model; only the idiosyncratic σ_R = 0.30 channel differs.
+        dispersed_cfg.tree_config.recovery_spec = RecoverySpec::market_correlated(0.40, 0.30, 0.0);
+
+        let constant = StochasticPricer::new(constant_cfg)
+            .price(&deal, &market)
+            .expect("constant-recovery per-name pricing");
+        let dispersed = StochasticPricer::new(dispersed_cfg)
+            .price(&deal, &market)
+            .expect("dispersed-recovery per-name pricing");
+
+        assert!(
+            dispersed.unexpected_loss.amount() > constant.unexpected_loss.amount(),
+            "per-name recovery dispersion must widen the loss distribution: \
+             dispersed UL {:.0} should exceed constant-recovery UL {:.0}",
+            dispersed.unexpected_loss.amount(),
+            constant.unexpected_loss.amount(),
         );
     }
 
