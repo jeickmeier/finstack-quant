@@ -392,7 +392,18 @@ fn test_structured_credit_registry_wal_matches_cashflow_wal() {
             finstack_valuations::instruments::PricingOptions::default(),
         )
         .expect("WAL metric request should succeed");
-    let expected = 2.225_539_769_375_057_4_f64;
+    // Library-self-calculated WAL regression benchmark.
+    //
+    // Re-blessed (cash-conservation remediation): the loss-allocation fix
+    // (audit item 2) replaced the "cumulative loss vs original face" cap with
+    // an incremental "loss vs current balance" cap. For this ABS deal — which
+    // carries the `abs_auto_standard` default assumptions — that shifts the
+    // tranche write-down schedule, hence the principal-payment timing the WAL
+    // is weighted on.
+    //   old: 2.2255397693750574   new: 2.226010097887204   (+0.00047 y, ~0.02%)
+    // The benchmark is library-self-calculated (no external oracle), so the
+    // golden-test policy permits a documented re-bless.
+    let expected = 2.226_010_097_887_204_f64;
     let actual = valuation.measures["wal"];
 
     assert!(

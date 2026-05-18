@@ -197,6 +197,15 @@ impl CoverageTest {
         // denominator of this expression carry the same sign, so X is positive).
         // At required_ratio == 1 the diversion never changes the ratio, so the
         // breach is uncurable by self-funding paydown; report a zero cure.
+        //
+        // Item 11 — the `1/(1 − required_ratio)` factor blows up as the
+        // trigger approaches 1.0 (a near-par-coverage OC trigger), producing a
+        // cure far larger than any principal the structure could actually pay
+        // down. A coverage diversion can only retire notional that exists in
+        // the OC stack, so the cure can never usefully exceed the OC
+        // denominator (test tranche balance + all senior tranche balances).
+        // Cap it there: this both bounds the near-1.0 explosion and keeps
+        // `denominator − X ≥ 0` in the cured ratio.
         let cure_amount = if !is_passing && required_ratio > 0.0 {
             let denom = 1.0 - required_ratio;
             let paydown_needed = if denom.abs() > f64::EPSILON {
@@ -204,7 +213,8 @@ impl CoverageTest {
             } else {
                 0.0
             };
-            Some(Money::new(paydown_needed.max(0.0), denominator.currency()))
+            let capped = paydown_needed.max(0.0).min(denominator.amount());
+            Some(Money::new(capped, denominator.currency()))
         } else {
             None
         };
@@ -588,6 +598,71 @@ mod tests {
         assert!(
             (cured_ratio - required_ratio).abs() < 1e-6,
             "cured ratio {cured_ratio} should equal required {required_ratio}; cure X={x}"
+        );
+    }
+
+    /// Item 11 — a near-1.0 OC trigger must NOT produce an exploding cure.
+    ///
+    /// The cure formula carries a `1/(1 − required_ratio)` factor. With a
+    /// trigger like 1.001 that factor is ~1000×, so an unbounded cure would be
+    /// orders of magnitude larger than any principal the structure holds. The
+    /// cure must be capped at the OC denominator (test tranche + senior
+    /// balances) — the most a coverage diversion could ever pay down.
+    #[test]
+    fn test_oc_cure_is_capped_at_denominator_for_near_one_trigger() {
+        let pool = Pool::new("TEST", DealType::CLO, Currency::USD);
+        // Trigger just above 1.0 — the pathological regime for the cure.
+        let required_ratio = 1.001_f64;
+        let test = CoverageTest::new_oc(required_ratio);
+
+        let tranche = Tranche::new(
+            "SENIOR",
+            0.0,
+            100.0,
+            Seniority::Senior,
+            Money::new(100_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
+        )
+        .expect("Valid tranche");
+        let tranches = TrancheStructure::new(vec![tranche]).expect("Valid tranche structure");
+
+        // Collateral well below par so the OC ratio breaches 1.001.
+        let collateral = 50_000.0_f64;
+        let denominator = 100_000.0_f64; // single senior tranche balance
+        let context = TestContext {
+            pool: &pool,
+            tranches: &tranches,
+            tranche_id: "SENIOR",
+            as_of: Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"),
+            period_start: None,
+            cash_balance: Money::new(0.0, Currency::USD),
+            interest_collections: Money::new(0.0, Currency::USD),
+            haircuts: None,
+            par_value_threshold: None,
+            market: None,
+            tranche_balances: None,
+            current_pool_balance: Some(Money::new(collateral, Currency::USD)),
+        };
+
+        let result = test
+            .calculate(&context)
+            .expect("calculation should succeed");
+        assert!(!result.is_passing, "OC test must breach (ratio 0.5 < 1.001)");
+
+        let cure = result.cure_amount.expect("breach must yield a cure amount");
+        // The raw formula would give a cure of roughly
+        //   (50k − 1.001·100k)/(1 − 1.001) ≈ 50.1M — absurdly large.
+        // The capped cure must never exceed the OC denominator.
+        assert!(
+            cure.amount() <= denominator + 1e-6,
+            "near-1.0-trigger OC cure {} must be capped at the denominator \
+             {denominator} — the raw formula explodes to tens of millions",
+            cure.amount()
+        );
+        assert!(
+            cure.amount() > 0.0,
+            "a breaching OC test must still report a positive cure"
         );
     }
 

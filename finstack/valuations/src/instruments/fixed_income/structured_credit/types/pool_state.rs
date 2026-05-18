@@ -34,6 +34,16 @@ pub(crate) struct PoolState {
     pub(crate) unique_curves: Vec<String>,
     /// Whether each asset amortizes through level payments (mortgages, auto, etc.)
     pub(crate) is_amortizing: Vec<bool>,
+    /// Frozen contractual level payment per amortizing asset.
+    ///
+    /// `None` until the first period the asset is amortized; then populated
+    /// with the level payment computed from the balance and remaining term at
+    /// that point, and reused for every subsequent period. A level-pay loan's
+    /// scheduled payment is fixed at origination — prepayments shorten the
+    /// loan, they do NOT reduce the scheduled payment. Recomputing it each
+    /// period off the (shrinking) remaining balance understates scheduled
+    /// principal after every prepayment.
+    pub(crate) level_payments: Vec<Option<f64>>,
 }
 
 impl PoolState {
@@ -86,6 +96,8 @@ impl PoolState {
             }
         }
 
+        let level_payments = vec![None; n];
+
         Self {
             ids,
             balances,
@@ -101,6 +113,7 @@ impl PoolState {
             curve_indices,
             unique_curves,
             is_amortizing,
+            level_payments,
         }
     }
 

@@ -145,17 +145,50 @@ impl PerNameCopulaDefault {
         rng: &mut PhiloxRng,
         out: &mut Vec<bool>,
     ) {
+        self.simulate_period_inner(systematic, marginal_pd, rng, out, false);
+    }
+
+    /// Realize per-name default indicators with optional antithetic negation.
+    ///
+    /// When `antithetic` is `true`, every idiosyncratic `εᵢ` draw is negated.
+    /// Paired with a negated systematic factor `Z`, the copula latent variable
+    /// `Aᵢ = √ρ·Z + √(1−ρ)·εᵢ` becomes `−Aᵢ`, giving the genuine antithetic
+    /// variate. The two paired paths MUST share the same RNG substream so the
+    /// underlying uniforms (and hence the εᵢ before negation, and the shared
+    /// mixing `W`) match. The Student-t mixing `W` is *not* negated — only the
+    /// Gaussian components are, per standard antithetic treatment.
+    pub(crate) fn simulate_period_antithetic(
+        &self,
+        systematic: f64,
+        marginal_pd: &[f64],
+        rng: &mut PhiloxRng,
+        out: &mut Vec<bool>,
+    ) {
+        self.simulate_period_inner(systematic, marginal_pd, rng, out, true);
+    }
+
+    fn simulate_period_inner(
+        &self,
+        systematic: f64,
+        marginal_pd: &[f64],
+        rng: &mut PhiloxRng,
+        out: &mut Vec<bool>,
+        antithetic: bool,
+    ) {
         out.clear();
         out.reserve(marginal_pd.len());
 
         // One shared mixing draw per period (1.0 for Gaussian — no mixing).
         // Drawn before any per-name εᵢ so the draw order is fixed regardless
-        // of pool size.
+        // of pool size. Not negated under antithetic mode (asymmetric mixing).
         let mixing = self.copula.sample_mixing(rng.next_u01());
 
         for &pd in marginal_pd {
             let threshold = self.threshold_kind.threshold(pd);
-            let idiosyncratic = rng.next_std_normal();
+            let raw = rng.next_std_normal();
+            // Antithetic partner negates the idiosyncratic Gaussian draw so
+            // its latent variable is the antithetic variate of its pair.
+            let idiosyncratic = if antithetic { -raw } else { raw };
             let latent =
                 self.copula
                     .latent_variable(systematic, idiosyncratic, mixing, self.correlation);
@@ -427,6 +460,47 @@ mod tests {
             "Student-t per-name rate {pn_rate} and LHP rate {lhp_rate} must \
              converge (N → ∞ limit); pre-fix LHP ≈ 0.043 fails this"
         );
+    }
+
+    /// Item 5 — `simulate_period_antithetic` produces the antithetic variate.
+    ///
+    /// With a Gaussian copula and `PD = 0.5` the default barrier is exactly
+    /// `c = Φ⁻¹(0.5) = 0`, so a name defaults iff its latent `Aᵢ ≤ 0`. The
+    /// antithetic partner negates BOTH the systematic `Z` and every
+    /// idiosyncratic `εᵢ`, so its latent variable is `−Aᵢ`. For a barrier of
+    /// 0, `Aᵢ ≤ 0` and `−Aᵢ ≤ 0` are complementary (one true, one false,
+    /// barring the measure-zero `Aᵢ = 0`). The antithetic default mask must
+    /// therefore be the exact bitwise complement of the normal mask.
+    ///
+    /// The pre-fix engine gave antithetic partners *independent* per-name
+    /// substreams, so the masks were uncorrelated rather than complementary —
+    /// no idiosyncratic-channel variance reduction.
+    #[test]
+    fn antithetic_per_name_mask_is_complement_of_normal() {
+        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.30);
+        let pd = 0.5; // barrier c = Φ⁻¹(0.5) = 0
+        let names = vec![pd; 256];
+
+        // Normal path and its antithetic partner share the SAME substream
+        // (mirroring the engine: both members of a pair use substream(k)).
+        let mut normal_rng = PhiloxRng::new(20_260_517);
+        let mut anti_rng = PhiloxRng::new(20_260_517);
+
+        let z = 0.7_f64;
+        let mut normal_out = Vec::new();
+        let mut anti_out = Vec::new();
+        sim.simulate_period(z, &names, &mut normal_rng, &mut normal_out);
+        // Antithetic partner: negated Z AND negated εᵢ ⇒ latent = −Aᵢ.
+        sim.simulate_period_antithetic(-z, &names, &mut anti_rng, &mut anti_out);
+
+        assert_eq!(normal_out.len(), anti_out.len());
+        for (i, (n, a)) in normal_out.iter().zip(anti_out.iter()).enumerate() {
+            assert_ne!(
+                *n, *a,
+                "name {i}: antithetic mask must be the complement of the \
+                 normal mask at a zero barrier (normal={n}, antithetic={a})"
+            );
+        }
     }
 
     /// Determinism: the same seed and inputs reproduce the per-name default

@@ -135,6 +135,22 @@ impl StochasticMetricsCalculator {
     }
 
     /// Compute metrics from a scenario tree.
+    ///
+    /// # Tail-risk caveat (item 7)
+    ///
+    /// The recombining scenario tree averages path-dependent cumulative losses
+    /// at each lattice node, collapsing the loss distribution to per-node
+    /// conditional means. The tail-risk fields of the returned
+    /// [`StochasticMetrics`] — `unexpected_loss`, `var_95`, `var_99`,
+    /// `expected_shortfall_95`, `expected_shortfall_99`, `loss_skewness`,
+    /// `loss_kurtosis` — are therefore biased toward the center: they describe
+    /// the dispersion of *conditional-mean* node losses, not of the true loss
+    /// distribution. The expected-value fields (`expected_loss`,
+    /// `expected_defaults`, `expected_prepayments`, `expected_terminal_balance`)
+    /// are unaffected — averaging is exact for first moments.
+    ///
+    /// For faithful tail risk, price in Monte Carlo mode, which runs each
+    /// scenario through the full waterfall and aggregates per-path losses.
     pub(crate) fn compute_from_tree(&self, tree: &ScenarioTree) -> StochasticMetrics {
         let n = tree.num_terminal_nodes();
         if n == 0 {
@@ -290,31 +306,42 @@ impl StochasticMetricsCalculator {
         last_loss
     }
 
+    /// Expected shortfall at `confidence`, computed consistently with
+    /// [`Self::compute_var`].
+    ///
+    /// Item 8 — on a coarse discrete loss distribution the independent
+    /// "average the worst `(1−c)` probability mass" estimator can land its
+    /// tail boundary on a different discrete loss point than the VaR quantile,
+    /// producing `ES < VaR` — an impossible ordering for a coherent risk pair.
+    ///
+    /// This computes ES as the probability-weighted mean of all losses
+    /// `≥ VaR(c)`. By construction every loss in that set is `≥ VaR`, so the
+    /// mean is `≥ VaR` — the `ES ≥ VaR` coherence inequality holds for any
+    /// discretization. (The VaR loss point itself is included so the tail set
+    /// is never empty.)
     fn compute_expected_shortfall(&self, values: &[(f64, f64)], confidence: f64) -> f64 {
-        // Sort by loss value (descending for tail)
-        let mut sorted: Vec<(f64, f64)> = values.to_vec();
-        sorted.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+        if values.is_empty() {
+            return 0.0;
+        }
+        // Anchor ES to the SAME quantile VaR reports, then average losses at
+        // or beyond it. This guarantees ES ≥ VaR on any discrete CDF.
+        let var = self.compute_var(values, confidence);
 
-        let total_prob: f64 = sorted.iter().map(|(_, p)| p).sum();
-        let tail_prob = (1.0 - confidence) * total_prob;
-
-        let mut cumulative = 0.0;
         let mut tail_sum = 0.0;
         let mut tail_weight = 0.0;
-
-        for (loss, prob) in &sorted {
-            if cumulative < tail_prob {
-                let include_prob = (tail_prob - cumulative).min(*prob);
-                tail_sum += loss * include_prob;
-                tail_weight += include_prob;
+        for (loss, prob) in values {
+            if *loss >= var {
+                tail_sum += loss * prob;
+                tail_weight += prob;
             }
-            cumulative += *prob;
         }
 
         if tail_weight > 1e-10 {
             tail_sum / tail_weight
         } else {
-            0.0
+            // Degenerate: no mass at/above VaR — fall back to VaR itself so
+            // the coherence inequality still holds.
+            var
         }
     }
 
@@ -440,6 +467,45 @@ mod tests {
         // ES should be >= VaR at same confidence
         assert!(metrics.expected_shortfall_95 >= metrics.var_95 - 1e-6);
         assert!(metrics.expected_shortfall_99 >= metrics.var_99 - 1e-6);
+    }
+
+    /// Item 8 — ES must be ≥ VaR at the same confidence on ANY discrete loss
+    /// distribution, including coarse ones where the old "average the worst
+    /// (1−c) mass" estimator could place its tail boundary below the VaR
+    /// quantile and report `ES < VaR`.
+    #[test]
+    fn expected_shortfall_is_never_below_var_on_coarse_distribution() {
+        let calc = StochasticMetricsCalculator::new(1.0);
+
+        // A deliberately coarse, lumpy loss CDF: a few discrete loss points
+        // with uneven probabilities — the regime where naive quantile vs
+        // tail-average estimators disagree.
+        let losses: Vec<(f64, f64)> = vec![
+            (0.0, 0.50),
+            (10_000.0, 0.30),
+            (50_000.0, 0.15),
+            (500_000.0, 0.05),
+        ];
+
+        for &c in &[0.90_f64, 0.95, 0.99] {
+            let var = calc.compute_var(&losses, c);
+            let es = calc.compute_expected_shortfall(&losses, c);
+            assert!(
+                es >= var - 1e-9,
+                "ES {es} must be >= VaR {var} at confidence {c} — coherence \
+                 requires ES ≥ VaR for any discretization"
+            );
+        }
+
+        // Single-point distribution: ES and VaR must coincide, not diverge.
+        let degenerate: Vec<(f64, f64)> = vec![(123_456.0, 1.0)];
+        let var = calc.compute_var(&degenerate, 0.95);
+        let es = calc.compute_expected_shortfall(&degenerate, 0.95);
+        assert!(
+            (es - var).abs() < 1e-6,
+            "on a degenerate single-point loss distribution ES ({es}) must \
+             equal VaR ({var})"
+        );
     }
 
     #[test]

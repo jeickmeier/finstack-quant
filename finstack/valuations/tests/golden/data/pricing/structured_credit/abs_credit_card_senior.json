@@ -6,11 +6,11 @@
   "provenance": {
     "as_of": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack canonical credit pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): replaced materialized USD-SOFR-DISC and SOFR-3M curves with two-step calibration (POC #4 pattern, plan \u00a716). SOFR-1M kept materialized in initial_market (auxiliary, not used by the instrument). Expected outputs recaptured from Finstack.",
+    "source_detail": "Finstack canonical credit pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): replaced materialized USD-SOFR-DISC and SOFR-3M curves with two-step calibration (POC #4 pattern, plan \u00a716). SOFR-1M kept materialized in initial_market (auxiliary, not used by the instrument). Expected outputs recaptured from Finstack. Re-blessed 2026-05-17 (cash-conservation remediation): the CLO/ABS simulation-engine cash-conservation fixes (audit items 1-13 \u2014 reinvestment principal recycling, loss-allocation cap by current balance, mid-period default interest accrual) move tranche cashflows, shifting npv/dv01/cs01 by ~0.03-0.11%. Library-self-calculated regression golden, re-blessed per golden-test policy. Old: npv=14458410.460818833, dv01=-3047.708901843056, cs01=-1902.2833933271468. New: npv=14449223.85764518, dv01=-3046.929275150411, cs01=-1900.175536161289. expected_loss unchanged (writedown total stable).",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_on": "2026-05-17",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -868,10 +868,10 @@
     }
   },
   "expected_outputs": {
-    "npv": 14458410.460818833,
+    "npv": 14449223.85764518,
     "expected_loss": 714206.8888378189,
-    "dv01": -3047.708901843056,
-    "cs01": -1902.2833933271468
+    "dv01": -3046.929275150411,
+    "cs01": -1900.175536161289
   },
   "tolerances": {
     "npv": {
