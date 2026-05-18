@@ -910,6 +910,25 @@ pub fn price_from_ytw(
 }
 
 /// Price from Z-spread added to zero rates in the bond's compounding convention.
+///
+/// # Settlement origin
+///
+/// `as_of` is the **valuation/trade date**. The Z-spread is, by market
+/// convention, a settlement-anchored quantity: [`ZSpreadCalculator`] solves it
+/// with discounting and year-fractions measured from the bond's settlement
+/// (`quote_date`), not from `as_of`. This inverter mirrors that exactly — it
+/// derives the same `quote_date` internally via [`QuoteDateContext`] and
+/// anchors all discounting there. As a result the documented round-trip
+///
+/// ```text
+/// price_from_z_spread(bond, market, as_of, ZSpreadCalculator.solve(...)) == dirty
+/// ```
+///
+/// holds for **any** bond, including ones with a non-zero `settlement_days`
+/// lag (`quote_date != as_of`). Callers must pass the valuation date as
+/// `as_of`; the settlement offset is handled here.
+///
+/// [`ZSpreadCalculator`]: crate::instruments::fixed_income::bond::ZSpreadCalculator
 pub fn price_from_z_spread(
     bond: &Bond,
     curves: &MarketContext,
@@ -918,31 +937,34 @@ pub fn price_from_z_spread(
 ) -> finstack_core::Result<f64> {
     use finstack_core::math::summation::NeumaierAccumulator;
 
+    // Cashflows are generated at the valuation date — identical to the
+    // ZSpreadCalculator, which builds them via `pricing_dated_cashflows(as_of)`.
     let flows = bond.pricing_dated_cashflows(curves, as_of)?;
     let disc = curves.get_discount(&bond.discount_curve_id)?;
     let compounds_per_year = bond_z_spread_compounding_frequency(bond);
 
+    // Settlement-anchored time origin: the same `quote_date` the Z-spread was
+    // calibrated on. When `settlement_days == 0` this equals `as_of`.
+    let quote_date = QuoteDateContext::new(bond, curves, as_of)?.quote_date;
+
     let mut pv = NeumaierAccumulator::new();
     for (d, a) in &flows {
-        // Mirror the ZSpreadCalculator convention: strictly-future cashflows only.
-        // A flow dated exactly on `as_of` (the settlement/quote anchor) has
-        // t = 0, df_z = 1, and would be added at full face value — but the
-        // canonical solver excludes it via `d > quote_date`. Using `<=` here
-        // keeps both paths on the same cashflow set and ensures round-trip
-        // consistency: compute_z_spread → price_from_z_spread recovers the
-        // original price within floating-point precision.
-        if *d <= as_of {
+        // Mirror the ZSpreadCalculator convention: strictly-future cashflows
+        // relative to the settlement date. A flow dated exactly on `quote_date`
+        // has t = 0 and is excluded by the solver's `d > quote_date` filter, so
+        // it is excluded here too — keeping both paths on the same cashflow set.
+        if *d <= quote_date {
             continue;
         }
-        // Time from as_of used for the exponential z-spread term is measured
-        // on the same basis as the discount curve to keep the spread
-        // definition aligned with the curve's own time axis.
-        let t_from_as_of = disc
+        // Time and base discount factor are both measured from `quote_date`
+        // (the settlement origin the Z-spread was solved on), so the
+        // exponential z-spread term `exp(-z * t)` is applied on the same axis.
+        let t_from_quote = disc
             .day_count()
-            .year_fraction(as_of, *d, DayCountContext::default())?;
+            .year_fraction(quote_date, *d, DayCountContext::default())?;
 
-        let df = disc.df_between_dates(as_of, *d)?;
-        let df_z = z_spread_discount_factor(df, t_from_as_of, z, compounds_per_year);
+        let df = disc.df_between_dates(quote_date, *d)?;
+        let df_z = z_spread_discount_factor(df, t_from_quote, z, compounds_per_year);
         pv.add(a.amount() * df_z);
     }
     Ok(pv.total())
@@ -1277,12 +1299,9 @@ pub(crate) fn price_from_quote_overrides(
         )?));
     }
     if let Some(z) = quotes.quoted_z_spread {
-        return Ok(Some(price_from_z_spread(
-            bond,
-            curves,
-            quote_ctx.quote_date,
-            z,
-        )?));
+        // `price_from_z_spread` derives the settlement (`quote_date`) origin
+        // internally, so it takes the valuation `as_of` here.
+        return Ok(Some(price_from_z_spread(bond, curves, as_of, z)?));
     }
     if let Some(oas) = quotes.quoted_oas {
         return Ok(Some(price_from_oas(

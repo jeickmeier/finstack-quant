@@ -176,22 +176,33 @@ impl BondFuturePricer {
         Ok((factor * 10_000.0).round() / 10_000.0)
     }
 
-    /// Calculate model futures price from the CTD bond.
+    /// Calculate model futures price from the CTD bond, **carry-adjusted to
+    /// the delivery date**.
     ///
-    /// The model futures price is the theoretical fair value of the futures contract
-    /// based on the CTD bond's market price and conversion factor.
-    ///
-    /// This is a **simplified clean-price proxy**, not a full exchange-style
-    /// fair-value model. It does not incorporate repo financing, interim coupon
-    /// carry, delivery-window optionality, or delivery-date invoice mechanics.
+    /// The model futures price is the theoretical fair value of the futures
+    /// contract: the *forward* clean price of the cheapest-to-deliver bond at
+    /// the contract's delivery date, divided by the CTD's conversion factor.
     ///
     /// # Formula
     ///
-    /// Model_Price = (Clean_Price_Percent / CF)
+    /// ```text
+    /// Forward_Dirty_CTD = ( Spot_Dirty_CTD − PV_coupons(as_of → delivery] ) / DF(as_of → delivery)
+    /// Forward_Clean_CTD = Forward_Dirty_CTD − Accrued_CTD(delivery)
+    /// Model_Price       = Forward_Clean_CTD_percent / CF
+    /// ```
     ///
-    /// Where:
-    /// - Clean_Price_Percent: CTD bond's clean price as % of par (e.g., 98.5 for $98.50/$100)
-    /// - CF: Conversion factor for the CTD bond
+    /// The spot dirty price is carried forward at the CTD bond's own discount
+    /// curve (the cost of financing the position to delivery), and any coupons
+    /// received before delivery are credited at their present value. This
+    /// removes the bias of the previous `Clean_Price / CF` proxy, which priced
+    /// the futures off the *spot* clean price and so omitted cost-of-carry.
+    ///
+    /// # Repo specials
+    ///
+    /// Financing uses the CTD bond's `discount_curve_id`. A bond future's
+    /// dedicated `repo_curve_id` (repo specials) is a refinement not modelled
+    /// here; when none is configured the discount curve is the correct general
+    /// funding proxy.
     ///
     /// # Parameters
     ///
@@ -199,10 +210,17 @@ impl BondFuturePricer {
     /// - `conversion_factor`: Pre-calculated conversion factor for the CTD bond
     /// - `market`: Market context with discount curves for pricing
     /// - `as_of`: Valuation date
+    /// - `delivery_date`: Contract delivery date the CTD is carried forward to
     ///
     /// # Returns
     ///
     /// Model futures price as a decimal (e.g., 125.50 for 125-16 in 32nds)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `conversion_factor` is non-positive, the discount
+    /// factor to delivery is non-positive, or the CTD schedule/curve lookups
+    /// fail.
     ///
     /// # Example
     ///
@@ -230,6 +248,7 @@ impl BondFuturePricer {
     ///     cf,
     ///     &market,
     ///     date!(2025-01-15),
+    ///     date!(2025-03-31),
     /// )?;
     /// // model_price might be 125.50
     /// # let _ = model_price;
@@ -241,52 +260,59 @@ impl BondFuturePricer {
         conversion_factor: f64,
         market: &MarketContext,
         as_of: Date,
+        delivery_date: Date,
     ) -> Result<f64> {
-        tracing::warn!(
-            "BondFuturePricer::calculate_model_price uses a simplified clean-price proxy and \
-             omits delivery carry/invoice economics"
-        );
-        use crate::instruments::fixed_income::bond::metrics::accrued::AccruedInterestCalculator;
-        use crate::instruments::fixed_income::bond::metrics::price_yield_spread::CleanPriceCalculator;
-        use crate::metrics::{MetricCalculator, MetricContext, MetricId};
-        use std::sync::Arc;
+        use crate::cashflow::accrual::accrued_interest_amount;
+        use finstack_core::math::summation::NeumaierAccumulator;
 
-        // Calculate the bond's NPV (dirty price in currency units)
-        let dirty_price_money = ctd_bond.value(market, as_of)?;
+        if !conversion_factor.is_finite() || conversion_factor <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "conversion factor must be a positive, finite number to compute a model \
+                 futures price, got {conversion_factor}"
+            )));
+        }
 
-        // We need to calculate accrued interest to get clean price
-        // Create a metric context for the calculations
-        // Note: MetricContext needs Arc wrappers
-        let bond_arc: Arc<dyn Instrument> = Arc::new(ctd_bond.clone());
-        let market_arc = Arc::new(market.clone());
+        // Spot dirty price of the CTD (PV in currency at the valuation date).
+        let spot_dirty = ctd_bond.value(market, as_of)?.amount();
 
-        let mut context = MetricContext::new(
-            bond_arc,
-            market_arc,
-            as_of,
-            dirty_price_money,
-            MetricContext::default_config(),
-        );
+        let disc = market.get_discount(&ctd_bond.discount_curve_id)?;
 
-        // Calculate accrued interest first (required for clean price)
-        let accrued_calculator = AccruedInterestCalculator;
-        let accrued_amount = accrued_calculator.calculate(&mut context)?;
-        context.computed.insert(MetricId::Accrued, accrued_amount);
+        // Present value of coupons/principal received strictly between today
+        // and delivery — these are credited to the carry (the long forward
+        // does not receive them).
+        let flows = ctd_bond.pricing_dated_cashflows(market, as_of)?;
+        let mut pv_interim = NeumaierAccumulator::new();
+        for (date, amount) in &flows {
+            if *date > as_of && *date <= delivery_date {
+                let df = disc.df_between_dates(as_of, *date)?;
+                pv_interim.add(amount.amount() * df);
+            }
+        }
 
-        // Calculate clean price (in currency units)
-        let clean_price_calculator = CleanPriceCalculator;
-        let clean_price_amount = clean_price_calculator.calculate(&mut context)?;
+        // Discount factor from today to delivery: the cost of carrying the
+        // financed position to the delivery date.
+        let df_to_delivery = disc.df_between_dates(as_of, delivery_date)?;
+        if !df_to_delivery.is_finite() || df_to_delivery <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "discount factor from as_of to delivery ({delivery_date}) must be positive \
+                 and finite to compute carry-adjusted forward CTD price, got {df_to_delivery}"
+            )));
+        }
 
-        // Convert clean price to percentage of par
-        // Clean price in currency / notional = clean price as decimal (e.g., 0.985 for 98.5%)
+        // Carry-adjusted forward dirty price of the CTD at delivery.
+        let forward_dirty = (spot_dirty - pv_interim.total()) / df_to_delivery;
+
+        // Forward clean price = forward dirty minus accrued at the delivery date.
+        let schedule = ctd_bond.full_cashflow_schedule(market)?;
+        let accrued_at_delivery =
+            accrued_interest_amount(&schedule, delivery_date, &ctd_bond.accrual_config())?;
+        let forward_clean = forward_dirty - accrued_at_delivery;
+
+        // Express as a percentage of par, then divide by the conversion factor.
         let notional = ctd_bond.notional.amount();
-        let clean_price_percent = (clean_price_amount / notional) * 100.0;
+        let forward_clean_percent = (forward_clean / notional) * 100.0;
 
-        // Calculate model futures price
-        // Formula: Futures_Price = Clean_Price_Percent / Conversion_Factor
-        let model_price = clean_price_percent / conversion_factor;
-
-        Ok(model_price)
+        Ok(forward_clean_percent / conversion_factor)
     }
 
     /// Calculate the NPV (present value) of a bond future position.
@@ -377,8 +403,15 @@ impl BondFuturePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        // Calculate the theoretical model price
-        let model_price = Self::calculate_model_price(ctd_bond, conversion_factor, market, as_of)?;
+        // Calculate the theoretical model price, carrying the CTD forward to
+        // the contract's delivery date.
+        let model_price = Self::calculate_model_price(
+            ctd_bond,
+            conversion_factor,
+            market,
+            as_of,
+            future.delivery_start,
+        )?;
 
         // Calculate price differential
         let price_diff = future.quoted_price - model_price;
@@ -773,7 +806,13 @@ mod tests {
             .expect("Failed to calculate conversion factor for par bond");
 
         // Calculate model futures price
-        let model_price = BondFuturePricer::calculate_model_price(&bond, cf, &market, as_of)
+        let model_price = BondFuturePricer::calculate_model_price(
+            &bond,
+            cf,
+            &market,
+            as_of,
+            as_of + time::Duration::days(90),
+        )
             .expect("Failed to calculate model futures price for par bond");
 
         // For a par bond with CF ~1.0, model price should be close to 100
@@ -800,7 +839,13 @@ mod tests {
         let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, as_of)
             .expect("Failed to calculate conversion factor for discount bond");
 
-        let model_price = BondFuturePricer::calculate_model_price(&bond, cf, &market, as_of)
+        let model_price = BondFuturePricer::calculate_model_price(
+            &bond,
+            cf,
+            &market,
+            as_of,
+            as_of + time::Duration::days(90),
+        )
             .expect("Failed to calculate model futures price for discount bond");
 
         // Model price should be positive and reasonable
@@ -824,7 +869,13 @@ mod tests {
         let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, as_of)
             .expect("Failed to calculate conversion factor for premium bond");
 
-        let model_price = BondFuturePricer::calculate_model_price(&bond, cf, &market, as_of)
+        let model_price = BondFuturePricer::calculate_model_price(
+            &bond,
+            cf,
+            &market,
+            as_of,
+            as_of + time::Duration::days(90),
+        )
             .expect("Failed to calculate model futures price for premium bond");
 
         // Model price should be above 100 for premium bond
@@ -850,7 +901,13 @@ mod tests {
 
         let cf = BondFuturePricer::calculate_conversion_factor(&bond, 0.06, 10.0, as_of)
             .expect("Failed to calculate conversion factor for manual verification");
-        let model_price = BondFuturePricer::calculate_model_price(&bond, cf, &market, as_of)
+        let model_price = BondFuturePricer::calculate_model_price(
+            &bond,
+            cf,
+            &market,
+            as_of,
+            as_of + time::Duration::days(90),
+        )
             .expect("Failed to calculate model futures price for manual verification");
 
         println!("\n=== Manual Verification ===");
@@ -869,6 +926,84 @@ mod tests {
         assert!(
             (model_price - expected_approx).abs() < 5.0,
             "Model price should be approximately 100/CF"
+        );
+    }
+
+    /// Item 9 regression: the model futures price must be the **carry-adjusted
+    /// forward** CTD clean price divided by CF — not the spot `clean / CF`
+    /// proxy, which omits cost-of-carry to delivery and biases the futures NPV.
+    ///
+    /// The test reconstructs the carry-adjusted forward independently and
+    /// asserts the pricer matches it, and that it differs from the old
+    /// spot-clean proxy by the carry over the delivery horizon.
+    #[test]
+    fn model_price_is_carry_adjusted_forward() {
+        use crate::cashflow::accrual::accrued_interest_amount;
+
+        // Discount/premium CTD over a steep curve so carry is material.
+        let bond = create_test_bond(
+            100_000.0,
+            0.04,
+            date!(2020 - 01 - 15),
+            date!(2030 - 01 - 15),
+        );
+        let market = create_test_market(0.06);
+        let as_of = date!(2025 - 01 - 15);
+        // Delivery roughly six months out — a sizeable carry horizon.
+        let delivery_date = date!(2025 - 07 - 15);
+        let cf = 0.8234_f64;
+
+        let model_price =
+            BondFuturePricer::calculate_model_price(&bond, cf, &market, as_of, delivery_date)
+                .expect("carry-adjusted model price should compute");
+
+        // --- Independent carry-adjusted forward reconstruction ---
+        let disc = market
+            .get_discount(&bond.discount_curve_id)
+            .expect("discount curve");
+        let spot_dirty = bond.value(&market, as_of).expect("ctd PV").amount();
+        let flows = bond
+            .pricing_dated_cashflows(&market, as_of)
+            .expect("ctd flows");
+        let mut pv_interim = 0.0;
+        for (date, amount) in &flows {
+            if *date > as_of && *date <= delivery_date {
+                pv_interim += amount.amount()
+                    * disc.df_between_dates(as_of, *date).expect("interim df");
+            }
+        }
+        let df_delivery = disc
+            .df_between_dates(as_of, delivery_date)
+            .expect("delivery df");
+        let forward_dirty = (spot_dirty - pv_interim) / df_delivery;
+        let schedule = bond.full_cashflow_schedule(&market).expect("schedule");
+        let accrued_delivery =
+            accrued_interest_amount(&schedule, delivery_date, &bond.accrual_config())
+                .expect("accrued at delivery");
+        let forward_clean_pct =
+            (forward_dirty - accrued_delivery) / bond.notional.amount() * 100.0;
+        let expected = forward_clean_pct / cf;
+
+        assert!(
+            (model_price - expected).abs() < 1e-9,
+            "model price must equal the carry-adjusted forward CTD clean / CF: \
+             model={model_price}, expected={expected}"
+        );
+
+        // The carry-adjusted forward must differ from the old spot-clean proxy:
+        // discounting the dirty PV to a clean spot price and dividing by CF.
+        let spot_accrued = accrued_interest_amount(
+            &schedule,
+            as_of,
+            &bond.accrual_config(),
+        )
+        .expect("accrued today");
+        let spot_clean_pct = (spot_dirty - spot_accrued) / bond.notional.amount() * 100.0;
+        let old_proxy = spot_clean_pct / cf;
+        assert!(
+            (model_price - old_proxy).abs() > 1e-3,
+            "carry adjustment must shift the model price away from the spot \
+             clean/CF proxy (model={model_price}, old_proxy={old_proxy})"
         );
     }
 
@@ -1037,7 +1172,15 @@ mod tests {
         let cf = BondFuturePricer::calculate_conversion_factor(&ctd_bond, 0.06, 10.0, as_of)
             .expect("Failed to calculate conversion factor");
 
-        let model_price = BondFuturePricer::calculate_model_price(&ctd_bond, cf, &market, as_of)
+        // Use the contract's delivery date so the model price matches the one
+        // `calculate_npv` derives internally (it carries the CTD to delivery).
+        let model_price = BondFuturePricer::calculate_model_price(
+            &ctd_bond,
+            cf,
+            &market,
+            as_of,
+            future.delivery_start,
+        )
             .expect("Failed to calculate model price");
 
         let npv = BondFuturePricer::calculate_npv(&future, &ctd_bond, cf, &market, as_of)

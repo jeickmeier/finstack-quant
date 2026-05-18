@@ -142,6 +142,7 @@ fn bench_model_price(c: &mut Criterion) {
     let ctd_bond = create_ctd_bond();
     let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let delivery_date = Date::from_calendar_date(2025, Month::March, 31).unwrap();
     let cf = 0.8234;
 
     group.bench_function("ust_10y", |b| {
@@ -151,6 +152,7 @@ fn bench_model_price(c: &mut Criterion) {
                 black_box(cf),
                 black_box(&market),
                 black_box(as_of),
+                black_box(delivery_date),
             )
         });
     });

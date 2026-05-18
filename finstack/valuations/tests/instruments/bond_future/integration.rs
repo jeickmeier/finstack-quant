@@ -326,9 +326,15 @@ fn test_realistic_ust_10y_future_full_workflow() {
         npv.amount()
     );
 
-    // Test 2: Model Price Calculation
-    let model_price = BondFuturePricer::calculate_model_price(ctd_bond, ctd_cf, &market, as_of)
-        .expect("Model price calculation should succeed");
+    // Test 2: Model Price Calculation (carry-adjusted to the delivery date)
+    let model_price = BondFuturePricer::calculate_model_price(
+        ctd_bond,
+        ctd_cf,
+        &market,
+        as_of,
+        future.delivery_start,
+    )
+    .expect("Model price calculation should succeed");
 
     // Model price should be a reasonable value (80-150 range for UST futures)
     assert!(

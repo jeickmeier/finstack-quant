@@ -292,8 +292,19 @@ impl BondValuator {
                         discount_curve.as_ref(),
                     );
                 } else {
-                    // Distributed mapping: spread cashflow between two nearest time steps
-                    // to reduce discretization error and improve convergence.
+                    // Distributed mapping: spread cashflow between the two
+                    // nearest time steps to reduce discretization error and
+                    // improve convergence.
+                    //
+                    // Each distributed piece lands at a *step time* that
+                    // differs from the coupon's true `time_frac`. Apply the
+                    // same discount-factor correction the exercise-coincident
+                    // path uses (`value_at_step_time`): a piece destined for
+                    // `step_time` is scaled by `DF(time_frac) / DF(step_time)`
+                    // so that, once the tree discounts it from `step_time`, its
+                    // present value equals the coupon's PV at its true time.
+                    // Without this correction the linear split silently
+                    // mis-times discounting.
 
                     // Lower step index
                     let step_idx = raw_clamped.floor() as usize;
@@ -303,12 +314,22 @@ impl BondValuator {
 
                     // Distribute to step_idx (weight: 1.0 - weight)
                     if step_idx > 0 && step_idx < num_steps {
-                        cashflow_vec[step_idx] += amount.amount() * (1.0 - weight);
+                        cashflow_vec[step_idx] += Self::value_at_step_time(
+                            amount.amount() * (1.0 - weight),
+                            time_frac,
+                            time_steps[step_idx],
+                            discount_curve.as_ref(),
+                        );
                     }
 
                     // Distribute to step_idx + 1 (weight: weight)
                     if step_idx + 1 < num_steps {
-                        cashflow_vec[step_idx + 1] += amount.amount() * weight;
+                        cashflow_vec[step_idx + 1] += Self::value_at_step_time(
+                            amount.amount() * weight,
+                            time_frac,
+                            time_steps[step_idx + 1],
+                            discount_curve.as_ref(),
+                        );
                     }
                 }
             }
@@ -651,6 +672,112 @@ mod tests {
     use finstack_core::market_data::term_structures::DiscountCurve;
     use finstack_core::money::Money;
     use time::macros::date;
+
+    /// Item 8 regression: off-grid coupons on the **non-exercise** path are
+    /// distributed across the two bracketing tree steps, and each distributed
+    /// piece must carry the discount-factor correction that moves it from the
+    /// coupon's true time to its destination step time — exactly as the
+    /// exercise-coincident path does via `value_at_step_time`.
+    ///
+    /// Aggregate PV-preservation invariant: discounting every step's mapped
+    /// cashflow at that step's time must reproduce the total present value of
+    /// the bond's raw cashflows discounted at their true times:
+    /// `Σ_step cashflow_vec[s] · DF(step_time_s) == Σ_flow amount · DF(true_t)`.
+    /// Without the DF correction on the distributed path the raw linear split
+    /// mis-times discounting and this identity fails.
+    #[test]
+    fn off_grid_nonexercise_cashflows_carry_df_correction() {
+        let as_of = date!(2025 - 01 - 01);
+        // Call snapped to its own step; the annual coupons below land off-grid
+        // and take the distributed (non-exercise) mapping path.
+        let call_date = date!(2031 - 06 - 15);
+        let maturity = date!(2032 - 01 - 01);
+        let tree_steps = 9;
+        let mut bond = Bond::fixed(
+            "OFF-GRID-NONEX-CF",
+            Money::new(1_000.0, Currency::USD),
+            0.06,
+            as_of,
+            maturity,
+            "USD-OIS",
+        )
+        .expect("bond");
+        bond.cashflow_spec = CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F);
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: call_date,
+                end_date: call_date,
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: vec![],
+        });
+
+        // Strongly sloped curve so a DF-correction error would be material.
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (7.0, 0.50)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+        let discount_curve = market.get_discount("USD-OIS").expect("discount curve");
+        let dc = discount_curve.day_count();
+        let time_to_maturity = dc
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("time to maturity");
+        let dt = time_to_maturity / tree_steps as f64;
+
+        let flows = bond
+            .pricing_dated_cashflows(&market, as_of)
+            .expect("cashflows");
+        // Confirm the test premise: at least one coupon is genuinely off-grid.
+        let has_off_grid = flows.iter().any(|(date, _)| {
+            if *date <= as_of {
+                return false;
+            }
+            let tf = dc
+                .year_fraction(as_of, *date, DayCountContext::default())
+                .unwrap_or(0.0);
+            let raw = (tf / time_to_maturity) * tree_steps as f64;
+            let frac = raw - raw.floor();
+            frac > 1e-6 && frac < 1.0 - 1e-6
+        });
+        assert!(has_off_grid, "test premise: an off-grid coupon must exist");
+
+        let valuator = BondValuator::new(
+            bond.clone(),
+            &market,
+            as_of,
+            time_to_maturity,
+            tree_steps,
+        )
+        .expect("tree");
+
+        // PV of every step's mapped cashflow, discounted at its step time.
+        let mut pv_mapped = 0.0;
+        for (step, amount) in valuator.cashflow_vec.iter().enumerate() {
+            pv_mapped += amount * discount_curve.df(step as f64 * dt);
+        }
+        // PV of the raw cashflows at their true times.
+        let mut pv_true = 0.0;
+        for (date, amount) in &flows {
+            if *date <= as_of {
+                continue;
+            }
+            let tf = dc
+                .year_fraction(as_of, *date, DayCountContext::default())
+                .expect("year fraction");
+            pv_true += amount.amount() * discount_curve.df(tf);
+        }
+
+        assert!(
+            (pv_mapped - pv_true).abs() < 1e-9,
+            "tree cashflow mapping must preserve present value under distributed \
+             (non-exercise) off-grid coupons: pv_mapped={pv_mapped}, pv_true={pv_true}, \
+             diff={}",
+            (pv_mapped - pv_true).abs()
+        );
+    }
 
     #[test]
     fn exercise_date_cashflows_are_adjusted_to_snapped_step_time() {

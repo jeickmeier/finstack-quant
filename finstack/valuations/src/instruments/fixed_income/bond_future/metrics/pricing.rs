@@ -23,6 +23,7 @@ impl MetricCalculator for FuturesPriceCalculator {
             conversion_factor,
             &context.curves,
             context.as_of,
+            future.delivery_start,
         )
     }
 }

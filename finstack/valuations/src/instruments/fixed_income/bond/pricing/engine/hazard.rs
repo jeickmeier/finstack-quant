@@ -260,10 +260,16 @@ impl HazardBondEngine {
         let surv: Vec<f64> = surv_raw.iter().map(|s| (s / s0).clamp(0.0, 1.0)).collect();
 
         // Alive leg: survival-weighted PV of signed canonical schedule coupons and principal.
+        //
+        // A cashflow dated exactly on `as_of` is included (`d >= as_of`) to stay
+        // consistent with the discounting engine, which discounts it at
+        // `DF(as_of, as_of) = 1`. Here it lands on grid index 0 with `df = 1`
+        // and conditional survival `Q(as_of, as_of) = 1`, so it contributes its
+        // full face value — identical to the discount-engine treatment.
         // Use Kahan summation from finstack-core for numerical stability.
         let pv_values: Vec<f64> = flows
             .iter()
-            .filter(|(d, amt)| *d > as_of && amt.amount() != 0.0)
+            .filter(|(d, amt)| *d >= as_of && amt.amount() != 0.0)
             .filter_map(|(d, amt)| {
                 // Dates come from the same grid we built, so binary_search should succeed
                 dates.binary_search(d).ok().map(|idx| {
@@ -430,6 +436,68 @@ mod tests {
         assert!(
             diff < 1e-6,
             "Hazard price with zero intensity should match risk-free price; diff={}",
+            diff
+        );
+    }
+
+    /// Item 7 regression: same-day cashflow handling must be consistent across
+    /// the discount and hazard engines.
+    ///
+    /// The discounting engine includes a cashflow dated exactly on `as_of`
+    /// (with `DF(as_of, as_of) = 1`). The hazard engine must do the same — its
+    /// alive leg and time grid previously used a strict `d > as_of` filter,
+    /// dropping the on-`as_of` flow. With a zero hazard intensity the two
+    /// engines must agree to floating-point precision even when a coupon lands
+    /// exactly on the valuation date.
+    #[test]
+    fn hazard_zero_matches_discounting_with_cashflow_on_as_of() {
+        // Issue one year before `as_of` with an annual coupon, so a coupon
+        // falls exactly on `as_of`.
+        let issue = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
+
+        let bond = Bond::builder()
+            .id("TEST_BOND_HAZARD_ONDATE".into())
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .issue_date(issue)
+            .maturity(maturity)
+            .cashflow_spec(CashflowSpec::fixed(
+                0.05,
+                Tenor::annual(),
+                DayCount::Act365F,
+            ))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
+            .pricing_overrides(crate::instruments::PricingOverrides::default())
+            .attributes(Attributes::new())
+            .build()
+            .expect("Bond builder should succeed");
+
+        let disc = build_flat_discount(issue);
+        let hazard_zero = build_flat_hazard("USD-CREDIT", issue, 0.0, 0.4);
+        let market = MarketContext::new().insert(disc).insert(hazard_zero);
+
+        // Confirm the test premise: a flow really lands on `as_of`.
+        let flows = bond
+            .pricing_dated_cashflows(&market, as_of)
+            .expect("cashflows");
+        assert!(
+            flows.iter().any(|(d, _)| *d == as_of),
+            "test premise: a cashflow must fall exactly on as_of"
+        );
+
+        let pv_rf = BondEngine::price(&bond, &market, as_of).expect("RF price should succeed");
+        let pv_haz =
+            HazardBondEngine::price(&bond, &market, as_of).expect("Hazard price should succeed");
+
+        let diff = (pv_rf.amount() - pv_haz.amount()).abs();
+        assert!(
+            diff < 1e-6,
+            "zero-hazard price must match the discounting engine when a coupon \
+             lands on as_of; pv_rf={}, pv_haz={}, diff={}",
+            pv_rf.amount(),
+            pv_haz.amount(),
             diff
         );
     }
