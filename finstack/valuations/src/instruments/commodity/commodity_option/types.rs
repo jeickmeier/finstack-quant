@@ -485,11 +485,27 @@ struct CommodityOptionInputs {
 fn implied_carry(spot: f64, forward: f64, r: f64, t: f64) -> f64 {
     // Guard against near-zero time: ln(F/S)/t amplifies noise when t is tiny.
     // For t < 1e-5 (~5 seconds), the carry estimate is unreliable.
-    if t < 1e-5 || spot <= 0.0 || forward <= 0.0 {
+    //
+    // Also guard against non-finite `forward` / `spot` (W-13): a NaN or
+    // infinite input passes the `<= 0.0` checks (NaN comparisons are false)
+    // and would otherwise feed `(forward/spot).ln()/t` — and hence `q` — a
+    // non-finite value straight into the binomial tree. Fall back to the
+    // risk-free rate (zero cost-of-carry) when any input is unusable.
+    if t < 1e-5
+        || !t.is_finite()
+        || !spot.is_finite()
+        || !forward.is_finite()
+        || spot <= 0.0
+        || forward <= 0.0
+    {
         return r;
     }
     let carry = (forward / spot).ln() / t;
-    r - carry
+    if carry.is_finite() {
+        r - carry
+    } else {
+        r
+    }
 }
 
 fn black76_unit_price(
@@ -1067,5 +1083,41 @@ mod tests {
             .value(&market, as_of)
             .expect_err("Bermudan commodity options should require an exercise schedule");
         assert!(err.to_string().contains("exercise_schedule"));
+    }
+
+    /// W-13: `implied_carry` must guard against non-finite `forward` / `spot`.
+    /// A NaN or infinite input passes the `<= 0.0` checks (NaN comparisons are
+    /// always false), so without an `is_finite()` guard a non-finite cost-of-
+    /// carry `q` would flow straight into the binomial tree. The guard makes
+    /// `implied_carry` fall back to the risk-free rate (zero carry).
+    #[test]
+    fn w13_implied_carry_guards_against_non_finite_inputs() {
+        let r = 0.05;
+        let t = 0.5;
+
+        // NaN forward → fall back to r.
+        let q_nan_fwd = implied_carry(100.0, f64::NAN, r, t);
+        assert_eq!(
+            q_nan_fwd, r,
+            "NaN forward must fall back to the risk-free rate, got {q_nan_fwd}"
+        );
+        assert!(q_nan_fwd.is_finite());
+
+        // NaN spot → fall back to r.
+        let q_nan_spot = implied_carry(f64::NAN, 100.0, r, t);
+        assert_eq!(q_nan_spot, r, "NaN spot must fall back to the risk-free rate");
+
+        // Infinite forward → fall back to r.
+        let q_inf_fwd = implied_carry(100.0, f64::INFINITY, r, t);
+        assert_eq!(q_inf_fwd, r, "infinite forward must fall back to r");
+        assert!(q_inf_fwd.is_finite());
+
+        // Sanity: a well-formed input still yields the true cost-of-carry.
+        let q_ok = implied_carry(100.0, 105.0, r, t);
+        let expected = r - (105.0_f64 / 100.0).ln() / t;
+        assert!(
+            (q_ok - expected).abs() < 1e-12,
+            "well-formed inputs must yield the true implied carry"
+        );
     }
 }

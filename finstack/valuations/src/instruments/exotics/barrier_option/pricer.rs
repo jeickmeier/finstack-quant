@@ -497,20 +497,42 @@ impl Pricer for BarrierOptionAnalyticalPricer {
             BarrierType::DownAndOut => AnalyticalBarrierType::DownOut,
         };
 
-        // Apply Broadie-Glasserman discrete monitoring correction when monitoring_frequency is set
+        // Apply Broadie-Glasserman-Kou discrete monitoring correction when
+        // monitoring_frequency is set.
         let is_down = matches!(
             barrier_opt.barrier_type,
             BarrierType::DownAndIn | BarrierType::DownAndOut
         );
+        let raw_barrier = barrier_opt.barrier.amount();
         let effective_barrier = if let Some(dt) = barrier_opt.monitoring_frequency {
             let shift = BG_BETA * sigma * dt.sqrt();
-            if is_down {
-                barrier_opt.barrier.amount() * (-shift).exp()
+            let shifted = if is_down {
+                raw_barrier * (-shift).exp()
             } else {
-                barrier_opt.barrier.amount() * shift.exp()
+                raw_barrier * shift.exp()
+            };
+            // Guard against the shift crossing spot (W-09). For a large
+            // monitoring interval `βσ√Δt` can be large enough to move the
+            // effective barrier onto the *other side* of spot, which flips the
+            // option's alive/knocked state and mis-prices a near-barrier
+            // option (e.g. a live down-and-out collapses to ~0). The
+            // Broadie-Glasserman-Kou adjustment is only meaningful while the
+            // effective barrier stays on the same side of spot as the
+            // contractual barrier, so clamp it just shy of spot.
+            //
+            // `BARRIER_SPOT_GAP` keeps the effective barrier strictly off spot
+            // so the analytical formula does not see a degenerate
+            // barrier == spot input.
+            const BARRIER_SPOT_GAP: f64 = 1e-8;
+            if raw_barrier <= spot {
+                // Down-ish barrier (at or below spot): must not rise to spot.
+                shifted.min(spot * (1.0 - BARRIER_SPOT_GAP))
+            } else {
+                // Up-ish barrier (above spot): must not fall to spot.
+                shifted.max(spot * (1.0 + BARRIER_SPOT_GAP))
             }
         } else {
-            barrier_opt.barrier.amount()
+            raw_barrier
         };
 
         let params =
@@ -753,6 +775,55 @@ mod tests {
         let expected = barrier_call_continuous(&p, AnalyticalBarrierType::DownOut);
 
         assert!((pv - expected).abs() < 1e-12);
+    }
+
+    /// W-09: the Broadie-Glasserman-Kou discrete-monitoring shift must not move
+    /// the effective barrier across spot. A down-and-out call whose contractual
+    /// barrier sits *above* spot is already knocked out (price ~0). With a
+    /// large monitoring interval the unguarded shift `barrier · exp(-βσ√Δt)`
+    /// can drop the effective barrier below spot, which makes the analytical
+    /// formula treat the option as alive and return a spurious positive value.
+    ///
+    /// The guard clamps the effective barrier just above spot so the
+    /// already-knocked-out option stays priced at ~0.
+    #[test]
+    fn w09_bgk_shift_does_not_cross_spot_for_knocked_out_barrier() {
+        let as_of = date(2024, 1, 1);
+        let expiry = date(2025, 1, 1);
+        let spot = 100.0;
+        let strike = 100.0;
+        // Down-and-out barrier ABOVE spot: the option is already knocked out.
+        let barrier = 130.0;
+        let vol = 0.60;
+        let rate = 0.05;
+        let div_yield = 0.0;
+        // A very large monitoring interval makes βσ√Δt large enough that the
+        // unguarded shift would push the effective barrier below spot.
+        let monitoring_dt = 4.0;
+
+        let option = BarrierOption {
+            monitoring_frequency: Some(monitoring_dt),
+            ..down_and_out_call(expiry, strike, barrier)
+        };
+        let market = market(as_of, spot, vol, rate, div_yield);
+        let pv = option.value(&market, as_of).expect("barrier pv").amount();
+
+        // The unguarded shift would have produced this (effective barrier far
+        // below spot → option treated as alive → large positive price).
+        let unguarded_barrier = barrier * (-(BG_BETA * vol * monitoring_dt.sqrt())).exp();
+        assert!(
+            unguarded_barrier < spot,
+            "test setup invalid: the unguarded shift must cross spot \
+             (unguarded effective barrier {unguarded_barrier} should be < spot {spot})"
+        );
+
+        // With the guard the effective barrier stays at/above spot, so a
+        // down-and-out whose barrier is above spot remains knocked out (~0).
+        assert!(
+            pv.abs() < 1e-6,
+            "down-and-out call with barrier above spot is already knocked out \
+             and must price to ~0, but got {pv}; the BGK shift crossed spot"
+        );
     }
 
     /// Two-clock migration witness: when the discount curve's day-

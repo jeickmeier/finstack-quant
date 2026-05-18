@@ -287,9 +287,12 @@ impl CommoditySwap {
     ///
     /// # Note on PriceCurve Evaluation
     ///
-    /// This method uses `price_on_date(date)` to respect the curve's day count convention
-    /// rather than hard-coding Act365F. If a date falls before the curve's base date,
-    /// it falls back to the curve's spot price.
+    /// This method uses `price_on_date(date)` to respect the curve's day count
+    /// convention rather than hard-coding Act365F. If the *whole* observation
+    /// window precedes the curve's base date, the curve's spot price is used.
+    /// A curve-lookup failure for an observation date that is *inside* the
+    /// window is propagated as an error (W-11) — silently substituting spot
+    /// there would hide a misconfigured curve and corrupt the average.
     fn expected_period_price(
         &self,
         price_curve: &finstack_core::market_data::term_structures::PriceCurve,
@@ -301,13 +304,6 @@ impl CommoditySwap {
         let lag_days = self.index_lag_days.unwrap_or(0);
         let obs_start = period_start - time::Duration::days(lag_days as i64);
         let obs_end = period_end - time::Duration::days(lag_days as i64);
-
-        // Helper to get price, falling back to spot if date is before curve base
-        let get_price = |date: Date| -> f64 {
-            price_curve
-                .price_on_date(date)
-                .unwrap_or_else(|_| price_curve.spot_price())
-        };
 
         // Resolve holiday calendar if available (Item 8: integrate holiday calendars)
         let calendar = self
@@ -334,14 +330,27 @@ impl CommoditySwap {
             return Ok(price_curve.spot_price());
         }
 
-        // Market standard: daily business day sampling for all periods
-        let mut sum = 0.0;
-        let mut count = 0;
+        // Curve-aware price lookup. A curve-lookup failure (e.g. the
+        // observation date precedes the curve base, meaning the curve does not
+        // cover this averaging window) is propagated as an error rather than
+        // silently substituting the curve spot (W-11): mixing spot into the
+        // average would hide a misconfigured curve and corrupt the result.
+        // Fully-past periods are already handled by the `obs_end <= curve_base`
+        // early return above, so reaching here with a pre-base date means the
+        // period genuinely straddles the curve base.
+        let get_price = |date: Date| -> Result<f64> { price_curve.price_on_date(date) };
+
+        // Market standard: daily business day sampling for all periods.
+        // Compensated (Neumaier) summation keeps the average accurate over a
+        // long observation window (W-11) — a multi-month period can sum many
+        // hundreds of daily observations.
+        let mut sum = finstack_core::math::NeumaierAccumulator::new();
+        let mut count = 0u64;
         let mut current = obs_start;
 
         while current <= obs_end {
             if is_business_day(current) {
-                sum += get_price(current);
+                sum.add(get_price(current)?);
                 count += 1;
             }
             current += time::Duration::days(1);
@@ -351,10 +360,10 @@ impl CommoditySwap {
         if count == 0 {
             // Fallback: use midpoint if no business days found (shouldn't happen in practice)
             let mid = obs_start + (obs_end - obs_start) / 2;
-            return Ok(get_price(mid));
+            return get_price(mid);
         }
 
-        Ok(sum / count as f64)
+        Ok(sum.total() / count as f64)
     }
 
     /// Generate the payment schedule for this swap.
@@ -785,6 +794,111 @@ mod tests {
         assert_eq!(swap.id.as_str(), deserialized.id.as_str());
         assert_eq!(swap.underlying.ticker, deserialized.underlying.ticker);
         assert_eq!(swap.fixed_price, deserialized.fixed_price);
+    }
+
+    /// W-11: a floating-leg observation window that starts before the curve
+    /// base date must propagate the curve-lookup error rather than silently
+    /// substituting the curve spot for the pre-base days. Silently mixing spot
+    /// into the daily average would hide a misconfigured (too-short) curve.
+    #[test]
+    fn w11_floating_leg_propagates_curve_lookup_error_for_straddling_period() {
+        // Curve base is well after the swap's first observation period, so the
+        // first period's averaging window straddles the curve base.
+        let curve_base = Date::from_calendar_date(2025, Month::March, 15).expect("date");
+        let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+            .base_date(curve_base)
+            .spot_price(3.50)
+            .knots([(0.0, 3.50), (1.0, 3.70)])
+            .build()
+            .expect("price curve");
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
+            .knots([(0.0, 1.0), (2.0, 0.90)])
+            .build()
+            .expect("discount curve");
+        let market = MarketContext::new().insert(disc).insert(price_curve);
+
+        // Swap starts 2025-01-01; the first monthly period (Jan-Feb) is fully
+        // before the curve base — but a period straddling the base exercises
+        // the pre-base lookup inside the averaging loop.
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let swap = CommoditySwap::builder()
+            .id(InstrumentId::new("W11-SWAP"))
+            .underlying(CommodityUnderlyingParams::new(
+                "Energy",
+                "NG",
+                "MMBTU",
+                Currency::USD,
+            ))
+            .quantity(10000.0)
+            .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("decimal"))
+            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .side(PayReceive::PayFixed)
+            .start_date(as_of)
+            .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("date"))
+            .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build()
+            .expect("should build");
+
+        // The period containing the curve base (March) straddles it: some
+        // observation days precede the base. The lookup error must propagate.
+        let result = swap.floating_leg_pv(&market, as_of);
+        assert!(
+            result.is_err(),
+            "a floating-leg observation window straddling the curve base must \
+             propagate the curve-lookup error, not silently use spot; got {result:?}"
+        );
+    }
+
+    /// W-11: the daily-averaged floating price must be computed with
+    /// compensated summation and remain correct over a long observation
+    /// window. With a flat curve the average equals the flat price exactly.
+    #[test]
+    fn w11_floating_leg_average_is_accurate_on_flat_curve() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        // Flat price curve: every business day observes the same price, so the
+        // compensated average must equal that price to full precision.
+        let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+            .base_date(as_of)
+            .spot_price(3.50)
+            .knots([(0.0, 3.50), (2.0, 3.50)])
+            .build()
+            .expect("price curve");
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (2.0, 0.90)])
+            .build()
+            .expect("discount curve");
+        let market = MarketContext::new().insert(disc).insert(price_curve);
+
+        let swap = CommoditySwap::builder()
+            .id(InstrumentId::new("W11-FLAT-SWAP"))
+            .underlying(CommodityUnderlyingParams::new(
+                "Energy",
+                "NG",
+                "MMBTU",
+                Currency::USD,
+            ))
+            .quantity(10000.0)
+            .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("decimal"))
+            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .side(PayReceive::PayFixed)
+            .start_date(as_of)
+            .maturity(Date::from_calendar_date(2025, Month::December, 31).expect("date"))
+            .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build()
+            .expect("should build");
+
+        // Flat curve ⇒ fixed price == floating average ⇒ NPV is exactly zero.
+        let npv = swap.value(&market, as_of).expect("should price").amount();
+        assert!(
+            npv.abs() < 1e-6,
+            "on a flat curve with fixed == flat price the swap NPV must be ~0, \
+             got {npv}; a non-zero value indicates summation error in the \
+             daily floating-leg average"
+        );
     }
 
     #[test]

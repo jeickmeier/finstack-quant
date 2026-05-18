@@ -125,23 +125,19 @@ impl AsianOptionHestonMcPricer {
         let process = HestonProcess::new(heston_params);
         let discretization = QeHeston::new();
 
-        // Build time grid
-        let num_steps = ((t * self.steps_per_year).round() as usize).max(self.min_steps);
-
-        // Map fixing dates to time steps (same pattern as GBM Asian pricer)
-        let mut fixing_steps = Vec::new();
-        for &fixing_date in &inst.fixing_dates {
-            let fixing_t =
-                inst.day_count
-                    .year_fraction(as_of, fixing_date, DayCountContext::default())?;
-            if fixing_t > 0.0 && fixing_t <= t {
-                let step = (fixing_t / t * num_steps as f64).round() as usize;
-                let clamped = step.min(num_steps.saturating_sub(1)).max(0);
-                fixing_steps.push(clamped);
-            }
-        }
-        fixing_steps.sort();
-        fixing_steps.dedup();
+        // Build time grid. Map fixing dates to time steps via the shared
+        // helper so each distinct fixing gets its own grid step (W-04) — the
+        // naive round()+dedup() merged distinct fixings on a coarse grid.
+        let base_num_steps = ((t * self.steps_per_year).round() as usize).max(self.min_steps);
+        let fixing_grid = crate::instruments::exotics::asian_option::pricer::map_fixings_to_distinct_steps(
+            &inst.fixing_dates,
+            inst.day_count,
+            as_of,
+            t,
+            base_num_steps,
+        )?;
+        let num_steps = fixing_grid.num_steps;
+        let fixing_steps = fixing_grid.fixing_steps;
 
         // Map averaging method
         let averaging = match inst.averaging_method {
