@@ -192,10 +192,18 @@ impl CommoditySwaption {
     /// Compute the forward swap rate from the commodity forward curve.
     ///
     /// The forward swap rate is the **annuity-weighted** average of forward
-    /// commodity prices at each swap payment period midpoint:
+    /// commodity prices observed **on each swap payment date**:
     /// ```text
     /// F_swap = Σ (F_i · DF_i · τ_i) / Σ (DF_i · τ_i)
     /// ```
+    /// where `F_i = F(payment_date_i)` and `DF_i = DF(as_of, payment_date_i)`.
+    ///
+    /// The forward price and the discount factor must be evaluated on the
+    /// **same** date — the payment date. Reading the forward at the period
+    /// *midpoint* while discounting to the period *end* biases the swap rate by
+    /// the intra-period carry on a sloped (contango/backwardation) forward
+    /// curve (W-02). On a flat curve the two are identical.
+    ///
     /// This is the fair fixed price consistent with the `annuity · Black76`
     /// pricing identity: the swaption is priced as `annuity · Black76(F_swap, K)`
     /// where `annuity = Σ DF_i · τ_i`, so the fair swap rate must be averaged
@@ -218,10 +226,11 @@ impl CommoditySwaption {
         let mut weight_total = 0.0;
         let mut prev = self.swap_start;
         for &payment_date in &schedule {
-            // Use the midpoint of each period for forward price lookup
-            let mid = prev + (payment_date - prev) / 2;
+            // Read the forward on the payment date — the same date the period
+            // settles and is discounted to — so the swap rate is not biased by
+            // intra-period carry on a sloped curve (W-02).
             let fwd = price_curve
-                .price_on_date(mid)
+                .price_on_date(payment_date)
                 .unwrap_or_else(|_| price_curve.spot_price());
 
             // Annuity weight DF_i * tau_i — identical to the per-period term
@@ -617,5 +626,114 @@ mod tests {
         assert_eq!(swaption.id.as_str(), deserialized.id.as_str());
         assert_eq!(swaption.underlying.ticker, deserialized.underlying.ticker);
         assert_eq!(swaption.fixed_price, deserialized.fixed_price);
+    }
+
+    /// W-02: `forward_swap_rate` must read the forward on each swap payment
+    /// date, not the period midpoint. On a sloped (contango) forward curve the
+    /// midpoint forward is lower than the payment-date forward, so the buggy
+    /// midpoint lookup biases the swap rate downward by the intra-period carry.
+    ///
+    /// This test builds a steep linear contango curve and asserts the computed
+    /// forward swap rate equals the annuity-weighted average of *payment-date*
+    /// forwards — and that it differs measurably from the *midpoint*-weighted
+    /// average that the pre-fix code produced.
+    #[test]
+    fn w02_forward_swap_rate_reads_payment_date_not_midpoint() {
+        use finstack_core::dates::TenorUnit;
+        use finstack_core::market_data::term_structures::{DiscountCurve, PriceCurve};
+        use finstack_core::types::CurveId;
+        use time::Month;
+
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+
+        // Steep linear contango: price rises ~1.0/yr. Midpoint vs payment-date
+        // forwards then differ by ~half a period of carry.
+        let price_curve = PriceCurve::builder("NG-FORWARD")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .spot_price(3.00)
+            .knots([(0.0, 3.00), (0.5, 3.50), (1.0, 4.00), (2.0, 5.00)])
+            .interp(finstack_core::math::interp::InterpStyle::Linear)
+            .build()
+            .expect("price curve");
+
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, 0.94)])
+            .build()
+            .expect("discount curve");
+
+        let market = MarketContext::new().insert(disc).insert(price_curve);
+
+        let swaption = CommoditySwaption::builder()
+            .id(InstrumentId::new("NG-SWAPTION-W02"))
+            .underlying(CommodityUnderlyingParams::new(
+                "Energy",
+                "NG",
+                "MMBTU",
+                Currency::USD,
+            ))
+            .option_type(OptionType::Call)
+            .expiry(Date::from_calendar_date(2025, Month::June, 1).expect("valid date"))
+            .swap_start(Date::from_calendar_date(2025, Month::July, 1).expect("valid date"))
+            .swap_end(Date::from_calendar_date(2026, Month::July, 1).expect("valid date"))
+            .swap_frequency(Tenor::new(3, TenorUnit::Months))
+            .fixed_price(4.0)
+            .notional(10000.0)
+            .forward_curve_id(CurveId::new("NG-FORWARD"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .vol_surface_id(CurveId::new("NG-VOL"))
+            .build()
+            .expect("swaption");
+
+        let actual = swaption
+            .forward_swap_rate(&market, as_of)
+            .expect("forward swap rate");
+
+        // Re-derive the expected payment-date-weighted average and the buggy
+        // midpoint-weighted average independently.
+        let schedule = swaption.swap_payment_schedule().expect("schedule");
+        let pc = market.get_price_curve("NG-FORWARD").expect("price curve");
+        let dc = market.get_discount("USD-OIS").expect("discount");
+
+        let mut prev = swaption.swap_start;
+        let mut pay_weighted = 0.0;
+        let mut mid_weighted = 0.0;
+        let mut weight_total = 0.0;
+        for &pay in &schedule {
+            let df = dc.df_between_dates(as_of, pay).expect("df");
+            let frac = DayCount::Act365F
+                .year_fraction(prev, pay, DayCountContext::default())
+                .expect("frac");
+            let weight = df * frac;
+            let fwd_pay = pc.price_on_date(pay).expect("fwd at payment date");
+            let mid = prev + (pay - prev) / 2;
+            let fwd_mid = pc.price_on_date(mid).expect("fwd at midpoint");
+            pay_weighted += fwd_pay * weight;
+            mid_weighted += fwd_mid * weight;
+            weight_total += weight;
+            prev = pay;
+        }
+        let expected_payment = pay_weighted / weight_total;
+        let buggy_midpoint = mid_weighted / weight_total;
+
+        assert!(
+            (actual - expected_payment).abs() < 1e-12,
+            "forward_swap_rate {actual} must equal the payment-date-weighted \
+             average {expected_payment}"
+        );
+        // Sanity: contango means the payment-date rate exceeds the midpoint
+        // rate, so the fix changes the result measurably.
+        assert!(
+            (expected_payment - buggy_midpoint).abs() > 1e-3,
+            "test setup is degenerate: payment-date ({expected_payment}) and \
+             midpoint ({buggy_midpoint}) rates must differ on a sloped curve"
+        );
+        assert!(
+            (actual - buggy_midpoint).abs() > 1e-3,
+            "forward_swap_rate {actual} must NOT equal the buggy midpoint-\
+             weighted average {buggy_midpoint}"
+        );
     }
 }

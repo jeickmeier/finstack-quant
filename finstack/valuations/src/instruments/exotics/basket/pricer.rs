@@ -142,6 +142,14 @@ impl BasketCalculator {
     }
 
     /// Calculate total basket value using an explicit AUM for weight-based constituents.
+    ///
+    /// For an all-weight-based basket the total invested value is
+    /// `Σ weightᵢ · AUM`. When the weights sum to ~1.0 this is just the AUM,
+    /// but a partially-invested or misconfigured basket (weights summing to,
+    /// say, 0.5 or 1.2) must be scaled by the actual weight sum rather than
+    /// returning the AUM verbatim (W-10). The plain `aum_amount` shortcut is
+    /// kept only when the weight sum is within a tight tolerance of 1.0, where
+    /// it avoids floating-point drift.
     pub fn basket_value_with_aum(
         &self,
         basket: &Basket,
@@ -150,11 +158,20 @@ impl BasketCalculator {
         aum_basket: Money,
     ) -> Result<Money> {
         let aum_amount = aum_basket.amount();
-        // If all constituents are weight-based (no explicit units), total should equal AUM
-        // to avoid floating rounding drift when weights sum to ~1.0.
+        // If all constituents are weight-based (no explicit units), the total
+        // invested value is `weight_sum × AUM`.
         let all_weight_based = basket.constituents.iter().all(|c| c.units.is_none());
         let total = if all_weight_based {
-            aum_amount
+            let weight_sum: f64 = basket.constituents.iter().map(|c| c.weight).sum();
+            // Within 10bp of fully invested → treat as exactly the AUM to
+            // avoid floating-point drift (matches `Basket::validate`'s
+            // tolerance). Otherwise scale by the actual weight sum so a
+            // partially-invested or misweighted basket is valued correctly.
+            if (weight_sum - 1.0).abs() <= 0.001 {
+                aum_amount
+            } else {
+                aum_amount * weight_sum
+            }
         } else {
             let mut sum = 0.0;
             for constituent in &basket.constituents {
@@ -336,5 +353,104 @@ impl BasketCalculator {
 impl Default for BasketCalculator {
     fn default() -> Self {
         Self::with_defaults()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::common_impl::traits::Attributes;
+    use crate::instruments::exotics::basket::types::{
+        AssetType, BasketConstituent, ConstituentReference,
+    };
+    use finstack_core::types::{InstrumentId, PriceId};
+
+    fn weight_based_basket(weights: &[f64]) -> Basket {
+        let constituents: Vec<BasketConstituent> = weights
+            .iter()
+            .enumerate()
+            .map(|(i, &w)| BasketConstituent {
+                id: format!("CONST-{i}"),
+                reference: ConstituentReference::MarketData {
+                    price_id: PriceId::new(format!("PX-{i}")),
+                    asset_type: AssetType::Equity,
+                },
+                weight: w,
+                units: None,
+                ticker: None,
+            })
+            .collect();
+        Basket {
+            id: InstrumentId::new("W10-BASKET"),
+            constituents,
+            // Zero expense ratio so the assertion isolates the weight-sum fix.
+            expense_ratio: 0.0,
+            currency: Currency::USD,
+            notional: Money::new(1.0, Currency::USD),
+            discount_curve_id: "USD-OIS".into(),
+            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            attributes: Attributes::new(),
+            pricing_config: BasketPricingConfig::default(),
+        }
+    }
+
+    /// W-10: an all-weight-based basket whose weights do NOT sum to 1.0 must
+    /// have its AUM scaled by the actual weight sum, not returned verbatim. A
+    /// basket only 50%-invested is worth half the AUM in positions.
+    #[test]
+    fn w10_partially_invested_basket_scales_aum_by_weight_sum() {
+        let calc = BasketCalculator::with_defaults();
+        let context = MarketContext::new();
+        let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
+        let aum = Money::new(1_000_000.0, Currency::USD);
+
+        // Weights sum to 0.5 — only half the AUM is invested.
+        let basket = weight_based_basket(&[0.3, 0.2]);
+        let value = calc
+            .basket_value_with_aum(&basket, &context, as_of, aum)
+            .expect("basket value");
+        assert!(
+            (value.amount() - 500_000.0).abs() < 1e-6,
+            "a 50%-invested weight-based basket must be worth 0.5 × AUM = \
+             500000, got {} — the AUM was returned verbatim",
+            value.amount()
+        );
+    }
+
+    /// W-10: an over-weighted basket (weights summing above 1.0) is likewise
+    /// scaled — a 1.2× levered weight set is worth 1.2 × AUM.
+    #[test]
+    fn w10_over_weighted_basket_scales_aum_up() {
+        let calc = BasketCalculator::with_defaults();
+        let context = MarketContext::new();
+        let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
+        let aum = Money::new(1_000_000.0, Currency::USD);
+
+        let basket = weight_based_basket(&[0.7, 0.5]); // sums to 1.2
+        let value = calc
+            .basket_value_with_aum(&basket, &context, as_of, aum)
+            .expect("basket value");
+        assert!(
+            (value.amount() - 1_200_000.0).abs() < 1e-6,
+            "a 1.2×-weighted basket must be worth 1.2 × AUM = 1200000, got {}",
+            value.amount()
+        );
+    }
+
+    /// W-10: a correctly-weighted basket (weights summing to ~1.0) still
+    /// returns the AUM exactly — the tight tolerance keeps the no-drift
+    /// shortcut for the common, well-formed case.
+    #[test]
+    fn w10_fully_invested_basket_returns_aum_exactly() {
+        let calc = BasketCalculator::with_defaults();
+        let context = MarketContext::new();
+        let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
+        let aum = Money::new(1_000_000.0, Currency::USD);
+
+        let basket = weight_based_basket(&[0.6, 0.4]); // sums to 1.0
+        let value = calc
+            .basket_value_with_aum(&basket, &context, as_of, aum)
+            .expect("basket value");
+        assert!((value.amount() - 1_000_000.0).abs() < 1e-9);
     }
 }
