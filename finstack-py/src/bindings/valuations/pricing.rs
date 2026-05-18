@@ -79,6 +79,9 @@ fn price_instrument(
 ///     JSON-serialized ``ValuationResult`` including requested metrics.
 #[pyfunction]
 #[pyo3(signature = (instrument_json, market, as_of, model="default", metrics=vec![], pricing_options=None, market_history=None))]
+// PyO3 binding: the argument list mirrors the Python keyword-argument API, so
+// it cannot be collapsed into a parameter struct without changing that API.
+#[allow(clippy::too_many_arguments)]
 fn price_instrument_with_metrics(
     py: Python<'_>,
     instrument_json: &str,

@@ -391,9 +391,12 @@ fn calibrate(py: Python<'_>, json: &str) -> PyResult<PyCalibrationResult> {
         )
     })?;
     // Release the GIL for the duration of the solver: calibration can run for seconds.
+    // The error is boxed inside the closure: `ExecuteError` is a large enum, and
+    // an un-boxed large `Err` variant on the `detach` closure trips
+    // `clippy::result_large_err`.
     let result = py
-        .detach(|| engine::execute_with_diagnostics(&envelope))
-        .map_err(|e| execute_error_to_py(py, e))?;
+        .detach(|| engine::execute_with_diagnostics(&envelope).map_err(Box::new))
+        .map_err(|e| execute_error_to_py(py, *e))?;
     Ok(PyCalibrationResult::new(result))
 }
 

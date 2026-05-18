@@ -236,15 +236,32 @@ pub fn npv_with_ctx<D: Discounting + ?Sized>(
         }
     }
 
+    // Discount each flow to the valuation date `base`, which need not coincide
+    // with the curve's own base date. `Discounting::df` expects an abscissa
+    // measured from the *curve* base date, so all year fractions are taken
+    // from `disc.base_date()`; the flow is then discounted by the relative
+    // factor DF(curve_base→d) / DF(curve_base→base). When `base` equals the
+    // curve base the denominator is `df(0) == 1`, so this reduces exactly to
+    // the plain `df(t)` lookup.
+    //
     // Per-flow discounting: Money × f64 discount factor produces a Money
     // value rounded to Money's Decimal scale. Accumulation of rounded
     // per-flow values is exact at that scale. For bit-exact precision,
     // callers should pre-discount amounts in Decimal and sum via
     // npv_prediscounted_money().
+    let curve_base = disc.base_date();
+    let t_base = day_count.signed_year_fraction(curve_base, base, ctx)?;
+    let df_base = disc.df(t_base);
+    if !df_base.is_finite() || df_base <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "npv: discount factor at the valuation date ({base}) is invalid: {df_base}"
+        )));
+    }
+
     let mut total = Money::new(0.0, ccy);
     for (d, amt) in flows {
-        let t = day_count.signed_year_fraction(base, *d, ctx)?;
-        let df = disc.df(t);
+        let t = day_count.signed_year_fraction(curve_base, *d, ctx)?;
+        let df = disc.df(t) / df_base;
         let disc_amt = *amt * df;
         total = total.checked_add(disc_amt)?;
     }
@@ -398,6 +415,50 @@ mod hardening_tests {
             "{} vs {}",
             pv.amount(),
             expected
+        );
+    }
+
+    /// `npv` must discount to the supplied valuation date even when it differs
+    /// from the curve's own base date — using the relative discount factor
+    /// `DF(curve_base→d) / DF(curve_base→base)` rather than the curve-base-
+    /// anchored `df(year_fraction(base, d))`.
+    ///
+    /// A non-flat curve is required: a flat curve is translation-invariant and
+    /// would hide the time-origin error.
+    #[test]
+    fn npv_discounts_to_valuation_date_when_base_differs_from_curve_base() {
+        use crate::market_data::term_structures::DiscountCurve;
+
+        let curve_base = create_date(2025, Month::January, 1).expect("date");
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.88)])
+            .build()
+            .expect("curve");
+
+        let val_date = create_date(2026, Month::January, 1).expect("date"); // 1y forward
+        let flow_date = create_date(2027, Month::January, 1).expect("date"); // 2y forward
+        let flows = vec![(flow_date, Money::new(1_000_000.0, Currency::USD))];
+
+        // Valuation at the curve base: PV = CF · DF(0→2y) = CF · 0.88.
+        let pv_at_curve_base = npv(&curve, curve_base, None, &flows).expect("npv");
+        assert!((pv_at_curve_base.amount() - 880_000.0).abs() < 1.0);
+
+        // Valuation one year forward must use the relative DF
+        // DF(1y→2y) = df(2)/df(1) = 0.88/0.95, not df(year_fraction(val,flow)).
+        let pv_forward = npv(&curve, val_date, None, &flows).expect("npv");
+        let expected_forward = 1_000_000.0 * (0.88 / 0.95);
+        assert!(
+            (pv_forward.amount() - expected_forward).abs() < 1.0,
+            "npv with base != curve base must use the relative DF: got {}, expected {}",
+            pv_forward.amount(),
+            expected_forward
+        );
+        // The pre-fix engine returned CF·df(1y) = 950_000; guard the regression.
+        assert!(
+            (pv_forward.amount() - 950_000.0).abs() > 1_000.0,
+            "npv must not reuse the curve-base-anchored df lookup"
         );
     }
 }
