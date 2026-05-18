@@ -525,12 +525,24 @@ impl SwaptionLsmcPricer {
     /// simulated short-rate path.
     ///
     /// `B(t)` is the value of the money-market account
-    /// `B(t) = exp(∫₀ᵗ r(s) ds)`, discretised on the simulation grid with
-    /// the left-endpoint (Riemann) rule:
+    /// `B(t) = exp(∫₀ᵗ r(s) ds)`, discretised on the simulation grid.
+    ///
+    /// The integral over each step is approximated with the **trapezoidal
+    /// rule**:
     ///
     /// ```text
-    /// B(t_0) = 1,   B(t_{k+1}) = B(t_k) · exp(r(t_k) · Δt_k)
+    /// B(t_0) = 1,
+    /// B(t_{k+1}) = B(t_k) · exp( ½·(r(t_k) + r(t_{k+1}))·Δt_k )
     /// ```
+    ///
+    /// The exact-HW1F transition gives both endpoints `r(t_k)` and
+    /// `r(t_{k+1})` of every interval, so the cheap left-endpoint Riemann sum
+    /// `exp(r(t_k)·Δt_k)` it previously used left an avoidable O(Δt) bias in
+    /// the discount factor — the short rate moves materially within a step on
+    /// a coarse exercise-aligned grid. The trapezoidal rule is O(Δt²) and uses
+    /// only the path values already simulated. (The fully exact integrated
+    /// short rate needs the joint law of `(r(t), ∫r ds)`, which lives in the
+    /// Monte-Carlo discretisation layer.)
     ///
     /// The returned vector has one entry per grid point (`num_steps + 1`).
     /// LSM continuation values and the final present value are discounted
@@ -546,11 +558,15 @@ impl SwaptionLsmcPricer {
         bank.push(1.0); // B(t_0) = 1
         let mut acc = 1.0;
         // `rate_path` carries one rate per grid point (`num_steps + 1`
-        // entries). `r(t_step)`, the rate at the start of the interval,
-        // drives `B` over `[t_step, t_{step+1})`; iterate the first
-        // `num_steps` rates directly so no fallible bounds check is needed.
-        for (step, &r_step) in rate_path.iter().take(num_steps).enumerate() {
-            acc *= (r_step * time_grid.dt(step)).exp();
+        // entries). Over `[t_step, t_{step+1}]` the integral ∫r ds is
+        // approximated by the trapezoidal rule using BOTH endpoint rates,
+        // `r(t_step)` and `r(t_{step+1})` — the exact-HW1F transition supplies
+        // both. `windows(2)` yields exactly `num_steps` interval pairs.
+        for (step, pair) in rate_path.windows(2).enumerate() {
+            let r_start = pair[0];
+            let r_end = pair[1];
+            let integral = 0.5 * (r_start + r_end) * time_grid.dt(step);
+            acc *= integral.exp();
             bank.push(acc);
         }
         bank

@@ -151,6 +151,30 @@ pub struct InflationCapFloor {
     /// Optional contract-level lag override.
     #[builder(optional)]
     pub lag_override: Option<InflationLag>,
+
+    // --- YoY convexity / timing adjustment parameters ---
+    //
+    // A YoY inflation caplet pays `(CPI(Tᵢ)/CPI(Tᵢ₋₁) − 1 − K)⁺`. Under the
+    // `Tᵢ`-payment measure `E[CPI(Tᵢ)/CPI(Tᵢ₋₁)] ≠ CPI_fwd(Tᵢ)/CPI_fwd(Tᵢ₋₁)`:
+    // the ratio carries a YoY convexity/timing correction (Brigo-Mercurio Ch.
+    // 16; Mercurio 2005). Feeding the raw deterministic forward ratio into
+    // Black-76/Bachelier omits it. The leading-order Jarrow-Yildirim correction
+    // `C ≈ σ_I·(σ_I − ρ·σ_n)·τ` needs the inflation/nominal-rate correlation
+    // and the nominal short-rate volatility (the inflation vol `σ_I` comes from
+    // the vol surface).
+    /// Correlation between the inflation index and the nominal short rate,
+    /// used in the YoY convexity/timing adjustment. `None` ⇒ treated as 0
+    /// (the timing term vanishes; the pure inflation-vol Jensen convexity
+    /// `σ_I²·τ` is still applied).
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inflation_nominal_correlation: Option<f64>,
+    /// Nominal short-rate volatility `σ_n` (annualized, absolute), used in the
+    /// YoY timing term. `None` ⇒ the `ρ·σ_n` timing term is dropped.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nominal_rate_volatility: Option<f64>,
+
     /// Attributes for scenario selection and tagging.
     pub attributes: Attributes,
 }
@@ -244,14 +268,18 @@ impl InflationCapFloor {
         }
 
         // Fall back to curve projection with lag adjustment.
-        // Day-count failure here degrades to anchor (`t = 0`); the inflation
-        // curve handles `cpi(0)` gracefully, so silent fallback is acceptable
-        // — but make it explicit at the call site.
+        //
+        // A failed day-count calculation must be PROPAGATED, not silently
+        // collapsed to `t = 0` (the curve anchor). `unwrap_or(0.0)` masked a
+        // genuine error — e.g. an inverted/invalid date — by quietly returning
+        // the base CPI, which mis-prices the whole leg with no diagnostic.
         let lagged_date = self.lagged_fixing_date(curves, date);
         let curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
-        let t = DayCount::Act365F
-            .signed_year_fraction(as_of, lagged_date, DayCountContext::default())
-            .unwrap_or(0.0);
+        let t = DayCount::Act365F.signed_year_fraction(
+            as_of,
+            lagged_date,
+            DayCountContext::default(),
+        )?;
         let value = curve.cpi(t);
         Self::validate_cpi_value(value, date)
     }
@@ -361,26 +389,33 @@ impl InflationCapFloor {
             let cpi_start = self.cpi_value(curves, as_of, start)?;
             let cpi_end = self.cpi_value(curves, as_of, end)?;
 
-            // Period inflation rate (annualized over the accrual period)
-            // Note: For true YoY rates, use annual frequency
-            let forward_rate = (cpi_end / cpi_start - 1.0) / accrual;
+            // Deterministic forward YoY ratio from the CPI curve. The YoY
+            // *rate* over the period is `ratio − 1`, and the rate the option is
+            // written on (annualized) is `(ratio − 1) / accrual`.
+            let deterministic_ratio = cpi_end / cpi_start;
+            let deterministic_rate = (deterministic_ratio - 1.0) / accrual;
 
             // Use consolidated lag method for fixing date
             let fixing_date = self.lagged_fixing_date(curves, end);
 
             // Time-to-fixing uses ACT/365F (standard option market convention)
-            // regardless of the instrument's accrual day count. Silent zero on
-            // day-count failure is intentional (matches the inflation-curve
-            // anchor convention), but explicit at the call site.
-            let t_fix = DayCount::Act365F
-                .signed_year_fraction(as_of, fixing_date, DayCountContext::default())
-                .unwrap_or(0.0);
+            // regardless of the instrument's accrual day count. A failed
+            // day-count calculation is propagated, not silently collapsed to
+            // `t_fix = 0` — a spurious zero would force intrinsic-only pricing
+            // and drop all option time value with no diagnostic.
+            let t_fix = DayCount::Act365F.signed_year_fraction(
+                as_of,
+                fixing_date,
+                DayCountContext::default(),
+            )?;
 
             let t_pay = disc
                 .day_count()
                 .year_fraction(as_of, pay, DayCountContext::default())?;
             let df = disc.df(t_pay);
 
+            // Volatility at the option strike (smile) prices the Black-76 /
+            // Bachelier payoff.
             let sigma = if t_fix > 0.0 {
                 crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
                     &self.pricing_overrides.market_quotes,
@@ -391,6 +426,32 @@ impl InflationCapFloor {
                 )?
             } else {
                 0.0
+            };
+
+            // YoY convexity / timing adjustment (Brigo-Mercurio Ch. 16;
+            // Mercurio 2005). `E^{Tᵢ}[CPI(Tᵢ)/CPI(Tᵢ₋₁)] ≠ deterministic
+            // ratio`: apply the leading-order Jarrow-Yildirim correction so the
+            // forward rate fed to the option model is the payment-measure
+            // expectation, not the raw deterministic ratio. The convexity uses
+            // the ATM inflation vol σ(F) (a property of the YoY distribution),
+            // not the strike vol.
+            let forward_rate = if t_fix > 0.0 {
+                let atm_sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
+                    &self.pricing_overrides.market_quotes,
+                    curves,
+                    self.vol_surface_id.as_str(),
+                    t_fix,
+                    deterministic_rate,
+                )?;
+                yoy_convexity_adjusted_rate(
+                    deterministic_ratio,
+                    accrual,
+                    atm_sigma,
+                    self.inflation_nominal_correlation,
+                    self.nominal_rate_volatility,
+                )
+            } else {
+                deterministic_rate
             };
 
             let leg_pv = match model {
@@ -450,6 +511,77 @@ impl InflationCapFloorBuilder {
     }
 }
 
+/// Convexity / timing-adjusted forward YoY inflation rate.
+///
+/// A YoY inflation caplet pays `(CPI(Tᵢ)/CPI(Tᵢ₋₁) − 1 − K)⁺` at `Tᵢ`. Under
+/// the nominal `Tᵢ`-forward measure the expected YoY ratio is **not** the
+/// deterministic ratio of forward CPIs:
+///
+/// ```text
+/// E^{n,Tᵢ}[CPI(Tᵢ)/CPI(Tᵢ₋₁)] = (CPI_fwd(Tᵢ)/CPI_fwd(Tᵢ₋₁)) · exp(C)
+/// ```
+///
+/// `CPI(Tᵢ₋₁)` enters in the denominator (a Jensen convexity) and is observed
+/// at `Tᵢ₋₁` while the payoff settles under the `Tᵢ`-forward measure (a timing
+/// correction). In the Jarrow-Yildirim Gaussian model the leading-order
+/// correction over a period of length `τ = Tᵢ − Tᵢ₋₁` is
+///
+/// ```text
+/// C ≈ σ_I · (σ_I − ρ · σ_n) · τ
+/// ```
+///
+/// where:
+/// - `σ_I` — inflation (YoY) volatility (ATM, from the vol surface),
+/// - `σ_n` — nominal short-rate volatility,
+/// - `ρ` — correlation between the inflation index and the nominal rate.
+///
+/// The `σ_I²·τ` term is the Jensen convexity of the log-normal YoY ratio; the
+/// `−ρ·σ_I·σ_n·τ` term is the measure/timing correction. When `ρ` or `σ_n`
+/// are unavailable the timing term is dropped but the pure inflation-vol
+/// convexity is still applied — feeding the unadjusted deterministic ratio
+/// (`C = 0`) is never correct under stochastic inflation.
+///
+/// # Arguments
+///
+/// * `deterministic_ratio` — `CPI_fwd(Tᵢ)/CPI_fwd(Tᵢ₋₁)` from the inflation curve.
+/// * `accrual` — accrual year fraction of the YoY period (`≈ τ`).
+/// * `inflation_vol` — ATM inflation (YoY) volatility `σ_I`.
+/// * `nominal_correlation` — `ρ`; `None` ⇒ timing term dropped.
+/// * `nominal_rate_vol` — `σ_n`; `None` ⇒ timing term dropped.
+///
+/// # Returns
+///
+/// The convexity/timing-adjusted **annualized** YoY rate, ready for Black-76 /
+/// Bachelier: `(deterministic_ratio · exp(C) − 1) / accrual`.
+///
+/// # References
+///
+/// - Brigo, D. & Mercurio, F. (2006). *Interest Rate Models — Theory and
+///   Practice* (2nd ed.), Ch. 16 (inflation-indexed derivatives, JY model).
+/// - Mercurio, F. (2005). "Pricing Inflation-Indexed Derivatives."
+///   *Quantitative Finance*, 5(3), 289-302.
+pub fn yoy_convexity_adjusted_rate(
+    deterministic_ratio: f64,
+    accrual: f64,
+    inflation_vol: f64,
+    nominal_correlation: Option<f64>,
+    nominal_rate_vol: Option<f64>,
+) -> f64 {
+    if accrual <= 0.0 || !deterministic_ratio.is_finite() {
+        return (deterministic_ratio - 1.0) / accrual.max(f64::MIN_POSITIVE);
+    }
+    let sigma_i = inflation_vol.max(0.0);
+    // Timing term coefficient ρ·σ_n; absent unless both parameters supplied.
+    let rho_sigma_n = match (nominal_correlation, nominal_rate_vol) {
+        (Some(rho), Some(sigma_n)) => rho.clamp(-1.0, 1.0) * sigma_n.max(0.0),
+        _ => 0.0,
+    };
+    // Leading-order JY correction C = σ_I·(σ_I − ρ·σ_n)·τ.
+    let correction = sigma_i * (sigma_i - rho_sigma_n) * accrual;
+    let adjusted_ratio = deterministic_ratio * correction.exp();
+    (adjusted_ratio - 1.0) / accrual
+}
+
 impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
     impl_instrument_base!(crate::pricer::InstrumentType::InflationCapFloor);
 
@@ -493,3 +625,67 @@ crate::impl_empty_cashflow_provider!(
     InflationCapFloor,
     crate::cashflow::builder::CashflowRepresentation::Placeholder
 );
+
+#[cfg(test)]
+mod yoy_convexity_tests {
+    use super::yoy_convexity_adjusted_rate;
+
+    /// Item 3: with stochastic inflation, the convexity-adjusted YoY rate must
+    /// differ from the deterministic ratio. The Jensen term `σ_I²·τ` raises the
+    /// forward; feeding the raw deterministic ratio (zero convexity) is wrong.
+    #[test]
+    fn convexity_raises_forward_above_deterministic() {
+        // 1-year YoY period, deterministic ratio 1.025 (2.5% YoY), 1.5% inflation vol.
+        let ratio = 1.025_f64;
+        let accrual = 1.0_f64;
+        let sigma_i = 0.015_f64;
+
+        let deterministic = (ratio - 1.0) / accrual;
+        // No correlation/nominal vol -> pure Jensen convexity σ_I²·τ.
+        let adjusted = yoy_convexity_adjusted_rate(ratio, accrual, sigma_i, None, None);
+
+        assert!(
+            adjusted > deterministic,
+            "YoY convexity must raise the forward above the deterministic ratio: \
+             adjusted={adjusted}, deterministic={deterministic}"
+        );
+        // Leading-order check: adjusted ratio ≈ ratio·exp(σ_I²·τ).
+        let expected_ratio = ratio * (sigma_i * sigma_i * accrual).exp();
+        let expected_rate = (expected_ratio - 1.0) / accrual;
+        assert!(
+            (adjusted - expected_rate).abs() < 1e-12,
+            "adjusted rate must equal the JY leading-order form"
+        );
+    }
+
+    /// The timing term `−ρ·σ_I·σ_n·τ` reduces the convexity for positive
+    /// inflation/nominal correlation. With `ρ > 0` and a nominal vol supplied,
+    /// the adjusted forward is below the Jensen-only (ρ = 0) value.
+    #[test]
+    fn positive_correlation_reduces_convexity_via_timing_term() {
+        let ratio = 1.025_f64;
+        let accrual = 1.0_f64;
+        let sigma_i = 0.015_f64;
+
+        let jensen_only = yoy_convexity_adjusted_rate(ratio, accrual, sigma_i, None, None);
+        let with_timing =
+            yoy_convexity_adjusted_rate(ratio, accrual, sigma_i, Some(0.40), Some(0.010));
+
+        assert!(
+            with_timing < jensen_only,
+            "positive inflation/nominal correlation must reduce the YoY convexity \
+             via the timing term: with_timing={with_timing}, jensen_only={jensen_only}"
+        );
+        // Both must still exceed the deterministic rate for these moderate params
+        // (σ_I − ρ·σ_n = 0.015 − 0.4·0.01 = 0.011 > 0).
+        let deterministic = (ratio - 1.0) / accrual;
+        assert!(with_timing > deterministic);
+    }
+
+    /// Degenerate guard: a non-positive accrual must not panic.
+    #[test]
+    fn zero_accrual_is_handled() {
+        let r = yoy_convexity_adjusted_rate(1.02, 0.0, 0.015, None, None);
+        assert!(r.is_finite() || r.is_infinite(), "must not panic on zero accrual");
+    }
+}

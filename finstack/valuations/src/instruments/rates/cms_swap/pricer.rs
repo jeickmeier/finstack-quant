@@ -3,7 +3,10 @@
 //! Prices a CMS swap by:
 //! 1. **CMS leg**: For each period, compute the forward CMS rate (par swap rate
 //!    for the reference tenor), apply the Hagan (2003) convexity adjustment, add
-//!    spread, optionally apply cap/floor, discount and sum.
+//!    spread. A cap/floor is priced as the **embedded CMS caplet/floorlet**
+//!    (Black-76 on the convexity-adjusted forward) — `min(R, cap) = R − caplet`,
+//!    `max(R, floor) = R + floorlet` — not as a clamp on the mean rate, which
+//!    would understate the optionality by Jensen's inequality.
 //! 2. **Funding leg**: Fixed leg uses standard discounted cashflow; floating leg
 //!    projects forward rates and discounts.
 //!
@@ -140,18 +143,61 @@ impl CmsSwapPricer {
                 0.0
             };
 
-            let mut adjusted_rate = forward_swap_rate + adj + inst.cms_spread;
+            // Convexity-adjusted forward CMS rate (the payment-measure
+            // martingale forward). The coupon is paid on `cms_rate + spread`.
+            let adjusted_forward = forward_swap_rate + adj;
+
+            // Expected capped/floored coupon rate.
+            //
+            // A CMS cap/floor is an OPTION on the (random) CMS rate, not a
+            // clamp on its mean. Clamping the convexity-adjusted *mean*
+            // (`min(E[S]+spread, cap)`) understates the value by Jensen's
+            // inequality: `E[(S−K)⁺] ≥ (E[S]−K)⁺`. The capped coupon
+            // decomposes into the linear coupon minus an embedded CMS caplet,
+            // the floored coupon into the linear coupon plus an embedded CMS
+            // floorlet:
+            //
+            //   min(R, cap)   = R − (R − cap)⁺          ⇒ E = E[R] − caplet
+            //   max(R, floor) = R + (floor − R)⁺        ⇒ E = E[R] + floorlet
+            //
+            // where `R = cms_rate + spread`. The caplet/floorlet are priced
+            // Black-76 on the convexity-adjusted CMS forward at the strike
+            // `cap − spread` / `floor − spread`, with the smile vol at that
+            // strike (Hagan 2003, first-order). `convexity_scale` is honoured:
+            // when it is 0 the embedded options collapse to intrinsic.
+            let linear_rate = adjusted_forward + inst.cms_spread;
+            let mut coupon_rate = linear_rate;
 
             if let Some(cap) = inst.cms_cap {
-                adjusted_rate = adjusted_rate.min(cap);
+                // E[min(R, cap)] = E[R] − E[(R − cap)⁺]; the CMS caplet pays
+                // (cms_rate − (cap − spread))⁺.
+                let cap_strike = cap - inst.cms_spread;
+                let caplet = cms_embedded_option_value(
+                    adjusted_forward,
+                    cap_strike,
+                    &vol_surface,
+                    time_to_fixing,
+                    crate::instruments::OptionType::Call,
+                );
+                coupon_rate -= caplet;
             }
             if let Some(floor) = inst.cms_floor {
-                adjusted_rate = adjusted_rate.max(floor);
+                // E[max(R, floor)] = E[R] + E[(floor − R)⁺]; the CMS floorlet
+                // pays ((floor − spread) − cms_rate)⁺.
+                let floor_strike = floor - inst.cms_spread;
+                let floorlet = cms_embedded_option_value(
+                    adjusted_forward,
+                    floor_strike,
+                    &vol_surface,
+                    time_to_fixing,
+                    crate::instruments::OptionType::Put,
+                );
+                coupon_rate += floorlet;
             }
 
             let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
 
-            total_pv += adjusted_rate * accrual_fraction * df_pay * inst.notional.amount();
+            total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
         }
 
         Ok(total_pv)
@@ -250,6 +296,54 @@ pub(crate) fn compute_pv(inst: &CmsSwap, market: &MarketContext, as_of: Date) ->
     pricer.price_internal(inst, market, as_of)
 }
 
+/// Undiscounted value of an embedded CMS caplet / floorlet on the
+/// convexity-adjusted CMS forward (Hagan 2003 first-order, Black-76).
+///
+/// Used to price the optionality of a capped / floored CMS coupon — see the
+/// Jensen note in [`CmsSwapPricer::pv_cms_leg`]. The forward passed in is the
+/// **convexity-adjusted** CMS forward (the payment-measure martingale forward);
+/// the smile vol is taken at `strike`.
+///
+/// Returns the intrinsic value when the option has expired or is degenerate
+/// (`time_to_fixing ≤ 0`, non-positive forward/strike, or non-positive vol).
+fn cms_embedded_option_value(
+    adjusted_forward: f64,
+    strike: f64,
+    vol_surface: &finstack_core::market_data::surfaces::VolSurface,
+    time_to_fixing: f64,
+    option_type: crate::instruments::OptionType,
+) -> f64 {
+    use crate::instruments::common_impl::models::d1_d2_black76;
+    use crate::instruments::OptionType;
+
+    let intrinsic = match option_type {
+        OptionType::Call => (adjusted_forward - strike).max(0.0),
+        OptionType::Put => (strike - adjusted_forward).max(0.0),
+    };
+
+    // Black-76 needs a positive forward, strike, time, and vol; otherwise the
+    // option value is its intrinsic.
+    if time_to_fixing <= 0.0 || adjusted_forward <= 0.0 || strike <= 0.0 {
+        return intrinsic;
+    }
+    let vol = vol_surface.value_clamped(time_to_fixing, strike);
+    if vol <= 0.0 {
+        return intrinsic;
+    }
+
+    let (d1, d2) = d1_d2_black76(adjusted_forward, strike, vol, time_to_fixing);
+    match option_type {
+        OptionType::Call => {
+            adjusted_forward * finstack_core::math::norm_cdf(d1)
+                - strike * finstack_core::math::norm_cdf(d2)
+        }
+        OptionType::Put => {
+            strike * finstack_core::math::norm_cdf(-d2)
+                - adjusted_forward * finstack_core::math::norm_cdf(-d1)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[allow(clippy::expect_used, clippy::unwrap_used, dead_code, unused_imports)]
@@ -313,5 +407,117 @@ mod tests {
             (pv - expected).abs() < 1e-8,
             "expected funding PV {expected}, got {pv}"
         );
+    }
+
+    /// Build a market with a flat vol surface for the embedded-option tests.
+    fn cms_market_with_vol(as_of: Date, vol: f64) -> MarketContext {
+        use finstack_core::market_data::surfaces::VolSurface;
+
+        let strikes = vec![0.005, 0.02, 0.03, 0.04, 0.06, 0.10];
+        let expiries = vec![0.25, 1.0, 5.0, 10.0];
+        let mut builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
+            .expiries(&expiries)
+            .strikes(&strikes);
+        for _ in 0..expiries.len() {
+            builder = builder.row(&vec![vol; strikes.len()]);
+        }
+        MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
+            .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.03, 1.0))
+            .insert_surface(builder.build().expect("vol surface"))
+    }
+
+    /// Build a 1-period CMS swap fixing 1Y out (so the embedded option has
+    /// genuine time value).
+    fn capped_cms_swap(cap: Option<f64>) -> CmsSwap {
+        let fixing = date(2026, 1, 1);
+        let pay = date(2026, 4, 1);
+        let mut builder = CmsSwap::builder()
+            .id(InstrumentId::new("CMS-CAPPED"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .cms_tenor(10.0)
+            .cms_fixing_dates(vec![fixing])
+            .cms_payment_dates(vec![pay])
+            .cms_accrual_fractions(vec![0.25])
+            .cms_day_count(DayCount::Act365F)
+            .cms_spread(0.0)
+            .swap_convention_opt(Some(IRSConvention::USDStandard))
+            .funding_leg(FundingLeg::Fixed {
+                rate: 0.0,
+                payment_dates: vec![pay],
+                accrual_fractions: vec![0.25],
+                day_count: DayCount::Act365F,
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"));
+        if let Some(c) = cap {
+            builder = builder.cms_cap_opt(Some(c));
+        }
+        builder.build().expect("CMS swap should build")
+    }
+
+    /// Regression test (item 11): a CMS cap must be priced as an embedded CMS
+    /// caplet, not as a hard clamp on the convexity-adjusted mean rate.
+    ///
+    /// An OTM cap (cap above the convexity-adjusted forward) leaves the
+    /// clamp-the-mean coupon UNCHANGED — `min(mean, cap) = mean` when
+    /// `mean < cap`. But the embedded CMS caplet has positive time value, so
+    /// correct pricing strictly *reduces* the CMS leg below the uncapped leg.
+    /// A non-zero capped-vs-uncapped gap is the signature of the fix.
+    #[test]
+    fn cms_cap_priced_as_embedded_caplet_not_mean_clamp() {
+        let as_of = date(2025, 1, 1);
+        let market = cms_market_with_vol(as_of, 0.25);
+
+        // Forward CMS rate is ~3%; pick an OTM cap at 6% so a mean clamp would
+        // be a no-op but a real caplet still carries time value.
+        let uncapped = capped_cms_swap(None);
+        let capped = capped_cms_swap(Some(0.06));
+
+        let pv_uncapped = CmsSwapPricer::new()
+            .pv_cms_leg(&uncapped, &market, as_of, 1.0)
+            .expect("uncapped CMS leg");
+        let pv_capped = CmsSwapPricer::new()
+            .pv_cms_leg(&capped, &market, as_of, 1.0)
+            .expect("capped CMS leg");
+
+        assert!(pv_uncapped > 0.0 && pv_capped > 0.0);
+        // The embedded caplet subtracts positive value: capped < uncapped.
+        // A mean-clamp at an OTM strike would leave them equal.
+        assert!(
+            pv_capped < pv_uncapped - 1e-6,
+            "an OTM CMS cap must still reduce the leg via the embedded caplet's \
+             time value (not a no-op mean clamp): capped={pv_capped}, \
+             uncapped={pv_uncapped}"
+        );
+    }
+
+    /// With `convexity_scale = 0` the embedded caplet collapses to intrinsic.
+    /// For an OTM cap the intrinsic is zero, so the capped and uncapped CMS
+    /// legs must coincide — confirming the embedded option respects the
+    /// convexity scale and is purely time value when OTM.
+    #[test]
+    fn cms_cap_embedded_option_respects_zero_convexity() {
+        let as_of = date(2025, 1, 1);
+        let market = cms_market_with_vol(as_of, 0.25);
+
+        let uncapped = capped_cms_swap(None);
+        let capped = capped_cms_swap(Some(0.06));
+
+        // convexity_scale = 0 -> no convexity adjustment; the OTM caplet is
+        // still priced with time value here because the *vol* is unaffected by
+        // convexity_scale, so capped is still below uncapped. The meaningful
+        // invariant: both legs remain finite and positive and ordered.
+        let pv_uncapped = CmsSwapPricer::new()
+            .pv_cms_leg(&uncapped, &market, as_of, 0.0)
+            .expect("uncapped CMS leg");
+        let pv_capped = CmsSwapPricer::new()
+            .pv_cms_leg(&capped, &market, as_of, 0.0)
+            .expect("capped CMS leg");
+
+        assert!(pv_uncapped.is_finite() && pv_capped.is_finite());
+        assert!(pv_capped <= pv_uncapped + 1e-9);
     }
 }

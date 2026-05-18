@@ -59,12 +59,28 @@ impl MetricCalculator for DeltaCalculator {
 
         // Black (lognormal) Greeks are undefined for non-positive forward or
         // strike; fall back to Bachelier (normal) for negative-rate regimes.
-        let use_normal = matches!(option.vol_model, VolatilityModel::Normal)
-            || inputs.forward <= 0.0
-            || strike <= 0.0;
+        let normal_by_model = matches!(option.vol_model, VolatilityModel::Normal);
+        let normal_by_negative_rate = inputs.forward <= 0.0 || strike <= 0.0;
+        let use_normal = normal_by_model || normal_by_negative_rate;
         let delta = if use_normal {
             use crate::instruments::common_impl::models::volatility::normal::d_bachelier;
-            let d = d_bachelier(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
+            // When the Normal model is the configured vol model, `inputs.sigma`
+            // is already a normal vol. When the fallback is triggered purely by
+            // a non-positive forward/strike, `inputs.sigma` is a LOGNORMAL vol
+            // (from SABR or a lognormal surface) and must be converted before
+            // the Bachelier greek, otherwise the d-value is mis-scaled.
+            let normal_sigma = if normal_by_model {
+                inputs.sigma
+            } else {
+                super::resolved_normal_sigma(
+                    option,
+                    inputs.forward,
+                    strike,
+                    inputs.sigma,
+                    inputs.time_to_expiry,
+                )
+            };
+            let d = d_bachelier(inputs.forward, strike, normal_sigma, inputs.time_to_expiry);
             match option.option_type {
                 OptionType::Call => finstack_core::math::norm_cdf(d),
                 OptionType::Put => -finstack_core::math::norm_cdf(-d),

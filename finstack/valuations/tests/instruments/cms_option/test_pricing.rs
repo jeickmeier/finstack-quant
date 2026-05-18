@@ -505,3 +505,75 @@ fn test_cms_option_requires_vol_surface_in_market() {
         "Should fail when vol surface is not in market"
     );
 }
+
+/// Build a market whose vol surface has a strong skew: a fixed ATM vol at the
+/// forward swap rate (~3.5%) but a very different vol at the option strike.
+///
+/// `atm_vol` is placed at every node on the 3%–4% strike band so the surface
+/// value at the forward is exactly `atm_vol`; `wing_vol` is placed on the
+/// 1%–2% strikes. With `strike = 1.5%` the option samples `wing_vol`, while the
+/// CMS convexity adjustment — a property of the swap-rate distribution — must
+/// sample `atm_vol`.
+fn skewed_vol_market(as_of: Date, atm_vol: f64, wing_vol: f64) -> MarketContext {
+    let mut market = standard_market(as_of);
+    // Replace the flat surface with a skewed one.
+    let strikes = vec![0.01, 0.02, 0.03, 0.035, 0.04, 0.05];
+    let expiries = vec![0.5, 1.0, 5.0, 10.0, 20.0];
+    // Per-strike vols: deep wings carry `wing_vol`, the ATM band carries `atm_vol`.
+    let row = vec![wing_vol, wing_vol, atm_vol, atm_vol, atm_vol, atm_vol];
+    let mut builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
+        .expiries(&expiries)
+        .strikes(&strikes);
+    for _ in 0..expiries.len() {
+        builder = builder.row(&row);
+    }
+    market = market.insert_surface(builder.build().unwrap());
+    market
+}
+
+/// Regression test (item 1): the CMS convexity adjustment must be computed with
+/// the ATM vol σ(F), not the strike vol σ(K).
+///
+/// Failure mode being guarded: the Hagan convexity adjustment was previously
+/// evaluated at `vol_surface.value_clamped(t, strike)`. The convexity
+/// adjustment is a property of the swap-rate *distribution* under the annuity
+/// measure (`Var^A[S] ≈ F²σ(F)²T`) and must use σ(F); using σ(K) makes the
+/// adjusted forward depend on the option strike and disagrees with the
+/// static-replication pricer.
+///
+/// Construction: a deep ITM CMS caplet (strike 1.5% vs forward ~3.5%) is priced
+/// on a strongly skewed surface (ATM 20%, wing 80%). A deep-ITM caplet's price
+/// is dominated by `(F_adjusted - K)`, so it is sensitive to the convexity
+/// adjustment but only weakly sensitive to the option-payoff vol. If the
+/// adjustment correctly used σ(F)=20%, the price matches the same option on a
+/// FLAT-20% surface; if it (wrongly) used the wing vol σ(K)=80%, the adjusted
+/// forward — and hence the price — would be materially larger.
+#[test]
+fn convexity_adjustment_uses_atm_vol_not_strike_vol() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+
+    // Deep-ITM caplet: strike well below the ~3.5% forward.
+    let mut inst = CmsOption::example();
+    inst.strike = Decimal::try_from(0.015).expect("valid decimal");
+
+    // Skewed surface: σ(F)=20% at the forward, σ(K)=80% at the strike.
+    let skewed = skewed_vol_market(as_of, 0.20, 0.80);
+    let pv_skewed = inst.value(&skewed, as_of).expect("skewed pricing").amount();
+
+    // Flat surface everywhere at the ATM level 20%.
+    let flat = standard_market(as_of); // standard_market is flat 20%
+    let pv_flat = inst.value(&flat, as_of).expect("flat pricing").amount();
+
+    // The convexity adjustment must be identical (both σ(F)=20%). For a
+    // deep-ITM caplet the option-payoff vol contributes only a small time
+    // value, so the prices must agree closely. With the pre-fix bug the
+    // skewed-surface convexity used σ(K)=80%, inflating the adjusted forward
+    // and the price by far more than this tolerance.
+    let rel_diff = (pv_skewed - pv_flat).abs() / pv_flat.max(1.0);
+    assert!(
+        rel_diff < 0.05,
+        "deep-ITM CMS caplet price must be driven by σ(F) for the convexity \
+         adjustment, independent of σ(K): pv_skewed={pv_skewed}, pv_flat={pv_flat}, \
+         rel_diff={rel_diff}"
+    );
+}

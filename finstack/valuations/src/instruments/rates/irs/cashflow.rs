@@ -253,7 +253,14 @@ fn projected_overnight_rate(
             proj.day_count()
                 .year_fraction(proj.base_date(), obs_end, DayCountContext::default())?
         };
-        return Ok(if (t1 - t0).abs() > f64::EPSILON {
+        // Distinguish a genuine forward period from a zero-length one using an
+        // *economic* tolerance, not raw machine epsilon. `f64::EPSILON`
+        // (~2.2e-16 yr) is meaningless as a time threshold — any real period
+        // exceeds it, and a near-degenerate sub-second period that should
+        // collapse to a spot rate would not. `MIN_FORWARD_PERIOD_YEARS`
+        // (~one second) is the smallest period worth projecting as a forward.
+        const MIN_FORWARD_PERIOD_YEARS: f64 = 1.0 / (365.0 * 24.0 * 60.0 * 60.0);
+        return Ok(if (t1 - t0).abs() > MIN_FORWARD_PERIOD_YEARS {
             proj.rate_period(t0, t1)
         } else {
             proj.rate(t0)

@@ -58,12 +58,28 @@ impl MetricCalculator for VegaCalculator {
 
         // Black (lognormal) Greeks are undefined for non-positive forward or
         // strike; fall back to Bachelier (normal) for negative-rate regimes.
-        let use_normal = matches!(option.vol_model, VolatilityModel::Normal)
-            || inputs.forward <= 0.0
-            || strike <= 0.0;
+        let normal_by_model = matches!(option.vol_model, VolatilityModel::Normal);
+        let normal_by_negative_rate = inputs.forward <= 0.0 || strike <= 0.0;
+        let use_normal = normal_by_model || normal_by_negative_rate;
         let vega_raw = if use_normal {
             use crate::instruments::common_impl::models::volatility::normal::d_bachelier;
-            let d = d_bachelier(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
+            // For the negative-rate fallback `inputs.sigma` is a lognormal vol;
+            // convert it to a normal vol so the Bachelier d-value — and hence
+            // the vega — is correctly scaled. (Vega here measures sensitivity
+            // to the normal vol on this path, consistent with the Bachelier
+            // pricer the fallback uses.)
+            let normal_sigma = if normal_by_model {
+                inputs.sigma
+            } else {
+                super::resolved_normal_sigma(
+                    option,
+                    inputs.forward,
+                    strike,
+                    inputs.sigma,
+                    inputs.time_to_expiry,
+                )
+            };
+            let d = d_bachelier(inputs.forward, strike, normal_sigma, inputs.time_to_expiry);
             finstack_core::math::norm_pdf(d) * inputs.time_to_expiry.sqrt()
         } else {
             use crate::instruments::common_impl::models::d1_black76;

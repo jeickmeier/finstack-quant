@@ -124,10 +124,21 @@ impl SwapSchedule {
 /// # Payoff
 ///
 /// At exercise date t, if exercised:
-/// - Payer: Pay fixed rate K, receive floating → value = (S(t) - K) * A(t) * N
-/// - Receiver: Receive fixed rate K, pay floating → value = (K - S(t)) * A(t) * N
+/// - Payer: Pay fixed rate K, receive floating → value = (S(t) - K)⁺ · A(t) · N
+/// - Receiver: Receive fixed rate K, pay floating → value = (K - S(t))⁺ · A(t) · N
 ///
-/// where S(t) is the forward swap rate and A(t) is the annuity.
+/// where `S(t)` is the forward swap rate, `A(t)` is the **swap annuity** at the
+/// exercise date and `N` the notional. The exercise-date value is then
+/// discounted to the valuation date by the pathwise numéraire `B(t)`:
+///
+/// ```text
+/// PV = (swap-rate diff)⁺ · A(t) · N / B(t)
+/// ```
+///
+/// `(swap-rate diff)⁺` alone is a *rate*, not a present value: it must be
+/// multiplied by the annuity (units of years) and divided by the numéraire to
+/// become a discounted cashflow. The pricer records `A(t)` and `B(t)` via
+/// [`BermudanSwaptionPayoff::record_exercise_state`] before the exercise event.
 #[derive(Debug, Clone)]
 pub struct BermudanSwaptionPayoff {
     /// Exercise dates (time in years from valuation date)
@@ -141,8 +152,18 @@ pub struct BermudanSwaptionPayoff {
     /// Notional amount
     pub notional: f64,
     // State variables (tracked during path simulation)
-    /// Current swap value (computed at exercise dates)
+    /// Current forward swap rate minus strike, payer convention `S(t) − K`
+    /// (computed at exercise dates by the pricer). This is a *rate*, not a PV.
     current_swap_value: f64,
+    /// Swap annuity `A(t)` at the current exercise date.
+    ///
+    /// Set by the pricer alongside `current_swap_value`. The exercise payoff
+    /// is `(rate diff)⁺ · A(t) · N`; without the annuity the payoff would be a
+    /// dimensionless rate rather than a cashflow.
+    current_annuity: f64,
+    /// Pathwise money-market numéraire `B(t)` at the current exercise date,
+    /// used to discount the exercise value to the valuation date (`B(0) = 1`).
+    current_numeraire: f64,
     /// Index of last exercise date checked
     next_exercise_idx: usize,
     /// Whether option was exercised
@@ -156,37 +177,90 @@ impl BermudanSwaptionPayoff {
     ///
     /// # Arguments
     ///
-    /// * `exercise_dates` - Dates when exercise is allowed (must be sorted)
+    /// * `exercise_dates` - Dates when exercise is allowed (must be strictly
+    ///   sorted ascending)
     /// * `swap_schedule` - Underlying swap schedule
     /// * `strike` - Fixed rate of the swap (e.g., 0.0325 for 3.25%)
     /// * `option_type` - Payer or receiver
     /// * `notional` - Notional amount
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_core::Error::Validation`] if `exercise_dates` are not
+    /// strictly sorted ascending. (Library code must not panic — a `debug`
+    /// `assert!` would also be a `panic!` in debug builds.)
     pub fn new(
         exercise_dates: Vec<f64>,
         swap_schedule: SwapSchedule,
         strike: f64,
         option_type: SwaptionType,
         notional: f64,
-    ) -> Self {
-        // Verify exercise dates are sorted
+    ) -> finstack_core::Result<Self> {
+        // Verify exercise dates are strictly sorted ascending. `partial_cmp`
+        // returning anything other than `Less` (including `None` for NaN)
+        // is rejected.
+        use std::cmp::Ordering;
         for i in 1..exercise_dates.len() {
-            assert!(
-                exercise_dates[i - 1] < exercise_dates[i],
-                "Exercise dates must be sorted"
-            );
+            if exercise_dates[i - 1].partial_cmp(&exercise_dates[i]) != Some(Ordering::Less) {
+                return Err(finstack_core::Error::Validation(format!(
+                    "BermudanSwaptionPayoff: exercise_dates must be strictly sorted \
+                     ascending; found {} >= {} at index {}",
+                    exercise_dates[i - 1],
+                    exercise_dates[i],
+                    i
+                )));
+            }
         }
 
-        Self {
+        Ok(Self {
             exercise_dates,
             swap_schedule,
             strike,
             option_type,
             notional,
             current_swap_value: 0.0,
+            current_annuity: 0.0,
+            current_numeraire: 1.0,
             next_exercise_idx: 0,
             exercised: false,
             exercise_date: None,
-        }
+        })
+    }
+
+    /// Record the exercise-date state the payoff needs to produce a properly
+    /// annuitied, discounted value.
+    ///
+    /// The pricer must call this *before* the exercise event so [`value`] can
+    /// turn the raw rate difference into a present value:
+    ///
+    /// ```text
+    /// PV = (rate diff)⁺ · annuity · notional / numeraire
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `swap_rate_minus_strike` - `S(t) − K` (payer convention), a rate.
+    /// * `annuity` - swap annuity `A(t)` at the exercise date (`Σ τ_i P(t,T_i)`).
+    /// * `numeraire` - pathwise money-market numéraire `B(t)` (`B(0) = 1`).
+    ///
+    /// [`value`]: Self::value
+    //
+    // Integration point for the generic `finstack_monte_carlo` `Payoff`-driven
+    // engine. The production Bermudan-swaption path uses the dedicated
+    // Longstaff-Schwartz induction in `monte_carlo_lsmc.rs`, which annuitises
+    // and discounts directly, so this setter is currently exercised only by
+    // unit tests — kept (rather than deleted) so the `Payoff` impl remains
+    // self-consistent and correct for any caller routing through that engine.
+    #[allow(dead_code)]
+    pub fn record_exercise_state(
+        &mut self,
+        swap_rate_minus_strike: f64,
+        annuity: f64,
+        numeraire: f64,
+    ) {
+        self.current_swap_value = swap_rate_minus_strike;
+        self.current_annuity = annuity;
+        self.current_numeraire = numeraire;
     }
 
     /// Check if we should exercise at current time.
@@ -222,13 +296,25 @@ impl Payoff for BermudanSwaptionPayoff {
 
     fn value(&self, currency: Currency) -> Money {
         if self.exercised {
-            // Value at exercise: (S(t) - K) * A(t) * N for payer
-            // Note: This is simplified - full implementation requires annuity calculation
-            let payoff = match self.option_type {
+            // Exercise value is the discounted, annuitied swap value:
+            //   PV = (rate diff)⁺ · A(t) · N / B(t)
+            // The bare rate difference `current_swap_value` is NOT a present
+            // value — it must be scaled by the annuity `A(t)` (years) and
+            // discounted by the pathwise numéraire `B(t)`. Returning the raw
+            // rate would inject a spurious dimensionless "cashflow".
+            let rate_diff = match self.option_type {
                 SwaptionType::Payer => self.current_swap_value.max(0.0),
                 SwaptionType::Receiver => (-self.current_swap_value).max(0.0),
             };
-            Money::new(payoff * self.notional, currency)
+            // `B(t) > 0` always (it is exp of an integral); guard defensively
+            // so an unset/degenerate numéraire cannot produce a non-finite PV.
+            let numeraire = if self.current_numeraire > 0.0 {
+                self.current_numeraire
+            } else {
+                1.0
+            };
+            let pv = rate_diff * self.current_annuity * self.notional / numeraire;
+            Money::new(pv, currency)
         } else {
             // Not exercised - value is zero (continuation value handled by LSMC)
             Money::new(0.0, currency)
@@ -237,6 +323,8 @@ impl Payoff for BermudanSwaptionPayoff {
 
     fn reset(&mut self) {
         self.current_swap_value = 0.0;
+        self.current_annuity = 0.0;
+        self.current_numeraire = 1.0;
         self.next_exercise_idx = 0;
         self.exercised = false;
         self.exercise_date = None;
@@ -287,11 +375,77 @@ mod tests {
             0.0325,
             SwaptionType::Payer,
             10_000_000.0,
-        );
+        )
+        .expect("valid bermudan payoff inputs");
 
         assert_eq!(payoff.strike, 0.0325);
         assert_eq!(payoff.exercise_dates.len(), 3);
         assert!(!payoff.exercised);
+    }
+
+    #[test]
+    fn test_bermudan_swaption_payoff_rejects_unsorted_exercise_dates() {
+        let payment_dates = vec![1.0, 1.25];
+        let accruals = vec![0.25, 0.25];
+        let schedule = SwapSchedule::new(1.0, 1.25, payment_dates, accruals)
+            .expect("valid swap schedule inputs");
+        // Unsorted exercise dates must produce an Err, not a panic.
+        let result = BermudanSwaptionPayoff::new(
+            vec![1.5, 1.0],
+            schedule,
+            0.0325,
+            SwaptionType::Payer,
+            1.0,
+        );
+        assert!(
+            result.is_err(),
+            "unsorted exercise dates must return Err, not panic"
+        );
+    }
+
+    /// Regression test (item 4): the Bermudan swaption exercise value must be
+    /// the properly annuitied, discounted swap value — `(rate diff)⁺ · A · N /
+    /// B` — not the bare rate difference. Previously `value()` returned
+    /// `current_swap_value.max(0.0) · notional`, a dimensionless rate scaled by
+    /// notional, omitting `× annuity` and discounting.
+    #[test]
+    fn exercised_payoff_is_annuitied_and_discounted() {
+        let payment_dates = vec![1.0, 1.5, 2.0];
+        let accruals = vec![0.5, 0.5, 0.5];
+        let schedule = SwapSchedule::new(1.0, 2.0, payment_dates, accruals)
+            .expect("valid swap schedule inputs");
+        let mut payoff = BermudanSwaptionPayoff::new(
+            vec![1.0],
+            schedule,
+            0.03,
+            SwaptionType::Payer,
+            10_000_000.0,
+        )
+        .expect("valid bermudan payoff inputs");
+
+        // Pricer records: S − K = 1% rate diff, annuity 2.7, numéraire B = 1.05.
+        let rate_diff = 0.01_f64;
+        let annuity = 2.7_f64;
+        let numeraire = 1.05_f64;
+        payoff.record_exercise_state(rate_diff, annuity, numeraire);
+        payoff.exercised = true;
+        payoff.exercise_date = Some(1.0);
+
+        let pv = payoff.value(Currency::USD).amount();
+
+        // Correct payoff: (rate diff)⁺ · A · N / B.
+        let expected = rate_diff * annuity * 10_000_000.0 / numeraire;
+        assert!(
+            (pv - expected).abs() < 1e-6,
+            "exercise value must be annuitied and discounted: got {pv}, expected {expected}"
+        );
+        // The bare-rate bug would have returned rate_diff · notional = 100_000;
+        // the correct value is materially different.
+        let buggy = rate_diff * 10_000_000.0;
+        assert!(
+            (pv - buggy).abs() > 1.0,
+            "payoff must differ from the unannuitied/undiscounted rate·notional"
+        );
     }
 
     #[test]
@@ -303,7 +457,8 @@ mod tests {
             .expect("valid swap schedule inputs");
 
         let mut payoff =
-            BermudanSwaptionPayoff::new(exercise_dates, schedule, 0.0325, SwaptionType::Payer, 1.0);
+            BermudanSwaptionPayoff::new(exercise_dates, schedule, 0.0325, SwaptionType::Payer, 1.0)
+                .expect("valid bermudan payoff inputs");
 
         // Simulate some state
         payoff.current_swap_value = 0.01;

@@ -20,8 +20,9 @@
 //!
 //! 2. **LSMC pathwise-numéraire consistency.** A single-exercise Bermudan
 //!    is a European swaption, whose price obeys the model-free identity
-//!    `V(0) = E[ X(t)/B(t) ]` with `B(t) = ∏ exp(r_k·Δt_k)` the realized
-//!    money-market account. An LSMC engine that discounts by the
+//!    `V(0) = E[ X(t)/B(t) ]` with `B(t) = exp(∫₀ᵗ r ds)` the realized
+//!    money-market account (discretised here with the trapezoidal rule, the
+//!    same rule the LSMC engine uses). An LSMC engine that discounts by the
 //!    *deterministic* market discount factor `DF(t)` instead of the
 //!    pathwise `1/B(t)` ignores the (negative, for payers) correlation
 //!    between the swap payoff and the stochastic discount factor and
@@ -363,12 +364,21 @@ fn hw1f_intrinsic(
 
 /// Simulate `num_paths` Hull-White 1F short-rate paths on `grid`, returning,
 /// for each path, the rate at every grid point and the realised
-/// money-market account `B(t)` (`B(0)=1`, left-endpoint Riemann rule).
+/// money-market account `B(t)` (`B(0)=1`).
+///
+/// `B(t)` integrates the short rate with the **trapezoidal rule**
+/// `∫_{t_k}^{t_{k+1}} r ds ≈ ½·(r(t_k)+r(t_{k+1}))·Δt_k`, matching
+/// `SwaptionLsmcPricer::accumulate_bank_factors`. (The exact-HW1F transition
+/// supplies both endpoint rates, so the trapezoidal rule is O(Δt²) at no extra
+/// cost — the previous left-endpoint Riemann rule left an O(Δt) bias.) This
+/// reference and the LSMC engine must use the **same** integration rule so any
+/// remaining discrepancy is attributable to the discounting *convention*
+/// (pathwise numéraire vs deterministic discount factor), not to a
+/// discretisation mismatch.
 ///
 /// This is the *same* generation as the LSMC engine's non-antithetic
 /// path generator: per-path Philox substream, one standard normal per
-/// step, `ExactHullWhite1F` stepper — so a reference built on these paths
-/// differs from the engine only in the discounting convention.
+/// step, `ExactHullWhite1F` stepper.
 fn simulate_hw1f_paths(
     hw: &HullWhite1FProcess,
     r0: f64,
@@ -392,13 +402,15 @@ fn simulate_hw1f_paths(
         banks.push(1.0_f64); // B(t_0) = 1
         let mut acc = 1.0;
         for step in 0..num_steps {
-            // r(t_step) at the start of the interval drives B over [t_step, t_{step+1}).
-            acc *= (rates[step] * grid.dt(step)).exp();
+            let r_start = rates[step];
             let t = grid.time(step);
             let dt = grid.dt(step);
             path_rng.fill_std_normals(&mut z);
             disc.step(hw, t, dt, &mut state, &z, &mut work);
-            rates.push(state[0]);
+            let r_end = state[0];
+            rates.push(r_end);
+            // Trapezoidal integral of the short rate over [t_step, t_{step+1}].
+            acc *= (0.5 * (r_start + r_end) * dt).exp();
             banks.push(acc);
         }
         rate_paths.push(rates);
@@ -591,7 +603,8 @@ fn lsmc_european_uses_pathwise_money_market_numeraire() {
             strike,
             SwaptionType::Payer,
             notional,
-        );
+        )
+        .expect("valid bermudan payoff inputs");
         let (grid, exercise_idx) =
             SwaptionLsmcConfig::build_exercise_aligned_grid(&[ex_t], schedule.end_date, 2)
                 .expect("grid");
@@ -670,7 +683,8 @@ fn lsmc_bermudan_matches_pathwise_numeraire_reference() {
         strike,
         SwaptionType::Payer,
         notional,
-    );
+    )
+    .expect("valid bermudan payoff inputs");
     let (grid, exercise_idx) =
         SwaptionLsmcConfig::build_exercise_aligned_grid(&exercise_times, schedule.end_date, 2)
             .expect("grid");

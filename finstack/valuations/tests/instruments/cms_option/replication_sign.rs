@@ -36,26 +36,32 @@
 //! ```
 //! confirming the PLUS sign is correct for the caplet branch.
 //!
-//! ## Key Consequence: V_floor < g(K)·P_sw(K)
+//! ## Key Consequence: V_floor < boundary
 //!
 //! Since `g(k)` is strictly **increasing** in `k` (because `A_par(k)` is strictly decreasing),
-//! for all `k < K`:  `g(k) < g(K)`.
+//! for all `k < K`:  `g(k) < g(K)`, so the replication integral is strictly positive and
+//! `V_floor = boundary − δ_floor < boundary`.
 //!
-//! Therefore:
+//! With the WRONG (`+`) sign, the formula gives `boundary + δ_floor > boundary`.
+//! With the CORRECT (`−`) sign, the formula gives `boundary − δ_floor < boundary`.
+//!
+//! ## Annuity convention (audit item 12)
+//!
+//! The boundary term is `g(K)·C_sw(K)`. The Radon-Nikodym weight `g(k) =
+//! DF_pay/A_par(k)` is defined with the closed-form par annuity `A_par(k)`; for
+//! annuity-consistency the replicating swaption price `C_sw(k)` is expressed on
+//! the **same** par annuity, `C_sw(k) = A_par(k)·Black76(F,k,σ,T)`, so the
+//! product collapses to
+//!
 //! ```text
-//! V_floor = A₀ · ∫_0^K g(k) · Q^A(S < k) dk
-//!         < A₀ · g(K) · ∫_0^K Q^A(S < k) dk
-//!         = g(K) · P_sw(K)
+//! boundary = g(K)·C_sw(K) = DF_pay · Black76(F, K, σ(K), T)
 //! ```
 //!
-//! so **the correct replication floorlet value is strictly less than the boundary term**
-//! `boundary = g(K)·P_sw(K)`.
-//!
-//! With the WRONG (`+`) sign, the formula gives `g(K)·P_sw(K) + δ_floor > boundary`.
-//! With the CORRECT (`−`) sign, the formula gives `g(K)·P_sw(K) − δ_floor < boundary`.
-//!
-//! The test below verifies `V_floor_replication < boundary` using independently computed
-//! values of `g(K)` (from the closed-form par-annuity) and `P_sw(K)` (from Black-76).
+//! with the annuity cancelling. (The earlier convention used the market
+//! annuity `A₀` for `C_sw`, leaving a spurious `A₀/A_par(K)` residual.) The
+//! tests below recompute `boundary` from this corrected, annuity-cancelled
+//! form using independently-evaluated `DF_pay` and Black-76 prices — so the
+//! integral-SIGN assertions remain self-contained.
 
 use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, DayCount, Tenor};
@@ -240,23 +246,18 @@ fn test_cms_replication_floorlet_positive() {
     );
 }
 
-/// **Core sign test**: V_floor_replication < g(K)·P_sw(K).
+/// **Core sign test**: V_floor_replication < boundary.
 ///
-/// The AP formula derives `V_floor = A₀ ∫_0^K g(k) Q^A(S<k) dk`.
-/// Because `g(k) < g(K)` for all `k < K` (g is strictly increasing), Jensen gives:
+/// The replication floorlet is `V_floor = boundary − ∫_{K_min}^K g'(k)·C_sw(k) dk`.
+/// Because `g'(k) > 0` (g is strictly increasing) the integral is strictly
+/// positive, so the correct (−) sign gives `V_floor < boundary`.
 ///
-/// ```text
-/// V_floor < A₀ · g(K) · ∫_0^K Q^A(S<k) dk = g(K) · A₀ · E^A[(K−S)^+] = g(K)·P_sw(K)
-/// ```
+/// With the **correct** (−) sign: `boundary − δ < boundary`. ✓
+/// With the **wrong** (+) sign:   `boundary + δ > boundary`. ✗
 ///
-/// The right-hand side `g(K)·P_sw(K)` is the **boundary term** computed identically
-/// inside `CmsReplicationPricer`.
-///
-/// With the **correct** (−) sign the formula gives `g(K)·P_sw − δ < g(K)·P_sw`. ✓
-/// With the **wrong** (+) sign the formula gives `g(K)·P_sw + δ > g(K)·P_sw`. ✗
-///
-/// The test computes `g(K)·P_sw(K)` independently (same par-annuity and Black-76
-/// formulas as the pricer) so the assertion is self-contained.
+/// The boundary is the annuity-consistent `g(K)·C_sw(K) = DF_pay·Black76_put(K)`
+/// (audit item 12), computed independently here from `DF_pay` and Black-76 so
+/// the assertion is self-contained.
 ///
 /// ## Parameters chosen to maximise δ/boundary ratio
 ///
@@ -281,30 +282,39 @@ fn test_cms_replication_floorlet_below_boundary() {
     let floor = single_curve_cms(fixing, payment, strike, cms_tenor, OptionType::Put);
     let v_floor = replication_price(&floor, &mkt, as_of);
 
-    // Compute the boundary g(K)·P_sw(K) independently.
+    // Compute the boundary g(K)·C_sw(K) independently.
+    //
+    // Annuity-consistency (audit item 12): the static-replication boundary is
+    // `g(k)·C_sw(k)` with `g(k) = DF_pay/A_par(k)` and the swaption price
+    // expressed on the SAME closed-form par annuity, `C_sw(k) =
+    // A_par(k)·Black76(F,k,σ,T)`. The annuity cancels cleanly:
+    //
+    //   boundary = g(K)·C_sw(K) = (DF_pay/A_par(K))·(A_par(K)·Black76) = DF_pay·Black76
+    //
+    // The pre-item-12 pricer used the *market* annuity `A₀` for `C_sw` while
+    // dividing by `A_par(K)` in `g`, leaving a spurious `A₀/A_par(K)` residual.
+    // `par_annuity` / `a0` are therefore no longer part of the boundary; they
+    // are retained below only for the diagnostic print.
     //
     // Time to fixing (Act365F from 2025-01-01 to 2030-01-02):
     let t_fix = 5.004_f64; // ≈ 5 years + 1 day in Act365F
                            // DF to payment date (Act365F continuous at 3%):
     let t_pay = 5.252_f64; // ≈ 5.25 years to 2030-04-03
     let df_pay = (-0.03_f64 * t_pay).exp();
-    // Par annuity at K = 3% for 20Y semi-annual — same formula as pricer.
-    let a_par_k = par_annuity(strike, cms_tenor, m);
-    let g_k = df_pay / a_par_k;
-    // Market annuity A₀ for the forward 20Y swap starting 2030-01-02.
-    // A₀ = Σ_{i=1}^{40} 0.5 · exp(−0.03 · (t_fix + 0.5·i))   [Act365F continuous, 40 periods]
+    let a_par_k = par_annuity(strike, cms_tenor, m); // diagnostic only
     let a0: f64 = (1..=40)
         .map(|i| 0.5 * (-0.03 * (t_fix + 0.5 * i as f64)).exp())
-        .sum();
+        .sum(); // diagnostic only
     // Black-76 ATM put: vol=40%, T=t_fix ≈ 5Y, F=K=3%.
-    let p_sw_k = a0 * b76_put(strike, strike, 0.40, t_fix);
-    let boundary = g_k * p_sw_k;
+    let p_sw_k = b76_put(strike, strike, 0.40, t_fix);
+    // Annuity-consistent boundary: g(K)·C_sw(K) = DF_pay·Black76_put(K).
+    let boundary = df_pay * p_sw_k;
 
     println!(
         "20Y CMS ATM floor test (vol=40%, T=5Y):\n  \
-         v_floor={v_floor:.8}  boundary=g(K)·P_sw(K)={boundary:.8}\n  \
-         df_pay={df_pay:.6}  g(K)={g_k:.6}  A₀={a0:.4}  A_par(K)={a_par_k:.4}\n  \
-         P_sw(K)={p_sw_k:.8}"
+         v_floor={v_floor:.8}  boundary=DF_pay·Black76_put(K)={boundary:.8}\n  \
+         df_pay={df_pay:.6}  A₀(diag)={a0:.4}  A_par(K)(diag)={a_par_k:.4}\n  \
+         Black76_put(K)={p_sw_k:.8}"
     );
 
     // The CMS replication floorlet must be strictly below the boundary term.
@@ -365,16 +375,15 @@ fn test_cms_replication_spread_exceeds_cap_integral() {
     let v_floor = replication_price(&floor, &mkt, as_of);
     let spread = v_cap - v_floor;
 
-    // Recompute the boundary = g(K)·P_sw(K) using the same formulas as the pricer.
+    // Recompute the boundary using the same annuity-consistent convention as
+    // the pricer (audit item 12): g(K)·C_sw(K) = DF_pay·Black76(K), with the
+    // par annuity cancelling. `par_annuity`/`a0` are unused for the boundary.
     let df_pay = (-0.03_f64 * t_pay).exp();
-    let a_par_k = par_annuity(strike, cms_tenor, m);
-    let g_k = df_pay / a_par_k;
-    let a0: f64 = (1..=40)
-        .map(|i| 0.5 * (-0.03 * (t_fix + 0.5 * i as f64)).exp())
-        .sum();
-    // At ATM (K = F_swap = 3%), C_sw(K) = P_sw(K), so cap boundary = floor boundary.
-    let p_sw_k = a0 * b76_put(strike, strike, vol, t_fix);
-    let boundary = g_k * p_sw_k; // = g(K)·C_sw(K) = g(K)·P_sw(K) at ATM
+    let _ = (par_annuity(strike, cms_tenor, m), cms_tenor, m); // not used in the boundary
+    // At ATM (K = F_swap = 3%), Black76_put(K) = Black76_call(K), so the cap
+    // and floor boundaries coincide.
+    let p_sw_k = b76_put(strike, strike, vol, t_fix);
+    let boundary = df_pay * p_sw_k; // = g(K)·C_sw(K) at ATM
 
     // δ_cap = V_cap − boundary_cap = V_cap − boundary (at ATM)
     let delta_cap = v_cap - boundary;
@@ -400,5 +409,77 @@ fn test_cms_replication_spread_exceeds_cap_integral() {
          got spread={spread:.8}  [cap={v_cap:.8}  floor={v_floor:.8}  boundary={boundary:.8}]. \
          This indicates the wrong (+) integral sign in the CmsReplicationPricer floorlet branch: \
          with the correct (−) sign the spread is δ_cap + δ_floor > δ_cap."
+    );
+}
+
+/// Regression test (audit item 12): the static-replication boundary term must
+/// be annuity-consistent.
+///
+/// The boundary `g(K)·C_sw(K)` collapses to `DF_pay·Black76(F,K,σ,T)` — the
+/// closed-form par annuity `A_par` cancels between `g(k) = DF_pay/A_par(k)` and
+/// `C_sw(k) = A_par(k)·Black76(k)`. The pre-item-12 code paired `g` with the
+/// *market*-annuity swaption `A₀·Black76`, leaving a spurious `A₀/A_par(K)`
+/// residual that scaled the whole price by `A₀/A_par(F)` (far from 1 for a long
+/// CMS tenor).
+///
+/// The test compares the static-replication price against the Hagan
+/// first-order pricer (`CmsOptionPricer`, `ModelKey::Black76`). For a
+/// near-immediate fixing (~3 days), the convexity adjustment and the
+/// replication integral are both negligible, so both pricers reduce to the
+/// SAME discounted Black-76 swaption-rate option:
+///
+/// ```text
+/// V ≈ DF_pay · Black76(F, K, σ, T) · accrual · notional
+/// ```
+///
+/// With the corrected (annuity-cancelled) boundary the two prices agree
+/// closely. With the pre-fix `A₀` convention the static-replication price was
+/// off by `A₀/A_par(F)` while the Hagan pricer was not — so they disagreed
+/// sharply. Comparing the two pricers avoids hard-coding the exact forward
+/// swap rate or discount factor.
+#[test]
+fn test_cms_replication_boundary_is_annuity_consistent() {
+    use finstack_valuations::instruments::Instrument;
+
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    // Near-immediate fixing: ~3 days out, so both the convexity adjustment and
+    // the replication integral are negligible.
+    let fixing = Date::from_calendar_date(2025, Month::January, 4).unwrap();
+    let payment = Date::from_calendar_date(2025, Month::April, 4).unwrap();
+    let mkt = single_curve_market(as_of, 0.03, 0.20);
+
+    let strike = 0.03_f64; // ~ATM (forward ≈ 3% on the flat 3% curve)
+    let cms_tenor = 10.0_f64;
+
+    let cap = single_curve_cms(fixing, payment, strike, cms_tenor, OptionType::Call);
+
+    // Static-replication price (the pricer under test for item 12).
+    let v_replication = replication_price(&cap, &mkt, as_of);
+
+    // Hagan first-order price via the default Black-76 CMS pricer. For a
+    // near-immediate fixing the convexity adjustment ~ 0, so this equals
+    // DF_pay·Black76(F,K)·accrual·notional — the same annuity-cancelled
+    // boundary the corrected static replication must produce.
+    let v_hagan = cap.value(&mkt, as_of).expect("hagan pricing").amount();
+
+    println!(
+        "Item 12 boundary test: v_replication={v_replication:.10}  v_hagan={v_hagan:.10}"
+    );
+
+    assert!(
+        v_replication > 0.0 && v_hagan > 0.0,
+        "both CMS caplet prices must be positive"
+    );
+    // The two pricers must agree closely for a near-immediate near-ATM caplet.
+    // The pre-fix `A₀/A_par(F)` residual scaled the static-replication price by
+    // a 10Y-CMS annuity ratio far from 1, breaking this agreement.
+    let rel = (v_replication - v_hagan).abs() / v_hagan.max(1e-12);
+    assert!(
+        rel < 0.05,
+        "static-replication and Hagan CMS caplet prices must agree for a \
+         near-immediate near-ATM fixing (both reduce to DF_pay·Black76); got \
+         v_replication={v_replication:.10}, v_hagan={v_hagan:.10} (rel diff {rel:.4}). \
+         A large gap indicates the spurious A₀/A_par(K) residual in the \
+         static-replication boundary."
     );
 }

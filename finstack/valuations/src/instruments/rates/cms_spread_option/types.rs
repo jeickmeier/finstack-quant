@@ -1,6 +1,7 @@
 //! CMS Spread Option instrument definition.
 
 use crate::impl_instrument_base;
+use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::instruments::PricingOverrides;
@@ -83,6 +84,32 @@ pub struct CmsSpreadOption {
     pub spread_correlation: f64,
     /// Day count convention.
     pub day_count: DayCount,
+
+    // --- Underlying Swap Conventions ---
+    //
+    // The forward swap rate of each CMS leg must be projected on the correct
+    // annuity / day-count basis. These fields plumb the actual instrument /
+    // market swap conventions through to `resolve_leg`; when unset they
+    // default to the USD market standard (semi-annual 30/360 fixed,
+    // quarterly Act/360 float), so existing USD instruments are unaffected.
+    /// IRS convention for the underlying CMS swaps (e.g. `EURStandard`).
+    ///
+    /// When set, provides default values for the fixed/float frequency and
+    /// day count. Individual fields still override the convention when set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_convention: Option<IRSConvention>,
+    /// Fixed leg frequency of the underlying CMS swaps (overrides convention).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_fixed_freq: Option<Tenor>,
+    /// Floating leg frequency of the underlying CMS swaps (overrides convention).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_float_freq: Option<Tenor>,
+    /// Fixed leg day count of the underlying CMS swaps (overrides convention).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_day_count: Option<DayCount>,
+    /// Floating leg day count of the underlying CMS swaps (overrides convention).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swap_float_day_count: Option<DayCount>,
     /// Pricing overrides.
     #[serde(default)]
     pub pricing_overrides: PricingOverrides,
@@ -131,6 +158,46 @@ impl CmsSpreadOption {
         Ok(())
     }
 
+    /// Resolved fixed leg frequency of the underlying CMS swaps.
+    ///
+    /// Resolution order: explicit `swap_fixed_freq` > `swap_convention` >
+    /// default semi-annual (USD market standard).
+    pub fn resolved_swap_fixed_freq(&self) -> Tenor {
+        self.swap_fixed_freq
+            .or_else(|| self.swap_convention.map(|c| c.fixed_frequency()))
+            .unwrap_or_else(Tenor::semi_annual)
+    }
+
+    /// Resolved floating leg frequency of the underlying CMS swaps.
+    ///
+    /// Resolution order: explicit `swap_float_freq` > `swap_convention` >
+    /// default quarterly (USD market standard).
+    pub fn resolved_swap_float_freq(&self) -> Tenor {
+        self.swap_float_freq
+            .or_else(|| self.swap_convention.map(|c| c.float_frequency()))
+            .unwrap_or_else(Tenor::quarterly)
+    }
+
+    /// Resolved fixed leg day count of the underlying CMS swaps.
+    ///
+    /// Resolution order: explicit `swap_day_count` > `swap_convention` >
+    /// default 30/360 (USD market standard).
+    pub fn resolved_swap_day_count(&self) -> DayCount {
+        self.swap_day_count
+            .or_else(|| self.swap_convention.map(|c| c.fixed_day_count()))
+            .unwrap_or(DayCount::Thirty360)
+    }
+
+    /// Resolved floating leg day count of the underlying CMS swaps.
+    ///
+    /// Resolution order: explicit `swap_float_day_count` > `swap_convention`
+    /// float day count > default Act/360 (USD market standard).
+    pub fn resolved_swap_float_day_count(&self) -> DayCount {
+        self.swap_float_day_count
+            .or_else(|| self.swap_convention.map(|c| c.float_day_count()))
+            .unwrap_or(DayCount::Act360)
+    }
+
     /// Create a canonical example CMS spread option for testing.
     #[allow(clippy::expect_used)]
     pub fn example() -> Self {
@@ -152,6 +219,11 @@ impl CmsSpreadOption {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_correlation: 0.85,
             day_count: DayCount::Act360,
+            swap_convention: Some(IRSConvention::USDStandard),
+            swap_fixed_freq: None,
+            swap_float_freq: None,
+            swap_day_count: None,
+            swap_float_day_count: None,
             pricing_overrides: PricingOverrides::default(),
             attributes: Attributes::new(),
         }
@@ -380,5 +452,73 @@ mod tests {
         let high_vol = price_amount(&opt, &market(as_of, 0.060), as_of);
 
         assert!(high_vol > low_vol);
+    }
+
+    /// Regression test (item 2): the underlying-swap conventions must be
+    /// plumbed through, not hard-coded to USD (semi/30360 fixed,
+    /// quarterly/Act360 float).
+    ///
+    /// `resolve_leg` previously hard-coded `Tenor::semi_annual()` /
+    /// `DayCount::Thirty360` / `Tenor::quarterly()` / `DayCount::Act360`. A
+    /// `EURStandard` CMS spread has an *annual* fixed leg, so its forward swap
+    /// rate is projected on a different annuity. This test verifies the
+    /// resolved conventions pick up the instrument's `swap_convention`.
+    #[test]
+    fn swap_conventions_resolve_from_convention_field() {
+        use finstack_core::dates::{DayCount, Tenor, TenorUnit};
+
+        // Default (no convention set) -> USD market standard.
+        let mut opt = CmsSpreadOption::example();
+        opt.swap_convention = None;
+        assert_eq!(opt.resolved_swap_fixed_freq(), Tenor::semi_annual());
+        assert_eq!(opt.resolved_swap_float_freq(), Tenor::quarterly());
+        assert_eq!(opt.resolved_swap_day_count(), DayCount::Thirty360);
+        assert_eq!(opt.resolved_swap_float_day_count(), DayCount::Act360);
+
+        // EUR convention -> annual fixed leg (the case the hard-coded path got wrong).
+        opt.swap_convention = Some(IRSConvention::EURStandard);
+        assert_eq!(
+            opt.resolved_swap_fixed_freq(),
+            Tenor::annual(),
+            "EUR CMS swap fixed leg must be annual, not the hard-coded semi-annual"
+        );
+
+        // Explicit per-field override beats the convention.
+        opt.swap_fixed_freq = Some(Tenor::new(3, TenorUnit::Months));
+        assert_eq!(
+            opt.resolved_swap_fixed_freq(),
+            Tenor::new(3, TenorUnit::Months)
+        );
+    }
+
+    /// A non-USD CMS spread must price on its own annuity basis. Switching the
+    /// underlying-swap convention from USD (semi-annual fixed) to EUR (annual
+    /// fixed) changes the forward swap rate annuity and therefore the price;
+    /// the pre-fix hard-coded path produced an identical (USD) price for both.
+    #[test]
+    fn non_usd_convention_changes_price() {
+        let as_of = date(2025, Month::January, 1);
+        let market = market(as_of, 0.035);
+
+        let mut usd = CmsSpreadOption::example();
+        usd.expiry_date = date(2026, Month::January, 1);
+        usd.payment_date = date(2026, Month::January, 5);
+        usd.strike = 0.0;
+        usd.spread_correlation = 0.50;
+        usd.swap_convention = Some(IRSConvention::USDStandard);
+
+        let mut eur = usd.clone();
+        eur.swap_convention = Some(IRSConvention::EURStandard);
+
+        let usd_value = price_amount(&usd, &market, as_of);
+        let eur_value = price_amount(&eur, &market, as_of);
+
+        assert!(usd_value > 0.0 && eur_value > 0.0);
+        assert!(
+            (usd_value - eur_value).abs() > 1e-9,
+            "CMS spread price must depend on the underlying-swap convention \
+             (annuity/day-count basis); USD and EUR priced identically: \
+             usd={usd_value}, eur={eur_value}"
+        );
     }
 }

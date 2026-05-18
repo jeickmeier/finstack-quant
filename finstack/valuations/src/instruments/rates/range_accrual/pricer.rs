@@ -60,6 +60,24 @@ fn get_fx_spot(inst: &RangeAccrual, curves: &MarketContext) -> Result<f64> {
 }
 
 /// Range accrual Monte Carlo pricer.
+///
+/// # Flat-volatility limitation (audit item 9)
+///
+/// This pricer simulates the underlying with a **single, constant** GBM
+/// volatility — `σ = vol_surface.value_clamped(T, S₀)`, the ATM vol at the
+/// final maturity. Geometric Brownian motion is a constant-volatility process,
+/// so the Monte Carlo path-set cannot represent a volatility **skew** or
+/// **term structure**. On a non-flat surface this MC therefore diverges from
+/// [`RangeAccrualStaticReplicationPricer`], which samples the surface
+/// per-observation and per-strike (via the digital call-spread replication)
+/// and so captures the smile and term structure exactly.
+///
+/// **Use the static-replication pricer (`ModelKey::StaticReplication`, the
+/// default) for any surface that is not flat.** This MC path is retained for
+/// flat-vol scenarios and as a cross-check; it is selected only explicitly
+/// (`ModelKey::MonteCarloGBM`) or by the deprecated `mc_seed_scenario`
+/// override. Capturing skew/term-structure here would require a local- or
+/// stochastic-volatility process, which is outside this crate.
 pub struct RangeAccrualMcPricer {
     config: PathDependentPricerConfig,
 }
@@ -131,6 +149,12 @@ impl RangeAccrualMcPricer {
         };
 
         let vol_surface = curves.get_surface(inst.vol_surface_id.as_str())?;
+        // FLAT-VOL APPROXIMATION (audit item 9 — see the struct-level doc):
+        // GBM is a constant-volatility process, so the whole simulation uses a
+        // single ATM vol. This deliberately does NOT capture volatility skew or
+        // term structure; on a non-flat surface this MC diverges from the
+        // static-replication pricer (which samples per-observation and
+        // per-strike). Use `ModelKey::StaticReplication` for non-flat surfaces.
         let sigma = vol_surface.value_clamped(t, initial_spot);
 
         // Quanto Adjustment using FX spot for vol lookup

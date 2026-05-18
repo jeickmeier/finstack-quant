@@ -145,13 +145,50 @@ pub(crate) fn price_cap_floor(
                 if forward > 0.0 {
                     black::price_caplet_floorlet(inputs())?
                 } else {
-                    normal::price_caplet_floorlet(inputs())?
+                    // Lognormal (Black) pricing is undefined for a non-positive
+                    // forward — fall back to Bachelier (normal). `sigma` is a
+                    // LOGNORMAL vol; it must be converted to a normal vol
+                    // before the Bachelier pricer, otherwise the price is
+                    // wrong by ~ a factor of the forward rate. Convert via the
+                    // standard lognormal→normal mapping (no shift on this
+                    // explicit-Lognormal path).
+                    let normal_vol =
+                        crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
+                            sigma,
+                            forward,
+                            strike,
+                            effective_t_fix,
+                            None,
+                        );
+                    normal::price_caplet_floorlet(CapletFloorletInputs {
+                        volatility: normal_vol,
+                        ..inputs()
+                    })?
                 }
             }
             CapFloorVolType::ShiftedLognormal => {
+                // Shifted-lognormal Black-76 requires the SHIFTED forward and
+                // strike to be strictly positive — that is the whole point of
+                // the shift in a negative-rate regime. If `vol_shift` is too
+                // small to lift this caplet's forward (the most-negative
+                // forward across the schedule fails first), `(F + shift)`
+                // would be non-positive and Black-76 would produce a
+                // log-of-non-positive NaN. Validate explicitly with an
+                // actionable error rather than emitting garbage.
+                let shifted_forward = forward + vol_shift;
+                let shifted_strike = strike + vol_shift;
+                if shifted_forward <= 0.0 || shifted_strike <= 0.0 {
+                    return Err(finstack_core::Error::Validation(format!(
+                        "cap/floor ShiftedLognormal: vol_shift {vol_shift:.6} does not lift \
+                         the caplet forward/strike positive (shifted forward {shifted_forward:.6}, \
+                         shifted strike {shifted_strike:.6}, fixing {fixing_date}). \
+                         Increase vol_shift so F + shift > 0 for the most-negative caplet, \
+                         or price with the Normal model."
+                    )));
+                }
                 black::price_caplet_floorlet(CapletFloorletInputs {
-                    strike: strike + vol_shift,
-                    forward: forward + vol_shift,
+                    strike: shifted_strike,
+                    forward: shifted_forward,
                     ..inputs()
                 })?
             }

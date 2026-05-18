@@ -127,15 +127,28 @@ impl CmsOptionPricer {
             //
             // ASSUMPTION: `vol_surface` must be the swaption volatility surface
             // for the CMS reference swap tenor (`inst.cms_tenor`), keyed by
-            // (expiry, strike). The lookup uses `(time_to_fixing, strike)`;
-            // the surface has no separate swap-tenor axis, so the caller is
-            // responsible for supplying the surface that corresponds to the
-            // CMS reference swap tenor.
-            let vol = vol_surface.value_clamped(time_to_fixing.max(0.0), strike);
+            // (expiry, strike). The surface has no separate swap-tenor axis, so
+            // the caller is responsible for supplying the surface that
+            // corresponds to the CMS reference swap tenor.
+            //
+            // Two distinct volatilities are needed:
+            //  - `strike_vol` σ(K) prices the Black-76 option payoff (captures
+            //    the smile at the option strike).
+            //  - `atm_vol` σ(F) drives the convexity adjustment. The CMS
+            //    convexity adjustment is a property of the swap-rate
+            //    *distribution* under the annuity measure (it is `g'(F)/g(F)`
+            //    times the swap-rate variance `Var^A[S] ≈ F²σ(F)²T`), so it
+            //    must be evaluated with the at-the-money vol, NOT the strike
+            //    vol. Using σ(K) makes the same forward inconsistently
+            //    convexity-adjusted across strikes — and disagrees with the
+            //    static-replication pricer, which already uses σ(F). See
+            //    Hagan (2003) and `replication_pricer.rs`.
+            let strike_vol = vol_surface.value_clamped(time_to_fixing.max(0.0), strike);
+            let atm_vol = vol_surface.value_clamped(time_to_fixing.max(0.0), forward_swap_rate);
 
-            // Convexity adjustment using Hagan (2003) formula with forward rate
+            // Convexity adjustment using Hagan (2003) formula with the ATM vol.
             let raw_convexity_adj = if time_to_fixing > 0.0 {
-                convexity_adjustment(vol, time_to_fixing, inst.cms_tenor, forward_swap_rate)
+                convexity_adjustment(atm_vol, time_to_fixing, inst.cms_tenor, forward_swap_rate)
             } else {
                 0.0
             };
@@ -143,14 +156,21 @@ impl CmsOptionPricer {
             let convexity_adj = raw_convexity_adj * convexity_scale;
             let adjusted_rate = forward_swap_rate + convexity_adj;
 
-            // 3. Black Price
+            // 3. Black Price — the option payoff uses the strike vol σ(K) so
+            //    the smile is captured at the option strike.
             let option_val = if time_to_fixing <= 0.0 {
                 match inst.option_type {
                     crate::instruments::OptionType::Call => (forward_swap_rate - strike).max(0.0),
                     crate::instruments::OptionType::Put => (strike - forward_swap_rate).max(0.0),
                 }
             } else {
-                self.black_price(adjusted_rate, strike, vol, time_to_fixing, inst.option_type)
+                self.black_price(
+                    adjusted_rate,
+                    strike,
+                    strike_vol,
+                    time_to_fixing,
+                    inst.option_type,
+                )
             };
 
             // 4. Discount to present using curve-consistent relative DF

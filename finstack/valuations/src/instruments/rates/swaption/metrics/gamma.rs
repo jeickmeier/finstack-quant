@@ -47,13 +47,29 @@ impl MetricCalculator for GammaCalculator {
 
         // Black (lognormal) Greeks are undefined for non-positive forward or
         // strike; fall back to Bachelier (normal) for negative-rate regimes.
-        let use_normal = matches!(option.vol_model, VolatilityModel::Normal)
-            || inputs.forward <= 0.0
-            || strike <= 0.0;
+        let normal_by_model = matches!(option.vol_model, VolatilityModel::Normal);
+        let normal_by_negative_rate = inputs.forward <= 0.0 || strike <= 0.0;
+        let use_normal = normal_by_model || normal_by_negative_rate;
         let gamma = if use_normal {
             use crate::instruments::common_impl::models::volatility::normal::d_bachelier;
-            let d = d_bachelier(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
-            finstack_core::math::norm_pdf(d) / (inputs.sigma * inputs.time_to_expiry.sqrt())
+            // `inputs.sigma` is a normal vol only when the Normal model is
+            // configured; for the negative-rate fallback it is a lognormal vol
+            // and must be converted before the Bachelier gamma (which also
+            // divides by `sigma`, so a mis-scaled sigma corrupts the result
+            // twice).
+            let normal_sigma = if normal_by_model {
+                inputs.sigma
+            } else {
+                super::resolved_normal_sigma(
+                    option,
+                    inputs.forward,
+                    strike,
+                    inputs.sigma,
+                    inputs.time_to_expiry,
+                )
+            };
+            let d = d_bachelier(inputs.forward, strike, normal_sigma, inputs.time_to_expiry);
+            finstack_core::math::norm_pdf(d) / (normal_sigma * inputs.time_to_expiry.sqrt())
         } else {
             use crate::instruments::common_impl::models::d1_black76;
             let d1 = d1_black76(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);

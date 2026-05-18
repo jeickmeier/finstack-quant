@@ -943,13 +943,25 @@ mod tests {
             "Normal cap/floor PV should be finite and non-negative"
         );
 
+        // A `Lognormal` cap/floor on a NON-POSITIVE forward must fall back to
+        // the Bachelier (normal) pricer without panicking or erroring.
+        //
+        // Note: the fallback *converts* the lognormal vol to a normal vol
+        // (audit item 6) — it does NOT feed the lognormal vol verbatim into
+        // Bachelier. So the fallback PV is NOT expected to equal the
+        // `Normal`-vol-type PV here: the single 50bp surface value is a
+        // *normal* vol for the `Normal` floorlet but a *lognormal* vol for the
+        // `Lognormal` floorlet, and the lognormal→normal conversion of a vol
+        // on a negative forward (no shift) is the crude approximation that
+        // `lognormal_to_normal_vol` documents. The meaningful invariant is
+        // that the fallback produces a finite, non-negative price.
         let black_pv = black_floorlet
             .value(&ctx, base_date)
             .expect("lognormal should auto-fallback to Bachelier for non-positive forwards");
         assert!(
-            (black_pv.amount() - normal_pv.amount()).abs() < 1e-6,
-            "expected lognormal fallback to match normal PV: normal={} lognormal={}",
-            normal_pv.amount(),
+            black_pv.amount().is_finite() && black_pv.amount() >= 0.0,
+            "lognormal-fallback cap/floor PV on a negative forward must be finite \
+             and non-negative; got {}",
             black_pv.amount()
         );
     }

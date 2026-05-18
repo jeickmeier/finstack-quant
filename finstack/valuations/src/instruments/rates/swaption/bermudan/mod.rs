@@ -517,7 +517,10 @@ impl BermudanSwaptionPricer {
             strike,
             option_type,
             swaption.notional.amount(),
-        );
+        )
+        .map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
 
         // Build exercise-aligned time grid
         let (time_grid, exercise_indices) = SwaptionLsmcConfig::build_exercise_aligned_grid(
@@ -535,21 +538,69 @@ impl BermudanSwaptionPricer {
             .filter(|&t| t <= ttm)
             .collect();
 
-        // Create discount curve function
-        let discount_fn = |t: f64| disc.df(t);
+        // Discount-curve closure giving `P(as_of, as_of + t)`.
+        //
+        // The HW1F simulation measures time from `t = 0 ≡ as_of`, but the
+        // discount curve is anchored at its own `base_date`. Passing
+        // `|t| disc.df(t)` unrebased treats curve-base time as as_of time:
+        // when `as_of ≠ curve.base_date` the θ(t) calibration, the initial
+        // short rate, and the HW1F bond reconstruction `P(t,T)` are all wrong.
+        // Re-base to `as_of` exactly as `exotics_shared::hw1f_curve` does:
+        //
+        //   P(as_of, as_of + t) = DF_curve(t_asof + t) / DF_curve(t_asof)
+        //
+        // (the closure is built inline, capturing the `Arc<DiscountCurve>`, so
+        // it stays `Send + Sync` as the LSMC engine requires).
+        let curve_base = disc.base_date();
+        let curve_dc = disc.day_count();
+        let t_asof = if as_of == curve_base {
+            0.0
+        } else {
+            curve_dc
+                .year_fraction(
+                    curve_base,
+                    as_of,
+                    finstack_core::dates::DayCountContext::default(),
+                )
+                .map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?
+        };
+        let df_asof = disc.df(t_asof);
+        if !df_asof.is_finite() || df_asof <= 0.0 {
+            return Err(PricingError::model_failure_with_context(
+                format!(
+                    "Bermudan LSMC: discount factor at as_of ({as_of}) is non-positive ({df_asof})"
+                ),
+                PricingErrorContext::default(),
+            ));
+        }
+        let disc_for_fn = std::sync::Arc::clone(&disc);
+        let discount_fn = move |t: f64| {
+            let df = disc_for_fn.df(t_asof + t);
+            if df.is_finite() && df > 0.0 {
+                df / df_asof
+            } else {
+                0.0
+            }
+        };
 
         // Calibrate Hull-White parameters from discount curve
         let hw_params = calibrate_theta_from_curve(
             self.config.hw_params.kappa,
             self.config.hw_params.sigma,
-            discount_fn,
+            &discount_fn,
             &theta_times,
         );
 
-        // Get initial short rate from discount curve
+        // Initial short rate from the `as_of`-rebased curve: a one-sided
+        // forward difference f(0) = −ln P(as_of, as_of+dt) / dt.
         let dt_small = 0.01; // Small time step for initial rate
         let initial_rate = if dt_small > 0.0 {
-            -disc.df(dt_small).ln() / dt_small
+            -discount_fn(dt_small).ln() / dt_small
         } else {
             0.03
         };
