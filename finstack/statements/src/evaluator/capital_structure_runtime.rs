@@ -19,7 +19,6 @@ impl Evaluator {
         model: &FinancialModelSpec,
     ) -> Result<Option<Instruments>> {
         use crate::capital_structure::integration;
-        use crate::types::DebtInstrumentSpec;
         use finstack_cashflows::CashflowProvider;
 
         let cs_spec = match &model.capital_structure {
@@ -31,16 +30,8 @@ impl Evaluator {
             IndexMap::new();
 
         for debt_spec in &cs_spec.debt_instruments {
-            let (id, instrument) = match debt_spec {
-                DebtInstrumentSpec::Bond { id, .. }
-                | DebtInstrumentSpec::Swap { id, .. }
-                | DebtInstrumentSpec::TermLoan { id, .. }
-                | DebtInstrumentSpec::Generic { id, .. } => {
-                    let instrument = integration::build_any_instrument_from_spec(debt_spec)?;
-                    (id.clone(), instrument)
-                }
-            };
-            instruments.insert(id, instrument);
+            let instrument = integration::build_any_instrument_from_spec(debt_spec)?;
+            instruments.insert(debt_spec.id.clone(), instrument);
         }
 
         Ok(Some(instruments))

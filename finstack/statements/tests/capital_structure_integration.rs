@@ -91,9 +91,10 @@ fn test_build_any_instrument_from_bond_spec() {
     )
     .expect("Bond::fixed should succeed with valid parameters");
 
-    let spec = DebtInstrumentSpec::Bond {
+    let spec = DebtInstrumentSpec {
         id: "BOND-001".to_string(),
-        spec: serde_json::to_value(&bond).expect("bond should serialize"),
+        spec: serde_json::to_value(finstack_valuations::instruments::InstrumentJson::Bond(bond))
+            .expect("bond should serialize"),
     };
 
     let instrument = build_any_instrument_from_spec(&spec).expect("bond should deserialize");
@@ -113,9 +114,12 @@ fn test_build_any_instrument_from_swap_spec() {
     )
     .expect("swap should build");
 
-    let spec = DebtInstrumentSpec::Swap {
+    let spec = DebtInstrumentSpec {
         id: "SWAP-001".to_string(),
-        spec: serde_json::to_value(&swap).expect("swap should serialize"),
+        spec: serde_json::to_value(
+            finstack_valuations::instruments::InstrumentJson::InterestRateSwap(swap),
+        )
+        .expect("swap should serialize"),
     };
 
     let instrument = build_any_instrument_from_spec(&spec).expect("swap should deserialize");
@@ -198,4 +202,22 @@ fn test_reporting_totals_sum_without_fx_when_same_currency() {
         total_accrued,
         a1 + a2
     );
+}
+
+#[test]
+fn test_capital_structure_builds_revolving_credit() {
+    // RevolvingCredit had no typed DebtInstrumentSpec variant and was absent
+    // from the old `Generic` brute-force list (Bond/IRS/TermLoan/Deposit/FRA/
+    // Repo). Routing through the canonical registry makes it constructible.
+    use finstack_valuations::instruments::{InstrumentJson, RevolvingCredit};
+
+    let rcf = RevolvingCredit::example().expect("example RevolvingCredit");
+    let spec = DebtInstrumentSpec {
+        id: "RCF-001".to_string(),
+        spec: serde_json::to_value(InstrumentJson::RevolvingCredit(rcf))
+            .expect("revolving credit should serialize"),
+    };
+
+    build_any_instrument_from_spec(&spec)
+        .expect("revolving credit must build via the canonical registry");
 }

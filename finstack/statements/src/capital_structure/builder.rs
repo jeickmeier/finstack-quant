@@ -10,7 +10,9 @@ use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Teno
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, InstrumentId};
 use finstack_valuations::instruments::rates::irs::FloatingLegCompounding;
-use finstack_valuations::instruments::{Bond, FixedLegSpec, FloatLegSpec, InterestRateSwap};
+use finstack_valuations::instruments::{
+    Bond, FixedLegSpec, FloatLegSpec, InstrumentJson, InterestRateSwap,
+};
 use rust_decimal::Decimal;
 
 /// Helper to ensure capital structure exists and return mutable reference.
@@ -30,38 +32,32 @@ fn ensure_capital_structure(cs: &mut Option<CapitalStructureSpec>) -> &mut Capit
     })
 }
 
-/// Serialize a bond and push it to the capital structure.
+/// Serialize a bond as a tagged instrument payload and push it to the capital structure.
 fn push_bond(
     cs: &mut Option<CapitalStructureSpec>,
     id_str: String,
     bond: Bond,
 ) -> crate::error::Result<()> {
-    let spec_json = serde_json::to_value(&bond).map_err(|e| {
-        crate::error::Error::build(format!("Failed to serialize bond '{}': {}", id_str, e))
+    let spec = serde_json::to_value(InstrumentJson::Bond(bond)).map_err(|e| {
+        crate::error::Error::build(format!("Failed to serialize bond '{id_str}': {e}"))
     })?;
     ensure_capital_structure(cs)
         .debt_instruments
-        .push(DebtInstrumentSpec::Bond {
-            id: id_str,
-            spec: spec_json,
-        });
+        .push(DebtInstrumentSpec { id: id_str, spec });
     Ok(())
 }
 
-/// Serialize a swap and push it to the capital structure.
+/// Serialize a swap as a tagged instrument payload and push it to the capital structure.
 fn push_swap(
     cs: &mut Option<CapitalStructureSpec>,
     id_str: String,
     swap: finstack_valuations::instruments::InterestRateSwap,
 ) -> crate::error::Result<()> {
-    let spec_json = serde_json::to_value(&swap)
-        .map_err(|e| crate::error::Error::build(format!("Failed to serialize swap: {}", e)))?;
+    let spec = serde_json::to_value(InstrumentJson::InterestRateSwap(swap))
+        .map_err(|e| crate::error::Error::build(format!("Failed to serialize swap: {e}")))?;
     ensure_capital_structure(cs)
         .debt_instruments
-        .push(DebtInstrumentSpec::Swap {
-            id: id_str,
-            spec: spec_json,
-        });
+        .push(DebtInstrumentSpec { id: id_str, spec });
     Ok(())
 }
 
@@ -421,10 +417,12 @@ impl<State> ModelBuilder<State> {
         Ok(self)
     }
 
-    /// Add a generic debt instrument via JSON specification.
+    /// Add a debt instrument from a canonical tagged JSON payload.
     ///
-    /// This allows adding custom debt instruments not covered by the convenience
-    /// methods (bonds, swaps).
+    /// This is the path for any instrument type not covered by the typed
+    /// convenience methods (`add_bond`, `add_swap`). The `spec` argument must be
+    /// the registry's tagged form — `{"type": "<tag>", "spec": {...}}` — where
+    /// `<tag>` is a type registered in the valuations instrument registry.
     ///
     /// # Example
     /// ```rust,no_run
@@ -432,25 +430,18 @@ impl<State> ModelBuilder<State> {
     /// use serde_json::json;
     ///
     /// let builder = ModelBuilder::new("cs-model").add_custom_debt(
-    ///     "TL-A",
+    ///     "RCF-A",
     ///     json!({
-    ///         "type": "amortizing_loan",
-    ///         "notional": 25_000_000.0,
-    ///         "currency": "USD",
-    ///         "issue_date": "2025-01-15",
-    ///         "maturity_date": "2030-01-15",
-    ///         "coupon_rate": 0.06,
-    ///         "frequency": "quarterly",
-    ///         "amortization": { "type": "linear", "final_notional": 0.0 }
+    ///         "type": "revolving_credit",
+    ///         "spec": { /* RevolvingCredit fields; see finstack_valuations::instruments::RevolvingCredit */ }
     ///     }),
     /// );
     /// # let _ = builder;
     /// ```
     pub fn add_custom_debt(mut self, id: impl Into<String>, spec: serde_json::Value) -> Self {
-        // Add to capital structure
         ensure_capital_structure(&mut self.capital_structure)
             .debt_instruments
-            .push(DebtInstrumentSpec::Generic {
+            .push(DebtInstrumentSpec {
                 id: id.into(),
                 spec,
             });

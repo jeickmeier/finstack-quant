@@ -7,8 +7,8 @@
 //! both per-currency and (when FX is available) in the reporting currency.
 //!
 //! The single-instrument / single-period extraction lives in
-//! [`crate::capital_structure::period_flows`]; the JSON-spec → instrument
-//! constructors live in [`crate::capital_structure::instrument_factory`].
+//! [`crate::capital_structure::period_flows`]. The JSON-spec → instrument
+//! constructor [`build_any_instrument_from_spec`] lives in this module.
 
 use crate::capital_structure::cashflows::{CapitalStructureCashflows, CashflowBreakdown};
 use crate::capital_structure::period_flows::period_snapshot_date;
@@ -23,11 +23,31 @@ use finstack_core::money::{fx::FxQuery, Money};
 use indexmap::IndexMap;
 use std::sync::Arc;
 
-// Re-export the moved helpers so existing call sites that import via this
-// module continue to compile. New code should import directly from
-// `period_flows` / `instrument_factory`.
-pub use crate::capital_structure::instrument_factory::build_any_instrument_from_spec;
+// Re-export the moved helper so existing call sites that import via this
+// module continue to compile.
 pub use crate::capital_structure::period_flows::calculate_period_flows;
+
+/// Build a runtime instrument from a [`crate::types::DebtInstrumentSpec`].
+///
+/// Delegates entirely to the canonical valuations instrument registry via
+/// [`finstack_valuations::instruments::cashflow_provider_from_value`]. The
+/// `spec` payload must be the registry's tagged form
+/// (`{"type": "...", "spec": {...}}`).
+///
+/// # Errors
+///
+/// Returns an error when the payload does not match a registered instrument
+/// type or fails spec validation.
+pub fn build_any_instrument_from_spec(
+    spec: &crate::types::DebtInstrumentSpec,
+) -> Result<Arc<dyn CashflowProvider + Send + Sync>> {
+    finstack_valuations::instruments::cashflow_provider_from_value(spec.spec.clone()).map_err(|e| {
+        crate::error::Error::build(format!(
+            "Failed to build debt instrument '{}': {e}",
+            spec.id
+        ))
+    })
+}
 
 /// Aggregate cashflows from instruments by period using valuations infrastructure.
 ///
