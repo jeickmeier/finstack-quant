@@ -9,7 +9,7 @@ use super::{
 use crate::instruments::common_impl::traits::Instrument as Priceable;
 use finstack_core::config::{results_meta_now, FinstackConfig};
 use finstack_core::market_data::context::MarketContext as Market;
-use finstack_core::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Helper function to safely downcast a trait object to a concrete instrument type.
@@ -66,9 +66,16 @@ pub trait Pricer: Send + Sync {
 /// Provides type-safe pricing dispatch without string comparisons or runtime
 /// registration errors. Pricers are registered at compile time and looked up
 /// via strongly-typed keys.
+///
+/// The backing map is a [`BTreeMap`] keyed by [`PricerKey`]: dispatch is purely
+/// by key, so a hash map would be functionally sufficient, but the ordered map
+/// guarantees a deterministic iteration order. That keeps any present or future
+/// enumeration of the registry (diagnostics, serialized coverage reports)
+/// reproducible across runs without relying on every call site remembering to
+/// sort.
 #[derive(Clone, Default)]
 pub struct PricerRegistry {
-    pricers: HashMap<PricerKey, Arc<dyn Pricer>>,
+    pricers: BTreeMap<PricerKey, Arc<dyn Pricer>>,
     /// Keys that were registered more than once via [`PricerRegistry::register`].
     ///
     /// `register` legitimately overwrites for test setup and monkey-patching,

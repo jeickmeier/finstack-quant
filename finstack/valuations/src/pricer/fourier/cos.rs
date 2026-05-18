@@ -12,6 +12,7 @@
 //!   *SIAM J. Sci. Comput.*, 31(2), 826-848.
 
 use finstack_core::math::characteristic_function::CharacteristicFunction;
+use finstack_core::math::NeumaierAccumulator;
 use num_complex::Complex64;
 use std::f64::consts::PI;
 
@@ -125,8 +126,18 @@ impl<'a> CosPricer<'a> {
         t: f64,
         is_call: bool,
     ) -> crate::pricer::PricingResult<f64> {
-        let prices = self.price_strip(spot, &[strike], r, t, is_call)?;
-        Ok(prices[0])
+        // `price_strip` returns one price per input strike; with a single
+        // strike the result is a one-element vector. Use a non-panicking
+        // accessor — a panicking index has no place in library code.
+        self.price_strip(spot, &[strike], r, t, is_call)?
+            .into_iter()
+            .next()
+            .ok_or_else(|| {
+                crate::pricer::PricingError::model_failure_with_context(
+                    "COS method: price_strip returned no price for a single strike",
+                    crate::pricer::PricingErrorContext::default(),
+                )
+            })
     }
 
     fn price_strip(
@@ -156,13 +167,13 @@ impl<'a> CosPricer<'a> {
         // the true payoff region outside the integration window and prices
         // collapse. The width b - a is unchanged, so u_k and the CF values
         // stay strike-independent; only the payoff coefficients shift.
-        let (a, b) = truncation_range(&cumulants, self.config.truncation_l);
+        let (a, b) = truncation_range(&cumulants, self.config.truncation_l)?;
 
         if !(a.is_finite() && b.is_finite()) || b <= a {
-            return Err(crate::pricer::PricingError::ModelFailure {
-                message: "COS method: invalid truncation range from cumulants".to_string(),
-                context: crate::pricer::PricingErrorContext::default(),
-            });
+            return Err(crate::pricer::PricingError::model_failure_with_context(
+                "COS method: invalid truncation range from cumulants",
+                crate::pricer::PricingErrorContext::default(),
+            ));
         }
 
         let n = self.config.num_terms;
@@ -171,76 +182,170 @@ impl<'a> CosPricer<'a> {
 
         // Pre-compute the CF values (strike-independent).
         // phi(u_k, t) for u_k = k*pi/(b-a)
+        //
+        // A non-finite CF value (NaN/inf) — e.g. a model parameterised
+        // outside its domain of validity — would otherwise propagate into
+        // `raw` and then be silently swallowed by a `max(0.0)` clamp,
+        // reporting a fully-failed pricing as a benign `$0`. Reject it here.
         let mut cf_vals: Vec<Complex64> = Vec::with_capacity(n);
         for k in 0..n {
             let u_k = k as f64 * PI / bma;
-            cf_vals.push(self.cf.cf(Complex64::new(u_k, 0.0), t));
+            let cf_val = self.cf.cf(Complex64::new(u_k, 0.0), t);
+            if !(cf_val.re.is_finite() && cf_val.im.is_finite()) {
+                return Err(crate::pricer::PricingError::model_failure_with_context(
+                    format!(
+                        "COS method: characteristic function returned a non-finite \
+                         value ({cf_val}) at frequency u_{k}={u_k}; the model is \
+                         likely parameterised outside its domain of validity"
+                    ),
+                    crate::pricer::PricingErrorContext::default(),
+                ));
+            }
+            cf_vals.push(cf_val);
         }
 
-        let prices = strikes
+        // The COS cosine-series sum is evaluated on the *put* payoff for every
+        // option. The put payoff `(1 - e^x)^+` is supported on `x <= 0`, where
+        // `e^x <= 1`, so the payoff coefficient `chi_k` never carries a large
+        // `exp(b)` term. The call payoff `(e^x - 1)^+` lives on `x >= 0`, and
+        // for long-dated / high-drift regimes the Fang-Oosterlee window is wide
+        // enough that `exp(b)` overflows the usable f64 dynamic range — pricing
+        // the call directly then collapses. We instead always price the put and
+        // recover the call by put-call parity.
+        //
+        // Put-call parity in the COS framework:
+        //   C - P = e^{-rt} * E[S_T - K]
+        //         = e^{-rt} * (S_0 * E[e^Y] - K)
+        // where E[e^Y] = phi_Y(-i) is the CF evaluated at u = -i. For a
+        // martingale-consistent CF this equals exp((r-q)*t), so the term is the
+        // dividend-discounted spot S_0 * exp(-q*t). Using the CF avoids needing
+        // the dividend yield q explicitly. `phi_Y(-i)` is strike-independent,
+        // so it is evaluated once here for the whole strip.
+        let fwd_moment_re = if is_call {
+            let fwd_moment = self.cf.cf(Complex64::new(0.0, -1.0), t);
+            if !(fwd_moment.re.is_finite() && fwd_moment.im.is_finite()) {
+                return Err(crate::pricer::PricingError::model_failure_with_context(
+                    format!(
+                        "COS method: characteristic function returned a non-finite \
+                         forward moment phi(-i) ({fwd_moment}); cannot apply \
+                         put-call parity"
+                    ),
+                    crate::pricer::PricingErrorContext::default(),
+                ));
+            }
+            fwd_moment.re
+        } else {
+            // Unused on the put path.
+            0.0
+        };
+
+        strikes
             .iter()
             .map(|&strike| {
-                // x0 = ln(S/K): shift from Y to X = Y + x0.
-                // Integration window in X-space, following the moneyness shift.
-                let x0 = (spot / strike).ln();
-                let a_x = a + x0;
-                let b_x = b + x0;
-
-                let mut sum = 0.0;
-                for (k, &cf_val) in cf_vals.iter().enumerate() {
-                    let k_f = k as f64;
-                    let u_k = k_f * PI / bma;
-
-                    // Payoff coefficient over the X-centred window [a_x, b_x].
-                    // Call payoff (e^x - 1)^+ is supported on X >= 0; put
-                    // payoff (1 - e^x)^+ on X <= 0. The payoff sub-interval is
-                    // the intersection of that half-line with [a_x, b_x] — for
-                    // deep OTM/ITM strikes the whole window can lie on one side
-                    // of zero, so the limits must be clamped, not fixed at 0.
-                    let v_k = if is_call {
-                        let lo = 0.0_f64.clamp(a_x, b_x);
-                        chi_k(k, a_x, b_x, lo, b_x) - psi_k(k, a_x, b_x, lo, b_x)
-                    } else {
-                        let hi = 0.0_f64.clamp(a_x, b_x);
-                        -chi_k(k, a_x, b_x, a_x, hi) + psi_k(k, a_x, b_x, a_x, hi)
-                    };
-
-                    // phi_X(u_k) = exp(i*u_k*x0) * phi_Y(u_k)
-                    // We need: Re[phi_X(u_k) * exp(-i*u_k*a_x)]
-                    //        = Re[phi_Y(u_k) * exp(-i*u_k*a)]   since a_x - x0 = a.
-                    let phase = Complex64::new(0.0, -u_k * a).exp();
-                    let ak = (cf_val * phase).re;
-
-                    let weight = if k == 0 { 0.5 } else { 1.0 };
-                    sum += weight * (2.0 / bma) * ak * v_k;
+                let put = self.put_price(strike, r, t, spot, a, b, bma, df, &cf_vals)?;
+                if !is_call {
+                    return Ok(put);
                 }
-
-                let raw = strike * df * sum;
-                // A negative result here is always a truncation / discretisation
-                // artefact for vanilla calls and puts — the mathematical price
-                // is non-negative. Surface it as a warning so callers can tune
-                // `num_terms` or `truncation_l` instead of silently accepting a
-                // misleading zero.
-                if raw < -numerical_negativity_tolerance(strike) {
-                    tracing::warn!(
-                        strike,
-                        spot,
-                        r,
-                        t,
-                        raw,
-                        num_terms = self.config.num_terms,
-                        truncation_l = self.config.truncation_l,
-                        "COS method returned negative raw price; clamping to zero. \
-                         Consider increasing num_terms or truncation_l, or check \
-                         that the CF's drift matches the supplied r."
-                    );
-                }
-                raw.max(0.0)
+                let call = put + df * (spot * fwd_moment_re - strike);
+                cos_finite_price(call, "call")
             })
-            .collect();
-
-        Ok(prices)
+            .collect()
     }
+
+    /// COS price of a European put for a single strike.
+    ///
+    /// The put payoff coefficients integrate `e^x` only over `x <= 0`, so the
+    /// coefficient `chi_k` stays bounded for arbitrarily wide truncation
+    /// windows — this is the numerically stable building block from which the
+    /// call is recovered by put-call parity.
+    #[allow(clippy::too_many_arguments)]
+    fn put_price(
+        &self,
+        strike: f64,
+        r: f64,
+        t: f64,
+        spot: f64,
+        a: f64,
+        b: f64,
+        bma: f64,
+        df: f64,
+        cf_vals: &[Complex64],
+    ) -> crate::pricer::PricingResult<f64> {
+        // x0 = ln(S/K): shift from Y to X = Y + x0.
+        // Integration window in X-space, following the moneyness shift.
+        let x0 = (spot / strike).ln();
+        let a_x = a + x0;
+        let b_x = b + x0;
+
+        // The COS cosine series accumulates up to `num_terms` (configurably
+        // hundreds) terms whose magnitudes span a wide dynamic range — the
+        // payoff coefficients `v_k` decay only algebraically while the CF
+        // weights decay (sub-)exponentially. A naive `+=` accumulator loses
+        // low-order bits; use Neumaier compensated summation.
+        let mut sum = NeumaierAccumulator::new();
+        for (k, &cf_val) in cf_vals.iter().enumerate() {
+            let k_f = k as f64;
+            let u_k = k_f * PI / bma;
+
+            // Put payoff (1 - e^x)^+ is supported on X <= 0. The payoff
+            // sub-interval is the intersection of that half-line with the
+            // X-centred window [a_x, b_x] — for deep OTM/ITM strikes the
+            // whole window can lie on one side of zero, so the upper limit
+            // must be clamped, not fixed at 0.
+            let hi = 0.0_f64.clamp(a_x, b_x);
+            let v_k = -chi_k(k, a_x, b_x, a_x, hi) + psi_k(k, a_x, b_x, a_x, hi);
+
+            // phi_X(u_k) = exp(i*u_k*x0) * phi_Y(u_k)
+            // We need: Re[phi_X(u_k) * exp(-i*u_k*a_x)]
+            //        = Re[phi_Y(u_k) * exp(-i*u_k*a)]   since a_x - x0 = a.
+            let phase = Complex64::new(0.0, -u_k * a).exp();
+            let ak = (cf_val * phase).re;
+
+            let weight = if k == 0 { 0.5 } else { 1.0 };
+            sum.add(weight * (2.0 / bma) * ak * v_k);
+        }
+
+        let raw = strike * df * sum.total();
+        // A negative result here is always a truncation / discretisation
+        // artefact for a vanilla put — the mathematical price is non-negative.
+        // Surface it as a warning so callers can tune `num_terms` or
+        // `truncation_l` instead of silently accepting a misleading zero.
+        if raw < -numerical_negativity_tolerance(strike) {
+            tracing::warn!(
+                strike,
+                spot,
+                r,
+                t,
+                raw,
+                num_terms = self.config.num_terms,
+                truncation_l = self.config.truncation_l,
+                "COS method returned negative raw put price; clamping to zero. \
+                 Consider increasing num_terms or truncation_l, or check \
+                 that the CF's drift matches the supplied r."
+            );
+        }
+        cos_finite_price(raw, "put")
+    }
+}
+
+/// Validate a raw COS price and clamp small negative noise to zero.
+///
+/// A non-finite `raw` (NaN/inf) means the cosine series or characteristic
+/// function diverged; returning `raw.max(0.0)` would turn that into a silent
+/// `$0`, since `f64::max(NaN, 0.0) == 0.0` and the negativity check
+/// `raw < -tol` is `false` for `NaN`. Surface it as an explicit error instead.
+fn cos_finite_price(raw: f64, side: &str) -> crate::pricer::PricingResult<f64> {
+    if !raw.is_finite() {
+        return Err(crate::pricer::PricingError::model_failure_with_context(
+            format!(
+                "COS method: {side} price is non-finite ({raw}); the cosine \
+                 series or characteristic function diverged — increase \
+                 num_terms / truncation_l or check the model parameters"
+            ),
+            crate::pricer::PricingErrorContext::default(),
+        ));
+    }
+    Ok(raw.max(0.0))
 }
 
 /// Threshold below which a negative COS price is surfaced as a warning.
@@ -252,17 +357,47 @@ fn numerical_negativity_tolerance(strike: f64) -> f64 {
     strike.abs() * 1e-10 + 1e-12
 }
 
+/// Minimum truncation half-width below which the cumulant set is treated as
+/// degenerate.
+///
+/// `c2 + sqrt(|c4|)` is the radicand of the Fang-Oosterlee half-width. A value
+/// at or below this threshold describes a (near-)deterministic log-price
+/// (`c2 -> 0`, e.g. `t -> 0` or `sigma -> 0`), for which the cosine-series
+/// expansion has no meaningful integration window.
+const DEGENERATE_CUMULANT_RADICAND: f64 = 1e-12;
+
 /// Compute the truncation range [a, b] from cumulants.
 ///
-/// Uses the Fang-Oosterlee (2008) formula:
+/// Uses the Fang-Oosterlee (2008) §3.3 formula:
 ///   a = c1 - L * sqrt(c2 + sqrt(|c4|))
 ///   b = c1 + L * sqrt(c2 + sqrt(|c4|))
+///
+/// The radicand `c2 + sqrt(|c4|)` is the distribution's spread proxy. A
+/// (near-)degenerate cumulant set — `c2` and `c4` both collapsing to zero, as
+/// happens for a deterministic payoff (`t -> 0`, `sigma -> 0`) — leaves no
+/// meaningful integration window. The previous implementation floored the
+/// radicand at `1e-8`, silently producing a tiny non-zero window and
+/// mis-pricing such an input rather than rejecting it; this returns an
+/// explicit error instead.
 fn truncation_range(
     c: &finstack_core::math::characteristic_function::Cumulants,
     l: f64,
-) -> (f64, f64) {
-    let width = l * (c.c2 + c.c4.abs().sqrt()).max(1e-8).sqrt();
-    (c.c1 - width, c.c1 + width)
+) -> crate::pricer::PricingResult<(f64, f64)> {
+    let radicand = c.c2 + c.c4.abs().sqrt();
+    if !radicand.is_finite() || radicand <= DEGENERATE_CUMULANT_RADICAND {
+        return Err(crate::pricer::PricingError::model_failure_with_context(
+            format!(
+                "COS method: degenerate cumulant set (c2={}, c4={}); the \
+                 log-price distribution has effectively zero spread, so no \
+                 meaningful truncation window exists — the COS method is not \
+                 applicable to a (near-)deterministic payoff",
+                c.c2, c.c4
+            ),
+            crate::pricer::PricingErrorContext::default(),
+        ));
+    }
+    let width = l * radicand.sqrt();
+    Ok((c.c1 - width, c.c1 + width))
 }
 
 /// Cosine series coefficient chi_k for the exponential payoff.
@@ -297,7 +432,51 @@ fn psi_k(k: usize, a: f64, b: f64, c: f64, d: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_core::math::characteristic_function::BlackScholesCf;
+    use finstack_core::math::characteristic_function::{
+        BlackScholesCf, Cumulants, MertonJumpCf,
+    };
+
+    /// Test CF whose `cf` evaluation returns a non-finite value.
+    ///
+    /// Used to verify that the COS pricer surfaces a non-finite
+    /// characteristic-function result as an explicit error rather than
+    /// silently clamping the resulting price to zero.
+    struct NanCf;
+
+    impl CharacteristicFunction for NanCf {
+        fn cf(&self, _u: Complex64, _t: f64) -> Complex64 {
+            Complex64::new(f64::NAN, 0.0)
+        }
+        fn cumulants(&self, t: f64) -> Cumulants {
+            // Well-formed, finite cumulants so the failure is isolated to the CF.
+            Cumulants {
+                c1: 0.0,
+                c2: 0.04 * t,
+                c3: 0.0,
+                c4: 0.0,
+            }
+        }
+    }
+
+    /// Test CF reporting a degenerate (zero-spread) cumulant set.
+    ///
+    /// `c2 = c4 = 0` describes a deterministic (point-mass) log-price, for
+    /// which the COS truncation half-width collapses to zero.
+    struct DegenerateCf;
+
+    impl CharacteristicFunction for DegenerateCf {
+        fn cf(&self, _u: Complex64, _t: f64) -> Complex64 {
+            Complex64::new(1.0, 0.0)
+        }
+        fn cumulants(&self, _t: f64) -> Cumulants {
+            Cumulants {
+                c1: 0.0,
+                c2: 0.0,
+                c3: 0.0,
+                c4: 0.0,
+            }
+        }
+    }
 
     /// Reference Black-Scholes call price for validation.
     fn bs_call_price(spot: f64, strike: f64, r: f64, q: f64, t: f64, sigma: f64) -> f64 {
@@ -519,6 +698,125 @@ mod tests {
             (call - bs_price).abs() < 5.0,
             "Merton should be in BS neighborhood: merton={call}, bs={bs_price}"
         );
+        Ok(())
+    }
+
+    /// Item 1: a non-finite characteristic-function result must surface as an
+    /// explicit error, not a silently-clamped `$0` price.
+    ///
+    /// With `raw = NaN`, the old guard `raw < -tol` is `false` (no warning
+    /// fires) and `raw.max(0.0)` returns `0.0`, so a totally failed pricing
+    /// was indistinguishable from a deep-OTM zero.
+    #[test]
+    fn cos_non_finite_cf_returns_error_not_silent_zero() {
+        let pricer = CosPricer::new(&NanCf, CosConfig::default());
+
+        let call = pricer.price_call(100.0, 100.0, 0.05, 1.0);
+        assert!(
+            call.is_err(),
+            "non-finite CF must yield an error, got {call:?}"
+        );
+        let msg = format!("{}", call.unwrap_err());
+        assert!(
+            msg.contains("non-finite") || msg.contains("not finite"),
+            "error should explain the non-finite failure, got: {msg}"
+        );
+
+        // The strip path must fail the same way (it is the shared core).
+        let strip = pricer.price_calls(100.0, &[90.0, 100.0, 110.0], 0.05, 1.0);
+        assert!(
+            strip.is_err(),
+            "non-finite CF must yield an error on the strip path too, got {strip:?}"
+        );
+    }
+
+    /// Item 3: a degenerate cumulant set (`c2 = c4 = 0`, i.e. a deterministic
+    /// log-price) must be rejected with an error rather than silently producing
+    /// a tiny, mis-priced truncation window via the old `√1e-8` floor.
+    #[test]
+    fn cos_degenerate_cumulants_return_error() {
+        let pricer = CosPricer::new(&DegenerateCf, CosConfig::default());
+        let call = pricer.price_call(100.0, 100.0, 0.05, 1.0);
+        assert!(
+            call.is_err(),
+            "degenerate cumulants must yield an error, got {call:?}"
+        );
+        let msg = format!("{}", call.unwrap_err());
+        assert!(
+            msg.contains("degenerate") || msg.contains("cumulant"),
+            "error should explain the degenerate-cumulant failure, got: {msg}"
+        );
+    }
+
+    /// Item 3: a near-degenerate but genuinely non-trivial cumulant set (very
+    /// short maturity, low vol) must still price — the rejection only fires
+    /// for a truly collapsed window, not for legitimately small ones.
+    #[test]
+    fn cos_tiny_but_valid_cumulants_still_price(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let sigma = 0.01;
+        let r = 0.01;
+        let t = 1.0 / 365.0;
+        let cf = BlackScholesCf { r, q: 0.0, sigma };
+        let pricer = CosPricer::new(&cf, CosConfig::default());
+        let cos = pricer.price_call(100.0, 100.0, r, t)?;
+        let bs = bs_call_price(100.0, 100.0, r, 0.0, t, sigma);
+        assert!(
+            (cos - bs).abs() < 1e-6,
+            "tiny-but-valid case should still price accurately: COS={cos}, BS={bs}"
+        );
+        Ok(())
+    }
+
+    /// Item 2: COS accuracy must hold for long-dated / high-drift regimes at
+    /// the default `num_terms`.
+    ///
+    /// A strongly-skewed Merton process accumulates variance, skew, and
+    /// kurtosis linearly in `t`. By `t = 20`+ the Fang-Oosterlee truncation
+    /// window is wide enough that the call payoff coefficient `chi_k` — which
+    /// carries an `exp(b)` term — overflows the usable f64 dynamic range,
+    /// producing a wildly wrong direct-call COS price. Pricing the call from
+    /// the bounded put payoff via put-call parity keeps `exp(x) <= 1` on the
+    /// integration support and stays accurate.
+    #[test]
+    fn cos_long_dated_high_drift_accuracy(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        for t in [10.0, 20.0, 30.0] {
+            let r = 0.05;
+            let merton = MertonJumpCf {
+                r,
+                q: 0.0,
+                sigma: 0.2,
+                lambda: 2.0,
+                mu_j: -0.3,
+                sigma_j: 0.2,
+            };
+            let pricer = CosPricer::new(&merton, CosConfig::default());
+
+            for k in [80.0, 100.0, 120.0] {
+                let call = pricer.price_call(100.0, k, r, t)?;
+                let put = pricer.price_put(100.0, k, r, t)?;
+
+                // Sanity bounds: a call is in [intrinsic_fwd_discounted, spot].
+                assert!(
+                    call.is_finite() && (0.0..=100.0).contains(&call),
+                    "Merton call out of range at t={t}, K={k}: {call}"
+                );
+                assert!(
+                    put.is_finite() && put >= 0.0,
+                    "Merton put invalid at t={t}, K={k}: {put}"
+                );
+
+                // Put-call parity must hold to tight tolerance for q = 0:
+                //   C - P = S - K * exp(-r t)
+                let parity = call - put - (100.0 - k * (-r * t).exp());
+                assert!(
+                    parity.abs() < 1e-6,
+                    "put-call parity broken at t={t}, K={k}: residual={parity:.3e} \
+                     (call={call}, put={put})"
+                );
+            }
+        }
         Ok(())
     }
 }

@@ -653,9 +653,16 @@ impl MetricPricingOverrides {
         use finstack_core::InputError;
         self.bump_config.validate()?;
         if let Some(ref s) = self.theta_period {
+            // The downstream consumer (`parse_theta_period`) uppercases the unit
+            // suffix before matching, so a lowercase form such as "1d" prices
+            // correctly at runtime. Normalize case here too so this JSON-boundary
+            // validation does not reject an input the pricer would accept.
             let ok = s.len() >= 2
                 && s[..s.len() - 1].chars().all(|c| c.is_ascii_digit())
-                && matches!(s.chars().last(), Some('D' | 'W' | 'M' | 'Y'));
+                && matches!(
+                    s.chars().last().map(|c| c.to_ascii_uppercase()),
+                    Some('D' | 'W' | 'M' | 'Y')
+                );
             if !ok {
                 return Err(InputError::Invalid.into());
             }
@@ -1299,6 +1306,34 @@ mod tests {
                 .map(|config| config.confidence_level),
             Some(0.99)
         );
+    }
+
+    /// `MetricPricingOverrides::validate` must accept a lowercase `theta_period`
+    /// unit suffix (e.g. `"1d"`). The downstream `parse_theta_period` consumer
+    /// uppercases the suffix, so a lowercase form prices fine at runtime; the
+    /// JSON-boundary validation must not reject what the pricer would accept.
+    #[test]
+    fn validate_accepts_case_insensitive_theta_period() {
+        for period in ["1d", "1D", "2w", "3M", "1y", "10Y", "12m"] {
+            let overrides = MetricPricingOverrides::default().with_theta_period(period);
+            assert!(
+                overrides.validate().is_ok(),
+                "theta_period {period:?} should validate (case-insensitive unit)"
+            );
+        }
+    }
+
+    /// Genuinely malformed `theta_period` values must still be rejected — the
+    /// case-normalization fix must not weaken validation of bad input.
+    #[test]
+    fn validate_rejects_malformed_theta_period() {
+        for period in ["1x", "D", "abc", "1", "1.5d", "-1d", ""] {
+            let overrides = MetricPricingOverrides::default().with_theta_period(period);
+            assert!(
+                overrides.validate().is_err(),
+                "malformed theta_period {period:?} must be rejected"
+            );
+        }
     }
 
     #[test]

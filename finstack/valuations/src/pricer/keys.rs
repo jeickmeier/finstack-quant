@@ -5,7 +5,17 @@
 //! appropriate pricer implementation.
 
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, strum::EnumIter,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    strum::EnumIter,
 )]
 #[repr(u16)]
 /// Strongly-typed instrument classification for pricer dispatch.
@@ -401,7 +411,17 @@ impl std::str::FromStr for InstrumentType {
 /// assert_eq!(model, ModelKey::Black76);
 /// ```
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, strum::EnumIter,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    strum::EnumIter,
 )]
 #[non_exhaustive]
 #[repr(u16)]
@@ -721,7 +741,9 @@ impl std::str::FromStr for ModelKey {
 /// assert_eq!(key.model, ModelKey::Black76);
 /// ```
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct PricerKey {
     /// The instrument type being priced.
     pub instrument: InstrumentType,
