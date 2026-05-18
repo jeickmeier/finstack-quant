@@ -141,6 +141,7 @@ impl AutocallableMcPricer {
             observation_times.clone(),
             inst.autocall_barriers.clone(),
             inst.coupons.clone(),
+            inst.memory_coupons,
             inst.final_barrier,
             mc_final_payoff,
             inst.participation_rate,

@@ -1096,13 +1096,26 @@ mod tests {
             .expect("NPV should succeed with mixed day counts");
         assert!(pv.amount() > 0.0, "Call option should have positive value");
 
-        // Rate should be consistent with curve DF under t_vol
+        // W-35 two-clock bridging — DISCOUNT leg.
+        // The discount factor is read off the curve on the curve clock
+        // (`t_rate`), but BSM applies the effective rate over the vol clock
+        // (`t_vol`). The bridge `r = −ln(df)/t_vol` must make the BSM discount
+        // `e^{−r·t_vol}` reproduce the true curve `df(t_rate)` exactly.
         let df_curve = curves
             .get_discount(DISC_ID)
             .expect("discount curve")
             .df(inputs.t_rate);
         let df_from_r = (-inputs.r * inputs.t_vol).exp();
         approx_eq(df_from_r, df_curve, 1e-10);
+
+        // W-35 two-clock bridging — CARRY leg.
+        // The BSM forward `F = S·e^{(r−q)·t_vol}` must equal the no-arbitrage
+        // forward `(S/df)·e^{−q·t_vol}`. This confirms the effective rate is
+        // correct for the carry term, not only the discount term — i.e. the
+        // single effective `r` is right for BOTH legs despite the clock split.
+        let bsm_forward = inputs.spot * ((inputs.r - inputs.q) * inputs.t_vol).exp();
+        let no_arb_forward = inputs.spot / df_curve * (-inputs.q * inputs.t_vol).exp();
+        approx_eq(bsm_forward, no_arb_forward, 1e-9);
 
         // Verify greeks are computed correctly
         let greeks = option

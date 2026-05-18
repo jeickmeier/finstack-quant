@@ -221,11 +221,13 @@ pub fn calculate_irr(flows: &[(Date, Money)], day_count: DayCount) -> finstack_c
                     finstack_core::dates::DayCountContext::default(),
                 )
                 .unwrap_or(0.0);
-            let df = if rate.abs() < 1e-10 {
-                1.0 - rate * t // Linear approximation for rates near zero
-            } else {
-                (1.0 + rate).powf(-t)
-            };
+            // Discount factor `(1 + r)^{-t}`. This expression is well-defined
+            // and continuous at `r = 0` — it evaluates to exactly `1.0^{-t} =
+            // 1.0` — so no special-case is needed. Using the same closed form
+            // at every rate keeps this routine consistent with the waterfall's
+            // IRR routine (`WaterfallSpec::calculate_irr`), which also discounts
+            // with `(1 + r)^{-t}` and treats `r = 0` as the `1.0` limit.
+            let df = (1.0 + rate).powf(-t);
             npv += amount.amount() * df;
         }
         npv
@@ -318,6 +320,54 @@ mod tests {
             (irr - 0.1487).abs() < 0.01,
             "Expected ~14.87% IRR, got {:.4}%",
             irr * 100.0
+        );
+    }
+
+    /// `calculate_irr` must discount cashflows with the exact closed form
+    /// `(1 + r)^{-t}` — no linearized `1 − r·t` near zero. This reconciles the
+    /// standalone routine with the waterfall's IRR routine
+    /// (`WaterfallSpec::calculate_irr`), which also uses `(1 + r)^{-t}`.
+    ///
+    /// With a near-zero IRR (a marginal gain over a multi-year horizon) the old
+    /// `1 − r·t` linearization is a different discount function from
+    /// `(1 + r)^{-t}`, so the recovered IRR drifts off the analytically exact
+    /// `(D/C)^{1/t} − 1`. The exact closed form recovers it tightly.
+    #[test]
+    fn irr_uses_exact_closed_form_discounting_near_zero_rate() {
+        // 0.05% total gain over (almost) 6 years => IRR ≈ 0.0083%/yr, deep in
+        // the near-zero region where the linearization and the closed form
+        // diverge.
+        let contribution = 1_000_000.0;
+        let distribution = 1_000_500.0;
+        let start = test_date(2020, 1, 1);
+        let end = test_date(2026, 1, 1);
+        let flows = vec![
+            (start, Money::new(-contribution, test_currency())),
+            (end, Money::new(distribution, test_currency())),
+        ];
+
+        let irr = calculate_irr(&flows, DayCount::Act365F).expect("IRR should solve");
+
+        // Analytically exact IRR for a single contribution/distribution pair:
+        //   C = D · (1 + r)^{-t}   =>   r = (D / C)^{1/t} − 1.
+        let t = DayCount::Act365F
+            .year_fraction(
+                start,
+                end,
+                finstack_core::dates::DayCountContext::default(),
+            )
+            .expect("year fraction");
+        let exact_irr = (distribution / contribution).powf(1.0 / t) - 1.0;
+
+        assert!(
+            (irr - exact_irr).abs() < 1e-9,
+            "near-zero IRR must match the exact (D/C)^(1/t) − 1 closed form: \
+             got {irr}, expected {exact_irr}"
+        );
+        // Confirm we are genuinely in the near-zero regime the fix targets.
+        assert!(
+            irr.abs() < 1e-3,
+            "test flows must produce a near-zero IRR; got {irr}"
         );
     }
 

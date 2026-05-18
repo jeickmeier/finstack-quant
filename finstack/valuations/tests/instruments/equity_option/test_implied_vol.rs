@@ -461,6 +461,47 @@ fn test_implied_vol_returns_zero_for_expired() {
     assert_approx_eq_tol(implied_vol, 0.0, TIGHT_TOL, "Expired implied vol");
 }
 
+/// A malformed `market_price` attribute must surface as an error, not be
+/// silently parsed to 0.0 (which would solve implied volatility against a zero
+/// target price and return a meaningless degenerate IV).
+#[test]
+fn test_implied_vol_malformed_market_price_errors() {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+    let strike = 100.0;
+    let spot = 100.0;
+
+    let mut call = create_call(as_of, expiry, strike);
+    let market = build_standard_market(as_of, spot, 0.25, 0.05, 0.0);
+
+    // Not a number — previously `.parse().unwrap_or(0.0)` swallowed this.
+    call.attributes
+        .meta
+        .insert("market_price".to_string(), "not-a-price".to_string());
+
+    let result = call.price_with_metrics(
+        &market,
+        as_of,
+        &[MetricId::ImpliedVol],
+        finstack_valuations::instruments::PricingOptions::default(),
+    );
+
+    match result {
+        Err(e) => {
+            let msg = e.to_string();
+            assert!(
+                msg.contains("market_price") && msg.contains("not a valid number"),
+                "error must name the malformed market_price attribute; got: {msg}"
+            );
+        }
+        Ok(r) => panic!(
+            "a malformed market_price must error, not silently solve IV against 0.0 \
+             (got implied_vol = {:?})",
+            r.measures.get("implied_vol")
+        ),
+    }
+}
+
 #[test]
 fn test_implied_vol_with_dividends() {
     let as_of = date!(2024 - 01 - 01);

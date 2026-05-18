@@ -44,6 +44,12 @@ pub struct AutocallablePayoff {
     pub autocall_barriers: Vec<f64>,
     /// Coupon payments if autocalled at each date
     pub coupons: Vec<f64>,
+    /// Memory ("Phoenix") coupon feature.
+    ///
+    /// When `true`, coupons from earlier observation dates whose barrier was
+    /// not met are accrued and paid in full on the autocall date. When
+    /// `false`, only the coupon at the autocall date is paid.
+    pub memory_coupons: bool,
     /// Final barrier level (for knock-in/knock-out)
     pub final_barrier: f64,
     /// Final payoff structure
@@ -88,6 +94,8 @@ impl AutocallablePayoff {
     /// * `observation_dates` - Dates when autocall barriers are checked (must be sorted)
     /// * `autocall_barriers` - Barrier levels at each observation date
     /// * `coupons` - Coupon payments if autocalled at each date
+    /// * `memory_coupons` - When `true`, earlier missed coupons accrue and are
+    ///   paid on the autocall date (Phoenix feature)
     /// * `final_barrier` - Barrier for final payoff (knock-in/knock-out)
     /// * `final_payoff_type` - Type of final payoff
     /// * `participation_rate` - Participation rate for final payoff
@@ -101,6 +109,7 @@ impl AutocallablePayoff {
         observation_dates: Vec<f64>,
         autocall_barriers: Vec<f64>,
         coupons: Vec<f64>,
+        memory_coupons: bool,
         final_barrier: f64,
         final_payoff_type: FinalPayoffType,
         participation_rate: f64,
@@ -147,6 +156,7 @@ impl AutocallablePayoff {
             observation_dates,
             autocall_barriers,
             coupons,
+            memory_coupons,
             final_barrier,
             final_payoff_type,
             participation_rate,
@@ -170,11 +180,16 @@ impl Payoff for AutocallablePayoff {
             return;
         };
 
-        // Track min/max for barrier checks
-        self.min_spot_observed = self.min_spot_observed.min(spot);
-        self.max_spot_observed = self.max_spot_observed.max(spot);
-
-        // Check autocall at observation dates
+        // Check autocall — and monitor the knock-in barrier — at the discrete
+        // observation dates only.
+        //
+        // The knock-in barrier (`min_spot_observed` / `max_spot_observed`) is
+        // contractually monitored *discretely* at the observation dates (see
+        // the `Barrier Monitoring Convention` section of `types.rs`). Updating
+        // it on every MC time step would amount to continuous monitoring on a
+        // dense grid, which over-counts barrier breaches and mis-prices the
+        // knock-in. Min/max are therefore recorded inside the observation-date
+        // loop, one sample per observation date, not once per time step.
         if self.autocalled_at.is_none() {
             const EPS: f64 = 1e-6;
             // Consume every observation date now due. A single MC time step can
@@ -190,6 +205,10 @@ impl Payoff for AutocallablePayoff {
                     break;
                 }
                 self.next_obs_idx = idx + 1;
+                // Discrete knock-in monitoring: record the spot at this
+                // observation date for the final-barrier check.
+                self.min_spot_observed = self.min_spot_observed.min(spot);
+                self.max_spot_observed = self.max_spot_observed.max(spot);
                 let barrier_level = self.initial_spot * self.autocall_barriers[idx];
                 if spot >= barrier_level {
                     // Autocall at the first date whose barrier is breached.
@@ -218,9 +237,23 @@ impl Payoff for AutocallablePayoff {
     fn value(&self, currency: Currency) -> Money {
         // If autocalled early
         if let Some(idx) = self.autocalled_at {
-            let coupon = self.coupons[idx];
-            // Return coupon + principal
-            // Adjust for discounting: The engine applies DF(T_mat), but we want DF(T_obs)
+            // Coupon paid on autocall.
+            //
+            // - Without memory: only the coupon at the autocall date `idx`.
+            // - With memory ("Phoenix"): every coupon from observation dates
+            //   0..=idx accrues and is paid in full on the autocall date.
+            //   Earlier observation barriers were necessarily *not* met (the
+            //   product would have autocalled there otherwise), so those
+            //   coupons were "remembered" and are now released.
+            let coupon: f64 = if self.memory_coupons {
+                self.coupons[..=idx].iter().sum()
+            } else {
+                self.coupons[idx]
+            };
+            // Return coupon + principal.
+            // Adjust for discounting: The engine applies DF(T_mat), but the
+            // autocall cashflow (principal *and* all accrued memory coupons)
+            // settles on the autocall date T_obs.
             // value * DF(T_mat) = Payoff * DF(T_obs)
             // value = Payoff * (DF(T_obs) / DF(T_mat))
             let payoff = (coupon + 1.0) * self.notional;
@@ -284,7 +317,8 @@ mod tests {
             observation_dates,
             barriers,
             coupons,
-            0.75, // Final barrier
+            false, // memory_coupons
+            0.75,  // Final barrier
             FinalPayoffType::CapitalProtection { floor: 0.9 },
             1.0, // Participation rate
             1.2, // Cap level
@@ -310,6 +344,7 @@ mod tests {
             observation_dates,
             barriers,
             coupons,
+            false, // memory_coupons
             0.75,
             FinalPayoffType::CapitalProtection { floor: 0.9 },
             1.0,
@@ -344,6 +379,7 @@ mod tests {
             observation_dates,
             barriers,
             coupons,
+            false, // memory_coupons
             0.75,
             FinalPayoffType::CapitalProtection { floor: 0.9 },
             1.0,
@@ -382,6 +418,7 @@ mod tests {
             vec![1.0],
             vec![2.0],
             vec![0.0],
+            false, // memory_coupons
             0.75,
             FinalPayoffType::Participation { rate: 1.0 },
             1.0,
@@ -413,6 +450,7 @@ mod tests {
             observation_dates,
             barriers,
             coupons,
+            false, // memory_coupons
             0.75,
             FinalPayoffType::CapitalProtection { floor: 0.9 },
             1.0,
@@ -441,6 +479,7 @@ mod tests {
             vec![1.0],
             vec![2.0],
             vec![0.0],
+            false, // memory_coupons
             0.6,
             FinalPayoffType::KnockInPut { strike: 100.0 },
             1.0,
@@ -482,6 +521,7 @@ mod tests {
             observation_dates,
             barriers,
             coupons,
+            false, // memory_coupons
             0.75,
             FinalPayoffType::CapitalProtection { floor: 0.9 },
             1.0,
@@ -521,6 +561,7 @@ mod tests {
             observation_dates,
             barriers,
             coupons,
+            false, // memory_coupons
             0.75,
             FinalPayoffType::CapitalProtection { floor: 0.9 },
             1.0,
@@ -549,6 +590,7 @@ mod tests {
             vec![1.0],
             vec![2.0],
             vec![0.0],
+            false, // memory_coupons
             0.6,
             FinalPayoffType::Participation { rate: 1.0 },
             1.0,
@@ -569,6 +611,153 @@ mod tests {
         assert!(
             (value.amount() - expected).abs() < 1e-6,
             "Participation payoff should cap at 120% of notional: expected {expected}, got {}",
+            value.amount()
+        );
+    }
+
+    /// The knock-in barrier is monitored *discretely* at the observation dates
+    /// only (see `types.rs` barrier-monitoring convention). A spot excursion
+    /// below the barrier on a non-observation time step must NOT knock the note
+    /// in. Before the fix, `on_event` updated `min_spot_observed` on every MC
+    /// time step, so an intermediate-step dip wrongly triggered the knock-in.
+    #[test]
+    fn knock_in_barrier_monitored_only_at_discrete_observation_dates() {
+        // Single observation date at t = 1.0; final knock-in barrier 60%.
+        let observation_dates = vec![1.0];
+        let barriers = vec![2.0]; // unreachable autocall barrier
+        let coupons = vec![0.0];
+
+        let mut payoff = AutocallablePayoff::new(
+            observation_dates,
+            barriers,
+            coupons,
+            false,
+            0.6, // 60% knock-in barrier => barrier level = 60.0
+            FinalPayoffType::KnockInPut { strike: 100.0 },
+            1.0,
+            1.5,
+            100_000.0,
+            Currency::USD,
+            100.0,
+            vec![1.0],
+        )
+        .expect("test fixture is well-formed");
+
+        // Intermediate (non-observation) time step at t = 0.5 with spot = 40,
+        // which is *below* the 60.0 knock-in barrier. Because t = 0.5 is not an
+        // observation date, this excursion must be ignored for knock-in.
+        let mut mid = PathState::new(1, 0.5);
+        mid.set(state_keys::SPOT, 40.0);
+        payoff.on_event(&mut mid);
+
+        // The dip must NOT have been recorded — discrete monitoring only.
+        assert_eq!(
+            payoff.min_spot_observed,
+            f64::INFINITY,
+            "an intermediate-step dip must not be recorded for discrete knock-in monitoring"
+        );
+
+        // Observation date at t = 1.0 with spot = 95 (well above the barrier).
+        let mut obs = PathState::new(1, 1.0);
+        obs.set(state_keys::SPOT, 95.0);
+        payoff.on_event(&mut obs);
+
+        let value = payoff.value(Currency::USD);
+        // Knock-in monitored only at t=1.0 where spot=95 > 60 barrier => NOT
+        // knocked in => full principal returned.
+        assert!(
+            (value.amount() - 100_000.0).abs() < 1e-6,
+            "with discrete monitoring the note is not knocked in (obs-date spot 95 \
+             > 60 barrier); expected full principal 100_000, got {}",
+            value.amount()
+        );
+    }
+
+    /// Memory ("Phoenix") feature: when the product autocalls at a later
+    /// observation date, every coupon from earlier observation dates whose
+    /// barrier was not met must be accrued and paid in full on the autocall
+    /// date. Before the fix, only the coupon at the autocall date was paid and
+    /// the earlier missed coupons were silently lost, underpricing the note.
+    #[test]
+    fn memory_coupons_accrue_unpaid_earlier_coupons_on_autocall() {
+        // Three observation dates. Barriers 0 and 1 are unreachable (200%),
+        // barrier 2 is 105%. The path breaches only at observation 2.
+        let observation_dates = vec![0.25, 0.5, 0.75];
+        let barriers = vec![2.0, 2.0, 1.05];
+        let coupons = vec![0.03, 0.04, 0.05];
+
+        let mut payoff = AutocallablePayoff::new(
+            observation_dates,
+            barriers,
+            coupons,
+            true, // memory_coupons ENABLED
+            0.6,
+            FinalPayoffType::Participation { rate: 1.0 },
+            1.0,
+            1.5,
+            100_000.0,
+            Currency::USD,
+            100.0,
+            vec![1.0, 1.0, 1.0], // df_ratios all 1.0 to isolate the coupon logic
+        )
+        .expect("test fixture is well-formed");
+
+        // One coarse step to t = 0.75 breaches only observation index 2.
+        let mut state = PathState::new(1, 0.75);
+        state.set(state_keys::SPOT, 110.0); // above the 105% barrier at index 2
+        payoff.on_event(&mut state);
+        assert_eq!(payoff.autocalled_at, Some(2));
+
+        let value = payoff.value(Currency::USD);
+        // Memory: accrued coupons = 0.03 + 0.04 + 0.05 = 0.12, plus principal.
+        // Payoff = (0.12 + 1.0) * 100_000 = 112_000.
+        let expected = (0.03 + 0.04 + 0.05 + 1.0) * 100_000.0;
+        assert!(
+            (value.amount() - expected).abs() < 1e-6,
+            "memory autocallable must pay the cumulative accrued coupons \
+             (0.12 + principal); expected {expected}, got {}",
+            value.amount()
+        );
+    }
+
+    /// Regression guard: with `memory_coupons = false` (the default), an
+    /// autocall must still pay ONLY the coupon at the autocall date — earlier
+    /// missed coupons are not accrued. This pins the non-memory pricing so the
+    /// memory feature cannot leak into ordinary autocallables.
+    #[test]
+    fn non_memory_autocall_pays_only_the_autocall_date_coupon() {
+        let observation_dates = vec![0.25, 0.5, 0.75];
+        let barriers = vec![2.0, 2.0, 1.05];
+        let coupons = vec![0.03, 0.04, 0.05];
+
+        let mut payoff = AutocallablePayoff::new(
+            observation_dates,
+            barriers,
+            coupons,
+            false, // memory_coupons DISABLED
+            0.6,
+            FinalPayoffType::Participation { rate: 1.0 },
+            1.0,
+            1.5,
+            100_000.0,
+            Currency::USD,
+            100.0,
+            vec![1.0, 1.0, 1.0],
+        )
+        .expect("test fixture is well-formed");
+
+        let mut state = PathState::new(1, 0.75);
+        state.set(state_keys::SPOT, 110.0);
+        payoff.on_event(&mut state);
+        assert_eq!(payoff.autocalled_at, Some(2));
+
+        let value = payoff.value(Currency::USD);
+        // Non-memory: only coupon[2] = 0.05 is paid, plus principal.
+        let expected = (0.05 + 1.0) * 100_000.0;
+        assert!(
+            (value.amount() - expected).abs() < 1e-6,
+            "non-memory autocallable must pay only the autocall-date coupon \
+             (0.05 + principal); expected {expected}, got {}",
             value.amount()
         );
     }

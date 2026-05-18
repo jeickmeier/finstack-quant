@@ -5,6 +5,20 @@ use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_core::Result;
 
 /// Calculate variance vega (sensitivity to 1 point change in variance).
+///
+/// This is the clean `∂PV/∂V` of the forward-variance leg:
+/// `variance_vega = DF · variance_notional · remaining_fraction · side`.
+///
+/// It satisfies the chain-rule identity with
+/// [`super::vega::VegaCalculator`] (W-34):
+///
+/// ```text
+/// vega = variance_vega · 2·σ_K · 0.01
+/// ```
+///
+/// where `σ_K = √(strike_variance)` is the strike vol — the same vol base the
+/// `Vega` metric and the vega-notional conversions
+/// ([`VarianceSwap::vega_to_variance_notional`]) are anchored to.
 pub(crate) struct VarianceVegaCalculator;
 
 impl MetricCalculator for VarianceVegaCalculator {

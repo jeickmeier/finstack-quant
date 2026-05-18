@@ -96,7 +96,8 @@ pub fn create_quarterly_autocallable(
         observation_dates,
         autocall_barriers,
         coupons,
-        final_barrier: 0.6, // 60% knock-in barrier
+        memory_coupons: false, // non-memory autocallable
+        final_barrier: 0.6,    // 60% knock-in barrier
         final_payoff_type: FinalPayoffType::Participation { rate: 1.0 },
         participation_rate: 1.0,
         cap_level: 1.5, // 150% cap

@@ -163,12 +163,63 @@ pub(crate) fn collect_inputs(
 /// - Dividend yield `q` is set to 0.0 (dividends are already priced into S*)
 ///
 /// This is the QuantLib-standard approach for discrete dividends in Black-Scholes.
+/// Extract future discrete dividends as `(time_to_ex_date, amount)` pairs.
+///
+/// Only dividends with an ex-date strictly after `as_of` and on or before
+/// `inst.expiry` are returned (past and post-expiry dividends do not affect the
+/// option). Times use ACT/365F (the equity-vol market standard). The returned
+/// slice drives the escrowed-dividend spot adjustment and its rho correction.
+fn future_dividends(inst: &EquityOption, as_of: Date) -> Result<Vec<(f64, f64)>> {
+    if inst.discrete_dividends.is_empty() {
+        return Ok(Vec::new());
+    }
+    let divs = inst
+        .discrete_dividends
+        .iter()
+        .filter(|(ex_date, _)| *ex_date > as_of && *ex_date <= inst.expiry)
+        .map(|(ex_date, amount)| {
+            let t_div = year_fraction(DayCount::Act365F, as_of, *ex_date)?;
+            Ok((t_div, *amount))
+        })
+        .collect::<finstack_core::Result<Vec<_>>>()?
+        .into_iter()
+        .filter(|(t_div, _)| *t_div > 0.0)
+        .collect();
+    Ok(divs)
+}
+
 pub(crate) fn collect_inputs_extended(
     inst: &EquityOption,
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<EquityOptionInputs> {
-    // Discount curve lookup - use curve's own day count for discount factor time
+    // Two-clock rate handling (W-35).
+    //
+    // The discount factor and the volatility surface live on *different* day
+    // counts: the discount curve uses its own convention (e.g. ACT/360 for an
+    // OIS curve), the vol surface uses ACT/365F (the equity-vol market
+    // standard). The two clocks must be kept separate:
+    //
+    //  - `t_rate` (curve clock): the ONLY argument used to read the discount
+    //    factor `df` off the curve. The curve's `df(·)` is parameterised by
+    //    *its own* clock, so it must be queried with `t_rate`, never `t_vol`.
+    //  - `t_vol` (ACT/365F): the time-to-expiry that drives the whole
+    //    Black–Scholes calculation — `d1`/`d2`, the carry term `(r−q)·t_vol`
+    //    and the discount term `e^{−r·t_vol}`.
+    //
+    // Black–Scholes is a single-`T` model: it applies one time `t_vol` to both
+    // the discount and the carry. The *effective* rate `r` must therefore be
+    // the rate that, compounded over the BSM clock `t_vol`, reproduces the true
+    // curve discount factor:
+    //
+    //     e^{−r · t_vol} = df            ⟹   r = −ln(df) / t_vol
+    //
+    // Dividing by `t_vol` (NOT `t_rate`) is deliberate and correct: it is the
+    // step that *bridges* the two clocks. It guarantees both legs of BSM are
+    // right — the discount `e^{−r·t_vol}` equals `df` exactly, and the forward
+    // `F = S·e^{(r−q)·t_vol}` equals the no-arbitrage forward `(S/df)·e^{−q·t_vol}`.
+    // Using `r = −ln(df)/t_rate` here would instead make `e^{−r·t_vol} ≠ df`
+    // whenever the clocks differ, mispricing both the discount and the carry.
     let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
     let curve_dc = disc_curve.day_count();
     let t_rate = year_fraction(curve_dc, as_of, inst.expiry)?;
@@ -177,6 +228,7 @@ pub(crate) fn collect_inputs_extended(
     // Vol time uses ACT/365F (equity market standard for vol surfaces)
     // This is consistent with how equity volatility is quoted in the market
     let t_vol = year_fraction(DayCount::Act365F, as_of, inst.expiry)?;
+    // Effective BSM rate on the vol clock — see the two-clock note above.
     let r = if t_vol > 0.0 { -df.ln() / t_vol } else { 0.0 };
 
     // Spot from scalar id (unitless or price)
@@ -187,21 +239,7 @@ pub(crate) fn collect_inputs_extended(
     };
 
     // Check for discrete dividends — if present, adjust spot and zero out q
-    let future_divs: Vec<(f64, f64)> = if !inst.discrete_dividends.is_empty() {
-        inst.discrete_dividends
-            .iter()
-            .filter(|(ex_date, _)| *ex_date > as_of && *ex_date <= inst.expiry)
-            .map(|(ex_date, amount)| {
-                let t_div = year_fraction(DayCount::Act365F, as_of, *ex_date)?;
-                Ok((t_div, *amount))
-            })
-            .collect::<finstack_core::Result<Vec<_>>>()?
-            .into_iter()
-            .filter(|(t_div, _)| *t_div > 0.0)
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let future_divs = future_dividends(inst, as_of)?;
 
     let (spot, q) = if !future_divs.is_empty() {
         // Escrowed dividend model: adjust spot, set q=0
@@ -310,6 +348,35 @@ pub(crate) fn adjust_spot_for_discrete_dividends(
     (spot - pv_dividends).max(1e-8)
 }
 
+/// Sensitivity of the escrowed (dividend-adjusted) spot to the risk-free rate.
+///
+/// With the escrowed-dividend model `S* = S − Σ D_i · e^{−r·t_i}`, the adjusted
+/// spot itself depends on `r`:
+///
+/// ```text
+/// ∂S*/∂r = Σ D_i · t_i · e^{−r·t_i}
+/// ```
+///
+/// This term is required to obtain a correct rho: the Black–Scholes `rho`
+/// computed from `S*` holds `S*` fixed and therefore misses the
+/// `∂V/∂S* · ∂S*/∂r` contribution. Total rho is
+/// `rho_total = rho_BS(S*) + delta(S*) · ∂S*/∂r`.
+///
+/// Returns `0.0` when no future dividends are present (the adjusted spot is
+/// then `r`-independent). The clamp floor applied by
+/// [`adjust_spot_for_discrete_dividends`] is intentionally *not* differentiated
+/// here: in the clamped (degenerate, PV-of-dividends ≥ spot) regime `S*` is a
+/// constant `1e-8` and its true rate derivative is zero, so callers must guard
+/// that case separately if they need it.
+#[must_use]
+pub(crate) fn escrowed_spot_drho(rate: f64, dividends: &[(f64, f64)]) -> f64 {
+    dividends
+        .iter()
+        .filter(|(t, _)| *t > 0.0)
+        .map(|(t, d)| d * t * (-rate * t).exp())
+        .sum()
+}
+
 /// Unit price under Black–Scholes (no contract size scaling).
 #[inline]
 pub(crate) fn price_bs_unit(
@@ -396,13 +463,41 @@ pub(crate) fn compute_greeks(
                 inst.option_type,
                 TRADING_DAYS_PER_YEAR,
             );
+
+            // Escrowed-dividend rho correction.
+            //
+            // Under the escrowed-dividend model the BS inputs use the adjusted
+            // spot `S* = S − Σ D_i·e^{−r·t_i}`, which itself depends on `r`.
+            // `bs_greeks` computes rho holding `S*` fixed, so it misses the
+            // `∂V/∂S* · ∂S*/∂r` chain-rule term. Total rho is
+            //   rho_total = rho_BS(S*) + delta(S*) · ∂S*/∂r,
+            // expressed per 1% rate move (hence the `ONE_PERCENT` factor:
+            // `greeks_unit.rho_r` and `vega` are already per-1%, while
+            // `delta` and `∂S*/∂r` are per-unit).
+            let rho_unit = {
+                let future_divs = future_dividends(inst, as_of)?;
+                if future_divs.is_empty() {
+                    greeks_unit.rho_r
+                } else {
+                    // In the degenerate clamped regime S* is pinned at the
+                    // 1e-8 floor and is genuinely r-independent (∂S*/∂r = 0).
+                    let ds_star_dr = if spot <= 1e-8 {
+                        0.0
+                    } else {
+                        escrowed_spot_drho(r, &future_divs)
+                    };
+                    const ONE_PERCENT: f64 = 0.01;
+                    greeks_unit.rho_r + greeks_unit.delta * ds_star_dr * ONE_PERCENT
+                }
+            };
+
             let scale = inst.notional.amount();
             Ok(EquityOptionGreeks {
                 delta: greeks_unit.delta * scale,
                 gamma: greeks_unit.gamma * scale,
                 vega: greeks_unit.vega * scale,
                 theta: greeks_unit.theta * scale,
-                rho: greeks_unit.rho_r * scale,
+                rho: rho_unit * scale,
             })
         }
         ExerciseStyle::American => {
@@ -480,7 +575,8 @@ fn tree_finite_difference_greeks(
 ) -> Result<EquityOptionGreeks> {
     let base_price = price_fn(params)?;
 
-    // Delta & Gamma (1% spot bump)
+    // Delta: small 1%-of-spot central bump (accuracy-limited; the first
+    // difference's noise is O(ε_tree / h), so a small bump is fine).
     let h_s = params.spot * 0.01;
     let mut p_up = params.clone();
     p_up.spot += h_s;
@@ -490,7 +586,34 @@ fn tree_finite_difference_greeks(
     let price_dn = price_fn(&p_dn)?;
 
     let delta_unit = (price_up - price_dn) / (2.0 * h_s);
-    let gamma_unit = (price_up - 2.0 * base_price + price_dn) / (h_s * h_s);
+
+    // Gamma: a 1%-of-spot bump is too small. The central second difference
+    // `(p_up − 2·base + p_dn) / h²` has noise of order `ε_tree / h²`, which a
+    // 1% bump leaves noise-dominated — gamma is then noisy and biased,
+    // especially for short-dated options where the tree's discrete spot grid
+    // makes `P(S)` locally piecewise-flat.
+    //
+    // Use a wider, better-conditioned gamma bump sized to the option's natural
+    // spot scale `σ·√t` (the width of the region where gamma actually lives),
+    // with a 2%-of-spot floor so the bump never collapses for short-dated /
+    // low-vol options. This trades a small, bounded discretisation bias for a
+    // large reduction in second-difference noise. A separate, dedicated
+    // re-pricing pair is used so the delta bump stays small for accuracy.
+    let gamma_unit = {
+        let vol_t = params.volatility * params.time_to_expiry.max(0.0).sqrt();
+        let h_g = params.spot * vol_t.max(0.02);
+        let mut p_g_up = params.clone();
+        p_g_up.spot += h_g;
+        let price_g_up = price_fn(&p_g_up)?;
+        let mut p_g_dn = params.clone();
+        p_g_dn.spot = (p_g_dn.spot - h_g).max(1e-8);
+        let price_g_dn = price_fn(&p_g_dn)?;
+        // Guard the (degenerate) case where the down-bump was clamped: fall
+        // back to the symmetric stencil radius actually used.
+        let h_dn = params.spot - p_g_dn.spot;
+        let h_eff = 0.5 * (h_g + h_dn);
+        (price_g_up - 2.0 * base_price + price_g_dn) / (h_eff * h_eff)
+    };
 
     // Vega (1% vol bump)
     let h_v = 0.01;
@@ -877,6 +1000,72 @@ mod tests {
         assert!((s_adj - 100.0).abs() < 1e-12);
     }
 
+    /// Escrowed-dividend rho must include the `∂S*/∂r` chain-rule term.
+    ///
+    /// With discrete dividends the BS inputs use `S* = S − Σ D·e^{−r·t}`, which
+    /// depends on `r`. The analytic rho from `compute_greeks` must therefore
+    /// match a finite-difference rho computed by bumping the discount-curve
+    /// rate (which re-derives `S*` at the bumped rate). Before the fix, rho
+    /// held `S*` fixed and disagreed with the FD rho by `delta·∂S*/∂r`.
+    #[test]
+    fn escrowed_dividend_rho_includes_spot_rate_sensitivity() {
+        let as_of = date(2025, 1, 1);
+        let expiry = date(2026, 1, 1); // ~1y
+        let mut opt = option(expiry, OptionType::Call, ExerciseStyle::European);
+        // A sizeable dividend mid-life makes ∂S*/∂r materially non-zero.
+        opt.discrete_dividends = vec![(date(2025, 7, 1), 8.0)];
+
+        let base_rate = 0.04;
+        let analytic = compute_greeks(&opt, &market(as_of, 100.0, 0.20, base_rate, 0.0), as_of)
+            .expect("analytic greeks")
+            .rho;
+
+        // Central finite-difference rho of the full PV over the curve rate.
+        // compute_pv re-derives r (and hence S*) from the curve, so this FD
+        // captures the ∂S*/∂r contribution that the analytic rho must match.
+        let h = 1e-4; // 1bp in rate space
+        let pv_up = compute_pv(&opt, &market(as_of, 100.0, 0.20, base_rate + h, 0.0), as_of)
+            .expect("pv up")
+            .amount();
+        let pv_dn = compute_pv(&opt, &market(as_of, 100.0, 0.20, base_rate - h, 0.0), as_of)
+            .expect("pv dn")
+            .amount();
+        // analytic rho is per 1% (100bp); FD slope per unit-rate * 0.01.
+        let fd_rho = (pv_up - pv_dn) / (2.0 * h) * 0.01;
+
+        let denom = analytic.abs().max(fd_rho.abs()).max(1e-9);
+        assert!(
+            (analytic - fd_rho).abs() / denom < 5e-3,
+            "escrowed-dividend rho must match FD rho of the full PV (which \
+             re-derives S* at the bumped rate): analytic={analytic} fd={fd_rho}"
+        );
+
+        // And it must NOT equal the naive rho that holds S* fixed.
+        let inputs = collect_inputs_extended(
+            &opt,
+            &market(as_of, 100.0, 0.20, base_rate, 0.0),
+            as_of,
+        )
+        .expect("inputs");
+        let naive = bs_greeks(
+            inputs.spot,
+            opt.strike,
+            inputs.r,
+            inputs.q,
+            inputs.sigma,
+            inputs.t_vol,
+            opt.option_type,
+            TRADING_DAYS_PER_YEAR,
+        )
+        .rho_r
+            * opt.notional.amount();
+        assert!(
+            (analytic - naive).abs() / denom > 1e-3,
+            "the ∂S*/∂r correction must move rho away from the S*-fixed value: \
+             analytic={analytic} naive={naive}"
+        );
+    }
+
     #[test]
     fn test_expired_atm_delta_convention_matches_compute_greeks_and_unit_greeks() {
         let as_of = date(2025, 1, 1);
@@ -895,6 +1084,55 @@ mod tests {
         assert_eq!(put_unit.delta, -0.5);
         assert_eq!(call_greeks.gamma, 0.0);
         assert_eq!(put_greeks.gamma, 0.0);
+    }
+
+    /// Short-dated tree FD gamma must be well-conditioned.
+    ///
+    /// An American call on a non-dividend-paying underlying is never optimally
+    /// exercised early, so its price (and gamma) equals the European value.
+    /// For a short-dated near-ATM option the analytic BS gamma is therefore a
+    /// reliable oracle. With the old 1%-of-spot gamma bump the tree second
+    /// difference is noise-dominated and gamma drifts well off the analytic
+    /// value; the wider `σ√t`-scaled bump keeps it close.
+    #[test]
+    fn short_dated_tree_gamma_is_well_conditioned() {
+        let as_of = date(2025, 1, 1);
+        // ~3-week expiry: short enough that a 1%-of-spot bump is noise-prone.
+        let expiry = date(2025, 1, 22);
+        let mut american = option(expiry, OptionType::Call, ExerciseStyle::American);
+        american.pricing_overrides.model_config.tree_steps = Some(201);
+        // Zero dividend yield => American call == European call.
+        let curves = market(as_of, 100.0, 0.20, 0.03, 0.0);
+
+        let tree_greeks = compute_greeks(&american, &curves, as_of).expect("tree greeks");
+
+        // Analytic European gamma with the same inputs.
+        let inputs = collect_inputs_extended(&american, &curves, as_of).expect("inputs");
+        let analytic = bs_greeks(
+            inputs.spot,
+            american.strike,
+            inputs.r,
+            inputs.q,
+            inputs.sigma,
+            inputs.t_vol,
+            american.option_type,
+            TRADING_DAYS_PER_YEAR,
+        )
+        .gamma
+            * american.notional.amount();
+
+        assert!(
+            analytic > 0.0 && tree_greeks.gamma > 0.0,
+            "gamma must be positive: analytic={analytic} tree={}",
+            tree_greeks.gamma
+        );
+        let rel_err = (tree_greeks.gamma - analytic).abs() / analytic;
+        assert!(
+            rel_err < 0.05,
+            "short-dated tree gamma must track analytic gamma within 5%: \
+             analytic={analytic} tree={} rel_err={rel_err}",
+            tree_greeks.gamma
+        );
     }
 
     #[test]
