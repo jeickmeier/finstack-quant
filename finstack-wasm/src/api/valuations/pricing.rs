@@ -470,6 +470,11 @@ mod tests {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_correlation: 0.5,
             day_count: DayCount::Act365F,
+            swap_convention: None,
+            swap_fixed_freq: None,
+            swap_float_freq: None,
+            swap_day_count: None,
+            swap_float_day_count: None,
             pricing_overrides: PricingOverrides::default(),
             attributes: Default::default(),
         };
