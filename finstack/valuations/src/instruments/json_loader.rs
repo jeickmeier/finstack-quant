@@ -574,9 +574,9 @@ impl InstrumentEnvelope {
 ///
 /// Accepts either the versioned envelope form
 /// (`{"schema": "finstack.instrument/1", "instrument": {...}}`) or the bare
-/// tagged form (`{"type": "...", "spec": {...}}`). Every instrument type in
-/// [`with_instrument_json_registry!`] is reachable, so callers never maintain
-/// their own instrument-type lists.
+/// tagged form (`{"type": "...", "spec": {...}}`). Every instrument type
+/// registered in the crate's instrument registry is reachable, so callers
+/// never maintain their own instrument-type lists.
 ///
 /// # Errors
 ///
