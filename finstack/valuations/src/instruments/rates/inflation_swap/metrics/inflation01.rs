@@ -1,126 +1,77 @@
 //! Inflation01 (inflation rate sensitivity) metric for `InflationSwap`.
 //!
-//! # Analytical Approximation
+//! # Finite-Difference Method
 //!
-//! This calculator uses a closed-form analytical approximation for Inflation01,
-//! rather than numerical finite differences. The formula is:
+//! Inflation01 is computed by **central finite differences** on the inflation
+//! curve — the same approach the YoY path (`YoYInflation01Calculator`) uses,
+//! so the zero-coupon and YoY metrics are mutually consistent and both agree
+//! with a bumped-curve DV01:
 //!
 //! ```text
-//! Inflation01 ≈ Notional × I(T)/I(0) × DF(T) × T × 0.0001
+//! Inflation01 ≈ [PV(+1bp) − PV(−1bp)] / (2 · 1bp)
 //! ```
 //!
-//! where:
-//! - `I(T)/I(0)` is the projected inflation index ratio
-//! - `DF(T)` is the discount factor to maturity
-//! - `T` is the time to lagged maturity in years
-//! - `0.0001` converts to per-basis-point sensitivity
+//! # Why not the closed form
 //!
-//! # Derivation
+//! The previous analytical approximation
 //!
-//! For a zero-coupon inflation swap, the inflation leg PV is:
 //! ```text
-//! PV_infl = N × [I(T)/I(0) - 1] × DF(T)
+//! Inflation01 ≈ N · I(T)/I(0) · DF(T) · T · 1bp
 //! ```
 //!
-//! Assuming the index ratio follows `I(T)/I(0) ≈ exp(π×T)` for inflation rate π:
-//! ```text
-//! dPV/dπ = N × DF(T) × T × exp(π×T) = N × DF(T) × T × I(T)/I(0)
-//! ```
+//! had a **lag mismatch**: the maturity time `T` in the `dPV/dπ` factor was
+//! computed to the *lagged* maturity (`maturity − indexation lag`, ACT/365F)
+//! while the discount factor `DF(T)` used the *unlagged* maturity on the
+//! discount curve's own day count. The two `T`s referred to different dates,
+//! so the analytic sensitivity disagreed with the bumped-curve DV01. It also
+//! silently assumed continuous compounding `exp(π·T)` whereas inflation curves
+//! may compound discretely. Finite differences re-use the instrument's actual
+//! `value()` (lag, day counts, compounding all consistent) and so carry no
+//! such mismatch.
 //!
-//! # Approximation Accuracy
+//! # Sign Convention
 //!
-//! This analytical formula assumes continuous compounding (`exp(π×T)`), but actual
-//! inflation curves may use discrete compounding (`(1+π)^T`). For discrete:
-//! ```text
-//! d/dπ[(1+π)^T] = T × (1+π)^(T-1) ≠ T × (1+π)^T
-//! ```
+//! - **PayFixed**: positive Inflation01 (benefits from higher inflation).
+//! - **ReceiveFixed**: negative Inflation01 (loses from higher inflation).
 //!
-//! The error is approximately `π×T` in relative terms, which is typically small
-//! (<1%) for normal inflation levels (2-3%) and maturities (<10Y).
-//!
-//! For high-precision applications or extreme scenarios, consider using finite
-//! differences (as implemented in `YoYInflation01Calculator`).
-//!
-//! # Comparison with YoY Inflation01
-//!
-//! - **Zero-coupon (this)**: Uses analytical approximation for speed
-//! - **YoY swaps**: Uses finite differences for accuracy with periodic cashflows
+//! The bumped-curve `value()` already carries the leg signs, so the finite
+//! difference reproduces the correct sign without an explicit branch.
 
-use crate::instruments::common_impl::parameters::legs::PayReceive;
+use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::inflation_swap::InflationSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_core::dates::DayCount;
-use finstack_core::market_data::scalars::InflationLag;
+use finstack_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_core::Result;
 
-/// Calculates Inflation01 (1bp inflation rate sensitivity) for inflation swaps.
-///
-/// Uses an analytical approximation based on the derivative of the inflation leg PV
-/// with respect to parallel inflation rate shifts.
-///
-/// # Formula
-///
-/// ```text
-/// Inflation01 ≈ N × (I_T / I_0) × DF × T × 0.0001
-/// ```
-///
-/// # Accuracy
-///
-/// This approximation is accurate to within ~1% for typical market conditions
-/// (inflation rates 0-5%, maturities 1-10Y). For extreme scenarios, finite
-/// differences may be more accurate.
-///
-/// # Sign Convention
-///
-/// - **PayFixed**: Positive Inflation01 (benefits from higher inflation)
-/// - **ReceiveFixed**: Negative Inflation01 (loses from higher inflation)
+/// Standard inflation curve bump: 1bp (0.0001 in decimal).
+const INFLATION_BUMP_BP: f64 = 0.0001;
+
+/// Calculates Inflation01 (1bp inflation rate sensitivity) for zero-coupon
+/// inflation swaps via central finite differences on the inflation curve.
 pub(crate) struct Inflation01Calculator;
 
 impl MetricCalculator for Inflation01Calculator {
-    fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
-        let s: &InflationSwap = context.instrument_as()?;
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let swap: &InflationSwap = context.instrument_as()?;
+        let as_of = context.as_of;
 
-        let disc = context.curves.get_discount(s.discount_curve_id.as_str())?;
-        let base = disc.base_date();
-        let curve_dc = disc.day_count();
+        // Bump the inflation curve up by 1bp and reprice.
+        let bump_up = BumpSpec::inflation_shift_pct(INFLATION_BUMP_BP * 100.0);
+        let curves_up = context.curves.as_ref().bump([MarketBump::Curve {
+            id: swap.inflation_index_id.clone(),
+            spec: bump_up,
+        }])?;
+        let pv_up = swap.value(&curves_up, as_of)?.amount();
 
-        // Get Index Ratio using central logic
-        let index_ratio = s.projected_index_ratio(&context.curves, base)?;
+        // Bump the inflation curve down by 1bp and reprice.
+        let bump_down = BumpSpec::inflation_shift_pct(-INFLATION_BUMP_BP * 100.0);
+        let curves_down = context.curves.as_ref().bump([MarketBump::Curve {
+            id: swap.inflation_index_id.clone(),
+            spec: bump_down,
+        }])?;
+        let pv_down = swap.value(&curves_down, as_of)?.amount();
 
-        // Calculate T (time to lagged maturity) for sensitivity
-        // Use the effective lag (instrument override or index default)
-        let inflation_index = context
-            .curves
-            .get_inflation_index(s.inflation_index_id.as_str())
-            .ok();
-
-        let default_lag = s
-            .lag_override
-            .or_else(|| inflation_index.map(|i| i.lag()))
-            .unwrap_or(InflationLag::Months(3)); // Standard 3-month lag default
-
-        let lagged_maturity = s.apply_lag(s.maturity, default_lag);
-
-        let t_maturity = DayCount::Act365F.year_fraction(
-            base,
-            lagged_maturity,
-            finstack_core::dates::DayCountContext::default(),
-        )?;
-
-        // Use curve day count for discounting
-        let t_discount = curve_dc.year_fraction(
-            base,
-            s.maturity,
-            finstack_core::dates::DayCountContext::default(),
-        )?;
-        let df = disc.df(t_discount);
-
-        let inflation_sensitivity = s.notional.amount() * index_ratio * df * t_maturity * 0.0001;
-
-        let signed_sensitivity = match s.side {
-            PayReceive::PayFixed => inflation_sensitivity,
-            PayReceive::ReceiveFixed => -inflation_sensitivity,
-        };
-
-        Ok(signed_sensitivity)
+        // Central difference: dPV/dπ scaled to a 1bp move.
+        Ok((pv_up - pv_down) / (2.0 * INFLATION_BUMP_BP))
     }
 }

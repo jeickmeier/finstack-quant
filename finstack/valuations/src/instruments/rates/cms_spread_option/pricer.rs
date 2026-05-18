@@ -17,7 +17,7 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
 };
 use crate::results::ValuationResult;
-use finstack_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor};
+use finstack_core::dates::{Date, DateExt, DayCountContext, Tenor};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::traits::VolProvider;
 use finstack_core::math::{norm_cdf, GaussHermiteQuadrature};
@@ -153,6 +153,12 @@ impl CmsSpreadOptionPricer {
             ))
         })?;
         let swap_end = inst.expiry_date.add_months(tenor_months as i32);
+        // Project the CMS forward swap rate on the instrument's actual swap
+        // conventions. Hard-coding USD conventions (semi/30360 fixed,
+        // quarterly/Act360 float) mis-prices the annuity and accrual basis for
+        // non-USD CMS spreads (e.g. EUR: annual/30360 fixed, annual/Act360
+        // float). `resolved_swap_*` falls back to the USD market standard when
+        // neither `swap_convention` nor an explicit field is set.
         let (forward_rate, _) = calculate_forward_swap_rate(ForwardSwapRateInputs {
             market,
             discount_curve_id: &inst.discount_curve_id,
@@ -160,10 +166,10 @@ impl CmsSpreadOptionPricer {
             as_of,
             start: inst.expiry_date,
             end: swap_end,
-            fixed_freq: Tenor::semi_annual(),
-            fixed_day_count: DayCount::Thirty360,
-            float_freq: Tenor::quarterly(),
-            float_day_count: DayCount::Act360,
+            fixed_freq: inst.resolved_swap_fixed_freq(),
+            fixed_day_count: inst.resolved_swap_day_count(),
+            float_freq: inst.resolved_swap_float_freq(),
+            float_day_count: inst.resolved_swap_float_day_count(),
         })?;
         if forward_rate <= 0.0 || !forward_rate.is_finite() {
             return Err(finstack_core::Error::Validation(format!(

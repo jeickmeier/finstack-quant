@@ -27,10 +27,13 @@
 //! - `g(k) = DF(T_pay) / A_par(k)` — ratio of payment discount factor to the
 //!   closed-form par annuity at rate `k` (the Radon-Nikodym derivative between
 //!   the payment measure and the annuity measure)
-//! - `C_sw(k) = A₀ × Black76_call(F, k, σ(k), T)` — annuity-measure payer
-//!   swaption price
-//! - `P_sw(k) = A₀ × Black76_put(F, k, σ(k), T)` — annuity-measure receiver
-//!   swaption price
+//! - `C_sw(k) = A_par(k) × Black76_call(F, k, σ(k), T)` — annuity-measure payer
+//!   swaption price, expressed with the **same** closed-form par annuity that
+//!   `g(k)` divides by, so `g(k)·C_sw(k) = DF(T_pay)·Black76_call(F, k, σ(k), T)`
+//!   with the annuity cancelling cleanly (the `A_par(F) = A₀` calibration
+//!   subsumes the market annuity — see the in-body note)
+//! - `P_sw(k) = A_par(k) × Black76_put(F, k, σ(k), T)` — annuity-measure receiver
+//!   swaption price (same annuity-consistency rule)
 //! - `g'(k)` — first derivative of `g`, computed via central differences
 //! - Integration uses 16-point Gauss-Legendre quadrature over ±6σ from the strike
 //!
@@ -212,8 +215,11 @@ impl CmsReplicationPricer {
             let swap_start = fixing_date;
             let swap_end = swap_start.add_months((inst.cms_tenor * 12.0).round() as i32);
 
-            // F (forward swap rate) and A₀ (market annuity per unit notional)
-            let (forward_rate, annuity_mkt) =
+            // F (forward swap rate). The market annuity A₀ is intentionally
+            // discarded: the static replication uses the closed-form par
+            // annuity `A_par(·)` consistently in both `g(k)` and `C_sw(k)`
+            // (see the annuity-consistency note at the boundary term below).
+            let (forward_rate, _annuity_mkt) =
                 self.calculate_forward_swap_rate(inst, curves, as_of, swap_start, swap_end)?;
 
             if forward_rate <= 0.0 {
@@ -251,6 +257,43 @@ impl CmsReplicationPricer {
                 // Vol at the caplet/floorlet strike (for the boundary term)
                 let vol_at_strike = vol_surface.value_clamped(ttf, strike);
 
+                // Annuity consistency (item 12).
+                //
+                // The CMS caplet value is `V = A₀·E^A[(S−K)⁺·g(S)]`, replicated
+                // by integration by parts as
+                //   V = g(K)·C_sw(K) + ∫ g'(k)·C_sw(k) dk
+                // where `C_sw(k)` is the annuity-measure swaption price and
+                // `g(s) = DF_pay/A(s)` is the Radon-Nikodym weight `dQ^{T_pay}/dQ^A`.
+                //
+                // `g` is *modelled* via the closed-form par annuity, `g(s) =
+                // DF_pay/A_par(s)` — this model must be calibrated to the
+                // market at the forward, i.e. `A_par(F) ≡ A₀`. The replicating
+                // swaption price must use the *same* annuity model that `g`
+                // divides by:
+                //
+                //   C_sw(k) = A_par(k) · Black76(F, k, σ(k), T)
+                //
+                // so that `g(k)·C_sw(k) = DF_pay · Black76(F, k, σ(k), T)`,
+                // with the annuity cancelling cleanly. The previous code paired
+                // `g(k) = DF_pay/A_par(k)` with the *market*-annuity swaption
+                // `C_sw(k) = A₀·Black76(k)`, leaving a spurious residual
+                // `A₀/A_par(k)` — equal to 1 only at `k = F` (where
+                // `A_par(F) = A₀`) and mispricing every `K ≠ F`.
+                //
+                // `A₀` (the market annuity) is therefore correctly *not* used
+                // here: it is subsumed into the `A_par(F) = A₀` calibration.
+                // The market curve still enters through the forward swap
+                // rate `F` and the payment discount factor `DF_pay`.
+                let g_times_c = |k: f64, v: f64, is_call: bool| -> f64 {
+                    let black = if is_call {
+                        black76_call(forward_rate, k, v, ttf)
+                    } else {
+                        black76_put(forward_rate, k, v, ttf)
+                    };
+                    // g(k) · C_sw(k) = (DF_pay / A_par(k)) · (A_par(k) · Black) = DF_pay · Black
+                    df_pay * black
+                };
+
                 match inst.option_type {
                     OptionType::Call => {
                         // Caplet formula:
@@ -259,16 +302,20 @@ impl CmsReplicationPricer {
                         // Upper bound K_max = K + 6σ ensures ≤ 1e-9 truncation error.
                         let k_max = (strike + N_STD_CUTOFF * std_dev).max(strike * 1.05);
 
-                        // Boundary term: g(K) × C_sw(K)
-                        let c_boundary =
-                            annuity_mkt * black76_call(forward_rate, strike, vol_at_strike, ttf);
-                        let g_at_k = df_pay / par_annuity(strike.max(K_FLOOR), cms_tenor, m);
+                        // Boundary term: g(K) · C_sw(K) = DF_pay · Black76_call(K).
+                        let boundary = g_times_c(strike, vol_at_strike, true);
 
-                        // Integral term: ∫_K^{K_max} g'(k) · C_sw(k) dk
+                        // Integral term: ∫_K^{K_max} g'(k) · C_sw(k) dk.
+                        //
+                        // With C_sw(k) = A_par(k)·Black76(k), the integrand is
+                        // g'(k)·A_par(k)·Black76(k). Expanding g(k)=DF_pay/A_par(k):
+                        //   g'(k)·A_par(k) = DF_pay · (−A_par'(k)/A_par(k))
+                        // so the integrand stays annuity-consistent.
                         let integral = gauss_legendre_integrate(
                             |k: f64| {
                                 let v = vol_surface.value_clamped(ttf, k);
-                                let c_sw = annuity_mkt * black76_call(forward_rate, k, v, ttf);
+                                let c_sw = par_annuity(k.max(K_FLOOR), cms_tenor, m)
+                                    * black76_call(forward_rate, k, v, ttf);
                                 // g'(k) via central differences; clamp lower node at K_FLOOR
                                 let k_lo = (k - G_PRIME_H).max(K_FLOOR);
                                 let k_hi = k + G_PRIME_H;
@@ -283,7 +330,7 @@ impl CmsReplicationPricer {
                         )
                         .unwrap_or(0.0);
 
-                        g_at_k * c_boundary + integral
+                        boundary + integral
                     }
 
                     OptionType::Put => {
@@ -298,16 +345,15 @@ impl CmsReplicationPricer {
                         // reducing the in-the-money probability for a floorlet.
                         let k_min = (strike - N_STD_CUTOFF * std_dev).max(K_FLOOR);
 
-                        // Boundary term: g(K) × P_sw(K)
-                        let p_boundary =
-                            annuity_mkt * black76_put(forward_rate, strike, vol_at_strike, ttf);
-                        let g_at_k = df_pay / par_annuity(strike.max(K_FLOOR), cms_tenor, m);
+                        // Boundary term: g(K) · P_sw(K) = DF_pay · Black76_put(K).
+                        let boundary = g_times_c(strike, vol_at_strike, false);
 
-                        // Integral term: ∫_{K_min}^K g'(k) · P_sw(k) dk
+                        // Integral term: ∫_{K_min}^K g'(k) · P_sw(k) dk.
                         let integral = gauss_legendre_integrate(
                             |k: f64| {
                                 let v = vol_surface.value_clamped(ttf, k);
-                                let p_sw = annuity_mkt * black76_put(forward_rate, k, v, ttf);
+                                let p_sw = par_annuity(k.max(K_FLOOR), cms_tenor, m)
+                                    * black76_put(forward_rate, k, v, ttf);
                                 // g'(k) via central differences
                                 let k_lo = (k - G_PRIME_H).max(K_FLOOR);
                                 let k_hi = k + G_PRIME_H;
@@ -322,7 +368,7 @@ impl CmsReplicationPricer {
                         )
                         .unwrap_or(0.0);
 
-                        g_at_k * p_boundary - integral
+                        boundary - integral
                     }
                 }
             };

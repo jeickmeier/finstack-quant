@@ -541,6 +541,8 @@ impl Swaption {
         volatility: f64,
         as_of: Date,
     ) -> Result<Money> {
+        use super::lognormal_to_normal_vol;
+
         let time_to_expiry = year_fraction(self.day_count, as_of, self.expiry)?;
         if time_to_expiry <= 0.0 {
             return Ok(Money::new(0.0, self.notional.currency()));
@@ -550,11 +552,17 @@ impl Swaption {
         let forward = self.forward_swap_rate(curves, as_of)?;
         if forward <= 0.0 || strike <= 0.0 {
             // Black (lognormal) pricing is undefined for a non-positive forward
-            // or strike. In negative-rate regimes (EUR/JPY/CHF) fall back to the
-            // Bachelier (normal) model, which prices negative rates natively.
-            // The supplied `volatility` is interpreted as a normal vol on this
-            // path, consistent with negative-rate market quoting.
-            return self.price_normal(curves, volatility, as_of);
+            // or strike. In negative-rate regimes (EUR/JPY/CHF) fall back to
+            // the Bachelier (normal) model, which prices negative rates
+            // natively. `volatility` here is a LOGNORMAL vol — it must be
+            // converted to a normal (Bachelier) vol before the normal pricer,
+            // otherwise the magnitude is wrong by roughly a factor of the
+            // forward rate. Use any configured SABR shift so the conversion
+            // can operate on positive shifted rates.
+            let shift = self.sabr_params.as_ref().and_then(|p| p.shift);
+            let normal_vol =
+                lognormal_to_normal_vol(volatility, forward, strike, time_to_expiry, shift);
+            return self.price_normal(curves, normal_vol, as_of);
         }
 
         self.price_model_base(curves, volatility, as_of, |fwd, strike, vol, t, annuity| {

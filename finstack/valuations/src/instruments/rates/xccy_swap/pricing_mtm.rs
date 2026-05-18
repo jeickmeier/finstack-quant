@@ -176,12 +176,14 @@ pub(crate) fn pv_mtm_reset(
         // Notional captured at the start of THIS period (T_j) = N_j^R. Also returns
         // P_R(as_of, accrual_start) so the rebalancing block below can reuse it
         // without a second curve lookup.
-        let (n_r_j, df_r_at_period_start) = if j == 0 {
-            // Initial period: notional already computed; rebalancing skipped, so no
-            // need for the DF. Use NAN as a sentinel — it must never be read.
-            (n_r_initial, f64::NAN)
+        // `df_r_at_period_start` is `Some` only for interior resets (j ≥ 1),
+        // where the rebalancing block below consumes it. For the initial
+        // period (j = 0) there is no rebalancing, so it is `None` — an honest
+        // "absent" rather than a `NaN` sentinel that could silently propagate.
+        let (n_r_j, df_r_at_period_start): (f64, Option<f64>) = if j == 0 {
+            (n_r_initial, None)
         } else {
-            compute_resetting_notional_and_df_r(
+            let (n, df) = compute_resetting_notional_and_df_r(
                 n_c,
                 spot_x_at_as_of,
                 as_of,
@@ -189,7 +191,8 @@ pub(crate) fn pv_mtm_reset(
                 disc_c.as_ref(),
                 disc_r.as_ref(),
                 &swap.id,
-            )?
+            )?;
+            (n, Some(df))
         };
 
         if period.payment_date <= as_of {
@@ -254,8 +257,16 @@ pub(crate) fn pv_mtm_reset(
         if j > 0 && period.accrual_start > as_of {
             // Reuse the resetting-leg DF already computed inside
             // compute_resetting_notional_and_df_r above. require_positive_df has
-            // already vetted it for finiteness/positivity.
-            let df_r_reset = df_r_at_period_start;
+            // already vetted it for finiteness/positivity. For j ≥ 1 the option
+            // is always `Some`; the explicit error guards against a future
+            // refactor breaking that invariant (no NaN can leak through).
+            let df_r_reset = df_r_at_period_start.ok_or_else(|| {
+                finstack_core::Error::Validation(format!(
+                    "xccy MtM swap {}: missing resetting-leg discount factor for \
+                     interior reset at {}",
+                    swap.id, period.accrual_start
+                ))
+            })?;
             let delta_n_r = n_r_j - n_r_prev;
             let rebal_r = resetting_leg.side.initial_principal_sign() * delta_n_r * df_r_reset;
             pv.add(convert(

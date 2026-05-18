@@ -247,12 +247,16 @@ impl InflationSwap {
         let default_anchor =
             Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);
         if curve.base_date() == default_anchor {
-            // Anchor curves degrade to `t = 0` on day-count failure; this
-            // matches `cpi(0)` returning the anchor value. Silent fallback is
-            // intentional but kept visible at the call site.
-            let t = DayCount::Act365F
-                .signed_year_fraction(fallback_base, lookup_date, DayCountContext::default())
-                .unwrap_or(0.0);
+            // Anchor curve: measure time from the supplied fallback base. A
+            // failed day-count calculation must be PROPAGATED, not silently
+            // collapsed to `t = 0`: `unwrap_or(0.0)` masked a genuine error
+            // (e.g. an inverted date) by quietly returning the base CPI, which
+            // mis-prices the swap with no diagnostic.
+            let t = DayCount::Act365F.signed_year_fraction(
+                fallback_base,
+                lookup_date,
+                DayCountContext::default(),
+            )?;
             Ok(curve.cpi(t))
         } else {
             curve.cpi_on_date(lookup_date)

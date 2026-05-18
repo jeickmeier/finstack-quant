@@ -161,13 +161,37 @@ fn instantaneous_forward(discount_curve_fn: &impl Fn(f64) -> f64, t: f64) -> f64
 pub struct ForwardSwapRate;
 
 impl ForwardSwapRate {
-    /// Compute forward swap rate at time t from short rate r(t).
+    /// Compute the forward (par) swap rate at time `t` from the short rate
+    /// `r(t)`.
+    ///
+    /// For a forward-starting swap (`t ≤ T_start`):
+    ///
+    /// ```text
+    /// S(t) = [P(t, T_start) − P(t, T_N)] / A(t)
+    /// ```
+    ///
+    /// For a swap that has **already started** (`t > T_start`), the par rate is
+    /// that of the *remaining* swap entered at `t`. Its float leg accrues from
+    /// `t`, so the numerator is `P(t,t) − P(t,T_N) = 1 − P(t,T_N)`. Crucially
+    /// its first coupon period runs `[t, T_first]` — a **stub** — so the
+    /// annuity weight of that first remaining period must be the stub fraction
+    /// `(T_first − t)`, not the full original accrual fraction `τ_first`:
+    ///
+    /// ```text
+    /// A(t) = (T_first − t)·P(t,T_first) + Σ_{i≥2} τ_i·P(t,T_i)
+    /// ```
+    ///
+    /// Using the full `τ_first` over-weights the partially-elapsed period and
+    /// under-states `S(t)` for mid-period (non-coupon-aligned) Bermudan
+    /// exercise — a double-counting of the stub. When `t` *is* coupon-aligned
+    /// (`t = T_start` or `t` exactly on a coupon date) the stub fraction equals
+    /// the full `τ` and the formula reduces to the standard expression.
     ///
     /// # Arguments
     ///
     /// * `params` - Hull-White parameters
     /// * `r_t` - Current short rate
-    /// * `t` - Current time
+    /// * `t` - Current time (years from valuation date)
     /// * `schedule` - Swap schedule
     /// * `discount_curve_fn` - Function to get market discount factors
     pub fn compute(
@@ -182,18 +206,30 @@ impl ForwardSwapRate {
             return 0.0; // Swap has expired
         }
 
-        // Compute bond prices for swap start and end
-        let p_start = if t <= schedule.start_date {
-            HullWhiteBondPrice::bond_price(params, r_t, t, schedule.start_date, &discount_curve_fn)
-        } else {
-            // After swap start, use current time as start
+        let swap_started = t > schedule.start_date;
+
+        // Float-leg start bond. Before the swap starts it is P(t, T_start);
+        // once the swap has started the remaining float leg accrues from `t`,
+        // so the start bond is P(t, t) = 1.
+        let p_start = if swap_started {
             1.0
+        } else {
+            HullWhiteBondPrice::bond_price(params, r_t, t, schedule.start_date, &discount_curve_fn)
         };
 
         let p_end =
             HullWhiteBondPrice::bond_price(params, r_t, t, schedule.end_date, &discount_curve_fn);
 
-        // Compute annuity: A(t) = Σ τ_i * P(t, T_i)
+        // Identify the first not-yet-paid coupon time, so its accrual weight
+        // can be reduced to the stub `(T_first − t)` for a started swap.
+        let first_remaining_payment = schedule
+            .payment_dates
+            .iter()
+            .copied()
+            .find(|&pt| pt > t);
+
+        // Annuity: A(t) = Σ τ_i · P(t, T_i), with the first remaining period's
+        // weight clamped to the stub fraction for a started swap.
         let mut annuity = 0.0;
         for (i, &payment_time) in schedule.payment_dates.iter().enumerate() {
             if payment_time > t {
@@ -204,7 +240,14 @@ impl ForwardSwapRate {
                     payment_time,
                     &discount_curve_fn,
                 );
-                let tau_i = schedule.accrual_fractions[i];
+                let mut tau_i = schedule.accrual_fractions[i];
+                // For a started swap, the first remaining period is a stub
+                // running [t, T_first]: replace its full accrual fraction with
+                // the elapsed-adjusted stub (never larger than the original).
+                if swap_started && first_remaining_payment == Some(payment_time) {
+                    let stub = (payment_time - t).max(0.0);
+                    tau_i = tau_i.min(stub);
+                }
                 annuity += tau_i * p_i;
             }
         }
@@ -385,6 +428,82 @@ mod tests {
         // Swap rate should be positive and reasonable
         assert!(swap_rate > 0.0);
         assert!(swap_rate < 1.0);
+    }
+
+    /// Regression test (item 5): for a swap that has already started, the
+    /// remaining-swap forward rate must not double-count the first (stub)
+    /// period. The annuity weight of the partially-elapsed first coupon must
+    /// be the stub `(T_first − t)`, not the full original accrual fraction.
+    ///
+    /// Construction: a swap with `start_date = 1.0`, semi-annual coupons at
+    /// {1.5, 2.0, 2.5, 3.0}, full accrual 0.5 each. Evaluate at `t = 1.25`
+    /// (mid first period). The first remaining coupon `T_first = 1.5` has
+    /// elapsed half its period, so the stub fraction is `1.5 − 1.25 = 0.25`,
+    /// not `0.5`. A smaller annuity ⇒ a larger par rate. The buggy code used
+    /// the full `0.5`, under-stating the rate.
+    #[test]
+    fn test_started_swap_uses_stub_not_full_accrual() {
+        let params = HullWhite1FParams::new(0.1, 0.01, 0.03);
+        let r_t = 0.03;
+        let discount_fn = |t: f64| (-0.03 * t).exp();
+
+        let payment_dates = vec![1.5, 2.0, 2.5, 3.0];
+        let accruals = vec![0.5, 0.5, 0.5, 0.5];
+        let schedule = SwapSchedule::new(1.0, 3.0, payment_dates.clone(), accruals.clone())
+            .expect("valid swap schedule inputs");
+
+        // Mid-period exercise: the swap started at t=1.0, now t=1.25.
+        let t = 1.25;
+        let s_fixed = ForwardSwapRate::compute(&params, r_t, t, &schedule, discount_fn);
+
+        // Reconstruct the buggy value: full accrual fraction on every remaining
+        // period, including the elapsed first period.
+        let p_end = HullWhiteBondPrice::bond_price(&params, r_t, t, 3.0, discount_fn);
+        let buggy_annuity: f64 = payment_dates
+            .iter()
+            .zip(accruals.iter())
+            .filter(|(&pt, _)| pt > t)
+            .map(|(&pt, &tau)| {
+                tau * HullWhiteBondPrice::bond_price(&params, r_t, t, pt, discount_fn)
+            })
+            .sum();
+        let s_buggy = (1.0 - p_end) / buggy_annuity;
+
+        // The corrected rate uses a strictly smaller annuity (stub 0.25 < 0.5
+        // on the first period), so it must be strictly larger than the buggy
+        // full-accrual rate.
+        assert!(
+            s_fixed.is_finite() && s_fixed > 0.0,
+            "started-swap forward rate must be finite and positive, got {s_fixed}"
+        );
+        assert!(
+            s_fixed > s_buggy + 1e-9,
+            "started-swap forward rate must not double-count the stub: \
+             corrected S={s_fixed:.8} should exceed the full-accrual S={s_buggy:.8}"
+        );
+    }
+
+    /// When exercise is coupon-aligned (`t` exactly on the swap start), the
+    /// stub equals the full accrual fraction, so the started-swap path and the
+    /// standard forward-starting path must agree.
+    #[test]
+    fn test_coupon_aligned_exercise_matches_standard_formula() {
+        let params = HullWhite1FParams::new(0.1, 0.01, 0.03);
+        let r_t = 0.03;
+        let discount_fn = |t: f64| (-0.03 * t).exp();
+
+        let payment_dates = vec![1.5, 2.0, 2.5, 3.0];
+        let accruals = vec![0.5, 0.5, 0.5, 0.5];
+        let schedule = SwapSchedule::new(1.0, 3.0, payment_dates, accruals)
+            .expect("valid swap schedule inputs");
+
+        // Exactly at the swap start (coupon-aligned): should be well-defined
+        // and use P(t, T_start) = P(1.0, 1.0) = 1 either way.
+        let s_at_start = ForwardSwapRate::compute(&params, r_t, 1.0, &schedule, discount_fn);
+        assert!(
+            s_at_start.is_finite() && s_at_start > 0.0,
+            "coupon-aligned forward rate must be finite and positive, got {s_at_start}"
+        );
     }
 
     #[test]

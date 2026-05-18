@@ -418,12 +418,14 @@ impl InterestRateFuture {
     ///
     /// This is Hull (10th ed., eq. 6.3) for the difference between futures-implied
     /// and forward rates of the underlying interest-rate period `[T_start, T_end]`.
-    /// `T_fixing` (the reset date) is only used to look up the vol surface — it does
-    /// not appear in the convexity formula itself, which depends on the underlying
-    /// period endpoints, not the reset date. Previous versions of this code used
-    /// `T_fixing × (T_fixing + τ)`, which silently embedded an error proportional
-    /// to the reset lag (≈ 2 business days for IBOR, an entire accrual period for
-    /// SOFR-style backward-looking futures where the fixing date is at period end).
+    /// The convexity formula depends on the underlying period endpoints
+    /// `(T_start, T_end)`, not the reset date `T_fixing`. The volatility used is
+    /// sampled on the **same** time axis — at `T_start` — for consistency: a
+    /// `T_fixing`-axis lookup mis-pairs the formula for SOFR-style
+    /// backward-looking futures whose fixing date sits at the period end.
+    /// Previous versions used `T_fixing × (T_fixing + τ)`, which silently
+    /// embedded an error proportional to the reset lag (≈ 2 business days for
+    /// IBOR, an entire accrual period for SOFR-style futures).
     ///
     /// The full HW formula is:
     /// ```text
@@ -433,21 +435,41 @@ impl InterestRateFuture {
     ///
     /// # Arguments
     /// * `forward_rate` - The unadjusted forward rate from the curve
-    /// * `t_fixing` - Time to fixing date in years (used only for vol lookup)
+    /// * `t_fixing` - Time to fixing date in years (kept for the signature /
+    ///   diagnostics; **not** used as the vol-surface expiry axis — see below)
     /// * `t_start` - Time to period start in years
     /// * `t_end` - Time to period end in years (must be >= t_start)
+    ///
+    /// # Vol-axis consistency (audit item 8)
+    ///
+    /// The convexity formula `0.5·σ²·T_start·T_end` is built from the rate
+    /// variance accumulated over the underlying interest-rate period, paired
+    /// `(T_start, T_end)`. The vol used must be sampled on the **same**
+    /// time axis. Sampling the surface at `t_fixing` is inconsistent: for
+    /// SOFR-style backward-looking futures the fixing date sits at the *period
+    /// end* (`t_fixing ≈ T_end`), so the surface lookup and the
+    /// `(T_start, T_end)` formula disagree by an entire accrual period. The
+    /// convexity adjustment accrues until the rate locks in at the period
+    /// start, so the consistent expiry-axis value is `T_start`.
     fn calculate_convexity_adjusted_rate(
         &self,
         context: &MarketContext,
         forward_rate: f64,
-        t_fixing: f64,
+        _t_fixing: f64,
         t_start: f64,
         t_end: f64,
     ) -> finstack_core::Result<f64> {
+        // Hull-White zero-mean-reversion convexity adjustment: 0.5 σ² T_start T_end.
+        let t1 = t_start.max(0.0);
+        let t2 = t_end.max(t1);
+
         let vol_estimate = if let Some(vol_id) = &self.vol_surface_id {
             let surface = context.get_surface(vol_id)?;
-            // Vol surface is keyed by time-to-fixing and strike (ATM = forward).
-            surface.value_checked(t_fixing, forward_rate)?
+            // Vol-axis consistency: sample at `T_start` (the time over which the
+            // convexity variance accumulates), NOT at `t_fixing` — the latter
+            // mis-pairs the `(T_start, T_end)` formula for SOFR-style futures
+            // whose fixing date is at the period end.
+            surface.value_checked(t1, forward_rate)?
         } else {
             return Err(finstack_core::Error::Input(
                 finstack_core::InputError::NotFound {
@@ -459,9 +481,6 @@ impl InterestRateFuture {
             ));
         };
 
-        // Hull-White zero-mean-reversion convexity adjustment: 0.5 σ² T_start T_end.
-        let t1 = t_start.max(0.0);
-        let t2 = t_end.max(t1);
         let convexity = 0.5 * vol_estimate * vol_estimate * t1 * t2;
         Ok(forward_rate + convexity)
     }

@@ -110,6 +110,36 @@ pub(crate) fn register_bermudan_swaption_metrics(
     );
 }
 
+/// Convert a (possibly lognormal) volatility to a normal (Bachelier) vol for a
+/// swaption greek's negative-rate fallback.
+///
+/// The swaption Black greeks (`delta`, `gamma`, `vega`) fall back to the
+/// Bachelier model when the forward swap rate or strike is non-positive. In
+/// that case `inputs.sigma` resolved from SABR or a lognormal vol surface is a
+/// **lognormal** vol — feeding it straight into a Bachelier greek mis-scales
+/// the result by roughly a factor of the forward rate. This helper converts it
+/// via the standard lognormal→normal mapping, using any configured SABR shift
+/// so the conversion can operate on positive shifted rates.
+///
+/// (When the swaption's `vol_model` is itself `Normal`, `sigma` is already a
+/// normal vol and callers must NOT invoke this helper.)
+pub(super) fn resolved_normal_sigma(
+    option: &crate::instruments::rates::swaption::Swaption,
+    forward: f64,
+    strike: f64,
+    sigma: f64,
+    time_to_expiry: f64,
+) -> f64 {
+    let shift = option.sabr_params.as_ref().and_then(|p| p.shift);
+    crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
+        sigma,
+        forward,
+        strike,
+        time_to_expiry,
+        shift,
+    )
+}
+
 /// Swaption metrics configuration constants.
 /// Centralizes scaling parameters to avoid magic numbers in calculators.
 pub(crate) mod config {

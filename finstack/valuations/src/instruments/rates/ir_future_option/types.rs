@@ -88,14 +88,19 @@ pub struct IrFutureOption {
 
 impl IrFutureOption {
     /// Time to expiry in years from `as_of`, using Act/365F.
-    /// Returns 0.0 for expired options (as_of >= expiry).
-    fn time_to_expiry(&self, as_of: Date) -> f64 {
+    ///
+    /// Returns `Ok(0.0)` for expired options (`as_of >= expiry`).
+    ///
+    /// # Errors
+    ///
+    /// Propagates a day-count failure rather than swallowing it as `0.0`: a
+    /// spurious zero would silently mis-classify a live option as expired and
+    /// drop all of its time value with no diagnostic.
+    fn time_to_expiry(&self, as_of: Date) -> finstack_core::Result<f64> {
         if as_of >= self.expiry {
-            return 0.0;
+            return Ok(0.0);
         }
-        DayCount::Act365F
-            .year_fraction(as_of, self.expiry, DayCountContext::default())
-            .unwrap_or(0.0)
+        DayCount::Act365F.year_fraction(as_of, self.expiry, DayCountContext::default())
     }
 
     /// Whether this is a call option.
@@ -137,7 +142,7 @@ impl IrFutureOption {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_core::Result<(f64, f64, f64)> {
-        let t = self.time_to_expiry(as_of);
+        let t = self.time_to_expiry(as_of)?;
         let disc = context.get_discount(&self.discount_curve_id)?;
         let df = relative_df_discount_curve(disc.as_ref(), as_of, self.expiry)?;
 
@@ -190,71 +195,87 @@ impl IrFutureOption {
     /// Forward delta (sensitivity to futures price).
     ///
     /// Call: N(d₁), Put: N(d₁) - 1
-    pub fn delta(&self, as_of: Date) -> f64 {
-        let t = self.time_to_expiry(as_of);
+    ///
+    /// # Errors
+    ///
+    /// Propagates a day-count failure from [`time_to_expiry`](Self::time_to_expiry).
+    pub fn delta(&self, as_of: Date) -> finstack_core::Result<f64> {
+        let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.volatility <= 0.0 {
             if self.is_call() {
-                return if self.futures_price > self.strike {
+                return Ok(if self.futures_price > self.strike {
                     1.0
                 } else {
                     0.0
-                };
+                });
             } else {
-                return if self.futures_price < self.strike {
+                return Ok(if self.futures_price < self.strike {
                     -1.0
                 } else {
                     0.0
-                };
+                });
             }
         }
         let d1 = d1_black76(self.futures_price, self.strike, self.volatility, t);
-        if self.is_call() {
+        Ok(if self.is_call() {
             norm_cdf(d1)
         } else {
             norm_cdf(d1) - 1.0
-        }
+        })
     }
 
     /// Gamma (second derivative w.r.t. futures price).
     ///
     /// Gamma = n(d₁) / (F × σ × √T)
-    pub fn gamma(&self, as_of: Date) -> f64 {
-        let t = self.time_to_expiry(as_of);
+    ///
+    /// # Errors
+    ///
+    /// Propagates a day-count failure from [`time_to_expiry`](Self::time_to_expiry).
+    pub fn gamma(&self, as_of: Date) -> finstack_core::Result<f64> {
+        let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.volatility <= 0.0 || self.futures_price <= 0.0 {
-            return 0.0;
+            return Ok(0.0);
         }
         let d1 = d1_black76(self.futures_price, self.strike, self.volatility, t);
         let denom = (self.futures_price * self.volatility * t.sqrt()).max(1e-12);
-        norm_pdf(d1) / denom
+        Ok(norm_pdf(d1) / denom)
     }
 
     /// Vega per 1% absolute change in volatility.
     ///
     /// Vega = F × √T × n(d₁) / 100
-    pub fn vega_per_pct(&self, as_of: Date) -> f64 {
-        let t = self.time_to_expiry(as_of);
+    ///
+    /// # Errors
+    ///
+    /// Propagates a day-count failure from [`time_to_expiry`](Self::time_to_expiry).
+    pub fn vega_per_pct(&self, as_of: Date) -> finstack_core::Result<f64> {
+        let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.futures_price <= 0.0 {
-            return 0.0;
+            return Ok(0.0);
         }
         let d1 = if self.volatility > 0.0 {
             d1_black76(self.futures_price, self.strike, self.volatility, t)
         } else {
             0.0
         };
-        self.futures_price * t.sqrt() * norm_pdf(d1) / 100.0
+        Ok(self.futures_price * t.sqrt() * norm_pdf(d1) / 100.0)
     }
 
     /// Theta (time decay per calendar day, undiscounted).
     ///
     /// Call theta = -F·σ·n(d₁) / (2√T) per year, divided by 365.25 for daily.
-    pub fn theta_daily(&self, as_of: Date) -> f64 {
-        let t = self.time_to_expiry(as_of);
+    ///
+    /// # Errors
+    ///
+    /// Propagates a day-count failure from [`time_to_expiry`](Self::time_to_expiry).
+    pub fn theta_daily(&self, as_of: Date) -> finstack_core::Result<f64> {
+        let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.volatility <= 0.0 || self.futures_price <= 0.0 {
-            return 0.0;
+            return Ok(0.0);
         }
         let d1 = d1_black76(self.futures_price, self.strike, self.volatility, t);
         let annual_theta = -self.futures_price * self.volatility * norm_pdf(d1) / (2.0 * t.sqrt());
-        annual_theta / 365.25
+        Ok(annual_theta / 365.25)
     }
 
     /// Create a canonical example 3M SOFR futures option.
@@ -337,25 +358,25 @@ impl CashflowProvider for IrFutureOption {
 
 impl crate::instruments::common_impl::traits::OptionDeltaProvider for IrFutureOption {
     fn option_delta(&self, _market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
-        Ok(self.delta(as_of) * self.contract_point_value()?)
+        Ok(self.delta(as_of)? * self.contract_point_value()?)
     }
 }
 
 impl crate::instruments::common_impl::traits::OptionGammaProvider for IrFutureOption {
     fn option_gamma(&self, _market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
-        Ok(self.gamma(as_of) * self.contract_point_value()?)
+        Ok(self.gamma(as_of)? * self.contract_point_value()?)
     }
 }
 
 impl crate::instruments::common_impl::traits::OptionVegaProvider for IrFutureOption {
     fn option_vega(&self, _market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
-        Ok(self.vega_per_pct(as_of) * self.contract_point_value()?)
+        Ok(self.vega_per_pct(as_of)? * self.contract_point_value()?)
     }
 }
 
 impl crate::instruments::common_impl::traits::OptionThetaProvider for IrFutureOption {
     fn option_theta(&self, _market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
-        Ok(self.theta_daily(as_of) * self.contract_point_value()?)
+        Ok(self.theta_daily(as_of)? * self.contract_point_value()?)
     }
 }
 
@@ -419,7 +440,7 @@ mod tests {
     #[test]
     fn atm_call_delta_near_half() {
         let opt = IrFutureOption::example().expect("IrFutureOption example is valid");
-        let delta = opt.delta(date!(2025 - 01 - 15));
+        let delta = opt.delta(date!(2025 - 01 - 15)).expect("delta");
         // ATM call delta should be close to 0.5
         assert!((delta - 0.5).abs() < 0.1, "ATM call delta = {delta}");
     }
@@ -440,7 +461,7 @@ mod tests {
             .build()
             .expect("build");
 
-        let delta = opt.delta(date!(2025 - 01 - 15));
+        let delta = opt.delta(date!(2025 - 01 - 15)).expect("delta");
         assert!(delta < 0.0, "Put delta should be negative: {delta}");
     }
 
@@ -460,21 +481,21 @@ mod tests {
             .build()
             .expect("build");
 
-        let delta = opt.delta(date!(2025 - 01 - 15));
+        let delta = opt.delta(date!(2025 - 01 - 15)).expect("delta");
         assert!(delta > 0.95, "Deep ITM call delta = {delta}");
     }
 
     #[test]
     fn gamma_is_non_negative() {
         let opt = IrFutureOption::example().expect("IrFutureOption example is valid");
-        let gamma = opt.gamma(date!(2025 - 01 - 15));
+        let gamma = opt.gamma(date!(2025 - 01 - 15)).expect("gamma");
         assert!(gamma >= 0.0, "Gamma should be non-negative: {gamma}");
     }
 
     #[test]
     fn vega_is_non_negative() {
         let opt = IrFutureOption::example().expect("IrFutureOption example is valid");
-        let vega = opt.vega_per_pct(date!(2025 - 01 - 15));
+        let vega = opt.vega_per_pct(date!(2025 - 01 - 15)).expect("vega");
         assert!(vega >= 0.0, "Vega should be non-negative: {vega}");
     }
 
@@ -495,7 +516,7 @@ mod tests {
             .expect("build");
 
         // as_of is after expiry
-        let delta = opt.delta(date!(2025 - 03 - 01));
+        let delta = opt.delta(date!(2025 - 03 - 01)).expect("delta");
         assert_eq!(delta, 1.0, "Expired ITM call delta should be 1.0");
     }
 
