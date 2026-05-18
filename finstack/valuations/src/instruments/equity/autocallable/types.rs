@@ -95,6 +95,19 @@ pub struct Autocallable {
     pub autocall_barriers: Vec<f64>,
     /// Coupon amounts paid if observation barrier is met
     pub coupons: Vec<f64>,
+    /// Memory ("Phoenix") coupon feature.
+    ///
+    /// When `true`, any coupons from earlier observation dates whose barrier
+    /// was *not* met are accrued ("remembered") and paid in full on the
+    /// observation date that finally triggers the autocall (in addition to
+    /// that date's own coupon). When `false` (the default), only the coupon
+    /// at the autocall date is paid and earlier missed coupons are lost.
+    ///
+    /// This flag must match the term sheet: a Phoenix/memory autocallable
+    /// priced with `memory_coupons = false` is silently underpriced.
+    #[serde(default)]
+    #[builder(default)]
+    pub memory_coupons: bool,
     /// Final barrier level for final payoff determination
     pub final_barrier: f64,
     /// Type of final payoff (capital protection, participation, knock-in put)
@@ -140,6 +153,8 @@ struct AutocallableUnchecked {
     expiry: Date,
     autocall_barriers: Vec<f64>,
     coupons: Vec<f64>,
+    #[serde(default)]
+    memory_coupons: bool,
     final_barrier: f64,
     final_payoff_type: FinalPayoffType,
     participation_rate: f64,
@@ -167,6 +182,7 @@ impl TryFrom<AutocallableUnchecked> for Autocallable {
             expiry: value.expiry,
             autocall_barriers: value.autocall_barriers,
             coupons: value.coupons,
+            memory_coupons: value.memory_coupons,
             final_barrier: value.final_barrier,
             final_payoff_type: value.final_payoff_type,
             participation_rate: value.participation_rate,

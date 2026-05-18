@@ -260,11 +260,38 @@ impl CliquetOptionMcPricer {
             )?;
             let var_curr = vol_curr * vol_curr * curr_t;
 
+            // Forward variance over [prev_t, curr_t] from the bootstrap:
+            //   fwd_var = σ²(curr_t)·curr_t − σ²(prev_t)·prev_t.
+            //
+            // A well-formed (calendar-arbitrage-free) total-variance surface is
+            // non-decreasing in maturity, so `fwd_var >= 0`. A non-monotone
+            // surface yields `fwd_var < 0`, which is an impossible (negative)
+            // period variance.
+            //
+            // The previous code silently substituted the *terminal* vol
+            // `vol_curr` for that period — an arbitrary value unrelated to the
+            // (degenerate) forward variance, mis-setting the period vol. Handle
+            // the non-monotone case explicitly instead: floor the forward
+            // variance at zero (the no-arbitrage minimum — that period simply
+            // contributes ~no volatility) and emit a diagnostic so the bad
+            // surface is visible in production logs.
             let fwd_var = var_curr - prev_var;
-            let fwd_sigma = if fwd_var > 0.0 {
+            let fwd_sigma = if fwd_var >= 0.0 {
                 (fwd_var / dt).sqrt()
             } else {
-                vol_curr
+                tracing::warn!(
+                    instrument_id = %inst.id,
+                    surface_id = %inst.vol_surface_id,
+                    t_prev = prev_t,
+                    t_curr = curr_t,
+                    total_var_prev = prev_var,
+                    total_var_curr = var_curr,
+                    forward_variance = fwd_var,
+                    "CliquetOption forward-vol bootstrap: total-variance surface is \
+                     non-monotone over [t_prev, t_curr] (calendar-spread arbitrage); \
+                     flooring the negative forward variance to zero for this period"
+                );
+                0.0
             };
 
             times.push(curr_t);
@@ -586,6 +613,84 @@ mod tests {
         let good_market = market(as_of);
         let pv1 = compute_pv(&option, &good_market, as_of).expect("pv1");
         let pv2 = compute_pv(&option, &good_market, as_of).expect("pv2");
+        assert_eq!(pv1.amount(), pv2.amount());
+    }
+
+    /// W-37: a non-monotone total-variance surface (calendar-spread arbitrage)
+    /// must be handled explicitly by the forward-vol bootstrap. The forward
+    /// variance over a period whose total variance *decreases* is negative and
+    /// impossible; the bootstrap must floor it to zero (not silently substitute
+    /// the terminal vol) and still produce a finite, deterministic price.
+    #[test]
+    fn cliquet_non_monotone_total_variance_surface_is_handled() {
+        let as_of = date(2024, 1, 1);
+
+        // Steeply *inverted* vol term structure: short-dated vol far exceeds
+        // long-dated vol, so total variance σ²·t is NON-monotone in maturity.
+        //   t = 0.5: σ = 0.60 => total var = 0.36 * 0.5 = 0.18
+        //   t = 1.0: σ = 0.20 => total var = 0.04 * 1.0 = 0.04  (< 0.18!)
+        let tv_short = 0.60_f64 * 0.60 * 0.5;
+        let tv_long = 0.20_f64 * 0.20 * 1.0;
+        assert!(
+            tv_long < tv_short,
+            "test surface must be non-monotone in total variance: \
+             short={tv_short} long={tv_long}"
+        );
+
+        let inverted_surface = VolSurface::builder("SPX-VOL")
+            .expiries(&[0.25, 0.5, 1.0, 2.0])
+            .strikes(&[80.0, 100.0, 120.0, 140.0])
+            .row(&[0.80, 0.80, 0.80, 0.80])
+            .row(&[0.60, 0.60, 0.60, 0.60])
+            .row(&[0.20, 0.20, 0.20, 0.20])
+            .row(&[0.15, 0.15, 0.15, 0.15])
+            .build()
+            .expect("inverted surface");
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(finstack_core::dates::DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new()
+            .insert(curve)
+            .insert_surface(inverted_surface)
+            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
+            .insert_price("SPX-DIV", MarketScalar::Unitless(0.01));
+
+        // Reset dates at ~0.5y and ~1.0y exercise the non-monotone period.
+        let option = CliquetOption::builder()
+            .id(InstrumentId::new("CLIQ-NONMONO"))
+            .underlying_ticker("SPX".to_string())
+            .reset_dates(vec![date(2024, 7, 1), date(2024, 12, 31)])
+            .expiry(date(2024, 12, 31))
+            .local_cap(0.05)
+            .local_floor(0.0)
+            .global_cap(0.20)
+            .global_floor(0.0)
+            .notional(Money::new(100_000.0, Currency::USD))
+            .day_count(finstack_core::dates::DayCount::Act365F)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
+            .pricing_overrides(PricingOverrides::default())
+            .attributes(Attributes::new())
+            .build()
+            .expect("non-monotone cliquet");
+
+        // The bootstrap must not panic and must return a finite, non-negative
+        // price (the long cliquet call payoff is floored at zero).
+        let pv1 = compute_pv(&option, &market, as_of)
+            .expect("non-monotone surface must price, not panic");
+        assert!(
+            pv1.amount().is_finite() && pv1.amount() >= 0.0,
+            "non-monotone surface must yield a finite non-negative price; got {}",
+            pv1.amount()
+        );
+
+        // Determinism (seeded RNG) holds through the non-monotone branch.
+        let pv2 = compute_pv(&option, &market, as_of).expect("repeat price");
         assert_eq!(pv1.amount(), pv2.amount());
     }
 

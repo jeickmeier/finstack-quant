@@ -103,10 +103,34 @@ fn test_npv_mid_period_blends_realized_and_forward_components() {
     // Act
     let pv = swap.value(&ctx, as_of).unwrap();
 
-    // Assert - compute expected manually
-    let realized = swap.partial_realized_variance(&ctx, as_of).unwrap();
-    let forward = swap.remaining_forward_variance(&ctx, as_of).unwrap();
+    // Assert - compute expected manually.
+    //
+    // W-33: the realized-variance term in the seasoned blend must be annualized
+    // on the day-count time basis (`V_accrued / t_elapsed`), the SAME basis as
+    // the day-count blend weight `w`. `partial_realized_variance` annualizes on
+    // an observation-count basis (Σr²/N · ~252), a different time base, so it
+    // cannot be used directly to reconstruct the identity. Reconstruct the
+    // time-basis realized variance from the public API: V_accrued = Σr² (sum of
+    // squared close-to-close log returns) divided by the elapsed day-count
+    // time.
     let weight = swap.time_elapsed_fraction(as_of);
+    let total_t = swap
+        .day_count
+        .year_fraction(swap.start_date, swap.maturity, Default::default())
+        .unwrap();
+    let t_elapsed = weight * total_t;
+
+    let past_prices = swap.get_historical_prices(&ctx, as_of).unwrap();
+    let v_accrued: f64 = past_prices
+        .windows(2)
+        .map(|w| {
+            let r = (w[1] / w[0]).ln();
+            r * r
+        })
+        .sum();
+    let realized = v_accrued / t_elapsed;
+
+    let forward = swap.remaining_forward_variance(&ctx, as_of).unwrap();
     let expected_var = realized * weight + forward * (1.0 - weight);
     let t = swap
         .day_count

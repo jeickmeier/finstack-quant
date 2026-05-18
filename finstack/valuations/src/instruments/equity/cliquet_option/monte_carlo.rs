@@ -19,13 +19,17 @@ use finstack_monte_carlo::traits::Payoff;
 ///
 /// Period Return R_i = S_i / S_{i-1} - 1
 /// Capped/Floored R_i^* = min(max(R_i, local_floor), local_cap)
+/// Global Return G = min(max(Σ R_i^*, global_floor), global_cap)
 ///
-/// Total Payoff = Notional × min(max(Σ R_i^*, global_floor), global_cap)
+/// Total Payoff = Notional × max(G, 0)
 ///
 /// where:
 /// - S_i is spot at reset date i
 /// - local_cap/local_floor are limits per period
 /// - global_cap/global_floor are limits on total return
+/// - the outer `max(·, 0)` is the long-call option floor: the holder lets a
+///   worthless option expire and never pays the issuer, even when a negative
+///   `global_floor` makes the accumulated global return `G` negative.
 #[derive(Debug, Clone)]
 pub struct CliquetCallPayoff {
     /// Reset dates (time in years, must be sorted)
@@ -191,11 +195,18 @@ impl Payoff for CliquetCallPayoff {
     }
 
     fn value(&self, currency: Currency) -> Money {
-        // Compute total cliquet return
+        // Compute total cliquet return: max(global_floor, min(global_cap, Σ R_i*)).
         let total_return = self.compute_return();
 
-        // Payoff = total_return * notional
-        Money::new(total_return * self.notional, currency)
+        // A long cliquet *call* holder cannot pay the issuer. When a negative
+        // global floor is configured, `total_return` can be negative, but the
+        // option payoff is `max(total_return, 0)` — the holder simply lets the
+        // worthless option expire. Without this floor a negative global floor
+        // would make the long call pay a negative amount (CRITICAL).
+        let payoff_return = total_return.max(0.0);
+
+        // Payoff = max(global_return, 0) * notional
+        Money::new(payoff_return * self.notional, currency)
     }
 
     fn reset(&mut self) {
@@ -352,6 +363,52 @@ mod tests {
             "reset_spots must hold exactly one spot per reset date"
         );
         assert_eq!(cliquet.reset_spots, vec![105.0, 105.0, 110.0, 110.0]);
+    }
+
+    /// A long cliquet *call* with a negative global floor must never pay the
+    /// issuer. `compute_return` can return a negative accumulated return when
+    /// `global_floor < 0`, but the option payoff `value()` must floor at zero —
+    /// the holder lets the worthless option expire. Before the fix, `value()`
+    /// returned `total_return * notional` with no `max(·, 0)`, so the long call
+    /// holder paid the issuer a negative amount.
+    #[test]
+    fn negative_global_floor_long_call_payoff_floored_at_zero() {
+        let reset_dates = vec![0.25, 0.5];
+        let mut cliquet = CliquetCallPayoff::new(
+            reset_dates,
+            0.10,  // local cap
+            -0.30, // local floor (allows large negative period returns)
+            0.30,  // global cap
+            -0.20, // NEGATIVE global floor
+            100_000.0,
+            Currency::USD,
+            100.0,
+            CliquetPayoffType::Additive,
+        )
+        .expect("test fixture is well-formed");
+
+        // Two sharply negative periods: 100 -> 80 -> 64, each -20%.
+        cliquet.reset_spots = vec![80.0, 64.0];
+
+        // Accumulated return: -0.20 + -0.20 = -0.40, clamped to global floor -0.20.
+        let accumulated = cliquet.compute_return();
+        assert!(
+            (accumulated - (-0.20)).abs() < 1e-12,
+            "accumulated return should hit the negative global floor: got {accumulated}"
+        );
+
+        // The long call payoff must be floored at zero — NOT -0.20 * notional.
+        let value = cliquet.value(Currency::USD);
+        assert!(
+            value.amount() >= 0.0,
+            "a long cliquet call must never pay the issuer; got {}",
+            value.amount()
+        );
+        assert!(
+            (value.amount() - 0.0).abs() < 1e-9,
+            "negative-global-floor cliquet call payoff must be exactly zero, got {}",
+            value.amount()
+        );
     }
 
     #[test]

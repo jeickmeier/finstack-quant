@@ -127,6 +127,7 @@ fn autocallable_note(mc_paths: usize) -> Autocallable {
         observation_dates,
         autocall_barriers: vec![1.0; n],
         coupons: vec![0.02; n],
+        memory_coupons: false,
         final_barrier: 0.6,
         final_payoff_type: FinalPayoffType::Participation { rate: 1.0 },
         participation_rate: 1.0,

@@ -17,6 +17,30 @@ use finstack_core::{
 /// Registry-facing pricer for variance swaps.
 pub struct SimpleVarianceSwapDiscountingPricer;
 
+/// Degraded fallback estimate of forward variance from a vol surface when full
+/// Carr–Madan replication is unavailable (W-39).
+///
+/// # This is a DEGRADED fallback
+///
+/// The fair variance of a variance swap is the Carr–Madan strip
+/// `(2/T)·∫ V(K)/K² dK` over the *whole* OTM smile. When that replication
+/// cannot be evaluated (e.g. too few strikes) this function returns a proxy —
+/// it is **not** an exact fair variance and the caller logs a WARN diagnostic
+/// whenever it is used.
+///
+/// # Method
+///
+/// The previous proxy used only the two strikes immediately bracketing the
+/// forward, which badly under-weights wing convexity: the variance-replication
+/// kernel `1/K²` places material weight on *deep* OTM strikes that a 2-strike
+/// butterfly ignores entirely.
+///
+/// This version instead aggregates `σ(K)²` across the **entire** available
+/// strike grid, weighted by the variance-replication kernel `w(K) ∝ 1/K²`
+/// (the leading term of the Carr–Madan integrand). That captures the full wing
+/// span and the smile's convexity far better than two strikes, while remaining
+/// a cheap closed-form proxy. The result is floored at the ATM variance so the
+/// fallback never reports *less* variance than a flat-ATM assumption.
 fn smile_convexity_adjusted_variance(
     surface: &finstack_core::market_data::surfaces::VolSurface,
     time_to_expiry: f64,
@@ -37,23 +61,37 @@ fn smile_convexity_adjusted_variance(
     let atm_variance = vol_atm * vol_atm;
 
     let strikes = surface.strikes();
-    let lower = strikes.iter().copied().rfind(|&k| k < forward);
-    let upper = strikes.iter().copied().find(|&k| k > forward);
-
-    let (Some(k_lo), Some(k_hi)) = (lower, upper) else {
-        return Some(atm_variance);
-    };
-
-    let vol_lo = surface.value_clamped(time_to_expiry, k_lo);
-    let vol_hi = surface.value_clamped(time_to_expiry, k_hi);
-    if !(vol_lo.is_finite() && vol_lo > 0.0 && vol_hi.is_finite() && vol_hi > 0.0) {
+    if strikes.is_empty() {
         return Some(atm_variance);
     }
 
-    // Use the local butterfly in variance space as a cheap convexity proxy when
-    // full Carr-Madan replication is unavailable.
-    let wing_average_variance = 0.5 * (vol_lo * vol_lo + vol_hi * vol_hi);
-    Some(atm_variance + (wing_average_variance - atm_variance).max(0.0))
+    // 1/K²-weighted average of σ(K)² across the full strike grid. The 1/K²
+    // kernel is the leading term of the Carr–Madan variance-replication
+    // integrand, so this weights the wings the way the fair-variance integral
+    // does — heavily on low strikes (downside puts), capturing skew convexity.
+    let mut weighted_var = 0.0;
+    let mut weight_sum = 0.0;
+    for &k in strikes {
+        if !k.is_finite() || k <= 0.0 {
+            continue;
+        }
+        let vol = surface.value_clamped(time_to_expiry, k);
+        if !vol.is_finite() || vol <= 0.0 {
+            continue;
+        }
+        let w = 1.0 / (k * k);
+        weighted_var += w * vol * vol;
+        weight_sum += w;
+    }
+
+    if weight_sum <= 0.0 {
+        return Some(atm_variance);
+    }
+
+    let smile_variance = weighted_var / weight_sum;
+    // Never report less than the flat-ATM variance: the smile (skew/convexity)
+    // can only add fair variance relative to a flat ATM assumption.
+    Some(smile_variance.max(atm_variance))
 }
 
 pub(crate) fn compute_pv(
@@ -108,7 +146,6 @@ pub(crate) fn compute_pv(
         return Ok(undiscounted * disc.df(t));
     }
 
-    let realized = partial_realized_variance(inst, curves, as_of)?;
     let forward = remaining_forward_variance(inst, curves, as_of)?;
     // Seasoned MTM blends already-annualized realized and forward variance.
     // The accrued-variance identity time-weights the un-annualized total
@@ -117,6 +154,17 @@ pub(crate) fn compute_pv(
     // `time_elapsed_fraction` rather than an observation-count fraction, which
     // only coincides for perfectly uniform schedules (W-32).
     let w = inst.time_elapsed_fraction(as_of);
+    // The realized-variance term must be annualized on the SAME day-count time
+    // basis as the blend weight `w`. `partial_realized_variance` annualizes on
+    // an observation-count basis (Σr²/N · ~252), a different time base, so the
+    // accrued-variance identity would not close (W-33). `seasoned_realized_variance`
+    // re-bases it to `V_accrued / t_elapsed` so `realized·w` equals
+    // `V_accrued / T` exactly.
+    let total_t = inst
+        .day_count
+        .year_fraction(inst.start_date, inst.maturity, Default::default())?;
+    let t_elapsed = w * total_t;
+    let realized = seasoned_realized_variance(inst, curves, as_of, t_elapsed)?;
     let expected_var = realized * w + forward * (1.0 - w);
     let undiscounted = inst.payoff(expected_var);
     let t = inst
@@ -349,10 +397,21 @@ pub(crate) fn get_historical_ohlc(
     Ok((open_vals, high_vals, low_vals, close_vals))
 }
 
-pub(crate) fn partial_realized_variance(
+/// Realized variance over the elapsed window, annualized with an explicit
+/// annualization factor.
+///
+/// Both close-to-close and the OHLC estimators compute a per-period variance
+/// (mean over the elapsed sample) and multiply by `annualization_factor`. The
+/// factor therefore selects the *time basis* of the annualization. With the
+/// observation-frequency factor (~252 for daily) the result is annualized on
+/// an observation-count basis; with `M / t_elapsed` (M = number of return
+/// periods / OHLC bars, `t_elapsed` in years) it is annualized on a day-count
+/// time basis instead — see [`seasoned_realized_variance`].
+fn realized_variance_with_factor(
     inst: &VarianceSwap,
     context: &MarketContext,
     as_of: Date,
+    annualization_factor: f64,
 ) -> Result<f64> {
     if inst.realized_var_method.requires_ohlc() {
         let (open, high, low, close) = get_historical_ohlc(inst, context, as_of)?;
@@ -365,18 +424,74 @@ pub(crate) fn partial_realized_variance(
             &low,
             &close,
             inst.realized_var_method,
-            annualization_factor_with_policy(inst, context),
+            annualization_factor,
         );
     }
     let prices = get_historical_prices(inst, context, as_of)?;
     if prices.len() < 2 {
         return Ok(0.0);
     }
-    realized_variance(
-        &prices,
-        inst.realized_var_method,
+    realized_variance(&prices, inst.realized_var_method, annualization_factor)
+}
+
+/// Number of per-period samples (return periods or OHLC bars) accrued by
+/// `as_of`. Used to convert an observation-count annualization to a time-basis
+/// annualization without re-deriving the squared-return sum.
+fn realized_sample_count(inst: &VarianceSwap, context: &MarketContext, as_of: Date) -> Result<f64> {
+    if inst.realized_var_method.requires_ohlc() {
+        let (_, _, _, close) = get_historical_ohlc(inst, context, as_of)?;
+        // OHLC estimators average over the number of bars.
+        Ok((close.len() as f64).max(0.0))
+    } else {
+        let prices = get_historical_prices(inst, context, as_of)?;
+        // Close-to-close averages over the number of returns = points − 1.
+        Ok((prices.len() as f64 - 1.0).max(0.0))
+    }
+}
+
+pub(crate) fn partial_realized_variance(
+    inst: &VarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+) -> Result<f64> {
+    realized_variance_with_factor(
+        inst,
+        context,
+        as_of,
         annualization_factor_with_policy(inst, context),
     )
+}
+
+/// Realized variance for the seasoned mark-to-market blend, annualized on the
+/// **day-count time basis** so it is consistent with the blend weight `w`.
+///
+/// `compute_pv` blends `realized·w + forward·(1−w)` with `w` the day-count
+/// `time_elapsed_fraction`. The accrued-variance identity
+/// `σ²_expected = (V_accrued + E[V_fwd]·τ) / T` requires `realized·w` to equal
+/// `V_accrued / T`, i.e. `realized = V_accrued / t_elapsed`.
+/// [`partial_realized_variance`] instead annualizes `V_accrued` on an
+/// observation-count basis (`Σr²/N · AF`, AF ≈ 252), so the two time bases
+/// disagree and the identity does not close for non-uniform schedules.
+///
+/// This function re-bases the annualization: it annualizes with
+/// `AF = M / t_elapsed` (M = accrued sample count), which yields exactly
+/// `V_accrued / t_elapsed` for both close-to-close and OHLC estimators. When
+/// the elapsed time or sample count is degenerate (≤ 0), it falls back to the
+/// observation-count annualization.
+pub(crate) fn seasoned_realized_variance(
+    inst: &VarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+    t_elapsed: f64,
+) -> Result<f64> {
+    let m = realized_sample_count(inst, context, as_of)?;
+    if t_elapsed > 0.0 && m > 0.0 {
+        // AF = M / t_elapsed turns the per-period mean (÷M) into Σ(·)/t_elapsed.
+        realized_variance_with_factor(inst, context, as_of, m / t_elapsed)
+    } else {
+        // Degenerate window: nothing meaningful accrued — fall back.
+        partial_realized_variance(inst, context, as_of)
+    }
 }
 
 /// Forward (remaining) variance from `as_of` to `maturity`.
@@ -650,8 +765,16 @@ mod tests {
 
         let pv = compute_pv(&swap, &market, as_of).expect("seasoned pv");
 
-        // Recompute the identity from the same building blocks.
-        let realized = partial_realized_variance(&swap, &market, as_of).expect("realized");
+        // Recompute the identity from the same building blocks. The realized
+        // term must use the time-basis annualization (`seasoned_realized_variance`,
+        // W-33) so it is consistent with the day-count blend weight `w`.
+        let total_t = swap
+            .day_count
+            .year_fraction(swap.start_date, swap.maturity, Default::default())
+            .expect("total yf");
+        let t_elapsed = time_w * total_t;
+        let realized =
+            seasoned_realized_variance(&swap, &market, as_of, t_elapsed).expect("realized");
         let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
         let expected_var = realized * time_w + forward * (1.0 - time_w);
         let t = swap
@@ -677,6 +800,103 @@ mod tests {
         );
     }
 
+    /// W-33: the realized-variance term in the seasoned MTM blend must be
+    /// annualized on the *day-count time basis* (`V_accrued / t_elapsed`), the
+    /// same basis as the blend weight `w`. The observation-count annualization
+    /// (`partial_realized_variance`, Σr²/N · ~252) uses a different time base,
+    /// so the accrued-variance identity does not close. The two must differ for
+    /// a non-uniform (weekend-skipping) schedule, and `compute_pv` must use the
+    /// time-basis value.
+    #[test]
+    fn seasoned_realized_variance_uses_time_basis_not_observation_count() {
+        use crate::instruments::common_impl::traits::Attributes;
+        use crate::instruments::equity::variance_swap::types::PayReceive;
+        use finstack_core::dates::{DayCount, Tenor};
+        use finstack_core::market_data::scalars::ScalarTimeSeries;
+        use finstack_core::money::Money;
+        use finstack_core::types::{CurveId, InstrumentId};
+
+        let start = date!(2025 - 01 - 06); // Monday
+        let maturity = date!(2025 - 06 - 30); // Monday
+        let as_of = date!(2025 - 04 - 18); // Friday, mid-life
+
+        let swap = VarianceSwap::builder()
+            .id(InstrumentId::new("VARSPX-W33"))
+            .underlying_ticker("SPX".to_string())
+            .notional(Money::new(
+                1_000_000.0,
+                finstack_core::currency::Currency::USD,
+            ))
+            .strike_variance(0.04)
+            .start_date(start)
+            .maturity(maturity)
+            .observation_freq(Tenor::daily())
+            .realized_var_method(finstack_core::math::stats::RealizedVarMethod::CloseToClose)
+            .side(PayReceive::Receive)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .attributes(Attributes::new())
+            .build()
+            .expect("w33 swap");
+
+        let past: Vec<Date> = observation_dates(&swap)
+            .into_iter()
+            .filter(|&d| d <= as_of)
+            .collect();
+        let obs: Vec<(Date, f64)> = past
+            .iter()
+            .enumerate()
+            .map(|(i, &d)| (d, 100.0 * (1.0 + 0.002 * (i as f64 % 4.0 - 1.5))))
+            .collect();
+        let series = ScalarTimeSeries::new("SPX", obs, None).expect("series");
+        let market = build_market(as_of).insert_series(series);
+
+        let time_w = swap.time_elapsed_fraction(as_of);
+        let total_t = swap
+            .day_count
+            .year_fraction(swap.start_date, swap.maturity, Default::default())
+            .expect("total yf");
+        let t_elapsed = time_w * total_t;
+
+        let obs_count_realized =
+            partial_realized_variance(&swap, &market, as_of).expect("obs-count realized");
+        let time_basis_realized =
+            seasoned_realized_variance(&swap, &market, as_of, t_elapsed).expect("time realized");
+
+        // The two annualizations must genuinely differ (weekend-skipping
+        // schedule => N_returns/AF ≠ t_elapsed).
+        assert!(
+            (obs_count_realized - time_basis_realized).abs()
+                / time_basis_realized.max(1e-12)
+                > 1e-3,
+            "observation-count ({obs_count_realized}) and time-basis \
+             ({time_basis_realized}) realized variance must differ"
+        );
+
+        // Identity check: time_basis_realized = V_accrued / t_elapsed.
+        // Reconstruct V_accrued = Σr² directly from the close series.
+        let prices: Vec<f64> = past
+            .iter()
+            .enumerate()
+            .map(|(i, _)| 100.0 * (1.0 + 0.002 * (i as f64 % 4.0 - 1.5)))
+            .collect();
+        let v_accrued: f64 = prices
+            .windows(2)
+            .map(|w| {
+                let r = (w[1] / w[0]).ln();
+                r * r
+            })
+            .sum();
+        let expected_time_realized = v_accrued / t_elapsed;
+        assert!(
+            (time_basis_realized - expected_time_realized).abs()
+                / expected_time_realized.max(1e-12)
+                < 1e-9,
+            "seasoned realized variance must equal V_accrued / t_elapsed: \
+             got {time_basis_realized}, expected {expected_time_realized}"
+        );
+    }
+
     #[test]
     fn smile_convexity_fallback_lifts_forward_variance_above_atm_variance() {
         let surface = VolSurface::builder("SPX")
@@ -692,6 +912,38 @@ mod tests {
         assert!(
             fallback > 0.04,
             "expected smile correction above ATM variance"
+        );
+    }
+
+    /// W-39: the smile-convexity fallback must capture *deep-wing* convexity.
+    ///
+    /// On a surface that is flat at the strikes bracketing the forward but has
+    /// elevated *deep* wings, the old 2-strike proxy only inspected the two
+    /// near-forward strikes and saw a flat smile, so it reported ≈ ATM variance
+    /// — under-weighting the wings. The 1/K²-weighted full-grid estimate must
+    /// pick up the deep wings and report variance materially above ATM.
+    #[test]
+    fn smile_convexity_fallback_captures_deep_wing_convexity() {
+        // Strikes bracketing the forward (90, 100, 110) are FLAT at 20% vol;
+        // only the DEEP wings (60, 150) are elevated. A 2-strike proxy around
+        // the 100 forward would see only the flat 20% and miss the wings.
+        let surface = VolSurface::builder("SPX")
+            .expiries(&[1.0])
+            .strikes(&[60.0, 90.0, 100.0, 110.0, 150.0])
+            .row(&[0.45, 0.20, 0.20, 0.20, 0.35])
+            .build()
+            .expect("surface");
+
+        let atm_variance = 0.20_f64 * 0.20; // 0.04
+        let fallback =
+            smile_convexity_adjusted_variance(&surface, 1.0, 100.0).expect("fallback variance");
+
+        // The deep wings must lift the estimate meaningfully above ATM. The old
+        // 2-strike proxy (k_lo=90, k_hi=110, both 20%) returned exactly 0.04.
+        assert!(
+            fallback > atm_variance * 1.05,
+            "deep-wing convexity must lift the fallback well above ATM variance \
+             ({atm_variance}); got {fallback}"
         );
     }
 }

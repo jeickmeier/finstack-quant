@@ -52,10 +52,43 @@ pub(crate) fn compute_pv_raw(
     let forward = vol_curve.forward_level(t);
     let vol_of_vol = vol_surface.value_clamped(t, option.strike);
     let df = disc.df_between_dates(as_of, option.expiry)?;
+    // The vol index is √(forward variance), so Black-76 on the index forward is
+    // an approximation (see `black_price`). Surface it as a diagnostic so the
+    // modelling choice is visible in production logs.
+    tracing::debug!(
+        instrument_id = %option.id,
+        forward = forward,
+        vol_of_vol = vol_of_vol,
+        "VolatilityIndexOption priced with Black-76 on the index forward — \
+         approximation: the index is √(forward variance), not a lognormal asset"
+    );
     let black_price = black_price(option, forward, vol_of_vol, t);
     Ok(black_price * option.contract_specs.multiplier * option.num_contracts() * df)
 }
 
+/// Black-76 price of a volatility-index option on the index forward.
+///
+/// # Model approximation (W-38)
+///
+/// A volatility index (VIX-style) is the **square root of a forward variance**,
+/// `VIX = √(forward variance)`. It is therefore *not* itself a lognormal traded
+/// asset, and Black-76 — which assumes the underlying forward is lognormal — is
+/// a deliberate **approximation** here, not an exact model.
+///
+/// A fully consistent valuation would model the forward variance (e.g. a
+/// vol-of-variance / mean-reverting square-root model) and carry the convexity
+/// of the `√(·)` map explicitly. That is out of scope for this discounting
+/// pricer; the approximation is the standard dealer practice of quoting a
+/// "vol of vol" and running Black-76 on the index forward, with the
+/// vol-of-vol smile absorbing the residual model error.
+///
+/// # Consistency with `vol_index_future`
+///
+/// The `forward` passed here is `VolatilityIndexCurve::forward_level(t)` — the
+/// **same** forward source that `vol_index_future::forward_vol` uses to price
+/// the volatility-index future. So a VIX option and a VIX future on the same
+/// curve are struck against an identical forward; the option only adds the
+/// Black-76 optionality layer on top of that shared forward.
 pub(crate) fn black_price(option: &VolatilityIndexOption, forward: f64, sigma: f64, t: f64) -> f64 {
     if t <= 0.0 || sigma <= 0.0 {
         return match option.option_type {
@@ -330,6 +363,53 @@ mod tests {
         let via_instrument = option.value(&market, as_of).expect("instrument pv");
 
         assert_eq!(via_pricer, via_instrument);
+    }
+
+    /// W-38: a volatility-index option and a volatility-index future on the
+    /// same vol-index curve and the same date must reference an identical
+    /// forward. The Black-76 option pricer is an approximation (the index is
+    /// √(forward variance), not a lognormal asset), but its forward must be the
+    /// exact same `VolatilityIndexCurve::forward_level` the future uses — the
+    /// option only adds optionality on top of the shared forward.
+    #[test]
+    fn vol_index_option_and_future_share_the_same_forward() {
+        use crate::instruments::equity::vol_index_future::{
+            VolIndexContractSpecs, VolatilityIndexFuture,
+        };
+        use crate::instruments::rates::ir_future::Position;
+
+        let market = setup_market();
+        let as_of = date!(2025 - 01 - 01);
+        let expiry = date!(2025 - 03 - 19);
+
+        // Option forward via the option pricer's `forward_vol`.
+        let option = sample_option();
+        let option_forward = forward_vol(&option, &market, as_of).expect("option forward");
+
+        // Future forward via the future pricer's `forward_vol`, settling on the
+        // same date.
+        let future = VolatilityIndexFuture::builder()
+            .id(InstrumentId::new("VIX-FUT-SHARED"))
+            .notional(Money::new(20_000.0, Currency::USD))
+            .expiry(expiry)
+            .settlement_date(expiry)
+            .quoted_price(20.0)
+            .position(Position::Long)
+            .contract_specs(VolIndexContractSpecs::vix())
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .vol_index_curve_id(CurveId::new("VIX"))
+            .attributes(Attributes::new())
+            .build()
+            .expect("future");
+        let future_forward =
+            crate::instruments::equity::vol_index_future::pricer::forward_vol(&future, &market)
+                .expect("future forward");
+
+        assert!(
+            (option_forward - future_forward).abs() < 1e-10,
+            "VIX option and VIX future must price off the same curve forward: \
+             option={option_forward} future={future_forward}"
+        );
     }
 
     /// W-34: the analytic theta must equal the finite-difference theta of the

@@ -11,7 +11,10 @@
 //! - **Protection barrier**: Capital protection level at maturity
 //!
 //! Typical payoff at observation i:
-//! - If S_i ≥ Autocall Barrier: Redeem at par + accrued coupons (stop)
+//! - If S_i ≥ Autocall Barrier: Redeem at par + coupon (stop). With the
+//!   `memory_coupons` ("Phoenix") flag set, all coupons missed at earlier
+//!   observation dates are also accrued and paid here; otherwise only the
+//!   coupon at the autocall date is paid.
 //! - Else: No coupon, continue to next observation
 //!
 //! At maturity (if not called):

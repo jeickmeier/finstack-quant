@@ -947,11 +947,12 @@ impl<'a> EquityWaterfallEngine<'a> {
                         finstack_core::dates::DayCountContext::default(),
                     )
                     .unwrap_or(0.0);
-                let df = if rate.abs() < 1e-10 {
-                    1.0 // Avoid division by zero for 0% rate
-                } else {
-                    (1.0 + rate).powf(-t)
-                };
+                // Discount factor `(1 + r)^{-t}`. The expression is already
+                // continuous at `r = 0` (`1.0^{-t} = 1.0`), so no zero-rate
+                // special-case is required — and using the closed form
+                // unconditionally keeps this routine consistent with the
+                // standalone IRR routine in `metrics::calculate_irr`.
+                let df = (1.0 + rate).powf(-t);
                 npv += amount.amount() * df;
             }
             npv

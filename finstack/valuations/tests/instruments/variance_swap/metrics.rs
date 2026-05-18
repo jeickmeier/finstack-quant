@@ -317,16 +317,57 @@ fn test_vega_matches_formula() {
     // Assert
     // Vega must differentiate the same PV as `compute_pv`, which uses the
     // day-count `time_elapsed_fraction` (W-32), not an observation-count weight.
+    // W-34: vega is anchored to the STRIKE vol `σ_K = √(strike_variance)` — the
+    // codebase's vega-notional convention — not the forward implied vol, so the
+    // vega / variance-vega chain-rule identity closes with a single σ.
     let remaining_fraction = 1.0 - swap.time_elapsed_fraction(as_of);
     let t = swap
         .day_count
         .year_fraction(as_of, swap.maturity, Default::default())
         .unwrap();
     let df = ctx.get_discount(DISC_ID).unwrap().df(t);
-    let expected =
-        df * 2.0 * swap.notional.amount() * 0.25 * 0.01 * remaining_fraction * swap.side.sign();
+    let strike_vol = swap.strike_variance.sqrt();
+    let expected = df
+        * 2.0
+        * swap.notional.amount()
+        * strike_vol
+        * 0.01
+        * remaining_fraction
+        * swap.side.sign();
 
     assert!((vega - expected).abs() < LOOSE_EPSILON);
+}
+
+/// W-34: the vega / variance-vega chain-rule identity
+/// `vega = variance_vega · 2·σ_K · 0.01` must hold exactly, with `σ_K` the
+/// strike vol. Before the fix, `vega` used the forward implied vol while
+/// `variance_vega` (and the vega-notional conversions) used the strike vol, so
+/// no single `σ` closed the identity.
+#[test]
+fn test_vega_and_variance_vega_satisfy_chain_rule_identity() {
+    let mut swap = sample_swap(PayReceive::Receive);
+    swap.observation_freq = Tenor::weekly();
+    let as_of = swap.start_date + time::Duration::days(21);
+    // Forward implied vol deliberately different from the strike vol (0.20)
+    // so a forward-vol-anchored vega would break the identity.
+    let ctx = add_unitless(base_context(), format!("{}_IMPL_VOL", UNDERLYING_ID), 0.35);
+
+    let opts = finstack_valuations::instruments::PricingOptions::default();
+    let vega = swap
+        .price_with_metrics(&ctx, as_of, &[MetricId::Vega], opts.clone())
+        .unwrap()
+        .measures[MetricId::Vega.as_str()];
+    let variance_vega = swap
+        .price_with_metrics(&ctx, as_of, &[MetricId::VarianceVega], opts)
+        .unwrap()
+        .measures[MetricId::VarianceVega.as_str()];
+
+    let strike_vol = swap.strike_variance.sqrt();
+    let implied = variance_vega * 2.0 * strike_vol * 0.01;
+    assert!(
+        (vega - implied).abs() <= LOOSE_EPSILON * vega.abs().max(1.0),
+        "vega ({vega}) must equal variance_vega * 2σ_K * 0.01 ({implied})"
+    );
 }
 
 #[test]

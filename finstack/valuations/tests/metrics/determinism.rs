@@ -337,6 +337,7 @@ mod tests {
                 .expect("non-empty observation schedule"),
             autocall_barriers: vec![1.1, 1.15, 1.2, 1.25],
             coupons: vec![0.05, 0.05, 0.05, 0.05],
+            memory_coupons: false,
             final_barrier: 0.8,
             final_payoff_type: FinalPayoffType::CapitalProtection { floor: 0.9 },
             participation_rate: 1.0,
