@@ -89,15 +89,23 @@ mod tests {
     fn bond_model_maturity_respects_day_count() {
         let as_of = date!(2025 - 01 - 01);
         let maturity = date!(2030 - 01 - 01);
-        let bond_365 = crate::instruments::fixed_income::bond::Bond::fixed(
-            "B365",
-            Money::new(100.0, Currency::USD),
-            0.05,
-            as_of,
-            maturity,
-            "USD-OIS",
-        )
-        .expect("bond");
+        let bond_365 = crate::instruments::fixed_income::bond::Bond::builder()
+            .id("B365".into())
+            .notional(Money::new(100.0, Currency::USD))
+            .issue_date(as_of)
+            .maturity(maturity)
+            .cashflow_spec(
+                crate::instruments::fixed_income::bond::CashflowSpec::fixed(
+                    0.05,
+                    finstack_core::dates::Tenor::semi_annual(),
+                    DayCount::Act365F,
+                )
+                .expect("spec"),
+            )
+            .discount_curve_id("USD-OIS".into())
+            .attributes(crate::instruments::Attributes::new())
+            .build()
+            .expect("bond");
         let y_365 = bond_model_maturity_years(&bond_365, as_of).expect("yf");
 
         let bond_360 = crate::instruments::fixed_income::bond::Bond::builder()
