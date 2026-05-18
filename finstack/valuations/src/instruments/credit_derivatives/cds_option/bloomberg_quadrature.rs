@@ -69,17 +69,6 @@ const THETA_DAYS_IN_YEAR: f64 = 365.25;
 /// Minimum standard-normal quadrature range — covers `±6σ` of the *driver*
 /// `ε`, adequate when the payoff weight does not shift the integration mass.
 const MIN_Z_LIMIT: f64 = 6.0;
-
-/// Standard deviations of head-room kept *past the payoff-weighted peak* when
-/// adapting the quadrature truncation (see [`z_limit`]). For a payer the
-/// payoff `(S−c)·L(S)` grows asymptotically like `S ∝ e^{σ√t·z}`, so the
-/// payoff-weighted integrand `payoff(z)·φ(z) ∝ e^{σ√t·z − z²/2}` peaks at
-/// `z* = σ√t`, not at `z = 0`. Truncating at a fixed multiple of the driver
-/// vol clips the right tail of a deep-OTM payer at high vol; we instead
-/// extend to `z* + PAYOFF_TAIL_STDEVS` so 8σ of payoff-weighted mass past the
-/// peak is always captured.
-const PAYOFF_TAIL_STDEVS: f64 = 8.0;
-
 const Z_STEP: f64 = 0.05;
 
 /// `1/√(2π)` — the standard normal density's normalising constant.
@@ -681,25 +670,14 @@ fn decimal_to_f64(value: Decimal) -> Result<f64> {
     })
 }
 
-/// Adaptive truncation half-width for the standard-normal quadrature.
+/// Bloomberg CDSO standard-normal quadrature half-width.
 ///
-/// The payoff-weighted integrand of a payer peaks at the *driver* value
-/// `z* = σ√t` (the payoff `∝ e^{σ√t·z}` shifts the lognormal × density
-/// product's mode away from `z = 0`). We therefore extend the truncation to
-/// `z* + PAYOFF_TAIL_STDEVS` — capturing `PAYOFF_TAIL_STDEVS` standard
-/// deviations of payoff-weighted mass past the peak — rather than a fixed
-/// multiple of the driver vol, which clips the right tail of a deep-OTM
-/// payer at high vol. The `4·σ√t` legacy term is retained inside the `max`
-/// so the truncation never *narrows* relative to the previous behaviour for
-/// very large `σ√t`. `normal_integral` is symmetric, so the same half-width
-/// also covers the (rapidly vanishing) left tail.
+/// DOCS 2055833 and Bloomberg-derived references use a fixed `[-6, 6]`
+/// driver grid for normal market vols. The legacy `4·σ√t` guard is retained
+/// only for extreme stress inputs so the integration range never narrows
+/// relative to the prior high-vol protection.
 fn z_limit(sigma: f64, t_expiry: f64) -> f64 {
-    let sigma_sqrt_t = sigma * t_expiry.max(0.0).sqrt();
-    // Peak of the payoff-weighted integrand for a payer is at z* = σ√t.
-    let payoff_peak_plus_tail = sigma_sqrt_t + PAYOFF_TAIL_STDEVS;
-    // Legacy multiple, kept so wide-vol cases never shrink.
-    let legacy = 4.0 * sigma_sqrt_t;
-    MIN_Z_LIMIT.max(payoff_peak_plus_tail).max(legacy)
+    MIN_Z_LIMIT.max(4.0 * sigma * t_expiry.max(0.0).sqrt())
 }
 
 fn normal_integral<F>(step: f64, limit: f64, mut value_at: F) -> f64
@@ -841,41 +819,22 @@ mod tests {
         );
     }
 
-    /// Item 8: the quadrature truncation `z_limit` must extend past the
-    /// PAYOFF-weighted peak `z* = σ√t`, not just a fixed multiple of the
-    /// driver vol. For a payer the payoff `∝ e^{σ√t·z}` shifts the
-    /// integration mass to the right; a too-narrow `z_limit` clips the
-    /// payoff-weighted right tail of a deep-OTM payer at high vol.
+    /// Bloomberg CDSO screen reconciliation depends on the published
+    /// standard-normal driver grid `[-6, 6]` for ordinary market vols. Keep
+    /// that fixed range for realistic short-dated CDSO inputs while retaining
+    /// the legacy stress guard for extreme `σ√t`.
     #[test]
-    fn z_limit_covers_payoff_weighted_peak() {
-        // At any (σ, t) the truncation must reach at least σ√t + 8 — eight
-        // standard deviations of payoff-weighted mass past the payer's peak.
-        for &(sigma, t) in &[(0.36, 0.1), (0.6, 1.0), (1.0, 1.0), (1.2, 4.0), (2.0, 4.0)] {
-            let sst = sigma * f64::sqrt(t);
-            let lim = z_limit(sigma, t);
-            assert!(
-                lim >= sst + PAYOFF_TAIL_STDEVS - 1e-9,
-                "z_limit({sigma},{t})={lim} must reach the payoff peak σ√t={sst} \
-                 plus {PAYOFF_TAIL_STDEVS} std-devs"
-            );
-            // Never narrower than the legacy bound.
-            assert!(lim >= MIN_Z_LIMIT && lim >= 4.0 * sst - 1e-9);
-        }
+    fn z_limit_uses_bloomberg_grid_with_legacy_stress_guard() {
+        let cdx_ig_46_sigma = 0.3603_f64;
+        let cdx_ig_46_t = 42.0 / 365.0;
+        assert_eq!(z_limit(cdx_ig_46_sigma, cdx_ig_46_t), MIN_Z_LIMIT);
 
-        // Integrating a payer-shaped payoff `e^{σ√t·z}` (the asymptotic
-        // payoff growth) against the normal density must be stable: the
-        // adaptive `z_limit` result must agree with a reference computed on a
-        // far wider domain, i.e. the tail is not clipped.
-        let sigma = 1.0_f64;
-        let t = 1.0_f64;
-        let sst = sigma * t.sqrt();
-        let payer_payoff = |z: f64| (sst * z).exp();
-        let adaptive = normal_integral(Z_STEP, z_limit(sigma, t), payer_payoff);
-        let reference = normal_integral(Z_STEP, sst + 16.0, payer_payoff);
+        let stressed_sigma = 2.0_f64;
+        let stressed_t = 4.0_f64;
+        let stressed_limit = z_limit(stressed_sigma, stressed_t);
         assert!(
-            (adaptive - reference).abs() <= 1e-9 * reference.abs().max(1e-12),
-            "adaptive z_limit must not clip the payoff-weighted tail: \
-             adaptive={adaptive}, reference={reference}"
+            (stressed_limit - 16.0).abs() < 1e-12,
+            "extreme vol-time inputs should still use the legacy 4σ√t guard, got {stressed_limit}"
         );
     }
 
