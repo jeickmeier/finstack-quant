@@ -440,6 +440,44 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         );
         report.update_metadata("clamped_target_points", extrapolated_points.to_string());
 
+        // Item 3: a failed SABR expiry/tenor bucket must fail the surface calibration.
+        //
+        // Each bucket either calibrates (incrementing `count` and contributing per-strike
+        // residuals) or fails (recorded in `bucket_errors` and `continue`d). The success
+        // report was previously built from `residuals` alone — so a surface where most
+        // buckets failed to fit still reported success because the survivors' residuals
+        // were all in tolerance. A partially-fitted vol surface is NOT a calibrated
+        // surface: mark the report failed whenever any bucket failed.
+        report.update_metadata("calibrated_buckets", count.to_string());
+        report.update_metadata("failed_buckets", bucket_errors.len().to_string());
+        if !bucket_errors.is_empty() {
+            let total_buckets = count + bucket_errors.len();
+            // Summarise the failed buckets (expiry,tenor in years) with their errors.
+            let mut failures: Vec<String> = bucket_errors
+                .iter()
+                .map(|((kb_exp, kb_ten), err)| {
+                    format!(
+                        "(expiry={:.4},tenor={:.4}): {}",
+                        *kb_exp as f64 / 10000.0,
+                        *kb_ten as f64 / 10000.0,
+                        err
+                    )
+                })
+                .collect();
+            failures.sort();
+            let summary = format!(
+                "Swaption vol surface calibration failed: {} of {} SABR bucket(s) did not \
+                 calibrate. Failed buckets: [{}]",
+                bucket_errors.len(),
+                total_buckets,
+                failures.join("; "),
+            );
+            report.success = false;
+            report.validation_passed = false;
+            report.validation_error = Some(summary.clone());
+            report.convergence_reason = summary;
+        }
+
         report.update_solver_config(config.solver.clone());
 
         Ok((cube, report))
@@ -1129,6 +1167,142 @@ mod tests {
             "atm mismatch: fitted={} true={}",
             fitted_atm,
             true_atm
+        );
+    }
+
+    /// Item 3: a failed SABR expiry/tenor bucket must fail the whole surface report.
+    ///
+    /// One bucket (1Y×5Y) is given five well-behaved strikes and calibrates cleanly.
+    /// A second bucket (2Y×5Y) is given only two strikes — below the three-strike SABR
+    /// minimum — so it lands in `bucket_errors` and is `continue`d. The target grid
+    /// points only at the good bucket, so the `VolCube` still builds. Pre-fix the report
+    /// was assembled from the surviving bucket's residuals alone and reported
+    /// `success = true`; post-fix the non-empty `bucket_errors` must force
+    /// `success = false`.
+    #[test]
+    fn item3_failed_sabr_bucket_fails_surface_report() {
+        let base_date = date(2024, Month::January, 2);
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (30.0, 0.20)])
+            .build()
+            .expect("discount curve");
+        let ctx = MarketContext::new().insert(disc);
+
+        // --- Good bucket: 1Y x 5Y, five strikes. ---
+        let good_expiry_years = 1.0_f64;
+        let tenor_years = 5.0_f64;
+        let good_expiry_date = base_date.add_months((good_expiry_years * 12.0).round() as i32);
+        let good_maturity_date =
+            good_expiry_date.add_months((tenor_years * 12.0).round() as i32);
+        let good_t_exp = to_basis_points(
+            DayCount::Act365F
+                .year_fraction(base_date, good_expiry_date, DayCountContext::default())
+                .expect("t_exp"),
+        ) as f64
+            / 10_000.0;
+        let good_t_ten = to_basis_points(
+            DayCount::Act365F
+                .year_fraction(good_expiry_date, good_maturity_date, DayCountContext::default())
+                .expect("t_ten"),
+        ) as f64
+            / 10_000.0;
+
+        let mut p = params(base_date);
+        p.vol_convention = SwaptionVolConvention::Lognormal;
+        p.sabr_beta = 0.5;
+        // Target only the good bucket so the cube can be built from it alone.
+        p.target_expiries = vec![good_t_exp];
+        p.target_tenors = vec![good_t_ten];
+        p.vol_tolerance = Some(0.0020);
+
+        let leg = SwaptionVolTarget::default_leg_conventions(&p).expect("leg conventions");
+        let good_fwd = SwaptionVolTarget::calculate_forward_swap_rate_years(
+            &p,
+            good_expiry_years,
+            tenor_years,
+            &leg,
+            &ctx,
+        )
+        .expect("forward");
+        let sabr_true = SABRParameters {
+            alpha: 0.020,
+            beta: p.sabr_beta,
+            nu: 0.30,
+            rho: -0.20,
+            shift: None,
+        };
+        let model = SABRModel::new(sabr_true);
+
+        let mut quotes = Vec::new();
+        for &k in &[
+            good_fwd - 0.010,
+            good_fwd - 0.005,
+            good_fwd,
+            good_fwd + 0.005,
+            good_fwd + 0.010,
+        ] {
+            let vol_dec = model
+                .implied_volatility(good_fwd, k, good_t_exp)
+                .expect("true vol");
+            quotes.push(MarketQuote::Vol(VolQuote::SwaptionVol {
+                id: QuoteId::new(format!("GOOD-1Yx5Y-{k}")),
+                expiry: good_expiry_date,
+                maturity: good_maturity_date,
+                strike: k,
+                vol: vol_dec * 100.0,
+                quote_type: "implied_vol".to_string(),
+                convention: SwaptionConventionId::new("USD-Annual"),
+            }));
+        }
+
+        // --- Bad bucket: 2Y x 5Y, only TWO strikes (< 3 required for SABR). ---
+        let bad_expiry_date = base_date.add_months(24);
+        let bad_maturity_date = bad_expiry_date.add_months((tenor_years * 12.0).round() as i32);
+        for &k in &[good_fwd, good_fwd + 0.005] {
+            quotes.push(MarketQuote::Vol(VolQuote::SwaptionVol {
+                id: QuoteId::new(format!("BAD-2Yx5Y-{k}")),
+                expiry: bad_expiry_date,
+                maturity: bad_maturity_date,
+                strike: k,
+                vol: 20.0,
+                quote_type: "implied_vol".to_string(),
+                convention: SwaptionConventionId::new("USD-Annual"),
+            }));
+        }
+
+        let config = CalibrationConfig {
+            solver: crate::calibration::solver::SolverConfig::brent_default()
+                .with_max_iterations(500),
+            ..CalibrationConfig::default()
+        };
+
+        let (_cube, report) =
+            SwaptionVolTarget::solve(&p, &quotes, &ctx, &config).expect("solve builds the cube");
+
+        assert!(
+            !report.success,
+            "Item 3: a surface with a failed SABR bucket must NOT report success \
+             (convergence_reason: {})",
+            report.convergence_reason,
+        );
+        assert!(
+            !report.validation_passed,
+            "validation_passed must be false when a bucket failed"
+        );
+        assert_eq!(
+            report.metadata.get("failed_buckets").map(String::as_str),
+            Some("1"),
+            "exactly one bucket should be recorded as failed"
+        );
+        assert!(
+            report
+                .validation_error
+                .as_deref()
+                .is_some_and(|e| e.contains("did not calibrate")),
+            "validation_error should describe the failed bucket(s): {:?}",
+            report.validation_error,
         );
     }
 

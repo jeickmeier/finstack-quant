@@ -221,28 +221,39 @@ impl SviSurfaceTarget {
             &grid,
         )?;
 
-        // After Gatheral total-variance interpolation, sanity-check
-        // the produced grid for calendar-spread and butterfly
-        // arbitrage. `lenient_arbitrage = true` so a borderline surface
-        // does not fail a running calibration pipeline outright, but any
-        // violation emits a tracing warning through the validation
-        // machinery and can be promoted to a hard error by callers that
-        // build a strict ValidationConfig.
-        let validation_cfg = ValidationConfig {
+        // After Gatheral total-variance interpolation, sanity-check the produced grid
+        // for calendar-spread and butterfly arbitrage.
+        //
+        // Two validation modes are used deliberately:
+        //
+        //  * Calendar-spread is checked in STRICT mode. "Total variance non-decreasing
+        //    in expiry" is an unambiguous no-arbitrage condition that holds exactly
+        //    under sampling, so a strict-mode `Err` here is a genuine arbitrage and
+        //    must fail the calibration (item 9 — see below).
+        //
+        //  * Butterfly is checked in LENIENT mode. The butterfly validator's discrete
+        //    convexity test on the coarse *absolute-strike* target grid is only an
+        //    approximation (an SVI smile is convex in log-moneyness `k`, not
+        //    necessarily in absolute strike `K`), so it can flag a genuinely
+        //    arbitrage-free SVI surface. It is recorded as a warning/diagnostic only
+        //    and does not gate `success`.
+        let calendar_cfg = ValidationConfig {
+            lenient_arbitrage: false,
+            ..ValidationConfig::default()
+        };
+        let butterfly_cfg = ValidationConfig {
             lenient_arbitrage: true,
             ..ValidationConfig::default()
         };
-        // Capture validator results so calibration callers can detect arbitrage
-        // violations on the produced surface. lenient_arbitrage=true keeps the
-        // call from hard-failing the calibration; we surface any violation as a
-        // diagnostic on the report so a downstream pipeline (or strict-mode
-        // caller) can promote it to an error.
-        let calendar_warning = surface
-            .validate_calendar_spread(&validation_cfg)
+        // A strict calendar-spread `Err` is a genuine arbitrage -> fails the report.
+        let calendar_arbitrage = surface
+            .validate_calendar_spread(&calendar_cfg)
             .err()
             .map(|e| format!("SVI calendar-spread arbitrage: {e}"));
+        // Butterfly is advisory only (lenient mode never returns `Err`; this stays
+        // `None`, but is kept for symmetry / future strict-butterfly tightening).
         let butterfly_warning = surface
-            .validate_butterfly_spread(&validation_cfg)
+            .validate_butterfly_spread(&butterfly_cfg)
             .err()
             .map(|e| format!("SVI butterfly-spread arbitrage: {e}"));
 
@@ -255,16 +266,27 @@ impl SviSurfaceTarget {
         .with_model_version(finstack_core::versions::SVI_SURFACE);
         report.update_solver_config(global_config.solver.clone());
 
-        // Surface arbitrage warnings on the report so callers can detect them.
-        // Both validation_passed and validation_error are populated if any
-        // arbitrage violation was detected by the surface validators above.
-        let warnings: Vec<String> = [calendar_warning, butterfly_warning]
-            .into_iter()
-            .flatten()
-            .collect();
-        if !warnings.is_empty() {
+        // A genuine (strict-mode) calendar-spread arbitrage fails validation.
+        if let Some(calendar_err) = calendar_arbitrage {
             report.validation_passed = false;
-            report.validation_error = Some(warnings.join("; "));
+            // Append the advisory butterfly diagnostic, if any, for completeness.
+            let detail = match &butterfly_warning {
+                Some(bf) => format!("{calendar_err}; (advisory) {bf}"),
+                None => calendar_err,
+            };
+            report.validation_error = Some(detail.clone());
+            // Item 9: `success` MUST reflect `validation_passed`. An SVI surface that
+            // fails the calendar-spread no-arbitrage check is not a usable calibration
+            // result — reporting `success = true` while `validation_passed` is `false`
+            // lets an arbitrageable surface be silently accepted downstream. A
+            // calibration that produces an arbitrageable surface has not succeeded.
+            report.success = false;
+            report.convergence_reason =
+                format!("SVI surface calibration failed validation: {detail}");
+        } else if let Some(bf) = butterfly_warning {
+            // Butterfly is advisory only: record it without failing validation or
+            // success (the discrete absolute-strike convexity test is approximate).
+            report.validation_error = Some(format!("(advisory) {bf}"));
         }
 
         Ok((surface, report))
@@ -656,6 +678,94 @@ mod tests {
                 prev_t = t;
             }
         }
+    }
+
+    /// Item 9: `report.success` must reflect `report.validation_passed`. An SVI surface
+    /// that fails the post-fit calendar-spread / butterfly arbitrage checks must not be
+    /// reported as a successful calibration.
+    ///
+    /// The fixture supplies two expiry slices where the longer-dated slice (T≈0.75y)
+    /// has uniformly *lower* implied vols than the shorter one (T≈0.25y). Each slice
+    /// fits arbitrage-free in isolation (so `calibrate_svi` succeeds per slice), but the
+    /// assembled surface has total variance that *decreases* with expiry — a calendar
+    /// arbitrage. Pre-fix the surface validators ran in lenient mode (only warned, so
+    /// `validation_passed` stayed `true`) and `success` was hard-coded `true`; post-fix
+    /// the strict validators flag the violation and `success` follows `validation_passed`
+    /// to `false`. `solve` must still return `Ok` (a failed *report*, not an aborted
+    /// calibration).
+    #[test]
+    fn item9_arbitrageable_svi_surface_is_not_reported_successful() {
+        let e1 = Date::from_calendar_date(2025, Month::April, 1).expect("e1");
+        let e2 = Date::from_calendar_date(2026, Month::January, 1).expect("e2");
+        let smile_short = [
+            (80.0, 0.55),
+            (90.0, 0.45),
+            (100.0, 0.40),
+            (110.0, 0.44),
+            (120.0, 0.52),
+        ];
+        // Longer-dated vols are far lower -> σ²·T decreases with T -> calendar arbitrage.
+        let smile_long = [
+            (80.0, 0.16),
+            (90.0, 0.13),
+            (100.0, 0.11),
+            (110.0, 0.13),
+            (120.0, 0.15),
+        ];
+
+        let mut quotes = Vec::new();
+        for (strike, vol) in smile_short {
+            quotes.push(MarketQuote::Vol(VolQuote::OptionVol {
+                id: QuoteId::new(format!("E1-{strike}")),
+                underlying: UnderlyingId::new("SPX"),
+                expiry: e1,
+                strike,
+                vol,
+                option_type: OptionType::Call,
+                convention: OptionConventionId::new("USD-EQ"),
+            }));
+        }
+        for (strike, vol) in smile_long {
+            quotes.push(MarketQuote::Vol(VolQuote::OptionVol {
+                id: QuoteId::new(format!("E2-{strike}")),
+                underlying: UnderlyingId::new("SPX"),
+                expiry: e2,
+                strike,
+                vol,
+                option_type: OptionType::Call,
+                convention: OptionConventionId::new("USD-EQ"),
+            }));
+        }
+
+        let mut p = base_params();
+        p.target_expiries = vec![0.25, 0.75];
+
+        let (_surface, report) = SviSurfaceTarget::solve(
+            &p,
+            &quotes,
+            &MarketContext::new(),
+            &CalibrationConfig::default(),
+        )
+        .expect("solve must still return Ok — a failed report, not an aborted calibration");
+
+        assert!(
+            !report.validation_passed,
+            "an arbitrageable SVI surface must fail validation"
+        );
+        assert!(
+            !report.success,
+            "Item 9: `success` must reflect `validation_passed` — an arbitrageable \
+             surface must NOT report success (validation_error: {:?})",
+            report.validation_error,
+        );
+        assert!(
+            report
+                .validation_error
+                .as_deref()
+                .is_some_and(|e| e.contains("arbitrage")),
+            "validation_error should describe the arbitrage violation: {:?}",
+            report.validation_error,
+        );
     }
 
     #[test]

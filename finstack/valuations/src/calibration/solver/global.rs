@@ -14,14 +14,24 @@ use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 
 /// Fill `resid` with a penalty term that gives LM a direction pointing back into the
-/// feasible bound box. The previous implementation added a `‖p‖²`-dependent term, which
-/// makes the LM normal equations minimize `‖p‖` rather than push toward feasibility — for
-/// a NS τ above the upper bound, that meant LM happily walked toward zero (also infeasible).
+/// feasible bound box.
 ///
-/// When bounds are provided we use signed distance to the nearest violated bound,
-/// scaled by `PENALTY`, broadcast equally to all residuals. When no bounds are provided
-/// we emit a flat `PENALTY` (J^T r ≈ 0 from a constant, so LM falls back on its
-/// trust-region step without a misleading gradient toward the origin).
+/// History: an earlier implementation added a `‖p‖²`-dependent term, which makes the LM
+/// normal equations minimize `‖p‖` rather than push toward feasibility. A later revision
+/// fixed the *direction* but broadcast a single scalar to every residual — that scalar is
+/// constant in each parameter, so the finite-difference Jacobian gets a **zero column**
+/// for any parameter whose ±h neighbourhood is also infeasible. With a zero column LM has
+/// no descent direction for that parameter and freezes it at its seed.
+///
+/// This implementation makes the penalty **parameter-dependent per residual**: each
+/// residual `k` carries a smooth bound-distance penalty for parameter `k % n_params`, so
+/// every parameter influences at least one residual and its Jacobian column is non-zero.
+/// The penalty is `0` when a parameter is interior and grows smoothly with the signed
+/// violation distance, so the FD column points monotonically back toward the feasible
+/// region. A constant floor (`PENALTY · FLOOR_FRACTION`) is added on top so the residual
+/// vector stays recognisably "penalised" (large `|r|`) for the caller-side validity
+/// checks even when no individual parameter is violated (e.g. an infeasible region the
+/// bounds do not describe, such as a curve builder rejecting otherwise in-bounds params).
 fn fill_penalty(
     resid: &mut [f64],
     n_residuals: usize,
@@ -29,36 +39,68 @@ fn fill_penalty(
     lb: Option<&[f64]>,
     ub: Option<&[f64]>,
 ) {
-    let mut signed_outside = 0.0_f64;
-    let mut any_violated = false;
-    if let Some(lo) = lb {
-        for (&p, &b) in params.iter().zip(lo.iter()) {
-            if p.is_finite() && p < b {
-                signed_outside += (b - p) * (b - p);
-                any_violated = true;
-            }
-        }
+    let n = n_residuals.min(resid.len());
+    if n == 0 {
+        return;
     }
-    if let Some(hi) = ub {
-        for (&p, &b) in params.iter().zip(hi.iter()) {
-            if p.is_finite() && p > b {
-                signed_outside += (p - b) * (p - b);
-                any_violated = true;
-            }
-        }
-    }
+    let n_params = params.len();
 
-    let v = if any_violated {
-        // Strictly increasing in the bound-violation distance, capped at `PENALTY` so the
-        // Jacobian numerical step stays sensible. LM minimises this by moving back inside
-        // the box.
-        PENALTY * (signed_outside.sqrt() / (1.0 + signed_outside.sqrt()))
-    } else {
-        PENALTY
+    // Per-parameter signed bound-violation distance (0 if interior). A smooth,
+    // strictly-increasing transform keeps the FD step sensible while still giving a
+    // non-zero gradient: d/dx [PENALTY·x/(1+x)] > 0 for all x >= 0.
+    let param_penalty = |idx: usize| -> f64 {
+        if idx >= n_params {
+            return 0.0;
+        }
+        let p = params[idx];
+        if !p.is_finite() {
+            // Non-finite parameter: emit the full penalty so LM is pushed hard and the
+            // residual vector is flagged invalid by downstream checks.
+            return PENALTY;
+        }
+        let mut dist = 0.0_f64;
+        if let Some(lo) = lb {
+            if let Some(&b) = lo.get(idx) {
+                if p < b {
+                    dist += b - p;
+                }
+            }
+        }
+        if let Some(hi) = ub {
+            if let Some(&b) = hi.get(idx) {
+                if p > b {
+                    dist += p - b;
+                }
+            }
+        }
+        if dist > 0.0 {
+            PENALTY * (dist / (1.0 + dist))
+        } else {
+            0.0
+        }
     };
 
-    for r in resid.iter_mut().take(n_residuals) {
-        *r = v;
+    // Constant floor so the residual vector stays large enough that callers treating
+    // `|r| >= OBJECTIVE/RESIDUAL` thresholds as "infeasible eval" still trip. Kept well
+    // below `PENALTY` so the parameter-dependent term dominates the Jacobian columns.
+    const FLOOR_FRACTION: f64 = 0.5;
+    let floor = PENALTY * FLOOR_FRACTION;
+
+    if n_params == 0 {
+        // No parameters to key on — fall back to a flat penalty (J^T r ≈ 0 from a
+        // constant; LM relies on its trust-region step). This branch is unreachable for
+        // real targets, which always have at least one knot.
+        for r in resid.iter_mut().take(n) {
+            *r = PENALTY;
+        }
+        return;
+    }
+
+    for (k, r) in resid.iter_mut().take(n).enumerate() {
+        // Round-robin parameter assignment guarantees coverage of every parameter when
+        // `n_residuals >= n_params` (the global solver enforces this in
+        // `validate_global_inputs`).
+        *r = floor + param_penalty(k % n_params);
     }
 }
 
@@ -297,9 +339,17 @@ impl GlobalFitOptimizer {
         // Success requires BOTH the weighted L2 norm AND the max individual residual
         // to be within tolerance. The L2 norm alone can mask outlier instruments when
         // many quotes fit well but one fits poorly.
+        //
+        // Both sides of the gate must be expressed on the SAME (weighted) residual
+        // scale. The L2 term is `sqrt(Σ (r_i·√w_i)^2)`; for a uniform per-quote error
+        // `e` on the weighted scale, that norm is `e·√n`, so the per-quote tolerance
+        // is `validation_tolerance·√n`. The max term must therefore also use the
+        // *weighted* max residual `max_i |r_i·√w_i|` — comparing an unweighted
+        // `max_i |r_i|` against a √n-scaled tolerance mixes units and can spuriously
+        // pass (or fail) whenever the weights differ from 1.
         let max_residual_tolerance = validation_tolerance * (n_residuals as f64).sqrt();
-        let calibration_success =
-            weighted_l2_norm <= validation_tolerance && max_abs_residual <= max_residual_tolerance;
+        let calibration_success = weighted_l2_norm <= validation_tolerance
+            && weighted_max_abs_residual <= max_residual_tolerance;
 
         let mut report = CalibrationReport::for_type_with_tolerance(
             "global_fit",
@@ -316,28 +366,28 @@ impl GlobalFitOptimizer {
         if calibration_success {
             report.convergence_reason = format!(
                 "global fit succeeded: LM terminated with {:?}; weighted L2 norm {:.2e} <= tolerance {:.2e}; \
-                 max residual {:.2e} <= per-quote tolerance {:.2e}",
+                 weighted max residual {:.2e} <= per-quote tolerance {:.2e}",
                 stats.termination_reason,
                 weighted_l2_norm,
                 validation_tolerance,
-                max_abs_residual,
+                weighted_max_abs_residual,
                 max_residual_tolerance,
             );
         } else if weighted_l2_norm > validation_tolerance
-            && max_abs_residual > max_residual_tolerance
+            && weighted_max_abs_residual > max_residual_tolerance
         {
             report.convergence_reason = format!(
                 "global fit calibration failed: LM terminated with {:?}; weighted L2 norm ({:.2e}) exceeds \
-                 tolerance ({:.2e}) and max residual ({:.2e}) exceeds per-quote tolerance ({:.2e})",
+                 tolerance ({:.2e}) and weighted max residual ({:.2e}) exceeds per-quote tolerance ({:.2e})",
                 stats.termination_reason,
-                weighted_l2_norm, validation_tolerance, max_abs_residual, max_residual_tolerance,
+                weighted_l2_norm, validation_tolerance, weighted_max_abs_residual, max_residual_tolerance,
             );
-        } else if max_abs_residual > max_residual_tolerance {
+        } else if weighted_max_abs_residual > max_residual_tolerance {
             report.convergence_reason = format!(
-                "global fit calibration failed: LM terminated with {:?}; max residual ({:.2e}) exceeds \
+                "global fit calibration failed: LM terminated with {:?}; weighted max residual ({:.2e}) exceeds \
                  per-quote tolerance ({:.2e}), weighted L2 norm ({:.2e}) passed",
                 stats.termination_reason,
-                max_abs_residual, max_residual_tolerance, weighted_l2_norm,
+                weighted_max_abs_residual, max_residual_tolerance, weighted_l2_norm,
             );
         }
 
@@ -1231,6 +1281,144 @@ mod tests {
                 Ok(())
             }
         }
+    }
+
+    /// Item 1: the success gate must compare a *weighted* max residual against the
+    /// √n-scaled tolerance — both sides on the same (weighted) scale.
+    ///
+    /// Construct residuals `[0.5, 0.0]` with small weights `w=[0.01,0.01]` (√w=0.1).
+    /// Weighted residuals are `[0.05, 0.0]`: weighted L2 = 0.05, weighted max = 0.05.
+    /// With `success_tolerance = 0.1`, `max_residual_tolerance = 0.1·√2 ≈ 0.1414`.
+    ///   * Pre-fix gate: `weighted_l2(0.05) ≤ 0.1` AND `UNWEIGHTED max(0.5) ≤ 0.1414`
+    ///     → false → spurious FAILURE despite the weighted fit being well in tolerance.
+    ///   * Post-fix gate: `weighted_l2(0.05) ≤ 0.1` AND `weighted max(0.05) ≤ 0.1414`
+    ///     → true → SUCCESS.
+    #[test]
+    fn success_gate_uses_weighted_max_residual_consistent_units() {
+        let target = TestTarget::from_len(2, vec![0.5, 0.0]).with_weights(vec![0.01, 0.01]);
+        let quotes = vec![0usize, 1usize];
+        let config = CalibrationConfig::default().with_tolerance(1e-12);
+
+        // The 4th arg is the *validation/success* tolerance (distinct from the LM
+        // solver tolerance set via `with_tolerance`).
+        let (_curve, report) =
+            GlobalFitOptimizer::optimize(&target, &quotes, &config, Some(0.1))
+                .expect("optimization should complete");
+
+        assert!(
+            report.success,
+            "weighted L2 ({:.4}) and weighted max residual both within tolerance — \
+             the gate must not fail on an UNWEIGHTED max residual (convergence_reason: {})",
+            report.objective_value, report.convergence_reason,
+        );
+    }
+
+    /// Item 1 (converse): a genuinely large *weighted* max residual must still fail the
+    /// gate. Residuals `[0.3, 0.0]`, unit weights, `success_tolerance = 0.01`: weighted
+    /// L2 = 0.3 and weighted max = 0.3 both far exceed any `tol·√n` per-quote bound.
+    /// Guards the fix against degenerating into an L2-only check.
+    #[test]
+    fn success_gate_still_fails_on_large_weighted_max_residual() {
+        let target = TestTarget::from_len(2, vec![0.3, 0.0]).with_weights(vec![1.0, 1.0]);
+        let quotes = vec![0usize, 1usize];
+        let config = CalibrationConfig::default().with_tolerance(1e-12);
+        let (_curve, report) =
+            GlobalFitOptimizer::optimize(&target, &quotes, &config, Some(0.01))
+                .expect("optimization should complete");
+        assert!(
+            !report.success,
+            "a weighted max residual far above tolerance must fail the gate"
+        );
+    }
+
+    /// Item 2: `fill_penalty` must produce a residual vector that *depends on each
+    /// parameter*, so the finite-difference Jacobian has a non-zero column for every
+    /// parameter even when its ±h neighbourhood is also infeasible.
+    ///
+    /// Pre-fix: every residual was set to one scalar `v(p)`; bumping a single parameter
+    /// while it stayed infeasible left `v` unchanged for that bump direction in the
+    /// pattern's structure — the per-column FD difference collapsed to zero because the
+    /// scalar mixed all parameters together and a one-parameter bump barely moved an
+    /// aggregate `‖violation‖`. Post-fix each residual keys on one specific parameter, so
+    /// a bump of parameter `j` strictly changes residual `j` (mod n_params).
+    #[test]
+    fn fill_penalty_yields_nonzero_jacobian_column_for_each_parameter() {
+        let n_params = 3usize;
+        let n_residuals = 6usize;
+        // Lower bounds 0.0; all parameters start *below* the bound (infeasible) and stay
+        // infeasible under a small bump — the exact regime that froze parameters before.
+        let lb = vec![0.0_f64; n_params];
+        let ub = vec![10.0_f64; n_params];
+
+        let base_params = vec![-1.0_f64, -2.0, -0.5];
+        let h = 1e-7_f64;
+
+        for j in 0..n_params {
+            let mut resid_base = vec![0.0_f64; n_residuals];
+            fill_penalty(
+                &mut resid_base,
+                n_residuals,
+                &base_params,
+                Some(&lb),
+                Some(&ub),
+            );
+
+            let mut bumped = base_params.clone();
+            bumped[j] += h; // still < 0.0 -> still infeasible
+            let mut resid_bumped = vec![0.0_f64; n_residuals];
+            fill_penalty(
+                &mut resid_bumped,
+                n_residuals,
+                &bumped,
+                Some(&lb),
+                Some(&ub),
+            );
+
+            // The FD column for parameter j: at least one residual must change.
+            let column_norm: f64 = resid_base
+                .iter()
+                .zip(resid_bumped.iter())
+                .map(|(a, b)| (b - a).abs())
+                .fold(0.0_f64, f64::max);
+
+            assert!(
+                column_norm > 0.0,
+                "fill_penalty produced a ZERO Jacobian column for parameter {j}: \
+                 LM would have no descent direction and freeze that parameter. \
+                 base={resid_base:?} bumped={resid_bumped:?}"
+            );
+        }
+    }
+
+    /// Item 2 (direction): the penalty must *decrease* as a violated parameter moves
+    /// back toward its bound, so the LM gradient points into the feasible box.
+    #[test]
+    fn fill_penalty_decreases_toward_feasible_region() {
+        let lb = vec![0.0_f64];
+        let ub = vec![10.0_f64];
+        let n_residuals = 1usize;
+
+        let mut deep = vec![0.0_f64; n_residuals];
+        fill_penalty(&mut deep, n_residuals, &[-5.0], Some(&lb), Some(&ub));
+
+        let mut shallow = vec![0.0_f64; n_residuals];
+        fill_penalty(&mut shallow, n_residuals, &[-0.5], Some(&lb), Some(&ub));
+
+        let mut feasible = vec![0.0_f64; n_residuals];
+        fill_penalty(&mut feasible, n_residuals, &[5.0], Some(&lb), Some(&ub));
+
+        assert!(
+            deep[0] > shallow[0],
+            "penalty must shrink as the parameter approaches the bound: deep={} shallow={}",
+            deep[0],
+            shallow[0],
+        );
+        assert!(
+            shallow[0] > feasible[0],
+            "penalty must be smallest when the parameter is interior: shallow={} feasible={}",
+            shallow[0],
+            feasible[0],
+        );
     }
 
     #[test]

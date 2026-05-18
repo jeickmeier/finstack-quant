@@ -1157,6 +1157,21 @@ fn validate_cap_floor_quote(
     Ok(())
 }
 
+/// Calibrate the HW1F volatility `sigma` against a basket of cap/floor quotes for a
+/// fixed mean-reversion `kappa`.
+///
+/// # Item 7: minimise a residual norm, not a signed sum
+///
+/// A previous implementation root-found the **signed sum** `Σ (price_i − market_i)`
+/// with a Brent solver. With more than one cap in the basket, opposite pricing errors
+/// cancel in that sum: a `sigma` that overprices one cap and underprices another by the
+/// same amount makes the signed sum zero, so Brent reports a "root" that is **not** a
+/// least-squares fit — every individual cap can still be badly mispriced.
+///
+/// This implementation minimises the sum of squared residuals `Σ (price_i − market_i)²`
+/// instead. Each cap/floor price is monotone in `sigma` (positive vega), so each squared
+/// residual is unimodal in `sigma` and the SSE is unimodal — a golden-section search
+/// over the plausible normal-vol range converges to the unique least-squares optimum.
 fn solve_cap_floor_sigma_for_fixed_kappa(
     kappa: f64,
     discount_df: &dyn Fn(f64) -> f64,
@@ -1165,33 +1180,72 @@ fn solve_cap_floor_sigma_for_fixed_kappa(
     market_prices: &[f64],
     frequency: SwapFrequency,
 ) -> finstack_core::Result<f64> {
-    let residual = |sigma: f64| -> f64 {
-        quotes
-            .iter()
-            .zip(market_prices.iter())
-            .map(|(quote, market_price)| {
-                let spec = CapFloorPriceSpec::from_quote(quote, frequency);
-                hw1f_cap_floor_price(kappa, sigma, discount_df, forward_df, spec) - market_price
-            })
-            .sum()
+    // Sum of squared residuals across the whole basket. A non-finite price (pathological
+    // sigma) is mapped to `+inf` so the minimiser steers away from it.
+    let sse = |sigma: f64| -> f64 {
+        let mut acc = 0.0_f64;
+        for (quote, market_price) in quotes.iter().zip(market_prices.iter()) {
+            let spec = CapFloorPriceSpec::from_quote(quote, frequency);
+            let price = hw1f_cap_floor_price(kappa, sigma, discount_df, forward_df, spec);
+            if !price.is_finite() {
+                return f64::INFINITY;
+            }
+            let r = price - market_price;
+            acc += r * r;
+        }
+        acc
     };
 
-    let lo = 1e-8;
-    let mut hi = 0.01;
-    let r_lo = residual(lo);
-    let mut r_hi = residual(hi);
-    while r_lo.signum() == r_hi.signum() && hi < 1.0 {
-        hi *= 2.0;
-        r_hi = residual(hi);
-    }
-    if r_lo.signum() == r_hi.signum() {
+    // Plausible normal-vol search range for cap/floor sigma.
+    let lo = 1e-8_f64;
+    let hi = 1.0_f64;
+
+    // Reject the case where the objective is non-finite across the whole range — the
+    // pricer cannot produce a usable fit and a silent bogus sigma must not be returned.
+    if !sse(lo).is_finite() && !sse(hi).is_finite() && !sse(0.5 * (lo + hi)).is_finite() {
         return Err(finstack_core::Error::Validation(
-            "Could not bracket cap/floor HW1F sigma calibration".to_string(),
+            "Cap/floor HW1F sigma calibration objective is non-finite across the search range"
+                .to_string(),
         ));
     }
 
-    let solver = BrentSolver::new().tolerance(1e-12).bracket_bounds(lo, hi);
-    solver.solve(residual, (lo + hi) * 0.5)
+    // Golden-section minimisation of the (unimodal) SSE. Bracketing the *minimum* of a
+    // unimodal function only requires the enclosing interval — no sign change needed.
+    const INV_PHI: f64 = 0.618_033_988_749_894_8; // 1/φ
+    let mut a = lo;
+    let mut b = hi;
+    let mut c = b - INV_PHI * (b - a);
+    let mut d = a + INV_PHI * (b - a);
+    let mut fc = sse(c);
+    let mut fd = sse(d);
+    // ~100 iterations contracts the interval by φ^-100 ≪ machine epsilon; stop early
+    // once the bracket is tighter than the historical Brent tolerance.
+    let x_tol = 1e-12_f64;
+    for _ in 0..200 {
+        if (b - a).abs() <= x_tol {
+            break;
+        }
+        if fc <= fd {
+            b = d;
+            d = c;
+            fd = fc;
+            c = b - INV_PHI * (b - a);
+            fc = sse(c);
+        } else {
+            a = c;
+            c = d;
+            fc = fd;
+            d = a + INV_PHI * (b - a);
+            fd = sse(d);
+        }
+    }
+    let sigma = 0.5 * (a + b);
+    if !sigma.is_finite() || sigma <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "Cap/floor HW1F sigma calibration produced an invalid sigma: {sigma}"
+        )));
+    }
+    Ok(sigma)
 }
 
 /// Price a full cap/floor with a flat normal volatility quote.
@@ -1753,6 +1807,18 @@ fn hw1f_swaption_price_inner(
         sum
     };
 
+    // Natural magnitude scale of `g'(r)` at a given `r`: the sum of the *absolute
+    // values* of the per-cashflow terms that make up `g'`. `g'` itself is a signed sum
+    // and can suffer catastrophic cancellation; comparing `|g'|` against this scale
+    // (rather than a fixed absolute floor) detects a numerically near-flat objective.
+    let g_prime_scale = |r: f64| -> f64 {
+        let mut sum = 0.0;
+        for i in 0..n_periods {
+            sum += (cashflows[i] * b_vals[i] * (ln_a_vals[i] - b_vals[i] * r).exp()).abs();
+        }
+        sum
+    };
+
     // Initial guess: the instantaneous forward rate at t0
     let h = (t0 * 1e-3).clamp(1e-6, 1e-3);
     let f0t0 = if t0 > h {
@@ -1761,21 +1827,53 @@ fn hw1f_swaption_price_inner(
         -(df(h).ln()) / h
     };
 
-    // Newton iterations to find r*
+    // Newton iterations to find r*.
+    //
+    // Derivative guard (item 5): a fixed `|g'| < 1e-15` *absolute* floor is the wrong
+    // criterion. A `g'` of ~1e-10 — a near-flat objective — sails straight past it, and
+    // `step = g / g'` then explodes to a ~1e8-scale jump that throws the iterate far
+    // outside any plausible short-rate range. Two scale-aware guards replace it:
+    //
+    //  1. A *relative* derivative-magnitude guard: `|g'|` must be a non-trivial fraction
+    //     of its own term-wise magnitude scale `Σ|c_i B_i e^…|`. This catches the
+    //     catastrophic-cancellation regime where the signed sum `g'` collapses toward
+    //     zero while its constituent terms are not.
+    //  2. A safeguarded step bound: even a "large enough" `g'` can yield an absurd step
+    //     when the objective is flat. A Newton step that would move `r` by more than
+    //     `NEWTON_MAX_STEP` is untrustworthy; we hand off to the bracketed Brent
+    //     fallback instead of accepting the jump.
     let mut r_star = f0t0;
     let mut newton_converged = false;
+    const NEWTON_DERIV_REL_EPS: f64 = 1e-10;
+    // Cap on a single Newton step in absolute short-rate units. A short rate moving by
+    // more than 5.0 (500%) in one step is non-physical; the Brent fallback bracket is
+    // sized to cover the plausible range under HW1F dynamics.
+    const NEWTON_MAX_STEP: f64 = 5.0;
     for _ in 0..50 {
         let gv = g(r_star);
         let gp = g_prime(r_star);
-        if gp.abs() < 1e-15 {
+        let gp_scale = g_prime_scale(r_star);
+        // Near-flat / fully-cancelled derivative: hand off to Brent rather than take an
+        // unbounded Newton step.
+        if !gp.is_finite() || gp.abs() <= NEWTON_DERIV_REL_EPS * gp_scale.max(f64::MIN_POSITIVE) {
             break;
         }
         let step = gv / gp;
+        // A non-finite or absurdly large step means the local linearisation is
+        // unreliable (near-flat objective); stop and let Brent bracket the root.
+        if !step.is_finite() || step.abs() > NEWTON_MAX_STEP {
+            break;
+        }
         r_star -= step;
         if step.abs() < 1e-12 {
             newton_converged = true;
             break;
         }
+    }
+    // Newton may have walked the iterate to a non-finite value before the step-size
+    // convergence test fired; treat that as non-convergence so the Brent fallback runs.
+    if !r_star.is_finite() {
+        newton_converged = false;
     }
 
     // Brent fallback if Newton didn't converge.
@@ -1931,6 +2029,43 @@ mod tests {
             p_high > p_low,
             "Higher sigma should give higher swaption price: {p_high:.6} vs {p_low:.6}"
         );
+    }
+
+    /// Item 5: under an extreme mean-reversion `kappa` the HW1F r* objective `g(r)`
+    /// becomes near-flat — every `B(t0,t_i) ≈ 1/kappa` shrinks, so `g'(r) ≈ -Σ c_i/κ`
+    /// is tiny (~1e-8 at κ=1e8, ~1e-10 at κ=1e10). The pre-fix Newton guard only
+    /// rejected `|g'| < 1e-15`, so such a derivative passed through and `step = g/g'`
+    /// exploded to a ~1e8–1e10-scale jump, throwing `r*` to a non-physical value that
+    /// then poisoned the bond-option strikes and the swaption price.
+    ///
+    /// Post-fix the safeguarded step bound rejects the explosive Newton step and hands
+    /// off to the bracketed Brent fallback, so the price stays finite and in the valid
+    /// `[0, annuity]`-bounded range (a payer swaption can never be worth more than its
+    /// fixed-leg annuity).
+    #[test]
+    fn item5_hw1f_r_star_extreme_kappa_does_not_explode() {
+        let df_fn = flat_df(0.03);
+        let (annuity, fwd) = compute_swap_annuity_and_rate(&df_fn, 1.0, 5.0, 2);
+
+        for kappa in [1.0e6_f64, 1.0e8, 1.0e10] {
+            let price = hw1f_swaption_price(kappa, 0.01, &df_fn, 1.0, 5.0, fwd, 2);
+            assert!(
+                price.is_finite(),
+                "swaption price must stay finite under extreme kappa={kappa:e}; \
+                 the r* Newton step must not explode (got {price})"
+            );
+            assert!(
+                price >= 0.0,
+                "swaption price must be non-negative under extreme kappa={kappa:e}; got {price}"
+            );
+            // A payer swaption is a portfolio of bond puts; its value cannot exceed the
+            // fixed-leg annuity. An exploded r* would blow this bound.
+            assert!(
+                price <= annuity * 1.0001,
+                "swaption price {price} exceeds the annuity bound {annuity} \
+                 under extreme kappa={kappa:e} — r* likely exploded"
+            );
+        }
     }
 
     #[test]
@@ -2212,6 +2347,99 @@ mod tests {
             result.is_err(),
             "one cap/floor quote cannot calibrate both kappa and sigma"
         );
+    }
+
+    /// Item 7: fixed-kappa cap/floor sigma calibration must minimise a residual NORM,
+    /// not a signed sum. With an inconsistent basket (no single sigma fits every cap),
+    /// the signed-sum root lets opposite errors cancel and lands on a sigma that is not
+    /// the least-squares optimum.
+    ///
+    /// Construct two caps of differing maturity (hence differing vega) and feed market
+    /// prices generated at *different* sigmas — `0.004` for the short cap, `0.020` for
+    /// the long cap — so no single sigma reprices both. The calibrated sigma must be the
+    /// SSE minimiser: `SSE(sigma*)` must be no worse than `SSE` a small step either side,
+    /// and strictly better than the SSE at the signed-sum root.
+    #[test]
+    fn item7_cap_floor_fixed_kappa_minimises_norm_not_signed_sum() {
+        let kappa = 0.03_f64;
+        let df_fn = flat_df(0.035);
+        let freq = SwapFrequency::Quarterly;
+
+        // Two caps, very different maturities -> very different vega.
+        let q_short = CapFloorQuote {
+            maturity: 2.0,
+            strike: 0.035,
+            volatility: 0.0, // unused for price-basket construction below
+            is_cap: true,
+            is_normal_vol: true,
+        };
+        let q_long = CapFloorQuote {
+            maturity: 10.0,
+            strike: 0.035,
+            volatility: 0.0,
+            is_cap: true,
+            is_normal_vol: true,
+        };
+        let quotes = [q_short, q_long];
+
+        // Inconsistent market prices: short cap priced at sigma=0.004, long at 0.020.
+        let spec_short = CapFloorPriceSpec::from_quote(&q_short, freq);
+        let spec_long = CapFloorPriceSpec::from_quote(&q_long, freq);
+        let market = [
+            hw1f_cap_floor_price(kappa, 0.004, &df_fn, &df_fn, spec_short),
+            hw1f_cap_floor_price(kappa, 0.020, &df_fn, &df_fn, spec_long),
+        ];
+
+        let sigma = solve_cap_floor_sigma_for_fixed_kappa(
+            kappa, &df_fn, &df_fn, &quotes, &market, freq,
+        )
+        .expect("fixed-kappa sigma calibration should succeed");
+
+        // SSE objective replicated locally.
+        let sse = |s: f64| -> f64 {
+            let r0 = hw1f_cap_floor_price(kappa, s, &df_fn, &df_fn, spec_short) - market[0];
+            let r1 = hw1f_cap_floor_price(kappa, s, &df_fn, &df_fn, spec_long) - market[1];
+            r0 * r0 + r1 * r1
+        };
+        // Signed-sum objective (the pre-fix root-find target).
+        let signed_sum = |s: f64| -> f64 {
+            (hw1f_cap_floor_price(kappa, s, &df_fn, &df_fn, spec_short) - market[0])
+                + (hw1f_cap_floor_price(kappa, s, &df_fn, &df_fn, spec_long) - market[1])
+        };
+
+        // 1. The returned sigma is a genuine SSE minimum (no better point nearby).
+        let delta = 1e-4;
+        let f_star = sse(sigma);
+        assert!(
+            f_star <= sse(sigma + delta) && f_star <= sse(sigma - delta),
+            "calibrated sigma={sigma} is not an SSE minimum: \
+             SSE(sigma)={f_star:.3e}, SSE(+d)={:.3e}, SSE(-d)={:.3e}",
+            sse(sigma + delta),
+            sse(sigma - delta),
+        );
+
+        // 2. Bracket the signed-sum root and confirm it is a DIFFERENT, worse point.
+        //    signed_sum is monotone increasing in sigma; bisect for its zero.
+        let (mut lo, mut hi) = (1e-8_f64, 1.0_f64);
+        if signed_sum(lo) < 0.0 && signed_sum(hi) > 0.0 {
+            for _ in 0..200 {
+                let mid = 0.5 * (lo + hi);
+                if signed_sum(mid) > 0.0 {
+                    hi = mid;
+                } else {
+                    lo = mid;
+                }
+            }
+            let signed_root = 0.5 * (lo + hi);
+            // The signed-sum root cancels opposite errors; its SSE is strictly worse.
+            assert!(
+                sse(signed_root) > f_star,
+                "the signed-sum root sigma={signed_root} has SSE {:.3e} which is not \
+                 worse than the norm-minimising SSE {f_star:.3e} — the fix did not \
+                 change behaviour",
+                sse(signed_root),
+            );
+        }
     }
 
     #[test]

@@ -1,5 +1,7 @@
 use crate::calibration::api::schema::HazardCurveParams;
-use crate::calibration::config::{CalibrationConfig, CalibrationMethod, ResidualWeightingScheme};
+use crate::calibration::config::{
+    CalibrationConfig, CalibrationMethod, HazardCurveSolveConfig, ResidualWeightingScheme,
+};
 use crate::calibration::constants::{TOLERANCE_DUP_KNOTS, WEIGHT_MIN_FLOOR};
 use crate::calibration::prepared::CalibrationQuote;
 use crate::calibration::solver::bootstrap::SequentialBootstrapper;
@@ -39,6 +41,91 @@ pub(crate) struct HazardCurveTarget {
     pub(crate) config: CalibrationConfig,
     /// Optional reusable context for sequential solvers to reduce memory pressure.
     reuse_context: Option<RefCell<MarketContext>>,
+}
+
+/// Build the log-spaced hazard bracketing scan grid for a spread-implied
+/// `initial_guess`, bounded by `cfg.hazard_hard_min` / `cfg.hazard_hard_max`.
+///
+/// # Item 6: distressed / jump-to-default upside resolution
+///
+/// The grid has two parts:
+///
+///  * A *primary window* `[log_center − 4, log_center + 2]` decades around the
+///    spread-implied guess. The asymmetric `+2 / −4` shape concentrates resolution in
+///    the typical low-hazard regime.
+///
+///  * A *distressed/JTD upside augmentation*: a coarser log-spaced set spanning
+///    `(log_center + 2, log10(hazard_hard_max)]`. The previous grid had only the lone
+///    `hazard_hard_max` anchor above the primary window, so a distressed name — whose
+///    true hazard can sit far above a moderate `spread/(1−R)` guess when the CDS curve
+///    is steep or inverted — could at best be bracketed against an extremely wide
+///    `[10^(log_center+2), hazard_hard_max]` interval with no interior resolution.
+///
+/// The augmentation is **purely additive**: every primary-window point is retained
+/// unchanged. The bracketing solver selects the sign-change bracket whose midpoint is
+/// closest to the initial guess, so a normal (non-distressed) name — whose root lies
+/// inside the primary window — gets the *same* bracket as before, keeping bit-stable
+/// Bloomberg golden fixtures unaffected. Only a distressed name, whose root is above
+/// the primary window, benefits from the added upper-region resolution.
+///
+/// Genuinely unbracketable cases (true hazard above `hazard_hard_max`) are a hard
+/// error downstream: `resolve_no_bracket` fails loud when no sign-change bracket is
+/// found rather than pinning the knot to the cap (item 10).
+fn hazard_scan_grid(cfg: &HazardCurveSolveConfig, initial_guess: f64) -> Vec<f64> {
+    let hazard_min = cfg.hazard_hard_min;
+    let max_h = cfg.hazard_hard_max;
+    let min_positive = 1e-10_f64;
+
+    let center = if initial_guess.is_finite() {
+        initial_guess.clamp(hazard_min, max_h)
+    } else {
+        0.01_f64
+    };
+
+    let mut pts = Vec::with_capacity(80);
+    pts.push(hazard_min);
+    pts.push(center);
+    pts.push(max_h);
+
+    let center_pos = center.max(min_positive);
+    let log_center = center_pos.log10();
+    let low_exp = (log_center - 4.0).max(min_positive.log10());
+    let max_h_exp = max_h.max(min_positive).log10();
+    let high_exp = (log_center + 2.0).min(max_h_exp);
+
+    // Primary window: dense log-spaced grid over `[low_exp, high_exp]`.
+    const N: usize = 48;
+    if (high_exp - low_exp).abs() > 1e-12 {
+        for i in 0..N {
+            let t = i as f64 / (N - 1) as f64;
+            let exp = low_exp + t * (high_exp - low_exp);
+            let v = 10f64.powf(exp);
+            if v.is_finite() && v >= hazard_min && v <= max_h {
+                pts.push(v);
+            }
+        }
+    } else {
+        pts.push(center_pos);
+    }
+
+    // Distressed/JTD upside augmentation: coarse log-spaced points spanning the region
+    // above the primary window, `(high_exp, max_h_exp]`. Additive only — does not
+    // perturb the primary-window points used by normal-name calibrations.
+    const N_UPPER: usize = 16;
+    if max_h_exp - high_exp > 1e-9 {
+        for i in 1..=N_UPPER {
+            let t = i as f64 / N_UPPER as f64;
+            let exp = high_exp + t * (max_h_exp - high_exp);
+            let v = 10f64.powf(exp);
+            if v.is_finite() && v >= hazard_min && v <= max_h {
+                pts.push(v);
+            }
+        }
+    }
+
+    pts.sort_by(|a, b| a.total_cmp(b));
+    pts.dedup_by(|a, b| (*a - *b).abs() < 1e-12);
+    pts
 }
 
 impl HazardCurveTarget {
@@ -444,60 +531,11 @@ impl BootstrapTarget for HazardCurveTarget {
     }
 
     fn scan_points(&self, _quote: &Self::Quote, initial_guess: f64) -> Result<Vec<f64>> {
-        // Bounded, maturity-agnostic scan grid (log-spaced) on [0, hazard_hard_max].
-        // This prevents the solver from spending effort in negative/absurd hazard regions.
-        //
-        // Window: `[log_center - 4, log_center + 2]` decades around the
-        // spread-implied initial guess, capped by the configured hazard bounds.
-        // The asymmetric +2 / -4 window favours resolution near the typical
-        // (low-hazard) regime while still covering up to ~100× the initial
-        // guess in case the recovery assumption is mildly off.
-        //
-        // The grid is *not* widened beyond ±2 decades upward. Doing so would
-        // change which point Brent picks as the bracket boundary and break
-        // bit-stable Bloomberg golden fixtures whose tolerances test
-        // 7-digit reproducibility. The C4 debug_assert in
-        // `bracket_solve_1d_with_diagnostics` and the explicit
-        // `hazard_hard_max` anchor below cover the catastrophic-mismatch
-        // case (`max_h` is always evaluated, so a far-out-of-window root is
-        // still bracketed against `hazard_hard_max`).
-        let hazard_min = self.config.hazard_curve.hazard_hard_min;
-        let max_h = self.config.hazard_curve.hazard_hard_max;
-        let min_positive = 1e-10_f64;
-
-        let center = if initial_guess.is_finite() {
-            initial_guess.clamp(hazard_min, max_h)
-        } else {
-            0.01_f64
-        };
-
-        let mut pts = Vec::with_capacity(64);
-        pts.push(hazard_min);
-        pts.push(center);
-        pts.push(max_h);
-
-        let center_pos = center.max(min_positive);
-        let log_center = center_pos.log10();
-        let low_exp = (log_center - 4.0).max(min_positive.log10());
-        let high_exp = (log_center + 2.0).min(max_h.log10());
-
-        const N: usize = 48;
-        if (high_exp - low_exp).abs() > 1e-12 {
-            for i in 0..N {
-                let t = i as f64 / (N - 1) as f64;
-                let exp = low_exp + t * (high_exp - low_exp);
-                let v = 10f64.powf(exp);
-                if v.is_finite() && v >= hazard_min && v <= max_h {
-                    pts.push(v);
-                }
-            }
-        } else {
-            pts.push(center_pos);
-        }
-
-        pts.sort_by(|a, b| a.total_cmp(b));
-        pts.dedup_by(|a, b| (*a - *b).abs() < 1e-12);
-        Ok(pts)
+        // The scan grid is maturity- and quote-agnostic; it depends only on the
+        // spread-implied `initial_guess` and the configured hazard bounds. The grid
+        // construction is factored into the free function `hazard_scan_grid` so it can
+        // be unit-tested directly (item 6) without fabricating a `CalibrationQuote`.
+        Ok(hazard_scan_grid(&self.config.hazard_curve, initial_guess))
     }
 
     fn validate_knot(&self, time: f64, value: f64) -> Result<()> {
@@ -787,6 +825,63 @@ mod tests {
             .err()
             .expect("inverted hazard bounds should be rejected");
         assert!(err.to_string().to_lowercase().contains("hazard"));
+    }
+
+    /// Item 6: the hazard scan grid must give distressed / jump-to-default names
+    /// resolution above the primary `+2`-decade window.
+    ///
+    /// For a moderate spread-implied guess (2% hazard), the primary window's upper edge
+    /// is `10^(log10(0.02)+2) ≈ 2.0`. Pre-fix the *only* grid point in `(2.0, hazard_max]`
+    /// was the lone `hazard_hard_max` anchor — no interior resolution for a distressed
+    /// root sitting up there. Post-fix the upside augmentation adds many log-spaced
+    /// points across that region. The primary window itself must be unchanged so
+    /// bit-stable Bloomberg golden fixtures (normal IG/HY names) are unaffected.
+    #[test]
+    fn item6_hazard_scan_grid_has_distressed_upside_resolution() {
+        let cfg = CalibrationConfig::default();
+        let hcfg = &cfg.hazard_curve;
+        let max_h = hcfg.hazard_hard_max; // 10.0 by default
+
+        let guess = 0.02_f64; // 2% hazard — a moderate spread-implied guess
+        let grid = hazard_scan_grid(hcfg, guess);
+
+        // Upper edge of the primary +2-decade window.
+        let primary_upper = 10f64.powf(guess.log10() + 2.0);
+        assert!(
+            primary_upper < max_h,
+            "test fixture invalid: primary window must not already reach hazard_max \
+             (primary_upper={primary_upper}, max_h={max_h})",
+        );
+
+        // Count grid points strictly inside the upper region (primary_upper, max_h).
+        let upper_region_points = grid
+            .iter()
+            .filter(|&&v| v > primary_upper * (1.0 + 1e-9) && v < max_h * (1.0 - 1e-9))
+            .count();
+        assert!(
+            upper_region_points >= 5,
+            "Item 6: the scan grid must provide distressed/JTD resolution above the \
+             primary window — found only {upper_region_points} point(s) in \
+             ({primary_upper:.4}, {max_h:.4}); pre-fix there were none",
+        );
+
+        // The grid must still span the full range and stay within bounds.
+        assert!(grid.iter().all(|&v| v >= hcfg.hazard_hard_min && v <= max_h));
+        assert!(
+            grid.iter().any(|&v| (v - max_h).abs() < 1e-12),
+            "hazard_hard_max anchor must still be present"
+        );
+
+        // Golden-safety: for a normal name the primary window is dense and the grid
+        // contains the spread-implied guess itself as an anchor.
+        assert!(
+            grid.iter().any(|&v| (v - guess).abs() < 1e-12),
+            "the spread-implied guess must remain a grid anchor"
+        );
+        // Strictly increasing & deduplicated.
+        for w in grid.windows(2) {
+            assert!(w[1] > w[0], "scan grid must be strictly increasing");
+        }
     }
 
     #[test]

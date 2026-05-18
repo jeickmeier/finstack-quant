@@ -12,6 +12,25 @@ pub(crate) fn diagnostics_bump_h(config: &CalibrationConfig) -> f64 {
     config.discount_curve.jacobian_step_size.max(1e-8)
 }
 
+/// Return `true` iff `a` and `b` straddle zero, i.e. one is strictly positive and the
+/// other strictly negative.
+///
+/// This intentionally replaces `a.signum() != b.signum()` for sign-change detection.
+/// `f64::signum` is the wrong tool here:
+///   * `signum(+0.0) = +1.0` and `signum(-0.0) = -1.0`, so `signum` reports a "sign
+///     change" between `+0.0` and `-0.0` (both are roots, not a bracket) and reports
+///     "same sign" between an exact `0.0` root and a positive value (hiding the root).
+///   * `signum(NaN) = NaN`, and `NaN != NaN`, so a non-finite objective value would be
+///     mistaken for a sign change and drive bisection/false-position on a bogus bracket.
+///
+/// With explicit `> 0.0` / `< 0.0` comparisons a zero or NaN endpoint yields `false`
+/// (no bracket), which is the safe answer — the caller's separate `|f| < tol` and
+/// finite-value checks handle exact roots and infeasible evaluations.
+#[inline]
+fn opposite_signs(a: f64, b: f64) -> bool {
+    (a > 0.0 && b < 0.0) || (a < 0.0 && b > 0.0)
+}
+
 /// `(max_abs_residual, rms_residual)` over a residual vector — shared between the
 /// bootstrap and global diagnostics computations so the two paths cannot drift.
 pub(crate) fn residual_stats(resid_values: &[f64]) -> (f64, f64) {
@@ -161,7 +180,7 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
             diag.bracket_found = true;
             return Ok((Some(x1), diag));
         }
-        if f0.signum() == f1.signum() {
+        if !opposite_signs(f0, f1) {
             continue;
         }
         let mid = 0.5 * (x0 + x1);
@@ -291,7 +310,7 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
             break;
         }
 
-        if fa.signum() != fm.signum() {
+        if opposite_signs(fa, fm) {
             b = m;
             fb = fm;
         } else {
@@ -318,9 +337,10 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
     // either: (a) we converged (handled above), (b) bisection_ok = false because a midpoint
     // produced |f| >= OBJECTIVE_VALID_ABS_MAX and `(a,fa,b,fb)` are last-known-good, or
     // (c) we ran out of iterations with a still-valid bracket. In all three cases the
-    // invariant `fa.signum() != fb.signum()` should hold; guard explicitly so that an
+    // invariant "fa and fb straddle zero" should hold; guard explicitly so that an
     // edge case (e.g. fa or fb became NaN upstream) cannot drive FP on a stale bracket.
-    let bracket_valid = fa.is_finite() && fb.is_finite() && fa.signum() != fb.signum() && a < b;
+    // `opposite_signs` already implies both are finite and non-zero.
+    let bracket_valid = opposite_signs(fa, fb) && a < b;
     if !bracket_valid {
         return Ok((diag.best_point, diag));
     }
@@ -347,10 +367,10 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
             break;
         }
 
-        if fa.signum() != fc.signum() {
+        if opposite_signs(fa, fc) {
             b = candidate;
             fb = fc;
-        } else if fc.signum() != fb.signum() {
+        } else if opposite_signs(fc, fb) {
             a = candidate;
             fa = fc;
         } else {
@@ -532,6 +552,55 @@ mod tests {
             "unexpected root from bounded fallback: {root}"
         );
         assert!(diag.bracket_found, "fallback root should be bracket-safe");
+    }
+
+    /// Item 8: `opposite_signs` must use explicit `> 0` / `< 0` comparisons, NOT
+    /// `f64::signum`. Verifies the three pathological inputs `signum` mishandles.
+    #[test]
+    fn opposite_signs_handles_signed_zero_and_nan() {
+        // Genuine sign change.
+        assert!(opposite_signs(1.0, -1.0));
+        assert!(opposite_signs(-2.5, 0.3));
+        // Same sign.
+        assert!(!opposite_signs(1.0, 2.0));
+        assert!(!opposite_signs(-1.0, -2.0));
+
+        // Signed zeros: `signum(+0.0)=+1`, `signum(-0.0)=-1` would WRONGLY report a
+        // sign change here. A zero is a root, not a bracket boundary.
+        assert!(!opposite_signs(0.0, -0.0));
+        assert!(!opposite_signs(-0.0, 0.0));
+        // A zero against a finite value is NOT a straddle (the zero is the root).
+        assert!(!opposite_signs(0.0, 5.0));
+        assert!(!opposite_signs(-0.0, 5.0));
+        assert!(!opposite_signs(0.0, -5.0));
+
+        // NaN: `signum(NaN)=NaN` and `NaN != NaN` would WRONGLY report a sign change.
+        assert!(!opposite_signs(f64::NAN, 1.0));
+        assert!(!opposite_signs(1.0, f64::NAN));
+        assert!(!opposite_signs(f64::NAN, f64::NAN));
+        assert!(!opposite_signs(f64::NAN, -0.0));
+    }
+
+    /// Item 8 (regression): an objective that is identically zero (emitting `-0.0`
+    /// then `+0.0` across the grid) must NOT be mistaken for a sign-changing bracket.
+    /// Under the old `signum`-based check, a `[-0.0, +0.0]` window reported
+    /// `signum(-0.0)=-1 != signum(+0.0)=+1` → a spurious bracket → `false-position` /
+    /// bisection driven on a non-root, with `is_sign_change_bracket` wrongly `true`.
+    ///
+    /// We use `tol = 0.0` so the early `|f| < tol` root-return is bypassed and the
+    /// windows-scan sign-change logic is genuinely exercised on the signed zeros.
+    #[test]
+    fn bracket_solver_no_spurious_bracket_from_signed_zero() {
+        // f(x) ≡ 0 but with a sign bit flip at x = 0.5.
+        let f = |x: f64| if x < 0.5 { -0.0_f64 } else { 0.0_f64 };
+        let scan = dense_scan(0.0, 1.0, &[0.25, 0.5, 0.75]);
+        let (_root, diag) =
+            bracket_solve_1d_with_diagnostics(&f, 0.3, &scan, 0.0, 100).expect("solver error");
+        assert!(
+            !diag.is_sign_change_bracket,
+            "an identically-zero objective has NO sign-change bracket; \
+             signed-zero (-0.0 vs +0.0) must not be mistaken for a straddle"
+        );
     }
 
     #[test]

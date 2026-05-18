@@ -272,6 +272,51 @@ impl DiscountCurveTarget {
         (log_lo + t * (log_hi - log_lo)).exp()
     }
 
+    /// Closed-form proxy for a par instrument's fixed-leg annuity (PV01) at maturity
+    /// `t`, used by [`Self::residual_weights`] to put residuals on a common rate-error
+    /// scale (item 4).
+    ///
+    /// The continuously-discounted annuity of a unit-coupon par instrument is
+    /// `A(t, r) = ∫₀ᵗ e^{−r·s} ds = (1 − e^{−r·t}) / r`, with the well-defined limit
+    /// `A → t` as `r → 0`. This is exact for a continuously-paid coupon and a tight
+    /// proxy for the discrete fixed-leg annuity `Σ τ_i·DF_i` of swaps; for a single-
+    /// period instrument (deposit / FRA) it reduces to `≈ t`, which is the correct
+    /// PV01 there. The proxy needs only the quote's own par rate, so it works inside
+    /// `residual_weights` where no calibrated curve is yet available.
+    ///
+    /// `r` is taken from the quote when it carries a par rate (rate quotes); other
+    /// quote kinds fall back to a small representative rate, for which `A ≈ t`.
+    fn quote_annuity_proxy(&self, quote: &CalibrationQuote, t: f64) -> f64 {
+        // Representative rate for the discount factor in the annuity integral.
+        let r = match quote {
+            CalibrationQuote::Rates(pq) => match pq.quote.as_ref() {
+                // Deposit / FRA / Swap quote `value()` IS the rate (decimal).
+                RateQuote::Deposit { rate, .. }
+                | RateQuote::Fra { rate, .. }
+                | RateQuote::Swap { rate, .. } => *rate,
+                // A future quotes a *price* (e.g. 98.5); the implied rate is
+                // `(100 − price)/100`. Using the price directly would be nonsense.
+                RateQuote::Futures { price, .. } => (100.0 - price) / 100.0,
+            },
+            // Inflation / xccy-basis quotes do not carry a comparable fixed par rate;
+            // a small rate makes the proxy degrade gracefully to `A ≈ t`.
+            _ => 0.0,
+        };
+        // Use the absolute rate: a negative-rate regime (EUR/JPY) still has a
+        // well-defined positive annuity, and `(1 − e^{−r·t})/r` is symmetric in the
+        // sign of `r` only to second order — `|r|` keeps the proxy stable and positive.
+        let r_abs = if r.is_finite() { r.abs() } else { 0.0 };
+        let t_pos = t.max(1e-6);
+        let annuity = if r_abs < 1e-8 {
+            // r → 0 limit: A(t, 0) = t.
+            t_pos
+        } else {
+            (1.0 - (-r_abs * t_pos).exp()) / r_abs
+        };
+        // Floor strictly positive so the `1/A²` weight is always finite.
+        annuity.max(1e-6)
+    }
+
     fn knots_from_params(&self, times: &[f64], params: &[f64]) -> Result<Vec<(f64, f64)>> {
         if times.len() != params.len() {
             return Err(finstack_core::Error::Calibration {
@@ -985,17 +1030,41 @@ Ensure quotes map to strictly increasing year fractions.",
         for (i, quote) in quotes.iter().enumerate() {
             let t = self.quote_time(quote)?.max(1e-6);
 
-            let weight = match self.config.discount_curve.weighting_scheme {
+            // Item 4: par-instrument residuals must enter the least-squares problem on a
+            // common *rate-error* scale, weighted by ~1/PV01 (inverse fixed-leg annuity).
+            //
+            // The residual handed to the solver is `pv / residual_notional`. For a par
+            // instrument `PV(r) ≈ A(t)·(r − r_par)·notional`, so the residual is
+            // `≈ A(t)·Δr` — a PV01-scaled rate error, NOT a rate error. The global
+            // solver minimises `Σ (r_i·√w_i)²`, so to recover the rate-error scale
+            // (`r_i·√w_i ≈ Δr`) the weight must be `w_i ≈ 1/A(t)²`.
+            //
+            // None of the previous schemes did this: `LinearTime` (`w = t`) actively
+            // up-weighted the long end — where `A` is largest and a given rate error
+            // already produces the largest PV residual — leaving the short end loose.
+            //
+            // `pv01_inverse_sq = 1/A(t)²` is the PV01-normalisation common to every
+            // scheme; the scheme factor then applies the *relative* time emphasis the
+            // user selected on top of a correct common scale.
+            let annuity = self.quote_annuity_proxy(quote, t);
+            let pv01_inverse_sq = 1.0 / (annuity * annuity);
+
+            let scheme_factor = match self.config.discount_curve.weighting_scheme {
                 ResidualWeightingScheme::Equal => 1.0,
                 ResidualWeightingScheme::LinearTime => t,
                 ResidualWeightingScheme::SqrtTime => t.sqrt(),
                 ResidualWeightingScheme::InverseDuration => {
-                    // Approximation: Duration ~ t
+                    // Extra inverse-duration tilt on top of the PV01 normalisation.
                     1.0 / t.max(0.1)
                 }
             };
 
-            weights_out[i] = weight.max(WEIGHT_MIN_FLOOR);
+            let weight = pv01_inverse_sq * scheme_factor;
+            weights_out[i] = if weight.is_finite() {
+                weight.max(WEIGHT_MIN_FLOOR)
+            } else {
+                WEIGHT_MIN_FLOOR
+            };
         }
         Ok(())
     }
