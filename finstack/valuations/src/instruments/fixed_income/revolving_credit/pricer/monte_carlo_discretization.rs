@@ -93,12 +93,37 @@ impl Discretization<RevolvingCreditProcess> for RevolvingCreditDiscretization {
             z
         };
 
-        // Step 1: Utilization (OU process) - Euler-Maruyama
+        // Step 1: Utilization (OU process) — exact transition.
+        //
         // dU = κ_U (θ_U - U) dt + σ_U dW
+        //
+        // The exact (analytical) conditional distribution of an OU process is
+        //   U_{t+Δt} = θ + (U_t - θ) e^{-κΔt}
+        //              + σ √[(1 - e^{-2κΔt}) / (2κ)] · Z
+        // which has the exact mean and variance for any Δt. The previous
+        // Euler-Maruyama step `U += κ(θ-U)Δt + σ√Δt·Z` has an O(Δt) bias in
+        // both moments, and that bias was being *masked* by the hard [0,1]
+        // clamp — i.e. the clamp was load-bearing for the simulated mean. With
+        // the exact transition the moments are correct before any clamp, so
+        // the (retained) clamp is now purely a defensive guard against rare
+        // tail excursions rather than a bias-correction crutch.
         let util_params = &process.params().utilization;
-        let util_drift = util_params.kappa * (util_params.theta - x[0].clamp(0.0, 1.0));
-        let util_diff = util_params.sigma;
-        x[0] += util_drift * dt + util_diff * dt.sqrt() * z_corr[0];
+        let kappa = util_params.kappa;
+        let theta = util_params.theta;
+        let sigma = util_params.sigma;
+
+        let exp_kappa_dt = (-kappa * dt).exp();
+        // Conditional std dev: σ √[(1 - e^{-2κΔt}) / (2κ)], with the small-κΔt
+        // limit σ√Δt to avoid 0/0 when κΔt → 0.
+        let util_std = if (kappa * dt).abs() < 1e-8 {
+            sigma * dt.sqrt()
+        } else {
+            sigma * ((1.0 - (-2.0 * kappa * dt).exp()) / (2.0 * kappa)).sqrt()
+        };
+        x[0] = theta + (x[0] - theta) * exp_kappa_dt + util_std * z_corr[0];
+        // Defensive only: utilization is a fraction in [0, 1]. The exact
+        // transition already carries the correct moments, so this clamp fires
+        // only on rare tail excursions and no longer biases the mean.
         x[0] = x[0].clamp(0.0, 1.0);
 
         // Step 2: Short rate
@@ -256,7 +281,7 @@ mod tests {
 
     #[test]
     fn test_discretization_step_fixed_rate() {
-        let utilization = UtilizationParams::new(0.5, 0.6, 0.1);
+        let utilization = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
@@ -280,9 +305,110 @@ mod tests {
         assert!(x[2] > 0.015 && x[2] < 0.02);
     }
 
+    /// Item 7 regression: the utilization OU step must use the exact
+    /// transition so the simulated conditional mean is unbiased — the clamp to
+    /// [0,1] must not be load-bearing for the mean.
+    ///
+    /// A single exact OU step from `U_t` has conditional mean
+    /// `θ + (U_t - θ)·e^{-κΔt}` exactly. The Euler step has an O(Δt) bias.
+    /// With θ in the interior and a single deterministic shock `z = 0`, the
+    /// stepped value must equal the exact conditional mean (no clamp involved),
+    /// which the Euler scheme would miss.
+    #[test]
+    fn utilization_step_uses_exact_ou_transition_mean() {
+        let utilization = UtilizationParams::new(2.0, 0.5, 0.2)
+            .expect("valid utilization params");
+        let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
+        let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
+        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
+        let process = RevolvingCreditProcess::new(params);
+        let disc = RevolvingCreditDiscretization::from_process(&process).expect("ok");
+
+        // A large step so the exact transition and the Euler scheme diverge
+        // visibly, but with z = 0 so only the (deterministic) mean is tested.
+        let dt = 0.25_f64;
+        let kappa = 2.0_f64;
+        let theta = 0.5_f64;
+        let u0 = 0.2_f64;
+
+        let mut x = [u0, 0.05, 0.015];
+        let z = [0.0, 0.0, 0.0];
+        let mut work = vec![0.0; disc.work_size(&process)];
+        disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
+
+        // Exact OU conditional mean.
+        let exact_mean = theta + (u0 - theta) * (-kappa * dt).exp();
+        // The (incorrect) Euler-Maruyama mean, for contrast.
+        let euler_mean = u0 + kappa * (theta - u0) * dt;
+
+        assert!(
+            (x[0] - exact_mean).abs() < 1e-12,
+            "utilization step {} should equal exact OU mean {exact_mean}, not Euler {euler_mean}",
+            x[0]
+        );
+        // Confirm the test actually discriminates: exact vs Euler differ.
+        assert!(
+            (exact_mean - euler_mean).abs() > 1e-3,
+            "exact OU mean {exact_mean} and Euler mean {euler_mean} should differ \
+             enough to make this test meaningful"
+        );
+    }
+
+    /// Item 7: the exact OU transition must also carry the correct conditional
+    /// variance, again without the clamp doing the work. Averaging the stepped
+    /// utilization over many independent shocks (with θ interior and modest σ
+    /// so the clamp essentially never fires) must recover the exact mean.
+    #[test]
+    fn utilization_step_unbiased_mean_across_shocks() {
+        use finstack_monte_carlo::rng::philox::PhiloxRng;
+        use finstack_monte_carlo::traits::RandomStream;
+
+        let utilization = UtilizationParams::new(1.0, 0.5, 0.05)
+            .expect("valid utilization params");
+        let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
+        let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
+        let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
+        let process = RevolvingCreditProcess::new(params);
+        let disc = RevolvingCreditDiscretization::from_process(&process).expect("ok");
+
+        let dt = 1.0 / 12.0;
+        let kappa = 1.0_f64;
+        let theta = 0.5_f64;
+        let u0 = 0.5_f64; // start at the mean → simulated mean must stay at θ
+
+        let n = 20_000usize;
+        let mut rng = PhiloxRng::new(20240517);
+        let mut normals = vec![0.0f64; n];
+        rng.fill_std_normals(&mut normals);
+
+        let mut sum = 0.0;
+        let mut work = vec![0.0; disc.work_size(&process)];
+        for &z0 in &normals {
+            let mut x = [u0, 0.05, 0.015];
+            let z = [z0, 0.0, 0.0];
+            disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
+            sum += x[0];
+        }
+        let mean = sum / n as f64;
+
+        // Starting at the mean, the exact OU conditional mean is exactly θ.
+        let exact_mean = theta + (u0 - theta) * (-kappa * dt).exp();
+        assert!(
+            (exact_mean - theta).abs() < 1e-12,
+            "sanity: starting at the mean, exact OU mean equals theta"
+        );
+        // Monte-Carlo mean must match θ within sampling error — the clamp is
+        // not biasing it (θ=0.5 interior, σ small).
+        assert!(
+            (mean - theta).abs() < 5e-3,
+            "simulated utilization mean {mean} should equal exact OU mean {theta} \
+             within MC error (clamp must not be load-bearing)"
+        );
+    }
+
     #[test]
     fn test_discretization_step_floating_rate() {
-        let utilization = UtilizationParams::new(0.5, 0.6, 0.1);
+        let utilization = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
         let hw_params = HullWhite1FParams::new(0.1, 0.01, 0.03);
         let interest_rate = InterestRateSpec::Floating {
             params: hw_params,

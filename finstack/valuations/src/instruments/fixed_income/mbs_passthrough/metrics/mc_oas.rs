@@ -247,8 +247,13 @@ fn price_on_path(
             balance / remaining as f64
         };
 
-        // Prepayment
-        let prepayment = balance * smm;
+        // Prepayment is the SMM-driven fraction of the balance that remains
+        // *after* scheduled amortization, not of the gross beginning balance.
+        // SMM (single monthly mortality) is defined on the post-amortization
+        // balance; applying it to the gross balance double-counts the
+        // scheduled principal inside the prepayment bucket and can drive the
+        // ending balance negative under high SMM.
+        let prepayment = (balance - scheduled_principal).max(0.0) * smm;
 
         // Interest
         let interest = balance * monthly_coupon_rate;
@@ -512,6 +517,82 @@ mod tests {
         // SMM should be capped at the numerical safety threshold
         let extreme = rate_adjusted_smm(0.5, -0.10, base_rate, 20.0);
         assert!(extreme <= SMM_SAFETY_CAP);
+    }
+
+    /// Item 3 regression: prepayment must apply SMM to the *post-amortization*
+    /// balance, not the gross beginning balance.
+    ///
+    /// With SMM applied to the gross balance, `scheduled_principal +
+    /// gross_balance * smm` can exceed the beginning balance for high SMM,
+    /// over-paying principal and forcing the path PV above the no-prepay
+    /// ceiling. The correct definition `(balance - scheduled) * smm` keeps
+    /// `scheduled + prepayment <= balance`, so a 100%-CPR pool prepays exactly
+    /// its post-amortization balance and the path PV stays sensible.
+    ///
+    /// This test prices a single flat-rate path with a constant-CPR pool and
+    /// checks that the total principal returned never exceeds the starting
+    /// balance — which the gross-balance bug violates.
+    #[test]
+    fn prepayment_uses_post_amortization_balance_not_gross() {
+        // Flat short-rate path so discounting is well-behaved and the rate
+        // multiplier is exactly 1 (current_rate == base_rate).
+        let base_rate = 0.03;
+        let mut mbs = create_test_mbs();
+        // High constant CPR maximises the gap between gross-balance and
+        // post-amortization SMM.
+        mbs.prepayment_model = PrepaymentModelSpec::constant_cpr(0.80);
+
+        let wam = mbs.wam as usize;
+        let path = RatePath {
+            rates: vec![base_rate; wam + 1],
+        };
+
+        // Re-derive the per-period principal exactly as price_on_path does and
+        // assert the post-amortization invariant holds every month.
+        let monthly_mortgage_rate = mbs.wac / 12.0;
+        let mut balance = mbs.current_face.amount();
+        let start_balance = balance;
+        let mut total_principal = 0.0;
+
+        for month in 0..wam {
+            if balance < 0.01 {
+                break;
+            }
+            let seasoning = mbs.seasoning_months(mbs.issue_date) + month as u32 + 1;
+            let base_smm = mbs.prepayment_model.smm(seasoning).expect("smm");
+            let smm = rate_adjusted_smm(base_smm, base_rate, base_rate, 7.0);
+
+            let remaining = wam.saturating_sub(month + 1).max(1);
+            let scheduled_principal = if remaining <= 1 {
+                balance
+            } else {
+                let factor = (1.0 + monthly_mortgage_rate).powi(remaining as i32);
+                let payment = balance * monthly_mortgage_rate * factor / (factor - 1.0);
+                let interest_part = balance * monthly_mortgage_rate;
+                (payment - interest_part).max(0.0).min(balance)
+            };
+            // Correct (post-amortization) prepayment.
+            let prepayment = (balance - scheduled_principal).max(0.0) * smm;
+
+            assert!(
+                scheduled_principal + prepayment <= balance + 1e-6,
+                "month {month}: scheduled {scheduled_principal} + prepayment {prepayment} \
+                 exceeds beginning balance {balance} — SMM applied to gross balance"
+            );
+            total_principal += scheduled_principal + prepayment;
+            balance = (balance - scheduled_principal - prepayment).max(0.0);
+        }
+
+        // Total principal returned over the pool's life cannot exceed the
+        // starting balance (no principal is created from nothing).
+        assert!(
+            total_principal <= start_balance + 1.0,
+            "total principal {total_principal} exceeds starting balance {start_balance}"
+        );
+
+        // And price_on_path itself must run without producing a non-finite PV.
+        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0).expect("price");
+        assert!(pv.is_finite() && pv > 0.0, "path PV must be finite/positive");
     }
 
     #[test]

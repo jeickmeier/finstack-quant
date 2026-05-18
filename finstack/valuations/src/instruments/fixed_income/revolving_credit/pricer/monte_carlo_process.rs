@@ -38,19 +38,37 @@ pub struct UtilizationParams {
 
 impl UtilizationParams {
     /// Create new utilization parameters.
-    pub fn new(kappa: f64, theta: f64, sigma: f64) -> Self {
-        assert!(kappa > 0.0, "Mean reversion speed must be positive");
-        assert!(
-            (0.0..=1.0).contains(&theta),
-            "Target utilization must be in [0, 1]"
-        );
-        assert!(sigma > 0.0, "Volatility must be positive");
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_core::Error::Validation`] when `kappa` or `sigma` is
+    /// not strictly positive, or when `theta` is outside `[0, 1]`. (Previously
+    /// these were `assert!`s that panicked in library code on invalid MC
+    /// parameters.)
+    pub fn new(kappa: f64, theta: f64, sigma: f64) -> finstack_core::Result<Self> {
+        // Reject non-finite values explicitly (a `<= 0.0` test would let NaN
+        // slip through, since all NaN comparisons are false).
+        if !kappa.is_finite() || kappa <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "utilization mean-reversion speed (kappa) must be positive, got {kappa}"
+            )));
+        }
+        if !theta.is_finite() || !(0.0..=1.0).contains(&theta) {
+            return Err(finstack_core::Error::Validation(format!(
+                "utilization target (theta) must be in [0, 1], got {theta}"
+            )));
+        }
+        if !sigma.is_finite() || sigma <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "utilization volatility (sigma) must be positive, got {sigma}"
+            )));
+        }
 
-        Self {
+        Ok(Self {
             kappa,
             theta,
             sigma,
-        }
+        })
     }
 }
 
@@ -68,9 +86,17 @@ impl CreditSpreadParams {
     ///
     /// # Errors
     ///
-    /// Returns an error if CIR parameters are invalid (see [`CirParams::new`]).
+    /// Returns [`finstack_core::Error::Validation`] when `initial` is
+    /// negative, or any error from [`CirParams::new`] for invalid CIR
+    /// parameters. (The initial-spread check was previously an `assert!` that
+    /// panicked in library code.)
     pub fn new(kappa: f64, theta: f64, sigma: f64, initial: f64) -> finstack_core::Result<Self> {
-        assert!(initial >= 0.0, "Initial credit spread must be non-negative");
+        // Explicit non-finite rejection: a `< 0.0` test would admit NaN.
+        if !initial.is_finite() || initial < 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "initial credit spread must be non-negative, got {initial}"
+            )));
+        }
 
         Ok(Self {
             cir: CirParams::new(kappa, theta, sigma)?,
@@ -344,10 +370,34 @@ mod tests {
 
     #[test]
     fn test_utilization_params() {
-        let params = UtilizationParams::new(0.5, 0.6, 0.1);
+        let params = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
         assert_eq!(params.kappa, 0.5);
         assert_eq!(params.theta, 0.6);
         assert_eq!(params.sigma, 0.1);
+    }
+
+    /// Item 16 regression: invalid MC parameters must return
+    /// `Error::Validation`, not panic via `assert!` inside library code.
+    #[test]
+    fn utilization_params_reject_invalid_inputs_without_panicking() {
+        // Non-positive mean-reversion speed.
+        let bad_kappa = UtilizationParams::new(0.0, 0.5, 0.1);
+        assert!(
+            matches!(bad_kappa, Err(finstack_core::Error::Validation(_))),
+            "kappa=0 should yield a Validation error, got {bad_kappa:?}"
+        );
+        // theta outside [0, 1].
+        let bad_theta = UtilizationParams::new(0.5, 1.5, 0.1);
+        assert!(
+            matches!(bad_theta, Err(finstack_core::Error::Validation(_))),
+            "theta=1.5 should yield a Validation error, got {bad_theta:?}"
+        );
+        // Non-positive volatility.
+        let bad_sigma = UtilizationParams::new(0.5, 0.5, 0.0);
+        assert!(
+            matches!(bad_sigma, Err(finstack_core::Error::Validation(_))),
+            "sigma=0 should yield a Validation error, got {bad_sigma:?}"
+        );
     }
 
     #[test]
@@ -357,9 +407,20 @@ mod tests {
         assert_eq!(params.cir.kappa, 0.3);
     }
 
+    /// Item 16 regression: a negative initial credit spread must return
+    /// `Error::Validation`, not panic.
+    #[test]
+    fn credit_spread_params_reject_negative_initial_without_panicking() {
+        let bad = CreditSpreadParams::new(0.3, 0.02, 0.05, -0.01);
+        assert!(
+            matches!(bad, Err(finstack_core::Error::Validation(_))),
+            "negative initial spread should yield a Validation error, got {bad:?}"
+        );
+    }
+
     #[test]
     fn test_process_params_initial_state() {
-        let utilization = UtilizationParams::new(0.5, 0.6, 0.1);
+        let utilization = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
@@ -373,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_process_params_floating_rate() {
-        let utilization = UtilizationParams::new(0.5, 0.6, 0.1);
+        let utilization = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
         let hw_params = HullWhite1FParams::new(0.1, 0.01, 0.03);
         let interest_rate = InterestRateSpec::Floating {
             params: hw_params,
@@ -391,7 +452,7 @@ mod tests {
 
     #[test]
     fn test_process_drift_fixed_rate() {
-        let utilization = UtilizationParams::new(0.5, 0.6, 0.1);
+        let utilization = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
@@ -415,7 +476,7 @@ mod tests {
 
     #[test]
     fn test_process_diffusion() {
-        let utilization = UtilizationParams::new(0.5, 0.6, 0.1);
+        let utilization = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
@@ -439,7 +500,7 @@ mod tests {
 
     #[test]
     fn test_factor_correlation() {
-        let utilization = UtilizationParams::new(0.5, 0.6, 0.1);
+        let utilization = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
 
@@ -447,7 +508,7 @@ mod tests {
         let process_no_corr = RevolvingCreditProcess::new(params);
         assert!(process_no_corr.factor_correlation().is_none());
 
-        let utilization2 = UtilizationParams::new(0.5, 0.6, 0.1);
+        let utilization2 = UtilizationParams::new(0.5, 0.6, 0.1).expect("valid utilization params");
         let interest_rate2 = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread2 = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
         let correlation = [[1.0, 0.2, 0.1], [0.2, 1.0, 0.3], [0.1, 0.3, 1.0]];

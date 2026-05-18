@@ -3,9 +3,10 @@
 //! CMO pricing projects collateral cashflows and distributes them
 //! through the waterfall to calculate the PV of the reference tranche.
 
-use super::types::{AgencyCmo, CmoTrancheType};
-use super::waterfall::{allocate_io_cashflow, execute_waterfall_with_principal_breakdown};
-use crate::cashflow::builder::specs::PrepaymentModelSpec;
+use super::tranches::pac_support::PacSchedule;
+use super::types::{AgencyCmo, CmoTranche, CmoTrancheType, PacCollar};
+use super::waterfall::{allocate_io_cashflow, execute_waterfall_with_principal_breakdown, PacContext};
+use crate::cashflow::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
 use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::fixed_income::mbs_passthrough::pricer::generate_cashflows;
@@ -47,6 +48,64 @@ pub(crate) fn resolve_collateral(cmo: &AgencyCmo) -> Result<AgencyMbsPassthrough
     }
 }
 
+/// Extract the actual PSA speed multiplier from a prepayment model spec.
+///
+/// PAC collar checks compare the realized prepayment speed (PSA multiple) of
+/// the collateral against the PAC band. A `Psa { speed_multiplier }` model maps
+/// directly. For non-PSA models the speed is approximated by converting the
+/// terminal CPR back to a PSA multiple (terminal PSA CPR is 6%), which lets the
+/// collar check still distinguish slow/fast pools.
+fn actual_psa_from_model(model: &PrepaymentModelSpec) -> f64 {
+    match &model.curve {
+        Some(PrepaymentCurve::Psa { speed_multiplier }) => *speed_multiplier,
+        // Constant / lockout: map CPR to a PSA-equivalent multiple (100% PSA
+        // terminal CPR = 6%). Clamped non-negative for safety.
+        _ => (model.cpr / 0.06).max(0.0),
+    }
+}
+
+/// Build the PAC context that drives PAC-schedule amortization in the waterfall.
+///
+/// Returns `None` when the deal has no PAC tranche, so non-PAC deals keep the
+/// plain sequential/pro-rata allocation. When a PAC tranche is present, the PAC
+/// schedule is generated from the *collateral* balance (the correct basis for
+/// the PAC band) and the carved PAC tranche balance.
+fn build_pac_context(cmo: &AgencyCmo, collateral: &AgencyMbsPassthrough) -> Option<PacContext> {
+    let pac_tranches: Vec<&CmoTranche> = cmo
+        .waterfall
+        .tranches
+        .iter()
+        .filter(|t| t.tranche_type == CmoTrancheType::Pac)
+        .collect();
+    if pac_tranches.is_empty() {
+        return None;
+    }
+
+    // Aggregate PAC face across all PAC tranches.
+    let pac_balance: f64 = pac_tranches.iter().map(|t| t.current_face.amount()).sum();
+
+    // Use the collar from the first PAC tranche, or the standard 100-300 collar.
+    let collar = pac_tranches
+        .iter()
+        .find_map(|t| t.pac_collar.clone())
+        .unwrap_or_else(PacCollar::standard);
+
+    let collateral_balance = collateral.current_face.amount();
+    let schedule = PacSchedule::generate(
+        collateral_balance,
+        pac_balance,
+        collateral.wam,
+        collateral.wac,
+        collar,
+    );
+
+    Some(PacContext {
+        schedule: Some(schedule),
+        period_index: 0,
+        actual_psa: actual_psa_from_model(&collateral.prepayment_model),
+    })
+}
+
 /// Generate cashflows for the reference tranche.
 ///
 /// Projects collateral cashflows and runs them through the waterfall
@@ -60,6 +119,10 @@ pub(crate) fn generate_tranche_cashflows(
 
     // Generate collateral cashflows
     let collateral_cfs = generate_cashflows(&collateral, as_of, max_periods)?;
+
+    // Build the PAC context once (None for non-PAC deals). The schedule is
+    // collateral-derived; only `period_index` advances per period below.
+    let mut pac_context = build_pac_context(cmo, &collateral);
 
     // Create a working copy of the waterfall
     let mut waterfall = cmo.waterfall.clone();
@@ -76,9 +139,15 @@ pub(crate) fn generate_tranche_cashflows(
     // Track collateral factor for IO strips
     let original_collateral = collateral.current_face.amount();
 
-    for cf in &collateral_cfs {
+    for (period_idx, cf) in collateral_cfs.iter().enumerate() {
         // Run waterfall for this period
         let total_interest = cf.interest;
+
+        // Advance the PAC schedule cursor to this projection period so the
+        // PAC tranche draws its scheduled principal for the correct month.
+        if let Some(ctx) = pac_context.as_mut() {
+            ctx.period_index = period_idx;
+        }
 
         if is_io {
             // IO gets interest based on collateral factor.
@@ -100,13 +169,16 @@ pub(crate) fn generate_tranche_cashflows(
                 });
             }
         } else {
-            // Regular waterfall execution
+            // Regular waterfall execution. For PAC deals `pac_context` is
+            // `Some`, so PAC tranches amortize on their collateral-derived
+            // schedule/collar via `allocate_pac_support` instead of falling
+            // through to balance-limited sequential allocation.
             let result = execute_waterfall_with_principal_breakdown(
                 &mut waterfall,
                 cf.scheduled_principal,
                 cf.prepayment,
                 total_interest,
-                None,
+                pac_context.as_ref(),
             );
 
             // Find allocation for reference tranche
@@ -314,21 +386,48 @@ mod tests {
             .any(|cf| cf.kind == CFKind::PrePayment));
     }
 
+    /// PAC/support schedule classification.
+    ///
+    /// RE-BLESSED for item 1 (library-self-calculated regression, no external
+    /// provenance). Before the PAC context was wired in, the PAC tranche fell
+    /// through to balance-limited sequential allocation and therefore received
+    /// prepayment principal — this test previously asserted that buggy
+    /// behavior (`PrePayment` rows on the PAC reference tranche).
+    ///
+    /// With the PAC schedule now driving amortization, a PAC tranche *within
+    /// its collar* receives only scheduled principal (its collateral-derived
+    /// collar schedule) — never prepayment. The correct, fixture-independent
+    /// expectations are:
+    ///   - the PAC reference schedule has `Amortization` (scheduled) rows;
+    ///   - the PAC reference schedule has **no** `PrePayment` rows while the
+    ///     pool runs inside the collar.
     #[test]
     fn test_pac_support_reference_schedule_preserves_prepayment_rows() {
         let cmo = AgencyCmo::example_pac_support().expect("PAC/support example is valid");
         let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
-        let schedule = build_reference_tranche_schedule(&cmo, as_of, Some(12))
-            .expect("PAC/support schedule should build");
 
-        assert!(schedule
-            .flows
-            .iter()
-            .any(|cf| cf.kind == CFKind::Amortization));
-        assert!(schedule
-            .flows
-            .iter()
-            .any(|cf| cf.kind == CFKind::PrePayment));
+        // PAC reference: within the collar it amortizes on its schedule, so it
+        // has scheduled-principal (`Amortization`) rows.
+        let pac_schedule = build_reference_tranche_schedule(&cmo, as_of, Some(12))
+            .expect("PAC schedule should build");
+        assert!(
+            pac_schedule
+                .flows
+                .iter()
+                .any(|cf| cf.kind == CFKind::Amortization),
+            "PAC tranche should receive scheduled principal"
+        );
+        // The PAC tranche, priced on its schedule, must not show prepayment
+        // rows while inside the collar — prepayment variability is diverted to
+        // the support tranche. (Under the pre-fix sequential fallback the PAC
+        // wrongly carried prepayment rows.)
+        assert!(
+            !pac_schedule
+                .flows
+                .iter()
+                .any(|cf| cf.kind == CFKind::PrePayment),
+            "PAC tranche within collar must not carry prepayment rows"
+        );
     }
 
     #[test]
@@ -341,6 +440,61 @@ mod tests {
 
         // PV should be positive
         assert!(pv.amount() > 0.0);
+    }
+
+    /// Item 1 regression: PAC tranches must amortize on the PAC schedule, not
+    /// fall through to balance-limited sequential allocation.
+    ///
+    /// Before the fix, `generate_tranche_cashflows` called the waterfall with
+    /// `pac_context = None`, so `PacSchedule`/`allocate_pac_support` were dead
+    /// code and a PAC bond was priced identically to a plain sequential. With
+    /// the PAC context wired in, the PAC tranche's per-period principal is
+    /// capped by its collateral-derived collar schedule and is therefore
+    /// strictly less than what an uncapped sequential front tranche would
+    /// receive from the same collateral.
+    #[test]
+    fn test_pac_tranche_amortizes_on_pac_schedule_not_sequential() {
+        let cmo = AgencyCmo::example_pac_support().expect("PAC/support example is valid");
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+
+        // PAC reference tranche cashflows (PAC context active).
+        let pac_cfs = generate_tranche_cashflows(&cmo, as_of, Some(24))
+            .expect("PAC tranche cashflows should generate");
+        assert!(!pac_cfs.is_empty());
+
+        // Build the collateral-derived PAC schedule directly for comparison.
+        let collateral = resolve_collateral(&cmo).expect("collateral resolves");
+        let pac_tranche = cmo.waterfall.get_tranche("PAC").expect("PAC tranche");
+        let schedule = super::PacSchedule::generate(
+            collateral.current_face.amount(),
+            pac_tranche.current_face.amount(),
+            collateral.wam,
+            collateral.wac,
+            pac_tranche.pac_collar.clone().expect("PAC has a collar"),
+        );
+
+        // Within the collar, the PAC tranche's principal each period must not
+        // exceed the PAC schedule amount for that period (the defining PAC
+        // property). A plain-sequential fallback would hand the PAC the full
+        // collateral principal and violate this for early periods.
+        let mut total_pac_principal = 0.0;
+        for (i, cf) in pac_cfs.iter().enumerate() {
+            let scheduled = schedule.scheduled_at(i);
+            total_pac_principal += cf.principal;
+            assert!(
+                cf.principal <= scheduled + 1.0,
+                "period {i}: PAC principal {} exceeds PAC schedule {scheduled}; \
+                 PAC is being priced as a plain sequential",
+                cf.principal
+            );
+        }
+
+        // And the PAC must actually receive some scheduled principal — i.e.
+        // the schedule path is live, not a degenerate all-zero schedule.
+        assert!(
+            total_pac_principal > 0.0,
+            "PAC tranche received no principal over 24 months"
+        );
     }
 
     #[test]

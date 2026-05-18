@@ -1,15 +1,17 @@
 //! Payment delay conventions for agency MBS.
 //!
-//! Agency MBS have standardized delays between the end of an accrual period
-//! and the actual payment date:
+//! Agency MBS have standardized stated delays measured from the **first day of
+//! the accrual period** to the payment date. Post-Single Security Initiative
+//! (June 2019), FNMA and FHLMC both issue UMBS with the same 55-day delay:
 //!
-//! - **FNMA**: 55 calendar days (actual stated delay)
-//! - **FHLMC**: 75 calendar days (actual stated delay)
-//! - **GNMA I**: 14 calendar days (single-issuer pools, payment on the 15th)
-//! - **GNMA II**: 45 calendar days (multi-issuer pools, payment on the 20th)
+//! - **FNMA / FHLMC (UMBS)**: 55-day stated delay — payment on the 25th of M+1
+//! - **GNMA I**: 14-day stated delay — single-issuer pools, payment on the 15th of M
+//! - **GNMA II**: 50-day stated delay — multi-issuer pools, payment on the 20th of M+1
 //!
-//! The delay is measured from the accrual period end (typically the last day
-//! of the month) to the payment date.
+//! These constants match [`AgencyProgram::payment_lag_days`] and the
+//! calendar-based [`AgencyProgram::payment_date_for_period`]. Legacy FHLMC
+//! Gold PCs (45-day) and ARM PCs (75-day) predate UMBS and should be modeled
+//! via the per-pool `payment_lag_days` override on `AgencyMbsPassthrough`.
 
 use crate::instruments::fixed_income::mbs_passthrough::AgencyProgram;
 use finstack_core::dates::calendar::calendar_by_id;
@@ -43,14 +45,19 @@ pub fn payment_lag_days(agency: AgencyProgram) -> u32 {
     agency.payment_lag_days()
 }
 
-/// Calculate actual payment date from accrual period end.
+/// Calculate the actual payment date by adding a stated delay to an accrual
+/// anchor date.
 ///
-/// Adds the payment delay and optionally adjusts for business days.
+/// The stated agency delay is measured from the **first day of the accrual
+/// period**, so production callers pass the accrual period start. The function
+/// itself simply adds `delay_days` calendar days to `anchor` and optionally
+/// adjusts for weekends.
 ///
 /// # Arguments
 ///
-/// * `accrual_end` - End date of the accrual period
-/// * `delay_days` - Number of delay days to add
+/// * `anchor` - Accrual anchor date (the accrual period start for agency
+///   stated delays)
+/// * `delay_days` - Number of calendar delay days to add
 /// * `adjust_to_business` - Whether to adjust to next business day
 ///
 /// # Returns
@@ -64,18 +71,19 @@ pub fn payment_lag_days(agency: AgencyProgram) -> u32 {
 /// use finstack_core::dates::Date;
 /// use time::Month;
 ///
-/// let accrual_end = Date::from_calendar_date(2024, Month::January, 31).unwrap();
-/// let payment_date = actual_payment_date(accrual_end, 25, false).unwrap();
-/// // Payment is Feb 25, 2024
+/// // 25-day delay from the accrual period start (Jan 1) → Jan 26.
+/// let accrual_start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
+/// let payment_date = actual_payment_date(accrual_start, 25, false).unwrap();
+/// assert_eq!(payment_date.day(), 26);
 /// ```
 pub fn actual_payment_date(
-    accrual_end: Date,
+    anchor: Date,
     delay_days: u32,
     adjust_to_business: bool,
 ) -> Result<Date> {
     use time::Duration;
 
-    let payment = accrual_end + Duration::days(delay_days as i64);
+    let payment = anchor + Duration::days(delay_days as i64);
 
     if adjust_to_business {
         // Simple weekend adjustment (Following convention)
@@ -93,11 +101,13 @@ pub fn actual_payment_date(
 
 /// Calculate payment date with calendar adjustment.
 ///
-/// Uses a specific calendar for business day adjustment.
+/// Uses a specific calendar for business day adjustment. The agency stated
+/// delay is measured from the **accrual period start**, so `accrual_start`
+/// should be the first day of the accrual period.
 ///
 /// # Arguments
 ///
-/// * `accrual_end` - End date of the accrual period
+/// * `accrual_start` - Start (first day) of the accrual period
 /// * `agency` - Agency program (determines delay)
 /// * `calendar_id` - Calendar identifier for business day adjustment
 /// * `bdc` - Business day convention
@@ -106,7 +116,7 @@ pub fn actual_payment_date(
 ///
 /// Adjusted payment date
 pub fn payment_date_with_calendar(
-    accrual_end: Date,
+    accrual_start: Date,
     agency: AgencyProgram,
     calendar_id: Option<&str>,
     bdc: BusinessDayConvention,
@@ -114,7 +124,7 @@ pub fn payment_date_with_calendar(
     use time::Duration;
 
     let delay = agency.payment_lag_days();
-    let raw_payment = accrual_end + Duration::days(delay as i64);
+    let raw_payment = accrual_start + Duration::days(delay as i64);
 
     // Use holiday calendar when provided; fall back to weekend-only adjustment.
     if let Some(cal_id) = calendar_id {
@@ -161,22 +171,29 @@ pub fn payment_date_with_calendar(
 
 /// Generate payment schedule with delays for a series of accrual periods.
 ///
+/// The agency stated delay is measured from the accrual period start, so the
+/// input dates are accrual period starts.
+///
 /// # Arguments
 ///
-/// * `accrual_ends` - Slice of accrual period end dates
+/// * `accrual_starts` - Slice of accrual period start dates (first day of each
+///   accrual period)
 /// * `agency` - Agency program (determines delay)
 ///
 /// # Returns
 ///
-/// Vector of (accrual_end, payment_date) pairs
-pub fn payment_schedule(accrual_ends: &[Date], agency: AgencyProgram) -> Result<Vec<(Date, Date)>> {
+/// Vector of (accrual_start, payment_date) pairs
+pub fn payment_schedule(
+    accrual_starts: &[Date],
+    agency: AgencyProgram,
+) -> Result<Vec<(Date, Date)>> {
     let delay = agency.payment_lag_days();
 
-    accrual_ends
+    accrual_starts
         .iter()
-        .map(|&accrual_end| {
-            let payment = actual_payment_date(accrual_end, delay, false)?;
-            Ok((accrual_end, payment))
+        .map(|&accrual_start| {
+            let payment = actual_payment_date(accrual_start, delay, false)?;
+            Ok((accrual_start, payment))
         })
         .collect()
 }
@@ -238,20 +255,22 @@ mod tests {
 
     #[test]
     fn test_payment_schedule() {
-        let accrual_ends = vec![
-            Date::from_calendar_date(2024, Month::January, 31).expect("valid"),
-            Date::from_calendar_date(2024, Month::February, 29).expect("valid"),
-            Date::from_calendar_date(2024, Month::March, 31).expect("valid"),
+        // Accrual period starts (first day of each month).
+        let accrual_starts = vec![
+            Date::from_calendar_date(2024, Month::January, 1).expect("valid"),
+            Date::from_calendar_date(2024, Month::February, 1).expect("valid"),
+            Date::from_calendar_date(2024, Month::March, 1).expect("valid"),
         ];
 
-        let schedule = payment_schedule(&accrual_ends, AgencyProgram::Fnma).expect("valid");
+        let schedule = payment_schedule(&accrual_starts, AgencyProgram::Fnma).expect("valid");
 
         assert_eq!(schedule.len(), 3);
 
-        // First payment: Jan 31 + 55 = Mar 26 (2024 is a leap year)
-        assert_eq!(schedule[0].0, accrual_ends[0]);
-        assert_eq!(schedule[0].1.month(), Month::March);
-        assert_eq!(schedule[0].1.day(), 26);
+        // First payment: the 55-day stated delay from the Jan 1 accrual start
+        // lands on Feb 25, 2024 — consistent with the FNMA "25th of M+1" rule.
+        assert_eq!(schedule[0].0, accrual_starts[0]);
+        assert_eq!(schedule[0].1.month(), Month::February);
+        assert_eq!(schedule[0].1.day(), 25);
     }
 
     #[test]
@@ -269,19 +288,21 @@ mod tests {
 
     #[test]
     fn test_payment_date_with_calendar() {
-        let accrual_end = Date::from_calendar_date(2024, Month::January, 31).expect("valid");
+        // Accrual period start (first day of the accrual month).
+        let accrual_start = Date::from_calendar_date(2024, Month::January, 1).expect("valid");
 
         // FNMA with Following convention
         let payment = payment_date_with_calendar(
-            accrual_end,
+            accrual_start,
             AgencyProgram::Fnma,
             None,
             BusinessDayConvention::Following,
         )
         .expect("valid");
 
-        // Jan 31 + 55 = Mar 26, 2024 (Tuesday, no weekend adjustment needed)
-        assert_eq!(payment.month(), Month::March);
+        // Jan 1 + 55-day stated delay = Feb 25, 2024 (Sunday → Following rolls
+        // to Feb 26, Monday).
+        assert_eq!(payment.month(), Month::February);
         assert_eq!(payment.day(), 26);
     }
 }
