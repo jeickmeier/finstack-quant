@@ -843,7 +843,8 @@ fn heston_pj_with_diagnostics(
     // Build the same composite Gauss-Legendre grid the strip pricer uses, so we
     // can inspect per-node behaviour rather than treating the quadrature as a
     // black box.
-    let grid = composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels);
+    let grid =
+        composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels);
     let Some(grid) = grid else {
         // Degenerate settings: fall back to the library quadrature with no
         // node-level diagnostics available.
@@ -1155,9 +1156,7 @@ pub fn heston_call_price_fourier_with_settings(
     let raw_p1_excursion = (d1.raw_probability - d1.raw_probability.clamp(0.0, 1.0)).abs();
     let raw_p2_excursion = (d2.raw_probability - d2.raw_probability.clamp(0.0, 1.0)).abs();
     let raw_excursion = raw_p1_excursion.max(raw_p2_excursion);
-    if tail > HESTON_TAIL_DIAGNOSTIC_THRESHOLD
-        || raw_excursion > HESTON_TAIL_DIAGNOSTIC_THRESHOLD
-    {
+    if tail > HESTON_TAIL_DIAGNOSTIC_THRESHOLD || raw_excursion > HESTON_TAIL_DIAGNOSTIC_THRESHOLD {
         warn!(
             spot,
             strike,
@@ -1943,8 +1942,7 @@ mod tests {
     fn scalar_fourier_no_false_corruption_on_normal_params() {
         let params = HestonParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
         let settings = HestonFourierSettings::default();
-        let scalar =
-            heston_call_price_fourier_with_settings(100.0, 100.0, 1.0, &params, &settings);
+        let scalar = heston_call_price_fourier_with_settings(100.0, 100.0, 1.0, &params, &settings);
         let strip = HestonStripPricer::new(100.0, 1.0, &params, &settings)
             .expect("constructs")
             .price_call(100.0);

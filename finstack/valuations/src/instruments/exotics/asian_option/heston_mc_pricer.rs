@@ -129,13 +129,14 @@ impl AsianOptionHestonMcPricer {
         // helper so each distinct fixing gets its own grid step (W-04) — the
         // naive round()+dedup() merged distinct fixings on a coarse grid.
         let base_num_steps = ((t * self.steps_per_year).round() as usize).max(self.min_steps);
-        let fixing_grid = crate::instruments::exotics::asian_option::pricer::map_fixings_to_distinct_steps(
-            &inst.fixing_dates,
-            inst.day_count,
-            as_of,
-            t,
-            base_num_steps,
-        )?;
+        let fixing_grid =
+            crate::instruments::exotics::asian_option::pricer::map_fixings_to_distinct_steps(
+                &inst.fixing_dates,
+                inst.day_count,
+                as_of,
+                t,
+                base_num_steps,
+            )?;
         let num_steps = fixing_grid.num_steps;
         let fixing_steps = fixing_grid.fixing_steps;
 

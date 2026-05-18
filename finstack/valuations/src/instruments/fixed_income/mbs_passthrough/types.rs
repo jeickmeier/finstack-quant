@@ -111,11 +111,7 @@ impl AgencyProgram {
     /// Returns [`finstack_core::Error::Validation`] if `accrual_year` is
     /// outside the range supported by the calendar (the payment day-of-month
     /// — 15/20/25 — is always valid, so only an out-of-range year can fail).
-    pub fn payment_date_for_period(
-        &self,
-        accrual_year: i32,
-        accrual_month: Month,
-    ) -> Result<Date> {
+    pub fn payment_date_for_period(&self, accrual_year: i32, accrual_month: Month) -> Result<Date> {
         let (pay_year, pay_month, pay_day) = match self {
             AgencyProgram::Fnma | AgencyProgram::Fhlmc => {
                 let (y, m) = advance_month(accrual_year, accrual_month);

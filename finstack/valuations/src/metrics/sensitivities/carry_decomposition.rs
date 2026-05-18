@@ -63,20 +63,19 @@ impl MetricCalculator for CarryDecompositionCalculator {
         // absorbs the entire PV change — a silent collapse that the
         // `CarryDecompositionDegenerate` diagnostic surfaces so downstream
         // consumers do not mistake the absorbed amount for genuine roll-down.
-        let (pull_to_par, degenerate) =
-            if let Some(&ytm) = context.computed.get(&MetricId::Ytm) {
-                let flat_market = build_flat_curve_market(context, ytm)?;
-                let flat_pv = context.reprice_money(&flat_market, rolled_date)?.amount();
-                (flat_pv - base_pv, false)
-            } else {
-                tracing::warn!(
-                    instrument_id = context.instrument.id(),
-                    "Carry decomposition missing YTM dependency; pull_to_par reported as 0.0, \
+        let (pull_to_par, degenerate) = if let Some(&ytm) = context.computed.get(&MetricId::Ytm) {
+            let flat_market = build_flat_curve_market(context, ytm)?;
+            let flat_pv = context.reprice_money(&flat_market, rolled_date)?.amount();
+            (flat_pv - base_pv, false)
+        } else {
+            tracing::warn!(
+                instrument_id = context.instrument.id(),
+                "Carry decomposition missing YTM dependency; pull_to_par reported as 0.0, \
                      roll_down absorbs the remaining PV change, and \
                      carry_decomposition_degenerate is flagged 1.0"
-                );
-                (0.0, true)
-            };
+            );
+            (0.0, true)
+        };
 
         let roll_down = total_pv_change - pull_to_par;
         let funding_cost = compute_funding_cost(context, rolled_date)?;

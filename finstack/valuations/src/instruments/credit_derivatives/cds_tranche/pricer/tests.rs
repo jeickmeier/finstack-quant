@@ -442,7 +442,12 @@ fn homogeneity_detection_uses_consistent_tolerance() {
         finstack_core::market_data::term_structures::HazardCurve::builder("CDX.NA.IG.42")
             .base_date(base_date)
             .recovery_rate(0.40)
-            .knots(vec![(1.0, 0.012), (3.0, 0.017), (5.0, 0.022), (10.0, 0.028)])
+            .knots(vec![
+                (1.0, 0.012),
+                (3.0, 0.017),
+                (5.0, 0.022),
+                (10.0, 0.028),
+            ])
             .par_spreads(vec![(1.0, 65.0), (3.0, 85.0), (5.0, 105.0), (10.0, 145.0)])
             .build()
             .expect("index curve");
@@ -461,18 +466,17 @@ fn homogeneity_detection_uses_consistent_tolerance() {
         let mut issuer_curves = finstack_core::HashMap::default();
         for i in 0..20 {
             let id = format!("ISSUER-{:03}", i + 1);
-            let hz =
-                finstack_core::market_data::term_structures::HazardCurve::builder(id.as_str())
-                    .base_date(base_date)
-                    .recovery_rate(0.40)
-                    .knots(vec![
-                        (1.0, 0.012 + hazard_shift),
-                        (3.0, 0.017 + hazard_shift),
-                        (5.0, 0.022 + hazard_shift),
-                        (10.0, 0.028 + hazard_shift),
-                    ])
-                    .build()
-                    .expect("issuer curve");
+            let hz = finstack_core::market_data::term_structures::HazardCurve::builder(id.as_str())
+                .base_date(base_date)
+                .recovery_rate(0.40)
+                .knots(vec![
+                    (1.0, 0.012 + hazard_shift),
+                    (3.0, 0.017 + hazard_shift),
+                    (5.0, 0.022 + hazard_shift),
+                    (10.0, 0.028 + hazard_shift),
+                ])
+                .build()
+                .expect("issuer curve");
             issuer_curves.insert(id, Arc::new(hz));
         }
         let index = CreditIndexData::builder()
@@ -1195,9 +1199,7 @@ fn correlation_bump_up_and_down_are_symmetric() {
     let original = &index_data.base_correlation_curve;
 
     let h = 0.01;
-    let up = model
-        .bump_base_correlation(original, h)
-        .expect("up bump");
+    let up = model.bump_base_correlation(original, h).expect("up bump");
     let down = model
         .bump_base_correlation(original, -h)
         .expect("down bump");
@@ -1706,14 +1708,13 @@ fn within_period_default_fraction_is_survival_weighted() {
     let pricer = CDSTranchePricer::new();
 
     // High-hazard index: positive λ ⇒ fraction must be < 0.5.
-    let high_hazard =
-        finstack_core::market_data::term_structures::HazardCurve::builder("HIGH")
-            .base_date(base_date)
-            .recovery_rate(0.40)
-            .knots(vec![(1.0, 0.15), (5.0, 0.15), (10.0, 0.15)])
-            .par_spreads(vec![(1.0, 900.0), (5.0, 900.0), (10.0, 900.0)])
-            .build()
-            .expect("hazard curve");
+    let high_hazard = finstack_core::market_data::term_structures::HazardCurve::builder("HIGH")
+        .base_date(base_date)
+        .recovery_rate(0.40)
+        .knots(vec![(1.0, 0.15), (5.0, 0.15), (10.0, 0.15)])
+        .par_spreads(vec![(1.0, 900.0), (5.0, 900.0), (10.0, 900.0)])
+        .build()
+        .expect("hazard curve");
     let base_corr =
         finstack_core::market_data::term_structures::BaseCorrelationCurve::builder("BC")
             .knots(vec![(3.0, 0.25), (7.0, 0.30), (30.0, 0.50)])
@@ -1735,14 +1736,13 @@ fn within_period_default_fraction_is_survival_weighted() {
     );
 
     // Near-zero-hazard index: fraction must tend to the 0.5 uniform limit.
-    let tiny_hazard =
-        finstack_core::market_data::term_structures::HazardCurve::builder("TINY")
-            .base_date(base_date)
-            .recovery_rate(0.40)
-            .knots(vec![(1.0, 1e-7), (5.0, 1e-7), (10.0, 1e-7)])
-            .par_spreads(vec![(1.0, 0.6), (5.0, 0.6), (10.0, 0.6)])
-            .build()
-            .expect("hazard curve");
+    let tiny_hazard = finstack_core::market_data::term_structures::HazardCurve::builder("TINY")
+        .base_date(base_date)
+        .recovery_rate(0.40)
+        .knots(vec![(1.0, 1e-7), (5.0, 1e-7), (10.0, 1e-7)])
+        .par_spreads(vec![(1.0, 0.6), (5.0, 0.6), (10.0, 0.6)])
+        .build()
+        .expect("hazard curve");
     let tiny_index = CreditIndexData::builder()
         .num_constituents(125)
         .recovery_rate(0.40)

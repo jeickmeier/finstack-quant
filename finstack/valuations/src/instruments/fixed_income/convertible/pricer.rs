@@ -1211,8 +1211,7 @@ pub fn calculate_convertible_greeks(
                     Ok(m) => m,
                     Err(_) => market_context.clone(),
                 };
-                let fwd_price =
-                    price_convertible_bond(bond, &rolled_market, tree_type, next_day)?;
+                let fwd_price = price_convertible_bond(bond, &rolled_market, tree_type, next_day)?;
                 // Theta = P(t+1d) - P(t), reported as change per calendar day.
                 greeks.theta = fwd_price.amount() - greeks.price;
             }
@@ -1564,8 +1563,8 @@ mod tests {
             .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
         let tree = ConvertibleTreeType::Binomial(80);
-        let greeks = calculate_convertible_greeks(&bond, &market, tree, Some(0.01), as_of)
-            .expect("greeks");
+        let greeks =
+            calculate_convertible_greeks(&bond, &market, tree, Some(0.01), as_of).expect("greeks");
         assert!(greeks.theta.is_finite(), "theta must be finite");
 
         // No-roll theta: reprice at t+1d with the SAME (un-rolled) market —
@@ -1675,8 +1674,7 @@ mod tests {
         let mut bond = create_test_bond();
         // Conversion only on a change-of-control — never modellable in the
         // tree, so `conversion_allowed` is false at every node.
-        bond.conversion.policy =
-            ConversionPolicy::UponEvent(ConversionEvent::ChangeOfControl);
+        bond.conversion.policy = ConversionPolicy::UponEvent(ConversionEvent::ChangeOfControl);
         // Callable for the whole life at 102% of par.
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
@@ -1703,13 +1701,9 @@ mod tests {
             .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
             .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
-        let price = price_convertible_bond(
-            &bond,
-            &market,
-            ConvertibleTreeType::Binomial(60),
-            as_of,
-        )
-        .expect("should price");
+        let price =
+            price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(60), as_of)
+                .expect("should price");
 
         let conversion_value = 10.0 * 5000.0; // ratio × spot = 50,000
         let call_price = 1000.0 * 1.02; // 102% of par = 1,020
@@ -1820,22 +1814,14 @@ mod tests {
         let market = create_test_market_context();
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-        let binomial = price_convertible_bond(
-            &bond,
-            &market,
-            ConvertibleTreeType::Binomial(400),
-            as_of,
-        )
-        .expect("binomial price")
-        .amount();
-        let trinomial = price_convertible_bond(
-            &bond,
-            &market,
-            ConvertibleTreeType::Trinomial(400),
-            as_of,
-        )
-        .expect("trinomial price")
-        .amount();
+        let binomial =
+            price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial(400), as_of)
+                .expect("binomial price")
+                .amount();
+        let trinomial =
+            price_convertible_bond(&bond, &market, ConvertibleTreeType::Trinomial(400), as_of)
+                .expect("trinomial price")
+                .amount();
 
         // Both lattices discretize the same process; with 400 steps they must
         // agree closely. A malformed trinomial grid would diverge sharply.

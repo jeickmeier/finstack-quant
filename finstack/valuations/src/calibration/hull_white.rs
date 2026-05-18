@@ -2390,10 +2390,9 @@ mod tests {
             hw1f_cap_floor_price(kappa, 0.020, &df_fn, &df_fn, spec_long),
         ];
 
-        let sigma = solve_cap_floor_sigma_for_fixed_kappa(
-            kappa, &df_fn, &df_fn, &quotes, &market, freq,
-        )
-        .expect("fixed-kappa sigma calibration should succeed");
+        let sigma =
+            solve_cap_floor_sigma_for_fixed_kappa(kappa, &df_fn, &df_fn, &quotes, &market, freq)
+                .expect("fixed-kappa sigma calibration should succeed");
 
         // SSE objective replicated locally.
         let sse = |s: f64| -> f64 {

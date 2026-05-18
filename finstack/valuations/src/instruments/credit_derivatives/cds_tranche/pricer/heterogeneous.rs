@@ -74,15 +74,26 @@ impl CDSTranchePricer {
         // introduce a discontinuity in the EL.
         let is_uniform_pd = pd_i
             .first()
-            .map(|&first| pd_i.iter().all(|&p| (p - first).abs() <= HOMOGENEITY_TOLERANCE))
+            .map(|&first| {
+                pd_i.iter()
+                    .all(|&p| (p - first).abs() <= HOMOGENEITY_TOLERANCE)
+            })
             .unwrap_or(true);
         let is_uniform_lgd = lgd_i
             .first()
-            .map(|&first| lgd_i.iter().all(|&l| (l - first).abs() <= HOMOGENEITY_TOLERANCE))
+            .map(|&first| {
+                lgd_i
+                    .iter()
+                    .all(|&l| (l - first).abs() <= HOMOGENEITY_TOLERANCE)
+            })
             .unwrap_or(true);
         let is_uniform_weight = weight_i
             .first()
-            .map(|&first| weight_i.iter().all(|&w| (w - first).abs() <= HOMOGENEITY_TOLERANCE))
+            .map(|&first| {
+                weight_i
+                    .iter()
+                    .all(|&w| (w - first).abs() <= HOMOGENEITY_TOLERANCE)
+            })
             .unwrap_or(true);
 
         if is_uniform_pd && is_uniform_lgd && is_uniform_weight {

@@ -160,9 +160,9 @@ pub(crate) fn compute_pv(
     // accrued-variance identity would not close (W-33). `seasoned_realized_variance`
     // re-bases it to `V_accrued / t_elapsed` so `realized·w` equals
     // `V_accrued / T` exactly.
-    let total_t = inst
-        .day_count
-        .year_fraction(inst.start_date, inst.maturity, Default::default())?;
+    let total_t =
+        inst.day_count
+            .year_fraction(inst.start_date, inst.maturity, Default::default())?;
     let t_elapsed = w * total_t;
     let realized = seasoned_realized_variance(inst, curves, as_of, t_elapsed)?;
     let expected_var = realized * w + forward * (1.0 - w);
@@ -866,8 +866,7 @@ mod tests {
         // The two annualizations must genuinely differ (weekend-skipping
         // schedule => N_returns/AF ≠ t_elapsed).
         assert!(
-            (obs_count_realized - time_basis_realized).abs()
-                / time_basis_realized.max(1e-12)
+            (obs_count_realized - time_basis_realized).abs() / time_basis_realized.max(1e-12)
                 > 1e-3,
             "observation-count ({obs_count_realized}) and time-basis \
              ({time_basis_realized}) realized variance must differ"

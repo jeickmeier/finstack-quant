@@ -351,11 +351,7 @@ mod tests {
         // Analytically exact IRR for a single contribution/distribution pair:
         //   C = D · (1 + r)^{-t}   =>   r = (D / C)^{1/t} − 1.
         let t = DayCount::Act365F
-            .year_fraction(
-                start,
-                end,
-                finstack_core::dates::DayCountContext::default(),
-            )
+            .year_fraction(start, end, finstack_core::dates::DayCountContext::default())
             .expect("year fraction");
         let exact_irr = (distribution / contribution).powf(1.0 / t) - 1.0;
 

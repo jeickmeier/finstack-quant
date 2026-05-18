@@ -590,7 +590,9 @@ fn compute_rate_factor(
     // Second-order term, also key-rate aware: Σ ½ γ_bucket × Δr_bucket².
     let gamma_pnl = if config.include_gamma {
         Some(finstack_core::math::neumaier_sum(
-            buckets.iter().map(|b| 0.5 * b.gamma * b.move_bp * b.move_bp),
+            buckets
+                .iter()
+                .map(|b| 0.5 * b.gamma * b.move_bp * b.move_bp),
         ))
     } else {
         None
@@ -668,7 +670,9 @@ fn compute_forward_factor(
 
     let gamma_pnl = if config.include_gamma {
         Some(finstack_core::math::neumaier_sum(
-            buckets.iter().map(|b| 0.5 * b.gamma * b.move_bp * b.move_bp),
+            buckets
+                .iter()
+                .map(|b| 0.5 * b.gamma * b.move_bp * b.move_bp),
         ))
     } else {
         None

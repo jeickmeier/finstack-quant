@@ -590,16 +590,20 @@ mod tests {
             err.to_string().contains("strike"),
             "error should name the strike: {err}"
         );
-        assert!(EquityOptionParams::new(-10.0, expiry, OptionType::Call, notional)
-            .validate()
-            .is_err());
+        assert!(
+            EquityOptionParams::new(-10.0, expiry, OptionType::Call, notional)
+                .validate()
+                .is_err()
+        );
         assert!(EquityOptionParams::european_put(-1.0, expiry, notional)
             .validate()
             .is_err());
         // A well-formed equity option passes validation.
-        assert!(EquityOptionParams::new(100.0, expiry, OptionType::Call, notional)
-            .validate()
-            .is_ok());
+        assert!(
+            EquityOptionParams::new(100.0, expiry, OptionType::Call, notional)
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]
@@ -610,12 +614,16 @@ mod tests {
         // `validate`. A finite (incl. zero/negative) notional is accepted.
         let expiry = date!(2026 - 06 - 15);
         let zero_notional = Money::new(0.0, Currency::USD);
-        assert!(EquityOptionParams::new(100.0, expiry, OptionType::Call, zero_notional)
-            .validate()
-            .is_ok());
-        assert!(FxOptionParams::new(1.10, expiry, OptionType::Put, zero_notional)
-            .validate()
-            .is_ok());
+        assert!(
+            EquityOptionParams::new(100.0, expiry, OptionType::Call, zero_notional)
+                .validate()
+                .is_ok()
+        );
+        assert!(
+            FxOptionParams::new(1.10, expiry, OptionType::Put, zero_notional)
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]
@@ -629,9 +637,11 @@ mod tests {
         assert!(FxOptionParams::european_call(-1.20, expiry, notional)
             .validate()
             .is_err());
-        assert!(FxOptionParams::new(1.10, expiry, OptionType::Call, notional)
-            .validate()
-            .is_ok());
+        assert!(
+            FxOptionParams::new(1.10, expiry, OptionType::Call, notional)
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]
@@ -649,7 +659,9 @@ mod tests {
         );
         // R = 1.0 is rejected (zero LGD degenerates protection legs), matching
         // the shared validator used by ProtectionLegSpec.
-        assert!(CreditParams::new("ACME", 1.0, "ACME-CDS").validate().is_err());
+        assert!(CreditParams::new("ACME", 1.0, "ACME-CDS")
+            .validate()
+            .is_err());
         assert!(CreditParams::new("ACME", -0.1, "ACME-CDS")
             .validate()
             .is_err());
@@ -657,7 +669,9 @@ mod tests {
             .validate()
             .is_err());
         // Valid mid-range recovery is accepted.
-        assert!(CreditParams::new("ACME", 0.4, "ACME-CDS").validate().is_ok());
+        assert!(CreditParams::new("ACME", 0.4, "ACME-CDS")
+            .validate()
+            .is_ok());
         // The shared corporate/sovereign presets are within bounds.
         assert!(CreditParams::corporate_standard("CORP", "CORP-CDS")
             .validate()
@@ -692,11 +706,15 @@ mod tests {
                 .validate()
                 .is_err()
         );
-        assert!(
-            InterestRateOptionParams::new(f64::INFINITY, expiry, OptionType::Put, "3M", notional)
-                .validate()
-                .is_err()
-        );
+        assert!(InterestRateOptionParams::new(
+            f64::INFINITY,
+            expiry,
+            OptionType::Put,
+            "3M",
+            notional
+        )
+        .validate()
+        .is_err());
         // A struct-literal spec that bypassed `new` is still checkable.
         let bad = InterestRateOptionParams {
             strike: f64::NAN,

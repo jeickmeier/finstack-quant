@@ -1022,8 +1022,7 @@ mod w40_tests {
             finstack_core::Error::Calibration { message, category } => {
                 assert_eq!(category, "bootstrapping");
                 assert!(
-                    message.contains("no converged root")
-                        && message.contains("sign-change root"),
+                    message.contains("no converged root") && message.contains("sign-change root"),
                     "error must explain the no-bracket failure mode; got: {message}"
                 );
             }

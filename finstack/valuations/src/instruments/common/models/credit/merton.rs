@@ -438,8 +438,8 @@ impl MertonModel {
                 let q = self.payout_rate;
                 let sqrt_t = horizon.sqrt();
 
-                let d1 = ((v / b).ln() + (r - q + 0.5 * sigma * sigma) * horizon)
-                    / (sigma * sqrt_t);
+                let d1 =
+                    ((v / b).ln() + (r - q + 0.5 * sigma * sigma) * horizon) / (sigma * sqrt_t);
                 let d2 = d1 - sigma * sqrt_t;
 
                 let exp_neg_qt = (-q * horizon).exp();

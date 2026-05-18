@@ -48,12 +48,8 @@ impl MetricCalculator for Fx01Calculator {
         // quoted as units of `to` per unit of `from`, so base-per-settlement
         // requires querying `(settlement -> base)`.
         let (from_ccy, to_ccy) = match ndf.quote_convention {
-            NdfQuoteConvention::BasePerSettlement => {
-                (ndf.settlement_currency, ndf.base_currency)
-            }
-            NdfQuoteConvention::SettlementPerBase => {
-                (ndf.base_currency, ndf.settlement_currency)
-            }
+            NdfQuoteConvention::BasePerSettlement => (ndf.settlement_currency, ndf.base_currency),
+            NdfQuoteConvention::SettlementPerBase => (ndf.base_currency, ndf.settlement_currency),
         };
         let spot = if let Some(rate) = ndf.spot_rate_override {
             rate
@@ -150,12 +146,7 @@ mod tests {
 
     /// Market with an explicit FX quote. `(from, to, rate)` follows the
     /// `FxProvider` contract (`rate` is `to` per `from`).
-    fn market_with_quote(
-        as_of: Date,
-        from: Currency,
-        to: Currency,
-        rate: f64,
-    ) -> MarketContext {
+    fn market_with_quote(as_of: Date, from: Currency, to: Currency, rate: f64) -> MarketContext {
         let provider = Arc::new(SimpleFxProvider::new());
         provider.set_quote(from, to, rate).expect("valid rate");
         curves(as_of).insert_fx(FxMatrix::new(provider))
@@ -213,7 +204,10 @@ mod tests {
         let fx01 = fx01_of(&ndf, &base_market, as_of);
 
         let pv_base = ndf.value(&base_market, as_of).expect("pv base").amount();
-        let pv_bumped = ndf.value(&bumped_market, as_of).expect("pv bumped").amount();
+        let pv_bumped = ndf
+            .value(&bumped_market, as_of)
+            .expect("pv bumped")
+            .amount();
         let fd = pv_bumped - pv_base;
 
         assert!(
@@ -265,7 +259,10 @@ mod tests {
         let fx01 = fx01_of(&ndf, &base_market, as_of);
 
         let pv_base = ndf.value(&base_market, as_of).expect("pv base").amount();
-        let pv_bumped = ndf.value(&bumped_market, as_of).expect("pv bumped").amount();
+        let pv_bumped = ndf
+            .value(&bumped_market, as_of)
+            .expect("pv bumped")
+            .amount();
         let fd = pv_bumped - pv_base;
 
         assert!(

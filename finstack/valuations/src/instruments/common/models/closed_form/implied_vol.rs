@@ -198,9 +198,7 @@ pub fn bs_implied_vol(
     // Iteration budget exhausted without the bracket collapsing or the price
     // residual reaching tolerance. Surface this as an explicit non-convergence
     // error instead of returning the last unconverged midpoint as `Ok`.
-    Err(finstack_core::Error::Validation(
-        NON_CONVERGENCE_MSG.into(),
-    ))
+    Err(finstack_core::Error::Validation(NON_CONVERGENCE_MSG.into()))
 }
 
 /// Solve for Black-76 implied volatility (forward-based).
@@ -314,9 +312,7 @@ pub fn black76_implied_vol(
 
     // Iteration budget exhausted without converging — surface explicitly rather
     // than returning the last unconverged midpoint as `Ok`.
-    Err(finstack_core::Error::Validation(
-        NON_CONVERGENCE_MSG.into(),
-    ))
+    Err(finstack_core::Error::Validation(NON_CONVERGENCE_MSG.into()))
 }
 
 #[cfg(test)]
@@ -372,9 +368,8 @@ mod tests {
     #[test]
     fn bisection_reports_non_convergence_explicitly() {
         // Sub-intrinsic target — unsolvable, must error (never silent Ok).
-        let intrinsic = (100.0_f64 * (-0.0_f64 * 1.0).exp()
-            - 80.0_f64 * (-0.05_f64 * 1.0).exp())
-        .max(0.0);
+        let intrinsic =
+            (100.0_f64 * (-0.0_f64 * 1.0).exp() - 80.0_f64 * (-0.05_f64 * 1.0).exp()).max(0.0);
         let err = bs_implied_vol(
             100.0,
             80.0,

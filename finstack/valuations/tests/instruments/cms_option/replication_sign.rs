@@ -305,7 +305,7 @@ fn test_cms_replication_floorlet_below_boundary() {
     let a0: f64 = (1..=40)
         .map(|i| 0.5 * (-0.03 * (t_fix + 0.5 * i as f64)).exp())
         .sum(); // diagnostic only
-    // Black-76 ATM put: vol=40%, T=t_fix ≈ 5Y, F=K=3%.
+                // Black-76 ATM put: vol=40%, T=t_fix ≈ 5Y, F=K=3%.
     let p_sw_k = b76_put(strike, strike, 0.40, t_fix);
     // Annuity-consistent boundary: g(K)·C_sw(K) = DF_pay·Black76_put(K).
     let boundary = df_pay * p_sw_k;
@@ -380,8 +380,8 @@ fn test_cms_replication_spread_exceeds_cap_integral() {
     // par annuity cancelling. `par_annuity`/`a0` are unused for the boundary.
     let df_pay = (-0.03_f64 * t_pay).exp();
     let _ = (par_annuity(strike, cms_tenor, m), cms_tenor, m); // not used in the boundary
-    // At ATM (K = F_swap = 3%), Black76_put(K) = Black76_call(K), so the cap
-    // and floor boundaries coincide.
+                                                               // At ATM (K = F_swap = 3%), Black76_put(K) = Black76_call(K), so the cap
+                                                               // and floor boundaries coincide.
     let p_sw_k = b76_put(strike, strike, vol, t_fix);
     let boundary = df_pay * p_sw_k; // = g(K)·C_sw(K) at ATM
 
@@ -462,9 +462,7 @@ fn test_cms_replication_boundary_is_annuity_consistent() {
     // boundary the corrected static replication must produce.
     let v_hagan = cap.value(&mkt, as_of).expect("hagan pricing").amount();
 
-    println!(
-        "Item 12 boundary test: v_replication={v_replication:.10}  v_hagan={v_hagan:.10}"
-    );
+    println!("Item 12 boundary test: v_replication={v_replication:.10}  v_hagan={v_hagan:.10}");
 
     assert!(
         v_replication > 0.0 && v_hagan > 0.0,

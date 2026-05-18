@@ -316,8 +316,7 @@ mod tests {
     /// which the Euler scheme would miss.
     #[test]
     fn utilization_step_uses_exact_ou_transition_mean() {
-        let utilization = UtilizationParams::new(2.0, 0.5, 0.2)
-            .expect("valid utilization params");
+        let utilization = UtilizationParams::new(2.0, 0.5, 0.2).expect("valid utilization params");
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
         let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);
@@ -363,8 +362,7 @@ mod tests {
         use finstack_monte_carlo::rng::philox::PhiloxRng;
         use finstack_monte_carlo::traits::RandomStream;
 
-        let utilization = UtilizationParams::new(1.0, 0.5, 0.05)
-            .expect("valid utilization params");
+        let utilization = UtilizationParams::new(1.0, 0.5, 0.05).expect("valid utilization params");
         let interest_rate = InterestRateSpec::Fixed { rate: 0.05 };
         let credit_spread = CreditSpreadParams::new(0.3, 0.02, 0.05, 0.015).unwrap();
         let params = RevolvingCreditProcessParams::new(utilization, interest_rate, credit_spread);

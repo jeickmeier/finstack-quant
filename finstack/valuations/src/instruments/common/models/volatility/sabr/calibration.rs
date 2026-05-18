@@ -480,11 +480,8 @@ impl SABRCalibrator {
         }
 
         // Pair and sort by strike so bracketing works regardless of input order.
-        let mut quotes: Vec<(f64, f64)> = strikes
-            .iter()
-            .copied()
-            .zip(vols.iter().copied())
-            .collect();
+        let mut quotes: Vec<(f64, f64)> =
+            strikes.iter().copied().zip(vols.iter().copied()).collect();
         quotes.sort_by(|a, b| a.0.total_cmp(&b.0));
 
         // Single quote: nothing to interpolate.

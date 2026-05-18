@@ -420,13 +420,13 @@ impl<'a> WaterfallContext<'a> {
                     )
                 }
                 // Generic / Level(k) / Adder all apply a *parallel* bp bump.
-                CreditStepKind::Generic
-                | CreditStepKind::Level(_)
-                | CreditStepKind::Adder => shift_hazard_curves(
-                    &self.current_market,
-                    &cascade.hazard_curve_ids,
-                    step.delta_bp,
-                )?,
+                CreditStepKind::Generic | CreditStepKind::Level(_) | CreditStepKind::Adder => {
+                    shift_hazard_curves(
+                        &self.current_market,
+                        &cascade.hazard_curve_ids,
+                        step.delta_bp,
+                    )?
+                }
             };
             let new_val = reprice_instrument(&self.current_instrument, &new_market, self.as_of_t1)?;
             self.num_repricings += 1;

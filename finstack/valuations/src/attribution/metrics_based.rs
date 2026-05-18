@@ -1551,7 +1551,11 @@ mod tests {
 
     /// Build a discount curve whose zero rate at each standard tenor is taken
     /// from `rates_by_tenor` (parallel to `STANDARD_TENORS`).
-    fn make_curve_from_zero_rates(id: &str, base_date: Date, rates_by_tenor: &[f64]) -> DiscountCurve {
+    fn make_curve_from_zero_rates(
+        id: &str,
+        base_date: Date,
+        rates_by_tenor: &[f64],
+    ) -> DiscountCurve {
         let mut knots = vec![(0.0, 1.0)];
         for (tenor, &rate) in finstack_core::market_data::diff::STANDARD_TENORS
             .iter()
@@ -1589,10 +1593,10 @@ mod tests {
         let t1_rates = [
             0.029, 0.029, 0.029, 0.0295, 0.030, 0.0305, 0.031, 0.031, 0.031,
         ];
-        let market_t0 = MarketContext::new()
-            .insert(make_curve_from_zero_rates("USD-OIS", as_of_t0, &t0_rates));
-        let market_t1 = MarketContext::new()
-            .insert(make_curve_from_zero_rates("USD-OIS", as_of_t1, &t1_rates));
+        let market_t0 =
+            MarketContext::new().insert(make_curve_from_zero_rates("USD-OIS", as_of_t0, &t0_rates));
+        let market_t1 =
+            MarketContext::new().insert(make_curve_from_zero_rates("USD-OIS", as_of_t1, &t1_rates));
 
         // Per-tenor key-rate DV01: concentrated at the LONG end (10y/30y),
         // so the steepener's long-end rise dominates the attributed P&L.

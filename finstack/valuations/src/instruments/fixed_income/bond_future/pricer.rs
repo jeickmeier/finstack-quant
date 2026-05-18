@@ -813,7 +813,7 @@ mod tests {
             as_of,
             as_of + time::Duration::days(90),
         )
-            .expect("Failed to calculate model futures price for par bond");
+        .expect("Failed to calculate model futures price for par bond");
 
         // For a par bond with CF ~1.0, model price should be close to 100
         println!("CF: {}, Model Price: {}", cf, model_price);
@@ -846,7 +846,7 @@ mod tests {
             as_of,
             as_of + time::Duration::days(90),
         )
-            .expect("Failed to calculate model futures price for discount bond");
+        .expect("Failed to calculate model futures price for discount bond");
 
         // Model price should be positive and reasonable
         println!("Discount bond - CF: {}, Model Price: {}", cf, model_price);
@@ -876,7 +876,7 @@ mod tests {
             as_of,
             as_of + time::Duration::days(90),
         )
-            .expect("Failed to calculate model futures price for premium bond");
+        .expect("Failed to calculate model futures price for premium bond");
 
         // Model price should be above 100 for premium bond
         println!("Premium bond - CF: {}, Model Price: {}", cf, model_price);
@@ -908,7 +908,7 @@ mod tests {
             as_of,
             as_of + time::Duration::days(90),
         )
-            .expect("Failed to calculate model futures price for manual verification");
+        .expect("Failed to calculate model futures price for manual verification");
 
         println!("\n=== Manual Verification ===");
         println!("Bond: 5% coupon, priced at 5% market rate");
@@ -968,8 +968,8 @@ mod tests {
         let mut pv_interim = 0.0;
         for (date, amount) in &flows {
             if *date > as_of && *date <= delivery_date {
-                pv_interim += amount.amount()
-                    * disc.df_between_dates(as_of, *date).expect("interim df");
+                pv_interim +=
+                    amount.amount() * disc.df_between_dates(as_of, *date).expect("interim df");
             }
         }
         let df_delivery = disc
@@ -980,8 +980,7 @@ mod tests {
         let accrued_delivery =
             accrued_interest_amount(&schedule, delivery_date, &bond.accrual_config())
                 .expect("accrued at delivery");
-        let forward_clean_pct =
-            (forward_dirty - accrued_delivery) / bond.notional.amount() * 100.0;
+        let forward_clean_pct = (forward_dirty - accrued_delivery) / bond.notional.amount() * 100.0;
         let expected = forward_clean_pct / cf;
 
         assert!(
@@ -992,12 +991,8 @@ mod tests {
 
         // The carry-adjusted forward must differ from the old spot-clean proxy:
         // discounting the dirty PV to a clean spot price and dividing by CF.
-        let spot_accrued = accrued_interest_amount(
-            &schedule,
-            as_of,
-            &bond.accrual_config(),
-        )
-        .expect("accrued today");
+        let spot_accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config())
+            .expect("accrued today");
         let spot_clean_pct = (spot_dirty - spot_accrued) / bond.notional.amount() * 100.0;
         let old_proxy = spot_clean_pct / cf;
         assert!(
@@ -1181,7 +1176,7 @@ mod tests {
             as_of,
             future.delivery_start,
         )
-            .expect("Failed to calculate model price");
+        .expect("Failed to calculate model price");
 
         let npv = BondFuturePricer::calculate_npv(&future, &ctd_bond, cf, &market, as_of)
             .expect("Failed to calculate NPV");

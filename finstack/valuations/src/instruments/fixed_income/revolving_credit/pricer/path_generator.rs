@@ -80,10 +80,7 @@ pub fn generate_three_factor_paths(
             // Handle zero volatility case (for deterministic/parity testing)
             let is_zero = volatility.abs() < 1e-8;
             let vol = if is_zero { 1e-10 } else { *volatility };
-            (
-                UtilizationParams::new(*speed, *target_rate, vol)?,
-                is_zero,
-            )
+            (UtilizationParams::new(*speed, *target_rate, vol)?, is_zero)
         }
     };
 

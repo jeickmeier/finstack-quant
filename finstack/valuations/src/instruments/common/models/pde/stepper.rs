@@ -282,7 +282,12 @@ impl TimeStepper for RannacherStepper {
 ///
 /// Returns `f64::INFINITY` when the diffusion vanishes everywhere (a
 /// degenerate, convection/reaction-only problem has no diffusive CFL limit).
-fn cfl_max_dt(problem: &dyn PdeProblem1D, grid: &Grid1D, t_from: f64, t_to: f64) -> (f64, f64, f64) {
+fn cfl_max_dt(
+    problem: &dyn PdeProblem1D,
+    grid: &Grid1D,
+    t_from: f64,
+    t_to: f64,
+) -> (f64, f64, f64) {
     let pts = grid.points();
 
     // Smallest spacing between any two adjacent grid points.
@@ -820,9 +825,7 @@ mod tests {
                     "the violation must cite the tighter interval CFL bound"
                 );
             }
-            other => panic!(
-                "expected CflViolation from the interval-max CFL bound, got {other:?}"
-            ),
+            other => panic!("expected CflViolation from the interval-max CFL bound, got {other:?}"),
         }
     }
 

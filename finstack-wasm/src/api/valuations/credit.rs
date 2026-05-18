@@ -245,8 +245,7 @@ mod tests {
     #[test]
     fn toggle_exercise_optimal_json_accepts_reasonable_path_count() {
         // A normal nested-path count round-trips into a valid model payload.
-        let json =
-            toggle_exercise_optimal_json(10_000, 0.10, 0.25, 0.04, 5.0).expect("model json");
+        let json = toggle_exercise_optimal_json(10_000, 0.10, 0.25, 0.04, 5.0).expect("model json");
         let model: ToggleExerciseModel =
             serde_json::from_str(&json).expect("payload must deserialize");
         match model {

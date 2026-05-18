@@ -863,11 +863,7 @@ mod tests {
         let tranche = with_reinvest.get("A").expect("tranche A");
 
         // Total interest collected by the senior tranche over the deal life.
-        let total_interest: f64 = tranche
-            .interest_flows
-            .iter()
-            .map(|(_, m)| m.amount())
-            .sum();
+        let total_interest: f64 = tranche.interest_flows.iter().map(|(_, m)| m.amount()).sum();
         // Total principal returned.
         let total_principal: f64 = tranche
             .principal_flows
@@ -1175,7 +1171,10 @@ mod tests {
         let level_payment = state.pool_state.level_payments[0]
             .expect("level payment must be frozen after the first amortizing period");
         let sched1 = flows1.scheduled_principal.amount();
-        assert!(sched1 > 0.0, "period 1 must amortize some scheduled principal");
+        assert!(
+            sched1 > 0.0,
+            "period 1 must amortize some scheduled principal"
+        );
 
         // ── Simulate an external prepayment: halve the asset balance. ───
         let balance_after_prepay = state.pool_state.balances[0] * 0.5;
@@ -1311,7 +1310,10 @@ mod tests {
         let pool_no_default = build_pool(None);
         let tranches_a = make_tranches();
         let interest_no_default = one_period_interest(&pool_no_default, &tranches_a);
-        assert!(interest_no_default > 0.0, "baseline interest must be positive");
+        assert!(
+            interest_no_default > 0.0,
+            "baseline interest must be positive"
+        );
 
         // High monthly MDR ⇒ large period default fraction.
         let monthly_mdr = 0.10_f64;
@@ -1670,8 +1672,8 @@ fn simulate_period(
     // to throw off interest, principal and defaults in later periods.
     // Recoveries are CASH and are never recycled — they flow to the waterfall.
     if is_reinvestment_active {
-        let recyclable =
-            pool_flows.scheduled_principal.amount().max(0.0) + pool_flows.prepayment.amount().max(0.0);
+        let recyclable = pool_flows.scheduled_principal.amount().max(0.0)
+            + pool_flows.prepayment.amount().max(0.0);
         if recyclable.is_finite() && recyclable > 0.0 {
             recycle_reinvestment_principal(state, recyclable);
         }
@@ -1728,8 +1730,7 @@ fn simulate_period(
             .values()
             .map(|r| r.total_writedown.amount())
             .sum();
-        let mut remaining_loss =
-            (state.cumulative_expected_loss - already_allocated).max(0.0);
+        let mut remaining_loss = (state.cumulative_expected_loss - already_allocated).max(0.0);
         // Clone loss_alloc_order to avoid borrow conflict with state
         let loss_order = state.loss_alloc_order.clone();
         for &idx in &loss_order {
@@ -2254,9 +2255,7 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
     // rather than an implicit assumption.
     if let Some(mask) = per_name_mask {
         let performing = (0..n)
-            .filter(|&i| {
-                state.pool_state.balances[i] > 0.0 && !state.pool_state.is_defaulted[i]
-            })
+            .filter(|&i| state.pool_state.balances[i] > 0.0 && !state.pool_state.is_defaulted[i])
             .count();
         if mask.len() != performing {
             return Err(finstack_core::Error::Validation(format!(

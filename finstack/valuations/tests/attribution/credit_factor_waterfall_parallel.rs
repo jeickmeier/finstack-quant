@@ -273,7 +273,9 @@ fn waterfall_twisted_hazard_attributes_curve_shape_not_adder() {
         flat_discount(as_of_t1),
         twisted_hazard(
             as_of_t1,
-            &[0.030, 0.030, 0.025, 0.025, 0.020, 0.015, 0.015, 0.010, 0.010],
+            &[
+                0.030, 0.030, 0.025, 0.025, 0.020, 0.015, 0.015, 0.010, 0.010,
+            ],
         ),
     );
 

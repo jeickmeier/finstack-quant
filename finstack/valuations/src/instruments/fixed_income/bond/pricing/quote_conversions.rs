@@ -959,9 +959,9 @@ pub fn price_from_z_spread(
         // Time and base discount factor are both measured from `quote_date`
         // (the settlement origin the Z-spread was solved on), so the
         // exponential z-spread term `exp(-z * t)` is applied on the same axis.
-        let t_from_quote = disc
-            .day_count()
-            .year_fraction(quote_date, *d, DayCountContext::default())?;
+        let t_from_quote =
+            disc.day_count()
+                .year_fraction(quote_date, *d, DayCountContext::default())?;
 
         let df = disc.df_between_dates(quote_date, *d)?;
         let df_z = z_spread_discount_factor(df, t_from_quote, z, compounds_per_year);

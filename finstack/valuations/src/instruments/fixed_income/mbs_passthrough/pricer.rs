@@ -425,8 +425,7 @@ mod tests {
 
         let balance = first.beginning_balance;
         // The accrual month spans [period_start, first-of-next-month) = 31 days.
-        let accrual_end =
-            Date::from_calendar_date(2024, Month::February, 1).expect("valid");
+        let accrual_end = Date::from_calendar_date(2024, Month::February, 1).expect("valid");
         let expected_yf = DayCount::Act360
             .year_fraction(first.period_start, accrual_end, DayCountContext::default())
             .expect("yf");

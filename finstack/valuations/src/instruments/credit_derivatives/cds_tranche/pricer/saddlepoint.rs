@@ -140,7 +140,7 @@ fn cgf_derivs(s: f64, a: &[f64], p: &[f64]) -> (f64, f64, f64) {
         let exponent = (s * ai).clamp(-MAX_TILT_EXP, MAX_TILT_EXP);
         let e = exponent.exp();
         let denom = q + pi * e; // > 0 always (q ≥ 0, p·e > 0)
-        // tilted Bernoulli probability for name i under measure shifted by s
+                                // tilted Bernoulli probability for name i under measure shifted by s
         let pt = (pi * e) / denom;
         k0 += denom.ln();
         k1 += ai * pt;
@@ -183,14 +183,9 @@ fn solve_saddle(target: f64, a: &[f64], p: &[f64]) -> Option<f64> {
             lo = s;
         }
         // Newton step, guarded by the bracket.
-        let mut next = if k2 > 0.0 {
-            s - resid / k2
-        } else {
-            f64::NAN
-        };
-        let in_bracket = next.is_finite()
-            && (lo.is_infinite() || next > lo)
-            && (hi.is_infinite() || next < hi);
+        let mut next = if k2 > 0.0 { s - resid / k2 } else { f64::NAN };
+        let in_bracket =
+            next.is_finite() && (lo.is_infinite() || next > lo) && (hi.is_infinite() || next < hi);
         if !in_bracket {
             // Bisection / outward expansion fallback.
             next = match (lo.is_finite(), hi.is_finite()) {
@@ -225,7 +220,9 @@ fn solve_saddle(target: f64, a: &[f64], p: &[f64]) -> Option<f64> {
 /// (passed in to avoid recomputing the `s = 0` CGF).
 fn spa_call(k: f64, mu: f64, var: f64, a: &[f64], p: &[f64]) -> f64 {
     // Total reachable loss: e^{s·a} support ⇒ L ∈ [0, Σaᵢ].
-    let total: f64 = a.iter().zip(p.iter())
+    let total: f64 = a
+        .iter()
+        .zip(p.iter())
         .filter(|(&ai, &pi)| ai > 0.0 && pi > 0.0)
         .map(|(&ai, _)| ai)
         .sum();

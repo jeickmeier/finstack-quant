@@ -390,13 +390,8 @@ mod tests {
         let schedule = SwapSchedule::new(1.0, 1.25, payment_dates, accruals)
             .expect("valid swap schedule inputs");
         // Unsorted exercise dates must produce an Err, not a panic.
-        let result = BermudanSwaptionPayoff::new(
-            vec![1.5, 1.0],
-            schedule,
-            0.0325,
-            SwaptionType::Payer,
-            1.0,
-        );
+        let result =
+            BermudanSwaptionPayoff::new(vec![1.5, 1.0], schedule, 0.0325, SwaptionType::Payer, 1.0);
         assert!(
             result.is_err(),
             "unsorted exercise dates must return Err, not panic"

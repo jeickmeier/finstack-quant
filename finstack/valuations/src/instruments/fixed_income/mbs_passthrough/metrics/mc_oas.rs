@@ -592,7 +592,10 @@ mod tests {
 
         // And price_on_path itself must run without producing a non-finite PV.
         let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0).expect("price");
-        assert!(pv.is_finite() && pv > 0.0, "path PV must be finite/positive");
+        assert!(
+            pv.is_finite() && pv > 0.0,
+            "path PV must be finite/positive"
+        );
     }
 
     #[test]

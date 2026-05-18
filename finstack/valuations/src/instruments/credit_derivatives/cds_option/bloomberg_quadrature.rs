@@ -1178,8 +1178,7 @@ mod tests {
         // They must be DISTINCT — the dual-annuity design is deliberate.
         // If a refactor unifies them this difference collapses to ~0 and the
         // assertion fires, prompting a re-check against the Bloomberg golden.
-        let rel_diff =
-            (triangle_annuity - bootstrapped_annuity).abs() / bootstrapped_annuity.abs();
+        let rel_diff = (triangle_annuity - bootstrapped_annuity).abs() / bootstrapped_annuity.abs();
         assert!(
             rel_diff > 1e-4,
             "F_0-anchor and integrand annuities must remain distinct (Bloomberg \

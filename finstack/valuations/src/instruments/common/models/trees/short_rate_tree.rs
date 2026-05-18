@@ -791,8 +791,8 @@ impl ShortRateTree {
                 let node_df = (-rate * dt).exp();
                 // `contains` is `false` for a `NaN` node_df, so the negation
                 // correctly flags non-finite values as pathological too.
-                let df_in_range = (MIN_NODE_DISCOUNT_FACTOR..=MAX_NODE_DISCOUNT_FACTOR)
-                    .contains(&node_df);
+                let df_in_range =
+                    (MIN_NODE_DISCOUNT_FACTOR..=MAX_NODE_DISCOUNT_FACTOR).contains(&node_df);
                 if !df_in_range {
                     self.calibration_quality = Some(CalibrationResult {
                         max_error_bps,

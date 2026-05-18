@@ -85,8 +85,7 @@ impl MetricCalculator for BondCs01Calculator {
         // as `ZSpreadCalculator`, so `base_npv` is the dirty price the z-spread
         // was solved to and the finite difference is taken on the right curve.
         let base_npv = price_from_z_spread(bond, &context.curves, context.as_of, base_spread)?;
-        let bumped_npv =
-            price_from_z_spread(bond, &context.curves, context.as_of, bumped_spread)?;
+        let bumped_npv = price_from_z_spread(bond, &context.curves, context.as_of, bumped_spread)?;
 
         let cs01 = bumped_npv - base_npv;
 

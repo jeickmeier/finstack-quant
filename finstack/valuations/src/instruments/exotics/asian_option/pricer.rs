@@ -1817,9 +1817,7 @@ mod tests {
     fn w04_close_fixings_map_to_distinct_steps() {
         let as_of = date(2025, 1, 1);
         // Twelve monthly fixings within one year.
-        let fixing_dates: Vec<Date> = (1..=12)
-            .map(|m| date(2025, m, 15))
-            .collect();
+        let fixing_dates: Vec<Date> = (1..=12).map(|m| date(2025, m, 15)).collect();
         let t = DayCount::Act365F
             .year_fraction(as_of, date(2026, 1, 1), DayCountContext::default())
             .expect("year fraction");
@@ -1845,7 +1843,9 @@ mod tests {
             );
         }
         assert!(
-            grid.fixing_steps.iter().all(|&s| s >= 1 && s <= grid.num_steps),
+            grid.fixing_steps
+                .iter()
+                .all(|&s| s >= 1 && s <= grid.num_steps),
             "every fixing step must lie in [1, num_steps={}]",
             grid.num_steps
         );
@@ -1914,8 +1914,18 @@ mod tests {
         // Equally spaced fixings t_i = i*T/n, i = 1..n.
         let future_times: Vec<f64> = (1..=n).map(|i| i as f64 * t / n as f64).collect();
 
-        let seasoned_call =
-            seasoned_geometric_asian_control(spot, strike, r, q, sigma, df, 0.0, 0, &future_times, true);
+        let seasoned_call = seasoned_geometric_asian_control(
+            spot,
+            strike,
+            r,
+            q,
+            sigma,
+            df,
+            0.0,
+            0,
+            &future_times,
+            true,
+        );
         let kv_call = geometric_asian_call(spot, strike, t, r, q, sigma, n);
         assert!(
             (seasoned_call - kv_call).abs() < 1e-9,
@@ -1923,8 +1933,18 @@ mod tests {
              Kemna-Vorst {kv_call}"
         );
 
-        let seasoned_put =
-            seasoned_geometric_asian_control(spot, strike, r, q, sigma, df, 0.0, 0, &future_times, false);
+        let seasoned_put = seasoned_geometric_asian_control(
+            spot,
+            strike,
+            r,
+            q,
+            sigma,
+            df,
+            0.0,
+            0,
+            &future_times,
+            false,
+        );
         let kv_put = geometric_asian_put(spot, strike, t, r, q, sigma, n);
         assert!(
             (seasoned_put - kv_put).abs() < 1e-9,
@@ -1951,10 +1971,30 @@ mod tests {
         let low_hist = 2.0 * 90.0_f64.ln();
         let high_hist = 2.0 * 130.0_f64.ln();
 
-        let call_low =
-            seasoned_geometric_asian_control(spot, strike, r, q, sigma, df, low_hist, 2, &future_times, true);
-        let call_high =
-            seasoned_geometric_asian_control(spot, strike, r, q, sigma, df, high_hist, 2, &future_times, true);
+        let call_low = seasoned_geometric_asian_control(
+            spot,
+            strike,
+            r,
+            q,
+            sigma,
+            df,
+            low_hist,
+            2,
+            &future_times,
+            true,
+        );
+        let call_high = seasoned_geometric_asian_control(
+            spot,
+            strike,
+            r,
+            q,
+            sigma,
+            df,
+            high_hist,
+            2,
+            &future_times,
+            true,
+        );
 
         assert!(call_low.is_finite() && call_low >= 0.0);
         assert!(call_high.is_finite() && call_high >= 0.0);

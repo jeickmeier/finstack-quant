@@ -455,7 +455,9 @@ mod tests {
         assert!(
             matches!(
                 result,
-                Err(PdeSolver2DError::Stepper(StepperError::PecletViolation { .. }))
+                Err(PdeSolver2DError::Stepper(
+                    StepperError::PecletViolation { .. }
+                ))
             ),
             "a convection-dominated 2D solve must surface a PecletViolation, got {result:?}"
         );

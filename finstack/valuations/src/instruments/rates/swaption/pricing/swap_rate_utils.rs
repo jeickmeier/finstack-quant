@@ -222,11 +222,7 @@ impl ForwardSwapRate {
 
         // Identify the first not-yet-paid coupon time, so its accrual weight
         // can be reduced to the stub `(T_first − t)` for a started swap.
-        let first_remaining_payment = schedule
-            .payment_dates
-            .iter()
-            .copied()
-            .find(|&pt| pt > t);
+        let first_remaining_payment = schedule.payment_dates.iter().copied().find(|&pt| pt > t);
 
         // Annuity: A(t) = Σ τ_i · P(t, T_i), with the first remaining period's
         // weight clamped to the stub fraction for a started swap.
@@ -535,7 +531,10 @@ mod tests {
         let adj_high_rate = ForwardSwapRate::convexity_adjustment(vol, time, swap_tenor, 0.05);
 
         for adj in [adj_low_rate, adj_high_rate] {
-            assert!(adj.is_finite() && adj > 0.0 && adj < 0.05, "insane adj {adj}");
+            assert!(
+                adj.is_finite() && adj > 0.0 && adj < 0.05,
+                "insane adj {adj}"
+            );
         }
         assert!(
             (adj_low_rate - adj_high_rate).abs() > 1e-9,

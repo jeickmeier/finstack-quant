@@ -1308,8 +1308,7 @@ fn test_z_spread_roundtrip_with_settlement_lag() {
         "USD-OIS",
     )
     .expect("bond should build");
-    bond.cashflow_spec =
-        CashflowSpec::fixed_rate(0.05.into(), Tenor::annual(), DayCount::Act365F);
+    bond.cashflow_spec = CashflowSpec::fixed_rate(0.05.into(), Tenor::annual(), DayCount::Act365F);
     // 3-business-day settlement lag => quote_date strictly after as_of.
     bond.settlement_convention = Some(BondSettlementConvention {
         settlement_days: 3,

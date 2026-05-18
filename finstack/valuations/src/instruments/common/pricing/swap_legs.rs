@@ -986,11 +986,12 @@ where
         // rate params so they are not applied a second time to the now-averaged
         // period rate. Spread, gearing, and the all-in floor/cap still apply.
         let all_in_rate = if is_compounded {
-            let rate_params_no_index_bounds = crate::cashflow::builder::rate_helpers::FloatingRateParams {
-                index_floor_bp: None,
-                index_cap_bp: None,
-                ..params.rate_params.clone()
-            };
+            let rate_params_no_index_bounds =
+                crate::cashflow::builder::rate_helpers::FloatingRateParams {
+                    index_floor_bp: None,
+                    index_cap_bp: None,
+                    ..params.rate_params.clone()
+                };
             crate::cashflow::builder::rate_helpers::calculate_floating_rate(
                 index_rate,
                 &rate_params_no_index_bounds,
@@ -2094,7 +2095,8 @@ mod tests {
         }];
 
         // Compounded leg, no observation shift.
-        let params = FloatingLegParams::with_spread(0.0).with_compounding(CompoundingMethod::Compounded);
+        let params =
+            FloatingLegParams::with_spread(0.0).with_compounding(CompoundingMethod::Compounded);
 
         let pv = pv_floating_leg(
             periods.into_iter(),
@@ -2226,7 +2228,8 @@ mod tests {
             reset_date: Some(date(2024, 7, 1)),
             year_fraction: 0.0,
         };
-        let params = FloatingLegParams::with_spread(0.0).with_compounding(CompoundingMethod::Compounded);
+        let params =
+            FloatingLegParams::with_spread(0.0).with_compounding(CompoundingMethod::Compounded);
         let result = pv_floating_leg(
             vec![degenerate].into_iter(),
             1_000_000.0,

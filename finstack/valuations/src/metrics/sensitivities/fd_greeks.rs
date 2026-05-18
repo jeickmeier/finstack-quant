@@ -99,9 +99,7 @@ fn effective_spot_bump(spot: f64, bump_pct: f64) -> SpotBump {
 /// minimum to detect the clamp and fall back to a one-sided difference.
 ///
 /// Returns `None` for an empty grid.
-fn min_surface_vol(
-    surface: &finstack_core::market_data::surfaces::VolSurface,
-) -> Option<f64> {
+fn min_surface_vol(surface: &finstack_core::market_data::surfaces::VolSurface) -> Option<f64> {
     let mut min_vol: Option<f64> = None;
     for &expiry in surface.expiries() {
         for &strike in surface.strikes() {
@@ -1519,14 +1517,10 @@ mod tests {
         // difference `(PV(σ+h) − PV(σ)) / h`.
         let as_of = date!(2025 - 01 - 01);
         let slope = 1_000_000.0; // PV = slope · σ.
-        let inst = VolLinearInstrument::new(
-            "VEGA-CLAMP",
-            date!(2026 - 01 - 01),
-            "SPOT",
-            "LOWVOL",
-            slope,
-        );
-        let market = market_with_spot("SPOT", 100.0).insert_surface(flat_vol_surface("LOWVOL", 0.005));
+        let inst =
+            VolLinearInstrument::new("VEGA-CLAMP", date!(2026 - 01 - 01), "SPOT", "LOWVOL", slope);
+        let market =
+            market_with_spot("SPOT", 100.0).insert_surface(flat_vol_surface("LOWVOL", 0.005));
 
         let base_value = inst.value(&market, as_of).expect("base pv");
         let mut registry = MetricRegistry::new();

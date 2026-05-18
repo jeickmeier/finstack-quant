@@ -5,7 +5,9 @@
 
 use super::tranches::pac_support::PacSchedule;
 use super::types::{AgencyCmo, CmoTranche, CmoTrancheType, PacCollar};
-use super::waterfall::{allocate_io_cashflow, execute_waterfall_with_principal_breakdown, PacContext};
+use super::waterfall::{
+    allocate_io_cashflow, execute_waterfall_with_principal_breakdown, PacContext,
+};
 use crate::cashflow::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
 use crate::cashflow::primitives::{CFKind, CashFlow};

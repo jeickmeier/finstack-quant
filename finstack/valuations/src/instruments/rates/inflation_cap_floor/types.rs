@@ -686,6 +686,9 @@ mod yoy_convexity_tests {
     #[test]
     fn zero_accrual_is_handled() {
         let r = yoy_convexity_adjusted_rate(1.02, 0.0, 0.015, None, None);
-        assert!(r.is_finite() || r.is_infinite(), "must not panic on zero accrual");
+        assert!(
+            r.is_finite() || r.is_infinite(),
+            "must not panic on zero accrual"
+        );
     }
 }

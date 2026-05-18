@@ -866,7 +866,9 @@ mod tests {
         );
 
         // The grid must still span the full range and stay within bounds.
-        assert!(grid.iter().all(|&v| v >= hcfg.hazard_hard_min && v <= max_h));
+        assert!(grid
+            .iter()
+            .all(|&v| v >= hcfg.hazard_hard_min && v <= max_h));
         assert!(
             grid.iter().any(|&v| (v - max_h).abs() < 1e-12),
             "hazard_hard_max anchor must still be present"

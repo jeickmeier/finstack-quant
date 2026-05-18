@@ -297,10 +297,7 @@ mod tests {
 
         // The buggy time-axis lookup disagrees: `zero(t)` reads df at curve
         // time `t` (anchored at base_date), not the option's `as_of→expiry` df.
-        let bug_r_dom = market
-            .get_discount("USD-OIS")
-            .expect("usd")
-            .zero(t);
+        let bug_r_dom = market.get_discount("USD-OIS").expect("usd").zero(t);
         assert!(
             ((-bug_r_dom * t).exp() - df_dom).abs() > 1e-4,
             "fixture must expose the curve-axis bug for the domestic rate"

@@ -723,8 +723,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
                     .steps
                     .par_iter()
                     .map(|step| -> Result<Money> {
-                        if matches!(step.kind, super::credit_cascade::CreditStepKind::CurveShape)
-                        {
+                        if matches!(step.kind, super::credit_cascade::CreditStepKind::CurveShape) {
                             // Placeholder; the curve-shape P&L is filled in
                             // below as the closing residual.
                             return Ok(Money::new(0.0, val_t1.currency()));
@@ -762,8 +761,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
                 // component) rather than left in a generic cross-factor bucket.
                 // `curve_shape = credit_curves_pnl − Σ(parallel steps)` makes
                 // `Σ all steps ≡ credit_curves_pnl` hold exactly.
-                let curve_shape_amt =
-                    attribution.credit_curves_pnl.amount() - parallel_step_sum;
+                let curve_shape_amt = attribution.credit_curves_pnl.amount() - parallel_step_sum;
                 for (pnl, step) in step_pnls.iter_mut().zip(cascade.steps.iter()) {
                     if matches!(step.kind, super::credit_cascade::CreditStepKind::CurveShape) {
                         *pnl = Money::new(curve_shape_amt, val_t1.currency());

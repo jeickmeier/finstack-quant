@@ -84,7 +84,8 @@ impl AttributionSpec {
                 TenorSamplingMethod::Standard,
             ) {
                 total_shift_bp += shift;
-                total_abs_shift_bp += hazard_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
+                total_abs_shift_bp +=
+                    hazard_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
                 count += 1;
             }
         }

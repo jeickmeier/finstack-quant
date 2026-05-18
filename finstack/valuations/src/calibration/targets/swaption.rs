@@ -1194,8 +1194,7 @@ mod tests {
         let good_expiry_years = 1.0_f64;
         let tenor_years = 5.0_f64;
         let good_expiry_date = base_date.add_months((good_expiry_years * 12.0).round() as i32);
-        let good_maturity_date =
-            good_expiry_date.add_months((tenor_years * 12.0).round() as i32);
+        let good_maturity_date = good_expiry_date.add_months((tenor_years * 12.0).round() as i32);
         let good_t_exp = to_basis_points(
             DayCount::Act365F
                 .year_fraction(base_date, good_expiry_date, DayCountContext::default())
@@ -1204,7 +1203,11 @@ mod tests {
             / 10_000.0;
         let good_t_ten = to_basis_points(
             DayCount::Act365F
-                .year_fraction(good_expiry_date, good_maturity_date, DayCountContext::default())
+                .year_fraction(
+                    good_expiry_date,
+                    good_maturity_date,
+                    DayCountContext::default(),
+                )
                 .expect("t_ten"),
         ) as f64
             / 10_000.0;

@@ -344,8 +344,7 @@ mod tests {
     #[test]
     fn bs_implied_vol_recovers_sigma() {
         let sigma = 0.25;
-        let price =
-            bs_price_js(100.0, 110.0, 0.03, 0.01, sigma, 0.75, true).expect("finite price");
+        let price = bs_price_js(100.0, 110.0, 0.03, 0.01, sigma, 0.75, true).expect("finite price");
         let iv = bs_implied_vol_js(100.0, 110.0, 0.03, 0.01, 0.75, price, true)
             .expect("solver should converge");
         assert!((iv - sigma).abs() < 1e-6, "iv={iv} sigma={sigma}");
@@ -387,7 +386,16 @@ mod tests {
         );
         // A well-posed input still returns a finite price.
         assert!(quanto_option_price_js(
-            100.0, 100.0, 1.0, 0.03, 0.01, 0.0, 0.20, 0.10, 0.3, Some(true)
+            100.0,
+            100.0,
+            1.0,
+            0.03,
+            0.01,
+            0.0,
+            0.20,
+            0.10,
+            0.3,
+            Some(true)
         )
         .is_ok());
     }

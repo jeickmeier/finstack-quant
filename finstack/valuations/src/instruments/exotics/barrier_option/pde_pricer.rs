@@ -407,11 +407,7 @@ impl BarrierOptionPdePricer {
     ///
     /// Uses the same grid and Rannacher stepper as [`Self::price_knock_out`] so
     /// that `KI = Vanilla - KO` is a consistent finite-difference difference.
-    fn price_vanilla(
-        &self,
-        grid: &Grid1D,
-        inputs: VanillaPdeInputs,
-    ) -> Result<f64, PricingError> {
+    fn price_vanilla(&self, grid: &Grid1D, inputs: VanillaPdeInputs) -> Result<f64, PricingError> {
         use crate::instruments::common_impl::models::pde::BlackScholesPde;
 
         let pde = BlackScholesPde {
@@ -575,7 +571,11 @@ mod tests {
             .amount();
 
         let t = DayCount::Act365F
-            .year_fraction(as_of, expiry, finstack_core::dates::DayCountContext::default())
+            .year_fraction(
+                as_of,
+                expiry,
+                finstack_core::dates::DayCountContext::default(),
+            )
             .expect("year fraction");
         let analytical = down_out_call(spot, strike, barrier, t, rate, 0.0, vol);
 
@@ -633,14 +633,17 @@ mod tests {
         let prices: Vec<f64> = ladder.iter().map(|&s| price_at(s)).collect();
 
         let t = DayCount::Act365F
-            .year_fraction(as_of, expiry, finstack_core::dates::DayCountContext::default())
+            .year_fraction(
+                as_of,
+                expiry,
+                finstack_core::dates::DayCountContext::default(),
+            )
             .expect("year fraction");
 
         for (&spot, &pv) in ladder.iter().zip(prices.iter()) {
             // Vanilla (unbarriered) call as an upper bound.
             let df = (-rate * t).exp();
-            let d1 =
-                ((spot / strike).ln() + (rate + 0.5 * vol * vol) * t) / (vol * t.sqrt());
+            let d1 = ((spot / strike).ln() + (rate + 0.5 * vol * vol) * t) / (vol * t.sqrt());
             let d2 = d1 - vol * t.sqrt();
             let vanilla = spot * finstack_core::math::norm_cdf(d1)
                 - strike * df * finstack_core::math::norm_cdf(d2);
@@ -716,7 +719,11 @@ mod tests {
             .amount();
 
         let t = DayCount::Act365F
-            .year_fraction(as_of, expiry, finstack_core::dates::DayCountContext::default())
+            .year_fraction(
+                as_of,
+                expiry,
+                finstack_core::dates::DayCountContext::default(),
+            )
             .expect("year fraction");
         // Analytical vanilla call (Black-Scholes) and analytical down-and-out.
         let df = (-rate * t).exp();

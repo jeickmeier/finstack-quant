@@ -282,7 +282,6 @@ fn test_callable_quoted_bond_can_request_callable_oas_risk_basis() {
     );
 }
 
-
 /// Item 3a regression: a callable bond on the default (`BulletDiscountable` /
 /// Workout) risk basis with **no market price quote** must not report a
 /// straight-bullet curve-bump DV01 that silently discards the embedded option.

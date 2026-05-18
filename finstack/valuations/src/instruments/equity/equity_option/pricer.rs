@@ -1041,12 +1041,9 @@ mod tests {
         );
 
         // And it must NOT equal the naive rho that holds S* fixed.
-        let inputs = collect_inputs_extended(
-            &opt,
-            &market(as_of, 100.0, 0.20, base_rate, 0.0),
-            as_of,
-        )
-        .expect("inputs");
+        let inputs =
+            collect_inputs_extended(&opt, &market(as_of, 100.0, 0.20, base_rate, 0.0), as_of)
+                .expect("inputs");
         let naive = bs_greeks(
             inputs.spot,
             opt.strike,

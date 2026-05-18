@@ -412,10 +412,10 @@ mod tests {
         // A range of moneyness offsets, including a coarse-grid-sized 9% gap
         // where the exact/Taylor discrepancy is clearly material.
         for &(forward, k0) in &[
-            (100.6, 100.0),  // ~0.6% — fine grid
-            (102.5, 100.0),  // 2.5%
-            (109.0, 100.0),  // 9% — coarse grid
-            (95.0, 100.0),   // forward below K₀ (last strike <= F can equal F-side)
+            (100.6, 100.0), // ~0.6% — fine grid
+            (102.5, 100.0), // 2.5%
+            (109.0, 100.0), // 9% — coarse grid
+            (95.0, 100.0),  // forward below K₀ (last strike <= F can equal F-side)
         ] {
             let m = forward / k0;
             let exact = demeterfi_anchor(forward, k0, t);
@@ -558,7 +558,13 @@ mod tests {
         );
 
         // Surface returns a NaN vol for one strike: broken.
-        let nan_at_120 = |_t: f64, k: f64| if (k - 120.0).abs() < 1e-9 { f64::NAN } else { 0.2 };
+        let nan_at_120 = |_t: f64, k: f64| {
+            if (k - 120.0).abs() < 1e-9 {
+                f64::NAN
+            } else {
+                0.2
+            }
+        };
         assert!(
             carr_madan_forward_variance(&strikes, fwd, r, t, nan_at_120, bs_fn).is_none(),
             "a NaN volatility at a sampled strike must be reported as None"

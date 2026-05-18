@@ -1105,7 +1105,10 @@ mod tests {
 
         // NaN spot → fall back to r.
         let q_nan_spot = implied_carry(f64::NAN, 100.0, r, t);
-        assert_eq!(q_nan_spot, r, "NaN spot must fall back to the risk-free rate");
+        assert_eq!(
+            q_nan_spot, r,
+            "NaN spot must fall back to the risk-free rate"
+        );
 
         // Infinite forward → fall back to r.
         let q_inf_fwd = implied_carry(100.0, f64::INFINITY, r, t);

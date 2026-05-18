@@ -618,7 +618,10 @@ impl CashflowSpec {
                     r.is_finite(),
                     "CashflowSpec::step_up: step rate is not finite ({r})"
                 );
-                (d, decimal_from_finite_f64(r, "CashflowSpec::step_up step rate"))
+                (
+                    d,
+                    decimal_from_finite_f64(r, "CashflowSpec::step_up step rate"),
+                )
             })
             .collect();
 

@@ -1301,9 +1301,8 @@ mod tests {
 
         // The 4th arg is the *validation/success* tolerance (distinct from the LM
         // solver tolerance set via `with_tolerance`).
-        let (_curve, report) =
-            GlobalFitOptimizer::optimize(&target, &quotes, &config, Some(0.1))
-                .expect("optimization should complete");
+        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, Some(0.1))
+            .expect("optimization should complete");
 
         assert!(
             report.success,
@@ -1322,9 +1321,8 @@ mod tests {
         let target = TestTarget::from_len(2, vec![0.3, 0.0]).with_weights(vec![1.0, 1.0]);
         let quotes = vec![0usize, 1usize];
         let config = CalibrationConfig::default().with_tolerance(1e-12);
-        let (_curve, report) =
-            GlobalFitOptimizer::optimize(&target, &quotes, &config, Some(0.01))
-                .expect("optimization should complete");
+        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, Some(0.01))
+            .expect("optimization should complete");
         assert!(
             !report.success,
             "a weighted max residual far above tolerance must fail the gate"

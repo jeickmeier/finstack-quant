@@ -225,11 +225,7 @@ impl Marginable for InterestRateSwap {
         self.margin_spec.as_ref().map(netting_set_id_from_spec)
     }
 
-    fn simm_sensitivities(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<SimmSensitivities> {
+    fn simm_sensitivities(&self, market: &MarketContext, as_of: Date) -> Result<SimmSensitivities> {
         let currency = self.notional.currency();
         let mut sens = SimmSensitivities::new(currency);
 
@@ -261,11 +257,11 @@ impl Marginable for InterestRateSwap {
             std::collections::BTreeMap::new();
         let mut any_repriced = false;
         for curve_id in &rate_curves {
-            for (tenor, dv01) in
-                repriced_bucketed_dv01(self, market, as_of, curve_id.as_str())
-            {
+            for (tenor, dv01) in repriced_bucketed_dv01(self, market, as_of, curve_id.as_str()) {
                 any_repriced = true;
-                *bucket_totals.entry(ir_bucket_for_tenor(tenor)).or_insert(0.0) += dv01;
+                *bucket_totals
+                    .entry(ir_bucket_for_tenor(tenor))
+                    .or_insert(0.0) += dv01;
             }
         }
 
@@ -354,11 +350,7 @@ impl Marginable for CreditDefaultSwap {
         self.margin_spec.as_ref().map(netting_set_id_from_spec)
     }
 
-    fn simm_sensitivities(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<SimmSensitivities> {
+    fn simm_sensitivities(&self, market: &MarketContext, as_of: Date) -> Result<SimmSensitivities> {
         let currency = self.notional.currency();
         let mut sens = SimmSensitivities::new(currency);
 
@@ -445,11 +437,7 @@ impl Marginable for CDSIndex {
         self.margin_spec.as_ref().map(netting_set_id_from_spec)
     }
 
-    fn simm_sensitivities(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<SimmSensitivities> {
+    fn simm_sensitivities(&self, market: &MarketContext, as_of: Date) -> Result<SimmSensitivities> {
         let currency = self.notional.currency();
         let mut sens = SimmSensitivities::new(currency);
 
@@ -760,7 +748,9 @@ mod tests {
 
         // Real market: USD-OIS discount + USD-SOFR-3M forward, both flat at 3%.
         let market = MarketContext::new()
-            .insert(test_utils::flat_discount_with_tenor("USD-OIS", start, 0.03, 30.0))
+            .insert(test_utils::flat_discount_with_tenor(
+                "USD-OIS", start, 0.03, 30.0,
+            ))
             .insert(test_utils::flat_forward_with_tenor(
                 "USD-SOFR-3M",
                 start,

@@ -645,8 +645,7 @@ mod tests {
             .rate;
 
         // Running the FD gamma exercises the bump-and-rebuild path.
-        let _gamma = OptionGammaProvider::option_gamma(&touch, &market, as_of)
-            .expect("gamma");
+        let _gamma = OptionGammaProvider::option_gamma(&touch, &market, as_of).expect("gamma");
 
         let spot_after = market
             .fx()

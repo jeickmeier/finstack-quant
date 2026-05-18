@@ -15,9 +15,9 @@ pub(crate) mod mc_oas;
 pub(crate) mod oas;
 
 pub(crate) use duration::{effective_convexity, effective_duration};
-pub(crate) use mc_oas::{calculate_mc_oas, McOasConfig};
 #[allow(unused_imports)] // Public API re-exports for external consumers
 pub(crate) use mc_oas::McOasResult;
+pub(crate) use mc_oas::{calculate_mc_oas, McOasConfig};
 #[allow(unused_imports)] // static Z-spread retained as a public-API helper
 pub(crate) use oas::calculate_oas;
 

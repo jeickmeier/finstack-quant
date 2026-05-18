@@ -432,9 +432,7 @@ fn psi_k(k: usize, a: f64, b: f64, c: f64, d: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_core::math::characteristic_function::{
-        BlackScholesCf, Cumulants, MertonJumpCf,
-    };
+    use finstack_core::math::characteristic_function::{BlackScholesCf, Cumulants, MertonJumpCf};
 
     /// Test CF whose `cf` evaluation returns a non-finite value.
     ///
@@ -779,8 +777,7 @@ mod tests {
     /// the bounded put payoff via put-call parity keeps `exp(x) <= 1` on the
     /// integration support and stays accurate.
     #[test]
-    fn cos_long_dated_high_drift_accuracy(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn cos_long_dated_high_drift_accuracy() -> std::result::Result<(), Box<dyn std::error::Error>> {
         for t in [10.0, 20.0, 30.0] {
             let r = 0.05;
             let merton = MertonJumpCf {

@@ -1011,8 +1011,9 @@ mod tests {
         // Geometric put
         let geo_put_rate =
             geometric_asian_put(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let geo_put_df = geometric_asian_put_df(spot, strike, time, df, div_yield, vol, num_fixings)
-            .expect("positive df");
+        let geo_put_df =
+            geometric_asian_put_df(spot, strike, time, df, div_yield, vol, num_fixings)
+                .expect("positive df");
         assert!(
             (geo_put_rate - geo_put_df).abs() < 1e-10,
             "geo put rate {} vs df {}",

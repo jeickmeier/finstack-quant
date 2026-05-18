@@ -146,9 +146,7 @@ fn validate_recovery_rate(value: f64, label: &str) -> Result<f64, JsValue> {
         return Err(to_js_err(format!("{label} must be finite, got {value}")));
     }
     if !(0.0..=1.0).contains(&value) {
-        return Err(to_js_err(format!(
-            "{label} must be in [0, 1], got {value}"
-        )));
+        return Err(to_js_err(format!("{label} must be in [0, 1], got {value}")));
     }
     Ok(value)
 }

@@ -372,11 +372,7 @@ impl StochasticPricer {
                     rng,
                 )
             } else {
-                PerNameDefaultEngine::new(
-                    Arc::clone(simulator),
-                    self.config.pool_granularity,
-                    rng,
-                )
+                PerNameDefaultEngine::new(Arc::clone(simulator), self.config.pool_granularity, rng)
             }
         } else {
             let rng = base.substream(path_index as u64);
@@ -1450,8 +1446,7 @@ mod per_name_copula_tests {
             num_periods as f64 / 12.0,
             BranchingSpec::fixed(2),
         );
-        tree_config.default_spec =
-            StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
+        tree_config.default_spec = StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
         tree_config.correlation = CorrelationStructure::flat(correlation, 0.0);
         tree_config.initial_balance = 100_000_000.0;
         StochasticPricerConfig::new(close(), discount_curve(), tree_config)

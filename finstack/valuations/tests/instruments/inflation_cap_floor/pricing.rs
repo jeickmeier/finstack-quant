@@ -216,13 +216,23 @@ fn test_yoy_caplet_applies_convexity_adjustment() {
     let ctx_flat = MarketContext::new()
         .insert(flat_discount("USD-OIS", as_of, 0.02).unwrap())
         .insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.025).unwrap())
-        .insert_surface(flat_vol_surface("US-CPI-VOL-LO", &[1.0, 5.0], &[0.025], 1e-6));
+        .insert_surface(flat_vol_surface(
+            "US-CPI-VOL-LO",
+            &[1.0, 5.0],
+            &[0.025],
+            1e-6,
+        ));
 
     // Market B: realistic 2% inflation vol -> non-trivial convexity.
     let ctx_vol = MarketContext::new()
         .insert(flat_discount("USD-OIS", as_of, 0.02).unwrap())
         .insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.025).unwrap())
-        .insert_surface(flat_vol_surface("US-CPI-VOL-HI", &[1.0, 5.0], &[0.025], 0.02));
+        .insert_surface(flat_vol_surface(
+            "US-CPI-VOL-HI",
+            &[1.0, 5.0],
+            &[0.025],
+            0.02,
+        ));
 
     let pv_no_convexity = build_caplet("US-CPI-VOL-LO")
         .npv_with_model(&ctx_flat, as_of, ModelKey::Black76)

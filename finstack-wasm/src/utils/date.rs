@@ -109,16 +109,25 @@ mod tests {
     fn accepts_explicit_plus_sign() {
         // An explicit `+` sign on the year is tolerated (ISO-8601 expanded
         // form) and parses identically to the unsigned spelling.
-        assert_eq!(parse_iso_date("+2024-01-15").expect("signed"), parsed("2024-01-15"));
+        assert_eq!(
+            parse_iso_date("+2024-01-15").expect("signed"),
+            parsed("2024-01-15")
+        );
     }
 
     #[test]
     fn rejects_malformed_input() {
-        assert!(parse_iso_date("2024-01").is_err(), "too few fields must error");
+        assert!(
+            parse_iso_date("2024-01").is_err(),
+            "too few fields must error"
+        );
         assert!(
             parse_iso_date("2024-01-15-00").is_err(),
             "too many fields must error"
         );
-        assert!(parse_iso_date("not-a-date").is_err(), "non-numeric must error");
+        assert!(
+            parse_iso_date("not-a-date").is_err(),
+            "non-numeric must error"
+        );
     }
 }

@@ -1550,7 +1550,10 @@ mod tests {
             (pnl - (-1000.0)).abs() < 1e-9,
             "skipped FX factor must not zero out the rate term, got {pnl}"
         );
-        assert!(skipped.skipped_fx, "skipping the FX-spot shock must be flagged");
+        assert!(
+            skipped.skipped_fx,
+            "skipping the FX-spot shock must be flagged"
+        );
         assert!(!skipped.skipped_vol, "no vol factor was present");
     }
 

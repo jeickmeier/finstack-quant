@@ -427,7 +427,12 @@ fn twisted_hazard_curve_omits_credit_detail_instead_of_exploding_cs01() {
         .base_date(as_of_t0)
         .day_count(DayCount::Act365F)
         .recovery_rate(0.4)
-        .knots(std_tenors.iter().map(|&t| (t, 0.02_f64)).collect::<Vec<_>>())
+        .knots(
+            std_tenors
+                .iter()
+                .map(|&t| (t, 0.02_f64))
+                .collect::<Vec<_>>(),
+        )
         .build()
         .expect("hazard t0");
     let t1_rates = [
@@ -505,11 +510,7 @@ fn twisted_hazard_curve_omits_credit_detail_instead_of_exploding_cs01() {
     );
     // A diagnostic note must explain why.
     assert!(
-        attribution
-            .meta
-            .notes
-            .iter()
-            .any(|n| n.contains("twist")),
+        attribution.meta.notes.iter().any(|n| n.contains("twist")),
         "a diagnostic note must flag the hazard-curve twist; notes were: {:?}",
         attribution.meta.notes
     );

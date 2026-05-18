@@ -480,9 +480,7 @@ pub(crate) fn build_credit_factor_attribution(
     }
     // A large curve-shape component means the hazard curve moved
     // non-parallel (steepening / twist) — surfaced as its own signal.
-    if total_credit_abs > 0.0
-        && curve_shape_abs > ADDER_MAGNITUDE_WARN_RATIO * total_credit_abs
-    {
+    if total_credit_abs > 0.0 && curve_shape_abs > ADDER_MAGNITUDE_WARN_RATIO * total_credit_abs {
         tracing::warn!(
             issuer_id = %cascade.issuer_id,
             curve_shape_pnl = curve_shape_pnl.amount(),

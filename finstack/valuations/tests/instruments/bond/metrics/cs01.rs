@@ -96,8 +96,7 @@ fn test_cs01_zspread_fallback_uses_settlement_anchored_basis() {
         "USD-OIS",
     )
     .unwrap();
-    bond.cashflow_spec =
-        CashflowSpec::fixed_rate(0.05.into(), Tenor::annual(), DayCount::Act365F);
+    bond.cashflow_spec = CashflowSpec::fixed_rate(0.05.into(), Tenor::annual(), DayCount::Act365F);
     // No credit curve => CS01 takes the z-spread fallback.
     bond.credit_curve_id = None;
     // Quote off-par so the Z-spread (and hence CS01) is non-trivial.

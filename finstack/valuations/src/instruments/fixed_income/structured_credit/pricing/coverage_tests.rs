@@ -648,7 +648,10 @@ mod tests {
         let result = test
             .calculate(&context)
             .expect("calculation should succeed");
-        assert!(!result.is_passing, "OC test must breach (ratio 0.5 < 1.001)");
+        assert!(
+            !result.is_passing,
+            "OC test must breach (ratio 0.5 < 1.001)"
+        );
 
         let cure = result.cure_amount.expect("breach must yield a cure amount");
         // The raw formula would give a cure of roughly

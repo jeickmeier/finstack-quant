@@ -141,8 +141,7 @@ fn attribute_pnl_from_spec(py: Python<'_>, spec_json: &str) -> PyResult<String> 
 #[pyfunction]
 fn validate_attribution_json(json: &str) -> PyResult<String> {
     let envelope: finstack_valuations::attribution::AttributionEnvelope =
-        serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid attribution JSON"))?;
+        serde_json::from_str(json).map_err(|e| serde_json_to_py(e, "invalid attribution JSON"))?;
     serde_json::to_string(&envelope).map_err(display_to_py)
 }
 
