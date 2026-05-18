@@ -81,10 +81,9 @@ impl FxBarrierOptionMcPricer {
         // guard `state.step == maturity_step` must fire at that step.
         let maturity_step = num_steps;
 
-        // Quanto adjustment removed as standard FX barriers don't need it.
-        // If Quanto is needed, it should be explicit.
-        let quanto_adjustment = 0.0;
-
+        // Standard FX barrier: the GBM drift `r_dom - r_for` (set above via
+        // `GbmParams`) fully describes the dynamics. Quanto barriers are not
+        // supported by this 1D MC payoff — see `FxBarrierCall` docs.
         let mc_barrier_type: McBarrierType = inst.barrier_type.into();
         let payoff = FxBarrierCall::new(
             inst.strike,
@@ -97,7 +96,6 @@ impl FxBarrierOptionMcPricer {
             inst.use_gobet_miri,
             inst.base_currency,
             inst.quote_currency,
-            quanto_adjustment,
             inst.rebate,
         )?;
 

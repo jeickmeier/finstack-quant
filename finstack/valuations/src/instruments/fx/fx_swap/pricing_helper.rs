@@ -312,4 +312,99 @@ mod tests {
         let result = FxSwapPricingContext::calculate_cip_forward(1.0, 1.0, 0.95, 0.0, 0.99);
         assert!(result.is_err(), "Should reject near-zero foreign DF");
     }
+
+    /// Item 5 verification: `total_pv` must equal a full four-cashflow,
+    /// per-currency discounting of an *off-market* FX swap.
+    ///
+    /// The four cashflows are: `+N` base @near, `−N·near_rate` quote @near,
+    /// `−N` base @far, `+N·far_rate` quote @far. Discounting the base flows on
+    /// the foreign curve and the quote flows on the domestic curve, then
+    /// converting the (already present-valued) base leg to quote at *today's*
+    /// spot, is the exact PV — converting a present value never requires a
+    /// future spot. This test pins that equivalence so the audit's "approximation"
+    /// concern is resolved by construction; no correction was required.
+    #[test]
+    fn total_pv_equals_four_cashflow_per_currency_discounting() {
+        use crate::instruments::common_impl::traits::Attributes;
+        use finstack_core::currency::Currency;
+        use finstack_core::market_data::context::MarketContext;
+        use finstack_core::market_data::term_structures::DiscountCurve;
+        use finstack_core::money::fx::{FxMatrix, SimpleFxProvider};
+        use finstack_core::money::Money;
+        use finstack_core::types::{CurveId, InstrumentId};
+        use std::sync::Arc;
+        use time::macros::date;
+
+        let as_of = date!(2025 - 01 - 15);
+        let near_date = date!(2025 - 01 - 17);
+        let far_date = date!(2025 - 07 - 17);
+
+        let usd = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (0.5, 0.9760), (1.0, 0.9520)])
+            .build()
+            .expect("usd curve");
+        let eur = DiscountCurve::builder("EUR-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (0.5, 0.9900), (1.0, 0.9810)])
+            .build()
+            .expect("eur curve");
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .expect("valid rate");
+        let market = MarketContext::new()
+            .insert(usd)
+            .insert(eur)
+            .insert_fx(FxMatrix::new(Arc::new(provider)));
+
+        // Off-market swap: both legs priced away from model spot/forward.
+        let swap = FxSwap::builder()
+            .id(InstrumentId::new("EURUSD-SWAP-OFFMKT"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .near_date(near_date)
+            .far_date(far_date)
+            .base_notional(Money::new(10_000_000.0, Currency::EUR))
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
+            .near_rate_opt(Some(1.0850))
+            .far_rate_opt(Some(1.1300))
+            .attributes(Attributes::new())
+            .build()
+            .expect("off-market swap");
+
+        let ctx = FxSwapPricingContext::build(&swap, &market, as_of).expect("ctx");
+        let total_pv = ctx.total_pv();
+
+        // Explicit four-cashflow, per-currency discounting.
+        let n = swap.base_notional.amount();
+        let domestic = market.get_discount("USD-OIS").expect("usd");
+        let foreign = market.get_discount("EUR-OIS").expect("eur");
+        let df_dom_near = domestic
+            .df_between_dates(as_of, near_date)
+            .expect("df dom near");
+        let df_dom_far = domestic
+            .df_between_dates(as_of, far_date)
+            .expect("df dom far");
+        let df_for_near = foreign
+            .df_between_dates(as_of, near_date)
+            .expect("df for near");
+        let df_for_far = foreign
+            .df_between_dates(as_of, far_date)
+            .expect("df for far");
+
+        // Base-currency leg, present-valued on the foreign curve.
+        let pv_base_leg = n * df_for_near - n * df_for_far;
+        // Quote-currency leg, present-valued on the domestic curve.
+        let pv_quote_leg = -n * 1.0850 * df_dom_near + n * 1.1300 * df_dom_far;
+        // Convert the present-valued base leg to quote at today's spot.
+        let expected = pv_base_leg * 1.10 + pv_quote_leg;
+
+        assert!(
+            (total_pv - expected).abs() < 1e-6,
+            "total_pv must equal four-cashflow per-currency discounting: \
+             total_pv={total_pv} expected={expected}"
+        );
+    }
 }

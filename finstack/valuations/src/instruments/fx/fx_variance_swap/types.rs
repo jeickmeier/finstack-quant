@@ -209,6 +209,19 @@ impl FxVarianceSwap {
         pricer::realized_fraction_by_observations(self, as_of)
     }
 
+    /// Fraction of the observation period elapsed at `as_of`, measured by the
+    /// instrument's day-count convention.
+    ///
+    /// This is the seasoning weight the pricer ([`pricer::compute_pv`]) uses to
+    /// blend already-annualized realized and forward variance. Risk metrics
+    /// (vega, variance vega, expected variance) must use the *same* weight as
+    /// the booked PV; an observation-count fraction only coincides for
+    /// perfectly uniform schedules and drifts for weekend-skipping daily
+    /// schedules near maturity.
+    pub fn time_elapsed_fraction(&self, as_of: Date) -> Result<f64> {
+        pricer::time_elapsed_fraction(self, as_of)
+    }
+
     /// Get historical prices aligned to observation dates when available.
     pub fn get_historical_prices(&self, context: &MarketContext, as_of: Date) -> Result<Vec<f64>> {
         pricer::get_historical_prices(self, context, as_of)

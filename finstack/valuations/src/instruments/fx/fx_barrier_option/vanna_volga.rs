@@ -31,12 +31,56 @@
 //! - Wystup, U. (2006). "FX Options and Structured Products." Wiley.
 
 use crate::instruments::common_impl::models::closed_form::barrier::{
-    barrier_call_continuous, barrier_put_continuous, BarrierParams,
+    barrier_call_continuous, barrier_put_continuous, barrier_touch_probability, BarrierParams,
     BarrierType as AnalyticalBarrierType,
 };
 use crate::instruments::common_impl::models::closed_form::vanilla::bs_price;
 use crate::instruments::common_impl::models::volatility::black::d1_d2;
 use crate::instruments::common_impl::parameters::OptionType;
+
+/// Survival-probability weight for the Vanna-Volga barrier correction.
+///
+/// Castagna & Mercurio (2007) / Wystup (2006, §3) weight the barrier
+/// Vanna-Volga correction by a *survival probability* `p ∈ [0, 1]` so the
+/// smile correction vanishes as the barrier option degenerates:
+///
+/// - **Knock-out** (`UpOut`/`DownOut`): the option only survives if the
+///   barrier is never touched, so `p = 1 − P(touch)` (the no-touch
+///   probability). As the barrier becomes certain to knock out
+///   (`P(touch) → 1`), `p → 0` and the correction → 0 — a dead option has no
+///   smile exposure.
+/// - **Knock-in** (`UpIn`/`DownIn`): the option only comes alive if the
+///   barrier *is* touched, so `p = P(touch)`. As knock-in becomes impossible
+///   (`P(touch) → 0`), `p → 0`.
+///
+/// The touch probability is taken under the Black-Scholes dynamics at the ATM
+/// volatility (the same vol the BS barrier leg uses).
+fn vv_survival_weight(
+    params: &BarrierParams,
+    barrier_type: AnalyticalBarrierType,
+    sigma_atm: f64,
+) -> f64 {
+    let is_up = matches!(
+        barrier_type,
+        AnalyticalBarrierType::UpIn | AnalyticalBarrierType::UpOut
+    );
+    let touch_prob = barrier_touch_probability(
+        params.spot,
+        params.barrier,
+        params.time,
+        params.rate,
+        params.div_yield,
+        sigma_atm,
+        is_up,
+    );
+    let survival = match barrier_type {
+        // Knock-out survives only on no-touch.
+        AnalyticalBarrierType::UpOut | AnalyticalBarrierType::DownOut => 1.0 - touch_prob,
+        // Knock-in activates only on touch.
+        AnalyticalBarrierType::UpIn | AnalyticalBarrierType::DownIn => touch_prob,
+    };
+    survival.clamp(0.0, 1.0)
+}
 
 /// Market quotes for the Vanna-Volga method (three-point smile).
 #[derive(Debug, Clone, Copy)]
@@ -324,8 +368,16 @@ pub fn vanna_volga_barrier_adjustment(
         volga_barrier,
     ) / det;
 
-    // Step 5: VV price = BS_barrier + Σ p_i × cost_i
-    let vv_adjustment = p1 * cost_1 + p2 * cost_2 + p3 * cost_3;
+    // Step 5: smile-cost portfolio, Σ pᵢ × costᵢ.
+    let smile_cost = p1 * cost_1 + p2 * cost_2 + p3 * cost_3;
+
+    // Step 6: weight by the survival probability. For a barrier option the
+    // Vanna-Volga correction must vanish as the barrier becomes certain to
+    // knock out (or, for a knock-in, certain not to activate): a dead option
+    // carries no vanna/volga and therefore no smile cost. Omitting this weight
+    // over-applies the smile correction near the barrier.
+    let survival_weight = vv_survival_weight(&atm_params, barrier_type, sigma_atm);
+    let vv_adjustment = survival_weight * smile_cost;
 
     bs_barrier_price + vv_adjustment
 }
@@ -459,6 +511,66 @@ mod tests {
         assert!(
             adjustment > 1e-6,
             "VV adjustment should be nonzero with smile, got {adjustment}"
+        );
+    }
+
+    /// Item 9 regression: the Vanna-Volga barrier correction must be weighted
+    /// by the no-touch survival probability, so it vanishes as the barrier
+    /// becomes certain to knock out. A knock-out call whose barrier sits just
+    /// above spot with high vol and long maturity is almost surely knocked out;
+    /// the smile correction must collapse toward zero even though the smile is
+    /// strong.
+    #[test]
+    fn test_vv_correction_vanishes_as_knockout_becomes_certain() {
+        let r_d = 0.05;
+        let r_f = 0.03;
+        let t = 3.0; // long maturity
+        let vol = 0.40; // high vol => near-certain touch
+        let spot = 1.10;
+
+        let quotes = VannaVolgaQuotes {
+            vol_25d_put: 0.50, // strong smile
+            vol_atm: vol,
+            vol_25d_call: 0.46,
+            strike_25d_put: 1.02,
+            strike_atm: 1.10,
+            strike_25d_call: 1.18,
+        };
+
+        let barrier_type = AnalyticalBarrierType::UpOut;
+
+        // Barrier essentially at spot: P(touch) ~ 1, survival ~ 0.
+        let barrier_near = 1.1001;
+        let params_near = BarrierParams::new(spot, 1.10, barrier_near, t, r_d, r_f, vol);
+        let survival_near = vv_survival_weight(&params_near, barrier_type, vol);
+        assert!(
+            survival_near < 1e-3,
+            "fixture must make knock-out near-certain (survival≈0), got {survival_near}"
+        );
+        let bs_near = barrier_bs_price(&params_near, barrier_type, true);
+        let vv_near =
+            vanna_volga_barrier_adjustment(bs_near, &params_near, &quotes, true, barrier_type);
+        assert!(
+            (vv_near - bs_near).abs() < 1e-3,
+            "VV correction must vanish as knock-out becomes certain: \
+             vv={vv_near} bs={bs_near}"
+        );
+
+        // A distant barrier survives with meaningful probability, so the same
+        // smile produces a materially larger correction — confirming the
+        // weighting is what suppresses the near-barrier case (not a degenerate
+        // smile or zero greeks).
+        let barrier_far = 1.60;
+        let params_far = BarrierParams::new(spot, 1.10, barrier_far, t, r_d, r_f, vol);
+        let bs_far = barrier_bs_price(&params_far, barrier_type, true);
+        let vv_far =
+            vanna_volga_barrier_adjustment(bs_far, &params_far, &quotes, true, barrier_type);
+        assert!(
+            (vv_far - bs_far).abs() > (vv_near - bs_near).abs() + 1e-6,
+            "distant barrier (higher survival) must carry a larger VV correction: \
+             near={} far={}",
+            (vv_near - bs_near).abs(),
+            (vv_far - bs_far).abs()
         );
     }
 

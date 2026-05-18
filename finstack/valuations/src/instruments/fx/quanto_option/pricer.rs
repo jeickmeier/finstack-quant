@@ -24,16 +24,27 @@ fn collect_quanto_inputs(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_core::Result<(f64, f64, f64, f64, f64, f64, f64)> {
+    use crate::instruments::common_impl::helpers::zero_rate_from_df;
+
     let t = inst
         .day_count
         .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
 
+    // Recover continuously-compounded rates from *date-based* discount factors,
+    // mirroring `shared.rs::collect_fx_option_inputs_no_vol`. `curve.zero(t)`
+    // interpolates on the curve's own time axis, so the rate it returns does
+    // not satisfy `e^{-r·t} = df_between_dates(as_of, expiry)` whenever
+    // `as_of != base_date` or the instrument and curve day-counts differ.
+    // Using `df_between_dates` + `zero_rate_from_df` keeps the recovered rate
+    // consistent with the actual discount factor over the option's life.
     let disc_curve = curves.get_discount(inst.domestic_discount_curve_id.as_str())?;
-    let r_dom = disc_curve.zero(t);
+    let df_dom = disc_curve.df_between_dates(as_of, inst.expiry)?;
+    let r_dom = zero_rate_from_df(df_dom, t, "QuantoOption domestic discount")?;
 
     // Get foreign rate
     let for_curve = curves.get_discount(inst.foreign_discount_curve_id.as_str())?;
-    let r_for = for_curve.zero(t);
+    let df_for = for_curve.df_between_dates(as_of, inst.expiry)?;
+    let r_for = zero_rate_from_df(df_for, t, "QuantoOption foreign discount")?;
 
     let spot_scalar = curves.get_price(&inst.spot_id)?;
     let spot = crate::metrics::scalar_numeric_value(spot_scalar);
@@ -162,5 +173,137 @@ impl Pricer for QuantoOptionAnalyticalPricer {
         })?;
         let pv = Money::new(price * scale, quanto.quote_currency);
         Ok(ValuationResult::stamped(quanto.id(), as_of, pv))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::common_impl::traits::Attributes;
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::DayCount;
+    use finstack_core::market_data::scalars::MarketScalar;
+    use finstack_core::market_data::surfaces::VolSurface;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_core::money::Money;
+    use finstack_core::types::{CurveId, InstrumentId};
+    use time::macros::date;
+
+    /// Item 3 regression: `r_dom`/`r_for` must be recovered from *date-based*
+    /// discount factors so that `e^{-r·t} == df_between_dates(as_of, expiry)`.
+    /// The fixture uses a discount curve whose `base_date` precedes `as_of`,
+    /// which makes the prior `curve.zero(t)` (time-axis interpolation) disagree
+    /// with the actual discount factor over the option's life.
+    #[test]
+    fn quanto_inputs_use_date_based_discount_rates() {
+        let curve_base = date!(2025 - 01 - 02);
+        let as_of = date!(2025 - 07 - 01);
+        let expiry = date!(2026 - 07 - 01);
+
+        // Non-flat curves: the instantaneous forward rate rises across tenors,
+        // so `df(t2)/df(t1) != df(t2 - t1)` and the curve-axis `zero()` lookup
+        // genuinely disagrees with date-based discounting.
+        let usd = DiscountCurve::builder("USD-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (0.5, (-0.01_f64).exp()),
+                (1.5, (-0.09_f64).exp()),
+                (3.0, (-0.30_f64).exp()),
+            ])
+            .build()
+            .expect("usd curve");
+        let jpy = DiscountCurve::builder("JPY-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (0.5, (-0.002_f64).exp()),
+                (1.5, (-0.012_f64).exp()),
+                (3.0, (-0.045_f64).exp()),
+            ])
+            .build()
+            .expect("jpy curve");
+        let eq_vol = VolSurface::builder("NKY-VOL")
+            .expiries(&[2.0])
+            .strikes(&[35000.0])
+            .row(&[0.22])
+            .build()
+            .expect("equity vol");
+        let fx_vol = VolSurface::builder("USDJPY-VOL")
+            .expiries(&[2.0])
+            .strikes(&[1.0])
+            .row(&[0.10])
+            .build()
+            .expect("fx vol");
+        let market = MarketContext::new()
+            .insert(usd)
+            .insert(jpy)
+            .insert_surface(eq_vol)
+            .insert_surface(fx_vol)
+            .insert_price(
+                "NKY-SPOT",
+                MarketScalar::Price(Money::new(34000.0, Currency::JPY)),
+            );
+
+        let quanto = QuantoOption::builder()
+            .id(InstrumentId::new("QUANTO-DISC"))
+            .underlying_ticker("NKY".to_string())
+            .equity_strike(Money::new(35000.0, Currency::JPY))
+            .option_type(crate::instruments::OptionType::Call)
+            .expiry(expiry)
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .base_currency(Currency::JPY)
+            .quote_currency(Currency::USD)
+            .correlation(-0.2)
+            .day_count(DayCount::Act365F)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("JPY-OIS"))
+            .spot_id("NKY-SPOT".into())
+            .vol_surface_id(CurveId::new("NKY-VOL"))
+            .div_yield_id_opt(None)
+            .fx_vol_id_opt(Some(CurveId::new("USDJPY-VOL")))
+            .attributes(Attributes::new())
+            .build()
+            .expect("quanto");
+
+        let (_spot, r_dom, r_for, _q, _se, _sf, t) =
+            collect_quanto_inputs(&quanto, &market, as_of).expect("inputs");
+
+        let df_dom = market
+            .get_discount("USD-OIS")
+            .expect("usd")
+            .df_between_dates(as_of, expiry)
+            .expect("df dom");
+        let df_for = market
+            .get_discount("JPY-OIS")
+            .expect("jpy")
+            .df_between_dates(as_of, expiry)
+            .expect("df for");
+
+        assert!(
+            ((-r_dom * t).exp() - df_dom).abs() < 1e-12,
+            "recovered r_dom must satisfy e^(-r·t)=df_between_dates: \
+             e^(-r·t)={} df={df_dom}",
+            (-r_dom * t).exp()
+        );
+        assert!(
+            ((-r_for * t).exp() - df_for).abs() < 1e-12,
+            "recovered r_for must satisfy e^(-r·t)=df_between_dates: \
+             e^(-r·t)={} df={df_for}",
+            (-r_for * t).exp()
+        );
+
+        // The buggy time-axis lookup disagrees: `zero(t)` reads df at curve
+        // time `t` (anchored at base_date), not the option's `as_of→expiry` df.
+        let bug_r_dom = market
+            .get_discount("USD-OIS")
+            .expect("usd")
+            .zero(t);
+        assert!(
+            ((-bug_r_dom * t).exp() - df_dom).abs() > 1e-4,
+            "fixture must expose the curve-axis bug for the domestic rate"
+        );
     }
 }
