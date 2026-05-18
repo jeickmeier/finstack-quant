@@ -162,6 +162,31 @@ impl ScenarioTree {
         Ok(())
     }
 
+    /// Merge an incoming node into an existing recombined lattice node.
+    ///
+    /// # Loss-state collapse (item 7 — KNOWN LIMITATION)
+    ///
+    /// Recombination probability-weights *every* node field, including
+    /// `cumulative_losses`, `cumulative_defaults` and `cumulative_prepayments`.
+    /// Those are **path-dependent** quantities: two paths reaching the same
+    /// `(period, position)` lattice node generally have *different* cumulative
+    /// loss histories. Averaging them keeps the lattice O(n²) but collapses
+    /// the loss *distribution* at each node to its conditional mean.
+    ///
+    /// Consequence: terminal-node losses carry only the mean loss per lattice
+    /// state, not the true dispersion. Any tail-risk metric read off the
+    /// recombined tree — unexpected loss (UL), VaR, expected shortfall (ES) —
+    /// is therefore biased LOW: the recombination has averaged away exactly
+    /// the dispersion those metrics measure.
+    ///
+    /// A correct fix requires either a non-recombining tree (exponential node
+    /// growth) or carrying a full loss *distribution* per node — a structural
+    /// redesign out of scope here. Until then: **use Monte Carlo mode
+    /// (`PricingMode::MonteCarlo`) for tail-risk metrics.** The MC path runs
+    /// each scenario through the full waterfall and aggregates per-path
+    /// losses, so it preserves the loss dispersion the tree collapses. The
+    /// tree's `unexpected_loss` / `expected_shortfall` / loss `percentile`
+    /// accessors are documented accordingly.
     fn merge_nodes(&mut self, target_idx: usize, incoming: ScenarioNode) {
         let target = &mut self.nodes[target_idx];
         assert_eq!(
@@ -481,11 +506,23 @@ impl ScenarioTree {
     }
 
     /// Compute unexpected loss (loss standard deviation).
+    ///
+    /// **Tail-risk caveat (item 7):** the recombining tree averages
+    /// path-dependent cumulative losses at each lattice node (see
+    /// [`Self::merge_nodes`]), so this UL is biased LOW — it measures the
+    /// dispersion of *conditional-mean* node losses, not of the true loss
+    /// distribution. For tail risk use Monte Carlo mode, which preserves
+    /// per-path loss dispersion.
     pub(crate) fn unexpected_loss(&self) -> f64 {
         self.variance(|n| n.cumulative_losses).sqrt()
     }
 
     /// Compute expected shortfall (CVaR) at a given confidence level.
+    ///
+    /// **Tail-risk caveat (item 7):** computed over recombined terminal-node
+    /// losses, which the lattice has collapsed to per-node conditional means
+    /// (see [`Self::merge_nodes`]). The reported ES therefore understates true
+    /// tail loss. Use Monte Carlo mode for a faithful tail estimate.
     pub(crate) fn expected_shortfall(&self, confidence: f64) -> f64 {
         let mut values: Vec<(f64, f64)> = self
             .terminal_indices

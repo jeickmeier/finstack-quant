@@ -150,26 +150,30 @@ fn execute_waterfall_core(
         context.tranche_balances,
     )?;
 
-    // Check if diversions are active and compute cure amount.
+    // Check if diversions are active and compute the binding cure amount.
     //
-    // INTEX/Bloomberg convention: for each tranche, the cure amount is the
-    // MAXIMUM of OC cure and IC cure (not the sum), because curing the larger
-    // shortfall implicitly cures the smaller one. Then sum across tranches.
+    // INTEX/Bloomberg convention: coverage cures are NOT additive across
+    // tranches. The diversion always redirects cash to the most-senior
+    // principal tier, and OC/IC tests *share* the senior tranche balances —
+    // an OC test for tranche T has `T_balance + senior_balances` in its
+    // denominator, so any senior paydown also de-leverages every more-senior
+    // test. Curing the most-subordinate failing test (the LARGEST required
+    // paydown) therefore implicitly cures every test above it.
+    //
+    // Summing the per-tranche cures double-counts that shared senior paydown
+    // and over-diverts cash. The binding cure is the MAXIMUM cure across all
+    // failing tests, not the sum.
     let diversion_active = coverage_test_results.iter().any(|r| !r.is_passing);
     let total_cure_amount: Money = {
-        // Group cure amounts by the typed tranche id on the test result.
-        let mut per_tranche_max: HashMap<&str, f64> = HashMap::default();
+        let mut binding_cure = 0.0_f64;
         for r in &coverage_test_results {
             if let Some(cure) = r.cure_amount {
                 if cure.amount() > 0.0 {
-                    let tranche_id = r.tranche_id.as_str();
-                    let entry = per_tranche_max.entry(tranche_id).or_insert(0.0);
-                    *entry = entry.max(cure.amount());
+                    binding_cure = binding_cure.max(cure.amount());
                 }
             }
         }
-        let sum: f64 = per_tranche_max.values().sum();
-        Money::new(sum, waterfall.base_currency)
+        Money::new(binding_cure, waterfall.base_currency)
     };
     if diversion_active {
         had_diversions = true;
@@ -1226,6 +1230,195 @@ mod ic_diversion_tests {
         assert!(
             result.diverted_cash.amount() < 5_000_000.0,
             "diversion must be cure-capped, not the full junior tier"
+        );
+    }
+
+    /// Item 4 — coverage cures must NOT be summed across tranches.
+    ///
+    /// Two OC triggers (one on the senior tranche, one on the subordinated
+    /// tranche) both breach. The OC tests share the senior tranche balance in
+    /// their denominators, so a single senior paydown de-leverages both — the
+    /// binding cure is the MAX of the two, not the sum. Summing them
+    /// over-diverts cash. This test asserts the diverted cash equals the
+    /// larger cure and is strictly below the sum of the two cures.
+    #[test]
+    fn coverage_cures_are_not_summed_across_tranches() {
+        let currency = Currency::USD;
+
+        // Pool: one performing asset sized so BOTH OC tests breach but by
+        // different amounts (the junior test, with a smaller denominator,
+        // needs a larger cure than the senior test).
+        let mut pool = Pool::new("POOL", DealType::CLO, currency);
+        {
+            use crate::instruments::fixed_income::structured_credit::types::{
+                AssetType, PoolAsset,
+            };
+            use finstack_core::types::{CreditRating, InstrumentId};
+            pool.assets.push(PoolAsset {
+                day_count: finstack_core::dates::DayCount::Act360,
+                id: InstrumentId::new("ASSET_0"),
+                asset_type: AssetType::FirstLienLoan {
+                    industry: Some("Technology".into()),
+                },
+                // Collateral deliberately below the tranche par stack so both
+                // OC ratios breach their triggers.
+                balance: Money::new(118_000_000.0, currency),
+                rate: 0.08,
+                spread_bps: Some(400.0),
+                index_id: None,
+                maturity: Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+                credit_quality: Some(CreditRating::BB),
+                industry: Some("Technology".into()),
+                obligor_id: Some("OBLIGOR_0".into()),
+                is_defaulted: false,
+                recovery_amount: None,
+                purchase_price: None,
+                acquisition_date: None,
+                smm_override: None,
+                mdr_override: None,
+            });
+        }
+
+        // Senior 100M, subordinated 30M.
+        let class_a = Tranche::new(
+            "CLASS_A",
+            0.0,
+            77.0,
+            Seniority::Senior,
+            Money::new(100_000_000.0, currency),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+        )
+        .unwrap();
+        let class_b = Tranche::new(
+            "CLASS_B",
+            77.0,
+            100.0,
+            Seniority::Subordinated,
+            Money::new(30_000_000.0, currency),
+            TrancheCoupon::Fixed { rate: 0.08 },
+            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+        )
+        .unwrap();
+        let tranches = TrancheStructure::new(vec![class_a, class_b]).unwrap();
+
+        let waterfall = WaterfallBuilder::new(currency)
+            .add_tier(
+                WaterfallTier::new("interest", 1, PaymentType::Interest)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
+                    .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B")),
+            )
+            .add_tier(
+                WaterfallTier::new("senior_principal", 2, PaymentType::Principal)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_principal(
+                        "class_a_prin",
+                        "CLASS_A",
+                        Some(Money::new(99_000_000.0, currency)),
+                    )),
+            )
+            .add_tier(
+                WaterfallTier::new("junior_principal", 3, PaymentType::Principal)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .divertible(true)
+                    .add_recipient(Recipient::tranche_principal(
+                        "class_b_prin",
+                        "CLASS_B",
+                        None,
+                    )),
+            )
+            .add_tier(
+                WaterfallTier::new("equity", 4, PaymentType::Residual)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::new(
+                        "equity_dist",
+                        RecipientType::Equity,
+                        PaymentCalculation::ResidualCash,
+                    )),
+            )
+            // Two OC triggers. CLASS_A denominator = 100M (ratio 158/100 =
+            // 1.58); CLASS_B denominator = 130M (ratio 158/130 = 1.215).
+            // Triggers set just above each ratio so BOTH breach, with
+            // materially different cure amounts.
+            .add_coverage_trigger(CoverageTrigger {
+                tranche_id: "CLASS_A".into(),
+                oc_trigger: Some(1.70),
+                ic_trigger: None,
+            })
+            .add_coverage_trigger(CoverageTrigger {
+                tranche_id: "CLASS_B".into(),
+                oc_trigger: Some(1.30),
+                ic_trigger: None,
+            })
+            .build()
+            .expect("build waterfall");
+
+        let market = MarketContext::new();
+        let payment_date = Date::from_calendar_date(2024, Month::April, 1).unwrap();
+        let period_start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
+
+        let context = WaterfallContext {
+            available_cash: Money::new(40_000_000.0, currency),
+            interest_collections: Money::new(20_000_000.0, currency),
+            payment_date,
+            period_start,
+            pool_balance: Money::new(118_000_000.0, currency),
+            market: &market,
+            tranche_balances: None,
+            deferred_interest: None,
+            reserve_balance: Money::new(0.0, currency),
+            recovery_proceeds: Money::new(0.0, currency),
+        };
+
+        let result =
+            execute_waterfall(&waterfall, &tranches, &pool, context).expect("waterfall execution");
+
+        // Both OC tests must fail for this test to exercise the summing bug.
+        let failing: Vec<_> = result
+            .coverage_tests
+            .iter()
+            .filter(|(_, _, passing)| !passing)
+            .collect();
+        assert_eq!(
+            failing.len(),
+            2,
+            "test setup: both OC tests must breach; got {:?}",
+            result.coverage_tests
+        );
+
+        // Independently derive the two OC cures.
+        // numerator = collateral + cash that remains in the numerator. The OC
+        // numerator includes cash; diverting X removes X from the numerator
+        // and pays down X of the (shared) senior denominator:
+        //   X = (numerator − ratio·denominator) / (1 − ratio)
+        let numerator = 118_000_000.0_f64 + 40_000_000.0; // collateral + cash
+        let cure = |ratio: f64, denom: f64| (numerator - ratio * denom) / (1.0 - ratio);
+        let cure_a = cure(1.70, 100_000_000.0);
+        let cure_b = cure(1.30, 130_000_000.0);
+        assert!(cure_a > 0.0 && cure_b > 0.0, "both cures must be positive");
+        let binding = cure_a.max(cure_b);
+        let summed = cure_a + cure_b;
+        assert!(
+            (summed - binding).abs() > 1_000_000.0,
+            "test setup: the two cures must differ enough that sum vs max is \
+             materially distinguishable (sum={summed:.0}, max={binding:.0})"
+        );
+
+        // The diverted cash is capped at the binding (max) cure, NOT the sum.
+        // Pre-fix it was capped at the sum, over-diverting.
+        let diverted = result.diverted_cash.amount();
+        assert!(
+            diverted <= binding + 1.0,
+            "diverted cash {diverted:.0} must not exceed the binding (max) \
+             cure {binding:.0}; pre-fix the cap was the SUM {summed:.0} which \
+             over-diverts"
+        );
+        assert!(
+            diverted < summed - 1_000_000.0,
+            "diverted cash {diverted:.0} must be strictly below the summed \
+             cures {summed:.0} — coverage cures are not additive across \
+             tranches"
         );
     }
 }

@@ -12,7 +12,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::de
 };
 use crate::instruments::fixed_income::structured_credit::types::{
     Pool, PoolState, RecipientType, StructuredCredit, TrancheCashflows, TrancheSeniority,
-    TrancheStructure, Waterfall,
+    TrancheStructure, Waterfall, WaterfallDistribution,
 };
 use crate::instruments::fixed_income::structured_credit::utils::simulation::RecoveryQueue;
 use finstack_core::cashflow::{CFKind, CashFlow};
@@ -129,14 +129,32 @@ impl PeriodPoolShock {
 /// draws are deterministic and order-stable (period → name index). The
 /// `simulator` is shared (cheap `Arc` clone of the copula kernel) across
 /// paths; only the RNG is per-path.
+///
+/// # Antithetic pairing
+///
+/// When `antithetic` is `true` this engine is the *second member* of an
+/// antithetic pair: it shares its RNG substream with the first member and
+/// **negates** every idiosyncratic `εᵢ` draw. Combined with the systematic
+/// factor `Z` being negated by `monte_carlo_factor_sets`, the copula latent
+/// variable `Aᵢ = √ρ·Z + √(1−ρ)·εᵢ` becomes `−Aᵢ` for the paired path — the
+/// genuine antithetic variate. Without this the per-name idiosyncratic
+/// channel of paired paths would be independent, defeating the variance
+/// reduction and making the reported confidence interval too narrow.
+///
+/// The Student-t mixing variable `W` is drawn from the same shared substream
+/// and is *not* negated: the χ²-based mixing is asymmetric, and standard
+/// antithetic treatment for the Student-t copula negates only the Gaussian
+/// components while keeping the mixing common to the pair.
 pub(crate) struct PerNameDefaultEngine {
     simulator: Arc<PerNameCopulaDefault>,
     granularity: PoolGranularity,
     rng: PhiloxRng,
+    /// `true` ⇒ second member of an antithetic pair; negate idiosyncratic draws.
+    antithetic: bool,
 }
 
 impl PerNameDefaultEngine {
-    /// Create a per-name engine for one scenario path.
+    /// Create a per-name engine for one scenario path (independent draws).
     pub(crate) fn new(
         simulator: Arc<PerNameCopulaDefault>,
         granularity: PoolGranularity,
@@ -146,6 +164,25 @@ impl PerNameDefaultEngine {
             simulator,
             granularity,
             rng,
+            antithetic: false,
+        }
+    }
+
+    /// Create the *antithetic partner* per-name engine for a scenario path.
+    ///
+    /// `rng` must be the SAME substream the paired path uses; this engine
+    /// negates every idiosyncratic `εᵢ` draw so the copula latent variable is
+    /// the antithetic variate of its partner.
+    pub(crate) fn new_antithetic(
+        simulator: Arc<PerNameCopulaDefault>,
+        granularity: PoolGranularity,
+        rng: PhiloxRng,
+    ) -> Self {
+        Self {
+            simulator,
+            granularity,
+            rng,
+            antithetic: true,
         }
     }
 }
@@ -218,12 +255,25 @@ impl PoolFlowSource for StochasticPathFlowSource {
                         .filter(|(defaulted, balance)| !**defaulted && **balance > 0.0)
                         .count();
                     let marginal = vec![plan.marginal_pd; alive];
-                    engine.simulator.simulate_period(
-                        plan.systematic_z,
-                        &marginal,
-                        &mut engine.rng,
-                        &mut self.default_scratch,
-                    );
+                    // Antithetic partners negate their idiosyncratic εᵢ draws
+                    // so the copula latent variable is the antithetic variate
+                    // of the paired path (the systematic Z is already negated
+                    // by `monte_carlo_factor_sets`).
+                    if engine.antithetic {
+                        engine.simulator.simulate_period_antithetic(
+                            plan.systematic_z,
+                            &marginal,
+                            &mut engine.rng,
+                            &mut self.default_scratch,
+                        );
+                    } else {
+                        engine.simulator.simulate_period(
+                            plan.systematic_z,
+                            &marginal,
+                            &mut engine.rng,
+                            &mut self.default_scratch,
+                        );
+                    }
                     Some(PeriodDefaultOutcome::PerName(&self.default_scratch))
                 }
                 PoolGranularity::LargeHomogeneous => {
@@ -724,6 +774,569 @@ mod tests {
              interest={interest_on_cleanup}"
         );
     }
+
+    // ── Cash-conservation fixes: items 1, 2, 13 ─────────────────────────
+
+    use crate::instruments::fixed_income::structured_credit::types::{
+        ReinvestmentCriteria, ReinvestmentPeriod,
+    };
+
+    fn cc_test_date() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).expect("valid date")
+    }
+
+    fn cc_discount_curve() -> finstack_core::market_data::term_structures::DiscountCurve {
+        finstack_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+            .base_date(cc_test_date())
+            .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.88), (10.0, 0.75)])
+            .build()
+            .expect("curve")
+    }
+
+    /// Item 1 — reinvestment-period collateral principal must be recycled into
+    /// new collateral (pool held flat net of defaults), NOT silently vanish.
+    ///
+    /// A CLO with a high CPR and an active reinvestment period. With the
+    /// pre-fix engine the collected principal is neither distributed nor
+    /// reinvested: the asset balances shrink, the reinvestment-end
+    /// reconciliation snaps `pool_outstanding` down to the shrunken sum, and
+    /// the cash is lost. The fix recycles it, so the pool keeps generating
+    /// interest and the senior tranche collects materially more total cash.
+    #[test]
+    fn reinvestment_period_principal_is_recycled_not_lost() {
+        let maturity = Date::from_calendar_date(2034, Month::January, 1).expect("valid date");
+        let reinvest_end = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
+
+        // Build a CLO whose pool prepays fast (high CPR). During the 6y
+        // reinvestment period, that prepaid principal must be recycled.
+        let build_deal = |with_reinvestment: bool| {
+            let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+            pool.assets.push(PoolAsset::fixed_rate_bond(
+                "L1",
+                Money::new(100_000_000.0, Currency::USD),
+                0.07,
+                maturity,
+                DayCount::Thirty360,
+            ));
+            if with_reinvestment {
+                pool.reinvestment_period = Some(ReinvestmentPeriod {
+                    end_date: reinvest_end,
+                    is_active: true,
+                    criteria: ReinvestmentCriteria::default(),
+                });
+            }
+            let tranche = Tranche::new(
+                "A",
+                0.0,
+                100.0,
+                Seniority::Senior,
+                Money::new(100_000_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity,
+            )
+            .expect("tranche");
+            let mut instrument = StructuredCredit::new_clo(
+                "CLO-REINVEST",
+                pool,
+                TrancheStructure::new(vec![tranche]).expect("structure"),
+                cc_test_date(),
+                maturity,
+                "USD-OIS",
+            )
+            .with_payment_calendar("nyse");
+            instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+            instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+            instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+            instrument
+        };
+
+        let market = MarketContext::new().insert(cc_discount_curve());
+
+        let with_reinvest = run_simulation_with_source(
+            &build_deal(true),
+            &market,
+            cc_test_date(),
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("simulation with reinvestment");
+
+        let tranche = with_reinvest.get("A").expect("tranche A");
+
+        // Total interest collected by the senior tranche over the deal life.
+        let total_interest: f64 = tranche
+            .interest_flows
+            .iter()
+            .map(|(_, m)| m.amount())
+            .sum();
+        // Total principal returned.
+        let total_principal: f64 = tranche
+            .principal_flows
+            .iter()
+            .map(|(_, m)| m.amount())
+            .sum();
+
+        // With recycling, the $100M of notional is held flat through the 6y
+        // reinvestment period, so it keeps throwing off 5% coupons. Interest
+        // on a flat $100M for ~6y of reinvestment plus amortization after is
+        // far above what a vanishing-principal pool would pay.
+        // Pre-fix (principal lost): the senior tranche collects only a small
+        // fraction of its principal back. Post-fix it must be repaid in full.
+        assert!(
+            total_principal > 99_000_000.0,
+            "with reinvestment recycling the senior tranche must be repaid \
+             nearly in full; got principal {total_principal:.0} (pre-fix the \
+             reinvested principal vanishes and is never returned)"
+        );
+        assert!(
+            total_interest > 25_000_000.0,
+            "a $100M tranche held flat through a 6y reinvestment period at 5% \
+             must collect substantial interest; got {total_interest:.0}"
+        );
+        // Final balance must be (near) zero — the tranche fully amortizes.
+        assert!(
+            tranche.final_balance.amount() < 1.0,
+            "tranche must fully amortize by maturity; final balance {}",
+            tranche.final_balance.amount()
+        );
+    }
+
+    /// Item 2 — loss allocation must not double-count notional already retired
+    /// by principal repayment. A tranche's notional is consumed by exactly two
+    /// channels — principal repayment and write-down — and the sum can never
+    /// exceed its original face.
+    ///
+    /// The pre-fix engine allocated *cumulative* expected loss against a cap
+    /// of `original_balance` every period. A tranche written down early (when
+    /// little principal had been repaid) keeps that write-down recorded, while
+    /// the waterfall keeps paying it principal in later periods — so
+    /// `principal_repaid + write-down` could exceed face. The fix allocates
+    /// only this period's incremental net loss and caps each tranche's
+    /// incremental write-down at its CURRENT balance.
+    ///
+    /// The loss-bearing tranche here is a **subordinated** tranche (paid via
+    /// bounded `TranchePrincipal`, not the uncapped equity residual), so the
+    /// `principal + write-down ≤ face` invariant is the genuine test.
+    #[test]
+    fn loss_allocation_caps_writedown_by_face_net_of_principal_repaid() {
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
+
+        let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+        // High CPR pays the structure down fast; concurrent high CDR writes
+        // losses against the (already-amortizing) subordinated tranche.
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "L1",
+            Money::new(100_000_000.0, Currency::USD),
+            0.07,
+            maturity,
+            DayCount::Thirty360,
+        ));
+        // Senior + subordinated + equity. The subordinated tranche absorbs
+        // loss after equity and is paid principal via bounded TranchePrincipal.
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "A",
+                0.0,
+                70.0,
+                Seniority::Senior,
+                Money::new(70_000_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity,
+            )
+            .expect("senior"),
+            Tranche::new(
+                "B",
+                70.0,
+                92.0,
+                Seniority::Subordinated,
+                Money::new(22_000_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.07 },
+                maturity,
+            )
+            .expect("subordinated"),
+            Tranche::new(
+                "EQ",
+                92.0,
+                100.0,
+                Seniority::Equity,
+                Money::new(8_000_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity,
+            )
+            .expect("equity"),
+        ])
+        .expect("structure");
+        let mut instrument = StructuredCredit::new_clo(
+            "CLO-LOSS-CAP",
+            pool,
+            tranches,
+            cc_test_date(),
+            maturity,
+            "USD-OIS",
+        )
+        .with_payment_calendar("nyse");
+        // Heavy prepayment + heavy default running together.
+        instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.40);
+        instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.30);
+        instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
+
+        let market = MarketContext::new().insert(cc_discount_curve());
+        let results = run_simulation_with_source(
+            &instrument,
+            &market,
+            cc_test_date(),
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("simulation");
+
+        // The core invariant for every bounded-principal tranche: principal
+        // repaid + write-down must never exceed the original face. Pre-fix the
+        // cumulative-loss cap ignored principal repaid, so this sum could
+        // exceed face (double-counting retired notional as loss-absorbing).
+        for (id, face) in [("A", 70_000_000.0_f64), ("B", 22_000_000.0_f64)] {
+            let tranche = results.get(id).unwrap_or_else(|| panic!("tranche {id}"));
+            let total_writedown = tranche.total_writedown.amount();
+            let total_principal = tranche.total_principal.amount();
+            assert!(
+                total_principal + total_writedown <= face + WRITEDOWN_DE_MINIMIS,
+                "{id}: principal repaid ({total_principal:.0}) + write-down \
+                 ({total_writedown:.0}) = {:.0} must not exceed original face \
+                 ({face:.0}); the pre-fix cap double-counts repaid face",
+                total_principal + total_writedown
+            );
+            // A write-down can never exceed the tranche's own face.
+            assert!(
+                total_writedown <= face + WRITEDOWN_DE_MINIMIS,
+                "{id}: write-down {total_writedown:.0} exceeds face {face:.0}"
+            );
+        }
+    }
+
+    /// Item 13 — per-period cash conservation: every dollar of pool collateral
+    /// cashflow must be accounted for as a tranche cashflow, a reserve
+    /// movement, or principal recycled during reinvestment. This drives the
+    /// in-engine debug assertion on a representative deal and asserts the
+    /// deal-level identity holds across the whole simulation.
+    #[test]
+    fn per_period_cash_conservation_holds_over_full_simulation() {
+        let maturity = Date::from_calendar_date(2031, Month::January, 1).expect("valid date");
+
+        let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "L1",
+            Money::new(80_000_000.0, Currency::USD),
+            0.07,
+            maturity,
+            DayCount::Thirty360,
+        ));
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "L2",
+            Money::new(20_000_000.0, Currency::USD),
+            0.065,
+            maturity,
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "A",
+                0.0,
+                80.0,
+                Seniority::Senior,
+                Money::new(80_000_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity,
+            )
+            .expect("senior"),
+            Tranche::new(
+                "B",
+                80.0,
+                100.0,
+                Seniority::Equity,
+                Money::new(20_000_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity,
+            )
+            .expect("equity"),
+        ])
+        .expect("structure");
+        let mut instrument = StructuredCredit::new_clo(
+            "CLO-CONSERVE",
+            pool,
+            tranches,
+            cc_test_date(),
+            maturity,
+            "USD-OIS",
+        )
+        .with_payment_calendar("nyse");
+        instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
+        instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
+        instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 6);
+
+        let market = MarketContext::new().insert(cc_discount_curve());
+        // The per-period cash-conservation debug assertion fires inside
+        // simulate_period; reaching `finalize` without a panic is the test.
+        let results = run_simulation_with_source(
+            &instrument,
+            &market,
+            cc_test_date(),
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("simulation");
+
+        // Deal-level sanity: total cash distributed to tranches is positive
+        // and finite (the per-period assertion already proved conservation).
+        let total_cash: f64 = results
+            .values()
+            .flat_map(|r| r.cashflows.iter())
+            .map(|(_, m)| m.amount())
+            .sum();
+        assert!(
+            total_cash.is_finite() && total_cash > 0.0,
+            "deal must distribute positive finite cash; got {total_cash}"
+        );
+    }
+
+    /// Item 6 — the contractual level payment must be FROZEN once computed.
+    ///
+    /// A level-pay loan's scheduled payment is fixed at origination;
+    /// prepayments shorten the loan, they do not shrink the scheduled payment.
+    /// White-box test: build a `SimulationState` with one amortizing mortgage,
+    /// run period 1 (pure scheduled amortization), then simulate an external
+    /// prepayment by shrinking the asset balance and run period 2. The frozen
+    /// level payment must be unchanged, and period-2 scheduled principal must
+    /// equal `frozen_LP − shrunk_balance·period_rate` — strictly LARGER than
+    /// the pre-fix recomputed value (which scales the whole payment down with
+    /// the balance).
+    #[test]
+    fn level_pay_scheduled_principal_uses_frozen_contractual_payment() {
+        use crate::instruments::fixed_income::structured_credit::types::AssetType;
+        use finstack_core::types::InstrumentId;
+
+        let closing = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+        let maturity = Date::from_calendar_date(2034, Month::January, 1).expect("date");
+        let pay1 = Date::from_calendar_date(2024, Month::April, 1).expect("date");
+        let pay2 = Date::from_calendar_date(2024, Month::July, 1).expect("date");
+
+        let rate = 0.06_f64;
+        let original_balance = 1_000_000.0_f64;
+
+        let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset {
+            day_count: DayCount::Thirty360,
+            id: InstrumentId::new("MTG1"),
+            asset_type: AssetType::SingleFamilyMortgage { ltv: None },
+            balance: Money::new(original_balance, Currency::USD),
+            rate,
+            spread_bps: None,
+            index_id: None,
+            maturity,
+            credit_quality: None,
+            industry: None,
+            obligor_id: None,
+            is_defaulted: false,
+            recovery_amount: None,
+            purchase_price: None,
+            acquisition_date: None,
+            smm_override: None,
+            mdr_override: None,
+        });
+        let tranche = Tranche::new(
+            "A",
+            0.0,
+            100.0,
+            Seniority::Senior,
+            Money::new(original_balance, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            maturity,
+        )
+        .expect("tranche");
+        let tranches = TrancheStructure::new(vec![tranche]).expect("structure");
+
+        let market = MarketContext::new().insert(cc_discount_curve());
+        let mut state = SimulationState::new(&pool, &tranches, closing, 0).expect("state");
+
+        let months_per_period = 3.0_f64;
+        let rates = PoolFlowRates {
+            smm: 0.0,
+            mdr: 0.0,
+            recovery_rate: 0.0,
+        };
+
+        // ── Period 1: pure scheduled amortization (no prepay). ──────────
+        let flows1 = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
+            state: &mut state,
+            pay_date: pay1,
+            prev_date: closing,
+            months_per_period,
+            context: &market,
+            rates,
+            copula_outcome: None,
+        })
+        .expect("period 1 flows");
+        let level_payment = state.pool_state.level_payments[0]
+            .expect("level payment must be frozen after the first amortizing period");
+        let sched1 = flows1.scheduled_principal.amount();
+        assert!(sched1 > 0.0, "period 1 must amortize some scheduled principal");
+
+        // ── Simulate an external prepayment: halve the asset balance. ───
+        let balance_after_prepay = state.pool_state.balances[0] * 0.5;
+        state.pool_state.balances[0] = balance_after_prepay;
+
+        // ── Period 2: the level payment must NOT be recomputed. ─────────
+        let flows2 = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
+            state: &mut state,
+            pay_date: pay2,
+            prev_date: pay1,
+            months_per_period,
+            context: &market,
+            rates,
+            copula_outcome: None,
+        })
+        .expect("period 2 flows");
+
+        // The frozen level payment is unchanged.
+        assert_eq!(
+            state.pool_state.level_payments[0],
+            Some(level_payment),
+            "the contractual level payment must stay frozen across periods"
+        );
+
+        // Period-2 scheduled principal = frozen_LP − interest on the
+        // (prepaid-down) balance. With the bug the level payment would be
+        // recomputed off the halved balance, roughly halving it.
+        let period_rate = (1.0 + rate).powf(months_per_period / 12.0) - 1.0;
+        let expected_sched2 = level_payment - balance_after_prepay * period_rate;
+        let sched2 = flows2.scheduled_principal.amount();
+        assert!(
+            (sched2 - expected_sched2).abs() < 1.0,
+            "period-2 scheduled principal {sched2:.2} must equal frozen \
+             level payment {level_payment:.2} minus interest on the \
+             prepaid-down balance ({expected_sched2:.2})"
+        );
+
+        // The buggy recomputed payment would be ~half the frozen one, so the
+        // buggy scheduled principal would be far below the correct value.
+        let buggy_recomputed_lp = level_payment * 0.5; // LP ∝ balance
+        let buggy_sched2 = (buggy_recomputed_lp - balance_after_prepay * period_rate).max(0.0);
+        assert!(
+            sched2 > buggy_sched2 + 1_000.0,
+            "frozen-payment scheduled principal {sched2:.2} must materially \
+             exceed the buggy recomputed-payment value {buggy_sched2:.2}"
+        );
+    }
+
+    /// Item 12 — interest must stop accruing when an asset defaults.
+    ///
+    /// A defaulting asset must not accrue the full period's interest on its
+    /// full pre-default balance. With defaults assumed uniformly distributed
+    /// over the period, the defaulting fraction `period_mdr` accrues on
+    /// average HALF the period's interest, so total interest is scaled by
+    /// `(1 − 0.5·period_mdr)`.
+    ///
+    /// White-box test: a single non-amortizing asset, two runs at the same
+    /// balance/rate — one with zero default, one with a high MDR. The
+    /// high-MDR run's interest must equal the zero-default interest times
+    /// `(1 − 0.5·period_mdr)`, strictly less than the full accrual.
+    #[test]
+    fn interest_accrual_stops_at_default() {
+        use crate::instruments::fixed_income::structured_credit::types::AssetType;
+        use finstack_core::types::InstrumentId;
+
+        let closing = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+        let maturity = Date::from_calendar_date(2034, Month::January, 1).expect("date");
+        let pay1 = Date::from_calendar_date(2024, Month::April, 1).expect("date");
+
+        let rate = 0.08_f64;
+        let balance = 1_000_000.0_f64;
+        let months_per_period = 3.0_f64;
+        let market = MarketContext::new().insert(cc_discount_curve());
+
+        // Build a single non-amortizing bond pool with an optional MDR override.
+        let build_pool = |mdr_override: Option<f64>| {
+            let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+            pool.assets.push(PoolAsset {
+                day_count: DayCount::Thirty360,
+                id: InstrumentId::new("BND1"),
+                asset_type: AssetType::HighYieldBond { industry: None },
+                balance: Money::new(balance, Currency::USD),
+                rate,
+                spread_bps: None,
+                index_id: None,
+                maturity,
+                credit_quality: None,
+                industry: None,
+                obligor_id: None,
+                is_defaulted: false,
+                recovery_amount: None,
+                purchase_price: None,
+                acquisition_date: None,
+                smm_override: None,
+                mdr_override,
+            });
+            pool
+        };
+        let make_tranches = || {
+            let tranche = Tranche::new(
+                "A",
+                0.0,
+                100.0,
+                Seniority::Senior,
+                Money::new(balance, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity,
+            )
+            .expect("tranche");
+            TrancheStructure::new(vec![tranche]).expect("structure")
+        };
+
+        let one_period_interest = |pool: &Pool, tranches: &TrancheStructure| -> f64 {
+            let mut state = SimulationState::new(pool, tranches, closing, 0).expect("state");
+            let flows = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
+                state: &mut state,
+                pay_date: pay1,
+                prev_date: closing,
+                months_per_period,
+                context: &market,
+                rates: PoolFlowRates {
+                    smm: 0.0,
+                    mdr: 0.0,
+                    recovery_rate: 0.40,
+                },
+                copula_outcome: None,
+            })
+            .expect("flows");
+            flows.interest.amount()
+        };
+
+        // No default: full period accrual.
+        let pool_no_default = build_pool(None);
+        let tranches_a = make_tranches();
+        let interest_no_default = one_period_interest(&pool_no_default, &tranches_a);
+        assert!(interest_no_default > 0.0, "baseline interest must be positive");
+
+        // High monthly MDR ⇒ large period default fraction.
+        let monthly_mdr = 0.10_f64;
+        let pool_with_default = build_pool(Some(monthly_mdr));
+        let tranches_b = make_tranches();
+        let interest_with_default = one_period_interest(&pool_with_default, &tranches_b);
+
+        // Expected: period_mdr = 1 − (1 − monthly_mdr)^months; interest scaled
+        // by (1 − 0.5·period_mdr).
+        let period_mdr = 1.0 - (1.0 - monthly_mdr).powf(months_per_period);
+        let expected = interest_no_default * (1.0 - 0.5 * period_mdr);
+        assert!(
+            (interest_with_default - expected).abs() < 1.0,
+            "defaulting-asset interest {interest_with_default:.2} must be the \
+             full-accrual interest {interest_no_default:.2} scaled by \
+             (1 − 0.5·period_mdr) = {expected:.2}"
+        );
+        // And it must be strictly below the un-haircut full accrual.
+        assert!(
+            interest_with_default < interest_no_default - 1.0,
+            "defaulting-asset interest must be strictly below the full \
+             pre-default accrual ({interest_with_default:.2} vs \
+             {interest_no_default:.2})"
+        );
+    }
 }
 
 // ============================================================================
@@ -775,6 +1388,11 @@ pub(crate) struct SimulationState<'a> {
     /// of recovery receipts. Lagged recoveries affect waterfall cash, not
     /// loss allocation.
     cumulative_expected_loss: f64,
+    /// Cumulative net loss that exceeds the structure's total absorbable
+    /// notional (every tranche fully written down). Surfaced rather than
+    /// silently dropped by the loss-allocation `min(...)` cap, so the
+    /// per-period cash-conservation check can account for it.
+    cumulative_loss_unallocated: f64,
     /// Total pool balance at simulation start (including defaulted assets).
     /// Used for cleanup call pool factor calculation.
     total_pool_balance: Money,
@@ -896,6 +1514,7 @@ impl<'a> SimulationState<'a> {
             tranche_recipient_keys,
             was_reinvestment_active: initial_reinvestment_active,
             cumulative_expected_loss: 0.0,
+            cumulative_loss_unallocated: 0.0,
             total_pool_balance,
             performing_pool_balance,
             loss_alloc_order,
@@ -1034,6 +1653,30 @@ fn simulate_period(
 
     state.prev_date = Some(pay_date);
 
+    // ── Reinvestment recycling ───────────────────────────────────────
+    // During the reinvestment period, collected principal (scheduled
+    // amortization + prepayments) is NOT distributed to the tranches — it is
+    // recycled by the manager into new collateral. Without this recycle the
+    // asset-level balances shrink every period (calculate_pool_flows debits
+    // scheduled principal and prepayments), the collected principal is never
+    // distributed (Step 3 excludes it from the waterfall), and at the
+    // reinvestment-end reconciliation `pool_outstanding` is snapped DOWN to
+    // the shrunken asset sum — so the recycled principal silently vanishes
+    // and never generates future cashflows.
+    //
+    // Recycle by crediting the collected principal back onto the surviving
+    // performing assets (pro-rata to their post-flow balances). This holds
+    // the pool balance flat net of defaults, so the recycled cash continues
+    // to throw off interest, principal and defaults in later periods.
+    // Recoveries are CASH and are never recycled — they flow to the waterfall.
+    if is_reinvestment_active {
+        let recyclable =
+            pool_flows.scheduled_principal.amount().max(0.0) + pool_flows.prepayment.amount().max(0.0);
+        if recyclable.is_finite() && recyclable > 0.0 {
+            recycle_reinvestment_principal(state, recyclable);
+        }
+    }
+
     // Add new recoveries to the lag queue
     state
         .recovery_queue
@@ -1063,32 +1706,55 @@ fn simulate_period(
     if state.cumulative_expected_loss > WRITEDOWN_DE_MINIMIS
         && state.performing_pool_balance.amount() > 0.0
     {
-        // Allocate cumulative expected loss bottom-up using pre-computed order
-        let mut remaining_loss = state.cumulative_expected_loss;
+        // Allocate the *period's* expected net loss bottom-up using the
+        // pre-computed order.
+        //
+        // A tranche's notional is consumed by exactly two channels: principal
+        // repayment (cash retiring face) and write-down (loss retiring face).
+        // The invariant is `principal_repaid + write-down ≤ original_balance`.
+        //
+        // The previous engine allocated *cumulative* expected loss against a
+        // cap of `original_balance` every period. That double-counts retired
+        // face: a tranche written down in an early period (when little
+        // principal had been repaid) keeps that write-down recorded, while the
+        // waterfall continues paying it principal in later periods — so
+        // `principal_repaid + write-down` could exceed face. The robust fix is
+        // to (a) allocate only this period's *incremental* net loss, and
+        // (b) cap each tranche's incremental write-down at its CURRENT balance
+        // — a tranche can never be written down below zero, and any loss it
+        // cannot absorb cascades up to the next-most-senior tranche.
+        let already_allocated: f64 = state
+            .results
+            .values()
+            .map(|r| r.total_writedown.amount())
+            .sum();
+        let mut remaining_loss =
+            (state.cumulative_expected_loss - already_allocated).max(0.0);
         // Clone loss_alloc_order to avoid borrow conflict with state
         let loss_order = state.loss_alloc_order.clone();
         for &idx in &loss_order {
             if remaining_loss <= WRITEDOWN_DE_MINIMIS {
                 break;
             }
-            let tranche = &state.tranches.tranches[idx];
-            let tranche_id_str = tranche.id.as_str();
-            let original_balance = tranche.original_balance.amount();
+            let tranche_id_str = state.tranches.tranches[idx].id.as_str();
 
-            // This tranche's share of cumulative loss (capped at original face)
-            let target_loss = remaining_loss.min(original_balance);
-            remaining_loss -= target_loss;
-
-            // Incremental write-down: only record the increase over prior periods
-            let already_written_down = state
-                .results
+            // The tranche can absorb at most its current outstanding balance.
+            // `tranche_balances` already nets out every prior principal
+            // payment AND prior write-down, so capping the incremental
+            // write-down here keeps `principal_repaid + write-down ≤ face`.
+            let current = state
+                .tranche_balances
                 .get(tranche_id_str)
-                .map(|r| r.total_writedown.amount())
+                .map(|m| m.amount())
                 .unwrap_or(0.0);
+            if current <= WRITEDOWN_DE_MINIMIS {
+                continue;
+            }
 
-            let incremental = (target_loss - already_written_down).max(0.0);
+            let incremental = remaining_loss.min(current);
+            remaining_loss -= incremental;
             if incremental > WRITEDOWN_DE_MINIMIS {
-                // Reduce tranche balance BEFORE waterfall execution
+                // Reduce tranche balance BEFORE waterfall execution.
                 if let Some(current_balance) = state.tranche_balances.get_mut(tranche_id_str) {
                     let new_balance = (current_balance.amount() - incremental).max(0.0);
                     *current_balance = Money::new(new_balance, state.base_ccy);
@@ -1100,6 +1766,46 @@ fn simulate_period(
                     res.total_writedown = res.total_writedown.checked_add(writedown)?;
                 }
             }
+        }
+
+        // Cumulative net loss above the structure's total absorbable notional
+        // cannot be written down further (every tranche is fully impaired).
+        // Surface it rather than silently dropping it: the engine accumulates
+        // it on `cumulative_loss_unallocated` so it is observable and the
+        // post-loss invariant below can be checked. `remaining_loss` here is
+        // the portion of THIS period's incremental net loss that no tranche
+        // could absorb, so it is accumulated, not overwritten.
+        if remaining_loss > WRITEDOWN_DE_MINIMIS {
+            state.cumulative_loss_unallocated += remaining_loss;
+        }
+
+        // Invariant: unallocated loss can only be non-zero once every tranche
+        // is fully written down (no notional left to absorb it). Debug-only —
+        // compiled out in release builds.
+        if cfg!(debug_assertions) && state.cumulative_loss_unallocated > WRITEDOWN_DE_MINIMIS {
+            let total_face: f64 = state
+                .tranches
+                .tranches
+                .iter()
+                .map(|t| t.original_balance.amount())
+                .sum();
+            let total_writedown: f64 = state
+                .results
+                .values()
+                .map(|r| r.total_writedown.amount())
+                .sum();
+            let total_principal: f64 = state
+                .results
+                .values()
+                .map(|r| r.total_principal.amount())
+                .sum();
+            debug_assert!(
+                total_writedown + total_principal >= total_face - WRITEDOWN_DE_MINIMIS,
+                "unallocated loss {} surfaced but structure is not fully \
+                 retired: face={total_face}, writedown={total_writedown}, \
+                 principal={total_principal}",
+                state.cumulative_loss_unallocated,
+            );
         }
     }
 
@@ -1292,7 +1998,140 @@ fn simulate_period(
         state.pool_outstanding = Money::new(0.0, state.base_ccy);
     }
 
+    // ── Item 13: per-period cash-conservation invariant ──────────────
+    // Every dollar of pool cash routed into the waterfall must come out as a
+    // tranche/recipient distribution or be left as residual cash. This is a
+    // debug/test-only assertion (zero release-build cost) that catches
+    // accounting regressions in the waterfall and the engine's pool-flow
+    // aggregation.
+    debug_assert_cash_conserved(
+        total_cash_for_waterfall,
+        &pool_flows,
+        released_recoveries,
+        is_reinvestment_active,
+        &waterfall_result,
+    );
+
     Ok(())
+}
+
+/// Per-period cash-conservation invariant (debug/test builds only).
+///
+/// Verifies two identities for one payment period:
+///
+/// 1. **Input identity** — the cash handed to the waterfall equals the pool
+///    cash that is actually distributable this period:
+///    `total_cash_for_waterfall = interest + released_recoveries`
+///    (`+ scheduled_principal + prepayment` when reinvestment is inactive;
+///    during reinvestment that principal is recycled into collateral, not
+///    distributed).
+///
+/// 2. **Output identity** — the waterfall conserves cash:
+///    `Σ distributions + remaining_cash = total_available`.
+///
+/// Compiled out entirely in release builds (`debug_assert!`), so there is no
+/// hot-path cost; it exists to fail loudly in tests and debug runs if a future
+/// change breaks the engine's cash accounting.
+#[inline]
+fn debug_assert_cash_conserved(
+    total_cash_for_waterfall: Money,
+    pool_flows: &PoolFlows,
+    released_recoveries: Money,
+    is_reinvestment_active: bool,
+    waterfall_result: &WaterfallDistribution,
+) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+
+    // Tolerance scales with deal size: penny-safe pro-rata allocation in the
+    // waterfall rounds to the currency's smallest unit per recipient.
+    let tol = (total_cash_for_waterfall.amount().abs() * 1e-9).max(1.0);
+
+    // Identity 1: input to the waterfall == distributable pool cash.
+    let expected_input = if is_reinvestment_active {
+        pool_flows.interest.amount() + released_recoveries.amount()
+    } else {
+        pool_flows.interest.amount()
+            + pool_flows.scheduled_principal.amount()
+            + pool_flows.prepayment.amount()
+            + released_recoveries.amount()
+    };
+    debug_assert!(
+        (total_cash_for_waterfall.amount() - expected_input).abs() <= tol,
+        "cash-conservation (input): waterfall received {} but distributable \
+         pool cash is {} (interest={}, scheduled={}, prepay={}, recoveries={}, \
+         reinvesting={})",
+        total_cash_for_waterfall.amount(),
+        expected_input,
+        pool_flows.interest.amount(),
+        pool_flows.scheduled_principal.amount(),
+        pool_flows.prepayment.amount(),
+        released_recoveries.amount(),
+        is_reinvestment_active,
+    );
+
+    // Identity 2: the waterfall neither creates nor destroys cash.
+    let distributed: f64 = waterfall_result
+        .distributions
+        .values()
+        .map(|m| m.amount())
+        .sum();
+    let accounted = distributed + waterfall_result.remaining_cash.amount();
+    debug_assert!(
+        (accounted - waterfall_result.total_available.amount()).abs() <= tol,
+        "cash-conservation (output): waterfall distributed {} + residual {} = \
+         {} but had {} available",
+        distributed,
+        waterfall_result.remaining_cash.amount(),
+        accounted,
+        waterfall_result.total_available.amount(),
+    );
+}
+
+/// Recycle reinvestment-period principal back into the surviving pool.
+///
+/// During the reinvestment period, collected scheduled principal and
+/// prepayments are reinvested by the manager into new collateral rather than
+/// distributed to the tranches. This helper models that by crediting the
+/// `recyclable` cash onto the still-performing assets (those that are not
+/// defaulted and carry a positive balance), pro-rata to their current
+/// balances. The net effect is that the pool balance stays flat net of
+/// defaults, so the recycled principal continues to generate interest,
+/// scheduled principal and defaults in subsequent periods instead of silently
+/// vanishing at the reinvestment-end reconciliation.
+///
+/// If no performing assets remain (the whole pool has defaulted/amortized),
+/// the cash cannot be placed into new collateral and the recycle is a no-op;
+/// the deal is structurally at its end and the cleanup/exhaustion logic takes
+/// over.
+fn recycle_reinvestment_principal(state: &mut SimulationState, recyclable: f64) {
+    let performing_total: f64 = state
+        .pool_state
+        .is_defaulted
+        .iter()
+        .zip(state.pool_state.balances.iter())
+        .filter(|(defaulted, balance)| !**defaulted && **balance > 0.0)
+        .map(|(_, balance)| *balance)
+        .sum();
+
+    if performing_total <= 0.0 {
+        // No surviving collateral to reinvest into — recycle is a no-op.
+        return;
+    }
+
+    let n = state.pool_state.len();
+    for i in 0..n {
+        if state.pool_state.is_defaulted[i] {
+            continue;
+        }
+        let balance = state.pool_state.balances[i];
+        if balance <= 0.0 {
+            continue;
+        }
+        let share = balance / performing_total;
+        state.pool_state.balances[i] = balance + recyclable * share;
+    }
 }
 
 // ============================================================================
@@ -1383,8 +2222,8 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
     // Copula default resolution. For `PerName`, `per_name_mask[k]` is the
     // realized default outcome of the k-th still-performing asset (in pool
     // order); `alive_idx` advances for every asset that passes the
-    // performing-asset gate below — including matured assets — so the
-    // indicator slice stays index-aligned with the simulator's draw order.
+    // performing-asset gate below, so the indicator slice stays
+    // index-aligned with the simulator's draw order.
     // For the LHP fast-path, `lhp_period_rate` is a single period-level rate
     // applied to every performing asset.
     let (per_name_mask, lhp_period_rate) = match &request.copula_outcome {
@@ -1395,6 +2234,42 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
     let mut alive_idx = 0usize;
 
     let n = state.pool_state.len();
+
+    // Item 3 — mask/asset-loop alignment guard.
+    //
+    // The per-name default mask is sized by the *builder* (StochasticPathFlowSource)
+    // from the count of still-performing assets (`!is_defaulted && balance > 0`)
+    // at period start. The asset loop below claims one mask entry per asset
+    // that passes the *same* performing-asset gate, in the *same* pool-index
+    // order, so the k-th claim lines up with the k-th drawn idiosyncratic
+    // shock. The asset loop mutates `is_defaulted`/`balances`, but only ever
+    // for the asset it is currently processing (index `i`) and only after
+    // that asset has claimed its slot — a later asset's gate is never
+    // affected. The two counts are therefore equal by construction.
+    //
+    // A silent `unwrap_or(false)` on an out-of-bounds claim would turn any
+    // future regression that breaks this alignment into a wrong-but-quiet
+    // default realization. Instead, validate the mask length up-front and
+    // fail loudly: this makes the deterministic alignment a checked invariant
+    // rather than an implicit assumption.
+    if let Some(mask) = per_name_mask {
+        let performing = (0..n)
+            .filter(|&i| {
+                state.pool_state.balances[i] > 0.0 && !state.pool_state.is_defaulted[i]
+            })
+            .count();
+        if mask.len() != performing {
+            return Err(finstack_core::Error::Validation(format!(
+                "per-name copula default mask is misaligned with the asset \
+                 loop: mask carries {} entries but {} assets are performing \
+                 at period start (pay_date {})",
+                mask.len(),
+                performing,
+                request.pay_date,
+            )));
+        }
+    }
+
     for i in 0..n {
         let balance = state.pool_state.balances[i];
         if balance <= 0.0 {
@@ -1410,13 +2285,39 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         }
 
         // This asset is performing at period start; claim its per-name
-        // default indicator (consumed even if the asset matures below, so the
-        // slice index never drifts from the simulator's draw order).
+        // default indicator. The pre-loop length guard proves `alive_idx` is
+        // always in bounds here, so the claim is exact and order-stable.
         let per_name_default = per_name_mask.map(|mask| {
             let defaulted = mask.get(alive_idx).copied().unwrap_or(false);
             alive_idx += 1;
             defaulted
         });
+
+        // Resolve this period's default rate up-front — it is needed both for
+        // the mid-period interest-accrual haircut below and for the principal
+        // default amount further down. The rate depends only on the asset's
+        // MDR override, the per-name copula realization, the LHP period rate,
+        // or the legacy pool-wide MDR — none of which depend on the scheduled
+        // amortization computed later.
+        //
+        // Default-rate precedence:
+        //   1. Per-asset `mdr_override` (explicit user input) — always wins.
+        //   2. Per-name copula realization — full default (1.0) or none (0.0).
+        //   3. LHP fast-path period rate — the closed-form `N → ∞` limit.
+        //   4. Legacy pool-wide MDR (`global_period_mdr`).
+        let period_mdr = if let Some(mdr) = state.pool_state.mdr_overrides[i] {
+            1.0 - (1.0 - mdr).powf(request.months_per_period)
+        } else if let Some(defaulted) = per_name_default {
+            if defaulted {
+                1.0
+            } else {
+                0.0
+            }
+        } else if let Some(rate) = lhp_period_rate {
+            rate.clamp(0.0, 1.0)
+        } else {
+            global_period_mdr
+        };
 
         // 1. Interest -- computed first so matured assets still pay their final coupon
         let rate = if let Some(curve_idx) = state.pool_state.curve_indices[i] {
@@ -1435,7 +2336,20 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
             .unwrap_or(DayCount::Act360)
             .year_fraction(request.prev_date, interest_end, DayCountContext::default())?;
 
-        let interest = Money::new(balance * rate * accrual_factor, base_ccy);
+        // Item 12 — interest must stop accruing when an asset defaults.
+        // Defaults in a period are modeled as a rate `period_mdr` (a fraction
+        // of the balance), with no explicit intra-period default date. Under
+        // the standard market convention defaults are assumed uniformly
+        // distributed over the period, so the defaulting fraction accrues, on
+        // average, HALF the period's interest. The non-defaulting fraction
+        // accrues the full period. Net interest is therefore scaled by
+        // `(1 − 0.5·period_mdr)` rather than accruing the full pre-default
+        // balance for the whole period.
+        let default_accrual_haircut = 1.0 - 0.5 * period_mdr.clamp(0.0, 1.0);
+        let interest = Money::new(
+            balance * rate * accrual_factor * default_accrual_haircut,
+            base_ccy,
+        );
         total_interest = total_interest.checked_add(interest)?;
 
         // M3: Check maturity -- if asset has matured, return remaining balance as
@@ -1448,7 +2362,15 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
             continue;
         }
 
-        // M1: Scheduled amortization for amortizing assets
+        // M1: Scheduled amortization for amortizing assets.
+        //
+        // Item 6 — a level-pay loan's scheduled payment is FIXED at
+        // origination. Prepayments shorten the loan; they do not reduce the
+        // scheduled payment. The previous engine recomputed the level payment
+        // every period from the current (post-prepayment) balance and
+        // remaining term, so the payment — and hence scheduled principal —
+        // shrank after every prepayment. The fix freezes the contractual
+        // level payment on first sight and reuses it.
         let scheduled_principal = if state.pool_state.is_amortizing[i] && rate > 0.0 {
             if !rate.is_finite() || rate <= -1.0 {
                 return Err(finstack_core::Error::Validation(format!(
@@ -1456,41 +2378,55 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
                     state.pool_state.ids[i]
                 )));
             }
-            // Compute level payment using period-native amortization math:
-            // period_rate = annual_rate * months_per_period / 12
-            // remaining_periods = remaining_months / months_per_period
-            // level_payment = P * r_p / (1 - (1+r_p)^-n_p)
-            let remaining_days = (state.pool_state.maturities[i] - request.pay_date)
-                .whole_days()
-                .max(1) as f64;
-            let remaining_months = (remaining_days / 30.44).round().max(1.0);
-
+            // period_rate = annual rate compounded over the payment period.
             let period_rate = (1.0 + rate).powf(request.months_per_period / 12.0) - 1.0;
-            let remaining_periods_f64 = remaining_months / request.months_per_period;
-            let denom = 1.0 - (1.0 + period_rate).powf(-remaining_periods_f64);
-            if !period_rate.is_finite() || !remaining_periods_f64.is_finite() || !denom.is_finite()
-            {
+            if !period_rate.is_finite() {
                 return Err(finstack_core::Error::Validation(format!(
                     "invalid amortization math for pool asset '{}': rate={rate}, period_rate={period_rate}",
                     state.pool_state.ids[i]
                 )));
             }
 
-            let period_payment = if denom.abs() > 1e-12 && remaining_periods_f64 > 0.0 {
-                balance * period_rate / denom
-            } else {
-                // If denominator is ~0 (very short term), return full balance
-                balance
+            // Resolve the frozen contractual level payment, computing it once
+            // on the first period the asset amortizes (period-native math:
+            // level_payment = P * r_p / (1 − (1+r_p)^−n_p)).
+            let level_payment = match state.pool_state.level_payments[i] {
+                Some(lp) => lp,
+                None => {
+                    let remaining_days = (state.pool_state.maturities[i] - request.pay_date)
+                        .whole_days()
+                        .max(1) as f64;
+                    let remaining_months = (remaining_days / 30.44).round().max(1.0);
+                    let remaining_periods_f64 = remaining_months / request.months_per_period;
+                    let denom = 1.0 - (1.0 + period_rate).powf(-remaining_periods_f64);
+                    if !remaining_periods_f64.is_finite() || !denom.is_finite() {
+                        return Err(finstack_core::Error::Validation(format!(
+                            "invalid amortization math for pool asset '{}': rate={rate}, period_rate={period_rate}",
+                            state.pool_state.ids[i]
+                        )));
+                    }
+                    let lp = if denom.abs() > 1e-12 && remaining_periods_f64 > 0.0 {
+                        balance * period_rate / denom
+                    } else {
+                        // Denominator ~0 (very short term): pay the full balance.
+                        balance
+                    };
+                    if !lp.is_finite() {
+                        return Err(finstack_core::Error::Validation(format!(
+                            "invalid level payment for pool asset '{}': {lp}",
+                            state.pool_state.ids[i]
+                        )));
+                    }
+                    state.pool_state.level_payments[i] = Some(lp);
+                    lp
+                }
             };
-            if !period_payment.is_finite() {
-                return Err(finstack_core::Error::Validation(format!(
-                    "invalid level payment for pool asset '{}': {period_payment}",
-                    state.pool_state.ids[i]
-                )));
-            }
 
-            // Scheduled principal = level payment - interest (for this period)
-            (period_payment - balance * period_rate)
+            // Scheduled principal = frozen level payment − this period's
+            // interest. As the balance amortizes the interest portion shrinks
+            // and the principal portion grows — the correct level-pay profile.
+            // Bounded by the current balance so the loan never over-amortizes.
+            (level_payment - balance * period_rate)
                 .max(0.0)
                 .min(balance)
         } else {
@@ -1503,33 +2439,9 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         let balance_after_sched = balance - scheduled_principal;
 
         // m2 fix: Apply default first, then prepayment to post-default balance
-        // (market convention per Intex/Moody's Analytics).
-        //
-        // Default-rate precedence:
-        //   1. Per-asset `mdr_override` (explicit user input) — always wins.
-        //   2. Per-name copula realization — when finite-pool simulation is
-        //      active, the asset either defaults in full (indicator `true`)
-        //      or not at all (`false`). This injects name-level lumpiness:
-        //      the realized default count carries genuine idiosyncratic
-        //      dispersion rather than the deterministic LHP fraction.
-        //   3. LHP fast-path period rate — the closed-form `N → ∞` copula
-        //      limit, already a period-level rate (no re-aggregation).
-        //   4. Legacy pool-wide MDR (`global_period_mdr`) — the
-        //      monthly-equivalent rate for non-copula / deterministic models.
-        let period_mdr = if let Some(mdr) = state.pool_state.mdr_overrides[i] {
-            1.0 - (1.0 - mdr).powf(request.months_per_period)
-        } else if let Some(defaulted) = per_name_default {
-            if defaulted {
-                1.0
-            } else {
-                0.0
-            }
-        } else if let Some(rate) = lhp_period_rate {
-            rate.clamp(0.0, 1.0)
-        } else {
-            global_period_mdr
-        };
-
+        // (market convention per Intex/Moody's Analytics). `period_mdr` was
+        // resolved up-front (above the interest computation) so the mid-period
+        // accrual haircut and the principal default share one rate.
         let default_amt = balance_after_sched * period_mdr;
         let balance_after_default = balance_after_sched - default_amt;
 

@@ -100,9 +100,12 @@ impl StochasticPricer {
         let mut collector = ScenarioCollector::new(instrument, path_count, false)?;
         for path_index in 0..path_count {
             let shocks = self.tree_path_shocks(instrument, path_index, path_count, branch_count)?;
+            // Tree mode draws no antithetic pairs — each path is an
+            // independent stratified node, so the per-name substream is
+            // per-path and never negated.
             let per_name_engine = per_name_simulator
                 .as_ref()
-                .map(|sim| self.per_name_engine(sim, path_index));
+                .map(|sim| self.per_name_engine(sim, path_index, false));
             let output = self.price_path(instrument, context, shocks, per_name_engine)?;
             collector.record_output(output);
         }
@@ -253,7 +256,7 @@ impl StochasticPricer {
                 let shocks = self.path_shocks_from_factors(instrument, &factors)?;
                 let per_name_engine = per_name_simulator
                     .as_ref()
-                    .map(|sim| self.per_name_engine(sim, path_index));
+                    .map(|sim| self.per_name_engine(sim, path_index, antithetic));
                 self.price_path(instrument, context, shocks, per_name_engine)
             })
             .collect::<Result<Vec<_>>>()?;
@@ -334,17 +337,51 @@ impl StochasticPricer {
 
     /// Construct the per-path per-name default engine.
     ///
-    /// Each path draws its idiosyncratic `εᵢ` shocks from its own Philox
-    /// substream, seeded with the salted seed so the idiosyncratic stream
-    /// space is disjoint from the systematic-factor streams.
+    /// Each path draws its idiosyncratic `εᵢ` shocks from a Philox substream
+    /// seeded with the salted seed, so the idiosyncratic stream space is
+    /// disjoint from the systematic-factor streams.
+    ///
+    /// # Antithetic pairing (item 5)
+    ///
+    /// When `antithetic` is `true` the paths were generated as antithetic
+    /// pairs `(2k, 2k+1)` with `monte_carlo_factor_sets` negating the
+    /// systematic factors of `2k+1`. For the variance reduction to actually
+    /// work, the per-name idiosyncratic channel must be paired too: both
+    /// members of pair `k` draw from the SAME substream `substream(k)`, and
+    /// the second member (`2k+1`) negates every `εᵢ`. The previous engine
+    /// gave each path its own independent substream `substream(path_index)`,
+    /// so paired paths had *uncorrelated* idiosyncratic shocks — the
+    /// antithetic cancellation was lost on the per-name channel and the
+    /// reported MC confidence interval was too narrow.
     fn per_name_engine(
         &self,
         simulator: &Arc<PerNameCopulaDefault>,
         path_index: usize,
+        antithetic: bool,
     ) -> PerNameDefaultEngine {
-        let rng =
-            PhiloxRng::new(self.config.seed ^ PER_NAME_SEED_SALT).substream(path_index as u64);
-        PerNameDefaultEngine::new(Arc::clone(simulator), self.config.pool_granularity, rng)
+        let base = PhiloxRng::new(self.config.seed ^ PER_NAME_SEED_SALT);
+        if antithetic {
+            // Both members of pair k share substream(k); the odd member is
+            // the antithetic partner (negates idiosyncratic draws).
+            let pair_index = (path_index / 2) as u64;
+            let rng = base.substream(pair_index);
+            if path_index % 2 == 1 {
+                PerNameDefaultEngine::new_antithetic(
+                    Arc::clone(simulator),
+                    self.config.pool_granularity,
+                    rng,
+                )
+            } else {
+                PerNameDefaultEngine::new(
+                    Arc::clone(simulator),
+                    self.config.pool_granularity,
+                    rng,
+                )
+            }
+        } else {
+            let rng = base.substream(path_index as u64);
+            PerNameDefaultEngine::new(Arc::clone(simulator), self.config.pool_granularity, rng)
+        }
     }
 
     fn price_path(
@@ -488,11 +525,13 @@ impl StochasticPricer {
     ///
     /// Returns the period systematic factor `Z` and the *unconditional*
     /// period marginal default probability `PDₜ`. The period systematic
-    /// factor is the period's first monthly factor — for a monthly-pay deal
-    /// that is exactly one fresh `N(0,1)` per period; for multi-month periods
-    /// it is the period-representative systematic shock, still `N(0,1)`. The
-    /// marginal PD compounds the model's unconditional monthly MDR
-    /// (`expected_mdr`) over the period's months.
+    /// factor aggregates all `M` of the period's monthly `N(0,1)` factors as
+    /// `(Σ Zₘ)/√M`, the period-representative systematic shock — itself
+    /// `N(0,1)` — so the copula channel conditions on the same months the
+    /// LHP/MDR channel integrates (item 10). A monthly-pay deal recovers a
+    /// single fresh `N(0,1)` per period. The marginal PD compounds the
+    /// model's unconditional monthly MDR (`expected_mdr`) over the period's
+    /// months.
     fn copula_period_input(
         &self,
         copula_model: Option<&dyn crate::instruments::fixed_income::structured_credit::pricing::stochastic::default::StochasticDefault>,
@@ -515,10 +554,23 @@ impl StochasticPricer {
         }
         let marginal_pd = (1.0 - survival).clamp(0.0, 1.0);
 
-        // Period systematic factor: the period's first monthly factor (zero
-        // when the scenario carries no stochastic rates).
-        let systematic_z = if self.has_stochastic_rates() {
-            factors.first().copied().unwrap_or(0.0)
+        // Period systematic factor (item 10).
+        //
+        // For a multi-month payment period the copula latent variable must
+        // condition on a factor that represents the WHOLE period, consistent
+        // with the LHP/MDR channel — which integrates every month's factor
+        // through `aggregate_monthly_shocks`. Taking only the first month's
+        // factor ignored months 2..M and desynchronized the two channels.
+        //
+        // The `M` monthly factors are i.i.d. `N(0,1)`; their sum has variance
+        // `M`, so the period-representative systematic factor is
+        // `Z_period = (Σ Zₘ)/√M`. Dividing by `√M` (not `M`) keeps
+        // `Z_period ~ N(0,1)`, so the marginal-PD copula barrier
+        // `c = Φ⁻¹(PDₜ)` stays correctly calibrated. A single-month period
+        // recovers exactly that month's factor.
+        let systematic_z = if self.has_stochastic_rates() && !factors.is_empty() {
+            let sum: f64 = factors.iter().sum();
+            sum / (factors.len() as f64).sqrt()
         } else {
             0.0
         };
@@ -1385,6 +1437,31 @@ mod per_name_copula_tests {
         )
     }
 
+    /// Build a copula config with antithetic Monte Carlo sampling enabled.
+    fn antithetic_copula_config(
+        base_cdr: f64,
+        correlation: f64,
+        num_periods: usize,
+        granularity: PoolGranularity,
+        num_paths: usize,
+    ) -> StochasticPricerConfig {
+        let mut tree_config = ScenarioTreeConfig::new(
+            num_periods,
+            num_periods as f64 / 12.0,
+            BranchingSpec::fixed(2),
+        );
+        tree_config.default_spec =
+            StochasticDefaultSpec::gaussian_copula(base_cdr, correlation);
+        tree_config.correlation = CorrelationStructure::flat(correlation, 0.0);
+        tree_config.initial_balance = 100_000_000.0;
+        StochasticPricerConfig::new(close(), discount_curve(), tree_config)
+            .with_pricing_mode(PricingMode::MonteCarlo {
+                num_paths,
+                antithetic: true,
+            })
+            .with_pool_granularity(granularity)
+    }
+
     /// Build a pricer config with a Student-t-copula default model.
     fn student_t_copula_config(
         base_cdr: f64,
@@ -1565,6 +1642,163 @@ mod per_name_copula_tests {
                 "{id}: repeated per-name runs must produce bit-identical tranche PV"
             );
         }
+    }
+
+    /// Item 3 — per-name copula mask / asset-loop alignment.
+    ///
+    /// The default-indicator mask is sized by the builder from the
+    /// performing-asset count at period start; the asset loop claims one
+    /// entry per performing asset in pool-index order. With ≥2 defaults per
+    /// period the loop mutates `is_defaulted` mid-iteration — the alignment
+    /// must survive that. A misalignment is now a hard `Error` (the engine's
+    /// pre-loop length guard), so a successfully-priced, deterministic run
+    /// over a high-default scenario proves the mask stays index-aligned.
+    ///
+    /// This drives a concentrated pool with a high base CDR and high
+    /// correlation so multiple names default in the same period across many
+    /// paths; if the guard ever tripped the run would error rather than
+    /// return a price.
+    #[test]
+    fn per_name_mask_stays_aligned_with_multiple_defaults_per_period() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        // 30 names ⇒ concentrated; high CDR + high correlation drives several
+        // simultaneous defaults per period on a meaningful share of paths.
+        let deal = clo_deal(30);
+
+        let run = || {
+            StochasticPricer::new(copula_config(
+                0.12, // high base CDR
+                0.45, // high correlation ⇒ clustered (multi-) defaults
+                24,
+                PoolGranularity::PerName,
+                400,
+            ))
+            .price(&deal, &market)
+            // `.expect` fails loudly if the mask-alignment guard ever errors.
+            .expect("per-name pricing must not trip the mask-alignment guard")
+        };
+        let a = run();
+        let b = run();
+
+        // The run completed (guard never tripped) and is bit-reproducible.
+        assert!(a.npv.amount().is_finite(), "priced NPV must be finite");
+        assert_eq!(
+            a.npv.amount(),
+            b.npv.amount(),
+            "per-name pricing under multi-default periods must be deterministic"
+        );
+        // The high-default scenario must actually realize losses — otherwise
+        // the test would not be exercising the multi-default code path.
+        let total_loss: f64 = a
+            .tranche_results
+            .iter()
+            .map(|t| t.expected_loss.amount())
+            .sum();
+        assert!(
+            total_loss > 0.0,
+            "high-CDR per-name scenario must realize pool losses (got {total_loss}); \
+             otherwise multi-default periods are not exercised"
+        );
+    }
+
+    /// Item 10 — for a multi-month payment period the per-name copula
+    /// systematic factor must aggregate ALL the period's monthly factors as
+    /// `(Σ Zₘ)/√M`, not just the first month's. White-box test on
+    /// `path_shocks_from_factors`: a quarterly deal with crafted month
+    /// factors must produce a period systematic `Z` equal to the `√M`-scaled
+    /// sum, so months 2..M are not silently ignored.
+    #[test]
+    fn multi_month_copula_systematic_factor_aggregates_all_months() {
+        // Quarterly deal ⇒ 3 months per payment period.
+        let mut deal = clo_deal(60);
+        deal.frequency = finstack_core::dates::Tenor::quarterly();
+
+        let pricer = StochasticPricer::new(copula_config(
+            0.05,
+            0.30,
+            12, // 12 monthly tree periods
+            PoolGranularity::PerName,
+            16,
+        ));
+
+        // Craft 6 monthly factors covering two quarterly periods. The first
+        // quarter is benign in month 1 but stressed in months 2 and 3 — a
+        // month-1-only systematic factor would miss that stress entirely.
+        let factors = vec![0.10_f64, -2.0, -1.5, 0.3, 0.4, 0.5];
+        let shocks = pricer
+            .path_shocks_from_factors(&deal, &factors)
+            .expect("path shocks");
+
+        assert!(!shocks.is_empty(), "must produce at least one period shock");
+        let period0 = shocks[0]
+            .per_name
+            .expect("per-name plan must be present for a copula deal");
+
+        // Expected period systematic factor for quarter 1: (Σ Zₘ)/√3.
+        let m = 3.0_f64;
+        let expected_z = (factors[0] + factors[1] + factors[2]) / m.sqrt();
+        assert!(
+            (period0.systematic_z - expected_z).abs() < 1e-9,
+            "quarter-1 copula systematic factor {} must be the √M-scaled sum \
+             of all 3 monthly factors ({expected_z}); a month-1-only factor \
+             would be {}",
+            period0.systematic_z,
+            factors[0],
+        );
+        // The aggregated factor must be materially stressed (negative), unlike
+        // the benign month-1 factor — proving months 2-3 are not ignored.
+        assert!(
+            period0.systematic_z < -1.0,
+            "aggregated systematic factor {} must reflect the months-2-3 \
+             stress, not the benign month-1 value {}",
+            period0.systematic_z,
+            factors[0],
+        );
+    }
+
+    /// Item 5 — antithetic per-name pricing must be deterministic and produce
+    /// a finite, sensible result. The per-name idiosyncratic substreams are
+    /// now paired antithetically (paired paths share a substream; the odd
+    /// member negates `εᵢ`), so repeated runs must stay bit-identical.
+    #[test]
+    fn antithetic_per_name_pricing_is_deterministic() {
+        let market = MarketContext::new().insert((*discount_curve()).clone());
+        let deal = clo_deal(60);
+
+        let run = || {
+            StochasticPricer::new(antithetic_copula_config(
+                0.05,
+                0.30,
+                24,
+                PoolGranularity::PerName,
+                400, // even ⇒ antithetic pairing is active
+            ))
+            .price(&deal, &market)
+            .expect("antithetic per-name pricing")
+        };
+        let a = run();
+        let b = run();
+
+        assert!(a.npv.amount().is_finite(), "antithetic NPV must be finite");
+        assert_eq!(
+            a.npv.amount(),
+            b.npv.amount(),
+            "repeated antithetic per-name MC runs must be bit-identical"
+        );
+        for id in ["SR", "MEZZ", "EQ"] {
+            assert_eq!(
+                tranche_pv(&a, id),
+                tranche_pv(&b, id),
+                "{id}: repeated antithetic per-name runs must produce \
+                 bit-identical tranche PV"
+            );
+        }
+        // The reported MC confidence interval must be a valid interval.
+        let (lo, hi) = a.pv_confidence_interval;
+        assert!(
+            lo.is_finite() && hi.is_finite() && lo <= hi,
+            "antithetic CI must be a valid finite interval: ({lo}, {hi})"
+        );
     }
 
     /// Concentrated pools must carry strictly more loss dispersion than
