@@ -21,8 +21,8 @@
 //! require market data and are exposed via the standard
 //! ``price_instrument`` / ``price_instrument_with_metrics`` pipeline.
 
+use crate::errors::display_to_py;
 use finstack_valuations::instruments::rates::exotics_shared::coupon_profiles;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -84,7 +84,7 @@ fn tarn_coupon_profile<'py>(
         target_coupon,
         day_count_fraction,
     )
-    .map_err(PyValueError::new_err)?;
+    .map_err(display_to_py)?;
 
     let out = PyDict::new(py);
     out.set_item("coupons_paid", profile.coupons_paid)?;
@@ -168,7 +168,7 @@ fn snowball_coupon_profile(
         is_inverse_floater,
         leverage,
     )
-    .map_err(PyValueError::new_err)
+    .map_err(display_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +208,7 @@ fn cms_spread_option_intrinsic(
     notional: f64,
 ) -> PyResult<f64> {
     coupon_profiles::cms_spread_option_intrinsic(long_cms, short_cms, strike, is_call, notional)
-        .map_err(PyValueError::new_err)
+        .map_err(display_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ fn callable_range_accrual_accrued(
         coupon_rate,
         day_count_fraction,
     )
-    .map_err(PyValueError::new_err)
+    .map_err(display_to_py)
 }
 
 // ---------------------------------------------------------------------------

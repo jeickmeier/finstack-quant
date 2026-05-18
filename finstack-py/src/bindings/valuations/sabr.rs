@@ -26,6 +26,15 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
+/// Default CEV exponent ``beta`` for :meth:`SabrCalibrator.calibrate` when the
+/// caller omits it.
+///
+/// ``1.0`` is the equity-market-standard lognormal convention and matches
+/// `SABRParameters::equity_default().beta`. Use ``0.5`` for rates or ``0.0``
+/// for normal vol. Defined once here so the calibrator's default cannot drift
+/// from the value documented in its docstring.
+const DEFAULT_CALIBRATION_BETA: f64 = 1.0;
+
 // ---------------------------------------------------------------------------
 // SabrParameters
 // ---------------------------------------------------------------------------
@@ -379,7 +388,7 @@ impl PySabrCalibrator {
     /// -------
     /// SabrParameters
     ///     Calibrated parameters (``beta`` fixed to the input value).
-    #[pyo3(signature = (forward, strikes, market_vols, t, beta=1.0))]
+    #[pyo3(signature = (forward, strikes, market_vols, t, beta=DEFAULT_CALIBRATION_BETA))]
     fn calibrate(
         &self,
         forward: f64,

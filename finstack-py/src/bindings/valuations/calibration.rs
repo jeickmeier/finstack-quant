@@ -34,12 +34,34 @@ create_exception!(
 
 /// Build a `CalibrationEnvelopeError` from a structured `EnvelopeError`,
 /// attaching `kind`, `step_id`, and pretty-printed `details` attributes.
+///
+/// The `kind` / `step_id` / `details` attributes are part of the exception's
+/// documented public contract, so a failed `setattr` is *not* discarded: the
+/// first failure is returned as the resulting `PyErr` rather than silently
+/// handing back a half-populated exception that would raise an unrelated
+/// `AttributeError` when a caller reads `e.kind`.
 fn envelope_error_to_py(py: Python<'_>, err: &EnvelopeError) -> PyErr {
     let exc = CalibrationEnvelopeError::new_err(err.to_string());
     let value = exc.value(py);
-    let _ = value.setattr("kind", err.kind_str());
-    let _ = value.setattr("details", err.to_json());
-    let _ = value.setattr("step_id", err.step_id().map(|s| s.to_string()));
+    let attrs: [(&str, PyResult<()>); 3] = [
+        ("kind", value.setattr("kind", err.kind_str())),
+        ("details", value.setattr("details", err.to_json())),
+        (
+            "step_id",
+            value.setattr("step_id", err.step_id().map(|s| s.to_string())),
+        ),
+    ];
+    for (name, result) in attrs {
+        if let Err(setattr_err) = result {
+            // Surface the failure to set a contracted attribute instead of
+            // returning an exception missing `kind` / `step_id` / `details`.
+            return PyRuntimeError::new_err(format!(
+                "failed to attach '{name}' attribute to CalibrationEnvelopeError \
+                 ({}): underlying calibration error: {err}",
+                setattr_err.value(py),
+            ));
+        }
+    }
     exc
 }
 

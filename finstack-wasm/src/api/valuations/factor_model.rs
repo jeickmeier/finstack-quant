@@ -4,6 +4,16 @@ use crate::utils::to_js_err;
 use finstack_valuations::factor_model::FactorSensitivityEngine;
 use wasm_bindgen::prelude::*;
 
+/// Default number of scenario grid points for `computePnlProfiles` when the
+/// caller omits `n_scenario_points`.
+///
+/// `5` produces the symmetric shift grid `[-2, -1, 0, 1, 2]` (see
+/// [`finstack_valuations::factor_model::ScenarioGrid`]). The Python binding
+/// (`compute_pnl_profiles`) uses the same value via its own crate-local
+/// `DEFAULT_PNL_SCENARIO_POINTS`; the two are kept in sync by review because
+/// `finstack-py` and `finstack-wasm` are sibling crates with no shared module.
+const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
+
 /// Compute first-order factor sensitivities and return the matrix as JSON.
 ///
 /// Accepts a JSON array of positions, a JSON array of `FactorDefinition`,
@@ -50,7 +60,8 @@ pub fn compute_factor_sensitivities(
 /// Compute scenario P&L profiles via full repricing and return as JSON.
 ///
 /// Same position/factor/market inputs as `computeFactorSensitivities`, plus
-/// an optional `n_scenario_points` integer (default 5).
+/// an optional `n_scenario_points` integer (default
+/// [`DEFAULT_PNL_SCENARIO_POINTS`]).
 #[wasm_bindgen(js_name = computePnlProfiles)]
 pub fn compute_pnl_profiles(
     positions_json: &str,
@@ -60,7 +71,7 @@ pub fn compute_pnl_profiles(
     bump_config_json: Option<String>,
     n_scenario_points: Option<usize>,
 ) -> Result<String, JsValue> {
-    let n_points = n_scenario_points.unwrap_or(5);
+    let n_points = n_scenario_points.unwrap_or(DEFAULT_PNL_SCENARIO_POINTS);
     let parsed_positions = finstack_valuations::factor_model::parse_positions_json(positions_json)
         .map_err(to_js_err)?;
     let positions = finstack_valuations::factor_model::pricing_positions(&parsed_positions);

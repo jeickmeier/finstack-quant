@@ -135,22 +135,61 @@ pub struct WasmRecoverySpec {
     inner: corr::RecoverySpec,
 }
 
+/// Validate a recovery rate before it reaches the (silently clamping) core
+/// [`corr::RecoverySpec`] constructors.
+///
+/// The core builders clamp out-of-range inputs and propagate `NaN`, masking
+/// caller errors. Validating here — and throwing on bad input — keeps these
+/// constructors consistent with the validating `MultiFactorModel` siblings.
+fn validate_recovery_rate(value: f64, label: &str) -> Result<f64, JsValue> {
+    if !value.is_finite() {
+        return Err(to_js_err(format!("{label} must be finite, got {value}")));
+    }
+    if !(0.0..=1.0).contains(&value) {
+        return Err(to_js_err(format!(
+            "{label} must be in [0, 1], got {value}"
+        )));
+    }
+    Ok(value)
+}
+
 #[wasm_bindgen(js_class = RecoverySpec)]
 impl WasmRecoverySpec {
     /// Constant recovery rate.
+    ///
+    /// Throws if `rate` is not finite or lies outside `[0, 1]`.
     #[wasm_bindgen(js_name = constant)]
-    pub fn constant(rate: f64) -> Self {
-        Self {
+    pub fn constant(rate: f64) -> Result<WasmRecoverySpec, JsValue> {
+        let rate = validate_recovery_rate(rate, "recovery rate")?;
+        Ok(Self {
             inner: corr::RecoverySpec::constant(rate),
-        }
+        })
     }
 
     /// Market-correlated (Andersen-Sidenius) stochastic recovery.
+    ///
+    /// Throws if `mean` is not finite or lies outside `[0, 1]`, or if `vol` /
+    /// `correlation` are not finite.
     #[wasm_bindgen(js_name = marketCorrelated)]
-    pub fn market_correlated(mean: f64, vol: f64, correlation: f64) -> Self {
-        Self {
-            inner: corr::RecoverySpec::market_correlated(mean, vol, correlation),
+    pub fn market_correlated(
+        mean: f64,
+        vol: f64,
+        correlation: f64,
+    ) -> Result<WasmRecoverySpec, JsValue> {
+        let mean = validate_recovery_rate(mean, "mean recovery")?;
+        if !vol.is_finite() {
+            return Err(to_js_err(format!(
+                "recovery volatility must be finite, got {vol}"
+            )));
         }
+        if !correlation.is_finite() {
+            return Err(to_js_err(format!(
+                "factor correlation must be finite, got {correlation}"
+            )));
+        }
+        Ok(Self {
+            inner: corr::RecoverySpec::market_correlated(mean, vol, correlation),
+        })
     }
 
     /// Expected (unconditional) recovery rate.
@@ -317,7 +356,7 @@ mod tests {
 
     #[test]
     fn wasm_recovery_spec_and_model() {
-        let c = WasmRecoverySpec::constant(0.4);
+        let c = WasmRecoverySpec::constant(0.4).expect("0.4 is a valid recovery rate");
         assert!((c.expected_recovery() - 0.4).abs() < 1e-12);
         let m = c.build();
         assert!((m.expected_recovery() - 0.4).abs() < 1e-12);
@@ -326,8 +365,44 @@ mod tests {
         assert!(!m.is_stochastic());
         assert!(!m.model_name().is_empty());
 
-        let mc = WasmRecoverySpec::market_correlated(0.4, 0.1, 0.3).build();
+        let mc = WasmRecoverySpec::market_correlated(0.4, 0.1, 0.3)
+            .expect("valid market-correlated spec")
+            .build();
         assert!(mc.is_stochastic());
+    }
+
+    #[test]
+    fn wasm_recovery_spec_constant_rejects_out_of_range_and_nan() {
+        // The core `RecoverySpec::constant` silently clamps; the binding must
+        // instead reject rates outside [0, 1] and non-finite values.
+        assert!(
+            WasmRecoverySpec::constant(1.5).is_err(),
+            "recovery rate above 1 must be rejected, not clamped"
+        );
+        assert!(
+            WasmRecoverySpec::constant(-0.2).is_err(),
+            "negative recovery rate must be rejected, not clamped"
+        );
+        assert!(
+            WasmRecoverySpec::constant(f64::NAN).is_err(),
+            "NaN recovery rate must be rejected"
+        );
+        // The valid endpoints must still be accepted.
+        assert!(WasmRecoverySpec::constant(0.0).is_ok());
+        assert!(WasmRecoverySpec::constant(1.0).is_ok());
+    }
+
+    #[test]
+    fn wasm_recovery_spec_market_correlated_validates_inputs() {
+        // Mean recovery outside [0, 1] or non-finite must be rejected.
+        assert!(WasmRecoverySpec::market_correlated(1.5, 0.1, 0.3).is_err());
+        assert!(WasmRecoverySpec::market_correlated(f64::NAN, 0.1, 0.3).is_err());
+        // Non-finite vol / correlation must also be rejected (NaN survives the
+        // core's `clamp`, so it would otherwise leak into the model).
+        assert!(WasmRecoverySpec::market_correlated(0.4, f64::NAN, 0.3).is_err());
+        assert!(WasmRecoverySpec::market_correlated(0.4, 0.1, f64::INFINITY).is_err());
+        // A fully valid spec is still accepted.
+        assert!(WasmRecoverySpec::market_correlated(0.4, 0.25, -0.4).is_ok());
     }
 
     #[test]

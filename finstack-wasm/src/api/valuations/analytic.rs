@@ -29,6 +29,24 @@ fn option_type(is_call: bool) -> OptionType {
     }
 }
 
+/// Guard a closed-form price against non-finite results.
+///
+/// The underlying `closed_form` formulas return a raw `f64` and yield `NaN`
+/// or `±inf` for degenerate / out-of-domain inputs (e.g. negative volatility).
+/// Surfacing that as a thrown error — rather than a silent `NaN` crossing the
+/// wasm boundary — keeps these wrappers consistent with `bsImpliedVol`, which
+/// already returns a `Result`. `what` names the quantity for the message.
+fn finite_price(value: f64, what: &str) -> Result<f64, JsValue> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(to_js_err(format!(
+            "{what} is not finite ({value}); check inputs (volatility, time \
+             to expiry, spot, strike) are in the model's valid domain"
+        )))
+    }
+}
+
 /// Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
 ///
 /// @param spot - Spot price of the underlying.
@@ -58,6 +76,8 @@ fn option_type(is_call: bool) -> OptionType {
 /// );
 /// // price ≈ 10.45
 /// ```
+///
+/// @throws If the inputs produce a non-finite price (e.g. negative volatility).
 #[wasm_bindgen(js_name = bsPrice)]
 pub fn bs_price_js(
     spot: f64,
@@ -67,8 +87,11 @@ pub fn bs_price_js(
     sigma: f64,
     t: f64,
     is_call: bool,
-) -> f64 {
-    bs_price(spot, strike, r, q, sigma, t, option_type(is_call))
+) -> Result<f64, JsValue> {
+    finite_price(
+        bs_price(spot, strike, r, q, sigma, t, option_type(is_call)),
+        "Black-Scholes price",
+    )
 }
 
 /// Black-Scholes / Garman-Kohlhagen Greeks as a `{delta, gamma, vega, theta, rho, rhoQ}` object.
@@ -264,6 +287,8 @@ pub fn lookback_option_price_js(
 }
 
 /// Quanto option (FX-adjusted cross-currency) price in domestic currency.
+///
+/// @throws If the inputs produce a non-finite price.
 #[wasm_bindgen(js_name = quantoOptionPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn quanto_option_price_js(
@@ -277,8 +302,8 @@ pub fn quanto_option_price_js(
     vol_fx: f64,
     correlation: f64,
     is_call: Option<bool>,
-) -> f64 {
-    if is_call.unwrap_or(true) {
+) -> Result<f64, JsValue> {
+    let price = if is_call.unwrap_or(true) {
         quanto_call(
             spot,
             strike,
@@ -302,7 +327,8 @@ pub fn quanto_option_price_js(
             vol_fx,
             correlation,
         )
-    }
+    };
+    finite_price(price, "quanto option price")
 }
 
 #[cfg(test)]
@@ -311,16 +337,58 @@ mod tests {
 
     #[test]
     fn bs_price_call_atm_is_positive() {
-        let p = bs_price_js(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true);
+        let p = bs_price_js(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true).expect("finite price");
         assert!(p > 0.0);
     }
 
     #[test]
     fn bs_implied_vol_recovers_sigma() {
         let sigma = 0.25;
-        let price = bs_price_js(100.0, 110.0, 0.03, 0.01, sigma, 0.75, true);
+        let price =
+            bs_price_js(100.0, 110.0, 0.03, 0.01, sigma, 0.75, true).expect("finite price");
         let iv = bs_implied_vol_js(100.0, 110.0, 0.03, 0.01, 0.75, price, true)
             .expect("solver should converge");
         assert!((iv - sigma).abs() < 1e-6, "iv={iv} sigma={sigma}");
+    }
+
+    #[test]
+    fn bs_price_rejects_non_finite_result() {
+        // A degenerate input (huge maturity with a negative rate) drives
+        // `exp(-r*t)` to `+inf`, which escapes the core's `.max(0.0)` clamp.
+        // The binding guard must surface that as a thrown error rather than a
+        // silent non-finite value crossing the wasm boundary.
+        let result = bs_price_js(100.0, 100.0, -1.0, 0.0, 0.2, 1.0e6, false);
+        assert!(
+            result.is_err(),
+            "a non-finite Black-Scholes price must produce an error"
+        );
+        // A well-posed input still returns a finite price unchanged.
+        assert!(bs_price_js(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true).is_ok());
+    }
+
+    #[test]
+    fn quanto_option_price_rejects_non_finite_result() {
+        // Same degenerate-maturity path: a non-finite quanto price must throw.
+        let result = quanto_option_price_js(
+            100.0,
+            100.0,
+            1.0e6,
+            -1.0,
+            0.01,
+            0.0,
+            0.20,
+            0.10,
+            0.3,
+            Some(false),
+        );
+        assert!(
+            result.is_err(),
+            "a non-finite quanto option price must produce an error"
+        );
+        // A well-posed input still returns a finite price.
+        assert!(quanto_option_price_js(
+            100.0, 100.0, 1.0, 0.03, 0.01, 0.0, 0.20, 0.10, 0.3, Some(true)
+        )
+        .is_ok());
     }
 }

@@ -14,6 +14,21 @@ use finstack_core::math::characteristic_function::{BlackScholesCf, MertonJumpCf,
 use finstack_valuations::pricer::fourier::{CosConfig, CosPricer};
 use pyo3::prelude::*;
 
+/// Build a [`CosConfig`] for the COS pricer.
+///
+/// When `n_terms` is `None` the term count is taken from
+/// [`CosConfig::default()`] — the single canonical source for the COS
+/// expansion default, shared with the WASM binding
+/// (`finstack-wasm/.../fourier.rs`). No COS default is hardcoded in the
+/// binding layer, so the Python and WASM defaults cannot drift from the core.
+fn cos_config(n_terms: Option<usize>) -> CosConfig {
+    let default = CosConfig::default();
+    CosConfig {
+        num_terms: n_terms.unwrap_or(default.num_terms),
+        ..default
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Black-Scholes
 // ---------------------------------------------------------------------------
@@ -44,7 +59,7 @@ use pyo3::prelude::*;
 /// float
 ///     Present-value option price in the underlying's currency units.
 #[pyfunction]
-#[pyo3(signature = (spot, strike, rate, dividend, vol, maturity, is_call, n_terms=128))]
+#[pyo3(signature = (spot, strike, rate, dividend, vol, maturity, is_call, n_terms=None))]
 #[allow(clippy::too_many_arguments)]
 fn bs_cos_price(
     py: Python<'_>,
@@ -55,7 +70,7 @@ fn bs_cos_price(
     vol: f64,
     maturity: f64,
     is_call: bool,
-    n_terms: usize,
+    n_terms: Option<usize>,
 ) -> PyResult<f64> {
     py.detach(move || {
         let cf = BlackScholesCf {
@@ -63,10 +78,7 @@ fn bs_cos_price(
             q: dividend,
             sigma: vol,
         };
-        let config = CosConfig {
-            num_terms: n_terms,
-            ..CosConfig::default()
-        };
+        let config = cos_config(n_terms);
         let pricer = CosPricer::new(&cf, config);
         if is_call {
             pricer
@@ -114,7 +126,7 @@ fn bs_cos_price(
 /// float
 ///     Present-value option price.
 #[pyfunction]
-#[pyo3(signature = (spot, strike, rate, dividend, sigma, theta, nu, maturity, is_call, n_terms=128))]
+#[pyo3(signature = (spot, strike, rate, dividend, sigma, theta, nu, maturity, is_call, n_terms=None))]
 #[allow(clippy::too_many_arguments)]
 fn vg_cos_price(
     py: Python<'_>,
@@ -127,7 +139,7 @@ fn vg_cos_price(
     nu: f64,
     maturity: f64,
     is_call: bool,
-    n_terms: usize,
+    n_terms: Option<usize>,
 ) -> PyResult<f64> {
     py.detach(move || {
         let cf = VarianceGammaCf {
@@ -137,10 +149,7 @@ fn vg_cos_price(
             nu,
             theta,
         };
-        let config = CosConfig {
-            num_terms: n_terms,
-            ..CosConfig::default()
-        };
+        let config = cos_config(n_terms);
         let pricer = CosPricer::new(&cf, config);
         if is_call {
             pricer
@@ -190,7 +199,7 @@ fn vg_cos_price(
 /// float
 ///     Present-value option price.
 #[pyfunction]
-#[pyo3(signature = (spot, strike, rate, dividend, sigma, mu_jump, sigma_jump, lambda, maturity, is_call, n_terms=128))]
+#[pyo3(signature = (spot, strike, rate, dividend, sigma, mu_jump, sigma_jump, lambda, maturity, is_call, n_terms=None))]
 #[allow(clippy::too_many_arguments)]
 fn merton_jump_cos_price(
     py: Python<'_>,
@@ -204,7 +213,7 @@ fn merton_jump_cos_price(
     lambda: f64,
     maturity: f64,
     is_call: bool,
-    n_terms: usize,
+    n_terms: Option<usize>,
 ) -> PyResult<f64> {
     py.detach(move || {
         let cf = MertonJumpCf {
@@ -215,10 +224,7 @@ fn merton_jump_cos_price(
             mu_j: mu_jump,
             sigma_j: sigma_jump,
         };
-        let config = CosConfig {
-            num_terms: n_terms,
-            ..CosConfig::default()
-        };
+        let config = cos_config(n_terms);
         let pricer = CosPricer::new(&cf, config);
         if is_call {
             pricer

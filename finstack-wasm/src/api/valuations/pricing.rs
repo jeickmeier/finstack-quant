@@ -4,6 +4,24 @@
 //! endogenous hazard, toggle exercise) live in [`super::credit`]. CDS-family
 //! example payloads live in [`super::credit_derivatives`]. Both mirror the
 //! Python binding layout; the exported JS surface is unchanged.
+//!
+//! # Monte-Carlo determinism
+//!
+//! `priceInstrument` / `priceInstrumentWithMetrics` (and their `WasmMarket`
+//! variants) accept Monte-Carlo models (e.g. `monte_carlo_gbm`,
+//! `monte_carlo_hull_white_1f`). These bindings deliberately expose **no**
+//! explicit RNG-seed parameter: the seed is part of the *instrument*
+//! contract, not the pricing call.
+//!
+//! The determinism guarantee is provided by the Rust core, not by these
+//! wrappers: when an instrument's `pricing_overrides.metrics.mc_seed_scenario`
+//! is `None`, the core MC pricers derive a **stable** seed deterministically
+//! from the instrument ID (see
+//! `finstack_valuations::instruments::PricingOverrides`). Repricing the same
+//! instrument JSON therefore yields bit-identical results without the caller
+//! supplying a seed. Callers who need a distinct deterministic stream set
+//! `mc_seed_scenario` inside the instrument JSON. This contract is verified by
+//! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
 use super::market_handle::WasmMarket;
 use crate::utils::{to_js_err, to_js_error};
@@ -602,6 +620,35 @@ mod tests {
         let amount = amount_from_result(&parsed);
         assert!(amount > 0.0);
         assert_eq!(parsed["measures"]["mc_num_paths"], 32.0);
+    }
+
+    #[test]
+    fn price_instrument_mc_is_deterministic_without_explicit_seed() {
+        // The MC pricing bindings expose no explicit seed parameter. The
+        // determinism contract (documented at the module level) is that the
+        // Rust core derives a stable seed from the instrument ID, so repricing
+        // the *same* instrument JSON yields bit-identical priced values and MC
+        // diagnostics. Only the wall-clock `meta.timestamp` differs between
+        // calls, so the assertion targets `value` and `measures` rather than
+        // the whole serialized envelope.
+        let inst = tarn_json();
+        let mkt = tarn_market_context_json();
+        let first = price_instrument(&inst, &mkt, "2025-01-01", "monte_carlo_hull_white_1f")
+            .expect("first MC price");
+        let second = price_instrument(&inst, &mkt, "2025-01-01", "monte_carlo_hull_white_1f")
+            .expect("second MC price");
+        let first_parsed: serde_json::Value =
+            serde_json::from_str(&first).expect("first result json");
+        let second_parsed: serde_json::Value =
+            serde_json::from_str(&second).expect("second result json");
+        assert_eq!(
+            first_parsed["value"], second_parsed["value"],
+            "MC priced value must be deterministic across repeated calls with no explicit seed"
+        );
+        assert_eq!(
+            first_parsed["measures"], second_parsed["measures"],
+            "MC diagnostics (paths, stderr, CI) must be deterministic across repeated calls"
+        );
     }
 
     #[test]

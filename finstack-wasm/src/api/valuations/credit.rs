@@ -5,7 +5,7 @@
 //! JS surface (under `valuations.credit.*`) is unchanged — wasm-bindgen
 //! exports are flat by `js_name`, so this is a pure source reorganisation.
 
-use crate::utils::to_js_err;
+use crate::utils::{check_js_safe_count, to_js_err};
 use finstack_valuations::instruments::models::credit::{
     CreditState, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec, MertonModel,
     OptimalToggle, ThresholdDirection, ToggleExerciseModel,
@@ -161,6 +161,11 @@ pub fn toggle_exercise_threshold_json(
 }
 
 /// Build an optimal toggle-exercise model JSON payload.
+///
+/// `nested_paths` is the Monte-Carlo path count for the nested optimal-exercise
+/// simulation. It is rejected if it exceeds `Number.MAX_SAFE_INTEGER` (`2^53-1`):
+/// `usize` counts marshal across the wasm boundary as IEEE-754 doubles, so a
+/// larger value would round silently rather than fail loudly.
 #[wasm_bindgen(js_name = toggleExerciseOptimalJson)]
 pub fn toggle_exercise_optimal_json(
     nested_paths: usize,
@@ -169,6 +174,7 @@ pub fn toggle_exercise_optimal_json(
     risk_free_rate: f64,
     horizon: f64,
 ) -> Result<String, JsValue> {
+    check_js_safe_count(nested_paths, "nested_paths")?;
     let model = ToggleExerciseModel::OptimalExercise(OptimalToggle {
         nested_paths,
         equity_discount_rate,
@@ -234,5 +240,31 @@ mod tests {
         let spec = EndogenousHazardSpec::power_law(0.10, 1.5, 2.5).expect("spec");
         let h_native = spec.hazard_after_pik_accrual(120.0, 66.67);
         assert!((h_wasm - h_native).abs() < 1e-12);
+    }
+
+    #[test]
+    fn toggle_exercise_optimal_json_accepts_reasonable_path_count() {
+        // A normal nested-path count round-trips into a valid model payload.
+        let json =
+            toggle_exercise_optimal_json(10_000, 0.10, 0.25, 0.04, 5.0).expect("model json");
+        let model: ToggleExerciseModel =
+            serde_json::from_str(&json).expect("payload must deserialize");
+        match model {
+            ToggleExerciseModel::OptimalExercise(o) => assert_eq!(o.nested_paths, 10_000),
+            other => panic!("expected OptimalExercise, got {other:?}"),
+        }
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn toggle_exercise_optimal_json_rejects_unsafe_path_count() {
+        // A `nested_paths` above Number.MAX_SAFE_INTEGER would round silently
+        // when marshaled as an f64; the binding must reject it instead.
+        let unsafe_count = crate::utils::MAX_SAFE_JS_INTEGER as usize + 1;
+        let result = toggle_exercise_optimal_json(unsafe_count, 0.10, 0.25, 0.04, 5.0);
+        assert!(
+            result.is_err(),
+            "nested_paths above 2^53-1 must be rejected, not silently rounded"
+        );
     }
 }

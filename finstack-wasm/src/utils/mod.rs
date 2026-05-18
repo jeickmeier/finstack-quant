@@ -42,6 +42,38 @@ fn display_error_message(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 
+/// Largest integer a JavaScript `number` (IEEE-754 double) can represent
+/// exactly: `2^53 - 1` (`Number.MAX_SAFE_INTEGER`).
+///
+/// `usize` counts that cross the wasm boundary are marshaled as `f64`. A value
+/// above this bound cannot survive the round trip without silent rounding, so
+/// callers should reject counts larger than this rather than accept a
+/// mis-represented value.
+pub const MAX_SAFE_JS_INTEGER: u64 = 9_007_199_254_740_991;
+
+/// Validate that a `usize` count is exactly representable as a JavaScript
+/// `number` before it crosses the wasm boundary.
+///
+/// `wasm-bindgen` marshals `usize` as an IEEE-754 double; on a 64-bit host a
+/// `usize` above `2^53 - 1` would round silently. This guard converts that
+/// silent precision loss into an explicit, catchable JS error. `label` names
+/// the offending count in the message (e.g. `"nested_paths"`).
+///
+/// # Errors
+///
+/// Returns a structured `JsValue` error when `count` exceeds
+/// [`MAX_SAFE_JS_INTEGER`].
+pub fn check_js_safe_count(count: usize, label: &str) -> Result<(), JsValue> {
+    if count as u64 > MAX_SAFE_JS_INTEGER {
+        return Err(to_js_err(format!(
+            "{label} ({count}) exceeds the maximum JavaScript-safe integer \
+             ({MAX_SAFE_JS_INTEGER}); counts above 2^53-1 cannot cross the \
+             wasm boundary without silent rounding"
+        )));
+    }
+    Ok(())
+}
+
 fn js_error_message(e: &dyn std::error::Error) -> String {
     format_error_chain(e)
 }
@@ -115,6 +147,31 @@ mod tests {
         assert_eq!(
             display_error_message(String::from("owned validation error")),
             "owned validation error"
+        );
+    }
+
+    #[test]
+    fn check_js_safe_count_accepts_values_up_to_the_bound() {
+        // Zero, a typical count, and exactly MAX_SAFE_JS_INTEGER must pass.
+        assert!(check_js_safe_count(0, "n").is_ok());
+        assert!(check_js_safe_count(1_000_000, "n").is_ok());
+        // `usize` on the 64-bit host can hold MAX_SAFE_JS_INTEGER exactly.
+        let at_bound = MAX_SAFE_JS_INTEGER as usize;
+        assert!(
+            check_js_safe_count(at_bound, "n").is_ok(),
+            "the boundary value itself is JS-safe and must be accepted"
+        );
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn check_js_safe_count_rejects_values_above_the_bound() {
+        // One past the bound cannot survive the f64 round trip; must error.
+        let over = MAX_SAFE_JS_INTEGER as usize + 1;
+        let result = check_js_safe_count(over, "nested_paths");
+        assert!(
+            result.is_err(),
+            "a count above 2^53-1 must be rejected, not silently rounded"
         );
     }
 }
