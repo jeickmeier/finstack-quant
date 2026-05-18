@@ -444,44 +444,12 @@ fn test_aggregate_instrument_cashflows() {
 }
 
 #[test]
-fn test_build_any_instrument_from_generic_spec() {
-    use finstack_core::dates::Date;
-    use finstack_core::types::{CurveId, InstrumentId};
-    use finstack_statements::capital_structure::integration::build_any_instrument_from_spec;
-    use finstack_statements::types::DebtInstrumentSpec;
-    use finstack_valuations::instruments::Bond;
-    use time::Month;
-
-    let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
-
-    let bond = Bond::fixed(
-        InstrumentId::new("BOND-001"),
-        Money::new(1_000_000.0, Currency::USD),
-        0.05,
-        issue,
-        maturity,
-        CurveId::new("USD-OIS"),
-    )
-    .expect("Bond::fixed should succeed with valid parameters");
-
-    let spec_json = serde_json::to_value(&bond).unwrap();
-    let spec = DebtInstrumentSpec::Generic {
-        id: "BOND-001".to_string(),
-        spec: spec_json,
-    };
-
-    let result = build_any_instrument_from_spec(&spec);
-    assert!(result.is_ok());
-}
-
-#[test]
 fn test_build_any_instrument_from_spec_bond_variant() {
     use finstack_core::dates::Date;
     use finstack_core::types::{CurveId, InstrumentId};
     use finstack_statements::capital_structure::integration::build_any_instrument_from_spec;
     use finstack_statements::types::DebtInstrumentSpec;
-    use finstack_valuations::instruments::Bond;
+    use finstack_valuations::instruments::{Bond, InstrumentJson};
     use time::Month;
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -497,8 +465,8 @@ fn test_build_any_instrument_from_spec_bond_variant() {
     )
     .expect("Bond::fixed should succeed with valid parameters");
 
-    let spec_json = serde_json::to_value(&bond).unwrap();
-    let spec = DebtInstrumentSpec::Bond {
+    let spec_json = serde_json::to_value(InstrumentJson::Bond(bond)).unwrap();
+    let spec = DebtInstrumentSpec {
         id: "BOND-002".to_string(),
         spec: spec_json,
     };
@@ -513,7 +481,7 @@ fn test_build_any_instrument_from_spec_swap_variant() {
     use finstack_core::types::InstrumentId;
     use finstack_statements::capital_structure::integration::build_any_instrument_from_spec;
     use finstack_statements::types::DebtInstrumentSpec;
-    use finstack_valuations::instruments::PayReceive;
+    use finstack_valuations::instruments::{InstrumentJson, PayReceive};
     use time::Month;
 
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -529,8 +497,8 @@ fn test_build_any_instrument_from_spec_swap_variant() {
     )
     .unwrap();
 
-    let spec_json = serde_json::to_value(&swap).unwrap();
-    let spec = DebtInstrumentSpec::Swap {
+    let spec_json = serde_json::to_value(InstrumentJson::InterestRateSwap(swap)).unwrap();
+    let spec = DebtInstrumentSpec {
         id: "SWAP-002".to_string(),
         spec: spec_json,
     };
@@ -544,7 +512,7 @@ fn test_build_any_instrument_invalid_json_error() {
     use finstack_statements::capital_structure::integration::build_any_instrument_from_spec;
     use finstack_statements::types::DebtInstrumentSpec;
 
-    let spec = DebtInstrumentSpec::Generic {
+    let spec = DebtInstrumentSpec {
         id: "INVALID".to_string(),
         spec: serde_json::json!({
             "invalid_field": "not a valid instrument"

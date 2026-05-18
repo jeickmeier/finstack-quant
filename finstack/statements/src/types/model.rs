@@ -10,7 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 ///
 /// Bump when the wire format changes in a breaking way and supply a migration
 /// path in [`validate_schema_version`].
-pub const CURRENT_SCHEMA_VERSION: u32 = 1;
+pub const CURRENT_SCHEMA_VERSION: u32 = 2;
 
 /// Top-level financial model specification.
 ///
@@ -280,35 +280,15 @@ pub struct CapitalStructureSpec {
 }
 
 /// Debt instrument specification.
+///
+/// An identifier paired with a canonical tagged instrument payload. The `spec`
+/// value is the registry's tagged form — `{"type": "<tag>", "spec": {...}}` —
+/// understood by `finstack_valuations::instruments::cashflow_provider_from_value`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum DebtInstrumentSpec {
-    /// Fixed-rate bond
-    Bond {
-        /// Instrument identifier
-        id: String,
-        /// Instrument specification (JSON)
-        spec: serde_json::Value,
-    },
-    /// Interest rate swap
-    Swap {
-        /// Instrument identifier
-        id: String,
-        /// Instrument specification (JSON)
-        spec: serde_json::Value,
-    },
-    /// Term loan (bank debt with amortization, floating rates, covenants)
-    TermLoan {
-        /// Instrument identifier
-        id: String,
-        /// Instrument specification (JSON)
-        spec: serde_json::Value,
-    },
-    /// Generic debt instrument (custom JSON spec)
-    Generic {
-        /// Instrument identifier
-        id: String,
-        /// Instrument specification (JSON)
-        spec: serde_json::Value,
-    },
+#[serde(deny_unknown_fields)]
+pub struct DebtInstrumentSpec {
+    /// Instrument identifier (key within the capital structure).
+    pub id: String,
+    /// Canonical tagged instrument payload: `{"type": "...", "spec": {...}}`.
+    pub spec: serde_json::Value,
 }

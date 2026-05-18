@@ -13,7 +13,7 @@ fn test_model_spec_creation() {
 
     assert_eq!(model.id, "test_model");
     assert_eq!(model.periods.len(), 4);
-    assert_eq!(model.schema_version, 1);
+    assert_eq!(model.schema_version, 2);
     assert!(model.nodes.is_empty());
 }
 

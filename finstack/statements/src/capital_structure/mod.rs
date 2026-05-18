@@ -72,7 +72,6 @@
 
 mod builder;
 mod cashflows;
-pub mod instrument_factory;
 pub mod integration;
 pub mod period_flows;
 mod state;
@@ -81,7 +80,7 @@ mod waterfall_spec;
 
 // Curated public facade — preserves the same public type set as the old `types.rs`.
 pub use cashflows::{CapitalStructureCashflows, CashflowBreakdown};
-pub use instrument_factory::build_any_instrument_from_spec;
+pub use integration::build_any_instrument_from_spec;
 pub use integration::aggregate_instrument_cashflows;
 pub use period_flows::calculate_period_flows;
 pub use state::CapitalStructureState;

@@ -5,7 +5,6 @@ use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::money::Money;
 use finstack_statements::builder::{ModelBuilder, NeedPeriods};
-use finstack_statements::types::DebtInstrumentSpec;
 use time::Month;
 
 #[test]
@@ -33,12 +32,8 @@ fn test_add_bond() {
         .expect("capital_structure should exist");
     assert_eq!(cs.debt_instruments.len(), 1);
 
-    match &cs.debt_instruments[0] {
-        DebtInstrumentSpec::Bond { id, .. } => {
-            assert_eq!(id, "BOND-001");
-        }
-        _ => panic!("Expected Bond variant"),
-    }
+    assert_eq!(cs.debt_instruments[0].id, "BOND-001");
+    assert_eq!(cs.debt_instruments[0].spec["type"], "bond");
 }
 
 #[test]
@@ -67,12 +62,8 @@ fn test_add_swap() {
         .expect("capital_structure should exist");
     assert_eq!(cs.debt_instruments.len(), 1);
 
-    match &cs.debt_instruments[0] {
-        DebtInstrumentSpec::Swap { id, .. } => {
-            assert_eq!(id, "SWAP-001");
-        }
-        _ => panic!("Expected Swap variant"),
-    }
+    assert_eq!(cs.debt_instruments[0].id, "SWAP-001");
+    assert_eq!(cs.debt_instruments[0].spec["type"], "interest_rate_swap");
 }
 
 #[test]
@@ -119,8 +110,10 @@ fn test_add_custom_debt() {
             "TL-A",
             serde_json::json!({
                 "type": "term_loan",
-                "notional": 10_000_000.0,
-                "currency": "USD",
+                "spec": {
+                    "id": "TL-A",
+                    "notional": { "amount": 10_000_000.0, "currency": "USD" }
+                }
             }),
         );
     let model = builder.build().expect("valid model");
@@ -131,12 +124,7 @@ fn test_add_custom_debt() {
         .expect("capital_structure should exist");
     assert_eq!(cs.debt_instruments.len(), 1);
 
-    match &cs.debt_instruments[0] {
-        DebtInstrumentSpec::Generic { id, .. } => {
-            assert_eq!(id, "TL-A");
-        }
-        _ => panic!("Expected Generic variant"),
-    }
+    assert_eq!(cs.debt_instruments[0].id, "TL-A");
 }
 
 // --- Parity: add_bond vs add_bond_with_convention (USD defaults) ---
@@ -189,20 +177,14 @@ fn parity_add_bond_and_add_bond_with_convention_same_id() {
         .as_ref()
         .expect("capital_structure present");
 
-    // Both produce Bond variants
-    assert!(
-        matches!(
-            &cs_simple.debt_instruments[0],
-            DebtInstrumentSpec::Bond { .. }
-        ),
-        "add_bond should produce Bond variant"
+    // Both produce a bond-tagged payload
+    assert_eq!(
+        cs_simple.debt_instruments[0].spec["type"], "bond",
+        "add_bond should produce a bond payload"
     );
-    assert!(
-        matches!(
-            &cs_conv.debt_instruments[0],
-            DebtInstrumentSpec::Bond { .. }
-        ),
-        "add_bond_with_convention should produce Bond variant"
+    assert_eq!(
+        cs_conv.debt_instruments[0].spec["type"], "bond",
+        "add_bond_with_convention should produce a bond payload"
     );
 }
 
@@ -261,18 +243,12 @@ fn parity_add_swap_and_add_swap_with_conventions_produce_swap_variant() {
         .as_ref()
         .expect("capital_structure present");
 
-    assert!(
-        matches!(
-            &cs_simple.debt_instruments[0],
-            DebtInstrumentSpec::Swap { .. }
-        ),
-        "add_swap should produce Swap variant"
+    assert_eq!(
+        cs_simple.debt_instruments[0].spec["type"], "interest_rate_swap",
+        "add_swap should produce an interest_rate_swap payload"
     );
-    assert!(
-        matches!(
-            &cs_conv.debt_instruments[0],
-            DebtInstrumentSpec::Swap { .. }
-        ),
-        "add_swap_with_conventions should produce Swap variant"
+    assert_eq!(
+        cs_conv.debt_instruments[0].spec["type"], "interest_rate_swap",
+        "add_swap_with_conventions should produce an interest_rate_swap payload"
     );
 }
