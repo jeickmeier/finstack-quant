@@ -283,6 +283,11 @@ pub fn compute_credit_factor_attribution(
         generic_pnl: Money::new(generic_pnl_amt, ccy),
         levels,
         adder_pnl_total: Money::new(adder_total_amt, ccy),
+        // This portfolio-level decomposition works purely from a
+        // `PeriodDecomposition` of scalar spread levels; it carries no
+        // hazard-curve term structure, so the non-parallel curve-shape
+        // component is identically zero here.
+        curve_shape_pnl: Money::new(0.0, ccy),
         adder_pnl_by_issuer,
         adder_magnitude: None,
     })

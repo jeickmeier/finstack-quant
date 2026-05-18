@@ -81,6 +81,7 @@ use finstack_core::market_data::diff::{
 use finstack_core::market_data::term_structures::DiscountCurve;
 #[cfg(test)]
 use finstack_core::math::interp::InterpStyle;
+use finstack_core::math::NeumaierAccumulator;
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
 use finstack_core::HashMap;
@@ -161,6 +162,64 @@ fn extract_bucketed_dv01_per_curve(
     }
 
     result
+}
+
+/// Extract per-curve **key-rate** (per-tenor) DV01 sensitivities.
+///
+/// The `BucketedDv01` calculator flattens its per-tenor series into the
+/// `measures` map under composite keys `bucketed_dv01::{curve}::{tenor_label}`
+/// (e.g. `bucketed_dv01::USD-OIS::5y`). This walks the standard bucket grid and
+/// collects, per curve, the `(tenor_years, dv01)` pairs that are present.
+///
+/// Returns a map `curve → Vec<(tenor_years, dv01)>`; a curve is absent from the
+/// map when none of its per-tenor keys were found (caller then falls back to
+/// the coarser per-curve-total or aggregate path).
+fn extract_keyrate_dv01_per_curve(
+    measures: &indexmap::IndexMap<MetricId, f64>,
+    curve_ids: &[CurveId],
+) -> HashMap<CurveId, Vec<(f64, f64)>> {
+    use crate::metrics::sensitivities::config::{STANDARD_BUCKETS_YEARS, STANDARD_BUCKET_LABELS};
+
+    let mut result: HashMap<CurveId, Vec<(f64, f64)>> = HashMap::default();
+    for curve_id in curve_ids {
+        let mut buckets: Vec<(f64, f64)> = Vec::new();
+        for (&tenor_years, label) in STANDARD_BUCKETS_YEARS
+            .iter()
+            .zip(STANDARD_BUCKET_LABELS.iter())
+        {
+            let key = format!("bucketed_dv01::{}::{}", curve_id.as_str(), label);
+            if let Some(&dv01) = measures.get(key.as_str()) {
+                buckets.push((tenor_years, dv01));
+            }
+        }
+        if !buckets.is_empty() {
+            result.insert(curve_id.clone(), buckets);
+        }
+    }
+    result
+}
+
+/// Measure the per-tenor discount-curve zero-rate shift (in basis points) at
+/// the supplied tenors.
+///
+/// Unlike [`measure_discount_curve_shift`], which averages the shift over a
+/// fixed tenor grid (and so mis-attributes a non-parallel move), this returns
+/// the shift at each requested tenor so the caller can pair it with the
+/// per-tenor (key-rate) DV01.
+fn measure_per_tenor_discount_shift(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    tenors: &[f64],
+) -> Option<Vec<f64>> {
+    let curve_t0 = market_t0.get_discount(curve_id).ok()?;
+    let curve_t1 = market_t1.get_discount(curve_id).ok()?;
+    Some(
+        tenors
+            .iter()
+            .map(|&t| (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0)
+            .collect(),
+    )
 }
 
 fn add_cross_factor_term(
@@ -448,31 +507,74 @@ pub fn attribute_pnl_metrics_based(
     //
     // METRIC DEFINITION:
     // - DV01: Dollar value of 1 basis point ($ / bp)
-    // - BucketedDv01: Per-curve DV01 sensitivities
-    // - Formula: PnL = Σ(DV01_i × Shift_i) for each curve i
+    // - BucketedDv01: Per-curve / per-tenor DV01 sensitivities
+    // - Formula: PnL = Σ(DV01_i × Shift_i) for each curve/tenor i
     //
-    // This implementation uses bucketed DV01 (per-curve) if available,
-    // otherwise falls back to aggregate DV01 with average shift.
+    // Accuracy ladder (best first):
+    //   (a) key-rate aware: Σ_curve Σ_tenor DV01_{curve,tenor} × Δr_{curve,tenor}.
+    //       Correct for non-parallel (steepener / twist) curve moves.
+    //   (b) per-curve bucketed: Σ_curve DV01_curve × avg(Δr_curve). Correct for
+    //       cross-curve basis but assumes each curve moved in parallel.
+    //   (c) aggregate: DV01_total × avg(Δr). Coarsest.
 
-    // Try to extract bucketed DV01 per curve
     let curve_ids = &market_deps.curve_dependencies().discount_curves;
+    // (a) per-tenor (key-rate) DV01 — the most accurate input.
+    let keyrate_dv01 = extract_keyrate_dv01_per_curve(&val_t0.measures, curve_ids);
+    // (b) per-curve total DV01 — fallback when no per-tenor series exist.
     let bucketed_dv01 = extract_bucketed_dv01_per_curve(&val_t0.measures, curve_ids);
 
+    let has_keyrate = !keyrate_dv01.is_empty();
     let has_bucketed = !bucketed_dv01.is_empty();
     let mut rates_pnl = 0.0;
     // Average rate shift used for the rates convexity / large-move blocks.
-    // - Bucketed branch: average only over curves that have BOTH a bucketed
-    //   DV01 entry AND a measurable shift (preserves prior behavior where a
-    //   curve without a bucketed entry doesn't contribute to the convexity
-    //   average).
+    // - Key-rate / bucketed branches: average only over curves with data.
     // - Fallback branch: preamble average over all discount curves with a
     //   measurable shift.
     let mut convexity_avg_shift_bp: Option<f64> = None;
 
-    if has_bucketed {
-        // Use bucketed DV01: sum per-curve contributions. The bucketed branch
-        // still needs per-curve shifts (pairing DV01_i × shift_i), so we
-        // iterate even though the preamble already computed a plain average.
+    if has_keyrate {
+        // KEY-RATE AWARE: pair per-tenor DV01 with the per-tenor curve shift.
+        // A steepener (+bp short / −bp long) is now attributed correctly
+        // instead of collapsing to an average-shift × parallel-DV01 product.
+        let mut rates_acc = NeumaierAccumulator::new();
+        let mut shift_acc = NeumaierAccumulator::new();
+        let mut shift_terms = 0usize;
+        let mut curves_with_data = 0usize;
+        for curve_id in curve_ids {
+            let Some(buckets) = keyrate_dv01.get(curve_id) else {
+                continue;
+            };
+            let tenors: Vec<f64> = buckets.iter().map(|(t, _)| *t).collect();
+            let Some(shifts) =
+                measure_per_tenor_discount_shift(curve_id.as_str(), market_t0, market_t1, &tenors)
+            else {
+                continue;
+            };
+            for ((_, dv01), shift) in buckets.iter().zip(shifts.iter()) {
+                rates_acc.add(dv01 * shift);
+                shift_acc.add(*shift);
+                shift_terms += 1;
+            }
+            curves_with_data += 1;
+        }
+        rates_pnl = rates_acc.total();
+        attribution.rates_curves_pnl = Money::new(rates_pnl, val_t1.value.currency());
+
+        if shift_terms > 0 {
+            // Mean per-tenor shift across all (curve, tenor) cells with data —
+            // used only as the scalar input to the coarse convexity block.
+            convexity_avg_shift_bp = Some(shift_acc.total() / shift_terms as f64);
+        }
+        if curves_with_data > 0 {
+            attribution.meta.notes.push(format!(
+                "Rates attribution computed using key-rate (per-tenor) DV01 across {} curve(s); \
+                 non-parallel curve moves are attributed per tenor",
+                curves_with_data
+            ));
+        }
+    } else if has_bucketed {
+        // PER-CURVE BUCKETED: sum per-curve contributions. Each curve is still
+        // assumed to move in parallel (no per-tenor series available).
         let mut total_shift = 0.0;
         let mut curves_with_data = 0usize;
         for curve_id in curve_ids {
@@ -495,7 +597,9 @@ pub fn attribute_pnl_metrics_based(
         if curves_with_data > 0 {
             convexity_avg_shift_bp = Some(total_shift / curves_with_data as f64);
             attribution.meta.notes.push(format!(
-                "Rates attribution computed using bucketed DV01 across {} curves",
+                "Rates attribution computed using per-curve bucketed DV01 across {} curves \
+                 (each curve assumed to move in parallel); provide per-tenor BucketedDv01 \
+                 series for key-rate-aware attribution of non-parallel moves",
                 curves_with_data
             ));
         }
@@ -1443,5 +1547,116 @@ mod tests {
             .interp(InterpStyle::Linear)
             .build()
             .expect("flat curve construction should succeed")
+    }
+
+    /// Build a discount curve whose zero rate at each standard tenor is taken
+    /// from `rates_by_tenor` (parallel to `STANDARD_TENORS`).
+    fn make_curve_from_zero_rates(id: &str, base_date: Date, rates_by_tenor: &[f64]) -> DiscountCurve {
+        let mut knots = vec![(0.0, 1.0)];
+        for (tenor, &rate) in finstack_core::market_data::diff::STANDARD_TENORS
+            .iter()
+            .zip(rates_by_tenor.iter())
+        {
+            knots.push((*tenor, (-rate * tenor).exp()));
+        }
+        DiscountCurve::builder(id)
+            .base_date(base_date)
+            .knots(knots)
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("per-tenor curve construction should succeed")
+    }
+
+    /// Audit item #3: when per-tenor (key-rate) `bucketed_dv01` is available the
+    /// rates attribution must pair each tenor's DV01 with that tenor's realized
+    /// shift. For a steepener (short tenors down, long tenors up) the signed
+    /// average shift is ~0; an average-shift × parallel-DV01 product would
+    /// report ~0 rates P&L, but the key-rate-aware sum is materially non-zero.
+    #[test]
+    fn test_metrics_based_rates_keyrate_aware_for_steepener() {
+        let as_of_t0 = date!(2025 - 01 - 15);
+        let as_of_t1 = date!(2025 - 01 - 16);
+        let meta = finstack_core::config::results_meta(&FinstackConfig::default());
+
+        let instrument: Arc<dyn Instrument> = Arc::new(
+            TestInstrument::new("TEST-KEYRATE", Money::new(100_000.0, Currency::USD))
+                .with_discount_curves(&["USD-OIS"]),
+        );
+
+        // T0 flat at 3%. T1 steepener: short tenors −10bp, long tenors +10bp,
+        // arranged so the average over the 9 standard tenors is ~0.
+        let t0_rates = [0.03_f64; 9];
+        let t1_rates = [
+            0.029, 0.029, 0.029, 0.0295, 0.030, 0.0305, 0.031, 0.031, 0.031,
+        ];
+        let market_t0 = MarketContext::new()
+            .insert(make_curve_from_zero_rates("USD-OIS", as_of_t0, &t0_rates));
+        let market_t1 = MarketContext::new()
+            .insert(make_curve_from_zero_rates("USD-OIS", as_of_t1, &t1_rates));
+
+        // Per-tenor key-rate DV01: concentrated at the LONG end (10y/30y),
+        // so the steepener's long-end rise dominates the attributed P&L.
+        let mut measures_t0 = IndexMap::new();
+        for (label, dv01) in [
+            ("3m", -1.0),
+            ("6m", -1.0),
+            ("1y", -2.0),
+            ("2y", -3.0),
+            ("3y", -4.0),
+            ("5y", -6.0),
+            ("7y", -8.0),
+            ("10y", -40.0),
+            ("30y", -120.0),
+        ] {
+            measures_t0.insert(
+                MetricId::custom(format!("bucketed_dv01::USD-OIS::{label}")),
+                dv01,
+            );
+        }
+
+        let val_t0 = ValuationResult::stamped_with_meta(
+            "TEST-KEYRATE",
+            as_of_t0,
+            Money::new(100_000.0, Currency::USD),
+            meta.clone(),
+        )
+        .with_measures(measures_t0);
+        let val_t1 = ValuationResult::stamped_with_meta(
+            "TEST-KEYRATE",
+            as_of_t1,
+            Money::new(99_000.0, Currency::USD),
+            meta,
+        );
+
+        let attribution = attribute_pnl_metrics_based(
+            &instrument,
+            &market_t0,
+            &market_t1,
+            &val_t0,
+            &val_t1,
+            as_of_t0,
+            as_of_t1,
+        )
+        .expect("metrics-based attribution should succeed");
+
+        // Long-end DV01 (−40, −120) paired with the long-end +10bp rise gives a
+        // large negative rates P&L; the short-end −10bp moves partly offset it.
+        // The key-rate-aware total is materially non-zero — NOT the ~0 an
+        // average-shift attribution would have produced.
+        let rates_pnl = attribution.rates_curves_pnl.amount();
+        assert!(
+            rates_pnl.abs() > 100.0,
+            "key-rate-aware steepener attribution must be materially non-zero, got {rates_pnl}"
+        );
+        // A note must record that key-rate (per-tenor) DV01 was used.
+        assert!(
+            attribution
+                .meta
+                .notes
+                .iter()
+                .any(|n| n.contains("key-rate")),
+            "a note must record key-rate attribution; notes: {:?}",
+            attribution.meta.notes
+        );
     }
 }

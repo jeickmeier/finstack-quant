@@ -28,6 +28,73 @@ use rust_decimal::prelude::ToPrimitive;
 // Helper Functions
 // ============================================================================
 
+/// Reprice an instrument and return a single scalar metric from its measures.
+///
+/// Used by the SIMM sensitivity impls to obtain a **repriced** DV01 / CS01
+/// (which respects the discount curve, coupon schedule and curve shape) instead
+/// of a flat `duration ≈ maturity` proxy. Returns `None` if pricing fails or
+/// the metric is absent, so callers can fall back to the proxy.
+fn repriced_metric(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+    as_of: Date,
+    metric: crate::metrics::MetricId,
+) -> Option<f64> {
+    let result = instrument
+        .price_with_metrics(
+            market,
+            as_of,
+            std::slice::from_ref(&metric),
+            crate::instruments::PricingOptions::default(),
+        )
+        .ok()?;
+    result.measures.get(metric.as_str()).copied()
+}
+
+/// Reprice an instrument and return the per-tenor `BucketedDv01` series for the
+/// given curve as `(tenor_years, dv01)` pairs.
+///
+/// The `BucketedDv01` calculator flattens its per-tenor series into `measures`
+/// under composite keys `bucketed_dv01::{curve}::{tenor_label}`. Returns an
+/// empty vec when no per-tenor series is available.
+fn repriced_bucketed_dv01(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+    as_of: Date,
+    curve_id: &str,
+) -> Vec<(f64, f64)> {
+    // Standard DV01 bucket grid and labels (mirrors the sensitivities config).
+    const TENORS: [f64; 11] = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
+    const LABELS: [&str; 11] = [
+        "3m", "6m", "1y", "2y", "3y", "5y", "7y", "10y", "15y", "20y", "30y",
+    ];
+    let Ok(result) = instrument.price_with_metrics(
+        market,
+        as_of,
+        &[crate::metrics::MetricId::BucketedDv01],
+        crate::instruments::PricingOptions::default(),
+    ) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for (&tenor, label) in TENORS.iter().zip(LABELS.iter()) {
+        let key = format!("bucketed_dv01::{curve_id}::{label}");
+        if let Some(&dv01) = result.measures.get(key.as_str()) {
+            out.push((tenor, dv01));
+        }
+    }
+    out
+}
+
+/// Assign a years-to-maturity value to the appropriate SIMM IR tenor bucket.
+///
+/// Standalone variant of [`assign_ir_tenor_bucket`] used when mapping the
+/// crate's DV01 bucket grid onto SIMM's IR tenor buckets.
+#[must_use]
+fn ir_bucket_for_tenor(years: f64) -> &'static str {
+    assign_ir_tenor_bucket(years)
+}
+
 /// Assign a years-to-maturity value to the appropriate SIMM credit tenor bucket.
 #[must_use]
 fn assign_credit_tenor_bucket(years_to_maturity: f64) -> &'static str {
@@ -160,7 +227,7 @@ impl Marginable for InterestRateSwap {
 
     fn simm_sensitivities(
         &self,
-        _market: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<SimmSensitivities> {
         let currency = self.notional.currency();
@@ -173,6 +240,49 @@ impl Marginable for InterestRateSwap {
             return Ok(sens);
         }
 
+        // Preferred path: repriced per-tenor (key-rate) DV01 across every rate
+        // curve the swap depends on. This respects the actual discount curve,
+        // coupon schedule and curve shape rather than a flat
+        // `duration ≈ maturity` proxy. The repriced DV01 sign already reflects
+        // the swap's `side` (the pricer prices the actual swap).
+        let rate_curves: Vec<finstack_core::types::CurveId> = self
+            .market_dependencies()
+            .map(|deps| {
+                let cd = deps.curve_dependencies();
+                cd.discount_curves
+                    .iter()
+                    .chain(cd.forward_curves.iter())
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let mut bucket_totals: std::collections::BTreeMap<&'static str, f64> =
+            std::collections::BTreeMap::new();
+        let mut any_repriced = false;
+        for curve_id in &rate_curves {
+            for (tenor, dv01) in
+                repriced_bucketed_dv01(self, market, as_of, curve_id.as_str())
+            {
+                any_repriced = true;
+                *bucket_totals.entry(ir_bucket_for_tenor(tenor)).or_insert(0.0) += dv01;
+            }
+        }
+
+        if any_repriced {
+            for (bucket, dv01) in bucket_totals {
+                sens.add_ir_delta(currency, bucket, dv01);
+            }
+            return Ok(sens);
+        }
+
+        // Fallback (no market data / pricer unavailable): the flat
+        // duration-proxy DV01 distributed by maturity-overlap weights.
+        tracing::warn!(
+            instrument_id = self.id.as_str(),
+            "SIMM IR delta falling back to duration ≈ maturity proxy: repriced \
+             bucketed DV01 unavailable (missing rate curves?)"
+        );
         let total_dv01 = self.notional.amount().abs()
             * years_to_maturity
             * DURATION_APPROXIMATION_FACTOR
@@ -183,9 +293,6 @@ impl Marginable for InterestRateSwap {
             crate::instruments::rates::irs::PayReceive::ReceiveFixed => 1.0,
         };
 
-        // Distribute DV01 across tenor buckets weighted by proportion of maturity
-        // that falls within each bucket range. This is a simplified key-rate
-        // duration decomposition.
         let buckets: &[(&str, f64, f64)] = &[
             ("6M", 0.0, 0.5),
             ("1Y", 0.5, 1.0),
@@ -249,7 +356,7 @@ impl Marginable for CreditDefaultSwap {
 
     fn simm_sensitivities(
         &self,
-        _market: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<SimmSensitivities> {
         let currency = self.notional.currency();
@@ -263,22 +370,34 @@ impl Marginable for CreditDefaultSwap {
             years_to_maturity
         };
 
+        let ref_entity = extract_reference_entity(self.protection.credit_curve_id.as_str())?;
+        let spread_bp_f64 = self.premium.spread_bp.to_f64().unwrap_or(f64::MAX);
+        let qualifying = is_credit_qualifying(ref_entity, spread_bp_f64);
+        let tenor = assign_credit_tenor_bucket(years_to_maturity);
+
+        // Preferred path: repriced CS01 (respects the survival curve, discount
+        // curve, recovery and premium schedule). The metric is computed on the
+        // actual CDS, so its sign already reflects the protection side.
+        if let Some(cs01) = repriced_metric(self, market, as_of, crate::metrics::MetricId::Cs01) {
+            sens.add_credit_delta(ref_entity, qualifying, tenor, cs01);
+            return Ok(sens);
+        }
+
+        // Fallback: flat risky-duration proxy when the survival curve / pricer
+        // is unavailable.
+        tracing::warn!(
+            instrument_id = self.id.as_str(),
+            "SIMM credit delta falling back to risky-duration proxy: repriced \
+             CS01 unavailable (missing survival curve?)"
+        );
         let risky_duration = years_to_maturity
             * (1.0 - self.protection.recovery_rate)
             * DURATION_APPROXIMATION_FACTOR;
         let cs01 = self.notional.amount().abs() * risky_duration * ONE_BP;
-
-        let ref_entity = extract_reference_entity(self.protection.credit_curve_id.as_str())?;
-        let spread_bp_f64 = self.premium.spread_bp.to_f64().unwrap_or(f64::MAX);
-        let qualifying = is_credit_qualifying(ref_entity, spread_bp_f64);
-
-        let tenor = assign_credit_tenor_bucket(years_to_maturity);
-
         let signed_cs01 = match self.side {
             crate::instruments::common_impl::parameters::legs::PayReceive::PayFixed => cs01,
             crate::instruments::common_impl::parameters::legs::PayReceive::ReceiveFixed => -cs01,
         };
-
         sens.add_credit_delta(ref_entity, qualifying, tenor, signed_cs01);
 
         Ok(sens)
@@ -328,7 +447,7 @@ impl Marginable for CDSIndex {
 
     fn simm_sensitivities(
         &self,
-        _market: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> Result<SimmSensitivities> {
         let currency = self.notional.currency();
@@ -342,20 +461,30 @@ impl Marginable for CDSIndex {
             years_to_maturity
         };
 
+        let qualifying = is_credit_qualifying(&self.index_name, 0.0);
+        let tenor = assign_credit_tenor_bucket(years_to_maturity);
+
+        // Preferred path: repriced CS01 (respects the index survival/discount
+        // curves, recovery and schedule). Sign reflects the actual index side.
+        if let Some(cs01) = repriced_metric(self, market, as_of, crate::metrics::MetricId::Cs01) {
+            sens.add_credit_delta(&self.index_name, qualifying, tenor, cs01);
+            return Ok(sens);
+        }
+
+        // Fallback: flat risky-duration proxy.
+        tracing::warn!(
+            instrument_id = self.id.as_str(),
+            "SIMM credit delta falling back to risky-duration proxy: repriced \
+             CS01 unavailable (missing survival curve?)"
+        );
         let recovery_rate = self.protection.recovery_rate;
         let risky_duration =
             years_to_maturity * (1.0 - recovery_rate) * DURATION_APPROXIMATION_FACTOR;
         let cs01 = self.notional.amount().abs() * risky_duration * ONE_BP;
-
-        let qualifying = is_credit_qualifying(&self.index_name, 0.0);
-
-        let tenor = assign_credit_tenor_bucket(years_to_maturity);
-
         let signed_cs01 = match self.side {
             crate::instruments::common_impl::parameters::legs::PayReceive::PayFixed => cs01,
             crate::instruments::common_impl::parameters::legs::PayReceive::ReceiveFixed => -cs01,
         };
-
         sens.add_credit_delta(&self.index_name, qualifying, tenor, signed_cs01);
 
         Ok(sens)
@@ -606,6 +735,58 @@ mod tests {
         assert!(
             sens.total_ir_delta() < 0.0,
             "Pay fixed should be short rates"
+        );
+    }
+
+    /// Audit item #10: with a real market the SIMM IR delta must come from a
+    /// repriced (curve-aware) bucketed DV01, not the flat `duration ≈ maturity`
+    /// proxy. We assert the repriced path is taken and that it disagrees with
+    /// the proxy (the proxy ignores discounting / coupon / curve shape).
+    #[test]
+    fn test_irs_simm_uses_repriced_dv01_with_market() {
+        let start = test_date();
+        let end = Date::from_calendar_date(2034, Month::June, 15).expect("valid date");
+        let notional = Money::new(100_000_000.0, Currency::USD);
+
+        let swap = test_utils::usd_irs_swap(
+            "TEST_IRS_REPRICED",
+            notional,
+            0.035,
+            start,
+            end,
+            crate::instruments::rates::irs::PayReceive::PayFixed,
+        )
+        .expect("swap creation");
+
+        // Real market: USD-OIS discount + USD-SOFR-3M forward, both flat at 3%.
+        let market = MarketContext::new()
+            .insert(test_utils::flat_discount_with_tenor("USD-OIS", start, 0.03, 30.0))
+            .insert(test_utils::flat_forward_with_tenor(
+                "USD-SOFR-3M",
+                start,
+                0.03,
+                30.0,
+            ));
+
+        let sens = swap
+            .simm_sensitivities(&market, start)
+            .expect("repriced SIMM sensitivities");
+
+        assert!(!sens.ir_delta.is_empty(), "must produce IR delta buckets");
+        let repriced_total = sens.total_ir_delta();
+        assert!(
+            repriced_total.is_finite() && repriced_total.abs() > 0.0,
+            "repriced IR delta must be finite and non-zero, got {repriced_total}"
+        );
+
+        // The flat duration ≈ maturity proxy total (the OLD behavior) for a
+        // ~10y swap: notional × 10 × 0.0001 (DURATION_APPROXIMATION_FACTOR) ×
+        // ONE_BP, signed negative for Pay-fixed. The repriced curve-aware DV01
+        // genuinely differs from this crude proxy.
+        let proxy_total = -notional.amount().abs() * 10.0 * DURATION_APPROXIMATION_FACTOR * ONE_BP;
+        assert!(
+            (repriced_total - proxy_total).abs() > 1e-6,
+            "repriced DV01 ({repriced_total}) must differ from the duration proxy ({proxy_total})"
         );
     }
 

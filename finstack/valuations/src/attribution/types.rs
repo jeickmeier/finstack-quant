@@ -246,16 +246,25 @@ pub struct PnlAttribution {
     pub result_invalid: bool,
 }
 
+/// Zero USD `Money` — serde default for [`CreditFactorAttribution::curve_shape_pnl`]
+/// so attributions serialized before that field was added still deserialize.
+fn zero_money_usd() -> Money {
+    Money::new(0.0, Currency::USD)
+}
+
 /// Hierarchy-level decomposition of credit P&L, opt-in via
 /// `AttributionSpec.credit_factor_model`.
 ///
 /// The reconciliation invariant
 ///
 /// ```text
-/// generic_pnl + Σ_levels(level.total) + adder_pnl_total ≡ credit_curves_pnl
+/// generic_pnl + Σ_levels(level.total) + adder_pnl_total + curve_shape_pnl ≡ credit_curves_pnl
 /// ```
 ///
 /// holds at absolute tolerance `1e-8` for both metrics-based and Taylor methods.
+/// `curve_shape_pnl` is the non-parallel hazard-curve residual (audit item #1);
+/// for a purely parallel credit move it is zero and the invariant reduces to
+/// the historical `generic + Σ levels + adder` form.
 ///
 /// **Single-instrument scope**: when produced via the valuations-layer
 /// per-instrument attribution wire (`metrics_based`, `taylor`), each call
@@ -274,8 +283,23 @@ pub struct CreditFactorAttribution {
     /// One entry per [`finstack_core::factor_model::credit_hierarchy::HierarchyDimension`]
     /// in the spec order recorded by the model's hierarchy.
     pub levels: Vec<LevelPnl>,
-    /// Total adder P&L: `-Σ_i CS01_i × Δadder_i`.
+    /// Total adder P&L: `-Σ_i CS01_i × Δadder_i`. This is the **parallel**
+    /// issuer-idiosyncratic move only; non-parallel curve-shape risk is
+    /// reported separately in [`Self::curve_shape_pnl`].
     pub adder_pnl_total: Money,
+    /// P&L attributed to the **non-parallel** part of the hazard-curve move
+    /// (steepening / twist / term-structure roll) — the curve-shape residual.
+    ///
+    /// Audit item #1: previously this residual was absorbed into
+    /// `adder_pnl_total`, which mislabeled curve-shape risk as
+    /// issuer-idiosyncratic. It is now a distinct component. The reconciliation
+    /// invariant is correspondingly:
+    /// `generic + Σ levels + adder + curve_shape ≡ credit_curves_pnl`.
+    ///
+    /// `#[serde(default)]` keeps backward compatibility: older serialized
+    /// attributions (no `curve_shape_pnl`) deserialize with a zero value.
+    #[serde(default = "zero_money_usd")]
+    pub curve_shape_pnl: Money,
     /// Optional per-issuer adder breakdown (gated by
     /// `CreditFactorDetailOptions.include_per_issuer_adder`, default off).
     #[serde(default, skip_serializing_if = "Option::is_none")]

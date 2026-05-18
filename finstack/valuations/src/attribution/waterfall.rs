@@ -407,16 +407,22 @@ impl<'a> WaterfallContext<'a> {
         for (idx, step) in cascade.steps.iter().enumerate() {
             let prev_val = self.current_val;
             let new_market = match step.kind {
-                CreditStepKind::Adder => {
-                    // Snap to T1 hazard so the cascade end-state matches the
-                    // legacy single Credit step exactly.
+                CreditStepKind::CurveShape => {
+                    // Snap to T1 hazard. After the parallel Generic / Level /
+                    // Adder bumps this step absorbs whatever non-parallel
+                    // (steepening / twist) residual remains, and makes the
+                    // cascade end-state match the legacy single Credit step
+                    // exactly so `Σ steps ≡ credit_curves_pnl` still holds.
                     snap_hazard_to_t1(
                         &self.current_market,
                         self.market_t1,
                         &cascade.hazard_curve_ids,
                     )
                 }
-                _ => shift_hazard_curves(
+                // Generic / Level(k) / Adder all apply a *parallel* bp bump.
+                CreditStepKind::Generic
+                | CreditStepKind::Level(_)
+                | CreditStepKind::Adder => shift_hazard_curves(
                     &self.current_market,
                     &cascade.hazard_curve_ids,
                     step.delta_bp,

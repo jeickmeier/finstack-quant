@@ -39,6 +39,9 @@ impl MetricCalculator for CarryDecompositionCalculator {
             context.computed.insert(MetricId::PullToPar, 0.0);
             context.computed.insert(MetricId::RollDown, 0.0);
             context.computed.insert(MetricId::FundingCost, 0.0);
+            context
+                .computed
+                .insert(MetricId::CarryDecompositionDegenerate, 0.0);
             return Ok(0.0);
         }
 
@@ -54,17 +57,26 @@ impl MetricCalculator for CarryDecompositionCalculator {
             .amount();
         let total_pv_change = curved_pv - base_pv;
 
-        let pull_to_par = if let Some(&ytm) = context.computed.get(&MetricId::Ytm) {
-            let flat_market = build_flat_curve_market(context, ytm)?;
-            let flat_pv = context.reprice_money(&flat_market, rolled_date)?.amount();
-            flat_pv - base_pv
-        } else {
-            tracing::warn!(
-                instrument_id = context.instrument.id(),
-                "Carry decomposition missing YTM dependency; setting pull_to_par to 0.0 and folding the remaining PV change into roll_down"
-            );
-            0.0
-        };
+        // `degenerate` is set when the pull-to-par / roll-down split cannot be
+        // computed because the `Ytm` metric is unavailable for this instrument.
+        // In that case `pull_to_par` is reported as `0.0` and `roll_down`
+        // absorbs the entire PV change — a silent collapse that the
+        // `CarryDecompositionDegenerate` diagnostic surfaces so downstream
+        // consumers do not mistake the absorbed amount for genuine roll-down.
+        let (pull_to_par, degenerate) =
+            if let Some(&ytm) = context.computed.get(&MetricId::Ytm) {
+                let flat_market = build_flat_curve_market(context, ytm)?;
+                let flat_pv = context.reprice_money(&flat_market, rolled_date)?.amount();
+                (flat_pv - base_pv, false)
+            } else {
+                tracing::warn!(
+                    instrument_id = context.instrument.id(),
+                    "Carry decomposition missing YTM dependency; pull_to_par reported as 0.0, \
+                     roll_down absorbs the remaining PV change, and \
+                     carry_decomposition_degenerate is flagged 1.0"
+                );
+                (0.0, true)
+            };
 
         let roll_down = total_pv_change - pull_to_par;
         let funding_cost = compute_funding_cost(context, rolled_date)?;
@@ -76,6 +88,10 @@ impl MetricCalculator for CarryDecompositionCalculator {
         context.computed.insert(MetricId::PullToPar, pull_to_par);
         context.computed.insert(MetricId::RollDown, roll_down);
         context.computed.insert(MetricId::FundingCost, funding_cost);
+        context.computed.insert(
+            MetricId::CarryDecompositionDegenerate,
+            if degenerate { 1.0 } else { 0.0 },
+        );
 
         Ok(carry_total)
     }
@@ -301,6 +317,62 @@ mod tests {
             .expect("carry decomposition should calculate without YTM");
 
         assert_eq!(context.computed.get(&MetricId::PullToPar), Some(&0.0));
+    }
+
+    /// Audit item #9: when `Ytm` is absent the pull-to-par / roll-down split is
+    /// degenerate (pull_to_par forced to 0, roll_down absorbs everything). That
+    /// degeneracy must be SURFACED via the `CarryDecompositionDegenerate`
+    /// diagnostic rather than silently folded into roll_down.
+    #[test]
+    fn test_missing_ytm_flags_decomposition_as_degenerate() {
+        let as_of = date!(2025 - 01 - 15);
+        let bond = zero_coupon_bond();
+        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let mut context = context_for(bond, market, as_of, "1M", None);
+
+        CarryDecompositionCalculator
+            .calculate(&mut context)
+            .expect("carry decomposition should calculate without YTM");
+
+        // Degeneracy flag must be raised.
+        assert_eq!(
+            context
+                .computed
+                .get(&MetricId::CarryDecompositionDegenerate),
+            Some(&1.0),
+            "missing YTM must flag the carry decomposition as degenerate"
+        );
+        // roll_down silently absorbed the whole PV change — exactly the harm
+        // the diagnostic warns about.
+        let pull_to_par = *context.computed.get(&MetricId::PullToPar).expect("ptp");
+        let roll_down = *context.computed.get(&MetricId::RollDown).expect("roll");
+        assert_eq!(pull_to_par, 0.0);
+        assert!(
+            roll_down.abs() > 1e-8,
+            "degenerate roll_down should hold the absorbed PV change"
+        );
+    }
+
+    /// When `Ytm` IS available the split is well-defined and the diagnostic
+    /// must report `0.0` (not degenerate).
+    #[test]
+    fn test_present_ytm_marks_decomposition_non_degenerate() {
+        let as_of = date!(2025 - 01 - 15);
+        let bond = zero_coupon_bond();
+        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let mut context = context_for(bond, market, as_of, "1M", Some(0.05));
+
+        CarryDecompositionCalculator
+            .calculate(&mut context)
+            .expect("carry decomposition should calculate with YTM");
+
+        assert_eq!(
+            context
+                .computed
+                .get(&MetricId::CarryDecompositionDegenerate),
+            Some(&0.0),
+            "a well-defined split must not be flagged degenerate"
+        );
     }
 
     #[test]

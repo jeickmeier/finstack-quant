@@ -177,6 +177,25 @@ fn standard_period() -> (time::Date, time::Date) {
     )
 }
 
+/// Hazard curve with knots at the standard tenor grid set to the given rates,
+/// used to build a deliberately non-parallel (twisted) hazard move.
+fn twisted_hazard(base: time::Date, rates: &[f64]) -> HazardCurve {
+    let std_tenors = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 30.0];
+    HazardCurve::builder("ISSUER-A-HAZ")
+        .base_date(base)
+        .day_count(DayCount::Act365F)
+        .recovery_rate(0.4)
+        .knots(
+            std_tenors
+                .iter()
+                .zip(rates.iter())
+                .map(|(&t, &r)| (t, r))
+                .collect::<Vec<_>>(),
+        )
+        .build()
+        .expect("twisted hazard curve")
+}
+
 // ─────────────────────────── Tests ───────────────────────────
 
 /// PR-8a test 1: waterfall reconciliation invariant.
@@ -212,13 +231,109 @@ fn waterfall_credit_factor_detail_reconciles_to_credit_curves_pnl() {
         .as_ref()
         .expect("credit_factor_detail must be Some for waterfall + model");
 
+    // Reconciliation invariant (audit item #1): the non-parallel hazard
+    // residual is now its own `curve_shape_pnl` component, so the closing
+    // sum is generic + Σlevels + adder + curve_shape.
     let attributed = detail.generic_pnl.amount()
         + detail.levels.iter().map(|l| l.total.amount()).sum::<f64>()
-        + detail.adder_pnl_total.amount();
+        + detail.adder_pnl_total.amount()
+        + detail.curve_shape_pnl.amount();
     let expected = attribution.credit_curves_pnl.amount();
     assert!(
         (attributed - expected).abs() < 1e-8,
         "waterfall reconciliation: attributed={attributed}, credit_curves_pnl={expected}"
+    );
+    // For a flat (parallel) hazard move the curve-shape component is ~0.
+    assert!(
+        detail.curve_shape_pnl.amount().abs() < 1e-6,
+        "a flat hazard move must leave curve_shape ~0, got {}",
+        detail.curve_shape_pnl.amount()
+    );
+}
+
+/// Audit item #1: a NON-PARALLEL (twisted) hazard-curve move must be
+/// attributed to the `curve_shape` component, not absorbed into the per-issuer
+/// adder. With the standard tenors flat at 200 bp at T0 and a twist at T1
+/// (short tenors up, long tenors down, signed average ≈ 0), the parallel
+/// cascade steps (generic / level / adder) see essentially no parallel move,
+/// so almost all of the credit P&L must land in `curve_shape_pnl`.
+#[test]
+fn waterfall_twisted_hazard_attributes_curve_shape_not_adder() {
+    let (as_of_t0, as_of_t1) = standard_period();
+    let bond = make_bond();
+    let model = make_model(vec![HierarchyDimension::Rating, HierarchyDimension::Region]);
+
+    // T0 flat at 200 bp; T1 twisted with shifts (+100,+100,+50,+50,0,-50,-50,
+    // -100,-100) bp — signed average exactly 0, large L1.
+    let market_t0 = make_market_state(
+        flat_discount(as_of_t0),
+        twisted_hazard(as_of_t0, &[0.02; 9]),
+    );
+    let market_t1 = make_market_state(
+        flat_discount(as_of_t1),
+        twisted_hazard(
+            as_of_t1,
+            &[0.030, 0.030, 0.025, 0.025, 0.020, 0.015, 0.015, 0.010, 0.010],
+        ),
+    );
+
+    let spec = AttributionSpec {
+        instrument: InstrumentJson::Bond(bond),
+        market_t0,
+        market_t1,
+        as_of_t0,
+        as_of_t1,
+        method: AttributionMethod::Waterfall(default_waterfall_order()),
+        model_params_t0: None,
+        credit_factor_model: Some(Box::new(model)),
+        credit_factor_detail_options: CreditFactorDetailOptions::default(),
+        config: None,
+    };
+
+    let result = AttributionEnvelope::new(spec)
+        .execute()
+        .expect("waterfall attribution should succeed");
+    let attribution = result.result.attribution;
+    let detail = attribution
+        .credit_factor_detail
+        .as_ref()
+        .expect("credit_factor_detail must be Some for waterfall + model");
+
+    // Reconciliation still closes with the curve-shape component included.
+    let attributed = detail.generic_pnl.amount()
+        + detail.levels.iter().map(|l| l.total.amount()).sum::<f64>()
+        + detail.adder_pnl_total.amount()
+        + detail.curve_shape_pnl.amount();
+    let expected = attribution.credit_curves_pnl.amount();
+    assert!(
+        (attributed - expected).abs() < 1e-8,
+        "reconciliation must hold: attributed={attributed}, credit_curves_pnl={expected}"
+    );
+
+    // The credit P&L is non-trivial (the curve genuinely moved).
+    assert!(
+        expected.abs() > 1.0,
+        "twisted curve must produce a material credit P&L, got {expected}"
+    );
+
+    // The curve-shape component must carry essentially all of it: the parallel
+    // generic / level / adder steps see a ~0 signed move.
+    let parallel_part = detail.generic_pnl.amount()
+        + detail.levels.iter().map(|l| l.total.amount()).sum::<f64>()
+        + detail.adder_pnl_total.amount();
+    assert!(
+        detail.curve_shape_pnl.amount().abs() > parallel_part.abs(),
+        "curve-shape component ({}) must dominate the parallel components ({}) \
+         for a twisted hazard move",
+        detail.curve_shape_pnl.amount(),
+        parallel_part
+    );
+    // And specifically: the adder must NOT be where the curve-shape risk went.
+    assert!(
+        detail.adder_pnl_total.amount().abs() < detail.curve_shape_pnl.amount().abs(),
+        "non-parallel risk must land in curve_shape ({}), not the adder ({})",
+        detail.curve_shape_pnl.amount(),
+        detail.adder_pnl_total.amount()
     );
 }
 
@@ -255,24 +370,29 @@ fn parallel_credit_detail_plus_cross_effects_preserves_total() {
         .as_ref()
         .expect("credit_factor_detail must be Some for parallel + model");
 
+    // Audit item #1: the parallel path now back-solves the non-parallel
+    // hazard residual into the `curve_shape_pnl` cascade component, so
+    // `generic + Σlevels + adder + curve_shape ≡ credit_curves_pnl` closes
+    // exactly — there is no longer a `CreditCascadeResidual` cross-factor
+    // entry to add back in.
     let credit_detail_total = detail.generic_pnl.amount()
         + detail.levels.iter().map(|l| l.total.amount()).sum::<f64>()
-        + detail.adder_pnl_total.amount();
+        + detail.adder_pnl_total.amount()
+        + detail.curve_shape_pnl.amount();
 
-    // Compute the CreditCascadeResidual cross-effect captured for parallel.
-    let credit_hier_cross = attribution
-        .cross_factor_detail
-        .as_ref()
-        .and_then(|d| d.by_pair.get("CreditCascadeResidual"))
-        .map(|m| m.amount())
-        .unwrap_or(0.0);
+    assert!(
+        attribution
+            .cross_factor_detail
+            .as_ref()
+            .and_then(|d| d.by_pair.get("CreditCascadeResidual"))
+            .is_none(),
+        "CreditCascadeResidual cross-effect is replaced by the curve_shape component"
+    );
 
     let expected = attribution.credit_curves_pnl.amount();
-    let recon = credit_detail_total + credit_hier_cross;
-    // Cross-effects are second order; modest tolerance is fine.
     assert!(
-        (recon - expected).abs() < 1e-6,
-        "parallel reconciliation: detail+cross={recon}, credit_curves_pnl={expected}"
+        (credit_detail_total - expected).abs() < 1e-6,
+        "parallel reconciliation: detail={credit_detail_total}, credit_curves_pnl={expected}"
     );
 }
 

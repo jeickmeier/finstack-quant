@@ -1406,10 +1406,12 @@ fn anchor_levels(
 ///
 /// Each series may contain `None` entries for dates where all bucket members
 /// were absent (empty-bucket). Such entries are skipped so that variance is
-/// computed only over observed dates. The estimator is the population variance
-/// (sums squared deviations from the sample mean and divides by `n`). Population
-/// variance is acceptable here because calibration windows are required to be
-/// ≥ 24 observations (`min_history` default = 24), keeping the bias negligible.
+/// computed only over observed dates. The estimator is the **unbiased sample
+/// variance** (sum of squared deviations from the sample mean divided by
+/// `n − 1`, Bessel's correction). The PC factor is typically observed on every
+/// date, but sparse bucket factors can have a much shorter effective history
+/// than the PC factor, so the `n` vs `n − 1` distinction is material there:
+/// dividing by `n` would systematically understate bucket-factor variance.
 fn factor_variances(
     factor_returns: &BTreeMap<FactorId, Vec<Option<f64>>>,
     annualization_factor: f64,
@@ -1424,7 +1426,8 @@ fn factor_variances(
         }
         let nf = n as f64;
         let mean = valid.iter().sum::<f64>() / nf;
-        let var = valid.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / nf;
+        // Unbiased (Bessel-corrected) sample variance: divide by n − 1.
+        let var = valid.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (nf - 1.0);
         out.insert(fid.clone(), (var * annualization_factor).max(0.0));
     }
     out
@@ -1616,19 +1619,6 @@ fn sample_correlation_flat(
         .map(|fid| factor_returns.get(fid).unwrap_or(&empty))
         .collect();
 
-    // Compute per-factor mean over valid observations (for demeaned covariance).
-    let means: Vec<f64> = series
-        .iter()
-        .map(|s| {
-            let valid: Vec<f64> = s.iter().filter_map(|v| *v).collect();
-            if valid.is_empty() {
-                0.0
-            } else {
-                valid.iter().sum::<f64>() / (valid.len() as f64)
-            }
-        })
-        .collect();
-
     // Flat row-major result — diagonal = 1.0, off-diagonal filled below.
     let mut rho = vec![0.0_f64; n * n];
     for i in 0..n {
@@ -1637,23 +1627,47 @@ fn sample_correlation_flat(
 
     for i in 0..n {
         for j in (i + 1)..n {
-            // Pairwise: use only dates where both are Some.
-            let mut cov_ij = 0.0_f64;
-            let mut var_i = 0.0_f64;
-            let mut var_j = 0.0_f64;
-            let mut count = 0usize;
+            // Pairwise: use only dates where both factors are observed.
+            //
+            // The covariance, both variances, and the means MUST all be formed
+            // over the same pairwise-overlap window. A factor's marginal mean
+            // (over its full valid history) generally differs from its mean on
+            // the subset of dates where the *other* factor is also observed; on
+            // a sparse panel the two windows can be wildly different. Demeaning
+            // with the marginal mean while summing over the overlap yields a
+            // ratio that is not a Pearson correlation (it can even exceed 1
+            // before the clamp). Compute the overlap mean for each factor here
+            // so the assembled entry is a proper sample correlation.
+            let mut overlap_i: Vec<f64> = Vec::new();
+            let mut overlap_j: Vec<f64> = Vec::new();
             for (vi_opt, vj_opt) in series[i].iter().zip(series[j].iter()) {
                 if let (Some(vi), Some(vj)) = (*vi_opt, *vj_opt) {
-                    let di = vi - means[i];
-                    let dj = vj - means[j];
+                    overlap_i.push(vi);
+                    overlap_j.push(vj);
+                }
+            }
+            let count = overlap_i.len();
+            let corr = if count >= 2 {
+                let nf = count as f64;
+                let mean_i = overlap_i.iter().sum::<f64>() / nf;
+                let mean_j = overlap_j.iter().sum::<f64>() / nf;
+                let mut cov_ij = 0.0_f64;
+                let mut var_i = 0.0_f64;
+                let mut var_j = 0.0_f64;
+                for (vi, vj) in overlap_i.iter().zip(overlap_j.iter()) {
+                    let di = vi - mean_i;
+                    let dj = vj - mean_j;
                     cov_ij += di * dj;
                     var_i += di * di;
                     var_j += dj * dj;
-                    count += 1;
                 }
-            }
-            let corr = if count >= 2 && var_i > 0.0 && var_j > 0.0 {
-                (cov_ij / (var_i * var_j).sqrt()).clamp(-1.0, 1.0)
+                // `cov_ij`, `var_i`, `var_j` share the same denominator
+                // (n − 1), so it cancels in the ratio and need not be applied.
+                if var_i > 0.0 && var_j > 0.0 {
+                    (cov_ij / (var_i * var_j).sqrt()).clamp(-1.0, 1.0)
+                } else {
+                    0.0
+                }
             } else {
                 0.0
             };
@@ -1790,5 +1804,88 @@ fn build_diagnostics(
         fold_ups,
         r_squared_histogram,
         tag_taxonomy,
+    }
+}
+
+#[cfg(test)]
+mod calibration_estimator_tests {
+    use super::{factor_variances, sample_correlation_flat};
+    use finstack_core::factor_model::FactorId;
+    use std::collections::BTreeMap;
+
+    /// Audit item #5: on a sparse panel the pairwise-overlap mean differs from
+    /// each factor's marginal mean. Demeaning the covariance with the marginal
+    /// mean (the previous behavior) is not a Pearson correlation; a perfectly
+    /// co-moving pair on the overlap window must come back as ρ = +1.
+    #[test]
+    fn sample_correlation_uses_pairwise_overlap_mean_on_sparse_panel() {
+        // Factor A: observed on dates 0..4. Factor B: observed on dates 2..4.
+        // On the overlap (dates 2,3) the two move identically, so the true
+        // pairwise correlation is exactly +1. A's marginal mean (over 4 obs)
+        // is far from its overlap mean (over 2 obs) — the bug would produce a
+        // biased value, possibly even > 1 before the clamp.
+        let a = FactorId::new("credit::generic");
+        let b = FactorId::new("credit::bucket::A");
+        let mut returns: BTreeMap<FactorId, Vec<Option<f64>>> = BTreeMap::new();
+        returns.insert(
+            a.clone(),
+            vec![Some(-5.0), Some(-4.0), Some(1.0), Some(2.0)],
+        );
+        returns.insert(b.clone(), vec![None, None, Some(1.0), Some(2.0)]);
+
+        let order = vec![a.clone(), b.clone()];
+        let rho = sample_correlation_flat(&order, &returns);
+
+        // 2x2 flat row-major: [aa, ab, ba, bb].
+        assert_eq!(rho.len(), 4);
+        assert!((rho[0] - 1.0).abs() < 1e-12, "diagonal must be 1.0");
+        assert!((rho[3] - 1.0).abs() < 1e-12, "diagonal must be 1.0");
+        assert!(
+            (rho[1] - 1.0).abs() < 1e-9,
+            "perfectly co-moving overlap must give correlation +1, got {}",
+            rho[1]
+        );
+        assert!(
+            (rho[1] - rho[2]).abs() < 1e-15,
+            "correlation matrix must be symmetric"
+        );
+    }
+
+    /// A perfectly anti-correlated overlap must give ρ = −1 regardless of the
+    /// (different) marginal means.
+    #[test]
+    fn sample_correlation_handles_anti_correlated_overlap() {
+        let a = FactorId::new("credit::generic");
+        let b = FactorId::new("credit::bucket::A");
+        let mut returns: BTreeMap<FactorId, Vec<Option<f64>>> = BTreeMap::new();
+        returns.insert(a.clone(), vec![Some(10.0), Some(1.0), Some(2.0), Some(3.0)]);
+        returns.insert(b.clone(), vec![None, Some(-1.0), Some(-2.0), Some(-3.0)]);
+
+        let order = vec![a, b];
+        let rho = sample_correlation_flat(&order, &returns);
+        assert!(
+            (rho[1] - (-1.0)).abs() < 1e-9,
+            "perfectly anti-correlated overlap must give -1, got {}",
+            rho[1]
+        );
+    }
+
+    /// Audit item #12: `factor_variances` must use the unbiased (`n − 1`)
+    /// sample-variance estimator, not population (`÷ n`).
+    #[test]
+    fn factor_variances_use_unbiased_n_minus_one_estimator() {
+        // Series {0, 2}: mean 1, Σ(dev²) = 1 + 1 = 2.
+        //   population variance = 2/2 = 1.0
+        //   unbiased  variance  = 2/1 = 2.0
+        let fid = FactorId::new("credit::generic");
+        let mut returns: BTreeMap<FactorId, Vec<Option<f64>>> = BTreeMap::new();
+        returns.insert(fid.clone(), vec![Some(0.0), Some(2.0)]);
+
+        let out = factor_variances(&returns, 1.0);
+        let var = *out.get(&fid).expect("variance present");
+        assert!(
+            (var - 2.0).abs() < 1e-12,
+            "expected unbiased variance 2.0 (n-1), got {var}"
+        );
     }
 }

@@ -302,6 +302,11 @@ pub(crate) fn bump_discount_curve_parallel(
 /// # Errors
 ///
 /// Returns an error if the curve ID is not found or the bump operation fails.
+///
+/// Currently unused: Taylor attribution moved to key-rate (triangular) forward
+/// bumps (audit item #3). Retained as the symmetric counterpart of
+/// [`bump_discount_curve_parallel`] for parallel-bump callers.
+#[allow(dead_code)]
 pub(crate) fn bump_forward_curve_parallel(
     context: &finstack_core::market_data::context::MarketContext,
     curve_id: &finstack_core::types::CurveId,

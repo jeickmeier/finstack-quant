@@ -267,14 +267,15 @@ pub fn attribute_pnl_parallel(
 /// Parallel attribution with optional `CreditFactorModel`.
 ///
 /// When `credit_factor_model` is `Some(_)` and the instrument has a
-/// resolvable issuer + hazard exposure, each cascade step (`generic`, level_k,
-/// adder) is isolated as its own parallel factor: starting from T1 markets,
-/// hazard curves are reverted to T0 and then bumped by the step's per-issuer
-/// `β·ΔF` (or `Δadder`) bp; the reprice differential is the step's parallel
-/// P&L. Step P&Ls populate `credit_factor_detail`; the deviation between
-/// `Σ step_pnl` and `credit_curves_pnl` is the parallel method's intrinsic
-/// cross-effect for credit and is added into the existing `cross_factor_pnl`
-/// bucket under the pair label `"CreditCascadeResidual"`.
+/// resolvable issuer + hazard exposure, each parallel-bump cascade step
+/// (`generic`, level_k, `adder`) is isolated as its own parallel factor:
+/// starting from T1 markets, hazard curves are reverted to T0 and then bumped
+/// by the step's per-issuer `β·ΔF` (or `Δadder`) bp; the reprice differential
+/// is the step's parallel P&L. The non-parallel hazard residual is attributed
+/// to the `curve_shape` step, back-solved as
+/// `credit_curves_pnl − Σ(parallel steps)` so that `Σ steps ≡ credit_curves_pnl`
+/// holds exactly (audit item #1) — no `CreditCascadeResidual` cross-factor
+/// entry is needed.
 ///
 /// See `credit_cascade::plan_credit_cascade` for the multi-curve issuer averaging caveat.
 ///
@@ -282,10 +283,11 @@ pub fn attribute_pnl_parallel(
 ///
 /// When a `CreditFactorModel` is supplied with `L` hierarchy levels, the credit
 /// cascade performs `L + 2` additional repricings (PC, one per level, and
-/// Adder) compared to the single-step credit reprice without a model. For
-/// typical L = 1–3 and portfolios of thousands of instruments this is
-/// acceptable; consider `MetricsBased` or `Taylor` for cost-sensitive use cases
-/// (they remain linear, no reprice).
+/// Adder) compared to the single-step credit reprice without a model. The
+/// `curve_shape` step costs no reprice (it is back-solved). For typical
+/// L = 1–3 and portfolios of thousands of instruments this is acceptable;
+/// consider `MetricsBased` or `Taylor` for cost-sensitive use cases (they
+/// remain linear, no reprice).
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(
     skip_all,
@@ -708,19 +710,25 @@ pub fn attribute_pnl_parallel_with_credit_model(
                     CurveRestoreFlags::CREDIT,
                 );
 
-                // Each cascade step bumps the T0 hazard curves by exactly that
-                // step's bp from the same `market_t0_credit` base — the running
-                // market is not chained between steps, so the steps are fully
-                // independent. Reprice in parallel, collect into a Vec in
-                // cascade order, then reduce sequentially so the result is
-                // bit-identical to a serial loop.
-                let step_pnls: Vec<Money> = cascade
+                // Each parallel-bump cascade step (Generic / Level / Adder)
+                // bumps the T0 hazard curves by exactly that step's bp from the
+                // same `market_t0_credit` base — the running market is not
+                // chained between steps, so the steps are fully independent.
+                // The `CurveShape` step is NOT a bp bump: it represents the
+                // non-parallel hazard residual and is back-solved below so the
+                // decomposition closes exactly (`Σ steps ≡ credit_curves_pnl`).
+                // Reprice the bp-bump steps in parallel, collect in cascade
+                // order, then reduce sequentially for bit-identical results.
+                let mut step_pnls: Vec<Money> = cascade
                     .steps
                     .par_iter()
                     .map(|step| -> Result<Money> {
-                        // Adder step in parallel decomposition uses its bp like
-                        // the others (no snap-to-T1) so cross-effects net out
-                        // cleanly in the residual.
+                        if matches!(step.kind, super::credit_cascade::CreditStepKind::CurveShape)
+                        {
+                            // Placeholder; the curve-shape P&L is filled in
+                            // below as the closing residual.
+                            return Ok(Money::new(0.0, val_t1.currency()));
+                        }
                         let market_step = shift_hazard_curves(
                             &market_t0_credit,
                             &cascade.hazard_curve_ids,
@@ -730,24 +738,36 @@ pub fn attribute_pnl_parallel_with_credit_model(
                         compute_pnl(reprice, val_t1, val_t1.currency(), market_t1, as_of_t1)
                     })
                     .collect::<Result<Vec<Money>>>()?;
-                num_repricings += step_pnls.len();
-                let mut step_sum = 0.0_f64;
-                for pnl in &step_pnls {
-                    step_sum += pnl.amount();
-                }
+                // CurveShape steps did not cost a reprice.
+                num_repricings += step_pnls
+                    .iter()
+                    .zip(cascade.steps.iter())
+                    .filter(|(_, s)| {
+                        !matches!(s.kind, super::credit_cascade::CreditStepKind::CurveShape)
+                    })
+                    .count();
 
-                // Cross-effect for credit hierarchy: gap between Σ(step) and
-                // credit_curves_pnl. Captured as a single pair so existing
-                // cross_factor_pnl semantics are preserved.
-                let gap = attribution.credit_curves_pnl.amount() - step_sum;
-                if gap.abs() > CROSS_FACTOR_TOLERANCE {
-                    let pnl = Money::new(gap, val_t1.currency());
-                    record_cross_pair(
-                        "CreditCascadeResidual",
-                        pnl,
-                        &mut cross_total,
-                        &mut cross_by_pair,
-                    );
+                // Sum of the parallel (bp-bump) steps only.
+                let parallel_step_sum: f64 = step_pnls
+                    .iter()
+                    .zip(cascade.steps.iter())
+                    .filter(|(_, s)| {
+                        !matches!(s.kind, super::credit_cascade::CreditStepKind::CurveShape)
+                    })
+                    .map(|(pnl, _)| pnl.amount())
+                    .sum();
+
+                // Audit item #1: the non-parallel hazard residual is attributed
+                // to the `CurveShape` step (a real curve-shape / term-structure
+                // component) rather than left in a generic cross-factor bucket.
+                // `curve_shape = credit_curves_pnl − Σ(parallel steps)` makes
+                // `Σ all steps ≡ credit_curves_pnl` hold exactly.
+                let curve_shape_amt =
+                    attribution.credit_curves_pnl.amount() - parallel_step_sum;
+                for (pnl, step) in step_pnls.iter_mut().zip(cascade.steps.iter()) {
+                    if matches!(step.kind, super::credit_cascade::CreditStepKind::CurveShape) {
+                        *pnl = Money::new(curve_shape_amt, val_t1.currency());
+                    }
                 }
 
                 let detail = build_credit_factor_attribution(

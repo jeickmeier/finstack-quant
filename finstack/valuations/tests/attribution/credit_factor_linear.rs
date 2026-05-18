@@ -376,6 +376,150 @@ fn taylor_credit_detail_reconciles_to_credit_curves_pnl() {
     assert!((detail.adder_pnl_total.amount() - expected * 0.50).abs() < 1e-8);
 }
 
+/// Audit item #8: when the hazard curve twists (short tenors up, long tenors
+/// down) the signed average spread shift `ds_i` collapses toward zero while the
+/// credit P&L stays material. The effective-CS01 back-solve `-credit_pnl / ds_i`
+/// would explode; `compute_credit_factor_detail` must instead detect the
+/// degeneracy, omit `credit_factor_detail`, and emit a diagnostic note.
+#[test]
+fn twisted_hazard_curve_omits_credit_detail_instead_of_exploding_cs01() {
+    use finstack_valuations::attribution::TaylorAttributionConfig;
+
+    let as_of_t0 = create_date(2025, Month::January, 1).unwrap();
+    let as_of_t1 = create_date(2025, Month::January, 2).unwrap();
+
+    let mut bond = Bond::fixed(
+        "BOND-ISSUER-A",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05_f64,
+        create_date(2024, Month::January, 1).unwrap(),
+        create_date(2034, Month::January, 1).unwrap(),
+        "USD-OIS",
+    )
+    .expect("bond construction");
+    bond.credit_curve_id = Some(CurveId::new("ISSUER-A-HAZ"));
+    bond.attributes = Attributes::new().with_meta("credit::issuer_id", "ISSUER-A");
+
+    let make_discount = |base| {
+        let r = 0.05_f64;
+        DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([
+                (0.0_f64, 1.0_f64),
+                (1.0_f64, (-r).exp()),
+                (5.0_f64, (-r * 5.0).exp()),
+                (10.0_f64, (-r * 10.0).exp()),
+                (30.0_f64, (-r * 30.0).exp()),
+            ])
+            .build()
+            .expect("discount curve")
+    };
+
+    // T0 hazard: flat at 200 bp on the standard tenor grid. T1 hazard: a TWIST
+    // — short tenors up, long tenors down — with knots placed exactly on the
+    // standard tenors so the per-tenor shifts are controlled. The signed
+    // shifts (+100,+100,+50,+50,0,-50,-50,-100,-100 bp) sum to EXACTLY 0, so
+    // the average parallel move is 0, yet the absolute (L1) move is large
+    // (~66 bp). Centered at 200 bp so every T1 rate stays comfortably positive.
+    let std_tenors = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 30.0];
+    let haz_t0 = HazardCurve::builder("ISSUER-A-HAZ")
+        .base_date(as_of_t0)
+        .day_count(DayCount::Act365F)
+        .recovery_rate(0.4)
+        .knots(std_tenors.iter().map(|&t| (t, 0.02_f64)).collect::<Vec<_>>())
+        .build()
+        .expect("hazard t0");
+    let t1_rates = [
+        0.030, 0.030, 0.025, 0.025, 0.020, 0.015, 0.015, 0.010, 0.010,
+    ];
+    let haz_t1 = HazardCurve::builder("ISSUER-A-HAZ")
+        .base_date(as_of_t1)
+        .day_count(DayCount::Act365F)
+        .recovery_rate(0.4)
+        .knots(
+            std_tenors
+                .iter()
+                .zip(t1_rates.iter())
+                .map(|(&t, &r)| (t, r))
+                .collect::<Vec<_>>(),
+        )
+        .build()
+        .expect("hazard t1");
+
+    let make_market_state =
+        |disc: DiscountCurve, haz: HazardCurve, prices: BTreeMap<String, MarketScalar>| {
+            MarketContextState {
+                version: MARKET_CONTEXT_STATE_VERSION,
+                curves: vec![CurveState::Discount(disc), CurveState::Hazard(haz)],
+                fx: None,
+                surfaces: vec![],
+                prices,
+                series: vec![],
+                inflation_indices: vec![],
+                dividends: vec![],
+                credit_indices: vec![],
+                collateral: BTreeMap::new(),
+                fx_delta_vol_surfaces: vec![],
+                hierarchy: None,
+                vol_cubes: vec![],
+            }
+        };
+    let prices = || {
+        BTreeMap::from([
+            ("cdx.ig.5y".to_string(), MarketScalar::Unitless(100.0)),
+            (
+                "credit::level0::Rating::IG".to_string(),
+                MarketScalar::Unitless(0.0),
+            ),
+            (
+                "credit::level1::Rating.Region::IG.EU".to_string(),
+                MarketScalar::Unitless(0.0),
+            ),
+        ])
+    };
+
+    let model = make_model();
+    let spec = AttributionSpec {
+        instrument: InstrumentJson::Bond(bond),
+        market_t0: make_market_state(make_discount(as_of_t0), haz_t0, prices()),
+        market_t1: make_market_state(make_discount(as_of_t1), haz_t1, prices()),
+        as_of_t0,
+        as_of_t1,
+        method: AttributionMethod::Taylor(TaylorAttributionConfig::default()),
+        model_params_t0: None,
+        credit_factor_model: Some(Box::new(model)),
+        credit_factor_detail_options: CreditFactorDetailOptions::default(),
+        config: None,
+    };
+
+    let result = AttributionEnvelope::new(spec)
+        .execute()
+        .expect("attribution should succeed even with a twisted hazard curve");
+    let attribution = result.result.attribution;
+
+    // The decomposition is degenerate: detail must be omitted, not exploded.
+    assert!(
+        attribution.credit_factor_detail.is_none(),
+        "twisted hazard curve must omit credit_factor_detail (back-solve ill-conditioned)"
+    );
+    // A diagnostic note must explain why.
+    assert!(
+        attribution
+            .meta
+            .notes
+            .iter()
+            .any(|n| n.contains("twist")),
+        "a diagnostic note must flag the hazard-curve twist; notes were: {:?}",
+        attribution.meta.notes
+    );
+    // Sanity: every reported number stays finite (no NaN/∞ from a blown divide).
+    assert!(
+        attribution.credit_curves_pnl.amount().is_finite(),
+        "credit_curves_pnl must remain finite"
+    );
+}
+
 /// PR-7 named test 4: per-issuer adder map is `None` by default.
 #[test]
 fn per_issuer_adder_is_omitted_by_default() {

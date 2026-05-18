@@ -58,10 +58,18 @@ pub(crate) enum CreditStepKind {
     Generic,
     /// Hierarchy level k: bp = β_level_k × ΔF_level_k(g_i^k).
     Level(usize),
-    /// Per-issuer adder. The bump value is `Δadder_i` bp; the implementation
-    /// also snaps the running hazard curves to T1 at this step so that
-    /// `credit_curves_pnl` matches the no-model single-step value byte-identically.
+    /// Per-issuer adder — the **parallel** issuer-idiosyncratic move. The bump
+    /// value is `Δadder_i` bp and the step applies a parallel hazard-curve
+    /// bump, exactly like Generic / Level.
     Adder,
+    /// Curve-shape / term-structure residual. Captures the **non-parallel**
+    /// part of the hazard-curve move (steepening, twist) — everything the
+    /// parallel Generic / Level / Adder bumps cannot explain. The step snaps
+    /// the running hazard curves to their T1 state, so the cascade end-state
+    /// matches the no-model single Credit step exactly and `Σ steps ≡ total`
+    /// still holds. Audit item #1: previously this residual was absorbed into
+    /// `Adder`, mislabeling curve-shape risk as issuer-idiosyncratic.
+    CurveShape,
 }
 
 /// One step in the credit cascade.
@@ -229,6 +237,13 @@ pub(crate) fn plan_credit_cascade(
             label: "credit::adder".to_string(),
             delta_bp: ds_i - explained_bp,
         });
+        // Curve-shape residual: snap-to-T1 catches the non-parallel hazard
+        // move. `delta_bp` is not a bp value (it is a snap), kept 0.0.
+        steps.push(CreditCascadeStep {
+            kind: CreditStepKind::CurveShape,
+            label: "credit::curve_shape".to_string(),
+            delta_bp: 0.0,
+        });
         return Ok(Some(CreditCascade {
             issuer_id,
             hazard_curve_ids: credit_curves,
@@ -296,6 +311,12 @@ pub(crate) fn plan_credit_cascade(
         kind: CreditStepKind::Adder,
         label: "credit::adder".to_string(),
         delta_bp: adder_bp,
+    });
+    // Curve-shape residual: snap-to-T1 catches the non-parallel hazard move.
+    steps.push(CreditCascadeStep {
+        kind: CreditStepKind::CurveShape,
+        label: "credit::curve_shape".to_string(),
+        delta_bp: 0.0,
     });
 
     Ok(Some(CreditCascade {
@@ -391,12 +412,14 @@ pub(crate) fn build_credit_factor_attribution(
 
     let mut generic_pnl = finstack_core::money::Money::new(0.0, ccy);
     let mut adder_pnl = finstack_core::money::Money::new(0.0, ccy);
+    let mut curve_shape_pnl = finstack_core::money::Money::new(0.0, ccy);
     let mut level_pnls: BTreeMap<usize, finstack_core::money::Money> = BTreeMap::new();
 
     for (step, pnl) in cascade.steps.iter().zip(step_pnls.iter()) {
         match step.kind {
             CreditStepKind::Generic => generic_pnl = *pnl,
             CreditStepKind::Adder => adder_pnl = *pnl,
+            CreditStepKind::CurveShape => curve_shape_pnl = *pnl,
             CreditStepKind::Level(k) => {
                 level_pnls.insert(k, *pnl);
             }
@@ -433,13 +456,15 @@ pub(crate) fn build_credit_factor_attribution(
     };
 
     // Diagnostic: surface the adder magnitude and warn when it dominates the
-    // credit P&L. Audit item #21 — the adder step absorbs non-parallel curve
-    // moves, so a large |adder| relative to total credit P&L is a signal that
-    // the hierarchy decomposition is missing real risk.
+    // credit P&L. The adder is now the *parallel* issuer-idiosyncratic move
+    // only — non-parallel curve-shape risk lands in `curve_shape_pnl` — so a
+    // large |adder| genuinely signals a large idiosyncratic spread move.
     let adder_abs = adder_pnl.amount().abs();
+    let curve_shape_abs = curve_shape_pnl.amount().abs();
     let total_credit_abs = generic_pnl.amount().abs()
         + levels.iter().map(|l| l.total.amount().abs()).sum::<f64>()
-        + adder_abs;
+        + adder_abs
+        + curve_shape_abs;
     if total_credit_abs > 0.0 && adder_abs > ADDER_MAGNITUDE_WARN_RATIO * total_credit_abs {
         tracing::warn!(
             issuer_id = %cascade.issuer_id,
@@ -448,8 +473,25 @@ pub(crate) fn build_credit_factor_attribution(
             total_credit_abs = total_credit_abs,
             ratio = adder_abs / total_credit_abs,
             threshold = ADDER_MAGNITUDE_WARN_RATIO,
-            "credit cascade adder magnitude exceeds {:.0}% of total credit P&L \
-             — non-parallel curve moves are being absorbed into the per-issuer adder",
+            "credit cascade per-issuer adder magnitude exceeds {:.0}% of total \
+             credit P&L — the issuer's idiosyncratic parallel spread move is large",
+            ADDER_MAGNITUDE_WARN_RATIO * 100.0
+        );
+    }
+    // A large curve-shape component means the hazard curve moved
+    // non-parallel (steepening / twist) — surfaced as its own signal.
+    if total_credit_abs > 0.0
+        && curve_shape_abs > ADDER_MAGNITUDE_WARN_RATIO * total_credit_abs
+    {
+        tracing::warn!(
+            issuer_id = %cascade.issuer_id,
+            curve_shape_pnl = curve_shape_pnl.amount(),
+            curve_shape_abs = curve_shape_abs,
+            total_credit_abs = total_credit_abs,
+            ratio = curve_shape_abs / total_credit_abs,
+            threshold = ADDER_MAGNITUDE_WARN_RATIO,
+            "credit cascade curve-shape magnitude exceeds {:.0}% of total credit \
+             P&L — the hazard curve experienced a significant non-parallel move",
             ADDER_MAGNITUDE_WARN_RATIO * 100.0
         );
     }
@@ -459,6 +501,7 @@ pub(crate) fn build_credit_factor_attribution(
         generic_pnl,
         levels,
         adder_pnl_total: adder_pnl,
+        curve_shape_pnl,
         adder_pnl_by_issuer,
         adder_magnitude: Some(finstack_core::money::Money::new(adder_abs, ccy)),
     }
@@ -631,12 +674,29 @@ mod tests {
         .unwrap()
         .expect("cascade");
 
+        // Cascade: generic, rating, region, adder, curve_shape (audit item #1
+        // adds the curve-shape step — for a flat hazard move it is a 0bp snap).
+        let labels: Vec<&str> = cascade.steps.iter().map(|s| s.label.as_str()).collect();
         let deltas: Vec<f64> = cascade.steps.iter().map(|step| step.delta_bp).collect();
-        assert_eq!(deltas.len(), 4);
+        assert_eq!(
+            labels,
+            vec![
+                "credit::generic",
+                "credit::rating",
+                "credit::region",
+                "credit::adder",
+                "credit::curve_shape",
+            ]
+        );
+        assert_eq!(deltas.len(), 5);
         assert!((deltas[0] - 25.0).abs() < 1e-10, "generic should be +25bp");
         assert!((deltas[1] - 7.0).abs() < 1e-10, "rating should be +7bp");
         assert!((deltas[2] - (-2.0)).abs() < 1e-10, "region should be -2bp");
         assert!((deltas[3]).abs() < 1e-10, "adder should reconcile to zero");
+        assert!(
+            (deltas[4]).abs() < 1e-10,
+            "curve_shape carries no bp value (it is a snap step)"
+        );
     }
 
     #[test]
@@ -683,19 +743,25 @@ mod tests {
 
         let labels: Vec<&str> = cascade.steps.iter().map(|s| s.label.as_str()).collect();
         let deltas: Vec<f64> = cascade.steps.iter().map(|s| s.delta_bp).collect();
+        // Config-ordered factors, then adder, then the curve-shape snap step.
         assert_eq!(
             labels,
             vec![
                 "credit::rating",
                 "credit::generic",
                 "credit::region",
-                "credit::adder"
+                "credit::adder",
+                "credit::curve_shape",
             ]
         );
-        assert_eq!(deltas.len(), 4);
+        assert_eq!(deltas.len(), 5);
         assert!((deltas[0] - 25.0).abs() < 1e-10);
         assert!((deltas[1] - 5.0).abs() < 1e-10);
         assert!((deltas[2] - (-2.0)).abs() < 1e-10);
         assert!((deltas[3] - 2.0).abs() < 1e-10);
+        assert!(
+            (deltas[4]).abs() < 1e-10,
+            "curve_shape carries no bp value (it is a snap step)"
+        );
     }
 }

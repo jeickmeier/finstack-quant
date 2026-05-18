@@ -64,12 +64,17 @@ impl AttributionSpec {
         }
 
         // 4. Measure per-credit-curve shifts on the instrument's dependencies.
+        //    Track BOTH the signed average move (`ds_i`, used for the
+        //    back-solve) AND the absolute (L1) per-tenor move. A twisted curve
+        //    — short tenors up, long tenors down — averages close to zero even
+        //    though the curve genuinely moved; the L1 magnitude exposes that.
         let market_deps = instrument.market_dependencies()?;
         let credit_curves = &market_deps.curve_dependencies().credit_curves;
         if credit_curves.is_empty() {
             return Ok(None);
         }
         let mut total_shift_bp = 0.0;
+        let mut total_abs_shift_bp = 0.0;
         let mut count = 0usize;
         for curve_id in credit_curves {
             if let Ok(shift) = measure_hazard_curve_shift(
@@ -79,6 +84,7 @@ impl AttributionSpec {
                 TenorSamplingMethod::Standard,
             ) {
                 total_shift_bp += shift;
+                total_abs_shift_bp += hazard_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
                 count += 1;
             }
         }
@@ -86,13 +92,36 @@ impl AttributionSpec {
             return Ok(None);
         }
         let avg_shift_bp = total_shift_bp / count as f64;
-        if avg_shift_bp.abs() < 1e-12 {
-            // No meaningful spread move; nothing to decompose. Emit a zeroed
-            // detail so downstream code still has a reference.
+        let avg_abs_shift_bp = total_abs_shift_bp / count as f64;
+        if avg_abs_shift_bp.abs() < 1e-12 {
+            // No meaningful spread move at all; nothing to decompose.
             return Ok(None);
         }
 
         let ds_i = avg_shift_bp;
+
+        // Guard the back-solve `CS01 = -credit_pnl / ds_i` against a
+        // divide-by-near-zero. The back-solve is only well-conditioned when the
+        // signed parallel move `ds_i` is a meaningful fraction of the curve's
+        // total (L1) move. When the curve twisted, `|ds_i|` collapses toward
+        // zero while `credit_pnl` stays large, so `-credit_pnl / ds_i` explodes
+        // into a nonsensical CS01. Surface the degeneracy instead of producing
+        // a meaningless decomposition.
+        //
+        // `PARALLEL_FRACTION_FLOOR` requires the signed move to be at least
+        // this fraction of the absolute move for the parallel back-solve to be
+        // trusted; below it the move is dominated by curve-shape (twist).
+        const PARALLEL_FRACTION_FLOOR: f64 = 1e-3;
+        if avg_shift_bp.abs() < PARALLEL_FRACTION_FLOOR * avg_abs_shift_bp.abs() {
+            notes.push(format!(
+                "credit_factor_detail unavailable: hazard curve(s) twisted \
+                 (signed avg shift {:.6}bp vs absolute avg shift {:.6}bp); a \
+                 single back-solved CS01 cannot represent a non-parallel move \
+                 and -credit_pnl/ds_i would be ill-conditioned",
+                avg_shift_bp, avg_abs_shift_bp
+            ));
+            return Ok(None);
+        }
 
         // 6. Back-solve the effective CS01 from the existing credit_curves_pnl
         //    so the reconciliation `generic + Σlevels + adder ≡
@@ -130,6 +159,48 @@ impl AttributionSpec {
             &step_pnls,
         );
         Ok(Some(detail))
+    }
+}
+
+/// Absolute (L1) hazard-curve shift in basis points, averaged over the standard
+/// tenor grid.
+///
+/// Where [`measure_hazard_curve_shift`](finstack_core::market_data::diff::measure_hazard_curve_shift)
+/// returns the *signed* mean shift (which collapses toward zero for a twisted
+/// curve), this returns the mean of the per-tenor absolute shifts, so a
+/// non-parallel move still registers a large magnitude. Returns `0.0` when
+/// either side's curve is missing.
+fn hazard_curve_abs_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> f64 {
+    use finstack_core::market_data::diff::STANDARD_TENORS;
+
+    let (Ok(curve_t0), Ok(curve_t1)) = (
+        market_t0.get_hazard(curve_id),
+        market_t1.get_hazard(curve_id),
+    ) else {
+        return 0.0;
+    };
+
+    let mut total_abs = 0.0;
+    let mut count = 0usize;
+    for &t in STANDARD_TENORS {
+        if t <= 0.0 {
+            continue;
+        }
+        let h0 = curve_t0.hazard_rate(t);
+        let h1 = curve_t1.hazard_rate(t);
+        if h0.is_finite() && h1.is_finite() {
+            total_abs += (h1 - h0).abs() * 10_000.0;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        0.0
+    } else {
+        total_abs / count as f64
     }
 }
 
