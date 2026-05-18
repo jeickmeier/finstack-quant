@@ -45,7 +45,10 @@ pub use json::{
 pub use keys::{InstrumentType, ModelKey, PricerKey};
 pub use registry::{expect_inst, Pricer, PricerRegistry};
 
-// Fourier pricing methods (COS, Lewis)
+// Fourier pricing methods (COS).
+//
+// The previously-exposed Lewis (2001) pricer was removed (known-divergent
+// off-ATM); see `fourier` module docs.
 pub mod fourier;
 
 // Asset-class registration submodules
