@@ -14,13 +14,64 @@
 //! calibrated model at full path count.
 
 use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig;
+use crate::instruments::fixed_income::bond::pricing::time_basis::{
+    bond_cashflow_dfs_on_model_grid, bond_model_maturity_years,
+    implied_flat_discount_rate_from_curve,
+};
 use crate::instruments::fixed_income::bond::types::Bond;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::market_data::context::MarketContext;
+use finstack_core::market_data::term_structures::DiscountCurve;
 use indexmap::IndexMap;
+
+/// Model maturity and flat discount rate for Merton MC, on consistent time bases.
+struct MertonMcTimeBasis {
+    mat_years: f64,
+    discount_rate: f64,
+}
+
+fn merton_mc_time_basis(
+    bond: &Bond,
+    disc: &DiscountCurve,
+    as_of: finstack_core::dates::Date,
+    ctx: &PricingErrorContext,
+) -> Result<MertonMcTimeBasis, PricingError> {
+    let mat_years = bond_model_maturity_years(bond, as_of)
+        .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+    let discount_rate =
+        implied_flat_discount_rate_from_curve(disc, as_of, bond.maturity, mat_years)
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+    Ok(MertonMcTimeBasis {
+        mat_years,
+        discount_rate,
+    })
+}
+
+fn populate_cashflow_dfs_if_needed(
+    config: &mut MertonMcConfig,
+    disc: &DiscountCurve,
+    bond: &Bond,
+    as_of: finstack_core::dates::Date,
+    mat_years: f64,
+    ctx: &PricingErrorContext,
+) -> Result<(), PricingError> {
+    if config.cashflow_dfs.is_none() && mat_years > 0.0 {
+        let dfs = bond_cashflow_dfs_on_model_grid(
+            disc,
+            as_of,
+            bond.maturity,
+            mat_years,
+            config.time_steps_per_year,
+        )
+        .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+        config.cashflow_dfs = Some(dfs);
+    }
+    Ok(())
+}
 
 /// Merton structural Monte Carlo pricer for (PIK) bonds.
 ///
@@ -84,17 +135,10 @@ impl Pricer for SimpleBondMertonMcPricer {
             .get_discount(bond.discount_curve_id.as_str())
             .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
 
-        let mat_years = (bond.maturity - as_of).whole_days() as f64 / 365.25;
-        let discount_rate = if mat_years > 0.0 {
-            let df = disc.df(mat_years);
-            if df > 0.0 {
-                -df.ln() / mat_years
-            } else {
-                0.0
-            }
-        } else {
-            0.0
-        };
+        let MertonMcTimeBasis {
+            mat_years,
+            discount_rate,
+        } = merton_mc_time_basis(bond, &disc, as_of, &ctx)?;
 
         // ---- Calibration pass (opt-in) ---------------------------------
         let mut calibration_measures: IndexMap<crate::metrics::MetricId, f64> = IndexMap::new();
@@ -146,17 +190,14 @@ impl Pricer for SimpleBondMertonMcPricer {
         // Build term-structure discount factors from the curve for cashflow
         // discounting. The flat `discount_rate` is still used for the Merton
         // risk-neutral drift.
-        if effective_config.cashflow_dfs.is_none() && mat_years > 0.0 {
-            let steps = effective_config.time_steps_per_year;
-            let n = (mat_years * steps as f64).round() as usize;
-            let dfs: Vec<(f64, f64)> = (1..=n)
-                .map(|i| {
-                    let t = i as f64 / steps as f64;
-                    (t, disc.df(t))
-                })
-                .collect();
-            effective_config.cashflow_dfs = Some(dfs);
-        }
+        populate_cashflow_dfs_if_needed(
+            &mut effective_config,
+            &disc,
+            bond,
+            as_of,
+            mat_years,
+            &ctx,
+        )?;
 
         // ---- Full pricing pass -----------------------------------------
         let mc_result = bond
@@ -238,17 +279,10 @@ impl Pricer for SimpleBondMertonMcPricer {
             .get_discount(bond.discount_curve_id.as_str())
             .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
 
-        let mat_years = (bond.maturity - as_of).whole_days() as f64 / 365.25;
-        let discount_rate = if mat_years > 0.0 {
-            let df = disc.df(mat_years);
-            if df > 0.0 {
-                -df.ln() / mat_years
-            } else {
-                0.0
-            }
-        } else {
-            0.0
-        };
+        let MertonMcTimeBasis {
+            mat_years,
+            discount_rate,
+        } = merton_mc_time_basis(bond, &disc, as_of, &ctx)?;
 
         let mut effective_config = if let Some(ref cal_spec) = mc_override.0.calibration {
             use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::calibration::calibrate_parameter_to_market;
@@ -270,17 +304,14 @@ impl Pricer for SimpleBondMertonMcPricer {
             mc_override.0.clone()
         };
 
-        if effective_config.cashflow_dfs.is_none() && mat_years > 0.0 {
-            let steps = effective_config.time_steps_per_year;
-            let n = (mat_years * steps as f64).round() as usize;
-            let dfs: Vec<(f64, f64)> = (1..=n)
-                .map(|i| {
-                    let t = i as f64 / steps as f64;
-                    (t, disc.df(t))
-                })
-                .collect();
-            effective_config.cashflow_dfs = Some(dfs);
-        }
+        populate_cashflow_dfs_if_needed(
+            &mut effective_config,
+            &disc,
+            bond,
+            as_of,
+            mat_years,
+            &ctx,
+        )?;
 
         let mc_result = bond
             .price_merton_mc(&effective_config, discount_rate, as_of)

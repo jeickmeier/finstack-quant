@@ -9,6 +9,7 @@
 - `.pyi` stubs in `finstack-py/finstack/` are derived from contract and binding code; structural parity tests live under `finstack-py/tests/parity`, with behavioral parity tests alongside runtime tests such as `finstack-py/tests/test_core_parity.py`
 - Parity contract: `finstack-py/parity_contract.toml`; design spec at `docs/superpowers/specs/2026-04-10-rust-canonical-api-alignment-design.md`
 - Example notebooks in `finstack-py/examples/notebooks/`; runner script: `run_all_notebooks.py`
+- **Valuations integration API** (stable surface for `scenarios` / `portfolio`): `docs/superpowers/specs/2026-05-18-valuations-integration-api.md`
 
 ## Build and Tooling
 

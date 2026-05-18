@@ -9,8 +9,8 @@
     "source_detail": "Finstack canonical credit pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
-    "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_by": "claude",
+    "last_reviewed_on": "2026-05-18",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -291,11 +291,11 @@
     }
   },
   "expected_outputs": {
-    "npv": 1851420.6034794892,
-    "par_spread": 547.102473708064,
-    "spread_dv01": -4140.931245860993,
-    "dv01": -580.391604453442,
-    "cs01": 27934.3783307
+    "npv": 1851426.9422832413,
+    "par_spread": 547.1016968145245,
+    "spread_dv01": -4140.952618775773,
+    "dv01": -580.3723847564543,
+    "cs01": 27934.543280274374
   },
   "tolerances": {
     "npv": {

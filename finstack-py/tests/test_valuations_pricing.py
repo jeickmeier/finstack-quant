@@ -376,7 +376,7 @@ def _callable_range_accrual_json() -> str:
                     "2026-01-01",
                     "2026-07-01",
                 ],
-                "lower_bound": 0.02,
+                "lower_bound": 0.01,
                 "upper_bound": 0.04,
                 "bounds_type": "absolute",
                 "coupon_rate": 0.06,

@@ -44,6 +44,7 @@ REPORT_LOCK_POLL_SECONDS = 0.01
 DATA_ROOTS = {
     "pricing": WORKSPACE_ROOT / "finstack/valuations/tests/golden/data",
     "analytics": WORKSPACE_ROOT / "finstack/analytics/tests/golden/data",
+    "volatility": WORKSPACE_ROOT / "finstack/valuations/tests/golden/data",
 }
 VALID_SOURCES = {
     "quantlib",
@@ -91,6 +92,7 @@ _DOMAIN_RUNNERS = {
     "credit.cds_tranche": "pricing_common",
     "equity.equity_option": "pricing_common",
     "equity.equity_index_future": "pricing_common",
+    "exotics.barrier_option": "pricing_common",
     "fixed_income.bond": "pricing_common",
     "fixed_income.bond_future": "pricing_common",
     "fixed_income.convertible": "pricing_common",
@@ -100,12 +102,14 @@ _DOMAIN_RUNNERS = {
     "fx.fx_option": "pricing_common",
     "fx.fx_swap": "pricing_common",
     "rates.cap_floor": "pricing_common",
+    "rates.cms_option": "pricing_common",
     "rates.deposit": "pricing_common",
     "rates.fra": "pricing_common",
     "rates.inflation_swap": "pricing_common",
     "rates.irs": "pricing_common",
     "rates.ir_future": "pricing_common",
     "rates.swaption": "pricing_common",
+    "volatility.sabr": "sabr_smile",
 }
 
 

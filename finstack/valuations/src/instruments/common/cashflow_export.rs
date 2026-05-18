@@ -21,9 +21,11 @@
 //!
 //! Hazard-only columns are populated when `model = "hazard_rate"`.
 //! Inflation / MBS columns are populated by concrete-type downcasts when the
-//! instrument is `InflationLinkedBond` / `AgencyMbsPassthrough`. CMO tranche
-//! pool state is left as null in this slice (TODO; the waterfall engine's
-//! per-tranche balance hook is not yet exposed cleanly).
+//! instrument is `InflationLinkedBond` / `AgencyMbsPassthrough`.
+//!
+//! **CMO tranche pool state** is intentionally exported as `null`: the waterfall
+//! engine does not yet expose a stable per-tranche balance hook for this path.
+//! Consumers should not treat `null` as missing data for non-CMO instruments.
 
 use finstack_core::cashflow::CFKind;
 use finstack_core::currency::Currency;

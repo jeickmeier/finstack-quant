@@ -142,7 +142,7 @@ status = "exists"
 attribution  = { python = "finstack.valuations",              status = "exists", note = "JSON-first helpers and the PnlAttribution wrapper are flattened onto finstack.valuations" }
 instruments  = { python = "finstack.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack.valuations.instruments; root aliases remain for compatibility" }
 fx           = { python = "finstack.valuations.fx",           status = "exists", note = "Direct FX instrument wrappers for Rust/WASM-supported FX instruments; no JSON-only workflow required" }
-calibration  = { python = "finstack.valuations.calibration",  status = "missing", note = "Bindings are currently exported from finstack.valuations root" }
+calibration  = { python = "finstack.valuations",              status = "flattened", note = "calibrate, dry_run, validate_calibration_json, dependency_graph_json exported from finstack.valuations root" }
 correlation  = { python = "finstack.valuations.correlation",  status = "exists", note = "Former standalone finstack-correlation crate; nested under valuations" }
 credit       = { python = "finstack.valuations.credit",       status = "exists", note = "Structural credit models and PIK toggle helpers" }
 credit_derivatives = { python = "finstack.valuations.credit_derivatives", status = "exists", note = "Typed wrappers for CDS, CDS index, tranche, and option JSON pricing" }
@@ -400,6 +400,154 @@ excluded = [
     "prelude",       # Re-export bag; no host-language meaning
     "validation",    # Internal validation helpers
 ]
+
+# ---------------------------------------------------------------------------
+# WASM valuations subset
+#
+# Python tracks the full valuations surface via [crates.valuations.symbols].
+# WASM exposes a JSON-first subset through finstack-wasm/exports/valuations.js
+# with camelCase facade names. Nested groups mirror the JS object layout.
+# ---------------------------------------------------------------------------
+[wasm_valuations_subset]
+rust_module_root = "../finstack-wasm/src/api/valuations/"
+js_export_file   = "../finstack-wasm/exports/valuations.js"
+
+# Nested facade keys on `valuations` (camelCase).
+nested = ["correlation", "credit", "creditDerivatives", "fx", "instruments"]
+
+# Root-level `valuations.<name>` exports (camelCase / PascalCase as in JS).
+# Duplicates under `instruments` / `creditDerivatives` are aliases, not extra entries.
+root_exports = [
+    "CreditCalibrator",
+    "CreditFactorModel",
+    "FactorCovarianceForecast",
+    "LevelsAtDate",
+    "PeriodDecomposition",
+    "SabrCalibrator",
+    "SabrModel",
+    "SabrParameters",
+    "SabrSmile",
+    "WasmMarket",
+    "asianOptionPrice",
+    "attributePnl",
+    "attributePnlFromSpec",
+    "barrierCall",
+    "black76ImpliedVol",
+    "bsCosPrice",
+    "bsGreeks",
+    "bsImpliedVol",
+    "bsPrice",
+    "calibrate",
+    "callableRangeAccrualAccrued",
+    "cmsSpreadOptionIntrinsic",
+    "computeFactorSensitivities",
+    "computePnlProfiles",
+    "decomposeFactorRisk",
+    "decomposeLevels",
+    "decomposePeriod",
+    "defaultAttributionMetrics",
+    "defaultWaterfallOrder",
+    "dependencyGraphJson",
+    "dryRun",
+    "instrumentCashflowsJson",
+    "instrumentCashflowsWithMarket",
+    "listStandardMetrics",
+    "listStandardMetricsGrouped",
+    "lookbackOptionPrice",
+    "mertonJumpCosPrice",
+    "priceInstrument",
+    "priceInstrumentWithMarket",
+    "priceInstrumentWithMetrics",
+    "priceInstrumentWithMetricsAndMarket",
+    "quantoOptionPrice",
+    "snowballCouponProfile",
+    "tarnCouponProfile",
+    "validateAttributionJson",
+    "validateCalibrationJson",
+    "validateInstrumentJson",
+    "validateValuationResultJson",
+    "vgCosPrice",
+]
+
+# Python-only valuations symbols (not on WASM valuations facade).
+python_only = [
+    "CalibrationEnvelope",
+    "CalibrationEnvelopeError",
+    "CalibrationPlan",
+    "CalibrationResult",
+    "CalibrationStep",
+    "DiscountStep",
+    "FactorPnlProfile",
+    "ForwardStep",
+    "HazardStep",
+    "MarketQuote",
+    "Pillar",
+    "PnlAttribution",
+    "RateDeposit",
+    "RateSwap",
+    "RiskDecomposition",
+    "SensitivityMatrix",
+    "Tenor",
+    "ValuationResult",
+    "VolSurfaceStep",
+]
+
+# Root exports with no Python snake_case twin (WASM JSON helpers / handles).
+wasm_only = [
+    "WasmMarket",
+    "validateValuationResultJson",
+]
+
+# Explicit python_snake_case -> js_name for root exports (triplet pinning).
+# Omitted entries follow default camelCase from snake_case.
+[wasm_valuations_subset.python_js_map]
+price_instrument = "priceInstrument"
+price_instrument_with_metrics = "priceInstrumentWithMetrics"
+price_instrument_with_market = "priceInstrumentWithMarket"
+price_instrument_with_metrics_and_market = "priceInstrumentWithMetricsAndMarket"
+instrument_cashflows_json = "instrumentCashflowsJson"
+instrument_cashflows = "instrumentCashflowsWithMarket"
+list_standard_metrics = "listStandardMetrics"
+list_standard_metrics_grouped = "listStandardMetricsGrouped"
+bs_price = "bsPrice"
+bs_greeks = "bsGreeks"
+bs_implied_vol = "bsImpliedVol"
+black76_implied_vol = "black76ImpliedVol"
+barrier_call = "barrierCall"
+asian_option_price = "asianOptionPrice"
+lookback_option_price = "lookbackOptionPrice"
+quanto_option_price = "quantoOptionPrice"
+bs_cos_price = "bsCosPrice"
+vg_cos_price = "vgCosPrice"
+merton_jump_cos_price = "mertonJumpCosPrice"
+tarn_coupon_profile = "tarnCouponProfile"
+snowball_coupon_profile = "snowballCouponProfile"
+cms_spread_option_intrinsic = "cmsSpreadOptionIntrinsic"
+callable_range_accrual_accrued = "callableRangeAccrualAccrued"
+attribute_pnl = "attributePnl"
+attribute_pnl_from_spec = "attributePnlFromSpec"
+validate_attribution_json = "validateAttributionJson"
+validate_calibration_json = "validateCalibrationJson"
+validate_instrument_json = "validateInstrumentJson"
+default_waterfall_order = "defaultWaterfallOrder"
+default_attribution_metrics = "defaultAttributionMetrics"
+compute_factor_sensitivities = "computeFactorSensitivities"
+compute_pnl_profiles = "computePnlProfiles"
+decompose_factor_risk = "decomposeFactorRisk"
+decompose_levels = "decomposeLevels"
+decompose_period = "decomposePeriod"
+dependency_graph_json = "dependencyGraphJson"
+CreditFactorModel = "CreditFactorModel"
+CreditCalibrator = "CreditCalibrator"
+LevelsAtDate = "LevelsAtDate"
+PeriodDecomposition = "PeriodDecomposition"
+FactorCovarianceForecast = "FactorCovarianceForecast"
+SabrParameters = "SabrParameters"
+SabrModel = "SabrModel"
+SabrSmile = "SabrSmile"
+SabrCalibrator = "SabrCalibrator"
+calibrate = "calibrate"
+dry_run = "dryRun"
 
 # ---------------------------------------------------------------------------
 # Intentionally NOT covered by parity tests

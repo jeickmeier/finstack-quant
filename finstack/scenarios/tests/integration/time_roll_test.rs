@@ -212,27 +212,38 @@ fn test_time_roll_with_bond_carry() {
             .unwrap(),
     )];
 
-    // Use the time roll adapter directly to verify carry computation
-    let mut ctx = ExecutionContext {
-        market: &mut market,
-        model: &mut model,
-        instruments: Some(&mut instruments),
-        rate_bindings: None,
-        calendar: None,
-        as_of: base_date,
+    let expected_date = base_date + time::Duration::days(31);
+    use finstack_valuations::metrics::MetricId;
+
+    let pv_base = {
+        instruments
+            .first()
+            .expect("bond instrument")
+            .as_ref()
+            .value(&market, base_date)
+            .expect("pv at base as_of before roll")
+            .amount()
     };
 
-    // Call the time roll adapter directly to get the RollForwardReport with carry info
-    let roll_report = finstack_scenarios::adapters::time_roll::apply_time_roll_forward(
-        &mut ctx,
-        "1M",
-        TimeRollMode::BusinessDays,
-    )
-    .unwrap();
+    let roll_report = {
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: &mut model,
+            instruments: Some(&mut instruments),
+            rate_bindings: None,
+            calendar: None,
+            as_of: base_date,
+        };
+        let roll_report = finstack_scenarios::adapters::time_roll::apply_time_roll_forward(
+            &mut ctx,
+            "1M",
+            TimeRollMode::BusinessDays,
+        )
+        .unwrap();
+        assert_eq!(ctx.as_of, expected_date);
+        roll_report
+    };
 
-    // Verify date rolled
-    let expected_date = base_date + time::Duration::days(31);
-    assert_eq!(ctx.as_of, expected_date);
     assert_eq!(roll_report.new_date, expected_date);
     assert_eq!(roll_report.days, 31);
 
@@ -257,5 +268,35 @@ fn test_time_roll_with_bond_carry() {
     assert!(
         roll_report.total_carry.get(&Currency::USD).is_some(),
         "Total carry should have USD entry"
+    );
+
+    // Reprice at the rolled horizon (explicit as_of, not the pre-roll base date).
+    let rolled = instruments
+        .first()
+        .expect("bond instrument")
+        .as_ref()
+        .price_with_metrics(
+            &market,
+            roll_report.new_date,
+            &[MetricId::Theta],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("metrics at rolled as_of");
+    assert!(
+        rolled.value.amount().is_finite(),
+        "rolled PV should be finite at rolled as_of"
+    );
+    assert_ne!(
+        rolled.value.amount(),
+        pv_base,
+        "pricing at roll_report.new_date must differ from base_date PV"
+    );
+    let theta = *rolled
+        .measures
+        .get("theta")
+        .expect("theta at rolled horizon");
+    assert!(
+        theta.is_finite(),
+        "theta should be computed at rolled as_of"
     );
 }

@@ -72,6 +72,10 @@ impl MetricCalculator for GenericHVar {
         context
             .computed
             .insert(MetricId::ExpectedShortfall, result.expected_shortfall);
+        context.computed.insert(
+            MetricId::custom("hvar_num_scenarios"),
+            result.num_scenarios as f64,
+        );
 
         Ok(result.var)
     }
@@ -127,6 +131,10 @@ impl MetricCalculator for GenericExpectedShortfall {
         )?;
 
         context.computed.insert(MetricId::HVar, result.var);
+        context.computed.insert(
+            MetricId::custom("hvar_num_scenarios"),
+            result.num_scenarios as f64,
+        );
 
         Ok(result.expected_shortfall)
     }
@@ -222,6 +230,11 @@ mod tests {
             "ES mismatch: got {es}, expected {}",
             expected.expected_shortfall
         );
+        let n = *result_ordered
+            .measures
+            .get("hvar_num_scenarios")
+            .expect("scenario count should be exposed");
+        assert_eq!(n as usize, expected.num_scenarios);
 
         // Also verify reversed ordering doesn't break ES vs VaR wiring.
         let history2 = Arc::new(history_from_rate_shifts(as_of, &shifts));

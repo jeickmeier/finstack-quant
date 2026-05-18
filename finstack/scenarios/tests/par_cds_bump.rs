@@ -1,11 +1,15 @@
+use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::market_data::term_structures::HazardCurve;
+use finstack_core::money::Money;
 use finstack_scenarios::{
     CurveKind, ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, TenorMatchMode,
 };
 use finstack_statements::FinancialModelSpec;
+use finstack_valuations::instruments::Bond;
+use finstack_valuations::instruments::Instrument;
 use time::Month;
 
 #[test]
@@ -80,5 +84,76 @@ fn test_par_cds_bump_integration() {
         "Hazard rate should increase from Par CDS spread bump: original {}, got {}",
         original_lambda,
         l_5y
+    );
+}
+
+#[test]
+fn test_par_cds_bump_reprices_credit_bond() {
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
+
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(base_date)
+        .knots(vec![(0.0, 1.0), (1.0, 0.97), (5.0, 0.85), (10.0, 0.70)])
+        .build()
+        .unwrap();
+
+    let hazard = HazardCurve::builder("USD-CDS")
+        .base_date(base_date)
+        .recovery_rate(0.4)
+        .knots(vec![(1.0, 0.01), (5.0, 0.02)])
+        .par_spreads(vec![(1.0, 60.0), (5.0, 120.0)])
+        .build()
+        .unwrap();
+
+    let market = MarketContext::new().insert(discount).insert(hazard);
+    let mut bond = Bond::fixed(
+        "CREDIT-BOND",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        base_date,
+        maturity,
+        "USD-OIS",
+    )
+    .expect("bond");
+    bond.credit_curve_id = Some("USD-CDS".into());
+
+    let pv_base = bond.value(&market, base_date).expect("base pv").amount();
+
+    let scenario = ScenarioSpec {
+        id: "par_cds_parallel".into(),
+        name: None,
+        description: None,
+        operations: vec![OperationSpec::CurveParallelBp {
+            curve_kind: CurveKind::ParCDS,
+            curve_id: "USD-CDS".into(),
+            discount_curve_id: Some("USD-OIS".into()),
+            bp: 25.0,
+        }],
+        priority: 0,
+        resolution_mode: Default::default(),
+    };
+
+    let mut market_after = market.clone();
+    let mut model = FinancialModelSpec::new("test", vec![]);
+    let engine = ScenarioEngine::new();
+    let mut ctx = ExecutionContext {
+        market: &mut market_after,
+        model: &mut model,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: base_date,
+    };
+    engine.apply(&scenario, &mut ctx).expect("scenario apply");
+
+    let pv_bumped = bond
+        .value(&market_after, base_date)
+        .expect("bumped pv")
+        .amount();
+
+    assert!(
+        pv_bumped < pv_base,
+        "wider par spreads should lower long bond PV: base={pv_base}, bumped={pv_bumped}"
     );
 }

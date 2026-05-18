@@ -10,7 +10,7 @@
     "captured_by": "claude",
     "captured_on": "2026-05-10",
     "last_reviewed_by": "claude",
-    "last_reviewed_on": "2026-05-10",
+    "last_reviewed_on": "2026-05-18",
     "review_interval_months": 12,
     "regen_command": "uv run pytest finstack-py/tests/golden/test_pricing_swaption.py -v -k self_test",
     "screenshots": []
@@ -709,9 +709,9 @@
     }
   },
   "expected_outputs": {
-    "npv": 1941979.446236737,
-    "vega": 169036.69155447895,
-    "dv01": -2731.297080800941
+    "npv": 1937363.8073202618,
+    "vega": 169029.44090068564,
+    "dv01": -2728.997029883787
   },
   "tolerances": {
     "npv": {

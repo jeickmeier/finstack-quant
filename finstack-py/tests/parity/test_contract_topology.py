@@ -232,3 +232,89 @@ def test_wasm_top_level_has_exports_files() -> None:
     exports_dir = (CONTRACT_PATH.parent / block["file"]).resolve().parent / "exports"
     missing = [ns for ns in block["namespaces"] if not (exports_dir / f"{ns}.js").exists()]
     assert not missing, f"contract lists namespaces that have no exports/*.js file: {missing}"
+
+
+def _parse_valuations_js_root_exports(js_path: Path) -> set[str]:
+    """Extract top-level keys from `export const valuations = { ... }`."""
+    source = js_path.read_text().splitlines()
+    keys: set[str] = set()
+    depth = 0
+    for line in source:
+        if depth == 0:
+            if "export const valuations = {" in line:
+                depth = 1
+            continue
+        stripped = line.strip()
+        if depth == 1:
+            if not stripped or stripped.startswith("//"):
+                pass
+            else:
+                key_match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:", stripped)
+                if key_match:
+                    keys.add(key_match.group(1))
+                else:
+                    method_match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*\(", stripped)
+                    if method_match:
+                        keys.add(method_match.group(1))
+                    else:
+                        shorthand_match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*,?\s*$", stripped)
+                        if shorthand_match:
+                            keys.add(shorthand_match.group(1))
+        depth += line.count("{") - line.count("}")
+        if depth <= 0:
+            break
+    return keys
+
+
+def test_wasm_valuations_exports_match_contract() -> None:
+    """`exports/valuations.js` root keys must match [wasm_valuations_subset]."""
+    block = CONTRACT["wasm_valuations_subset"]
+    js_path = (CONTRACT_PATH.parent / block["js_export_file"]).resolve()
+    expected_root = set(block["root_exports"])
+    expected_nested = set(block["nested"])
+    actual_root = _parse_valuations_js_root_exports(js_path)
+    assert expected_nested <= actual_root, (
+        f"nested facade keys missing from valuations.js root: {sorted(expected_nested - actual_root)}"
+    )
+    non_nested_actual = actual_root - expected_nested
+    assert non_nested_actual == expected_root, (
+        f"valuations.js root exports diverged from contract.\n"
+        f"  missing from JS: {sorted(expected_root - non_nested_actual)}\n"
+        f"  unlisted in contract: {sorted(non_nested_actual - expected_root)}"
+    )
+
+
+def test_wasm_valuations_python_js_map_matches_root_exports() -> None:
+    """Pinned python->js map must resolve to root exports on the WASM facade."""
+    block = CONTRACT["wasm_valuations_subset"]
+    root_exports = set(block["root_exports"])
+    for python_name, js_name in block["python_js_map"].items():
+        assert js_name in root_exports, f"python_js_map[{python_name!r}] -> {js_name!r} not in root_exports"
+
+
+def test_wasm_valuations_root_exports_are_triplet_accounted_for() -> None:
+    """Every root export is pinned in python_js_map or listed wasm_only."""
+    block = CONTRACT["wasm_valuations_subset"]
+    root_exports = set(block["root_exports"])
+    wasm_only = set(block.get("wasm_only", []))
+    mapped_js = set(block["python_js_map"].values())
+    unaccounted = root_exports - wasm_only - mapped_js
+    assert not unaccounted, f"root_exports must appear in python_js_map or wasm_only: {sorted(unaccounted)}"
+    overlap = wasm_only & mapped_js
+    assert not overlap, f"wasm_only must not overlap python_js_map values: {sorted(overlap)}"
+
+
+def test_wasm_valuations_python_only_excludes_wasm_map() -> None:
+    """python_only symbols must not appear in the WASM python_js_map."""
+    block = CONTRACT["wasm_valuations_subset"]
+    python_only = set(block["python_only"])
+    mapped_python = set(block["python_js_map"])
+    overlap = python_only & mapped_python
+    assert not overlap, f"python_only overlaps python_js_map keys: {sorted(overlap)}"
+
+
+def test_wasm_valuations_python_js_names_use_camel_or_pascal_case() -> None:
+    """WASM export names should be camelCase or PascalCase, not snake_case."""
+    block = CONTRACT["wasm_valuations_subset"]
+    for js_name in block["python_js_map"].values():
+        assert "_" not in js_name, f"WASM name must not be snake_case: {js_name!r}"

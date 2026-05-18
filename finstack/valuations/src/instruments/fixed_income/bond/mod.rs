@@ -606,8 +606,16 @@ mod tests {
         )
         .expect("Bond::fixed should succeed with valid parameters");
 
-        let years_to_maturity = (bond.maturity - bond.issue_date).whole_days() / 365;
-        assert!(years_to_maturity >= 30);
+        let years_to_maturity = bond
+            .cashflow_spec
+            .day_count()
+            .year_fraction(
+                bond.issue_date,
+                bond.maturity,
+                finstack_core::dates::DayCountContext::default(),
+            )
+            .expect("year fraction");
+        assert!(years_to_maturity >= 30.0);
     }
 
     #[test]
