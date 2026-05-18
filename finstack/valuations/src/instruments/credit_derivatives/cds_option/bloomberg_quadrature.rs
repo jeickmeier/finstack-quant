@@ -66,9 +66,20 @@ const G_DAYS_IN_YEAR: f64 = 365.0;
 /// formulation against accidental rewrites.
 const THETA_DAYS_IN_YEAR: f64 = 365.25;
 
-/// Minimum standard-normal quadrature range. Stressed vols adapt wider using
-/// `max(6, 4 σ sqrt(t))` so the lognormal tail is not clipped.
+/// Minimum standard-normal quadrature range — covers `±6σ` of the *driver*
+/// `ε`, adequate when the payoff weight does not shift the integration mass.
 const MIN_Z_LIMIT: f64 = 6.0;
+
+/// Standard deviations of head-room kept *past the payoff-weighted peak* when
+/// adapting the quadrature truncation (see [`z_limit`]). For a payer the
+/// payoff `(S−c)·L(S)` grows asymptotically like `S ∝ e^{σ√t·z}`, so the
+/// payoff-weighted integrand `payoff(z)·φ(z) ∝ e^{σ√t·z − z²/2}` peaks at
+/// `z* = σ√t`, not at `z = 0`. Truncating at a fixed multiple of the driver
+/// vol clips the right tail of a deep-OTM payer at high vol; we instead
+/// extend to `z* + PAYOFF_TAIL_STDEVS` so 8σ of payoff-weighted mass past the
+/// peak is always captured.
+const PAYOFF_TAIL_STDEVS: f64 = 8.0;
+
 const Z_STEP: f64 = 0.05;
 
 /// `1/√(2π)` — the standard normal density's normalising constant.
@@ -670,8 +681,25 @@ fn decimal_to_f64(value: Decimal) -> Result<f64> {
     })
 }
 
+/// Adaptive truncation half-width for the standard-normal quadrature.
+///
+/// The payoff-weighted integrand of a payer peaks at the *driver* value
+/// `z* = σ√t` (the payoff `∝ e^{σ√t·z}` shifts the lognormal × density
+/// product's mode away from `z = 0`). We therefore extend the truncation to
+/// `z* + PAYOFF_TAIL_STDEVS` — capturing `PAYOFF_TAIL_STDEVS` standard
+/// deviations of payoff-weighted mass past the peak — rather than a fixed
+/// multiple of the driver vol, which clips the right tail of a deep-OTM
+/// payer at high vol. The `4·σ√t` legacy term is retained inside the `max`
+/// so the truncation never *narrows* relative to the previous behaviour for
+/// very large `σ√t`. `normal_integral` is symmetric, so the same half-width
+/// also covers the (rapidly vanishing) left tail.
 fn z_limit(sigma: f64, t_expiry: f64) -> f64 {
-    MIN_Z_LIMIT.max(4.0 * sigma * t_expiry.max(0.0).sqrt())
+    let sigma_sqrt_t = sigma * t_expiry.max(0.0).sqrt();
+    // Peak of the payoff-weighted integrand for a payer is at z* = σ√t.
+    let payoff_peak_plus_tail = sigma_sqrt_t + PAYOFF_TAIL_STDEVS;
+    // Legacy multiple, kept so wide-vol cases never shrink.
+    let legacy = 4.0 * sigma_sqrt_t;
+    MIN_Z_LIMIT.max(payoff_peak_plus_tail).max(legacy)
 }
 
 fn normal_integral<F>(step: f64, limit: f64, mut value_at: F) -> f64
@@ -810,6 +838,44 @@ mod tests {
         assert!(
             (coarse - fine).abs() < 1e-8,
             "normal quadrature should be stable under step halving: coarse={coarse}, fine={fine}",
+        );
+    }
+
+    /// Item 8: the quadrature truncation `z_limit` must extend past the
+    /// PAYOFF-weighted peak `z* = σ√t`, not just a fixed multiple of the
+    /// driver vol. For a payer the payoff `∝ e^{σ√t·z}` shifts the
+    /// integration mass to the right; a too-narrow `z_limit` clips the
+    /// payoff-weighted right tail of a deep-OTM payer at high vol.
+    #[test]
+    fn z_limit_covers_payoff_weighted_peak() {
+        // At any (σ, t) the truncation must reach at least σ√t + 8 — eight
+        // standard deviations of payoff-weighted mass past the payer's peak.
+        for &(sigma, t) in &[(0.36, 0.1), (0.6, 1.0), (1.0, 1.0), (1.2, 4.0), (2.0, 4.0)] {
+            let sst = sigma * f64::sqrt(t);
+            let lim = z_limit(sigma, t);
+            assert!(
+                lim >= sst + PAYOFF_TAIL_STDEVS - 1e-9,
+                "z_limit({sigma},{t})={lim} must reach the payoff peak σ√t={sst} \
+                 plus {PAYOFF_TAIL_STDEVS} std-devs"
+            );
+            // Never narrower than the legacy bound.
+            assert!(lim >= MIN_Z_LIMIT && lim >= 4.0 * sst - 1e-9);
+        }
+
+        // Integrating a payer-shaped payoff `e^{σ√t·z}` (the asymptotic
+        // payoff growth) against the normal density must be stable: the
+        // adaptive `z_limit` result must agree with a reference computed on a
+        // far wider domain, i.e. the tail is not clipped.
+        let sigma = 1.0_f64;
+        let t = 1.0_f64;
+        let sst = sigma * t.sqrt();
+        let payer_payoff = |z: f64| (sst * z).exp();
+        let adaptive = normal_integral(Z_STEP, z_limit(sigma, t), payer_payoff);
+        let reference = normal_integral(Z_STEP, sst + 16.0, payer_payoff);
+        assert!(
+            (adaptive - reference).abs() <= 1e-9 * reference.abs().max(1e-12),
+            "adaptive z_limit must not clip the payoff-weighted tail: \
+             adaptive={adaptive}, reference={reference}"
         );
     }
 
@@ -1070,6 +1136,57 @@ mod tests {
         assert!(
             rel_gap > 0.01,
             "theta() must use pure-T-shift, not as-of-shift: pure_t={actual}, as_of_shift={as_of_shift_theta}, rel_gap={rel_gap}"
+        );
+    }
+
+    /// Item 3 (audit): the Bloomberg CDSO model intentionally uses TWO
+    /// different risky annuities — the bootstrapped term-structure annuity
+    /// `bootstrapped_l_at_expiry` for the `F_0` calibration anchor, and the
+    /// credit-triangle flat-hazard annuity `flat_annuity` inside the
+    /// quadrature integrand. They differ by design (~0.6% NPV on cdx_ig_46).
+    ///
+    /// The audit flagged this as a possible inconsistency. It is NOT a bug:
+    /// the module documentation on `no_knockout_forward` records that making
+    /// the annuity consistent (credit-triangle `F_0`) moves the cdx_ig_46
+    /// option NPV from +0.61% to +6.5% versus the Bloomberg CDSO screen —
+    /// i.e. the dual-annuity design is what reproduces Bloomberg. The
+    /// Bloomberg-screen golden `cdx_ig_46_payer_atm_jun26.json` is an
+    /// immutable external oracle that locks the current behaviour.
+    ///
+    /// This test PINS the dual-annuity design: it asserts the two annuities
+    /// are genuinely different at the bootstrapped forward par spread, so a
+    /// future refactor that "unifies" them (and silently regresses the
+    /// Bloomberg reconciliation) fails loudly here instead.
+    #[test]
+    fn f0_anchor_and_integrand_annuities_are_intentionally_distinct() {
+        let as_of = date!(2025 - 01 - 01);
+        let market = market(as_of);
+        let option = option(as_of, OptionType::Call, 100.0, 0.30);
+        let ctx = context_for(&option, &market, as_of, 0.30);
+
+        // The integrand's credit-triangle annuity, evaluated at the same
+        // forward par spread that anchors F_0.
+        let triangle_annuity = ctx.flat_annuity(ctx.forward_par_spread);
+        // The F_0 calibration anchor's bootstrapped term-structure annuity.
+        let bootstrapped_annuity = ctx.bootstrapped_l_at_expiry;
+
+        assert!(
+            triangle_annuity > 0.0 && bootstrapped_annuity > 0.0,
+            "both annuities must be positive: triangle={triangle_annuity}, \
+             bootstrapped={bootstrapped_annuity}"
+        );
+        // They must be DISTINCT — the dual-annuity design is deliberate.
+        // If a refactor unifies them this difference collapses to ~0 and the
+        // assertion fires, prompting a re-check against the Bloomberg golden.
+        let rel_diff =
+            (triangle_annuity - bootstrapped_annuity).abs() / bootstrapped_annuity.abs();
+        assert!(
+            rel_diff > 1e-4,
+            "F_0-anchor and integrand annuities must remain distinct (Bloomberg \
+             CDSO dual-annuity design): triangle={triangle_annuity}, \
+             bootstrapped={bootstrapped_annuity}, rel_diff={rel_diff}. If this \
+             fails, a refactor unified the two annuities — re-verify the \
+             cdx_ig_46 Bloomberg golden before accepting the change."
         );
     }
 }

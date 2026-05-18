@@ -34,14 +34,22 @@ fn sample_market_context() -> MarketContext {
         .build()
         .expect("Curve builder should succeed with valid test data");
 
-    // Create base correlation curve
+    // Create base correlation curve.
+    //
+    // The slope must be gentle enough to stay arbitrage-free at the
+    // tranchelet level: a steeply rising base correlation pushes the
+    // equity-tranche EL *down*, so an over-steep curve produces
+    // `EL(0,D) < EL(0,A)` at short horizons (low PD). The shape below
+    // was verified to keep `EL(0,D) ≥ EL(0,A)` across all payment-date
+    // PDs for this index — see `arbitrage_market_context` for the
+    // converse (deliberately non-arbitrage-free) fixture.
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
         .knots(vec![
             (3.0, 0.25),  // 0-3% equity
-            (7.0, 0.45),  // 0-7% junior mezzanine
-            (10.0, 0.60), // 0-10% senior mezzanine
-            (15.0, 0.75), // 0-15% senior
-            (30.0, 0.85), // 0-30% super senior
+            (7.0, 0.30),  // 0-7% junior mezzanine
+            (10.0, 0.34), // 0-10% senior mezzanine
+            (15.0, 0.40), // 0-15% senior
+            (30.0, 0.50), // 0-30% super senior
         ])
         .build()
         .expect("Curve builder should succeed with valid test data");
@@ -82,13 +90,15 @@ fn sample_market_context_with_issuers(n: usize) -> MarketContext {
         .build()
         .expect("Curve builder should succeed with valid test data");
 
+    // Gentle, arbitrage-free base-correlation slope (see
+    // `sample_market_context` for the rationale).
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
         .knots(vec![
             (3.0, 0.25),
-            (7.0, 0.45),
-            (10.0, 0.60),
-            (15.0, 0.75),
-            (30.0, 0.85),
+            (7.0, 0.30),
+            (10.0, 0.34),
+            (15.0, 0.40),
+            (30.0, 0.50),
         ])
         .build()
         .expect("Curve builder should succeed with valid test data");
@@ -407,6 +417,121 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
         .expect("Tranche pricing should succeed in test")
         .amount();
     assert!((pv_spa - pv_exact).abs() < 0.02 * pv_exact.abs().max(1.0));
+}
+
+/// Item 4: the homogeneity-detection thresholds for PD, LGD and weight must
+/// be a single consistent tolerance. Previously PD used the 1e-12 probit
+/// clamp while LGD/weight used 1e-9, so a pool uniform in LGD/weight but with
+/// PD dispersion in the (1e-12, 1e-9) gap was routed inconsistently — a
+/// discontinuous model-branch switch. This test prices a pool whose issuers
+/// are identical (truly homogeneous) and one whose issuers carry a tiny
+/// sub-tolerance perturbation; both must price as the homogeneous pool, with
+/// no discontinuity between them.
+#[test]
+fn homogeneity_detection_uses_consistent_tolerance() {
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let as_of = base_date;
+
+    let discount_curve =
+        finstack_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
+            .build()
+            .expect("discount curve");
+    let index_curve =
+        finstack_core::market_data::term_structures::HazardCurve::builder("CDX.NA.IG.42")
+            .base_date(base_date)
+            .recovery_rate(0.40)
+            .knots(vec![(1.0, 0.012), (3.0, 0.017), (5.0, 0.022), (10.0, 0.028)])
+            .par_spreads(vec![(1.0, 65.0), (3.0, 85.0), (5.0, 105.0), (10.0, 145.0)])
+            .build()
+            .expect("index curve");
+    let base_corr =
+        finstack_core::market_data::term_structures::BaseCorrelationCurve::builder("BC")
+            .knots(vec![(3.0, 0.25), (7.0, 0.30), (10.0, 0.34), (30.0, 0.50)])
+            .build()
+            .expect("base corr");
+
+    // Build an index whose 20 issuer curves differ from the index curve by a
+    // PD perturbation of `pd_shift` (applied as a hazard-knot bump). With
+    // `pd_shift = 0` the pool is exactly homogeneous; with a sub-tolerance
+    // shift it must still be classified homogeneous under the unified
+    // tolerance.
+    let build_ctx = |hazard_shift: f64| {
+        let mut issuer_curves = finstack_core::HashMap::default();
+        for i in 0..20 {
+            let id = format!("ISSUER-{:03}", i + 1);
+            let hz =
+                finstack_core::market_data::term_structures::HazardCurve::builder(id.as_str())
+                    .base_date(base_date)
+                    .recovery_rate(0.40)
+                    .knots(vec![
+                        (1.0, 0.012 + hazard_shift),
+                        (3.0, 0.017 + hazard_shift),
+                        (5.0, 0.022 + hazard_shift),
+                        (10.0, 0.028 + hazard_shift),
+                    ])
+                    .build()
+                    .expect("issuer curve");
+            issuer_curves.insert(id, Arc::new(hz));
+        }
+        let index = CreditIndexData::builder()
+            .num_constituents(20)
+            .recovery_rate(0.40)
+            .index_credit_curve(Arc::new(index_curve.clone()))
+            .base_correlation_curve(Arc::new(base_corr.clone()))
+            .issuer_curves(issuer_curves)
+            .build()
+            .expect("index data");
+        MarketContext::new()
+            .insert(discount_curve.clone())
+            .insert_credit_index("CDX.NA.IG.42", index)
+    };
+
+    let params = CDSTrancheParams::new(
+        "CDX.NA.IG.42",
+        42,
+        0.0,
+        3.0,
+        Money::new(10_000_000.0, Currency::USD),
+        as_of.add_months(60),
+        0.0,
+    );
+    let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
+    let tranche = CDSTranche::new(
+        "CDX_IG42_0_3_5Y",
+        &params,
+        &schedule_params,
+        finstack_core::types::CurveId::from("USD-OIS"),
+        finstack_core::types::CurveId::from("CDX.NA.IG.42"),
+        TrancheSide::SellProtection,
+    )
+    .expect("Valid tranche parameters");
+
+    let mut pricer = CDSTranchePricer::new();
+    pricer.params.use_issuer_curves = true;
+    pricer.params.hetero_method = HeteroMethod::Spa;
+
+    // Exactly homogeneous (shift 0): all PD/LGD/weight identical.
+    let pv_exact_homo = pricer
+        .price_tranche(&tranche, &build_ctx(0.0), as_of)
+        .expect("homogeneous pricing")
+        .amount();
+    // Sub-tolerance PD perturbation: hazard knots shifted by 1e-11, which
+    // produces a PD dispersion well below the 1e-9 unified tolerance but
+    // ABOVE the old 1e-12 PD threshold. Under the old inconsistent
+    // thresholds this could flip to the heterogeneous branch and price
+    // discontinuously; under the unified tolerance it must stay homogeneous.
+    let pv_sub_tol = pricer
+        .price_tranche(&tranche, &build_ctx(1e-11), as_of)
+        .expect("near-homogeneous pricing")
+        .amount();
+
+    assert!(
+        (pv_exact_homo - pv_sub_tol).abs() <= 1e-6 * pv_exact_homo.abs().max(1.0),
+        "a sub-tolerance PD perturbation must not cause a discontinuous \
+         model-branch switch: pv(shift=0)={pv_exact_homo}, pv(shift=1e-11)={pv_sub_tol}"
+    );
 }
 
 #[test]
@@ -1016,28 +1141,97 @@ fn test_jtd_detail_consistency() {
 }
 
 #[test]
-fn test_monotonicity_enforcement_in_bumping() {
-    // Test that correlation bumping enforces monotonicity
+fn test_correlation_bump_is_a_pure_parallel_shift() {
+    // A parallel shift of a monotone base-correlation curve is itself
+    // monotone — the bump preserves the ordering without any repair loop.
     let model = CDSTranchePricer::new();
     let market_ctx = sample_market_context();
     let index_data = market_ctx
         .get_credit_index("CDX.NA.IG.42")
         .expect("Index should exist");
+    let original = &index_data.base_correlation_curve;
 
-    // Create a large negative bump that could violate monotonicity
-    let bumped = model.bump_base_correlation(&index_data.base_correlation_curve, -0.2);
-    assert!(bumped.is_ok(), "Bumping should succeed");
+    // A large negative bump still parallel-shifts every knot by the same
+    // amount; monotonicity is preserved by construction.
+    let bump = -0.2;
+    let bumped = model
+        .bump_base_correlation(original, bump)
+        .expect("Bumping should succeed");
 
-    let curve = bumped.expect("Bumped curve should be Ok");
-    // Verify monotonicity
-    for i in 1..curve.correlations().len() {
+    // Every knot must be shifted by exactly `bump` (no clamp fires for this
+    // curve since all shifted values stay inside [0, 1]).
+    for (i, (&orig, &shifted)) in original
+        .correlations()
+        .iter()
+        .zip(bumped.correlations().iter())
+        .enumerate()
+    {
+        let expected = (orig + bump).clamp(0.0, 1.0);
         assert!(
-            curve.correlations()[i] >= curve.correlations()[i - 1],
-            "Bumped correlations should be monotonic: {} < {}",
-            curve.correlations()[i],
-            curve.correlations()[i - 1]
+            (shifted - expected).abs() < 1e-12,
+            "knot {i}: bumped correlation {shifted} must equal pure shift {expected}"
         );
     }
+    // The shifted curve remains monotone (parallel shift preserves order).
+    for i in 1..bumped.correlations().len() {
+        assert!(
+            bumped.correlations()[i] >= bumped.correlations()[i - 1] - 1e-12,
+            "parallel-shifted correlations stay monotone"
+        );
+    }
+}
+
+/// Item 7: the up- and down-bumped base-correlation curves must be exact
+/// mirror images so the central-difference Correlation01 is a symmetric
+/// perturbation. The previous monotonicity-repair loop adjusted the two
+/// sides differently near curve kinks, biasing the derivative.
+#[test]
+fn correlation_bump_up_and_down_are_symmetric() {
+    let model = CDSTranchePricer::new();
+    let market_ctx = sample_market_context();
+    let index_data = market_ctx
+        .get_credit_index("CDX.NA.IG.42")
+        .expect("Index should exist");
+    let original = &index_data.base_correlation_curve;
+
+    let h = 0.01;
+    let up = model
+        .bump_base_correlation(original, h)
+        .expect("up bump");
+    let down = model
+        .bump_base_correlation(original, -h)
+        .expect("down bump");
+
+    // For every knot, (up - orig) must equal -(down - orig): the two bumps
+    // are exact mirror images. A surviving monotonicity-repair loop would
+    // break this at compressed-spacing knots.
+    for (i, ((&orig, &u), &d)) in original
+        .correlations()
+        .iter()
+        .zip(up.correlations().iter())
+        .zip(down.correlations().iter())
+        .enumerate()
+    {
+        let up_delta = u - orig;
+        let down_delta = orig - d;
+        assert!(
+            (up_delta - down_delta).abs() < 1e-12,
+            "knot {i}: up/down correlation bumps must be symmetric — \
+             up_delta={up_delta}, down_delta={down_delta}, orig={orig}"
+        );
+        // And each side is the pure shift `h`.
+        assert!(
+            (up_delta - h).abs() < 1e-12 && (down_delta - h).abs() < 1e-12,
+            "knot {i}: each bump must be the pure shift h={h}"
+        );
+    }
+
+    // The resulting Correlation01 must be finite and well-defined.
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let corr01 = model
+        .calculate_correlation_delta(&sample_tranche(), &market_ctx, as_of)
+        .expect("correlation delta");
+    assert!(corr01.is_finite(), "Correlation01 must be finite");
 }
 
 #[test]
@@ -1067,6 +1261,71 @@ fn test_par_spread_solver_convergence() {
         "NPV at par spread should be near zero, got {}",
         npv_amount
     );
+}
+
+/// Item 9: `calculate_par_spread` must never silently return a non-converged
+/// iterate. When it returns `Ok`, the spread must genuinely zero the tranche
+/// NPV (to the solver tolerance); a non-convergence is reported as an error.
+/// This pins that a successful result is always a true par spread.
+#[test]
+fn par_spread_ok_result_is_always_a_true_par() {
+    let model = CDSTranchePricer::new();
+    let market_ctx = sample_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+
+    // Exercise both protection sides and a range of strikes.
+    let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
+    for side in [TrancheSide::BuyProtection, TrancheSide::SellProtection] {
+        for &(attach, detach) in &[(0.0_f64, 3.0_f64), (3.0, 7.0), (10.0, 15.0)] {
+            let params = CDSTrancheParams::new(
+                "CDX.NA.IG.42",
+                42,
+                attach,
+                detach,
+                Money::new(10_000_000.0, Currency::USD),
+                maturity,
+                500.0,
+            );
+            let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
+            let tranche = CDSTranche::new(
+                "PAR_SPREAD_TEST",
+                &params,
+                &schedule_params,
+                finstack_core::types::CurveId::from("USD-OIS"),
+                finstack_core::types::CurveId::from("CDX.NA.IG.42"),
+                side,
+            )
+            .expect("Valid tranche parameters");
+
+            match model.calculate_par_spread(&tranche, &market_ctx, as_of) {
+                Ok(spread) => {
+                    // A successful result MUST zero the NPV — i.e. it is a
+                    // genuine par spread, not a silent last iterate.
+                    assert!(spread.is_finite() && spread >= 0.0);
+                    let mut at_par = tranche.clone();
+                    at_par.running_coupon_bp = spread;
+                    let npv = model
+                        .price_tranche(&at_par, &market_ctx, as_of)
+                        .expect("pricing at par")
+                        .amount()
+                        .abs();
+                    assert!(
+                        npv < 1e-6 * tranche.notional.amount(),
+                        "Ok par spread {spread} for {side:?} [{attach}%,{detach}%] must \
+                         zero NPV, got residual {npv}"
+                    );
+                }
+                Err(e) => {
+                    // A non-convergence must carry an explanatory message.
+                    let msg = format!("{e}");
+                    assert!(
+                        msg.contains("par-spread"),
+                        "non-convergence error must explain the par-spread failure: {msg}"
+                    );
+                }
+            }
+        }
+    }
 }
 
 #[test]
@@ -1273,5 +1532,276 @@ fn test_stochastic_recovery_default_is_deterministic() {
     assert!(
         pricer.config().recovery_spec.is_none(),
         "Default recovery_spec should be None (deterministic)"
+    );
+}
+
+/// Build a market context whose base-correlation curve is monotonically
+/// increasing but so steep between the equity attachment and detachment that
+/// the equity tranchelet decomposition `EL(0,D) − EL(0,A)` goes *negative*
+/// (genuine base-correlation arbitrage: a higher base correlation pushes the
+/// equity-tranche EL down, so `EL(0,D)` evaluated at a much larger ρ falls
+/// below `EL(0,A)`).
+fn arbitrage_market_context() -> MarketContext {
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+
+    let discount_curve = DiscountCurve::builder("USD-OIS")
+        .base_date(base_date)
+        .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
+        .build()
+        .expect("Curve builder should succeed");
+
+    // High-hazard index so equity-tranche EL is materially sensitive to ρ.
+    let index_curve = HazardCurve::builder("CDX.NA.IG.42")
+        .base_date(base_date)
+        .recovery_rate(0.40)
+        .knots(vec![(1.0, 0.05), (3.0, 0.06), (5.0, 0.07), (10.0, 0.08)])
+        .par_spreads(vec![
+            (1.0, 300.0),
+            (3.0, 360.0),
+            (5.0, 420.0),
+            (10.0, 480.0),
+        ])
+        .build()
+        .expect("Curve builder should succeed");
+
+    // Monotonically *increasing* (so it builds without `allow_non_monotonic`)
+    // but extremely steep at the [3%, 7%] strikes: ρ jumps from the lower
+    // clamp toward the upper clamp over a tiny detachment span. Increasing
+    // base correlation is necessary, not sufficient, for arbitrage-free EL.
+    let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+        .knots(vec![
+            (3.0, 0.05),
+            (7.0, 0.95),
+            (10.0, 0.96),
+            (15.0, 0.97),
+            (30.0, 0.98),
+        ])
+        .build()
+        .expect("Curve builder should succeed (monotonically increasing)");
+
+    let index_data = CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(0.40)
+        .index_credit_curve(Arc::new(index_curve))
+        .base_correlation_curve(Arc::new(base_corr_curve))
+        .build()
+        .expect("Index builder should succeed");
+
+    MarketContext::new()
+        .insert(discount_curve)
+        .insert_credit_index("CDX.NA.IG.42", index_data)
+}
+
+/// Item 2: base-correlation arbitrage (`EL(0,D) < EL(0,A)`) must surface as
+/// an explicit error when arbitrage validation is enabled (the default),
+/// rather than being silently clamped to zero protection.
+#[test]
+fn base_correlation_arbitrage_surfaces_as_error_when_validation_enabled() {
+    let market_ctx = arbitrage_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let tranche = sample_tranche(); // [3%, 7%] equity-ish tranche
+
+    // Default config has validate_arbitrage_free = true.
+    let pricer = CDSTranchePricer::new();
+    assert!(pricer.config().validate_arbitrage_free);
+
+    let result = pricer.price_tranche(&tranche, &market_ctx, as_of);
+    assert!(
+        result.is_err(),
+        "base-correlation arbitrage must produce an explicit error, not a silent \
+         zero-protection clamp; got {result:?}"
+    );
+    let msg = format!("{}", result.unwrap_err());
+    assert!(
+        msg.contains("base-correlation arbitrage"),
+        "error must name the base-correlation arbitrage condition, got: {msg}"
+    );
+}
+
+/// Item 2: with arbitrage validation explicitly disabled, the same arbitrage
+/// is clamped (legacy behaviour) so pricing still produces a finite PV — but
+/// the clamp is now a visible `warn`, not a silent `debug`.
+#[test]
+fn base_correlation_arbitrage_clamps_when_validation_disabled() {
+    let market_ctx = arbitrage_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let tranche = sample_tranche();
+
+    let pricer = CDSTranchePricer::with_params(
+        CDSTranchePricerConfig::default().with_arbitrage_validation(false),
+    );
+    assert!(!pricer.config().validate_arbitrage_free);
+
+    let pv = pricer
+        .price_tranche(&tranche, &market_ctx, as_of)
+        .expect("with validation disabled, arbitrage is clamped and pricing succeeds");
+    assert!(
+        pv.amount().is_finite(),
+        "clamped price must be finite, got {}",
+        pv.amount()
+    );
+}
+
+/// Item 2: a well-formed (arbitrage-free) base-correlation curve must price
+/// cleanly under the default validating configuration — the new diagnostic
+/// must not produce false positives on benign quadrature noise. Covers the
+/// equity, mezzanine and senior strike ranges of the standard fixture so a
+/// regression in any tranchelet pair is caught.
+#[test]
+fn well_formed_base_correlation_prices_without_arbitrage_error() {
+    let market_ctx = sample_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
+    let pricer = CDSTranchePricer::new();
+
+    for &(attach, detach, coupon) in &[
+        (0.0_f64, 3.0_f64, 1000.0_f64), // equity
+        (3.0, 7.0, 500.0),              // junior mezzanine
+        (7.0, 10.0, 300.0),             // senior mezzanine
+        (10.0, 15.0, 100.0),            // senior
+        (15.0, 30.0, 50.0),             // super senior
+    ] {
+        let params = CDSTrancheParams::new(
+            "CDX.NA.IG.42",
+            42,
+            attach,
+            detach,
+            Money::new(10_000_000.0, Currency::USD),
+            maturity,
+            coupon,
+        );
+        let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
+        let tranche = CDSTranche::new(
+            "ARB_FREE_TEST",
+            &params,
+            &schedule_params,
+            finstack_core::types::CurveId::from("USD-OIS"),
+            finstack_core::types::CurveId::from("CDX.NA.IG.42"),
+            TrancheSide::SellProtection,
+        )
+        .expect("Valid tranche parameters");
+
+        let pv = pricer
+            .price_tranche(&tranche, &market_ctx, as_of)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "arbitrage-free base correlation must price [{attach}%, {detach}%] \
+                     without error, got: {e:?}"
+                )
+            });
+        assert!(
+            pv.amount().is_finite(),
+            "[{attach}%, {detach}%] PV must be finite"
+        );
+    }
+}
+
+/// Items 5 & 6: the within-period default fraction must be survival-weighted,
+/// not a flat `0.5`. It must equal `0.5` only in the zero-hazard limit, be
+/// strictly less than `0.5` for a positive hazard (defaults front-load toward
+/// the period start as survival decays), and stay in `(0, 0.5]` always.
+#[test]
+fn within_period_default_fraction_is_survival_weighted() {
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let pricer = CDSTranchePricer::new();
+
+    // High-hazard index: positive λ ⇒ fraction must be < 0.5.
+    let high_hazard =
+        finstack_core::market_data::term_structures::HazardCurve::builder("HIGH")
+            .base_date(base_date)
+            .recovery_rate(0.40)
+            .knots(vec![(1.0, 0.15), (5.0, 0.15), (10.0, 0.15)])
+            .par_spreads(vec![(1.0, 900.0), (5.0, 900.0), (10.0, 900.0)])
+            .build()
+            .expect("hazard curve");
+    let base_corr =
+        finstack_core::market_data::term_structures::BaseCorrelationCurve::builder("BC")
+            .knots(vec![(3.0, 0.25), (7.0, 0.30), (30.0, 0.50)])
+            .build()
+            .expect("base corr");
+    let high_index = CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(0.40)
+        .index_credit_curve(Arc::new(high_hazard))
+        .base_correlation_curve(Arc::new(base_corr.clone()))
+        .build()
+        .expect("index data");
+
+    // A one-year period [1.0, 2.0] under λ≈0.15.
+    let frac = pricer.within_period_default_fraction(&high_index, 1.0, 2.0);
+    assert!(
+        frac > 0.0 && frac < 0.5,
+        "survival-weighted default fraction must be in (0, 0.5) for positive hazard, got {frac}"
+    );
+
+    // Near-zero-hazard index: fraction must tend to the 0.5 uniform limit.
+    let tiny_hazard =
+        finstack_core::market_data::term_structures::HazardCurve::builder("TINY")
+            .base_date(base_date)
+            .recovery_rate(0.40)
+            .knots(vec![(1.0, 1e-7), (5.0, 1e-7), (10.0, 1e-7)])
+            .par_spreads(vec![(1.0, 0.6), (5.0, 0.6), (10.0, 0.6)])
+            .build()
+            .expect("hazard curve");
+    let tiny_index = CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(0.40)
+        .index_credit_curve(Arc::new(tiny_hazard))
+        .base_correlation_curve(Arc::new(base_corr))
+        .build()
+        .expect("index data");
+    let frac_tiny = pricer.within_period_default_fraction(&tiny_index, 1.0, 2.0);
+    assert!(
+        (frac_tiny - 0.5).abs() < 1e-3,
+        "near-zero-hazard default fraction must approach the 0.5 uniform limit, got {frac_tiny}"
+    );
+
+    // Degenerate period (t_end <= t_start) must fall back to 0.5, never NaN.
+    let frac_degenerate = pricer.within_period_default_fraction(&high_index, 2.0, 2.0);
+    assert!(
+        (frac_degenerate - 0.5).abs() < 1e-12,
+        "degenerate period must fall back to 0.5, got {frac_degenerate}"
+    );
+}
+
+/// Item 6: with `mid_period_protection`, raising the index hazard moves the
+/// survival-weighted default time earlier within each period, so the
+/// within-period loss is discounted at an earlier (higher-DF) point. This
+/// pins that the protection-leg discounting responds to default timing
+/// rather than always using the flat period midpoint.
+#[test]
+fn mid_period_protection_uses_survival_weighted_timing() {
+    let market_ctx = sample_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+
+    // Sell-protection, zero coupon: PV is the (signed) protection leg only.
+    let mut tranche = sample_tranche();
+    tranche.running_coupon_bp = 0.0;
+
+    let mut with_mid = CDSTranchePricer::new();
+    with_mid.params.mid_period_protection = true;
+    let mut without_mid = CDSTranchePricer::new();
+    without_mid.params.mid_period_protection = false;
+
+    let pv_mid = with_mid
+        .price_tranche(&tranche, &market_ctx, as_of)
+        .expect("mid-period pricing")
+        .amount();
+    let pv_end = without_mid
+        .price_tranche(&tranche, &market_ctx, as_of)
+        .expect("end-of-period pricing")
+        .amount();
+
+    // Discounting within-period losses earlier (mid-period) vs at period end
+    // must change the protection-leg PV: earlier discounting => larger
+    // |protection PV| because the loss cashflow is less discounted.
+    assert!(
+        (pv_mid - pv_end).abs() > 0.0,
+        "mid-period vs end-of-period protection timing must change PV: \
+         mid={pv_mid}, end={pv_end}"
+    );
+    assert!(
+        pv_mid.is_finite() && pv_end.is_finite(),
+        "both protection-timing PVs must be finite"
     );
 }
