@@ -373,7 +373,6 @@ where
         let as_of = context.as_of;
 
         let mut series = Vec::with_capacity(curves.len());
-        let mut total_dv01 = 0.0;
 
         // Single scratch clone, reused across all curves via in-place bump + revert.
         let mut scratch = context.curves.as_ref().clone();
@@ -391,9 +390,13 @@ where
 
             let dv01 = calculate_dv01_central(pv_up, pv_down, bump_bp);
             series.push((curve_id.as_str().to_string(), dv01));
-            total_dv01 += dv01;
         }
 
+        // Compensated summation over per-curve DV01s: a naive `+=` accumulates
+        // rounding error when summing many curves with widely differing
+        // magnitudes (mirrors the per-bucket `neumaier_sum` in
+        // `compute_triangular_for_curve`).
+        let total_dv01 = neumaier_sum(series.iter().map(|(_, v)| *v));
         context.store_bucketed_series(self.config.series_id.clone(), series);
         Ok(total_dv01)
     }
@@ -414,7 +417,7 @@ where
         }
 
         let base = self.config.series_id.as_str();
-        let mut total_dv01 = 0.0;
+        let mut curve_totals = Vec::with_capacity(curves.len());
 
         for (curve_id, _kind) in curves.iter() {
             let curve_metric_id = MetricId::custom(format!("{}::{}", base, curve_id.as_str()));
@@ -427,10 +430,12 @@ where
                 buckets,
             )?;
 
-            total_dv01 += curve_total;
+            curve_totals.push(curve_total);
         }
 
-        Ok(total_dv01)
+        // Compensated summation over per-curve key-rate totals: avoids the
+        // rounding drift a naive `+=` accumulates across many curves.
+        Ok(neumaier_sum(curve_totals))
     }
 
     /// Compute triangular key-rate DV01 for a single curve (central differencing).
@@ -523,4 +528,42 @@ fn calculate_dv01_central(pv_up: f64, pv_down: f64, bump_bp: f64) -> f64 {
         return 0.0;
     }
     (pv_up - pv_down) / (2.0 * bump_bp)
+}
+
+#[cfg(test)]
+mod tests {
+    use finstack_core::math::neumaier_sum;
+
+    /// Audit item #6: the cross-curve / cross-bucket DV01 totals must use
+    /// compensated (Neumaier) summation, matching the per-curve key-rate path.
+    ///
+    /// This pins the invariant that motivates the fix: when per-curve DV01s
+    /// span widely different magnitudes (a tiny basis curve alongside a large
+    /// primary curve, repeated across many curves), a naive running `+=`
+    /// accumulates rounding error that compensated summation eliminates.
+    #[test]
+    fn cross_curve_dv01_total_uses_compensated_summation() {
+        // A huge term, then `n` unit terms, then the cancelling huge term.
+        // Exact total = 1e16 + n·1 − 1e16 = n. A naive left-fold loses every
+        // unit term (1e16 + 1 == 1e16 in f64) and then cancels to ~0;
+        // compensated summation recovers the exact `n`.
+        let n = 1_000_000usize;
+        let mut values = vec![1.0e16];
+        values.extend(std::iter::repeat_n(1.0, n));
+        values.push(-1.0e16);
+
+        let naive: f64 = values.iter().fold(0.0_f64, |acc, v| acc + v);
+        let compensated = neumaier_sum(values.iter().copied());
+
+        assert!(
+            (compensated - n as f64).abs() < 1e-6,
+            "compensated summation must recover the exact total {n}, got {compensated}"
+        );
+        assert!(
+            (naive - n as f64).abs() > 1.0,
+            "naive summation is expected to lose precision here (got {naive}, \
+             exact {n}); the DV01 cross-curve/bucket totals must therefore use \
+             neumaier_sum"
+        );
+    }
 }

@@ -40,6 +40,23 @@ fn vol_bump(value: f64) -> BumpSpec {
     }
 }
 
+/// Smallest implied vol on a surface's `(expiry, strike)` grid.
+///
+/// Used to detect whether an additive parallel down-bump of size `h` would
+/// clamp `σ - h` at zero (which happens wherever `σ < h`), in which case a
+/// central difference divided by `2h` is biased.
+fn min_grid_vol(surface: &finstack_core::market_data::surfaces::VolSurface) -> Option<f64> {
+    let mut min_vol: Option<f64> = None;
+    for &expiry in surface.expiries() {
+        for &strike in surface.strikes() {
+            if let Ok(vol) = surface.value_checked(expiry, strike) {
+                min_vol = Some(min_vol.map_or(vol, |m: f64| m.min(vol)));
+            }
+        }
+    }
+    min_vol
+}
+
 fn scaled_bucketed_vega_matrix(
     raw_matrix: Vec<Vec<f64>>,
     raw_total: f64,
@@ -173,18 +190,35 @@ where
         let target_total = if let Some(existing) = context.computed.get(&MetricId::Vega) {
             *existing
         } else {
-            // Central difference O(h²) — consistent with bucketed approach
+            // Central difference O(h²) — consistent with bucketed approach.
             let mut scratch = base_ctx.clone();
             let token_up =
                 scratch.apply_surface_bump_in_place(vol_surface_id.as_str(), vol_bump(bump_pct))?;
             let pv_up = context.reprice_money(&scratch, as_of)?;
             scratch.revert_scratch_bump(token_up)?;
 
-            let token_down = scratch
-                .apply_surface_bump_in_place(vol_surface_id.as_str(), vol_bump(-bump_pct))?;
-            let pv_down = context.reprice_money(&scratch, as_of)?;
-            scratch.revert_scratch_bump(token_down)?;
-            (pv_up.amount() - pv_down.amount()) / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
+            // The additive down-bump `σ - h` clamps at zero wherever `σ < h`,
+            // making a central difference divided by the full `2h` biased.
+            // Detect the clamp via the surface's minimum vol and fall back to
+            // a one-sided forward difference near zero vol.
+            let min_vol = min_grid_vol(&vol_surface);
+            if min_vol.map(|m| m < bump_pct).unwrap_or(false) {
+                tracing::warn!(
+                    surface_id = %vol_surface_id,
+                    min_vol = min_vol,
+                    bump = bump_pct,
+                    "key-rate vega parallel down-bump would clamp σ at 0; \
+                     using one-sided forward difference"
+                );
+                let pv_base = context.reprice_money(base_ctx, as_of)?;
+                (pv_up.amount() - pv_base.amount()) / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
+            } else {
+                let token_down = scratch
+                    .apply_surface_bump_in_place(vol_surface_id.as_str(), vol_bump(-bump_pct))?;
+                let pv_down = context.reprice_money(&scratch, as_of)?;
+                scratch.revert_scratch_bump(token_down)?;
+                (pv_up.amount() - pv_down.amount()) / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
+            }
         };
 
         let mut raw_matrix = Vec::new();

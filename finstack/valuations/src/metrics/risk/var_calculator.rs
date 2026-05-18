@@ -731,10 +731,16 @@ fn calculate_var_taylor_approximation(
 
     let mut spot_cache: HashMap<String, f64> = HashMap::default();
     let mut pnls = Vec::with_capacity(history.len());
+    let mut skipped = TaylorSkipFlags::default();
 
     for scenario in history.iter() {
-        let pnl_local =
-            taylor_pnl_for_scenario(&sensitivities, base_market, scenario, &mut spot_cache)?;
+        let pnl_local = taylor_pnl_for_scenario(
+            &sensitivities,
+            base_market,
+            scenario,
+            &mut spot_cache,
+            &mut skipped,
+        )?;
         // Convert P&L using the scenario-shifted market's FX rates, not the
         // base market's: when a scenario shocks FX, the reporting-currency
         // value of the P&L must reflect the shifted rates. This mirrors the
@@ -748,6 +754,10 @@ fn calculate_var_taylor_approximation(
             "Historical VaR",
         )?);
     }
+
+    // Surface (once) any factors the Taylor approximation had to skip rather
+    // than hard-failing the job.
+    skipped.warn_if_any("historical_var.taylor.single");
 
     VarResult::from_distribution(pnls, config.confidence_level)
 }
@@ -853,15 +863,58 @@ fn compute_taylor_sensitivities(
 
 /// Tolerance (in basis points) for treating a set of rate-bucket shifts as a
 /// parallel curve move. If every bucket shift lies within this band of the
-/// first observed shift, the move is considered parallel and the second-order
-/// convexity term is applied; otherwise it is omitted (see `taylor_pnl_for_scenario`).
+/// first observed shift, the move is considered an exact parallel move and the
+/// second-order convexity term uses the common shift; otherwise the term uses
+/// the mean-square shift (see `taylor_pnl_for_scenario`).
 const PARALLEL_SHIFT_TOLERANCE_BP: f64 = 1e-6;
+
+/// Records risk-factor kinds the Taylor VaR approximation could not represent
+/// for a scenario and therefore **skipped** (rather than hard-failing the whole
+/// portfolio). The caller aggregates these across scenarios and emits a single
+/// diagnostic so the limitation is surfaced instead of silently dropped.
+#[derive(Default, Debug, Clone, Copy)]
+struct TaylorSkipFlags {
+    /// An `FxSpot` shock was skipped (no FX-delta Taylor term is available).
+    skipped_fx: bool,
+    /// An `ImpliedVol` point shock was skipped for an instrument carrying
+    /// aggregate Vega (no bucketed-vol Taylor term is available).
+    skipped_vol: bool,
+}
+
+impl TaylorSkipFlags {
+    fn merge(&mut self, other: TaylorSkipFlags) {
+        self.skipped_fx |= other.skipped_fx;
+        self.skipped_vol |= other.skipped_vol;
+    }
+
+    /// Emit a single `tracing::warn!` describing what was skipped, if anything.
+    fn warn_if_any(&self, context_name: &str) {
+        if self.skipped_fx {
+            tracing::warn!(
+                context = context_name,
+                "Taylor VaR skipped FX-spot shocks (no FX-delta Taylor term); \
+                 the FX component of those scenarios is excluded from VaR. \
+                 Use full-revaluation VaR for an FX-exposed portfolio."
+            );
+        }
+        if self.skipped_vol {
+            tracing::warn!(
+                context = context_name,
+                "Taylor VaR skipped ImpliedVol point shocks for vol-exposed \
+                 instruments (only aggregate Vega is available, not bucketed \
+                 vol). The vega component of those scenarios is excluded from \
+                 VaR. Use full-revaluation VaR for a vol-exposed portfolio."
+            );
+        }
+    }
+}
 
 fn taylor_pnl_for_scenario(
     sensitivities: &TaylorSensitivities,
     base_market: &MarketContext,
     scenario: &crate::metrics::risk::MarketScenario,
     spot_cache: &mut HashMap<String, f64>,
+    skipped: &mut TaylorSkipFlags,
 ) -> Result<f64> {
     let mut pnl = 0.0;
     let mut rate_shift_count = 0u32;
@@ -869,6 +922,9 @@ fn taylor_pnl_for_scenario(
     // shifts match it (within tolerance), i.e. the move is a parallel shift.
     let mut first_rate_shift_bp = 0.0;
     let mut rate_shifts_parallel = true;
+    // Sum of squared bucket shifts (bp²): used to apply the aggregate
+    // convexity term on non-parallel scenarios via a mean-square shift.
+    let mut sum_rate_shift_sq = 0.0_f64;
 
     for shift in &scenario.shifts {
         match &shift.factor {
@@ -889,6 +945,7 @@ fn taylor_pnl_for_scenario(
                     })?;
                 let shift_bp = shift.shift * 10_000.0;
                 pnl += dv01 * shift_bp;
+                sum_rate_shift_sq += shift_bp * shift_bp;
                 if rate_shift_count == 0 {
                     first_rate_shift_bp = shift_bp;
                 } else if (shift_bp - first_rate_shift_bp).abs() > PARALLEL_SHIFT_TOLERANCE_BP {
@@ -926,23 +983,20 @@ fn taylor_pnl_for_scenario(
                         + 0.5 * sensitivities.equity_gamma * d_spot * d_spot;
                 }
             }
-            crate::metrics::risk::RiskFactorType::FxSpot { base, quote } => {
-                return Err(finstack_core::Error::Validation(format!(
-                    "Historical VaR Taylor approximation does not support FX spot shocks for {base}/{quote}. Use full revaluation or an FX-delta Taylor implementation."
-                )));
+            crate::metrics::risk::RiskFactorType::FxSpot { .. } => {
+                // No FX-delta Taylor term is available. Rather than hard-fail
+                // the whole VaR job, skip this factor's P&L contribution and
+                // flag it so the caller can surface the degradation. The
+                // first-order rate/credit/equity terms still apply.
+                skipped.skipped_fx = true;
             }
-            crate::metrics::risk::RiskFactorType::ImpliedVol {
-                surface_id,
-                expiry_years,
-                strike,
-            } => {
+            crate::metrics::risk::RiskFactorType::ImpliedVol { .. } => {
                 if sensitivities.vega_rel.abs() > 0.0 {
-                    return Err(finstack_core::Error::Validation(format!(
-                        "Historical VaR Taylor approximation does not support ImpliedVol point shocks with aggregate Vega (surface='{}', expiry_years={}, strike={}). Use full revaluation or a bucketed-vol Taylor implementation.",
-                        surface_id.as_str(),
-                        expiry_years,
-                        strike
-                    )));
+                    // Only aggregate Vega is available, not bucketed vol, so a
+                    // point ImpliedVol shock cannot be turned into a Taylor
+                    // term. Skip it (do not hard-fail the portfolio) and flag
+                    // the degradation for the caller's diagnostic.
+                    skipped.skipped_vol = true;
                 }
             }
         }
@@ -950,21 +1004,32 @@ fn taylor_pnl_for_scenario(
 
     // Second-order rate term: 0.5 * convexity * (shift_bp)^2.
     //
-    // `ir_convexity` is an aggregate (parallel-shift) quantity: it is only
-    // meaningful when multiplied by a single parallel shift magnitude.
-    // Averaging signed per-bucket shifts is incorrect for non-parallel moves
-    // (e.g. a steepener of +10bp/-10bp averages to ~0, which would zero out
-    // the convexity P&L and badly understate risk for options on rates).
+    // `ir_convexity` is an aggregate (parallel-shift) quantity — there is no
+    // per-bucket convexity metric, so a true `Σ 0.5·C_bucket·Δr_bucket²` is
+    // not available here. The previous behavior dropped the convexity term
+    // entirely on any non-parallel scenario; because ordinary key-rate noise
+    // disqualifies the parallel test, that meant convexity P&L was silently
+    // dropped on essentially every historical scenario, making Taylor VaR
+    // optimistic.
     //
-    // We therefore only apply the convexity term when the scenario's rate
-    // shifts are a (near-)parallel move, using the common parallel shift.
-    // For non-parallel moves we omit the second-order term entirely rather
-    // than computing a wrong number; the first-order DV01 contribution is
-    // still captured per bucket above. Per-bucket convexity data is not
-    // available here (only an aggregate `ir_convexity`), so summing
-    // 0.5*convexity_bucket*shift_bucket^2 is not an option.
-    if sensitivities.ir_convexity.abs() > 0.0 && rate_shift_count > 0 && rate_shifts_parallel {
-        pnl += 0.5 * sensitivities.ir_convexity * first_rate_shift_bp * first_rate_shift_bp;
+    // Instead we always apply the second-order term, choosing the squared
+    // shift magnitude so it is exact for a parallel move and stays correctly
+    // signed (never cancels) for a non-parallel move:
+    //
+    //   * parallel move      → use `Δr²` (the common shift) — exact.
+    //   * non-parallel move  → use the **mean-square** bucket shift
+    //     `⟨Δr²⟩ = Σ Δr_b² / n`. This reduces to `Δr²` when all buckets move
+    //     together and, unlike a signed average, does not vanish for a
+    //     steepener/twist (+10bp/−10bp ⇒ ⟨Δr²⟩ = 100, not 0). It is an
+    //     approximation of the unavailable per-bucket sum, but a conservative,
+    //     non-zero one — far better than dropping the term.
+    if sensitivities.ir_convexity.abs() > 0.0 && rate_shift_count > 0 {
+        let shift_sq = if rate_shifts_parallel {
+            first_rate_shift_bp * first_rate_shift_bp
+        } else {
+            sum_rate_shift_sq / rate_shift_count as f64
+        };
+        pnl += 0.5 * sensitivities.ir_convexity * shift_sq;
     }
 
     Ok(pnl)
@@ -1078,6 +1143,7 @@ fn calculate_portfolio_var_taylor(
 
     let mut spot_cache: HashMap<String, f64> = HashMap::default();
     let mut pnls = Vec::with_capacity(history.len());
+    let mut skipped = TaylorSkipFlags::default();
 
     for scenario in history.iter() {
         // Build the scenario-shifted market once per scenario so P&L is
@@ -1086,7 +1152,15 @@ fn calculate_portfolio_var_taylor(
         let scenario_market = scenario.apply(base_market)?;
         let mut acc = NeumaierAccumulator::new();
         for sens in &sensitivities {
-            let pnl_local = taylor_pnl_for_scenario(sens, base_market, scenario, &mut spot_cache)?;
+            let mut sens_skipped = TaylorSkipFlags::default();
+            let pnl_local = taylor_pnl_for_scenario(
+                sens,
+                base_market,
+                scenario,
+                &mut spot_cache,
+                &mut sens_skipped,
+            )?;
+            skipped.merge(sens_skipped);
             let term = convert_money_to_reporting(
                 Money::new(pnl_local, sens.currency),
                 reporting_currency,
@@ -1098,6 +1172,10 @@ fn calculate_portfolio_var_taylor(
         }
         pnls.push(acc.total());
     }
+
+    // A single FX/vol-exposed instrument no longer kills the whole portfolio's
+    // VaR job — its unsupported factors are skipped and surfaced here.
+    skipped.warn_if_any("historical_var.taylor.portfolio");
 
     VarResult::from_distribution(pnls, config.confidence_level)
 }
@@ -1417,8 +1495,74 @@ mod tests {
         Ok(())
     }
 
+    /// Audit item #7: an `FxSpot` shock has no Taylor term, but it must DEGRADE
+    /// GRACEFULLY — the factor is skipped and `TaylorSkipFlags::skipped_fx` is
+    /// raised — instead of hard-failing the whole VaR job. The first-order
+    /// rate term in the same scenario must still be applied.
     #[test]
-    fn test_taylor_vol_pnl_rejects_aggregate_vega_for_vol_point() {
+    fn test_taylor_fx_shock_skips_gracefully_and_keeps_rate_term() {
+        let as_of = sample_as_of();
+        let scenario = MarketScenario::new(
+            as_of,
+            vec![
+                RiskFactorShift {
+                    factor: RiskFactorType::FxSpot {
+                        base: Currency::EUR,
+                        quote: Currency::USD,
+                    },
+                    shift: 0.05,
+                },
+                RiskFactorShift {
+                    factor: RiskFactorType::DiscountRate {
+                        curve_id: CurveId::new("USD-OIS"),
+                        tenor_years: 5.0,
+                    },
+                    shift: 0.0010,
+                },
+            ],
+        );
+        let mut dv01_buckets = HashMap::default();
+        dv01_buckets.insert("5y".to_string(), -100.0);
+        let mut dv01_by_curve = HashMap::default();
+        dv01_by_curve.insert("USD-OIS".to_string(), dv01_buckets);
+        let sensitivities = TaylorSensitivities {
+            currency: Currency::USD,
+            dv01: BucketedSeries {
+                per_curve: dv01_by_curve,
+                fallback: HashMap::default(),
+            },
+            ..Default::default()
+        };
+
+        let mut skipped = TaylorSkipFlags::default();
+        let pnl = taylor_pnl_for_scenario(
+            &sensitivities,
+            &MarketContext::new(),
+            &scenario,
+            &mut HashMap::default(),
+            &mut skipped,
+        )
+        .expect("FX shock must degrade gracefully, not hard-fail");
+
+        // FX factor skipped (no contribution); rate factor still applied:
+        // -100 * 10bp = -1000.
+        assert!(
+            (pnl - (-1000.0)).abs() < 1e-9,
+            "skipped FX factor must not zero out the rate term, got {pnl}"
+        );
+        assert!(skipped.skipped_fx, "skipping the FX-spot shock must be flagged");
+        assert!(!skipped.skipped_vol, "no vol factor was present");
+    }
+
+    /// Audit item #7: an aggregate-Vega vol-point shock can no longer be turned
+    /// into a Taylor term, but it must DEGRADE GRACEFULLY — the factor is
+    /// skipped (contributes zero P&L) and `TaylorSkipFlags::skipped_vol` is
+    /// raised — instead of hard-failing the whole VaR job.
+    ///
+    /// Re-blessed (self-calculated regression): the previous test asserted
+    /// `taylor_pnl_for_scenario` returned `Err`; the fix degrades gracefully.
+    #[test]
+    fn test_taylor_vol_pnl_skips_aggregate_vega_for_vol_point() {
         let as_of = sample_as_of();
         let base_market = MarketContext::new().insert_surface(
             VolSurface::from_grid(
@@ -1445,18 +1589,22 @@ mod tests {
             ..Default::default()
         };
 
-        let err = taylor_pnl_for_scenario(
+        let mut skipped = TaylorSkipFlags::default();
+        let pnl = taylor_pnl_for_scenario(
             &sensitivities,
             &base_market,
             &scenario,
             &mut HashMap::default(),
+            &mut skipped,
         )
-        .expect_err("Taylor VaR should not apply aggregate Vega to a vol point");
+        .expect("vol-point shock must degrade gracefully, not hard-fail");
 
+        assert_eq!(pnl, 0.0, "skipped vol factor contributes zero P&L");
         assert!(
-            err.to_string().contains("ImpliedVol") && err.to_string().contains("EQ-VOL"),
-            "unsupported vol Taylor error should identify the surface, got: {err}"
+            skipped.skipped_vol,
+            "skipping an aggregate-Vega vol-point shock must be flagged"
         );
+        assert!(!skipped.skipped_fx, "no FX factor was present");
     }
 
     #[test]
@@ -1509,6 +1657,7 @@ mod tests {
             &base_market,
             &scenario,
             &mut HashMap::default(),
+            &mut TaylorSkipFlags::default(),
         )
         .expect_err("Taylor VaR must not use a cross-curve parallel DV01 fallback");
 
@@ -1549,6 +1698,7 @@ mod tests {
             &base_market,
             &scenario,
             &mut HashMap::default(),
+            &mut TaylorSkipFlags::default(),
         )
         .expect_err("missing tenor bucket should not fall back to same-curve total");
 
@@ -1558,8 +1708,15 @@ mod tests {
         );
     }
 
+    /// Audit item #7: a vol-exposed FX option no longer kills the Taylor VaR
+    /// job. The unsupported `ImpliedVol` point shock is skipped and the job
+    /// still produces a `VarResult` (here a degenerate all-zero distribution,
+    /// because the only risk factor present was the skipped vol shock).
+    ///
+    /// Re-blessed (self-calculated regression): the previous test asserted
+    /// `calculate_var_dyn` returned `Err`; the fix degrades gracefully.
     #[test]
-    fn test_taylor_vol_shock_matches_full_revaluation_for_fx_option() -> Result<()> {
+    fn test_taylor_vol_shock_skips_gracefully_for_fx_option() -> Result<()> {
         use crate::instruments::fx::fx_option::FxOption;
         use crate::instruments::{
             Attributes, ExerciseStyle, OptionType, PricingOverrides, SettlementType,
@@ -1643,32 +1800,47 @@ mod tests {
         );
         let history = MarketHistory::new(as_of, 1, vec![scenario]);
 
-        let err = calculate_var_dyn(
+        // The job must succeed (graceful degradation), not hard-fail. The vol
+        // shock is the only risk factor and it is skipped, so the Taylor P&L
+        // distribution is all-zero and VaR/ES come back as 0.
+        let result = calculate_var_dyn(
             &[&option as &dyn Instrument],
             &base_market,
             &history,
             as_of,
             &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
         )
-        .expect_err("Taylor VaR should reject aggregate Vega for point vol shocks");
+        .expect("Taylor VaR must degrade gracefully for a vol-exposed instrument");
 
-        let msg = err.to_string();
+        assert_eq!(
+            result.num_scenarios, 1,
+            "the single scenario must still be processed"
+        );
         assert!(
-            msg.contains("ImpliedVol") && msg.contains("EURUSD-VOL"),
-            "Taylor vol rejection should identify the vol surface, got: {msg}"
+            result.var.is_finite() && result.expected_shortfall.is_finite(),
+            "degraded Taylor VaR must still produce finite VaR/ES"
+        );
+        assert!(
+            result.var.abs() < 1e-9,
+            "with only the skipped vol factor, Taylor VaR collapses to zero, got {}",
+            result.var
         );
 
         Ok(())
     }
 
-    /// BUG 1 regression: a non-parallel (steepener) rate scenario must still
-    /// produce a non-zero Taylor P&L driven by first-order DV01. The previous
-    /// implementation averaged signed bucket shifts; a +shift/-shift steepener
-    /// averaged to ~0 and (with the asymmetric DV01 weighting per bucket) the
-    /// first-order term is what carries the risk. We assert the steepener P&L
-    /// is non-trivial and reflects net first-order exposure.
+    /// BUG 1 + audit item #2 regression: a non-parallel (steepener) rate
+    /// scenario must produce a non-zero Taylor P&L driven by first-order DV01,
+    /// AND the aggregate-convexity second-order term must still be applied
+    /// (via the mean-square bucket shift) rather than silently dropped.
+    ///
+    /// Re-blessed (self-calculated regression): the previous test asserted the
+    /// convexity term was OMITTED on a steepener (P&L == 800). Audit item #2
+    /// shows that dropping convexity on every non-parallel scenario makes
+    /// Taylor VaR optimistic; the fix applies `0.5·C·⟨Δr²⟩`. New expected P&L:
+    /// `800 + 0.5·5000·100 = 250_800`.
     #[test]
-    fn test_taylor_steepener_reflects_first_order_risk() {
+    fn test_taylor_steepener_reflects_first_order_and_convexity() {
         let as_of = sample_as_of();
         // Bond DV01 buckets supplied directly so the test is deterministic and
         // independent of curve calibration.
@@ -1678,7 +1850,8 @@ mod tests {
         let mut dv01_by_curve = HashMap::default();
         dv01_by_curve.insert("USD-OIS".to_string(), dv01_buckets);
 
-        // Non-zero aggregate convexity: must NOT contribute for a steepener.
+        // Non-zero aggregate convexity: contributes via the mean-square shift
+        // even for a steepener.
         let sensitivities = TaylorSensitivities {
             currency: Currency::USD,
             dv01: BucketedSeries {
@@ -1689,7 +1862,8 @@ mod tests {
             ..Default::default()
         };
 
-        // Steepener: +10bp at 2y, -10bp at 10y. Signed average ~= 0.
+        // Steepener: +10bp at 2y, -10bp at 10y. Signed average ~= 0, but the
+        // mean-square shift is 100 bp².
         let steepener = MarketScenario::new(
             as_of,
             vec![
@@ -1715,14 +1889,17 @@ mod tests {
             &MarketContext::new(),
             &steepener,
             &mut HashMap::default(),
+            &mut TaylorSkipFlags::default(),
         )
         .expect("steepener Taylor P&L should compute");
 
-        // First-order only: (-40 * 10bp) + (-120 * -10bp) = -400 + 1200 = 800.
-        // The convexity term must be omitted (non-parallel), so P&L == 800.
+        // First-order: (-40 * 10bp) + (-120 * -10bp) = -400 + 1200 = 800.
+        // Convexity (mean-square): 0.5 * 5000 * (⟨Δr²⟩ = (100+100)/2 = 100)
+        //   = 250_000. Total = 250_800.
         assert!(
-            (pnl - 800.0).abs() < 1e-9,
-            "steepener Taylor P&L should be pure first-order DV01 (800), got {pnl}"
+            (pnl - 250_800.0).abs() < 1e-6,
+            "steepener Taylor P&L should be first-order DV01 (800) plus the \
+             mean-square convexity term (250_000) = 250_800, got {pnl}"
         );
         assert!(
             pnl.abs() > 1.0,
@@ -1754,6 +1931,7 @@ mod tests {
             &MarketContext::new(),
             &parallel,
             &mut HashMap::default(),
+            &mut TaylorSkipFlags::default(),
         )
         .expect("parallel Taylor P&L should compute");
         // First-order: (-40 - 120) * 10bp = -1600.

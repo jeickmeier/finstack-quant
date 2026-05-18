@@ -90,6 +90,30 @@ fn effective_spot_bump(spot: f64, bump_pct: f64) -> SpotBump {
     }
 }
 
+/// Smallest implied vol on a surface's `(expiry, strike)` grid.
+///
+/// An additive parallel vol bump of size `h` clamps the down-bumped surface
+/// (`σ - h`) at zero wherever `σ < h` (see `VolSurface`'s `Bumpable` impl).
+/// When that happens the down-bump no longer represents a `-h` move, so a
+/// central difference divided by the full `2h` is wrong. Callers use this
+/// minimum to detect the clamp and fall back to a one-sided difference.
+///
+/// Returns `None` for an empty grid.
+fn min_surface_vol(
+    surface: &finstack_core::market_data::surfaces::VolSurface,
+) -> Option<f64> {
+    let mut min_vol: Option<f64> = None;
+    for &expiry in surface.expiries() {
+        for &strike in surface.strikes() {
+            // Exact grid points evaluate to the stored vol with no interpolation.
+            if let Ok(vol) = surface.value_checked(expiry, strike) {
+                min_vol = Some(min_vol.map_or(vol, |m: f64| m.min(vol)));
+            }
+        }
+    }
+    min_vol
+}
+
 /// Guard against NaN / ±Inf leaking out of finite-difference calculations.
 fn ensure_finite(value: f64, metric_name: &str) -> finstack_core::Result<f64> {
     if value.is_finite() {
@@ -412,8 +436,14 @@ where
             None,
         )?;
 
-        // Central difference: delta = (PV_up - PV_down) / (2 * bump_size)
-        let delta = (pv_up - pv_down) / (2.0 * bump.absolute);
+        // Central difference: delta = (PV_up - PV_down) / (2 * bump_size).
+        // Route through the guarded helper so a degenerate bump width is
+        // surfaced as an error rather than producing a silent NaN/∞.
+        let delta = crate::metrics::core::finite_difference::central_diff_by_width(
+            pv_up,
+            pv_down,
+            2.0 * bump.absolute,
+        )?;
 
         ensure_finite(delta, "fd_delta")
     }
@@ -549,13 +579,16 @@ where
         })?;
 
         // Verify the vol surface exists in the market context
-        if context.curves.get_surface(vol_surface_id.as_str()).is_err() {
-            return Err(finstack_core::Error::from(
-                finstack_core::InputError::NotFound {
-                    id: format!("vol_surface:{}", vol_surface_id),
-                },
-            ));
-        }
+        let surface = match context.curves.get_surface(vol_surface_id.as_str()) {
+            Ok(surface) => surface,
+            Err(_) => {
+                return Err(finstack_core::Error::from(
+                    finstack_core::InputError::NotFound {
+                        id: format!("vol_surface:{}", vol_surface_id),
+                    },
+                ))
+            }
+        };
 
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
         // Interpreted as an **absolute** implied vol bump in decimal units (e.g., 0.01 = +1 vol point).
@@ -572,18 +605,49 @@ where
             None,
             Some((vol_surface_id.as_str(), bump_abs)),
         )?;
-        let pv_down = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            None,
-            Some((vol_surface_id.as_str(), -bump_abs)),
-        )?;
+
+        // The additive down-bump `σ - h` is clamped at zero wherever `σ < h`
+        // (VolSurface `Bumpable`). When that clamp triggers, the down-bumped
+        // surface does NOT represent a uniform `-h` move, so a central
+        // difference divided by the full `2h` is asymmetric and biased. Detect
+        // the clamp and fall back to a one-sided (forward) difference with the
+        // correct `h` divisor near zero vol.
+        let min_vol = min_surface_vol(&surface);
+        let clamp_active = min_vol.map(|m| m < bump_abs).unwrap_or(false);
+
+        let vega = if clamp_active {
+            tracing::warn!(
+                instrument_id = instrument.id(),
+                surface_id = %vol_surface_id,
+                min_vol = min_vol,
+                bump_abs = bump_abs,
+                "vega down-bump would clamp σ at 0; using one-sided forward difference"
+            );
+            let pv_base = context.reprice_instrument_raw(&seeded_instrument, &scratch, as_of)?;
+            // Forward difference: (PV(σ+h) - PV(σ)) / h.
+            crate::metrics::core::finite_difference::central_diff_by_width(
+                pv_up,
+                pv_base,
+                bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL,
+            )?
+        } else {
+            let pv_down = eval_raw_with_scratch_bumps(
+                context,
+                &mut scratch,
+                &seeded_instrument,
+                as_of,
+                None,
+                Some((vol_surface_id.as_str(), -bump_abs)),
+            )?;
+            // Central difference: (PV(σ+h) - PV(σ-h)) / 2h.
+            crate::metrics::core::finite_difference::central_diff_by_width(
+                pv_up,
+                pv_down,
+                2.0 * bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL,
+            )?
+        };
 
         // MetricId::Vega is reported per 1 vol point (0.01 absolute vol), not per 1.00 vol.
-        let vega = (pv_up - pv_down) / (2.0 * bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL);
-
         ensure_finite(vega, "fd_vega")
     }
 }
@@ -1291,5 +1355,249 @@ mod tests {
     fn validate_spot_accepts_positive_finite() {
         let result = super::validate_spot(100.0, "test");
         assert!(result.is_ok(), "positive finite spot should be accepted");
+    }
+
+    // ── Audit item #4: vega clamp on the down-bump ──────────────────────────
+
+    /// Instrument whose PV is linear in the surface's ATM vol: `PV = K · σ`.
+    /// Vega is therefore the constant `K` (per unit absolute vol).
+    #[allow(dead_code)]
+    #[derive(Clone)]
+    struct VolLinearInstrument {
+        id: String,
+        expiry: Date,
+        day_count: DayCount,
+        spot_id: PriceId,
+        vol_surface_id: String,
+        slope: f64,
+        overrides: PricingOverrides,
+        attributes: Attributes,
+    }
+
+    crate::impl_empty_cashflow_provider!(
+        VolLinearInstrument,
+        crate::cashflow::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl VolLinearInstrument {
+        fn new(id: &str, expiry: Date, spot_id: &str, vol_surface_id: &str, slope: f64) -> Self {
+            Self {
+                id: id.to_string(),
+                expiry,
+                day_count: DayCount::Act365F,
+                spot_id: spot_id.into(),
+                vol_surface_id: vol_surface_id.to_string(),
+                slope,
+                overrides: PricingOverrides::default(),
+                attributes: Attributes::new(),
+            }
+        }
+
+        fn raw_pv(&self, market: &MarketContext) -> finstack_core::Result<f64> {
+            let surface = market.get_surface(self.vol_surface_id.as_str())?;
+            // Sample the surface at its first grid point (ATM-ish): an exact
+            // grid hit so `value_checked` returns the stored vol verbatim.
+            let expiry = surface
+                .expiries()
+                .first()
+                .copied()
+                .ok_or_else(|| finstack_core::Error::Validation("empty expiries".into()))?;
+            let strike = surface
+                .strikes()
+                .first()
+                .copied()
+                .ok_or_else(|| finstack_core::Error::Validation("empty strikes".into()))?;
+            let sigma = surface.value_checked(expiry, strike)?;
+            Ok(self.slope * sigma)
+        }
+    }
+
+    impl EquityDependencies for VolLinearInstrument {
+        fn equity_dependencies(&self) -> finstack_core::Result<EquityInstrumentDeps> {
+            EquityInstrumentDeps::builder()
+                .spot(self.spot_id.as_str().to_string())
+                .vol_surface(self.vol_surface_id.clone())
+                .build()
+        }
+    }
+
+    impl HasExpiry for VolLinearInstrument {
+        fn expiry(&self) -> Date {
+            self.expiry
+        }
+    }
+
+    impl HasDayCount for VolLinearInstrument {
+        fn day_count(&self) -> DayCount {
+            self.day_count
+        }
+    }
+
+    impl HasPricingOverrides for VolLinearInstrument {
+        fn pricing_overrides_mut(&mut self) -> &mut PricingOverrides {
+            &mut self.overrides
+        }
+    }
+
+    impl crate::instruments::common_impl::traits::Instrument for VolLinearInstrument {
+        fn id(&self) -> &str {
+            &self.id
+        }
+
+        fn key(&self) -> InstrumentType {
+            InstrumentType::Equity
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+
+        fn clone_box(&self) -> Box<dyn crate::instruments::common_impl::traits::Instrument> {
+            Box::new(self.clone())
+        }
+
+        fn attributes(&self) -> &Attributes {
+            &self.attributes
+        }
+
+        fn attributes_mut(&mut self) -> &mut Attributes {
+            &mut self.attributes
+        }
+
+        fn base_value(&self, market: &MarketContext, _as_of: Date) -> finstack_core::Result<Money> {
+            Ok(Money::new(self.raw_pv(market)?, Currency::USD))
+        }
+
+        fn value_raw(&self, market: &MarketContext, _as_of: Date) -> finstack_core::Result<f64> {
+            self.raw_pv(market)
+        }
+
+        fn price_with_metrics(
+            &self,
+            market: &MarketContext,
+            as_of: Date,
+            metrics: &[MetricId],
+            options: crate::instruments::common_impl::traits::PricingOptions,
+        ) -> finstack_core::Result<crate::results::ValuationResult> {
+            let base_value = self.value(market, as_of)?;
+            crate::instruments::common_impl::helpers::build_with_metrics_dyn(
+                Arc::from(self.clone_box()),
+                Arc::new(market.clone()),
+                as_of,
+                base_value,
+                metrics,
+                crate::instruments::common_impl::helpers::MetricBuildOptions {
+                    cfg: options.config,
+                    market_history: options.market_history,
+                    ..crate::instruments::common_impl::helpers::MetricBuildOptions::default()
+                },
+            )
+        }
+    }
+
+    /// Flat vol surface at the given (low) vol level.
+    fn flat_vol_surface(id: &str, vol: f64) -> finstack_core::market_data::surfaces::VolSurface {
+        finstack_core::market_data::surfaces::VolSurface::builder(id)
+            .expiries(&[0.5, 1.0])
+            .strikes(&[90.0, 100.0, 110.0])
+            .row(&[vol, vol, vol])
+            .row(&[vol, vol, vol])
+            .build()
+            .expect("flat vol surface")
+    }
+
+    #[test]
+    fn vega_uses_one_sided_difference_when_down_bump_clamps_at_zero() {
+        // Surface min vol 0.005 is BELOW the 0.01 default vol bump, so the
+        // additive down-bump `σ - h` clamps at 0. A central difference over
+        // `2h` would mix a +0.01 up-move with a clamped −0.005 down-move and
+        // understate vega; the fix detects the clamp and uses a forward
+        // difference `(PV(σ+h) − PV(σ)) / h`.
+        let as_of = date!(2025 - 01 - 01);
+        let slope = 1_000_000.0; // PV = slope · σ.
+        let inst = VolLinearInstrument::new(
+            "VEGA-CLAMP",
+            date!(2026 - 01 - 01),
+            "SPOT",
+            "LOWVOL",
+            slope,
+        );
+        let market = market_with_spot("SPOT", 100.0).insert_surface(flat_vol_surface("LOWVOL", 0.005));
+
+        let base_value = inst.value(&market, as_of).expect("base pv");
+        let mut registry = MetricRegistry::new();
+        registry.register_metric(
+            MetricId::Vega,
+            Arc::new(GenericFdVega::<VolLinearInstrument>::default()),
+            &[InstrumentType::Equity],
+        );
+        let mut ctx = MetricContext::new(
+            Arc::new(inst),
+            Arc::new(market),
+            as_of,
+            base_value,
+            MetricContext::default_config(),
+        );
+
+        let result = registry.compute(&[MetricId::Vega], &mut ctx).expect("vega");
+        let vega = *result.get(&MetricId::Vega).expect("vega value");
+
+        // PV = slope·σ ⇒ dPV/dσ = slope. Vega is reported per 1 vol point
+        // (0.01 absolute vol): expected = slope · 0.01 = 10_000.
+        let expected = slope * 0.01;
+        assert!(
+            (vega - expected).abs() < 1e-6,
+            "clamp-aware forward difference must recover the true vega {expected}, got {vega}"
+        );
+        // The contaminated central difference would have produced
+        // slope·0.015 / 2 = 7_500 — assert we are NOT near that wrong value.
+        assert!(
+            (vega - slope * 0.0075).abs() > 1.0,
+            "vega must not equal the contaminated central-difference value"
+        );
+    }
+
+    #[test]
+    fn vega_uses_central_difference_when_no_clamp() {
+        // Surface min vol 0.20 is well above the 0.01 bump: standard central
+        // difference path, still exact for a PV linear in σ.
+        let as_of = date!(2025 - 01 - 01);
+        let slope = 500_000.0;
+        let inst = VolLinearInstrument::new(
+            "VEGA-NOCLAMP",
+            date!(2026 - 01 - 01),
+            "SPOT",
+            "HIVOL",
+            slope,
+        );
+        let market =
+            market_with_spot("SPOT", 100.0).insert_surface(flat_vol_surface("HIVOL", 0.20));
+
+        let base_value = inst.value(&market, as_of).expect("base pv");
+        let mut registry = MetricRegistry::new();
+        registry.register_metric(
+            MetricId::Vega,
+            Arc::new(GenericFdVega::<VolLinearInstrument>::default()),
+            &[InstrumentType::Equity],
+        );
+        let mut ctx = MetricContext::new(
+            Arc::new(inst),
+            Arc::new(market),
+            as_of,
+            base_value,
+            MetricContext::default_config(),
+        );
+
+        let result = registry.compute(&[MetricId::Vega], &mut ctx).expect("vega");
+        let vega = *result.get(&MetricId::Vega).expect("vega value");
+        let expected = slope * 0.01;
+        assert!(
+            (vega - expected).abs() < 1e-6,
+            "central difference must recover the true vega {expected}, got {vega}"
+        );
     }
 }

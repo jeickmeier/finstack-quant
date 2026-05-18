@@ -25,15 +25,12 @@ use super::factors::{CurveRestoreFlags, MarketSnapshot};
 use super::helpers::*;
 use super::types::*;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::metrics::{
-    bump_discount_curve_parallel, bump_forward_curve_parallel, bump_surface_vol_absolute,
-};
+use crate::metrics::bump_surface_vol_absolute;
 use finstack_core::dates::Date;
 use finstack_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::diff::{
-    measure_discount_curve_shift, measure_hazard_curve_shift, measure_vol_surface_shift,
-    TenorSamplingMethod, STANDARD_TENORS,
+    measure_hazard_curve_shift, measure_vol_surface_shift, TenorSamplingMethod,
 };
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
@@ -479,60 +476,59 @@ pub fn attribute_pnl_taylor_standard(
 
 // ─── Helper functions ──────────────────────────────────────────────────────
 
-/// Measure average parallel forward rate shift between two markets (basis points).
-fn measure_forward_curve_shift(
-    curve_id: &CurveId,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    method: TenorSamplingMethod,
-) -> Result<f64> {
-    let curve_t0 = market_t0.get_forward(curve_id.as_str())?;
-    let curve_t1 = market_t1.get_forward(curve_id.as_str())?;
-    let tenors: &[f64] = match method {
-        TenorSamplingMethod::Standard => STANDARD_TENORS,
-        TenorSamplingMethod::Dynamic => {
-            let knots = curve_t0.knots();
-            if knots.is_empty() {
-                STANDARD_TENORS
-            } else {
-                knots
-            }
-        }
-        TenorSamplingMethod::Custom(ref tenors) => tenors.as_slice(),
+// NOTE (audit item #3): the former `measure_forward_curve_shift` /
+// `measure_average_rate_shift` helpers — an unweighted mean of per-tenor shifts
+// — were removed. An unweighted average mis-attributes non-parallel curve
+// moves (a steepener averages toward zero), so `compute_rate_factor` and
+// `compute_forward_factor` now measure the per-tenor move and pair it with a
+// per-bucket (key-rate) DV01 instead.
+
+/// Standard key-rate bucket grid (years) used for key-rate-aware rate / forward
+/// curve attribution. Matches the DV01 calculator's standard bucket grid.
+const KEY_RATE_BUCKETS_YEARS: [f64; 11] =
+    [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
+
+/// One key-rate bucket's contribution to a rate/forward factor: the per-bucket
+/// DV01 (from a triangular bump) paired with the realized per-tenor curve move.
+struct KeyRateBucket {
+    /// Per-bucket DV01 (currency / bp) from a triangular key-rate bump.
+    dv01: f64,
+    /// Per-bucket DV01 gamma (currency / bp²), only when `include_gamma`.
+    gamma: f64,
+    /// Realized zero-rate move at this bucket's tenor (basis points).
+    move_bp: f64,
+}
+
+/// Triangular key-rate bump spec for bucket `i` of `KEY_RATE_BUCKETS_YEARS`.
+fn key_rate_bump_spec(i: usize, bump_bp: f64) -> BumpSpec {
+    let prev = if i == 0 {
+        0.0
+    } else {
+        KEY_RATE_BUCKETS_YEARS[i - 1]
     };
-    Ok(measure_average_rate_shift(
-        tenors,
-        |t| curve_t0.rate(t),
-        |t| curve_t1.rate(t),
-    ))
+    let target = KEY_RATE_BUCKETS_YEARS[i];
+    let next = if i + 1 == KEY_RATE_BUCKETS_YEARS.len() {
+        f64::INFINITY
+    } else {
+        KEY_RATE_BUCKETS_YEARS[i + 1]
+    };
+    BumpSpec::triangular_key_rate_bp(prev, target, next, bump_bp)
 }
 
-fn measure_average_rate_shift(
-    sample_points: &[f64],
-    mut value_t0: impl FnMut(f64) -> f64,
-    mut value_t1: impl FnMut(f64) -> f64,
-) -> f64 {
-    let mut total_shift = 0.0;
-    let mut count = 0;
-
-    for &t in sample_points {
-        if t <= 0.0 {
-            continue;
-        }
-        let v0 = value_t0(t);
-        let v1 = value_t1(t);
-        let shift = (v1 - v0) * 10_000.0;
-        total_shift += shift;
-        count += 1;
-    }
-
-    if count == 0 {
-        return 0.0;
-    }
-    total_shift / count as f64
-}
-
-/// Compute rate (DV01) attribution for a single discount curve.
+/// Compute rate (DV01) attribution for a single discount curve — KEY-RATE
+/// AWARE.
+///
+/// Rather than a single parallel DV01 multiplied by an *average* curve shift
+/// (which mis-attributes non-parallel moves — a steepener averages toward zero
+/// and inflates the unexplained residual), this bumps each standard key-rate
+/// bucket with a triangular weight, measures the DV01 of that bucket, and pairs
+/// it with the realized zero-rate move at that bucket's tenor:
+///
+///   explained = Σ_bucket  DV01_bucket × Δr_bucket
+///
+/// The reported `sensitivity` is the parallel-equivalent DV01 (Σ bucket DV01s)
+/// and `market_move` the average shift, preserved for backward compatibility of
+/// `TaylorFactorResult`'s scalar fields.
 fn compute_rate_factor(
     instrument: &Arc<dyn Instrument>,
     market_t0: &MarketContext,
@@ -542,46 +538,80 @@ fn compute_rate_factor(
     curve_id: &CurveId,
     config: &TaylorAttributionConfig,
 ) -> Result<TaylorFactorResult> {
-    let bumped_up = bump_discount_curve_parallel(market_t0, curve_id, config.rate_bump_bp)?;
-    let pv_up = reprice_instrument(instrument, &bumped_up, as_of_t0)?;
+    // Realized per-tenor zero-rate moves on the standard bucket grid (bp).
+    let (curve_t0, curve_t1) = (
+        market_t0.get_discount(curve_id.as_str())?,
+        market_t1.get_discount(curve_id.as_str())?,
+    );
+    let per_tenor_move_bp: Vec<f64> = KEY_RATE_BUCKETS_YEARS
+        .iter()
+        .map(|&t| (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0)
+        .collect();
 
-    let bumped_down = bump_discount_curve_parallel(market_t0, curve_id, -config.rate_bump_bp)?;
-    let pv_down = reprice_instrument(instrument, &bumped_down, as_of_t0)?;
+    let mut buckets: Vec<KeyRateBucket> = Vec::with_capacity(KEY_RATE_BUCKETS_YEARS.len());
+    for (i, &move_bp) in per_tenor_move_bp.iter().enumerate() {
+        let up = market_t0.bump([MarketBump::Curve {
+            id: curve_id.clone(),
+            spec: key_rate_bump_spec(i, config.rate_bump_bp),
+        }])?;
+        let pv_up = reprice_instrument(instrument, &up, as_of_t0)?;
 
-    // Central difference DV01: O(h²) accuracy
-    let dv01 = (pv_up.amount() - pv_down.amount()) / (2.0 * config.rate_bump_bp);
+        let down = market_t0.bump([MarketBump::Curve {
+            id: curve_id.clone(),
+            spec: key_rate_bump_spec(i, -config.rate_bump_bp),
+        }])?;
+        let pv_down = reprice_instrument(instrument, &down, as_of_t0)?;
 
-    let rate_move_bp = measure_discount_curve_shift(
-        curve_id.as_str(),
-        market_t0,
-        market_t1,
-        TenorSamplingMethod::Standard,
-    )?;
+        // Central difference per bucket: O(h²) accuracy.
+        let dv01 = (pv_up.amount() - pv_down.amount()) / (2.0 * config.rate_bump_bp);
+        let gamma = if config.include_gamma {
+            (pv_up.amount() - 2.0 * pv_t0.amount() + pv_down.amount())
+                / (config.rate_bump_bp * config.rate_bump_bp)
+        } else {
+            0.0
+        };
+        buckets.push(KeyRateBucket {
+            dv01,
+            gamma,
+            move_bp,
+        });
+    }
 
-    let explained = dv01 * rate_move_bp;
+    // Key-rate-aware explained P&L: Σ DV01_bucket × Δr_bucket. Compensated
+    // summation keeps the per-bucket accumulation stable.
+    let explained = finstack_core::math::neumaier_sum(buckets.iter().map(|b| b.dv01 * b.move_bp));
+    let total_dv01 = finstack_core::math::neumaier_sum(buckets.iter().map(|b| b.dv01));
+    let avg_move_bp = if buckets.is_empty() {
+        0.0
+    } else {
+        finstack_core::math::neumaier_sum(buckets.iter().map(|b| b.move_bp)) / buckets.len() as f64
+    };
 
+    // Second-order term, also key-rate aware: Σ ½ γ_bucket × Δr_bucket².
     let gamma_pnl = if config.include_gamma {
-        let gamma = (pv_up.amount() - 2.0 * pv_t0.amount() + pv_down.amount())
-            / (config.rate_bump_bp * config.rate_bump_bp);
-        Some(0.5 * gamma * rate_move_bp * rate_move_bp)
+        Some(finstack_core::math::neumaier_sum(
+            buckets.iter().map(|b| 0.5 * b.gamma * b.move_bp * b.move_bp),
+        ))
     } else {
         None
     };
 
     Ok(TaylorFactorResult {
         factor_name: format!("Rates:{}", curve_id),
-        sensitivity: dv01,
-        market_move: rate_move_bp,
+        sensitivity: total_dv01,
+        market_move: avg_move_bp,
         explained_pnl: explained,
         gamma_pnl,
     })
 }
 
-/// Compute forward-curve sensitivity attribution for a single forward curve.
+/// Compute forward-curve sensitivity attribution for a single forward curve —
+/// KEY-RATE AWARE.
 ///
-/// Uses the same parallel bump convention as [`compute_rate_factor`], but applies
-/// to the forward curve entry in [`MarketContext`] and measures the realized
-/// move using forward rates (not discount zeros).
+/// Mirrors [`compute_rate_factor`] but applies triangular key-rate bumps to the
+/// forward curve and measures the realized move using forward rates (not
+/// discount zeros). A non-parallel forward-curve move is attributed per bucket
+/// rather than collapsing to an average shift × parallel DV01.
 fn compute_forward_factor(
     instrument: &Arc<dyn Instrument>,
     market_t0: &MarketContext,
@@ -591,35 +621,63 @@ fn compute_forward_factor(
     curve_id: &CurveId,
     config: &TaylorAttributionConfig,
 ) -> Result<TaylorFactorResult> {
-    let bumped_up = bump_forward_curve_parallel(market_t0, curve_id, config.rate_bump_bp)?;
-    let pv_up = reprice_instrument(instrument, &bumped_up, as_of_t0)?;
+    let (curve_t0, curve_t1) = (
+        market_t0.get_forward(curve_id.as_str())?,
+        market_t1.get_forward(curve_id.as_str())?,
+    );
+    let per_tenor_move_bp: Vec<f64> = KEY_RATE_BUCKETS_YEARS
+        .iter()
+        .map(|&t| (curve_t1.rate(t) - curve_t0.rate(t)) * 10_000.0)
+        .collect();
 
-    let bumped_down = bump_forward_curve_parallel(market_t0, curve_id, -config.rate_bump_bp)?;
-    let pv_down = reprice_instrument(instrument, &bumped_down, as_of_t0)?;
+    let mut buckets: Vec<KeyRateBucket> = Vec::with_capacity(KEY_RATE_BUCKETS_YEARS.len());
+    for (i, &move_bp) in per_tenor_move_bp.iter().enumerate() {
+        let up = market_t0.bump([MarketBump::Curve {
+            id: curve_id.clone(),
+            spec: key_rate_bump_spec(i, config.rate_bump_bp),
+        }])?;
+        let pv_up = reprice_instrument(instrument, &up, as_of_t0)?;
 
-    let dv01 = (pv_up.amount() - pv_down.amount()) / (2.0 * config.rate_bump_bp);
+        let down = market_t0.bump([MarketBump::Curve {
+            id: curve_id.clone(),
+            spec: key_rate_bump_spec(i, -config.rate_bump_bp),
+        }])?;
+        let pv_down = reprice_instrument(instrument, &down, as_of_t0)?;
 
-    let rate_move_bp = measure_forward_curve_shift(
-        curve_id,
-        market_t0,
-        market_t1,
-        TenorSamplingMethod::Standard,
-    )?;
+        let dv01 = (pv_up.amount() - pv_down.amount()) / (2.0 * config.rate_bump_bp);
+        let gamma = if config.include_gamma {
+            (pv_up.amount() - 2.0 * pv_t0.amount() + pv_down.amount())
+                / (config.rate_bump_bp * config.rate_bump_bp)
+        } else {
+            0.0
+        };
+        buckets.push(KeyRateBucket {
+            dv01,
+            gamma,
+            move_bp,
+        });
+    }
 
-    let explained = dv01 * rate_move_bp;
+    let explained = finstack_core::math::neumaier_sum(buckets.iter().map(|b| b.dv01 * b.move_bp));
+    let total_dv01 = finstack_core::math::neumaier_sum(buckets.iter().map(|b| b.dv01));
+    let avg_move_bp = if buckets.is_empty() {
+        0.0
+    } else {
+        finstack_core::math::neumaier_sum(buckets.iter().map(|b| b.move_bp)) / buckets.len() as f64
+    };
 
     let gamma_pnl = if config.include_gamma {
-        let gamma = (pv_up.amount() - 2.0 * pv_t0.amount() + pv_down.amount())
-            / (config.rate_bump_bp * config.rate_bump_bp);
-        Some(0.5 * gamma * rate_move_bp * rate_move_bp)
+        Some(finstack_core::math::neumaier_sum(
+            buckets.iter().map(|b| 0.5 * b.gamma * b.move_bp * b.move_bp),
+        ))
     } else {
         None
     };
 
     Ok(TaylorFactorResult {
         factor_name: format!("Forward:{}", curve_id),
-        sensitivity: dv01,
-        market_move: rate_move_bp,
+        sensitivity: total_dv01,
+        market_move: avg_move_bp,
         explained_pnl: explained,
         gamma_pnl,
     })

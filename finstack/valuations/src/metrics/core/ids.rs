@@ -145,6 +145,16 @@ impl MetricId {
     /// Cost of financing the position (dirty_price x funding_rate x dcf).
     pub const FundingCost: Self = Self(Cow::Borrowed("funding_cost"));
 
+    /// Diagnostic flag for the carry decomposition: `1.0` when the
+    /// pull-to-par / roll-down split is **degenerate** (the `Ytm` metric was
+    /// not available, so `pull_to_par` is reported as `0.0` and `roll_down`
+    /// absorbs the entire PV change), `0.0` when the split is well-defined.
+    ///
+    /// Consumers reading `pull_to_par` / `roll_down` should check this flag
+    /// before attributing the split to genuine roll-down.
+    pub const CarryDecompositionDegenerate: Self =
+        Self(Cow::Borrowed("carry_decomposition_degenerate"));
+
     /// Breakeven parameter shift: how much can the configured target parameter
     /// (spread, yield, vol, correlation) move before carry + roll-down is wiped out.
     ///
