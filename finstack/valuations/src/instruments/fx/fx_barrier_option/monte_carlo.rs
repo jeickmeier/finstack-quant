@@ -10,10 +10,10 @@ use finstack_monte_carlo::payoff::barrier::{BarrierOptionPayoff, BarrierType, Op
 use finstack_monte_carlo::traits::PathState;
 use finstack_monte_carlo::traits::Payoff;
 
-/// FX barrier call option with quanto support.
+/// FX barrier call option payoff.
 ///
-/// Similar to `BarrierOptionPayoff` but designed for FX markets with optional quanto
-/// adjustments for correlation between FX rate and domestic/foreign rates.
+/// Wraps the generic [`BarrierOptionPayoff`] with FX currency metadata for use
+/// by the FX barrier Monte Carlo pricer.
 ///
 /// # FX Barrier Types
 ///
@@ -24,9 +24,14 @@ use finstack_monte_carlo::traits::Payoff;
 ///
 /// # Quanto Barriers
 ///
-/// When barrier monitoring and payoff settlement are in different currencies,
-/// the correlation between FX rate and underlying affects pricing. This is
-/// handled via quanto adjustment in the drift of the FX process.
+/// Quanto FX barriers — where barrier monitoring and payoff settlement are in
+/// different currencies — are intentionally **not** supported here. Correctly
+/// pricing a quanto requires a 2D correlated equity/FX process; a scalar drift
+/// adjustment on this 1D GBM payoff cannot represent it (the same reasoning
+/// `QuantoOption` documents for its unsupported MC path). A constructor that
+/// silently priced a "quanto" barrier identically to a non-quanto one would be
+/// misleading, so no such constructor is exposed. The FX barrier pricer builds
+/// the GBM drift directly as `r_dom - r_for`.
 #[derive(Debug, Clone)]
 pub struct FxBarrierCall {
     /// Underlying barrier call (reuses existing infrastructure)
@@ -35,8 +40,6 @@ pub struct FxBarrierCall {
     pub base_currency: Currency,
     /// Quote currency (settlement currency, formerly domestic_currency)
     pub quote_currency: Currency,
-    /// Quanto adjustment factor (pre-computed)
-    pub quanto_adjustment: f64,
 }
 
 impl FxBarrierCall {
@@ -52,9 +55,8 @@ impl FxBarrierCall {
     /// * `sigma` - FX volatility
     /// * `dt` - Time step size
     /// * `use_gobet_miri` - Use Gobet-Miri barrier adjustment
-    /// * `domestic_currency` - Settlement currency
-    /// * `foreign_currency` - Underlying currency
-    /// * `quanto_adjustment` - Quanto adjustment factor (0.0 if not quanto)
+    /// * `base_currency` - Underlying currency
+    /// * `quote_currency` - Settlement currency
     /// * `rebate` - Optional rebate paid at maturity if barrier condition met
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -68,7 +70,6 @@ impl FxBarrierCall {
         use_gobet_miri: bool,
         base_currency: Currency,
         quote_currency: Currency,
-        quanto_adjustment: f64,
         rebate: Option<f64>,
     ) -> Result<Self> {
         let time_grid = finstack_monte_carlo::time_grid::TimeGrid::uniform(
@@ -92,11 +93,10 @@ impl FxBarrierCall {
             inner,
             base_currency,
             quote_currency,
-            quanto_adjustment,
         })
     }
 
-    /// Create a standard FX barrier (no quanto adjustment).
+    /// Create a standard FX barrier with continuous monitoring.
     ///
     /// `use_gobet_miri` defaults to `false` to match the
     /// `FxBarrierOption::use_gobet_miri` instrument default. Callers that need
@@ -124,41 +124,6 @@ impl FxBarrierCall {
             false, // continuous monitoring; matches FxBarrierOption default
             base_currency,
             quote_currency,
-            0.0, // No quanto adjustment
-            None,
-        )
-    }
-
-    /// Create a quanto FX barrier with adjustment.
-    ///
-    /// # Arguments
-    ///
-    /// * `quanto_adjustment` - Pre-computed quanto adjustment: r_for - q - ρ σ_FX σ_S
-    #[allow(clippy::too_many_arguments)]
-    pub fn quanto(
-        strike: f64,
-        barrier: f64,
-        barrier_type: BarrierType,
-        notional: f64,
-        maturity_step: usize,
-        sigma: f64,
-        dt: f64,
-        base_currency: Currency,
-        quote_currency: Currency,
-        quanto_adjustment: f64,
-    ) -> Result<Self> {
-        Self::new(
-            strike,
-            barrier,
-            barrier_type,
-            notional,
-            maturity_step,
-            sigma,
-            dt,
-            true,
-            base_currency,
-            quote_currency,
-            quanto_adjustment,
             None,
         )
     }
@@ -166,17 +131,12 @@ impl FxBarrierCall {
 
 impl Payoff for FxBarrierCall {
     fn on_event(&mut self, state: &mut PathState) {
-        // Delegate to inner barrier call
-        // FX rate should be stored in state as "spot" or "fx_rate"
+        // Delegate to inner barrier call. The FX rate is carried in PathState
+        // as the simulated spot.
         self.inner.on_event(state);
     }
 
     fn value(&self, currency: Currency) -> Money {
-        // Get base payoff from inner barrier call
-        // For quanto barriers, adjustment is already applied to drift
-        // So we just return the base payoff
-        // In more sophisticated implementations, we might need to apply
-        // additional quanto corrections here
         self.inner.value(currency)
     }
 
@@ -206,13 +166,11 @@ mod tests {
 
         assert_eq!(fx_barrier.base_currency, Currency::EUR);
         assert_eq!(fx_barrier.quote_currency, Currency::USD);
-        assert_eq!(fx_barrier.quanto_adjustment, 0.0);
     }
 
     #[test]
-    fn test_fx_barrier_quanto_creation() {
-        let quanto_adj = 0.0172;
-        let fx_barrier = FxBarrierCall::quanto(
+    fn test_fx_barrier_new_constructs_with_currency_metadata() {
+        let fx_barrier = FxBarrierCall::new(
             1.15,
             1.20,
             BarrierType::UpAndOut,
@@ -220,12 +178,14 @@ mod tests {
             100,
             0.12,
             0.01,
+            true,
             Currency::EUR,
             Currency::USD,
-            quanto_adj,
+            Some(0.02),
         )
-        .expect("valid quanto FX barrier should construct");
+        .expect("valid FX barrier should construct");
 
-        assert_eq!(fx_barrier.quanto_adjustment, quanto_adj);
+        assert_eq!(fx_barrier.base_currency, Currency::EUR);
+        assert_eq!(fx_barrier.quote_currency, Currency::USD);
     }
 }

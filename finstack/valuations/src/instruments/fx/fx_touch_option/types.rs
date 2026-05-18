@@ -327,8 +327,13 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for FxTouchOpt
             return Ok(0.0);
         }
 
-        // Bump spot up/down via vol override trick: use pricing overrides for spot bump
-        // Instead, we bump the FX matrix
+        // Central-difference spot bump. Each scenario is a *fresh* `FxMatrix`
+        // wrapping the same provider `Arc`. This is safe: `FxMatrix::set_quote`
+        // writes a matrix-local explicit quote (its own LRU), and `FxMatrix`
+        // never mutates the underlying provider — the explicit quote shadows
+        // the provider on lookup. The base market's matrix is therefore
+        // unaffected by the bumps. (Bumping must NOT go through
+        // `SimpleFxProvider::set_quote`, which would mutate shared state.)
         let up_fx = {
             let fx_up = finstack_core::money::fx::FxMatrix::new(fx_matrix.provider().clone());
             fx_up.set_quote(
@@ -391,6 +396,8 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for FxTouchOpt
             return Ok(0.0);
         }
 
+        // See `option_delta` for why reusing the provider `Arc` is safe:
+        // `FxMatrix::set_quote` is matrix-local and never mutates the provider.
         let up_fx = {
             let fx_up = finstack_core::money::fx::FxMatrix::new(fx_matrix.provider().clone());
             fx_up.set_quote(
@@ -563,5 +570,102 @@ mod tests {
         assert_payout_timing("athit", PayoutTiming::AtHit);
         assert_payout_timing("atexpiry", PayoutTiming::AtExpiry);
         assert!(PayoutTiming::from_str("invalid").is_err());
+    }
+
+    /// Item 8 regression: the FD spot bumps in `option_delta`/`option_gamma`
+    /// rebuild `FxMatrix` via `provider().clone()` (an `Arc` clone — the
+    /// provider is shared). This test pins that the bumped scenarios do NOT
+    /// corrupt the base market's FX spot: `FxMatrix::set_quote` writes a
+    /// matrix-local explicit quote and `FxMatrix` never mutates the provider.
+    #[test]
+    fn touch_fd_greeks_do_not_corrupt_base_market_fx_spot() {
+        use crate::instruments::common_impl::traits::{Instrument, OptionGammaProvider};
+        use finstack_core::currency::Currency;
+        use finstack_core::dates::Date;
+        use finstack_core::market_data::context::MarketContext;
+        use finstack_core::market_data::surfaces::VolSurface;
+        use finstack_core::market_data::term_structures::DiscountCurve;
+        use finstack_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
+        use std::sync::Arc;
+        use time::Month;
+
+        let as_of = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+        let expiry = Date::from_calendar_date(2026, Month::January, 2).expect("date");
+
+        let usd = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+            .build()
+            .expect("usd curve");
+        let eur = DiscountCurve::builder("EUR-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, (-0.02_f64).exp())])
+            .build()
+            .expect("eur curve");
+        let surface = VolSurface::builder("EURUSD-VOL")
+            .expiries(&[1.0])
+            .strikes(&[1.05])
+            .row(&[0.11])
+            .build()
+            .expect("vol surface");
+        let provider = Arc::new(SimpleFxProvider::new());
+        provider
+            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .expect("valid rate");
+        let market = MarketContext::new()
+            .insert(usd)
+            .insert(eur)
+            .insert_surface(surface)
+            .insert_fx(FxMatrix::new(provider));
+
+        let touch = FxTouchOption::builder()
+            .id(InstrumentId::new("FXTOUCH-CORRUPT-CHECK"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .barrier_level(1.05)
+            .touch_type(TouchType::OneTouch)
+            .barrier_direction(BarrierDirection::Down)
+            .payout_amount(Money::new(1_000_000.0, Currency::USD))
+            .payout_timing(PayoutTiming::AtExpiry)
+            .expiry(expiry)
+            .day_count(DayCount::Act365F)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
+            .vol_surface_id(CurveId::new("EURUSD-VOL"))
+            .pricing_overrides(PricingOverrides::default())
+            .attributes(Attributes::new())
+            .build()
+            .expect("touch option");
+
+        let spot_before = market
+            .fx()
+            .expect("fx")
+            .rate(FxQuery::new(Currency::EUR, Currency::USD, as_of))
+            .expect("spot")
+            .rate;
+
+        // Running the FD gamma exercises the bump-and-rebuild path.
+        let _gamma = OptionGammaProvider::option_gamma(&touch, &market, as_of)
+            .expect("gamma");
+
+        let spot_after = market
+            .fx()
+            .expect("fx")
+            .rate(FxQuery::new(Currency::EUR, Currency::USD, as_of))
+            .expect("spot")
+            .rate;
+        assert!(
+            (spot_before - spot_after).abs() < 1e-15,
+            "base market FX spot must be unchanged after FD bumps: \
+             before={spot_before} after={spot_after}"
+        );
+
+        // The base PV must also be reproducible (unchanged) after the bumps.
+        let pv1 = touch.value(&market, as_of).expect("pv1").amount();
+        let pv2 = touch.value(&market, as_of).expect("pv2").amount();
+        assert!(
+            (pv1 - pv2).abs() < 1e-9,
+            "base PV must be stable after FD Greeks ran: pv1={pv1} pv2={pv2}"
+        );
     }
 }

@@ -66,10 +66,12 @@ pub(crate) fn compute_pv(
     if as_of < inst.start_date {
         let forward_var = remaining_forward_variance(inst, context, as_of)?;
         let undiscounted = inst.payoff(forward_var);
-        let t = inst
-            .day_count
-            .year_fraction(as_of, inst.maturity, DayCountContext::default())?;
-        return Ok(undiscounted * dom.df(t.max(0.0)));
+        // Date-based discounting: `df_between_dates` resolves the year fraction
+        // on the curve's own time axis. Feeding `df()` an instrument-day-count
+        // year fraction mis-discounts whenever the instrument and curve
+        // day-counts differ or `as_of != base_date`.
+        let df = dom.df_between_dates(as_of, inst.maturity)?;
+        return Ok(undiscounted * df);
     }
 
     let realized = partial_realized_variance_with_dates(inst, context, as_of, &obs_dates)?;
@@ -83,10 +85,10 @@ pub(crate) fn compute_pv(
     let w = time_elapsed_fraction(inst, as_of)?;
     let expected_var = realized * w + forward * (1.0 - w);
     let undiscounted = inst.payoff(expected_var);
-    let t = inst
-        .day_count
-        .year_fraction(as_of, inst.maturity, DayCountContext::default())?;
-    Ok(undiscounted * dom.df(t.max(0.0)))
+    // Date-based discounting (see the pre-start branch above): `df_between_dates`
+    // resolves the year fraction on the curve's own time axis.
+    let df = dom.df_between_dates(as_of, inst.maturity)?;
+    Ok(undiscounted * df)
 }
 
 pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Vec<Date> {
@@ -551,12 +553,12 @@ mod tests {
         let realized = partial_realized_variance(&swap, &market, as_of).expect("realized");
         let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
         let expected_var = realized * time_w + forward * (1.0 - time_w);
-        let t = swap
-            .day_count
-            .year_fraction(as_of, swap.maturity, DayCountContext::default())
-            .expect("yf");
         let dom = market.get_discount("USD-OIS").expect("curve");
-        let expected_pv = swap.payoff(expected_var) * dom.df(t.max(0.0));
+        // Date-based discounting, matching the pricer (item 4).
+        let df = dom
+            .df_between_dates(as_of, swap.maturity)
+            .expect("date-based df");
+        let expected_pv = swap.payoff(expected_var) * df;
 
         assert!(
             (pv.amount() - expected_pv.amount()).abs() < 1e-6,
@@ -566,10 +568,104 @@ mod tests {
         );
 
         let count_var = realized * count_w + forward * (1.0 - count_w);
-        let count_pv = swap.payoff(count_var) * dom.df(t.max(0.0));
+        let count_pv = swap.payoff(count_var) * df;
         assert!(
             (pv.amount() - count_pv.amount()).abs() > 1e-6,
             "FX seasoned MTM must differ from observation-count weighting"
+        );
+    }
+
+    /// Item 4 regression: the terminal PV discount must be date-based. When the
+    /// discount curve's `base_date` precedes `as_of`, `dom.df(yf(as_of, mat))`
+    /// reads the curve at the wrong point on its time axis; the correct factor
+    /// is `dom.df_between_dates(as_of, maturity)`.
+    #[test]
+    fn fx_variance_swap_terminal_discount_is_date_based() {
+        use crate::instruments::common_impl::traits::Attributes;
+        use crate::instruments::fx::fx_variance_swap::types::PayReceive;
+        use finstack_core::dates::{DayCount, Tenor};
+        use finstack_core::market_data::surfaces::VolSurface;
+        use finstack_core::math::stats::RealizedVarMethod;
+        use finstack_core::types::{CurveId, InstrumentId};
+
+        // Curve base date is well before the valuation date (a stale-but-valid
+        // curve). `df(t)` is anchored at base_date, so feeding it
+        // `yf(as_of, maturity)` mis-discounts.
+        let curve_base = date!(2025 - 01 - 02);
+        let as_of = date!(2025 - 07 - 01);
+        let start = date!(2025 - 07 - 02);
+        let maturity = date!(2026 - 01 - 02);
+
+        let usd_curve = DiscountCurve::builder("USD-OIS")
+            .base_date(curve_base)
+            .knots([(0.0, 1.0), (2.0, (-0.06_f64).exp())])
+            .build()
+            .expect("usd curve");
+        let eur_curve = DiscountCurve::builder("EUR-OIS")
+            .base_date(curve_base)
+            .knots([(0.0, 1.0), (2.0, (-0.02_f64).exp())])
+            .build()
+            .expect("eur curve");
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .expect("valid rate");
+        let surface = VolSurface::builder("EURUSD-VOL")
+            .expiries(&[1.0])
+            .strikes(&[0.9, 1.1, 1.3])
+            .row(&[0.12, 0.10, 0.12])
+            .build()
+            .expect("surface");
+        let market = MarketContext::new()
+            .insert(usd_curve)
+            .insert(eur_curve)
+            .insert_fx(FxMatrix::new(Arc::new(provider)))
+            .insert_surface(surface);
+
+        let swap = FxVarianceSwap::builder()
+            .id(InstrumentId::new("FXVAR-DISC"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .spot_id("EURUSD".to_string())
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .strike_variance(0.04)
+            .start_date(start)
+            .maturity(maturity)
+            .observation_freq(Tenor::daily())
+            .realized_var_method(RealizedVarMethod::CloseToClose)
+            .side(PayReceive::Receive)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
+            .vol_surface_id(CurveId::new("EURUSD-VOL"))
+            .day_count(DayCount::Act365F)
+            .attributes(Attributes::new())
+            .build()
+            .expect("pre-start fx swap");
+
+        let pv = compute_pv(&swap, &market, as_of).expect("pre-start pv");
+
+        let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
+        let dom = market.get_discount("USD-OIS").expect("curve");
+        let df_correct = dom
+            .df_between_dates(as_of, maturity)
+            .expect("date-based df");
+        let expected_pv = swap.payoff(forward) * df_correct;
+        assert!(
+            (pv.amount() - expected_pv.amount()).abs() < 1e-6,
+            "terminal PV must use date-based discounting: pv={} expected={}",
+            pv.amount(),
+            expected_pv.amount()
+        );
+
+        // The buggy time-axis lookup gives a materially different factor.
+        let t_bug = swap
+            .day_count
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("yf");
+        let df_bug = dom.df(t_bug.max(0.0));
+        assert!(
+            (df_correct - df_bug).abs() > 1e-4,
+            "fixture must expose the discount-axis bug: df_correct={df_correct} df_bug={df_bug}"
         );
     }
 }

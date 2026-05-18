@@ -16,15 +16,20 @@ impl MetricCalculator for VegaCalculator {
             .map(|v| v.sqrt())
             .unwrap_or_else(|_| swap.strike_variance.sqrt());
 
-        let remaining_fraction = 1.0 - swap.realized_fraction_by_observations(context.as_of);
+        // Only the un-seasoned forward variance carries vol sensitivity. Weight
+        // by the day-count `time_elapsed_fraction` so the metric is consistent
+        // with the pricer's seasoned-MTM time-weighting (an observation-count
+        // fraction drifts for weekend-skipping daily schedules).
+        let remaining_fraction = 1.0 - swap.time_elapsed_fraction(context.as_of)?;
 
-        let t = swap
-            .day_count
-            .year_fraction(context.as_of, swap.maturity, Default::default())?;
+        // Date-based discounting: `df_between_dates` resolves the year fraction
+        // on the curve's own time axis. Passing an instrument-day-count year
+        // fraction into `df()` (which expects the curve axis) is incorrect when
+        // the day-counts differ or `as_of != base_date`.
         let disc = context
             .curves
             .get_discount(swap.domestic_discount_curve_id.as_str())?;
-        let df = disc.df(t);
+        let df = disc.df_between_dates(context.as_of, swap.maturity)?;
 
         let vega = df * 2.0 * swap.notional.amount() * current_vol * 0.01 * remaining_fraction;
         Ok(vega * swap.side.sign())

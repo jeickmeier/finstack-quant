@@ -10,14 +10,18 @@ pub(crate) struct VarianceVegaCalculator;
 impl MetricCalculator for VarianceVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let swap = context.instrument_as::<FxVarianceSwap>()?;
-        let remaining_fraction = 1.0 - swap.realized_fraction_by_observations(context.as_of);
-        let t = swap
-            .day_count
-            .year_fraction(context.as_of, swap.maturity, Default::default())?;
+        // Only the un-seasoned forward variance carries variance sensitivity.
+        // Weight by the day-count `time_elapsed_fraction` to match the pricer's
+        // seasoned-MTM time-weighting (observation-count fractions drift for
+        // weekend-skipping daily schedules).
+        let remaining_fraction = 1.0 - swap.time_elapsed_fraction(context.as_of)?;
+        // Date-based discounting: `df_between_dates` resolves the year fraction
+        // on the curve's own time axis, unlike `df()` fed an instrument
+        // day-count year fraction.
         let disc = context
             .curves
             .get_discount(swap.domestic_discount_curve_id.as_str())?;
-        let df = disc.df(t);
+        let df = disc.df_between_dates(context.as_of, swap.maturity)?;
         Ok(df * swap.notional.amount() * remaining_fraction * swap.side.sign())
     }
 }
