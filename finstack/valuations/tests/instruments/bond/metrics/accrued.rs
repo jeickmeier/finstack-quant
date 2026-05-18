@@ -149,12 +149,15 @@ fn test_accrued_frn_uses_forward_rate() {
         .notional(Money::new(100.0, Currency::USD))
         .issue_date(issue)
         .maturity(date!(2026 - 01 - 01))
-        .cashflow_spec(CashflowSpec::floating(
-            CurveId::new("USD-SOFR-3M"),
-            0.0,
-            Tenor::quarterly(),
-            DayCount::Act360,
-        ).expect("finite test rate"))
+        .cashflow_spec(
+            CashflowSpec::floating(
+                CurveId::new("USD-SOFR-3M"),
+                0.0,
+                Tenor::quarterly(),
+                DayCount::Act360,
+            )
+            .expect("finite test rate"),
+        )
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
         .pricing_overrides(PricingOverrides::default())

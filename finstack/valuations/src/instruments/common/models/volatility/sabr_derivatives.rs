@@ -504,7 +504,9 @@ mod tests {
                 .expect("valid market data"),
         );
         let shifted_atm = provider.sabr_vol_and_derivatives(forward, alpha, nu, rho).0;
-        let unshifted_atm = unshifted.sabr_vol_and_derivatives(forward, alpha, nu, rho).0;
+        let unshifted_atm = unshifted
+            .sabr_vol_and_derivatives(forward, alpha, nu, rho)
+            .0;
         assert!(
             (shifted_atm - unshifted_atm).abs() > 1e-6,
             "shift should change the vol: shifted={shifted_atm}, unshifted={unshifted_atm}"

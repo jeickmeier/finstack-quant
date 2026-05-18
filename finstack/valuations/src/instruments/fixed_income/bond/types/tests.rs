@@ -152,11 +152,10 @@ fn test_bond_with_cashflows_method() {
         .notional(Money::new(1_000_000.0, Currency::USD))
         .issue_date(issue)
         .maturity(maturity)
-        .cashflow_spec(CashflowSpec::fixed(
-            0.04,
-            Tenor::semi_annual(),
-            DayCount::Act365F,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.04, Tenor::semi_annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
         .pricing_overrides(PricingOverrides::default())
@@ -202,11 +201,10 @@ fn test_custom_cashflows_override_regular_generation() {
         .notional(Money::new(1_000_000.0, Currency::USD))
         .issue_date(issue)
         .maturity(maturity)
-        .cashflow_spec(CashflowSpec::fixed(
-            0.03,
-            Tenor::annual(),
-            DayCount::Act365F,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.03, Tenor::annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
         .pricing_overrides(PricingOverrides::default())
@@ -414,7 +412,8 @@ fn test_amortizing_bond_ex_coupon_accrual_zero_in_window() {
             (maturity, Money::new(0.0, Currency::USD)),                  // 0 remaining
         ],
     };
-    let base_spec = CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
+    let base_spec =
+        CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
     let cashflow_spec = CashflowSpec::amortizing(base_spec, amort_spec);
 
     let mut bond = Bond::builder()
@@ -574,7 +573,8 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
             (maturity, Money::new(0.0, Currency::USD)),
         ],
     };
-    let base_spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360).expect("finite test coupon");
+    let base_spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)
+        .expect("finite test coupon");
     let cashflow_spec = CashflowSpec::amortizing(base_spec, amort_spec);
 
     let bond = Bond::builder()
@@ -680,7 +680,8 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
     let market = MarketContext::new().insert(disc_curve);
 
     // Bullet bond: 3-year annual, 1% coupon, full principal at maturity
-    let bullet_cashflow_spec = CashflowSpec::fixed(0.01, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
+    let bullet_cashflow_spec =
+        CashflowSpec::fixed(0.01, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
     let bullet_bond = Bond::builder()
         .id("BULLET-TEST".into())
         .notional(notional)
@@ -708,7 +709,8 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
             (maturity, Money::new(0.0, Currency::USD)),                  // 0 remaining
         ],
     };
-    let amort_base_spec = CashflowSpec::fixed(0.01, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
+    let amort_base_spec =
+        CashflowSpec::fixed(0.01, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
     let amort_spec = CashflowSpec::amortizing(amort_base_spec, amort_schedule);
     let amort_bond = Bond::builder()
         .id("AMORT-TEST-PV".into())

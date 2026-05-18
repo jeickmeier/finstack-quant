@@ -61,9 +61,7 @@ fn financing_period_rate(
     calendar_id: &str,
 ) -> finstack_core::Result<f64> {
     match financing.compounding {
-        FinancingRateCompounding::TermRate => {
-            rate_period_on_dates(fwd, period_start, period_end)
-        }
+        FinancingRateCompounding::TermRate => rate_period_on_dates(fwd, period_start, period_end),
         FinancingRateCompounding::OvernightCompounded => {
             // The daily-compounding observation grid needs either a registered
             // holiday calendar or `None` (weekday-only stepping). The

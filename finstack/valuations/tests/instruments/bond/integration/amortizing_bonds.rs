@@ -30,7 +30,8 @@ fn test_linear_amortization() {
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .cashflow_spec(CashflowSpec::amortizing(
-            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F).expect("finite test coupon"),
+            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
             AmortizationSpec::LinearTo {
                 final_notional: Money::new(400.0, Currency::USD),
             },
@@ -62,7 +63,8 @@ fn test_full_amortization() {
         .issue_date(as_of)
         .maturity(date!(2030 - 01 - 01))
         .cashflow_spec(CashflowSpec::amortizing(
-            CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Act365F).expect("finite test coupon"),
+            CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
             AmortizationSpec::LinearTo {
                 final_notional: Money::new(0.0, Currency::USD),
             },

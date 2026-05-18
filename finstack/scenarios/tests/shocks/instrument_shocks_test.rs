@@ -27,11 +27,14 @@ fn test_instrument_type_price_shock_matching() {
                 .notional(finstack_core::money::Money::new(100.0, Currency::USD))
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(365))
-                .cashflow_spec(CashflowSpec::fixed(
-                    0.05,
-                    finstack_core::dates::Tenor::annual(),
-                    finstack_core::dates::DayCount::Thirty360,
-                ).expect("finite test coupon"))
+                .cashflow_spec(
+                    CashflowSpec::fixed(
+                        0.05,
+                        finstack_core::dates::Tenor::annual(),
+                        finstack_core::dates::DayCount::Thirty360,
+                    )
+                    .expect("finite test coupon"),
+                )
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -45,11 +48,14 @@ fn test_instrument_type_price_shock_matching() {
                 .notional(finstack_core::money::Money::new(100.0, Currency::USD))
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(730))
-                .cashflow_spec(CashflowSpec::fixed(
-                    0.04,
-                    finstack_core::dates::Tenor::annual(),
-                    finstack_core::dates::DayCount::Thirty360,
-                ).expect("finite test coupon"))
+                .cashflow_spec(
+                    CashflowSpec::fixed(
+                        0.04,
+                        finstack_core::dates::Tenor::annual(),
+                        finstack_core::dates::DayCount::Thirty360,
+                    )
+                    .expect("finite test coupon"),
+                )
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -120,11 +126,14 @@ fn test_instrument_type_spread_shock_matching() {
             .notional(finstack_core::money::Money::new(100.0, Currency::USD))
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(365))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                finstack_core::dates::Tenor::annual(),
-                finstack_core::dates::DayCount::Thirty360,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(
+                    0.05,
+                    finstack_core::dates::Tenor::annual(),
+                    finstack_core::dates::DayCount::Thirty360,
+                )
+                .expect("finite test coupon"),
+            )
             .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())
@@ -191,11 +200,14 @@ fn test_instrument_attr_price_shock_matching() {
                 .notional(finstack_core::money::Money::new(100.0, Currency::USD))
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(365))
-                .cashflow_spec(CashflowSpec::fixed(
-                    0.05,
-                    finstack_core::dates::Tenor::annual(),
-                    finstack_core::dates::DayCount::Thirty360,
-                ).expect("finite test coupon"))
+                .cashflow_spec(
+                    CashflowSpec::fixed(
+                        0.05,
+                        finstack_core::dates::Tenor::annual(),
+                        finstack_core::dates::DayCount::Thirty360,
+                    )
+                    .expect("finite test coupon"),
+                )
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -213,11 +225,14 @@ fn test_instrument_attr_price_shock_matching() {
                 .notional(finstack_core::money::Money::new(100.0, Currency::USD))
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(365))
-                .cashflow_spec(CashflowSpec::fixed(
-                    0.05,
-                    finstack_core::dates::Tenor::annual(),
-                    finstack_core::dates::DayCount::Thirty360,
-                ).expect("finite test coupon"))
+                .cashflow_spec(
+                    CashflowSpec::fixed(
+                        0.05,
+                        finstack_core::dates::Tenor::annual(),
+                        finstack_core::dates::DayCount::Thirty360,
+                    )
+                    .expect("finite test coupon"),
+                )
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -281,11 +296,14 @@ fn test_instrument_attr_price_shock_no_matches() {
             .notional(finstack_core::money::Money::new(100.0, Currency::USD))
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(365))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                finstack_core::dates::Tenor::annual(),
-                finstack_core::dates::DayCount::Thirty360,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(
+                    0.05,
+                    finstack_core::dates::Tenor::annual(),
+                    finstack_core::dates::DayCount::Thirty360,
+                )
+                .expect("finite test coupon"),
+            )
             .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())
@@ -371,11 +389,14 @@ fn test_instrument_shock_no_matching_types() {
             .notional(finstack_core::money::Money::new(100.0, Currency::USD))
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(365))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                finstack_core::dates::Tenor::annual(),
-                finstack_core::dates::DayCount::Thirty360,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(
+                    0.05,
+                    finstack_core::dates::Tenor::annual(),
+                    finstack_core::dates::DayCount::Thirty360,
+                )
+                .expect("finite test coupon"),
+            )
             .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())
@@ -460,11 +481,14 @@ fn test_instrument_shock_multiple_types() {
                 .notional(finstack_core::money::Money::new(100.0, Currency::USD))
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(365))
-                .cashflow_spec(CashflowSpec::fixed(
-                    0.05,
-                    finstack_core::dates::Tenor::annual(),
-                    finstack_core::dates::DayCount::Thirty360,
-                ).expect("finite test coupon"))
+                .cashflow_spec(
+                    CashflowSpec::fixed(
+                        0.05,
+                        finstack_core::dates::Tenor::annual(),
+                        finstack_core::dates::DayCount::Thirty360,
+                    )
+                    .expect("finite test coupon"),
+                )
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -478,11 +502,14 @@ fn test_instrument_shock_multiple_types() {
                 .notional(finstack_core::money::Money::new(100.0, Currency::USD))
                 .issue_date(base_date)
                 .maturity(base_date + time::Duration::days(730))
-                .cashflow_spec(CashflowSpec::fixed(
-                    0.04,
-                    finstack_core::dates::Tenor::annual(),
-                    finstack_core::dates::DayCount::Thirty360,
-                ).expect("finite test coupon"))
+                .cashflow_spec(
+                    CashflowSpec::fixed(
+                        0.04,
+                        finstack_core::dates::Tenor::annual(),
+                        finstack_core::dates::DayCount::Thirty360,
+                    )
+                    .expect("finite test coupon"),
+                )
                 .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .pricing_overrides(PricingOverrides::default())
@@ -569,11 +596,14 @@ fn test_attr_filter_ignores_tags_uses_meta_only() {
             .notional(finstack_core::money::Money::new(100.0, Currency::USD))
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(365))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                finstack_core::dates::Tenor::annual(),
-                finstack_core::dates::DayCount::Thirty360,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(
+                    0.05,
+                    finstack_core::dates::Tenor::annual(),
+                    finstack_core::dates::DayCount::Thirty360,
+                )
+                .expect("finite test coupon"),
+            )
             .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())

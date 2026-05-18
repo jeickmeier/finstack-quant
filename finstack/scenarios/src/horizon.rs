@@ -371,11 +371,14 @@ mod tests {
             .notional(Money::new(100.0, Currency::USD))
             .issue_date(base_date)
             .maturity(base_date + time::Duration::days(730))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                finstack_core::dates::Tenor::annual(),
-                DayCount::Thirty360,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(
+                    0.05,
+                    finstack_core::dates::Tenor::annual(),
+                    DayCount::Thirty360,
+                )
+                .expect("finite test coupon"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .pricing_overrides(PricingOverrides::default())

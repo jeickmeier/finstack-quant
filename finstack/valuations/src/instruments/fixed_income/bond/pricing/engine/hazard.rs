@@ -367,11 +367,10 @@ mod tests {
             .notional(Money::new(1_000_000.0, Currency::USD))
             .issue_date(issue)
             .maturity(maturity)
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
             .pricing_overrides(crate::instruments::PricingOverrides::default())
@@ -399,7 +398,8 @@ mod tests {
     }
 
     fn build_pik_bond(issue: Date, maturity: Date) -> Bond {
-        let mut spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F).expect("finite test coupon");
+        let mut spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+            .expect("finite test coupon");
         if let CashflowSpec::Fixed(ref mut inner) = spec {
             inner.coupon_type = CouponType::PIK;
         }
@@ -462,11 +462,10 @@ mod tests {
             .notional(Money::new(1_000_000.0, Currency::USD))
             .issue_date(issue)
             .maturity(maturity)
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::annual(),
-                DayCount::Act365F,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
             .pricing_overrides(crate::instruments::PricingOverrides::default())

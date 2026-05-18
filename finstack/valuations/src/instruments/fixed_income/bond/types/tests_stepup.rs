@@ -271,11 +271,10 @@ fn pricing_cashflows_discount_only() {
         .notional(Money::new(1_000_000.0, Currency::USD))
         .issue_date(issue)
         .maturity(maturity)
-        .cashflow_spec(CashflowSpec::fixed(
-            0.05,
-            Tenor::semi_annual(),
-            DayCount::Act365F,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .discount_curve_id(CurveId::new("USD-OIS"))
         .pricing_overrides(crate::instruments::PricingOverrides::default())
         .attributes(Attributes::new())
@@ -321,11 +320,10 @@ fn pricing_cashflows_with_hazard_curve() {
         .notional(Money::new(1_000_000.0, Currency::USD))
         .issue_date(issue)
         .maturity(maturity)
-        .cashflow_spec(CashflowSpec::fixed(
-            0.05,
-            Tenor::semi_annual(),
-            DayCount::Act365F,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
         .pricing_overrides(crate::instruments::PricingOverrides::default())
@@ -403,12 +401,15 @@ fn build_step_up_bond_schedule(
         .notional(Money::new(1_000_000.0, Currency::USD))
         .issue_date(issue)
         .maturity(maturity)
-        .cashflow_spec(CashflowSpec::step_up(
-            initial_rate,
-            step_schedule,
-            Tenor::semi_annual(),
-            DayCount::Thirty360,
-        ).expect("finite test rate"))
+        .cashflow_spec(
+            CashflowSpec::step_up(
+                initial_rate,
+                step_schedule,
+                Tenor::semi_annual(),
+                DayCount::Thirty360,
+            )
+            .expect("finite test rate"),
+        )
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(crate::instruments::PricingOverrides::default())
         .attributes(Attributes::new())
@@ -447,11 +448,10 @@ fn step_up_no_steps_equals_fixed_rate() {
         .notional(Money::new(1_000_000.0, Currency::USD))
         .issue_date(issue)
         .maturity(maturity)
-        .cashflow_spec(CashflowSpec::fixed(
-            0.05,
-            Tenor::semi_annual(),
-            DayCount::Thirty360,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)
+                .expect("finite test coupon"),
+        )
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(crate::instruments::PricingOverrides::default())
         .attributes(Attributes::new())
@@ -618,7 +618,8 @@ fn step_up_serde_roundtrip() {
         vec![(step_date, 0.05)],
         Tenor::semi_annual(),
         DayCount::Thirty360,
-    ).expect("finite test rate");
+    )
+    .expect("finite test rate");
 
     let bond = Bond::builder()
         .id("SERDE-STEP-UP".into())
@@ -681,7 +682,8 @@ fn step_up_frequency_and_day_count() {
         vec![(step_date, 0.05)],
         Tenor::quarterly(),
         DayCount::Act360,
-    ).expect("finite test rate");
+    )
+    .expect("finite test rate");
 
     assert_eq!(spec.frequency(), Tenor::quarterly());
     assert_eq!(spec.day_count(), DayCount::Act360);

@@ -244,7 +244,8 @@ fn test_accrued_interest_amortizing_schedule_driven() {
             (maturity, Money::new(0.0, Currency::USD)),
         ],
     };
-    let base_spec = CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
+    let base_spec =
+        CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
     let cashflow_spec = CashflowSpec::amortizing(base_spec, amort_spec);
 
     let bond = Bond::builder()

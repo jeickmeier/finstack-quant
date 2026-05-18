@@ -100,11 +100,10 @@ fn test_yield_dv01_duration_price_relationship() {
     let bond = Bond::builder()
         .id("DV01_REL".into())
         .notional(Money::new(100.0, Currency::USD))
-        .cashflow_spec(CashflowSpec::fixed(
-            0.08,
-            Tenor::annual(),
-            DayCount::Act365F,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())

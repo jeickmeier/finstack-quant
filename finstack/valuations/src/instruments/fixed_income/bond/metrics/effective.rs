@@ -195,11 +195,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(as_of)
             .maturity(maturity)
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .pricing_overrides(PricingOverrides::default())
             .attributes(Default::default())
@@ -215,11 +214,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(as_of)
             .maturity(maturity)
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .pricing_overrides(PricingOverrides::default())
             .attributes(Default::default())
@@ -263,11 +261,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(as_of)
             .maturity(maturity)
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(98.0))
             .settlement_convention_opt(Some(BondSettlementConvention {
@@ -357,11 +354,10 @@ mod tests {
             .notional(Money::new(1000.0, Currency::USD))
             .issue_date(as_of)
             .maturity(maturity)
-            .cashflow_spec(CashflowSpec::fixed(
-                0.05,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .discount_curve_id(CurveId::new("USD-OIS"))
             // Quote via OAS directly (decimal: 0.005 = 50 bp).
             .pricing_overrides(PricingOverrides::default().with_quoted_oas(0.005))

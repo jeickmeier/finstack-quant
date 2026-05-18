@@ -213,7 +213,11 @@ impl DriftSchedule {
                 ));
             }
         }
-        if times.iter().chain(cumulative_drift.iter()).any(|v| !v.is_finite()) {
+        if times
+            .iter()
+            .chain(cumulative_drift.iter())
+            .any(|v| !v.is_finite())
+        {
             return Err(finstack_core::Error::Validation(
                 "DriftSchedule times and cumulative_drift values must be finite".to_string(),
             ));
@@ -582,8 +586,8 @@ mod tests {
     #[test]
     fn drift_schedule_interpolates_and_extrapolates() {
         // Front-loaded cumulative drift: steeper over the first year.
-        let sched = DriftSchedule::new(vec![0.0, 1.0, 2.0], vec![0.0, 0.06, 0.08])
-            .expect("valid schedule");
+        let sched =
+            DriftSchedule::new(vec![0.0, 1.0, 2.0], vec![0.0, 0.06, 0.08]).expect("valid schedule");
 
         assert!((sched.cumulative(0.5) - 0.03).abs() < 1e-12); // linear in [0,1]
         assert!((sched.cumulative(1.5) - 0.07).abs() < 1e-12); // linear in [1,2]

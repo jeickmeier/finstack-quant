@@ -55,11 +55,10 @@ fn test_bond_ytm_benchmark_1() {
     let bond = Bond::builder()
         .id("BOND_YTM_TEST1".into())
         .notional(Money::new(100.0, Currency::USD))
-        .cashflow_spec(CashflowSpec::fixed(
-            0.05,
-            Tenor::semi_annual(),
-            DayCount::Thirty360,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)
+                .expect("finite test coupon"),
+        )
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -138,11 +137,10 @@ fn test_bond_ytm_benchmark_2_par_bond() {
     let bond = Bond::builder()
         .id("BOND_PAR_TEST".into())
         .notional(Money::new(100.0, Currency::USD))
-        .cashflow_spec(CashflowSpec::fixed(
-            0.06,
-            Tenor::annual(),
-            DayCount::Act365F,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -192,11 +190,10 @@ fn test_bond_macaulay_duration_benchmark() {
     let bond = Bond::builder()
         .id("BOND_DUR_TEST".into())
         .notional(Money::new(100.0, Currency::USD))
-        .cashflow_spec(CashflowSpec::fixed(
-            0.08,
-            Tenor::annual(),
-            DayCount::Act365F,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -246,11 +243,10 @@ fn test_bond_modified_duration_benchmark() {
     let bond = Bond::builder()
         .id("BOND_MODDUR_TEST".into())
         .notional(Money::new(100.0, Currency::USD))
-        .cashflow_spec(CashflowSpec::fixed(
-            0.08,
-            Tenor::annual(),
-            DayCount::Act365F,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -304,11 +300,10 @@ fn test_bond_yield_dv01_market_standard() {
     let bond = Bond::builder()
         .id("BOND_DV01_TEST".into())
         .notional(Money::new(100.0, Currency::USD))
-        .cashflow_spec(CashflowSpec::fixed(
-            0.08,
-            Tenor::annual(),
-            DayCount::Act365F,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -370,11 +365,10 @@ fn test_bond_price_yield_relationship() {
         let bond = Bond::builder()
             .id("BOND_PRICE_YIELD".into())
             .notional(Money::new(100.0, Currency::USD))
-            .cashflow_spec(CashflowSpec::fixed(
-                0.06,
-                Tenor::semi_annual(),
-                DayCount::Act365F,
-            ).expect("finite test coupon"))
+            .cashflow_spec(
+                CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Act365F)
+                    .expect("finite test coupon"),
+            )
             .issue_date(as_of)
             .maturity(maturity)
             .discount_curve_id("USD_DISC".into())
@@ -425,7 +419,10 @@ fn test_bond_zero_coupon_duration() {
     let bond = Bond::builder()
         .id("ZERO_COUPON_TEST".into())
         .notional(Money::new(100.0, Currency::USD))
-        .cashflow_spec(CashflowSpec::fixed(0.0, Tenor::annual(), DayCount::Act365F).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.0, Tenor::annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -471,11 +468,10 @@ fn test_bond_convexity_positive() {
     let bond = Bond::builder()
         .id("BOND_CVX_TEST".into())
         .notional(Money::new(100.0, Currency::USD))
-        .cashflow_spec(CashflowSpec::fixed(
-            0.08,
-            Tenor::annual(),
-            DayCount::Act365F,
-        ).expect("finite test coupon"))
+        .cashflow_spec(
+            CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
+                .expect("finite test coupon"),
+        )
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
