@@ -8,8 +8,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 /// Current on-disk schema version for [`FinancialModelSpec`].
 ///
-/// Bump when the wire format changes in a breaking way and supply a migration
-/// path in [`validate_schema_version`].
+/// Bump on breaking wire-format changes. `validate_schema_version` rejects
+/// versions outside `1..=CURRENT_SCHEMA_VERSION`; older payloads that are no
+/// longer structurally compatible must be re-exported rather than migrated.
 pub const CURRENT_SCHEMA_VERSION: u32 = 2;
 
 /// Top-level financial model specification.
@@ -46,9 +47,7 @@ pub struct FinancialModelSpec {
     /// Schema version for forward compatibility.
     ///
     /// Validated on deserialize against `CURRENT_SCHEMA_VERSION`; unknown
-    /// versions fail deserialization rather than silently accepting drift. This
-    /// field is intentionally present even while only v1 exists so serialized
-    /// model stores have an explicit migration anchor.
+    /// versions fail deserialization rather than silently accepting drift.
     #[serde(
         default = "default_schema_version",
         deserialize_with = "deserialize_schema_version"
