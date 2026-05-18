@@ -450,6 +450,28 @@ impl ProtectionLegSpec {
 // the pricing surface minimal and consistent. If needed, store as metadata in
 // instrument `Attributes`.
 
+/// Rate-compounding convention for a TRS financing leg.
+///
+/// Distinguishes how each accrual period's floating rate is projected from the
+/// forward curve. The two conventions differ by the daily-compounding convexity
+/// — typically 12–15 bp of rate at current levels on an upward-sloping curve.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum FinancingRateCompounding {
+    /// Term-rate financing (e.g. 3M Term SOFR, EURIBOR): the period rate is the
+    /// simple arithmetic-average forward over the accrual period. This is the
+    /// default and matches a conventional term-rate-funded TRS.
+    #[default]
+    TermRate,
+    /// Overnight-indexed (OIS / RFR) financing — SOFR, SONIA, €STR, TONA: the
+    /// period rate daily-compounds the overnight forward,
+    /// `R = (∏(1 + rᵢ·dᵢ) − 1) / τ`, picking up the compounding convexity that
+    /// the simple arithmetic average drops.
+    OvernightCompounded,
+}
+
 /// Specification for TRS financing legs
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct FinancingLegSpec {
@@ -461,10 +483,21 @@ pub struct FinancingLegSpec {
     pub spread_bp: Decimal,
     /// Day count convention for accrual calculations
     pub day_count: DayCount,
+    /// Rate-compounding convention (term-rate vs overnight-compounded).
+    ///
+    /// Defaults to [`FinancingRateCompounding::TermRate`]. Set to
+    /// [`FinancingRateCompounding::OvernightCompounded`] for SOFR/SONIA/€STR
+    /// overnight-funded TRS so the financing rate captures daily-compounding
+    /// convexity.
+    #[serde(default)]
+    pub compounding: FinancingRateCompounding,
 }
 
 impl FinancingLegSpec {
-    /// Create a new financing leg specification
+    /// Create a new financing leg specification.
+    ///
+    /// The compounding convention defaults to [`FinancingRateCompounding::TermRate`];
+    /// use [`FinancingLegSpec::with_compounding`] to select OIS compounding.
     pub fn new(
         discount_curve_id: impl Into<String>,
         forward_curve_id: impl Into<String>,
@@ -476,7 +509,14 @@ impl FinancingLegSpec {
             forward_curve_id: CurveId::new(forward_curve_id),
             spread_bp,
             day_count,
+            compounding: FinancingRateCompounding::TermRate,
         }
+    }
+
+    /// Set the rate-compounding convention (consuming builder style).
+    pub fn with_compounding(mut self, compounding: FinancingRateCompounding) -> Self {
+        self.compounding = compounding;
+        self
     }
 }
 

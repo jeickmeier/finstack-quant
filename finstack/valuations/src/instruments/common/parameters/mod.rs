@@ -23,8 +23,8 @@ pub mod volatility;
 pub use contract::{ContractSpec, ScheduleSpec};
 pub use conventions::{BondConvention, CommodityConvention, IRSConvention};
 pub use legs::{
-    BasisSwapLeg, FinancingLegSpec, FixedLegSpec, FloatLegSpec, ParRateMethod, PayReceive,
-    PremiumLegSpec, ProtectionLegSpec, TotalReturnLegSpec,
+    BasisSwapLeg, FinancingLegSpec, FinancingRateCompounding, FixedLegSpec, FloatLegSpec,
+    ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec, TotalReturnLegSpec,
 };
 pub use market::{
     CreditParams, EquityOptionParams, ExerciseStyle, FxOptionParams, InterestRateOptionParams,

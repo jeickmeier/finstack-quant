@@ -173,12 +173,12 @@ impl EquityTotalReturnSwap {
                 contract_size: 1.0,
                 currency: Currency::USD,
             })
-            .financing(FinancingLegSpec {
-                discount_curve_id: CurveId::new("USD-OIS"),
-                forward_curve_id: CurveId::new("USD-SOFR-3M"),
-                spread_bp: Decimal::from(75),
-                day_count: DayCount::Act360,
-            })
+            .financing(FinancingLegSpec::new(
+                "USD-OIS",
+                "USD-SOFR-3M",
+                Decimal::from(75),
+                DayCount::Act360,
+            ))
             .schedule(TrsScheduleSpec::from_params(
                 date!(2024 - 01 - 01),
                 date!(2025 - 01 - 01),

@@ -244,11 +244,11 @@ pub use common_impl::traits::{
 // === Parameter Types ===
 pub use common_impl::parameters::{
     BasisSwapLeg, BondConvention, CommodityUnderlyingParams, ContractSpec, CreditParams,
-    EquityOptionParams, EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec, FixedLegSpec,
-    FloatLegSpec, FxOptionParams, FxUnderlyingParams, IRSConvention, IndexUnderlyingParams,
-    InterestRateOptionParams, OptionMarketParams, OptionType, ParRateMethod, PayReceive,
-    PremiumLegSpec, ProtectionLegSpec, ScheduleSpec, SettlementType, TotalReturnLegSpec,
-    UnderlyingParams,
+    EquityOptionParams, EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec,
+    FinancingRateCompounding, FixedLegSpec, FloatLegSpec, FxOptionParams, FxUnderlyingParams,
+    IRSConvention, IndexUnderlyingParams, InterestRateOptionParams, OptionMarketParams, OptionType,
+    ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec, ScheduleSpec, SettlementType,
+    TotalReturnLegSpec, UnderlyingParams,
 };
 
 // Re-export TRS common types

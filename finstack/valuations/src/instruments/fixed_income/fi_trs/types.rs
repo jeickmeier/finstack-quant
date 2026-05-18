@@ -18,7 +18,7 @@ use finstack_core::{
     dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor},
     market_data::context::MarketContext,
     money::Money,
-    types::{CurveId, InstrumentId},
+    types::InstrumentId,
     Result,
 };
 use finstack_margin::types::OtcMarginSpec;
@@ -91,12 +91,12 @@ impl FIIndexTotalReturnSwap {
             .with_duration("US-CORP-DURATION")
             .with_convexity("US-CORP-CONVEXITY")
             .with_contract_size(1.0);
-        let financing = FinancingLegSpec {
-            discount_curve_id: CurveId::new("USD-OIS"),
-            forward_curve_id: CurveId::new("USD-SOFR-3M"),
-            spread_bp: Decimal::from(100),
-            day_count: DayCount::Act360,
-        };
+        let financing = FinancingLegSpec::new(
+            "USD-OIS",
+            "USD-SOFR-3M",
+            Decimal::from(100),
+            DayCount::Act360,
+        );
         let sched = TrsScheduleSpec::from_params(
             date!(2024 - 01 - 01),
             date!(2025 - 01 - 01),

@@ -402,7 +402,7 @@ fn shift_business_days(date: Date, n: i32, calendar_id: Option<&str>) -> Result<
 /// if a daily/observation date step fails, or if the day-count fraction of a
 /// sub-period is non-positive.
 #[allow(clippy::too_many_arguments)]
-fn compounded_forward_projection(
+pub(crate) fn compounded_forward_projection(
     fwd: &ForwardCurve,
     accrual_start: Date,
     accrual_end: Date,

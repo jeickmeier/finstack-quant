@@ -13,35 +13,31 @@
 //! This allows equity TRS and fixed income TRS to share the common infrastructure
 //! while implementing their own return calculation logic.
 //!
-//! # Known limitation — financing-leg rate compounding
+//! # Financing-leg rate compounding
 //!
-//! The financing-leg functions ([`TrsEngine::pv_financing_leg`],
-//! [`TrsEngine::financing_annuity`], [`TrsEngine::pv_financing_float_only`])
-//! project each period's floating rate with [`rate_period_on_dates`] — the
-//! **simple arithmetic-average forward** over the accrual period. This is a
-//! defensible approximation for a *term-rate*-financed TRS (e.g. 3M Term SOFR,
-//! the convention the default `FinancingLegSpec` encodes), where the period
-//! length matches the index tenor.
+//! [`TrsEngine::pv_financing_leg`] and [`TrsEngine::pv_financing_float_only`]
+//! project each period's floating rate according to the financing leg's
+//! `FinancingRateCompounding` setting:
 //!
-//! It is, however, **not correct for an overnight-indexed (OIS / RFR) financing
-//! leg** — SOFR/SONIA/ESTR overnight financing — which must instead
-//! daily-compound `(∏(1+rᵢ·dᵢ)−1)/τ`. The simple average drops the
-//! daily-compounding convexity (~12-15 bp of rate at current levels) and any
-//! observation shift, exactly as audited for the swap-leg pricer.
+//! - `TermRate` — the **simple arithmetic-average forward** over the accrual
+//!   period ([`rate_period_on_dates`]), correct for a term-rate-financed TRS
+//!   (e.g. 3M Term SOFR) where the period length matches the index tenor.
+//! - `OvernightCompounded` — **daily-compounds** the overnight forward via
+//!   `swap_legs::compounded_forward_projection`, `(∏(1+rᵢ·dᵢ)−1)/τ`, correct
+//!   for an overnight-indexed (OIS / RFR) financing leg (SOFR/SONIA/€STR). The
+//!   simple average would drop the daily-compounding convexity (~12–15 bp of
+//!   rate at current levels).
 //!
-//! The fix is **blocked out of scope**: `FinancingLegSpec`
-//! (`instruments/common/parameters/legs.rs`) carries no compounding-method
-//! discriminator, so the financing leg cannot currently express the
-//! OIS-vs-term distinction, and unconditionally daily-compounding would
-//! mis-price genuinely term-rate-financed TRS. Once `FinancingLegSpec` gains a
-//! compounding field, the OIS branch should call
-//! `swap_legs::compounded_forward_projection` (already implemented for the
-//! swap-leg pricer) for the OIS / RFR case.
+//! [`TrsEngine::financing_annuity`] projects no rate (it sums discounted year
+//! fractions only) and is therefore independent of the compounding choice.
 
-use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
+use crate::instruments::common_impl::parameters::legs::{
+    FinancingLegSpec, FinancingRateCompounding,
+};
 use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
 use finstack_core::dates::{Date, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
+use finstack_core::market_data::term_structures::ForwardCurve;
 use finstack_core::math::NeumaierAccumulator;
 use finstack_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
@@ -49,6 +45,48 @@ use rust_decimal::prelude::ToPrimitive;
 use crate::instruments::common_impl::pricing::time::{
     rate_period_on_dates, relative_df_discount_curve,
 };
+
+/// Project one financing-leg accrual period's floating rate, excluding spread.
+///
+/// `TermRate` legs use the simple arithmetic-average forward over the period;
+/// `OvernightCompounded` (OIS / RFR) legs daily-compound the overnight forward
+/// and return the equivalent simple rate `(∏(1+rᵢ·dᵢ)−1)/τ`, capturing the
+/// daily-compounding convexity the arithmetic average drops.
+fn financing_period_rate(
+    financing: &FinancingLegSpec,
+    fwd: &ForwardCurve,
+    period_start: Date,
+    period_end: Date,
+    period_year_fraction: f64,
+    calendar_id: &str,
+) -> finstack_core::Result<f64> {
+    match financing.compounding {
+        FinancingRateCompounding::TermRate => {
+            rate_period_on_dates(fwd, period_start, period_end)
+        }
+        FinancingRateCompounding::OvernightCompounded => {
+            // The daily-compounding observation grid needs either a registered
+            // holiday calendar or `None` (weekday-only stepping). The
+            // weekends-only sentinel and an empty id both mean weekday-only,
+            // which `compounded_forward_projection` expresses as `None`.
+            let obs_calendar = match calendar_id {
+                "" => None,
+                id if id == crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID => None,
+                id => Some(id),
+            };
+            super::swap_legs::compounded_forward_projection(
+                fwd,
+                period_start,
+                period_end,
+                period_year_fraction,
+                0, // no observation lookback modelled for the TRS funding leg
+                obs_calendar,
+                None,
+                None,
+            )
+        }
+    }
+}
 
 /// Parameters for total return leg calculation.
 #[derive(Debug, Clone)]
@@ -278,13 +316,16 @@ impl TrsEngine {
                 .day_count
                 .year_fraction(period_start, period_end, ctx)?;
 
-            // Simple arithmetic-average forward over the accrual period. This is
-            // correct for a term-rate financing leg but understates an
-            // overnight-indexed (OIS) financing leg by the daily-compounding
-            // convexity — see the module-level "Known limitation" note. The fix
-            // is blocked on a compounding discriminator being added to
-            // `FinancingLegSpec` (out of scope).
-            let fwd_rate = rate_period_on_dates(fwd.as_ref(), period_start, period_end)?;
+            // Project the period rate per the leg's compounding convention
+            // (simple term-rate average vs daily-compounded OIS).
+            let fwd_rate = financing_period_rate(
+                financing,
+                fwd.as_ref(),
+                period_start,
+                period_end,
+                yf,
+                schedule.params.calendar_id.as_str(),
+            )?;
             let total_rate = fwd_rate + spread_decimal;
             let payment = notional.amount() * total_rate * yf;
 
@@ -412,11 +453,16 @@ impl TrsEngine {
                 .day_count
                 .year_fraction(period_start, period_end, ctx)?;
 
-            // Simple arithmetic-average forward — see the "Known limitation"
-            // note: correct for term-rate financing, understates an OIS
-            // financing leg by the daily-compounding convexity (blocked on a
-            // `FinancingLegSpec` compounding discriminator, out of scope).
-            let fwd_rate = rate_period_on_dates(fwd.as_ref(), period_start, period_end)?;
+            // Project the period rate per the leg's compounding convention
+            // (simple term-rate average vs daily-compounded OIS).
+            let fwd_rate = financing_period_rate(
+                financing,
+                fwd.as_ref(),
+                period_start,
+                period_end,
+                yf,
+                schedule.params.calendar_id.as_str(),
+            )?;
             let payment = notional.amount() * fwd_rate * yf;
 
             let payment_date = schedule.payment_date_for(period_end)?;
@@ -432,7 +478,9 @@ impl TrsEngine {
 mod tests {
     use super::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
     use crate::cashflow::builder::ScheduleParams;
-    use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
+    use crate::instruments::common_impl::parameters::legs::{
+        FinancingLegSpec, FinancingRateCompounding,
+    };
     use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
     use crate::instruments::common_impl::pricing::swap_legs;
     use crate::instruments::common_impl::pricing::time::{
@@ -661,6 +709,7 @@ mod tests {
             forward_curve_id: CurveId::new("FWD"),
             spread_bp: Decimal::ZERO,
             day_count: DayCount::Act365F,
+            compounding: FinancingRateCompounding::TermRate,
         };
 
         let pv = TrsEngine::pv_financing_leg(
@@ -710,6 +759,73 @@ mod tests {
         assert!(
             (expected - naive).abs() > 1e-6,
             "Expected curve-based forward/DF to differ from naive time mapping"
+        );
+    }
+
+    #[test]
+    fn trs_financing_leg_overnight_compounding_exceeds_term_rate_on_upward_curve() {
+        // On an upward-sloping forward curve, daily-compounding an OIS financing
+        // leg picks up positive convexity that the simple term-rate average
+        // drops. A `TermRate` and an `OvernightCompounded` leg over the same
+        // curves must therefore price differently, with OIS strictly higher.
+        let as_of = date(2025, 1, 1);
+        let end = date(2026, 1, 1);
+        let schedule = TrsScheduleSpec::from_params(
+            as_of,
+            end,
+            ScheduleParams {
+                freq: Tenor::quarterly(),
+                dc: DayCount::Act365F,
+                bdc: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+            },
+        );
+
+        let disc = DiscountCurve::builder(CurveId::new("DISC"))
+            .base_date(as_of)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 1.0), (1.0, 0.95)])
+            .build()
+            .expect("discount curve");
+
+        // Steep upward-sloping overnight forward: 3% -> 6% over the year.
+        let fwd = ForwardCurve::builder(CurveId::new("FWD"), 0.25)
+            .base_date(as_of)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.03), (1.0, 0.06)])
+            .build()
+            .expect("forward curve");
+
+        let ctx = MarketContext::new().insert(disc).insert(fwd);
+        let notional = Money::new(1_000_000.0, Currency::USD);
+
+        let term = FinancingLegSpec::new("DISC", "FWD", Decimal::ZERO, DayCount::Act365F);
+        let ois = term
+            .clone()
+            .with_compounding(FinancingRateCompounding::OvernightCompounded);
+
+        let pv_term = TrsEngine::pv_financing_leg(&term, &schedule, notional, &ctx, as_of)
+            .expect("term-rate financing pv");
+        let pv_ois = TrsEngine::pv_financing_leg(&ois, &schedule, notional, &ctx, as_of)
+            .expect("OIS financing pv");
+
+        assert!(
+            pv_ois.amount() > pv_term.amount(),
+            "OIS compounding must exceed term-rate on an upward curve: ois={}, term={}",
+            pv_ois.amount(),
+            pv_term.amount()
+        );
+
+        // The convexity gap should be material (a fraction of a bp up to a few
+        // bp of notional) but not absurd — guards against a degenerate
+        // near-zero pass or a units blunder.
+        let gap_bp = (pv_ois.amount() - pv_term.amount()) / notional.amount() * 10_000.0;
+        assert!(
+            (0.1..50.0).contains(&gap_bp),
+            "OIS-vs-term convexity gap {gap_bp} bp is outside the expected range"
         );
     }
 }
