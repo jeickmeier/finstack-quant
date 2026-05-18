@@ -1030,7 +1030,7 @@ fn test_sabr_calibrate_with_atm_pinning_matches_synthetic_smile() {
 }
 
 #[test]
-fn test_sabr_calibrate_with_derivatives_tracks_fd_gradient_solution() {
+fn test_sabr_calibrate_with_derivatives_recovers_known_smile() {
     let true_params = SABRParameters::new(0.25, 0.5, 0.45, -0.3).expect("valid params");
     let true_model = SABRModel::new(true_params);
 
@@ -1047,35 +1047,20 @@ fn test_sabr_calibrate_with_derivatives_tracks_fd_gradient_solution() {
         })
         .collect();
 
-    let fd_params = SABRCalibrator::new()
-        .with_fd_gradients(true)
+    let params = SABRCalibrator::new()
         .with_tolerance(1e-9)
         .with_max_iterations(200)
         .calibrate_with_derivatives(forward, &strikes, &market_vols, expiry, beta)
-        .expect("FD-derivative calibration should succeed");
-    let analytic_params = SABRCalibrator::new()
-        .with_fd_gradients(false)
-        .with_tolerance(1e-9)
-        .with_max_iterations(200)
-        .calibrate_with_derivatives(forward, &strikes, &market_vols, expiry, beta)
-        .expect("analytical-derivative calibration should succeed");
+        .expect("derivative calibration should succeed");
 
-    let fd_model = SABRModel::new(fd_params);
-    let analytic_model = SABRModel::new(analytic_params);
+    let model = SABRModel::new(params);
     for (strike, market_vol) in strikes.into_iter().zip(market_vols.into_iter()) {
-        let fd_vol = fd_model
+        let fitted = model
             .implied_volatility(forward, strike, expiry)
-            .expect("FD model vol should compute");
-        let analytic_vol = analytic_model
-            .implied_volatility(forward, strike, expiry)
-            .expect("analytic model vol should compute");
+            .expect("model vol should compute");
         assert!(
-            (fd_vol - market_vol).abs() < 2e-2,
-            "FD fit too loose at strike {strike}: fitted={fd_vol}, market={market_vol}"
-        );
-        assert!(
-            (analytic_vol - market_vol).abs() < 2e-2,
-            "analytical fit too loose at strike {strike}: fitted={analytic_vol}, market={market_vol}"
+            (fitted - market_vol).abs() < 2e-2,
+            "fit too loose at strike {strike}: fitted={fitted}, market={market_vol}"
         );
     }
 }

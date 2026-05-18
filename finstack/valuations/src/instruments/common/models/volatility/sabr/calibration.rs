@@ -18,12 +18,12 @@ use finstack_core::{Error, Result};
 /// For production vol surfaces where Greeks are computed from the surface,
 /// consider using tighter tolerance (1e-8) to ensure smooth Greeks.
 ///
-/// # Gradient Methods
+/// # Gradient Method
 ///
-/// Two gradient computation methods are available:
-///
-/// - **Finite differences** (default): More robust, works for all parameter ranges
-/// - **Analytical**: Faster but may have numerical issues at parameter boundaries
+/// `calibrate_with_derivatives` drives the Levenberg-Marquardt solver with
+/// central finite-difference gradients of the SABR implied-vol function. The
+/// gradient is therefore exactly consistent with the calibration objective
+/// and robust across the full parameter range.
 #[derive(Clone)]
 pub struct SABRCalibrator {
     /// Tolerance for calibration convergence.
@@ -33,8 +33,6 @@ pub struct SABRCalibrator {
     tolerance: f64,
     /// Maximum iterations for the optimizer.
     max_iterations: usize,
-    /// Use finite-difference gradients instead of analytical approximations.
-    use_fd_gradients: bool,
 }
 
 impl SABRCalibrator {
@@ -59,16 +57,10 @@ impl SABRCalibrator {
     ///     .with_tolerance(1e-8)
     ///     .with_max_iterations(200);
     /// ```
-    ///
-    /// By default, uses finite-difference gradients (`use_fd_gradients: true`)
-    /// for more accurate calibration at the cost of some performance.
-    /// Use `with_fd_gradients(false)` to switch to analytical approximations
-    /// for faster but potentially less accurate calibration.
     pub fn new() -> Self {
         Self {
             tolerance: 1e-6,
             max_iterations: 100,
-            use_fd_gradients: true, // Default to FD for production accuracy
         }
     }
 
@@ -83,7 +75,6 @@ impl SABRCalibrator {
         Self {
             tolerance: 1e-8,
             max_iterations: 200,
-            use_fd_gradients: true,
         }
     }
 
@@ -96,12 +87,6 @@ impl SABRCalibrator {
     /// Set maximum iterations
     pub fn with_max_iterations(mut self, max_iterations: usize) -> Self {
         self.max_iterations = max_iterations;
-        self
-    }
-
-    /// Enable finite-difference gradients for higher accuracy (slower).
-    pub fn with_fd_gradients(mut self, use_fd: bool) -> Self {
-        self.use_fd_gradients = use_fd;
         self
     }
 
@@ -293,7 +278,7 @@ impl SABRCalibrator {
         SABRParameters::new(solution[0], beta, solution[1], solution[2])
     }
 
-    /// Calibrate SABR parameters with analytical derivatives for improved performance
+    /// Calibrate SABR parameters with finite-difference parameter gradients.
     pub fn calibrate_with_derivatives(
         &self,
         forward: f64,
@@ -326,12 +311,8 @@ impl SABRCalibrator {
             shift: None,
         };
 
-        // Create derivatives provider (with or without FD gradients)
-        let derivatives_provider = if self.use_fd_gradients {
-            SABRCalibrationDerivatives::new_with_fd(market_data.clone())
-        } else {
-            SABRCalibrationDerivatives::new(market_data.clone())
-        };
+        // Finite-difference derivatives provider for the LM solver.
+        let derivatives_provider = SABRCalibrationDerivatives::new(market_data.clone());
 
         // Create Levenberg-Marquardt solver
         let solver = LevenbergMarquardtSolver::new()
