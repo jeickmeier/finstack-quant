@@ -71,6 +71,20 @@ pub(crate) trait BootstrapTarget {
     fn validate_knot(&self, _time: f64, _value: f64) -> Result<()> {
         Ok(())
     }
+
+    /// Whether this target may accept a best-effort knot when the solver finds
+    /// no sign-change bracket. The accepted knot's residual is still validated
+    /// against the target tolerance, and the report flags it via the
+    /// `approximate_knots` metadata.
+    ///
+    /// Defaults to `false`: a no-bracket knot is a hard failure (audit item 10).
+    /// Targets whose objective is monotone and whose market quotes can
+    /// legitimately sit outside the model-reachable range — notably
+    /// base-correlation bootstrapping against tranche upfronts — override this
+    /// to `true` (the audit's sanctioned "explicit caller opt-in").
+    fn allow_approximate_knots(&self) -> bool {
+        false
+    }
 }
 
 /// Trait defining the specific physics for a global optimization process.

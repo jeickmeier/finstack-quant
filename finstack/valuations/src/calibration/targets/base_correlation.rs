@@ -359,9 +359,17 @@ impl BaseCorrelationTarget {
         let target = BaseCorrelationTarget::new(params.clone(), context.clone());
         let prepared_quotes = target.prepare_quotes(tranche_quotes)?;
 
-        // Base correlation uses discount curve validation tolerance as the closest target-specific config.
-        // Could add a dedicated base_correlation_curve config in the future if needed.
-        let success_tolerance = Some(global_config.discount_curve.validation_tolerance);
+        // Base-correlation bootstrapping fits a correlation to each tranche's market
+        // upfront. Unlike a discount-curve bootstrap (which reprices par instruments to
+        // machine precision), tranche repricing carries its own loss-distribution /
+        // numerical-integration error, and a market upfront need not correspond exactly
+        // to any correlation in the model-admissible range. Holding it to the
+        // discount-curve machine-precision tolerance is unrealistic; use a
+        // tranche-appropriate validation tolerance. ~10 bp of upfront — generous
+        // relative to tranche-pricing precision, but still rejects a materially
+        // miscalibrated knot.
+        const BASE_CORRELATION_VALIDATION_TOLERANCE: f64 = 1e-3;
+        let success_tolerance = Some(BASE_CORRELATION_VALIDATION_TOLERANCE);
 
         let (curve, mut report) = SequentialBootstrapper::bootstrap(
             &target,
@@ -388,6 +396,14 @@ impl BaseCorrelationTarget {
 impl BootstrapTarget for BaseCorrelationTarget {
     type Quote = CalibrationQuote;
     type Curve = BaseCorrelationCurve;
+
+    /// Base-correlation calibration opts into best-effort knots: the objective
+    /// (tranche upfront vs. correlation) is monotone, and a market upfront may
+    /// sit just outside the model-reachable correlation range, in which case the
+    /// closest admissible correlation is the correct calibrated value.
+    fn allow_approximate_knots(&self) -> bool {
+        true
+    }
 
     fn quote_time(&self, quote: &Self::Quote) -> Result<f64> {
         match quote {

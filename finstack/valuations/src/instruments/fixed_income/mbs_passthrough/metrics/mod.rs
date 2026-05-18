@@ -78,6 +78,26 @@ impl MetricCalculator for OasCalculator {
     }
 }
 
+/// Register agency MBS passthrough metrics with the registry.
+pub(crate) fn register_mbs_passthrough_metrics(registry: &mut MetricRegistry) {
+    use crate::pricer::InstrumentType;
+    crate::register_metrics! {
+        registry: registry,
+        instrument: InstrumentType::AgencyMbsPassthrough,
+        metrics: [
+            (DurationMod, EffectiveDurationCalculator),
+            (Convexity, EffectiveConvexityCalculator),
+            (Oas, OasCalculator),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::<
+                crate::instruments::AgencyMbsPassthrough,
+            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
+                crate::instruments::AgencyMbsPassthrough,
+            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+        ]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,25 +194,5 @@ mod tests {
             (mc_oas - static_zspread).abs() > 1e-4,
             "MC-OAS {mc_oas} should differ from static Z-spread {static_zspread}"
         );
-    }
-}
-
-/// Register agency MBS passthrough metrics with the registry.
-pub(crate) fn register_mbs_passthrough_metrics(registry: &mut MetricRegistry) {
-    use crate::pricer::InstrumentType;
-    crate::register_metrics! {
-        registry: registry,
-        instrument: InstrumentType::AgencyMbsPassthrough,
-        metrics: [
-            (DurationMod, EffectiveDurationCalculator),
-            (Convexity, EffectiveConvexityCalculator),
-            (Oas, OasCalculator),
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::AgencyMbsPassthrough,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::AgencyMbsPassthrough,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
-        ]
     }
 }

@@ -26,6 +26,10 @@ struct NoBracketContext<'a, Q> {
     quote: &'a Q,
     diag: &'a BracketDiagnostics,
     validation_tolerance: f64,
+    /// When `true`, a no-sign-change-bracket best point that reprices within
+    /// `validation_tolerance` is accepted as an approximate knot rather than a
+    /// hard failure (see `BootstrapTarget::allow_approximate_knots`).
+    allow_approximate: bool,
     first_eval_error: Option<String>,
 }
 
@@ -184,6 +188,17 @@ fn resolve_no_bracket<Q: std::fmt::Debug>(ctx: NoBracketContext<'_, Q>) -> Resul
         // guess. Accept it (the bracketed-root contract — `is_approximate = false`).
         if ctx.diag.is_sign_change_bracket && within_tol {
             return Ok((best_x, false));
+        }
+
+        // No sign-change bracket, but the target explicitly opts into best-effort
+        // knots and the best point reprices within the validation tolerance. This is
+        // the audit item-10 "explicit caller opt-in": used by base-correlation
+        // bootstrapping, whose objective (tranche upfront vs. correlation) is monotone,
+        // so a best point pinned at a scan bound is the genuine "closest reachable"
+        // knot, not a spurious local minimum. Flagged `is_approximate = true` so the
+        // report records it under `approximate_knots`.
+        if ctx.allow_approximate && within_tol {
+            return Ok((best_x, true));
         }
 
         // No sign-change bracket (or the residual exceeds tolerance): hard failure.
@@ -527,6 +542,7 @@ impl SequentialBootstrapper {
                 quote,
                 diag: &diag,
                 validation_tolerance,
+                allow_approximate: target.allow_approximate_knots(),
                 first_eval_error: first_eval_error.borrow().clone(),
             })?,
         };
