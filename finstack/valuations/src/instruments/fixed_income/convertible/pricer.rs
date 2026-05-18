@@ -604,7 +604,17 @@ impl<'a> TsiveriotisZhangEngine<'a> {
         // State tracking: (Total Value, Cash Component)
         let mut values: Vec<(f64, f64)> = Vec::with_capacity(2 * self.steps + 1);
 
-        // Helper to get spot at (step, node)
+        // Helper to get spot at (step, node).
+        //
+        // Trinomial node spot: for a recombining trinomial the recombination
+        // identity is `up·down = middle²`, so the spot at `net` net up-moves
+        // after `step` total moves depends only on `net` and equals
+        //   S₀ · up^net · middle^(step − net).
+        // The previous form `up^max(net,0) · down^max(-net,0)` silently
+        // assumed `up·down = 1` (it dropped the middle factor entirely) and is
+        // malformed for any trinomial whose middle factor is not 1. Using the
+        // explicit `middle_factor` is correct for any recombining trinomial.
+        let trinomial_middle = params.middle_factor.unwrap_or(1.0);
         let get_spot = |step: usize, node: usize| -> f64 {
             match tree_type {
                 ConvertibleTreeType::Binomial(_) => {
@@ -614,8 +624,10 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 }
                 ConvertibleTreeType::Trinomial(_) => {
                     let net_moves = node as i32 - step as i32;
-                    spot * params.up_factor.powi(net_moves.max(0))
-                        * params.down_factor.powi((-net_moves).max(0))
+                    // `powi` accepts negative exponents (u^(-k) = 1/u^k), so
+                    // this is correct for both up and down net moves.
+                    spot * params.up_factor.powi(net_moves)
+                        * trinomial_middle.powi(step as i32 - net_moves)
                 }
             }
         };
@@ -723,25 +735,49 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                     final_cash = 0.0;
                 }
 
-                // 2. Call (Issuer minimizes value)
-                // M3: Uses adjusted soft-call trigger with observation window correction
+                // 2. Call (Issuer minimizes value).
+                //
+                // Tsiveriotis-Zhang call rule:
+                //   value = min(continuation, max(call_price, conversion_value))
+                // The issuer calls only when doing so *reduces* the bond value,
+                // i.e. when `continuation > value_if_called`, where
+                // `value_if_called` is the holder's optimal response to a call:
+                //   - convert (→ conversion_value, all-equity) iff conversion
+                //     is permitted at this step AND conversion_value exceeds
+                //     the call price;
+                //   - otherwise accept the cash call price (all-cash).
+                //
+                // Critically the conversion branch must be gated on
+                // `can_convert`: a previous form used `conversion_val` in the
+                // cash/equity split unconditionally, which forced a conversion
+                // (cash = 0) even at steps where conversion is not allowed,
+                // corrupting both the value and the cash component that feeds
+                // the next credit-risky discounting step.
+                // M3: Uses adjusted soft-call trigger with observation window correction.
                 let call_allowed = self.valuator.soft_call_triggered(node_spot);
 
                 if call_allowed {
                     if let Some(call_price) = self.valuator.call_price_at_step(step) {
-                        let val_if_called = if can_convert {
-                            conversion_val.max(call_price)
+                        // Holder converts in response to a call only if
+                        // conversion is genuinely permitted here and is worth
+                        // more than the cash call price.
+                        let holder_converts = can_convert && conversion_val >= call_price;
+                        let value_if_called = if holder_converts {
+                            conversion_val
                         } else {
                             call_price
                         };
 
-                        if final_total > val_if_called {
-                            if conversion_val >= val_if_called {
+                        // Issuer calls iff it strictly lowers the bond value.
+                        if final_total > value_if_called {
+                            if holder_converts {
                                 final_total = conversion_val;
                                 final_cash = 0.0;
                             } else {
-                                final_total = val_if_called;
-                                final_cash = val_if_called;
+                                // Cash redemption at the call price: the whole
+                                // payoff is a cash (credit-risky) component.
+                                final_total = call_price;
+                                final_cash = call_price;
                             }
                         }
                     }
@@ -1160,8 +1196,24 @@ pub fn calculate_convertible_greeks(
     {
         if inputs.time_to_maturity > 1.0 / 365.25 {
             if let Some(next_day) = as_of.next_day() {
-                let fwd_price = price_convertible_bond(bond, market_context, tree_type, next_day)?;
-                // Theta = P(t+1d) - P(t), reported as change per calendar day
+                // Theta must roll the discount/credit curves forward by one
+                // day, not just advance the valuation date. Repricing at
+                // `t+1d` with the *same* market context leaves the curves
+                // anchored at `t`, so theta omits curve roll-down (the change
+                // in discount factors as the curve's own base date advances).
+                // `roll_forward(1)` re-anchors every curve to `t+1d`.
+                //
+                // A roll can fail when a curve is too sparse to retain ≥ 2
+                // knots after the shift; in that case we fall back to a
+                // no-roll reprice (still a valid theta estimate, just without
+                // curve roll-down) rather than failing the whole Greeks call.
+                let rolled_market = match market_context.roll_forward(1) {
+                    Ok(m) => m,
+                    Err(_) => market_context.clone(),
+                };
+                let fwd_price =
+                    price_convertible_bond(bond, &rolled_market, tree_type, next_day)?;
+                // Theta = P(t+1d) - P(t), reported as change per calendar day.
                 greeks.theta = fwd_price.amount() - greeks.price;
             }
         }
@@ -1478,6 +1530,63 @@ mod tests {
         assert!(greeks.price > 1000.0);
     }
 
+    /// Item 8 regression: theta must roll the discount curve to `t+1d`, not
+    /// reprice at `t+1d` against the curve still anchored at `t`.
+    ///
+    /// On a non-flat curve, rolling the curve forward changes the discount
+    /// factors (roll-down). The pre-fix theta repriced at the next day with
+    /// the *same* market context, so it omitted curve roll-down entirely. This
+    /// test computes the no-roll theta explicitly and asserts the reported
+    /// theta — which now rolls the curve — differs from it on a steep curve.
+    #[test]
+    fn theta_rolls_the_discount_curve() {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let as_of = issue;
+        let bond = create_test_bond();
+
+        // A steeply-sloped discount curve so curve roll-down is material.
+        let steep_curve = DiscountCurve::builder("USD-OIS")
+            .base_date(issue)
+            .knots([
+                (0.0, 1.0),
+                (0.5, 0.95),
+                (1.0, 0.88),
+                (5.0, 0.55),
+                (10.0, 0.30),
+            ])
+            .interp(finstack_core::math::interp::InterpStyle::Linear)
+            .build()
+            .expect("steep curve");
+        let market = MarketContext::new()
+            .insert(steep_curve)
+            .insert_price("AAPL", MarketScalar::Unitless(150.0))
+            .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+            .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
+
+        let tree = ConvertibleTreeType::Binomial(80);
+        let greeks = calculate_convertible_greeks(&bond, &market, tree, Some(0.01), as_of)
+            .expect("greeks");
+        assert!(greeks.theta.is_finite(), "theta must be finite");
+
+        // No-roll theta: reprice at t+1d with the SAME (un-rolled) market —
+        // exactly the pre-fix behavior.
+        let next_day = as_of.next_day().expect("next day");
+        let base_price = greeks.price;
+        let no_roll_price = price_convertible_bond(&bond, &market, tree, next_day)
+            .expect("no-roll price")
+            .amount();
+        let no_roll_theta = no_roll_price - base_price;
+
+        // The reported theta rolls the curve, so on this steep curve it must
+        // differ from the no-roll theta.
+        assert!(
+            (greeks.theta - no_roll_theta).abs() > 1e-6,
+            "theta {} should differ from the no-roll theta {no_roll_theta} on a \
+             steep curve — curve roll-down must be included",
+            greeks.theta
+        );
+    }
+
     #[test]
     fn test_accrued_interest() {
         let bond = create_test_bond();
@@ -1535,6 +1644,92 @@ mod tests {
             price_before.amount() < 1000.0,
             "Mandatory OTM bond should price below par: got {}",
             price_before.amount()
+        );
+    }
+
+    /// Item 2 regression: the call branch must not force a conversion at a
+    /// node where conversion is *not* permitted.
+    ///
+    /// Construct a callable bond whose conversion is gated on
+    /// `ChangeOfControl` — an event the tree cannot model, so
+    /// `conversion_allowed` is `false` at every node. With a very high equity
+    /// spot the conversion *value* (ratio·spot) is enormous, but the holder
+    /// can never actually convert. The bond is economically a callable
+    /// straight bond: its value is capped by the call price and must stay far
+    /// below the conversion value.
+    ///
+    /// The pre-fix code used `conversion_val` in the call branch's cash/equity
+    /// split unconditionally, so at a call node it set `(conversion_val, 0)` —
+    /// forcing a conversion that is not allowed and inflating the price to the
+    /// conversion value. The fix gates the conversion response on
+    /// `can_convert`, so the called bond correctly redeems in cash.
+    #[test]
+    fn call_branch_does_not_force_disallowed_conversion() {
+        use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+        use crate::instruments::fixed_income::convertible::ConversionEvent;
+
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
+        let as_of = issue;
+
+        let mut bond = create_test_bond();
+        // Conversion only on a change-of-control — never modellable in the
+        // tree, so `conversion_allowed` is false at every node.
+        bond.conversion.policy =
+            ConversionPolicy::UponEvent(ConversionEvent::ChangeOfControl);
+        // Callable for the whole life at 102% of par.
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: issue,
+                end_date: maturity,
+                price_pct_of_par: 102.0,
+                make_whole: None,
+            }],
+            puts: Vec::new(),
+        });
+
+        // Very high spot: conversion value (ratio 10 × spot 5000 = 50,000) is
+        // ~50× the 1,000 face. A callable non-convertible bond must ignore it.
+        let base_date = issue;
+        let discount_curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots([(0.0, 1.0), (10.0, 0.90)])
+            .interp(finstack_core::math::interp::InterpStyle::Linear)
+            .build()
+            .expect("curve");
+        let market = MarketContext::new()
+            .insert(discount_curve)
+            .insert_price("AAPL", MarketScalar::Unitless(5000.0))
+            .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+            .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
+
+        let price = price_convertible_bond(
+            &bond,
+            &market,
+            ConvertibleTreeType::Binomial(60),
+            as_of,
+        )
+        .expect("should price");
+
+        let conversion_value = 10.0 * 5000.0; // ratio × spot = 50,000
+        let call_price = 1000.0 * 1.02; // 102% of par = 1,020
+
+        // The bond must be valued as a callable straight bond: nowhere near
+        // the conversion value, and capped around the call price (plus the
+        // PV of coupons until the call).
+        assert!(
+            price.amount() < conversion_value / 10.0,
+            "callable non-convertible bond priced at {} — far too close to the \
+             conversion value {conversion_value}; the call branch is forcing a \
+             disallowed conversion",
+            price.amount()
+        );
+        // Sanity: it should be a sensible callable-bond value, near the call
+        // price (the issuer calls the deep-premium bond), well under 2× par.
+        assert!(
+            price.amount() > 0.0 && price.amount() < 2.0 * call_price,
+            "callable straight-bond value out of range: {}",
+            price.amount()
         );
     }
 
@@ -1607,6 +1802,48 @@ mod tests {
             accrued > 5.0 && accrued < 20.0,
             "30/360 accrued should be reasonable: {}",
             accrued
+        );
+    }
+
+    /// Item 11 regression: the trinomial node-spot grid must be built with the
+    /// proper middle factor, `S₀ · up^net · middle^(step − net)`.
+    ///
+    /// For a recombining trinomial the recombination identity is
+    /// `up·down = middle²`. The previous `up^max(net,0)·down^max(-net,0)` form
+    /// dropped the middle factor and is only valid when `up·down = 1`. With
+    /// the corrected formula the trinomial spot grid is well-formed, so a
+    /// trinomial price must converge to the binomial price for the same bond
+    /// (both are consistent lattice discretizations of the same process).
+    #[test]
+    fn trinomial_spot_grid_well_formed_matches_binomial() {
+        let bond = create_test_bond();
+        let market = create_test_market_context();
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+
+        let binomial = price_convertible_bond(
+            &bond,
+            &market,
+            ConvertibleTreeType::Binomial(400),
+            as_of,
+        )
+        .expect("binomial price")
+        .amount();
+        let trinomial = price_convertible_bond(
+            &bond,
+            &market,
+            ConvertibleTreeType::Trinomial(400),
+            as_of,
+        )
+        .expect("trinomial price")
+        .amount();
+
+        // Both lattices discretize the same process; with 400 steps they must
+        // agree closely. A malformed trinomial grid would diverge sharply.
+        let rel_diff = (binomial - trinomial).abs() / binomial.max(1.0);
+        assert!(
+            rel_diff < 0.01,
+            "trinomial price {trinomial} should match binomial {binomial} \
+             within 1% (rel diff {rel_diff:.4}); a malformed spot grid would diverge"
         );
     }
 

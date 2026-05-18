@@ -4,6 +4,7 @@
 //! to parallel shifts in interest rates, accounting for the change in
 //! prepayment behavior as rates change.
 
+use crate::cashflow::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
 use crate::instruments::fixed_income::mbs_passthrough::pricer::price_mbs;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_core::dates::Date;
@@ -11,6 +12,44 @@ use finstack_core::market_data::bumps::MarketBump;
 use finstack_core::market_data::context::BumpSpec;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::Result;
+
+/// Prepayment rate-sensitivity coefficient β for effective duration/convexity.
+///
+/// MBS prepayment responds to rates: when rates fall the refinancing incentive
+/// rises and prepayment speeds up; when rates rise the lock-in effect slows
+/// prepayment. We apply the refinancing-incentive multiplier `exp(-β·Δy)` to
+/// the pool's prepayment *speed* in the bumped scenarios so the effective
+/// measures capture the negative convexity that a *static* PSA bump cannot.
+///
+/// β is calibrated so a 100 bp rate move roughly doubles (rates down) or
+/// halves (rates up) the prepayment speed — the standard rule-of-thumb shape
+/// of the empirical refinancing S-curve: `β = ln(2) / 0.01 ≈ 69.3`. This is a
+/// *speed-multiplier* sensitivity for a parallel curve bump and is distinct
+/// from the Monte-Carlo OAS model's per-path short-rate SMM sensitivity.
+const PREPAY_RATE_SENSITIVITY: f64 = 69.314_718_055_994_53; // ln(2) / 0.01
+
+/// Scale a prepayment model's speed by a rate-shift multiplier.
+///
+/// `rate_shift` is the parallel curve shift in decimal (e.g. `+0.0025` for a
+/// +25 bp bump). The prepayment speed is multiplied by `exp(-β·rate_shift)`:
+/// a positive shift (rates up) slows prepayment, a negative shift speeds it
+/// up. For a PSA model the `speed_multiplier` is scaled; for constant/lockout
+/// models the annual `cpr` is scaled.
+fn rate_shift_prepayment(model: &PrepaymentModelSpec, rate_shift: f64) -> PrepaymentModelSpec {
+    let multiplier = (-PREPAY_RATE_SENSITIVITY * rate_shift).exp();
+    match &model.curve {
+        Some(PrepaymentCurve::Psa { speed_multiplier }) => PrepaymentModelSpec {
+            cpr: model.cpr,
+            curve: Some(PrepaymentCurve::Psa {
+                speed_multiplier: (speed_multiplier * multiplier).max(0.0),
+            }),
+        },
+        _ => PrepaymentModelSpec {
+            cpr: (model.cpr * multiplier).max(0.0),
+            curve: model.curve.clone(),
+        },
+    }
+}
 
 /// Duration and convexity result.
 #[derive(Debug, Clone)]
@@ -130,9 +169,20 @@ pub(crate) fn duration_convexity(
         spec: BumpSpec::parallel_bp(-shock_bps),
     }])?;
 
-    // Get bumped prices
-    let price_up = price_mbs(mbs, &market_up, as_of)?.amount();
-    let price_down = price_mbs(mbs, &market_down, as_of)?.amount();
+    // Effective measures require the prepayment speed to respond to the rate
+    // bump — otherwise the projected cashflows are identical up and down and
+    // agency MBS cannot exhibit its characteristic negative convexity. We
+    // re-shift the pool's prepayment model in each bumped scenario: rates up
+    // slow prepayment, rates down speed it up. (A static PSA bump alone leaves
+    // cashflows unchanged and yields near-zero convexity.)
+    let mut mbs_up = mbs.clone();
+    mbs_up.prepayment_model = rate_shift_prepayment(&mbs.prepayment_model, shock);
+    let mut mbs_down = mbs.clone();
+    mbs_down.prepayment_model = rate_shift_prepayment(&mbs.prepayment_model, -shock);
+
+    // Get bumped prices (curve bump + rate-dependent prepayment).
+    let price_up = price_mbs(&mbs_up, &market_up, as_of)?.amount();
+    let price_down = price_mbs(&mbs_down, &market_down, as_of)?.amount();
 
     // Calculate effective duration
     // Duration = -(dP/dY) / P = -(P_down - P_up) / (2 × P_base × shock)
@@ -249,6 +299,92 @@ mod tests {
         // However, the sign depends on rate level and prepayment model
         // Just check it's a reasonable value
         assert!(convexity.abs() < 1000.0);
+    }
+
+    /// Item 9 regression: effective convexity must reflect rate-dependent
+    /// prepayment.
+    ///
+    /// With a *static* PSA bump the projected cashflows are identical at the
+    /// up and down shocks, so `P_up + P_down - 2*P_base ≈ 0` and the MBS shows
+    /// essentially zero convexity — it can never exhibit the negative
+    /// convexity that defines agency MBS. After the fix the prepayment speed
+    /// re-shifts with the bump (rates down → faster prepay, rates up → slower),
+    /// so a premium pool prices below the linear (duration-only) prediction in
+    /// both directions and the effective convexity is materially negative.
+    #[test]
+    fn effective_convexity_is_negative_with_rate_dependent_prepayment() {
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+
+        // Premium pool: pass-through well above the curve, so faster
+        // prepayment (rates down) destroys value and slower prepayment
+        // (rates up) extends a premium — the classic negative-convexity setup.
+        let mbs = AgencyMbsPassthrough::builder()
+            .id(InstrumentId::new("TEST-MBS-NEGCVX"))
+            .pool_id("TEST-POOL".into())
+            .agency(AgencyProgram::Fnma)
+            .pool_type(PoolType::Generic)
+            .original_face(Money::new(1_000_000.0, Currency::USD))
+            .current_face(Money::new(1_000_000.0, Currency::USD))
+            .current_factor(1.0)
+            .wac(0.075)
+            .pass_through_rate(0.07)
+            .servicing_fee_rate(0.0025)
+            .guarantee_fee_rate(0.0025)
+            .wam(360)
+            .issue_date(Date::from_calendar_date(2024, Month::January, 1).expect("valid"))
+            .maturity(Date::from_calendar_date(2054, Month::January, 1).expect("valid"))
+            .prepayment_model(PrepaymentModelSpec::psa(2.0))
+            .discount_curve_id(CurveId::new("USD-TSY"))
+            .day_count(DayCount::Thirty360)
+            .build()
+            .expect("valid mbs");
+        let market = create_test_market(as_of);
+
+        let result = duration_convexity(&mbs, &market, as_of, Some(50.0)).expect("result");
+
+        // The bumped prices must NOT be the symmetric (zero-convexity) pair a
+        // static PSA bump produces: with rate-dependent prepayment the up/down
+        // cashflows genuinely differ.
+        let linear_midpoint = (result.price_up + result.price_down) / 2.0;
+        assert!(
+            (linear_midpoint - result.base_price).abs() > 1.0,
+            "rate-dependent prepayment should make P_up+P_down-2*P_base \
+             non-zero (negative convexity); got base={} up={} down={}",
+            result.base_price,
+            result.price_up,
+            result.price_down
+        );
+
+        // A premium agency MBS exhibits negative effective convexity.
+        assert!(
+            result.convexity < 0.0,
+            "premium MBS should show negative effective convexity, got {}",
+            result.convexity
+        );
+    }
+
+    /// The rate-shift prepayment helper must speed up prepayment when rates
+    /// fall and slow it when rates rise.
+    #[test]
+    fn rate_shift_prepayment_responds_to_rate_direction() {
+        let base = PrepaymentModelSpec::psa(1.0);
+
+        // Rates up (+50 bp): prepayment slows → speed multiplier below base.
+        let up = rate_shift_prepayment(&base, 0.005);
+        let up_smm = up.smm(60).expect("smm");
+        // Rates down (-50 bp): prepayment speeds up → above base.
+        let down = rate_shift_prepayment(&base, -0.005);
+        let down_smm = down.smm(60).expect("smm");
+        let base_smm = base.smm(60).expect("smm");
+
+        assert!(
+            up_smm < base_smm,
+            "rates up should slow prepayment: up SMM {up_smm} >= base {base_smm}"
+        );
+        assert!(
+            down_smm > base_smm,
+            "rates down should speed prepayment: down SMM {down_smm} <= base {base_smm}"
+        );
     }
 
     #[test]

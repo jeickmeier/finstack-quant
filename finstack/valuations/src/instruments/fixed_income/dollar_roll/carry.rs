@@ -54,15 +54,6 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
 
     let pool = create_assumed_pool(&front_leg, front_settle)?;
 
-    // Coupon income accrued between the two settlement dates (per $100).
-    // Dollar-roll carry uses accrued income, not payment-date cashflows,
-    // because the payment delay for agency MBS (55–75 days) typically
-    // pushes the first payment past the back settlement date.
-    // Accrue on the actual roll horizon (ACT/360) rather than rounding to a
-    // whole number of months — a 28-day roll overstated income ~7% under the
-    // previous `round(days/30)` whole-month convention.
-    let coupon_income = roll.coupon * (days as f64 / 360.0) * 100.0;
-
     // Principal paydown: use the model's projection for the roll period.
     let max_months = ((days as f64 / 28.0).ceil() as u32).max(2) + 1;
     let cashflows = generate_cashflows(&pool, front_settle, Some(max_months))?;
@@ -95,6 +86,24 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
             principal_paydown += user_smm_paydown - model_smm_paydown;
         }
     }
+
+    // Coupon income accrued between the two settlement dates (per $100).
+    // Dollar-roll carry uses accrued income, not payment-date cashflows,
+    // because the payment delay for agency MBS (55–75 days) typically
+    // pushes the first payment past the back settlement date.
+    //
+    // Interest accrues on the *declining* MBS balance: as the pool amortizes
+    // and prepays over the roll, the balance earning the coupon shrinks.
+    // Accruing the coupon on a constant 100 face overstates income —
+    // materially for fast pools / long rolls. We accrue on the time-weighted
+    // average balance, approximated by the mean of the front-settle balance
+    // (100 per $100) and the back-settle balance (100 − principal_paydown).
+    // `principal_paydown` here is the *total* roll-period paydown, including
+    // any user-supplied SMM layered in above, so the declining balance is
+    // consistent with the realized paydown. The accrual horizon uses the
+    // actual roll days (ACT/360).
+    let avg_balance = (100.0 + (100.0 - principal_paydown).max(0.0)) / 2.0;
+    let coupon_income = roll.coupon * (days as f64 / 360.0) * avg_balance;
 
     let net_benefit = drop + coupon_income - principal_paydown;
 
@@ -170,6 +179,45 @@ mod tests {
         let result = implied_financing_rate(&roll, 0.0).expect("should calculate");
         assert!(result.implied_rate > -0.20);
         assert!(result.implied_rate < 0.20);
+    }
+
+    /// Item 13 regression: coupon income must accrue on the *declining* MBS
+    /// balance, not a constant 100 face.
+    ///
+    /// Over the roll the pool amortizes and prepays, so the balance earning
+    /// the coupon shrinks. Accruing on a flat 100 face overstates income. This
+    /// test checks the carry result's `coupon_income` is strictly below the
+    /// (incorrect) flat-100 accrual whenever there is any principal paydown.
+    #[test]
+    fn coupon_income_accrues_on_declining_balance() {
+        let roll = DollarRoll::example().expect("DollarRoll example is valid");
+        let result = implied_financing_rate(&roll, 0.005).expect("ok");
+
+        // There must be some paydown for the test to be meaningful.
+        assert!(
+            result.principal_paydown > 0.0,
+            "expected positive principal paydown over the roll"
+        );
+
+        // Flat-100-face accrual (the pre-fix formula).
+        let days = result.settlement_days;
+        let flat_100_income = roll.coupon * (days as f64 / 360.0) * 100.0;
+
+        // Declining-balance accrual must be strictly smaller.
+        assert!(
+            result.coupon_income < flat_100_income,
+            "coupon income {} should be below flat-100 accrual {flat_100_income} \
+             once the balance declines",
+            result.coupon_income
+        );
+        // And it must equal the mean-balance accrual.
+        let avg_balance = (100.0 + (100.0 - result.principal_paydown).max(0.0)) / 2.0;
+        let expected = roll.coupon * (days as f64 / 360.0) * avg_balance;
+        assert!(
+            (result.coupon_income - expected).abs() < 1e-9,
+            "coupon income {} should equal mean-balance accrual {expected}",
+            result.coupon_income
+        );
     }
 
     #[test]

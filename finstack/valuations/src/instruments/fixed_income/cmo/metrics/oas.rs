@@ -7,6 +7,7 @@ use crate::instruments::fixed_income::cmo::pricer::generate_tranche_cashflows;
 use crate::instruments::fixed_income::cmo::AgencyCmo;
 use finstack_core::dates::{Date, DayCount, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
+use finstack_core::math::solver::{BrentSolver, Solver};
 use finstack_core::Result;
 
 /// CMO tranche OAS result.
@@ -46,7 +47,7 @@ pub(crate) fn calculate_tranche_oas(
     let discount_curve = market.get_discount(&cmo.discount_curve_id)?;
     let day_count = DayCount::Thirty360;
 
-    // Price function with spread (uses cached cashflows)
+    // Price function with spread (uses cached cashflows).
     let price_at_spread = |spread: f64| -> Result<f64> {
         let mut pv = 0.0;
         for cf in &tranche_cfs {
@@ -61,101 +62,69 @@ pub(crate) fn calculate_tranche_oas(
         Ok(pv)
     };
 
-    // Brent's method
-    let mut lower = -0.05;
-    let mut upper = 0.10;
-    let tolerance = 1e-8;
-    let max_iterations = 100;
+    // Use core's `BrentSolver` instead of a hand-rolled Brent loop. The
+    // previous implementation only widened its bounds once and never
+    // re-verified that the wider interval actually bracketed the root, so an
+    // unbracketed solve could fall through the `(b - a) < tolerance` exit and
+    // report a *boundary* as a converged OAS. `BrentSolver` returns
+    // `Err(SolverConvergenceFailed)` when no bracketing interval exists, which
+    // we surface here as an honest `converged: false` result rather than a
+    // false positive.
+    const MAX_ITERATIONS: usize = 100;
+    let solver = BrentSolver::new()
+        .tolerance(1e-8)
+        .max_iterations(MAX_ITERATIONS)
+        .bracket_bounds(-0.10, 0.20)
+        .initial_bracket_size(Some(0.05));
 
-    let f_lower = price_at_spread(lower)? - market_price;
-    let f_upper = price_at_spread(upper)? - market_price;
+    // Capture any pricing error from the objective so it can be propagated
+    // after the solver finishes (the `Solver` trait expects `Fn(f64) -> f64`).
+    let pricing_error: std::cell::RefCell<Option<finstack_core::Error>> =
+        std::cell::RefCell::new(None);
+    let objective = |spread: f64| -> f64 {
+        match price_at_spread(spread) {
+            Ok(model_price) => model_price - market_price,
+            Err(e) => {
+                if pricing_error.borrow().is_none() {
+                    *pricing_error.borrow_mut() = Some(e);
+                }
+                f64::NAN
+            }
+        }
+    };
 
-    if f_lower * f_upper > 0.0 {
-        // Try wider bounds
-        lower = -0.10;
-        upper = 0.20;
+    let result = solver.solve(objective, 0.0);
+
+    // A pricing error during objective evaluation takes precedence.
+    if let Some(err) = pricing_error.into_inner() {
+        return Err(err);
     }
 
-    let mut a = lower;
-    let mut b = upper;
-    let mut fa = price_at_spread(a)? - market_price;
-    let mut fb = price_at_spread(b)? - market_price;
-
-    if fa.abs() < fb.abs() {
-        std::mem::swap(&mut a, &mut b);
-        std::mem::swap(&mut fa, &mut fb);
-    }
-
-    let mut c = a;
-    let mut fc = fa;
-    let mut mflag = true;
-    let mut d = 0.0;
-    let mut iterations = 0;
-
-    while iterations < max_iterations {
-        iterations += 1;
-
-        let s = if (fa - fc).abs() > 1e-15 && (fb - fc).abs() > 1e-15 {
-            let l0 = a * fb * fc / ((fa - fb) * (fa - fc));
-            let l1 = b * fa * fc / ((fb - fa) * (fb - fc));
-            let l2 = c * fa * fb / ((fc - fa) * (fc - fb));
-            l0 + l1 + l2
-        } else {
-            b - fb * (b - a) / (fb - fa)
-        };
-
-        let cond1 = !(s > (3.0 * a + b) / 4.0 && s < b || s > b && s < (3.0 * a + b) / 4.0);
-        let cond2 = mflag && (s - b).abs() >= (b - c).abs() / 2.0;
-        let cond3 = !mflag && (s - b).abs() >= (c - d).abs() / 2.0;
-        let cond4 = mflag && (b - c).abs() < tolerance;
-        let cond5 = !mflag && (c - d).abs() < tolerance;
-
-        let s = if cond1 || cond2 || cond3 || cond4 || cond5 {
-            mflag = true;
-            (a + b) / 2.0
-        } else {
-            mflag = false;
-            s
-        };
-
-        let fs = price_at_spread(s)? - market_price;
-        d = c;
-        c = b;
-        fc = fb;
-
-        if fa * fs < 0.0 {
-            b = s;
-            fb = fs;
-        } else {
-            a = s;
-            fa = fs;
-        }
-
-        if fa.abs() < fb.abs() {
-            std::mem::swap(&mut a, &mut b);
-            std::mem::swap(&mut fa, &mut fb);
-        }
-
-        if fb.abs() < tolerance * market_price || (b - a).abs() < tolerance {
-            let final_price = price_at_spread(b)?;
-            return Ok(CmoOasResult {
-                oas: b,
+    match result {
+        Ok(oas) => {
+            let final_price = price_at_spread(oas)?;
+            Ok(CmoOasResult {
+                oas,
                 model_price: final_price,
                 market_price,
-                iterations,
+                iterations: MAX_ITERATIONS as u32,
                 converged: true,
-            });
+            })
+        }
+        Err(_) => {
+            // No bracketing interval / no convergence: report this honestly.
+            // OAS is reported as 0.0 (best-effort) with `converged = false` —
+            // we do NOT pass off a bracket boundary as a converged OAS.
+            let model_price_zero = price_at_spread(0.0)?;
+            Ok(CmoOasResult {
+                oas: 0.0,
+                model_price: model_price_zero,
+                market_price,
+                iterations: MAX_ITERATIONS as u32,
+                converged: false,
+            })
         }
     }
-
-    let final_price = price_at_spread(b)?;
-    Ok(CmoOasResult {
-        oas: b,
-        model_price: final_price,
-        market_price,
-        iterations,
-        converged: false,
-    })
 }
 
 #[cfg(test)]
@@ -180,6 +149,38 @@ mod tests {
             .expect("valid curve");
 
         MarketContext::new().insert(disc)
+    }
+
+    /// Item 14 regression: an OAS solve that cannot bracket the target must
+    /// report `converged = false` — never a bracket boundary disguised as a
+    /// converged OAS.
+    ///
+    /// The pre-fix hand-rolled Brent widened its bounds once without
+    /// re-checking the bracket, so an out-of-range market price could exit via
+    /// the interval-width test and return a *boundary* as the "OAS". Here we
+    /// request an absurdly low price (1% of face) that no spread inside
+    /// [-10%, +20%] can reach; the result must be flagged non-converged.
+    #[test]
+    fn unbracketable_target_reports_non_convergence() {
+        let cmo = AgencyCmo::example().expect("AgencyCmo example is valid");
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+        let market = create_test_market(as_of);
+
+        // A price far below any value reachable within the spread bracket.
+        let result = calculate_tranche_oas(&cmo, 1.0, &market, as_of).expect("oas call");
+
+        assert!(
+            !result.converged,
+            "an unbracketable OAS solve must report converged = false, got oas={}",
+            result.oas
+        );
+        // The reported OAS for a non-converged solve must be the explicit
+        // best-effort 0.0, not a leaked bracket boundary (-0.10 or 0.20).
+        assert!(
+            result.oas.abs() < 1e-12,
+            "non-converged OAS should be reported as 0.0, not a boundary; got {}",
+            result.oas
+        );
     }
 
     #[test]

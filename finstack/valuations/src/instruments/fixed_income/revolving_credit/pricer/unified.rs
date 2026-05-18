@@ -708,6 +708,85 @@ mod tests {
     use finstack_core::{currency::Currency, dates::Tenor};
     use time::Month;
 
+    /// Item 6 verification: the contractual leg (survival-weighted no-default
+    /// cashflows) plus the recovery leg must NOT double-count LGD on
+    /// principal.
+    ///
+    /// The audit flagged a suspected double-count (PV overstated ≈ R·drawn·PD).
+    /// This test pins the exact decomposition: for a zero-coupon facility
+    /// (principal only) with flat DF = 1, flat hazard, and recovery R, the
+    /// correct risky PV of principal is `D·SP + R·D·(1-SP)` — full repayment
+    /// if the borrower survives, recovery if it defaults. The priced PV must
+    /// equal that exactly, NOT the double-counted `D·SP + 2·R·D·(1-SP)`.
+    ///
+    /// Conclusion (recorded as a regression guard): the current implementation
+    /// is correct — the survival-weighted contractual leg represents the
+    /// no-default state and the recovery leg adds the disjoint default-state
+    /// value, exactly as a risky-cashflow decomposition should.
+    #[test]
+    fn recovery_leg_does_not_double_count_lgd_on_principal() {
+        use crate::instruments::fixed_income::revolving_credit::RevolvingCreditFees;
+        use finstack_core::market_data::term_structures::HazardCurve;
+
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+
+        let facility = RevolvingCredit::builder()
+            .id("RC-RECOVERY-NODBL".into())
+            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
+            .drawn_amount(Money::new(1_000_000.0, Currency::USD))
+            .commitment_date(start)
+            .maturity(end)
+            // Zero coupon isolates the principal leg.
+            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
+            .day_count(DayCount::Act365F)
+            .frequency(Tenor::annual())
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
+            .discount_curve_id("USD-OIS".into())
+            .credit_curve_id("USD-HZ".into())
+            .recovery_rate(0.4)
+            .build()
+            .expect("facility");
+
+        // Flat DF = 1 everywhere → arithmetic is exact (no discounting noise).
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(start)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 1.0), (5.0, 1.0)])
+            .build()
+            .expect("curve");
+        // Flat hazard 20% → SP(1y) = exp(-0.2).
+        let hz = HazardCurve::builder("USD-HZ")
+            .base_date(start)
+            .knots([(1.0, 0.20), (5.0, 0.20)])
+            .build()
+            .expect("hazard");
+        let market = MarketContext::new().insert(disc).insert(hz);
+
+        let pv = RevolvingCreditPricer::price(&facility, &market, start)
+            .expect("price")
+            .amount();
+
+        let d = 1_000_000.0_f64;
+        let sp = (-0.20_f64).exp();
+        let r = 0.4_f64;
+        // Correct: full repayment on survival + recovery on default.
+        let correct = d * sp + r * d * (1.0 - sp);
+        // Double-counted: an extra R·D·(1-SP) on top.
+        let double_counted = correct + r * d * (1.0 - sp);
+
+        assert!(
+            (pv - correct).abs() < 1.0,
+            "risky PV {pv} should equal D·SP + R·D·(1-SP) = {correct}, not the \
+             double-counted {double_counted}"
+        );
+        assert!(
+            (pv - double_counted).abs() > 1.0,
+            "risky PV {pv} must NOT equal the double-counted value {double_counted}"
+        );
+    }
+
     #[test]
     fn test_compute_dynamic_survival() {
         let spreads = vec![0.01, 0.02, 0.015, 0.018];

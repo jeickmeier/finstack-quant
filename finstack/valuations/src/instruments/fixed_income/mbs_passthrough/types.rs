@@ -105,7 +105,17 @@ impl AgencyProgram {
     ///
     /// If the resulting day falls on a weekend, the caller should adjust
     /// to the next business day separately.
-    pub fn payment_date_for_period(&self, accrual_year: i32, accrual_month: Month) -> Date {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_core::Error::Validation`] if `accrual_year` is
+    /// outside the range supported by the calendar (the payment day-of-month
+    /// — 15/20/25 — is always valid, so only an out-of-range year can fail).
+    pub fn payment_date_for_period(
+        &self,
+        accrual_year: i32,
+        accrual_month: Month,
+    ) -> Result<Date> {
         let (pay_year, pay_month, pay_day) = match self {
             AgencyProgram::Fnma | AgencyProgram::Fhlmc => {
                 let (y, m) = advance_month(accrual_year, accrual_month);
@@ -120,8 +130,12 @@ impl AgencyProgram {
                 (y, m, 20_u8)
             }
         };
-        Date::from_calendar_date(pay_year, pay_month, pay_day)
-            .unwrap_or_else(|_| unreachable!("payment day always valid for these conventions"))
+        Date::from_calendar_date(pay_year, pay_month, pay_day).map_err(|e| {
+            finstack_core::Error::Validation(format!(
+                "invalid agency payment date {pay_year}-{:02}-{pay_day}: {e}",
+                pay_month as u8
+            ))
+        })
     }
 
     /// Returns the canonical string representation.
@@ -144,16 +158,16 @@ impl AgencyProgram {
 }
 
 /// Advance a month by one, wrapping December -> January of the next year.
+///
+/// Uses [`time::Month::next`], which is total (no fallible conversion), so
+/// this helper cannot panic.
 fn advance_month(year: i32, month: Month) -> (i32, Month) {
-    let m = month as u8;
-    if m == 12 {
-        (year + 1, Month::January)
+    let next_year = if matches!(month, Month::December) {
+        year + 1
     } else {
-        (
-            year,
-            Month::try_from(m + 1).unwrap_or_else(|_| unreachable!("month 1..=11 + 1 is valid")),
-        )
-    }
+        year
+    };
+    (next_year, month.next())
 }
 
 impl std::fmt::Display for AgencyProgram {
@@ -388,9 +402,8 @@ impl AgencyMbsPassthrough {
         if let Some(custom_delay) = self.payment_lag_days {
             super::delay::actual_payment_date(period_start, custom_delay, false)
         } else {
-            Ok(self
-                .agency
-                .payment_date_for_period(period_start.year(), period_start.month()))
+            self.agency
+                .payment_date_for_period(period_start.year(), period_start.month())
         }
     }
 
@@ -488,11 +501,15 @@ mod tests {
 
     #[test]
     fn test_payment_date_for_period_fnma() {
-        let pay = AgencyProgram::Fnma.payment_date_for_period(2024, Month::January);
+        let pay = AgencyProgram::Fnma
+            .payment_date_for_period(2024, Month::January)
+            .expect("valid payment date");
         assert_eq!(pay.month(), Month::February);
         assert_eq!(pay.day(), 25);
 
-        let pay_dec = AgencyProgram::Fnma.payment_date_for_period(2024, Month::December);
+        let pay_dec = AgencyProgram::Fnma
+            .payment_date_for_period(2024, Month::December)
+            .expect("valid payment date");
         assert_eq!(pay_dec.year(), 2025);
         assert_eq!(pay_dec.month(), Month::January);
         assert_eq!(pay_dec.day(), 25);
@@ -500,16 +517,54 @@ mod tests {
 
     #[test]
     fn test_payment_date_for_period_gnma_i() {
-        let pay = AgencyProgram::GnmaI.payment_date_for_period(2024, Month::March);
+        let pay = AgencyProgram::GnmaI
+            .payment_date_for_period(2024, Month::March)
+            .expect("valid payment date");
         assert_eq!(pay.month(), Month::March);
         assert_eq!(pay.day(), 15);
     }
 
     #[test]
     fn test_payment_date_for_period_gnma_ii() {
-        let pay = AgencyProgram::GnmaII.payment_date_for_period(2024, Month::January);
+        let pay = AgencyProgram::GnmaII
+            .payment_date_for_period(2024, Month::January)
+            .expect("valid payment date");
         assert_eq!(pay.month(), Month::February);
         assert_eq!(pay.day(), 20);
+    }
+
+    /// Item 15 regression: `payment_date_for_period` must return a `Result`
+    /// rather than `unreachable!()`-panicking inside library code.
+    ///
+    /// The happy path (every agency, December wrap included) must yield `Ok`
+    /// with the correct date; the function no longer contains a panicking
+    /// `unreachable!` branch.
+    #[test]
+    fn payment_date_for_period_returns_result_not_panic() {
+        // Every agency, every month — all must be Ok.
+        for agency in [
+            AgencyProgram::Fnma,
+            AgencyProgram::Fhlmc,
+            AgencyProgram::Gnma,
+            AgencyProgram::GnmaI,
+            AgencyProgram::GnmaII,
+        ] {
+            for month_num in 1u8..=12 {
+                let month = Month::try_from(month_num).expect("valid month");
+                let res = agency.payment_date_for_period(2024, month);
+                assert!(
+                    res.is_ok(),
+                    "{agency:?} {month:?} should yield Ok, got {res:?}"
+                );
+            }
+        }
+
+        // December wrap rolls into the next calendar year.
+        let dec = AgencyProgram::Fnma
+            .payment_date_for_period(2024, Month::December)
+            .expect("December wrap should be Ok");
+        assert_eq!(dec.year(), 2025);
+        assert_eq!(dec.month(), Month::January);
     }
 
     #[test]

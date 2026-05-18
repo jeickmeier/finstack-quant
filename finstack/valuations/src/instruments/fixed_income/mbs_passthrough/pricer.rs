@@ -98,7 +98,9 @@ pub fn generate_cashflows(
     }
 
     let max_periods = max_periods.unwrap_or(mbs.wam);
-    let monthly_rate = mbs.pass_through_rate / 12.0;
+    // Level-pay mortgage amortization is, by construction, computed on the
+    // monthly mortgage rate (WAC / 12) — that is the contractual amortization
+    // convention and is intentionally not day-counted.
     let monthly_mortgage_rate = mbs.wac / 12.0;
 
     let mut projected_count: u32 = 0;
@@ -144,7 +146,19 @@ pub fn generate_cashflows(
         };
 
         let prepayment = (balance - scheduled_principal).max(0.0) * smm;
-        let interest = balance * monthly_rate;
+        // Investor interest accrues at the pass-through rate over the actual
+        // accrual-period day-count fraction, not a flat 1/12. The accrual
+        // period is the full calendar month `[period_start, next_month_start)`.
+        // For 30/360 this recovers exactly 1/12 each month, but Act/360 and
+        // Act/365F vary by month length (28–31 days), so a fixed 1/12
+        // mis-states accrued interest.
+        let accrual_period_end = next_month_start(period_start)?;
+        let period_yf = mbs.day_count.year_fraction(
+            period_start,
+            accrual_period_end,
+            DayCountContext::default(),
+        )?;
+        let interest = balance * mbs.pass_through_rate * period_yf;
         let total_principal = scheduled_principal + prepayment;
         let ending_balance = (balance - total_principal).max(0.0);
 
@@ -388,6 +402,49 @@ mod tests {
         for i in 1..cashflows.len() {
             assert!(cashflows[i].beginning_balance <= cashflows[i - 1].beginning_balance);
         }
+    }
+
+    /// Item 12 regression: monthly investor interest must use the pool's
+    /// day-count fraction over the full calendar accrual month, not a flat
+    /// `rate / 12`.
+    ///
+    /// Under Act/360 a 31-day accrual month accrues `31/360` of the annual
+    /// pass-through rate (≈ 0.08611), materially larger than the flat `1/12`
+    /// (≈ 0.08333). This test builds an Act/360 pool and checks the first
+    /// month's interest matches the day-counted accrual over the full month
+    /// `[1st, 1st-of-next-month)`, not `rate/12`.
+    #[test]
+    fn monthly_interest_uses_pool_day_count_not_flat_twelfth() {
+        let mut mbs = create_test_mbs();
+        mbs.day_count = DayCount::Act360;
+        // January 2024 — a 31-day accrual month.
+        let as_of = Date::from_calendar_date(2024, Month::January, 1).expect("valid");
+
+        let cashflows = generate_cashflows(&mbs, as_of, Some(1)).expect("should generate");
+        let first = cashflows.first().expect("at least one cashflow");
+
+        let balance = first.beginning_balance;
+        // The accrual month spans [period_start, first-of-next-month) = 31 days.
+        let accrual_end =
+            Date::from_calendar_date(2024, Month::February, 1).expect("valid");
+        let expected_yf = DayCount::Act360
+            .year_fraction(first.period_start, accrual_end, DayCountContext::default())
+            .expect("yf");
+        let expected_interest = balance * mbs.pass_through_rate * expected_yf;
+        let flat_twelfth = balance * mbs.pass_through_rate / 12.0;
+
+        assert!(
+            (first.interest - expected_interest).abs() < 1e-6,
+            "interest {} should equal day-counted accrual {expected_interest} (31/360)",
+            first.interest
+        );
+        // The day-counted value must differ from the flat 1/12 — otherwise the
+        // test is not actually exercising the day-count path.
+        assert!(
+            (expected_interest - flat_twelfth).abs() > 1.0,
+            "Act/360 31-day month accrual should differ from flat rate/12, \
+             got day-counted {expected_interest} vs flat {flat_twelfth}"
+        );
     }
 
     #[test]
