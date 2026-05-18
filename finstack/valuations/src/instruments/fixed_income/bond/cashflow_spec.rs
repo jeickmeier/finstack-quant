@@ -53,6 +53,29 @@ fn rate_index_defaults(index_id: &CurveId) -> Option<RateIndexConventions> {
     registry.require_rate_index(&id).ok().cloned()
 }
 
+/// Convert an `f64` rate/margin into a `Decimal` for the infallible
+/// `CashflowSpec` convenience constructors.
+///
+/// `Decimal::try_from` fails only for non-finite input (`NaN`, `±inf`). These
+/// convenience constructors return `Self` (not `Result`), so a hard error
+/// cannot be surfaced here without a breaking API change. To avoid the failure
+/// being **silent**, a non-finite input is logged at `error` level (active in
+/// release builds, unlike the callers' `debug_assert!`) before falling back to
+/// zero. Callers that must reject invalid external data should construct the
+/// typed `FixedCouponSpec` / `StepUpCouponSpec` / `FloatingRateSpec` directly.
+#[inline]
+fn decimal_from_finite_f64(value: f64, context: &str) -> Decimal {
+    Decimal::try_from(value).unwrap_or_else(|_| {
+        tracing::error!(
+            value,
+            context,
+            "non-finite rate passed to an infallible CashflowSpec constructor; \
+             coercing to 0 — construct the typed *Spec directly to reject invalid input"
+        );
+        Decimal::ZERO
+    })
+}
+
 /// Parameters for [`CashflowSpec::from_bond_builder_params`].
 ///
 /// Bundles all the flat fields from the Python bond builder so that the
@@ -186,7 +209,7 @@ impl CashflowSpec {
             coupon.is_finite(),
             "CashflowSpec::fixed: coupon is not finite ({coupon})"
         );
-        let rate = Decimal::try_from(coupon).unwrap_or(Decimal::ZERO);
+        let rate = decimal_from_finite_f64(coupon, "CashflowSpec::fixed coupon");
         Self::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate,
@@ -202,7 +225,7 @@ impl CashflowSpec {
 
     /// Create a fixed-rate specification using a typed rate.
     pub fn fixed_rate(coupon: Rate, freq: Tenor, dc: DayCount) -> Self {
-        let rate = Decimal::try_from(coupon.as_decimal()).unwrap_or(Decimal::ZERO);
+        let rate = decimal_from_finite_f64(coupon.as_decimal(), "CashflowSpec::fixed_rate coupon");
         Self::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate,
@@ -386,7 +409,8 @@ impl CashflowSpec {
             margin_bp.is_finite(),
             "CashflowSpec::floating_with_reset_lag: margin_bp is not finite ({margin_bp})"
         );
-        let spread_bp = Decimal::try_from(margin_bp).unwrap_or(Decimal::ZERO);
+        let spread_bp =
+            decimal_from_finite_f64(margin_bp, "CashflowSpec::floating_with_reset_lag margin_bp");
         let calendar_id = rate_index_defaults(&index_id)
             .map(|conv| conv.market_calendar_id)
             .unwrap_or_else(|| "weekends_only".to_string());
@@ -586,7 +610,7 @@ impl CashflowSpec {
             initial_rate.is_finite(),
             "CashflowSpec::step_up: initial_rate is not finite ({initial_rate})"
         );
-        let initial = Decimal::try_from(initial_rate).unwrap_or(Decimal::ZERO);
+        let initial = decimal_from_finite_f64(initial_rate, "CashflowSpec::step_up initial_rate");
         let step_schedule: Vec<(finstack_core::dates::Date, Decimal)> = steps
             .into_iter()
             .map(|(d, r)| {
@@ -594,7 +618,7 @@ impl CashflowSpec {
                     r.is_finite(),
                     "CashflowSpec::step_up: step rate is not finite ({r})"
                 );
-                (d, Decimal::try_from(r).unwrap_or(Decimal::ZERO))
+                (d, decimal_from_finite_f64(r, "CashflowSpec::step_up step rate"))
             })
             .collect();
 

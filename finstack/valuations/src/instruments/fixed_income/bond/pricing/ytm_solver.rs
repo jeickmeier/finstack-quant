@@ -327,15 +327,33 @@ impl YtmSolver {
                         *slot = Some(e);
                     }
                     drop(slot);
-                    // Return large signed residual so Brent doesn't see a fake root.
-                    // The sign depends on yield to prevent accidental bracket crossing.
-                    1e12 * if y >= 0.0 { 1.0 } else { -1.0 }
+                    // Return a large residual whose sign reflects price-vs-target,
+                    // NOT the sign of `y`.
+                    //
+                    // The bond price is monotonically decreasing in yield, and
+                    // `price_from_ytm_compounded_params` can only fail for a
+                    // *yield-dependent* reason in the deep-negative-yield regime
+                    // (a non-positive compounding base `1 + y/m <= 0`). There the
+                    // true price diverges to `+infinity`, so `price - target` is
+                    // unambiguously large and positive. Returning `+1e12` keeps
+                    // the objective consistent with the monotone price/yield
+                    // curve; the previous `sign(y)`-based residual could flip
+                    // sign and manufacture a spurious bracket for Brent.
+                    1e12
                 }
             }
         };
 
-        // Always use BrentSolver for robustness
-        let solver = BrentSolver::new().tolerance(self.config.tolerance);
+        // Always use BrentSolver for robustness. `BrentSolver::solve` returns
+        // an explicit `SolverConvergenceFailed` error (rather than a silent
+        // last iterate) when the iteration cap is hit, no sign-changing
+        // bracket is found, or the objective is non-finite — so non-convergent
+        // YTM solves surface as `Err`. The configured `max_iterations` is
+        // honoured here (previously the field was ignored and Brent's default
+        // cap was always used).
+        let solver = BrentSolver::new()
+            .tolerance(self.config.tolerance)
+            .max_iterations(self.config.max_iterations);
         let ytm = solver.solve(price_fn, initial_guess)?;
 
         // If any pricing error occurred during objective evaluation, surface it
@@ -462,6 +480,94 @@ mod tests {
             )
             .expect("should succeed");
         assert!((ytm - coupon_rate).abs() < 1e-4);
+    }
+
+    /// Item 6 regression: when `price_from_ytm_compounded_params` fails (only
+    /// possible in the deep-negative-yield regime, where the price diverges to
+    /// `+infinity`), the solver must not "converge" to a fake yield off the
+    /// back of a `sign(y)`-flipped residual. A target price unreachable by any
+    /// valid yield must surface as an explicit `Err`.
+    #[test]
+    fn ytm_unreachable_target_does_not_return_fake_yield() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let mut cashflows = vec![];
+        for year in 1..=5 {
+            let date =
+                Date::from_calendar_date(2025 + year, Month::January, 1).expect("valid date");
+            let amt = if year < 5 { 50.0 } else { 1050.0 };
+            cashflows.push((date, Money::new(amt, Currency::USD)));
+        }
+        let notional = Money::new(1000.0, Currency::USD);
+
+        // A target far above the largest attainable price: the sum of the
+        // undiscounted cashflows is 1250, so a $5,000,000 target can only be
+        // "solved" by a non-physical deeply negative yield.
+        let solver = YtmSolver::new();
+        let result = solver.solve(
+            &cashflows,
+            as_of,
+            Money::new(5_000_000.0, Currency::USD),
+            YtmPricingSpec {
+                day_count: DayCount::Act365F,
+                notional,
+                coupon_rate: 0.05,
+                compounding: YieldCompounding::Street,
+                frequency: Tenor::annual(),
+            },
+        );
+
+        assert!(
+            result.is_err(),
+            "an unreachable target price must surface as Err, not a fake yield \
+             from a sign-flipped objective residual"
+        );
+    }
+
+    /// Item 12 regression: a non-convergent YTM solve must return an explicit
+    /// error, never a silent last iterate. The configured `max_iterations` is
+    /// honoured, so capping it at 1 with a tight tolerance forces Brent to bail
+    /// out with `SolverConvergenceFailed` instead of returning a fake yield.
+    #[test]
+    fn ytm_non_convergence_returns_error() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let mut cashflows = vec![];
+        for year in 1..=5 {
+            let date =
+                Date::from_calendar_date(2025 + year, Month::January, 1).expect("valid date");
+            let amt = if year < 5 { 50.0 } else { 1050.0 };
+            cashflows.push((date, Money::new(amt, Currency::USD)));
+        }
+        let notional = Money::new(1000.0, Currency::USD);
+
+        // One iteration is far too few for Brent to reach a 1e-15 residual.
+        let solver = YtmSolver::with_config(YtmSolverConfig {
+            tolerance: 1e-15,
+            max_iterations: 1,
+            use_smart_guess: true,
+        });
+        let result = solver.solve(
+            &cashflows,
+            as_of,
+            Money::new(950.0, Currency::USD),
+            YtmPricingSpec {
+                day_count: DayCount::Act365F,
+                notional,
+                coupon_rate: 0.05,
+                compounding: YieldCompounding::Street,
+                frequency: Tenor::annual(),
+            },
+        );
+
+        assert!(
+            result.is_err(),
+            "non-convergent YTM solve must return Err, not a silent last iterate"
+        );
+        match result {
+            Err(finstack_core::Error::Input(
+                finstack_core::InputError::SolverConvergenceFailed { .. },
+            )) => {}
+            other => panic!("expected SolverConvergenceFailed, got {other:?}"),
+        }
     }
 
     #[test]

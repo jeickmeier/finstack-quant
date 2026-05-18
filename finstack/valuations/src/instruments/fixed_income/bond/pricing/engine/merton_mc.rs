@@ -1094,7 +1094,9 @@ pub mod calibration {
                 let flows = bond.pricing_dated_cashflows(market, as_of)?;
                 price_from_ytm(bond, &flows, quote_date, ytm)?
             }
-            BondQuoteInput::ZSpread(z) => price_from_z_spread(bond, market, quote_date, z)?,
+            // `price_from_z_spread` derives the settlement origin internally,
+            // so it takes the valuation `as_of` (not the pre-computed quote_date).
+            BondQuoteInput::ZSpread(z) => price_from_z_spread(bond, market, as_of, z)?,
             BondQuoteInput::DiscountMargin(_)
             | BondQuoteInput::Oas(_)
             | BondQuoteInput::AswMarket(_)

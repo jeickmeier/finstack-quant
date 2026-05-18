@@ -281,3 +281,60 @@ fn test_callable_quoted_bond_can_request_callable_oas_risk_basis() {
         "callable_oas basis should use option-aware DV01"
     );
 }
+
+
+/// Item 3a regression: a callable bond on the default (`BulletDiscountable` /
+/// Workout) risk basis with **no market price quote** must not report a
+/// straight-bullet curve-bump DV01 that silently discards the embedded option.
+///
+/// On the Workout basis `DurationMod`, `Convexity` and `YieldDv01` are all
+/// yield-basis measures (and pick up the call via the workout path when a
+/// price is quoted). `Dv01` must be consistent with that family — the dollar
+/// analogue of modified duration — rather than a curve-bump of a structurally
+/// mutated `call_put = None` clone. So on this basis `Dv01 == YieldDv01`.
+#[test]
+fn test_callable_no_quote_default_basis_dv01_is_yield_basis() {
+    let as_of = date!(2025 - 01 - 01);
+
+    let mut callable = Bond::fixed(
+        "CALLABLE-NOQUOTE",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        as_of,
+        date!(2032 - 01 - 01),
+        "USD-OIS",
+    )
+    .unwrap();
+    callable.call_put = Some(CallPutSchedule {
+        calls: vec![CallPut {
+            start_date: date!(2028 - 01 - 01),
+            end_date: date!(2028 - 01 - 01),
+            price_pct_of_par: 100.0,
+            make_whole: None,
+        }],
+        puts: vec![],
+    });
+    // Deliberately NO price quote: exercise the no-price-driver branch.
+
+    let market = callable_risk_market(as_of);
+
+    let result = callable
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Dv01, MetricId::YieldDv01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("callable no-quote default-basis risk metrics should compute");
+
+    let dv01 = result.measures["dv01"];
+    let yield_dv01 = result.measures["yield_dv01"];
+
+    assert!(
+        (dv01 - yield_dv01).abs() < 1e-8,
+        "default-basis callable DV01 must equal the yield-basis DV01 (no \
+         straight-bullet curve-bump): dv01={dv01}, yield_dv01={yield_dv01}"
+    );
+    // Sanity: both are negative for a long bond.
+    assert!(dv01 < 0.0, "long-bond DV01 should be negative, got {dv01}");
+}

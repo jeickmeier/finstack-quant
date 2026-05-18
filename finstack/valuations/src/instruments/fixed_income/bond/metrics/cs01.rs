@@ -24,18 +24,30 @@
 //!    `O(bump²) ≈ 10⁻⁸` of CS01 magnitude for a 1 bp shock; the forward
 //!    form is preserved for deterministic golden parity.
 //!
+//! # Settlement-anchored repricing
+//!
+//! The bumped and base PVs are obtained from
+//! [`price_from_z_spread`], which discounts on the same settlement
+//! (`quote_date`) time axis and with the same compounding-aware spread shift
+//! that [`ZSpreadCalculator`] used to *solve* the z-spread. This guarantees
+//! `PV(z)` equals the dirty price the z-spread was calibrated to, so the
+//! finite difference `PV(z+1bp) − PV(z)` is taken around the correct point on
+//! the correct curve — even when the discount curve's base date differs from
+//! the valuation date or the bond has a non-zero settlement lag.
+//!
 //! Sign convention is identical to the canonical reference:
 //! - Long bond → CS01 negative (wider spreads reduce PV).
 //! - Short bond → CS01 positive.
 //!
 //! [canonical]: crate::metrics::sensitivities::cs01
+//! [`price_from_z_spread`]: crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread
+//! [`ZSpreadCalculator`]: crate::instruments::fixed_income::bond::ZSpreadCalculator
 
 use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::{CurveDependencies, Instrument};
+use crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
-use finstack_core::dates::DayCountContext;
-use finstack_core::math::summation::NeumaierAccumulator;
 
 /// Bond parallel CS01 with z-spread fallback.
 ///
@@ -67,27 +79,16 @@ impl MetricCalculator for BondCs01Calculator {
 
         let bumped_spread = base_spread + ONE_BASIS_POINT;
 
-        let flows = bond.pricing_dated_cashflows(&context.curves, context.as_of)?;
-        let disc = context.curves.get_discount(&bond.discount_curve_id)?;
-        let dc = disc.day_count();
-        let base_date = disc.base_date();
+        // Reprice on the settlement-anchored, compounding-aware basis the
+        // z-spread was calibrated on. `price_from_z_spread` derives the same
+        // `quote_date` origin and uses the same `z_spread_discount_factor` shift
+        // as `ZSpreadCalculator`, so `base_npv` is the dirty price the z-spread
+        // was solved to and the finite difference is taken on the right curve.
+        let base_npv = price_from_z_spread(bond, &context.curves, context.as_of, base_spread)?;
+        let bumped_npv =
+            price_from_z_spread(bond, &context.curves, context.as_of, bumped_spread)?;
 
-        let mut base_npv = NeumaierAccumulator::new();
-        let mut bumped_npv = NeumaierAccumulator::new();
-
-        for (date, amount) in &flows {
-            if *date <= context.as_of {
-                continue;
-            }
-            let t = dc.year_fraction(base_date, *date, DayCountContext::default())?;
-            let df = disc.df_on_date_curve(*date)?;
-            let amt = amount.amount();
-
-            base_npv.add(amt * df * (-base_spread * t).exp());
-            bumped_npv.add(amt * df * (-bumped_spread * t).exp());
-        }
-
-        let cs01 = bumped_npv.total() - base_npv.total();
+        let cs01 = bumped_npv - base_npv;
 
         context
             .computed

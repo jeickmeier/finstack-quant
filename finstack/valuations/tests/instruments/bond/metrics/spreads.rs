@@ -1208,13 +1208,18 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
     ];
 
     for (target_z, base_bond) in scenarios {
+        // `price_from_z_spread` takes the valuation `as_of` and derives the
+        // settlement (`quote_date`) origin internally. For these bonds the
+        // 2-business-day settlement of a Wednesday `as_of` lands on Friday,
+        // which coincides with `as_of + 2` calendar days used for the accrued
+        // reconstruction below.
         let settlement_days = base_bond.settlement_days().unwrap_or(0) as i64;
         let quote_date = as_of + time::Duration::days(settlement_days);
 
         // Price the bond at the target Z-spread to obtain a dirty price.
         let dirty_target =
             finstack_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread(
-                &base_bond, &market, quote_date, target_z,
+                &base_bond, &market, as_of, target_z,
             )
             .expect("pricing with target Z-spread should succeed");
 
@@ -1260,7 +1265,7 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
         // Re-price with solved z and verify price residual is tiny.
         let dirty_repriced =
             finstack_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread(
-                &bond, &market, quote_date, z,
+                &bond, &market, as_of, z,
             )
             .expect("repricing with solved Z-spread should succeed");
         let price_error = (dirty_repriced - dirty_target).abs() / notional.amount();
@@ -1271,4 +1276,89 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
             price_error
         );
     }
+}
+
+/// Item 2 regression: the documented `Z-spread metric -> price_from_z_spread`
+/// round-trip must hold for a bond **with a settlement lag**.
+///
+/// The `ZSpreadCalculator` solves the spread on the settlement (`quote_date`)
+/// time axis. `price_from_z_spread` takes the valuation `as_of` and must derive
+/// the same settlement origin internally, so that
+/// `price_from_z_spread(bond, market, as_of, solve(...)) == dirty_target`
+/// even when `quote_date != as_of`.
+#[test]
+fn test_z_spread_roundtrip_with_settlement_lag() {
+    use finstack_core::dates::{DayCount, Tenor};
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread;
+    use finstack_valuations::instruments::fixed_income::bond::CashflowSpec;
+
+    let as_of = date!(2025 - 01 - 06);
+    let issue_date = date!(2023 - 01 - 06);
+    let maturity = date!(2030 - 01 - 06);
+    let notional = Money::new(1_000_000.0, Currency::USD);
+
+    let mut bond = Bond::fixed(
+        "ZSPR-SETTLE-LAG",
+        notional,
+        0.05,
+        issue_date,
+        maturity,
+        "USD-OIS",
+    )
+    .expect("bond should build");
+    bond.cashflow_spec =
+        CashflowSpec::fixed_rate(0.05.into(), Tenor::annual(), DayCount::Act365F);
+    // 3-business-day settlement lag => quote_date strictly after as_of.
+    bond.settlement_convention = Some(BondSettlementConvention {
+        settlement_days: 3,
+        ..Default::default()
+    });
+
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 1.0), (7.0, 0.80)])
+        .build()
+        .expect("curve");
+    let market = MarketContext::new().insert(disc);
+
+    // Quote the bond off-par so the Z-spread is non-zero.
+    let clean_pct = 97.25_f64;
+    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_pct);
+
+    // Forward path: solve Z-spread and read the settlement-anchored dirty price
+    // (the metric `DirtyPrice` is exactly the ZSpreadCalculator's solve target:
+    // clean quote + accrued at settlement).
+    let res = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ZSpread, MetricId::DirtyPrice],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("Z-spread metric should solve");
+    let z = *res.measures.get("z_spread").expect("z_spread measure");
+    let target_dirty = *res
+        .measures
+        .get("dirty_price")
+        .expect("dirty_price measure");
+
+    // Inversion path: recover the dirty price from z, passing the *valuation*
+    // `as_of`. This is the function's documented contract (its parameter is
+    // named `as_of`). It must round-trip despite the settlement lag.
+    let dirty_inverted =
+        price_from_z_spread(&bond, &market, as_of, z).expect("price_from_z_spread should invert");
+
+    // Residual tolerance scaled to notional: the Z-spread solver tolerance
+    // (1e-10 on the spread axis) maps to a price residual of roughly
+    // duration * notional * 1e-10 ~ 1e-3, so 1e-6 * notional is comfortable.
+    let price_error = (dirty_inverted - target_dirty).abs() / notional.amount();
+    assert!(
+        price_error < 1e-6,
+        "Z-spread price round-trip must hold under a settlement lag: \
+         target_dirty={target_dirty:.6}, inverted={dirty_inverted:.6}, \
+         relative_error={price_error:.6e}"
+    );
 }

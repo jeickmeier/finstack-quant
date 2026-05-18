@@ -28,19 +28,24 @@ impl MetricCalculator for BondDv01Calculator {
         let basis = super::bond_risk_basis(context);
 
         if basis != BondRiskBasis::CallableOas {
-            if !bond.pricing_overrides.market_quotes.has_price_driver() {
-                if has_options {
-                    let mut bullet_bond = bond.clone();
-                    bullet_bond.call_put = None;
-                    return curve_bump_dv01(&bullet_bond, context, &bullet_bond.discount_curve_id);
-                }
-
+            if !bond.pricing_overrides.market_quotes.has_price_driver() && !has_options {
                 return crate::metrics::UnifiedDv01Calculator::<Bond>::new(
                     crate::metrics::Dv01CalculatorConfig::parallel_combined(),
                 )
                 .calculate(context);
             }
 
+            // Default (Workout) basis: a callable/putable bond is handled by
+            // the yield-basis DV01, the dollar analogue of `DurationMod`. This
+            // keeps it consistent with `DurationMod`, `Convexity` and
+            // `YieldDv01` on this basis (they all use the quoted-yield /
+            // workout convention), and — when a market price is quoted — the
+            // workout path feeding `DurationMod` captures the embedded option.
+            //
+            // The previous behaviour cloned the bond with `call_put = None`
+            // and curve-bumped that bullet, which silently discarded the
+            // option and reported a curve sensitivity inconsistent in both
+            // methodology and units with the rest of the Workout-basis family.
             let duration_mod = context
                 .computed
                 .get(&MetricId::DurationMod)

@@ -237,6 +237,191 @@ mod tests {
         bond
     }
 
+    /// Item 10 regression: effective duration/convexity must put all three
+    /// prices (base, up, down) on a single valuation date.
+    ///
+    /// The bumped legs are repriced with `value(.., as_of)`. The base price
+    /// must therefore also be the `as_of`-anchored value of the same risk bond
+    /// — `risk_bond.value(market, as_of)` — not the settlement-anchored
+    /// quote/OAS price. When the bond carries a settlement lag those differ by
+    /// the accrued-interest carry, which would otherwise contaminate the
+    /// finite-difference ratio.
+    #[test]
+    fn effective_duration_uses_single_valuation_date() {
+        use crate::instruments::fixed_income::bond::BondSettlementConvention;
+
+        let as_of =
+            finstack_core::dates::Date::from_calendar_date(2025, Month::January, 1).expect("ok");
+        let market = test_market(as_of);
+
+        // Quoted callable bond with a 2-day settlement lag: the quote is
+        // interpreted at settlement, but PV (and the bumped legs) anchor at as_of.
+        let maturity = as_of + time::Duration::days(5 * 365);
+        let call_date = as_of + time::Duration::days(2 * 365);
+        let mut bond = Bond::builder()
+            .id("CALLABLE-QUOTED-LAG".into())
+            .notional(Money::new(1000.0, Currency::USD))
+            .issue_date(as_of)
+            .maturity(maturity)
+            .cashflow_spec(CashflowSpec::fixed(
+                0.05,
+                Tenor::semi_annual(),
+                DayCount::Act365F,
+            ))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .pricing_overrides(PricingOverrides::default().with_quoted_clean_price(98.0))
+            .settlement_convention_opt(Some(BondSettlementConvention {
+                settlement_days: 2,
+                ..Default::default()
+            }))
+            .attributes(Default::default())
+            .build()
+            .expect("valid bond");
+        let mut schedule = CallPutSchedule::default();
+        schedule.calls.push(CallPut {
+            start_date: call_date,
+            end_date: maturity,
+            price_pct_of_par: 100.0,
+            make_whole: None,
+        });
+        bond.call_put = Some(schedule);
+
+        let shock_bps = 25.0;
+        let result = effective_duration_convexity(&bond, &market, as_of, Some(shock_bps))
+            .expect("effective duration/convexity");
+
+        // Reconstruct the expected finite difference with all three prices on
+        // the single `as_of` valuation date.
+        let (risk_bond, _) =
+            option_risk_bond_and_base_price(&bond, &market, as_of).expect("risk bond");
+        let curve_id = option_risk_curve_id(&risk_bond);
+        let market_up = market
+            .bump([MarketBump::Curve {
+                id: curve_id.clone(),
+                spec: BumpSpec::parallel_bp(shock_bps),
+            }])
+            .expect("bump up");
+        let market_down = market
+            .bump([MarketBump::Curve {
+                id: curve_id,
+                spec: BumpSpec::parallel_bp(-shock_bps),
+            }])
+            .expect("bump down");
+        let base = risk_bond.value(&market, as_of).expect("base").amount();
+        let up = risk_bond.value(&market_up, as_of).expect("up").amount();
+        let down = risk_bond.value(&market_down, as_of).expect("down").amount();
+        let shock = shock_bps / 10_000.0;
+        let expected_duration = (down - up) / (2.0 * base * shock);
+        let expected_convexity = (up + down - 2.0 * base) / (base * shock * shock);
+
+        assert!(
+            (result.duration - expected_duration).abs() < 1e-9,
+            "effective duration must use the as_of-anchored base price: \
+             got {}, expected {}",
+            result.duration,
+            expected_duration
+        );
+        assert!(
+            (result.convexity - expected_convexity).abs() < 1e-9,
+            "effective convexity must use the as_of-anchored base price: \
+             got {}, expected {}",
+            result.convexity,
+            expected_convexity
+        );
+        // The base price the calculator reports must be the as_of value.
+        assert!(
+            (result.base_price - base).abs() < 1e-9,
+            "reported base price must be the as_of-anchored risk-bond value: \
+             got {}, expected {}",
+            result.base_price,
+            base
+        );
+    }
+
+    /// Item 10 regression for the OAS-quote path: with a settlement lag, the
+    /// `quoted_oas` inversion (`price_from_oas`) anchors at `quote_date`, while
+    /// the bumped legs reprice at `as_of`. Effective duration/convexity must
+    /// still place all three prices on the single `as_of` valuation date.
+    #[test]
+    fn effective_duration_uses_single_valuation_date_oas_quote() {
+        use crate::instruments::fixed_income::bond::BondSettlementConvention;
+
+        let as_of =
+            finstack_core::dates::Date::from_calendar_date(2025, Month::January, 1).expect("ok");
+        let market = test_market(as_of);
+
+        let maturity = as_of + time::Duration::days(5 * 365);
+        let call_date = as_of + time::Duration::days(2 * 365);
+        let mut bond = Bond::builder()
+            .id("CALLABLE-OAS-LAG".into())
+            .notional(Money::new(1000.0, Currency::USD))
+            .issue_date(as_of)
+            .maturity(maturity)
+            .cashflow_spec(CashflowSpec::fixed(
+                0.05,
+                Tenor::semi_annual(),
+                DayCount::Act365F,
+            ))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            // Quote via OAS directly (decimal: 0.005 = 50 bp).
+            .pricing_overrides(PricingOverrides::default().with_quoted_oas(0.005))
+            .settlement_convention_opt(Some(BondSettlementConvention {
+                settlement_days: 2,
+                ..Default::default()
+            }))
+            .attributes(Default::default())
+            .build()
+            .expect("valid bond");
+        let mut schedule = CallPutSchedule::default();
+        schedule.calls.push(CallPut {
+            start_date: call_date,
+            end_date: maturity,
+            price_pct_of_par: 100.0,
+            make_whole: None,
+        });
+        bond.call_put = Some(schedule);
+
+        let shock_bps = 25.0;
+        let result = effective_duration_convexity(&bond, &market, as_of, Some(shock_bps))
+            .expect("effective duration/convexity");
+
+        let (risk_bond, _) =
+            option_risk_bond_and_base_price(&bond, &market, as_of).expect("risk bond");
+        let curve_id = option_risk_curve_id(&risk_bond);
+        let market_up = market
+            .bump([MarketBump::Curve {
+                id: curve_id.clone(),
+                spec: BumpSpec::parallel_bp(shock_bps),
+            }])
+            .expect("bump up");
+        let market_down = market
+            .bump([MarketBump::Curve {
+                id: curve_id,
+                spec: BumpSpec::parallel_bp(-shock_bps),
+            }])
+            .expect("bump down");
+        let base = risk_bond.value(&market, as_of).expect("base").amount();
+        let up = risk_bond.value(&market_up, as_of).expect("up").amount();
+        let down = risk_bond.value(&market_down, as_of).expect("down").amount();
+        let shock = shock_bps / 10_000.0;
+        let expected_duration = (down - up) / (2.0 * base * shock);
+
+        assert!(
+            (result.duration - expected_duration).abs() < 1e-9,
+            "effective duration (OAS quote) must use the as_of-anchored base: \
+             got {}, expected {}",
+            result.duration,
+            expected_duration
+        );
+        assert!(
+            (result.base_price - base).abs() < 1e-9,
+            "reported base price (OAS quote) must be the as_of-anchored value: \
+             got {}, expected {}",
+            result.base_price,
+            base
+        );
+    }
+
     #[test]
     fn bullet_effective_duration_matches_modified() {
         let as_of =
