@@ -12,10 +12,18 @@ use finstack_core::math::characteristic_function::{BlackScholesCf, MertonJumpCf,
 use finstack_valuations::pricer::fourier::{CosConfig, CosPricer};
 use wasm_bindgen::prelude::*;
 
+/// Build a [`CosConfig`] for the COS pricer.
+///
+/// When `n_terms` is `None` the term count is taken from
+/// [`CosConfig::default()`] — the single canonical source for the COS
+/// expansion default, shared with the Python binding (`fourier.rs`). No COS
+/// default is hardcoded in the binding layer, so the Python and WASM defaults
+/// cannot drift from the core.
 fn cos_config(n_terms: Option<usize>) -> CosConfig {
+    let default = CosConfig::default();
     CosConfig {
-        num_terms: n_terms.unwrap_or(128),
-        ..CosConfig::default()
+        num_terms: n_terms.unwrap_or(default.num_terms),
+        ..default
     }
 }
 

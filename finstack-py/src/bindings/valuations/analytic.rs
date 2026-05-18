@@ -36,6 +36,25 @@ fn option_type(is_call: bool) -> OptionType {
     }
 }
 
+/// Guard a closed-form price against non-finite results.
+///
+/// The underlying `closed_form` formulas return a raw `f64` and yield `NaN`
+/// or `±inf` for degenerate / out-of-domain inputs (e.g. negative volatility,
+/// zero time with a spot–strike mismatch). Surfacing that as an exception —
+/// rather than a silent `NaN` — keeps these wrappers consistent with
+/// `bs_implied_vol`, which already returns a `Result`. `what` names the
+/// quantity for the error message.
+fn finite_price(value: f64, what: &str) -> PyResult<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(PyValueError::new_err(format!(
+            "{what} is not finite ({value}); check inputs (volatility, time \
+             to expiry, spot, strike) are in the model's valid domain"
+        )))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // bs_price
 // ---------------------------------------------------------------------------
@@ -63,6 +82,11 @@ fn option_type(is_call: bool) -> OptionType {
 /// -------
 /// float
 ///     Present-value option price (per unit; multiply by contract size to scale).
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the inputs produce a non-finite price (e.g. negative volatility).
 #[pyfunction(name = "bs_price")]
 #[pyo3(signature = (spot, strike, r, q, sigma, t, is_call))]
 fn bs_price_wrapper(
@@ -73,8 +97,11 @@ fn bs_price_wrapper(
     sigma: f64,
     t: f64,
     is_call: bool,
-) -> f64 {
-    bs_price(spot, strike, r, q, sigma, t, option_type(is_call))
+) -> PyResult<f64> {
+    finite_price(
+        bs_price(spot, strike, r, q, sigma, t, option_type(is_call)),
+        "Black-Scholes price",
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -363,6 +390,11 @@ fn lookback_option_wrapper(
 ///     Correlation between asset and FX returns (``[-1, 1]``).
 /// is_call : bool, optional
 ///     ``True`` for call (default), ``False`` for put.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the inputs produce a non-finite price.
 #[pyfunction(name = "quanto_option_price")]
 #[pyo3(signature = (spot, strike, t, rate_domestic, rate_foreign, div_yield, vol_asset, vol_fx, correlation, is_call=true))]
 #[allow(clippy::too_many_arguments)]
@@ -377,8 +409,8 @@ fn quanto_option_wrapper(
     vol_fx: f64,
     correlation: f64,
     is_call: bool,
-) -> f64 {
-    if is_call {
+) -> PyResult<f64> {
+    let price = if is_call {
         quanto_call(
             spot,
             strike,
@@ -402,7 +434,8 @@ fn quanto_option_wrapper(
             vol_fx,
             correlation,
         )
-    }
+    };
+    finite_price(price, "quanto option price")
 }
 
 // ---------------------------------------------------------------------------

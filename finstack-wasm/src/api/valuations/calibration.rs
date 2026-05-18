@@ -44,21 +44,27 @@ fn parse_envelope(json: &str) -> Result<CalibrationEnvelope, EnvelopeError> {
 
 /// Native-testable core of [`validate_calibration_json`].
 ///
-/// Parses the envelope and returns its canonical (pretty-printed) form. The
-/// error path carries a structured [`EnvelopeError`] preserving the full parse
-/// diagnostic. Re-serializing a value that just parsed cannot fail, so the
-/// `to_string_pretty` call is `expect`-free and infallible in practice.
-fn validate_calibration_json_inner(json: &str) -> Result<String, EnvelopeError> {
+/// Parses the envelope and returns its canonical (pretty-printed) form. A parse
+/// failure surfaces a structured [`EnvelopeError`] preserving the full parse
+/// diagnostic; a re-serialization failure surfaces an [`ExecuteError::Other`]
+/// internal error. Re-serializing a value that just parsed is not expected to
+/// fail, but the failure is *propagated* rather than masked by a silent `"{}"`
+/// fallback that would look like a successful validation to the JS caller.
+fn validate_calibration_json_inner(json: &str) -> Result<String, ExecuteError> {
     let parsed = parse_envelope(json)?;
-    // A `CalibrationEnvelope` that round-trips from JSON always re-serializes;
-    // fall back to a JSON-parse diagnostic only to avoid an `unwrap`.
-    Ok(serde_json::to_string_pretty(&parsed).unwrap_or_else(|_| "{}".to_string()))
+    // Surface any re-serialization failure as an internal error rather than
+    // returning a literal empty object that masquerades as a valid envelope.
+    serde_json::to_string_pretty(&parsed).map_err(|e| {
+        ExecuteError::Other(finstack_core::Error::Internal(format!(
+            "failed to serialize validated calibration envelope: {e}"
+        )))
+    })
 }
 
 /// Validate a calibration plan JSON and return the canonical (pretty-printed) form.
 #[wasm_bindgen(js_name = validateCalibrationJson)]
 pub fn validate_calibration_json(json: &str) -> Result<String, JsValue> {
-    validate_calibration_json_inner(json).map_err(|e| envelope_error_to_js(&e))
+    validate_calibration_json_inner(json).map_err(execute_error_to_js)
 }
 
 /// Native-testable core of [`calibrate`].
@@ -222,7 +228,11 @@ mod tests {
         // carrying the parse diagnostic — never a silently nulled error.
         let err = validate_calibration_json_inner("{ not valid json")
             .expect_err("malformed JSON must error");
-        match &err {
+        let envelope = match err {
+            ExecuteError::Envelope(env) => env,
+            ExecuteError::Other(other) => panic!("expected envelope diagnostic, got: {other:?}"),
+        };
+        match &envelope {
             EnvelopeError::JsonParse { message, line, col } => {
                 assert!(!message.is_empty(), "parse message must be populated");
                 assert!(
@@ -234,15 +244,36 @@ mod tests {
         }
         // The serialized payload (what wasm clients see via `e.cause`) carries
         // both the structured kind and the human-readable message.
-        let json = err.to_json();
+        let json = envelope.to_json();
         assert!(
             json.contains("json_parse") && json.contains("message"),
             "diagnostic JSON should carry the structured parse error, got: {json}"
         );
         assert!(
-            !err.to_string().is_empty(),
+            !envelope.to_string().is_empty(),
             "diagnostic Display text must not be empty"
         );
+    }
+
+    #[test]
+    fn validate_calibration_json_inner_never_returns_empty_object_fallback() {
+        // A successfully validated envelope must round-trip to a non-trivial
+        // canonical JSON — never the literal `"{}"` that the old silent
+        // `unwrap_or_else` fallback would have produced on a (hypothetical)
+        // re-serialization failure. This guards the regression: the success
+        // path returns the real canonical form, and the error path (covered
+        // by `validate_calibration_json_inner_preserves_parse_diagnostic`)
+        // returns a structured error rather than a fake `"{}"` success.
+        let json = empty_envelope_json();
+        let canonical = validate_calibration_json_inner(&json).expect("validate");
+        assert_ne!(
+            canonical, "{}",
+            "canonical envelope JSON must not collapse to an empty object"
+        );
+        // The canonical form must itself parse back into a `CalibrationEnvelope`.
+        let reparsed: CalibrationEnvelope =
+            serde_json::from_str(&canonical).expect("canonical JSON must round-trip");
+        assert_eq!(reparsed.schema, CALIBRATION_SCHEMA);
     }
 
     #[test]

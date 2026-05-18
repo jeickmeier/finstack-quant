@@ -4,7 +4,7 @@
 //! for interactive exploration from Python.
 
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::errors::display_to_py;
+use crate::errors::{display_to_py, serde_json_to_py};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -142,7 +142,7 @@ fn attribute_pnl_from_spec(py: Python<'_>, spec_json: &str) -> PyResult<String> 
 fn validate_attribution_json(json: &str) -> PyResult<String> {
     let envelope: finstack_valuations::attribution::AttributionEnvelope =
         serde_json::from_str(json)
-            .map_err(|e| PyValueError::new_err(format!("invalid attribution JSON: {e}")))?;
+            .map_err(|e| serde_json_to_py(e, "invalid attribution JSON"))?;
     serde_json::to_string(&envelope).map_err(display_to_py)
 }
 

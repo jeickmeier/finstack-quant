@@ -1,4 +1,15 @@
 //! Direct WASM wrappers for FX valuation instruments.
+//!
+//! # Monte-Carlo determinism
+//!
+//! The `price` / `priceWithMetrics` methods accept Monte-Carlo models for
+//! path-dependent FX products (e.g. barrier / touch options). As with the
+//! generic `priceInstrument` bindings, no explicit RNG-seed parameter is
+//! exposed: the seed is an instrument-level concern. When an instrument's
+//! `pricing_overrides.metrics.mc_seed_scenario` is `None`, the core MC pricers
+//! derive a stable seed deterministically from the instrument ID, so repricing
+//! the same instrument JSON is bit-reproducible. Callers needing a distinct
+//! deterministic stream set `mc_seed_scenario` inside the instrument JSON.
 
 use crate::utils::to_js_err;
 use finstack_valuations::pricer::{

@@ -5,11 +5,21 @@
 
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::errors::display_to_py;
+use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_valuations::factor_model::FactorSensitivityEngine;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+
+/// Default number of scenario grid points for :func:`compute_pnl_profiles`
+/// when the caller omits ``n_scenario_points``.
+///
+/// ``5`` produces the symmetric shift grid ``[-2, -1, 0, 1, 2]`` (see
+/// [`finstack_valuations::factor_model::ScenarioGrid`]). The WASM binding
+/// (`computePnlProfiles`) uses the same value via its own crate-local
+/// `DEFAULT_PNL_SCENARIO_POINTS`; the two are kept in sync by review because
+/// `finstack-py` and `finstack-wasm` are sibling crates with no shared module.
+const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
 
 /// Serialize a Python object to JSON via `json.dumps`, then deserialize into `T`.
 fn py_to_serde<'py, T: serde::de::DeserializeOwned>(
@@ -19,8 +29,7 @@ fn py_to_serde<'py, T: serde::de::DeserializeOwned>(
 ) -> PyResult<T> {
     let json_mod = py.import("json")?;
     let json_str: String = json_mod.call_method1("dumps", (obj,))?.extract()?;
-    serde_json::from_str(&json_str)
-        .map_err(|e| PyValueError::new_err(format!("invalid {label}: {e}")))
+    serde_json::from_str(&json_str).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
 }
 
 // ---------------------------------------------------------------------------
@@ -333,7 +342,7 @@ fn compute_factor_sensitivities(
 /// list[FactorPnlProfile]
 ///     One profile per factor, each containing scenario P&L for every position.
 #[pyfunction]
-#[pyo3(signature = (positions_json, factors_json, market, as_of, bump_config_json=None, n_scenario_points=5))]
+#[pyo3(signature = (positions_json, factors_json, market, as_of, bump_config_json=None, n_scenario_points=DEFAULT_PNL_SCENARIO_POINTS))]
 fn compute_pnl_profiles(
     py: Python<'_>,
     positions_json: &str,
