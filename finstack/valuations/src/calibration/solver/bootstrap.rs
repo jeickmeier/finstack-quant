@@ -145,26 +145,68 @@ fn normalize_scan_points(mut points: Vec<f64>, initial_guess: f64, time: f64) ->
     Ok(points)
 }
 
-/// Resolve the solved value when no sign-change bracket was found.
+/// Resolve the solved value when the bracketing solver did not return a formally
+/// converged root (`tentative = None`).
 ///
-/// Returns `(solved_x, is_approximate)` on success, where `is_approximate = true`
-/// indicates the knot was accepted from a local `|f|`-minimum rather than a true
-/// sign-change bracket.  Callers MUST propagate this flag so the calibration report
-/// can distinguish approximate knots from properly-bracketed roots (W-40).
+/// Returns `(solved_x, is_approximate)`. `is_approximate` is always `false` here: the
+/// only `Ok` outcome is a genuinely bracketed root (see below); every other case is a
+/// hard `Err`.
+///
+/// # Item 10: a *no-sign-change-bracket* local minimum is a hard failure
+///
+/// A previous implementation accepted a grid-local `|f|`-minimum here whenever
+/// `|f| <= validation_tolerance`, returning `(best_x, /* is_approximate */ true)`.
+/// The bootstrap report's `success` flag is derived from the final residuals, and an
+/// accepted local minimum trivially satisfies the residual tolerance — so the curve was
+/// reported as a **successful calibration** with only an `approximate_knots` metadata
+/// breadcrumb. A knot pinned to a local minimum *with no sign-change bracket* is not a
+/// solved root: its residual is small by construction, not because the instrument
+/// reprices to par. Silently shipping such a curve as `success = true` is a correctness
+/// defect (the W-40 metadata flag does not gate `success`), so that case is now a hard
+/// failure.
+///
+/// # Genuine bracketed root vs. local minimum
+///
+/// `tentative = None` does NOT always mean "no bracket". `bracket_solve_1d_with_diagnostics`
+/// returns `None` whenever its bisection / false-position loop did not formally hit the
+/// **solver** tolerance — which can be tighter than the **validation** tolerance. When a
+/// real sign-change bracket *was* discovered (`diag.is_sign_change_bracket`) and the best
+/// observed `|f|` is within the validation tolerance, the best point IS a properly
+/// bracketed root; rejecting it would spuriously fail well-converged calibrations. That
+/// case is accepted. The hard failure is reserved for the true item-10 defect: no
+/// sign-change bracket at all.
 fn resolve_no_bracket<Q: std::fmt::Debug>(ctx: NoBracketContext<'_, Q>) -> Result<(f64, bool)> {
-    // Check if best point is within tolerance
     if let (Some(best_x), Some(best_f)) = (ctx.diag.best_point, ctx.diag.best_value) {
-        if best_f.is_finite() && best_f.abs() <= ctx.validation_tolerance {
-            // Accepted without a sign-change bracket: flag as approximate.
-            return Ok((best_x, true));
+        let within_tol = best_f.is_finite() && best_f.abs() <= ctx.validation_tolerance;
+
+        // A genuine sign-change bracket was found and the best point reprices within
+        // the validation tolerance: this is a real bracketed root, not a local-minimum
+        // guess. Accept it (the bracketed-root contract — `is_approximate = false`).
+        if ctx.diag.is_sign_change_bracket && within_tol {
+            return Ok((best_x, false));
         }
+
+        // No sign-change bracket (or the residual exceeds tolerance): hard failure.
+        // `detail` MUST keep the substring "exceeds tolerance" — downstream f-space
+        // tolerance regression tests assert on it.
+        let detail = if within_tol {
+            "best point is a local |f|-minimum that satisfies the residual tolerance \
+             but is NOT a sign-change root; accepting it would silently report a \
+             non-repricing knot as a successful calibration"
+        } else {
+            "best |residual| exceeds tolerance"
+        };
         return Err(finstack_core::Error::Calibration {
             message: format!(
-                "Bootstrap failed at t={:.6} (quote={:?}): no bracket found and best |residual|={:.3e} exceeds tolerance={:.3e} (scan_bounds=[{:.3e}, {:.3e}])",
+                "Bootstrap failed at t={:.6} (quote={:?}): no converged root — {} \
+                 (best |residual|={:.3e}, tolerance={:.3e}, sign_change_bracket={}, \
+                 scan_bounds=[{:.3e}, {:.3e}])",
                 ctx.time,
                 ctx.quote,
+                detail,
                 best_f.abs(),
                 ctx.validation_tolerance,
+                ctx.diag.is_sign_change_bracket,
                 ctx.diag.scan_bounds.0,
                 ctx.diag.scan_bounds.1
             ),
@@ -915,6 +957,61 @@ mod w40_tests {
                 // Also acceptable: rejecting a no-bracket result is a valid fix.
                 // This branch means the fix chose to reject rather than flag.
             }
+        }
+    }
+
+    /// Item 10: a no-bracket knot — a grid-local |f|-minimum that satisfies the residual
+    /// tolerance but has NO sign-change bracket — must be a HARD calibration failure,
+    /// not a silently-accepted knot with `report.success = true`.
+    ///
+    /// Residual `f(x) = (x - root)^2 + eps` is strictly positive everywhere (no zero
+    /// crossing). To exercise the `resolve_no_bracket` path specifically (rather than the
+    /// secant/best-point `Some` path), the *solver* tolerance is set tight (`1e-12`, well
+    /// below `eps`) so no scan point and no secant step register as a root — the solver
+    /// returns `None`. The *validation* tolerance is set loose (`1e-6`, above `eps`) so
+    /// the pre-fix `resolve_no_bracket` would accept `x = root` as an approximate knot
+    /// and yield `success = true`. Post-fix the bootstrap must return `Err`.
+    #[test]
+    fn item10_no_bracket_knot_is_a_hard_failure_not_a_silent_success() {
+        let target = NonMonotoneNoBracketTarget;
+        let eps = 1e-8; // solver_tol < eps <= validation_tolerance
+        let q = NonMonotoneNoBracketQuote {
+            t: 1.0,
+            root: 0.5,
+            eps,
+        };
+        let cfg = crate::calibration::CalibrationConfig {
+            solver: crate::calibration::solver::SolverConfig::brent_default()
+                .with_tolerance(1e-12) // tight: min |f| = eps = 1e-8 never < tol
+                .with_max_iterations(200),
+            ..crate::calibration::CalibrationConfig::default()
+        };
+
+        // Validation tolerance 1e-6 > eps: pre-fix `resolve_no_bracket` accepted the
+        // local minimum as an "approximate knot" and reported success.
+        let result = SequentialBootstrapper::bootstrap(
+            &target,
+            &[q],
+            vec![(0.0, 0.0)],
+            &cfg,
+            Some(1e-6),
+            None,
+        );
+
+        let err = result.expect_err(
+            "Item 10: a no-bracket local-minimum knot must be a hard failure, \
+             not a successful calibration",
+        );
+        match err {
+            finstack_core::Error::Calibration { message, category } => {
+                assert_eq!(category, "bootstrapping");
+                assert!(
+                    message.contains("no converged root")
+                        && message.contains("sign-change root"),
+                    "error must explain the no-bracket failure mode; got: {message}"
+                );
+            }
+            other => panic!("expected a Calibration error, got: {other:?}"),
         }
     }
 }
