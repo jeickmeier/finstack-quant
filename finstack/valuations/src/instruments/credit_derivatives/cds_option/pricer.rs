@@ -173,6 +173,14 @@ impl CDSOptionPricer {
         option.validate_supported_configuration()?;
 
         let cds = synthetic_underlying_cds(option, as_of)?;
+        // `BrentSolver` expects an `FnMut(f64) -> f64` and has no `Result` channel
+        // for in-iteration pricing failures. We squirrel away the first NPV error
+        // in a `RefCell<Option<Error>>` and return `f64::NAN` to trip Brent's
+        // built-in non-finite guard (`solver.rs` rejects NaN endpoints and
+        // mid-iteration NaN with its own `SolverConvergenceFailed`). On either
+        // path we surface the original (more informative) NPV error after Brent
+        // returns; do not "simplify" this pattern without restoring an error
+        // propagation channel.
         let captured: std::cell::RefCell<Option<finstack_core::Error>> =
             std::cell::RefCell::new(None);
         let f = |log_sigma: f64| -> f64 {
@@ -255,6 +263,23 @@ fn resolve_sigma(
 /// ```text
 /// Δ = (option_pv_bumped − option_pv_base) / (cds_pv_bumped − cds_pv_base)
 /// ```
+///
+/// # Bootstrap symmetry
+///
+/// Both legs of the forward-difference go through
+/// [`bump_hazard_spreads`] — the base leg with a zero parallel bump, the
+/// bumped leg with `+bump_bp`. Pricing both NPVs against rebootstrapped
+/// hazard curves removes any "zero-bump bootstrap drift" (the small PV
+/// gap between the as-supplied hazard knots and what the bootstrap
+/// would solve from the same par spreads) from the numerator and
+/// denominator. This is the same symmetric-rebootstrap convention used
+/// by the canonical CS01 helper (`metrics/sensitivities/cs01.rs`) and
+/// it is what Bloomberg's CDSO Spread DV01 path also does. Without
+/// this, the option Δ silently absorbs the bootstrap-vs-snapshot
+/// methodology delta on top of the genuine credit sensitivity. The
+/// option's reported NPV (returned by [`CDSOptionPricer::npv`]) still
+/// uses the as-supplied `curves`; only Δ/Γ are computed under
+/// rebootstrapped legs.
 fn bumped_delta(
     option: &CDSOption,
     curves: &MarketContext,
@@ -264,28 +289,44 @@ fn bumped_delta(
     use crate::calibration::bumps::{bump_hazard_spreads, BumpRequest};
 
     let pricer = CDSOptionPricer;
-    let pv_base = pricer.npv(option, curves, as_of)?.amount();
 
     let hazard = curves.get_hazard(&option.credit_curve_id)?;
+    let discount_id = Some(&option.discount_curve_id);
+
+    // Symmetric rebootstrap: both base (zero bump) and bumped legs are
+    // re-bootstrapped from the same par-spread points, so the forward
+    // difference captures only the genuine credit sensitivity rather than
+    // a mixture of bootstrap drift + spread sensitivity.
+    let base_hazard = bump_hazard_spreads(
+        hazard.as_ref(),
+        curves,
+        &BumpRequest::Parallel(0.0),
+        discount_id,
+    )?;
     let bumped_hazard = bump_hazard_spreads(
         hazard.as_ref(),
         curves,
         &BumpRequest::Parallel(bump_bp),
-        Some(&option.discount_curve_id),
+        discount_id,
     )?;
+    let base_curves = (*curves).clone().insert(base_hazard);
     let bumped_curves = (*curves).clone().insert(bumped_hazard);
 
+    let pv_base = pricer.npv(option, &base_curves, as_of)?.amount();
     let pv_bumped = pricer.npv(option, &bumped_curves, as_of)?.amount();
 
-    // Underlying-swap PV change uses the synthetic forward CDS. We price
-    // it with the standard CDS pricer at both curve states.
+    // Underlying-swap PV change uses the synthetic forward CDS, also priced
+    // on the rebootstrapped legs so the ratio's denominator and numerator
+    // share the same bootstrap methodology.
     let cds = synthetic_underlying_cds(option, as_of)?;
     let cds_delta = cds_with_bloomberg_protection_end_extension(&cds);
     let cds_pricer = crate::instruments::credit_derivatives::cds::pricer::CDSPricer::new();
     let disc = curves.get_discount(&option.discount_curve_id)?;
+    let base_hazard_arc = base_curves.get_hazard(&option.credit_curve_id)?;
     let bumped_hazard_arc = bumped_curves.get_hazard(&option.credit_curve_id)?;
 
-    let cds_pv_base = cds_pricer.npv_full(&cds_delta, disc.as_ref(), hazard.as_ref(), as_of)?;
+    let cds_pv_base =
+        cds_pricer.npv_full(&cds_delta, disc.as_ref(), base_hazard_arc.as_ref(), as_of)?;
     let cds_pv_bumped =
         cds_pricer.npv_full(&cds_delta, disc.as_ref(), bumped_hazard_arc.as_ref(), as_of)?;
 

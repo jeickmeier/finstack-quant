@@ -36,3 +36,4 @@ mod test_metrics_registry;
 // CDSW screen values, isolating the CDS-pricer layer from the CDSO
 // option-pricer layer.
 mod test_bloomberg_cdsw_parity;
+mod test_cdx_ig_46_cdso_diagnostics;

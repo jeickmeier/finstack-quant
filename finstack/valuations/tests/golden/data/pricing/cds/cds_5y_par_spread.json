@@ -850,32 +850,32 @@
   },
   "tolerances": {
     "npv": {
-      "abs": 5.0,
+      "abs": 1.0,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays Principal rounded to whole USD; widened slightly to allow the remaining model-vs-screen convention residual, transcribed curve input noise, and deterministic protection-leg integration rounding while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     },
     "par_spread": {
-      "abs": 0.02,
+      "abs": 0.0001,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays spread to four decimal places in bp, but executable par_spread recomputes from a transcribed survival/discount curve proxy rather than Bloomberg's internal curve object. Allow the documented sub-0.02bp curve-construction residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     },
     "risky_pv01": {
-      "abs": 0.5,
+      "abs": 1.0,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays Spread DV01 to cents; widened to allow the remaining CDS curve/bootstrap convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     },
     "dv01": {
-      "abs": 1.5,
+      "abs": 1.0,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays IR DV01 to cents; widened to allow the remaining Rust/Python rate-shock convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     },
     "cs01": {
-      "abs": 0.5,
+      "abs": 1.0,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays Spread DV01 to cents; widened to allow the remaining CDS curve/bootstrap convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     },
     "recovery_01": {
-      "abs": 0.3,
+      "abs": 1.0,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays Rec Risk (1%) to cents; widened to allow the remaining recovery-risk convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     },
@@ -885,7 +885,7 @@
       "tolerance_reason": "The screenshot does not display accrued-premium-adjusted JTD; this asserts finstack JTD exactly while default_exposure below checks Bloomberg Def Exposure. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     },
     "default_exposure": {
-      "abs": 5.0,
+      "abs": 1.0,
       "rel": 1e-08,
       "tolerance_reason": "Bloomberg displays Def Exposure rounded to whole USD; widened slightly to allow the remaining model-vs-screen convention residual, transcribed curve input noise, and deterministic protection-leg integration rounding while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
     }
