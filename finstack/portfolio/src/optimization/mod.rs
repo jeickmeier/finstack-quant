@@ -55,12 +55,7 @@ mod result;
 mod types;
 mod universe;
 
-/// Centralized numerical tolerances used across the optimization stack.
-///
-/// The constants themselves now live in [`types`]; this module is a thin
-/// re-export shim that preserves the historical
-/// `optimization::tolerances::*` public path.
-pub mod tolerances {
+pub(crate) mod tolerances {
     pub use super::types::{
         GROSS_BASE_TOL, MIN_WEIGHT_TOL, PV_PER_UNIT_TOL, SLACK_TOL, WEIGHT_TOL,
     };
@@ -68,8 +63,7 @@ pub mod tolerances {
 
 pub use constraints::{Constraint, ConstraintValidationError, Inequality};
 pub use helpers::{
-    optimize_from_parts, optimize_from_spec, optimize_with_parameters, OptimizationParameters,
-    PortfolioOptimizationSpec,
+    optimize_from_spec, optimize_with_parameters, OptimizationParameters, PortfolioOptimizationSpec,
 };
 pub use lp_solver::DefaultLpOptimizer;
 pub use problem::PortfolioOptimizationProblem;

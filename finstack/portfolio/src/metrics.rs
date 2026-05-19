@@ -191,7 +191,7 @@ static SUMMABLE_SET: LazyLock<HashSet<&'static str>> = LazyLock::new(|| {
 ///
 /// `true` when the metric is safe to sum across positions after any required
 /// FX conversion.
-pub fn is_summable(metric_id: &str) -> bool {
+pub(crate) fn is_summable(metric_id: &str) -> bool {
     if SUMMABLE_SET.contains(metric_id) {
         return true;
     }

@@ -51,19 +51,19 @@ use std::sync::Arc;
 ///
 /// ```rust,no_run
 /// use finstack_core::market_data::context::MarketContext;
-/// use finstack_portfolio::scenarios::apply_scenario;
+/// use finstack_portfolio::scenarios::apply_and_revalue;
 /// use finstack_scenarios::spec::ScenarioSpec;
 ///
 /// # fn main() -> finstack_portfolio::Result<()> {
 /// # let portfolio: finstack_portfolio::Portfolio = unimplemented!("Provide a portfolio");
 /// # let market: MarketContext = unimplemented!("Provide market data");
 /// # let scenario: ScenarioSpec = unimplemented!("Provide a scenario");
-/// let (_portfolio, _market, report) = apply_scenario(&portfolio, &scenario, &market)?;
+/// let (_valuation, report) = apply_and_revalue(&portfolio, &scenario, &market, &Default::default())?;
 /// println!("Applied {} operations", report.operations_applied);
 /// # Ok(())
 /// # }
 /// ```
-pub fn apply_scenario(
+pub(crate) fn apply_scenario(
     portfolio: &Portfolio,
     scenario: &ScenarioSpec,
     market: &MarketContext,

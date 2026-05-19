@@ -57,12 +57,12 @@
 //! - Basel Committee on Banking Supervision (2015), "Guidance on credit risk
 //!   and accounting for expected credit losses"
 
-pub mod cecl;
-pub mod engine;
+pub(crate) mod cecl;
+pub(crate) mod engine;
 pub(crate) mod policy;
-pub mod portfolio;
-pub mod staging;
-pub mod types;
+pub(crate) mod portfolio;
+pub(crate) mod staging;
+pub(crate) mod types;
 
 // Re-export core types for convenience.
 pub use types::{Exposure, PdTermStructure, QualitativeFlags, RawPdCurve, Stage};
@@ -72,8 +72,9 @@ pub use staging::{classify_stage, StageResult, StagingConfig, StagingTrigger};
 
 // Re-export ECL engine API.
 pub use engine::{
-    compute_ecl_single, compute_ecl_weighted, EclBucket, EclConfig, EclConfigBuilder, EclEngine,
-    EclResult, ExposureEclResult, LgdType, MacroScenario, WeightedEclResult,
+    compute_ecl_single, compute_ecl_weighted, compute_ecl_weighted_from_schedules, EclBucket,
+    EclConfig, EclConfigBuilder, EclEngine, EclResult, ExposureEclResult, LgdType, MacroScenario,
+    WeightedEclResult,
 };
 
 // Re-export CECL API.

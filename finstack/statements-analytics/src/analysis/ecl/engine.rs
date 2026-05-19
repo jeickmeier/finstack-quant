@@ -41,7 +41,7 @@ use finstack_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 use super::staging::{classify_stage, StageResult, StagingConfig};
-use super::types::{Exposure, PdTermStructure, Stage};
+use super::types::{Exposure, PdTermStructure, RawPdCurve, Stage};
 
 // ---------------------------------------------------------------------------
 // Macro scenario
@@ -540,6 +540,7 @@ pub fn compute_ecl_weighted(
             "At least one PD source is required for weighted ECL".to_string(),
         ));
     }
+    validate_scenario_weights(pd_sources.iter().map(|(scenario, _)| *scenario))?;
 
     let mut weighted_ecl = 0.0;
     let mut scenario_results = Vec::with_capacity(pd_sources.len());
@@ -561,6 +562,71 @@ pub fn compute_ecl_weighted(
         ecl: weighted_ecl,
         scenario_breakdown: scenario_results,
     })
+}
+
+/// Compute weighted ECL from serde-friendly scenario PD schedules.
+///
+/// This is the canonical binding path for Python/WASM-style callers that hold
+/// each macro scenario as `(weight, raw_pd_curve)` pairs rather than
+/// lifetime-bound `(&MacroScenario, &dyn PdTermStructure)` references.
+///
+/// # Errors
+///
+/// Returns an error if scenario weights are invalid, any raw PD curve is
+/// malformed, or ECL calculation fails for any scenario.
+pub fn compute_ecl_weighted_from_schedules(
+    exposure: &Exposure,
+    stage: Stage,
+    scenarios: &[(f64, Vec<(f64, f64)>)],
+    config: &EclConfig,
+) -> Result<WeightedEclResult> {
+    if scenarios.is_empty() {
+        return Err(Error::Validation(
+            "At least one scenario is required for weighted ECL".to_string(),
+        ));
+    }
+
+    let scenario_defs = scenarios
+        .iter()
+        .enumerate()
+        .map(|(idx, (weight, _))| MacroScenario {
+            id: format!("scenario_{idx}"),
+            weight: *weight,
+            lgd_override: None,
+        })
+        .collect::<Vec<_>>();
+    let curves = scenarios
+        .iter()
+        .map(|(_, schedule)| RawPdCurve::new("scenario", schedule.clone()))
+        .collect::<Result<Vec<_>>>()?;
+    let pd_sources = scenario_defs
+        .iter()
+        .zip(curves.iter())
+        .map(|(scenario, curve)| (scenario, curve as &dyn PdTermStructure))
+        .collect::<Vec<_>>();
+
+    compute_ecl_weighted(exposure, stage, &pd_sources, config)
+}
+
+fn validate_scenario_weights<'a>(
+    scenarios: impl IntoIterator<Item = &'a MacroScenario>,
+) -> Result<()> {
+    let mut total_weight = 0.0;
+    for scenario in scenarios {
+        if !scenario.weight.is_finite() || scenario.weight < 0.0 {
+            return Err(Error::Validation(format!(
+                "scenario '{}' weight must be finite and non-negative",
+                scenario.id
+            )));
+        }
+        total_weight += scenario.weight;
+    }
+    if (total_weight - 1.0).abs() > 1e-6 {
+        return Err(Error::Validation(format!(
+            "scenario weights must sum to 1.0, got {total_weight:.6}"
+        )));
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

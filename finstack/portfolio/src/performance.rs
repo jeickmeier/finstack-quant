@@ -43,6 +43,7 @@
 //!   XIRR.)
 
 use finstack_core::dates::Date;
+use serde::{Deserialize, Serialize};
 
 /// A single sub-period of a portfolio, with the information needed to
 /// compute a Modified-Dietz return.
@@ -54,7 +55,7 @@ use finstack_core::dates::Date;
 ///   period end divided by the total period length, i.e., the Dietz
 ///   weight `w_i = (T − t_i) / T ∈ [0, 1]`. A flow *at the start* of
 ///   the period has `w_i = 1`; a flow *at the end* has `w_i = 0`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TwrrPeriod {
     /// PV at period start.
     pub beginning_market_value: f64,
@@ -70,7 +71,7 @@ pub struct TwrrPeriod {
 }
 
 /// A single external cashflow within a TWRR sub-period.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DietzFlow {
     /// Signed flow amount (positive = contribution; negative = withdrawal).
     pub amount: f64,
@@ -111,7 +112,7 @@ pub fn twrr_modified_dietz(period: &TwrrPeriod) -> Option<f64> {
 }
 
 /// Result of geometrically linking sub-period returns.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LinkedReturn {
     /// Cumulative return over the full horizon: `Π(1 + r_i) − 1`.
     pub cumulative: f64,
@@ -120,6 +121,16 @@ pub struct LinkedReturn {
     pub annualised: f64,
     /// Number of sub-periods linked.
     pub num_periods: usize,
+}
+
+/// A dated cashflow amount for money-weighted return calculations.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct DatedCashflow {
+    /// Cashflow date.
+    pub date: Date,
+    /// Signed amount. Contributions from the investor are negative; terminal
+    /// value or distributions back to the investor are positive.
+    pub amount: f64,
 }
 
 /// Geometrically link sub-period returns. GIPS 2020 §2.A.6.b.i.
@@ -175,6 +186,15 @@ pub fn twrr_linked(periods: &[f64], horizon_years: f64) -> Option<LinkedReturn> 
 /// boundary.
 pub fn mwr_xirr(cashflows: &[(Date, f64)]) -> finstack_core::Result<f64> {
     finstack_core::cashflow::xirr(cashflows, None)
+}
+
+/// Money-weighted return via XIRR from serde-friendly dated cashflow objects.
+pub fn mwr_xirr_from_cashflows(cashflows: &[DatedCashflow]) -> finstack_core::Result<f64> {
+    let flows = cashflows
+        .iter()
+        .map(|cashflow| (cashflow.date, cashflow.amount))
+        .collect::<Vec<_>>();
+    mwr_xirr(&flows)
 }
 
 #[cfg(test)]

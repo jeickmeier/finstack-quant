@@ -53,9 +53,8 @@ fn add_years_clamped(date: Date, years: i32) -> Option<Date> {
 /// Default threshold (in years) past which spot-equivalent FX is flagged as
 /// economically unjustifiable for cashflow conversion. Override at call
 /// sites that have a different mandate (e.g. ALM books with 50-year
-/// liabilities) by passing a different value through
-/// [`should_warn_far_future_fx_conversion_with_horizon`].
-pub const DEFAULT_FAR_FUTURE_FX_HORIZON_YEARS: i32 = 30;
+/// liabilities) by using the internal horizon-aware helper.
+const DEFAULT_FAR_FUTURE_FX_HORIZON_YEARS: i32 = 30;
 
 /// Decide whether to warn about spot-equivalent FX being used beyond the
 /// caller's valuation horizon, using the default 30-year mandate.
@@ -89,7 +88,7 @@ fn should_warn_far_future_fx_conversion(
 /// - `as_of + horizon_years` overflows the supported date range, in which
 ///   case no useful threshold can be computed (callers see no warning
 ///   rather than a panic).
-pub fn should_warn_far_future_fx_conversion_with_horizon(
+fn should_warn_far_future_fx_conversion_with_horizon(
     as_of: Date,
     payment_date: Date,
     from_ccy: Currency,

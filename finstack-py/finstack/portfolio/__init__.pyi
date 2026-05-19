@@ -18,13 +18,16 @@ __all__ = [
     "almgren_chriss_impact",
     "amihud_illiquidity",
     "apply_scenario_and_revalue",
+    "brinson_fachler",
     "build_portfolio_from_spec",
+    "carino_link",
     "days_to_liquidate",
     "evaluate_risk_budget",
     "historical_var_decomposition",
     "kyle_lambda",
     "liquidity_tier",
     "lvar_bangia",
+    "mwr_xirr",
     "optimize_portfolio",
     "parametric_es_decomposition",
     "parametric_var_decomposition",
@@ -33,6 +36,8 @@ __all__ = [
     "portfolio_result_total_value",
     "replay_portfolio",
     "roll_effective_spread",
+    "twrr_linked",
+    "twrr_modified_dietz",
     "value_portfolio",
 ]
 
@@ -276,3 +281,22 @@ def almgren_chriss_impact(
     reference_price: float | None = None,
 ) -> dict[str, float]: ...
 def kyle_lambda(volumes: list[float], returns: list[float]) -> float | None: ...
+def brinson_fachler(sectors_json: str) -> str:
+    """Compute single-period Brinson-Fachler attribution from sector JSON."""
+    ...
+
+def carino_link(periods_json: str) -> str:
+    """Compute Carino-linked multi-period Brinson attribution from period JSON."""
+    ...
+
+def twrr_modified_dietz(period_json: str) -> float | None:
+    """Compute a Modified-Dietz TWRR sub-period return from period JSON."""
+    ...
+
+def twrr_linked(returns_json: str, horizon_years: float) -> str | None:
+    """Geometrically link TWRR sub-period returns from returns JSON."""
+    ...
+
+def mwr_xirr(cashflows_json: str) -> float:
+    """Compute money-weighted return via XIRR from dated cashflow JSON."""
+    ...

@@ -8,10 +8,10 @@
 //! - [`compute_ecl_weighted`] — probability-weighted ECL across macro scenarios.
 //!
 //! PD term structures are passed as ``Vec<(time_years, cumulative_pd)>`` knots
-//! (wrapped by [`finstack_statements_analytics::analysis::ecl::RawPdCurve`]).
+//! (wrapped by [`finstack_statements_analytics::analysis::RawPdCurve`]).
 
 use crate::errors::display_to_py;
-use finstack_statements_analytics::analysis::ecl as rust_ecl;
+use finstack_statements_analytics::analysis as rust_ecl;
 use pyo3::prelude::*;
 
 // ---------------------------------------------------------------------------
@@ -401,16 +401,8 @@ fn compute_ecl_weighted(
     max_horizon: f64,
     stage: &str,
 ) -> PyResult<f64> {
-    if scenarios.is_empty() {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "at least one scenario is required",
-        ));
-    }
     let stage = parse_stage(stage)?;
 
-    // Build each scenario's curve and weighted-average ECL explicitly.
-    // We avoid the engine's lifetime-bound scenario binding by calling
-    // compute_ecl_single per scenario.
     let config = build_ecl_config(rust_ecl::binding_default_compute_ecl_bucket_width_years())?;
     let exposure = rust_ecl::Exposure {
         id: "weighted".to_string(),
@@ -427,22 +419,10 @@ fn compute_ecl_weighted(
         previous_stage: None,
     };
 
-    let total_weight: f64 = scenarios.iter().map(|(w, _)| *w).sum();
-    if (total_weight - 1.0).abs() > 1e-6 {
-        return Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "scenario weights must sum to 1.0, got {:.6}",
-            total_weight
-        )));
-    }
-
-    let mut weighted = 0.0;
-    for (weight, pd_schedule) in scenarios {
-        let curve = build_pd_curve(&pd_schedule)?;
-        let result = rust_ecl::compute_ecl_single(&exposure, stage, &curve, &config)
+    let result =
+        rust_ecl::compute_ecl_weighted_from_schedules(&exposure, stage, &scenarios, &config)
             .map_err(display_to_py)?;
-        weighted += weight * result.ecl;
-    }
-    Ok(weighted)
+    Ok(result.ecl)
 }
 
 // ---------------------------------------------------------------------------

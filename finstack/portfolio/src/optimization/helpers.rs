@@ -101,7 +101,7 @@ pub struct OptimizationParameters {
 /// `Portfolio::from_spec` on every call. The semantics match
 /// [`optimize_from_spec`] otherwise.
 #[allow(clippy::too_many_arguments)]
-pub fn optimize_from_parts(
+pub(crate) fn optimize_from_parts(
     portfolio: &Portfolio,
     objective: &Objective,
     constraints: &[Constraint],

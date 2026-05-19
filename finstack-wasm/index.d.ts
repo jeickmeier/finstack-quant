@@ -1721,6 +1721,16 @@ export interface PortfolioNamespace {
   /** Typed handle for cached portfolio builds. */
   Portfolio: typeof Portfolio;
   parsePortfolioSpec(jsonStr: string): string;
+  /** Compute single-period Brinson-Fachler attribution from sector JSON. */
+  brinsonFachler(sectorsJson: string): string;
+  /** Compute Carino-linked multi-period Brinson attribution from period JSON. */
+  carinoLink(periodsJson: string): string;
+  /** Compute a Modified-Dietz TWRR sub-period return from period JSON. */
+  twrrModifiedDietz(periodJson: string): number | undefined;
+  /** Geometrically link TWRR sub-period returns from returns JSON. */
+  twrrLinked(returnsJson: string, horizonYears: number): string | undefined;
+  /** Compute money-weighted return via XIRR from dated cashflow JSON. */
+  mwrXirr(cashflowsJson: string): number;
   buildPortfolioFromSpec(specJson: string): string;
   portfolioResultTotalValue(resultJson: string): number;
   portfolioResultGetMetric(resultJson: string, metricId: string): number | undefined;

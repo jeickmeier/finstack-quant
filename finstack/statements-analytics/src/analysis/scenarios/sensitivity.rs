@@ -512,7 +512,7 @@ fn approx_equal(lhs: f64, rhs: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::types::ParameterSpec;
+    use crate::analysis::scenarios::types::ParameterSpec;
     use finstack_core::dates::PeriodId;
     use finstack_statements::builder::ModelBuilder;
 

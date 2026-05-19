@@ -273,6 +273,7 @@ status = "exists"
 [crates.portfolio.modules]
 attribution  = { python = "finstack.portfolio.attribution",  status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
 book         = { python = "finstack.portfolio.book",         status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
+brinson      = { python = "finstack.portfolio",              status = "flattened", note = "Brinson-Fachler and Carino attribution helpers are exported flat on finstack.portfolio" }
 builder      = { python = "finstack.portfolio.builder",      status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
 cashflows    = { python = "finstack.portfolio.cashflows",    status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
 dataframe    = { python = "finstack.portfolio.dataframe",    status = "missing", note = "Table-envelope helpers are currently exported from finstack.portfolio root" }
@@ -283,6 +284,7 @@ grouping     = { python = "finstack.portfolio.grouping",     status = "missing",
 margin       = { python = "finstack.portfolio.margin",       status = "missing", note = "Portfolio margin helpers are not materialized as a dedicated submodule" }
 metrics      = { python = "finstack.portfolio.metrics",      status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
 optimization = { python = "finstack.portfolio.optimization", status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
+performance  = { python = "finstack.portfolio",              status = "flattened", note = "TWRR/MWRR performance helpers are exported flat on finstack.portfolio" }
 portfolio    = { python = "finstack.portfolio.portfolio",    status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
 position     = { python = "finstack.portfolio.position",     status = "missing" }
 prelude      = { python = "finstack.portfolio.prelude",      status = "missing" }

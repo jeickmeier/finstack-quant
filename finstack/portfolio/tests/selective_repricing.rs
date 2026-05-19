@@ -9,13 +9,13 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::math::interp::InterpStyle;
 use finstack_core::money::Money;
-use finstack_portfolio::dependencies::MarketFactorKey;
 use finstack_portfolio::position::{Position, PositionUnit};
 use finstack_portfolio::types::Entity;
 use finstack_portfolio::valuation::{
     revalue_affected, value_portfolio, PortfolioValuationOptions,
     PORTFOLIO_SELECTIVE_REPRICING_EXTENSION_KEY,
 };
+use finstack_portfolio::MarketFactorKey;
 use finstack_portfolio::{Portfolio, PortfolioBuilder};
 use finstack_valuations::instruments::rates::deposit::Deposit;
 use finstack_valuations::instruments::Instrument;

@@ -120,6 +120,56 @@ pub fn parse_portfolio_spec(json_str: &str) -> Result<String, JsValue> {
     serde_json::to_string(&spec).map_err(to_js_err)
 }
 
+/// Compute a single-period Brinson-Fachler attribution from sector JSON.
+///
+/// Accepts a JSON array of `SectorPeriod` objects and returns a JSON
+/// `BrinsonPeriodResult`.
+#[wasm_bindgen(js_name = brinsonFachler)]
+pub fn brinson_fachler(sectors_json: &str) -> Result<String, JsValue> {
+    let sectors: Vec<finstack_portfolio::SectorPeriod> =
+        serde_json::from_str(sectors_json).map_err(to_js_err)?;
+    let result = finstack_portfolio::brinson_fachler(&sectors).map_err(to_js_err)?;
+    serde_json::to_string(&result).map_err(to_js_err)
+}
+
+/// Compute Carino-linked multi-period Brinson attribution from period JSON.
+///
+/// Accepts a JSON array of periods, where each period is an array of
+/// `SectorPeriod` objects, and returns a JSON `CarinoLinkedAttribution`.
+#[wasm_bindgen(js_name = carinoLink)]
+pub fn carino_link(periods_json: &str) -> Result<String, JsValue> {
+    let periods: Vec<Vec<finstack_portfolio::SectorPeriod>> =
+        serde_json::from_str(periods_json).map_err(to_js_err)?;
+    let result =
+        finstack_portfolio::carino_link_from_sector_periods(&periods).map_err(to_js_err)?;
+    serde_json::to_string(&result).map_err(to_js_err)
+}
+
+/// Compute a Modified-Dietz TWRR sub-period return from period JSON.
+#[wasm_bindgen(js_name = twrrModifiedDietz)]
+pub fn twrr_modified_dietz(period_json: &str) -> Result<Option<f64>, JsValue> {
+    let period: finstack_portfolio::TwrrPeriod =
+        serde_json::from_str(period_json).map_err(to_js_err)?;
+    Ok(finstack_portfolio::twrr_modified_dietz(&period))
+}
+
+/// Geometrically link TWRR sub-period returns from returns JSON.
+#[wasm_bindgen(js_name = twrrLinked)]
+pub fn twrr_linked(returns_json: &str, horizon_years: f64) -> Result<Option<String>, JsValue> {
+    let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
+    finstack_portfolio::twrr_linked(&returns, horizon_years)
+        .map(|result| serde_json::to_string(&result).map_err(to_js_err))
+        .transpose()
+}
+
+/// Compute money-weighted return via XIRR from dated cashflow JSON.
+#[wasm_bindgen(js_name = mwrXirr)]
+pub fn mwr_xirr(cashflows_json: &str) -> Result<f64, JsValue> {
+    let cashflows: Vec<finstack_portfolio::DatedCashflow> =
+        serde_json::from_str(cashflows_json).map_err(to_js_err)?;
+    finstack_portfolio::mwr_xirr_from_cashflows(&cashflows).map_err(to_js_err)
+}
+
 /// Build a runtime portfolio from a JSON spec, validate, and round-trip.
 ///
 /// Deserializes the spec, constructs the portfolio with live instruments,
@@ -912,5 +962,127 @@ mod tests {
         let priced_bps = priced["expected_cost_bps"].as_f64().expect("priced bps");
 
         assert!((priced_bps - default_bps / 100.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn brinson_fachler_reconstructs_active_return() {
+        let sectors = serde_json::json!([
+            {
+                "sector": "A",
+                "portfolio_weight": 0.60,
+                "benchmark_weight": 0.40,
+                "portfolio_return": 0.08,
+                "benchmark_return": 0.06
+            },
+            {
+                "sector": "B",
+                "portfolio_weight": 0.40,
+                "benchmark_weight": 0.60,
+                "portfolio_return": 0.01,
+                "benchmark_return": 0.03
+            }
+        ]);
+        let result = brinson_fachler(&sectors.to_string()).expect("brinson attribution");
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("json");
+        let reconstructed = parsed["total_allocation"].as_f64().expect("allocation")
+            + parsed["total_selection"].as_f64().expect("selection")
+            + parsed["total_interaction"].as_f64().expect("interaction");
+        let active = parsed["total_excess_return"].as_f64().expect("active");
+
+        assert!((reconstructed - active).abs() < 1e-12);
+    }
+
+    #[test]
+    fn carino_link_reconstructs_compounded_active_return() {
+        let periods = serde_json::json!([
+            [
+                {
+                    "sector": "A",
+                    "portfolio_weight": 0.70,
+                    "benchmark_weight": 0.50,
+                    "portfolio_return": 0.10,
+                    "benchmark_return": 0.06
+                },
+                {
+                    "sector": "B",
+                    "portfolio_weight": 0.30,
+                    "benchmark_weight": 0.50,
+                    "portfolio_return": 0.04,
+                    "benchmark_return": 0.05
+                }
+            ],
+            [
+                {
+                    "sector": "A",
+                    "portfolio_weight": 0.60,
+                    "benchmark_weight": 0.50,
+                    "portfolio_return": 0.02,
+                    "benchmark_return": 0.03
+                },
+                {
+                    "sector": "B",
+                    "portfolio_weight": 0.40,
+                    "benchmark_weight": 0.50,
+                    "portfolio_return": -0.01,
+                    "benchmark_return": 0.00
+                }
+            ]
+        ]);
+        let result = carino_link(&periods.to_string()).expect("carino attribution");
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("json");
+        let geometric_active = parsed["portfolio_return_compounded"]
+            .as_f64()
+            .expect("portfolio")
+            - parsed["benchmark_return_compounded"]
+                .as_f64()
+                .expect("benchmark");
+        let reconstructed = parsed["linked_allocation"].as_f64().expect("allocation")
+            + parsed["linked_selection"].as_f64().expect("selection")
+            + parsed["linked_interaction"].as_f64().expect("interaction");
+
+        assert!((reconstructed - geometric_active).abs() < 1e-10);
+    }
+
+    #[test]
+    fn twrr_modified_dietz_matches_gips_example() {
+        let period = serde_json::json!({
+            "beginning_market_value": 10_000_000.0,
+            "ending_market_value": 10_500_000.0,
+            "cashflows": [
+                {
+                    "amount": 1_000_000.0,
+                    "fraction_of_period_remaining": 0.60
+                }
+            ]
+        });
+
+        let result = twrr_modified_dietz(&period.to_string())
+            .expect("modified dietz")
+            .expect("defined return");
+        let expected = -500_000.0 / 10_600_000.0;
+        assert!((result - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn twrr_linked_geometrically_links_returns() {
+        let result = twrr_linked(&serde_json::json!([0.05, 0.03]).to_string(), 1.0)
+            .expect("linked return")
+            .expect("defined return");
+        let parsed: serde_json::Value = serde_json::from_str(&result).expect("json");
+
+        assert!((parsed["cumulative"].as_f64().expect("cumulative") - 0.0815).abs() < 1e-12);
+        assert!((parsed["annualised"].as_f64().expect("annualised") - 0.0815).abs() < 1e-12);
+        assert_eq!(parsed["num_periods"], serde_json::json!(2));
+    }
+
+    #[test]
+    fn mwr_xirr_solves_money_weighted_return() {
+        let cashflows = serde_json::json!([
+            {"date": "2025-01-01", "amount": -100.0},
+            {"date": "2026-01-01", "amount": 110.0}
+        ]);
+
+        let result = mwr_xirr(&cashflows.to_string()).expect("xirr");
+        assert!((result - 0.10).abs() < 1e-6);
     }
 }

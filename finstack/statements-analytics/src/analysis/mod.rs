@@ -2,14 +2,14 @@
 //!
 //! This module provides tools for:
 //!
-//! - **[`crate::analysis::valuation`]** — DCF corporate valuation and the orchestrated analysis pipeline
-//! - **[`crate::analysis::credit`]** — Covenant forecasting and credit coverage metrics
-//! - **[`crate::analysis::scenarios`]** — Scenario sets, sensitivity sweeps, variance, and Monte Carlo
+//! - DCF corporate valuation and the orchestrated analysis pipeline
+//! - Covenant forecasting and credit coverage metrics
+//! - Scenario sets, sensitivity sweeps, variance, and Monte Carlo
 //! - **[`crate::analysis::introspection`]** — Dependency tracing and formula explanation
 //! - **[`crate::analysis::reports`]** — Formatted P&L summaries and credit assessment reports
 //! - **[`mod@crate::analysis::goal_seek`]** — Root-finding for target metric values
 //! - **[`crate::analysis::backtesting`]** — Forecast accuracy metrics
-//! - **[`crate::analysis::ecl`]** — Expected credit loss (IFRS 9 staging, CECL, portfolio aggregation)
+//! - Expected credit loss (IFRS 9 staging, CECL, portfolio aggregation)
 //!
 //! ## Where To Start
 //!
@@ -33,23 +33,18 @@
 
 // ---- Grouped submodules ----
 
-/// Corporate valuation and orchestration.
-pub mod valuation;
+pub(crate) mod valuation;
 
-/// Credit analysis (covenants, coverage ratios).
-pub mod credit;
+pub(crate) mod credit;
 
-/// Scenario, sensitivity, variance, and Monte Carlo analysis.
-pub mod scenarios;
+pub(crate) mod scenarios;
 
 /// Domain-level validation checks (reconciliation, consistency, credit).
 pub mod checks;
 
-/// Expected credit loss: IFRS 9 staging, ECL calculation, CECL, portfolio aggregation.
-pub mod ecl;
+pub(crate) mod ecl;
 
-/// Comparable-company analysis: peer sets, multiples, relative-value scoring.
-pub mod comps;
+pub(crate) mod comps;
 
 // ---- Flat submodules ----
 
@@ -58,43 +53,29 @@ pub mod goal_seek;
 pub mod introspection;
 pub mod reports;
 
-// ---- Flattened module re-exports ----
-// These expose `analysis::corporate::*`, `analysis::covenants::*`, etc.
-// as the canonical public paths.
-
-pub use valuation::corporate;
-pub use valuation::orchestrator;
-
-pub use credit::covenants;
-pub use credit::credit_context;
-
-pub use scenarios::monte_carlo;
-pub use scenarios::scenario_set;
-pub use scenarios::sensitivity;
-pub use scenarios::types;
-pub use scenarios::variance;
-
 // ---- Type-level re-exports (unchanged public API) ----
 
 pub use backtesting::{backtest_forecast, ForecastMetrics};
-pub use corporate::{evaluate_dcf_with_market, CorporateValuationResult, DcfOptions};
-pub use covenants::forecast_breaches;
-pub use credit_context::{compute_credit_context, CreditContextMetrics};
+pub use credit::{
+    compute_credit_context, forecast_breaches, forecast_covenant, forecast_covenants, to_table,
+    AdjustedNetDebtSpec, AdjustedNetDebtSpecBuilder, CovenantForecast, CreditContextMetrics,
+    StatementsAdapter,
+};
 pub use goal_seek::goal_seek;
 pub use introspection::{
     render_tree_ascii, render_tree_detailed, DependencyTracer, DependencyTree, Explanation,
     ExplanationStep, FormulaExplainer,
 };
-pub use monte_carlo::{MonteCarloConfig, MonteCarloResults, PercentileSeries};
-pub use orchestrator::{CorporateAnalysis, CorporateAnalysisBuilder, CreditInstrumentAnalysis};
 pub use reports::{Alignment, CreditAssessmentReport, PLSummaryReport, Report, TableBuilder};
-pub use scenario_set::{ScenarioDefinition, ScenarioDiff, ScenarioResults, ScenarioSet};
-pub use sensitivity::{generate_tornado_entries, SensitivityAnalyzer};
-pub use types::{
-    ParameterSpec, SensitivityConfig, SensitivityMode, SensitivityResult, TornadoEntry,
+pub use scenarios::{
+    generate_tornado_entries, BridgeChart, BridgeStep, MonteCarloConfig, MonteCarloResults,
+    ParameterSpec, PercentileSeries, ScenarioDefinition, ScenarioDiff, ScenarioResults,
+    ScenarioSet, SensitivityAnalyzer, SensitivityConfig, SensitivityMode, SensitivityResult,
+    TornadoEntry, VarianceAnalyzer, VarianceConfig, VarianceReport, VarianceRow,
 };
-pub use variance::{
-    BridgeChart, BridgeStep, VarianceAnalyzer, VarianceConfig, VarianceReport, VarianceRow,
+pub use valuation::{
+    evaluate_dcf_with_market, CorporateAnalysis, CorporateAnalysisBuilder,
+    CorporateValuationResult, CreditInstrumentAnalysis, DcfOptions,
 };
 
 // ---- Check-framework re-exports ----
@@ -107,11 +88,17 @@ pub use checks::{
 // ---- ECL re-exports ----
 
 pub use ecl::{
-    classify_stage, compute_ecl_single, compute_ecl_weighted, compute_waterfall, CeclConfig,
-    CeclEngine, CeclMethodology, CeclResult, EclBucket, EclConfig, EclConfigBuilder, EclEngine,
-    EclResult, Exposure, ExposureEclResult, LgdType, MacroScenario, PdTermStructure,
+    binding_default_classify_stage_dpd_30_trigger, binding_default_classify_stage_dpd_90_trigger,
+    binding_default_classify_stage_pd_delta_absolute,
+    binding_default_compute_ecl_bucket_width_years, binding_default_cure_periods_stage2_to_1,
+    binding_default_cure_periods_stage3_to_2, binding_default_exposure_dpd, classify_stage,
+    compute_ecl_single, compute_ecl_weighted, compute_ecl_weighted_from_schedules,
+    compute_waterfall, default_cecl_config, default_cecl_config_from_config, default_ecl_config,
+    default_ecl_config_from_config, default_staging_config, default_staging_config_from_config,
+    CeclConfig, CeclEngine, CeclMethodology, CeclResult, EclBucket, EclConfig, EclConfigBuilder,
+    EclEngine, EclResult, Exposure, ExposureEclResult, LgdType, MacroScenario, PdTermStructure,
     PortfolioEclResult, ProvisionWaterfall, QualitativeFlags, RawPdCurve, ReversionMethod, Stage,
-    StageResult, StagingConfig, StagingTrigger, WeightedEclResult,
+    StageResult, StagingConfig, StagingTrigger, WeightedEclResult, ECL_POLICY_EXTENSION_KEY,
 };
 
 // ---- Comps re-exports ----

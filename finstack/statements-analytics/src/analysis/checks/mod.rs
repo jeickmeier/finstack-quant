@@ -6,21 +6,21 @@
 //!
 //! Higher-level conveniences:
 //!
-//! - [`crate::analysis::checks::formula_check::FormulaCheck`] — user-defined expression checks evaluated per period
-//! - [`crate::analysis::checks::mappings`] — typed node-id mappings for common model patterns
-//! - [`crate::analysis::checks::suites`] — pre-built check suites (three-statement, credit, LBO)
-//! - [`crate::analysis::checks::corkscrew_adapter`] — convert corkscrew configs into structural checks
-//! - [`crate::analysis::checks::renderer`] — render [`finstack_statements::checks::CheckReport`] as
+//! - [`FormulaCheck`] — user-defined expression checks evaluated per period
+//! - [`CreditMapping`] and [`ThreeStatementMapping`] — typed node-id mappings for common model patterns
+//! - [`three_statement_checks`], [`credit_underwriting_checks`], and [`lbo_model_checks`] — pre-built check suites
+//! - [`corkscrew_as_checks`] — convert corkscrew configs into structural checks
+//! - [`CheckReportRenderer`] — render [`finstack_statements::checks::CheckReport`] as
 //!   text or HTML
 
-pub mod consistency;
-pub mod corkscrew_adapter;
-pub mod credit;
-pub mod formula_check;
-pub mod mappings;
-pub mod reconciliation;
-pub mod renderer;
-pub mod suites;
+pub(crate) mod consistency;
+pub(crate) mod corkscrew_adapter;
+pub(crate) mod credit;
+pub(crate) mod formula_check;
+pub(crate) mod mappings;
+pub(crate) mod reconciliation;
+pub(crate) mod renderer;
+pub(crate) mod suites;
 
 // Re-export all check structs at the `checks` level.
 

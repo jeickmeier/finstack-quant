@@ -73,44 +73,12 @@ impl MetricCalculator for CdsOptionDv01Calculator {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::metrics::sensitivities::cs01::sensitivity_central_diff;
-
-    /// W-18: the CDS-option IR DV01 must report the same unit and sign as the
-    /// CDS IR DV01 so the two can be summed in a portfolio. Both are the
-    /// central-difference slope `(pv_up - pv_down) / (2 * bump_bp)`.
-    ///
-    /// This reproduces the prior defect: the legacy CDS-option formula
-    /// `-(pv_up - pv_down) / bump_bp` is 2x scaled AND sign-flipped relative
-    /// to the CDS DV01 convention used by `sensitivity_central_diff`.
-    #[test]
-    fn cds_option_dv01_matches_cds_dv01_scale_and_sign() {
-        // Equivalent positions: identical PV response to a rate bump.
-        let pv_up = 101.0;
-        let pv_down = 99.0;
-        let bump_bp = 1.0;
-
-        // CDS DV01 convention (the reference).
-        let cds_dv01 = sensitivity_central_diff(pv_up, pv_down, bump_bp);
-
-        // CDS-option DV01 must now use the identical helper/convention.
-        let option_dv01 = sensitivity_central_diff(pv_up, pv_down, bump_bp);
-        assert!(
-            (option_dv01 - cds_dv01).abs() < 1e-12,
-            "option DV01 {option_dv01} must equal CDS DV01 {cds_dv01}"
-        );
-
-        // The legacy form would have given -(pv_up-pv_down)/bump_bp = -2.0,
-        // i.e. opposite sign and 2x magnitude relative to the +1.0 slope.
-        let legacy = -(pv_up - pv_down) / bump_bp;
-        assert!(
-            (legacy - cds_dv01).abs() > 1e-6,
-            "legacy formula must differ from the reconciled convention"
-        );
-        assert!(
-            (legacy + 2.0 * cds_dv01).abs() < 1e-12,
-            "legacy form is exactly -2x the central-difference slope"
-        );
-    }
-}
+// W-18 unit-and-sign reconciliation between CDS-option IR DV01 and CDS IR
+// DV01 is exercised at the integration level by
+// `tests/instruments/cds_option/test_metrics_registry.rs::
+// test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention`,
+// which prices a CDS option and a CDS on a shared discount curve, bumps
+// the swap-curve quotes, and asserts both metrics report the same sign
+// and unit. A purely-numeric unit test that calls `sensitivity_central_diff`
+// twice with identical inputs adds no coverage on top of that, so it was
+// removed.

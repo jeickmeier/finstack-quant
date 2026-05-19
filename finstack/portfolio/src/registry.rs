@@ -5,11 +5,7 @@ use std::sync::OnceLock;
 use serde::Deserialize;
 
 use crate::liquidity::LiquidityConfig;
-use finstack_core::config::FinstackConfig;
 use finstack_core::{Error, Result};
-
-/// Config extension key for overriding portfolio liquidity defaults.
-pub const LIQUIDITY_DEFAULTS_EXTENSION_KEY: &str = "portfolio.liquidity_defaults.v1";
 
 const LIQUIDITY_DEFAULTS: &str = include_str!("../data/defaults/liquidity_defaults.v1.json");
 
@@ -55,20 +51,6 @@ pub fn embedded_liquidity_defaults() -> Result<&'static LiquidityDefaults> {
 pub fn embedded_liquidity_defaults_or_panic() -> &'static LiquidityDefaults {
     embedded_liquidity_defaults()
         .expect("embedded portfolio liquidity defaults are compile-time assets")
-}
-
-/// Loads liquidity defaults from configuration or falls back to embedded defaults.
-pub fn liquidity_defaults_from_config(config: &FinstackConfig) -> Result<LiquidityDefaults> {
-    if let Some(value) = config.extensions.get(LIQUIDITY_DEFAULTS_EXTENSION_KEY) {
-        let file: LiquidityDefaultsFile = serde_json::from_value(value.clone()).map_err(|err| {
-            Error::Validation(format!(
-                "failed to parse portfolio liquidity defaults extension: {err}"
-            ))
-        })?;
-        liquidity_defaults_from_file(file)
-    } else {
-        Ok(embedded_liquidity_defaults()?.clone())
-    }
 }
 
 fn parse_liquidity_defaults() -> Result<LiquidityDefaults> {

@@ -30,7 +30,7 @@
 //! # Usage
 //!
 //! ```rust,no_run
-//! use finstack_portfolio::margin::PortfolioMarginAggregator;
+//! use finstack_portfolio::PortfolioMarginAggregator;
 //! use finstack_core::market_data::context::MarketContext;
 //! use finstack_portfolio::Portfolio;
 //! use time::macros::date;

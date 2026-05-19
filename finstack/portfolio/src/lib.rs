@@ -160,19 +160,19 @@ pub mod brinson;
 /// Fluent portfolio construction helpers.
 pub mod builder;
 /// Tabular exports for portfolio results.
-pub mod dataframe;
+pub(crate) mod dataframe;
 /// Error types for portfolio operations.
 pub mod error;
 /// Factor-model portfolio risk decomposition outputs and engines.
 pub mod factor_model;
 /// Shared FX conversion helpers (e.g. converting position values to base currency).
-pub mod fx;
+pub(crate) mod fx;
 /// Grouping and aggregation by attributes or books.
 pub mod grouping;
 /// Liquidity risk metrics, spread estimation, and portfolio scoring.
 pub mod liquidity;
 /// Portfolio margin and netting set utilities.
-pub mod margin;
+pub(crate) mod margin;
 /// Metrics aggregation and reporting.
 pub mod metrics;
 /// Portfolio optimization engines and constraints.
@@ -184,7 +184,7 @@ pub mod portfolio;
 /// Position primitives and units.
 pub mod position;
 /// Embedded portfolio defaults registries.
-pub mod registry;
+pub(crate) mod registry;
 /// Result envelopes for portfolio operations.
 pub mod results;
 /// Core portfolio entity and ID types.
@@ -195,7 +195,7 @@ pub mod valuation;
 /// Cashflow ladder and schedule aggregation utilities.
 pub mod cashflows;
 /// Market-factor dependency index for selective repricing.
-pub mod dependencies;
+pub(crate) mod dependencies;
 
 #[cfg(test)]
 mod test_utils;
@@ -215,6 +215,22 @@ pub use types::{AttributeTest, AttributeValue, ComparisonOp, Entity, EntityId, P
 // through long module paths for the most common workflows. Anything not
 // re-exported here is still reachable via its module path; the goal is just
 // to surface the canonical entry points.
+pub use brinson::{
+    brinson_fachler, carino_link, carino_link_from_sector_periods, BrinsonPeriodResult,
+    CarinoLinkedAttribution, SectorEffect, SectorPeriod,
+};
+pub use dataframe::{
+    aggregated_metrics_to_table, entities_to_table, metrics_to_table, positions_to_table,
+};
+pub use dependencies::{flatten_dependencies, DependencyIndex, MarketFactorKey};
+pub use margin::{
+    CurrencyMismatchError, NettingSet, NettingSetManager, NettingSetMargin,
+    PortfolioMarginAggregator, PortfolioMarginResult,
+};
+pub use performance::{
+    mwr_xirr, mwr_xirr_from_cashflows, twrr_linked, twrr_modified_dietz, DatedCashflow, DietzFlow,
+    LinkedReturn, TwrrPeriod,
+};
 pub use portfolio::PortfolioSpec;
 pub use position::{Position, PositionUnit};
 pub use results::PortfolioResult;

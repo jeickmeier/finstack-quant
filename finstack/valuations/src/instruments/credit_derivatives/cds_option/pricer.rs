@@ -1,10 +1,11 @@
 //! Bloomberg CDSO pricer for [`CDSOption`].
 //!
-//! All pricing — NPV, par spread, Greeks, implied volatility — flows
-//! through the [`bloomberg_quadrature`](super::bloomberg_quadrature) module
-//! by way of `npv()` (bump-and-reprice for sensitivities). The legacy
-//! Black-on-spreads implementation was removed alongside the field clean-up
-//! when the Bloomberg model became the default pricer.
+//! Pricing primitives — NPV, par spread, theta, implied volatility — that
+//! flow through the [`bloomberg_quadrature`](super::bloomberg_quadrature)
+//! numerical-quadrature engine. Greek metrics (delta, gamma, vega) live
+//! alongside their `MetricCalculator` definitions under
+//! [`super::metrics`]; the `CDSOption::{delta, gamma, vega}` methods are
+//! thin pass-throughs to those canonical implementations.
 //!
 //! # References
 //!
@@ -14,6 +15,7 @@
 //!   DOCS 2057273 ⟨GO⟩, August 2024.
 
 use super::bloomberg_quadrature;
+use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds::{
     CdsValuationConvention, CreditDefaultSwap, PayReceive,
@@ -55,213 +57,7 @@ pub(crate) fn forward_spread_bp(
     bloomberg_quadrature::forward_par_at_expiry_bp(option, &cds, curves, as_of)
 }
 
-// ---------------------------------------------------------------- Greeks (bump & reprice)
-
-/// Bloomberg CDSO Δ: ratio of the change in option premium to the
-/// change in underlying-swap principal value when the index credit
-/// curve is bumped by `+1 bp`. Returned as a unit-less ratio (multiply
-/// by 100 for the displayed percentage).
-#[tracing::instrument(skip(option, curves), fields(instrument_id = %option.id, as_of = %as_of))]
-pub(crate) fn delta(
-    option: &CDSOption,
-    curves: &MarketContext,
-    as_of: finstack_core::dates::Date,
-) -> Result<f64> {
-    bumped_delta(option, curves, as_of, 1.0)
-}
-
-/// Bloomberg CDSO Γ: change in [`Self::delta`] when the credit curve
-/// is bumped by `+10 bp` rather than `+1 bp`. Returned as a unit-less
-/// number (multiply by 100 for the displayed percentage).
-pub(crate) fn gamma(
-    option: &CDSOption,
-    curves: &MarketContext,
-    as_of: finstack_core::dates::Date,
-) -> Result<f64> {
-    gamma_bbg_screen(option, curves, as_of)
-}
-
-/// Bloomberg-screen gamma: difference between 10bp-bumped and 1bp-bumped deltas.
-pub(crate) fn gamma_bbg_screen(
-    option: &CDSOption,
-    curves: &MarketContext,
-    as_of: finstack_core::dates::Date,
-) -> Result<f64> {
-    // Δ at +1bp and at +10bp; (Δ_10bp − Δ_1bp) is Bloomberg's gamma.
-    let d_low = bumped_delta(option, curves, as_of, 1.0)?;
-    let d_high = bumped_delta(option, curves, as_of, 10.0)?;
-    Ok(d_high - d_low)
-}
-
-/// Bloomberg CDSO Vega(1%): change in option premium for a `+1`
-/// vol-point increase in implied volatility.
-pub(crate) fn vega(
-    option: &CDSOption,
-    curves: &MarketContext,
-    as_of: finstack_core::dates::Date,
-) -> Result<f64> {
-    let base_sigma = resolve_sigma(option, curves, as_of)?;
-    let bumped = base_sigma + 0.01;
-    let cds = synthetic_underlying_cds(option, as_of)?;
-    let pv_base = bloomberg_quadrature::npv(option, &cds, curves, base_sigma, as_of)?.amount();
-    let pv_bumped = if option.underlying_is_index && !option.knockout {
-        vega_bumped_index_price(option, &cds, curves, base_sigma, bumped, as_of, pv_base)?
-    } else {
-        bloomberg_quadrature::npv(option, &cds, curves, bumped, as_of)?.amount()
-    };
-    Ok(pv_bumped - pv_base)
-}
-
-fn vega_bumped_index_price(
-    option: &CDSOption,
-    cds: &CreditDefaultSwap,
-    curves: &MarketContext,
-    base_sigma: f64,
-    bumped_sigma: f64,
-    as_of: finstack_core::dates::Date,
-    target_base_pv: f64,
-) -> Result<f64> {
-    let disc = curves.get_discount(&option.discount_curve_id)?;
-    let surv = curves.get_hazard(&option.credit_curve_id)?;
-    let base_ctx = bloomberg_quadrature::ForwardCdsContext::build(
-        option,
-        disc.as_ref(),
-        surv.as_ref(),
-        cds,
-        as_of,
-        base_sigma,
-    )?;
-    if base_ctx.front_end_protection.abs() <= 1e-12 {
-        return bloomberg_quadrature::npv(option, cds, curves, bumped_sigma, as_of)
-            .map(|m| m.amount());
-    }
-
-    let fep_beta = solve_vega_fep_beta(&base_ctx, option.notional.amount(), target_base_pv)?;
-    let bumped_ctx = bloomberg_quadrature::ForwardCdsContext::build(
-        option,
-        disc.as_ref(),
-        surv.as_ref(),
-        cds,
-        as_of,
-        bumped_sigma,
-    )?;
-    price_with_forward_fep_target(
-        &bumped_ctx,
-        option.notional.amount(),
-        bumped_ctx.front_end_protection,
-        fep_beta * bumped_ctx.front_end_protection,
-    )
-}
-
-fn solve_vega_fep_beta(
-    ctx: &bloomberg_quadrature::ForwardCdsContext,
-    notional: f64,
-    target_base_pv: f64,
-) -> Result<f64> {
-    let f0_fep = ctx.front_end_protection;
-    let mut lo = -0.002;
-    let mut hi = 0.002;
-    let mut f_lo = price_with_forward_fep_target(ctx, notional, f0_fep, lo)? - target_base_pv;
-    let f_hi = price_with_forward_fep_target(ctx, notional, f0_fep, hi)? - target_base_pv;
-    if f_lo * f_hi > 0.0 {
-        return Ok(1.0);
-    }
-
-    for _ in 0..80 {
-        let mid = 0.5 * (lo + hi);
-        let f_mid = price_with_forward_fep_target(ctx, notional, f0_fep, mid)? - target_base_pv;
-        if f_mid.abs() < 1e-8 {
-            return Ok(mid / ctx.front_end_protection);
-        }
-        if f_lo * f_mid <= 0.0 {
-            hi = mid;
-        } else {
-            lo = mid;
-            f_lo = f_mid;
-        }
-    }
-
-    Ok((0.5 * (lo + hi)) / ctx.front_end_protection)
-}
-
-fn price_with_forward_fep_target(
-    ctx: &bloomberg_quadrature::ForwardCdsContext,
-    notional: f64,
-    f0_fep: f64,
-    d_fep: f64,
-) -> Result<f64> {
-    let m = calibrate_mean_to_forward_target(ctx, ctx.no_knockout_forward() + f0_fep)?;
-    let realized_loss = if ctx.is_index {
-        ctx.realized_index_loss / ctx.scale.max(1e-12)
-    } else {
-        0.0
-    };
-    Ok(bloomberg_quadrature::quadrature_payoff(
-        ctx,
-        m,
-        ctx.signed_strike_adjustment_per_n(),
-        ctx.sign() * (realized_loss + d_fep),
-        ctx.t_expiry,
-    ) * notional)
-}
-
-fn calibrate_mean_to_forward_target(
-    ctx: &bloomberg_quadrature::ForwardCdsContext,
-    target: f64,
-) -> Result<f64> {
-    let t_expiry = ctx.t_expiry.max(0.0);
-    let s0 = (-0.5 * ctx.sigma * ctx.sigma * t_expiry).exp();
-    let sigma_sqrt_t = ctx.sigma * t_expiry.sqrt();
-    let expected_v_te = |m: f64| -> f64 {
-        bloomberg_quadrature::normal_integral(
-            crate::constants::bloomberg_cdso::Z_STEP,
-            bloomberg_quadrature::z_limit(ctx.sigma, t_expiry),
-            |z| {
-                let s = m * s0 * (sigma_sqrt_t * z).exp();
-                ctx.swap_value_per_n(s)
-            },
-        )
-    };
-    let f = |log_m: f64| -> f64 { expected_v_te(log_m.exp()) - target };
-    const LOG_M_LO: f64 = -18.420_680_743_952_367;
-    const LOG_M_HI: f64 = 4.605_170_185_988_092;
-    const MAX_EXPANSIONS: usize = 30;
-    let m_seed = ctx.forward_par_spread.clamp(1e-8, 100.0);
-    let log_seed = m_seed.ln().clamp(LOG_M_LO, LOG_M_HI);
-    let f_seed = f(log_seed);
-    let (mut lo_x, mut lo_f) = (log_seed, f_seed);
-    let (mut hi_x, mut hi_f) = (log_seed, f_seed);
-    let mut bracket = None;
-    let step = (2.0_f64).ln();
-    for k in 1..=MAX_EXPANSIONS {
-        let widen = step * (k as f64);
-        let x_lo_new = (log_seed - widen).max(LOG_M_LO);
-        let x_hi_new = (log_seed + widen).min(LOG_M_HI);
-        if x_lo_new < lo_x {
-            let f_new = f(x_lo_new);
-            if f_new.is_finite() && f_new * lo_f <= 0.0 {
-                bracket = Some((x_lo_new, lo_x));
-                break;
-            }
-            lo_x = x_lo_new;
-            lo_f = f_new;
-        }
-        if x_hi_new > hi_x {
-            let f_new = f(x_hi_new);
-            if f_new.is_finite() && f_new * hi_f <= 0.0 {
-                bracket = Some((hi_x, x_hi_new));
-                break;
-            }
-            hi_x = x_hi_new;
-            hi_f = f_new;
-        }
-    }
-    let Some((lo, hi)) = bracket else {
-        return bloomberg_quadrature::calibrate_lognormal_mean(ctx);
-    };
-    let solver = BrentSolver::new().tolerance(1e-12);
-    solver.solve_in_bracket(f, lo, hi).map(f64::exp)
-}
+// ---------------------------------------------------------------- Theta
 
 /// Bloomberg CDSO θ: change in option premium for a one-day decrease
 /// in option maturity.
@@ -270,12 +66,6 @@ fn calibrate_mean_to_forward_target(
 /// `t_e` by `1/365.25`" — while retaining the same calibrated forward
 /// price and lognormal mean. `df_te` and `sp_te` are NOT advanced; the
 /// shift is purely on the integrand's `t_expiry` argument.
-///
-/// Empirical match against the CDSO screen on `cdx_ig_46_payer_atm_jun26`
-/// is materially closer under pure-T-shift (~−$1,479 / −$1,461 after the
-/// Phase 2 bootstrap migration) than under the alternative as-of-shift
-/// formulation (~−$1,705) vs Bloomberg's −$1,499.93. The pure-T-shift
-/// path is the one tested by that golden's $40 absolute tolerance.
 #[tracing::instrument(skip(option, curves), fields(instrument_id = %option.id, as_of = %as_of))]
 pub(crate) fn theta(
     option: &CDSOption,
@@ -367,15 +157,14 @@ pub(crate) fn implied_vol(
 /// Resolve the lognormal spread vol `σ` for the option, preferring the
 /// instrument-level `pricing_overrides.market_quotes.implied_volatility`
 /// override, falling back to the volatility surface lookup at
-/// `(t_expiry, strike)`.
-fn resolve_sigma(
+/// `(t_expiry, strike)`. Enforces the `MAX_IMPLIED_VOL` ceiling.
+pub(crate) fn resolve_sigma(
     option: &CDSOption,
     curves: &MarketContext,
     as_of: finstack_core::dates::Date,
 ) -> Result<f64> {
-    use rust_decimal::prelude::ToPrimitive;
     let t = option.time_to_expiry(as_of)?;
-    let strike = option.strike.to_f64().unwrap_or(0.0);
+    let strike = decimal_to_f64(option.strike, "strike")?;
     let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
         &option.pricing_overrides.market_quotes,
         curves,
@@ -391,88 +180,6 @@ fn resolve_sigma(
         )));
     }
     Ok(sigma)
-}
-
-/// Bump the index credit curve by `bump_bp` parallel, re-price both the
-/// option (under [`bloomberg_quadrature`]) and the underlying CDS, and
-/// return Bloomberg's CDSO Δ:
-///
-/// ```text
-/// Δ = (option_pv_bumped − option_pv_base) / (cds_pv_bumped − cds_pv_base)
-/// ```
-///
-/// # Bootstrap symmetry
-///
-/// Both legs of the forward-difference go through
-/// [`bump_hazard_spreads`] — the base leg with a zero parallel bump, the
-/// bumped leg with `+bump_bp`. Pricing both NPVs against rebootstrapped
-/// hazard curves removes any "zero-bump bootstrap drift" (the small PV
-/// gap between the as-supplied hazard knots and what the bootstrap
-/// would solve from the same par spreads) from the numerator and
-/// denominator. This is the same symmetric-rebootstrap convention used
-/// by the canonical CS01 helper (`metrics/sensitivities/cs01.rs`) and
-/// it is what Bloomberg's CDSO Spread DV01 path also does. Without
-/// this, the option Δ silently absorbs the bootstrap-vs-snapshot
-/// methodology delta on top of the genuine credit sensitivity. The
-/// option's reported NPV (returned by [`npv`]) still
-/// uses the as-supplied `curves`; only Δ/Γ are computed under
-/// rebootstrapped legs.
-fn bumped_delta(
-    option: &CDSOption,
-    curves: &MarketContext,
-    as_of: finstack_core::dates::Date,
-    bump_bp: f64,
-) -> Result<f64> {
-    use crate::calibration::bumps::{bump_hazard_spreads, BumpRequest};
-
-    let hazard = curves.get_hazard(&option.credit_curve_id)?;
-    let discount_id = Some(&option.discount_curve_id);
-
-    // Symmetric rebootstrap: both base (zero bump) and bumped legs are
-    // re-bootstrapped from the same par-spread points, so the forward
-    // difference captures only the genuine credit sensitivity rather than
-    // a mixture of bootstrap drift + spread sensitivity.
-    let base_hazard = bump_hazard_spreads(
-        hazard.as_ref(),
-        curves,
-        &BumpRequest::Parallel(0.0),
-        discount_id,
-    )?;
-    let bumped_hazard = bump_hazard_spreads(
-        hazard.as_ref(),
-        curves,
-        &BumpRequest::Parallel(bump_bp),
-        discount_id,
-    )?;
-    let base_curves = (*curves).clone().insert(base_hazard);
-    let bumped_curves = (*curves).clone().insert(bumped_hazard);
-
-    let pv_base = npv(option, &base_curves, as_of)?.amount();
-    let pv_bumped = npv(option, &bumped_curves, as_of)?.amount();
-
-    // Underlying-swap PV change uses the synthetic forward CDS, also priced
-    // on the rebootstrapped legs so the ratio's denominator and numerator
-    // share the same bootstrap methodology.
-    let cds = synthetic_underlying_cds(option, as_of)?;
-    let cds_delta = cds_with_bloomberg_protection_end_extension(&cds);
-    let cds_pricer = crate::instruments::credit_derivatives::cds::pricer::CDSPricer::new();
-    let disc = curves.get_discount(&option.discount_curve_id)?;
-    let base_hazard_arc = base_curves.get_hazard(&option.credit_curve_id)?;
-    let bumped_hazard_arc = bumped_curves.get_hazard(&option.credit_curve_id)?;
-
-    let cds_pv_base =
-        cds_pricer.npv_full(&cds_delta, disc.as_ref(), base_hazard_arc.as_ref(), as_of)?;
-    let cds_pv_bumped =
-        cds_pricer.npv_full(&cds_delta, disc.as_ref(), bumped_hazard_arc.as_ref(), as_of)?;
-
-    let denom = cds_pv_bumped - cds_pv_base;
-    if denom.abs() < 1e-12 {
-        return Err(finstack_core::Error::Validation(format!(
-            "degenerate CDS option delta denominator: id={}, bump_bp={}, cds_pv_base={cds_pv_base:.6}, cds_pv_bumped={cds_pv_bumped:.6}",
-            option.id, bump_bp
-        )));
-    }
-    Ok((pv_bumped - pv_base) / denom)
 }
 
 /// Build the synthetic underlying CDS that backs the option's forward
@@ -527,8 +234,12 @@ pub fn synthetic_underlying_cds(
     Ok(cds)
 }
 
-#[doc(hidden)]
-pub fn cds_with_bloomberg_protection_end_extension(cds: &CreditDefaultSwap) -> CreditDefaultSwap {
+/// Apply the CDSO-scoped `+1-day` inclusive extension to the synthetic
+/// CDS's premium-end date so the ACT/360 protection-leg integral matches
+/// Bloomberg's inclusive-end convention.
+pub(crate) fn cds_with_bloomberg_protection_end_extension(
+    cds: &CreditDefaultSwap,
+) -> CreditDefaultSwap {
     let mut extended = cds.clone();
     extended.premium.end += time::Duration::days(1);
     extended

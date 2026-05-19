@@ -1,8 +1,8 @@
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
 use finstack_margin::{ImMethodology, NettingSetId, SimmRiskClass, SimmSensitivities};
-use finstack_portfolio::margin::{CurrencyMismatchError, NettingSetMargin, PortfolioMarginResult};
 use finstack_portfolio::types::PositionId;
+use finstack_portfolio::{CurrencyMismatchError, NettingSetMargin, PortfolioMarginResult};
 use time::macros::date;
 
 fn roundtrip_json<T>(value: &T) -> T

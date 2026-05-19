@@ -6,11 +6,11 @@
 //! - [`variance`] — baseline vs comparison variance and bridge decomposition
 //! - [`monte_carlo`] — re-exports of Monte Carlo types from the evaluator
 
-pub mod monte_carlo;
-pub mod scenario_set;
-pub mod sensitivity;
-pub mod types;
-pub mod variance;
+pub(crate) mod monte_carlo;
+pub(crate) mod scenario_set;
+pub(crate) mod sensitivity;
+pub(crate) mod types;
+pub(crate) mod variance;
 
 pub use monte_carlo::{MonteCarloConfig, MonteCarloResults, PercentileSeries};
 pub use scenario_set::{ScenarioDefinition, ScenarioDiff, ScenarioResults, ScenarioSet};

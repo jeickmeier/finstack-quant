@@ -3,10 +3,10 @@
 //! Validated at the point of construction so the resulting `CDSOption` is
 //! guaranteed to satisfy the Bloomberg CDSO model's preconditions.
 
+use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::credit_derivatives::cds_option::ProtectionStartConvention;
 use finstack_core::{dates::Date, money::Money};
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
 /// Strike upper bound — `0.10` decimal = 1000 bp = 10% spread, matching the
@@ -19,7 +19,7 @@ pub(crate) fn validate_common_terms(
     cds_maturity: Date,
     index_factor: Option<f64>,
 ) -> finstack_core::Result<()> {
-    let strike_f64 = strike.to_f64().unwrap_or(0.0);
+    let strike_f64 = decimal_to_f64(strike, "strike")?;
     if strike_f64 <= 0.0 {
         return Err(finstack_core::Error::Validation(format!(
             "strike must be positive, got {}",

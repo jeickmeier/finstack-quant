@@ -9,7 +9,7 @@ use common::base_date;
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
 use finstack_margin::{ImMethodology, NettingSetId};
-use finstack_portfolio::margin::{NettingSetMargin, PortfolioMarginResult};
+use finstack_portfolio::{NettingSetMargin, PortfolioMarginResult};
 
 fn test_date() -> finstack_core::dates::Date {
     base_date()

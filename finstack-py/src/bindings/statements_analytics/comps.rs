@@ -14,7 +14,7 @@
 //! tuples for univariate scoring or dicts with `label`, `y`, optional `x`, and
 //! `weight` keys for regression-based scoring.
 
-use finstack_statements_analytics::analysis::comps::{
+use finstack_statements_analytics::analysis::{
     compute_multiple as core_compute_multiple, peer_stats as core_peer_stats,
     percentile_rank as core_percentile_rank, regression_fair_value as core_regression,
     score_relative_value as core_score, z_score as core_z_score, CompanyMetrics, MetricExtractor,

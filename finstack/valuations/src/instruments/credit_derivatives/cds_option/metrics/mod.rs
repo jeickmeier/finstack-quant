@@ -12,16 +12,16 @@
 //! - Implied Volatility (placeholder)
 
 mod cs01;
-mod delta;
+pub(crate) mod delta;
 mod dv01;
-mod gamma;
+pub(crate) mod gamma;
 mod implied_vol;
 mod par_spread;
 mod recovery01;
 mod spread_dv01;
 mod theta;
 // risk_bucketed_dv01 - now using generic implementation
-mod vega;
+pub(crate) mod vega;
 
 use crate::metrics::MetricRegistry;
 

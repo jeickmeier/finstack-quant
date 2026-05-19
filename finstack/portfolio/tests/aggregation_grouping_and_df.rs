@@ -129,10 +129,10 @@ fn dataframe_exports_have_expected_columns() {
         finstack_portfolio::metrics::aggregate_metrics(&valuation, Currency::USD, &market, as_of)
             .unwrap();
 
-    let table_pos = finstack_portfolio::dataframe::positions_to_table(&valuation).unwrap();
-    let table_ent = finstack_portfolio::dataframe::entities_to_table(&valuation).unwrap();
-    let table_m = finstack_portfolio::dataframe::metrics_to_table(&metrics).unwrap();
-    let table_ma = finstack_portfolio::dataframe::aggregated_metrics_to_table(&metrics).unwrap();
+    let table_pos = finstack_portfolio::positions_to_table(&valuation).unwrap();
+    let table_ent = finstack_portfolio::entities_to_table(&valuation).unwrap();
+    let table_m = finstack_portfolio::metrics_to_table(&metrics).unwrap();
+    let table_ma = finstack_portfolio::aggregated_metrics_to_table(&metrics).unwrap();
 
     let pos_cols: Vec<&str> = table_pos
         .columns

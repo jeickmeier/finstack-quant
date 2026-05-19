@@ -5,8 +5,10 @@
 //! result extraction via serde round-trips, and end-to-end pipeline functions
 //! that build the runtime portfolio internally.
 
+mod brinson;
 mod liquidity;
 mod optimization;
+mod performance;
 mod pipeline;
 mod position_risk;
 mod replay;
@@ -55,6 +57,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     replay::register(py, &m)?;
     position_risk::register(py, &m)?;
     liquidity::register(py, &m)?;
+    brinson::register(py, &m)?;
+    performance::register(py, &m)?;
 
     let exports = vec![
         "PortfolioError",
@@ -86,6 +90,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "lvar_bangia",
         "almgren_chriss_impact",
         "kyle_lambda",
+        "brinson_fachler",
+        "carino_link",
+        "twrr_modified_dietz",
+        "twrr_linked",
+        "mwr_xirr",
     ];
 
     let all = PyList::new(py, exports)?;

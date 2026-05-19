@@ -32,7 +32,7 @@ instrument-level margin interfaces in `finstack-margin` and
 ## Minimal Example
 
 ```rust,no_run
-use finstack_portfolio::margin::PortfolioMarginAggregator;
+use finstack_portfolio::PortfolioMarginAggregator;
 use finstack_core::market_data::context::MarketContext;
 use time::macros::date;
 

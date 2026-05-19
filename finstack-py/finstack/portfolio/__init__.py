@@ -79,6 +79,11 @@ liquidity_tier = _portfolio.liquidity_tier
 lvar_bangia = _portfolio.lvar_bangia
 almgren_chriss_impact = _portfolio.almgren_chriss_impact
 kyle_lambda = _portfolio.kyle_lambda
+brinson_fachler = _portfolio.brinson_fachler
+carino_link = _portfolio.carino_link
+twrr_modified_dietz = _portfolio.twrr_modified_dietz
+twrr_linked = _portfolio.twrr_linked
+mwr_xirr = _portfolio.mwr_xirr
 
 __all__: list[str] = [
     "FinstackFxError",
@@ -94,13 +99,16 @@ __all__: list[str] = [
     "almgren_chriss_impact",
     "amihud_illiquidity",
     "apply_scenario_and_revalue",
+    "brinson_fachler",
     "build_portfolio_from_spec",
+    "carino_link",
     "days_to_liquidate",
     "evaluate_risk_budget",
     "historical_var_decomposition",
     "kyle_lambda",
     "liquidity_tier",
     "lvar_bangia",
+    "mwr_xirr",
     "optimize_portfolio",
     "parametric_es_decomposition",
     "parametric_var_decomposition",
@@ -109,5 +117,7 @@ __all__: list[str] = [
     "portfolio_result_total_value",
     "replay_portfolio",
     "roll_effective_spread",
+    "twrr_linked",
+    "twrr_modified_dietz",
     "value_portfolio",
 ]

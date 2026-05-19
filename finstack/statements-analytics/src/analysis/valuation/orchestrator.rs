@@ -4,8 +4,8 @@
 //! statement evaluation, credit instrument pricing, and equity valuation
 //! in a single pipeline.
 
-use crate::analysis::corporate::{CorporateValuationResult, DcfOptions};
-use crate::analysis::credit_context::{compute_credit_context, CreditContextMetrics};
+use crate::analysis::credit::{compute_credit_context, CreditContextMetrics};
+use crate::analysis::valuation::corporate::{CorporateValuationResult, DcfOptions};
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_statements::error::Result;
@@ -353,23 +353,24 @@ impl CorporateAnalysisBuilder {
                 net_debt_override,
                 dcf_options,
             }) => {
-                let (result, _trace) = crate::analysis::corporate::evaluate_dcf_from_results_impl(
-                    &self.model,
-                    &statement,
-                    wacc,
-                    terminal_value,
-                    &ufcf_node,
-                    crate::analysis::corporate::DcfEvalContext {
-                        net_debt_override,
-                        options: &dcf_options,
-                        market: self.market.as_ref(),
-                    },
-                )
-                .map_err(|e| {
-                    finstack_statements::error::Error::Eval(format!(
-                        "DCF equity valuation failed in corporate analysis pipeline: {e}"
-                    ))
-                })?;
+                let (result, _trace) =
+                    crate::analysis::valuation::corporate::evaluate_dcf_from_results_impl(
+                        &self.model,
+                        &statement,
+                        wacc,
+                        terminal_value,
+                        &ufcf_node,
+                        crate::analysis::valuation::corporate::DcfEvalContext {
+                            net_debt_override,
+                            options: &dcf_options,
+                            market: self.market.as_ref(),
+                        },
+                    )
+                    .map_err(|e| {
+                        finstack_statements::error::Error::Eval(format!(
+                            "DCF equity valuation failed in corporate analysis pipeline: {e}"
+                        ))
+                    })?;
                 Some(result)
             }
             None => None,

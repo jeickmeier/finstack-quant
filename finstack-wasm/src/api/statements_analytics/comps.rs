@@ -4,7 +4,7 @@
 //! canonical valuation multiples, and composite rich/cheap scoring.
 
 use crate::utils::to_js_err;
-use finstack_statements_analytics::analysis::comps as fc;
+use finstack_statements_analytics::analysis as fc;
 use std::collections::BTreeMap;
 use wasm_bindgen::prelude::*;
 

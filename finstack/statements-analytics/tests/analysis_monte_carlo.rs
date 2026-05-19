@@ -4,7 +4,7 @@
 use finstack_core::dates::PeriodId;
 use finstack_statements::builder::ModelBuilder;
 use finstack_statements::types::{AmountOrScalar, ForecastSpec};
-use finstack_statements_analytics::analysis::monte_carlo::MonteCarloConfig;
+use finstack_statements_analytics::analysis::MonteCarloConfig;
 
 #[test]
 fn evaluate_monte_carlo_produces_deterministic_results() {

@@ -10,7 +10,7 @@ use finstack_core::money::Money;
 use finstack_statements::builder::ModelBuilder;
 use finstack_statements::evaluator::Evaluator;
 use finstack_statements::types::AmountOrScalar;
-use finstack_statements_analytics::analysis::orchestrator::CorporateAnalysisBuilder;
+use finstack_statements_analytics::analysis::CorporateAnalysisBuilder;
 use finstack_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
 
 fn flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {

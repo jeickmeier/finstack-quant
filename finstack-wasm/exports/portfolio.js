@@ -3,6 +3,11 @@ import * as wasm from '../pkg/finstack_wasm.js';
 export const portfolio = {
   Portfolio: wasm.Portfolio,
   parsePortfolioSpec: wasm.parsePortfolioSpec,
+  brinsonFachler: wasm.brinsonFachler,
+  carinoLink: wasm.carinoLink,
+  twrrModifiedDietz: wasm.twrrModifiedDietz,
+  twrrLinked: wasm.twrrLinked,
+  mwrXirr: wasm.mwrXirr,
   buildPortfolioFromSpec: wasm.buildPortfolioFromSpec,
   portfolioResultTotalValue: wasm.portfolioResultTotalValue,
   portfolioResultGetMetric: wasm.portfolioResultGetMetric,

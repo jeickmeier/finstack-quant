@@ -42,7 +42,7 @@ fn table_metadata(source: &str) -> IndexMap<String, serde_json::Value> {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use finstack_portfolio::dataframe::positions_to_table;
+/// use finstack_portfolio::positions_to_table;
 ///
 /// # fn main() -> finstack_core::Result<()> {
 /// # let valuation: finstack_portfolio::PortfolioValuation = unimplemented!("Provide a valuation");

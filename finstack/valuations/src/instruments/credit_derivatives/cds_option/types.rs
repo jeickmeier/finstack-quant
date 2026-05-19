@@ -469,43 +469,38 @@ impl CDSOption {
             })
     }
 
-    /// Bloomberg CDSO Δ: ratio of the change in option premium to the
-    /// change in the principal value of the underlying swap when the index
-    /// credit curve is bumped up by one basis point (DOCS 2055833 §2.5).
-    ///
-    /// Bumps the credit curve by `+1 bp` parallel and re-prices both the
-    /// option (via [`super::pricer::npv`]) and the
-    /// underlying CDS, then takes the ratio. Returned as a unit-less
-    /// number — multiply by 100 for the displayed percentage.
+    /// Bloomberg CDSO Δ — closed-form Black-76 N(d₁) on the displayed
+    /// ATM forward spread (DOCS 2055833 §2.5). Returned as a unit-less
+    /// ratio (multiply by 100 for the displayed percentage). Calls
+    /// Δ ≥ 0, puts Δ ≤ 0.
     pub fn delta(
         &self,
         curves: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<f64> {
-        super::pricer::delta(self, curves, as_of)
+        super::metrics::delta::delta(self, curves, as_of)
     }
 
-    /// Bloomberg CDSO Γ: change in [`Self::delta`] when the credit curve is
-    /// bumped by `+10 bp` rather than `+1 bp` (DOCS 2055833 §2.5). Returned
-    /// as a unit-less number; multiply by 100 for the displayed percentage.
+    /// Bloomberg CDSO Γ — central difference of the Black-76 N(d₁)
+    /// delta across a ±5 bp move in the displayed ATM forward (DOCS
+    /// 2055833 §2.5). Returned as a unit-less number.
     pub fn gamma(
         &self,
         curves: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<f64> {
-        super::pricer::gamma(self, curves, as_of)
+        super::metrics::gamma::gamma(self, curves, as_of)
     }
 
-    /// Bloomberg CDSO Vega(1%): change in option premium for a `+1`
-    /// vol-point increase in implied volatility (DOCS 2055833 §2.5). The
-    /// vol surface or `pricing_overrides` override is bumped by `+0.01`
-    /// (one absolute percentage point) and the option is re-priced.
+    /// Bloomberg CDSO Vega(1%) — one-sided forward difference of the
+    /// canonical Bloomberg quadrature NPV on a `+0.01` lognormal-vol
+    /// bump (DOCS 2055833 §2.5).
     pub fn vega(
         &self,
         curves: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<f64> {
-        super::pricer::vega(self, curves, as_of)
+        super::metrics::vega::vega(self, curves, as_of)
     }
 
     /// Bloomberg CDSO θ: change in option premium for a one-calendar-day
