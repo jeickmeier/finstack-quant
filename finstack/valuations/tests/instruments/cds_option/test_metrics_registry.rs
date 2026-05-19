@@ -148,7 +148,6 @@ fn test_metrics_registry_all_greeks() {
         MetricId::Gamma,
         MetricId::Vega,
         MetricId::Theta,
-        MetricId::Rho,
         MetricId::Cs01,
         MetricId::Dv01,
     ];

@@ -3,9 +3,9 @@
 use super::common::*;
 use finstack_core::currency::Currency;
 use finstack_core::market_data::context::MarketContext;
+use finstack_valuations::instruments::credit_derivatives::cds_option::pricer::synthetic_underlying_cds;
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::metrics::MetricId;
-use rust_decimal::prelude::ToPrimitive;
 use time::macros::date;
 
 #[test]
@@ -168,8 +168,7 @@ fn test_forward_spread_calculation() {
     let market = standard_market(as_of);
     let option = CDSOptionBuilder::new().build(as_of);
 
-    let strike_bp = option.strike.to_f64().unwrap_or(0.0) * 10000.0;
-    let underlying = option_underlying_cds(&option, strike_bp);
+    let underlying = synthetic_underlying_cds(&option, as_of).expect("synthetic underlying CDS");
     let forward = underlying
         .price_with_metrics(
             &market,
@@ -249,7 +248,7 @@ fn test_realized_index_loss_changes_payer_and_receiver_values() {
 fn test_single_name_option_is_knockout_weighted_by_survival() {
     let as_of = date!(2025 - 01 - 01);
     let discount = flat_discount("USD-OIS", as_of, 0.03);
-    let hazard = flat_hazard("HZ-SN", as_of, 0.4, 0.25);
+    let hazard = flat_hazard("HZ-SN", as_of, 0.4, 0.10);
     let market = MarketContext::new().insert(discount).insert(hazard);
 
     let single_name = CDSOptionBuilder::new()

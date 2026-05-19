@@ -1210,6 +1210,11 @@
             "FinancingLegSpec": {
               "description": "Specification for TRS financing legs",
               "properties": {
+                "compounding": {
+                  "$ref": "#/$defs/FinancingRateCompounding",
+                  "default": "term_rate",
+                  "description": "Rate-compounding convention (term-rate vs overnight-compounded).\n\nDefaults to [`FinancingRateCompounding::TermRate`]. Set to\n[`FinancingRateCompounding::OvernightCompounded`] for SOFR/SONIA/€STR\novernight-funded TRS so the financing rate captures daily-compounding\nconvexity."
+                },
                 "day_count": {
                   "$ref": "#/$defs/DayCount",
                   "description": "Day count convention for accrual calculations"
@@ -1238,6 +1243,21 @@
                 "day_count"
               ],
               "type": "object"
+            },
+            "FinancingRateCompounding": {
+              "description": "Rate-compounding convention for a TRS financing leg.\n\nDistinguishes how each accrual period's floating rate is projected from the\nforward curve. The two conventions differ by the daily-compounding convexity\n— typically 12–15 bp of rate at current levels on an upward-sloping curve.",
+              "oneOf": [
+                {
+                  "const": "term_rate",
+                  "description": "Term-rate financing (e.g. 3M Term SOFR, EURIBOR): the period rate is the\nsimple arithmetic-average forward over the accrual period. This is the\ndefault and matches a conventional term-rate-funded TRS.",
+                  "type": "string"
+                },
+                {
+                  "const": "overnight_compounded",
+                  "description": "Overnight-indexed (OIS / RFR) financing — SOFR, SONIA, €STR, TONA: the\nperiod rate daily-compounds the overnight forward,\n`R = (∏(1 + rᵢ·dᵢ) − 1) / τ`, picking up the compounding convexity that\nthe simple arithmetic average drops.",
+                  "type": "string"
+                }
+              ]
             },
             "Id": {
               "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",

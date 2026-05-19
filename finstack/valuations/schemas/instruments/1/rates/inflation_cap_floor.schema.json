@@ -1833,6 +1833,14 @@
               "$ref": "#/$defs/Id",
               "description": "Inflation index/curve identifier (e.g., US-CPI-U)."
             },
+            "inflation_nominal_correlation": {
+              "description": "Correlation between the inflation index and the nominal short rate,\nused in the YoY convexity/timing adjustment. `None` ⇒ treated as 0\n(the timing term vanishes; the pure inflation-vol Jensen convexity\n`σ_I²·τ` is still applied).",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "lag_override": {
               "anyOf": [
                 {
@@ -1847,6 +1855,14 @@
             "maturity": {
               "description": "End date of the final inflation period.",
               "type": "string"
+            },
+            "nominal_rate_volatility": {
+              "description": "Nominal short-rate volatility `σ_n` (annualized, absolute), used in the\nYoY timing term. `None` ⇒ the `ρ·σ_n` timing term is dropped.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
             },
             "notional": {
               "$ref": "#/$defs/Money",

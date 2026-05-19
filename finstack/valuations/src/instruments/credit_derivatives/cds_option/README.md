@@ -38,7 +38,9 @@ let pv = opt.value(&market_context, as_of)?;
 
 ## Metrics
 
-- PV, delta, gamma, vega, theta, rho, CS01, DV01, Recovery01.
+- PV, delta, gamma, vega, theta, CS01, DV01, Recovery01.
+- `dv01` is the canonical CDSO interest-rate sensitivity: it bumps the
+  calibrated swap-curve quotes and rebuilds the discount curve.
 - `par_spread` reports the Bloomberg CDSO displayed ATM forward spread.
 - `implied_vol` solves the Bloomberg quadrature price in log-vol space.
 

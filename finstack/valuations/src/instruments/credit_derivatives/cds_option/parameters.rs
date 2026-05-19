@@ -9,12 +9,45 @@ use finstack_core::{dates::Date, money::Money};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
-/// Strike must be strictly positive (zero or negative spread is meaningless).
-pub(crate) const MIN_STRIKE: f64 = 0.0;
+/// Strike upper bound — `0.10` decimal = 1000 bp = 10% spread, matching the
+/// Bloomberg CDSO calibration guard for distressed credit.
+pub(crate) const MAX_STRIKE: f64 = 0.10;
 
-/// Strike upper bound — `1.0` decimal = 10000 bp = 100% spread, far beyond
-/// any realistic distressed-credit quote.
-pub(crate) const MAX_STRIKE: f64 = 1.0;
+pub(crate) fn validate_common_terms(
+    strike: Decimal,
+    expiry: Date,
+    cds_maturity: Date,
+    index_factor: Option<f64>,
+) -> finstack_core::Result<()> {
+    let strike_f64 = strike.to_f64().unwrap_or(0.0);
+    if strike_f64 <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "strike must be positive, got {}",
+            strike
+        )));
+    }
+    if strike_f64 > MAX_STRIKE {
+        return Err(finstack_core::Error::Validation(format!(
+            "strike {} exceeds maximum {}",
+            strike, MAX_STRIKE
+        )));
+    }
+    if expiry >= cds_maturity {
+        return Err(finstack_core::Error::Validation(format!(
+            "option expiry ({}) must be before CDS maturity ({})",
+            expiry, cds_maturity
+        )));
+    }
+    if let Some(factor) = index_factor {
+        if factor <= 0.0 || factor > 1.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "index_factor must be in (0, 1], got {}",
+                factor
+            )));
+        }
+    }
+    Ok(())
+}
 
 /// Construction-time inputs for a CDS option.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -53,34 +86,12 @@ pub struct CDSOptionParams {
 
 impl CDSOptionParams {
     fn validate(&self) -> finstack_core::Result<()> {
-        let strike_f64 = self.strike.to_f64().unwrap_or(0.0);
-        if strike_f64 <= MIN_STRIKE {
-            return Err(finstack_core::Error::Validation(format!(
-                "strike must be positive, got {}",
-                self.strike
-            )));
-        }
-        if strike_f64 > MAX_STRIKE {
-            return Err(finstack_core::Error::Validation(format!(
-                "strike {} exceeds maximum {}",
-                self.strike, MAX_STRIKE
-            )));
-        }
-        if self.expiry >= self.cds_maturity {
-            return Err(finstack_core::Error::Validation(format!(
-                "option expiry ({}) must be before CDS maturity ({})",
-                self.expiry, self.cds_maturity
-            )));
-        }
-        if let Some(factor) = self.index_factor {
-            if factor <= 0.0 || factor > 1.0 {
-                return Err(finstack_core::Error::Validation(format!(
-                    "index_factor must be in (0, 1], got {}",
-                    factor
-                )));
-            }
-        }
-        Ok(())
+        validate_common_terms(
+            self.strike,
+            self.expiry,
+            self.cds_maturity,
+            self.index_factor,
+        )
     }
 
     /// Construct a validated set of parameters.

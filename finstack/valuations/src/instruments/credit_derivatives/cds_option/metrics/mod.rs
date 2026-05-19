@@ -5,9 +5,10 @@
 //! registered via `register_cds_option_metrics`.
 //!
 //! Exposed metrics:
-//! - Delta, Gamma, Vega, Theta, Rho
+//! - Delta, Gamma, Vega, Theta
 //! - CS01 (quoted CDS spread sensitivity)
-//! - ParSpread (Black forward CDS spread in bp)
+//! - DV01 (swap-curve quote sensitivity; canonical IR sensitivity)
+//! - ParSpread (Bloomberg CDSO ATM forward spread in bp)
 //! - Implied Volatility (placeholder)
 
 mod cs01;
@@ -17,7 +18,7 @@ mod gamma;
 mod implied_vol;
 mod par_spread;
 mod recovery01;
-mod rho;
+mod spread_dv01;
 mod theta;
 // risk_bucketed_dv01 - now using generic implementation
 mod vega;
@@ -45,9 +46,9 @@ pub(crate) fn register_cds_option_metrics(registry: &mut MetricRegistry) {
             (Gamma, gamma::GammaCalculator),
             (Vega, vega::VegaCalculator),
             (Cs01, cs01::Cs01Calculator),
+            (SpreadDv01, spread_dv01::UnderlyingSpreadDv01Calculator),
             (Dv01, dv01::CdsOptionDv01Calculator),
             (Theta, theta::ThetaCalculator),
-            (Rho, rho::RhoCalculator),
             (ParSpread, par_spread::ParSpreadCalculator),
             (ImpliedVol, implied_vol::ImpliedVolCalculator),
             (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<

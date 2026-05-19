@@ -33,19 +33,14 @@ use finstack_core::dates::{
 };
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, InstrumentId};
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use time::Month;
 
 use super::parameters::CDSOptionParams;
 use crate::impl_instrument_base;
 
-/// Minimum valid recovery rate (exclusive lower bound).
-pub(crate) const MIN_RECOVERY_RATE: f64 = 0.0;
 /// Maximum valid recovery rate (exclusive upper bound).
 pub(crate) const MAX_RECOVERY_RATE: f64 = 1.0;
-/// Minimum valid implied volatility (exclusive lower bound).
-pub(crate) const MIN_IMPLIED_VOL: f64 = 0.0;
 /// Maximum valid implied volatility (inclusive upper bound).
 /// 500% lognormal vol is extremely high but theoretically valid.
 pub(crate) const MAX_IMPLIED_VOL: f64 = 5.0;
@@ -214,29 +209,13 @@ impl CDSOption {
 
     /// Validate the CDSOption parameters.
     fn validate(&self) -> finstack_core::Result<()> {
-        // Strike validation
-        let strike_f64 = self.strike.to_f64().unwrap_or(0.0);
-        if strike_f64 <= super::parameters::MIN_STRIKE {
-            return Err(finstack_core::Error::Validation(format!(
-                "strike must be positive, got {}",
-                self.strike
-            )));
-        }
-        if strike_f64 > super::parameters::MAX_STRIKE {
-            return Err(finstack_core::Error::Validation(format!(
-                "strike {} exceeds maximum {}",
-                self.strike,
-                super::parameters::MAX_STRIKE
-            )));
-        }
+        super::parameters::validate_common_terms(
+            self.strike,
+            self.expiry,
+            self.cds_maturity,
+            self.index_factor,
+        )?;
 
-        // Date validation
-        if self.expiry >= self.cds_maturity {
-            return Err(finstack_core::Error::Validation(format!(
-                "option expiry ({}) must be before CDS maturity ({})",
-                self.expiry, self.cds_maturity
-            )));
-        }
         if let (Some(cash_settlement), Some(exercise_settlement)) =
             (self.cash_settlement_date, self.exercise_settlement_date)
         {
@@ -263,21 +242,11 @@ impl CDSOption {
         }
 
         // Recovery rate validation
-        if self.recovery_rate <= MIN_RECOVERY_RATE || self.recovery_rate >= MAX_RECOVERY_RATE {
+        if self.recovery_rate <= 0.0 || self.recovery_rate >= MAX_RECOVERY_RATE {
             return Err(finstack_core::Error::Validation(format!(
                 "recovery_rate must be in (0, 1), got {}",
                 self.recovery_rate
             )));
-        }
-
-        // Index factor validation
-        if let Some(factor) = self.index_factor {
-            if factor <= 0.0 || factor > 1.0 {
-                return Err(finstack_core::Error::Validation(format!(
-                    "index_factor must be in (0, 1], got {}",
-                    factor
-                )));
-            }
         }
 
         // Realized index loss validation
@@ -295,9 +264,15 @@ impl CDSOption {
             }
         }
 
+        if self.underlying_is_index && self.underlying_cds_coupon.is_none() {
+            return Err(finstack_core::Error::Validation(
+                "underlying_cds_coupon is required for CDS index options".to_string(),
+            ));
+        }
+
         // Implied volatility override validation
         if let Some(vol) = self.pricing_overrides.market_quotes.implied_volatility {
-            if vol <= MIN_IMPLIED_VOL {
+            if vol <= 0.0 {
                 return Err(finstack_core::Error::Validation(format!(
                     "implied_volatility must be positive, got {}",
                     vol
@@ -399,7 +374,7 @@ impl CDSOption {
     ///
     /// Returns an error if volatility is not positive.
     pub fn with_implied_vol(mut self, vol: f64) -> finstack_core::Result<Self> {
-        if vol <= MIN_IMPLIED_VOL {
+        if vol <= 0.0 {
             return Err(finstack_core::Error::Validation(format!(
                 "implied_volatility must be positive, got {}",
                 vol
@@ -441,10 +416,8 @@ impl CDSOption {
     /// Effective cash-settlement date for the option premium. Defaults to
     /// the underlying CDS convention's settlement lag from the next
     /// business day after `as_of`.
-    pub(crate) fn effective_cash_settlement_date(
-        &self,
-        as_of: Date,
-    ) -> finstack_core::Result<Date> {
+    #[doc(hidden)]
+    pub fn effective_cash_settlement_date(&self, as_of: Date) -> finstack_core::Result<Date> {
         if let Some(date) = self.cash_settlement_date {
             return Ok(date);
         }
@@ -501,7 +474,7 @@ impl CDSOption {
     /// credit curve is bumped up by one basis point (DOCS 2055833 §2.5).
     ///
     /// Bumps the credit curve by `+1 bp` parallel and re-prices both the
-    /// option (via [`super::pricer::CDSOptionPricer::npv`]) and the
+    /// option (via [`super::pricer::npv`]) and the
     /// underlying CDS, then takes the ratio. Returned as a unit-less
     /// number — multiply by 100 for the displayed percentage.
     pub fn delta(
@@ -509,7 +482,7 @@ impl CDSOption {
         curves: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<f64> {
-        super::pricer::CDSOptionPricer.delta(self, curves, as_of)
+        super::pricer::delta(self, curves, as_of)
     }
 
     /// Bloomberg CDSO Γ: change in [`Self::delta`] when the credit curve is
@@ -520,7 +493,7 @@ impl CDSOption {
         curves: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<f64> {
-        super::pricer::CDSOptionPricer.gamma(self, curves, as_of)
+        super::pricer::gamma(self, curves, as_of)
     }
 
     /// Bloomberg CDSO Vega(1%): change in option premium for a `+1`
@@ -532,7 +505,7 @@ impl CDSOption {
         curves: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<f64> {
-        super::pricer::CDSOptionPricer.vega(self, curves, as_of)
+        super::pricer::vega(self, curves, as_of)
     }
 
     /// Bloomberg CDSO θ: change in option premium for a one-calendar-day
@@ -545,7 +518,7 @@ impl CDSOption {
         curves: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<f64> {
-        super::pricer::CDSOptionPricer.theta(self, curves, as_of)
+        super::pricer::theta(self, curves, as_of)
     }
 
     /// Solve for the Bloomberg CDSO implied volatility `σ` that reproduces
@@ -558,11 +531,11 @@ impl CDSOption {
         target_price: f64,
         initial_guess: Option<f64>,
     ) -> finstack_core::Result<f64> {
-        super::pricer::CDSOptionPricer.implied_vol(self, curves, as_of, target_price, initial_guess)
+        super::pricer::implied_vol(self, curves, as_of, target_price, initial_guess)
     }
 }
 
-fn prior_cds_roll_on_or_before(date: Date) -> Date {
+pub(crate) fn prior_cds_roll_on_or_before(date: Date) -> Date {
     const CDS_ROLL_MONTHS: [Month; 4] =
         [Month::March, Month::June, Month::September, Month::December];
 
@@ -589,7 +562,7 @@ impl crate::instruments::common_impl::traits::Instrument for CDSOption {
         curves: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<finstack_core::money::Money> {
-        super::pricer::CDSOptionPricer.npv(self, curves, as_of)
+        super::pricer::npv(self, curves, as_of)
     }
 
     fn expiry(&self) -> Option<finstack_core::dates::Date> {
@@ -670,6 +643,34 @@ mod tests {
         assert_eq!(
             option.effective_underlying_effective_date(as_of),
             date!(2026 - 03 - 21)
+        );
+    }
+
+    #[test]
+    fn index_option_requires_underlying_cds_coupon() {
+        let option_params = CDSOptionParams::call(
+            Decimal::from_str_exact("0.005").expect("valid strike"),
+            date!(2026 - 06 - 26),
+            date!(2031 - 06 - 20),
+            Money::new(10_000_000.0, Currency::USD),
+        )
+        .expect("valid option params")
+        .as_index(1.0)
+        .expect("valid index factor");
+        let credit_params = CreditParams::corporate_standard("CDX", "CDX-IG");
+
+        let err = CDSOption::new(
+            "CDX-CDSO-MISSING-COUPON",
+            &option_params,
+            &credit_params,
+            "USD-S531-SWAP",
+            "CDX-CDSO-VOL",
+        )
+        .expect_err("index option without contractual coupon should fail");
+
+        assert!(
+            err.to_string().contains("underlying_cds_coupon"),
+            "error should point to missing underlying_cds_coupon: {err}"
         );
     }
 }

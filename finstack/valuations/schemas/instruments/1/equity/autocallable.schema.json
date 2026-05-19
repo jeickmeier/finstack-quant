@@ -1765,6 +1765,10 @@
             "id": {
               "$ref": "#/$defs/Id"
             },
+            "memory_coupons": {
+              "default": false,
+              "type": "boolean"
+            },
             "notional": {
               "$ref": "#/$defs/Money"
             },

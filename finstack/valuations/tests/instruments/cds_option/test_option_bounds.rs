@@ -1,9 +1,9 @@
 //! Market validation tests for option value bounds and no-arbitrage conditions.
 
 use super::common::*;
+use finstack_valuations::instruments::credit_derivatives::cds_option::pricer::synthetic_underlying_cds;
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::metrics::MetricId;
-use rust_decimal::prelude::ToPrimitive;
 use time::macros::date;
 
 #[test]
@@ -249,10 +249,8 @@ fn test_put_call_parity_at_forward() {
 
     // Get forward spread
     let temp_option = CDSOptionBuilder::new().build(as_of);
-    let underlying = option_underlying_cds(
-        &temp_option,
-        temp_option.strike.to_f64().unwrap_or(0.0) * 10000.0,
-    );
+    let underlying =
+        synthetic_underlying_cds(&temp_option, as_of).expect("synthetic underlying CDS");
     let forward = underlying
         .price_with_metrics(
             &market,

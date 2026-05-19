@@ -148,6 +148,28 @@ pub mod numerical {
     pub const DF_EPSILON: f64 = 1e-10;
 }
 
+/// Bloomberg CDSO numerical-quadrature conventions.
+pub mod bloomberg_cdso {
+    /// Bloomberg CDSO calendar-day denominator (DOCS 2055833 §2.1).
+    pub const G_DAYS_IN_YEAR: f64 = 365.0;
+
+    /// Bloomberg CDSO theta day basis (DOCS 2055833 §2.5).
+    ///
+    /// The 0.25-day inconsistency with [`G_DAYS_IN_YEAR`] is faithful to the
+    /// published convention: theta shortens exercise time by `1/365.25`.
+    pub const THETA_DAYS_IN_YEAR: f64 = 365.25;
+
+    /// Minimum standard-normal quadrature half-width for the Bloomberg CDSO
+    /// driver grid.
+    pub const MIN_Z_LIMIT: f64 = 6.0;
+
+    /// Step size for the Bloomberg CDSO standard-normal quadrature grid.
+    pub const Z_STEP: f64 = 0.05;
+
+    /// CDX option front-end-protection fallback start lag in business days.
+    pub const INDEX_OPTION_FEP_START_LAG_BD: i32 = 2;
+}
+
 /// ISDA 2014 standard constants used by the engine
 pub mod isda {
     /// Standard recovery rate for senior unsecured (40%)

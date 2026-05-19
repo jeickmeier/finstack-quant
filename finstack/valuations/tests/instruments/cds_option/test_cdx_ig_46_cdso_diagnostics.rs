@@ -32,6 +32,20 @@ use std::fs;
 use std::path::PathBuf;
 use time::macros::date;
 
+use finstack_core::dates::{CalendarRegistry, DateExt};
+use finstack_core::math::solver::BrentSolver;
+use finstack_core::Result;
+use finstack_valuations::calibration::bumps::bump_hazard_shift;
+use finstack_valuations::constants::{bloomberg_cdso, numerical};
+use finstack_valuations::instruments::credit_derivatives::cds_option::bloomberg_quadrature::{
+    calibrate_lognormal_mean, index_option_front_end_protection_start, normal_integral, npv,
+    price_with_calibrated_mean, quadrature_payoff, theta, z_limit, ForwardCdsContext,
+};
+use finstack_valuations::instruments::credit_derivatives::cds_option::pricer::synthetic_underlying_cds;
+
+const DIAG_G_DAYS_IN_YEAR: f64 = 365.0;
+const DIAG_THETA_DAYS_IN_YEAR: f64 = 365.25;
+
 const FIXTURE: &str = "tests/golden/data/pricing/cds_option/cdx_ig_46_payer_atm_jun26.json";
 
 const BBG_NPV: f64 = 118_781.76;
@@ -144,6 +158,76 @@ fn metrics(option: &CDSOption, market: &MarketContext, as_of: Date) -> (f64, f64
 
 fn central_cs01(pv_up: f64, pv_down: f64, bump_bp: f64) -> f64 {
     (pv_up - pv_down) / (2.0 * bump_bp)
+}
+
+#[test]
+fn cdx_ig_46_production_integrand_converges_at_quadrature_step() {
+    let fixture = load_fixture_json();
+    let as_of = date!(2026 - 05 - 07);
+    let market = bootstrap_market(&fixture);
+    let option = load_option(&fixture);
+    let ctx = context_for(&option, &market, as_of, 0.3603);
+    let m = calibrate_lognormal_mean(&ctx).expect("calibrate lognormal mean");
+    let t_expiry = ctx.t_expiry.max(0.0);
+    let s0 = (-0.5 * ctx.sigma * ctx.sigma * t_expiry).exp();
+    let sigma_sqrt_t = ctx.sigma * t_expiry.sqrt();
+    let integrand = |z: f64| {
+        let s = m * s0 * (sigma_sqrt_t * z).exp();
+        ctx.swap_value_per_n(s)
+    };
+
+    let production = normal_integral(
+        bloomberg_cdso::Z_STEP,
+        z_limit(ctx.sigma, t_expiry),
+        integrand,
+    );
+    let fine = normal_integral(
+        bloomberg_cdso::Z_STEP * 0.5,
+        z_limit(ctx.sigma, t_expiry),
+        integrand,
+    );
+    let dollar_diff = (production - fine).abs() * option.notional.amount();
+
+    assert!(
+        dollar_diff < 0.01,
+        "production quadrature grid should be sub-cent stable on V_te(s): diff=${dollar_diff:.8}",
+    );
+}
+
+#[test]
+fn cdx_ig_46_reported_npv_uses_supplied_curve_not_zero_rebootstrap() {
+    let fixture = load_fixture_json();
+    let as_of = date!(2026 - 05 - 07);
+    let market = bootstrap_market(&fixture);
+    let option = load_option(&fixture);
+    let cds = synthetic_underlying_cds(&option, as_of).expect("synthetic cds");
+    let supplied_pv = npv(&option, &cds, &market, 0.3603, as_of)
+        .expect("supplied market npv")
+        .amount();
+
+    let hazard = market.get_hazard(&option.credit_curve_id).expect("hazard");
+    let zero_hazard = bump_hazard_spreads_with_doc_clause_and_valuation_convention(
+        hazard.as_ref(),
+        &market,
+        &BumpRequest::Parallel(0.0),
+        Some(&option.discount_curve_id),
+        Some(CdsDocClause::IsdaNa),
+        Some(CdsValuationConvention::BloombergCdswClean),
+    )
+    .expect("zero-bump hazard rebootstrap");
+    let zero_market = market.clone().insert(zero_hazard);
+    let zero_pv = npv(&option, &cds, &zero_market, 0.3603, as_of)
+        .expect("zero-bump market npv")
+        .amount();
+
+    assert!(
+        (supplied_pv - BBG_NPV).abs() < 1.0,
+        "reported NPV should remain anchored to the supplied fixture market: supplied={supplied_pv}, target={BBG_NPV}",
+    );
+    assert!(
+        (zero_pv - supplied_pv).abs() > 100.0,
+        "zero-bump rebootstrap drift is intentional sensitivity-path behavior, not reported NPV behavior: supplied={supplied_pv}, zero={zero_pv}",
+    );
 }
 
 fn print_row(label: &str, npv: f64, par: f64, vega: f64, cs01: f64, theta: f64) {
@@ -470,5 +554,732 @@ fn diag_cdx_ig_46_cs01_rebootstrap_anchor() {
     eprintln!(
         "  0bp offset on spot CDS PV  = ${:.2}",
         revalue_cds(&market_rebased).unwrap() - pv_cds
+    );
+}
+
+// Diagnostics moved out of bloomberg_quadrature.rs to keep production source focused.
+fn calibrate_lognormal_mean_to_target_at(
+    ctx: &ForwardCdsContext,
+    target: f64,
+    t_expiry: f64,
+) -> Result<f64> {
+    let t_expiry = t_expiry.max(0.0);
+    let s0 = (-0.5 * ctx.sigma * ctx.sigma * t_expiry).exp();
+    let sigma_sqrt_t = ctx.sigma * t_expiry.sqrt();
+    let expected_v_te = |m: f64| -> f64 {
+        normal_integral(bloomberg_cdso::Z_STEP, z_limit(ctx.sigma, t_expiry), |z| {
+            let s = m * s0 * (sigma_sqrt_t * z).exp();
+            ctx.swap_value_per_n(s)
+        })
+    };
+    let f = |log_m: f64| -> f64 { expected_v_te(log_m.exp()) - target };
+    const LOG_M_LO: f64 = -18.420_680_743_952_367;
+    const LOG_M_HI: f64 = 4.605_170_185_988_092;
+    const MAX_EXPANSIONS: usize = 30;
+    let m_seed = ctx.forward_par_spread.clamp(1e-8, 100.0);
+    let log_seed = m_seed.ln().clamp(LOG_M_LO, LOG_M_HI);
+    let f_seed = f(log_seed);
+    let (mut lo_x, mut lo_f) = (log_seed, f_seed);
+    let (mut hi_x, mut hi_f) = (log_seed, f_seed);
+    let mut bracket = None;
+    let step = (2.0_f64).ln();
+    for k in 1..=MAX_EXPANSIONS {
+        let widen = step * (k as f64);
+        let x_lo_new = (log_seed - widen).max(LOG_M_LO);
+        let x_hi_new = (log_seed + widen).min(LOG_M_HI);
+        if x_lo_new < lo_x {
+            let f_new = f(x_lo_new);
+            if f_new.is_finite() && f_new * lo_f <= 0.0 {
+                bracket = Some((x_lo_new, lo_x));
+                break;
+            }
+            lo_x = x_lo_new;
+            lo_f = f_new;
+        }
+        if x_hi_new > hi_x {
+            let f_new = f(x_hi_new);
+            if f_new.is_finite() && f_new * hi_f <= 0.0 {
+                bracket = Some((hi_x, x_hi_new));
+                break;
+            }
+            hi_x = x_hi_new;
+            hi_f = f_new;
+        }
+    }
+    let Some((lo, hi)) = bracket else {
+        return Err(finstack_core::Error::Validation(format!(
+            "diagnostic calibration bracket violation: target={target}, t={t_expiry}, \
+             seed={m_seed}, f_lo={lo_f:.6e}, f_hi={hi_f:.6e}",
+        )));
+    };
+    let solver = BrentSolver::new().tolerance(1e-12);
+    solver.solve_in_bracket(f, lo, hi).map(f64::exp)
+}
+
+fn cdx_fixture_internal() -> (CDSOption, MarketContext) {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden/data/pricing/cds_option/cdx_ig_46_payer_atm_jun26.json");
+    let raw = fs::read_to_string(path).expect("read cdx fixture");
+    let fixture: Value = serde_json::from_str(&raw).expect("parse fixture");
+    let option: CDSOption =
+        serde_json::from_value(fixture["inputs"]["instrument_json"]["spec"].clone())
+            .expect("parse option spec");
+    let envelope: CalibrationEnvelope =
+        serde_json::from_value(fixture["inputs"]["market_envelope"].clone())
+            .expect("parse envelope");
+    let result = engine::execute_with_diagnostics(&envelope).expect("calibrate market");
+    let market = MarketContext::try_from(result.result.final_market).expect("market context");
+    (option, market)
+}
+
+fn context_for(
+    option: &CDSOption,
+    market: &MarketContext,
+    as_of: Date,
+    sigma: f64,
+) -> ForwardCdsContext {
+    let cds = synthetic_underlying_cds(option, as_of).expect("synthetic cds");
+    let disc = market
+        .get_discount(&option.discount_curve_id)
+        .expect("discount");
+    let hazard = market.get_hazard(&option.credit_curve_id).expect("hazard");
+    ForwardCdsContext::build(option, disc.as_ref(), hazard.as_ref(), &cds, as_of, sigma)
+        .expect("forward cds context")
+}
+
+fn price_with_fep_split(ctx: &ForwardCdsContext, f0_fep: f64, d_fep: f64) -> Result<f64> {
+    let m = calibrate_lognormal_mean_to_target_at(
+        ctx,
+        ctx.no_knockout_forward() + f0_fep,
+        ctx.t_expiry,
+    )?;
+    let realized_loss = if ctx.is_index {
+        ctx.realized_index_loss / ctx.scale.max(numerical::ZERO_TOLERANCE)
+    } else {
+        0.0
+    };
+    Ok(quadrature_payoff(
+        ctx,
+        m,
+        ctx.signed_strike_adjustment_per_n(),
+        ctx.sign() * (realized_loss + d_fep),
+        ctx.t_expiry,
+    ) * 100_000_000.0)
+}
+
+fn price_with_fep_split_at_t(
+    ctx: &ForwardCdsContext,
+    f0_fep: f64,
+    d_fep: f64,
+    t_expiry: f64,
+) -> Result<f64> {
+    let m =
+        calibrate_lognormal_mean_to_target_at(ctx, ctx.no_knockout_forward() + f0_fep, t_expiry)?;
+    let realized_loss = if ctx.is_index {
+        ctx.realized_index_loss / ctx.scale.max(numerical::ZERO_TOLERANCE)
+    } else {
+        0.0
+    };
+    Ok(quadrature_payoff(
+        ctx,
+        m,
+        ctx.signed_strike_adjustment_per_n(),
+        ctx.sign() * (realized_loss + d_fep),
+        t_expiry,
+    ) * 100_000_000.0)
+}
+
+fn solve_d_fep_for_target(ctx: &ForwardCdsContext, f0_fep: f64, target: f64) -> Result<f64> {
+    solve_d_fep_for_target_at(ctx, f0_fep, target, ctx.t_expiry)
+}
+
+fn solve_d_fep_for_target_at_t(
+    ctx: &ForwardCdsContext,
+    f0_fep: f64,
+    target: f64,
+    t_expiry: f64,
+) -> Result<f64> {
+    solve_d_fep_for_target_at(ctx, f0_fep, target, t_expiry)
+}
+
+fn solve_d_fep_for_target_at(
+    ctx: &ForwardCdsContext,
+    f0_fep: f64,
+    target: f64,
+    t_expiry: f64,
+) -> Result<f64> {
+    let mut lo = -0.002;
+    let mut hi = 0.002;
+    let mut f_lo = price_with_fep_split_at_t(ctx, f0_fep, lo, t_expiry)? - target;
+    let f_hi = price_with_fep_split_at_t(ctx, f0_fep, hi, t_expiry)? - target;
+    assert!(
+        f_lo * f_hi <= 0.0,
+        "target not bracketed for d_fep/t solve: f0_fep={f0_fep}, t={t_expiry}, f_lo={f_lo}, f_hi={f_hi}",
+    );
+    for _ in 0..80 {
+        let mid = 0.5 * (lo + hi);
+        let f_mid = price_with_fep_split_at_t(ctx, f0_fep, mid, t_expiry)? - target;
+        if f_mid.abs() < 1e-8 {
+            return Ok(mid);
+        }
+        if f_lo * f_mid <= 0.0 {
+            hi = mid;
+        } else {
+            lo = mid;
+            f_lo = f_mid;
+        }
+    }
+    Ok(0.5 * (lo + hi))
+}
+
+#[test]
+#[ignore = "diagnostic: cdx_ig_46 CDSO risk metric FEP placement"]
+fn diag_cdx_ig_46_risk_fep_split() {
+    const BBG_NPV: f64 = 118_781.76;
+    const BBG_VEGA: f64 = 3_411.78;
+    const BBG_CS01: f64 = 25_352.02;
+    let as_of = date!(2026 - 05 - 07);
+    let sigma = 0.3603;
+    let (option, market) = cdx_fixture_internal();
+    let cds = synthetic_underlying_cds(&option, as_of).expect("synthetic cds");
+    let ctx = context_for(&option, &market, as_of, sigma);
+    let bumped_ctx = context_for(&option, &market, as_of, sigma + 0.01);
+    let hazard = market.get_hazard(&option.credit_curve_id).expect("hazard");
+    let up_hazard = bump_hazard_spreads_with_doc_clause_and_valuation_convention(
+        hazard.as_ref(),
+        &market,
+        &BumpRequest::Parallel(1.0),
+        Some(&option.discount_curve_id),
+        Some(CdsDocClause::IsdaNa),
+        Some(CdsValuationConvention::BloombergCdswClean),
+    )
+    .expect("up hazard");
+    let down_hazard = bump_hazard_spreads_with_doc_clause_and_valuation_convention(
+        hazard.as_ref(),
+        &market,
+        &BumpRequest::Parallel(-1.0),
+        Some(&option.discount_curve_id),
+        Some(CdsDocClause::IsdaNa),
+        Some(CdsValuationConvention::BloombergCdswClean),
+    )
+    .expect("down hazard");
+    let zero_hazard = bump_hazard_spreads_with_doc_clause_and_valuation_convention(
+        hazard.as_ref(),
+        &market,
+        &BumpRequest::Parallel(0.0),
+        Some(&option.discount_curve_id),
+        Some(CdsDocClause::IsdaNa),
+        Some(CdsValuationConvention::BloombergCdswClean),
+    )
+    .expect("zero hazard");
+    let up_market = market.clone().insert(up_hazard);
+    let down_market = market.clone().insert(down_hazard);
+    let zero_market = market.clone().insert(zero_hazard);
+    let up_ctx = context_for(&option, &up_market, as_of, sigma);
+    let down_ctx = context_for(&option, &down_market, as_of, sigma);
+
+    eprintln!("\n=== cdx_ig_46 CDSO risk FEP split ===");
+    eprintln!(
+        "base fep(T+2->expiry)         = {:.12}",
+        ctx.front_end_protection
+    );
+    eprintln!("target NPV / Vega / CS01      = {BBG_NPV:.4} / {BBG_VEGA:.4} / {BBG_CS01:.4}");
+    eprintln!("alpha = fraction of FEP in F0; beta = fraction of FEP in D, solved to match NPV");
+    for alpha in [0.0, 0.25, 0.50, 0.75, 1.0] {
+        let f0_fep = alpha * ctx.front_end_protection;
+        let d_fep = solve_d_fep_for_target(&ctx, f0_fep, BBG_NPV).expect("d solve");
+        let beta = d_fep / ctx.front_end_protection;
+        let npv = price_with_fep_split(&ctx, f0_fep, d_fep).expect("base price");
+        let bumped = price_with_fep_split(
+            &bumped_ctx,
+            alpha * bumped_ctx.front_end_protection,
+            beta * bumped_ctx.front_end_protection,
+        )
+        .expect("vega price");
+        let vega = bumped - npv;
+
+        let up = price_with_fep_split(
+            &up_ctx,
+            alpha * up_ctx.front_end_protection,
+            beta * up_ctx.front_end_protection,
+        )
+        .expect("up price");
+        let down = price_with_fep_split(
+            &down_ctx,
+            alpha * down_ctx.front_end_protection,
+            beta * down_ctx.front_end_protection,
+        )
+        .expect("down price");
+        let cs01 = central_cs01(up, down, 1.0);
+
+        eprintln!(
+            "alpha={alpha:.2} beta={beta:.6} npv={npv:.4} vega={vega:.4} d_vega={:+.4} cs01={cs01:.4} d_cs01={:+.4}",
+            vega - BBG_VEGA,
+            cs01 - BBG_CS01
+        );
+    }
+
+    let production = npv(&option, &cds, &market, sigma, as_of)
+        .expect("production npv")
+        .amount();
+    let production_vega = npv(&option, &cds, &market, sigma + 0.01, as_of)
+        .expect("production bumped")
+        .amount()
+        - production;
+    eprintln!("production npv/vega           = {production:.4} / {production_vega:.4}");
+    let vega_central_half = npv(&option, &cds, &market, sigma + 0.005, as_of)
+        .expect("vega central up half")
+        .amount()
+        - npv(&option, &cds, &market, sigma - 0.005, as_of)
+            .expect("vega central down half")
+            .amount();
+    let vega_central_full = 0.5
+        * (npv(&option, &cds, &market, sigma + 0.01, as_of)
+            .expect("vega central up full")
+            .amount()
+            - npv(&option, &cds, &market, sigma - 0.01, as_of)
+                .expect("vega central down full")
+                .amount());
+    eprintln!("vega central +/-0.5vp / +/-1vp = {vega_central_half:.4} / {vega_central_full:.4}");
+    let fep_start = index_option_front_end_protection_start(&option, as_of).expect("fep start");
+    eprintln!("\n-- t-expiry variants with D solved to target NPV --");
+    for t_days in [42.0, 42.25, 42.5, 42.75, 43.0] {
+        let t = t_days / DIAG_G_DAYS_IN_YEAR;
+        let d_fep = solve_d_fep_for_target_at_t(&ctx, 0.0, BBG_NPV, t).expect("d/t solve");
+        let base_t = price_with_fep_split_at_t(&ctx, 0.0, d_fep, t).expect("base t");
+        let bumped_t = price_with_fep_split_at_t(&bumped_ctx, 0.0, d_fep, t).expect("bumped t");
+        let beta_t = d_fep / ctx.front_end_protection;
+        let cs_up_t =
+            price_with_fep_split_at_t(&up_ctx, 0.0, beta_t * up_ctx.front_end_protection, t)
+                .expect("cs up t");
+        let cs_down_t =
+            price_with_fep_split_at_t(&down_ctx, 0.0, beta_t * down_ctx.front_end_protection, t)
+                .expect("cs down t");
+        let cs_t = central_cs01(cs_up_t, cs_down_t, 1.0);
+        let m_t = calibrate_lognormal_mean_to_target_at(&ctx, ctx.no_knockout_forward(), t)
+            .expect("theta m/t");
+        let theta_t = quadrature_payoff(
+            &ctx,
+            m_t,
+            ctx.signed_strike_adjustment_per_n(),
+            ctx.sign() * d_fep,
+            (t - (1.0 / DIAG_THETA_DAYS_IN_YEAR)).max(0.0),
+        ) * option.notional.amount()
+            - base_t;
+        eprintln!(
+            "t_days={t_days:.2} d_fep={d_fep:.12} vega={:.4} d_vega={:+.4} cs01={cs_t:.4} d_cs01={:+.4} theta={theta_t:.4} d_theta={:+.4}",
+            bumped_t - base_t,
+            bumped_t - base_t - BBG_VEGA,
+            cs_t - BBG_CS01,
+            theta_t + 1_499.93
+        );
+    }
+    for start in [
+        fep_start,
+        option
+            .effective_cash_settlement_date(as_of)
+            .expect("cash date"),
+        option
+            .effective_cash_settlement_date(as_of)
+            .expect("cash date")
+            .add_business_days(
+                2,
+                CalendarRegistry::global()
+                    .resolve_str(option.underlying_convention.default_calendar())
+                    .expect("calendar"),
+            )
+            .expect("cash plus two"),
+    ] {
+        let sp_s = hazard.sp_on_date(start).expect("start sp");
+        let sp_e = hazard.sp_on_date(option.expiry).expect("expiry sp");
+        let d = ctx.lgd * (1.0 - (sp_e / sp_s).clamp(0.0, 1.0));
+        let t = 42.5 / DIAG_G_DAYS_IN_YEAR;
+        let p = price_with_fep_split_at_t(&ctx, 0.0, d, t).expect("date/t price");
+        let v = price_with_fep_split_at_t(&bumped_ctx, 0.0, d, t).expect("date/t bumped") - p;
+        eprintln!(
+            "t_days=42.50 fep_start={start} d_fep={d:.12} npv={p:.4} d_npv={:+.4} vega={v:.4} d_vega={:+.4}",
+            p - BBG_NPV,
+            v - BBG_VEGA
+        );
+    }
+
+    let prod_up = price_with_fep_split(&up_ctx, 0.0, up_ctx.front_end_protection)
+        .expect("production up custom");
+    let prod_down = price_with_fep_split(&down_ctx, 0.0, down_ctx.front_end_protection)
+        .expect("production down custom");
+    let zero = npv(&option, &cds, &zero_market, sigma, as_of)
+        .expect("zero rebootstrap")
+        .amount();
+    let prod_held_fep_up =
+        price_with_fep_split(&up_ctx, 0.0, ctx.front_end_protection).expect("held-fep up");
+    let prod_held_fep_down =
+        price_with_fep_split(&down_ctx, 0.0, ctx.front_end_protection).expect("held-fep down");
+    let direct_up_market = market.clone().insert(
+        bump_hazard_shift(hazard.as_ref(), &BumpRequest::Parallel(1.0)).expect("direct up hazard"),
+    );
+    let direct_down_market = market.clone().insert(
+        bump_hazard_shift(hazard.as_ref(), &BumpRequest::Parallel(-1.0))
+            .expect("direct down hazard"),
+    );
+    let direct_up = npv(&option, &cds, &direct_up_market, sigma, as_of)
+        .expect("direct up")
+        .amount();
+    let direct_down = npv(&option, &cds, &direct_down_market, sigma, as_of)
+        .expect("direct down")
+        .amount();
+    eprintln!("\n-- cs01 conventions (production FEP placement) --");
+    eprintln!(
+        "rebootstrap central           = {:.4}",
+        central_cs01(prod_up, prod_down, 1.0)
+    );
+    eprintln!(
+        "rebootstrap one-sided up      = {:.4}",
+        prod_up - production
+    );
+    eprintln!(
+        "rebootstrap one-sided down    = {:.4}",
+        production - prod_down
+    );
+    eprintln!(
+        "rebootstrap zero-base pv      = {zero:.4}  drift={:+.4}",
+        zero - production
+    );
+    eprintln!("rebootstrap up from zero      = {:.4}", prod_up - zero);
+    eprintln!("rebootstrap down from zero    = {:.4}", zero - prod_down);
+    eprintln!(
+        "rebootstrap central held FEP  = {:.4}",
+        central_cs01(prod_held_fep_up, prod_held_fep_down, 1.0)
+    );
+    eprintln!(
+        "direct hazard central         = {:.4}",
+        central_cs01(direct_up, direct_down, 1.0)
+    );
+    for convention in [
+        CdsValuationConvention::BloombergCdswCleanFullPremium,
+        CdsValuationConvention::QuantLibIsdaParity,
+    ] {
+        let up_alt = bump_hazard_spreads_with_doc_clause_and_valuation_convention(
+            hazard.as_ref(),
+            &market,
+            &BumpRequest::Parallel(1.0),
+            Some(&option.discount_curve_id),
+            Some(CdsDocClause::IsdaNa),
+            Some(convention),
+        )
+        .expect("alt up hazard");
+        let down_alt = bump_hazard_spreads_with_doc_clause_and_valuation_convention(
+            hazard.as_ref(),
+            &market,
+            &BumpRequest::Parallel(-1.0),
+            Some(&option.discount_curve_id),
+            Some(CdsDocClause::IsdaNa),
+            Some(convention),
+        )
+        .expect("alt down hazard");
+        let up_alt_market = market.clone().insert(up_alt);
+        let down_alt_market = market.clone().insert(down_alt);
+        let up_alt_pv = npv(&option, &cds, &up_alt_market, sigma, as_of)
+            .expect("alt up pv")
+            .amount();
+        let down_alt_pv = npv(&option, &cds, &down_alt_market, sigma, as_of)
+            .expect("alt down pv")
+            .amount();
+        eprintln!(
+            "rebootstrap central {:?} = {:.4}",
+            convention,
+            central_cs01(up_alt_pv, down_alt_pv, 1.0)
+        );
+    }
+
+    let m = calibrate_lognormal_mean(&ctx).expect("theta calibration");
+    let shortened_t = (ctx.t_expiry - (1.0 / DIAG_THETA_DAYS_IN_YEAR)).max(0.0);
+    let shortened_expiry = option.expiry - time::Duration::days(1);
+    let sp_start = hazard
+        .sp_on_date(fep_start)
+        .expect("sp start")
+        .max(numerical::ZERO_TOLERANCE);
+    let sp_short = hazard
+        .sp_on_date(shortened_expiry)
+        .expect("sp shortened expiry")
+        .clamp(0.0, 1.0);
+    let shortened_fep = ctx.lgd * (1.0 - (sp_short / sp_start).clamp(0.0, 1.0));
+    let t_start = hazard
+        .day_count()
+        .year_fraction(
+            hazard.base_date(),
+            fep_start,
+            finstack_core::dates::DayCountContext::default(),
+        )
+        .expect("fep start time");
+    let t_expiry_hazard = hazard
+        .day_count()
+        .year_fraction(
+            hazard.base_date(),
+            option.expiry,
+            finstack_core::dates::DayCountContext::default(),
+        )
+        .expect("expiry hazard time");
+    let sp_short_frac = hazard.sp((t_expiry_hazard - (1.0 / DIAG_THETA_DAYS_IN_YEAR)).max(t_start));
+    let shortened_fep_frac = ctx.lgd * (1.0 - (sp_short_frac / sp_start).clamp(0.0, 1.0));
+    let theta_current = theta(&option, &cds, &market, sigma, as_of).expect("theta");
+    let cds_tomorrow =
+        synthetic_underlying_cds(&option, as_of + time::Duration::days(1)).expect("tom cds");
+    let theta_asof_shift = npv(
+        &option,
+        &cds_tomorrow,
+        &market,
+        sigma,
+        as_of + time::Duration::days(1),
+    )
+    .expect("asof shift theta")
+    .amount()
+        - production;
+    let theta_fep_horizon = (quadrature_payoff(
+        &ctx,
+        m,
+        ctx.signed_strike_adjustment_per_n(),
+        ctx.sign() * shortened_fep,
+        shortened_t,
+    ) * option.notional.amount())
+        - production;
+    eprintln!("\n-- theta conventions --");
+    eprintln!("pure t shift current          = {theta_current:.4}");
+    eprintln!("as-of +1 calendar revalue     = {theta_asof_shift:.4}");
+    eprintln!(
+        "pure t + shortened FEP end    = {theta_fep_horizon:.4}  fep_short={shortened_fep:.12}"
+    );
+    let theta_fep_horizon_frac = (quadrature_payoff(
+        &ctx,
+        m,
+        ctx.signed_strike_adjustment_per_n(),
+        ctx.sign() * shortened_fep_frac,
+        shortened_t,
+    ) * option.notional.amount())
+        - production;
+    eprintln!(
+        "pure t + fractional FEP end   = {theta_fep_horizon_frac:.4}  fep_short={shortened_fep_frac:.12}"
+    );
+}
+
+#[test]
+#[ignore = "diagnostic: exact cdx_ig_46 CDSO NPV decomposition"]
+fn diag_cdx_ig_46_npv_decomposition() {
+    let as_of = date!(2026 - 05 - 07);
+    let (option, market) = cdx_fixture_internal();
+    let sigma = 0.3603;
+    let ctx = context_for(&option, &market, as_of, sigma);
+    let m = calibrate_lognormal_mean(&ctx).expect("base calibration");
+
+    let h1 = if ctx.knockout {
+        0.0
+    } else {
+        ctx.lgd * (1.0 - ctx.survival_to_expiry)
+    };
+    let h2 = (ctx.forward_par_spread - ctx.coupon) * ctx.bootstrapped_l_at_expiry;
+    let f0 = ctx.no_knockout_forward();
+    let h_k_flat = ctx.signed_strike_adjustment_per_n();
+    let h_k_boot = ctx.sign() * (ctx.coupon - ctx.strike) * ctx.bootstrapped_l_at_expiry;
+
+    let base = price_with_calibrated_mean(&ctx, m, ctx.t_expiry) * option.notional.amount();
+    let no_fep = calibrate_lognormal_mean_to_target_at(&ctx, h2, ctx.t_expiry)
+        .map(|m| price_with_calibrated_mean(&ctx, m, ctx.t_expiry) * option.notional.amount());
+    let display_target =
+        h1 + (ctx.display_forward_par_spread - ctx.coupon) * ctx.bootstrapped_l_at_expiry;
+    let display_f0 = calibrate_lognormal_mean_to_target_at(&ctx, display_target, ctx.t_expiry)
+        .map(|m| price_with_calibrated_mean(&ctx, m, ctx.t_expiry) * option.notional.amount());
+    let boot_h = quadrature_payoff(
+        &ctx,
+        m,
+        h_k_boot,
+        ctx.signed_loss_settlement_per_n(),
+        ctx.t_expiry,
+    ) * option.notional.amount();
+    let fep_as_payoff = quadrature_payoff(
+        &ctx,
+        m,
+        h_k_flat,
+        ctx.signed_loss_settlement_per_n() + h1,
+        ctx.t_expiry,
+    ) * option.notional.amount();
+    let fep_as_payoff_boot_h = quadrature_payoff(
+        &ctx,
+        m,
+        h_k_boot,
+        ctx.signed_loss_settlement_per_n() + h1,
+        ctx.t_expiry,
+    ) * option.notional.amount();
+    let fep_from = |start: Date, end: Date| -> f64 {
+        let sp_start = market
+            .get_hazard(&option.credit_curve_id)
+            .expect("hazard")
+            .sp_on_date(start)
+            .unwrap_or(1.0)
+            .max(numerical::ZERO_TOLERANCE);
+        let sp_end = market
+            .get_hazard(&option.credit_curve_id)
+            .expect("hazard")
+            .sp_on_date(end)
+            .unwrap_or(1.0);
+        ctx.lgd * (1.0 - (sp_end / sp_start).clamp(0.0, 1.0))
+    };
+    let fep_next_day = fep_from(as_of + time::Duration::days(1), option.expiry);
+    let fep_t_plus_2 = fep_from(as_of + time::Duration::days(4), option.expiry);
+    let fep_cash_settle = fep_from(
+        option
+            .effective_cash_settlement_date(as_of)
+            .expect("cash settlement"),
+        option.expiry,
+    );
+    let fep_next_day_price = quadrature_payoff(
+        &ctx,
+        m,
+        h_k_flat,
+        ctx.signed_loss_settlement_per_n() + fep_next_day,
+        ctx.t_expiry,
+    ) * option.notional.amount();
+    let fep_t_plus_2_price = quadrature_payoff(
+        &ctx,
+        m,
+        h_k_flat,
+        ctx.signed_loss_settlement_per_n() + fep_t_plus_2,
+        ctx.t_expiry,
+    ) * option.notional.amount();
+    let fep_cash_settle_price = quadrature_payoff(
+        &ctx,
+        m,
+        h_k_flat,
+        ctx.signed_loss_settlement_per_n() + fep_cash_settle,
+        ctx.t_expiry,
+    ) * option.notional.amount();
+    let pure_forward_target = f0 - h1;
+    let pure_forward_m =
+        calibrate_lognormal_mean_to_target_at(&ctx, pure_forward_target, ctx.t_expiry)
+            .expect("pure forward calibration");
+    let pure_forward_plus_fep = quadrature_payoff(
+        &ctx,
+        pure_forward_m,
+        h_k_flat,
+        ctx.signed_loss_settlement_per_n() + h1,
+        ctx.t_expiry,
+    ) * option.notional.amount();
+    let full_fep_m = calibrate_lognormal_mean_to_target_at(&ctx, f0 + h1, ctx.t_expiry)
+        .expect("full fep calibration");
+    let full_fep_flat_h =
+        price_with_calibrated_mean(&ctx, full_fep_m, ctx.t_expiry) * option.notional.amount();
+    let full_fep_boot_h = quadrature_payoff(
+        &ctx,
+        full_fep_m,
+        h_k_boot,
+        ctx.signed_loss_settlement_per_n(),
+        ctx.t_expiry,
+    ) * option.notional.amount();
+    let legal_t = 41.0 / 365.0;
+    let legal_t_price = price_with_calibrated_mean(&ctx, m, legal_t) * option.notional.amount();
+
+    eprintln!("\n=== cdx_ig_46 CDSO NPV decomposition ===");
+    eprintln!("target Bloomberg NPV          = 118781.76");
+    eprintln!("base price                    = {base:.4}");
+    eprintln!("base - target                 = {:+.4}", base - 118_781.76);
+    eprintln!("\n-- context --");
+    eprintln!("t_expiry                      = {:.10}", ctx.t_expiry);
+    eprintln!("df_to_expiry                  = {:.10}", ctx.df_to_expiry);
+    eprintln!(
+        "survival_to_expiry            = {:.10}",
+        ctx.survival_to_expiry
+    );
+    eprintln!("coupon                        = {:.8}", ctx.coupon);
+    eprintln!("strike                        = {:.8}", ctx.strike);
+    eprintln!(
+        "economic forward par bp       = {:.8}",
+        ctx.forward_par_spread * 10_000.0
+    );
+    eprintln!(
+        "display forward par bp        = {:.8}",
+        ctx.display_forward_par_spread * 10_000.0
+    );
+    eprintln!(
+        "bootstrapped L                = {:.10}",
+        ctx.bootstrapped_l_at_expiry
+    );
+    eprintln!(
+        "flat L(strike)                = {:.10}",
+        ctx.flat_annuity(ctx.strike)
+    );
+    eprintln!(
+        "flat L(fwd)                   = {:.10}",
+        ctx.flat_annuity(ctx.forward_par_spread)
+    );
+    eprintln!("\n-- calibration --");
+    eprintln!("h1 FEP                        = {:.12}", h1);
+    eprintln!("h2 (fwd-coupon)*L             = {:.12}", h2);
+    eprintln!("F0 target                     = {:.12}", f0);
+    eprintln!("m base bp                     = {:.8}", m * 10_000.0);
+    eprintln!("H(K) flat                     = {:.12}", h_k_flat);
+    eprintln!("H(K) boot L                   = {:.12}", h_k_boot);
+    eprintln!("\n-- variants --");
+    match no_fep {
+        Ok(price) => {
+            eprintln!(
+                "no FEP target                 = {price:.4}  diff={:+.4}",
+                price - 118_781.76
+            );
+        }
+        Err(err) => {
+            eprintln!("no FEP target                 = calibration failed: {err}");
+        }
+    }
+    match display_f0 {
+        Ok(price) => {
+            eprintln!(
+                "display F0 target             = {price:.4}  diff={:+.4}",
+                price - 118_781.76
+            );
+        }
+        Err(err) => {
+            eprintln!("display F0 target             = calibration failed: {err}");
+        }
+    }
+    eprintln!(
+        "boot L in H(K)                = {boot_h:.4}  diff={:+.4}",
+        boot_h - 118_781.76
+    );
+    eprintln!(
+        "FEP as payoff D               = {fep_as_payoff:.4}  diff={:+.4}",
+        fep_as_payoff - 118_781.76
+    );
+    eprintln!(
+        "FEP D from as_of+1d           = {fep_next_day_price:.4}  diff={:+.4}  fep={:.12}",
+        fep_next_day_price - 118_781.76,
+        fep_next_day
+    );
+    eprintln!(
+        "FEP D from T+2 calendar       = {fep_t_plus_2_price:.4}  diff={:+.4}  fep={:.12}",
+        fep_t_plus_2_price - 118_781.76,
+        fep_t_plus_2
+    );
+    eprintln!(
+        "FEP D from cash settlement    = {fep_cash_settle_price:.4}  diff={:+.4}  fep={:.12}",
+        fep_cash_settle_price - 118_781.76,
+        fep_cash_settle
+    );
+    eprintln!(
+        "FEP as D + boot L H(K)        = {fep_as_payoff_boot_h:.4}  diff={:+.4}",
+        fep_as_payoff_boot_h - 118_781.76
+    );
+    eprintln!(
+        "pure fwd F0 + FEP as D        = {pure_forward_plus_fep:.4}  diff={:+.4}",
+        pure_forward_plus_fep - 118_781.76
+    );
+    eprintln!(
+        "full FEP in F0 + flat H(K)    = {full_fep_flat_h:.4}  diff={:+.4}",
+        full_fep_flat_h - 118_781.76
+    );
+    eprintln!(
+        "full FEP in F0 + boot H(K)    = {full_fep_boot_h:.4}  diff={:+.4}",
+        full_fep_boot_h - 118_781.76
+    );
+    eprintln!(
+        "price with 41/365 t only      = {legal_t_price:.4}  diff={:+.4}",
+        legal_t_price - 118_781.76
     );
 }

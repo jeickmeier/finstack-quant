@@ -1640,6 +1640,10 @@
                 "id": {
                   "$ref": "#/$defs/Id"
                 },
+                "memory_coupons": {
+                  "default": false,
+                  "type": "boolean"
+                },
                 "notional": {
                   "$ref": "#/$defs/Money"
                 },
@@ -2956,6 +2960,16 @@
                 "notional": {
                   "$ref": "#/$defs/Money",
                   "description": "Notional amount of the index"
+                },
+                "num_constituents": {
+                  "default": null,
+                  "description": "Number of reference entities in the index pool.\n\nRequired for portfolio-level analytics (e.g. jump-to-default) when\n`constituents` is empty (`SingleCurve` mode), since the per-name\nrisk number is `notional / N · LGD`. Index pool sizes drift with\nseries — iTraxx Crossover has been 75 names only since Series 9,\nand CDX.NA.HY membership varies — so this is supplied explicitly\nrather than inferred from `index_name`. Standard presets populate\nit via `CDSIndex::from_preset`; set it directly with\n`with_num_constituents` for custom indices.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
                 },
                 "premium": {
                   "$ref": "#/$defs/PremiumLegSpec",
@@ -4692,6 +4706,61 @@
                   "description": "Strike spread (in decimal, e.g., 0.005 = 50bp).",
                   "format": "double",
                   "type": "number"
+                },
+                "swap_convention": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/IRSConvention"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "IRS convention for the underlying CMS swaps (e.g. `EURStandard`).\n\nWhen set, provides default values for the fixed/float frequency and\nday count. Individual fields still override the convention when set."
+                },
+                "swap_day_count": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/DayCount"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Fixed leg day count of the underlying CMS swaps (overrides convention)."
+                },
+                "swap_fixed_freq": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Tenor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Fixed leg frequency of the underlying CMS swaps (overrides convention)."
+                },
+                "swap_float_day_count": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/DayCount"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Floating leg day count of the underlying CMS swaps (overrides convention)."
+                },
+                "swap_float_freq": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Tenor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Floating leg frequency of the underlying CMS swaps (overrides convention)."
                 }
               },
               "required": [
@@ -9660,6 +9729,11 @@
             "FinancingLegSpec": {
               "description": "Specification for TRS financing legs",
               "properties": {
+                "compounding": {
+                  "$ref": "#/$defs/FinancingRateCompounding",
+                  "default": "term_rate",
+                  "description": "Rate-compounding convention (term-rate vs overnight-compounded).\n\nDefaults to [`FinancingRateCompounding::TermRate`]. Set to\n[`FinancingRateCompounding::OvernightCompounded`] for SOFR/SONIA/€STR\novernight-funded TRS so the financing rate captures daily-compounding\nconvexity."
+                },
                 "day_count": {
                   "$ref": "#/$defs/DayCount",
                   "description": "Day count convention for accrual calculations"
@@ -9688,6 +9762,21 @@
                 "day_count"
               ],
               "type": "object"
+            },
+            "FinancingRateCompounding": {
+              "description": "Rate-compounding convention for a TRS financing leg.\n\nDistinguishes how each accrual period's floating rate is projected from the\nforward curve. The two conventions differ by the daily-compounding convexity\n— typically 12–15 bp of rate at current levels on an upward-sloping curve.",
+              "oneOf": [
+                {
+                  "const": "term_rate",
+                  "description": "Term-rate financing (e.g. 3M Term SOFR, EURIBOR): the period rate is the\nsimple arithmetic-average forward over the accrual period. This is the\ndefault and matches a conventional term-rate-funded TRS.",
+                  "type": "string"
+                },
+                {
+                  "const": "overnight_compounded",
+                  "description": "Overnight-indexed (OIS / RFR) financing — SOFR, SONIA, €STR, TONA: the\nperiod rate daily-compounds the overnight forward,\n`R = (∏(1 + rᵢ·dᵢ) − 1) / τ`, picking up the compounding convexity that\nthe simple arithmetic average drops.",
+                  "type": "string"
+                }
+              ]
             },
             "FixedCouponSpec": {
               "description": "Fixed-rate coupon specification.\n\nThis type combines the coupon quote, payment behavior, and schedule\nconventions required to emit a fixed-rate leg.",
@@ -11737,6 +11826,14 @@
                   "$ref": "#/$defs/Id",
                   "description": "Inflation index/curve identifier (e.g., US-CPI-U)."
                 },
+                "inflation_nominal_correlation": {
+                  "description": "Correlation between the inflation index and the nominal short rate,\nused in the YoY convexity/timing adjustment. `None` ⇒ treated as 0\n(the timing term vanishes; the pure inflation-vol Jensen convexity\n`σ_I²·τ` is still applied).",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
                 "lag_override": {
                   "anyOf": [
                     {
@@ -11751,6 +11848,14 @@
                 "maturity": {
                   "description": "End date of the final inflation period.",
                   "type": "string"
+                },
+                "nominal_rate_volatility": {
+                  "description": "Nominal short-rate volatility `σ_n` (annualized, absolute), used in the\nYoY timing term. `None` ⇒ the `ρ·σ_n` timing term is dropped.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 },
                 "notional": {
                   "$ref": "#/$defs/Money",

@@ -1,15 +1,97 @@
 //! Delta metric for `CDSOption`.
 
+use crate::instruments::credit_derivatives::cds::pricer::CDSPricer;
+use crate::instruments::credit_derivatives::cds_option::bloomberg_quadrature::ForwardCdsContext;
+use crate::instruments::credit_derivatives::cds_option::pricer::synthetic_underlying_cds;
 use crate::instruments::credit_derivatives::cds_option::CDSOption;
+use crate::instruments::OptionType;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_core::Result;
+use rust_decimal::prelude::ToPrimitive;
 
-/// Delta calculator for credit options on CDS spreads.
+/// Bloomberg-screen Delta calculator for credit options on CDS spreads.
 pub(crate) struct DeltaCalculator;
 
 impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &CDSOption = context.instrument_as()?;
-        option.delta(&context.curves, context.as_of)
+        let t = option.time_to_expiry(context.as_of)?;
+        if t <= 0.0 {
+            return Ok(0.0);
+        }
+        let strike = option.strike.to_f64().unwrap_or(0.0);
+        let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
+            &option.pricing_overrides.market_quotes,
+            &context.curves,
+            option.vol_surface_id.as_str(),
+            t,
+            strike,
+        )?;
+        let cds = synthetic_underlying_cds(option, context.as_of)?;
+        let disc = context.curves.get_discount(&option.discount_curve_id)?;
+        let surv = context.curves.get_hazard(&option.credit_curve_id)?;
+        let ctx = ForwardCdsContext::build(
+            option,
+            disc.as_ref(),
+            surv.as_ref(),
+            &cds,
+            context.as_of,
+            sigma,
+        )?;
+        let clean_forward = delta_display_forward(option, &context.curves, &ctx, context.as_of)?;
+        Ok(black_delta_ratio(
+            option.option_type,
+            clean_forward,
+            ctx.strike,
+            sigma,
+            t,
+        ))
+    }
+}
+
+pub(super) fn delta_display_forward(
+    option: &CDSOption,
+    curves: &finstack_core::market_data::context::MarketContext,
+    ctx: &ForwardCdsContext,
+    as_of: finstack_core::dates::Date,
+) -> Result<f64> {
+    let cds = synthetic_underlying_cds(option, as_of)?;
+    let disc = curves.get_discount(&option.discount_curve_id)?;
+    let surv = curves.get_hazard(&option.credit_curve_id)?;
+    let spot_protection_pv = CDSPricer::new()
+        .pv_protection_leg(&cds, disc.as_ref(), surv.as_ref(), as_of)?
+        .amount();
+    let denom = ctx.df_to_expiry
+        * ctx.survival_to_expiry
+        * ctx.bootstrapped_l_at_expiry
+        * cds.notional.amount();
+    if denom <= 1e-12 {
+        return Err(finstack_core::Error::Validation(format!(
+            "degenerate CDS option delta display-forward denominator: id={}, denom={denom:.6e}",
+            option.id,
+        )));
+    }
+    Ok(spot_protection_pv / denom)
+}
+
+pub(super) fn black_delta_ratio(
+    option_type: OptionType,
+    forward: f64,
+    strike: f64,
+    sigma: f64,
+    t: f64,
+) -> f64 {
+    if forward <= 0.0 || strike <= 0.0 || sigma <= 0.0 || t <= 0.0 {
+        return 0.0;
+    }
+    let sigma_sqrt_t = sigma * t.sqrt();
+    if sigma_sqrt_t <= 1e-12 {
+        return 0.0;
+    }
+    let d1 = ((forward / strike).ln() + 0.5 * sigma_sqrt_t * sigma_sqrt_t) / sigma_sqrt_t;
+
+    match option_type {
+        OptionType::Call => finstack_core::math::norm_cdf(d1),
+        OptionType::Put => -finstack_core::math::norm_cdf(-d1),
     }
 }

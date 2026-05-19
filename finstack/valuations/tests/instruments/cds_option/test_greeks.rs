@@ -106,25 +106,6 @@ fn test_theta_exists() {
 }
 
 #[test]
-fn test_rho_exists() {
-    let as_of = date!(2025 - 01 - 01);
-    let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new().build(as_of);
-
-    let result = option
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Rho],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-    let rho = *result.measures.get("rho").unwrap();
-
-    assert_finite(rho, "Rho");
-}
-
-#[test]
 fn test_cs01_call_positive() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);
@@ -180,7 +161,6 @@ fn test_all_greeks_together() {
                 MetricId::Gamma,
                 MetricId::Vega,
                 MetricId::Theta,
-                MetricId::Rho,
                 MetricId::Cs01,
                 MetricId::Dv01,
             ],
@@ -189,8 +169,8 @@ fn test_all_greeks_together() {
         .unwrap();
 
     assert!(
-        result.measures.len() >= 7,
-        "Should compute at least 7 greeks, got {}",
+        result.measures.len() >= 6,
+        "Should compute at least 6 greeks, got {}",
         result.measures.len(),
     );
 

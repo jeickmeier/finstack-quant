@@ -2364,6 +2364,16 @@
               "$ref": "#/$defs/Money",
               "description": "Notional amount of the index"
             },
+            "num_constituents": {
+              "default": null,
+              "description": "Number of reference entities in the index pool.\n\nRequired for portfolio-level analytics (e.g. jump-to-default) when\n`constituents` is empty (`SingleCurve` mode), since the per-name\nrisk number is `notional / N · LGD`. Index pool sizes drift with\nseries — iTraxx Crossover has been 75 names only since Series 9,\nand CDX.NA.HY membership varies — so this is supplied explicitly\nrather than inferred from `index_name`. Standard presets populate\nit via `CDSIndex::from_preset`; set it directly with\n`with_num_constituents` for custom indices.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
             "premium": {
               "$ref": "#/$defs/PremiumLegSpec",
               "description": "Premium leg specification (coupon schedule and discounting)"

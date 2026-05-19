@@ -14,16 +14,13 @@ use finstack_core::market_data::term_structures::{
     DiscountCurveRateQuoteType, HazardCurve,
 };
 use finstack_core::money::Money;
-use finstack_valuations::instruments::credit_derivatives::cds::{
-    CreditDefaultSwap, RECOVERY_SENIOR_UNSECURED,
-};
+use finstack_valuations::instruments::credit_derivatives::cds::RECOVERY_SENIOR_UNSECURED;
 use finstack_valuations::instruments::credit_derivatives::cds_option::{
     CDSOption, CDSOptionParams, ProtectionStartConvention,
 };
 use finstack_valuations::instruments::CreditParams;
 use finstack_valuations::instruments::OptionType;
 use rust_decimal::Decimal;
-use time::Month;
 
 /// Standard flat discount curve for testing
 pub fn flat_discount(id: &str, base: Date, rate: f64) -> DiscountCurve {
@@ -242,40 +239,6 @@ impl Default for CDSOptionBuilder {
     fn default() -> Self {
         Self::new()
     }
-}
-
-pub fn option_underlying_cds(option: &CDSOption, spread_bp: f64) -> CreditDefaultSwap {
-    let start = prior_cds_roll_on_or_before(option.expiry) + time::Duration::days(1);
-    let mut underlying = crate::finstack_test_utils::cds_buy_protection(
-        "CDS-FWD",
-        option.notional,
-        spread_bp,
-        start,
-        option.cds_maturity,
-        option.discount_curve_id.clone(),
-        option.credit_curve_id.clone(),
-    )
-    .expect("underlying CDS should build");
-    underlying.protection.recovery_rate = option.recovery_rate;
-    if underlying.premium.start < option.expiry {
-        underlying.protection_effective_date = Some(option.expiry);
-    }
-    underlying
-}
-
-fn prior_cds_roll_on_or_before(date: Date) -> Date {
-    const CDS_ROLL_MONTHS: [Month; 4] =
-        [Month::March, Month::June, Month::September, Month::December];
-
-    for month in CDS_ROLL_MONTHS.iter().rev().copied() {
-        if let Ok(candidate) = Date::from_calendar_date(date.year(), month, 20) {
-            if candidate <= date {
-                return candidate;
-            }
-        }
-    }
-
-    Date::from_calendar_date(date.year().saturating_sub(1), Month::December, 20).unwrap_or(date)
 }
 
 /// Assert that a value is finite and non-NaN
