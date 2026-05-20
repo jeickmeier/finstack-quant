@@ -356,61 +356,41 @@ impl CashflowProvider for IrFutureOption {
     }
 }
 
-impl crate::instruments::common_impl::traits::OptionDeltaProvider for IrFutureOption {
-    fn option_delta(&self, _market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
-        Ok(self.delta(as_of)? * self.contract_point_value()?)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionGammaProvider for IrFutureOption {
-    fn option_gamma(&self, _market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
-        Ok(self.gamma(as_of)? * self.contract_point_value()?)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionVegaProvider for IrFutureOption {
-    fn option_vega(&self, _market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
-        Ok(self.vega_per_pct(as_of)? * self.contract_point_value()?)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionThetaProvider for IrFutureOption {
-    fn option_theta(&self, _market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
-        Ok(self.theta_daily(as_of)? * self.contract_point_value()?)
-    }
-}
-
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for IrFutureOption {
-    fn option_greeks(
+    fn option_delta(
         &self,
-        market: &MarketContext,
+        _market: &MarketContext,
         as_of: Date,
-        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
-        use crate::instruments::common_impl::traits::{
-            OptionDeltaProvider, OptionGammaProvider, OptionGreekKind, OptionGreeks,
-            OptionThetaProvider, OptionVegaProvider,
-        };
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.delta(as_of)? * self.contract_point_value()?))
+    }
 
-        match request.greek {
-            OptionGreekKind::Delta => Ok(OptionGreeks {
-                delta: Some(OptionDeltaProvider::option_delta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Gamma => Ok(OptionGreeks {
-                gamma: Some(OptionGammaProvider::option_gamma(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Vega => Ok(OptionGreeks {
-                vega: Some(OptionVegaProvider::option_vega(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Theta => Ok(OptionGreeks {
-                theta: Some(OptionThetaProvider::option_theta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            _ => Ok(OptionGreeks::default()),
-        }
+    fn option_gamma(
+        &self,
+        _market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.gamma(as_of)? * self.contract_point_value()?))
+    }
+
+    fn option_vega(
+        &self,
+        _market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(
+            self.vega_per_pct(as_of)? * self.contract_point_value()?,
+        ))
+    }
+
+    fn option_theta(
+        &self,
+        _market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(
+            self.theta_daily(as_of)? * self.contract_point_value()?,
+        ))
     }
 }
 

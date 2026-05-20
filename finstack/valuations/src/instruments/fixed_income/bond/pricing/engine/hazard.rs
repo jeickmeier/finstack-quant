@@ -30,6 +30,11 @@
 //! but the PV is always anchored at `as_of`. The quote engine handles
 //! settlement-date accrued interest separately.
 
+use crate::instruments::common_impl::traits::Instrument;
+use crate::pricer::{
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
+};
+use crate::results::ValuationResult;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::HazardCurve;
@@ -339,6 +344,62 @@ impl HazardBondEngine {
         }
 
         Ok(pv_cf + pv_rec)
+    }
+}
+
+/// Registry adapter for the hazard-rate bond pricer.
+///
+/// Routes `(InstrumentType::Bond, ModelKey::HazardRate)` to [`HazardBondEngine`]
+/// with FRP. Falls back to risk-free pricing if no hazard curve is available.
+pub(crate) struct SimpleBondHazardPricer;
+
+impl Pricer for SimpleBondHazardPricer {
+    fn key(&self) -> PricerKey {
+        PricerKey::new(InstrumentType::Bond, ModelKey::HazardRate)
+    }
+
+    fn price_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> std::result::Result<ValuationResult, PricingError> {
+        let bond = instrument
+            .as_any()
+            .downcast_ref::<Bond>()
+            .ok_or_else(|| PricingError::type_mismatch(InstrumentType::Bond, instrument.key()))?;
+
+        let ctx = PricingErrorContext::new()
+            .instrument_id(bond.id())
+            .instrument_type(InstrumentType::Bond)
+            .model(ModelKey::HazardRate)
+            .curve_id(bond.discount_curve_id.as_str());
+
+        let pv = HazardBondEngine::price(bond, market, as_of)
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+
+        Ok(ValuationResult::stamped(bond.id(), as_of, pv))
+    }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let bond = instrument
+            .as_any()
+            .downcast_ref::<Bond>()
+            .ok_or_else(|| PricingError::type_mismatch(InstrumentType::Bond, instrument.key()))?;
+
+        let ctx = PricingErrorContext::new()
+            .instrument_id(bond.id())
+            .instrument_type(InstrumentType::Bond)
+            .model(ModelKey::HazardRate)
+            .curve_id(bond.discount_curve_id.as_str());
+
+        HazardBondEngine::price_raw(bond, market, as_of)
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx))
     }
 }
 

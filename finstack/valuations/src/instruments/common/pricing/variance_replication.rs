@@ -150,12 +150,12 @@ pub fn carr_madan_forward_variance(
         let k = *strikes.get(i)?;
         let dk = if i == 0 {
             // First endpoint: half of the first cell.
-            0.5 * strikes.get(1)?.checked_sub_f(strikes.first()?)?
+            0.5 * finite_diff(*strikes.get(1)?, *strikes.first()?)?
         } else if i + 1 == strikes.len() {
             // Last endpoint: half of the last cell.
-            0.5 * strikes.get(i)?.checked_sub_f(strikes.get(i - 1)?)?
+            0.5 * finite_diff(*strikes.get(i)?, *strikes.get(i - 1)?)?
         } else {
-            0.5 * strikes.get(i + 1)?.checked_sub_f(strikes.get(i - 1)?)?
+            0.5 * finite_diff(*strikes.get(i + 1)?, *strikes.get(i - 1)?)?
         };
 
         let vol = vol_fn(time_to_expiry, k);
@@ -343,25 +343,15 @@ fn wing_tail_integral(
     Some(acc.total())
 }
 
-/// Difference helper that fails on a non-finite result.
+/// `a - b`, but `None` if the result is non-finite.
 ///
 /// `f64` subtraction never panics, but a non-finite difference (e.g. from an
 /// infinite strike that slipped past validation) must not silently poison the
-/// integral; this surfaces it as `None`.
-trait CheckedSubF {
-    fn checked_sub_f(&self, rhs: &f64) -> Option<f64>;
-}
-
-impl CheckedSubF for f64 {
-    #[inline]
-    fn checked_sub_f(&self, rhs: &f64) -> Option<f64> {
-        let d = self - rhs;
-        if d.is_finite() {
-            Some(d)
-        } else {
-            None
-        }
-    }
+/// integral.
+#[inline]
+fn finite_diff(a: f64, b: f64) -> Option<f64> {
+    let d = a - b;
+    d.is_finite().then_some(d)
 }
 
 #[cfg(test)]

@@ -15,8 +15,7 @@ mod tests {
         types::{moodys_warf_factor, CreditRating},
     };
     use finstack_valuations::instruments::fixed_income::structured_credit::{
-        config::{DealConfig, DealDates, DefaultAssumptions},
-        DealType, Pool, PoolAsset,
+        DealConfig, DealDates, DealType, DefaultAssumptions, Pool, PoolAsset,
     };
     use time::Month;
 

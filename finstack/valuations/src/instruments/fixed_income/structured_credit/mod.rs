@@ -22,23 +22,6 @@
 //! - `Tranche` for tranche structure
 //! - waterfall engine for cashflow distribution
 
-// ============================================================================
-// MODULES
-// ============================================================================
-
-pub mod config {
-    //! Configuration and constants for structured credit instruments.
-
-    /// Industry-standard constants for structured credit modeling.
-    pub mod constants {
-        pub use crate::instruments::fixed_income::structured_credit::types::constants::*;
-    }
-    pub use crate::instruments::fixed_income::structured_credit::types::setup::{
-        CoverageTestConfig, DealConfig, DealDates, DealFees, DefaultAssumptions,
-    };
-    pub use constants::*;
-}
-
 // New module structure
 pub(crate) mod assumptions;
 pub(crate) mod metrics;
@@ -46,55 +29,6 @@ pub(crate) mod pricer;
 pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
-
-// ============================================================================
-// PRELUDE
-// ============================================================================
-
-/// Prelude module for end-users.
-pub mod prelude {
-    // Main types
-    pub use super::DealType;
-    pub use super::StructuredCredit;
-
-    // Building blocks
-    pub use super::Pool;
-    pub use super::PoolAsset;
-    pub use super::Tranche;
-    pub use super::TrancheBuilder;
-    pub use super::TrancheCoupon;
-    pub use super::TrancheStructure;
-
-    // Seniority
-    pub use super::Seniority;
-
-    // Waterfall
-    pub use super::Waterfall;
-    pub use super::WaterfallBuilder;
-    pub use super::WaterfallTier;
-
-    // Behavioral models
-    pub use super::CreditModelConfig;
-    pub use super::DefaultModelSpec;
-    pub use super::PrepaymentModelSpec;
-    pub use super::RecoveryModelSpec;
-
-    // Metadata and overrides
-    pub use super::Metadata;
-    pub use super::Overrides;
-
-    // Enums
-    pub use super::AssetType;
-
-    // Results
-    pub use super::TrancheCashflows;
-    pub use super::TrancheValuation;
-
-    // Configuration
-    pub use super::DealConfig;
-    pub use super::DealDates;
-    pub use super::DealFees;
-}
 
 // ============================================================================
 // MAIN TYPES
@@ -262,9 +196,3 @@ pub use types::constants::{
 /// Waterfall-level coverage trigger (for waterfall diversion).
 /// Use this when building waterfall engines with coverage test diversion.
 pub use types::waterfall::CoverageTrigger as WaterfallCoverageTrigger;
-
-/// Re-exports for WASM bindings.
-#[doc(hidden)]
-pub mod waterfall {
-    pub use super::types::waterfall::{CoverageTestRules, CoverageTrigger};
-}

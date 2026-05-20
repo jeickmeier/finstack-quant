@@ -6,6 +6,7 @@ pub mod bermudan_call;
 pub mod coupon_profiles;
 /// Cumulative coupon tracker for path-dependent products (TARN, Snowball).
 pub mod cumulative_coupon;
+pub use cumulative_coupon::CouponEvent;
 /// Forward swap rate and annuity helpers shared by CMS instruments.
 pub mod forward_swap_rate;
 /// Monte Carlo configuration shared across rate exotic pricers.

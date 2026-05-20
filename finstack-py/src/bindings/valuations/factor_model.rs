@@ -6,20 +6,12 @@
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{display_to_py, serde_json_to_py};
-use finstack_valuations::factor_model::FactorSensitivityEngine;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-/// Default number of scenario grid points for :func:`compute_pnl_profiles`
-/// when the caller omits ``n_scenario_points``.
-///
-/// ``5`` produces the symmetric shift grid ``[-2, -1, 0, 1, 2]`` (see
-/// [`finstack_valuations::factor_model::ScenarioGrid`]). The WASM binding
-/// (`computePnlProfiles`) uses the same value via its own crate-local
-/// `DEFAULT_PNL_SCENARIO_POINTS`; the two are kept in sync by review because
-/// `finstack-py` and `finstack-wasm` are sibling crates with no shared module.
-const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
+const DEFAULT_PNL_SCENARIO_POINTS: usize =
+    finstack_valuations::factor_model::DEFAULT_PNL_SCENARIO_POINTS;
 
 /// Serialize a Python object to JSON via `json.dumps`, then deserialize into `T`.
 fn py_to_serde<'py, T: serde::de::DeserializeOwned>(
@@ -294,22 +286,22 @@ fn compute_factor_sensitivities(
     as_of: &str,
     bump_config_json: Option<&str>,
 ) -> PyResult<PySensitivityMatrix> {
-    let parsed_positions = finstack_valuations::factor_model::parse_positions_json(positions_json)
-        .map_err(display_to_py)?;
-    let positions = finstack_valuations::factor_model::pricing_positions(&parsed_positions);
-
-    let factors: Vec<finstack_core::factor_model::FactorDefinition> =
-        serde_json::from_str(factors_json).map_err(display_to_py)?;
     let market = extract_market(market)?;
     let date = super::parse_date(as_of)?;
-    let bump_config: finstack_core::factor_model::BumpSizeConfig = match bump_config_json {
-        Some(json) => serde_json::from_str(json).map_err(display_to_py)?,
-        None => finstack_core::factor_model::BumpSizeConfig::default(),
-    };
+    let positions_json = positions_json.to_owned();
+    let factors_json = factors_json.to_owned();
+    let bump_config_json = bump_config_json.map(str::to_owned);
 
-    let engine = finstack_valuations::factor_model::DeltaBasedEngine::new(bump_config);
     let matrix = py
-        .detach(move || engine.compute_sensitivities(&positions, &factors, &market, date))
+        .detach(move || {
+            finstack_valuations::factor_model::compute_factor_sensitivities_from_json(
+                &positions_json,
+                &factors_json,
+                &market,
+                date,
+                bump_config_json.as_deref(),
+            )
+        })
         .map_err(display_to_py)?;
 
     Ok(PySensitivityMatrix::from_inner(matrix))
@@ -352,26 +344,23 @@ fn compute_pnl_profiles(
     bump_config_json: Option<&str>,
     n_scenario_points: usize,
 ) -> PyResult<Vec<PyFactorPnlProfile>> {
-    let parsed_positions = finstack_valuations::factor_model::parse_positions_json(positions_json)
-        .map_err(display_to_py)?;
-    let positions = finstack_valuations::factor_model::pricing_positions(&parsed_positions);
-
-    let factors: Vec<finstack_core::factor_model::FactorDefinition> =
-        serde_json::from_str(factors_json).map_err(display_to_py)?;
     let market = extract_market(market)?;
     let date = super::parse_date(as_of)?;
-    let bump_config: finstack_core::factor_model::BumpSizeConfig = match bump_config_json {
-        Some(json) => serde_json::from_str(json).map_err(display_to_py)?,
-        None => finstack_core::factor_model::BumpSizeConfig::default(),
-    };
+    let positions_json = positions_json.to_owned();
+    let factors_json = factors_json.to_owned();
+    let bump_config_json = bump_config_json.map(str::to_owned);
 
-    let engine = finstack_valuations::factor_model::FullRepricingEngine::try_new(
-        bump_config,
-        n_scenario_points,
-    )
-    .map_err(display_to_py)?;
     let profiles = py
-        .detach(move || engine.compute_pnl_profiles(&positions, &factors, &market, date))
+        .detach(move || {
+            finstack_valuations::factor_model::compute_pnl_profiles_from_json(
+                &positions_json,
+                &factors_json,
+                &market,
+                date,
+                bump_config_json.as_deref(),
+                n_scenario_points,
+            )
+        })
         .map_err(display_to_py)?;
 
     Ok(profiles

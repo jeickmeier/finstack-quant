@@ -1061,17 +1061,6 @@ fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
     losses.iter().take(tail_count).sum::<f64>() / tail_count as f64
 }
 
-trait TrancheDurationSetter {
-    fn with_credit_duration(self, duration: f64) -> Self;
-}
-
-impl TrancheDurationSetter for TranchePricingResult {
-    fn with_credit_duration(mut self, duration: f64) -> Self {
-        self.credit_duration = duration;
-        self
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

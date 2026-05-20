@@ -163,19 +163,19 @@ impl FxBarrierOption {
 // Option risk metric providers (metrics adapters)
 // ================================================================================================
 
-impl crate::instruments::common_impl::traits::OptionDeltaProvider for FxBarrierOption {
+impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrierOption {
     fn option_delta(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         let t = self.day_count.year_fraction(
             as_of,
             self.expiry,
             finstack_core::dates::DayCountContext::default(),
         )?;
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
         let spot_id = self.fx_spot_id.as_ref().ok_or_else(|| {
             finstack_core::Error::Validation(
@@ -183,22 +183,20 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for FxBarrierO
                     .to_string(),
             )
         })?;
-        crate::metrics::central_diff_scalar_relative(
+        Ok(Some(crate::metrics::central_diff_scalar_relative(
             self,
             market,
             as_of,
             spot_id,
             crate::metrics::bump_sizes::SPOT,
-        )
+        )?))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionGammaProvider for FxBarrierOption {
     fn option_gamma(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let t = self.day_count.year_fraction(
@@ -207,7 +205,7 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for FxBarrierO
             finstack_core::dates::DayCountContext::default(),
         )?;
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
@@ -222,7 +220,7 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for FxBarrierO
         let current_spot = crate::metrics::scalar_numeric_value(spot_scalar);
         let bump_size = current_spot * crate::metrics::bump_sizes::SPOT;
         if bump_size <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let up =
@@ -232,16 +230,16 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for FxBarrierO
             crate::metrics::bump_scalar_price(market, spot_id, -crate::metrics::bump_sizes::SPOT)?;
         let pv_down = self.value(&down, as_of)?.amount();
 
-        Ok((pv_up - 2.0 * base_pv + pv_down) / (bump_size * bump_size))
+        Ok(Some(
+            (pv_up - 2.0 * base_pv + pv_down) / (bump_size * bump_size),
+        ))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVegaProvider for FxBarrierOption {
     fn option_vega(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let t = self.day_count.year_fraction(
@@ -250,7 +248,7 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for FxBarrierOp
             finstack_core::dates::DayCountContext::default(),
         )?;
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
@@ -260,16 +258,16 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for FxBarrierOp
             crate::metrics::bump_sizes::VOLATILITY,
         )?;
         let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok((pv_bumped - base_pv) / crate::metrics::bump_sizes::VOLATILITY)
+        Ok(Some(
+            (pv_bumped - base_pv) / crate::metrics::bump_sizes::VOLATILITY,
+        ))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionRhoProvider for FxBarrierOption {
     fn option_rho_bp(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let t = self.day_count.year_fraction(
@@ -278,7 +276,7 @@ impl crate::instruments::common_impl::traits::OptionRhoProvider for FxBarrierOpt
             finstack_core::dates::DayCountContext::default(),
         )?;
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
@@ -289,16 +287,14 @@ impl crate::instruments::common_impl::traits::OptionRhoProvider for FxBarrierOpt
             bump_bp,
         )?;
         let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok((pv_bumped - base_pv) / bump_bp)
+        Ok(Some((pv_bumped - base_pv) / bump_bp))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVannaProvider for FxBarrierOption {
     fn option_vanna(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let t = self.day_count.year_fraction(
@@ -307,7 +303,7 @@ impl crate::instruments::common_impl::traits::OptionVannaProvider for FxBarrierO
             finstack_core::dates::DayCountContext::default(),
         )?;
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let spot_id = self.fx_spot_id.as_ref().ok_or_else(|| {
@@ -321,7 +317,7 @@ impl crate::instruments::common_impl::traits::OptionVannaProvider for FxBarrierO
 
         let spot_bump = current_spot * crate::metrics::bump_sizes::SPOT;
         if spot_bump <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
         let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
 
@@ -365,17 +361,15 @@ impl crate::instruments::common_impl::traits::OptionVannaProvider for FxBarrierO
         let pv_dn = self.value(&curves_dn, as_of)?.amount();
         let delta_vol_dn = (pv_up - pv_dn) / (2.0 * spot_bump);
 
-        Ok((delta_vol_up - delta_vol_dn) / (2.0 * vol_bump))
+        Ok(Some((delta_vol_up - delta_vol_dn) / (2.0 * vol_bump)))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVolgaProvider for FxBarrierOption {
     fn option_volga(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
         base_pv: f64,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let t = self.day_count.year_fraction(
@@ -384,7 +378,7 @@ impl crate::instruments::common_impl::traits::OptionVolgaProvider for FxBarrierO
             finstack_core::dates::DayCountContext::default(),
         )?;
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
@@ -400,54 +394,9 @@ impl crate::instruments::common_impl::traits::OptionVolgaProvider for FxBarrierO
         )?;
         let pv_up = self.value(&up, as_of)?.amount();
         let pv_dn = self.value(&dn, as_of)?.amount();
-        Ok((pv_up - 2.0 * base_pv + pv_dn) / (vol_bump * vol_bump))
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrierOption {
-    fn option_greeks(
-        &self,
-        market: &finstack_core::market_data::context::MarketContext,
-        as_of: finstack_core::dates::Date,
-        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
-        use crate::instruments::common_impl::traits::{
-            OptionDeltaProvider, OptionGammaProvider, OptionGreekKind, OptionGreeks,
-            OptionRhoProvider, OptionVannaProvider, OptionVegaProvider, OptionVolgaProvider,
-        };
-
-        match request.greek {
-            OptionGreekKind::Delta => Ok(OptionGreeks {
-                delta: Some(OptionDeltaProvider::option_delta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Gamma => Ok(OptionGreeks {
-                gamma: Some(OptionGammaProvider::option_gamma(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Vega => Ok(OptionGreeks {
-                vega: Some(OptionVegaProvider::option_vega(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Rho => Ok(OptionGreeks {
-                rho_bp: Some(OptionRhoProvider::option_rho_bp(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Vanna => Ok(OptionGreeks {
-                vanna: Some(OptionVannaProvider::option_vanna(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Volga => Ok(OptionGreeks {
-                volga: Some(OptionVolgaProvider::option_volga(
-                    self,
-                    market,
-                    as_of,
-                    request.require_base_pv()?,
-                )?),
-                ..OptionGreeks::default()
-            }),
-            _ => Ok(OptionGreeks::default()),
-        }
+        Ok(Some(
+            (pv_up - 2.0 * base_pv + pv_dn) / (vol_bump * vol_bump),
+        ))
     }
 }
 

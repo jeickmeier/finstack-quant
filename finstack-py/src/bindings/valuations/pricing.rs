@@ -122,11 +122,7 @@ fn price_instrument_with_metrics(
 ///     All registered metric identifiers (sorted alphabetically).
 #[pyfunction]
 fn list_standard_metrics() -> Vec<String> {
-    finstack_valuations::metrics::standard_registry()
-        .available_metrics()
-        .into_iter()
-        .map(|id| id.to_string())
-        .collect()
+    finstack_valuations::pricer::list_standard_metrics()
 }
 
 /// List all standard metrics organized by group.
@@ -140,17 +136,8 @@ fn list_standard_metrics() -> Vec<String> {
 /// dict[str, list[str]]
 ///     Metrics grouped by category.
 #[pyfunction]
-fn list_standard_metrics_grouped() -> std::collections::HashMap<String, Vec<String>> {
-    finstack_valuations::metrics::standard_registry()
-        .available_metrics_grouped()
-        .into_iter()
-        .map(|(group, metrics)| {
-            (
-                group.display_name().to_string(),
-                metrics.into_iter().map(|m| m.to_string()).collect(),
-            )
-        })
-        .collect()
+fn list_standard_metrics_grouped() -> std::collections::BTreeMap<String, Vec<String>> {
+    finstack_valuations::pricer::list_standard_metrics_grouped()
 }
 
 /// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
@@ -193,7 +180,7 @@ fn instrument_cashflows_json(
     let model = model.to_owned();
 
     py.detach(move || {
-        finstack_valuations::instruments::cashflow_export::instrument_cashflows_json(
+        finstack_valuations::pricer::instrument_cashflows_json(
             &instrument_json,
             &market,
             &as_of,

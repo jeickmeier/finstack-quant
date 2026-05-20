@@ -13,8 +13,8 @@
 //! using low-path MC with common random numbers, then re-prices with the
 //! calibrated model at full path count.
 
+use super::merton_mc::MertonMcConfig;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig;
 use crate::instruments::fixed_income::bond::pricing::time_basis::{
     bond_cashflow_dfs_on_model_grid, bond_model_maturity_years,
     implied_flat_discount_rate_from_curve,
@@ -77,23 +77,7 @@ fn populate_cashflow_dfs_if_needed(
 ///
 /// Registered under `PricerKey::new(InstrumentType::Bond, ModelKey::MertonMc)`;
 /// see the module-level docs for configuration details and metric outputs.
-pub struct SimpleBondMertonMcPricer;
-
-impl SimpleBondMertonMcPricer {
-    /// Construct a stateless `SimpleBondMertonMcPricer`.
-    ///
-    /// All per-instrument configuration (paths, barrier, calibration, etc.) is
-    /// read from the bond's `pricing_overrides.model_config` at pricing time.
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for SimpleBondMertonMcPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub(crate) struct SimpleBondMertonMcPricer;
 
 impl Pricer for SimpleBondMertonMcPricer {
     fn key(&self) -> PricerKey {
@@ -143,7 +127,7 @@ impl Pricer for SimpleBondMertonMcPricer {
         // ---- Calibration pass (opt-in) ---------------------------------
         let mut calibration_measures: IndexMap<crate::metrics::MetricId, f64> = IndexMap::new();
         let mut effective_config = if let Some(ref cal_spec) = mc_override.0.calibration {
-            use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::calibration::calibrate_parameter_to_market;
+            use super::merton_mc::calibration::calibrate_parameter_to_market;
             let cal_output = calibrate_parameter_to_market(
                 bond,
                 market,
@@ -285,7 +269,7 @@ impl Pricer for SimpleBondMertonMcPricer {
         } = merton_mc_time_basis(bond, &disc, as_of, &ctx)?;
 
         let mut effective_config = if let Some(ref cal_spec) = mc_override.0.calibration {
-            use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::calibration::calibrate_parameter_to_market;
+            use super::merton_mc::calibration::calibrate_parameter_to_market;
             let cal_output = calibrate_parameter_to_market(
                 bond,
                 market,

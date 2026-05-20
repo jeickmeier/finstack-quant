@@ -31,12 +31,14 @@ pub mod json;
 mod keys;
 mod registry;
 
+pub use crate::instruments::cashflow_export::instrument_cashflows_json;
 pub(crate) use errors::actionable_unknown_pricer_message;
 pub use errors::{PricingError, PricingErrorContext, PricingResult};
 pub use json::{
-    canonical_instrument_json, canonical_instrument_json_from_str,
-    metric_value_from_instrument_json, parse_as_of_date, parse_boxed_instrument_json,
-    parse_instrument_json, parse_model_key, present_metric_values_from_instrument_json,
+    canonical_instrument_json, canonical_instrument_json_from_str, list_standard_metrics,
+    list_standard_metrics_grouped, metric_value_from_instrument_json, parse_as_of_date,
+    parse_boxed_instrument_json, parse_instrument_json, parse_model_key,
+    present_metric_values_from_instrument_json,
     present_standard_option_greeks_from_instrument_json, pretty_instrument_json,
     price_instrument_json, price_instrument_json_with_metrics,
     price_instrument_json_with_metrics_and_history, validate_instrument_json,

@@ -75,10 +75,6 @@ pub use equity_dependencies::{
     EquityDependencies, EquityInstrumentDeps, EquityInstrumentDepsBuilder,
 };
 pub use instrument::Instrument;
-pub(crate) use option_greeks::{
-    OptionDeltaProvider, OptionForeignRhoProvider, OptionGammaProvider, OptionRhoProvider,
-    OptionThetaProvider, OptionVannaProvider, OptionVegaProvider, OptionVolgaProvider,
-};
 pub use option_greeks::{OptionGreekKind, OptionGreeks, OptionGreeksProvider, OptionGreeksRequest};
 pub use pricing_options::{CurveIdVec, DynInstrument, PricingOptions};
 

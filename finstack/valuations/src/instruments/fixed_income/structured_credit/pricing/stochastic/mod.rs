@@ -20,6 +20,7 @@
 pub(crate) mod calibrations;
 pub(crate) mod correlation;
 pub(crate) mod default;
+#[cfg(test)]
 pub(crate) mod metrics;
 pub(crate) mod prepayment;
 pub(crate) mod pricer;
@@ -34,6 +35,7 @@ pub use correlation::CorrelationStructure;
 #[allow(unused_imports)]
 pub(crate) use default::{CopulaBasedDefault, IntensityProcessDefault, StochasticDefault};
 pub use default::{PoolGranularity, StochasticDefaultSpec};
+#[cfg(test)]
 #[allow(unused_imports)]
 pub(crate) use metrics::{
     CorrelationSensitivities, SensitivityConfig, StochasticMetrics, StochasticMetricsCalculator,
@@ -44,6 +46,7 @@ pub(crate) use prepayment::{FactorCorrelatedPrepay, RichardRollPrepay, Stochasti
 pub use pricer::{PricingMode, StochasticPricingResult, TranchePricingResult};
 #[allow(unused_imports)] // May be used by external bindings
 pub(crate) use pricer::{StochasticPricer, StochasticPricerConfig};
+#[cfg(test)]
 #[allow(unused_imports)]
 pub(crate) use tree::{
     BranchingSpec, ScenarioNode, ScenarioNodeId, ScenarioPath, ScenarioTree, ScenarioTreeConfig,

@@ -515,115 +515,53 @@ impl EquityOption {
     }
 }
 
-impl crate::instruments::common_impl::traits::OptionDeltaProvider for EquityOption {
+impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOption {
     fn option_delta(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks(market, as_of)?.delta)
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.greeks(market, as_of)?.delta))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOption {
-    fn option_greeks(
-        &self,
-        market: &finstack_core::market_data::context::MarketContext,
-        as_of: finstack_core::dates::Date,
-        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
-        use crate::instruments::common_impl::traits::{
-            OptionDeltaProvider, OptionGammaProvider, OptionGreekKind, OptionGreeks,
-            OptionRhoProvider, OptionThetaProvider, OptionVannaProvider, OptionVegaProvider,
-            OptionVolgaProvider,
-        };
-
-        match request.greek {
-            OptionGreekKind::Delta => Ok(OptionGreeks {
-                delta: Some(OptionDeltaProvider::option_delta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Gamma => Ok(OptionGreeks {
-                gamma: Some(OptionGammaProvider::option_gamma(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Vega => Ok(OptionGreeks {
-                vega: Some(OptionVegaProvider::option_vega(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Theta => Ok(OptionGreeks {
-                theta: Some(OptionThetaProvider::option_theta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Rho => Ok(OptionGreeks {
-                rho_bp: Some(OptionRhoProvider::option_rho_bp(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::ForeignRho => Ok(OptionGreeks::default()),
-            OptionGreekKind::Vanna => Ok(OptionGreeks {
-                vanna: Some(OptionVannaProvider::option_vanna(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Volga => Ok(OptionGreeks {
-                volga: Some(OptionVolgaProvider::option_volga(
-                    self,
-                    market,
-                    as_of,
-                    request.require_base_pv()?,
-                )?),
-                ..OptionGreeks::default()
-            }),
-        }
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionGammaProvider for EquityOption {
     fn option_gamma(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks(market, as_of)?.gamma)
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.greeks(market, as_of)?.gamma))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVegaProvider for EquityOption {
     fn option_vega(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks(market, as_of)?.vega)
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.greeks(market, as_of)?.vega))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionThetaProvider for EquityOption {
     fn option_theta(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks(market, as_of)?.theta)
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.greeks(market, as_of)?.theta))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionRhoProvider for EquityOption {
     fn option_rho_bp(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         // EquityOptionGreeks::rho is per 1% rate move; metrics expose per 1bp.
-        Ok(self.greeks(market, as_of)?.rho / 100.0)
+        Ok(Some(self.greeks(market, as_of)?.rho / 100.0))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVannaProvider for EquityOption {
     fn option_vanna(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         // Match the public metric test/reference conventions:
@@ -636,7 +574,7 @@ impl crate::instruments::common_impl::traits::OptionVannaProvider for EquityOpti
         };
         let spot_bump_abs = spot * crate::metrics::bump_sizes::SPOT;
         if spot_bump_abs <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let vol_bump_abs = crate::metrics::bump_sizes::VOLATILITY;
@@ -698,17 +636,15 @@ impl crate::instruments::common_impl::traits::OptionVannaProvider for EquityOpti
             .amount();
         let delta_dn = (pv_su - pv_sd) / (2.0 * spot_bump_abs);
 
-        Ok((delta_up - delta_dn) / (2.0 * vol_bump_abs))
+        Ok(Some((delta_up - delta_dn) / (2.0 * vol_bump_abs)))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVolgaProvider for EquityOption {
     fn option_volga(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
         base_pv: f64,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let vol_bump_abs = crate::metrics::bump_sizes::VOLATILITY;
@@ -726,7 +662,9 @@ impl crate::instruments::common_impl::traits::OptionVolgaProvider for EquityOpti
         let pv_up = self.value(&curves_vol_up, as_of)?.amount();
         let pv_dn = self.value(&curves_vol_dn, as_of)?.amount();
 
-        Ok((pv_up - 2.0 * base_pv + pv_dn) / (vol_bump_abs * vol_bump_abs))
+        Ok(Some(
+            (pv_up - 2.0 * base_pv + pv_dn) / (vol_bump_abs * vol_bump_abs),
+        ))
     }
 }
 

@@ -63,6 +63,7 @@ impl StructuredCreditAssumptionRegistry {
         )
     }
 
+    #[cfg(test)]
     pub(crate) fn default_recovery_rate(&self) -> f64 {
         self.credit_model_defaults.recovery_rate
     }

@@ -5,6 +5,7 @@ use crate::instruments::common_impl::pricing::time::{
     rate_period_on_dates, relative_df_discount_curve,
 };
 use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::rates::exotics_shared::cumulative_coupon::CouponEvent;
 use crate::instruments::rates::exotics_shared::hw1f_curve::{
     calibrate_hw1f_params, initial_short_rate_from_curve, Hw1fTermForward, PeriodForwardCoeffs,
 };
@@ -24,36 +25,12 @@ use finstack_monte_carlo::results::MoneyEstimate;
 use finstack_monte_carlo::seed;
 use finstack_monte_carlo::traits::{PathState, Payoff, StateKey};
 
-#[derive(Debug, Clone, Copy)]
-struct SnowballCouponEvent {
-    accrual_fraction: f64,
-    discount_factor: f64,
-    /// HW1F bond-reconstruction coefficients for the coupon's floating index.
-    ///
-    /// A snowball / inverse-floater coupon fixes **in advance**: the floating
-    /// rate `L` is set at the period start and applies over `[start, end]`. The
-    /// index is therefore the `[start, end]`-tenor simple forward (not the raw
-    /// instantaneous short rate), reconstructed via the affine HW1F bond formula
-    /// from the short rate sampled **at the period start** — which is when this
-    /// event fires.
-    forward_coeffs: PeriodForwardCoeffs,
-    /// Whether this coupon's fixing is sampled from a simulated short-rate path.
-    ///
-    /// `true` for a forward-starting coupon (period start strictly after
-    /// `as_of`): the simulation fires one `on_event` at the period start and
-    /// the payoff reads the short rate there. `false` for an already-seasoned
-    /// first coupon (period start at or before `as_of`): its fixing is the
-    /// deterministic `r(0) = f(0,0)` reconstruction, so `forward_coeffs`
-    /// degenerates to a flat rate and the event consumes no path sample.
-    needs_path_sample: bool,
-}
-
 /// Path-local snowball coupon accumulator.
 #[derive(Debug, Clone)]
 struct SnowballPayoff {
     spec: SnowballCouponSpec,
     notional: f64,
-    events: Vec<SnowballCouponEvent>,
+    events: Vec<CouponEvent>,
     discounted_pv: f64,
     next_event: usize,
     prev_coupon: f64,
@@ -70,7 +47,7 @@ struct SnowballCouponSpec {
 }
 
 impl SnowballPayoff {
-    fn new(spec: SnowballCouponSpec, notional: f64, events: Vec<SnowballCouponEvent>) -> Self {
+    fn new(spec: SnowballCouponSpec, notional: f64, events: Vec<CouponEvent>) -> Self {
         Self {
             spec,
             notional,
@@ -532,7 +509,7 @@ fn ensure_not_callable(inst: &Snowball) -> Result<()> {
     Ok(())
 }
 
-/// Build the per-coupon event schedule, one [`SnowballCouponEvent`] per coupon
+/// Build the per-coupon event schedule, one [`CouponEvent`] per coupon
 /// period surviving past `as_of`.
 ///
 /// Snowball / inverse-floater coupons fix **in advance**: the floating rate for
@@ -554,7 +531,7 @@ fn coupon_events(
     as_of: Date,
     term_forward: &Hw1fTermForward<'_>,
     r0: f64,
-) -> Result<Vec<SnowballCouponEvent>> {
+) -> Result<Vec<CouponEvent>> {
     let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
     let mut events = Vec::new();
     for period in inst.coupon_dates.windows(2) {
@@ -601,7 +578,7 @@ fn coupon_events(
             )
         };
 
-        events.push(SnowballCouponEvent {
+        events.push(CouponEvent {
             accrual_fraction,
             discount_factor,
             forward_coeffs,
@@ -641,7 +618,7 @@ fn event_times(inst: &Snowball, as_of: Date) -> Result<Vec<f64>> {
 fn deterministic_estimate(
     spec: SnowballCouponSpec,
     notional: Money,
-    events: &[SnowballCouponEvent],
+    events: &[CouponEvent],
     num_paths: usize,
 ) -> MoneyEstimate {
     let mut payoff = SnowballPayoff::new(spec, notional.amount(), events.to_vec());

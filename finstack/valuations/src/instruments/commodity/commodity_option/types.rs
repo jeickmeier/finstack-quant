@@ -683,8 +683,12 @@ impl Instrument for CommodityOption {
     }
 }
 
-impl crate::instruments::common_impl::traits::OptionDeltaProvider for CommodityOption {
-    fn option_delta(&self, market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
+impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommodityOption {
+    fn option_delta(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
         use finstack_core::math::special_functions::norm_cdf;
 
         let t = self
@@ -709,7 +713,7 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for CommodityO
                     }
                 }
             };
-            return Ok(intrinsic * self.quantity * self.multiplier);
+            return Ok(Some(intrinsic * self.quantity * self.multiplier));
         }
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
@@ -720,7 +724,7 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for CommodityO
             self.strike,
         )?;
         if sigma <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let forward = self.forward_price(market, as_of)?;
@@ -734,12 +738,14 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for CommodityO
             OptionType::Call => df * nd1,
             OptionType::Put => df * (nd1 - 1.0),
         };
-        Ok(delta_unit * self.quantity * self.multiplier)
+        Ok(Some(delta_unit * self.quantity * self.multiplier))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVegaProvider for CommodityOption {
-    fn option_vega(&self, market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
+    fn option_vega(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
         use finstack_core::math::special_functions::norm_pdf;
 
         let t = self
@@ -747,7 +753,7 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for CommodityOp
             .year_fraction(as_of, self.expiry, DayCountContext::default())?
             .max(0.0);
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
@@ -758,7 +764,7 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for CommodityOp
             self.strike,
         )?;
         if sigma <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let forward = self.forward_price(market, as_of)?;
@@ -767,12 +773,14 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for CommodityOp
         let d1 =
             crate::instruments::common_impl::models::d1_black76(forward, self.strike, sigma, t);
         let vega_abs = df * forward * norm_pdf(d1) * t.sqrt();
-        Ok(vega_abs * 0.01 * self.quantity * self.multiplier)
+        Ok(Some(vega_abs * 0.01 * self.quantity * self.multiplier))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionGammaProvider for CommodityOption {
-    fn option_gamma(&self, market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
+    fn option_gamma(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         #[derive(Debug)]
@@ -802,7 +810,7 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for CommodityO
         let forward_price = self.forward_price(market, as_of)?;
         let bump_size = forward_price * bump_pct;
         if bump_size <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let pv_base = self.value(market, as_of)?.amount();
@@ -855,12 +863,16 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for CommodityO
             }
         };
 
-        Ok((pv_up - 2.0 * pv_base + pv_down) / (bump_size * bump_size))
+        Ok(Some(
+            (pv_up - 2.0 * pv_base + pv_down) / (bump_size * bump_size),
+        ))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVannaProvider for CommodityOption {
-    fn option_vanna(&self, market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
+    fn option_vanna(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
         #[derive(Debug)]
         enum ForwardDriver {
             QuotedForward(f64),
@@ -890,7 +902,7 @@ impl crate::instruments::common_impl::traits::OptionVannaProvider for CommodityO
         let forward_price = self.forward_price(market, as_of)?;
         let fwd_bump_size = forward_price * fwd_bump_pct;
         if fwd_bump_size <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let pv_with_bumps = |fwd_bump_pct: f64, vol_bump: f64| -> finstack_core::Result<f64> {
@@ -944,17 +956,17 @@ impl crate::instruments::common_impl::traits::OptionVannaProvider for CommodityO
         let pv_dn_up = pv_with_bumps(-fwd_bump_pct, vol_bump)?;
         let pv_dn_dn = pv_with_bumps(-fwd_bump_pct, -vol_bump)?;
 
-        Ok((pv_up_up - pv_up_dn - pv_dn_up + pv_dn_dn) / (4.0 * fwd_bump_size * vol_bump))
+        Ok(Some(
+            (pv_up_up - pv_up_dn - pv_dn_up + pv_dn_dn) / (4.0 * fwd_bump_size * vol_bump),
+        ))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVolgaProvider for CommodityOption {
     fn option_volga(
         &self,
         market: &MarketContext,
         as_of: Date,
         base_pv: f64,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
@@ -970,50 +982,9 @@ impl crate::instruments::common_impl::traits::OptionVolgaProvider for CommodityO
         )?;
         let pv_up = self.value(&up, as_of)?.amount();
         let pv_dn = self.value(&dn, as_of)?.amount();
-        Ok((pv_up - 2.0 * base_pv + pv_dn) / (vol_bump * vol_bump))
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommodityOption {
-    fn option_greeks(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
-        use crate::instruments::common_impl::traits::{
-            OptionDeltaProvider, OptionGammaProvider, OptionGreekKind, OptionGreeks,
-            OptionVannaProvider, OptionVegaProvider, OptionVolgaProvider,
-        };
-
-        match request.greek {
-            OptionGreekKind::Delta => Ok(OptionGreeks {
-                delta: Some(OptionDeltaProvider::option_delta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Gamma => Ok(OptionGreeks {
-                gamma: Some(OptionGammaProvider::option_gamma(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Vega => Ok(OptionGreeks {
-                vega: Some(OptionVegaProvider::option_vega(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Vanna => Ok(OptionGreeks {
-                vanna: Some(OptionVannaProvider::option_vanna(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Volga => Ok(OptionGreeks {
-                volga: Some(OptionVolgaProvider::option_volga(
-                    self,
-                    market,
-                    as_of,
-                    request.require_base_pv()?,
-                )?),
-                ..OptionGreeks::default()
-            }),
-            _ => Ok(OptionGreeks::default()),
-        }
+        Ok(Some(
+            (pv_up - 2.0 * base_pv + pv_dn) / (vol_bump * vol_bump),
+        ))
     }
 }
 

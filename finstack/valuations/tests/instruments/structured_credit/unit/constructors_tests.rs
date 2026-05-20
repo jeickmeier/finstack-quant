@@ -3,14 +3,12 @@
 use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, Tenor};
 use finstack_core::money::Money;
-use finstack_valuations::instruments::fixed_income::structured_credit::config::constants::{
+use finstack_valuations::instruments::fixed_income::structured_credit::{
     abs_auto_standard_cdr, clo_standard_cdr, cmbs_standard_cdr, psa_ramp_months, psa_terminal_cpr,
-    rmbs_standard_cdr, sda_peak_cdr, sda_peak_month, sda_terminal_cdr,
+    rmbs_standard_cdr, sda_peak_cdr, sda_peak_month, sda_terminal_cdr, DealType, Pool, PoolAsset,
+    StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
 };
 use finstack_valuations::instruments::fixed_income::structured_credit::{cdr_to_mdr, cpr_to_smm};
-use finstack_valuations::instruments::fixed_income::structured_credit::{
-    DealType, Pool, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
-};
 use time::Month;
 
 const DECIMAL_TO_PERCENT: f64 = 100.0;

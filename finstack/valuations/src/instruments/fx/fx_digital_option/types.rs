@@ -212,92 +212,48 @@ impl crate::instruments::common_impl::traits::Instrument for FxDigitalOption {
     }
 }
 
-impl crate::instruments::common_impl::traits::OptionDeltaProvider for FxDigitalOption {
+impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigitalOption {
     fn option_delta(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks_internal(market, as_of)?.delta)
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.greeks_internal(market, as_of)?.delta))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionGammaProvider for FxDigitalOption {
     fn option_gamma(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks_internal(market, as_of)?.gamma)
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.greeks_internal(market, as_of)?.gamma))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVegaProvider for FxDigitalOption {
     fn option_vega(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks_internal(market, as_of)?.vega)
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.greeks_internal(market, as_of)?.vega))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionThetaProvider for FxDigitalOption {
     fn option_theta(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks_internal(market, as_of)?.theta)
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.greeks_internal(market, as_of)?.theta))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionRhoProvider for FxDigitalOption {
     fn option_rho_bp(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         // Rho domestic per 1bp
-        Ok(self.greeks_internal(market, as_of)?.rho_domestic / 100.0)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigitalOption {
-    fn option_greeks(
-        &self,
-        market: &finstack_core::market_data::context::MarketContext,
-        as_of: finstack_core::dates::Date,
-        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
-        use crate::instruments::common_impl::traits::{
-            OptionDeltaProvider, OptionGammaProvider, OptionGreekKind, OptionGreeks,
-            OptionRhoProvider, OptionThetaProvider, OptionVegaProvider,
-        };
-
-        match request.greek {
-            OptionGreekKind::Delta => Ok(OptionGreeks {
-                delta: Some(OptionDeltaProvider::option_delta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Gamma => Ok(OptionGreeks {
-                gamma: Some(OptionGammaProvider::option_gamma(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Vega => Ok(OptionGreeks {
-                vega: Some(OptionVegaProvider::option_vega(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Theta => Ok(OptionGreeks {
-                theta: Some(OptionThetaProvider::option_theta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Rho => Ok(OptionGreeks {
-                rho_bp: Some(OptionRhoProvider::option_rho_bp(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            _ => Ok(OptionGreeks::default()),
-        }
+        Ok(Some(
+            self.greeks_internal(market, as_of)?.rho_domestic / 100.0,
+        ))
     }
 }
 

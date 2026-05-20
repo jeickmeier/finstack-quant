@@ -142,6 +142,7 @@ status = "exists"
 attribution  = { python = "finstack.valuations",              status = "exists", note = "JSON-first helpers and the PnlAttribution wrapper are flattened onto finstack.valuations" }
 instruments  = { python = "finstack.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack.valuations.instruments; root aliases remain for compatibility" }
 fx           = { python = "finstack.valuations.fx",           status = "exists", note = "Direct FX instrument wrappers for Rust/WASM-supported FX instruments; no JSON-only workflow required" }
+exotics      = { python = "finstack.valuations.exotics",      status = "exists", note = "Python-only direct exotics wrappers; WASM exposes closed-form exotics helpers on the valuations facade instead of class wrappers" }
 calibration  = { python = "finstack.valuations",              status = "flattened", note = "calibrate, dry_run, validate_calibration_json, dependency_graph_json exported from finstack.valuations root" }
 correlation  = { python = "finstack.valuations.correlation",  status = "exists", note = "Former standalone finstack-correlation crate; nested under valuations" }
 credit       = { python = "finstack.valuations.credit",       status = "exists", note = "Structural credit models and PIK toggle helpers" }

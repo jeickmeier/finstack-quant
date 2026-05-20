@@ -3,7 +3,9 @@
 use crate::calibration::hull_white::HullWhiteParams;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::exotics_shared::cumulative_coupon::CumulativeCouponTracker;
+use crate::instruments::rates::exotics_shared::cumulative_coupon::{
+    CouponEvent, CumulativeCouponTracker,
+};
 use crate::instruments::rates::exotics_shared::hw1f_curve::{
     calibrate_hw1f_params, initial_short_rate_from_curve, Hw1fTermForward, PeriodForwardCoeffs,
 };
@@ -24,29 +26,6 @@ use finstack_monte_carlo::seed;
 use finstack_monte_carlo::traits::{PathState, Payoff, StateKey};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Copy)]
-struct TarnCouponEvent {
-    accrual_fraction: f64,
-    discount_factor: f64,
-    /// HW1F bond-reconstruction coefficients for the coupon's floating index.
-    ///
-    /// A TARN coupon fixes **in advance**: the floating rate `L` is set at the
-    /// period start and applies over `[start, end]`. The index is therefore the
-    /// `[start, end]`-tenor simple forward (not the raw instantaneous short
-    /// rate), reconstructed via the affine HW1F bond formula from the short rate
-    /// sampled **at the period start** — which is when this event fires.
-    forward_coeffs: PeriodForwardCoeffs,
-    /// Whether this coupon's fixing is sampled from a simulated short-rate path.
-    ///
-    /// `true` for a forward-starting coupon (period start strictly after
-    /// `as_of`): the simulation fires one `on_event` at the period start and
-    /// the payoff reads the short rate there. `false` for an already-seasoned
-    /// first coupon (period start at or before `as_of`): its fixing is the
-    /// deterministic `r(0) = f(0,0)` reconstruction, so `forward_coeffs`
-    /// degenerates to a flat rate and the event consumes no path sample.
-    needs_path_sample: bool,
-}
-
 /// Path-local TARN payoff accumulator.
 ///
 /// The immutable coupon-event schedule is shared across all simulated paths
@@ -57,7 +36,7 @@ struct TarnPayoff {
     fixed_rate: f64,
     coupon_floor: f64,
     notional: f64,
-    events: Arc<[TarnCouponEvent]>,
+    events: Arc<[CouponEvent]>,
     tracker: CumulativeCouponTracker,
     discounted_pv: f64,
     next_event: usize,
@@ -70,7 +49,7 @@ impl TarnPayoff {
         coupon_floor: f64,
         target_coupon: f64,
         notional: f64,
-        events: Arc<[TarnCouponEvent]>,
+        events: Arc<[CouponEvent]>,
     ) -> Self {
         Self {
             fixed_rate,
@@ -84,7 +63,7 @@ impl TarnPayoff {
         }
     }
 
-    fn add_redemption(&mut self, event: &TarnCouponEvent) {
+    fn add_redemption(&mut self, event: &CouponEvent) {
         if !self.redeemed {
             self.discounted_pv += self.notional * event.discount_factor;
             self.redeemed = true;
@@ -303,7 +282,7 @@ impl TarnPricer {
                     )));
                 }
                 event_times.push(fixing_time);
-                events.push(TarnCouponEvent {
+                events.push(CouponEvent {
                     accrual_fraction,
                     discount_factor,
                     forward_coeffs: term_forward.period_coeffs(fixing_time, accrual_fraction),
@@ -327,7 +306,7 @@ impl TarnPricer {
                 PeriodForwardCoeffs::from_flat_rate(seasoned_rate, accrual_fraction)
             };
 
-            events.push(TarnCouponEvent {
+            events.push(CouponEvent {
                 accrual_fraction,
                 discount_factor,
                 forward_coeffs,
@@ -397,11 +376,7 @@ impl Default for TarnPricer {
 /// The returned [`MoneyEstimate`] reports the exact PV with zero dispersion.
 /// `num_paths` mirrors what an MC run with this configuration would have
 /// reported, keeping the result shape consistent for callers.
-fn deterministic_estimate(
-    inst: &Tarn,
-    events: &[TarnCouponEvent],
-    num_paths: usize,
-) -> MoneyEstimate {
+fn deterministic_estimate(inst: &Tarn, events: &[CouponEvent], num_paths: usize) -> MoneyEstimate {
     let mut payoff = TarnPayoff::new(
         inst.fixed_rate,
         inst.coupon_floor,
@@ -645,13 +620,13 @@ mod tests {
         // coupons are path-fixed so each consumes one `on_event`.
         let coeffs = PeriodForwardCoeffs::from_flat_rate(0.01, 1.0);
         let events = vec![
-            TarnCouponEvent {
+            CouponEvent {
                 accrual_fraction: 1.0,
                 discount_factor: 1.0,
                 forward_coeffs: coeffs,
                 needs_path_sample: true,
             },
-            TarnCouponEvent {
+            CouponEvent {
                 accrual_fraction: 1.0,
                 discount_factor: 1.0,
                 forward_coeffs: coeffs,

@@ -292,12 +292,12 @@ impl crate::instruments::common_impl::traits::Instrument for FxTouchOption {
 // Touch options use finite-difference Greeks (barrier discontinuities make
 // analytical Greeks unreliable near the barrier).
 
-impl crate::instruments::common_impl::traits::OptionDeltaProvider for FxTouchOption {
+impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOption {
     fn option_delta(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let t = self.day_count.year_fraction(
@@ -306,7 +306,7 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for FxTouchOpt
             finstack_core::dates::DayCountContext::default(),
         )?;
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         // Use FX spot bump via FX matrix
@@ -324,7 +324,7 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for FxTouchOpt
             .rate;
         let bump_size = current_spot * crate::metrics::bump_sizes::SPOT;
         if bump_size <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         // Central-difference spot bump. Each scenario is a *fresh* `FxMatrix`
@@ -356,16 +356,14 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for FxTouchOpt
         let pv_up = self.value(&up_fx, as_of)?.amount();
         let pv_dn = self.value(&dn_fx, as_of)?.amount();
 
-        Ok((pv_up - pv_dn) / (2.0 * bump_size))
+        Ok(Some((pv_up - pv_dn) / (2.0 * bump_size)))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionGammaProvider for FxTouchOption {
     fn option_gamma(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let t = self.day_count.year_fraction(
@@ -374,7 +372,7 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for FxTouchOpt
             finstack_core::dates::DayCountContext::default(),
         )?;
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
@@ -393,7 +391,7 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for FxTouchOpt
             .rate;
         let bump_size = current_spot * crate::metrics::bump_sizes::SPOT;
         if bump_size <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         // See `option_delta` for why reusing the provider `Arc` is safe:
@@ -420,16 +418,16 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for FxTouchOpt
         let pv_up = self.value(&up_fx, as_of)?.amount();
         let pv_dn = self.value(&dn_fx, as_of)?.amount();
 
-        Ok((pv_up - 2.0 * base_pv + pv_dn) / (bump_size * bump_size))
+        Ok(Some(
+            (pv_up - 2.0 * base_pv + pv_dn) / (bump_size * bump_size),
+        ))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVegaProvider for FxTouchOption {
     fn option_vega(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let t = self.day_count.year_fraction(
@@ -438,7 +436,7 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for FxTouchOpti
             finstack_core::dates::DayCountContext::default(),
         )?;
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
@@ -448,16 +446,16 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for FxTouchOpti
             crate::metrics::bump_sizes::VOLATILITY,
         )?;
         let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok((pv_bumped - base_pv) / crate::metrics::bump_sizes::VOLATILITY)
+        Ok(Some(
+            (pv_bumped - base_pv) / crate::metrics::bump_sizes::VOLATILITY,
+        ))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionRhoProvider for FxTouchOption {
     fn option_rho_bp(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
 
         let t = self.day_count.year_fraction(
@@ -466,7 +464,7 @@ impl crate::instruments::common_impl::traits::OptionRhoProvider for FxTouchOptio
             finstack_core::dates::DayCountContext::default(),
         )?;
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let base_pv = self.value(market, as_of)?.amount();
@@ -477,41 +475,7 @@ impl crate::instruments::common_impl::traits::OptionRhoProvider for FxTouchOptio
             bump_bp,
         )?;
         let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok((pv_bumped - base_pv) / bump_bp)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOption {
-    fn option_greeks(
-        &self,
-        market: &finstack_core::market_data::context::MarketContext,
-        as_of: finstack_core::dates::Date,
-        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
-        use crate::instruments::common_impl::traits::{
-            OptionDeltaProvider, OptionGammaProvider, OptionGreekKind, OptionGreeks,
-            OptionRhoProvider, OptionVegaProvider,
-        };
-
-        match request.greek {
-            OptionGreekKind::Delta => Ok(OptionGreeks {
-                delta: Some(OptionDeltaProvider::option_delta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Gamma => Ok(OptionGreeks {
-                gamma: Some(OptionGammaProvider::option_gamma(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Vega => Ok(OptionGreeks {
-                vega: Some(OptionVegaProvider::option_vega(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Rho => Ok(OptionGreeks {
-                rho_bp: Some(OptionRhoProvider::option_rho_bp(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            _ => Ok(OptionGreeks::default()),
-        }
+        Ok(Some((pv_bumped - base_pv) / bump_bp))
     }
 }
 
@@ -579,7 +543,7 @@ mod tests {
     /// matrix-local explicit quote and `FxMatrix` never mutates the provider.
     #[test]
     fn touch_fd_greeks_do_not_corrupt_base_market_fx_spot() {
-        use crate::instruments::common_impl::traits::{Instrument, OptionGammaProvider};
+        use crate::instruments::common_impl::traits::{Instrument, OptionGreeksProvider};
         use finstack_core::currency::Currency;
         use finstack_core::dates::Date;
         use finstack_core::market_data::context::MarketContext;
@@ -645,7 +609,7 @@ mod tests {
             .rate;
 
         // Running the FD gamma exercises the bump-and-rebuild path.
-        let _gamma = OptionGammaProvider::option_gamma(&touch, &market, as_of).expect("gamma");
+        let _gamma = OptionGreeksProvider::option_gamma(&touch, &market, as_of).expect("gamma");
 
         let spot_after = market
             .fx()

@@ -1,18 +1,7 @@
 //! WASM bindings for factor-model sensitivities and risk decomposition.
 
 use crate::utils::to_js_err;
-use finstack_valuations::factor_model::FactorSensitivityEngine;
 use wasm_bindgen::prelude::*;
-
-/// Default number of scenario grid points for `computePnlProfiles` when the
-/// caller omits `n_scenario_points`.
-///
-/// `5` produces the symmetric shift grid `[-2, -1, 0, 1, 2]` (see
-/// [`finstack_valuations::factor_model::ScenarioGrid`]). The Python binding
-/// (`compute_pnl_profiles`) uses the same value via its own crate-local
-/// `DEFAULT_PNL_SCENARIO_POINTS`; the two are kept in sync by review because
-/// `finstack-py` and `finstack-wasm` are sibling crates with no shared module.
-const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
 
 /// Compute first-order factor sensitivities and return the matrix as JSON.
 ///
@@ -28,40 +17,20 @@ pub fn compute_factor_sensitivities(
     as_of: &str,
     bump_config_json: Option<String>,
 ) -> Result<String, JsValue> {
-    let parsed_positions = finstack_valuations::factor_model::parse_positions_json(positions_json)
-        .map_err(to_js_err)?;
-    let positions = finstack_valuations::factor_model::pricing_positions(&parsed_positions);
-
-    let factors: Vec<finstack_core::factor_model::FactorDefinition> =
-        serde_json::from_str(factors_json).map_err(to_js_err)?;
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    let date = finstack_valuations::pricer::parse_as_of_date(as_of).map_err(to_js_err)?;
-    let bump_config: finstack_core::factor_model::BumpSizeConfig = match bump_config_json {
-        Some(ref json) => serde_json::from_str(json).map_err(to_js_err)?,
-        None => finstack_core::factor_model::BumpSizeConfig::default(),
-    };
-
-    let engine = finstack_valuations::factor_model::DeltaBasedEngine::new(bump_config);
-    let matrix = engine
-        .compute_sensitivities(&positions, &factors, &market, date)
-        .map_err(to_js_err)?;
-
-    let result = serde_json::json!({
-        "position_ids": matrix.position_ids(),
-        "factor_ids": matrix.factor_ids().iter().map(|id| id.to_string()).collect::<Vec<_>>(),
-        "data": (0..matrix.n_positions())
-            .map(|pi| matrix.position_deltas(pi).to_vec())
-            .collect::<Vec<Vec<f64>>>(),
-    });
-    serde_json::to_string(&result).map_err(to_js_err)
+    finstack_valuations::factor_model::compute_factor_sensitivities_json(
+        positions_json,
+        factors_json,
+        market_json,
+        as_of,
+        bump_config_json.as_deref(),
+    )
+    .map_err(to_js_err)
 }
 
 /// Compute scenario P&L profiles via full repricing and return as JSON.
 ///
 /// Same position/factor/market inputs as `computeFactorSensitivities`, plus
-/// an optional `n_scenario_points` integer (default
-/// [`DEFAULT_PNL_SCENARIO_POINTS`]).
+/// an optional `n_scenario_points` integer.
 #[wasm_bindgen(js_name = computePnlProfiles)]
 pub fn compute_pnl_profiles(
     positions_json: &str,
@@ -71,39 +40,15 @@ pub fn compute_pnl_profiles(
     bump_config_json: Option<String>,
     n_scenario_points: Option<usize>,
 ) -> Result<String, JsValue> {
-    let n_points = n_scenario_points.unwrap_or(DEFAULT_PNL_SCENARIO_POINTS);
-    let parsed_positions = finstack_valuations::factor_model::parse_positions_json(positions_json)
-        .map_err(to_js_err)?;
-    let positions = finstack_valuations::factor_model::pricing_positions(&parsed_positions);
-
-    let factors: Vec<finstack_core::factor_model::FactorDefinition> =
-        serde_json::from_str(factors_json).map_err(to_js_err)?;
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    let date = finstack_valuations::pricer::parse_as_of_date(as_of).map_err(to_js_err)?;
-    let bump_config: finstack_core::factor_model::BumpSizeConfig = match bump_config_json {
-        Some(ref json) => serde_json::from_str(json).map_err(to_js_err)?,
-        None => finstack_core::factor_model::BumpSizeConfig::default(),
-    };
-
-    let engine =
-        finstack_valuations::factor_model::FullRepricingEngine::try_new(bump_config, n_points)
-            .map_err(to_js_err)?;
-    let profiles = engine
-        .compute_pnl_profiles(&positions, &factors, &market, date)
-        .map_err(to_js_err)?;
-
-    let result: Vec<serde_json::Value> = profiles
-        .iter()
-        .map(|p| {
-            serde_json::json!({
-                "factor_id": p.factor_id.to_string(),
-                "shifts": p.shifts,
-                "position_pnls": p.position_pnls,
-            })
-        })
-        .collect();
-    serde_json::to_string(&result).map_err(to_js_err)
+    finstack_valuations::factor_model::compute_pnl_profiles_json(
+        positions_json,
+        factors_json,
+        market_json,
+        as_of,
+        bump_config_json.as_deref(),
+        n_scenario_points,
+    )
+    .map_err(to_js_err)
 }
 
 /// Decompose portfolio risk into factor and position contributions.

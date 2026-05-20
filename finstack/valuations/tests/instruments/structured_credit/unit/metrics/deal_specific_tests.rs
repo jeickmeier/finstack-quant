@@ -13,12 +13,11 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::types::{Percentage, Rate};
-use finstack_valuations::instruments::fixed_income::structured_credit::config::constants::standard_psa_speeds;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AbsDelinquencyCalculator,
-    AbsExcessSpreadCalculator, AbsSpeedCalculator, CmbsDscrCalculator, DealType, Pool, PoolAsset,
-    RmbsFicoCalculator, RmbsLtvCalculator, RmbsWalCalculator, Seniority, StructuredCredit, Tranche,
-    TrancheCoupon, TrancheStructure,
+    standard_psa_speeds, AbsChargeOffCalculator, AbsCreditEnhancementCalculator,
+    AbsDelinquencyCalculator, AbsExcessSpreadCalculator, AbsSpeedCalculator, CmbsDscrCalculator,
+    DealType, Pool, PoolAsset, RmbsFicoCalculator, RmbsLtvCalculator, RmbsWalCalculator, Seniority,
+    StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
 };
 use finstack_valuations::metrics::{MetricCalculator, MetricContext};
 use std::sync::Arc;

@@ -174,6 +174,12 @@ impl TranchePricingResult {
         self
     }
 
+    /// Set credit duration.
+    pub fn with_credit_duration(mut self, duration: f64) -> Self {
+        self.credit_duration = duration;
+        self
+    }
+
     /// Get thickness (width of the tranche).
     pub fn thickness(&self) -> f64 {
         self.detachment - self.attachment

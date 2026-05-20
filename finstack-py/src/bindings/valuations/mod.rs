@@ -11,6 +11,7 @@ pub mod correlation;
 mod credit;
 mod credit_derivatives;
 mod credit_factor_model;
+mod direct_wrapper;
 mod exotic_rates;
 mod exotics;
 mod factor_model;

@@ -756,11 +756,13 @@ pub trait Instrument: CashflowProvider + Send + Sync {
                     available_models,
                 } => actionable_unknown_pricer_message(key, &available_models)
                     .map(finstack_core::Error::Validation)
-                    .unwrap_or_else(|| PricingError::UnknownPricer {
-                        key,
-                        available_models,
-                    }
-                    .into()),
+                    .unwrap_or_else(|| {
+                        PricingError::UnknownPricer {
+                            key,
+                            available_models,
+                        }
+                        .into()
+                    }),
                 other => other.into(),
             })
     }

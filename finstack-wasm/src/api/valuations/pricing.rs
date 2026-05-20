@@ -107,23 +107,14 @@ pub fn instrument_cashflows_json(
 ) -> Result<String, JsValue> {
     let market: finstack_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
-    finstack_valuations::instruments::cashflow_export::instrument_cashflows_json(
-        instrument_json,
-        &market,
-        as_of,
-        model,
-    )
-    .map_err(|e| to_js_error(&e))
+    finstack_valuations::pricer::instrument_cashflows_json(instrument_json, &market, as_of, model)
+        .map_err(|e| to_js_error(&e))
 }
 
 /// List all metric IDs in the standard metric registry.
 #[wasm_bindgen(js_name = listStandardMetrics)]
 pub fn list_standard_metrics() -> Result<JsValue, JsValue> {
-    let ids: Vec<String> = finstack_valuations::metrics::standard_registry()
-        .available_metrics()
-        .into_iter()
-        .map(|id| id.to_string())
-        .collect();
+    let ids = finstack_valuations::pricer::list_standard_metrics();
     serde_wasm_bindgen::to_value(&ids).map_err(to_js_err)
 }
 
@@ -134,17 +125,7 @@ pub fn list_standard_metrics() -> Result<JsValue, JsValue> {
 /// "Sensitivity") and the value is a sorted array of metric ID strings.
 #[wasm_bindgen(js_name = listStandardMetricsGrouped)]
 pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
-    let grouped: Vec<(String, Vec<String>)> = finstack_valuations::metrics::standard_registry()
-        .available_metrics_grouped()
-        .into_iter()
-        .map(|(group, metrics)| {
-            (
-                group.display_name().to_string(),
-                metrics.into_iter().map(|m| m.to_string()).collect(),
-            )
-        })
-        .collect();
-    let map: std::collections::BTreeMap<String, Vec<String>> = grouped.into_iter().collect();
+    let map = finstack_valuations::pricer::list_standard_metrics_grouped();
     serde_wasm_bindgen::to_value(&map).map_err(to_js_err)
 }
 
@@ -205,7 +186,7 @@ pub fn instrument_cashflows_with_market(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
-    finstack_valuations::instruments::cashflow_export::instrument_cashflows_json(
+    finstack_valuations::pricer::instrument_cashflows_json(
         instrument_json,
         market.inner(),
         as_of,

@@ -856,20 +856,24 @@ fn heston_pj_with_diagnostics(
             let exp_term = (-i * phi * log_strike).exp();
             (exp_term * psi / (i * phi)).re
         };
-        let integral = gauss_legendre_integrate_composite(
+        let (integral, integration_failed) = match gauss_legendre_integrate_composite(
             integrand,
             0.0,
             settings.u_max,
             settings.gl_order,
             settings.panels,
-        )
-        .unwrap_or(0.0);
+        ) {
+            Ok(v) => (v, false),
+            Err(_) => (0.0, true),
+        };
         let raw = 0.5 + integral / PI;
         return HestonPjDiagnostics {
             probability: raw.clamp(0.0, 1.0),
             raw_probability: raw,
             tail_estimate: f64::INFINITY,
-            corrupted: false,
+            // If the fallback integrator also failed, surface corruption so the
+            // caller falls back to Black-Scholes rather than silently using 0.5.
+            corrupted: integration_failed,
         };
     };
 

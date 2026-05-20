@@ -13,6 +13,7 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::Error;
 use serde_json::{Map, Value};
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 
 /// Standard option Greek metric IDs exposed by host-language option wrappers.
 pub const STANDARD_OPTION_GREEKS: &[&str] = &[
@@ -74,6 +75,32 @@ pub fn validate_instrument_json(json: &str) -> finstack_core::Result<String> {
     let parsed = parse_instrument_json(json)?;
     serde_json::to_string(&parsed)
         .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))
+}
+
+/// List all metric IDs in the standard metric registry.
+pub fn list_standard_metrics() -> Vec<String> {
+    crate::metrics::standard_registry()
+        .available_metrics()
+        .into_iter()
+        .map(|id| id.to_string())
+        .collect()
+}
+
+/// List all standard metrics grouped by display category.
+pub fn list_standard_metrics_grouped() -> BTreeMap<String, Vec<String>> {
+    crate::metrics::standard_registry()
+        .available_metrics_grouped()
+        .into_iter()
+        .map(|(group, metrics)| {
+            (
+                group.display_name().to_string(),
+                metrics
+                    .into_iter()
+                    .map(|metric| metric.to_string())
+                    .collect(),
+            )
+        })
+        .collect()
 }
 
 /// Parse tagged instrument JSON, optionally merge metric pricing overrides, and

@@ -29,10 +29,14 @@
 //! ```
 
 mod config;
+#[cfg(test)]
 mod node;
 #[allow(clippy::module_inception)]
+#[cfg(test)]
 mod tree;
 
 pub(crate) use config::{BranchingSpec, ScenarioTreeConfig};
+#[cfg(test)]
 pub(crate) use node::{ScenarioNode, ScenarioNodeId, ScenarioPath};
+#[cfg(test)]
 pub(crate) use tree::ScenarioTree;

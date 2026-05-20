@@ -42,7 +42,7 @@ pub struct SABRParameters {
 impl SABRParameters {
     /// Create new SABR parameters with validation.
     pub fn new(alpha: f64, beta: f64, nu: f64, rho: f64) -> Result<Self> {
-        let _ = InternalSabrParameters::new(alpha, beta, nu, rho)?;
+        InternalSabrParameters::new(alpha, beta, nu, rho)?;
         Ok(Self {
             alpha,
             beta,
@@ -54,7 +54,7 @@ impl SABRParameters {
 
     /// Create new SABR parameters with a shift for negative rates.
     pub fn new_with_shift(alpha: f64, beta: f64, nu: f64, rho: f64, shift: f64) -> Result<Self> {
-        let _ = InternalSabrParameters::new_with_shift(alpha, beta, nu, rho, shift)?;
+        InternalSabrParameters::new_with_shift(alpha, beta, nu, rho, shift)?;
         Ok(Self {
             alpha,
             beta,
@@ -66,7 +66,7 @@ impl SABRParameters {
 
     /// Create SABR parameters with equity market standard (beta=1.0).
     pub fn equity_standard(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
-        let _ = InternalSabrParameters::equity_standard(alpha, nu, rho)?;
+        InternalSabrParameters::equity_standard(alpha, nu, rho)?;
         Ok(Self {
             alpha,
             beta: 1.0,
@@ -78,7 +78,7 @@ impl SABRParameters {
 
     /// Create SABR parameters with interest rate market standard (beta=0.5).
     pub fn rates_standard(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
-        let _ = InternalSabrParameters::rates_standard(alpha, nu, rho)?;
+        InternalSabrParameters::rates_standard(alpha, nu, rho)?;
         Ok(Self {
             alpha,
             beta: 0.5,
@@ -90,7 +90,7 @@ impl SABRParameters {
 
     /// Create SABR parameters with normal model convention (beta=0.0).
     pub fn normal(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
-        let _ = InternalSabrParameters::normal(alpha, nu, rho)?;
+        InternalSabrParameters::normal(alpha, nu, rho)?;
         Ok(Self {
             alpha,
             beta: 0.0,
@@ -102,7 +102,7 @@ impl SABRParameters {
 
     /// Create SABR parameters with lognormal model convention (beta=1.0).
     pub fn lognormal(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
-        let _ = InternalSabrParameters::lognormal(alpha, nu, rho)?;
+        InternalSabrParameters::lognormal(alpha, nu, rho)?;
         Ok(Self {
             alpha,
             beta: 1.0,

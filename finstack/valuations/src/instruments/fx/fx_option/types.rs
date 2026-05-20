@@ -484,26 +484,17 @@ impl crate::instruments::common_impl::traits::Instrument for FxOption {
     }
 }
 
-impl crate::instruments::common_impl::traits::OptionDeltaProvider for FxOption {
-    fn option_delta(
-        &self,
-        market: &finstack_core::market_data::context::MarketContext,
-        as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks_internal(market, as_of)?.delta)
-    }
-}
-
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption {
+    // Override `option_greeks` to batch the 6 standard greeks via a single
+    // `greeks_internal` call; the metric layer's caching then makes follow-up
+    // greek requests free.
     fn option_greeks(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
         request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
     ) -> finstack_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
-        use crate::instruments::common_impl::traits::{
-            OptionGreekKind, OptionGreeks, OptionVannaProvider, OptionVolgaProvider,
-        };
+        use crate::instruments::common_impl::traits::{OptionGreekKind, OptionGreeks};
 
         match request.greek {
             OptionGreekKind::Delta
@@ -524,80 +515,21 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
                 })
             }
             OptionGreekKind::Vanna => Ok(OptionGreeks {
-                vanna: Some(OptionVannaProvider::option_vanna(self, market, as_of)?),
+                vanna: self.option_vanna(market, as_of)?,
                 ..OptionGreeks::default()
             }),
             OptionGreekKind::Volga => Ok(OptionGreeks {
-                volga: Some(OptionVolgaProvider::option_volga(
-                    self,
-                    market,
-                    as_of,
-                    request.require_base_pv()?,
-                )?),
+                volga: self.option_volga(market, as_of, request.require_base_pv()?)?,
                 ..OptionGreeks::default()
             }),
         }
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionGammaProvider for FxOption {
-    fn option_gamma(
-        &self,
-        market: &finstack_core::market_data::context::MarketContext,
-        as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks_internal(market, as_of)?.gamma)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionVegaProvider for FxOption {
-    fn option_vega(
-        &self,
-        market: &finstack_core::market_data::context::MarketContext,
-        as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks_internal(market, as_of)?.vega)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionThetaProvider for FxOption {
-    fn option_theta(
-        &self,
-        market: &finstack_core::market_data::context::MarketContext,
-        as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        Ok(self.greeks_internal(market, as_of)?.theta)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionRhoProvider for FxOption {
-    fn option_rho_bp(
-        &self,
-        market: &finstack_core::market_data::context::MarketContext,
-        as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        // FxOptionGreeks::rho_domestic is per 1% rate move; metrics expose per 1bp.
-        Ok(self.greeks_internal(market, as_of)?.rho_domestic / 100.0)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionForeignRhoProvider for FxOption {
-    fn option_foreign_rho_bp(
-        &self,
-        market: &finstack_core::market_data::context::MarketContext,
-        as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
-        // FxOptionGreeks::rho_foreign is per 1% rate move; metrics expose per 1bp.
-        Ok(self.greeks_internal(market, as_of)?.rho_foreign / 100.0)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionVannaProvider for FxOption {
     fn option_vanna(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         let t = self
             .day_count
             .year_fraction(
@@ -607,7 +539,7 @@ impl crate::instruments::common_impl::traits::OptionVannaProvider for FxOption {
             )?
             .max(0.0);
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         // Match the existing FX option vanna/volga metric conventions (tests rely on this):
@@ -616,7 +548,7 @@ impl crate::instruments::common_impl::traits::OptionVannaProvider for FxOption {
         let surf = market.get_surface(self.vol_surface_id.as_str())?;
         let sigma = surf.value_clamped(t, self.strike);
         if sigma <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let vol_bump_pct: f64 = 0.01;
@@ -634,17 +566,15 @@ impl crate::instruments::common_impl::traits::OptionVannaProvider for FxOption {
         let delta_up = self.greeks_internal(&curves_up, as_of)?.delta;
         let delta_dn = self.greeks_internal(&curves_dn, as_of)?.delta;
 
-        Ok((delta_up - delta_dn) / (2.0 * delta_sigma))
+        Ok(Some((delta_up - delta_dn) / (2.0 * delta_sigma)))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionVolgaProvider for FxOption {
     fn option_volga(
         &self,
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
         _base_pv: f64,
-    ) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         let t = self
             .day_count
             .year_fraction(
@@ -654,13 +584,13 @@ impl crate::instruments::common_impl::traits::OptionVolgaProvider for FxOption {
             )?
             .max(0.0);
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let surf = market.get_surface(self.vol_surface_id.as_str())?;
         let sigma = surf.value_clamped(t, self.strike);
         if sigma <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let vol_bump_pct: f64 = 0.01;
@@ -682,7 +612,7 @@ impl crate::instruments::common_impl::traits::OptionVolgaProvider for FxOption {
         // closed_form::greeks::bs_vega which also scales by 0.01).
         let vega_up = self.greeks_internal(&curves_up, as_of)?.vega;
         let vega_dn = self.greeks_internal(&curves_dn, as_of)?.vega;
-        Ok((vega_up - vega_dn) / (2.0 * delta_sigma) * 0.01)
+        Ok(Some((vega_up - vega_dn) / (2.0 * delta_sigma) * 0.01))
     }
 }
 

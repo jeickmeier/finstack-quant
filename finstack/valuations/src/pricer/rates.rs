@@ -21,17 +21,17 @@ pub fn register_rates_pricers(registry: &mut PricerRegistry) {
     registry.register(
         InstrumentType::Bond,
         ModelKey::HazardRate,
-        crate::instruments::fixed_income::bond::pricing::pricer::SimpleBondHazardPricer,
+        crate::instruments::fixed_income::bond::pricing::engine::SimpleBondHazardPricer,
     );
     registry.register(
         InstrumentType::Bond,
         ModelKey::Tree,
-        crate::instruments::fixed_income::bond::pricing::pricer::SimpleBondOasPricer,
+        crate::instruments::fixed_income::bond::pricing::engine::SimpleBondOasPricer,
     );
     registry.register(
         InstrumentType::Bond,
         ModelKey::MertonMc,
-        crate::instruments::fixed_income::bond::pricing::pricer::SimpleBondMertonMcPricer,
+        crate::instruments::fixed_income::bond::pricing::engine::SimpleBondMertonMcPricer,
     );
 
     // Interest Rate Swaps

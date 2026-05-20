@@ -376,8 +376,12 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
     }
 }
 
-impl crate::instruments::common_impl::traits::OptionDeltaProvider for CommoditySwaption {
-    fn option_delta(&self, market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
+impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommoditySwaption {
+    fn option_delta(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
         use finstack_core::math::special_functions::norm_cdf;
 
         let t = self
@@ -405,7 +409,7 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for CommodityS
                     }
                 }
             };
-            return Ok(intrinsic * annuity * self.notional);
+            return Ok(Some(intrinsic * annuity * self.notional));
         }
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
@@ -416,7 +420,7 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for CommodityS
             self.fixed_price,
         )?;
         if sigma <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let d1 = crate::instruments::common_impl::models::d1_black76(
@@ -431,12 +435,14 @@ impl crate::instruments::common_impl::traits::OptionDeltaProvider for CommodityS
             OptionType::Call => annuity * nd1,
             OptionType::Put => annuity * (nd1 - 1.0),
         };
-        Ok(delta_unit * self.notional)
+        Ok(Some(delta_unit * self.notional))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionGammaProvider for CommoditySwaption {
-    fn option_gamma(&self, market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
+    fn option_gamma(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
         use finstack_core::market_data::bumps::{
             BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
@@ -446,7 +452,7 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for CommodityS
         let forward_price = self.forward_swap_rate(market, as_of)?;
         let bump_size = forward_price * bump_pct;
         if bump_size <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let pv_base = self.value(market, as_of)?.amount();
@@ -474,42 +480,16 @@ impl crate::instruments::common_impl::traits::OptionGammaProvider for CommodityS
         }])?;
         let pv_down = self.value(&down, as_of)?.amount();
 
-        Ok((pv_up - 2.0 * pv_base + pv_down) / (bump_size * bump_size))
+        Ok(Some(
+            (pv_up - 2.0 * pv_base + pv_down) / (bump_size * bump_size),
+        ))
     }
-}
 
-impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommoditySwaption {
-    fn option_greeks(
+    fn option_vega(
         &self,
         market: &MarketContext,
         as_of: Date,
-        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
-        use crate::instruments::common_impl::traits::{
-            OptionDeltaProvider, OptionGammaProvider, OptionGreekKind, OptionGreeks,
-            OptionVegaProvider,
-        };
-
-        match request.greek {
-            OptionGreekKind::Delta => Ok(OptionGreeks {
-                delta: Some(OptionDeltaProvider::option_delta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Gamma => Ok(OptionGreeks {
-                gamma: Some(OptionGammaProvider::option_gamma(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Vega => Ok(OptionGreeks {
-                vega: Some(OptionVegaProvider::option_vega(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            _ => Ok(OptionGreeks::default()),
-        }
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionVegaProvider for CommoditySwaption {
-    fn option_vega(&self, market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
+    ) -> finstack_core::Result<Option<f64>> {
         use finstack_core::math::special_functions::norm_pdf;
 
         let t = self
@@ -517,7 +497,7 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for CommoditySw
             .year_fraction(as_of, self.expiry, DayCountContext::default())?
             .max(0.0);
         if t <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
@@ -528,7 +508,7 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for CommoditySw
             self.fixed_price,
         )?;
         if sigma <= 0.0 {
-            return Ok(0.0);
+            return Ok(Some(0.0));
         }
 
         let forward = self.forward_swap_rate(market, as_of)?;
@@ -541,7 +521,7 @@ impl crate::instruments::common_impl::traits::OptionVegaProvider for CommoditySw
         );
         // Vega = annuity * F * N'(d1) * sqrt(T) * 0.01 (per vol point)
         let vega_abs = annuity * forward * norm_pdf(d1) * t.sqrt();
-        Ok(vega_abs * 0.01 * self.notional)
+        Ok(Some(vega_abs * 0.01 * self.notional))
     }
 }
 

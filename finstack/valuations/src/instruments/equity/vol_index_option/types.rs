@@ -461,40 +461,21 @@ impl VolatilityIndexOption {
 // Option risk metric providers (metrics adapters)
 // ================================================================================================
 
-impl crate::instruments::common_impl::traits::OptionDeltaProvider for VolatilityIndexOption {
-    fn option_delta(&self, market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
-        self.delta(market, as_of)
-    }
-}
-
-impl crate::instruments::common_impl::traits::OptionVegaProvider for VolatilityIndexOption {
-    fn option_vega(&self, market: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
-        self.vega(market, as_of)
-    }
-}
-
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for VolatilityIndexOption {
-    fn option_greeks(
+    fn option_delta(
         &self,
         market: &MarketContext,
         as_of: Date,
-        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
-    ) -> finstack_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
-        use crate::instruments::common_impl::traits::{
-            OptionDeltaProvider, OptionGreekKind, OptionGreeks, OptionVegaProvider,
-        };
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.delta(market, as_of)?))
+    }
 
-        match request.greek {
-            OptionGreekKind::Delta => Ok(OptionGreeks {
-                delta: Some(OptionDeltaProvider::option_delta(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            OptionGreekKind::Vega => Ok(OptionGreeks {
-                vega: Some(OptionVegaProvider::option_vega(self, market, as_of)?),
-                ..OptionGreeks::default()
-            }),
-            _ => Ok(OptionGreeks::default()),
-        }
+    fn option_vega(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(Some(self.vega(market, as_of)?))
     }
 }
 

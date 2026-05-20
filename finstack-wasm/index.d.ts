@@ -1219,6 +1219,15 @@ export interface ValuationCreditNamespace {
     meanRecovery: number
   ): string;
   mertonDefaultProbability(modelJson: string, horizon: number): number;
+  mertonDistanceToDefault(modelJson: string, horizon: number): number;
+  mertonImpliedSpread(modelJson: string, horizon: number, recovery: number): number;
+  dynamicRecoveryAtNotional(specJson: string, notional: number): number;
+  endogenousHazardAtLeverage(specJson: string, leverage: number): number;
+  endogenousHazardAfterPikAccrual(
+    specJson: string,
+    accretedNotional: number,
+    assetValue: number
+  ): number;
   dynamicRecoveryConstantJson(recovery: number): string;
   endogenousHazardPowerLawJson(baseHazard: number, baseLeverage: number, exponent: number): string;
   creditStateJson(
