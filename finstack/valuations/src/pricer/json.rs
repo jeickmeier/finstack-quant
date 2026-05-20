@@ -261,6 +261,28 @@ pub fn present_standard_option_greeks_from_instrument_json(
     )
 }
 
+/// Best-effort extraction of `spec.id` from a tagged instrument JSON payload.
+///
+/// Used purely to enrich error messages so an analyst running a batch can
+/// identify the offending row. Returns `None` when the JSON is malformed or
+/// the `id` field is absent — callers must not depend on the id being present.
+fn extract_spec_id_lossy(instrument_json: &str) -> Option<String> {
+    let value: Value = serde_json::from_str(instrument_json).ok()?;
+    value
+        .get("spec")?
+        .get("id")?
+        .as_str()
+        .map(ToString::to_string)
+}
+
+/// Suffix `[instrument=<id>]` to an error message when an id is known.
+fn with_id_suffix(message: String, id: Option<&str>) -> String {
+    match id {
+        Some(id) => format!("{message} [instrument={id}]"),
+        None => message,
+    }
+}
+
 fn instrument_json_for_pricing<'a>(
     instrument_json: &'a str,
     pricing_options: Option<&str>,
@@ -269,31 +291,55 @@ fn instrument_json_for_pricing<'a>(
         return Ok(Cow::Borrowed(instrument_json));
     };
 
+    let instrument_id = extract_spec_id_lossy(instrument_json);
+    let id = instrument_id.as_deref();
+
     let pricing_options: MetricPricingOverrides = serde_json::from_str(pricing_options_json)
-        .map_err(|e| Error::Validation(format!("invalid pricing options JSON: {e}")))?;
-    let mut document: Value = serde_json::from_str(instrument_json)
-        .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))?;
-    let pricing_patch = serde_json::to_value(&pricing_options)
-        .map_err(|e| Error::Validation(format!("invalid pricing options JSON: {e}")))?;
+        .map_err(|e| {
+            Error::Validation(with_id_suffix(
+                format!("invalid pricing options JSON: {e}"),
+                id,
+            ))
+        })?;
+    let mut document: Value = serde_json::from_str(instrument_json).map_err(|e| {
+        Error::Validation(with_id_suffix(format!("invalid instrument JSON: {e}"), id))
+    })?;
+    let pricing_patch = serde_json::to_value(&pricing_options).map_err(|e| {
+        Error::Validation(with_id_suffix(
+            format!("invalid pricing options JSON: {e}"),
+            id,
+        ))
+    })?;
 
     let patch = pricing_patch.as_object().cloned().ok_or_else(|| {
-        Error::Validation("metric pricing overrides must serialize to an object".to_string())
+        Error::Validation(with_id_suffix(
+            "metric pricing overrides must serialize to an object".to_string(),
+            id,
+        ))
     })?;
     let spec = document
         .get_mut("spec")
         .and_then(Value::as_object_mut)
-        .ok_or_else(|| Error::Validation("instrument JSON must contain an object spec".into()))?;
+        .ok_or_else(|| {
+            Error::Validation(with_id_suffix(
+                "instrument JSON must contain an object spec".into(),
+                id,
+            ))
+        })?;
     let pricing_overrides = spec
         .entry("pricing_overrides".to_string())
         .or_insert_with(|| Value::Object(Map::new()));
     let pricing_overrides = pricing_overrides.as_object_mut().ok_or_else(|| {
-        Error::Validation("instrument spec.pricing_overrides must be an object".to_string())
+        Error::Validation(with_id_suffix(
+            "instrument spec.pricing_overrides must be an object".to_string(),
+            id,
+        ))
     })?;
     pricing_overrides.extend(patch);
 
     serde_json::to_string(&document)
         .map(Cow::Owned)
-        .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))
+        .map_err(|e| Error::Validation(with_id_suffix(format!("invalid instrument JSON: {e}"), id)))
 }
 
 #[cfg(test)]
@@ -390,6 +436,37 @@ mod tests {
         assert!(err
             .to_string()
             .contains("expected instrument type `fx_forward`, got `fx_spot`"));
+    }
+
+    #[test]
+    fn instrument_json_for_pricing_error_includes_instrument_id() {
+        // Malformed pricing options on a well-formed instrument JSON.
+        let json = bond_instrument_json();
+        let err = instrument_json_for_pricing(&json, Some("not-valid-json"))
+            .expect_err("malformed pricing options must error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("invalid pricing options JSON"),
+            "expected pricing options error, got: {msg}"
+        );
+        assert!(
+            msg.contains("[instrument=TEST-BOND]"),
+            "expected instrument id suffix, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn instrument_json_for_pricing_error_without_id_when_json_unparseable() {
+        // Instrument JSON itself is malformed, so id cannot be extracted; the
+        // error message should still be useful but without an [instrument=...]
+        // suffix.
+        let err = instrument_json_for_pricing("{not-json", Some("{}"))
+            .expect_err("malformed instrument JSON must error");
+        let msg = err.to_string();
+        assert!(
+            !msg.contains("[instrument="),
+            "no id should be attached when JSON is unparseable, got: {msg}"
+        );
     }
 
     #[test]

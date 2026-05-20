@@ -119,8 +119,25 @@ impl std::fmt::Display for PricingErrorContext {
 #[non_exhaustive]
 pub enum PricingError {
     /// No pricer registered for the requested (instrument, model) combination.
-    #[error("No pricer found for instrument={} model={}", .0.instrument, .0.model)]
-    UnknownPricer(PricerKey),
+    ///
+    /// `available_models` lists every model that IS registered for the
+    /// requested instrument type, so analysts can recover from the typo or
+    /// the missing feature-flag without re-reading registration source.
+    /// Empty when the instrument type has no pricers at all (e.g. unknown
+    /// instrument or a registry built without standard pricers).
+    #[error(
+        "No pricer found for instrument={} model={}{}",
+        .key.instrument,
+        .key.model,
+        format_available_models(.available_models),
+    )]
+    UnknownPricer {
+        /// The (instrument, model) pair that had no registered pricer.
+        key: PricerKey,
+        /// Models registered for `key.instrument` in the registry that produced
+        /// this error. Empty if no pricers exist for the instrument type.
+        available_models: Vec<ModelKey>,
+    },
 
     /// Instrument type mismatch during downcasting.
     #[error("Type mismatch: expected {expected}, got {got}")]
@@ -166,6 +183,23 @@ pub enum PricingError {
     },
 }
 
+/// Helper to format the list of available models on an `UnknownPricer` error.
+///
+/// Returns an empty string when no models are registered, otherwise a
+/// `". Available models for this instrument: ..."` suffix that piggy-backs
+/// on the base error message.
+fn format_available_models(models: &[ModelKey]) -> String {
+    if models.is_empty() {
+        String::new()
+    } else {
+        let names: Vec<String> = models.iter().map(ModelKey::to_string).collect();
+        format!(
+            ". Available models for this instrument: {}",
+            names.join(", ")
+        )
+    }
+}
+
 /// Helper to format context for error display.
 fn format_context(ctx: &PricingErrorContext) -> String {
     let display = ctx.to_string();
@@ -177,25 +211,33 @@ fn format_context(ctx: &PricingErrorContext) -> String {
 }
 
 /// Provide a more actionable error for MC-gated pricers in non-MC builds.
-pub(crate) fn actionable_unknown_pricer_message(key: PricerKey) -> Option<String> {
-    {
-        if key.model.requires_mc_feature() {
-            let extra_hint = match (key.instrument, key.model) {
-                (InstrumentType::BarrierOption, ModelKey::MonteCarloGBM)
-                | (InstrumentType::LookbackOption, ModelKey::MonteCarloGBM)
-                | (InstrumentType::FxBarrierOption, ModelKey::MonteCarloGBM) => {
-                    " Rebuild with feature `mc` or switch the instrument back to its continuous-monitoring configuration."
-                }
-                (InstrumentType::BermudanSwaption, ModelKey::MonteCarloHullWhite1F) => {
-                    " Rebuild with feature `mc` or select a non-LSMC pricing model."
-                }
-                _ => " Rebuild with feature `mc` to enable this pricing model.",
-            };
-            return Some(format!(
-                "No pricer found for instrument={} model={}.{}",
-                key.instrument, key.model, extra_hint
-            ));
-        }
+///
+/// `available_models` is appended to the message so analysts see which models
+/// they could use as fallbacks. Pass an empty slice when no registry context
+/// is available.
+pub(crate) fn actionable_unknown_pricer_message(
+    key: PricerKey,
+    available_models: &[ModelKey],
+) -> Option<String> {
+    if key.model.requires_mc_feature() {
+        let extra_hint = match (key.instrument, key.model) {
+            (InstrumentType::BarrierOption, ModelKey::MonteCarloGBM)
+            | (InstrumentType::LookbackOption, ModelKey::MonteCarloGBM)
+            | (InstrumentType::FxBarrierOption, ModelKey::MonteCarloGBM) => {
+                " Rebuild with feature `mc` or switch the instrument back to its continuous-monitoring configuration."
+            }
+            (InstrumentType::BermudanSwaption, ModelKey::MonteCarloHullWhite1F) => {
+                " Rebuild with feature `mc` or select a non-LSMC pricing model."
+            }
+            _ => " Rebuild with feature `mc` to enable this pricing model.",
+        };
+        return Some(format!(
+            "No pricer found for instrument={} model={}.{}{}",
+            key.instrument,
+            key.model,
+            extra_hint,
+            format_available_models(available_models),
+        ));
     }
 
     None
@@ -218,7 +260,7 @@ pub(crate) fn actionable_unknown_pricer_message(key: PricerKey) -> Option<String
 impl From<PricingError> for finstack_core::Error {
     fn from(err: PricingError) -> Self {
         match err {
-            PricingError::UnknownPricer(key) => {
+            PricingError::UnknownPricer { key, .. } => {
                 let pricer_id = format!("pricer:{}:{:?}", key.instrument, key.model);
                 finstack_core::InputError::NotFound { id: pricer_id }.into()
             }
@@ -395,9 +437,11 @@ mod tests {
         }
 
         // UnknownPricer -> InputError::NotFound
-        let unknown_pricer: finstack_core::Error =
-            PricingError::UnknownPricer(PricerKey::new(InstrumentType::Bond, ModelKey::Tree))
-                .into();
+        let unknown_pricer: finstack_core::Error = PricingError::UnknownPricer {
+            key: PricerKey::new(InstrumentType::Bond, ModelKey::Tree),
+            available_models: Vec::new(),
+        }
+        .into();
         match unknown_pricer {
             finstack_core::Error::Input(finstack_core::InputError::NotFound { id }) => {
                 assert_eq!(id, "pricer:bond:Tree")

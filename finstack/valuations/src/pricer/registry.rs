@@ -194,6 +194,19 @@ impl PricerRegistry {
         self.pricers.get(&key).map(|p| p.as_ref())
     }
 
+    /// Return every [`ModelKey`] registered for the given instrument type.
+    ///
+    /// Used by error paths to suggest fallback models when a requested
+    /// `(instrument, model)` pair has no pricer. Order is deterministic
+    /// because the registry stores pricers in a [`std::collections::BTreeMap`].
+    pub fn available_models_for_instrument(&self, instrument: InstrumentType) -> Vec<ModelKey> {
+        self.pricers
+            .keys()
+            .filter(|k| k.instrument == instrument)
+            .map(|k| k.model)
+            .collect()
+    }
+
     /// Price an instrument and compute requested metrics through the registered pricer.
     ///
     /// This is the single registry-level pricing entry point. Pass an empty
@@ -305,7 +318,10 @@ impl PricerRegistry {
         // --- Base PV through the registered pricer ---
         let key = PricerKey::new(instrument.key(), model);
         let Some(pricer) = self.get_pricer(key) else {
-            return Err(PricingError::UnknownPricer(key));
+            return Err(PricingError::UnknownPricer {
+                key,
+                available_models: self.available_models_for_instrument(key.instrument),
+            });
         };
         tracing::debug!(
             instrument_id = %instrument.id(),
@@ -450,7 +466,10 @@ impl PricerRegistry {
     ) -> PricingResult<f64> {
         let key = PricerKey::new(instrument.key(), model);
         let Some(pricer) = self.get_pricer(key) else {
-            return Err(PricingError::UnknownPricer(key));
+            return Err(PricingError::UnknownPricer {
+                key,
+                available_models: self.available_models_for_instrument(key.instrument),
+            });
         };
         pricer.price_raw_dyn(instrument, market, as_of)
     }

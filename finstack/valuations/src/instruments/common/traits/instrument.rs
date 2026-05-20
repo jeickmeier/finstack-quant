@@ -751,9 +751,16 @@ pub trait Instrument: CashflowProvider + Send + Sync {
                 registry_options,
             )
             .map_err(|e| match e {
-                PricingError::UnknownPricer(key) => actionable_unknown_pricer_message(key)
+                PricingError::UnknownPricer {
+                    key,
+                    available_models,
+                } => actionable_unknown_pricer_message(key, &available_models)
                     .map(finstack_core::Error::Validation)
-                    .unwrap_or_else(|| PricingError::UnknownPricer(key).into()),
+                    .unwrap_or_else(|| PricingError::UnknownPricer {
+                        key,
+                        available_models,
+                    }
+                    .into()),
                 other => other.into(),
             })
     }

@@ -435,11 +435,25 @@ fn test_pricer_key_equality() {
 #[test]
 fn test_pricing_error_display() {
     let key = PricerKey::new(InstrumentType::Bond, ModelKey::HazardRate);
-    let err = PricingError::UnknownPricer(key);
+    let err = PricingError::UnknownPricer {
+        key,
+        available_models: Vec::new(),
+    };
     let msg = err.to_string();
     assert!(msg.contains("No pricer found"));
     assert!(msg.contains("bond"));
     assert!(msg.contains("hazard_rate"));
+
+    // With available models, the message should list them so an analyst can
+    // pick a working alternative without consulting the source.
+    let err_with_models = PricingError::UnknownPricer {
+        key,
+        available_models: vec![ModelKey::Discounting, ModelKey::Tree],
+    };
+    let msg_with_models = err_with_models.to_string();
+    assert!(msg_with_models.contains("Available models"));
+    assert!(msg_with_models.contains("discounting"));
+    assert!(msg_with_models.contains("tree"));
 
     let err2 = PricingError::TypeMismatch {
         expected: InstrumentType::Bond,
@@ -507,9 +521,14 @@ fn test_registry_price_with_unknown_pricer() {
 
     assert!(result.is_err());
     match result.unwrap_err() {
-        PricingError::UnknownPricer(key) => {
+        PricingError::UnknownPricer {
+            key,
+            available_models,
+        } => {
             assert_eq!(key.instrument, InstrumentType::Bond);
             assert_eq!(key.model, ModelKey::HazardRate);
+            // Empty registry has no models for any instrument.
+            assert!(available_models.is_empty());
         }
         _ => panic!("Expected UnknownPricer error"),
     }
