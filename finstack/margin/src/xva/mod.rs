@@ -50,11 +50,7 @@
 //! # Quick Start
 //!
 //! ```rust,no_run
-//! use finstack_margin::xva::{
-//!     types::{XvaConfig, XvaNettingSet, FundingConfig},
-//!     exposure::compute_exposure_profile,
-//!     cva::{compute_cva, compute_dva, compute_fva, compute_bilateral_xva},
-//! };
+//! use finstack_margin::xva::types::{FundingConfig, XvaConfig, XvaNettingSet};
 //! use std::sync::Arc;
 //! # use finstack_core::market_data::context::MarketContext;
 //!
@@ -117,14 +113,16 @@
 //! - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
 
 /// CVA, DVA, FVA, and bilateral-XVA integration formulas.
-pub mod cva;
+#[cfg(test)]
+pub(crate) mod cva;
 /// Deterministic and stochastic exposure engines.
-pub mod exposure;
+#[cfg(test)]
+pub(crate) mod exposure;
 /// Netting and collateral-reduction helpers.
-pub mod netting;
+#[cfg(test)]
+pub(crate) mod netting;
 /// Minimal trait surface for XVA-compatible instruments.
+#[cfg(test)]
 pub mod traits;
 /// Shared XVA configuration and result container types.
 pub mod types;
-
-pub use traits::Valuable;

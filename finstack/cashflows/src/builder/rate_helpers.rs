@@ -65,7 +65,7 @@ pub struct FloatingRateParams {
 
 /// Runtime-resolved fallback policy for floating-rate projection.
 #[derive(Debug, Clone, PartialEq)]
-pub enum ResolvedFloatingRateFallback {
+pub(crate) enum ResolvedFloatingRateFallback {
     /// Propagate the original error.
     Error,
     /// Use the spread-only fallback implied by the projection params.
@@ -88,7 +88,7 @@ impl ResolvedFloatingRateFallback {
 
 /// Validated runtime floating-rate configuration used by coupon emission.
 #[derive(Debug, Clone)]
-pub struct ResolvedFloatingRateSpec {
+pub(crate) struct ResolvedFloatingRateSpec {
     /// Projection parameters consumed by the numerical helpers.
     pub params: FloatingRateParams,
     /// Runtime-resolved fallback policy.
@@ -350,7 +350,7 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
 /// // Index floored to 1%, plus 2% spread = 3%
 /// assert!((rate - 0.03).abs() < 0.0001);
 /// ```
-pub fn project_fallback_rate(params: &FloatingRateParams) -> f64 {
+pub(crate) fn project_fallback_rate(params: &FloatingRateParams) -> f64 {
     calculate_floating_rate(0.0, params)
 }
 
@@ -548,7 +548,7 @@ pub fn project_floating_rate_from_market(
 /// let rate = compute_compounded_rate(&fixings, 7, 360.0);
 /// assert!((rate - 0.05).abs() < 0.001);
 /// ```
-pub fn compute_compounded_rate(
+pub(crate) fn compute_compounded_rate(
     daily_rates: &[(f64, u32)],
     total_days: u32,
     day_count_basis: f64,
@@ -631,7 +631,7 @@ fn compute_compounded_rate_with_lockout(
 /// let rate = compute_simple_average_rate(&fixings, 5);
 /// assert!(rate > 0.0);
 /// ```
-pub fn compute_simple_average_rate(daily_rates: &[(f64, u32)], total_days: u32) -> f64 {
+pub(crate) fn compute_simple_average_rate(daily_rates: &[(f64, u32)], total_days: u32) -> f64 {
     if daily_rates.is_empty() || total_days == 0 {
         return 0.0;
     }
@@ -677,7 +677,7 @@ pub fn compute_simple_average_rate(daily_rates: &[(f64, u32)], total_days: u32) 
 ///
 /// assert!(rate > 0.0);
 /// ```
-pub fn compute_overnight_rate(
+pub(crate) fn compute_overnight_rate(
     method: super::specs::OvernightCompoundingMethod,
     daily_rates: &[(f64, u32)],
     total_days: u32,

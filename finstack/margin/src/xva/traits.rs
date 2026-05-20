@@ -10,7 +10,7 @@ use finstack_core::Result;
 /// XVA exposure only needs to identify instruments and value them at future
 /// dates, so this trait deliberately stays narrower than the full
 /// `Instrument` interface from `finstack-valuations`.
-pub trait Valuable: Send + Sync {
+pub(crate) trait Valuable: Send + Sync {
     /// Returns the instrument identifier used in diagnostics.
     fn id(&self) -> &str;
 

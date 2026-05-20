@@ -29,7 +29,7 @@ pub mod constants;
 /// Margin-specific analytics and instrument metrics.
 pub mod metrics;
 /// Embedded registry data and registry wiring.
-pub mod registry;
+pub(crate) mod registry;
 /// Standalone traits used by the margin crate.
 pub mod traits;
 /// Margin and collateral domain types.

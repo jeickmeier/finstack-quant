@@ -43,7 +43,7 @@ use finstack_core::math::neumaier_sum;
 /// # Examples
 ///
 /// ```
-/// use finstack_margin::xva::netting::apply_netting;
+/// use crate::xva::netting::apply_netting;
 ///
 /// // Two offsetting trades: net exposure is reduced
 /// let values = [100.0, -80.0];
@@ -85,7 +85,7 @@ pub fn apply_netting(instrument_values: &[f64]) -> f64 {
 /// # Examples
 ///
 /// ```
-/// use finstack_margin::xva::netting::apply_collateral;
+/// use crate::xva::netting::apply_collateral;
 /// use finstack_margin::xva::types::CsaTerms;
 ///
 /// let csa = CsaTerms {

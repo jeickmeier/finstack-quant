@@ -1,7 +1,6 @@
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
-use finstack_scenarios::adapters::{ArbitrageViolation, RollForwardReport};
-use finstack_scenarios::utils::InterpolationResult;
+use finstack_scenarios::{ArbitrageViolation, InterpolationResult, RollForwardReport};
 use indexmap::IndexMap;
 use time::macros::date;
 

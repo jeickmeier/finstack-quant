@@ -9,5 +9,6 @@
 //! general bump-and-reprice fallback.
 
 pub mod finite_diff;
-pub mod lrm;
-pub mod pathwise;
+pub(crate) mod lrm;
+#[cfg(test)]
+pub(crate) mod pathwise;

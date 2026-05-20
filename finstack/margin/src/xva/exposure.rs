@@ -345,7 +345,7 @@ pub fn compute_exposure_profile(
 /// # Example
 ///
 /// ```rust,no_run
-/// use finstack_margin::xva::exposure::compute_stochastic_exposure_profile;
+/// use crate::xva::exposure::compute_stochastic_exposure_profile;
 /// use finstack_margin::xva::types::{StochasticExposureConfig, XvaConfig};
 ///
 /// #

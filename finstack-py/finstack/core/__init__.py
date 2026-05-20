@@ -29,6 +29,8 @@ _submodules = {
     "credit": credit,
     "credit.scoring": credit.scoring,
     "credit.pd": credit.pd,
+    "credit.lgd": credit.lgd,
+    "credit.migration": credit.migration,
 }
 
 for _name, _mod in _submodules.items():

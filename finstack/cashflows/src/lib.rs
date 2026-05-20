@@ -155,9 +155,9 @@
 //! - `aggregation` for currency-safe dated-flow aggregation
 //! - `CashflowProvider` and `schedule_from_dated_flows` for schedule interfaces
 
-/// Cash-flow primitives (`CashFlow`, `CFKind`, etc.).
+/// Cash-flow primitives (`CashFlow`, `CFKind`).
 pub mod primitives {
-    pub use finstack_core::cashflow::*;
+    pub use finstack_core::cashflow::{CFKind, CashFlow};
 }
 
 /// Currency-preserving aggregation utilities for cashflows.

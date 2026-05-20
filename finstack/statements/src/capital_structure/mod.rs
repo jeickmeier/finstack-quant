@@ -72,8 +72,8 @@
 
 mod builder;
 mod cashflows;
-pub mod integration;
-pub mod period_flows;
+pub(crate) mod integration;
+pub(crate) mod period_flows;
 mod state;
 pub mod waterfall;
 mod waterfall_spec;

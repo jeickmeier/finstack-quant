@@ -25,7 +25,7 @@ fn is_identifier_boundary(c: char) -> bool {
 /// # Returns
 ///
 /// Returns true if the identifier is standalone (proper boundaries before and after).
-pub fn is_standalone_identifier(
+pub(crate) fn is_standalone_identifier(
     formula: &str,
     start_idx: usize,
     end_idx: usize,
@@ -125,7 +125,7 @@ pub fn extract_all_identifiers(formula: &str) -> crate::error::Result<IndexSet<S
 /// # Returns
 ///
 /// Returns a set of `NodeId` values that are direct dependencies in the current period.
-pub fn extract_direct_dependencies(formula: &str) -> crate::error::Result<IndexSet<NodeId>> {
+pub(crate) fn extract_direct_dependencies(formula: &str) -> crate::error::Result<IndexSet<NodeId>> {
     let ast = parse_formula(formula)?;
     let mut identifiers: IndexSet<String> = IndexSet::new();
     collect_identifiers_from_ast(&ast, &mut identifiers, true);
@@ -216,9 +216,9 @@ fn collect_identifiers_from_ast(
 ///
 /// ```rust,ignore
 /// // Low-level helper; prefer higher-level APIs when possible.
-/// use finstack_statements::formula::extract_identifiers;
+/// use crate::utils::formula::extract_identifiers;
 /// ```
-pub fn extract_identifiers(
+pub(crate) fn extract_identifiers(
     formula: &str,
     known_identifiers: &IndexSet<String>,
 ) -> crate::error::Result<IndexSet<String>> {
@@ -251,9 +251,9 @@ pub fn extract_identifiers(
 ///
 /// ```rust,ignore
 /// // Low-level helper; prefer higher-level APIs when possible.
-/// use finstack_statements::formula::qualify_identifiers;
+/// use crate::utils::formula::qualify_identifiers;
 /// ```
-pub fn qualify_identifiers(
+pub(crate) fn qualify_identifiers(
     formula: &str,
     identifiers: &IndexSet<String>,
     namespace: &str,

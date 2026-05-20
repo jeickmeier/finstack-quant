@@ -32,9 +32,6 @@
 //! - [`ExecutionContext`] to supply market data, statements, instruments, and calendars
 //! - [`templates`] for reusable historical stress scenarios
 //!
-//! Public helpers in [`adapters`] and [`utils`] are available for advanced workflows
-//! that need to build or apply individual effects outside the top-level engine.
-//!
 //! # Quick Start
 //!
 //! ```rust,no_run
@@ -89,7 +86,7 @@
 //! `docs/REFERENCES.md`.
 
 /// Adaptations for scenario execution across domains.
-pub mod adapters;
+pub(crate) mod adapters;
 /// Scenario execution engine and context.
 pub mod engine;
 /// Error types for scenario evaluation.
@@ -101,11 +98,12 @@ pub mod spec;
 /// Historical stress test template types and builders.
 pub mod templates;
 /// Utility helpers for scenario operations.
-pub mod utils;
+pub(crate) mod utils;
 /// Structured warning enum surfaced via `ApplicationReport.warnings`.
 pub mod warning;
 
-pub use engine::{ExecutionContext, ScenarioEngine};
+pub use adapters::{ArbitrageViolation, RollForwardReport};
+pub use engine::{ApplicationReport, ExecutionContext, ScenarioEngine};
 pub use error::{Error, Result};
 pub use horizon::{HorizonAnalysis, HorizonResult};
 pub use spec::{
@@ -116,4 +114,5 @@ pub use templates::{
     AssetClass, RegisteredTemplate, ScenarioSpecBuilder, Severity, TemplateMetadata,
     TemplateRegistry,
 };
+pub use utils::InterpolationResult;
 pub use warning::Warning;

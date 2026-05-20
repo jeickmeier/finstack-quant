@@ -7,7 +7,4 @@
 //! downstream crates link against a stable surface even when the underlying
 //! helpers are reorganised.
 
-pub use crate::utils::formula::{
-    extract_all_identifiers, extract_direct_dependencies, extract_identifiers,
-    is_standalone_identifier, qualify_identifiers,
-};
+pub use crate::utils::formula::extract_all_identifiers;

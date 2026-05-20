@@ -1,6 +1,7 @@
 //! Python bindings for `finstack_core::credit`.
 
 mod lgd;
+mod migration;
 mod pd;
 mod scoring;
 
@@ -25,8 +26,9 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     scoring::register(py, &m)?;
     pd::register(py, &m)?;
     lgd::register(py, &m)?;
+    migration::register(py, &m)?;
 
-    let all = PyList::new(py, ["scoring", "pd", "lgd"])?;
+    let all = PyList::new(py, ["scoring", "pd", "lgd", "migration"])?;
     m.setattr("__all__", all)?;
     crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
 

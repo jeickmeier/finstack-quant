@@ -327,62 +327,6 @@ fn test_shock_nonexistent_statement_node() {
 }
 
 #[test]
-fn test_empty_tenor_string() {
-    use finstack_scenarios::utils::parse_tenor_to_years;
-
-    let result = parse_tenor_to_years("");
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_empty_period_string() {
-    use finstack_scenarios::utils::parse_period_to_days;
-
-    let result = parse_period_to_days("");
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_malformed_tenor_no_unit() {
-    use finstack_scenarios::utils::parse_tenor_to_years;
-
-    let result = parse_tenor_to_years("123");
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_malformed_tenor_bad_unit() {
-    use finstack_scenarios::utils::parse_tenor_to_years;
-
-    let result = parse_tenor_to_years("5X");
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_malformed_tenor_bad_number() {
-    use finstack_scenarios::utils::parse_tenor_to_years;
-
-    let result = parse_tenor_to_years("ABCY");
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_malformed_period_no_unit() {
-    use finstack_scenarios::utils::parse_period_to_days;
-
-    let result = parse_period_to_days("30");
-    assert!(result.is_err());
-}
-
-#[test]
-fn test_malformed_period_bad_unit() {
-    use finstack_scenarios::utils::parse_period_to_days;
-
-    let result = parse_period_to_days("1Z");
-    assert!(result.is_err());
-}
-
-#[test]
 fn test_curve_parallel_shock_zero_bp() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let curve = DiscountCurve::builder("USD_SOFR")

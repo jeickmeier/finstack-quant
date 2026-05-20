@@ -381,8 +381,8 @@ fn compute_fva_internal(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use finstack_margin::xva::cva::compute_cva;
-/// use finstack_margin::xva::types::ExposureProfile;
+/// use crate::xva::cva::compute_cva;
+/// use crate::xva::types::ExposureProfile;
 /// use finstack_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 ///
 /// # fn example() -> finstack_core::Result<()> {

@@ -39,8 +39,6 @@ mod embedded;
 mod merge;
 mod wire;
 
-pub use merge::merge_json;
-
 /// Fully resolved, ready-to-use margin registry.
 ///
 /// This is the public, parsed view of the embedded margin registry after any
@@ -57,8 +55,6 @@ pub struct MarginRegistry {
     pub collateral_schedules: HashMap<String, EligibleCollateralSchedule>,
     /// CCP conservative fallback parameters keyed by CCP identifier.
     pub ccp: HashMap<String, CcpParams>,
-    /// Optional default key into [`Self::ccp`].
-    pub ccp_default: Option<String>,
     /// Resolved default CCP conservative fallback parameters.
     pub ccp_default_params: CcpParams,
     /// Resolved generic VaR fallback metadata for unknown CCP names.
@@ -67,8 +63,6 @@ pub struct MarginRegistry {
     pub xva: XvaDefaults,
     /// SIMM parameter sets keyed by registry id such as `"v2_6"`.
     pub simm: HashMap<String, SimmParams>,
-    /// Optional default key into [`Self::simm`].
-    pub simm_default: Option<String>,
 }
 
 /// Top-level default settings shared across margin methodologies.
@@ -204,7 +198,6 @@ pub struct GenericVarDefaults {
 
 struct ParsedCcpRegistry {
     ccp: HashMap<String, CcpParams>,
-    ccp_default: Option<String>,
     ccp_default_params: CcpParams,
     ccp_generic_var_defaults: GenericVarDefaults,
 }
@@ -379,7 +372,7 @@ pub fn build_registry(overlay: Option<&Value>) -> Result<MarginRegistry> {
     let defaults = parse_defaults(root.get("defaults"))?;
     let parsed_ccp = parse_ccp(root.get("ccp"))?;
     let xva = parse_xva_defaults(root.get("xva_defaults"))?;
-    let (simm, simm_default) = parse_simm(root.get("simm"))?;
+    let simm = parse_simm(root.get("simm"))?;
 
     info!(
         schedules = schedule_im.len(),
@@ -396,12 +389,10 @@ pub fn build_registry(overlay: Option<&Value>) -> Result<MarginRegistry> {
         collateral_asset_class_defaults: collateral_defaults,
         collateral_schedules,
         ccp: parsed_ccp.ccp,
-        ccp_default: parsed_ccp.ccp_default,
         ccp_default_params: parsed_ccp.ccp_default_params,
         ccp_generic_var_defaults: parsed_ccp.ccp_generic_var_defaults,
         xva,
         simm,
-        simm_default,
     })
 }
 
@@ -593,7 +584,6 @@ fn parse_ccp(value: Option<&Value>) -> Result<ParsedCcpRegistry> {
     };
     let file: wire::CcpFile = serde_json::from_value(val.clone()).map_err(to_validation)?;
     let mut map = HashMap::default();
-    let mut default: Option<String> = None;
     let mut default_params: Option<CcpParams> = None;
     let mut generic_var_defaults: Option<GenericVarDefaults> = None;
     for entry in file.entries {
@@ -636,12 +626,11 @@ fn parse_ccp(value: Option<&Value>) -> Result<ParsedCcpRegistry> {
             if default_params.is_some() {
                 return Err(Error::Validation("duplicate ccp default entry".to_string()));
             }
-            let Some(default_id) = entry.ids.first() else {
+            if entry.ids.is_empty() {
                 return Err(Error::Validation(
                     "ccp default entry requires at least one id".to_string(),
                 ));
-            };
-            default = Some(default_id.clone());
+            }
             default_params = Some(record.clone());
         }
         for id in entry.ids {
@@ -660,7 +649,6 @@ fn parse_ccp(value: Option<&Value>) -> Result<ParsedCcpRegistry> {
     };
     Ok(ParsedCcpRegistry {
         ccp: map,
-        ccp_default: default,
         ccp_default_params: default_params,
         ccp_generic_var_defaults: generic_var_defaults,
     })
@@ -729,13 +717,12 @@ fn parse_xva_defaults(value: Option<&Value>) -> Result<XvaDefaults> {
     })
 }
 
-fn parse_simm(value: Option<&Value>) -> Result<(HashMap<String, SimmParams>, Option<String>)> {
+fn parse_simm(value: Option<&Value>) -> Result<HashMap<String, SimmParams>> {
     let Some(val) = value else {
         return Err(Error::Validation("simm section missing".to_string()));
     };
     let file: wire::SimmFile = serde_json::from_value(val.clone()).map_err(to_validation)?;
     let mut map = HashMap::default();
-    let mut default: Option<String> = None;
     for entry in file.entries {
         let record = entry.record;
         let version = parse_simm_version(entry.ids.first().map(String::as_str))?;
@@ -869,12 +856,9 @@ fn parse_simm(value: Option<&Value>) -> Result<(HashMap<String, SimmParams>, Opt
             if map.insert(id.clone(), params.clone()).is_some() {
                 return Err(Error::Validation(format!("duplicate simm id '{id}'")));
             }
-            if default.is_none() && matches!(id.as_str(), "v2_6" | "default") {
-                default = Some(id.clone());
-            }
         }
     }
-    Ok((map, default))
+    Ok(map)
 }
 
 // -----------------------------------------------------------------------------//
@@ -1596,10 +1580,9 @@ mod tests {
             "Cash default should be present"
         );
 
-        assert!(!registry.simm.is_empty(), "simm should have entries");
         assert!(
-            registry.simm_default.is_some(),
-            "simm_default should be set"
+            registry.simm.contains_key("v2_6"),
+            "v2_6 SIMM params should be present"
         );
 
         assert!(!registry.ccp.is_empty(), "ccp should have entries");
@@ -1633,8 +1616,7 @@ mod tests {
     #[test]
     fn simm_params_have_required_weights() {
         let registry = embedded_registry().expect("embedded registry should load");
-        let simm_id = registry.simm_default.as_ref().expect("simm_default set");
-        let params = registry.simm.get(simm_id).expect("default simm params");
+        let params = registry.simm.get("v2_6").expect("v2_6 simm params");
 
         assert!(
             params.ir_delta_weights.contains_key("5y"),
@@ -1661,8 +1643,7 @@ mod tests {
     /// Clone the embedded v2_6 SIMM params for mutation in PSD tests.
     fn base_simm_params() -> SimmParams {
         let registry = embedded_registry().expect("embedded registry should load");
-        let id = registry.simm_default.as_ref().expect("simm_default set");
-        registry.simm.get(id).expect("default simm params").clone()
+        registry.simm.get("v2_6").expect("v2_6 simm params").clone()
     }
 
     #[test]

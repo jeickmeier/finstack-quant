@@ -102,6 +102,7 @@ pub fn lrm_vega(
 /// e^{-rT} payoff × (√T Z / σ - T)
 /// ```
 #[must_use]
+#[cfg(test)]
 pub fn lrm_rho(
     payoffs: &[f64],
     terminal_shocks: &[f64],

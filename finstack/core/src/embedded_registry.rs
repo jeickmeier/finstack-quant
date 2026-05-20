@@ -60,11 +60,6 @@ where
         }
     }
 
-    /// Configuration extension key consulted by `load_from_config`.
-    pub const fn extension_key(&self) -> &'static str {
-        self.extension_key
-    }
-
     /// Load (and cache) the embedded registry, applying `validate`.
     ///
     /// Returns a borrowed reference to the cached value. If parsing or

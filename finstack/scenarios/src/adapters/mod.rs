@@ -17,4 +17,4 @@ pub(crate) mod traits;
 pub mod vol;
 
 pub use time_roll::RollForwardReport;
-pub use vol::{check_arbitrage, ArbitrageViolation};
+pub use vol::ArbitrageViolation;

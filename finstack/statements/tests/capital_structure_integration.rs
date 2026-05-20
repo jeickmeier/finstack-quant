@@ -8,7 +8,7 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, InstrumentId};
 use finstack_statements::capital_structure::aggregate_instrument_cashflows;
-use finstack_statements::capital_structure::integration::build_any_instrument_from_spec;
+use finstack_statements::capital_structure::build_any_instrument_from_spec;
 use finstack_statements::types::CapitalStructureSpec;
 use finstack_statements::types::DebtInstrumentSpec;
 use finstack_valuations::instruments::rates::irs::{FloatingLegCompounding, InterestRateSwap};

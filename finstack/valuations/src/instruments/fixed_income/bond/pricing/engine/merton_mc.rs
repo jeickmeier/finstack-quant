@@ -27,7 +27,7 @@ use crate::instruments::models::credit::{
     AssetDynamics, BarrierType, CreditState, DynamicRecoverySpec, EndogenousHazardSpec,
     MertonModel, ToggleExerciseModel,
 };
-use finstack_core::credit::registry::default_market_recovery_rate_or_panic;
+use finstack_core::credit::registry::default_market_recovery_rate;
 use finstack_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use finstack_core::{InputError, Result};
 
@@ -223,6 +223,19 @@ pub struct MertonMcConfig {
     pub cashflow_dfs: Option<Vec<(f64, f64)>>,
 }
 
+fn default_market_recovery_rate_for_mc() -> f64 {
+    match default_market_recovery_rate() {
+        Ok(rate) => rate,
+        Err(err) => {
+            tracing::warn!(
+                error = %err,
+                "falling back to 40% market recovery rate for Merton MC defaults"
+            );
+            0.40
+        }
+    }
+}
+
 impl MertonMcConfig {
     /// Create a new configuration with default simulation parameters.
     ///
@@ -247,7 +260,7 @@ impl MertonMcConfig {
             antithetic: defaults.antithetic,
             time_steps_per_year: defaults.time_steps_per_year,
             barrier_crossing,
-            default_recovery_rate: default_market_recovery_rate_or_panic(),
+            default_recovery_rate: default_market_recovery_rate_for_mc(),
             calibration: None,
             cashflow_dfs: None,
         }

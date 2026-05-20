@@ -122,7 +122,7 @@ pub mod time_grid;
 pub mod traits;
 
 // --- Pricing infrastructure ---
-pub mod barriers;
+pub(crate) mod barriers;
 pub mod engine;
 pub mod engine_fractional;
 pub mod greeks;
@@ -160,14 +160,14 @@ pub mod prelude {
     pub use super::rng::sobol::SobolRng;
 
     // --- Processes ---
-    pub use super::process::bates::{BatesParams, BatesProcess};
+    pub use super::process::bates::BatesParams;
     pub use super::process::brownian::{BrownianParams, BrownianProcess, MultiBrownianProcess};
     pub use super::process::cir::{CirParams, CirPlusPlusProcess, CirProcess};
     pub use super::process::correlation::{apply_correlation, cholesky_decomposition};
     pub use super::process::gbm::{GbmParams, GbmProcess, MultiGbmProcess};
     pub use super::process::heston::{HestonParams, HestonProcess};
     pub use super::process::jump_diffusion::{MertonJumpParams, MertonJumpProcess};
-    pub use super::process::multi_ou::{MultiOuParams, MultiOuProcess};
+    pub use super::process::multi_ou::MultiOuParams;
     pub use super::process::ou::{HullWhite1FParams, HullWhite1FProcess, VasicekProcess};
     pub use super::process::schwartz_smith::{SchwartzSmithParams, SchwartzSmithProcess};
 
@@ -178,8 +178,8 @@ pub mod prelude {
     // per scheme. The prelude is a curated list on top of that.
     pub use super::discretization::{
         CheyetteRoughEuler, EulerMaruyama, ExactGbm, ExactHullWhite1F, ExactMultiGbm,
-        ExactMultiGbmCorrelated, ExactSchwartzSmith, JumpEuler, LogMilstein, Milstein, QeCir,
-        QeHeston, RoughBergomiEuler, RoughHestonHybrid,
+        ExactMultiGbmCorrelated, ExactSchwartzSmith, JumpEuler, Milstein, QeCir, QeHeston,
+        RoughBergomiEuler, RoughHestonHybrid,
     };
 
     // --- Engine and configuration ---

@@ -112,7 +112,7 @@ pub mod decimal;
 ///
 /// Centralises the boilerplate around `include_str!` + `OnceLock` + serde
 /// parse + validation that crates use to ship versioned compile-time assets.
-pub mod embedded_registry;
+pub(crate) mod embedded_registry;
 /// Error types for finstack-core.
 ///
 /// The crate uses a unified `Error` enum with specific variants for
@@ -136,7 +136,7 @@ pub mod math;
 /// Currency-tagged monetary amounts with safe arithmetic
 pub mod money;
 /// Label normalization for human-entered identifiers.
-pub mod parse;
+pub(crate) mod parse;
 /// Convenient re-exports of commonly used types
 pub mod prelude;
 /// Shared credit rating-scale registry.

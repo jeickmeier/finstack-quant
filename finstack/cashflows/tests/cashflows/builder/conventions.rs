@@ -54,66 +54,6 @@ fn test_single_currency_aggregation() {
     );
 }
 
-#[test]
-fn test_single_currency_period_pv_rejects_multi_currency_result() {
-    use crate::helpers::FlatRateCurve;
-    use finstack_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_core::cashflow::{CFKind, CashFlow};
-    use finstack_core::dates::{DayCount, DayCountContext, Period, PeriodId};
-
-    let schedule = CashFlowSchedule {
-        flows: vec![
-            CashFlow {
-                date: d(2024, 6, 15),
-                reset_date: None,
-                amount: Money::new(100.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: d(2024, 6, 20),
-                reset_date: None,
-                amount: Money::new(80.0, Currency::EUR),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-        ],
-        notional: Notional::par(100.0, Currency::USD),
-        day_count: DayCount::Act365F,
-        meta: CashFlowMeta::default(),
-    };
-    let periods = vec![Period {
-        id: PeriodId::month(2024, 6),
-        start: d(2024, 6, 1),
-        end: d(2024, 7, 1),
-        is_actual: true,
-    }];
-    let curve = FlatRateCurve::new("TEST", d(2024, 1, 1), 0.0);
-
-    let pv_map = schedule
-        .pv_by_period(
-            &periods,
-            finstack_cashflows::builder::PvDiscountSource::Discount {
-                disc: &curve,
-                credit: None,
-            },
-            finstack_cashflows::aggregation::DateContext::new(
-                d(2024, 1, 1),
-                DayCount::Act365F,
-                DayCountContext::default(),
-            ),
-        )
-        .expect("multi-currency PV map should succeed");
-    let result = finstack_cashflows::builder::schedule::require_single_currency(pv_map);
-
-    assert!(
-        result.is_err(),
-        "single-currency PV helper should reject multi-currency schedules"
-    );
-}
-
 // =============================================================================
 // Currency Preservation Tests
 // =============================================================================

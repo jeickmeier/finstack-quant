@@ -30,7 +30,7 @@ status = "exists"  # Python package already present
 [crates.core.modules]
 cashflow     = { python = "finstack.core.cashflow",     status = "missing", note = "Core cashflow APIs are not yet materialized as a dedicated Python submodule" }
 config       = { python = "finstack.core.config",       status = "exists" }
-credit       = { python = "finstack.core.credit",       status = "exists" }
+credit       = { python = "finstack.core.credit",       status = "exists", note = "Includes scoring, pd, lgd, and migration submodules." }
 currency     = { python = "finstack.core.currency",     status = "exists" }
 dates        = { python = "finstack.core.dates",        status = "exists" }
 error        = { python = "finstack.core.error",        status = "missing" }

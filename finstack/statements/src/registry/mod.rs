@@ -75,10 +75,10 @@
 //! - Metric files in `finstack/statements/data/metrics/`
 
 pub(crate) mod aliases;
-pub mod builtins;
+pub(crate) mod builtins;
 pub mod dynamic;
-pub mod schema;
-pub mod validation;
+pub(crate) mod schema;
+pub(crate) mod validation;
 
 pub(crate) use aliases::AliasRegistry;
 pub use dynamic::Registry;

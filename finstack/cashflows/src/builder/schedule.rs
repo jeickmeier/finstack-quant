@@ -685,35 +685,6 @@ fn apply_flow_to_outstanding(
     Ok(())
 }
 
-/// Collapse a per-period currency-indexed PV map into a single-currency map.
-///
-/// Returns a [`finstack_core::Error::Validation`] if any period contains more
-/// than one currency or its aggregated `Money` currency disagrees with the
-/// outer map key. Use in combination with [`CashFlowSchedule::pv_by_period`]
-/// (or related methods) when the caller expects a homogeneous currency result.
-pub fn require_single_currency(
-    pv_map: IndexMap<PeriodId, IndexMap<Currency, Money>>,
-) -> finstack_core::Result<IndexMap<PeriodId, Money>> {
-    let mut result = IndexMap::with_capacity(pv_map.len());
-    for (period_id, currency_map) in pv_map {
-        let mut entries = currency_map.into_iter();
-        if let Some((currency, pv_money)) = entries.next() {
-            if entries.next().is_some() {
-                return Err(finstack_core::Error::Validation(format!(
-                    "period {period_id} has multiple currencies; single-currency PV output is not available"
-                )));
-            }
-            if pv_money.currency() != currency {
-                return Err(finstack_core::Error::Validation(format!(
-                    "period {period_id} returned inconsistent currency aggregation"
-                )));
-            }
-            result.insert(period_id, pv_money);
-        }
-    }
-    Ok(result)
-}
-
 /// Credit-adjustment inputs for periodized PV aggregation.
 #[derive(Clone, Copy)]
 pub struct PvCreditAdjustment<'a> {

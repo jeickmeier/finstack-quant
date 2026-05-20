@@ -11,7 +11,6 @@
 //! - `npv`: per-instrument NPV (allocation-per-call pattern)
 //! - `merge_cashflow_schedules`: k-way schedule concatenation + sort
 //! - `outstanding_by_date`: balance-path tracking for amortizing instruments
-//! - `compute_overnight_rate`: daily-fixing compounding variants
 //! - `weighted_average_life`: WAL over principal flows
 //!
 //! Run with:
@@ -26,13 +25,10 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use finstack_cashflows::aggregation::{
     aggregate_by_period, aggregate_cashflows_checked, DateContext,
 };
-use finstack_cashflows::builder::rate_helpers::{
-    compute_compounded_rate, compute_overnight_rate, compute_simple_average_rate,
-};
 use finstack_cashflows::builder::schedule::{merge_cashflow_schedules, sort_flows};
 use finstack_cashflows::builder::{
     CashFlowMeta, CashFlowSchedule, CashflowRepresentation, CouponType, FixedCouponSpec, Notional,
-    OvernightCompoundingMethod, PeriodDataFrameOptions,
+    PeriodDataFrameOptions,
 };
 use finstack_cashflows::primitives::{CFKind, CashFlow};
 use finstack_cashflows::DatedFlow;
@@ -166,11 +162,6 @@ fn make_unsorted_flows(n: usize, base: Date) -> Vec<CashFlow> {
             }
         })
         .collect()
-}
-
-/// Daily overnight fixings of length `n` (all at 5%).
-fn make_daily_fixings(n: usize) -> Vec<(f64, u32)> {
-    (0..n).map(|_| (0.05_f64, 1u32)).collect()
 }
 
 /// Build a minimal amortizing `CashFlowSchedule` with `n_principal` Amortization flows.
@@ -570,129 +561,6 @@ fn bench_outstanding_by_date(c: &mut Criterion) {
 }
 
 // =============================================================================
-// Benchmark: compute_overnight_rate (compounding method variants)
-// =============================================================================
-
-fn bench_overnight_compounding(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cashflow_overnight_rate");
-
-    for n_fixings in [30usize, 92] {
-        let fixings = make_daily_fixings(n_fixings);
-        let total_days = n_fixings as u32;
-
-        group.throughput(Throughput::Elements(n_fixings as u64));
-
-        group.bench_with_input(
-            BenchmarkId::new("compounded_in_arrears", n_fixings),
-            &n_fixings,
-            |b, _| {
-                b.iter(|| {
-                    compute_overnight_rate(
-                        black_box(OvernightCompoundingMethod::CompoundedInArrears),
-                        black_box(&fixings),
-                        black_box(total_days),
-                        360.0,
-                    )
-                });
-            },
-        );
-
-        group.bench_with_input(
-            BenchmarkId::new("simple_average", n_fixings),
-            &n_fixings,
-            |b, _| {
-                b.iter(|| {
-                    compute_overnight_rate(
-                        black_box(OvernightCompoundingMethod::SimpleAverage),
-                        black_box(&fixings),
-                        black_box(total_days),
-                        360.0,
-                    )
-                });
-            },
-        );
-
-        group.bench_with_input(
-            BenchmarkId::new("lookback_2d", n_fixings),
-            &n_fixings,
-            |b, _| {
-                b.iter(|| {
-                    compute_overnight_rate(
-                        black_box(OvernightCompoundingMethod::CompoundedWithLookback {
-                            lookback_days: 2,
-                        }),
-                        black_box(&fixings),
-                        black_box(total_days),
-                        360.0,
-                    )
-                });
-            },
-        );
-
-        group.bench_with_input(
-            BenchmarkId::new("lockout_2d", n_fixings),
-            &n_fixings,
-            |b, _| {
-                b.iter(|| {
-                    compute_overnight_rate(
-                        black_box(OvernightCompoundingMethod::CompoundedWithLockout {
-                            lockout_days: 2,
-                        }),
-                        black_box(&fixings),
-                        black_box(total_days),
-                        360.0,
-                    )
-                });
-            },
-        );
-
-        group.bench_with_input(
-            BenchmarkId::new("observation_shift_2d", n_fixings),
-            &n_fixings,
-            |b, _| {
-                b.iter(|| {
-                    compute_overnight_rate(
-                        black_box(OvernightCompoundingMethod::CompoundedWithObservationShift {
-                            shift_days: 2,
-                        }),
-                        black_box(&fixings),
-                        black_box(total_days),
-                        360.0,
-                    )
-                });
-            },
-        );
-    }
-
-    group.finish();
-}
-
-// =============================================================================
-// Benchmark: compute_compounded_rate + compute_simple_average_rate (isolated)
-// =============================================================================
-
-fn bench_rate_computation(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cashflow_rate_computation");
-
-    for n in [30usize, 92, 365] {
-        let fixings = make_daily_fixings(n);
-        let total_days = n as u32;
-
-        group.throughput(Throughput::Elements(n as u64));
-
-        group.bench_with_input(BenchmarkId::new("compounded", n), &n, |b, _| {
-            b.iter(|| compute_compounded_rate(black_box(&fixings), black_box(total_days), 360.0));
-        });
-
-        group.bench_with_input(BenchmarkId::new("simple_average", n), &n, |b, _| {
-            b.iter(|| compute_simple_average_rate(black_box(&fixings), black_box(total_days)));
-        });
-    }
-
-    group.finish();
-}
-
-// =============================================================================
 // Benchmark: weighted_average_life
 // =============================================================================
 
@@ -755,8 +623,6 @@ criterion_group!(
     bench_npv,
     bench_merge_schedules,
     bench_outstanding_by_date,
-    bench_overnight_compounding,
-    bench_rate_computation,
     bench_wal,
     bench_normalize_public,
 );

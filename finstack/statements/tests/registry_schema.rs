@@ -1,7 +1,7 @@
 //! Registry schema integration tests.
 #![allow(clippy::expect_used)]
 
-use finstack_statements::registry::schema::{MetricDefinition, MetricRegistry};
+use finstack_statements::registry::{MetricDefinition, MetricRegistry};
 use indexmap::IndexMap;
 
 #[test]

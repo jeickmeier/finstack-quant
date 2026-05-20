@@ -18,7 +18,7 @@ use indexmap::IndexMap;
 ///
 /// # Examples
 /// ```rust
-/// use finstack_scenarios::adapters::RollForwardReport;
+/// use finstack_scenarios::RollForwardReport;
 /// use indexmap::IndexMap;
 /// use time::macros::date;
 ///
@@ -315,7 +315,19 @@ fn collect_instrument_cashflows(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::ExecutionContext;
+    use crate::TimeRollMode;
+    use finstack_core::dates::{Date, DayCount, Tenor};
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_core::money::Money;
+    use finstack_statements::FinancialModelSpec;
+    use finstack_valuations::instruments::fixed_income::bond::CashflowSpec;
+    use finstack_valuations::instruments::pricing_overrides::PricingOverrides;
+    use finstack_valuations::instruments::{Attributes, Bond, DynInstrument, PricingOptions};
+    use finstack_valuations::metrics::MetricId;
     use time::macros::date;
+    use time::Month;
 
     #[test]
     fn roll_forward_report_keeps_only_live_fields() {
@@ -329,5 +341,96 @@ mod tests {
         };
 
         assert_eq!(report.days, 31);
+    }
+
+    #[test]
+    fn apply_time_roll_forward_reports_bond_carry() {
+        let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+            .build()
+            .expect("valid discount curve");
+
+        let mut market = MarketContext::new().insert(curve);
+        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut instruments: Vec<Box<DynInstrument>> = vec![Box::new(
+            Bond::builder()
+                .id("BOND1".into())
+                .notional(Money::new(100.0, Currency::USD))
+                .issue_date(base_date)
+                .maturity(base_date + time::Duration::days(730))
+                .cashflow_spec(
+                    CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Thirty360)
+                        .expect("finite test coupon"),
+                )
+                .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
+                .credit_curve_id_opt(None)
+                .pricing_overrides(PricingOverrides::default())
+                .attributes(Attributes::new())
+                .build()
+                .expect("valid bond"),
+        )];
+
+        let pv_base = instruments
+            .first()
+            .expect("bond instrument")
+            .as_ref()
+            .value(&market, base_date)
+            .expect("pv at base as_of before roll")
+            .amount();
+
+        let expected_date = base_date + time::Duration::days(31);
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: &mut model,
+            instruments: Some(&mut instruments),
+            rate_bindings: None,
+            calendar: None,
+            as_of: base_date,
+        };
+
+        let report = apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::BusinessDays)
+            .expect("time roll succeeds");
+        assert_eq!(ctx.as_of, expected_date);
+        assert_eq!(report.new_date, expected_date);
+        assert_eq!(report.days, 31);
+        assert!(
+            !report.instrument_carry.is_empty(),
+            "expected instrument carry to be populated"
+        );
+
+        let bond_carry = report
+            .instrument_carry
+            .iter()
+            .find(|(id, _)| id == "BOND1")
+            .expect("BOND1 should have carry entry");
+        assert!(
+            bond_carry.1.get(&Currency::USD).is_some(),
+            "bond carry should have USD amount"
+        );
+        assert!(
+            report.total_carry.get(&Currency::USD).is_some(),
+            "total carry should have USD entry"
+        );
+
+        let rolled = instruments
+            .first()
+            .expect("bond instrument")
+            .as_ref()
+            .price_with_metrics(
+                &market,
+                report.new_date,
+                &[MetricId::Theta],
+                PricingOptions::default(),
+            )
+            .expect("metrics at rolled as_of");
+        assert!(rolled.value.amount().is_finite());
+        assert_ne!(rolled.value.amount(), pv_base);
+        let theta = *rolled
+            .measures
+            .get("theta")
+            .expect("theta at rolled horizon");
+        assert!(theta.is_finite());
     }
 }

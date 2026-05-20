@@ -34,6 +34,8 @@ finstack-portfolio = { path = "../finstack/portfolio" }
 nalgebra = "0.34"
 numpy = "0.28"
 pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
+rand = { version = "0.9.3", default-features = false, features = ["std"] }
+rand_pcg = { version = "0.9", features = ["serde"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true }

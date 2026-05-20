@@ -73,12 +73,13 @@ impl CreditAssumptionRegistry {
         let record = self
             .rating_factor_tables
             .iter()
-            .find(|record| has_id(&record.ids, id))
+            .find(|record| record.ids.iter().any(|c| c == id))
             .ok_or_else(|| not_found("rating factor table", id))?;
-        let mut factors = HashMap::default();
-        for factor in &record.factors {
-            factors.insert(factor.rating, factor.factor);
-        }
+        let factors = record
+            .factors
+            .iter()
+            .map(|f| (f.rating, f.factor))
+            .collect();
         Ok(RatingFactorTableParts {
             factors,
             agency: record.agency.clone(),
@@ -91,15 +92,13 @@ impl CreditAssumptionRegistry {
         let record = self
             .seniority_calibrations
             .iter()
-            .find(|record| has_id(&record.ids, id))
+            .find(|record| record.ids.iter().any(|c| c == id))
             .ok_or_else(|| not_found("seniority calibration", id))?;
-        let mut classes = Vec::with_capacity(record.classes.len());
-        for class in &record.classes {
-            classes.push((
-                class.seniority,
-                BetaRecovery::new(class.mean, class.std_dev)?,
-            ));
-        }
+        let classes = record
+            .classes
+            .iter()
+            .map(|c| Ok((c.seniority, BetaRecovery::new(c.mean, c.std_dev)?)))
+            .collect::<Result<Vec<_>>>()?;
         Ok(SeniorityCalibration {
             source: record.source.clone(),
             classes,
@@ -110,7 +109,7 @@ impl CreditAssumptionRegistry {
         let record = self
             .pd_master_scales
             .iter()
-            .find(|record| has_id(&record.ids, id))
+            .find(|record| record.ids.iter().any(|c| c == id))
             .ok_or_else(|| not_found("PD master scale", id))?;
         Ok(record
             .grades
@@ -127,7 +126,7 @@ impl CreditAssumptionRegistry {
         let record = self
             .downturn_lgd_presets
             .iter()
-            .find(|record| has_id(&record.ids, id))
+            .find(|record| record.ids.iter().any(|c| c == id))
             .ok_or_else(|| not_found("downturn LGD preset", id))?;
         Ok(DownturnLgdPreset {
             method: record.method.clone(),
@@ -140,7 +139,7 @@ impl CreditAssumptionRegistry {
         let record = self
             .workout_lgd_defaults
             .iter()
-            .find(|record| has_id(&record.ids, id))
+            .find(|record| record.ids.iter().any(|c| c == id))
             .ok_or_else(|| not_found("workout LGD defaults", id))?;
         Ok(WorkoutLgdDefaults {
             workout_years: record.workout_years,
@@ -295,7 +294,7 @@ pub fn default_market_recovery_rate() -> Result<f64> {
 /// public signatures must remain infallible.
 #[must_use]
 #[allow(clippy::expect_used)]
-pub fn default_market_recovery_rate_or_panic() -> f64 {
+pub(crate) fn default_market_recovery_rate_or_panic() -> f64 {
     embedded_registry()
         .expect("embedded credit assumptions registry is a compile-time asset")
         .default_market_recovery_rate()
@@ -309,10 +308,6 @@ pub fn registry_from_config(config: &FinstackConfig) -> Result<CreditAssumptionR
 fn validate_registry(registry: CreditAssumptionRegistry) -> Result<CreditAssumptionRegistry> {
     registry.validate()?;
     Ok(registry)
-}
-
-fn has_id(ids: &[String], id: &str) -> bool {
-    ids.iter().any(|candidate| candidate == id)
 }
 
 fn first_id(ids: &[String]) -> &str {

@@ -381,8 +381,16 @@ mod tests {
     #[test]
     fn test_invalid_tenor() {
         assert!(parse_tenor_to_years("").is_err());
+        assert!(parse_tenor_to_years("123").is_err());
         assert!(parse_tenor_to_years("XYZ").is_err());
         assert!(parse_tenor_to_years("1X").is_err());
+    }
+
+    #[test]
+    fn test_invalid_period() {
+        assert!(parse_period_to_days("").is_err());
+        assert!(parse_period_to_days("30").is_err());
+        assert!(parse_period_to_days("1Z").is_err());
     }
 
     #[test]

@@ -447,7 +447,7 @@ fn test_aggregate_instrument_cashflows() {
 fn test_build_any_instrument_from_spec_bond_variant() {
     use finstack_core::dates::Date;
     use finstack_core::types::{CurveId, InstrumentId};
-    use finstack_statements::capital_structure::integration::build_any_instrument_from_spec;
+    use finstack_statements::capital_structure::build_any_instrument_from_spec;
     use finstack_statements::types::DebtInstrumentSpec;
     use finstack_valuations::instruments::{Bond, InstrumentJson};
     use time::Month;
@@ -479,7 +479,7 @@ fn test_build_any_instrument_from_spec_bond_variant() {
 fn test_build_any_instrument_from_spec_swap_variant() {
     use finstack_core::dates::Date;
     use finstack_core::types::InstrumentId;
-    use finstack_statements::capital_structure::integration::build_any_instrument_from_spec;
+    use finstack_statements::capital_structure::build_any_instrument_from_spec;
     use finstack_statements::types::DebtInstrumentSpec;
     use finstack_valuations::instruments::{InstrumentJson, PayReceive};
     use time::Month;
@@ -509,7 +509,7 @@ fn test_build_any_instrument_from_spec_swap_variant() {
 
 #[test]
 fn test_build_any_instrument_invalid_json_error() {
-    use finstack_statements::capital_structure::integration::build_any_instrument_from_spec;
+    use finstack_statements::capital_structure::build_any_instrument_from_spec;
     use finstack_statements::types::DebtInstrumentSpec;
 
     let spec = DebtInstrumentSpec {
