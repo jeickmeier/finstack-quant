@@ -221,6 +221,12 @@ impl QuantoOption {
             self.quote_currency,
             "QuantoOption",
         )?;
+        if !self.correlation.is_finite() || !(-1.0..=1.0).contains(&self.correlation) {
+            return Err(finstack_core::Error::Validation(format!(
+                "QuantoOption correlation must be a finite value in [-1, 1], got {}",
+                self.correlation
+            )));
+        }
         if self.equity_strike.currency() != self.base_currency {
             return Err(finstack_core::Error::Validation(format!(
                 "QuantoOption equity_strike currency ({}) must match base_currency ({})",

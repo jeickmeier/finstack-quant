@@ -1,8 +1,40 @@
 use crate::constants::{credit, numerical};
 use finstack_core::dates::{Date, DateExt, DayCount, HolidayCalendar};
 use finstack_core::market_data::term_structures::{DiscountCurve, HazardCurve};
-use finstack_core::Result;
+use finstack_core::{Error, Result};
 use time::Duration;
+
+/// Tolerance for recovery-rate consistency between the CDS instrument and the
+/// hazard curve. Quoted recoveries are typically ≤4 decimals (40 bp resolution),
+/// so anything beyond 1e-6 is an actual configuration mismatch.
+const RECOVERY_CONSISTENCY_TOL: f64 = 1e-6;
+
+/// Ensure the CDS protection-leg recovery rate matches the recovery used to
+/// bootstrap the hazard curve.
+///
+/// The ISDA Standard Model requires the same R in both legs: λ was bootstrapped
+/// under `R_bootstrap`, and the protection-leg multiplier (1 − R_pricing) must
+/// agree. If they diverge by more than [`RECOVERY_CONSISTENCY_TOL`], the
+/// protection-leg PV is silently mis-scaled. This is a configuration bug, not
+/// a legitimate use case, so we surface it as a hard error at the pricer entry.
+#[inline]
+pub(super) fn validate_recovery_consistency(
+    cds_recovery: f64,
+    surv: &HazardCurve,
+) -> Result<()> {
+    let curve_recovery = surv.recovery_rate();
+    if (cds_recovery - curve_recovery).abs() > RECOVERY_CONSISTENCY_TOL {
+        return Err(Error::Validation(format!(
+            "CDS recovery rate ({}) differs from the hazard curve's bootstrap \
+             recovery ({}) by more than {:.0e}. The ISDA Standard Model requires \
+             the same R in both legs; pricing with mismatched recoveries silently \
+             mis-scales the protection leg. Re-bootstrap the curve with the \
+             trade's recovery, or use the curve's recovery on the trade.",
+            cds_recovery, curve_recovery, RECOVERY_CONSISTENCY_TOL
+        )));
+    }
+    Ok(())
+}
 
 // ----- Time-axis helpers -----
 //

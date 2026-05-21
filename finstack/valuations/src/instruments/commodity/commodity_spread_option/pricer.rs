@@ -288,6 +288,16 @@ mod tests {
         correlation: f64,
         expiry: time::Date,
     ) -> CommoditySpreadOption {
+        try_make_spread_option(option_type, strike, correlation, expiry)
+            .expect("build spread option")
+    }
+
+    fn try_make_spread_option(
+        option_type: OptionType,
+        strike: f64,
+        correlation: f64,
+        expiry: time::Date,
+    ) -> finstack_core::Result<CommoditySpreadOption> {
         CommoditySpreadOption::builder()
             .id(InstrumentId::new("TEST-SPREAD"))
             .currency(Currency::USD)
@@ -303,7 +313,6 @@ mod tests {
             .correlation(correlation)
             .day_count(DayCount::Act365F)
             .build()
-            .expect("build spread option")
     }
 
     #[test]
@@ -526,15 +535,11 @@ mod tests {
 
         let market = make_market(as_of, 100.0, 80.0, 0.25, 0.30, 0.05);
 
-        // Correlation > 1 should fail
-        let opt = make_spread_option(OptionType::Call, 10.0, 1.5, expiry);
-        assert!(opt.value(&market, as_of).is_err());
+        // Out-of-range correlations fail at construction (builder validation).
+        assert!(try_make_spread_option(OptionType::Call, 10.0, 1.5, expiry).is_err());
+        assert!(try_make_spread_option(OptionType::Call, 10.0, -1.5, expiry).is_err());
 
-        // Correlation < -1 should fail
-        let opt = make_spread_option(OptionType::Call, 10.0, -1.5, expiry);
-        assert!(opt.value(&market, as_of).is_err());
-
-        // Boundary values should work
+        // Boundary values should price.
         let opt = make_spread_option(OptionType::Call, 10.0, 1.0, expiry);
         assert!(opt.value(&market, as_of).is_ok());
 

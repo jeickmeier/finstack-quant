@@ -1,6 +1,16 @@
 use super::parameters::SABRParameters;
 use finstack_core::{Error, Result};
 
+/// Snap β to the exact endpoints 0 or 1 when it is within this tolerance.
+///
+/// Used by every code path that branches on "β = 0" (normal-SABR) or "β = 1"
+/// (lognormal-SABR) so that a raw parameter like `0.00005` lands on the same
+/// branch in both `implied_volatility` (smile pricing) and `atm_volatility`
+/// (ATM-only). Previously these two paths used 1e-4 vs 1e-12 respectively,
+/// which let raw β=5e-5 take the normal branch when smiling and the general
+/// branch when ATM-pricing the same parameter set.
+pub(crate) const BETA_SNAP_TOL: f64 = 1e-4;
+
 /// SABR model for volatility smile dynamics
 pub struct SABRModel {
     params: SABRParameters,
@@ -49,7 +59,6 @@ impl SABRModel {
         // single tolerance, during the snap — the previous code snapped at
         // 1e-4 and then redundantly re-classified the snapped value with a
         // mismatched 1e-12 threshold.
-        const BETA_SNAP_TOL: f64 = 1e-4;
         let raw_beta = self.params.beta;
         let beta_is_zero = raw_beta < BETA_SNAP_TOL;
         let beta_is_one = !beta_is_zero && (1.0 - raw_beta).abs() < BETA_SNAP_TOL;
@@ -193,7 +202,9 @@ impl SABRModel {
         let beta = self.params.beta;
         let nu = self.params.nu;
         let rho = self.params.rho;
-        let beta_is_zero = beta.abs() < 1e-12;
+        // Use the same snap tolerance as `implied_volatility` so the same raw
+        // β classifies onto the same (β=0 / general) branch in both paths.
+        let beta_is_zero = beta.abs() < BETA_SNAP_TOL;
 
         // Handle degenerate cases
         if alpha.abs() < 1e-14 {

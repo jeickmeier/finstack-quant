@@ -18,6 +18,12 @@ use finstack_core::money::Money;
 use finstack_core::types::{CurveId, InstrumentId};
 use finstack_core::Error as CoreError;
 
+/// Spread `WACC − g` below which Gordon Growth is near-singular: the terminal
+/// multiplier `(1+g)/(WACC−g)` becomes extremely sensitive to small parameter
+/// errors. 10 bp is the standard practitioner threshold (Damodaran):
+/// `(1.03)/0.001 ≈ 1030×`, vs `(1.03)/0.05 ≈ 21×` for a healthy spread.
+const GORDON_GROWTH_NEAR_SINGULARITY_THRESHOLD: f64 = 0.001;
+
 /// Terminal value calculation method for DCF.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -499,7 +505,23 @@ impl DiscountedCashFlow {
                         self.wacc, g
                     )));
                 }
-                Ok(last_fcf * (1.0 + g) / (self.wacc - g))
+                // Warn on near-singularity: the multiplier (1 + g) / (WACC − g)
+                // blows up as the spread closes. A 1 bp WACC/g typo at spread
+                // ≈ 10 bp swings TV by ~10×; trader/analyst should see this.
+                let spread = self.wacc - g;
+                if spread < GORDON_GROWTH_NEAR_SINGULARITY_THRESHOLD {
+                    tracing::warn!(
+                        wacc = self.wacc,
+                        growth_rate = g,
+                        wacc_minus_g = spread,
+                        "Gordon Growth: WACC − g = {:.4} bp is within near-singularity \
+                         threshold ({:.0} bp); terminal value is extremely sensitive to \
+                         small parameter changes",
+                        spread * 10_000.0,
+                        GORDON_GROWTH_NEAR_SINGULARITY_THRESHOLD * 10_000.0
+                    );
+                }
+                Ok(last_fcf * (1.0 + g) / spread)
             }
             TerminalValueSpec::ExitMultiple {
                 terminal_metric,

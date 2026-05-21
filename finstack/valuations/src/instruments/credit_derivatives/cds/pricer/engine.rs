@@ -1,7 +1,7 @@
 use super::config::CDSPricerConfig;
 use super::helpers::{
     date_from_hazard_time, df_asof_to, haz_t, isda_standard_model_boundaries, settlement_date,
-    sp_cond_to,
+    sp_cond_to, validate_recovery_consistency,
 };
 use crate::constants::{credit, numerical, BASIS_POINTS_PER_UNIT};
 use crate::instruments::common_impl::helpers::year_fraction;
@@ -112,6 +112,12 @@ impl CDSPricer {
     ) -> Result<f64> {
         // Note: Recovery rate validation is performed at CDS construction time.
         // All public constructors (builder, new_isda) call validate().
+        //
+        // Additionally enforce that the trade-spec recovery agrees with the
+        // recovery used to bootstrap the hazard curve. The ISDA Standard Model
+        // requires the same R in both legs; mismatched recoveries silently
+        // mis-scale the protection leg (1 − R) factor.
+        validate_recovery_consistency(cds.protection.recovery_rate, surv)?;
 
         // Protection leg covers the period from protection start to premium end.
         // For forward-starting CDS, protection begins at protection_effective_date

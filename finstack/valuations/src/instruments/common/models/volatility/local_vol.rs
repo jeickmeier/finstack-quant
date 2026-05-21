@@ -360,7 +360,24 @@ fn dupire_lognormal_point(
         let iv = implied_vol(k, t)?;
         return Ok(iv * iv);
     }
-    Ok((numerator / denominator).max(0.0))
+    let raw_local_var = numerator / denominator;
+    if raw_local_var < 0.0 {
+        // Dupire numerator < 0 with positive curvature (butterfly OK) typically
+        // signals calendar arbitrage (∂C/∂T < 0 in the relevant regime) on the
+        // input IV surface. The earlier `.max(0.0)` silently swallowed it; warn
+        // and fall back to the implied vol so the caller can see something is
+        // wrong with the surface rather than pricing on a frozen diffusion.
+        tracing::warn!(
+            strike = k,
+            time = t,
+            raw_local_var,
+            "Dupire local variance < 0 with d²C/dK² > 0 (likely calendar arbitrage): \
+             falling back to implied vol"
+        );
+        let iv = implied_vol(k, t)?;
+        return Ok(iv * iv);
+    }
+    Ok(raw_local_var)
 }
 
 /// Normal (Bachelier) Dupire local variance at a single grid point.
@@ -455,7 +472,23 @@ fn dupire_normal_point(
         let iv = implied_vol(k, t)?;
         return Ok(iv * iv);
     }
-    Ok((dC_dT / denominator).max(0.0))
+    let raw_local_var = dC_dT / denominator;
+    if raw_local_var < 0.0 {
+        // For Bachelier at fixed forward, ∂C/∂T is the pure time-decay term:
+        // negative means the input IV surface has calendar arbitrage at this
+        // (K, T). Warn and fall back to the implied vol rather than silently
+        // clamping to zero local variance (which would freeze the diffusion).
+        tracing::warn!(
+            strike = k,
+            time = t,
+            raw_local_var,
+            "Dupire local variance < 0 (likely calendar arbitrage in normal-vol surface): \
+             falling back to implied vol"
+        );
+        let iv = implied_vol(k, t)?;
+        return Ok(iv * iv);
+    }
+    Ok(raw_local_var)
 }
 
 #[cfg(test)]

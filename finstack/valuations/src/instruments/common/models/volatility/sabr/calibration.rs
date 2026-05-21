@@ -1,6 +1,24 @@
 use super::model::SABRModel;
 use super::parameters::SABRParameters;
+use finstack_core::math::volatility::black_vega;
 use finstack_core::{Error, Result};
+
+/// Vega weight used by the SABR calibration objectives.
+///
+/// Standard practitioner choice (Hagan 2002, Bloomberg VCUB): weight each
+/// (strike, market_vol) residual by Black-76 vega. Vega concentrates near ATM
+/// and decays into the wings, so an unweighted `Σ(σ_m − σ_*)²` would
+/// over-fit the wings (large numbers of low-information quotes) at the
+/// expense of the ATM. Vega weighting gives every dollar of premium roughly
+/// equal weight, which is what the market actually quotes against.
+///
+/// Floor at a tiny positive number keeps deep-OTM strikes from getting a
+/// strictly-zero weight (which would let the optimizer drift on the wings).
+#[inline]
+fn vega_weight(forward: f64, strike: f64, market_vol: f64, time_to_expiry: f64) -> f64 {
+    const MIN_VEGA: f64 = 1e-10;
+    black_vega(forward, strike, market_vol, time_to_expiry).max(MIN_VEGA)
+}
 
 /// SABR calibration using market prices.
 ///
@@ -240,14 +258,15 @@ impl SABRCalibrator {
             if let Ok(sabr_params) = SABRParameters::new(alpha, beta, nu, rho) {
                 let model = SABRModel::new(sabr_params);
 
-                // Calculate sum of squared errors
+                // Vega-weighted sum of squared errors (see `vega_weight`).
                 strikes_vec
                     .iter()
                     .zip(market_vols_vec.iter())
                     .map(|(&strike, &market_vol)| {
+                        let w = vega_weight(forward, strike, market_vol, time_to_expiry);
                         model
                             .implied_volatility(forward, strike, time_to_expiry)
-                            .map(|model_vol| (model_vol - market_vol).powi(2))
+                            .map(|model_vol| w * (model_vol - market_vol).powi(2))
                             .unwrap_or(1e6) // Large penalty for invalid parameters
                     })
                     .sum()
@@ -329,15 +348,16 @@ impl SABRCalibrator {
             if let Ok(sabr_params) = SABRParameters::new(alpha, beta, nu, rho) {
                 let model = SABRModel::new(sabr_params);
 
-                // Calculate sum of squared errors
+                // Vega-weighted sum of squared errors (see `vega_weight`).
                 market_data
                     .strikes
                     .iter()
                     .zip(market_data.market_vols.iter())
                     .map(|(&strike, &market_vol)| {
+                        let w = vega_weight(forward, strike, market_vol, time_to_expiry);
                         model
                             .implied_volatility(forward, strike, time_to_expiry)
-                            .map(|model_vol| (model_vol - market_vol).powi(2))
+                            .map(|model_vol| w * (model_vol - market_vol).powi(2))
                             .unwrap_or(1e6) // Large penalty for invalid parameters
                     })
                     .sum()
@@ -580,9 +600,10 @@ impl SABRCalibrator {
                         if is_atm {
                             0.0
                         } else {
+                            let w = vega_weight(forward, strike, market_vol, time_to_expiry);
                             model
                                 .implied_volatility(forward, strike, time_to_expiry)
-                                .map(|model_vol| (model_vol - market_vol).powi(2))
+                                .map(|model_vol| w * (model_vol - market_vol).powi(2))
                                 .unwrap_or(1e6)
                         }
                     })

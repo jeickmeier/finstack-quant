@@ -82,6 +82,7 @@ use finstack_core::Result;
     serde::Deserialize,
     schemars::JsonSchema,
 )]
+#[builder(validate = CommoditySpreadOption::validate)]
 pub struct CommoditySpreadOption {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -165,11 +166,11 @@ impl CommoditySpreadOption {
         price_curve.price_on_date(self.expiry)
     }
 
-    /// Validate correlation is within [-1, 1].
+    /// Validate correlation is finite and within [-1, 1].
     pub(crate) fn validate(&self) -> Result<()> {
-        if !(-1.0..=1.0).contains(&self.correlation) {
+        if !self.correlation.is_finite() || !(-1.0..=1.0).contains(&self.correlation) {
             return Err(finstack_core::Error::Validation(format!(
-                "CommoditySpreadOption correlation must be in [-1, 1], got {}",
+                "CommoditySpreadOption correlation must be a finite value in [-1, 1], got {}",
                 self.correlation
             )));
         }
