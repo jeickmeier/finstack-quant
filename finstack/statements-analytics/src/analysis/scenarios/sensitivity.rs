@@ -63,19 +63,14 @@ impl<'a> SensitivityAnalyzer<'a> {
     ///
     /// # Parallelism
     ///
-    /// With the `parallel` feature enabled, diagonal sensitivity runs
-    /// each `(parameter, perturbation)` pair concurrently on a rayon
-    /// thread pool. Each worker holds its own cloned `FinancialModelSpec`
-    /// and `Evaluator`, so there is no shared mutable state. Because the
-    /// baseline model is immutable after build, the parallel result is
-    /// identical to the serial result up to floating-point determinism
-    /// of the inner evaluator.
+    /// On native targets, diagonal sensitivity runs each
+    /// `(parameter, perturbation)` pair concurrently via Rayon. Each worker
+    /// holds its own cloned `FinancialModelSpec` and `Evaluator`. Results
+    /// match the serial path bit-for-bit given the same seed and model.
     ///
-    /// With the feature disabled (the default), the serial path runs.
+    /// WebAssembly builds use the serial path (no Rayon thread pool).
     ///
-    /// Full-grid and tornado modes remain serial for now; full-grid has
-    /// cross-parameter ordering dependencies in the naive implementation,
-    /// and tornado delegates to the diagonal path internally.
+    /// Full-grid and tornado modes remain serial.
     pub fn run(&self, config: &SensitivityConfig) -> Result<SensitivityResult> {
         match config.mode {
             // Diagonal runs in parallel on native targets; wasm32 has no

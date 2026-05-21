@@ -18,11 +18,8 @@
 //! - `cs.debt_balance.{instrument_id}` - Outstanding debt balance for specific instrument
 //! - `cs.debt_balance.total` - Total outstanding debt balance
 //!
-//! ## Integration Status: Complete
-//! - Capital structure cashflow computation fully integrated with valuations
-//! - Precise CFKind-based classification (no heuristics)
-//! - Outstanding balance tracking via `outstanding_by_date()`
-//! - 100% leverage of valuations infrastructure achieved
+//! Cashflows are classified by `CFKind` from `finstack-valuations`. Outstanding
+//! balances use `outstanding_by_date()`.
 //!
 //! ## Example
 //! ```rust,no_run

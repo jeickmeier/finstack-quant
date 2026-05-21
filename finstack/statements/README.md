@@ -1,41 +1,32 @@
 # finstack-statements
 
-`finstack-statements` is the statement-modeling crate in Finstack. It builds and evaluates period-based financial models, supports deterministic and stochastic forecast methods, exposes a formula DSL, manages reusable metric registries, and integrates capital-structure cashflows into statement formulas.
+Period-based financial statement modeling: declarative formulas, forecasting, metric registries, and capital-structure integration.
 
-Higher-level analysis workflows such as DCF, sensitivity analysis, variance analysis, scorecards, and covenant-oriented reports live in `finstack-statements-analytics`.
+Higher-level analysis (DCF, scenarios, scorecards, covenants) lives in `finstack-statements-analytics`.
 
-## Operational Notes
+## Usage notes
 
-- Built-in metrics are compile-time embedded. Deployments do not need a runtime `data/metrics` directory.
-- Capital-structure-aware formulas require `Evaluator::evaluate_with_market(&model, &market_ctx, as_of)`.
-- Monte Carlo results preserve path-evaluation warnings when the simulated paths remain finite. Non-finite Monte Carlo path values are treated as hard failures during aggregation.
+- Built-in metrics (`fin.*`) are embedded at compile time; no runtime `data/metrics` directory is required.
+- Capital-structure formulas (`cs.*`) require `Evaluator::evaluate_with_market(&model, &market_ctx, as_of)`.
+- Monte Carlo path evaluation is deterministic when using the same seed; non-finite path values fail during aggregation.
 
-## Runtime Notes
+## Parallelism
 
-Monte Carlo path parallelism via Rayon is always enabled; the crate has no
-Cargo feature flags. Parallel execution is deterministic: results match a
-serial run bit-for-bit given the same seed.
+Rayon-based path parallelism is always enabled on native targets (no Cargo features). Results match a serial run bit-for-bit given the same seed. WebAssembly builds omit Rayon.
 
-Recommended verification matrix:
+## Module docs
 
-```bash
-cargo test -p finstack-statements
-cargo bench -p finstack-statements --bench statements_operations --no-run
-```
-
-## Key Module Docs
-
-- `src/lib.rs` - crate overview, quick start, and module map.
-- `src/dsl/mod.rs` - formula DSL operators, function reference, and examples.
-- `src/evaluator/mod.rs` - evaluation entry points, precedence, and result conventions.
-- `src/capital_structure/mod.rs` - `cs.*` formula namespace and market-context evaluation.
-- `data/metrics/README.md` - built-in metric registry conventions.
+- `src/lib.rs` — crate overview and quick start
+- `src/dsl/mod.rs` — formula DSL operators and function reference
+- `src/evaluator/mod.rs` — evaluation entry points and result conventions
+- `src/capital_structure/mod.rs` — `cs.*` namespace and market-context evaluation
+- `data/metrics/README.md` — built-in metric conventions
 
 ## Verification
 
-Primary crate verification:
-
 ```bash
 cargo test -p finstack-statements
 cargo bench -p finstack-statements --bench statements_operations --no-run
 ```
+
+See `benches/README.md` for benchmark groups and `benches/BENCHMARKS.md` for production-scale workloads.

@@ -1,92 +1,52 @@
-# Golden Test Data - finstack-statements
+# Golden test data
 
-This directory contains reference test data from external sources to validate that
-Finstack Statements produces results consistent with industry-standard tools.
+Reference fixtures that validate `finstack-statements` output against external tools.
 
-## Framework
+Tests use `finstack_core::golden` (`GoldenSuite`, `ExpectedValue`, `GoldenAssert`, `load_suite_from_path`, `assert_abs`).
 
-Tests use the unified `finstack_core::golden` framework:
-
-```rust
-use finstack_core::golden::{
-    GoldenSuite, ExpectedValue, GoldenAssert,
-    load_suite_from_path, assert_abs,
-};
-```
-
-## Directory Structure
+## Layout
 
 ```
 golden/
-├── README.md                   # This file
-├── mod.rs                      # Test module
-├── golden_tests.rs             # Model evaluation tests
-├── golden_parity.rs            # External parity tests
-├── basic_model.json            # Model spec fixture
-├── basic_model_results.json    # Expected results
-├── data/                       # JSON fixtures (canonical format)
+├── golden_tests.rs          # Model evaluation
+├── golden_parity.rs         # External parity
+├── basic_model.json         # Model spec fixture
+├── basic_model_results.json # Expected results
+├── data/
 │   └── excel_npv_scenarios.json
-├── excel/                      # Legacy CSV fixtures
-│   └── npv_scenarios.csv
-└── pandas/                     # Legacy CSV fixtures
-    ├── ewm_values.csv
-    └── rolling_stats.csv
+├── excel/                   # Legacy CSV (NPV)
+└── pandas/                  # Legacy CSV (rolling/EWM)
 ```
 
 ## Suites
 
-### Model Evaluation (`basic_model.json`)
+**Model evaluation** (`basic_model.json`) — serialization, node evaluation, period handling.
 
-Tests for financial model evaluation:
-- Serialization stability
-- Node evaluation correctness
-- Period handling
+**Excel NPV** (`data/excel_npv_scenarios.json`) — NPV vs Microsoft Excel 365 (16.80), tolerance `0.01`.
 
-### Excel NPV Parity (`data/excel_npv_scenarios.json`)
+**pandas rolling/EWM** (`pandas/*.csv`) — rolling and EWM vs pandas 2.1.3, tolerance `1e-10`.
 
-NPV calculations validated against Microsoft Excel NPV() function.
+## Fixture metadata
 
-**Reference Source**: Microsoft Excel 365 (Version 16.80)
-**Tolerance**: 0.01 (accounting precision)
+JSON fixtures should include:
 
-### pandas Rolling Statistics (Legacy CSV)
+- `meta.suite_id`
+- `meta.reference_source.name`
+- `meta.generated.at` and `meta.generated.by`
+- `meta.status` — `"certified"` after validation, `"provisional"` before
 
-Rolling window and EWM calculations validated against pandas.
+## Tolerances
 
-**Reference Source**: pandas 2.1.3 (Python 3.11)
-**Tolerance**: 1e-10 (float64 precision)
+| Source | Tolerance | Notes |
+|--------|-----------|-------|
+| Excel | `1e-8` | double precision |
+| pandas | `1e-10` | float64 |
+| Statistical | `1e-3` | algorithm differences |
+| Accounting | `0.01` | two decimal places |
 
-## Provenance Requirements
+## Adding fixtures
 
-Every JSON fixture must include:
-- `meta.suite_id`: Unique identifier
-- `meta.reference_source.name`: Source tool/library
-- `meta.generated.at`: Generation timestamp
-- `meta.generated.by`: Generator script/person
-- `meta.status`: "certified" for validated fixtures
-
-## Tolerance Rationale
-
-| Source | Tolerance | Rationale |
-|--------|-----------|-----------|
-| Excel | 1e-8 | Double precision limit |
-| pandas | 1e-10 | float64 precision |
-| Statistical | 1e-3 | Algorithmic differences |
-| Accounting | 0.01 | 2 decimal places |
-
-## Adding New Fixtures
-
-1. Create JSON file in `data/` with canonical structure
-2. Include full provenance in `meta`
-3. Set `status` to `"provisional"` initially
-4. Validate against reference source
-5. Update `status` to `"certified"`
-6. Document in this README
-
-## Migration Notes
-
-CSV fixtures in `excel/` and `pandas/` are being migrated to JSON format
-in `data/`. The JSON format provides:
-- Structured provenance metadata
-- Consistent tolerance specification
-- Integration with `finstack_core::golden` framework
+1. Add JSON under `data/` with full `meta` provenance.
+2. Validate against the reference source.
+3. Set `meta.status` to `"certified"`.
+4. Document the suite here.

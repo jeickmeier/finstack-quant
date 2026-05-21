@@ -59,7 +59,7 @@
 //!
 //! - **types**: Wire types for serialization (`NodeSpec`, `FinancialModelSpec`)
 //! - **builder**: Type-safe builder API with compile-time state enforcement
-//! - **error**: Comprehensive error types with context
+//! - **error**: Error types with context
 //! - **adjustments**: Normalization engine plus add-back specs/caps for adjusted EBITDA
 //! - **dsl**: Formula DSL (parser, AST, compiler) for arithmetic, time-series, rolling and statistical functions
 //! - **evaluator**: DAG-based evaluation with topological sort, precedence resolution, and capital structure integration

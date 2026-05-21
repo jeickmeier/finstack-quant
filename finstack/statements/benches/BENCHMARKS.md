@@ -1,20 +1,22 @@
-# `finstack-statements` Benchmarks
+# `finstack-statements` production-scale benchmarks
 
-Production-scale benchmark entry points for evaluator, Monte Carlo, aggregate,
-and capital-structure hot paths.
+`statements_scale` targets evaluator, Monte Carlo, aggregate, and capital-structure hot paths at production sizes.
 
-## How to reproduce
+## Run
 
 ```bash
 cargo bench -p finstack-statements --bench statements_scale
 ```
 
-Re-run after meaningful changes to the evaluator hot path
-(`evaluator/{engine,formula,formula_dispatch,formula_aggregates,formula_helpers}`),
-the historical cache (`evaluator/context.rs`), the Monte Carlo loop
-(`evaluator/monte_carlo.rs`), or the capital-structure waterfall.
+## When to re-run
 
-The smaller `statements_operations` bench remains the place to track
-correctness-sized models (4–24 periods × ≤50 nodes).
+After changes to:
+
+- Evaluator hot path (`evaluator/{engine,formula,formula_dispatch,formula_aggregates,formula_helpers}`)
+- Historical cache (`evaluator/context.rs`)
+- Monte Carlo loop (`evaluator/monte_carlo.rs`)
+- Capital-structure waterfall
+
+Use `statements_operations` for smaller models (4–24 periods, ≤50 nodes).
 
 Keep machine-specific timing baselines in Criterion output or CI artifacts.

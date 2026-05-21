@@ -1,61 +1,51 @@
-# Financial Metrics Registry
+# Financial metrics registry
 
-This directory contains JSON metric definitions for the `finstack-statements` registry.
+JSON metric definitions loaded by `finstack-statements` registry APIs. Built-in files are embedded at compile time via `Registry::with_builtins()` / `ModelBuilder::with_builtin_metrics()`.
 
-## Metric Conventions
+## Files
 
-### Leverage & Coverage Metrics
+| File | Contents |
+|------|----------|
+| `fin_basic.json` | Core income statement metrics |
+| `fin_leverage.json` | Leverage and coverage ratios |
+| `fin_margins.json` | Margin metrics |
+| `fin_returns.json` | Return metrics |
 
-Leverage and coverage metrics in `fin_leverage.json` follow standard credit analysis conventions:
+Additional registries can be loaded with `ModelBuilder::with_metrics()`.
 
-#### EBITDA Construction
+## Conventions
 
-- All coverage metrics use EBITDA = `revenue - cogs - opex + depreciation + amortization`
-- This assumes D&A are captured in their own line items, not embedded in COGS/opex
-- For accurate comparisons, ensure consistent D&A classification across periods
+### EBITDA
 
-#### Interest Expense
+Coverage metrics in `fin_leverage.json` use EBITDA = `revenue - cogs - opex + depreciation + amortization`. D&A must be separate line items, not embedded in COGS or opex.
 
-- Interest expense should include all forms of interest:
-  - Cash interest payments
-  - PIK (payment-in-kind) interest accruals
-  - Amortization of debt issuance costs (if applicable per your accounting policy)
-- When using capital structure integration (`cs.interest_expense`), this automatically includes PIK
+### Interest expense
 
-#### Principal Payments
+Include cash interest, PIK accruals, and debt-cost amortization per your accounting policy. `cs.interest_expense` from capital-structure integration includes PIK automatically.
 
-- Principal payments are not tax-deductible
-- Debt service coverage ratios may understate true coverage since EBITDA is pre-tax
-- Consider using EBIAT (EBIT × (1 - tax_rate)) for more conservative analysis
+### Principal and taxes
 
-#### Capitalized Interest
+Principal is not tax-deductible; debt-service coverage on pre-tax EBITDA can overstate capacity. Consider EBIAT (`EBIT × (1 - tax_rate)`) for conservative analysis.
 
-- If interest is capitalized during construction periods, it will not appear in interest_expense
-- This can distort coverage ratios during development phases
-- Adjust formulas manually if capitalized interest materially affects analysis
+### Capitalized interest
 
-### Common Thresholds (Industry Guidelines)
+Capitalized interest during construction may be absent from `interest_expense`, distorting coverage during development phases.
 
-- **Interest Coverage**: > 1.5x (investment grade), > 2.5x (strong)
-- **Debt Service Coverage**: > 1.25x (typical covenant), > 1.5x (comfortable)
-- **Debt/EBITDA**: < 3.0x (conservative), < 4.0x (acceptable for most industries)
+### Reference thresholds
 
-### Customization
+Typical industry guidelines (not enforced by the registry):
 
-When defining custom metrics:
+- Interest coverage: > 1.5x (IG), > 2.5x (strong)
+- Debt service coverage: > 1.25x (covenant), > 1.5x (comfortable)
+- Debt/EBITDA: < 3.0x (conservative), < 4.0x (acceptable for many industries)
 
-1. Use qualified references for registry metrics: `fin.ebitda` not `ebitda`
-2. Document assumptions about line-item classification
-3. Note any industry-specific adjustments
-4. Specify whether ratios use TTM or period values
+### Custom metrics
 
-## File Structure
+1. Reference registry metrics with qualified ids: `fin.ebitda`, not `ebitda`.
+2. Document line-item classification assumptions.
+3. State whether ratios use TTM or period values.
 
-- `fin_basic.json` - Core income statement metrics
-- `fin_leverage.json` - Leverage and coverage ratios
-- Additional registries can be loaded via `ModelBuilder::with_metrics()`
+## See also
 
-## See Also
-
-- Main registry documentation: `finstack/statements/src/registry/`
-- DSL function reference: `finstack/statements/src/dsl/`
+- `src/registry/mod.rs` — namespace resolution and shadowing rules
+- `src/dsl/mod.rs` — formula function reference
