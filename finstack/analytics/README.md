@@ -1,28 +1,26 @@
 # finstack-analytics
 
-`finstack-analytics` provides portfolio performance and risk analytics on
-numeric return series and `finstack_core::dates::Date`, with no DataFrame or
-Polars dependency.
+Portfolio performance and risk analytics on numeric return series and
+`finstack_core::dates::Date`, with no DataFrame or Polars dependency.
 
-[`Performance`](src/performance.rs) is the only entry point. Construct it from
-a price or return panel and every analytic — return / risk scalars, drawdown
-statistics, rolling windows, periodic returns, benchmark alpha / beta, basic
-factor models — is a method on the resulting instance.
+[`Performance`](src/performance/mod.rs) is the entry point. Construct it from
+a price or return panel; scalars, drawdown statistics, rolling windows,
+periodic returns, and benchmark-relative metrics are methods on that instance.
 
-The per-domain modules (`returns`, `risk_metrics`, `drawdown`, `benchmark`,
-`aggregation`, `lookback`) contain crate-internal building blocks that
-`Performance` composes. Result and config types those modules produce are
-re-exported because `Performance` returns them.
+Per-domain modules (`returns`, `risk_metrics`, `drawdown`, `benchmark`,
+`aggregation`, `lookback`) hold crate-internal building blocks that
+`Performance` composes. Result and config types those modules define are
+re-exported at the crate root because `Performance` returns them.
 
-## What This Crate Covers
+## Coverage
 
-- **Returns**: simple returns, excess returns, compounded accumulation, geometric mean.
-- **Risk metrics**: CAGR, mean return, volatility, Sharpe, Sortino, downside deviation, Omega, gain-to-pain, modified Sharpe.
-- **Tail-risk**: historical VaR, Expected Shortfall, parametric VaR, Cornish-Fisher VaR, skewness, kurtosis, tail ratios.
-- **Drawdown**: drawdown paths, drawdown episodes, max / mean drawdown, Ulcer Index, CDaR, Calmar, Martin, Sterling, Burke, Pain, recovery factor.
-- **Benchmark-relative**: tracking error, information ratio, beta (with SE and CI), alpha / beta / R² greeks, rolling greeks, up / down capture, batting average, Treynor, M-squared, multi-factor regression.
-- **Rolling series**: rolling Sharpe, Sortino, volatility, alpha / beta.
-- **Aggregation and lookbacks**: period compounding, win / loss streaks, Kelly criterion, MTD / QTD / YTD / FYTD range selection.
+- **Returns**: simple returns, excess returns, compounded accumulation, geometric mean
+- **Risk metrics**: CAGR, mean return, volatility, Sharpe, Sortino, downside deviation, Omega, gain-to-pain, modified Sharpe
+- **Tail risk**: historical VaR, Expected Shortfall, parametric VaR, Cornish-Fisher VaR, skewness, kurtosis, tail ratios
+- **Drawdown**: drawdown paths, episodes, max/mean drawdown, Ulcer Index, CDaR, Calmar, Martin, Sterling, Burke, Pain, recovery factor
+- **Benchmark-relative**: tracking error, information ratio, beta (with SE and CI), alpha/beta/R² greeks, rolling greeks, up/down capture, batting average, Treynor, M-squared, multi-factor regression
+- **Rolling series**: rolling Sharpe, Sortino, volatility, alpha/beta
+- **Aggregation and lookbacks**: period compounding, win/loss streaks, Kelly criterion, MTD/QTD/YTD/FYTD range selection
 
 ## Dependencies
 
@@ -39,7 +37,7 @@ use finstack_analytics::Performance;
 use finstack_core::dates::{Date, Month, PeriodKind};
 ```
 
-## Quick Start
+## Quick start
 
 ```rust
 use finstack_analytics::Performance;
@@ -76,53 +74,58 @@ perf.reset_date_range(
     Date::from_calendar_date(2025, Month::January, 6).unwrap(),
 );
 
-let windowed_cagr = perf.cagr()?;
+let windowed_cagr = perf.cagr().expect("valid active window");
 assert_eq!(windowed_cagr.len(), 2);
 ```
 
-## Public API Surface
+Use [`Performance::from_returns`](src/performance/mod.rs) when the panel is
+already simple returns instead of prices.
 
-| Item | Location | Notes |
-|------|----------|-------|
-| `Performance`, `LookbackReturns` | `performance` | Canonical entry point |
+## Public API
+
+| Item | Module | Notes |
+|------|--------|-------|
+| `Performance`, `LookbackReturns` | `performance` | Entry point |
 | `PeriodStats` | `aggregation` | Returned by `Performance::period_stats` |
 | `DrawdownEpisode` | `drawdown` | Returned by `Performance::drawdown_details` |
-| `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult` | `benchmark` | Returned by `Performance::beta`, `greeks`, `rolling_greeks`, `multi_factor_greeks` |
+| `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult` | `benchmark` | Returned by benchmark methods on `Performance` |
 | `CagrBasis`, `AnnualizationConvention` | `risk_metrics` | Configuration types |
 | `DatedSeries`, `RollingSharpe`, `RollingSortino`, `RollingVolatility` | `risk_metrics` | Returned by `Performance::rolling_*` |
-| `benchmark::beta` | `benchmark` | Kept public for cross-crate use by `finstack-valuations` |
+| `beta` | `benchmark` | Freestanding OLS beta; also used by `finstack-valuations` |
 
 All other functions are crate-internal (`pub(crate)`).
 
-## Core Conventions
+## Conventions
 
 - **Returns are simple decimal returns** unless a function explicitly says otherwise. `0.01` means `+1%`.
 - **Drawdown depths are non-positive fractions**. A 25% drawdown is `-0.25`.
-- **CDaR is non-negative** (reported as an absolute tail drawdown depth).
-- **Benchmark alignment is the caller's responsibility**. `Performance` assumes the benchmark column already aligns with the panel's date grid.
-- **Annualization is derived from `PeriodKind`** when called through `Performance`.
-- **Rolling series are right-labeled**: the date attached to each rolling value is the last date in that window.
-- **`Performance::new(...)` expects price paths** and derives simple returns internally.
+- **CDaR is non-negative** (absolute tail drawdown depth).
+- **Benchmark alignment is the caller's responsibility**. `Performance` assumes the benchmark column aligns with the panel date grid.
+- **Annualization comes from `PeriodKind`** when called through `Performance`.
+- **Rolling series are right-labeled**: each output date is the last date in its window.
+- **`Performance::new` expects price paths** and derives simple returns internally.
+- **Per-ticker methods** (`rolling_*`, `drawdown_details`, `period_stats`, `multi_factor_greeks`) take a zero-based ticker index and return `Result` when the index is invalid.
 
-## Numerical Behavior and Validation
+## Numerical behavior
 
 - Compounding uses compensated summation in log space for long-series stability.
-- `Performance::new` rejects ragged price matrices, mismatched ticker names, non-finite inputs, negative price-domain issues, and interior invalid returns.
+- `Performance::new` and `Performance::from_returns` reject empty inputs, ragged matrices, unknown benchmark names, duplicate or non-monotonic dates, non-finite values, and interior invalid returns.
 - Multi-factor regression rejects mismatched factor lengths, non-finite factors, non-positive annualization factors, and singular or near-singular factor matrices.
+- Volatility, covariance, skewness, and kurtosis use sample statistics (`n - 1` denominator).
 - Degenerate cases return `0.0`, `NaN`, or `±∞` rather than panicking.
 
 ## Serialization
 
-`Performance`, `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`, `GreeksResult`, `MultiFactorResult`, `RollingGreeks`, `RollingSharpe`, `RollingSortino`, and `RollingVolatility` all derive `Serialize`/`Deserialize`.
+`Performance`, `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`, `GreeksResult`, `MultiFactorResult`, `RollingGreeks`, `RollingSharpe`, `RollingSortino`, and `RollingVolatility` derive `Serialize`/`Deserialize`.
 
-## Bindings Notes
+## Bindings
 
-- Python surface is intentionally **flat**: `Performance` is exposed under `finstack.analytics`. See `parity_contract.toml` for the canonical mapping.
-- WASM surface mirrors `Performance`; result types are returned as JS objects via `serde-wasm-bindgen`.
+- Python: flat surface under `finstack.analytics`; see `finstack-py/parity_contract.toml`.
+- WASM: mirrors `Performance`; result types serialize to JS objects via `serde-wasm-bindgen`.
 
 ## References
 
-Canonical quantitative references live in [`docs/REFERENCES.md`](../../docs/REFERENCES.md).
+Quantitative references: [`docs/REFERENCES.md`](../docs/REFERENCES.md).
 
 ## Verification
 

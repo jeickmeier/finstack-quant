@@ -1,11 +1,8 @@
-//! Stateful `Performance` struct that orchestrates all analytics sub-modules.
+//! Stateful `Performance` orchestrator over the analytics building blocks.
 //!
-//! Mirrors the Python `Performance` class 1:1 (minus plotting), operating on
-//! internal slices and returning numeric results.
-//!
-//! The implementation is split across several sibling files to keep each
-//! topic readable; all submodules add `impl Performance` blocks. Any public
-//! re-export still happens through this module.
+//! Implementation is split across sibling files (`scalar`, `rolling`,
+//! `benchmark`, `aggregation`); each adds `impl Performance` methods.
+//! Public re-exports happen from `lib.rs`.
 
 use crate::dates::{Date, Duration, PeriodKind};
 

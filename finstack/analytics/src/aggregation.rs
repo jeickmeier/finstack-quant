@@ -166,7 +166,7 @@ pub(crate) fn group_by_period(
 
 /// Compute period-level statistics from grouped returns.
 ///
-/// Derives a comprehensive set of trading statistics from a sequence of
+/// Derives period-level trading statistics from a sequence of
 /// per-period compounded returns, including win rate, payoff ratio, Kelly
 /// criterion, and consecutive streak lengths.
 ///
