@@ -73,22 +73,17 @@ finstack = { path = "finstack" }
 
 ## Python Bindings
 
-`finstack-py` builds the Python package named `finstack`. The binding tree
-mirrors the Rust domain layout and currently exposes these top-level
-subpackages:
+`finstack-py` builds the Python package `finstack`. Top-level subpackages (lazy-loaded):
 
-- `analytics`
-- `core`
-- `margin`
-- `monte_carlo`
-- `portfolio`
-- `scenarios`
-- `statements`
-- `statements_analytics`
-- `valuations`
+- `analytics`, `cashflows`, `core`, `margin`, `monte_carlo`, `portfolio`,
+  `scenarios`, `statements`, `statements_analytics`, `valuations`
 
-The Python examples and notebook curriculum live under `finstack-py/examples/`.
-The notebook runner is `finstack-py/examples/run_all_notebooks.py`.
+Nested modules under `finstack.valuations` (for example `correlation`, `instruments`)
+mirror the Rust crate layout. See [`finstack-py/README.md`](finstack-py/README.md).
+
+Notebooks live under `finstack-py/examples/notebooks/`. Run them with
+`mise run python-examples` or
+`uv run python finstack-py/examples/notebooks/run_all_notebooks.py`.
 
 ## WASM Bindings
 
@@ -170,7 +165,9 @@ Run `mise tasks` to list every available task.
 ## Documentation
 
 - `docs/` for shared references, standards, and design notes.
-- `finstack-py/examples/README.md` for the Python notebook curriculum.
+- [`finstack-py/README.md`](finstack-py/README.md) and
+  [`finstack-py/examples/notebooks/README.md`](finstack-py/examples/notebooks/README.md)
+  for Python bindings and the notebook curriculum.
 
 ## License
 

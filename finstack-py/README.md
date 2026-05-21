@@ -1,182 +1,155 @@
 # finstack Python bindings
 
-`finstack-py` builds the Python package named `finstack`, providing Python
-access to the Rust Finstack workspace without moving pricing or analytics logic
-out of Rust. The public package mirrors the Rust umbrella crate structure, and
-the package-level modules are loaded lazily so importing `finstack` does not
-eagerly import every domain.
+`finstack-py` builds the Python package `finstack`: thin PyO3 wrappers over the Rust
+Finstack workspace. Pricing and analytics logic stay in Rust. Top-level subpackages
+load lazily so `import finstack` does not import every domain.
 
-## Available Modules
+## Top-level modules
 
-The current top-level Python package exposes these subpackages:
+| Module | Rust crate domain |
+|--------|-------------------|
+| `finstack.analytics` | `finstack-analytics` |
+| `finstack.cashflows` | `finstack-cashflows` (schedule JSON helpers) |
+| `finstack.core` | `finstack-core` |
+| `finstack.margin` | `finstack-margin` |
+| `finstack.monte_carlo` | `finstack-monte-carlo` |
+| `finstack.portfolio` | `finstack-portfolio` |
+| `finstack.scenarios` | `finstack-scenarios` |
+| `finstack.statements` | `finstack-statements` |
+| `finstack.statements_analytics` | `finstack-statements-analytics` |
+| `finstack.valuations` | `finstack-valuations` |
 
-- `finstack.analytics`
-- `finstack.core`
-- `finstack.margin`
-- `finstack.monte_carlo`
-- `finstack.portfolio`
-- `finstack.scenarios`
-- `finstack.statements`
-- `finstack.statements_analytics`
-- `finstack.valuations` (includes `finstack.valuations.correlation`)
+`finstack.valuations` also exposes nested subpackages (`instruments`, `correlation`,
+`credit`, `credit_derivatives`, `fx`, `exotics`, …) that mirror Rust module layout.
 
-Each subpackage is a thin wrapper over the corresponding Rust crate domain.
+## Build and install
 
-## Build And Install
-
-From the repository root, the recommended path is:
+From the repository root:
 
 ```bash
 mise run python-build
 ```
 
-That installs the Python dependencies defined in the root `pyproject.toml` and
-builds the extension with the Rust **dev** profile (fast compile).
+Installs dependencies from the root `pyproject.toml` and builds the extension with
+the Rust **dev** profile (fast compile).
 
-For a release build (slower compile, faster runtime — e.g. large portfolio runs):
+Release build (slower compile, faster runtime — large portfolios, batch notebooks):
 
 ```bash
 mise run python-build -- --release
 ```
 
-If you want to build the extension directly:
+Direct maturin develop (from `finstack-py/`):
 
 ```bash
-cd finstack-py
-uv run python -m maturin develop          # dev (default)
+uv run python -m maturin develop
 uv run python -m maturin develop --release
 ```
 
-`mise run python-build` builds with the dev profile (fast compile, slower runtime); use `mise run python-build -- --release` for the optimized release build.
-
-## Quick Start
+## Quick start
 
 ```python
 from datetime import date
 
 from finstack.core.currency import Currency
-from finstack.core.dates import BusinessDayConvention, adjust, get_calendar
+from finstack.core.dates import BusinessDayConvention, HolidayCalendar, adjust
 from finstack.core.money import Money
 
 usd = Currency("USD")
 amount = Money(1_000_000, usd)
 
-calendar = get_calendar("usny")
-settle = adjust(date(2025, 1, 4), BusinessDayConvention.FOLLOWING, calendar)
+settle = adjust(
+    date(2025, 1, 4),
+    BusinessDayConvention.FOLLOWING,
+    HolidayCalendar("usny"),
+)
 
 print(amount.format())
 print(settle)
 ```
 
-## Package Structure
+## Package layout
 
-The package tree under `finstack-py/finstack/` follows the Rust domain layout:
+| Path | Role |
+|------|------|
+| `finstack-py/finstack/` | Python package, lazy `__init__.py`, `.pyi` stubs |
+| `finstack-py/src/bindings/` | PyO3 registration by domain |
+| `finstack-py/parity_contract.toml` | Parity-tested public API |
+| `finstack-py/tests/` | Runtime and behavioral tests |
+| `finstack-py/tests/parity/` | Structural import/name parity |
 
-- `analytics/`
-- `core/`
-- `correlation/`
-- `margin/`
-- `monte_carlo/`
-- `portfolio/`
-- `scenarios/`
-- `statements/`
-- `statements_analytics/`
-- `valuations/`
+## Examples and notebooks
 
-The Rust-side bindings live under `finstack-py/src/bindings/`, again split by
-domain. Public type stubs live alongside the Python package as `.pyi` files.
+Notebook curriculum under `finstack-py/examples/notebooks/`:
 
-## Examples And Notebooks
+- `01_foundations` — core types, dates, market data, math, registry
+- `02_pricing` — instruments, attribution
+- `03_analytics` — performance and risk analytics
+- `04_statement_modeling` — statements and statement analytics
+- `05_portfolio_and_scenarios` — portfolio, scenarios, liquidity
+- `06_advanced_quant` — Monte Carlo, correlation, margin/XVA
+- `07_capstone` — end-to-end workflow
 
-The live Python examples are notebook-first and live under
-`finstack-py/examples/`. The curriculum currently includes:
+Index: [`examples/notebooks/README.md`](examples/notebooks/README.md).
 
-- `01_foundations`
-- `02_pricing`
-- `03_analytics`
-- `04_statement_modeling`
-- `05_portfolio_and_scenarios`
-- `06_advanced_quant`
-- `07_capstone`
-
-Start with the examples index:
-
-- `finstack-py/examples/README.md`
-
-Run the notebook suite from the repository root:
+Run all notebooks from the repo root:
 
 ```bash
-uv run python finstack-py/examples/run_all_notebooks.py
+mise run python-examples
+# or:
+uv run python finstack-py/examples/notebooks/run_all_notebooks.py
 ```
 
-Run a single section:
+One section:
 
 ```bash
-uv run python finstack-py/examples/run_all_notebooks.py --directory 05_portfolio_and_scenarios
+uv run python finstack-py/examples/notebooks/run_all_notebooks.py --directory 05_portfolio_and_scenarios
 ```
 
-## Stubs, Parity, And Testing
+## Stubs, parity, and tests
 
-The Python package ships manually maintained `.pyi` stubs in
-`finstack-py/finstack/`. Runtime coverage lives under `finstack-py/tests/`;
-structural parity checks live under `finstack-py/tests/parity/`.
+`.pyi` stubs live under `finstack-py/finstack/`. When you add or rename a binding in the
+parity-tested surface, update `parity_contract.toml` in the same change.
 
-Useful checks from the repository root:
+| Check | Command |
+|-------|---------|
+| Python tests | `mise run python-test` |
+| Parity only | `uv run pytest finstack-py/tests/parity` |
+| Type check | `mise run python-typecheck` |
+| Stub completeness | `mise run python-verifytypes` |
 
-```bash
-uv run pyright
-uv run ty check finstack-py/finstack
-uv run pytest finstack-py/tests
-uv run pytest finstack-py/tests/parity
-```
+Structural parity (`finstack-py/tests/parity/`):
 
-### Parity contract
+- Every contract entry imports.
+- Names match Rust `snake_case` 1:1 (see `AGENTS.md`).
+- Modules marked `exists` / `flattened` import; `missing` stay absent until the contract changes.
 
-`finstack-py/parity_contract.toml` is the authoritative spec for the
-Python-visible API surface that parity tests pin. When you add or rename a
-binding, update the contract in the same change. The structural parity tests
-under `finstack-py/tests/parity/` enforce that:
+Behavioral parity (e.g. `tests/test_core_parity.py`) compares Rust-backed results.
 
-- Every entry in the contract resolves to an importable Python symbol.
-- Names match Rust source 1:1 (per `AGENTS.md` naming-strategy rules).
-- Public modules marked `exists` or `flattened` import successfully, while
-  modules marked `missing` remain absent until the contract changes.
+## Type discovery
 
-Behavioral parity cases that compare Rust-backed results live alongside the
-runtime tests, for example `finstack-py/tests/test_core_parity.py`.
-
-## Type Discovery
-
-Python types live alongside their Rust counterparts. A few common entry
-points:
-
-| Concept | Python module | Key types |
-|---------|---------------|-----------|
+| Area | Module | Entry points |
+|------|--------|--------------|
 | Money / currency | `finstack.core.money`, `finstack.core.currency` | `Money`, `Currency` |
-| Rates and bps | `finstack.core.types` | `Rate`, `Bps`, `Percentage` |
+| Rates | `finstack.core.types` | `Rate`, `Bps`, `Percentage` |
 | Credit ratings | `finstack.core.types` | `CreditRating` |
-| Dates and calendars | `finstack.core.dates` | `Tenor`, `DayCount`, `Schedule`, `ScheduleBuilder`, `BusinessDayConvention` |
-| Configuration | `finstack.core.config` | `FinstackConfig`, `RoundingMode`, `ToleranceConfig` |
-| Discount and forward curves | `finstack.core.market_data` | `DiscountCurve`, `ForwardCurve`, `MarketContext` |
-| Credit scoring | `finstack.core.credit.scoring` | `altman_z_score`, `ohlson_o_score`, `ScoringResult` |
-| Pricers and metrics | `finstack.valuations` | `price_instrument`, instrument types |
-| Performance and risk | `finstack.analytics` | `value_at_risk`, drawdown, return-series helpers |
+| Dates | `finstack.core.dates` | `Tenor`, `DayCount`, `Schedule`, `ScheduleBuilder`, `HolidayCalendar`, `adjust` |
+| Config | `finstack.core.config` | `FinstackConfig`, `RoundingMode`, `ToleranceConfig` |
+| Curves / context | `finstack.core.market_data` | `DiscountCurve`, `ForwardCurve`, `MarketContext` |
+| Credit scoring | `finstack.core.credit.scoring` | `altman_z_score`, `ohlson_o_score`, … (tuple results) |
+| Cashflow schedules | `finstack.cashflows` | `build_cashflow_schedule`, `validate_cashflow_schedule` |
+| Pricing | `finstack.valuations` | `price_instrument`, instrument types under `valuations.instruments` |
+| Performance / risk | `finstack.analytics` | `Performance` (methods: `value_at_risk`, drawdowns, rolling metrics, …) |
 
-For the full surface, browse `finstack-py/finstack/**/*.pyi` — every public
-import has a stub with type annotations and docstrings.
+Full surface: `finstack-py/finstack/**/*.pyi`.
 
-## Common Pitfalls
-
-A few things that surprise users coming from the Rust side or other
-financial Python libraries:
+## Common pitfalls
 
 ### Decimal vs `float`
 
-Per `INVARIANTS.md` §1, the Rust workspace uses `rust_decimal::Decimal` at
-the money/accounting boundary (`finstack-core::money`) and `f64` everywhere
-else (rates, vols, returns, derivative prices). The Python bindings expose
-`f64` for ergonomic interop. If your downstream code needs exact
-`decimal.Decimal` arithmetic, convert at your boundary:
+Per `INVARIANTS.md` §1, Rust uses `Decimal` at the money/accounting boundary and `f64`
+elsewhere. Bindings expose `f64` for interop; `Money` also accepts `decimal.Decimal` on
+construction. Convert at your boundary if downstream code needs exact decimals:
 
 ```python
 from decimal import Decimal
@@ -186,45 +159,54 @@ m = Money(123.45, "USD")
 d = Decimal(m.format(decimals=2, show_currency=False))
 ```
 
-### Builder pattern: in-place mutation
+### Builders mutate in place
 
-Rust builders use fluent self-return (`builder.frequency(x).stub_rule(y).build()`).
-Python builders **mutate in place and return `None`** — chaining will fail.
-Call setters sequentially on the same instance:
+Rust builders chain (`builder.frequency(x).stub_rule(y).build()`). Python builder
+methods return `None` — call setters on the same instance, then `.build()`:
 
 ```python
+from finstack.core.dates import ScheduleBuilder, StubKind
+
 b = ScheduleBuilder(start, end)
-b.frequency("3M")               # returns None
+b.frequency("3M")
 b.stub_rule(StubKind.SHORT_FRONT)
 schedule = b.build()
 ```
 
-### Errors are `ValueError`
+### Errors
 
-All fallible bindings raise `ValueError` (with the underlying Rust error
-chain flattened into the message). The error-mapping helper lives at
-`finstack-py/src/errors.rs`. There are no domain-specific exception
-classes; check `str(exc)` if you need to discriminate.
+Most fallible bindings raise `ValueError` with the Rust error chain in the message
+(`finstack-py/src/errors.rs`: `core_to_py`, `display_to_py`).
 
-### Naming follows Rust 1:1
+Domain-specific types (all subclass `ValueError` unless noted):
 
-Rust `snake_case` ↔ Python `snake_case` — no rename. If you find yourself
-hunting for a Python name that "should" exist, search the Rust source first
-— odds are the name is identical and the answer is in `finstack/<crate>/src/`.
+| Exception | Module | Use |
+|-----------|--------|-----|
+| `AnalyticsError` | `finstack.analytics` | Analytics validation / calculation |
+| `PortfolioError` | `finstack.portfolio` | General portfolio errors |
+| `FinstackValuationError` | `finstack.portfolio` | Valuation failures |
+| `FinstackFxError` | `finstack.portfolio` | FX / missing market data |
+| `FinstackOptimizationError` | `finstack.portfolio` | Optimization failures |
+| `CholeskyError` | `finstack.core.math.linalg` | Cholesky decomposition |
+| `CalibrationEnvelopeError` | `finstack.valuations` | Calibration envelope (`RuntimeError` subclass) |
 
-## Documentation Style
+Catching `ValueError` still covers analytics and portfolio subclasses.
 
-For contributors adding or editing bindings, see
-[`finstack-py/DOCS_STYLE.md`](DOCS_STYLE.md). It covers PyO3 docstring
-conventions, `.pyi` NumPy-style format, financial conventions, and the
-in-place-mutation contract for Python builders.
+### Naming matches Rust
 
-## Relationship To Rust And WASM
+Rust `snake_case` ↔ Python `snake_case`, identical. Search the Rust crate if a symbol
+is missing from stubs — the name is usually the same.
 
-The Python package is one binding surface for the same Rust workspace described
-in the repository root `README.md`. The repository also ships
-`finstack-wasm`, which follows the same domain layout for browser and Node.js
-consumers.
+## Documentation style
+
+Contributors: [`DOCS_STYLE.md`](DOCS_STYLE.md) (PyO3 `///` comments, `.pyi` NumPy-style
+docstrings, financial conventions, in-place builders).
+
+## Rust and WASM
+
+Same Rust workspace as the repo root `README.md`. Browser/Node bindings:
+`finstack-wasm` (subset of `finstack-core` on WASM; see `parity_contract.toml`
+`[wasm_core_subset]`).
 
 ## License
 

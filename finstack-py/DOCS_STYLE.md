@@ -1,8 +1,10 @@
-## finstack-py documentation style
+# finstack-py documentation style
 
-`finstack-py` is the PyO3-based Python binding for the `finstack` Rust workspace. The user-facing API is consumed via Python imports and IDE tooltips. Documentation must read naturally as Python docstrings while staying in sync with the Rust source.
+PyO3 bindings for the `finstack` Rust workspace. Users see docs via `help()`, IDE
+tooltips (`.pyi`), and notebooks. Wording should read as Python docstrings and match
+the Rust source semantics.
 
-This style guide is the Python counterpart to [`finstack-wasm/DOCS_STYLE.md`](../finstack-wasm/DOCS_STYLE.md). Both are governed by [`docs/DOCUMENTATION_STANDARD.md`](../docs/DOCUMENTATION_STANDARD.md).
+Counterpart: [`finstack-wasm/DOCS_STYLE.md`](../finstack-wasm/DOCS_STYLE.md).
 
 ### Where docs live
 
@@ -160,13 +162,20 @@ When you find yourself wanting to rename in the binding, rename the Rust source 
 
 ### Error conversion contract
 
-Every fallible binding goes through a centralized helper in `finstack-py/src/errors.rs`:
+Fallible bindings route through `finstack-py/src/errors.rs`:
 
-- `core_to_py(err: finstack_core::Error)` — flattens the full source chain.
-- `display_to_py(err: impl Display)` — for non-`finstack_core::Error` types whose `Display` is sufficient.
-- `error_to_py(err: impl Error)` — escape hatch for full `std::error::Error` chains.
+- `core_to_py` — `finstack_core::Error` → `ValueError` (full source chain in message).
+- `analytics_to_py` — same chain → `AnalyticsError` (`ValueError` subclass).
+- `portfolio_to_py` — `finstack_portfolio::Error` → `PortfolioError` or a narrower
+  subclass (`FinstackValuationError`, `FinstackFxError`, `FinstackOptimizationError`).
+- `display_to_py` — any `Display` type → `ValueError`.
+- `serde_json_to_py` — JSON parse/serialize boundaries with a context prefix.
 
-Document errors in the binding `///` comment using `# Errors` or `Raises ------`. Do **not** use `.unwrap()` or `.expect()` in non-test binding code — the workspace lints deny it.
+Some modules define additional exceptions (e.g. `CholeskyError` in `core.math.linalg`,
+`CalibrationEnvelopeError` in valuations calibration). Document the type users should
+catch in `# Errors` / `Raises`.
+
+Do not use `.unwrap()` or `.expect()` in non-test binding code.
 
 ### `.pyi` stub minimum bar
 
@@ -179,53 +188,52 @@ Every public binding needs a `.pyi` entry with:
 
 ### Templates
 
-#### Free function
+#### Static method on a namespace class
 
 ```python
-def altman_z_score(input: AltmanZScoreInput) -> ScoringResult:
-    """Compute the original Altman Z-Score (1968) for public manufacturing firms.
+class scoring:
+    @staticmethod
+    def altman_z_score(
+        working_capital_to_ta: float,
+        retained_earnings_to_ta: float,
+        ebit_to_ta: float,
+        market_equity_to_book_liab: float,
+        sales_to_ta: float,
+    ) -> tuple[float, str, float]:
+        """Original Altman Z-Score (1968) for public manufacturers.
 
-    Z = 1.2 X1 + 1.4 X2 + 3.3 X3 + 0.6 X4 + 1.0 X5
+        Parameters
+        ----------
+        working_capital_to_ta : float
+            Working capital / total assets (X1).
+        retained_earnings_to_ta : float
+            Retained earnings / total assets (X2).
+        ebit_to_ta : float
+            EBIT / total assets (X3).
+        market_equity_to_book_liab : float
+            Market equity / book liabilities (X4).
+        sales_to_ta : float
+            Sales / total assets (X5).
 
-    Parameters
-    ----------
-    input : AltmanZScoreInput
-        Five financial ratios (working capital, retained earnings, EBIT,
-        market equity, sales, all scaled to total assets).
+        Returns
+        -------
+        tuple[float, str, float]
+            ``(score, zone, implied_pd)`` with ``zone`` in
+            ``{"safe", "grey", "distress"}``.
 
-    Returns
-    -------
-    ScoringResult
-        Raw Z score, zone classification (Safe/Grey/Distress), and an
-        empirically-mapped implied probability of default.
+        Raises
+        ------
+        ValueError
+            If any ratio is non-finite.
 
-    Raises
-    ------
-    ValueError
-        If any input ratio is NaN or infinite.
-
-    References
-    ----------
-    Altman, E. I. (1968). "Financial Ratios, Discriminant Analysis and the
-    Prediction of Corporate Bankruptcy." Journal of Finance, 23(4), 589-609.
-
-    Examples
-    --------
-    >>> from finstack.core.credit.scoring import (
-    ...     AltmanZScoreInput, altman_z_score, ScoringZone,
-    ... )
-    >>> healthy = AltmanZScoreInput(
-    ...     working_capital_to_total_assets=0.20,
-    ...     retained_earnings_to_total_assets=0.30,
-    ...     ebit_to_total_assets=0.15,
-    ...     market_equity_to_total_liabilities=1.50,
-    ...     sales_to_total_assets=1.00,
-    ... )
-    >>> result = altman_z_score(healthy)
-    >>> result.zone == ScoringZone.SAFE
-    True
-    """
-    ...
+        Examples
+        --------
+        >>> from finstack.core.credit import scoring
+        >>> score, zone, pd = scoring.altman_z_score(0.2, 0.3, 0.15, 1.5, 1.0)
+        >>> zone
+        'safe'
+        """
+        ...
 ```
 
 #### Class with builder

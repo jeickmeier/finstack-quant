@@ -1,8 +1,7 @@
-# finstack Python Notebook Examples
+# finstack Python notebook examples
 
-A layered Jupyter notebook curriculum covering the full `finstack` Python library.
-Designed for a starting quant to learn every module from core types through
-advanced credit portfolio analytics.
+Layered Jupyter notebooks for the `finstack` package: core types through portfolio,
+scenarios, and advanced credit/Monte Carlo workflows.
 
 ## Prerequisites
 
@@ -18,16 +17,18 @@ advanced credit portfolio analytics.
 uv run jupyter lab
 ```
 
-**Programmatic** -- execute all notebooks and report pass/fail:
+**Batch** — execute all notebooks and report pass/fail (from repo root):
 
 ```bash
-uv run python finstack-py/examples/run_all_notebooks.py
+mise run python-examples
+# or:
+uv run python finstack-py/examples/notebooks/run_all_notebooks.py
 ```
 
-Run a single section:
+One section:
 
 ```bash
-uv run python finstack-py/examples/run_all_notebooks.py --directory 01_foundations
+uv run python finstack-py/examples/notebooks/run_all_notebooks.py --directory 01_foundations
 ```
 
 ## Curriculum Structure
