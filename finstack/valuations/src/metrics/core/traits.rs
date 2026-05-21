@@ -12,6 +12,7 @@ use crate::metrics::MetricId;
 use crate::pricer::{ModelKey, PricerRegistry};
 use finstack_core::cashflow::CashFlow;
 use finstack_core::dates::{Date, DayCount};
+use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
 
@@ -122,7 +123,13 @@ pub struct MetricContext {
     pub instrument: Arc<dyn Instrument>,
 
     /// Market curves for discounting and forwarding.
-    pub curves: Arc<finstack_core::market_data::context::MarketContext>,
+    pub curves: Arc<MarketContext>,
+
+    /// Reusable scratch copy of [`Self::curves`] for finite-difference bump/reprice metrics.
+    ///
+    /// A metric set shares one [`MetricContext`], so this cache avoids cloning
+    /// the full market container separately for each Greek/DV01 calculator.
+    market_scratch: Option<MarketContext>,
 
     /// Optional market history for historical scenario revaluation (e.g., Historical VaR).
     ///
@@ -227,7 +234,7 @@ impl MetricContext {
     /// See unit tests and `examples/` for usage.
     pub fn new(
         instrument: Arc<dyn Instrument>,
-        curves: Arc<finstack_core::market_data::context::MarketContext>,
+        curves: Arc<MarketContext>,
         as_of: Date,
         base_value: Money,
         finstack_config: Arc<FinstackConfig>,
@@ -235,6 +242,7 @@ impl MetricContext {
         Self {
             instrument,
             curves,
+            market_scratch: None,
             market_history: None,
             pricing_model: None,
             pricer_registry: None,
@@ -255,6 +263,40 @@ impl MetricContext {
             scenario_overrides: None,
             finstack_config,
         }
+    }
+
+    /// Take the reusable market scratch context, cloning the base market only
+    /// the first time a finite-difference metric needs a mutable copy.
+    #[inline]
+    pub(crate) fn take_market_scratch(&mut self) -> MarketContext {
+        self.market_scratch
+            .take()
+            .unwrap_or_else(|| self.curves.as_ref().clone())
+    }
+
+    /// Return an unbumped scratch context for reuse by the next metric.
+    #[inline]
+    pub(crate) fn put_market_scratch(&mut self, scratch: MarketContext) {
+        self.market_scratch = Some(scratch);
+    }
+
+    /// Run a finite-difference calculation against the reusable scratch market
+    /// and return it to the context even when the calculation fails.
+    #[inline]
+    pub(crate) fn with_market_scratch<T>(
+        &mut self,
+        f: impl FnOnce(&Self, &mut MarketContext) -> finstack_core::Result<T>,
+    ) -> finstack_core::Result<T> {
+        let mut scratch = self.take_market_scratch();
+        let result = f(self, &mut scratch);
+        if result.is_ok() {
+            self.put_market_scratch(scratch);
+        } else {
+            // The failing path may have exited before reverting a bump token.
+            // Discard the scratch copy instead of caching a contaminated market.
+            self.market_scratch = None;
+        }
+        result
     }
 
     /// Access the finstack configuration associated with this context.

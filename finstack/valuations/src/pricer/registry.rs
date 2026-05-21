@@ -352,7 +352,7 @@ impl PricerRegistry {
         let needs_split = model != ModelKey::Discounting;
         let pricer_registry = shared.registry.unwrap_or_else(|| Arc::new(self.clone()));
 
-        if !needs_split {
+        if !needs_split || !instrument.has_custom_metrics_equivalent() {
             let mut enriched = crate::instruments::common_impl::helpers::build_with_metrics_dyn(
                 std::sync::Arc::from(instrument.clone_box()),
                 Arc::clone(&market_arc),

@@ -330,28 +330,29 @@ where
         let spec_up = BumpSpec::parallel_bp(bump_bp);
         let spec_down = BumpSpec::parallel_bp(-bump_bp);
 
-        // Single scratch clone for both up and down bumps.
-        let mut scratch = context.curves.as_ref().clone();
+        let (pv_up, pv_down) = context.with_market_scratch(|context, scratch| {
+            // Apply all up bumps, reprice, then revert all.
+            let mut tokens_up = Vec::with_capacity(curves.len());
+            for (curve_id, _kind) in curves {
+                tokens_up.push(scratch.apply_curve_bump_in_place(curve_id, spec_up)?);
+            }
+            let pv_up = context.reprice_raw(scratch, as_of)?;
+            for token in tokens_up.into_iter().rev() {
+                scratch.revert_scratch_bump(token)?;
+            }
 
-        // Apply all up bumps, reprice, then revert all.
-        let mut tokens_up = Vec::with_capacity(curves.len());
-        for (curve_id, _kind) in curves {
-            tokens_up.push(scratch.apply_curve_bump_in_place(curve_id, spec_up)?);
-        }
-        let pv_up = context.reprice_raw(&scratch, as_of)?;
-        for token in tokens_up.into_iter().rev() {
-            scratch.revert_scratch_bump(token)?;
-        }
+            // Apply all down bumps, reprice, then revert all.
+            let mut tokens_down = Vec::with_capacity(curves.len());
+            for (curve_id, _kind) in curves {
+                tokens_down.push(scratch.apply_curve_bump_in_place(curve_id, spec_down)?);
+            }
+            let pv_down = context.reprice_raw(scratch, as_of)?;
+            for token in tokens_down.into_iter().rev() {
+                scratch.revert_scratch_bump(token)?;
+            }
 
-        // Apply all down bumps, reprice, then revert all.
-        let mut tokens_down = Vec::with_capacity(curves.len());
-        for (curve_id, _kind) in curves {
-            tokens_down.push(scratch.apply_curve_bump_in_place(curve_id, spec_down)?);
-        }
-        let pv_down = context.reprice_raw(&scratch, as_of)?;
-        for token in tokens_down.into_iter().rev() {
-            scratch.revert_scratch_bump(token)?;
-        }
+            Ok((pv_up, pv_down))
+        })?;
 
         let dv01 = calculate_dv01_central(pv_up, pv_down, bump_bp);
         Ok(dv01)
@@ -374,23 +375,23 @@ where
 
         let mut series = Vec::with_capacity(curves.len());
 
-        // Single scratch clone, reused across all curves via in-place bump + revert.
-        let mut scratch = context.curves.as_ref().clone();
+        context.with_market_scratch(|context, scratch| {
+            for (curve_id, _kind) in curves {
+                let token_up =
+                    scratch.apply_curve_bump_in_place(curve_id, BumpSpec::parallel_bp(bump_bp))?;
+                let pv_up = context.reprice_raw(scratch, as_of)?;
+                scratch.revert_scratch_bump(token_up)?;
 
-        for (curve_id, _kind) in curves {
-            let token_up =
-                scratch.apply_curve_bump_in_place(curve_id, BumpSpec::parallel_bp(bump_bp))?;
-            let pv_up = context.reprice_raw(&scratch, as_of)?;
-            scratch.revert_scratch_bump(token_up)?;
+                let token_down =
+                    scratch.apply_curve_bump_in_place(curve_id, BumpSpec::parallel_bp(-bump_bp))?;
+                let pv_down = context.reprice_raw(scratch, as_of)?;
+                scratch.revert_scratch_bump(token_down)?;
 
-            let token_down =
-                scratch.apply_curve_bump_in_place(curve_id, BumpSpec::parallel_bp(-bump_bp))?;
-            let pv_down = context.reprice_raw(&scratch, as_of)?;
-            scratch.revert_scratch_bump(token_down)?;
-
-            let dv01 = calculate_dv01_central(pv_up, pv_down, bump_bp);
-            series.push((curve_id.as_str().to_string(), dv01));
-        }
+                let dv01 = calculate_dv01_central(pv_up, pv_down, bump_bp);
+                series.push((curve_id.as_str().to_string(), dv01));
+            }
+            Ok(())
+        })?;
 
         // Compensated summation over per-curve DV01s: a naive `+=` accumulates
         // rounding error when summing many curves with widely differing
@@ -467,34 +468,42 @@ where
         let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> =
             Vec::with_capacity(buckets.len());
 
-        // Single scratch clone, reused across all buckets via in-place bump + revert.
-        let mut scratch = context.curves.as_ref().clone();
+        context.with_market_scratch(|context, scratch| {
+            for (i, &target_time) in buckets.iter().enumerate() {
+                let label = super::config::format_bucket_label_cow(target_time);
 
-        for (i, &target_time) in buckets.iter().enumerate() {
-            let label = super::config::format_bucket_label_cow(target_time);
+                let prev_bucket = if i == 0 { 0.0 } else { buckets[i - 1] };
+                let next_bucket = if i == buckets.len() - 1 {
+                    f64::INFINITY
+                } else {
+                    buckets[i + 1]
+                };
 
-            let prev_bucket = if i == 0 { 0.0 } else { buckets[i - 1] };
-            let next_bucket = if i == buckets.len() - 1 {
-                f64::INFINITY
-            } else {
-                buckets[i + 1]
-            };
+                let spec_up = BumpSpec::triangular_key_rate_bp(
+                    prev_bucket,
+                    target_time,
+                    next_bucket,
+                    bump_bp,
+                );
+                let token_up = scratch.apply_curve_bump_in_place(curve_id, spec_up)?;
+                let pv_up = context.reprice_raw(scratch, as_of)?;
+                scratch.revert_scratch_bump(token_up)?;
 
-            let spec_up =
-                BumpSpec::triangular_key_rate_bp(prev_bucket, target_time, next_bucket, bump_bp);
-            let token_up = scratch.apply_curve_bump_in_place(curve_id, spec_up)?;
-            let pv_up = context.reprice_raw(&scratch, as_of)?;
-            scratch.revert_scratch_bump(token_up)?;
+                let spec_down = BumpSpec::triangular_key_rate_bp(
+                    prev_bucket,
+                    target_time,
+                    next_bucket,
+                    -bump_bp,
+                );
+                let token_down = scratch.apply_curve_bump_in_place(curve_id, spec_down)?;
+                let pv_down = context.reprice_raw(scratch, as_of)?;
+                scratch.revert_scratch_bump(token_down)?;
 
-            let spec_down =
-                BumpSpec::triangular_key_rate_bp(prev_bucket, target_time, next_bucket, -bump_bp);
-            let token_down = scratch.apply_curve_bump_in_place(curve_id, spec_down)?;
-            let pv_down = context.reprice_raw(&scratch, as_of)?;
-            scratch.revert_scratch_bump(token_down)?;
-
-            let dv01 = calculate_dv01_central(pv_up, pv_down, bump_bp);
-            series.push((label, dv01));
-        }
+                let dv01 = calculate_dv01_central(pv_up, pv_down, bump_bp);
+                series.push((label, dv01));
+            }
+            Ok(())
+        })?;
 
         let total: f64 = neumaier_sum(series.iter().map(|(_, v)| *v));
         context.store_bucketed_series(metric_id, series);

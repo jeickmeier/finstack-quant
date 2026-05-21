@@ -107,6 +107,10 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         }
         Box::new(clone)
     }
+
+    fn has_custom_metrics_equivalent(&self) -> bool {
+        true
+    }
 }
 
 // Implement CurveDependencies for DV01/CS01 calculators

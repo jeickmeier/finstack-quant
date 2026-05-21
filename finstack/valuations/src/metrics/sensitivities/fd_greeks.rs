@@ -22,6 +22,7 @@ use crate::instruments::common_impl::traits::{EquityDependencies, Instrument};
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_core::dates::{Date, DayCount};
+use finstack_core::market_data::context::MarketContext;
 use finstack_core::Result;
 
 /// Minimum absolute bump size for spot-based finite differences.
@@ -136,7 +137,7 @@ where
 
 fn eval_raw_with_scratch_bumps<I>(
     context: &MetricContext,
-    scratch: &mut finstack_core::market_data::context::MarketContext,
+    scratch: &mut MarketContext,
     instrument: &I,
     as_of: Date,
     spot_bump: Option<(&str, f64)>,
@@ -182,6 +183,13 @@ where
         scratch.revert_scratch_bump(token)?;
     }
     value
+}
+
+fn with_market_scratch<T>(
+    context: &mut MetricContext,
+    f: impl FnOnce(&MetricContext, &mut MarketContext) -> Result<T>,
+) -> Result<T> {
+    context.with_market_scratch(f)
 }
 
 // ================================================================================================
@@ -416,23 +424,25 @@ where
         // Common Random Numbers: same seed for all scenarios ensures variance reduction.
         let seeded_instrument = clone_with_crn_seed(instrument);
 
-        let mut scratch = context.curves.as_ref().clone();
-        let pv_up = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            Some((spot_id, bump.relative)),
-            None,
-        )?;
-        let pv_down = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            Some((spot_id, -bump.relative)),
-            None,
-        )?;
+        let (pv_up, pv_down) = with_market_scratch(context, |context, scratch| {
+            let pv_up = eval_raw_with_scratch_bumps(
+                context,
+                scratch,
+                &seeded_instrument,
+                as_of,
+                Some((spot_id, bump.relative)),
+                None,
+            )?;
+            let pv_down = eval_raw_with_scratch_bumps(
+                context,
+                scratch,
+                &seeded_instrument,
+                as_of,
+                Some((spot_id, -bump.relative)),
+                None,
+            )?;
+            Ok((pv_up, pv_down))
+        })?;
 
         // Central difference: delta = (PV_up - PV_down) / (2 * bump_size).
         // Route through the guarded helper so a degenerate bump width is
@@ -512,26 +522,26 @@ where
 
         // Common Random Numbers: same seed for all scenarios ensures variance reduction.
         let seeded_instrument = clone_with_crn_seed(instrument);
-        let mut scratch = context.curves.as_ref().clone();
-        let base_pv = context.reprice_instrument_raw(&seeded_instrument, &scratch, as_of)?;
-
-        let pv_up = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            Some((spot_id, bump.relative)),
-            None,
-        )?;
-
-        let pv_down = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            Some((spot_id, -bump.relative)),
-            None,
-        )?;
+        let (base_pv, pv_up, pv_down) = with_market_scratch(context, |context, scratch| {
+            let base_pv = context.reprice_instrument_raw(&seeded_instrument, scratch, as_of)?;
+            let pv_up = eval_raw_with_scratch_bumps(
+                context,
+                scratch,
+                &seeded_instrument,
+                as_of,
+                Some((spot_id, bump.relative)),
+                None,
+            )?;
+            let pv_down = eval_raw_with_scratch_bumps(
+                context,
+                scratch,
+                &seeded_instrument,
+                as_of,
+                Some((spot_id, -bump.relative)),
+                None,
+            )?;
+            Ok((base_pv, pv_up, pv_down))
+        })?;
 
         let gamma = (pv_up - 2.0 * base_pv + pv_down) / (bump.absolute * bump.absolute);
 
@@ -593,16 +603,7 @@ where
         let bump_abs = defaults.vol_bump_pct;
 
         let seeded_instrument = clone_with_crn_seed(instrument);
-
-        let mut scratch = context.curves.as_ref().clone();
-        let pv_up = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            None,
-            Some((vol_surface_id.as_str(), bump_abs)),
-        )?;
+        let instrument_id = instrument.id().to_string();
 
         // The additive down-bump `σ - h` is clamped at zero wherever `σ < h`
         // (VolSurface `Bumpable`). When that clamp triggers, the down-bumped
@@ -615,34 +616,54 @@ where
 
         let vega = if clamp_active {
             tracing::warn!(
-                instrument_id = instrument.id(),
+                instrument_id = %instrument_id,
                 surface_id = %vol_surface_id,
                 min_vol = min_vol,
                 bump_abs = bump_abs,
                 "vega down-bump would clamp σ at 0; using one-sided forward difference"
             );
-            let pv_base = context.reprice_instrument_raw(&seeded_instrument, &scratch, as_of)?;
-            // Forward difference: (PV(σ+h) - PV(σ)) / h.
-            crate::metrics::core::finite_difference::central_diff_by_width(
-                pv_up,
-                pv_base,
-                bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL,
-            )?
+            with_market_scratch(context, |context, scratch| {
+                let pv_up = eval_raw_with_scratch_bumps(
+                    context,
+                    scratch,
+                    &seeded_instrument,
+                    as_of,
+                    None,
+                    Some((vol_surface_id.as_str(), bump_abs)),
+                )?;
+                let pv_base = context.reprice_instrument_raw(&seeded_instrument, scratch, as_of)?;
+                // Forward difference: (PV(σ+h) - PV(σ)) / h.
+                crate::metrics::core::finite_difference::central_diff_by_width(
+                    pv_up,
+                    pv_base,
+                    bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL,
+                )
+            })?
         } else {
-            let pv_down = eval_raw_with_scratch_bumps(
-                context,
-                &mut scratch,
-                &seeded_instrument,
-                as_of,
-                None,
-                Some((vol_surface_id.as_str(), -bump_abs)),
-            )?;
-            // Central difference: (PV(σ+h) - PV(σ-h)) / 2h.
-            crate::metrics::core::finite_difference::central_diff_by_width(
-                pv_up,
-                pv_down,
-                2.0 * bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL,
-            )?
+            with_market_scratch(context, |context, scratch| {
+                let pv_up = eval_raw_with_scratch_bumps(
+                    context,
+                    scratch,
+                    &seeded_instrument,
+                    as_of,
+                    None,
+                    Some((vol_surface_id.as_str(), bump_abs)),
+                )?;
+                let pv_down = eval_raw_with_scratch_bumps(
+                    context,
+                    scratch,
+                    &seeded_instrument,
+                    as_of,
+                    None,
+                    Some((vol_surface_id.as_str(), -bump_abs)),
+                )?;
+                // Central difference: (PV(σ+h) - PV(σ-h)) / 2h.
+                crate::metrics::core::finite_difference::central_diff_by_width(
+                    pv_up,
+                    pv_down,
+                    2.0 * bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL,
+                )
+            })?
         };
 
         // MetricId::Vega is reported per 1 vol point (0.01 absolute vol), not per 1.00 vol.
@@ -714,28 +735,30 @@ where
 
         // Common Random Numbers: same seed for all scenarios ensures variance reduction.
         let seeded_instrument = clone_with_crn_seed(instrument);
-        let mut scratch = context.curves.as_ref().clone();
-        let base_pv = context.reprice_instrument_raw(&seeded_instrument, &scratch, as_of)?;
 
         // Absolute implied vol bump (vol points).
         let bump_abs = defaults.vol_bump_pct;
 
-        let pv_up = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            None,
-            Some((vol_surface_id.as_str(), bump_abs)),
-        )?;
-        let pv_down = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            None,
-            Some((vol_surface_id.as_str(), -bump_abs)),
-        )?;
+        let (base_pv, pv_up, pv_down) = with_market_scratch(context, |context, scratch| {
+            let base_pv = context.reprice_instrument_raw(&seeded_instrument, scratch, as_of)?;
+            let pv_up = eval_raw_with_scratch_bumps(
+                context,
+                scratch,
+                &seeded_instrument,
+                as_of,
+                None,
+                Some((vol_surface_id.as_str(), bump_abs)),
+            )?;
+            let pv_down = eval_raw_with_scratch_bumps(
+                context,
+                scratch,
+                &seeded_instrument,
+                as_of,
+                None,
+                Some((vol_surface_id.as_str(), -bump_abs)),
+            )?;
+            Ok((base_pv, pv_up, pv_down))
+        })?;
 
         let volga = (pv_up - 2.0 * base_pv + pv_down) / (bump_abs * bump_abs);
 
@@ -814,39 +837,41 @@ where
 
         let seeded_instrument = clone_with_crn_seed(instrument);
 
-        let mut scratch = context.curves.as_ref().clone();
-        let v_pp = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            Some((spot_id, spot_bump.relative)),
-            Some((vol_surface_id.as_str(), k_abs)),
-        )?;
-        let v_pm = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            Some((spot_id, spot_bump.relative)),
-            Some((vol_surface_id.as_str(), -k_abs)),
-        )?;
-        let v_mp = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            Some((spot_id, -spot_bump.relative)),
-            Some((vol_surface_id.as_str(), k_abs)),
-        )?;
-        let v_mm = eval_raw_with_scratch_bumps(
-            context,
-            &mut scratch,
-            &seeded_instrument,
-            as_of,
-            Some((spot_id, -spot_bump.relative)),
-            Some((vol_surface_id.as_str(), -k_abs)),
-        )?;
+        let (v_pp, v_pm, v_mp, v_mm) = with_market_scratch(context, |context, scratch| {
+            let v_pp = eval_raw_with_scratch_bumps(
+                context,
+                scratch,
+                &seeded_instrument,
+                as_of,
+                Some((spot_id, spot_bump.relative)),
+                Some((vol_surface_id.as_str(), k_abs)),
+            )?;
+            let v_pm = eval_raw_with_scratch_bumps(
+                context,
+                scratch,
+                &seeded_instrument,
+                as_of,
+                Some((spot_id, spot_bump.relative)),
+                Some((vol_surface_id.as_str(), -k_abs)),
+            )?;
+            let v_mp = eval_raw_with_scratch_bumps(
+                context,
+                scratch,
+                &seeded_instrument,
+                as_of,
+                Some((spot_id, -spot_bump.relative)),
+                Some((vol_surface_id.as_str(), k_abs)),
+            )?;
+            let v_mm = eval_raw_with_scratch_bumps(
+                context,
+                scratch,
+                &seeded_instrument,
+                as_of,
+                Some((spot_id, -spot_bump.relative)),
+                Some((vol_surface_id.as_str(), -k_abs)),
+            )?;
+            Ok((v_pp, v_pm, v_mp, v_mm))
+        })?;
 
         let vanna = (v_pp - v_pm - v_mp + v_mm) / (4.0 * h_abs * k_abs);
 

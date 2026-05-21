@@ -3,7 +3,7 @@ use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::metrics::MetricId;
 use crate::pricer::{
     actionable_unknown_pricer_message, shared_standard_registry, InstrumentType, ModelKey,
-    PricingError,
+    PricerRegistry, PricingError,
 };
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::types::Attributes;
@@ -434,6 +434,16 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         self.clone_box()
     }
 
+    /// Returns `true` when [`Self::metrics_equivalent`] changes the instrument's
+    /// metric cashflow basis.
+    ///
+    /// The default equivalent is just `clone_box()`. Non-discounting pricing
+    /// paths use this flag to avoid splitting spread and risk metrics when both
+    /// sides would consume the same cloned instrument.
+    fn has_custom_metrics_equivalent(&self) -> bool {
+        false
+    }
+
     // === Pricing Methods ===
 
     /// Compute the present value only (fast path, no metrics).
@@ -741,30 +751,30 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             registry: None,
         };
 
-        registry
-            .price_with_metrics(
-                instrument.as_ref(),
-                model,
-                market,
-                as_of,
-                metrics,
-                registry_options,
-            )
-            .map_err(|e| match e {
-                PricingError::UnknownPricer {
-                    key,
-                    available_models,
-                } => actionable_unknown_pricer_message(key, &available_models)
-                    .map(finstack_core::Error::Validation)
-                    .unwrap_or_else(|| {
-                        PricingError::UnknownPricer {
-                            key,
-                            available_models,
-                        }
-                        .into()
-                    }),
-                other => other.into(),
-            })
+        PricerRegistry::price_with_metrics_shared(
+            &registry,
+            instrument.as_ref(),
+            model,
+            market,
+            as_of,
+            metrics,
+            registry_options,
+        )
+        .map_err(|e| match e {
+            PricingError::UnknownPricer {
+                key,
+                available_models,
+            } => actionable_unknown_pricer_message(key, &available_models)
+                .map(finstack_core::Error::Validation)
+                .unwrap_or_else(|| {
+                    PricingError::UnknownPricer {
+                        key,
+                        available_models,
+                    }
+                    .into()
+                }),
+            other => other.into(),
+        })
     }
 
     // === Market Data Introspection (for Attribution) ===
