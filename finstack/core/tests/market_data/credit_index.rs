@@ -70,7 +70,7 @@ fn credit_index_builder_validates_bad_input() {
 }
 
 // =============================================================================
-// Additional Comprehensive Tests for Phase 4 Coverage
+// Additional credit index behavior
 // =============================================================================
 
 #[test]

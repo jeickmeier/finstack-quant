@@ -271,8 +271,8 @@ pub fn embedded_registry() -> Result<&'static CreditAssumptionRegistry> {
 ///
 /// Returns `Err` if the embedded credit-assumptions JSON fails to parse or
 /// validate. This is the preferred entry point for fallible call sites and
-/// for any new code; existing infallible builders may use
-/// [`default_market_recovery_rate_or_panic`].
+/// for any new code; existing infallible builders use
+/// `default_market_recovery_rate_or_panic`.
 pub fn default_market_recovery_rate() -> Result<f64> {
     Ok(embedded_registry()?.default_market_recovery_rate())
 }

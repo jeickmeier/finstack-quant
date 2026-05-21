@@ -1,6 +1,9 @@
 ## Math Module (core)
 
-The `math` module in `finstack-core` provides **deterministic numerical building blocks** used across curves, cashflows, valuations, scenarios, and portfolio analytics. It focuses on **stable floating‑point algorithms** and **finance‑oriented utilities**, avoiding heap allocations where possible and keeping behavior deterministic.
+The `math` module in `finstack-core` provides deterministic numerical building
+blocks used across curves, cashflows, valuations, scenarios, and portfolio
+analytics. It includes interpolation, solvers, integration, statistics,
+random-number utilities, and finance-oriented helpers.
 
 - **Root finding and optimization**: 1D and multi‑dimensional solvers for pricing and calibration
 - **Integration and interpolation**: Quadrature rules and curve interpolation for term structures
@@ -8,7 +11,7 @@ The `math` module in `finstack-core` provides **deterministic numerical building
 - **Probability utilities**: Joint probabilities and bounds for correlated Bernoulli variables
 - **Linear algebra and statistics**: Correlation, Cholesky, and time‑series statistics
 - **Time grids**: Year‑fraction grids for simulation time stepping
-- **Special functions and numerically stable summation**: Normal distribution, error function, and robust summation utilities
+- **Special functions and numerically stable summation**: Normal distribution, error function, and compensated summation utilities
 
 `finstack_core::math` re-exports the common entry points from `mod.rs`:
 
@@ -49,7 +52,7 @@ in submodules — import them explicitly when needed.
 - **`solver_multi.rs`**
   - Multi‑dimensional optimization and calibration:
     - `trait MultiSolver`: interface for minimizing scalar objectives and solving systems via least‑squares.
-    - `trait AnalyticalDerivatives`: optional analytic gradient/Jacobian support for faster and more accurate calibration.
+    - `trait AnalyticalDerivatives`: optional analytic gradient/Jacobian support for calibration.
     - `LevenbergMarquardtSolver`: damped least‑squares algorithm for non‑linear least‑squares problems.
   - Used by calibration and curve/surface fitting routines (e.g., SABR, Heston, multi‑curve bootstrapping).
 - **`integration.rs`**
@@ -72,7 +75,7 @@ in submodules — import them explicitly when needed.
       - `LogLinearDf`: log‑linear DF interpolation (constant forwards, positive DF).
       - `MonotoneConvex`: Hagan–West monotone convex scheme (no‑arbitrage, positive forwards).
       - `CubicHermite`: PCHIP‑style shape‑preserving cubic for smooth curves when data is monotone.
-  - Designed to be reused by curve builders in `market_data::term_structures` and pricing logic in `valuations`.
+  - Reused by curve builders in `market_data::term_structures` and pricing logic in `valuations`.
 - **`distributions.rs`**
   - Probability distributions and sampling helpers:
     - Binomial:
@@ -85,11 +88,11 @@ in submodules — import them explicitly when needed.
     - Credit portfolio loss distributions, default counting models.
     - Recovery‑rate and correlation priors in Bayesian/Monte Carlo frameworks.
 - **`random.rs`**
-  - Production-grade random number generation:
+  - Random number generation:
     - `RandomNumberGenerator`: trait (`uniform`, `normal`, `bernoulli`) for pluggable RNGs.
-    - `Pcg64Rng`: Production-grade PCG64 generator with period 2^128, passes all TestU01/PractRand tests.
+    - `Pcg64Rng`: deterministic PCG64 generator with seed and stream accessors.
     - `box_muller_transform`: Box–Muller transform producing two independent `N(0,1)` samples from uniform inputs.
-  - Intended usage:
+  - Usage:
     - Use `Pcg64Rng::new(seed)` for deterministic, reproducible simulations.
     - Use `Pcg64Rng::new_with_stream(seed, stream)` for parallel Monte Carlo with independent streams.
 - **`linalg.rs`**
@@ -148,14 +151,14 @@ in submodules — import them explicitly when needed.
   - Implemented by `NewtonSolver` (with finite‑difference derivative) and `BrentSolver` (robust bracketed).
 - **`NewtonSolver`**:
   - Adaptive finite‑difference derivative, configurable tolerance/iteration/step limits.
-  - `solve_with_derivative` lets callers supply an analytic derivative for better performance and robustness.
+  - `solve_with_derivative` lets callers supply an analytic derivative.
 - **`LevenbergMarquardtSolver`**:
   - `minimize` for scalar objectives with optional box constraints.
   - `solve_system_with_dim_stats` for residual-based systems.
   - `solve_system_with_jacobian_stats` when an analytic Jacobian is available.
   - `AnalyticalDerivatives` supplies exact gradients/Jacobians when available.
 
-These solvers are used extensively throughout the project (e.g., IRR/XIRR, implied vols, curve calibration) and are the preferred way to do numeric solving instead of ad‑hoc loops.
+These solvers are used by IRR/XIRR, implied-volatility, and calibration code.
 
 ### Integration and Interpolation
 
@@ -170,8 +173,8 @@ These solvers are used extensively throughout the project (e.g., IRR/XIRR, impli
 ### Random Numbers, Distributions, and Linear Algebra
 
 - **Random numbers**:
-  - `RandomNumberGenerator` abstracts away the underlying RNG implementation.
-  - `Pcg64Rng` is the production-grade RNG with excellent statistical properties (period 2^128, passes TestU01).
+  - `RandomNumberGenerator` defines the RNG surface used by simulation helpers.
+  - `Pcg64Rng` wraps PCG64 and provides deterministic seed/stream construction.
   - `box_muller_transform` is the canonical helper for turning uniforms into standard normals.
 - **Distributions**:
   - Binomial and Beta implementations are tailored for financial use (credit portfolios, recovery modeling).
@@ -206,7 +209,7 @@ assert!((root - 2.0_f64.sqrt()).abs() < 1e-10);
 # Ok::<(), finstack_core::Error>(())
 ```
 
-When an analytic derivative is available, prefer `solve_with_derivative`:
+When an analytic derivative is available, use `solve_with_derivative`:
 
 ```rust
 use finstack_core::math::solver::NewtonSolver;

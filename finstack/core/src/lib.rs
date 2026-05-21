@@ -18,14 +18,16 @@
 // Allow expect() in doc tests (they are test code)
 #![doc(test(attr(allow(clippy::expect_used))))]
 
-//! Financial primitives & date utilities for the **Finstack** ecosystem.
+//! Financial primitives and date utilities for the Finstack workspace.
 //!
-//! This crate exposes lightweight, composable building-blocks that are
-//! commonly required in pricing engines and risk systems:
+//! This crate exposes reusable building blocks used by pricing, risk, scenario,
+//! portfolio, and binding crates:
 //!
 //! * [`currency::Currency`] – ISO-4217 codes with numeric identifiers and metadata
 //! * [`money::Money`] – type-safe monetary amounts that refuse to mix currencies
 //! * [`dates`] – date/time scaffolding (business calendars, day-count, schedules)
+//! * [`market_data`] – curves, surfaces, scalars, and [`market_data::MarketContext`]
+//! * [`math`] – interpolation, solvers, integration, statistics, and random numbers
 //!
 //! This crate uses the Rust standard library.
 //!
@@ -49,11 +51,8 @@
 //! # }
 //! ```
 //!
-//! # API Layers
+//! # API surface
 //!
-//! The public API is organized into layers:
-//!
-//! ## Core API (Stable)
 //! - [`currency`]: Currency types and ISO-4217 codes
 //! - [`mod@money`]: Monetary amounts with currency safety
 //! - [`dates`]: Date handling, calendars, and schedules
@@ -61,8 +60,6 @@
 //! - [`config`]: Configuration and global settings
 //! - [`types`]: Core type definitions (IDs, rates, etc.)
 //! - [`prelude`]: Convenient re-exports of commonly used types
-//!
-//! ## Extended API (Stable, Less Common)
 //! - [`cashflow`]: Cashflow primitives and discounting
 //! - [`math`]: Numerical utilities and interpolation
 //! - [`expr`]: Expression engine for formula evaluation
@@ -75,18 +72,9 @@
 //! # Cargo features
 //! Serde support is always enabled in this crate; no feature flags are required.
 //!
-//! # Documentation conventions
-//! Public APIs in `finstack-core` follow the workspace documentation standard in
-//! `docs/DOCUMENTATION_STANDARD.md`. Financial and numerical APIs link canonical
-//! sources from `docs/REFERENCES.md` when they encode a market convention,
-//! algorithm, or pricing model with a standard reference.
-//!
 //! # Minimum Supported Rust Version (MSRV)
 //! This crate targets **Rust 1.90**.  It is tested in CI and follows the
 //! standard *cargo-semver* guideline: MSRV may only bump in a **minor** release.
-//!
-//! ---
-//! _Released under the MIT license.  Contributions welcome!_
 
 // Core modules
 //
@@ -109,8 +97,7 @@ pub mod decimal;
 
 /// Shared loader for embedded JSON registries with config override support.
 ///
-/// Centralises the boilerplate around `include_str!` + `OnceLock` + serde
-/// parse + validation that crates use to ship versioned compile-time assets.
+/// Provides cached parsing and validation for versioned compile-time JSON assets.
 pub(crate) mod embedded_registry;
 /// Error types for finstack-core.
 ///
@@ -128,7 +115,7 @@ pub mod explain;
 pub mod expr;
 /// Factor-model primitives for statistical risk decomposition.
 pub mod factor_model;
-/// Market data term‐structure framework (former `curves` module)
+/// Market data curves, surfaces, scalars, and context storage.
 pub mod market_data;
 /// Numerical helpers (root finding, summation, stats)
 pub mod math;

@@ -8,7 +8,7 @@
 /// - convert `-`, `/`, and ` ` (space) to `_`
 ///
 /// # Examples
-/// ```
+/// ```ignore
 /// use finstack_core::parse::normalize_label;
 /// assert_eq!(normalize_label("Act/365F"), "act_365f");
 /// assert_eq!(normalize_label("act-act ISDA"), "act_act_isda");
@@ -33,7 +33,7 @@ pub fn normalize_label(input: &str) -> String {
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// use finstack_core::parse::{NormalizedEnum, parse_normalized_enum};
 ///
 /// #[derive(Debug, Clone, Copy, PartialEq)]

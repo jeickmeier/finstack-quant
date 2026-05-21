@@ -1,49 +1,44 @@
 //! Numerical helpers: root finding, summation, statistics, distributions, and mathematical functions.
 //!
-//! The implementations avoid heap allocation where possible and prefer
-//! numerically stable, order-preserving algorithms.
+//! The implementations favor deterministic numerical behavior and explicit
+//! error returns for invalid inputs.
 //!
 //! # Root Finding
 //!
 //! The `solver` module provides multiple root-finding algorithms:
-//! - `NewtonSolver`: Fast convergence, supports analytic derivatives via `solve_with_derivative`
-//! - `BrentSolver`: Robust bracketing method, guaranteed convergence
+//! - `NewtonSolver`: Newton iteration with finite-difference or analytic derivatives
+//! - `BrentSolver`: bracketed root finding by bisection, secant, and inverse quadratic steps
 //!
-//! **Performance Tip:** When analytic derivatives are available (e.g., for XIRR, implied volatility),
-//! use `NewtonSolver::solve_with_derivative` for 2× fewer function evaluations and better numerical stability.
+//! When analytic derivatives are available, `NewtonSolver::solve_with_derivative`
+//! avoids finite-difference derivative estimates.
 //!
 //! ## Solver Selection Guide
 //!
 //! ### 1D Root Finding (`solver` module)
 //!
-//! | Use Case | Recommended Solver | Method | Why |
+//! | Use case | Solver | Method | Notes |
 //! |----------|-------------------|--------|-----|
-//! | **Implied volatility** | `NewtonSolver` | `solve_with_derivative()` | Vega (∂Price/∂σ) available |
-//! | **Yield-to-maturity** | `NewtonSolver` | `solve_with_derivative()` | Duration (∂Price/∂y) known |
-//! | **IRR/XIRR** | `NewtonSolver` | `solve_with_derivative()` | Analytic d(NPV)/dr |
-//! | **Piecewise functions** | `BrentSolver` | `solve()` | Robust to discontinuities |
-//! | **Poor initial guess** | `BrentSolver` | `solve()` | Guaranteed convergence |
-//! | **Smooth function, no derivatives** | `NewtonSolver` | `solve()` | Auto finite differences |
+//! | **Implied volatility** | `NewtonSolver` | `solve_with_derivative()` | Use when vega is available |
+//! | **Yield-to-maturity** | `NewtonSolver` | `solve_with_derivative()` | Use when duration is available |
+//! | **IRR/XIRR** | `NewtonSolver` | `solve_with_derivative()` | Uses analytic d(NPV)/dr |
+//! | **Bracketed roots** | `BrentSolver` | `solve()` | Requires a sign-changing bracket |
+//! | **Smooth function, no derivatives** | `NewtonSolver` | `solve()` | Uses finite differences |
 //!
 //! ### Multi-Dimensional Optimization (`solver_multi` module)
 //!
-//! | Use Case | Recommended Method | Why |
+//! | Use case | Method | Notes |
 //! |----------|-------------------|-----|
 //! | **SABR calibration** | `solve_system_with_dim_stats()` | System of market quotes, returns stats |
-//! | **Curve bootstrapping** | `solve_system_with_jacobian_stats()` | Analytic sensitivities, 2× faster |
+//! | **Curve bootstrapping** | `solve_system_with_jacobian_stats()` | Use when analytic sensitivities are available |
 //! | **Simple minimization** | `minimize()` | Scalar objective function |
-//! | **With known Jacobian** | `solve_system_with_jacobian_stats()` | 2× faster convergence |
+//! | **With known Jacobian** | `solve_system_with_jacobian_stats()` | Avoids numerical Jacobian estimates |
 //!
 //!
 //! ### Performance Trade-offs
 //!
-//! **Analytic vs Finite Difference Derivatives:**
-//! - Analytic: 2× fewer function calls, better accuracy, faster convergence
-//! - Finite Difference: Simpler to implement, works for any function
-//!
-//! **When to use each:**
-//! - Use analytic when derivatives are cheap to compute (most financial models)
-//! - Use finite difference for quick prototypes or complex black-box functions
+//! Analytic derivatives avoid finite-difference noise when the derivative or
+//! Jacobian is already available. Finite differences are useful for black-box
+//! objectives where only function values are exposed.
 //!
 //! # Examples
 //!
@@ -61,7 +56,7 @@
 //! # }
 //! ```
 //!
-//! ## Root finding with analytic derivatives (recommended when available)
+//! ## Root finding with analytic derivatives
 //!
 //! ```rust
 //! use finstack_core::math::solver::NewtonSolver;

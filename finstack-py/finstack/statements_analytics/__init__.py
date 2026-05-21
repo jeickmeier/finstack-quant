@@ -47,9 +47,72 @@ regression_fair_value = _sa.regression_fair_value
 compute_multiple = _sa.compute_multiple
 score_relative_value = _sa.score_relative_value
 
+# Credit scorecards
+ScorecardMetric = _sa.ScorecardMetric
+ScorecardConfig = _sa.ScorecardConfig
+ScorecardReport = _sa.ScorecardReport
+CreditScorecardExtension = _sa.CreditScorecardExtension
+validate_scorecard_config = _sa.validate_scorecard_config
+
+# Corkscrew roll-forwards
+AccountType = _sa.AccountType
+CorkscrewAccount = _sa.CorkscrewAccount
+CorkscrewConfig = _sa.CorkscrewConfig
+CorkscrewReport = _sa.CorkscrewReport
+CorkscrewExtension = _sa.CorkscrewExtension
+
+# Vintage cohort buildup
+add_vintage_buildup = _sa.add_vintage_buildup
+
+# Roll-forward template
+add_roll_forward = _sa.add_roll_forward
+
+# Real estate templates
+SimpleLeaseSpec = _sa.SimpleLeaseSpec
+RentStepSpec = _sa.RentStepSpec
+FreeRentWindowSpec = _sa.FreeRentWindowSpec
+RenewalSpec = _sa.RenewalSpec
+LeaseGrowthConvention = _sa.LeaseGrowthConvention
+LeaseSpec = _sa.LeaseSpec
+RentRollOutputNodes = _sa.RentRollOutputNodes
+ManagementFeeBase = _sa.ManagementFeeBase
+ManagementFeeSpec = _sa.ManagementFeeSpec
+PropertyTemplateNodes = _sa.PropertyTemplateNodes
+add_noi_buildup = _sa.add_noi_buildup
+add_ncf_buildup = _sa.add_ncf_buildup
+add_rent_roll = _sa.add_rent_roll
+add_rent_roll_rental_revenue = _sa.add_rent_roll_rental_revenue
+add_property_operating_statement = _sa.add_property_operating_statement
+
 __all__: list[str] = [
+    "AccountType",
+    "CorkscrewAccount",
+    "CorkscrewConfig",
+    "CorkscrewExtension",
+    "CorkscrewReport",
+    "CreditScorecardExtension",
     "DependencyTracer",
     "Exposure",
+    "FreeRentWindowSpec",
+    "LeaseGrowthConvention",
+    "LeaseSpec",
+    "ManagementFeeBase",
+    "ManagementFeeSpec",
+    "PropertyTemplateNodes",
+    "RenewalSpec",
+    "RentRollOutputNodes",
+    "RentStepSpec",
+    "ScorecardConfig",
+    "ScorecardMetric",
+    "ScorecardReport",
+    "SimpleLeaseSpec",
+    "add_ncf_buildup",
+    "add_noi_buildup",
+    "add_property_operating_statement",
+    "add_rent_roll",
+    "add_rent_roll_rental_revenue",
+    "add_roll_forward",
+    "add_vintage_buildup",
     "all_dependencies",
     "backtest_forecast",
     "classify_stage",
@@ -81,5 +144,6 @@ __all__: list[str] = [
     "score_relative_value",
     "trace_dependencies",
     "trace_dependencies_detailed",
+    "validate_scorecard_config",
     "z_score",
 ]

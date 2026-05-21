@@ -201,7 +201,7 @@ fn xirr_gips_vc_high_return() {
 
 /// Reference: Microsoft Excel XIRR function
 ///
-/// Test case designed to match Excel XIRR calculation:
+/// Test case matching Excel XIRR calculation:
 /// Total invested: $10,000, total received: $11,000 over 1 year
 /// With quarterly compounding of ~3.9% per quarter, annualized IRR is ~16.6%
 #[test]

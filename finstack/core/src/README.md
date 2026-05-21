@@ -1,6 +1,6 @@
 # finstack-core `src/` overview
 
-Low-level, deterministic building blocks for the Finstack workspace:
+Low-level building blocks for the Finstack workspace:
 
 - **Deterministic** — serial and parallel runs match
 - **Currency-safe** — no implicit FX; cross-currency math is explicit
@@ -96,7 +96,7 @@ Common patterns:
 
 See module READMEs and `AGENTS.md` for binding and naming conventions.
 
-## Further reading
+## Related files
 
 - Module READMEs linked above
 - Integration tests: `finstack/core/tests/`

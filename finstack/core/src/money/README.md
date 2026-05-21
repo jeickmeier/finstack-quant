@@ -1,12 +1,14 @@
 ## `core::money` — Money and FX primitives
 
-This module provides the **currency‑tagged `Money` type** and **foreign‑exchange (FX) utilities** used throughout Finstack:
+This module provides the currency-tagged `Money` type and foreign-exchange (FX)
+utilities used throughout Finstack:
 
 - **`Money`**: deterministic, currency‑safe monetary amounts backed by `rust_decimal::Decimal` with an ergonomic `f64` API.
 - **`money::fx`**: traits and helpers for FX quotes, matrices, conversion policies, and standard provider implementations.
 - **Rounding helpers**: internal utilities that implement the rounding policy defined in `crate::config`.
 
-The design enforces **currency safety** (no implicit cross‑currency math), **accounting‑grade precision**, and **stable, audit‑friendly behavior**.
+The module enforces currency safety, keeps internal arithmetic in
+`rust_decimal::Decimal`, and makes FX sourcing explicit.
 
 ---
 
@@ -112,7 +114,7 @@ assert_eq!(amt.format_with_config(&cfg), "USD 10.0000");
 
 ## FX utilities (`money::fx`)
 
-The `fx` submodule defines **how FX rates are obtained, cached, and consumed**:
+The `fx` submodule defines FX rate lookup, caching, and conversion policy types:
 
 - **`FxProvider`**: trait for any FX quote source (in‑memory, external feeds, prebuilt term structures, etc.).
 - **`FxMatrix`**: cache and lookup layer that wraps a provider, adds LRU caching and optional triangulation.
@@ -136,7 +138,7 @@ pub trait FxProvider: Send + Sync {
 }
 ```
 
-Implementations are expected to:
+Implementations should:
 
 - Return `1.0` for identity conversions when appropriate, or let callers handle identity.
 - Respect the supplied `FxConversionPolicy` (e.g., pick spot vs forward vs averaged rate).
@@ -144,7 +146,7 @@ Implementations are expected to:
 
 ### `FxMatrix`
 
-`FxMatrix` adds **bounded caching** and **simple triangulation** on top of a provider:
+`FxMatrix` adds bounded caching and one-pivot triangulation on top of a provider:
 
 - Caches direct quotes and uses reciprocals when possible.
 - Optionally triangulates via a configured pivot (e.g., USD) when a direct pair is missing.
@@ -327,7 +329,7 @@ assert_eq!(usd.amount(), 120.0);
 assert_eq!(usd.currency(), Currency::USD);
 ```
 
-This pattern keeps **money arithmetic currency‑safe** and **FX sourcing explicit**.
+This pattern keeps money arithmetic currency-safe and FX sourcing explicit.
 
 ---
 

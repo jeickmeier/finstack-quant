@@ -2,10 +2,10 @@
 
 The `core::expr` module is a small, deterministic expression engine used throughout
 Finstack for **time–series style** computations (lags, diffs, rolling windows, EWMs,
-etc.) over plain `f64` slices. It is designed to be:
+etc.) over plain `f64` slices. It provides:
 
 - **Deterministic**: stable results across platforms and runs.
-- **Allocation‑aware**: scratch arenas and an arena‑style executor minimise per‑node `Vec` allocations.
+- **Allocation‑aware evaluation**: scratch arenas and an arena-style executor reduce per-node `Vec` allocations.
 - **DAG‑optimized**: shared sub‑expressions across many formulas are evaluated once.
 - **Cache‑friendly**: intermediate node results can be cached with an LRU cache and explicit memory budget.
 - **Embedding‑friendly**: no Polars dependency, `SimpleContext` handles column resolution and can be constructed from any ordered iterator of column names.
@@ -38,7 +38,7 @@ The `mod.rs` re‑exports the small public API:
   - `CompiledExpr`
   - `EvalOpts`
 
-The Polars `Series` API is intentionally **not** exposed here; callers work with simple slices (`&[f64]`).
+The Polars `Series` API is not exposed here; callers work with simple slices (`&[f64]`).
 
 ---
 
@@ -186,8 +186,8 @@ assert!((out.values[4] - 4.0).abs() < 1e-12);
 
 ### Using DAG Planning and Caching
 
-For large model graphs (e.g., financial statements), using a pre‑built plan with a cache
-significantly reduces recomputation of shared sub‑expressions:
+For large model graphs, a pre-built plan with a cache can reduce recomputation
+of shared sub-expressions:
 
 ```rust
 use finstack_core::config::{results_meta, FinstackConfig};
@@ -220,9 +220,9 @@ let values = result.values;
 let meta = result.metadata;
 ```
 
-### Overriding the Execution Plan
+### Reusing an Execution Plan
 
-Advanced callers (e.g., the statements engine) can build a plan once and reuse it:
+Callers can build a plan once and reuse it:
 
 ```rust
 use finstack_core::config::{results_meta, FinstackConfig};
@@ -260,8 +260,8 @@ let result = compiled.eval(
   - Rolling windows that are not yet full return `NaN`.
   - Divisions by zero return `NaN`.
   - Many reducers ignore `NaN` inputs when computing aggregates but emit `NaN` if there are no valid values.
-- **Metadata**: `EvaluationResult.metadata` is stamped via `config::results_meta` and is designed
-  to be consistent with other Finstack result envelopes. The evaluator itself does not track timings or parallelism.
+- **Metadata**: `EvaluationResult.metadata` is stamped via `config::results_meta`.
+  The evaluator itself does not track timings or parallelism.
 
 ---
 

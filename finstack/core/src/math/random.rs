@@ -1,12 +1,12 @@
 //! Random number generation for Monte Carlo simulations.
 //!
-//! Provides trait-based interface for random number generators with production-grade
-//! PCG64 implementation for financial simulations.
+//! Provides a small RNG trait, a deterministic PCG64 implementation, Sobol
+//! utilities, and sampling helpers used by simulation code.
 //!
 //! # Components
 //!
 //! - [`RandomNumberGenerator`]: Trait for pluggable RNG implementations
-//! - [`Pcg64Rng`]: Production-grade PCG64 generator
+//! - [`Pcg64Rng`]: Deterministic PCG64 generator
 //! - [`box_muller_transform`]: Normal variate generation from uniform samples
 //! - [`sobol::SobolRng`]: Sobol low-discrepancy sequence with Owen scrambling
 //! - [`brownian_bridge::BrownianBridge`]: Brownian bridge construction order
@@ -27,12 +27,11 @@
 //! let event = rng.bernoulli(0.05);   // 5% probability
 //! ```
 //!
-//! # Statistical Properties
+//! # Statistical properties
 //!
-//! [`Pcg64Rng`] provides excellent statistical properties:
-//! - **Period**: 2^128 (essentially infinite for practical purposes)
-//! - **Quality**: Passes all TestU01 and PractRand statistical tests
-//! - **Speed**: ~2ns per sample on modern hardware
+//! [`Pcg64Rng`] wraps `rand_pcg::Pcg64`:
+//! - **Period**: 2^128
+//! - **Streams**: [`Pcg64Rng::new_with_stream`] uses a stream-specific increment
 //! - **Deterministic**: Same seed always produces same sequence
 //!
 //! # Parallel Simulations
@@ -92,20 +91,19 @@ pub trait RandomNumberGenerator {
 }
 
 // ============================================================================
-// Production-Grade RNG: Pcg64Rng
+// PCG64 RNG: Pcg64Rng
 // ============================================================================
 
 use rand::prelude::*;
 use rand_pcg::Pcg64;
 
-/// Production-grade random number generator backed by PCG64.
+/// Deterministic random number generator backed by PCG64.
 ///
-/// PCG64 (Permuted Congruential Generator) provides excellent statistical
-/// properties suitable for Monte Carlo simulations in financial applications:
+/// PCG64 (Permuted Congruential Generator) is used for seeded Monte Carlo
+/// simulations and stochastic sampling:
 ///
-/// - **Period**: 2^128 (vs 2^32 for simple LCG)
-/// - **Quality**: Passes all TestU01 and PractRand statistical tests
-/// - **Speed**: ~2ns per sample on modern hardware
+/// - **Period**: 2^128
+/// - **Streams**: [`Pcg64Rng::new_with_stream`] uses a stream-specific increment
 /// - **Deterministic**: Same seed always produces same sequence
 ///
 /// # Use Cases
@@ -114,13 +112,12 @@ use rand_pcg::Pcg64;
 /// - Value at Risk (VaR) simulations
 /// - Credit Valuation Adjustment (CVA) calculations
 /// - Scenario generation for risk analysis
-/// - Any production financial simulation
+/// - Seeded financial simulations
 ///
 /// # Stream Support
 ///
-/// PCG64 supports independent streams via [`Pcg64Rng::new_with_stream`],
-/// enabling parallel simulations with guaranteed non-overlapping sequences.
-/// Each stream is statistically independent, making it ideal for:
+/// [`Pcg64Rng::new_with_stream`] creates deterministic stream-specific
+/// sequences for:
 /// - Parallel Monte Carlo paths
 /// - Multi-threaded simulations
 /// - Distributed computing scenarios

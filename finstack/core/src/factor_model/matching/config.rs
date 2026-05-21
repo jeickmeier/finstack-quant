@@ -58,7 +58,8 @@ impl MatchingConfig {
 
     /// Returns every factor identifier this matcher config can emit.
     ///
-    /// Used by [`FactorModelConfig`] validation to verify that every factor
+    /// Used by [`FactorModelConfig`](crate::factor_model::FactorModelConfig)
+    /// validation to verify that every factor
     /// the matcher can name is also defined in `factors`.
     #[must_use]
     pub fn enumerate_factor_ids(&self) -> Vec<FactorId> {

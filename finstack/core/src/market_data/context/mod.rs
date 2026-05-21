@@ -1078,8 +1078,8 @@ impl MarketContext {
     ///
     /// Yields `(curve_id, Arc<DiscountCurve>)` pairs in arbitrary order. Use this
     /// when you need to scan discount curves (e.g. for currency-prefix matching)
-    /// in a hot path where materializing a [`MarketContextState`](super::MarketContextState)
-    /// would be wasteful.
+    /// in a hot path where materializing a
+    /// [`MarketContextState`] would be wasteful.
     pub fn iter_discount_curves(
         &self,
     ) -> impl Iterator<Item = (&CurveId, Arc<DiscountCurve>)> + '_ {

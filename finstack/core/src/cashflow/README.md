@@ -1,12 +1,14 @@
 ## Cashflow Module (core)
 
-The `cashflow` module in `finstack-core` provides **foundational building blocks for dated cashflows and present value calculations**. It is deliberately **instrument‑agnostic**: instruments in the `valuations` crate build their payment schedules and pricing logic on top of these primitives.
+The `cashflow` module in `finstack-core` provides dated cashflow and present
+value primitives. It is instrument-agnostic: instruments in the `valuations`
+crate build payment schedules and pricing logic on top of these types.
 
 - **Primitives**: `CashFlow`, `CFKind` and related validation
 - **Discounting**: NPV against market discount curves via the `Discounting` trait
 - **XIRR**: IRR and XIRR for investment analysis
 
-This module focuses on **small, composable types** and **deterministic numerics**; instrument‑specific logic belongs in `valuations`, not here.
+Instrument-specific logic belongs in `valuations`, not here.
 
 ---
 
@@ -41,7 +43,7 @@ This module focuses on **small, composable types** and **deterministic numerics*
 
 ### `CashFlow`
 
-`CashFlow` represents a **single dated monetary flow** with classification metadata:
+`CashFlow` represents a dated monetary flow with classification metadata:
 
 - **Fields (key ones)**:
   - `date: Date` – payment or reset date.
@@ -55,11 +57,12 @@ This module focuses on **small, composable types** and **deterministic numerics*
   - Finite `accrual_factor` and `rate` (if present).
   - `reset_date <= date` when provided.
 
-`CashFlow` is intentionally kept **small and POD‑like** (size‑bounded in tests) to support large schedules and vectorized operations in the `valuations` crate.
+`CashFlow` is size-bounded in tests so large schedules remain practical for
+valuation code.
 
 ### `CFKind`
 
-`CFKind` is a **non‑exhaustive enum** used to classify flows without imposing a holder/issuer sign convention:
+`CFKind` is a non-exhaustive enum used to classify flows without imposing a holder/issuer sign convention:
 
 - Coupons: `Fixed`, `FloatReset`
 - Fees: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`
@@ -69,11 +72,14 @@ This module focuses on **small, composable types** and **deterministic numerics*
 - Margin & collateral: `InitialMarginPost`, `InitialMarginReturn`, `VariationMarginReceive`,
   `VariationMarginPay`, `MarginInterest`, `CollateralSubstitutionIn`, `CollateralSubstitutionOut`
 
-Instruments are responsible for mapping these kinds into their own view (e.g., positive/negative sign for holder vs issuer). **Do not bake view‑specific semantics into `CFKind`.**
+Instruments are responsible for mapping these kinds into their own view (for
+example, positive/negative sign for holder vs issuer). Do not bake view-specific
+semantics into `CFKind`.
 
 ### `Discountable`
 
-The `Discountable` trait provides a unified way to **present‑value dated `Money` flows** against any discount curve implementing `Discounting`:
+The `Discountable` trait present-values dated `Money` flows against any discount
+curve implementing `Discounting`:
 
 - Implemented for any `T: AsRef<[(Date, Money)]>`, including:
   - `&[(Date, Money)]`
@@ -90,7 +96,8 @@ This lets instruments and portfolios reuse the same discounting core while retai
 
 ### Present Value with a Discount Curve
 
-Use `npv` with `Some(day_count)` when you need an explicit day count, or `None` to use the curve's day count (recommended), or `Discountable::npv` for a generic container:
+Use `npv` with `Some(day_count)` when you need an explicit day count, `None` to
+use the curve's day count, or `Discountable::npv` for a generic container:
 
 ```rust
 use finstack_core::cashflow::discounting::{npv, Discountable};
@@ -150,7 +157,8 @@ assert!(pv > 0.0); // positive NPV at 5% hurdle rate
 # Ok::<(), finstack_core::Error>(())
 ```
 
-This is independent of market curves and uses a scalar solver; it is not meant for instrument pricing against full term structures.
+This is independent of market curves and uses a scalar rate; use curve-based
+discounting for instrument pricing against term structures.
 
 ### IRR for Periodic Cashflows
 
@@ -167,7 +175,8 @@ assert!(rate > 0.10 && rate < 0.20); // ~15% annual IRR
 # Ok::<(), finstack_core::Error>(())
 ```
 
-`irr` uses a Newton solver with derivative and a small grid of seeds to improve robustness around challenging regions (e.g., near −100% or very high returns).
+`irr` uses a Newton solver with derivative and a small grid of seeds for
+challenging regions such as rates near -100% or very high returns.
 
 ### XIRR for Irregular Cashflows
 
@@ -211,7 +220,8 @@ Inputs may be unsorted; they are internally sorted and the earliest date is used
   - No randomness is used; solvers are deterministic for a given input and configuration.
   - Sorting behavior in XIRR is stable and defined (ascending by date).
 
-When integrating from higher‑level crates, treat these errors as **input validation failures** or **configuration issues** rather than runtime surprises.
+Higher-level crates should treat these errors as input validation failures or
+configuration issues.
 
 ---
 

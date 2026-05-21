@@ -150,8 +150,8 @@ impl BracketHint {
 /// # Provided Implementations
 ///
 /// The following solvers implement this trait:
-/// - [`NewtonSolver`]: Fast quadratic convergence, uses derivatives (finite diff or analytic)
-/// - [`BrentSolver`]: Robust bracketing method, guaranteed convergence
+/// - [`NewtonSolver`]: Newton iteration with finite-difference or analytic derivatives
+/// - [`BrentSolver`]: Bracketed method combining bisection, secant, and inverse quadratic steps
 ///
 /// # Implementation Guide
 ///
@@ -210,8 +210,8 @@ impl BracketHint {
 ///
 /// # See Also
 ///
-/// - [`NewtonSolver`] for fast convergence with smooth functions
-/// - [`BrentSolver`] for robust convergence with bracketing
+/// - [`NewtonSolver`] for smooth functions
+/// - [`BrentSolver`] for sign-changing brackets
 /// - [`crate::math::solver_multi::LevenbergMarquardtSolver`] for multi-dimensional problems
 pub trait Solver: Send + Sync {
     /// Solve the equation `f(x) = 0` for `x`.
@@ -410,14 +410,12 @@ impl NewtonSolver {
     /// - **Better numerical stability**: Avoids finite-difference cancellation errors
     /// - **Faster convergence**: Exact derivatives lead to more accurate Newton steps
     ///
-    /// # Performance Comparison
+    /// # Evaluation count
     ///
     /// | Method | Function Evals/Iter | Typical Iterations | Total Evals |
     /// |--------|---------------------|-------------------|-------------|
     /// | `solve()` (finite diff) | 3 (f, f+h, f-h) | 5-10 | 15-30 |
     /// | `solve_with_derivative()` | 2 (f, f') | 4-8 | 8-16 |
-    ///
-    /// **Speedup:** ~2× faster for most financial applications
     ///
     /// # When to Use
     ///
@@ -593,11 +591,10 @@ impl NewtonSolver {
     }
 }
 
-/// Brent's method solver (robust, bracketing required).
+/// Brent's method solver (bracketing required).
 ///
 /// Implements Brent's root-finding algorithm, which combines bisection,
-/// secant method, and inverse quadratic interpolation. This provides
-/// guaranteed convergence with superlinear convergence rate.
+/// secant method, and inverse quadratic interpolation.
 ///
 /// # Algorithm
 ///
@@ -605,23 +602,23 @@ impl NewtonSolver {
 /// have opposite signs. At each iteration, it chooses between:
 /// 1. **Inverse quadratic interpolation**: Fast when applicable
 /// 2. **Secant method**: Reliable fallback
-/// 3. **Bisection**: Guaranteed progress
+/// 3. **Bisection**: bracket-preserving progress
 ///
-/// The algorithm automatically selects the most appropriate method based on
-/// convergence criteria and numerical stability.
+/// The algorithm selects the step type from the current bracket and convergence
+/// criteria.
 ///
 /// # Convergence
 ///
 /// - **Rate**: Superlinear (order ≈ 1.618)
-/// - **Guarantee**: Always converges if initial bracket is valid
-/// - **Robustness**: Handles discontinuous derivatives and poor initial guesses
+/// - **Bracket condition**: Requires a finite sign-changing bracket
+/// - **Derivative-free**: Does not require smooth derivatives
 ///
 /// # Use Cases
 ///
-/// Preferred over Newton-Raphson when:
+/// Use instead of Newton-Raphson when:
 /// - Function has discontinuous derivatives (e.g., piecewise functions)
 /// - Initial guess quality is uncertain
-/// - Absolute convergence guarantee is required
+/// - A sign-changing bracket is available
 /// - Function evaluation is cheap relative to derivative computation
 ///
 /// Common applications:

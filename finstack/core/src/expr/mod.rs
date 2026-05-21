@@ -14,10 +14,10 @@
 //! - rolling_min / rolling_max / rolling_count
 //! - ewm_std / ewm_var
 //!
-//! Features:
+//! Evaluation supports:
 //! - DAG planning with shared sub-expression detection
-//! - Intelligent caching for intermediate results
-//! - Optimized scalar implementations
+//! - Optional caching for intermediate results
+//! - Scalar implementations over `&[f64]` inputs
 //! - Deterministic execution
 //! - Metadata stamping for results
 //!
@@ -37,7 +37,7 @@
 //! back across the output vector unless the function name explicitly says
 //! `rolling_*`.
 //!
-//! # Quick Example
+//! # Quick example
 //!
 //! ```rust
 //! use finstack_core::expr::{Expr, Function, CompiledExpr, SimpleContext, EvalOpts};
@@ -53,16 +53,18 @@
 //! let context = SimpleContext::new(["x"]).expect("unique columns");
 //! let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
 //! let cols = [data.as_slice()];
-//! let result = compiled.eval(&context, &cols, EvalOpts::default()).unwrap();
+//! let result = compiled.eval(&context, &cols, EvalOpts::default())?;
+//! assert_eq!(result.values.len(), 5);
+//! # Ok::<(), finstack_core::Error>(())
 //! ```
 //!
 //! # Execution Strategy
 //!
-//! All functions are implemented using optimized scalar algorithms that:
-//! 1. Minimize allocations through buffer reuse
-//! 2. Use vectorized patterns where beneficial (e.g., rolling windows)
-//! 3. Provide deterministic results across platforms
-//! 4. Support WASM compilation without external dependencies
+//! All functions are implemented as scalar operations over column slices:
+//! 1. Intermediate buffers are reused during evaluation.
+//! 2. Rolling functions use row-count windows.
+//! 3. Results are deterministic for the same inputs and evaluation options.
+//! 4. The module does not depend on external DataFrame libraries.
 //!
 //! # References
 //!

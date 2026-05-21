@@ -1,19 +1,23 @@
 ## Market Data Module (core)
 
-The `market_data` module in `finstack-core` provides the **core infrastructure for yield curves, credit curves, volatility surfaces, FX, and scalar market data** used across valuations, scenarios, and portfolios.
+The `market_data` module in `finstack-core` provides yield curves, credit
+curves, volatility surfaces, FX, and scalar market data used across valuations,
+scenarios, and portfolios.
 
 - **Term structures**: one-dimensional curves for discount factors, forward rates, credit hazard rates, and inflation.
 - **Surfaces**: two-dimensional volatility surfaces indexed by expiry and strike.
-- **Scalars & time series**: spot prices, FX rates, indices, and generic scalar time series.
-- **Market context**: `MarketContext` as the central, thread-safe container for all market data.
+- **Scalars and time series**: spot prices, FX rates, indices, and generic scalar time series.
+- **Market context**: `MarketContext` stores curves, surfaces, scalars, histories, FX, and collateral mappings.
 - **Scenario/risk utilities**: bumping APIs (`bumps.rs`) and shift measurement utilities (`diff.rs`).
 - **Dividends**: shared dividend schedules for equity and ETF valuations.
 
-The module is designed to be **deterministic**, **type-safe**, and **serde-stable** (serde is always on), forming the backbone for the higher-level `valuations`, `scenarios`, and `portfolio` crates.
+The module uses deterministic data structures, typed IDs, and serde-friendly
+state objects. Higher-level `valuations`, `scenarios`, and `portfolio` crates
+consume these types directly.
 
-Two important convention notes:
+Convention notes:
 
-- Hazard curves now require strictly positive knot times; use the first positive pillar
+- Hazard curves require strictly positive knot times; use the first positive pillar
   as the start of the published term structure instead of encoding a synthetic `t=0`
   hazard node.
 - Parallel inflation bumps are applied in zero-inflation-rate space so a `+x%` shift
@@ -34,7 +38,7 @@ Two important convention notes:
 
 - **`context.rs`**
   - Defines:
-    - `MarketContext`: central registry for market data; cheap to clone (Arc-based), builder-style insert APIs (`insert_discount`, `insert_forward`, `insert_surface`, `insert_price`, `insert_fx`, etc.), and type-safe getters (`get_discount`, `surface`, `price`, `series`, `collateral`, …).
+    - `MarketContext`: registry for market data; cheap to clone (Arc-based), builder-style insert APIs (`insert_discount`, `insert_forward`, `insert_surface`, `insert_price`, `insert_fx`, etc.), and type-safe getters (`get_discount`, `surface`, `price`, `series`, `collateral`, …).
     - `CurveStorage`: enum wrapper for heterogeneous curve storage (`Discount`, `Forward`, `Hazard`, `Inflation`, `BaseCorrelation`) with helpers like `curve_type()` and type filters.
     - `ContextStats`: lightweight statistics struct returned by `MarketContext::stats()`.
   - Scenario helpers:
@@ -42,9 +46,9 @@ Two important convention notes:
     - `MarketContext::roll_forward` implements constant-curve roll-down scenarios.
   - Serialization:
     - `CurveState`: tagged enum for serializing any curve type.
-    - `CreditIndexState` and `MarketContextState`: canonical DTOs for persisting complete context snapshots.
+    - `CreditIndexState` and `MarketContextState`: DTOs for persisting complete context snapshots.
     - `Serialize`/`Deserialize` implementations for `CurveStorage` and `MarketContext` round-trip through the `*State` DTOs.
-  - **API guidance**:
+  - **Public surface**:
     - Use `new`, `insert_*`, typed getters, scenario helper (`bump`), stats, and serde state types as the stable surface.
     - Treat internal storage details (HashMaps, instrument registry, `market_history`) as private; they may change.
 
@@ -94,8 +98,8 @@ Two important convention notes:
   - Market shift measurement helpers between two `MarketContext` instances:
     - `TenorSamplingMethod` (`Standard`, `Dynamic`, `Custom`) controls sampling points along a curve.
   - `measure_discount_curve_shift` for rate shifts in basis points.
-  - Additional helpers for hazard spreads and volatility surfaces (P&L attribution and risk reporting).
-  - Used primarily for P&L attribution, risk reports (DV01/CS01-style metrics), and calibration diagnostics.
+  - Additional helpers for hazard spreads and volatility surfaces.
+  - Used for P&L attribution, DV01/CS01-style risk reports, and calibration diagnostics.
 
 - **`dividends.rs`**
   - Shared dividend schedule types (`DividendSchedule`, cash/yield/stock events) keyed by `CurveId`.
@@ -107,7 +111,7 @@ Two important convention notes:
     - `Discounting`: discount curve abstraction with `base_date`, `df(t)`, and a default `day_count`.
     - `Forward`: forward-rate abstraction with `rate(t)` and `rate_period(t1, t2)`.
     - `Survival`: hazard/survival abstraction with `sp(t)` for survival probabilities.
-  - The traits are intentionally small; most functionality lives on concrete curve types for discoverability and performance.
+  - The traits stay small; most functionality lives on concrete curve types.
 
 ---
 
@@ -143,7 +147,7 @@ All curve and surface types:
 
 - **`MarketScalar`**
   - Enum wrapper for single-value market observables (e.g., equity spot, FX rate, index level).
-  - Designed to integrate with `Money` and `Currency` for currency-safe arithmetic.
+  - Carries `Money` and `Currency` where spot values need currency tags.
 - **`ScalarTimeSeries`**
   - Generic `(Date, f64)` time series with interpolation (`SeriesInterpolation`) and optional metadata.
   - Used for things like historical vol, macro series, and generic market history.
@@ -157,7 +161,7 @@ These types are stored inside `MarketContext` under `prices`, `series`, and `inf
 
 ### MarketContext
 
-`MarketContext` is the **central container for all market data** used in a valuation run:
+`MarketContext` stores the market data used in a valuation run:
 
 - **Builder-style inserts**
   - Curves: `insert_discount`, `insert_forward`, `insert_hazard`, `insert_inflation`, `insert_base_correlation`.
@@ -180,7 +184,7 @@ These types are stored inside `MarketContext` under `prices`, `series`, and `inf
 - **Serialization**
   - `MarketContext` serializes via `MarketContextState` with stable field names:
     - `curves`, `surfaces`, `prices`, `series`, `inflation_indices`, `credit_indices`, `collateral`.
-  - `MarketContextState` is the canonical wire shape for Python/WASM bindings and long-lived storage.
+  - `MarketContextState` is the wire shape for Python/WASM bindings and long-lived storage.
 
 ---
 

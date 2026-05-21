@@ -191,7 +191,7 @@ fn explicit_zero_time_knot_defines_first_positive_interval() {
 }
 
 // =============================================================================
-// Additional Comprehensive Tests for Phase 1 Coverage
+// Additional hazard curve behavior
 // =============================================================================
 
 fn test_date() -> Date {

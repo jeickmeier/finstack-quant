@@ -296,7 +296,7 @@ pub fn xirr_with_daycount_ctx(
 }
 
 // -----------------------------------------------------------------------------
-// Solver Logic (formerly solver_common.rs)
+// Solver logic
 // -----------------------------------------------------------------------------
 
 /// Solves for the rate of return (r) that sets the Net Present Value (NPV) to zero.
@@ -428,7 +428,7 @@ where
         }
     }
 
-    // Phase 2: Fall back to Brent's method (robust, guaranteed convergence given bracket)
+    // Phase 2: fall back to Brent's method when a valid bracket is available.
     let brent = BrentSolver::new()
         .tolerance(DEFAULT_TOLERANCE)
         .max_iterations(DEFAULT_MAX_ITERATIONS)

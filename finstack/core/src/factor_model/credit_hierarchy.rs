@@ -1,13 +1,15 @@
 //! Credit factor hierarchy artifact types (serde-first data model).
 //!
 //! This module defines the canonical calibration artifact for the credit
-//! factor hierarchy. The central type is [`CreditFactorModel`], a
+//! factor hierarchy. The central type is
+//! [`CreditFactorModel`](crate::factor_model::credit_hierarchy::CreditFactorModel), a
 //! fully self-contained JSON artifact produced by offline calibration and
 //! consumed at runtime by attribution, risk, and vol-forecast pipelines.
 //!
 //! # Schema version
 //!
-//! [`CreditFactorModel::SCHEMA_VERSION`] is `"finstack.credit_factor_model/1"`.
+//! [`CreditFactorModel::SCHEMA_VERSION`](crate::factor_model::credit_hierarchy::CreditFactorModel::SCHEMA_VERSION)
+//! is `"finstack.credit_factor_model/1"`.
 //! Consumers must check this field before trusting any other field.
 //!
 //! # Usage
@@ -624,9 +626,9 @@ pub struct GenericFactorSpec {
 /// Fully self-contained credit factor model artifact.
 ///
 /// Produced by offline monthly calibration and loaded at startup by attribution,
-/// risk, and vol-forecast consumers. The artifact is designed to be round-tripped
-/// through JSON: `serde_json::to_string` followed by `serde_json::from_str`
-/// must produce a byte-identical round-trip.
+/// risk, and vol-forecast consumers. JSON serialization is deterministic:
+/// `serde_json::to_string` followed by `serde_json::from_str` must produce a
+/// byte-identical round-trip.
 ///
 /// # Schema version
 ///
@@ -683,7 +685,7 @@ impl CreditFactorModel {
     /// # Errors
     ///
     /// Returns `Err` when:
-    /// - `schema_version` does not equal [`SCHEMA_VERSION`].
+    /// - `schema_version` does not equal [`Self::SCHEMA_VERSION`].
     /// - `issuer_betas` contains duplicate `issuer_id` values.
     /// - `hierarchy.levels` contains duplicate dimension names.
     /// - `factor_histories` has vectors of inconsistent length.

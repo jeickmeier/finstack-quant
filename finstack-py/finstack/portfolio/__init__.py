@@ -85,15 +85,104 @@ twrr_modified_dietz = _portfolio.twrr_modified_dietz
 twrr_linked = _portfolio.twrr_linked
 mwr_xirr = _portfolio.mwr_xirr
 
+# Factor-model decomposition results
+FactorContribution = _portfolio.FactorContribution
+PositionFactorContribution = _portfolio.PositionFactorContribution
+PositionResidualContribution = _portfolio.PositionResidualContribution
+RiskDecomposition = _portfolio.RiskDecomposition
+PositionVarContribution = _portfolio.PositionVarContribution
+PositionEsContribution = _portfolio.PositionEsContribution
+PositionRiskDecomposition = _portfolio.PositionRiskDecomposition
+PositionBudgetEntry = _portfolio.PositionBudgetEntry
+RiskBudgetResult = _portfolio.RiskBudgetResult
+FactorContributionDelta = _portfolio.FactorContributionDelta
+WhatIfResult = _portfolio.WhatIfResult
+StressResult = _portfolio.StressResult
+StressPositionEntry = _portfolio.StressPositionEntry
+TailScenarioBreakdown = _portfolio.TailScenarioBreakdown
+StressAttribution = _portfolio.StressAttribution
+PositionAssignment = _portfolio.PositionAssignment
+UnmatchedEntry = _portfolio.UnmatchedEntry
+FactorAssignmentReport = _portfolio.FactorAssignmentReport
+LevelVolContribution = _portfolio.LevelVolContribution
+PositionVolContribution = _portfolio.PositionVolContribution
+CreditVolReport = _portfolio.CreditVolReport
+VolHorizon = _portfolio.VolHorizon
+DecompositionConfig = _portfolio.DecompositionConfig
+parametric_var_decomposition_typed = _portfolio.parametric_var_decomposition_typed
+historical_var_decomposition_typed = _portfolio.historical_var_decomposition_typed
+evaluate_risk_budget_typed = _portfolio.evaluate_risk_budget_typed
+position_component_var = _portfolio.position_component_var
+
+# Portfolio optimization specifications and results
+WeightingScheme = _portfolio.WeightingScheme
+MissingMetricPolicy = _portfolio.MissingMetricPolicy
+Inequality = _portfolio.Inequality
+OptimizationStatus = _portfolio.OptimizationStatus
+TradeDirection = _portfolio.TradeDirection
+TradeType = _portfolio.TradeType
+PerPositionMetric = _portfolio.PerPositionMetric
+PositionFilter = _portfolio.PositionFilter
+MetricExpr = _portfolio.MetricExpr
+Objective = _portfolio.Objective
+Constraint = _portfolio.Constraint
+TradeSpec = _portfolio.TradeSpec
+OptimizationParameters = _portfolio.OptimizationParameters
+PortfolioOptimizationSpec = _portfolio.PortfolioOptimizationSpec
+PortfolioOptimizationResult = _portfolio.PortfolioOptimizationResult
+CandidatePosition = _portfolio.CandidatePosition
+TradeUniverse = _portfolio.TradeUniverse
+optimize_portfolio_typed = _portfolio.optimize_portfolio_typed
+
 __all__: list[str] = [
+    "CandidatePosition",
+    "Constraint",
+    "CreditVolReport",
+    "DecompositionConfig",
+    "FactorAssignmentReport",
+    "FactorContribution",
+    "FactorContributionDelta",
     "FinstackFxError",
     "FinstackOptimizationError",
     "FinstackValuationError",
+    "Inequality",
+    "LevelVolContribution",
+    "MetricExpr",
+    "MissingMetricPolicy",
+    "Objective",
+    "OptimizationParameters",
+    "OptimizationStatus",
+    "PerPositionMetric",
     "Portfolio",
     "PortfolioCashflows",
     "PortfolioError",
+    "PortfolioOptimizationResult",
+    "PortfolioOptimizationSpec",
     "PortfolioResult",
     "PortfolioValuation",
+    "PositionAssignment",
+    "PositionBudgetEntry",
+    "PositionEsContribution",
+    "PositionFactorContribution",
+    "PositionFilter",
+    "PositionResidualContribution",
+    "PositionRiskDecomposition",
+    "PositionVarContribution",
+    "PositionVolContribution",
+    "RiskBudgetResult",
+    "RiskDecomposition",
+    "StressAttribution",
+    "StressPositionEntry",
+    "StressResult",
+    "TailScenarioBreakdown",
+    "TradeDirection",
+    "TradeSpec",
+    "TradeType",
+    "TradeUniverse",
+    "UnmatchedEntry",
+    "VolHorizon",
+    "WeightingScheme",
+    "WhatIfResult",
     "aggregate_full_cashflows",
     "aggregate_metrics",
     "almgren_chriss_impact",
@@ -104,17 +193,22 @@ __all__: list[str] = [
     "carino_link",
     "days_to_liquidate",
     "evaluate_risk_budget",
+    "evaluate_risk_budget_typed",
     "historical_var_decomposition",
+    "historical_var_decomposition_typed",
     "kyle_lambda",
     "liquidity_tier",
     "lvar_bangia",
     "mwr_xirr",
     "optimize_portfolio",
+    "optimize_portfolio_typed",
     "parametric_es_decomposition",
     "parametric_var_decomposition",
+    "parametric_var_decomposition_typed",
     "parse_portfolio_spec",
     "portfolio_result_get_metric",
     "portfolio_result_total_value",
+    "position_component_var",
     "replay_portfolio",
     "roll_effective_spread",
     "twrr_linked",

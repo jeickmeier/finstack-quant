@@ -251,7 +251,7 @@ mod serde_tests {
 }
 
 // =============================================================================
-// Additional Comprehensive Tests for Phase 1 Coverage
+// Additional forward curve behavior
 // =============================================================================
 
 #[test]

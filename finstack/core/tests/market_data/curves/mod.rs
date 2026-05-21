@@ -1,6 +1,6 @@
 //! Term structure curve tests.
 //!
-//! This module contains comprehensive tests for all curve types:
+//! This module groups tests for curve types:
 //! - [`discount`] - Discount curves (DF interpolation, bumps, no-arbitrage validation)
 //! - [`forward`] - Forward rate curves
 //! - [`hazard`] - Credit hazard rate curves (survival probabilities)

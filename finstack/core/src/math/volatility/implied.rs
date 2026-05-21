@@ -1,7 +1,6 @@
 //! Implied volatility solvers for Black-76 and Bachelier (normal) models.
 //!
-//! Implements production-grade implied volatility extraction inspired by
-//! Jäckel (2017), "Let's Be Rational":
+//! Implements implied volatility extraction for Black-76 and Bachelier prices:
 //!
 //! 1. **Normalize** the problem using put-call parity to work with the
 //!    out-of-the-money option (better numerical conditioning — avoids

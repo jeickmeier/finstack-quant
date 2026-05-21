@@ -150,7 +150,7 @@ fn test_financial_yield_curve_integration() {
 }
 
 // ==========================================
-// Additional comprehensive tests for Phase 1
+// Additional integration behavior
 // ==========================================
 
 #[test]

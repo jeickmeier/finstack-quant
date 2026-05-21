@@ -1,4 +1,4 @@
-//! Comprehensive tests for DiscountCurve functionality.
+//! Tests for DiscountCurve functionality.
 //!
 //! This module consolidates all discount curve tests including:
 //! - Builder validation and construction

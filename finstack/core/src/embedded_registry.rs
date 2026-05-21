@@ -1,24 +1,14 @@
 //! Shared loader for embedded JSON registries with optional config overrides.
 //!
-//! Several crates ship a versioned JSON registry as a compile-time asset
-//! (e.g. credit assumptions, rating scales, calibration defaults, contract
-//! specs, monte-carlo pricer defaults, statements metric libraries). They all
-//! repeat the same pattern:
+//! Registries keep ownership of their domain payload and validation logic. This
+//! loader handles JSON decoding, process-wide caching for the embedded payload,
+//! and optional lookup through [`FinstackConfig`](crate::config::FinstackConfig)
+//! extensions.
 //!
-//! 1. `const EMBEDDED: &str = include_str!("…json");`
-//! 2. `static CELL: OnceLock<Result<T>> = OnceLock::new();`
-//! 3. A `parse_json(raw)` helper that wraps `serde_json::from_str` and
-//!    forwards the registry through a domain-specific `validate` step.
-//! 4. A `from_config(cfg)` helper that consults a typed extension key and
-//!    falls back to the embedded copy when absent.
-//!
-//! This module centralises the boilerplate. Callers only need to:
+//! Callers provide:
 //! - Declare a `static MY_REGISTRY: EmbeddedJsonRegistry<MyRegistry> = …;`
 //! - Provide a `fn validate(reg: MyRegistry) -> Result<MyRegistry>`.
 //! - Call `MY_REGISTRY.load(validate)` and `MY_REGISTRY.load_from_config(cfg, validate)`.
-//!
-//! Crates retain ownership of their typed registry struct and validation
-//! logic; only the IO/caching/dispatch plumbing is shared.
 
 use crate::config::FinstackConfig;
 use crate::{Error, Result};

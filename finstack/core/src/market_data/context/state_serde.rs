@@ -201,8 +201,8 @@ pub struct MarketContextState {
     pub hierarchy: Option<MarketDataHierarchy>,
 }
 
-/// Build a quote-only [`FxMatrix`] from an [`FxConfig`] and explicit `(from, to, rate)`
-/// quotes.
+/// Build a quote-only [`FxMatrix`] from an
+/// [`FxConfig`](crate::money::fx::FxConfig) and explicit `(from, to, rate)` quotes.
 ///
 /// This is the same construction path used by [`MarketContext::try_from`] when
 /// restoring an FX matrix from a persisted [`FxMatrixState`]. Exposed publicly so

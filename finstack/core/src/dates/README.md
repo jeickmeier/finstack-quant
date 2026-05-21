@@ -1,6 +1,7 @@
 ## Dates Module (core)
 
-The `dates` module in `finstack-core` provides **time and calendar primitives** for all other crates. It wraps the `time` crate and adds finance‑specific behavior:
+The `dates` module in `finstack-core` provides time and calendar primitives for
+the workspace. It wraps the `time` crate and adds finance-specific behavior:
 
 - **Re‑exports** of `time` types (`Date`, `OffsetDateTime`, `PrimitiveDateTime`)
 - **Holiday calendars** and business‑day conventions
@@ -13,7 +14,7 @@ The `dates` module in `finstack-core` provides **time and calendar primitives** 
 For compounding-convention rate conversions (simple ↔ periodic ↔ continuous), use
 [`finstack_core::math::Compounding::convert_rate`](../math/compounding.rs).
 
-Everything is accessible via `finstack_core::dates`, and is designed to be:
+Everything is accessible via `finstack_core::dates`:
 
 - **Deterministic**: No randomness; date math is pure and repeatable
 - **Panic‑free in public APIs**: functions return `crate::Result<T>` for invalid input
@@ -152,7 +153,8 @@ let invalid = create_date(2025, Month::February, 30);  // Err(InputError::Invali
 
 ### `HolidayCalendar` and `BusinessDayConvention`
 
-Calendars are read‑only, deterministic objects backed by generated bitsets plus runtime rules. The core trait is:
+Calendars are read-only objects backed by generated bitsets plus runtime rules.
+The core trait is:
 
 - `HolidayCalendar` (in `calendar::business_days`):
   - `is_holiday(date: Date) -> bool`
@@ -205,7 +207,7 @@ Context carries:
 
 ### `Tenor`, `ScheduleBuilder`, and `Schedule`
 
-`Tenor` is a **time period** used for payment frequencies and schedule intervals:
+`Tenor` is a relative time period used for payment frequencies and schedule intervals:
 
 - Year/Month‑based: `Tenor::annual()`, `semi_annual()`, `quarterly()`, `bimonthly()`, `monthly()`
 - Week/Day‑based: `Tenor::biweekly()`, `weekly()`, `daily()`
@@ -272,7 +274,7 @@ Use `Tenor::from_years(years, DayCount)` when converting continuous year fractio
 
 ### Periods and Fiscal Configurations
 
-The period system is designed for statements and forecasting:
+The period system supports statements and forecasting:
 
 - Use `PeriodId` to represent a single period (`2025Q1`, `2025M03`, `2025W10`).
 - Use `build_periods` to expand range expressions:

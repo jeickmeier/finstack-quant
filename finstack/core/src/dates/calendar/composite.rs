@@ -83,8 +83,6 @@ impl<'a> CompositeCalendar<'a> {
         }
     }
 
-    // Single canonical constructor is `new`; former `merge` alias removed for simplicity.
-
     /// Construct a composite calendar with an explicit mode.
     /// When `CompositeMode::Intersection`, a date is a holiday only if all sub-calendars
     /// mark it as a holiday. With `CompositeMode::Union`, union semantics are used.
