@@ -5,22 +5,40 @@ envelopes as Python dicts. They mirror the Rust `CalibrationEnvelope` schema
 in [`finstack-valuations`] and produce JSON that ``calibrate`` and ``dry_run``
 accept verbatim.
 
-Coverage (Phase 5 v1):
-- All top-level structures: ``CalibrationEnvelope``, ``CalibrationPlan``,
-  ``CalibrationStep``.
-- The four most common step kinds: ``discount``, ``forward``, ``hazard``,
-  ``vol_surface``.
-- Shared building blocks: ``Tenor``, ``Pillar``, ``RateDeposit``,
-  ``RateSwap``, ``CdsParSpread``.
+Coverage:
 
-Other step kinds (inflation, swaption_vol, base_correlation, student_t,
-hull_white, cap_floor_hull_white, svi_surface, xccy_basis, parametric) and
-quote variants (FRA, futures, FX, bond, vol, inflation, CDS upfront, CDS
-tranche, xccy) are not yet typed — fall back to ``dict[str, Any]`` for those
-or work from the JSON Schema (see Phase 3).
+- Top-level structures: ``CalibrationEnvelope``, ``CalibrationPlan``,
+  ``CalibrationStep``.
+- All calibration step kinds: ``discount``, ``forward``, ``hazard``,
+  ``inflation``, ``vol_surface``, ``swaption_vol``, ``base_correlation``,
+  ``student_t``, ``hull_white``, ``cap_floor_hull_white``, ``svi_surface``,
+  ``xccy_basis``, ``parametric``.
+- Shared building blocks: ``Tenor``, ``Pillar``, ``CdsConventionKey``.
+- All ``MarketQuote`` variants: rate (deposit, FRA, futures, swap), CDS (par
+  spread, upfront), CDS tranche, FX (forward outright, swap outright, vanilla
+  option), inflation (zero-coupon swap, year-on-year), vol (option, swaption,
+  cap/floor), cross-currency basis swap, bond (clean price, Z-spread, OAS,
+  YTM).
+- All ``MarketDatum`` variants (17): the eight quote variants plus FX spot,
+  price, dividend schedule, fixing series, inflation fixings, credit index,
+  FX vol surface, vol cube, collateral.
+- All ``PriorMarketObject`` variants (10): discount, forward, hazard,
+  inflation, base correlation, basis spread, parametric, price, volatility
+  index curves, and vol surface.
 
 These TypedDicts are documentation only — no runtime validation. Use
 ``dry_run`` (Phase 4) for structural checks.
+
+Note on serde tagging:
+
+The Rust schema mixes internally tagged and externally tagged enums. Where
+an enum carries ``#[serde(tag = "type")]`` (RateQuote, CdsQuote, CDSTrancheQuote,
+FxQuote, XccyQuote, BondQuote) the variant fields are flattened. Where it
+lacks a tag (InflationQuote, VolQuote) the variant is nested under a
+snake_case variant key. The TypedDict shapes below mirror the JSON exactly.
+
+Untyped envelopes still type-check thanks to the ``| dict[str, Any]`` escape
+hatch on the public unions.
 """
 
 from __future__ import annotations
@@ -75,13 +93,16 @@ class CdsConventionKey(TypedDict):
 
 
 # =============================================================================
-# MarketQuote variants (subset)
+# MarketQuote variants
 # =============================================================================
 #
-# `MarketQuote` is `#[serde(tag = "class", ...)]`. The inner enums are also
-# tagged via `type`. We use the functional TypedDict form because `class` and
-# `type` are reserved/built-in names in Python.
+# `MarketQuote` is `#[serde(tag = "class", rename_all = "snake_case")]`. Each
+# inner enum is either internally tagged via `type` (rates, cds, cds_tranche,
+# fx, xccy, bond) or externally tagged (inflation, vol). Internally tagged
+# variants flatten their fields next to `class`; externally tagged variants
+# nest fields under a snake_case variant key.
 
+# --- rates -----------------------------------------------------------------
 
 RateDeposit = TypedDict(
     "RateDeposit",
@@ -96,6 +117,35 @@ RateDeposit = TypedDict(
 )
 """A money-market deposit rate quote."""
 
+RateFra = TypedDict(
+    "RateFra",
+    {
+        "class": Literal["rates"],
+        "type": Literal["fra"],
+        "id": str,
+        "index": str,
+        "start": Pillar,
+        "end": Pillar,
+        "rate": float,
+    },
+)
+"""A forward-rate-agreement (FRA) quote."""
+
+RateFutures = TypedDict(
+    "RateFutures",
+    {
+        "class": Literal["rates"],
+        "type": Literal["futures"],
+        "id": str,
+        "contract": str,
+        "expiry": str,
+        "price": float,
+        "convexity_adjustment": NotRequired[float | None],
+        "vol_surface_id": NotRequired[str | None],
+    },
+)
+"""An interest-rate futures price quote."""
+
 RateSwap = TypedDict(
     "RateSwap",
     {
@@ -109,6 +159,8 @@ RateSwap = TypedDict(
     },
 )
 """A vanilla IRS par-rate quote."""
+
+# --- cds -------------------------------------------------------------------
 
 CdsParSpread = TypedDict(
     "CdsParSpread",
@@ -125,18 +177,820 @@ CdsParSpread = TypedDict(
 )
 """A CDS par-spread quote."""
 
+CdsUpfront = TypedDict(
+    "CdsUpfront",
+    {
+        "class": Literal["cds"],
+        "type": Literal["cds_upfront"],
+        "id": str,
+        "entity": str,
+        "convention": CdsConventionKey,
+        "pillar": Pillar,
+        "running_spread_bp": float,
+        "upfront_pct": float,
+        "recovery_rate": float,
+    },
+)
+"""A CDS upfront + running coupon quote."""
 
-# Union of the typed quote variants plus an untyped escape hatch.
-#
-# Phase 5 v1 only types `RateDeposit`, `RateSwap`, and `CdsParSpread`.
-# Quotes for FRA, futures, FX, bond, vol, inflation, CDS upfront, CDS
-# tranche, and cross-currency variants pass through as `dict[str, Any]`
-# rather than triggering a type error. Pair with `dry_run` (Phase 4) for
-# structural validation that catches typos in the untyped variants.
-MarketQuote = RateDeposit | RateSwap | CdsParSpread | dict[str, Any]
+# --- cds_tranche -----------------------------------------------------------
+
+CdsTrancheQuote = TypedDict(
+    "CdsTrancheQuote",
+    {
+        "class": Literal["cds_tranche"],
+        "type": Literal["cds_tranche"],
+        "id": str,
+        "index": str,
+        "attachment": float,
+        "detachment": float,
+        "maturity": str,
+        "upfront_pct": float,
+        "running_spread_bp": float,
+        "convention": CdsConventionKey,
+    },
+)
+"""A CDS index tranche quote (attachment/detachment with upfront and running spread)."""
+
+# --- fx --------------------------------------------------------------------
+
+FxForwardOutright = TypedDict(
+    "FxForwardOutright",
+    {
+        "class": Literal["fx"],
+        "type": Literal["forward_outright"],
+        "id": str,
+        "convention": str,
+        "pillar": Pillar,
+        "forward_rate": float,
+    },
+)
+"""An outright FX forward quote."""
+
+FxSwapOutright = TypedDict(
+    "FxSwapOutright",
+    {
+        "class": Literal["fx"],
+        "type": Literal["swap_outright"],
+        "id": str,
+        "convention": str,
+        "far_pillar": Pillar,
+        "near_rate": float,
+        "far_rate": float,
+    },
+)
+"""A spot-start FX swap quote with explicit near/far outrights."""
+
+FxOptionVanilla = TypedDict(
+    "FxOptionVanilla",
+    {
+        "class": Literal["fx"],
+        "type": Literal["option_vanilla"],
+        "id": str,
+        "convention": str,
+        "expiry": str,
+        "strike": float,
+        "option_type": Literal["call", "put"],
+        "vol_surface_id": str,
+    },
+)
+"""A European vanilla FX option quote."""
+
+# --- inflation (externally tagged; payload nested under variant key) ------
+
+InflationSwapPayload = TypedDict(
+    "InflationSwapPayload",
+    {
+        "id": str,
+        "maturity": str,
+        "rate": float,
+        "index": str,
+        "convention": str,
+    },
+)
+"""Zero-coupon inflation swap payload (nested under ``inflation_swap``)."""
+
+YoyInflationSwapPayload = TypedDict(
+    "YoyInflationSwapPayload",
+    {
+        "id": str,
+        "maturity": str,
+        "rate": float,
+        "index": str,
+        "frequency": Tenor,
+        "convention": str,
+    },
+)
+"""Year-on-year inflation swap payload (nested under ``yo_y_inflation_swap``)."""
+
+InflationSwapQuote = TypedDict(
+    "InflationSwapQuote",
+    {
+        "class": Literal["inflation"],
+        "inflation_swap": InflationSwapPayload,
+    },
+)
+"""Zero-coupon inflation swap quote."""
+
+YoyInflationSwapQuote = TypedDict(
+    "YoyInflationSwapQuote",
+    {
+        "class": Literal["inflation"],
+        "yo_y_inflation_swap": YoyInflationSwapPayload,
+    },
+)
+"""Year-on-year inflation swap quote.
+
+The serde variant name is ``YoYInflationSwap`` and ``rename_all = "snake_case"``
+converts it to ``yo_y_inflation_swap`` (matching how serde lowercases each
+character run between case boundaries).
+"""
+
+# --- vol (externally tagged) -----------------------------------------------
+
+OptionVolPayload = TypedDict(
+    "OptionVolPayload",
+    {
+        "id": str,
+        "underlying": str,
+        "expiry": str,
+        "strike": float,
+        "vol": float,
+        "option_type": Literal["call", "put"],
+        "convention": str,
+    },
+)
+"""Equity/commodity option implied-vol payload."""
+
+SwaptionVolPayload = TypedDict(
+    "SwaptionVolPayload",
+    {
+        "id": str,
+        "expiry": str,
+        "maturity": str,
+        "strike": float,
+        "vol": float,
+        "quote_type": str,
+        "convention": str,
+    },
+)
+"""Swaption implied-vol payload."""
+
+CapFloorVolPayload = TypedDict(
+    "CapFloorVolPayload",
+    {
+        "id": str,
+        "expiry": str,
+        "strike": float,
+        "vol": float,
+        "quote_type": str,
+        "is_cap": bool,
+        "convention": str,
+    },
+)
+"""Cap/floor implied-vol payload."""
+
+OptionVolQuote = TypedDict(
+    "OptionVolQuote",
+    {
+        "class": Literal["vol"],
+        "option_vol": OptionVolPayload,
+    },
+)
+"""Equity/commodity option implied-vol quote."""
+
+SwaptionVolQuote = TypedDict(
+    "SwaptionVolQuote",
+    {
+        "class": Literal["vol"],
+        "swaption_vol": SwaptionVolPayload,
+    },
+)
+"""Interest-rate swaption implied-vol quote."""
+
+CapFloorVolQuote = TypedDict(
+    "CapFloorVolQuote",
+    {
+        "class": Literal["vol"],
+        "cap_floor_vol": CapFloorVolPayload,
+    },
+)
+"""Cap/floor implied-vol quote."""
+
+# --- xccy ------------------------------------------------------------------
+
+XccyBasisSwapQuote = TypedDict(
+    "XccyBasisSwapQuote",
+    {
+        "class": Literal["xccy"],
+        "type": Literal["basis_swap"],
+        "id": str,
+        "convention": str,
+        "far_pillar": Pillar,
+        "basis_spread_bp": float,
+        "spot_fx": NotRequired[float | None],
+    },
+)
+"""A cross-currency basis-swap quote."""
+
+# --- bond ------------------------------------------------------------------
+
+BondFixedRateBulletCleanPrice = TypedDict(
+    "BondFixedRateBulletCleanPrice",
+    {
+        "class": Literal["bond"],
+        "type": Literal["fixed_rate_bullet_clean_price"],
+        "id": str,
+        "currency": str,
+        "issue_date": str,
+        "maturity": str,
+        "coupon_rate": float,
+        "convention": str,
+        "clean_price_pct": float,
+    },
+)
+"""A fixed-rate bullet bond quoted in clean price (% of par)."""
+
+BondFixedRateBulletZSpread = TypedDict(
+    "BondFixedRateBulletZSpread",
+    {
+        "class": Literal["bond"],
+        "type": Literal["fixed_rate_bullet_z_spread"],
+        "id": str,
+        "currency": str,
+        "issue_date": str,
+        "maturity": str,
+        "coupon_rate": float,
+        "convention": str,
+        "z_spread": float,
+    },
+)
+"""A fixed-rate bullet bond quoted in Z-spread (decimal)."""
+
+BondFixedRateBulletOas = TypedDict(
+    "BondFixedRateBulletOas",
+    {
+        "class": Literal["bond"],
+        "type": Literal["fixed_rate_bullet_oas"],
+        "id": str,
+        "currency": str,
+        "issue_date": str,
+        "maturity": str,
+        "coupon_rate": float,
+        "convention": str,
+        "oas": float,
+    },
+)
+"""A fixed-rate bullet bond quoted in OAS (decimal)."""
+
+BondFixedRateBulletYtm = TypedDict(
+    "BondFixedRateBulletYtm",
+    {
+        "class": Literal["bond"],
+        "type": Literal["fixed_rate_bullet_ytm"],
+        "id": str,
+        "currency": str,
+        "issue_date": str,
+        "maturity": str,
+        "coupon_rate": float,
+        "convention": str,
+        "ytm": float,
+    },
+)
+"""A fixed-rate bullet bond quoted in yield-to-maturity (decimal)."""
+
+
+# Union of typed MarketQuote variants plus an untyped escape hatch.
+MarketQuote = (
+    RateDeposit
+    | RateFra
+    | RateFutures
+    | RateSwap
+    | CdsParSpread
+    | CdsUpfront
+    | CdsTrancheQuote
+    | FxForwardOutright
+    | FxSwapOutright
+    | FxOptionVanilla
+    | InflationSwapQuote
+    | YoyInflationSwapQuote
+    | OptionVolQuote
+    | SwaptionVolQuote
+    | CapFloorVolQuote
+    | XccyBasisSwapQuote
+    | BondFixedRateBulletCleanPrice
+    | BondFixedRateBulletZSpread
+    | BondFixedRateBulletOas
+    | BondFixedRateBulletYtm
+    | dict[str, Any]
+)
 
 # =============================================================================
-# Step variants (4 most common)
+# MarketDatum variants
+# =============================================================================
+#
+# `MarketDatum` is `#[serde(tag = "kind", rename_all = "snake_case")]`. Quote
+# variants flatten or nest the inner enum exactly as the wrapped `MarketQuote`
+# class does (without the outer `class` tag); snapshot variants are tuple
+# enums that flatten their wrapped struct fields.
+
+# --- quote-bearing variants ------------------------------------------------
+
+RateQuoteDepositDatum = TypedDict(
+    "RateQuoteDepositDatum",
+    {
+        "kind": Literal["rate_quote"],
+        "type": Literal["deposit"],
+        "id": str,
+        "index": str,
+        "pillar": Pillar,
+        "rate": float,
+    },
+)
+"""Deposit rate quote as a flat ``MarketDatum``."""
+
+RateQuoteFraDatum = TypedDict(
+    "RateQuoteFraDatum",
+    {
+        "kind": Literal["rate_quote"],
+        "type": Literal["fra"],
+        "id": str,
+        "index": str,
+        "start": Pillar,
+        "end": Pillar,
+        "rate": float,
+    },
+)
+"""FRA quote as a flat ``MarketDatum``."""
+
+RateQuoteFuturesDatum = TypedDict(
+    "RateQuoteFuturesDatum",
+    {
+        "kind": Literal["rate_quote"],
+        "type": Literal["futures"],
+        "id": str,
+        "contract": str,
+        "expiry": str,
+        "price": float,
+        "convexity_adjustment": NotRequired[float | None],
+        "vol_surface_id": NotRequired[str | None],
+    },
+)
+"""Interest-rate futures quote as a flat ``MarketDatum``."""
+
+RateQuoteSwapDatum = TypedDict(
+    "RateQuoteSwapDatum",
+    {
+        "kind": Literal["rate_quote"],
+        "type": Literal["swap"],
+        "id": str,
+        "index": str,
+        "pillar": Pillar,
+        "rate": float,
+        "spread_decimal": NotRequired[float | None],
+    },
+)
+"""IRS par-rate quote as a flat ``MarketDatum``."""
+
+CdsParSpreadDatum = TypedDict(
+    "CdsParSpreadDatum",
+    {
+        "kind": Literal["cds_quote"],
+        "type": Literal["cds_par_spread"],
+        "id": str,
+        "entity": str,
+        "convention": CdsConventionKey,
+        "pillar": Pillar,
+        "spread_bp": float,
+        "recovery_rate": float,
+    },
+)
+"""CDS par-spread quote as a flat ``MarketDatum``."""
+
+CdsUpfrontDatum = TypedDict(
+    "CdsUpfrontDatum",
+    {
+        "kind": Literal["cds_quote"],
+        "type": Literal["cds_upfront"],
+        "id": str,
+        "entity": str,
+        "convention": CdsConventionKey,
+        "pillar": Pillar,
+        "running_spread_bp": float,
+        "upfront_pct": float,
+        "recovery_rate": float,
+    },
+)
+"""CDS upfront + running quote as a flat ``MarketDatum``."""
+
+CdsTrancheDatum = TypedDict(
+    "CdsTrancheDatum",
+    {
+        "kind": Literal["cds_tranche_quote"],
+        "type": Literal["cds_tranche"],
+        "id": str,
+        "index": str,
+        "attachment": float,
+        "detachment": float,
+        "maturity": str,
+        "upfront_pct": float,
+        "running_spread_bp": float,
+        "convention": CdsConventionKey,
+    },
+)
+"""CDS tranche quote as a flat ``MarketDatum``."""
+
+FxForwardOutrightDatum = TypedDict(
+    "FxForwardOutrightDatum",
+    {
+        "kind": Literal["fx_quote"],
+        "type": Literal["forward_outright"],
+        "id": str,
+        "convention": str,
+        "pillar": Pillar,
+        "forward_rate": float,
+    },
+)
+"""FX outright-forward quote as a flat ``MarketDatum``."""
+
+FxSwapOutrightDatum = TypedDict(
+    "FxSwapOutrightDatum",
+    {
+        "kind": Literal["fx_quote"],
+        "type": Literal["swap_outright"],
+        "id": str,
+        "convention": str,
+        "far_pillar": Pillar,
+        "near_rate": float,
+        "far_rate": float,
+    },
+)
+"""FX swap-outright quote as a flat ``MarketDatum``."""
+
+FxOptionVanillaDatum = TypedDict(
+    "FxOptionVanillaDatum",
+    {
+        "kind": Literal["fx_quote"],
+        "type": Literal["option_vanilla"],
+        "id": str,
+        "convention": str,
+        "expiry": str,
+        "strike": float,
+        "option_type": Literal["call", "put"],
+        "vol_surface_id": str,
+    },
+)
+"""FX vanilla-option quote as a flat ``MarketDatum``."""
+
+InflationSwapDatum = TypedDict(
+    "InflationSwapDatum",
+    {
+        "kind": Literal["inflation_quote"],
+        "inflation_swap": InflationSwapPayload,
+    },
+)
+"""Zero-coupon inflation swap quote as a ``MarketDatum`` (nested payload)."""
+
+YoyInflationSwapDatum = TypedDict(
+    "YoyInflationSwapDatum",
+    {
+        "kind": Literal["inflation_quote"],
+        "yo_y_inflation_swap": YoyInflationSwapPayload,
+    },
+)
+"""Year-on-year inflation swap quote as a ``MarketDatum`` (nested payload)."""
+
+OptionVolDatum = TypedDict(
+    "OptionVolDatum",
+    {
+        "kind": Literal["vol_quote"],
+        "option_vol": OptionVolPayload,
+    },
+)
+"""Equity/commodity option vol quote as a ``MarketDatum`` (nested payload)."""
+
+SwaptionVolDatum = TypedDict(
+    "SwaptionVolDatum",
+    {
+        "kind": Literal["vol_quote"],
+        "swaption_vol": SwaptionVolPayload,
+    },
+)
+"""Swaption vol quote as a ``MarketDatum`` (nested payload)."""
+
+CapFloorVolDatum = TypedDict(
+    "CapFloorVolDatum",
+    {
+        "kind": Literal["vol_quote"],
+        "cap_floor_vol": CapFloorVolPayload,
+    },
+)
+"""Cap/floor vol quote as a ``MarketDatum`` (nested payload)."""
+
+XccyBasisSwapDatum = TypedDict(
+    "XccyBasisSwapDatum",
+    {
+        "kind": Literal["xccy_quote"],
+        "type": Literal["basis_swap"],
+        "id": str,
+        "convention": str,
+        "far_pillar": Pillar,
+        "basis_spread_bp": float,
+        "spot_fx": NotRequired[float | None],
+    },
+)
+"""Cross-currency basis-swap quote as a flat ``MarketDatum``."""
+
+BondCleanPriceDatum = TypedDict(
+    "BondCleanPriceDatum",
+    {
+        "kind": Literal["bond_quote"],
+        "type": Literal["fixed_rate_bullet_clean_price"],
+        "id": str,
+        "currency": str,
+        "issue_date": str,
+        "maturity": str,
+        "coupon_rate": float,
+        "convention": str,
+        "clean_price_pct": float,
+    },
+)
+"""Fixed-rate bullet bond clean-price quote as a flat ``MarketDatum``."""
+
+BondZSpreadDatum = TypedDict(
+    "BondZSpreadDatum",
+    {
+        "kind": Literal["bond_quote"],
+        "type": Literal["fixed_rate_bullet_z_spread"],
+        "id": str,
+        "currency": str,
+        "issue_date": str,
+        "maturity": str,
+        "coupon_rate": float,
+        "convention": str,
+        "z_spread": float,
+    },
+)
+"""Fixed-rate bullet bond Z-spread quote as a flat ``MarketDatum``."""
+
+BondOasDatum = TypedDict(
+    "BondOasDatum",
+    {
+        "kind": Literal["bond_quote"],
+        "type": Literal["fixed_rate_bullet_oas"],
+        "id": str,
+        "currency": str,
+        "issue_date": str,
+        "maturity": str,
+        "coupon_rate": float,
+        "convention": str,
+        "oas": float,
+    },
+)
+"""Fixed-rate bullet bond OAS quote as a flat ``MarketDatum``."""
+
+BondYtmDatum = TypedDict(
+    "BondYtmDatum",
+    {
+        "kind": Literal["bond_quote"],
+        "type": Literal["fixed_rate_bullet_ytm"],
+        "id": str,
+        "currency": str,
+        "issue_date": str,
+        "maturity": str,
+        "coupon_rate": float,
+        "convention": str,
+        "ytm": float,
+    },
+)
+"""Fixed-rate bullet bond YTM quote as a flat ``MarketDatum``."""
+
+# --- snapshot variants -----------------------------------------------------
+
+# `from` is a Python keyword, so this TypedDict must use the functional form
+# to keep the key name exactly ``"from"`` as required by the Rust schema.
+FxSpotDatum = TypedDict(
+    "FxSpotDatum",
+    {
+        "kind": Literal["fx_spot"],
+        "id": str,
+        "from": str,
+        "to": str,
+        "rate": float,
+    },
+)
+"""FX-spot rate snapshot. Uses ``from``/``to`` ISO currency codes."""
+
+
+class PriceDatum(TypedDict):
+    """Single-name spot price (``MarketScalar``-wrapping) snapshot."""
+
+    kind: Literal["price"]
+    id: str
+    scalar: dict[str, Any]
+
+
+class DividendScheduleDatum(TypedDict):
+    """Dividend schedule snapshot.
+
+    The wrapped ``DividendSchedule`` does not derive ``JsonSchema`` directly
+    on the Rust side, so the inner ``schedule`` field is modelled as an
+    open dict.
+    """
+
+    kind: Literal["dividend_schedule"]
+    schedule: dict[str, Any]
+
+
+class FixingSeriesDatum(TypedDict):
+    """Generic scalar time series snapshot (CPI, historical fixings, ...).
+
+    Wraps ``ScalarTimeSeries`` which serializes with internal id/observations
+    fields. The exact wire shape is intentionally left as an open dict
+    because ``ScalarTimeSeries`` does not derive ``JsonSchema``.
+    """
+
+    kind: Literal["fixing_series"]
+    id: NotRequired[str]
+    observations: NotRequired[list[dict[str, Any]]]
+
+
+class InflationFixingsDatum(TypedDict):
+    """Inflation index fixings snapshot.
+
+    Wraps ``InflationIndex``; the underlying type carries a ``HashMap`` of
+    fixings keyed by ``NaiveDate`` that TypedDicts cannot represent cleanly,
+    so the bulk of the payload is left as an open dict.
+    """
+
+    kind: Literal["inflation_fixings"]
+    id: NotRequired[str]
+
+
+class CreditIndexDatum(TypedDict):
+    """Credit-index reference-state snapshot."""
+
+    kind: Literal["credit_index"]
+    id: NotRequired[str]
+
+
+class FxVolSurfaceDatum(TypedDict):
+    """FX delta-vol surface snapshot."""
+
+    kind: Literal["fx_vol_surface"]
+    id: NotRequired[str]
+
+
+class VolCubeDatum(TypedDict):
+    """Generic vol-cube snapshot."""
+
+    kind: Literal["vol_cube"]
+    id: NotRequired[str]
+
+
+class CollateralDatum(TypedDict):
+    """Collateral / CSA mapping entry.
+
+    The Rust struct's ``id`` field is a ``Currency`` enum; the JSON value
+    is the ISO currency string (e.g. ``"USD"``).
+    """
+
+    kind: Literal["collateral"]
+    id: str
+    csa_currency: str
+
+
+# Union of all typed `MarketDatum` variants plus an untyped escape hatch.
+MarketDatum = (
+    RateQuoteDepositDatum
+    | RateQuoteFraDatum
+    | RateQuoteFuturesDatum
+    | RateQuoteSwapDatum
+    | CdsParSpreadDatum
+    | CdsUpfrontDatum
+    | CdsTrancheDatum
+    | FxForwardOutrightDatum
+    | FxSwapOutrightDatum
+    | FxOptionVanillaDatum
+    | InflationSwapDatum
+    | YoyInflationSwapDatum
+    | OptionVolDatum
+    | SwaptionVolDatum
+    | CapFloorVolDatum
+    | XccyBasisSwapDatum
+    | BondCleanPriceDatum
+    | BondZSpreadDatum
+    | BondOasDatum
+    | BondYtmDatum
+    | FxSpotDatum
+    | PriceDatum
+    | DividendScheduleDatum
+    | FixingSeriesDatum
+    | InflationFixingsDatum
+    | CreditIndexDatum
+    | FxVolSurfaceDatum
+    | VolCubeDatum
+    | CollateralDatum
+    | dict[str, Any]
+)
+
+# =============================================================================
+# PriorMarketObject variants
+# =============================================================================
+#
+# `PriorMarketObject` is `#[serde(tag = "kind", rename_all = "snake_case")]`.
+# Each variant wraps a curve/surface struct that does not derive
+# ``JsonSchema`` directly on the Rust side, so the wrapped payload is
+# modelled as an open dict. The TypedDict still pins the ``kind``
+# discriminator to a literal so mypy catches typos there.
+
+
+class DiscountCurvePrior(TypedDict):
+    """Pre-built discount-factor curve."""
+
+    kind: Literal["discount_curve"]
+    id: NotRequired[str]
+
+
+class ForwardCurvePrior(TypedDict):
+    """Pre-built forward-rate curve."""
+
+    kind: Literal["forward_curve"]
+    id: NotRequired[str]
+
+
+class HazardCurvePrior(TypedDict):
+    """Pre-built default hazard-rate curve."""
+
+    kind: Literal["hazard_curve"]
+    id: NotRequired[str]
+
+
+class InflationCurvePrior(TypedDict):
+    """Pre-built inflation (breakeven / index) curve."""
+
+    kind: Literal["inflation_curve"]
+    id: NotRequired[str]
+
+
+class BaseCorrelationCurvePrior(TypedDict):
+    """Pre-built CDS-index base-correlation curve."""
+
+    kind: Literal["base_correlation_curve"]
+    id: NotRequired[str]
+
+
+class BasisSpreadCurvePrior(TypedDict):
+    """Pre-built tenor-basis spread curve."""
+
+    kind: Literal["basis_spread_curve"]
+    id: NotRequired[str]
+
+
+class ParametricCurvePrior(TypedDict):
+    """Pre-built parametric (e.g. Nelson-Siegel) curve."""
+
+    kind: Literal["parametric_curve"]
+    id: NotRequired[str]
+
+
+class PriceCurvePrior(TypedDict):
+    """Pre-built spot / forward price curve."""
+
+    kind: Literal["price_curve"]
+    id: NotRequired[str]
+
+
+class VolatilityIndexCurvePrior(TypedDict):
+    """Pre-built volatility-index forward curve."""
+
+    kind: Literal["volatility_index_curve"]
+    id: NotRequired[str]
+
+
+class VolSurfacePrior(TypedDict):
+    """Pre-built volatility surface (expiry x strike)."""
+
+    kind: Literal["vol_surface"]
+    id: NotRequired[str]
+
+
+PriorMarketObject = (
+    DiscountCurvePrior
+    | ForwardCurvePrior
+    | HazardCurvePrior
+    | InflationCurvePrior
+    | BaseCorrelationCurvePrior
+    | BasisSpreadCurvePrior
+    | ParametricCurvePrior
+    | PriceCurvePrior
+    | VolatilityIndexCurvePrior
+    | VolSurfacePrior
+    | dict[str, Any]
+)
+
+# =============================================================================
+# Calibration step variants
 # =============================================================================
 
 
@@ -202,6 +1056,30 @@ class HazardStep(TypedDict):
     interpolation: NotRequired[str]
     par_interp: NotRequired[str]
     doc_clause: NotRequired[str]
+    cds_valuation_convention: NotRequired[str | None]
+
+
+class InflationStep(TypedDict):
+    """An ``inflation`` calibration step.
+
+    Builds a zero-coupon inflation curve from ZCIS or YoY quotes against a
+    discount curve.
+    """
+
+    id: str
+    quote_set: str
+    kind: Literal["inflation"]
+    curve_id: str
+    currency: str
+    base_date: str
+    discount_curve_id: str
+    index: str
+    observation_lag: str
+    base_cpi: float
+    notional: NotRequired[float]
+    method: NotRequired[str]
+    interpolation: NotRequired[str]
+    seasonal_factors: NotRequired[dict[str, Any] | None]
 
 
 class VolSurfaceStep(TypedDict):
@@ -226,7 +1104,186 @@ class VolSurfaceStep(TypedDict):
     expiry_extrapolation: NotRequired[str]
 
 
-CalibrationStep = DiscountStep | ForwardStep | HazardStep | VolSurfaceStep | dict[str, Any]
+class SwaptionVolStep(TypedDict):
+    """A ``swaption_vol`` calibration step.
+
+    Builds a swaption volatility surface (per-bucket SABR) from swaption
+    quotes against a discount curve.
+    """
+
+    id: str
+    quote_set: str
+    kind: Literal["swaption_vol"]
+    surface_id: str
+    base_date: str
+    discount_curve_id: str
+    currency: str
+    forward_id: NotRequired[str | None]
+    vol_convention: NotRequired[str | dict[str, Any]]
+    atm_convention: NotRequired[str]
+    sabr_beta: NotRequired[float]
+    target_expiries: NotRequired[list[float]]
+    target_tenors: NotRequired[list[float]]
+    sabr_interpolation: NotRequired[str]
+    calendar_id: NotRequired[str | None]
+    fixed_day_count: NotRequired[str | None]
+    swap_index: NotRequired[str | None]
+    vol_tolerance: NotRequired[float | None]
+    sabr_tolerance: NotRequired[float | None]
+    sabr_extrapolation: NotRequired[str]
+    allow_sabr_missing_bucket_fallback: NotRequired[bool]
+
+
+class BaseCorrelationStep(TypedDict):
+    """A ``base_correlation`` calibration step.
+
+    Builds a base-correlation curve from CDS tranche quotes.
+    """
+
+    id: str
+    quote_set: str
+    kind: Literal["base_correlation"]
+    index_id: str
+    series: int
+    maturity_years: float
+    base_date: str
+    discount_curve_id: str
+    currency: str
+    notional: NotRequired[float]
+    frequency: NotRequired[Tenor | None]
+    day_count: NotRequired[str | None]
+    bdc: NotRequired[str | None]
+    calendar_id: NotRequired[str | None]
+    detachment_points: NotRequired[list[float]]
+    use_imm_dates: NotRequired[bool]
+
+
+class StudentTStep(TypedDict):
+    """A ``student_t`` calibration step.
+
+    Calibrates the degrees-of-freedom parameter of a Student-t copula
+    against a tranche upfront target.
+    """
+
+    id: str
+    quote_set: str
+    kind: Literal["student_t"]
+    tranche_instrument_id: str
+    base_correlation_curve_id: str
+    discount_curve_id: NotRequired[str | None]
+    initial_df: NotRequired[float]
+    df_bounds: NotRequired[tuple[float, float] | list[float]]
+    correlation: NotRequired[float]
+
+
+class HullWhiteStep(TypedDict):
+    """A ``hull_white`` calibration step.
+
+    Calibrates the 1-factor Hull-White short-rate model to European
+    swaption prices.
+    """
+
+    id: str
+    quote_set: str
+    kind: Literal["hull_white"]
+    curve_id: str
+    currency: str
+    base_date: str
+    initial_kappa: NotRequired[float | None]
+    initial_sigma: NotRequired[float | None]
+
+
+class CapFloorHullWhiteStep(TypedDict):
+    """A ``cap_floor_hull_white`` calibration step.
+
+    Calibrates 1-factor Hull-White to cap/floor volatility quotes.
+    """
+
+    id: str
+    quote_set: str
+    kind: Literal["cap_floor_hull_white"]
+    discount_curve_id: str
+    forward_curve_id: str
+    currency: str
+    base_date: str
+    fixed_kappa: NotRequired[float | None]
+    initial_kappa: NotRequired[float | None]
+    initial_sigma: NotRequired[float | None]
+    payment_frequency: NotRequired[str]
+
+
+class SviSurfaceStep(TypedDict):
+    """An ``svi_surface`` calibration step.
+
+    Fits a per-expiry SVI parameterization to market-implied vols.
+    """
+
+    id: str
+    quote_set: str
+    kind: Literal["svi_surface"]
+    surface_id: str
+    base_date: str
+    underlying_ticker: str
+    discount_curve_id: NotRequired[str | None]
+    target_expiries: NotRequired[list[float]]
+    target_strikes: NotRequired[list[float]]
+    spot_override: NotRequired[float | None]
+
+
+class XccyBasisStep(TypedDict):
+    """An ``xccy_basis`` calibration step.
+
+    Derives a foreign-currency discount curve from a domestic OIS curve,
+    FX spot, and cross-currency basis-swap or FX-forward quotes.
+    """
+
+    id: str
+    quote_set: str
+    kind: Literal["xccy_basis"]
+    curve_id: str
+    currency: str
+    base_date: str
+    fx_spot: float
+    domestic_discount_id: str
+    method: NotRequired[str]
+    interpolation: NotRequired[str]
+    extrapolation: NotRequired[str]
+    conventions: NotRequired[dict[str, Any]]
+    basis_spread_curve_id: NotRequired[str | None]
+
+
+class ParametricStep(TypedDict):
+    """A ``parametric`` calibration step.
+
+    Fits a Nelson-Siegel or NSS curve via Levenberg-Marquardt.
+    """
+
+    id: str
+    quote_set: str
+    kind: Literal["parametric"]
+    curve_id: str
+    base_date: str
+    model: str
+    discount_curve_id: NotRequired[str | None]
+    initial_params: NotRequired[dict[str, Any] | None]
+
+
+CalibrationStep = (
+    DiscountStep
+    | ForwardStep
+    | HazardStep
+    | InflationStep
+    | VolSurfaceStep
+    | SwaptionVolStep
+    | BaseCorrelationStep
+    | StudentTStep
+    | HullWhiteStep
+    | CapFloorHullWhiteStep
+    | SviSurfaceStep
+    | XccyBasisStep
+    | ParametricStep
+    | dict[str, Any]
+)
 
 # =============================================================================
 # Top-level
@@ -242,31 +1299,6 @@ class CalibrationPlan(TypedDict):
     quote_sets: dict[str, list[str]]
     steps: list[CalibrationStep]
     settings: NotRequired[dict[str, Any]]
-
-
-# MarketDatum and PriorMarketObject are open-ended tagged dicts (the underlying
-# Rust enums have 17 and 10 variants respectively). We don't restate the full
-# variant set here — refer to the design doc / Rust source for the catalog.
-MarketDatum = dict[str, Any]
-"""A flat, id-addressable market-data input.
-
-Each entry is a tagged dict with a ``"kind"`` discriminator (one of
-``"rate_quote"``, ``"cds_quote"``, ``"cds_tranche_quote"``, ``"fx_quote"``,
-``"inflation_quote"``, ``"vol_quote"``, ``"xccy_quote"``, ``"bond_quote"``,
-``"fx_spot"``, ``"price"``, ``"dividend_schedule"``, ``"fixing_series"``,
-``"inflation_fixings"``, ``"credit_index"``, ``"fx_vol_surface"``,
-``"vol_cube"``, ``"collateral"``). See `MarketDatum` in the Rust source for
-the canonical variant catalog.
-"""
-
-PriorMarketObject = dict[str, Any]
-"""A pre-built calibrated curve or surface to layer in before steps run.
-
-Tagged dict with ``"kind"`` ∈ ``"discount_curve"``, ``"forward_curve"``,
-``"hazard_curve"``, ``"inflation_curve"``, ``"base_correlation_curve"``,
-``"basis_spread_curve"``, ``"parametric_curve"``, ``"price_curve"``,
-``"volatility_index_curve"``, ``"vol_surface"``.
-"""
 
 
 CalibrationEnvelope = TypedDict(
@@ -304,22 +1336,92 @@ Both fields are optional and default to empty.
 
 
 __all__ = [
+    "BaseCorrelationCurvePrior",
+    "BaseCorrelationStep",
+    "BasisSpreadCurvePrior",
+    "BondCleanPriceDatum",
+    "BondFixedRateBulletCleanPrice",
+    "BondFixedRateBulletOas",
+    "BondFixedRateBulletYtm",
+    "BondFixedRateBulletZSpread",
+    "BondOasDatum",
+    "BondYtmDatum",
+    "BondZSpreadDatum",
     "CalibrationEnvelope",
     "CalibrationPlan",
     "CalibrationStep",
+    "CapFloorHullWhiteStep",
+    "CapFloorVolDatum",
+    "CapFloorVolPayload",
+    "CapFloorVolQuote",
     "CdsConventionKey",
     "CdsParSpread",
+    "CdsParSpreadDatum",
+    "CdsTrancheDatum",
+    "CdsTrancheQuote",
+    "CdsUpfront",
+    "CdsUpfrontDatum",
+    "CollateralDatum",
+    "CreditIndexDatum",
     "DatePillar",
+    "DiscountCurvePrior",
     "DiscountStep",
+    "DividendScheduleDatum",
+    "FixingSeriesDatum",
+    "ForwardCurvePrior",
     "ForwardStep",
+    "FxForwardOutright",
+    "FxForwardOutrightDatum",
+    "FxOptionVanilla",
+    "FxOptionVanillaDatum",
+    "FxSpotDatum",
+    "FxSwapOutright",
+    "FxSwapOutrightDatum",
+    "FxVolSurfaceDatum",
+    "HazardCurvePrior",
     "HazardStep",
+    "HullWhiteStep",
+    "InflationCurvePrior",
+    "InflationFixingsDatum",
+    "InflationStep",
+    "InflationSwapDatum",
+    "InflationSwapPayload",
+    "InflationSwapQuote",
     "MarketDatum",
     "MarketQuote",
+    "OptionVolDatum",
+    "OptionVolPayload",
+    "OptionVolQuote",
+    "ParametricCurvePrior",
+    "ParametricStep",
     "Pillar",
+    "PriceCurvePrior",
+    "PriceDatum",
     "PriorMarketObject",
     "RateDeposit",
+    "RateFra",
+    "RateFutures",
+    "RateQuoteDepositDatum",
+    "RateQuoteFraDatum",
+    "RateQuoteFuturesDatum",
+    "RateQuoteSwapDatum",
     "RateSwap",
+    "StudentTStep",
+    "SviSurfaceStep",
+    "SwaptionVolDatum",
+    "SwaptionVolPayload",
+    "SwaptionVolQuote",
+    "SwaptionVolStep",
     "Tenor",
     "TenorPillar",
+    "VolCubeDatum",
+    "VolSurfacePrior",
     "VolSurfaceStep",
+    "VolatilityIndexCurvePrior",
+    "XccyBasisSwapDatum",
+    "XccyBasisSwapQuote",
+    "XccyBasisStep",
+    "YoyInflationSwapDatum",
+    "YoyInflationSwapPayload",
+    "YoyInflationSwapQuote",
 ]

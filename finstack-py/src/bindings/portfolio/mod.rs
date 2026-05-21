@@ -6,8 +6,10 @@
 //! that build the runtime portfolio internally.
 
 mod brinson;
+mod factor_model;
 mod liquidity;
 mod optimization;
+mod optimization_spec;
 mod performance;
 mod pipeline;
 mod position_risk;
@@ -54,8 +56,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     spec::register(py, &m)?;
     pipeline::register(py, &m)?;
     optimization::register(py, &m)?;
+    optimization_spec::register(py, &m)?;
     replay::register(py, &m)?;
     position_risk::register(py, &m)?;
+    factor_model::register(py, &m)?;
     liquidity::register(py, &m)?;
     brinson::register(py, &m)?;
     performance::register(py, &m)?;
@@ -95,6 +99,53 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "twrr_modified_dietz",
         "twrr_linked",
         "mwr_xirr",
+        // factor_model typed result classes (Slice 8)
+        "FactorContribution",
+        "PositionFactorContribution",
+        "PositionResidualContribution",
+        "RiskDecomposition",
+        "PositionVarContribution",
+        "PositionEsContribution",
+        "PositionRiskDecomposition",
+        "PositionBudgetEntry",
+        "RiskBudgetResult",
+        "FactorContributionDelta",
+        "WhatIfResult",
+        "StressResult",
+        "StressPositionEntry",
+        "TailScenarioBreakdown",
+        "StressAttribution",
+        "PositionAssignment",
+        "UnmatchedEntry",
+        "FactorAssignmentReport",
+        "LevelVolContribution",
+        "PositionVolContribution",
+        "CreditVolReport",
+        "VolHorizon",
+        "DecompositionConfig",
+        "parametric_var_decomposition_typed",
+        "historical_var_decomposition_typed",
+        "evaluate_risk_budget_typed",
+        "position_component_var",
+        // optimization spec/result classes (Slice 9)
+        "WeightingScheme",
+        "MissingMetricPolicy",
+        "Inequality",
+        "TradeDirection",
+        "TradeType",
+        "PerPositionMetric",
+        "PositionFilter",
+        "MetricExpr",
+        "Objective",
+        "Constraint",
+        "CandidatePosition",
+        "TradeUniverse",
+        "OptimizationStatus",
+        "TradeSpec",
+        "OptimizationParameters",
+        "PortfolioOptimizationSpec",
+        "PortfolioOptimizationResult",
+        "optimize_portfolio_typed",
     ];
 
     let all = PyList::new(py, exports)?;

@@ -2,11 +2,18 @@
 //!
 //! Exposes financial statement analysis: sensitivity, variance, scenario sets,
 //! backtesting, goal seek, introspection, DCF valuation, corporate analysis
-//! pipeline, Monte Carlo, and reports.
+//! pipeline, Monte Carlo, reports, comparable-company analysis, ECL, the
+//! corkscrew and credit-scorecard extensions, and the roll-forward / vintage /
+//! real-estate templates.
 
 mod analysis;
 mod comps;
+mod corkscrew;
 mod ecl;
+mod scorecards;
+mod templates_real_estate;
+mod templates_roll_forward;
+mod templates_vintage;
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -16,12 +23,17 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = PyModule::new(py, "statements_analytics")?;
     m.setattr(
         "__doc__",
-        "Statement analysis: sensitivity, variance, scenarios, backtesting, goal seek, DCF, corporate, Monte Carlo, reports, introspection, comparable-company analysis.",
+        "Statement analysis: sensitivity, variance, scenarios, backtesting, goal seek, DCF, corporate, Monte Carlo, reports, introspection, comparable-company analysis, ECL, corkscrew/scorecard extensions, and roll-forward/vintage/real-estate templates.",
     )?;
 
     analysis::register(py, &m)?;
     ecl::register(py, &m)?;
     comps::register(py, &m)?;
+    scorecards::register(py, &m)?;
+    corkscrew::register(py, &m)?;
+    templates_vintage::register(py, &m)?;
+    templates_roll_forward::register(py, &m)?;
+    templates_real_estate::register(py, &m)?;
 
     let all = PyList::new(
         py,
@@ -61,6 +73,38 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "regression_fair_value",
             "compute_multiple",
             "score_relative_value",
+            // Scorecard extension
+            "ScorecardMetric",
+            "ScorecardConfig",
+            "ScorecardReport",
+            "CreditScorecardExtension",
+            "validate_scorecard_config",
+            // Corkscrew extension
+            "AccountType",
+            "CorkscrewAccount",
+            "CorkscrewConfig",
+            "CorkscrewReport",
+            "CorkscrewExtension",
+            // Vintage template
+            "add_vintage_buildup",
+            // Roll-forward template
+            "add_roll_forward",
+            // Real-estate template
+            "SimpleLeaseSpec",
+            "RentStepSpec",
+            "FreeRentWindowSpec",
+            "RenewalSpec",
+            "LeaseGrowthConvention",
+            "LeaseSpec",
+            "RentRollOutputNodes",
+            "ManagementFeeBase",
+            "ManagementFeeSpec",
+            "PropertyTemplateNodes",
+            "add_noi_buildup",
+            "add_ncf_buildup",
+            "add_rent_roll",
+            "add_rent_roll_rental_revenue",
+            "add_property_operating_statement",
         ],
     )?;
     m.setattr("__all__", all)?;

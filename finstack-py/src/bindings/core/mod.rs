@@ -7,6 +7,7 @@ pub mod dates;
 pub mod market_data;
 mod math;
 pub(crate) mod money;
+mod rating_scales;
 mod types;
 
 use pyo3::prelude::*;
@@ -26,6 +27,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     dates::register(py, &m)?;
     market_data::register(py, &m)?;
     credit::register(py, &m)?;
+    rating_scales::register(py, &m)?;
 
     let all = PyList::new(
         py,
@@ -38,6 +40,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "dates",
             "market_data",
             "credit",
+            "rating_scales",
         ],
     )?;
     m.setattr("__all__", all)?;

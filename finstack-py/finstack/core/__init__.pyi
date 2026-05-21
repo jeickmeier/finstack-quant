@@ -13,6 +13,7 @@ from finstack.core import dates as dates
 from finstack.core import market_data as market_data
 from finstack.core import math as math
 from finstack.core import money as money
+from finstack.core import rating_scales as rating_scales
 from finstack.core import types as types
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "market_data",
     "math",
     "money",
+    "rating_scales",
     "types",
 ]

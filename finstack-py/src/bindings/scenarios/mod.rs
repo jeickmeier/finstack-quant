@@ -6,6 +6,7 @@
 
 mod engine;
 mod horizon;
+mod operation_spec;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -179,6 +180,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(build_template_component, &m)?)?;
     engine::register(py, &m)?;
     horizon::register(py, &m)?;
+    operation_spec::register(py, &m)?;
 
     let all = PyList::new(
         py,
@@ -196,6 +198,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "apply_scenario_to_market",
             "compute_horizon_return",
             "HorizonResult",
+            "OperationSpec",
+            "RateBindingSpec",
+            "CurveKind",
+            "VolSurfaceKind",
+            "TenorMatchMode",
+            "TimeRollMode",
+            "Compounding",
         ],
     )?;
     m.setattr("__all__", all)?;

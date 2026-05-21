@@ -38,6 +38,38 @@ __all__ = [
     "regression_fair_value",
     "compute_multiple",
     "score_relative_value",
+    # Credit scorecard extension
+    "ScorecardMetric",
+    "ScorecardConfig",
+    "ScorecardReport",
+    "CreditScorecardExtension",
+    "validate_scorecard_config",
+    # Corkscrew extension
+    "AccountType",
+    "CorkscrewAccount",
+    "CorkscrewConfig",
+    "CorkscrewReport",
+    "CorkscrewExtension",
+    # Vintage template
+    "add_vintage_buildup",
+    # Roll-forward template
+    "add_roll_forward",
+    # Real-estate template
+    "SimpleLeaseSpec",
+    "RentStepSpec",
+    "FreeRentWindowSpec",
+    "RenewalSpec",
+    "LeaseGrowthConvention",
+    "LeaseSpec",
+    "RentRollOutputNodes",
+    "ManagementFeeBase",
+    "ManagementFeeSpec",
+    "PropertyTemplateNodes",
+    "add_noi_buildup",
+    "add_ncf_buildup",
+    "add_rent_roll",
+    "add_rent_roll_rental_revenue",
+    "add_property_operating_statement",
 ]
 
 def run_sensitivity(model_json: str, config_json: str) -> str:
@@ -627,4 +659,460 @@ def score_relative_value(
     dimensions: list[tuple[str, float] | dict[str, Any]],
 ) -> dict[str, Any]:
     """Composite relative-value score across weighted univariate or regression dimensions."""
+    ...
+
+# ---------------------------------------------------------------------------
+# Credit scorecard extension
+# ---------------------------------------------------------------------------
+
+class ScorecardMetric:
+    """A single scorecard metric (name, formula, weight, rating thresholds)."""
+
+    def __init__(
+        self,
+        name: str,
+        formula: str,
+        weight: float = 1.0,
+        thresholds_json: str = "{}",
+        description: str | None = None,
+    ) -> None: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def formula(self) -> str: ...
+    @property
+    def weight(self) -> float: ...
+    @property
+    def description(self) -> str | None: ...
+    def thresholds_json(self) -> str: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> ScorecardMetric: ...
+
+class ScorecardConfig:
+    """Configuration for credit scorecard analysis."""
+
+    def __init__(
+        self,
+        rating_scale: str = "S&P",
+        metrics: list[ScorecardMetric] = ...,
+        min_rating: str | None = None,
+    ) -> None: ...
+    @property
+    def rating_scale(self) -> str: ...
+    @property
+    def min_rating(self) -> str | None: ...
+    @property
+    def metrics(self) -> list[ScorecardMetric]: ...
+    def validate(self) -> None: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> ScorecardConfig: ...
+
+class ScorecardReport:
+    """Report produced by ``CreditScorecardExtension.execute``."""
+
+    @property
+    def status(self) -> str: ...
+    @property
+    def message(self) -> str: ...
+    @property
+    def warnings(self) -> list[str]: ...
+    @property
+    def errors(self) -> list[str]: ...
+    def data_json(self) -> str: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> ScorecardReport: ...
+
+class CreditScorecardExtension:
+    """Credit scorecard extension for rating assignment and stress testing."""
+
+    def __init__(self) -> None: ...
+    @staticmethod
+    def with_config(config: ScorecardConfig) -> CreditScorecardExtension: ...
+    def set_config(self, config: ScorecardConfig) -> None: ...
+    def config(self) -> ScorecardConfig | None: ...
+    def execute(self, model: Any, results: Any) -> ScorecardReport: ...
+
+def validate_scorecard_config(config: ScorecardConfig) -> None:
+    """Validate a scorecard configuration without executing."""
+    ...
+
+# ---------------------------------------------------------------------------
+# Corkscrew (balance-sheet roll-forward) extension
+# ---------------------------------------------------------------------------
+
+class AccountType:
+    """Balance-sheet account classifier: asset / liability / equity."""
+
+    Asset: AccountType
+    Liability: AccountType
+    Equity: AccountType
+
+    @staticmethod
+    def from_str(value: str) -> AccountType: ...
+    def value(self) -> str: ...
+
+class CorkscrewAccount:
+    """Single corkscrew account: balance node + change nodes + optional beginning override."""
+
+    def __init__(
+        self,
+        node_id: str,
+        account_type: AccountType,
+        changes: list[str] = ...,
+        beginning_balance_node: str | None = None,
+    ) -> None: ...
+    @property
+    def node_id(self) -> str: ...
+    @property
+    def account_type(self) -> AccountType: ...
+    @property
+    def changes(self) -> list[str]: ...
+    @property
+    def beginning_balance_node(self) -> str | None: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> CorkscrewAccount: ...
+
+class CorkscrewConfig:
+    """Configuration for corkscrew (roll-forward) validation."""
+
+    def __init__(
+        self,
+        accounts: list[CorkscrewAccount] = ...,
+        tolerance: float = 0.01,
+        fail_on_error: bool = False,
+    ) -> None: ...
+    @property
+    def accounts(self) -> list[CorkscrewAccount]: ...
+    @property
+    def tolerance(self) -> float: ...
+    @property
+    def fail_on_error(self) -> bool: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> CorkscrewConfig: ...
+
+class CorkscrewReport:
+    """Report produced by ``CorkscrewExtension.execute``."""
+
+    @property
+    def status(self) -> str: ...
+    @property
+    def message(self) -> str: ...
+    @property
+    def warnings(self) -> list[str]: ...
+    @property
+    def errors(self) -> list[str]: ...
+    def data_json(self) -> str: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> CorkscrewReport: ...
+
+class CorkscrewExtension:
+    """Corkscrew extension for balance-sheet roll-forward validation."""
+
+    def __init__(self) -> None: ...
+    @staticmethod
+    def with_config(config: CorkscrewConfig) -> CorkscrewExtension: ...
+    def set_config(self, config: CorkscrewConfig) -> None: ...
+    def config(self) -> CorkscrewConfig | None: ...
+    def execute(self, model: Any, results: Any) -> CorkscrewReport: ...
+
+# ---------------------------------------------------------------------------
+# Vintage template
+# ---------------------------------------------------------------------------
+
+def add_vintage_buildup(
+    model: Any,
+    name: str,
+    new_volume_node: str,
+    decay_curve: list[float],
+) -> str:
+    """Apply the vintage (cohort) buildup template to a model spec.
+
+    Returns a JSON-serialized ``FinancialModelSpec`` with the convolution
+    node added.
+    """
+    ...
+
+# ---------------------------------------------------------------------------
+# Roll-forward template
+# ---------------------------------------------------------------------------
+
+def add_roll_forward(
+    model: Any,
+    name: str,
+    increases: list[str],
+    decreases: list[str],
+) -> str:
+    """Apply the roll-forward template (Beginning + Increases - Decreases = Ending) to a model spec.
+
+    Returns a JSON-serialized ``FinancialModelSpec`` with ``{name}_beg`` and
+    ``{name}_end`` nodes added.
+    """
+    ...
+
+# ---------------------------------------------------------------------------
+# Real-estate template
+# ---------------------------------------------------------------------------
+
+class SimpleLeaseSpec:
+    """Lightweight per-lease rent schedule (period strings + base rent + growth + occupancy)."""
+
+    def __init__(
+        self,
+        node_id: str,
+        start: str,
+        base_rent: float,
+        end: str | None = None,
+        growth_rate: float = 0.0,
+        free_rent_periods: int = 0,
+        occupancy: float = 1.0,
+    ) -> None: ...
+    @property
+    def node_id(self) -> str: ...
+    @property
+    def start(self) -> str: ...
+    @property
+    def end(self) -> str | None: ...
+    @property
+    def base_rent(self) -> float: ...
+    @property
+    def growth_rate(self) -> float: ...
+    @property
+    def free_rent_periods(self) -> int: ...
+    @property
+    def occupancy(self) -> float: ...
+    def validate(self) -> None: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> SimpleLeaseSpec: ...
+
+class RentStepSpec:
+    """Rent step that resets the base rent starting at ``start``."""
+
+    def __init__(self, start: str, rent: float) -> None: ...
+    @property
+    def start(self) -> str: ...
+    @property
+    def rent(self) -> float: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> RentStepSpec: ...
+
+class FreeRentWindowSpec:
+    """Free rent (concession) window that zeros out rent for ``periods`` starting at ``start``."""
+
+    def __init__(self, start: str, periods: int) -> None: ...
+    @property
+    def start(self) -> str: ...
+    @property
+    def periods(self) -> int: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> FreeRentWindowSpec: ...
+
+class RenewalSpec:
+    """Renewal specification modeled in expected-value terms."""
+
+    def __init__(
+        self,
+        term_periods: int,
+        probability: float,
+        downtime_periods: int = 0,
+        rent_factor: float = 1.0,
+        free_rent_periods: int = 0,
+    ) -> None: ...
+    @property
+    def term_periods(self) -> int: ...
+    @property
+    def probability(self) -> float: ...
+    @property
+    def downtime_periods(self) -> int: ...
+    @property
+    def rent_factor(self) -> float: ...
+    @property
+    def free_rent_periods(self) -> int: ...
+    def validate(self) -> None: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> RenewalSpec: ...
+
+class LeaseGrowthConvention:
+    """Compounding convention for lease rent growth."""
+
+    PerPeriod: LeaseGrowthConvention
+    AnnualEscalator: LeaseGrowthConvention
+
+    @staticmethod
+    def from_str(value: str) -> LeaseGrowthConvention: ...
+    def value(self) -> str: ...
+
+class LeaseSpec:
+    """Rich lease specification for rent-roll generation."""
+
+    def __init__(
+        self,
+        node_id: str,
+        start: str,
+        base_rent: float,
+        end: str | None = None,
+        growth_rate: float = 0.0,
+        growth_convention: LeaseGrowthConvention = ...,
+        rent_steps: list[RentStepSpec] = ...,
+        free_rent_periods: int = 0,
+        free_rent_windows: list[FreeRentWindowSpec] = ...,
+        occupancy: float = 1.0,
+        renewal: RenewalSpec | None = None,
+    ) -> None: ...
+    @property
+    def node_id(self) -> str: ...
+    @property
+    def start(self) -> str: ...
+    @property
+    def end(self) -> str | None: ...
+    @property
+    def base_rent(self) -> float: ...
+    @property
+    def growth_rate(self) -> float: ...
+    @property
+    def growth_convention(self) -> LeaseGrowthConvention: ...
+    @property
+    def free_rent_periods(self) -> int: ...
+    @property
+    def occupancy(self) -> float: ...
+    @property
+    def renewal(self) -> RenewalSpec | None: ...
+    def validate(self) -> None: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> LeaseSpec: ...
+
+class RentRollOutputNodes:
+    """Aggregated output node ids for a rent roll."""
+
+    def __init__(
+        self,
+        rent_pgi_node: str = "rent_pgi",
+        free_rent_node: str = "free_rent",
+        vacancy_loss_node: str = "vacancy_loss",
+        rent_effective_node: str = "rent_effective",
+    ) -> None: ...
+    @property
+    def rent_pgi_node(self) -> str: ...
+    @property
+    def free_rent_node(self) -> str: ...
+    @property
+    def vacancy_loss_node(self) -> str: ...
+    @property
+    def rent_effective_node(self) -> str: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> RentRollOutputNodes: ...
+
+class ManagementFeeBase:
+    """Basis for management fee calculation."""
+
+    Egi: ManagementFeeBase
+    EffectiveRent: ManagementFeeBase
+
+    @staticmethod
+    def from_str(value: str) -> ManagementFeeBase: ...
+    def value(self) -> str: ...
+
+class ManagementFeeSpec:
+    """Management fee specification (rate + base)."""
+
+    def __init__(self, rate: float, base: ManagementFeeBase = ...) -> None: ...
+    @property
+    def rate(self) -> float: ...
+    @property
+    def base(self) -> ManagementFeeBase: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> ManagementFeeSpec: ...
+
+class PropertyTemplateNodes:
+    """Standard node ids for the full property operating-statement template."""
+
+    def __init__(
+        self,
+        rent_roll: RentRollOutputNodes | None = None,
+        other_income_total_node: str = "other_income_total",
+        egi_node: str = "egi",
+        management_fee_node: str = "management_fee",
+        opex_total_node: str = "opex_total",
+        noi_node: str = "noi",
+        capex_total_node: str = "capex_total",
+        ncf_node: str = "ncf",
+    ) -> None: ...
+    @property
+    def rent_roll(self) -> RentRollOutputNodes: ...
+    @property
+    def other_income_total_node(self) -> str: ...
+    @property
+    def egi_node(self) -> str: ...
+    @property
+    def management_fee_node(self) -> str: ...
+    @property
+    def opex_total_node(self) -> str: ...
+    @property
+    def noi_node(self) -> str: ...
+    @property
+    def capex_total_node(self) -> str: ...
+    @property
+    def ncf_node(self) -> str: ...
+    def to_json(self) -> str: ...
+    @staticmethod
+    def from_json(json: str) -> PropertyTemplateNodes: ...
+
+def add_noi_buildup(
+    model: Any,
+    total_revenue_node: str,
+    revenue_nodes: list[str],
+    total_expenses_node: str,
+    expense_nodes: list[str],
+    noi_node: str,
+) -> str:
+    """Apply the NOI buildup template to a model spec. Returns JSON ``FinancialModelSpec``."""
+    ...
+
+def add_ncf_buildup(
+    model: Any,
+    noi_node: str,
+    capex_nodes: list[str],
+    ncf_node: str,
+) -> str:
+    """Apply the NCF buildup template to a model spec. Returns JSON ``FinancialModelSpec``."""
+    ...
+
+def add_rent_roll(
+    model: Any,
+    leases: list[LeaseSpec],
+    nodes: RentRollOutputNodes | None = None,
+) -> str:
+    """Apply the rich rent-roll template to a model spec. Returns JSON ``FinancialModelSpec``."""
+    ...
+
+def add_rent_roll_rental_revenue(
+    model: Any,
+    leases: list[SimpleLeaseSpec],
+    total_rent_node: str,
+) -> str:
+    """Apply the simple rent-roll rental-revenue template. Returns JSON ``FinancialModelSpec``."""
+    ...
+
+def add_property_operating_statement(
+    model: Any,
+    leases: list[LeaseSpec],
+    other_income_nodes: list[str] = ...,
+    opex_nodes: list[str] = ...,
+    capex_nodes: list[str] = ...,
+    management_fee: ManagementFeeSpec | None = None,
+    nodes: PropertyTemplateNodes | None = None,
+) -> str:
+    """Apply the full property operating-statement template. Returns JSON ``FinancialModelSpec``."""
     ...

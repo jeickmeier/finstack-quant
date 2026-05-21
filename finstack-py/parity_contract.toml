@@ -28,21 +28,22 @@ visibility = "pub"
 status = "exists"  # Python package already present
 
 [crates.core.modules]
-cashflow     = { python = "finstack.core.cashflow",     status = "missing", note = "Core cashflow APIs are not yet materialized as a dedicated Python submodule" }
-config       = { python = "finstack.core.config",       status = "exists" }
-credit       = { python = "finstack.core.credit",       status = "exists", note = "Includes scoring, pd, lgd, and migration submodules." }
-currency     = { python = "finstack.core.currency",     status = "exists" }
-dates        = { python = "finstack.core.dates",        status = "exists" }
-error        = { python = "finstack.core.error",        status = "missing" }
-explain      = { python = "finstack.core.explain",      status = "missing", note = "Explain helpers are not yet surfaced as a dedicated Python submodule" }
-expr         = { python = "finstack.core.expr",         status = "missing", note = "Expression APIs are not yet surfaced as a dedicated Python submodule" }
-factor_model = { python = "finstack.core.factor_model", status = "missing" }
-market_data  = { python = "finstack.core.market_data",  status = "exists" }
-math         = { python = "finstack.core.math",         status = "exists" }
-money        = { python = "finstack.core.money",        status = "exists" }
-prelude      = { python = "finstack.core.prelude",      status = "missing" }
-types        = { python = "finstack.core.types",        status = "exists" }
-validation   = { python = "finstack.core.validation",   status = "missing" }
+cashflow      = { python = "finstack.core.cashflow",      status = "missing", note = "Core cashflow APIs are not yet materialized as a dedicated Python submodule" }
+config        = { python = "finstack.core.config",        status = "exists" }
+credit        = { python = "finstack.core.credit",        status = "exists", note = "Includes scoring, pd, lgd, and migration submodules." }
+currency      = { python = "finstack.core.currency",      status = "exists" }
+dates         = { python = "finstack.core.dates",         status = "exists" }
+error         = { python = "finstack.core.error",         status = "missing" }
+explain       = { python = "finstack.core.explain",       status = "missing", note = "Explain helpers are not yet surfaced as a dedicated Python submodule" }
+expr          = { python = "finstack.core.expr",          status = "missing", note = "Expression APIs are not yet surfaced as a dedicated Python submodule" }
+factor_model  = { python = "finstack.core.factor_model",  status = "missing" }
+market_data   = { python = "finstack.core.market_data",   status = "exists" }
+math          = { python = "finstack.core.math",          status = "exists" }
+money         = { python = "finstack.core.money",         status = "exists" }
+prelude       = { python = "finstack.core.prelude",       status = "missing" }
+rating_scales = { python = "finstack.core.rating_scales", status = "exists" }
+types         = { python = "finstack.core.types",         status = "exists" }
+validation    = { python = "finstack.core.validation",    status = "missing" }
 # golden is feature-gated test-only — excluded (see [exclusions])
 
 # ---------------------------------------------------------------------------
@@ -265,8 +266,8 @@ status = "exists"
 [crates.statements_analytics.modules]
 analysis                    = { python = "finstack.statements_analytics.analysis",         status = "missing", note = "Bindings are currently exported from finstack.statements_analytics root" }
 comps                       = { python = "finstack.statements_analytics",                  status = "flattened", note = "Comparable-company analysis exposed flat on finstack.statements_analytics" }
-extensions                  = { python = "finstack.statements_analytics.extensions",       status = "missing", note = "Bindings are currently exported from finstack.statements_analytics root" }
-templates                   = { python = "finstack.statements_analytics.templates",        status = "missing", note = "Bindings are currently exported from finstack.statements_analytics root" }
+extensions                  = { python = "finstack.statements_analytics",                  status = "flattened", note = "Credit-scorecard and corkscrew extensions exposed flat on finstack.statements_analytics (ScorecardMetric/Config/Report, CreditScorecardExtension, AccountType, CorkscrewAccount/Config/Report, CorkscrewExtension, validate_scorecard_config)" }
+templates                   = { python = "finstack.statements_analytics",                  status = "flattened", note = "Vintage, roll-forward, and real-estate templates exposed flat on finstack.statements_analytics (add_vintage_buildup, add_roll_forward, add_noi_buildup, add_ncf_buildup, add_rent_roll, add_rent_roll_rental_revenue, add_property_operating_statement, plus LeaseSpec/SimpleLeaseSpec/RentStepSpec/FreeRentWindowSpec/RenewalSpec/LeaseGrowthConvention/RentRollOutputNodes/ManagementFeeBase/ManagementFeeSpec/PropertyTemplateNodes)" }
 
 # ---------------------------------------------------------------------------
 # finstack-portfolio  →  finstack.portfolio
@@ -287,11 +288,11 @@ cashflows    = { python = "finstack.portfolio.cashflows",    status = "missing",
 dataframe    = { python = "finstack.portfolio.dataframe",    status = "missing", note = "Table-envelope helpers are currently exported from finstack.portfolio root" }
 dependencies = { python = "finstack.portfolio.dependencies", status = "missing" }
 error        = { python = "finstack.portfolio.error",        status = "missing" }
-factor_model = { python = "finstack.portfolio.factor_model", status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
+factor_model = { python = "finstack.portfolio",              status = "flattened", note = "Result types (RiskDecomposition, PositionRiskDecomposition, RiskBudgetResult, WhatIfResult, StressResult, StressAttribution, FactorAssignmentReport, CreditVolReport, VolHorizon, DecompositionConfig, ...) plus typed sibling functions (parametric/historical_var_decomposition_typed, evaluate_risk_budget_typed) are exported flat on finstack.portfolio; engine/builder types remain Rust-only for now" }
 grouping     = { python = "finstack.portfolio.grouping",     status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
 margin       = { python = "finstack.portfolio.margin",       status = "missing", note = "Portfolio margin helpers are not materialized as a dedicated submodule" }
 metrics      = { python = "finstack.portfolio.metrics",      status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
-optimization = { python = "finstack.portfolio.optimization", status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
+optimization = { python = "finstack.portfolio",              status = "flattened", note = "Spec/result types (PortfolioOptimizationSpec, OptimizationParameters, Constraint, Objective, MetricExpr, PerPositionMetric, PositionFilter, WeightingScheme, MissingMetricPolicy, Inequality, OptimizationStatus, TradeSpec, TradeDirection, TradeType, CandidatePosition, TradeUniverse, PortfolioOptimizationResult) plus optimize_portfolio_typed are exported flat on finstack.portfolio alongside the legacy JSON-string optimize_portfolio entry point" }
 performance  = { python = "finstack.portfolio",              status = "flattened", note = "TWRR/MWRR performance helpers are exported flat on finstack.portfolio" }
 portfolio    = { python = "finstack.portfolio.portfolio",    status = "missing", note = "Bindings are currently exported from finstack.portfolio root" }
 position     = { python = "finstack.portfolio.position",     status = "missing" }
@@ -315,6 +316,16 @@ status = "exists"
 # Scenario symbols are exposed flat on finstack.scenarios — the Rust crate's
 # internal engine/spec/enums/reports partitioning is not surfaced as a
 # separate Python import path to keep a single pathway.
+#
+# NOTE: ``finstack.scenarios`` now exposes a typed authoring path alongside the
+# original JSON helpers — ``OperationSpec`` (typed classmethod constructors,
+# one per Rust enum variant), ``RateBindingSpec``, and the supporting enums
+# (``CurveKind``, ``VolSurfaceKind``, ``TenorMatchMode``, ``TimeRollMode``,
+# ``Compounding``). Round-trip is delegated to serde on the Rust types so the
+# wire contract (``tag = "kind"``, snake_case, with ``forward`` / ``par_cds``
+# renames preserved) matches what the engine parses. These symbols remain flat
+# on the package root rather than living under a ``spec`` submodule to keep a
+# single pathway.
 adapters  = { python = "finstack.scenarios.adapters",  status = "missing" }
 templates = { python = "finstack.scenarios.templates", status = "missing" }
 utils     = { python = "finstack.scenarios.utils",     status = "missing" }

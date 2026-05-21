@@ -20,6 +20,13 @@ __all__ = [
     "apply_scenario_to_market",
     "compute_horizon_return",
     "HorizonResult",
+    "OperationSpec",
+    "RateBindingSpec",
+    "CurveKind",
+    "VolSurfaceKind",
+    "TenorMatchMode",
+    "TimeRollMode",
+    "Compounding",
 ]
 
 def parse_scenario_spec(json_str: str) -> str:
@@ -338,3 +345,349 @@ def compute_horizon_return(
         ``HorizonResult`` with decomposed total return and factor attribution.
     """
     ...
+
+# ---------------------------------------------------------------------------
+# Typed operation builders
+#
+# These mirror the Rust ``OperationSpec`` enum and its supporting enums. They
+# replace the raw-JSON authoring path so quants can write
+# ``OperationSpec.curve_parallel_bp(...)`` and feed the result straight into
+# ``build_scenario_spec`` via ``op.to_json()``.
+# ---------------------------------------------------------------------------
+
+class CurveKind:
+    """Type of market curve targeted by a scenario operation."""
+
+    @classmethod
+    def discount(cls) -> CurveKind:
+        """Discount factor curve."""
+        ...
+
+    @classmethod
+    def forward(cls) -> CurveKind:
+        """Forward rate curve."""
+        ...
+
+    @classmethod
+    def par_cds(cls) -> CurveKind:
+        """Par CDS spread curve."""
+        ...
+
+    @classmethod
+    def inflation(cls) -> CurveKind:
+        """Inflation index curve."""
+        ...
+
+    @classmethod
+    def commodity(cls) -> CurveKind:
+        """Commodity forward curve."""
+        ...
+
+    @property
+    def name(self) -> str:
+        """Variant name, e.g. ``"Discount"``."""
+        ...
+
+    @property
+    def value(self) -> str:
+        """Serialized wire value, e.g. ``"discount"`` or ``"par_cds"``."""
+        ...
+
+class VolSurfaceKind:
+    """Category of volatility surface targeted by a scenario operation."""
+
+    @classmethod
+    def equity(cls) -> VolSurfaceKind: ...
+    @classmethod
+    def credit(cls) -> VolSurfaceKind: ...
+    @classmethod
+    def swaption(cls) -> VolSurfaceKind: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def value(self) -> str: ...
+
+class TenorMatchMode:
+    """Tenor-pillar alignment strategy for curve-node operations."""
+
+    @classmethod
+    def exact(cls) -> TenorMatchMode: ...
+    @classmethod
+    def interpolate(cls) -> TenorMatchMode: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def value(self) -> str: ...
+
+class TimeRollMode:
+    """Calendar-vs-business-day semantics for time-roll operations."""
+
+    @classmethod
+    def business_days(cls) -> TimeRollMode: ...
+    @classmethod
+    def calendar_days(cls) -> TimeRollMode: ...
+    @classmethod
+    def approximate(cls) -> TimeRollMode: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def value(self) -> str: ...
+
+class Compounding:
+    """Compounding convention for rate-extraction operations."""
+
+    @classmethod
+    def simple(cls) -> Compounding: ...
+    @classmethod
+    def continuous(cls) -> Compounding: ...
+    @classmethod
+    def annual(cls) -> Compounding: ...
+    @classmethod
+    def semi_annual(cls) -> Compounding: ...
+    @classmethod
+    def quarterly(cls) -> Compounding: ...
+    @classmethod
+    def monthly(cls) -> Compounding: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def value(self) -> str: ...
+
+class RateBindingSpec:
+    """Configuration linking a statement rate node to a market curve."""
+
+    def __init__(
+        self,
+        node_id: str,
+        curve_id: str,
+        tenor: str,
+        compounding: Compounding | None = None,
+        day_count: str | None = None,
+    ) -> None: ...
+    @property
+    def node_id(self) -> str: ...
+    @property
+    def curve_id(self) -> str: ...
+    @property
+    def tenor(self) -> str: ...
+    @property
+    def compounding(self) -> Compounding: ...
+    @property
+    def day_count(self) -> str | None: ...
+    def to_json(self) -> str:
+        """Serialize to JSON."""
+        ...
+
+    @classmethod
+    def from_json(cls, json: str) -> RateBindingSpec:
+        """Deserialize a ``RateBindingSpec`` from JSON."""
+        ...
+
+class OperationSpec:
+    """Typed builder for ``finstack_scenarios::OperationSpec``.
+
+    Each classmethod corresponds to one Rust enum variant; ``to_json()``
+    produces the canonical wire form expected by ``build_scenario_spec`` and
+    the scenario engine.
+    """
+
+    @classmethod
+    def market_fx_pct(cls, base: str, quote: str, pct: float) -> OperationSpec:
+        """FX rate percent shift (``pct = 5.0`` strengthens ``base`` by 5%)."""
+        ...
+
+    @classmethod
+    def equity_price_pct(cls, ids: list[str], pct: float) -> OperationSpec:
+        """Equity price percent shock applied to all supplied identifiers."""
+        ...
+
+    @classmethod
+    def instrument_price_pct_by_attr(
+        cls, attrs: list[tuple[str, str]], pct: float
+    ) -> OperationSpec:
+        """Instrument price shock by exact attribute match.
+
+        ``attrs`` is a list of ``(key, value)`` pairs preserving order.
+        """
+        ...
+
+    @classmethod
+    def curve_parallel_bp(
+        cls,
+        curve_kind: CurveKind,
+        curve_id: str,
+        bp: float,
+        discount_curve_id: str | None = None,
+    ) -> OperationSpec:
+        """Parallel basis-point shift on a rate-style curve."""
+        ...
+
+    @classmethod
+    def curve_node_bp(
+        cls,
+        curve_kind: CurveKind,
+        curve_id: str,
+        nodes: list[tuple[str, float]],
+        match_mode: TenorMatchMode | None = None,
+        discount_curve_id: str | None = None,
+    ) -> OperationSpec:
+        """Node-level basis-point shifts on a rate-style curve."""
+        ...
+
+    @classmethod
+    def vol_index_parallel_pts(cls, curve_id: str, points: float) -> OperationSpec:
+        """Parallel shock to a volatility-index curve in absolute index points."""
+        ...
+
+    @classmethod
+    def vol_index_node_pts(
+        cls,
+        curve_id: str,
+        nodes: list[tuple[str, float]],
+        match_mode: TenorMatchMode | None = None,
+    ) -> OperationSpec:
+        """Node-level shocks to a volatility-index curve in absolute index points."""
+        ...
+
+    @classmethod
+    def base_corr_parallel_pts(cls, surface_id: str, points: float) -> OperationSpec:
+        """Parallel base-correlation shift (absolute correlation points)."""
+        ...
+
+    @classmethod
+    def base_corr_bucket_pts(
+        cls,
+        surface_id: str,
+        points: float,
+        detachment_bps: list[int] | None = None,
+        maturities: list[str] | None = None,
+    ) -> OperationSpec:
+        """Bucketed base-correlation shock by detachment and (reserved) maturity."""
+        ...
+
+    @classmethod
+    def vol_surface_parallel_pct(
+        cls, surface_kind: VolSurfaceKind, surface_id: str, pct: float
+    ) -> OperationSpec:
+        """Parallel percent shift to a volatility surface."""
+        ...
+
+    @classmethod
+    def vol_surface_bucket_pct(
+        cls,
+        surface_kind: VolSurfaceKind,
+        surface_id: str,
+        pct: float,
+        tenors: list[str] | None = None,
+        strikes: list[float] | None = None,
+    ) -> OperationSpec:
+        """Bucketed volatility surface percent shock."""
+        ...
+
+    @classmethod
+    def stmt_forecast_percent(cls, node_id: str, pct: float) -> OperationSpec:
+        """Statement forecast percent change."""
+        ...
+
+    @classmethod
+    def stmt_forecast_assign(cls, node_id: str, value: float) -> OperationSpec:
+        """Statement forecast value assignment."""
+        ...
+
+    @classmethod
+    def rate_binding(cls, binding: RateBindingSpec) -> OperationSpec:
+        """Bind a statement rate node to a curve for the lifetime of the scenario."""
+        ...
+
+    @classmethod
+    def instrument_spread_bp_by_attr(
+        cls, attrs: list[tuple[str, str]], bp: float
+    ) -> OperationSpec:
+        """Instrument spread shock (basis points) by exact attribute match."""
+        ...
+
+    @classmethod
+    def instrument_price_pct_by_type(
+        cls, instrument_types: list[str], pct: float
+    ) -> OperationSpec:
+        """Instrument price shock by ``InstrumentType`` (snake_case strings)."""
+        ...
+
+    @classmethod
+    def instrument_spread_bp_by_type(
+        cls, instrument_types: list[str], bp: float
+    ) -> OperationSpec:
+        """Instrument spread shock by ``InstrumentType`` (snake_case strings)."""
+        ...
+
+    @classmethod
+    def asset_correlation_pts(cls, delta_pts: float) -> OperationSpec:
+        """Asset-correlation shock for structured credit."""
+        ...
+
+    @classmethod
+    def prepay_default_correlation_pts(cls, delta_pts: float) -> OperationSpec:
+        """Prepay-default correlation shock for structured credit."""
+        ...
+
+    @classmethod
+    def hierarchy_curve_parallel_bp(
+        cls,
+        curve_kind: CurveKind,
+        target_json: str,
+        bp: float,
+        discount_curve_id: str | None = None,
+    ) -> OperationSpec:
+        """Hierarchy-targeted parallel curve shift.
+
+        ``target_json`` is a JSON-serialized ``HierarchyTarget``
+        (``{"path": [...], "tag_filter": {...}}``).
+        """
+        ...
+
+    @classmethod
+    def hierarchy_vol_surface_parallel_pct(
+        cls, surface_kind: VolSurfaceKind, target_json: str, pct: float
+    ) -> OperationSpec:
+        """Hierarchy-targeted vol-surface percent shift."""
+        ...
+
+    @classmethod
+    def hierarchy_equity_price_pct(cls, target_json: str, pct: float) -> OperationSpec:
+        """Hierarchy-targeted equity price shift."""
+        ...
+
+    @classmethod
+    def hierarchy_base_corr_parallel_pts(
+        cls, target_json: str, points: float
+    ) -> OperationSpec:
+        """Hierarchy-targeted base-correlation parallel shift."""
+        ...
+
+    @classmethod
+    def time_roll_forward(
+        cls,
+        period: str,
+        apply_shocks: bool = True,
+        roll_mode: TimeRollMode | None = None,
+    ) -> OperationSpec:
+        """Roll the valuation horizon forward (e.g. ``"1M"``).
+
+        ``apply_shocks`` defaults to ``True`` to mirror the Rust
+        ``#[serde(default = "default_true")]`` attribute.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """Serialize to the canonical JSON wire format."""
+        ...
+
+    @classmethod
+    def from_json(cls, json: str) -> OperationSpec:
+        """Deserialize an ``OperationSpec`` from JSON."""
+        ...
+
+    @property
+    def kind(self) -> str:
+        """Variant discriminator (the serde ``kind`` tag value)."""
+        ...
