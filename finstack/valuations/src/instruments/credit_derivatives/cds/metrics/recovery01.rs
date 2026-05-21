@@ -75,6 +75,16 @@ fn price_at_bumped_recovery(
     // becomes a partial sensitivity (the LGD-only direct effect).
     let has_par_quotes = hazard.par_spread_points().next().is_some();
 
+    // Frozen-curve fallback: reuse the hazard curve's λ knots unchanged but
+    // realign its `recovery_rate` metadata with the bumped trade recovery.
+    // Without this the recovery-consistency guard in the pricer rejects the
+    // (trade, curve) pair; the λ knots are untouched so the priced PV is
+    // exactly the documented LGD-only sensitivity.
+    let frozen_curve_market = || -> Result<MarketContext> {
+        let frozen = hazard.with_recovery_rate(new_recovery)?;
+        Ok(base_market.clone().insert(frozen))
+    };
+
     let market_for_pricing: MarketContext = if has_par_quotes {
         match recalibrate_hazard_with_recovery_and_doc_clause_and_valuation_convention(
             hazard.as_ref(),
@@ -89,11 +99,11 @@ fn price_at_bumped_recovery(
                 // Recalibration failure (e.g. degenerate spreads under the new
                 // recovery) is non-fatal: fall through to the frozen-curve
                 // bump so the metric still produces a number.
-                base_market.clone()
+                frozen_curve_market()?
             }
         }
     } else {
-        base_market.clone()
+        frozen_curve_market()?
     };
 
     Ok(bumped_cds.value(&market_for_pricing, as_of)?.amount())

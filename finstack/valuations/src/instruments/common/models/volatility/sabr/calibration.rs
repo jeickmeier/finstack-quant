@@ -15,7 +15,7 @@ use finstack_core::{Error, Result};
 /// Floor at a tiny positive number keeps deep-OTM strikes from getting a
 /// strictly-zero weight (which would let the optimizer drift on the wings).
 #[inline]
-fn vega_weight(forward: f64, strike: f64, market_vol: f64, time_to_expiry: f64) -> f64 {
+pub(crate) fn vega_weight(forward: f64, strike: f64, market_vol: f64, time_to_expiry: f64) -> f64 {
     const MIN_VEGA: f64 = 1e-10;
     black_vega(forward, strike, market_vol, time_to_expiry).max(MIN_VEGA)
 }

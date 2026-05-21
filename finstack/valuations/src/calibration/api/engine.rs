@@ -526,7 +526,14 @@ fn execute_sequential(
 /// downstream code can pattern-match on the error kind and surface the
 /// failing quote ID without re-parsing the message.
 fn bad_fit_envelope_error(step_id: &str, report: &CalibrationReport) -> EnvelopeError {
-    let tolerance = report.solver_config.tolerance();
+    // Prefer the actual success-gate tolerance (recorded in metadata by
+    // `for_type_with_tolerance`) over the solver's internal root-finder
+    // tolerance, which is a different quantity and misleading here.
+    let tolerance = report
+        .metadata
+        .get("success_tolerance")
+        .and_then(|s| s.parse::<f64>().ok())
+        .unwrap_or_else(|| report.solver_config.tolerance());
     EnvelopeError::SolverNotConverged {
         step_id: step_id.to_string(),
         max_residual: report.max_residual,

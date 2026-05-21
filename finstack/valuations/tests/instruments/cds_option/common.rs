@@ -76,6 +76,23 @@ pub fn standard_market(as_of: Date) -> MarketContext {
     MarketContext::new().insert(disc).insert(credit)
 }
 
+/// Clone `market` with the named hazard curve's `recovery_rate` metadata
+/// overridden, keeping its λ knots unchanged.
+///
+/// Used to build a "frozen-curve" market for a trade whose recovery has been
+/// bumped: the hazard λ stays fixed (the frozen-curve / LGD-only semantics)
+/// while the curve's recovery metadata is realigned with the bumped trade
+/// recovery so the ISDA recovery-consistency guard accepts the pair.
+pub fn frozen_market_with_recovery(
+    market: &MarketContext,
+    hazard_id: &str,
+    recovery: f64,
+) -> MarketContext {
+    let hazard = market.get_hazard(hazard_id).unwrap();
+    let realigned = hazard.with_recovery_rate(recovery).unwrap();
+    market.clone().insert(realigned)
+}
+
 /// Convert basis points (f64) to a Decimal rate.
 /// e.g., 100.0 bp -> Decimal 0.01
 fn bp_to_decimal(bp: f64) -> Decimal {

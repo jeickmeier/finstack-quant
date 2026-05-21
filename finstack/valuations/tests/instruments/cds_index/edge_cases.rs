@@ -253,7 +253,16 @@ fn test_recovery_rate_zero() {
     )
     .expect("valid test parameters");
 
-    let ctx = standard_market_context(as_of);
+    // The hazard curve's bootstrap recovery must agree with the index trade
+    // recovery (ISDA "same R in both legs"); build HZ-INDEX at 0.0 to match.
+    let ctx = MarketContext::new()
+        .insert(flat_discount_curve("USD-OIS", as_of, 0.03))
+        .insert(flat_hazard_curve(
+            "HZ-INDEX",
+            as_of,
+            0.0,
+            STANDARD_HAZARD_RATE,
+        ));
     let result = idx.value(&ctx, as_of);
 
     assert!(result.is_ok(), "Zero recovery should be valid");
@@ -279,7 +288,16 @@ fn test_recovery_rate_one() {
     )
     .expect("valid test parameters");
 
-    let ctx = standard_market_context(as_of);
+    // The hazard curve's bootstrap recovery must agree with the index trade
+    // recovery (ISDA "same R in both legs"); build HZ-INDEX at 1.0 to match.
+    let ctx = MarketContext::new()
+        .insert(flat_discount_curve("USD-OIS", as_of, 0.03))
+        .insert(flat_hazard_curve(
+            "HZ-INDEX",
+            as_of,
+            1.0,
+            STANDARD_HAZARD_RATE,
+        ));
     let result = idx.value(&ctx, as_of);
 
     assert!(result.is_ok(), "Full recovery should be valid");

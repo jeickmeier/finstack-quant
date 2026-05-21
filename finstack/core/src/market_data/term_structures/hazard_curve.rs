@@ -417,6 +417,39 @@ impl HazardCurve {
         self.knots.is_empty()
     }
 
+    /// Create a copy of this curve with its `recovery_rate` metadata overridden.
+    ///
+    /// All hazard knots (λ), the survival interpolator, day-count, base date,
+    /// par spreads and other metadata are preserved **unchanged** — only the
+    /// recovery-rate field is replaced. The recovery rate is calibration/
+    /// reporting metadata (consulted by the recovery-consistency guard and the
+    /// spread↔hazard bootstrap mapping); it is *not* a direct input to the
+    /// survival-probability or protection-leg PV math. Overriding it therefore
+    /// realigns a "frozen-curve" curve with a trade carrying a different
+    /// recovery without altering any priced quantity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `recovery_rate` is outside `[0, 1]`.
+    pub fn with_recovery_rate(&self, recovery_rate: f64) -> crate::Result<HazardCurve> {
+        super::common::validate_unit_range(recovery_rate, "recovery_rate")?;
+        Ok(HazardCurve {
+            id: self.id.clone(),
+            base: self.base,
+            knots: self.knots.clone(),
+            lambdas: self.lambdas.clone(),
+            recovery_rate,
+            issuer: self.issuer.clone(),
+            seniority: self.seniority,
+            currency: self.currency,
+            day_count: self.day_count,
+            par_tenors: self.par_tenors.clone(),
+            par_spreads_bp: self.par_spreads_bp.clone(),
+            par_interp: self.par_interp,
+            interp: self.interp.clone(),
+        })
+    }
+
     /// Create a builder with this curve's parameters, using a new ID.
     /// Useful for creating modified versions of the curve.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> HazardCurveBuilder {

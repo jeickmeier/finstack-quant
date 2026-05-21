@@ -52,6 +52,7 @@ pub use trees::{
     NodeState, ShortRateModel, ShortRateTree, ShortRateTreeConfig, StateVariables, TreeBranching,
     TreeCompounding, TreeGreeks, TreeModel, TreeParameters, TreeType, TreeValuator,
 };
+pub(crate) use volatility::vega_weight;
 #[allow(unused_imports)]
 pub use volatility::{
     d1, d1_black76, d1_d2, d1_d2_black76, d2, d2_black76, norm_cdf, norm_pdf, SABRCalibrator,

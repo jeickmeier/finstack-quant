@@ -399,14 +399,19 @@ fn test_recovery01_recalibrates_hazard_curve_with_par_spreads() {
 
     let recovery = 0.40;
     // Build a hazard curve carrying its own par-spread quotes (production
-    // shape — mirrors what a bootstrap would store).
-    let hazard = HazardCurve::builder("CDS-CAL-CREDIT")
-        .base_date(base)
-        .recovery_rate(recovery)
-        .knots([(1.0, 0.05), (3.0, 0.05), (5.0, 0.05), (10.0, 0.05)])
-        .par_spreads([(1.0, 300.0), (3.0, 300.0), (5.0, 300.0), (10.0, 300.0)])
-        .build()
-        .unwrap();
+    // shape — mirrors what a bootstrap would store). Parameterised on the
+    // recovery so the frozen-curve baseline below can produce a curve whose
+    // recovery metadata matches each bumped trade recovery.
+    let make_hazard = |rec: f64| {
+        HazardCurve::builder("CDS-CAL-CREDIT")
+            .base_date(base)
+            .recovery_rate(rec)
+            .knots([(1.0, 0.05), (3.0, 0.05), (5.0, 0.05), (10.0, 0.05)])
+            .par_spreads([(1.0, 300.0), (3.0, 300.0), (5.0, 300.0), (10.0, 300.0)])
+            .build()
+            .unwrap()
+    };
+    let hazard = make_hazard(recovery);
 
     let cds = crate::finstack_test_utils::cds_buy_protection(
         "CDS-RECALIB",
@@ -436,15 +441,25 @@ fn test_recovery01_recalibrates_hazard_curve_with_par_spreads() {
         .expect("Recovery01 should compute on calibrated curve");
     let recalibrated_recovery01 = result.measures[MetricId::Recovery01.as_str()];
 
-    // Hand-rolled frozen-curve baseline: bump only the instrument LGD,
-    // leave the hazard curve intact. This is what Recovery01 used to do.
+    // Hand-rolled frozen-curve baseline: bump only the instrument LGD, keep
+    // the hazard λ knots intact. This is what Recovery01 does on its
+    // frozen-curve path. The curve's recovery metadata is realigned with each
+    // bumped trade recovery so the (trade, curve) pair stays consistent under
+    // the ISDA recovery-consistency guard — the λ knots are untouched, so this
+    // is still the pure LGD-only sensitivity.
     let bump = 0.01;
     let mut cds_up = cds_test.clone();
     cds_up.protection.recovery_rate = recovery + bump;
+    let market_up = MarketContext::new()
+        .insert(create_discount_curve(base))
+        .insert(make_hazard(recovery + bump));
     let mut cds_down = cds_test.clone();
     cds_down.protection.recovery_rate = recovery - bump;
-    let pv_up_frozen = cds_up.value(&market, base).unwrap().amount();
-    let pv_down_frozen = cds_down.value(&market, base).unwrap().amount();
+    let market_down = MarketContext::new()
+        .insert(create_discount_curve(base))
+        .insert(make_hazard(recovery - bump));
+    let pv_up_frozen = cds_up.value(&market_up, base).unwrap().amount();
+    let pv_down_frozen = cds_down.value(&market_down, base).unwrap().amount();
     let frozen_recovery01 = (pv_up_frozen - pv_down_frozen) / 2.0;
 
     assert!(

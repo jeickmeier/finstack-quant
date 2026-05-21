@@ -387,7 +387,15 @@ mod cds_invariants {
     use proptest::prelude::*;
     use time::macros::date;
 
-    fn build_test_curves(flat_rate: f64, hazard_rate: f64) -> (DiscountCurve, HazardCurve) {
+    /// Build a discount + hazard curve pair. `recovery` sets the hazard
+    /// curve's bootstrap recovery; callers must pass the same recovery the
+    /// CDS trade uses, since the ISDA recovery-consistency guard requires the
+    /// same R in both legs.
+    fn build_test_curves(
+        flat_rate: f64,
+        hazard_rate: f64,
+        recovery: f64,
+    ) -> (DiscountCurve, HazardCurve) {
         let as_of = date!(2025 - 01 - 01);
 
         let disc = DiscountCurve::builder("USD-OIS")
@@ -405,7 +413,7 @@ mod cds_invariants {
         let hazard = HazardCurve::builder("TEST-CREDIT")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
-            .recovery_rate(0.4)
+            .recovery_rate(recovery)
             .knots(vec![
                 (0.0, hazard_rate),
                 (1.0, hazard_rate),
@@ -454,7 +462,9 @@ mod cds_invariants {
         ) {
             let as_of = date!(2025 - 01 - 01);
             let maturity = as_of.add_months(60); // 5Y CDS
-            let (disc, hazard) = build_test_curves(0.04, hazard_rate);
+            // Build the hazard curve at the trade recovery so the ISDA
+            // recovery-consistency guard (same R in both legs) is satisfied.
+            let (disc, hazard) = build_test_curves(0.04, hazard_rate, recovery);
 
             let cds = crate::finstack_test_utils::cds_buy_protection(
                 "PROP_PAR_TEST",
@@ -511,13 +521,21 @@ mod cds_invariants {
             cds_low.protection.recovery_rate = 0.30; // Low recovery = high LGD
             cds_high_recovery.protection.recovery_rate = 0.50; // High recovery = low LGD
 
-            let (disc, hazard) = build_test_curves(0.04, hazard_rate);
-            let market = MarketContext::new()
-                .insert(disc)
-                .insert(hazard);
-            let prot_low = metric_value(&cds_low, &market, as_of, MetricId::ProtectionLegPv);
+            // Each trade needs a hazard curve whose bootstrap recovery matches
+            // its own recovery (ISDA same-R-in-both-legs guard). The λ knots
+            // are identical across both curves, so the protection-leg PVs are
+            // directly comparable.
+            let (disc_low, hazard_low) = build_test_curves(0.04, hazard_rate, 0.30);
+            let market_low = MarketContext::new()
+                .insert(disc_low)
+                .insert(hazard_low);
+            let (disc_high, hazard_high) = build_test_curves(0.04, hazard_rate, 0.50);
+            let market_high = MarketContext::new()
+                .insert(disc_high)
+                .insert(hazard_high);
+            let prot_low = metric_value(&cds_low, &market_low, as_of, MetricId::ProtectionLegPv);
             let prot_high =
-                metric_value(&cds_high_recovery, &market, as_of, MetricId::ProtectionLegPv);
+                metric_value(&cds_high_recovery, &market_high, as_of, MetricId::ProtectionLegPv);
 
             // Higher recovery = lower protection PV (smaller payout)
             prop_assert!(

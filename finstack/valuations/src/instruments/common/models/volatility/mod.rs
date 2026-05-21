@@ -76,5 +76,6 @@ pub use finstack_core::math::{norm_cdf, norm_pdf};
 pub use heston::{HestonModel, HestonParameters};
 pub use local_vol::{DupireParams, LocalVolBuilder, LocalVolSurface};
 pub use normal::{bachelier_price, d_bachelier};
+pub(crate) use sabr::vega_weight;
 pub use sabr::{SABRCalibrator, SABRModel, SABRParameters, SABRSmile};
 pub use sabr_derivatives::{SABRCalibrationDerivatives, SABRMarketData};

@@ -48,7 +48,13 @@ fn price_at_bumped_recovery(
             )?;
         base_market.clone().insert(recalibrated)
     } else {
-        base_market.clone()
+        // Frozen-curve fallback: keep the hazard λ knots unchanged but realign
+        // the curve's `recovery_rate` metadata with the bumped trade recovery
+        // so the recovery-consistency guard in the underlying CDS pricer
+        // accepts the (trade, curve) pair. The priced PV is the documented
+        // LGD-only sensitivity since λ is untouched.
+        let frozen = hazard.with_recovery_rate(new_recovery)?;
+        base_market.clone().insert(frozen)
     };
 
     Ok(bumped_option.value(&market_for_pricing, as_of)?.amount())

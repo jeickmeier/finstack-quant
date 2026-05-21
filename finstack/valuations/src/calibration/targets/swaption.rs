@@ -3,7 +3,9 @@ use crate::calibration::api::schema::{
 };
 use crate::calibration::config::CalibrationConfig;
 use crate::calibration::CalibrationReport;
-use crate::instruments::common_impl::models::{SABRCalibrator, SABRModel, SABRParameters};
+use crate::instruments::common_impl::models::{
+    vega_weight, SABRCalibrator, SABRModel, SABRParameters,
+};
 use crate::market::conventions::registry::ConventionRegistry;
 use crate::market::quotes::market_quote::MarketQuote;
 use crate::market::quotes::vol::VolQuote;
@@ -263,11 +265,33 @@ impl SwaptionVolTarget {
                     sabr_params.insert((*kb_exp, *kb_ten), p.clone());
 
                     let model = SABRModel::new(p);
+
+                    // Normalized vega weighting of the recorded residuals so the
+                    // success gate is consistent with the vega-weighted SABR
+                    // calibration objective (see `vega_weight`). The optimizer
+                    // minimizes `Σ w·(σ_model − σ_market)²`; an unweighted
+                    // success gate would then reject low-vega wing strikes that
+                    // the objective deliberately under-weighted. Each residual is
+                    // scaled by `w_i / w_max` within its (expiry,tenor) bucket:
+                    // residuals stay in vol units, the most-weighted (≈ATM)
+                    // strike is unchanged, and wing strikes are de-emphasized
+                    // exactly as the objective de-emphasizes them.
+                    let weights: Vec<f64> = strikes
+                        .iter()
+                        .zip(vols.iter())
+                        .map(|(&k, &v)| vega_weight(fwd_rate, k, v, t_exp))
+                        .collect();
+                    let w_max = weights
+                        .iter()
+                        .copied()
+                        .fold(0.0_f64, f64::max)
+                        .max(f64::MIN_POSITIVE);
                     for (i, k) in strikes.iter().enumerate() {
                         let v = model.implied_volatility(fwd_rate, *k, t_exp)?;
+                        let weighted_residual = (weights[i] / w_max) * (v - vols[i]).abs();
                         residuals.insert(
                             format!("swpt_{}_{}_{}", kb_exp, kb_ten, i),
-                            (v - vols[i]).abs(),
+                            weighted_residual,
                         );
                     }
                     count += 1;

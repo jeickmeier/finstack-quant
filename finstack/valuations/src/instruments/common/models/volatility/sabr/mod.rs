@@ -37,6 +37,7 @@ mod smile;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use calibration::vega_weight;
 pub use calibration::SABRCalibrator;
 pub use model::SABRModel;
 pub use parameters::SABRParameters;
