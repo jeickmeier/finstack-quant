@@ -5,64 +5,56 @@ loans, swaps, and structured products.
 
 ## Overview
 
-`finstack-cashflows` is the cashflow-focused crate in the Finstack workspace. It
-provides:
+`finstack-cashflows` builds dated, currency-tagged cashflow schedules and
+aggregates them for reporting and PV:
 
-- schedule construction through `CashFlowSchedule::builder()`
-- finance-facing specification types for coupons, fees, amortization, default,
-  prepayment, and recovery
-- schedule-driven accrued-interest calculations
-- currency-preserving aggregation utilities
-- schedule-level periodized PV helpers that accept explicit `DayCountContext`
+- `CashFlowSchedule::builder()` for coupons, principal, fees, and credit legs
+- specification types for coupons, amortization, fees, default, prepayment,
+  and recovery
+- schedule-driven accrued interest
+- currency-preserving aggregation and period PV helpers with explicit
+  `DayCountContext`
 
-The crate is designed around a few explicit conventions:
+Conventions:
 
-- amounts are represented with currency-tagged `Money`
-- rates are usually decimals, while spreads and fee quotes are often basis
-  points
-- payment and reset lags are business-day based when a calendar is supplied
-- day-count behavior is explicit and should not be inferred from examples alone
+- amounts use `Money` with an explicit currency
+- coupon rates are decimals; spreads and periodic fee quotes are often basis
+  points on the spec types
+- payment and reset lags are business-day based when a calendar ID is set
+- day-count and calendar behavior come from the builder specs, not from examples
 
-## Import Paths
-
-Use `finstack_cashflows::...` when you depend on this crate directly.
+## Import path
 
 ```rust
 use finstack_cashflows::builder::CashFlowSchedule;
 ```
 
-The `finstack-valuations` crate also re-exports this crate as
-`finstack_valuations::cashflow`, which is convenient inside valuations code but
-is not the canonical path for this package README.
+`finstack-valuations` depends on this crate internally. For application code,
+add `finstack-cashflows` as a direct dependency rather than reaching through
+valuations.
 
-## Main Entry Points
+## Modules
 
-- `finstack_cashflows::builder`
-  Schedule construction, schedule specs, and `CashFlowSchedule`. Includes
-  schedule-inspection methods (`weighted_average_life`, `coupons`,
-  `outstanding_path_per_flow`, `outstanding_by_date`,
-  `merge_cashflow_schedules`, `normalize_public`) and ten market-convention
-  presets on `ScheduleParams` (USD/EUR/GBP/JPY swaps and bonds, including
-  `jpy_tona_swap`).
-- `finstack_cashflows::aggregation`
-  Currency-preserving nominal aggregation helpers, plus the
-  [`RecoveryTiming`] enum that controls how the recovery leg on
-  surviving principal flows is placed in time (`AtPaymentDate` vs
-  `AtDefaultIntegrated`).
-- `finstack_cashflows::accrual`
-  Schedule-driven accrued interest configuration and calculations.
-- `finstack_cashflows::traits`
-  `CashflowProvider`, `schedule_from_dated_flows`, and
-  `schedule_from_classified_flows` (for callers that already carry
-  pre-classified flows).
-- `finstack_cashflows::primitives`
-  Re-exports from `finstack_core::cashflow`, including `CashFlow` and `CFKind`.
+| Module | Role |
+| --- | --- |
+| [`builder`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/builder/index.html) | `CashFlowSchedule`, specs, schedule inspection, period PV |
+| [`aggregation`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/aggregation/index.html) | Period rollups; [`RecoveryTiming`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/aggregation/enum.RecoveryTiming.html) for recovery placement |
+| [`accrual`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/accrual/index.html) | `accrued_interest_amount`, `AccrualConfig` |
+| [`traits`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/traits/index.html) | `CashflowProvider`, `schedule_from_dated_flows`, `schedule_from_classified_flows` |
+| [`primitives`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/primitives/index.html) | Re-exports `CashFlow` and `CFKind` from `finstack-core` |
 
-[`RecoveryTiming`]: https://docs.rs/finstack-cashflows/latest/finstack_cashflows/aggregation/enum.RecoveryTiming.html
+`ScheduleParams` ships ten presets: `quarterly_act360`, `semiannual_30360`,
+`annual_actact`, and seven regional templates (`usd_sofr_swap`,
+`usd_corporate_bond`, `usd_treasury`, `eur_estr_swap`, `eur_gov_bond`,
+`gbp_sonia_swap`, `jpy_tona_swap`).
 
-## Quick Start
+Schedule helpers include `weighted_average_life`, `coupons`,
+`outstanding_path_per_flow`, `outstanding_by_date`, `merge_cashflow_schedules`,
+and `normalize_public`.
 
-### Build a Fixed-Rate Schedule
+## Quick start
+
+### Fixed-rate schedule
 
 ```rust
 use finstack_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
@@ -78,7 +70,7 @@ let maturity = Date::from_calendar_date(2030, Month::January, 15)?;
 
 let fixed_spec = FixedCouponSpec {
     coupon_type: CouponType::Cash,
-    rate: dec!(0.05), // 5% annual coupon rate
+    rate: dec!(0.05),
     freq: Tenor::semi_annual(),
     dc: DayCount::Thirty360,
     bdc: BusinessDayConvention::Following,
@@ -98,7 +90,7 @@ assert!(!schedule.flows.is_empty());
 # }
 ```
 
-### Add Amortization and Periodic Fees
+### Amortization and fees
 
 ```rust
 use finstack_cashflows::builder::{
@@ -152,7 +144,7 @@ assert!(!balances.is_empty());
 # }
 ```
 
-### Build a Floating-Rate Schedule
+### Floating-rate schedule
 
 ```rust
 use finstack_cashflows::builder::{CashFlowSchedule, CouponType, FloatingCouponSpec, FloatingRateSpec};
@@ -204,7 +196,7 @@ assert!(!schedule.flows.is_empty());
 # }
 ```
 
-### Compute Accrued Interest
+### Accrued interest
 
 ```rust
 use finstack_cashflows::{accrued_interest_amount, AccrualConfig, AccrualMethod, ExCouponRule};
@@ -220,17 +212,16 @@ let config = AccrualConfig {
     frequency: None,
 };
 
-let accrued = accrued_interest_amount(schedule, as_of, &config)?;
-# Ok(accrued)
+accrued_interest_amount(schedule, as_of, &config)
 # }
 ```
 
-The return value is a scalar amount in the schedule's amount space. Use the
-schedule notional or flow currency to interpret it.
+The result is a scalar in the schedule amount space; use the schedule currency
+when reporting it.
 
-## Common Workflows
+## Workflows
 
-### Aggregate Dated Flows by Reporting Period
+### Aggregate by reporting period
 
 ```rust
 use finstack_cashflows::aggregation::aggregate_by_period;
@@ -264,9 +255,7 @@ assert!(aggregated.contains_key(&PeriodId::quarter(2025, 1)));
 # }
 ```
 
-### Compute Periodized PV from a Schedule
-
-Schedule-level PV helpers are the stable public interface in this crate.
+### Periodized PV
 
 ```rust,no_run
 use finstack_cashflows::aggregation::DateContext;
@@ -286,7 +275,6 @@ fn periodized_pv(
         PvDiscountSource::Discount { disc, credit: None },
         DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
     )?;
-
     let _ = pv_map;
     Ok(())
 }
@@ -309,17 +297,12 @@ fn credit_adjusted_periodized_pv(
         },
         DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
     )?;
-
     let _ = pv_map;
     Ok(())
 }
 ```
 
-### Implement `CashflowProvider`
-
-`CashflowProvider` requires `cashflow_schedule`. The default
-`dated_cashflows` implementation derives holder-view `(Date, Money)` pairs
-from the returned `CashFlowSchedule`.
+### `CashflowProvider`
 
 ```rust,no_run
 use finstack_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
@@ -364,101 +347,58 @@ impl CashflowProvider for FixedBondLike {
 }
 ```
 
-### Inspect a Schedule
+Implement `cashflow_schedule`; `dated_cashflows` derives holder-view `(Date, Money)`
+pairs from that schedule.
 
-`CashFlowSchedule` exposes several inspection helpers that downstream desks
-typically reach for after building a schedule. All accessors operate on the
-canonical sorted flow list and respect the schedule's currency invariants.
+### Inspect and merge schedules
 
 ```rust,no_run
-use finstack_cashflows::builder::{CashFlowSchedule, merge_cashflow_schedules};
-use finstack_core::dates::Date;
+use finstack_cashflows::builder::{CashFlowSchedule, merge_cashflow_schedules, Notional};
+use finstack_core::currency::Currency;
+use finstack_core::dates::{Date, DayCount};
 
 fn inspect(schedule: &CashFlowSchedule, as_of: Date) -> finstack_core::Result<()> {
-    // Weighted Average Life (Act/365F regardless of schedule day count).
-    let wal_years = schedule.weighted_average_life(as_of)?;
-
-    // Iterate interest-like coupons only (excludes PIK, fees, principal).
-    let coupon_count = schedule.coupons().count();
-
-    // Two outstanding-balance views — pick by use case:
-    // - per_flow: simple amortization view, ignores notional draws/repays.
-    // - by_date:  full balance tracker including draws/repays (RCFs, etc.).
-    let per_flow = schedule.outstanding_path_per_flow()?;
-    let by_date  = schedule.outstanding_by_date()?;
-
-    let _ = (wal_years, coupon_count, per_flow, by_date);
+    let _wal = schedule.weighted_average_life(as_of)?;
+    let _coupons = schedule.coupons().count();
+    let _per_flow = schedule.outstanding_path_per_flow()?;
+    let _by_date = schedule.outstanding_by_date()?;
     Ok(())
 }
 
-// Compose multiple legs into a single deterministic composite schedule.
-// Metadata fields (calendar IDs, issue date, facility limit, representation)
-// are merged conservatively — see `merge_cashflow_schedules` rustdoc for the
-// exact rules.
 fn compose(legs: Vec<CashFlowSchedule>) -> CashFlowSchedule {
-    use finstack_core::currency::Currency;
-    use finstack_core::dates::DayCount;
-    use finstack_cashflows::builder::Notional;
-    merge_cashflow_schedules(
-        legs,
-        Notional::par(0.0, Currency::USD),
-        DayCount::Act365F,
-    )
+    merge_cashflow_schedules(legs, Notional::par(0.0, Currency::USD), DayCount::Act365F)
 }
 ```
 
-For the `CashflowProvider` boundary, callers commonly need to re-stamp a
-schedule as future-only and `Projected` before handing it downstream.
-[`CashFlowSchedule::normalize_public`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/builder/schedule/struct.CashFlowSchedule.html#method.normalize_public)
-performs the canonical `filter_future + omit_pure_pik + re-sort + tag`
-pipeline in a single call.
+`normalize_public` filters to future flows, omits pure PIK accretion, re-sorts,
+and tags the schedule as `Projected` for downstream consumers.
 
-## Hidden Integration Helpers
+## Internal emission helpers
 
-The builder module re-exports a small set of `emit_*` helpers with
-`#[doc(hidden)]`. They exist for internal interoperability and tests, but this
-README does not treat them as the primary stable API surface. Prefer the
-schedule builder and the public spec types unless you are intentionally working
-close to the emission pipeline.
+`builder` re-exports `#[doc(hidden)]` `emit_*` helpers for tests and internal
+callers. Prefer `CashFlowSchedule::builder()` and the public spec types.
 
-## `CFKind` Guidance
+## `CFKind`
 
-`CFKind` is defined in `finstack_core::cashflow` and is `#[non_exhaustive]`.
-Prefer linking to or matching the authoritative type instead of copying the enum
-into downstream docs. The schedule builder relies on `CFKind` for deterministic
-ordering, accrual behavior, and credit-adjusted PV treatment.
+`CFKind` lives in `finstack_core::cashflow` and is `#[non_exhaustive]`. Match on
+the core enum in downstream code; the schedule builder uses it for ordering,
+accrual, and credit-adjusted PV.
 
-## Testing
-
-Useful crate-local commands:
+## Tests
 
 ```bash
-# package tests
 cargo test -p finstack-cashflows
-
-# doc tests
 cargo test -p finstack-cashflows --doc
-
-# generate rustdoc and fail on warnings
 RUSTDOCFLAGS='-D warnings' cargo doc -p finstack-cashflows --no-deps --all-features
 ```
 
 ## References
 
-- Day-count and business-day conventions:
-  `docs/REFERENCES.md#isda-2006-definitions`
-- Bond accrued-interest conventions:
-  `docs/REFERENCES.md#icma-rule-book`
-- Discounting and fixed-income intuition:
-  `docs/REFERENCES.md#hull-options-futures`
-- Multi-curve and rates conventions:
-  `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
+- Day count and business days: `docs/REFERENCES.md#isda-2006-definitions`
+- Bond accrued interest: `docs/REFERENCES.md#icma-rule-book`
+- Discounting: `docs/REFERENCES.md#hull-options-futures`
+- Multi-curve rates: `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
 
-## See Also
+## See also
 
-- `finstack_core::cashflow` for `CashFlow` and `CFKind`
-- `finstack_core::money` for currency-safe `Money`
-- `finstack_core::dates` for `DayCount`, `DayCountContext`, calendars, and schedule
-  helpers
-- `finstack/valuations/src/lib.rs` for the valuations-side `cashflow`
-  re-export
+- `finstack_core::cashflow`, `finstack_core::money`, `finstack_core::dates`

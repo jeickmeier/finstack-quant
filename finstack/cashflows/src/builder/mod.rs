@@ -1,28 +1,12 @@
 //! Composable cashflow builder for instruments.
 //!
-//! Provides a builder interface for common cashflow patterns with programmatic control.
-//! Use `CashFlowSchedule::builder()` as the standard entry point.
+//! Entry point: `CashFlowSchedule::builder()`.
 //!
-//! # Public API
+//! # Types
 //!
-//! ## Primary Types (stable)
-//! - `CashFlowSchedule` — Output schedule containing ordered cashflows
-//! - `CashFlowBuilder` — Fluent builder for constructing schedules
-//! - `Notional` — Principal amount with optional amortization
-//!
-//! ## Coupon Specifications (stable)
-//! - `FixedCouponSpec` — Fixed-rate coupon configuration
-//! - `FloatingCouponSpec` — Floating-rate coupon with index, spread, caps/floors
-//! - `CouponType` — Payment type (Cash, PIK, or Split)
-//!
-//! ## Amortization & Fees (stable)
-//! - `AmortizationSpec` — Principal behavior (None, Linear, Step, Percent, Custom)
-//! - `FeeSpec` — Fixed or periodic fee configuration
-//!
-//! ## Schedule Parameters (stable)
-//! - `ScheduleParams` — Frequency, day count, business day convention
-//!
-//! ## Credit Models (for structured products)
+//! - `CashFlowSchedule`, `CashFlowBuilder`, `Notional`
+//! - `FixedCouponSpec`, `FloatingCouponSpec`, `CouponType`
+//! - `AmortizationSpec`, `FeeSpec`, `ScheduleParams`
 //! - `PrepaymentModelSpec`, `DefaultModelSpec`, `RecoveryModelSpec`
 //!
 //! # Usage
@@ -35,8 +19,9 @@
 //! use rust_decimal_macros::dec;
 //! use time::Month;
 //!
-//! let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-//! let maturity = Date::from_calendar_date(2026, Month::January, 15).expect("valid date");
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let issue = Date::from_calendar_date(2025, Month::January, 15)?;
+//! let maturity = Date::from_calendar_date(2026, Month::January, 15)?;
 //!
 //! let fixed_spec = FixedCouponSpec {
 //!     coupon_type: CouponType::Cash,
@@ -53,10 +38,11 @@
 //! let schedule = CashFlowSchedule::builder()
 //!     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
 //!     .fixed_cf(fixed_spec)
-//!     .build_with_curves(None)
-//!     .expect("should succeed");
+//!     .build_with_curves(None)?;
 //!
-//! assert!(schedule.flows.len() > 0);
+//! assert!(!schedule.flows.is_empty());
+//! # Ok(())
+//! # }
 //! ```
 
 // Internal modules

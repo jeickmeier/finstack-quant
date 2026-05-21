@@ -335,21 +335,6 @@ pub fn calculate_floating_rate(index_rate: f64, params: &FloatingRateParams) -> 
 /// # Returns
 ///
 /// The all-in rate assuming a zero index rate.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_cashflows::builder::rate_helpers::{project_fallback_rate, FloatingRateParams};
-///
-/// let params = FloatingRateParams {
-///     spread_bp: 200.0,
-///     index_floor_bp: Some(100.0), // 1% index floor
-///     ..Default::default()
-/// };
-/// let rate = project_fallback_rate(&params);
-/// // Index floored to 1%, plus 2% spread = 3%
-/// assert!((rate - 0.03).abs() < 0.0001);
-/// ```
 pub(crate) fn project_fallback_rate(params: &FloatingRateParams) -> f64 {
     calculate_floating_rate(0.0, params)
 }
@@ -437,7 +422,7 @@ pub fn project_floating_rate(
         fwd_dc.year_fraction(fwd_base, reset_period_end, DayCountContext::default())?
     };
 
-    // Get period forward rate (robust to zero-length periods).
+    // Get period forward rate (zero-length periods fall back to point rate).
     let index_rate = if t1 > t0 {
         fwd.rate_period(t0, t1)
     } else {
@@ -536,18 +521,6 @@ pub fn project_floating_rate_from_market(
 /// # References
 ///
 /// - `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_cashflows::builder::rate_helpers::compute_compounded_rate;
-///
-/// let fixings = vec![
-///     (0.05, 1u32), (0.05, 1), (0.05, 1), (0.05, 1), (0.05, 3),
-/// ];
-/// let rate = compute_compounded_rate(&fixings, 7, 360.0);
-/// assert!((rate - 0.05).abs() < 0.001);
-/// ```
 pub(crate) fn compute_compounded_rate(
     daily_rates: &[(f64, u32)],
     total_days: u32,
@@ -621,16 +594,6 @@ fn compute_compounded_rate_with_lockout(
 /// # References
 ///
 /// - `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_cashflows::builder::rate_helpers::compute_simple_average_rate;
-///
-/// let fixings = vec![(0.05, 1u32), (0.06, 1), (0.04, 3)];
-/// let rate = compute_simple_average_rate(&fixings, 5);
-/// assert!(rate > 0.0);
-/// ```
 pub(crate) fn compute_simple_average_rate(daily_rates: &[(f64, u32)], total_days: u32) -> f64 {
     if daily_rates.is_empty() || total_days == 0 {
         return 0.0;
@@ -660,23 +623,6 @@ pub(crate) fn compute_simple_average_rate(daily_rates: &[(f64, u32)], total_days
 /// # References
 ///
 /// - `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_cashflows::builder::rate_helpers::compute_overnight_rate;
-/// use finstack_cashflows::builder::OvernightCompoundingMethod;
-///
-/// let fixings = vec![(0.05, 1u32), (0.05, 1), (0.05, 3)];
-/// let rate = compute_overnight_rate(
-///     OvernightCompoundingMethod::CompoundedInArrears,
-///     &fixings,
-///     5,
-///     360.0,
-/// );
-///
-/// assert!(rate > 0.0);
-/// ```
 pub(crate) fn compute_overnight_rate(
     method: super::specs::OvernightCompoundingMethod,
     daily_rates: &[(f64, u32)],

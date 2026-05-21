@@ -1,22 +1,9 @@
-//! Generic schedule-driven interest accrual engine.
+//! Schedule-driven accrued interest.
 //!
-//! This module provides reusable logic to compute accrued interest from a
-//! canonical [`crate::builder::CashFlowSchedule`] only, without
-//! depending on instrument
-//! specifications. Any instrument that can expose a `CashFlowSchedule`
-//! (via `CashflowProvider::cashflow_schedule` or otherwise) can use this
-//! engine for consistent Linear / Compounded accrual, including:
-//!
-//! - Fixed, floating, fixed-to-float, and float-to-fixed coupons
-//! - PIK and cash/PIK split coupons
-//! - Amortization schedules and notional draws/repays
-//! - Ex-coupon conventions
-//! - Fully custom schedules built directly from the cashflow builder
-//!
-//! The engine works purely off `CFKind`-tagged flows and the schedule's
-//! own day-count and outstanding path, ensuring that all schedule
-//! semantics (step-ups, amortization, PIK capitalization, etc.) are
-//! respected without re-reading instrument specs.
+//! [`accrued_interest_amount`] reads a [`crate::builder::CashFlowSchedule`]
+//! only: coupon shape, PIK splits, amortization, draws/repays, and ex-coupon
+//! rules are inferred from `CFKind`-tagged flows and the schedule outstanding
+//! path, not from instrument specs.
 
 use crate::builder::schedule::CashFlowSchedule;
 use crate::primitives::CFKind;

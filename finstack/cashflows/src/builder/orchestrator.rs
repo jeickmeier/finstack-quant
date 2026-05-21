@@ -1,54 +1,8 @@
-//! Cash-flow build orchestration.
+//! `CashFlowBuilder` orchestration: validation, schedule compilation, and
+//! emission into a [`CashFlowSchedule`].
 //!
-//! This module owns the `CashFlowBuilder` struct and the build orchestration
-//! that turns accumulated builder state into a deterministic
-//! `CashFlowSchedule`.
-//!
-//! ## Responsibilities
-//!
-//! - `CashFlowBuilder` struct definition and shared internal state types
-//! - Build orchestration (validation, compilation, date collection, projection)
-//! - Pipeline stages: validate inputs, compile schedules, initialize state, process dates
-//! - Amortization setup and parameter derivation
-//! - Integration with emission, compiler, and date generation modules
-//!
-//! The fluent coupon/fee/payment-split builder methods live in
-//! [`super::coupon_api`]; the principal/amortization builder methods live in
-//! [`super::principal`].
-//!
-//! Quick start
-//! -----------
-//! ```rust
-//! use finstack_core::currency::Currency;
-//! use finstack_core::dates::{Date, Tenor, DayCount, BusinessDayConvention};
-//! use finstack_core::dates::StubKind;
-//! use finstack_core::money::Money;
-//! use finstack_cashflows::builder::{CashFlowSchedule, FixedCouponSpec, CouponType};
-//! use rust_decimal_macros::dec;
-//! use time::Month;
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!
-//! let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-//! let maturity = Date::from_calendar_date(2026, Month::January, 15).expect("valid date");
-//! let mut b = CashFlowSchedule::builder();
-//! b.principal(Money::new(1_000.0, Currency::USD), issue, maturity)
-//!  .fixed_cf(FixedCouponSpec{
-//!      coupon_type: CouponType::Cash,
-//!      rate: dec!(0.05),
-//!      freq: Tenor::semi_annual(),
-//!      dc: DayCount::Act365F,
-//!      bdc: BusinessDayConvention::Following,
-//!      calendar_id: "weekends_only".to_string(),
-//!      end_of_month: false,
-//!      payment_lag_days: 0,
-//!      stub: StubKind::None,
-//!  });
-//! let schedule = b.build_with_curves(None)
-//!     .map_err(|e| format!("Failed to build cashflow schedule: {}", e))?;
-//! assert!(!schedule.flows.is_empty());
-//! # Ok(())
-//! # }
-//! ```
+//! Fluent coupon and fee methods live in `coupon_api`; principal and
+//! amortization methods live in `principal`.
 
 use super::schedule::{finalize_flows, CashFlowSchedule};
 use crate::builder::{AmortizationSpec, Notional};
@@ -324,11 +278,9 @@ fn collect_all_dates(inputs: &DateCollectionInputs<'_>) -> finstack_core::Result
 
 /// Builder for constructing cashflow schedules with validation.
 ///
-/// Provides a fluent API for building complex cashflow schedules with
-/// proper validation and business day adjustments. The fluent methods are
-/// implemented across [`super::principal`] (principal/amortization) and
-/// [`super::coupon_api`] (coupons, fees, payment splits); build orchestration
-/// lives in this module.
+/// Fluent methods are split across `principal` (notional and amortization) and
+/// `coupon_api` (coupons, fees, payment splits). Build orchestration lives in
+/// this module.
 #[derive(Debug, Clone)]
 pub struct CashFlowBuilder {
     pub(super) notional: Option<Notional>,

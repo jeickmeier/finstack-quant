@@ -19,35 +19,25 @@
 
 //! Cashflow schedule generation, aggregation, and currency-safe operations.
 //!
-//! Provides comprehensive cashflow modeling infrastructure for bonds, swaps,
-//! loans, and structured products. All cashflows use currency-tagged `Money`
-//! types to prevent accidental cross-currency arithmetic.
+//! Build dated schedules for bonds, swaps, loans, and structured products using
+//! currency-tagged [`Money`]. Aggregation and period PV helpers keep currency
+//! boundaries explicit.
 //!
-//! # Core Components
+//! # Modules
 //!
-//! - **Primitives**: Fundamental `CashFlow` type with date, amount, and classification
-//! - **Builder**: Composable schedule builder for coupons, principal, and amortization
-//! - **Aggregation**: Currency-preserving cashflow merging and rollup
-//! - **Traits**: `CashflowProvider` trait for instruments to expose schedules
-//!
-//! # Currency Safety
-//!
-//! All aggregation operations enforce currency matching:
-//! - Cannot sum cashflows in different currencies without explicit FX
-//! - Currency preserved through aggregation pipeline
-//! - FX conversion requires explicit policy
+//! - [`primitives`]: `CashFlow` and `CFKind` (from `finstack-core`)
+//! - [`builder`]: [`builder::CashFlowSchedule`] and schedule construction
+//! - [`aggregation`]: period rollups and PV aggregation inputs
+//! - [`accrual`]: schedule-driven accrued interest
+//! - [`traits`]: [`CashflowProvider`] and `schedule_from_*` helpers
 //!
 //! # Conventions
 //!
-//! - Coupon rates are generally decimals (for example `0.05` for 5%).
-//! - Spreads and fee quotes are often expressed in basis points on the
-//!   specification types.
-//! - Schedule timing depends on explicit day-count, business-day, calendar, and
-//!   lag settings carried by the builder specs.
-//! - `CFKind` behavior should be read from the authoritative
-//!   `finstack_core::cashflow::CFKind` definition rather than copied here. The
-//!   enum is `#[non_exhaustive]` and downstream logic should not assume a fixed
-//!   exhaustive list of variants.
+//! - Coupon rates are decimals (for example `0.05` for 5%).
+//! - Spreads and periodic fee quotes are often basis points on spec types.
+//! - Timing follows the day-count, calendar, and lag fields on builder specs.
+//! - [`primitives::CFKind`] is `#[non_exhaustive]` in `finstack_core::cashflow`; do not
+//!   assume a fixed variant set in downstream matches.
 //!
 //! # Examples
 //!
@@ -110,14 +100,9 @@
 //! # }
 //! ```
 //!
-//! ## Periodized Present Value Aggregation
+//! ## Periodized present value
 //!
-//! Compute present values aggregated by reporting period for analysis and reconciliation.
-//!
-//! ### From a Schedule (Recommended In This Crate)
-//!
-//! The stable public interface in this crate is the schedule-level API on
-//! [`builder::CashFlowSchedule`]:
+//! Use [`builder::CashFlowSchedule::pv_by_period`] with [`aggregation::DateContext`]:
 //!
 //! ```rust,no_run
 //! use finstack_cashflows::builder::CashFlowSchedule;
@@ -143,17 +128,8 @@
 //! }
 //! ```
 //!
-//! ### From Higher-Level Instruments
-//!
-//! Higher-level instrument adapters may exist in other crates, such as
-//! `finstack-valuations`, but they are outside this crate's direct public API.
-//!
-//! # See Also
-//!
-//! - `primitives` for core `CashFlow` type from finstack-core
-//! - `builder` for schedule construction
-//! - `aggregation` for currency-safe dated-flow aggregation
-//! - `CashflowProvider` and `schedule_from_dated_flows` for schedule interfaces
+//! Instrument-level PV adapters live in other workspace crates; this crate stops
+//! at schedule construction and schedule-level period PV.
 
 /// Cash-flow primitives (`CashFlow`, `CFKind`).
 pub mod primitives {

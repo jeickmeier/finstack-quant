@@ -1,15 +1,9 @@
 //! Cashflow-related traits and helpers.
 //!
-//! This module owns [`CashflowProvider`], the canonical contract that lets
-//! instruments expose a [`crate::builder::CashFlowSchedule`] without coupling
-//! callers to instrument-specific types. Pricing, accrual, risk, and reporting
-//! code consume this trait so that any instrument that can emit a schedule
-//! plugs into the same downstream pipeline.
-//!
-//! It also provides two free functions —
-//! [`schedule_from_dated_flows`] and [`schedule_from_classified_flows`] —
-//! that wrap an ad-hoc list of dated cashflows into a canonical schedule via
-//! the shared [`ScheduleBuildOpts`] options bag.
+//! [`CashflowProvider`] is the instrument boundary for emitting a
+//! [`crate::builder::CashFlowSchedule`]. [`schedule_from_dated_flows`] and
+//! [`schedule_from_classified_flows`] wrap ad-hoc flow lists using
+//! [`ScheduleBuildOpts`].
 
 use crate::builder::schedule::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use crate::builder::Notional;

@@ -1,33 +1,8 @@
-//! Cashflow emission helpers.
+//! Date-level cashflow emission for the build pipeline.
 //!
-//! This module contains functions that emit cashflows on specific dates based on
-//! coupon schedules, amortization specs, and fee specifications. These functions
-//! are called by the build pipeline to generate deterministic cashflow sequences.
-//!
-//! ## Responsibilities
-//!
-//! - Emit fixed coupon cashflows with PIK capitalization
-//! - Emit floating coupon cashflows with forward rate lookups
-//! - Emit amortization payments according to various schedules
-//! - Emit periodic and fixed fee cashflows
-//! - Emit credit event cashflows (defaults, prepayments, recoveries)
-//! - Track outstanding balances through PIK and amortization
-//!
-//! ## Organization
-//!
-//! This module is organized into submodules by emission type:
-//! - `helpers`: Common helper functions for PIK flows and reset date calculation
-//! - `coupons`: Fixed and floating coupon emission
-//! - `amortization`: Principal amortization emission
-//! - `fees`: Periodic, commitment, usage, and facility fee emission (includes
-//!   `RevolvingFeeEmissionConfig` and `emit_revolving_credit_fees`)
-//! - `credit`: Default, prepayment, and recovery emission
-//!
-//! ## Design
-//!
-//! Each `emit_*_on` function takes a date and relevant schedules, computes the
-//! appropriate cashflows for that date, and returns both the flows and any PIK
-//! amount that should capitalize into the outstanding balance.
+//! Submodules: `coupons`, `amortization`, `fees`, `credit`, and `helpers`.
+//! Each `emit_*_on` function returns flows for one date plus any PIK amount to
+//! capitalize into outstanding balance.
 
 mod amortization;
 pub(crate) mod coupons;

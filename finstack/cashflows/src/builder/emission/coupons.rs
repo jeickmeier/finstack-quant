@@ -1,17 +1,8 @@
 //! Coupon cashflow emission (fixed and floating).
 //!
-//! # Inflation Adapter Scope
-//!
-//! `emit_inflation_coupons` is intentionally a thin adapter from
-//! pre-indexed inflation coupon tuples into `CashFlow` values. Inflation index
-//! projection, interpolation, index-ratio calculation, and real/nominal
-//! decomposition belong in the instrument model that prepares those tuples.
-//!
-//! Future explicit inflation-linked coupon emission logic could support:
-//! - CPI-linked coupons with interpolation (e.g., 2-month or 3-month lag)
-//! - Index ratio calculations for principal adjustment
-//! - Real vs nominal rate decomposition
-//! - Support for different inflation indices (CPI-U, HICP, RPI, etc.)
+//! `emit_inflation_coupons` maps pre-indexed inflation coupon tuples into
+//! `CashFlow` values. Index projection and ratio logic belong in the instrument
+//! layer that supplies those tuples.
 
 use crate::primitives::{CFKind, CashFlow};
 use finstack_core::currency::Currency;
