@@ -45,6 +45,8 @@ ts_export = ["dep:ts-rs"]
 # Vanna-Volga smile-correction pricer for FX barrier options. Aspirational —
 # unregistered until per-trade smile quotes are part of the market-data
 # contract. Enable to pull the analytics into builds for research/calibration.
+# Review by 2026-11-20. If still unactivated, move this implementation to a
+# finstack-valuations-research crate instead of carrying a dormant prod feature.
 fx-vanna-volga = []
 
 [[bench]]

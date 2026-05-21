@@ -60,6 +60,7 @@ def test_fx_spot_kwargs_roundtrip_and_default_price() -> None:
     payload = json.loads(spot.to_json())
     assert payload["type"] == "fx_spot"
     assert payload["spec"]["id"] == "EURUSD-SPOT"
+    assert spot.validate() is None
 
     result = json.loads(spot.price(MarketContext(), "2025-01-15"))
     assert result["value"]["currency"] == "USD"

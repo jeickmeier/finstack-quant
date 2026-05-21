@@ -24,6 +24,7 @@
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
 use super::market_handle::WasmMarket;
+use crate::utils::date::parse_iso_date;
 use crate::utils::{to_js_err, to_js_error};
 use wasm_bindgen::prelude::*;
 
@@ -56,6 +57,7 @@ pub fn price_instrument(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
+    parse_iso_date(as_of)?;
     let market: finstack_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let result =
@@ -77,6 +79,7 @@ pub fn price_instrument_with_metrics(
     pricing_options: Option<String>,
     market_history: Option<String>,
 ) -> Result<String, JsValue> {
+    parse_iso_date(as_of)?;
     let market: finstack_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let metric_strs: Vec<String> = serde_wasm_bindgen::from_value(metrics).map_err(to_js_err)?;
@@ -105,6 +108,7 @@ pub fn instrument_cashflows_json(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
+    parse_iso_date(as_of)?;
     let market: finstack_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     finstack_valuations::pricer::instrument_cashflows_json(instrument_json, &market, as_of, model)
@@ -143,6 +147,7 @@ pub fn price_instrument_with_market(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
+    parse_iso_date(as_of)?;
     let result = finstack_valuations::pricer::price_instrument_json(
         instrument_json,
         market.inner(),
@@ -164,6 +169,7 @@ pub fn price_instrument_with_metrics_and_market(
     pricing_options: Option<String>,
     market_history: Option<String>,
 ) -> Result<String, JsValue> {
+    parse_iso_date(as_of)?;
     let metric_strs: Vec<String> = serde_wasm_bindgen::from_value(metrics).map_err(to_js_err)?;
     let result = finstack_valuations::pricer::price_instrument_json_with_metrics_and_history(
         instrument_json,
@@ -186,6 +192,7 @@ pub fn instrument_cashflows_with_market(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
+    parse_iso_date(as_of)?;
     finstack_valuations::pricer::instrument_cashflows_json(
         instrument_json,
         market.inner(),

@@ -1,5 +1,7 @@
 //! WASM bindings for factor-model sensitivities and risk decomposition.
 
+use super::market_handle::WasmMarket;
+use crate::utils::date::parse_iso_date;
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
@@ -17,6 +19,7 @@ pub fn compute_factor_sensitivities(
     as_of: &str,
     bump_config_json: Option<String>,
 ) -> Result<String, JsValue> {
+    parse_iso_date(as_of)?;
     finstack_valuations::factor_model::compute_factor_sensitivities_json(
         positions_json,
         factors_json,
@@ -25,6 +28,30 @@ pub fn compute_factor_sensitivities(
         bump_config_json.as_deref(),
     )
     .map_err(to_js_err)
+}
+
+/// Compute first-order factor sensitivities using a pre-parsed [`WasmMarket`].
+///
+/// Avoids reparsing market JSON for repeated factor analytics calls.
+#[wasm_bindgen(js_name = computeFactorSensitivitiesWithMarket)]
+pub fn compute_factor_sensitivities_with_market(
+    positions_json: &str,
+    factors_json: &str,
+    market: &WasmMarket,
+    as_of: &str,
+    bump_config_json: Option<String>,
+) -> Result<String, JsValue> {
+    let as_of = parse_iso_date(as_of)?;
+    let matrix = finstack_valuations::factor_model::compute_factor_sensitivities_from_json(
+        positions_json,
+        factors_json,
+        market.inner(),
+        as_of,
+        bump_config_json.as_deref(),
+    )
+    .map_err(to_js_err)?;
+    let output = finstack_valuations::factor_model::SensitivityMatrixJson::from(&matrix);
+    serde_json::to_string(&output).map_err(to_js_err)
 }
 
 /// Compute scenario P&L profiles via full repricing and return as JSON.
@@ -40,6 +67,7 @@ pub fn compute_pnl_profiles(
     bump_config_json: Option<String>,
     n_scenario_points: Option<usize>,
 ) -> Result<String, JsValue> {
+    parse_iso_date(as_of)?;
     finstack_valuations::factor_model::compute_pnl_profiles_json(
         positions_json,
         factors_json,
@@ -49,6 +77,33 @@ pub fn compute_pnl_profiles(
         n_scenario_points,
     )
     .map_err(to_js_err)
+}
+
+/// Compute scenario P&L profiles using a pre-parsed [`WasmMarket`].
+#[wasm_bindgen(js_name = computePnlProfilesWithMarket)]
+pub fn compute_pnl_profiles_with_market(
+    positions_json: &str,
+    factors_json: &str,
+    market: &WasmMarket,
+    as_of: &str,
+    bump_config_json: Option<String>,
+    n_scenario_points: Option<usize>,
+) -> Result<String, JsValue> {
+    let as_of = parse_iso_date(as_of)?;
+    let profiles = finstack_valuations::factor_model::compute_pnl_profiles_from_json(
+        positions_json,
+        factors_json,
+        market.inner(),
+        as_of,
+        bump_config_json.as_deref(),
+        n_scenario_points.unwrap_or(finstack_valuations::factor_model::DEFAULT_PNL_SCENARIO_POINTS),
+    )
+    .map_err(to_js_err)?;
+    let output: Vec<finstack_valuations::factor_model::FactorPnlProfileJson> = profiles
+        .iter()
+        .map(finstack_valuations::factor_model::FactorPnlProfileJson::from)
+        .collect();
+    serde_json::to_string(&output).map_err(to_js_err)
 }
 
 /// Decompose portfolio risk into factor and position contributions.

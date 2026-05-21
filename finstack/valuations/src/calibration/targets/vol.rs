@@ -13,7 +13,9 @@ use finstack_core::Result;
 use std::collections::BTreeMap;
 
 use crate::calibration::constants::OrderedF64;
-use crate::calibration::validation::surfaces::SurfaceValidator;
+use crate::calibration::validation::surfaces::{
+    validate_butterfly_spread, validate_calendar_spread,
+};
 
 /// Bootstrapper for calibrating option volatility surfaces.
 ///
@@ -274,12 +276,10 @@ impl VolSurfaceTarget {
             lenient_arbitrage: true,
             ..ValidationConfig::default()
         };
-        let calendar_warning = surface
-            .validate_calendar_spread(&validation_cfg)
+        let calendar_warning = validate_calendar_spread(&surface, &validation_cfg)
             .err()
             .map(|e| format!("SABR calendar-spread arbitrage: {e}"));
-        let butterfly_warning = surface
-            .validate_butterfly_spread(&validation_cfg)
+        let butterfly_warning = validate_butterfly_spread(&surface, &validation_cfg)
             .err()
             .map(|e| format!("SABR butterfly-spread arbitrage: {e}"));
 

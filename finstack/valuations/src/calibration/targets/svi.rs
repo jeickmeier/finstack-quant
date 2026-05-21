@@ -15,8 +15,7 @@
 //! themselves are calendar-monotone.
 //!
 //! After the grid is built, we hand it to
-//! [`SurfaceValidator::validate_calendar_spread`] and
-//! [`SurfaceValidator::validate_butterfly_spread`] so any residual
+//! [`validate_calendar_spread`] and [`validate_butterfly_spread`] so any residual
 //! arbitrage in the calibrated slices surfaces as a structured
 //! `Error::Validation` rather than propagating silently into pricing.
 
@@ -34,7 +33,9 @@ use finstack_core::market_data::surfaces::VolSurface;
 use finstack_core::Result;
 use std::collections::BTreeMap;
 
-use crate::calibration::validation::surfaces::SurfaceValidator;
+use crate::calibration::validation::surfaces::{
+    validate_butterfly_spread, validate_calendar_spread,
+};
 
 /// Target for SVI surface calibration from option volatility quotes.
 pub(crate) struct SviSurfaceTarget;
@@ -246,14 +247,12 @@ impl SviSurfaceTarget {
             ..ValidationConfig::default()
         };
         // A strict calendar-spread `Err` is a genuine arbitrage -> fails the report.
-        let calendar_arbitrage = surface
-            .validate_calendar_spread(&calendar_cfg)
+        let calendar_arbitrage = validate_calendar_spread(&surface, &calendar_cfg)
             .err()
             .map(|e| format!("SVI calendar-spread arbitrage: {e}"));
         // Butterfly is advisory only (lenient mode never returns `Err`; this stays
         // `None`, but is kept for symmetry / future strict-butterfly tightening).
-        let butterfly_warning = surface
-            .validate_butterfly_spread(&butterfly_cfg)
+        let butterfly_warning = validate_butterfly_spread(&surface, &butterfly_cfg)
             .err()
             .map(|e| format!("SVI butterfly-spread arbitrage: {e}"));
 

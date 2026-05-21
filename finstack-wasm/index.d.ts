@@ -42,13 +42,15 @@
 export { default } from './pkg/finstack_wasm';
 
 // --- Calibration envelope types (generated from Rust via ts-rs) ---
-export type { CalibrationEnvelope } from './types/generated/CalibrationEnvelope';
+import type { CalibrationEnvelope } from './types/generated/CalibrationEnvelope';
+import type { CalibrationResultEnvelope } from './types/generated/CalibrationResultEnvelope';
+
+export type { CalibrationEnvelope, CalibrationResultEnvelope };
 export type { CalibrationPlan } from './types/generated/CalibrationPlan';
 export type { CalibrationStep } from './types/generated/CalibrationStep';
 export type { StepParams } from './types/generated/StepParams';
 export type { MarketDatum } from './types/generated/MarketDatum';
 export type { PriorMarketObject } from './types/generated/PriorMarketObject';
-export type { CalibrationResultEnvelope } from './types/generated/CalibrationResultEnvelope';
 export type { CalibrationResult } from './types/generated/CalibrationResult';
 export type { CalibrationReport } from './types/generated/CalibrationReport';
 
@@ -1339,6 +1341,9 @@ export interface ValuationsNamespace {
    *
    * @throws Error with `name = "CalibrationEnvelopeError"` and structured `cause`
    *   (e.g. `e.cause.kind === "solver_not_converged"`) on calibration failure.
+   *
+   * ⚠️ BLOCKING: calibration may be CPU-heavy. Wrap calls in an application
+   * timeout until `timeout_ms` is carried by the calibration envelope schema.
    */
   calibrate(envelope: CalibrationEnvelope | string): CalibrationResultEnvelope;
   /**
@@ -1607,11 +1612,23 @@ export interface ValuationsNamespace {
   defaultWaterfallOrder(): string[];
   /** Return the default metric IDs used by metrics-based attribution. */
   defaultAttributionMetrics(): string[];
-  /** Compute first-order factor sensitivities. */
+  /** Compute first-order factor sensitivities.
+   *
+   * ⚠️ BLOCKING: prefer `computeFactorSensitivitiesWithMarket` for repeated
+   * calls so market JSON is parsed once into `WasmMarket`.
+   */
   computeFactorSensitivities(
     positionsJson: string,
     factorsJson: string,
     marketJson: string,
+    asOf: string,
+    bumpConfigJson?: string
+  ): string;
+  /** Compute first-order factor sensitivities using a pre-parsed market. */
+  computeFactorSensitivitiesWithMarket(
+    positionsJson: string,
+    factorsJson: string,
+    market: WasmMarket,
     asOf: string,
     bumpConfigJson?: string
   ): string;
@@ -1624,7 +1641,20 @@ export interface ValuationsNamespace {
     bumpConfigJson?: string,
     nScenarioPoints?: number
   ): string;
-  /** Decompose portfolio risk into factor and position contributions. */
+  /** Compute scenario P&L profiles via full repricing using a pre-parsed market. */
+  computePnlProfilesWithMarket(
+    positionsJson: string,
+    factorsJson: string,
+    market: WasmMarket,
+    asOf: string,
+    bumpConfigJson?: string,
+    nScenarioPoints?: number
+  ): string;
+  /** Decompose portfolio risk into factor and position contributions.
+   *
+   * ⚠️ BLOCKING: sensitivity and covariance dimensions must match exactly;
+   * malformed matrices throw instead of producing partial decompositions.
+   */
   decomposeFactorRisk(
     sensitivitiesJson: string,
     covarianceJson: string,

@@ -87,6 +87,15 @@ FactorCovarianceForecast = _valuations.FactorCovarianceForecast
 decompose_levels = _valuations.decompose_levels
 decompose_period = _valuations.decompose_period
 
+# Canonical structural-credit exports live at `finstack.valuations.*`; the
+# `finstack.valuations.credit` module remains only as an import-compatibility
+# namespace.
+MertonModel = _valuations.credit.MertonModel
+DynamicRecoverySpec = _valuations.credit.DynamicRecoverySpec
+EndogenousHazardSpec = _valuations.credit.EndogenousHazardSpec
+CreditState = _valuations.credit.CreditState
+ToggleExerciseModel = _valuations.credit.ToggleExerciseModel
+
 
 def instrument_cashflows(
     instrument_json: str,
@@ -138,7 +147,10 @@ __all__: list[str] = [
     "CalibrationStep",
     "CreditCalibrator",
     "CreditFactorModel",
+    "CreditState",
     "DiscountStep",
+    "DynamicRecoverySpec",
+    "EndogenousHazardSpec",
     "FactorCovarianceForecast",
     "FactorPnlProfile",
     "ForwardStep",
@@ -146,6 +158,7 @@ __all__: list[str] = [
     "LevelsAtDate",
     "MarketDatum",
     "MarketQuote",
+    "MertonModel",
     "PeriodDecomposition",
     "Pillar",
     "PnlAttribution",
@@ -159,6 +172,7 @@ __all__: list[str] = [
     "SabrSmile",
     "SensitivityMatrix",
     "Tenor",
+    "ToggleExerciseModel",
     "ValuationResult",
     "VolSurfaceStep",
     "asian_option_price",

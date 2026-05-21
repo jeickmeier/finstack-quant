@@ -161,16 +161,22 @@ public = [
     "CalibrationStep",
     "CreditCalibrator",
     "CreditFactorModel",
+    "CreditState",
     "DiscountStep",
+    "DynamicRecoverySpec",
+    "EndogenousHazardSpec",
     "FactorCovarianceForecast",
     "FactorPnlProfile",
     "ForwardStep",
     "HazardStep",
     "LevelsAtDate",
+    "MarketDatum",
     "MarketQuote",
+    "MertonModel",
     "PeriodDecomposition",
     "Pillar",
     "PnlAttribution",
+    "PriorMarketObject",
     "RateDeposit",
     "RateSwap",
     "RiskDecomposition",
@@ -180,6 +186,7 @@ public = [
     "SabrSmile",
     "SensitivityMatrix",
     "Tenor",
+    "ToggleExerciseModel",
     "ValuationResult",
     "VolSurfaceStep",
     "asian_option_price",
@@ -444,7 +451,9 @@ root_exports = [
     "callableRangeAccrualAccrued",
     "cmsSpreadOptionIntrinsic",
     "computeFactorSensitivities",
+    "computeFactorSensitivitiesWithMarket",
     "computePnlProfiles",
+    "computePnlProfilesWithMarket",
     "decomposeFactorRisk",
     "decomposeLevels",
     "decomposePeriod",
@@ -535,7 +544,9 @@ validate_instrument_json = "validateInstrumentJson"
 default_waterfall_order = "defaultWaterfallOrder"
 default_attribution_metrics = "defaultAttributionMetrics"
 compute_factor_sensitivities = "computeFactorSensitivities"
+compute_factor_sensitivities_with_market = "computeFactorSensitivitiesWithMarket"
 compute_pnl_profiles = "computePnlProfiles"
+compute_pnl_profiles_with_market = "computePnlProfilesWithMarket"
 decompose_factor_risk = "decomposeFactorRisk"
 decompose_levels = "decomposeLevels"
 decompose_period = "decomposePeriod"

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from finstack.valuations import exotics
 
 
@@ -41,3 +43,12 @@ def test_asian_option_kwargs_roundtrip() -> None:
     payload = json.loads(option.to_json())
     assert payload["type"] == "asian_option"
     assert payload["spec"]["id"] == "ASIAN-TEST"
+    assert option.validate() is None
+
+
+def test_asian_option_constructor_rejects_invalid_schema() -> None:
+    spec = _asian_option_spec()
+    del spec["strike"]
+
+    with pytest.raises(ValueError, match="strike"):
+        exotics.AsianOption(spec)

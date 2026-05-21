@@ -1,6 +1,9 @@
 use finstack_core::dates::Date;
 use finstack_core::math::interp::InterpStyle;
-use finstack_valuations::calibration::{CurveValidator, SurfaceValidator, ValidationConfig};
+use finstack_valuations::calibration::{
+    validate_butterfly_spread, validate_calendar_spread, validate_surface, validate_vol_bounds,
+    CurveValidator, ValidationConfig,
+};
 use time::Month;
 
 #[test]
@@ -270,14 +273,14 @@ fn test_butterfly_arbitrage_detected_and_fails() {
         .expect("should build vol surface for testing");
 
     let strict_config = ValidationConfig::default();
-    let result = surface.validate_butterfly_spread(&strict_config);
+    let result = validate_butterfly_spread(&surface, &strict_config);
     assert!(result.is_err());
 
     let err_msg = result.expect_err("Expected validation error").to_string();
     assert!(err_msg.contains("Butterfly") || err_msg.contains("butterfly"));
 
     let lenient_config = ValidationConfig::lenient();
-    let lenient_result = surface.validate_butterfly_spread(&lenient_config);
+    let lenient_result = validate_butterfly_spread(&surface, &lenient_config);
     assert!(lenient_result.is_ok());
 }
 
@@ -298,14 +301,14 @@ fn test_calendar_arbitrage_detected_and_fails() {
         .expect("should build vol surface for testing");
 
     let strict_config = ValidationConfig::default();
-    let result = surface.validate_calendar_spread(&strict_config);
+    let result = validate_calendar_spread(&surface, &strict_config);
     assert!(result.is_err());
 
     let err_msg = result.expect_err("Expected validation error").to_string();
     assert!(err_msg.contains("Calendar") || err_msg.contains("calendar"));
 
     let lenient_config = ValidationConfig::lenient();
-    let lenient_result = surface.validate_calendar_spread(&lenient_config);
+    let lenient_result = validate_calendar_spread(&surface, &lenient_config);
     assert!(lenient_result.is_ok());
 }
 
@@ -326,10 +329,10 @@ fn test_valid_surface_passes_arbitrage_checks() {
         .expect("should build valid vol surface");
 
     let config = ValidationConfig::default();
-    assert!(surface.validate_calendar_spread(&config).is_ok());
-    assert!(surface.validate_butterfly_spread(&config).is_ok());
-    assert!(surface.validate_vol_bounds(&config).is_ok());
-    assert!(surface.validate(&config).is_ok());
+    assert!(validate_calendar_spread(&surface, &config).is_ok());
+    assert!(validate_butterfly_spread(&surface, &config).is_ok());
+    assert!(validate_vol_bounds(&surface, &config).is_ok());
+    assert!(validate_surface(&surface, &config).is_ok());
 }
 
 #[test]

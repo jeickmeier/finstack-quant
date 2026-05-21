@@ -2,6 +2,15 @@ import * as wasm from '../pkg/finstack_wasm.js';
 import { correlation } from './valuations/correlation.js';
 import { fx } from './valuations/fx.js';
 
+const instrumentPricing = {
+  validateInstrumentJson: wasm.validateInstrumentJson,
+  priceInstrument: wasm.priceInstrument,
+  priceInstrumentWithMetrics: wasm.priceInstrumentWithMetrics,
+  priceInstrumentWithMarket: wasm.priceInstrumentWithMarket,
+  priceInstrumentWithMetricsAndMarket: wasm.priceInstrumentWithMetricsAndMarket,
+  instrumentCashflowsWithMarket: wasm.instrumentCashflowsWithMarket,
+};
+
 export const valuations = {
   correlation,
   credit: {
@@ -25,20 +34,11 @@ export const valuations = {
     cdsTrancheExampleJson: wasm.cdsTrancheExampleJson,
     cdsOptionExampleJson: wasm.cdsOptionExampleJson,
     validate: wasm.validateInstrumentJson,
-    priceInstrument: wasm.priceInstrument,
-    priceInstrumentWithMetrics: wasm.priceInstrumentWithMetrics,
-    priceInstrumentWithMarket: wasm.priceInstrumentWithMarket,
-    priceInstrumentWithMetricsAndMarket: wasm.priceInstrumentWithMetricsAndMarket,
-    instrumentCashflowsWithMarket: wasm.instrumentCashflowsWithMarket,
+    ...instrumentPricing,
   },
   fx,
   instruments: {
-    validateInstrumentJson: wasm.validateInstrumentJson,
-    priceInstrument: wasm.priceInstrument,
-    priceInstrumentWithMetrics: wasm.priceInstrumentWithMetrics,
-    priceInstrumentWithMarket: wasm.priceInstrumentWithMarket,
-    priceInstrumentWithMetricsAndMarket: wasm.priceInstrumentWithMetricsAndMarket,
-    instrumentCashflowsWithMarket: wasm.instrumentCashflowsWithMarket,
+    ...instrumentPricing,
     listStandardMetrics: wasm.listStandardMetrics,
     listStandardMetricsGrouped: wasm.listStandardMetricsGrouped,
   },
@@ -51,7 +51,9 @@ export const valuations = {
   decomposeLevels: wasm.decomposeLevels,
   decomposePeriod: wasm.decomposePeriod,
   validateValuationResultJson: wasm.validateValuationResultJson,
-  // Calibration: build a MarketContext from raw quotes
+  // Calibration: build a MarketContext from raw quotes.
+  // ⚠️ BLOCKING: calibration can be CPU-heavy; callers must run it behind an
+  // application-level timeout until the envelope schema carries timeout_ms.
   calibrate(envelope) {
     const json = typeof envelope === 'string' ? envelope : JSON.stringify(envelope);
     return JSON.parse(wasm.calibrate(json));
@@ -68,14 +70,14 @@ export const valuations = {
     const json = typeof envelope === 'string' ? envelope : JSON.stringify(envelope);
     return wasm.dependencyGraphJson(json);
   },
-  validateInstrumentJson: wasm.validateInstrumentJson,
+  validateInstrumentJson: instrumentPricing.validateInstrumentJson,
   WasmMarket: wasm.WasmMarket,
-  priceInstrument: wasm.priceInstrument,
-  priceInstrumentWithMetrics: wasm.priceInstrumentWithMetrics,
-  priceInstrumentWithMarket: wasm.priceInstrumentWithMarket,
-  priceInstrumentWithMetricsAndMarket: wasm.priceInstrumentWithMetricsAndMarket,
+  priceInstrument: instrumentPricing.priceInstrument,
+  priceInstrumentWithMetrics: instrumentPricing.priceInstrumentWithMetrics,
+  priceInstrumentWithMarket: instrumentPricing.priceInstrumentWithMarket,
+  priceInstrumentWithMetricsAndMarket: instrumentPricing.priceInstrumentWithMetricsAndMarket,
   instrumentCashflowsJson: wasm.instrumentCashflowsJson,
-  instrumentCashflowsWithMarket: wasm.instrumentCashflowsWithMarket,
+  instrumentCashflowsWithMarket: instrumentPricing.instrumentCashflowsWithMarket,
   listStandardMetrics: wasm.listStandardMetrics,
   listStandardMetricsGrouped: wasm.listStandardMetricsGrouped,
   bsPrice: wasm.bsPrice,
@@ -102,7 +104,13 @@ export const valuations = {
   validateAttributionJson: wasm.validateAttributionJson,
   defaultWaterfallOrder: wasm.defaultWaterfallOrder,
   defaultAttributionMetrics: wasm.defaultAttributionMetrics,
+  // ⚠️ BLOCKING: prefer computeFactorSensitivitiesWithMarket for repeated calls
+  // so large MarketContext JSON is parsed once into WasmMarket.
   computeFactorSensitivities: wasm.computeFactorSensitivities,
+  computeFactorSensitivitiesWithMarket: wasm.computeFactorSensitivitiesWithMarket,
   computePnlProfiles: wasm.computePnlProfiles,
+  computePnlProfilesWithMarket: wasm.computePnlProfilesWithMarket,
+  // ⚠️ BLOCKING: validate sensitivity/covariance dimensions before calling;
+  // malformed matrices throw instead of returning partial decompositions.
   decomposeFactorRisk: wasm.decomposeFactorRisk,
 };

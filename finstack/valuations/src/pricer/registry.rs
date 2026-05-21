@@ -252,6 +252,14 @@ impl PricerRegistry {
         metrics: &[crate::metrics::MetricId],
         options: crate::instruments::PricingOptions,
     ) -> PricingResult<crate::results::ValuationResult> {
+        let shared = if metrics.is_empty() {
+            SharedPricingInputs::default()
+        } else {
+            SharedPricingInputs {
+                registry: Some(Arc::new(self.clone())),
+                market: Some(Arc::new(market.clone())),
+            }
+        };
         self.price_with_metrics_impl(
             PricingRequest {
                 instrument,
@@ -261,7 +269,7 @@ impl PricerRegistry {
                 metrics,
                 options,
             },
-            SharedPricingInputs::default(),
+            shared,
         )
     }
 
@@ -380,8 +388,8 @@ impl PricerRegistry {
         // cashflows) and risk (actual cashflows).
         let spread_ids = MetricId::SPREAD_EQUIVALENT_METRICS;
 
-        let mut spread_metrics = Vec::new();
-        let mut risk_metrics = Vec::new();
+        let mut spread_metrics = Vec::with_capacity(metrics.len());
+        let mut risk_metrics = Vec::with_capacity(metrics.len());
         for m in metrics {
             if spread_ids.contains(m) {
                 spread_metrics.push(m.clone());
@@ -392,8 +400,9 @@ impl PricerRegistry {
 
         // Spread metrics: cash-equivalent cashflows via metrics_equivalent()
         let mut result = if !spread_metrics.is_empty() {
+            let spread_instrument = Arc::from(instrument.metrics_equivalent());
             crate::instruments::common_impl::helpers::build_with_metrics_dyn(
-                std::sync::Arc::from(instrument.metrics_equivalent()),
+                spread_instrument,
                 Arc::clone(&market_arc),
                 as_of,
                 base_result.value,

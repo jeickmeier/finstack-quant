@@ -105,7 +105,8 @@ pub(crate) fn compute_parallel_cs01_with_context_raw<RevalFn>(
 where
     RevalFn: FnMut(&MarketContext) -> finstack_core::Result<f64>,
 {
-    let base_ctx = context.curves.as_ref();
+    let curves = Arc::clone(&context.curves);
+    let base_ctx = curves.as_ref();
     let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
     let hazard_ref = hazard.as_ref();
     let has_par_points = hazard_ref.par_spread_points().next().is_some();
@@ -185,14 +186,17 @@ where
         bump_hazard_shift(hazard_ref, &bump_request_down)?
     };
 
-    let mut scratch = base_ctx.clone();
-    scratch.insert_mut(bumped_hazard_up);
-    let pv_bumped_up = revalue_raw(&scratch)?;
-    scratch.insert_mut(std::sync::Arc::clone(&hazard));
+    let (pv_bumped_up, pv_bumped_down) = context.with_market_scratch(|_, scratch| {
+        scratch.insert_mut(bumped_hazard_up);
+        let pv_bumped_up = revalue_raw(scratch)?;
+        scratch.insert_mut(std::sync::Arc::clone(&hazard));
 
-    scratch.insert_mut(bumped_hazard_down);
-    let pv_bumped_down = revalue_raw(&scratch)?;
-    scratch.insert_mut(std::sync::Arc::clone(&hazard));
+        scratch.insert_mut(bumped_hazard_down);
+        let pv_bumped_down = revalue_raw(scratch)?;
+        scratch.insert_mut(std::sync::Arc::clone(&hazard));
+
+        Ok((pv_bumped_up, pv_bumped_down))
+    })?;
 
     Ok(sensitivity_central_diff(
         pv_bumped_up,
@@ -238,7 +242,8 @@ where
         doc_clause,
         cds_valuation_convention,
     } = request;
-    let base_ctx = context.curves.as_ref();
+    let curves = Arc::clone(&context.curves);
+    let base_ctx = curves.as_ref();
     let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
     let hazard_ref = hazard.as_ref();
     let has_par_points = hazard_ref.par_spread_points().next().is_some();
@@ -289,68 +294,71 @@ where
         false
     };
 
-    let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> = Vec::new();
-    let mut total = 0.0;
-    let mut scratch = base_ctx.clone();
+    let (series, total) = context.with_market_scratch(|_, scratch| {
+        let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> = Vec::new();
+        let mut total = 0.0;
 
-    for t in buckets {
-        let label = super::config::format_bucket_label_cow(t);
+        for t in buckets {
+            let label = super::config::format_bucket_label_cow(t);
 
-        let bump_request_up = BumpRequest::Tenors(vec![(t, bump_bp)]);
-        let bump_request_down = BumpRequest::Tenors(vec![(t, -bump_bp)]);
+            let bump_request_up = BumpRequest::Tenors(vec![(t, bump_bp)]);
+            let bump_request_down = BumpRequest::Tenors(vec![(t, -bump_bp)]);
 
-        let bumped_hazard_up = if used_rebootstrap {
-            bump_hazard_spreads_with_doc_clause_and_valuation_convention(
-                hazard_ref,
-                base_ctx,
-                &bump_request_up,
-                discount_id,
-                doc_clause,
-                cds_valuation_convention,
-            )
-            .map_err(|e| finstack_core::Error::Calibration {
-                message: format!(
-                    "CS01 bucket '{}' up-bump hazard re-calibration failed: {}",
-                    label, e
-                ),
-                category: "cs01_rebootstrap".to_string(),
-            })?
-        } else {
-            bump_hazard_shift(hazard_ref, &bump_request_up)?
-        };
+            let bumped_hazard_up = if used_rebootstrap {
+                bump_hazard_spreads_with_doc_clause_and_valuation_convention(
+                    hazard_ref,
+                    base_ctx,
+                    &bump_request_up,
+                    discount_id,
+                    doc_clause,
+                    cds_valuation_convention,
+                )
+                .map_err(|e| finstack_core::Error::Calibration {
+                    message: format!(
+                        "CS01 bucket '{}' up-bump hazard re-calibration failed: {}",
+                        label, e
+                    ),
+                    category: "cs01_rebootstrap".to_string(),
+                })?
+            } else {
+                bump_hazard_shift(hazard_ref, &bump_request_up)?
+            };
 
-        let bumped_hazard_down = if used_rebootstrap {
-            bump_hazard_spreads_with_doc_clause_and_valuation_convention(
-                hazard_ref,
-                base_ctx,
-                &bump_request_down,
-                discount_id,
-                doc_clause,
-                cds_valuation_convention,
-            )
-            .map_err(|e| finstack_core::Error::Calibration {
-                message: format!(
-                    "CS01 bucket '{}' down-bump hazard re-calibration failed: {}",
-                    label, e
-                ),
-                category: "cs01_rebootstrap".to_string(),
-            })?
-        } else {
-            bump_hazard_shift(hazard_ref, &bump_request_down)?
-        };
+            let bumped_hazard_down = if used_rebootstrap {
+                bump_hazard_spreads_with_doc_clause_and_valuation_convention(
+                    hazard_ref,
+                    base_ctx,
+                    &bump_request_down,
+                    discount_id,
+                    doc_clause,
+                    cds_valuation_convention,
+                )
+                .map_err(|e| finstack_core::Error::Calibration {
+                    message: format!(
+                        "CS01 bucket '{}' down-bump hazard re-calibration failed: {}",
+                        label, e
+                    ),
+                    category: "cs01_rebootstrap".to_string(),
+                })?
+            } else {
+                bump_hazard_shift(hazard_ref, &bump_request_down)?
+            };
 
-        scratch.insert_mut(bumped_hazard_up);
-        let pv_bumped_up = revalue_raw(&scratch)?;
-        scratch.insert_mut(std::sync::Arc::clone(&hazard));
+            scratch.insert_mut(bumped_hazard_up);
+            let pv_bumped_up = revalue_raw(scratch)?;
+            scratch.insert_mut(std::sync::Arc::clone(&hazard));
 
-        scratch.insert_mut(bumped_hazard_down);
-        let pv_bumped_down = revalue_raw(&scratch)?;
-        scratch.insert_mut(std::sync::Arc::clone(&hazard));
+            scratch.insert_mut(bumped_hazard_down);
+            let pv_bumped_down = revalue_raw(scratch)?;
+            scratch.insert_mut(std::sync::Arc::clone(&hazard));
 
-        let cs01 = sensitivity_central_diff(pv_bumped_up, pv_bumped_down, bump_bp);
-        series.push((label, cs01));
-        total += cs01;
-    }
+            let cs01 = sensitivity_central_diff(pv_bumped_up, pv_bumped_down, bump_bp);
+            series.push((label, cs01));
+            total += cs01;
+        }
+
+        Ok((series, total))
+    })?;
 
     context.store_bucketed_series(series_id, series);
     Ok(total)
@@ -529,7 +537,8 @@ where
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?
                 .credit_spread_bump_bp;
 
-        let base_ctx = context.curves.as_ref();
+        let curves = Arc::clone(&context.curves);
+        let base_ctx = curves.as_ref();
         let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
         let hazard_ref = hazard.as_ref();
 
@@ -538,16 +547,17 @@ where
         let bumped_up = bump_hazard_shift(hazard_ref, &BumpRequest::Parallel(bump_bp))?;
         let bumped_down = bump_hazard_shift(hazard_ref, &BumpRequest::Parallel(-bump_bp))?;
 
-        // Single scratch context reused for both bump legs (clone once, not
-        // twice); restored to the base hazard between legs.
-        let mut scratch = base_ctx.clone();
+        let (pv_up, pv_down) = context.with_market_scratch(|ctx, scratch| {
+            scratch.insert_mut(bumped_up);
+            let pv_up = ctx.reprice_raw(scratch, as_of)?;
+            scratch.insert_mut(std::sync::Arc::clone(&hazard));
 
-        scratch.insert_mut(bumped_up);
-        let pv_up = context.reprice_raw(&scratch, as_of)?;
-        scratch.insert_mut(std::sync::Arc::clone(&hazard));
+            scratch.insert_mut(bumped_down);
+            let pv_down = ctx.reprice_raw(scratch, as_of)?;
+            scratch.insert_mut(std::sync::Arc::clone(&hazard));
 
-        scratch.insert_mut(bumped_down);
-        let pv_down = context.reprice_raw(&scratch, as_of)?;
+            Ok((pv_up, pv_down))
+        })?;
 
         let cs01 = sensitivity_central_diff(pv_up, pv_down, bump_bp);
 
@@ -590,36 +600,40 @@ where
         let buckets = defaults.cs01_buckets_years;
         let bump_bp = defaults.credit_spread_bump_bp;
 
-        let base_ctx = context.curves.as_ref();
+        let curves = Arc::clone(&context.curves);
+        let base_ctx = curves.as_ref();
         let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
         let hazard_ref = hazard.as_ref();
 
         let as_of = context.as_of;
 
-        let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> = Vec::new();
-        let mut total = 0.0;
-        let mut scratch = base_ctx.clone();
+        let (series, total) = context.with_market_scratch(|ctx, scratch| {
+            let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> = Vec::new();
+            let mut total = 0.0;
 
-        for t in buckets {
-            let label = super::config::format_bucket_label_cow(t);
+            for t in buckets {
+                let label = super::config::format_bucket_label_cow(t);
 
-            let bumped_up =
-                bump_hazard_shift(hazard_ref, &BumpRequest::Tenors(vec![(t, bump_bp)]))?;
-            let bumped_down =
-                bump_hazard_shift(hazard_ref, &BumpRequest::Tenors(vec![(t, -bump_bp)]))?;
+                let bumped_up =
+                    bump_hazard_shift(hazard_ref, &BumpRequest::Tenors(vec![(t, bump_bp)]))?;
+                let bumped_down =
+                    bump_hazard_shift(hazard_ref, &BumpRequest::Tenors(vec![(t, -bump_bp)]))?;
 
-            scratch.insert_mut(bumped_up);
-            let pv_up = context.reprice_raw(&scratch, as_of)?;
-            scratch.insert_mut(std::sync::Arc::clone(&hazard));
+                scratch.insert_mut(bumped_up);
+                let pv_up = ctx.reprice_raw(scratch, as_of)?;
+                scratch.insert_mut(std::sync::Arc::clone(&hazard));
 
-            scratch.insert_mut(bumped_down);
-            let pv_down = context.reprice_raw(&scratch, as_of)?;
-            scratch.insert_mut(std::sync::Arc::clone(&hazard));
+                scratch.insert_mut(bumped_down);
+                let pv_down = ctx.reprice_raw(scratch, as_of)?;
+                scratch.insert_mut(std::sync::Arc::clone(&hazard));
 
-            let cs01 = sensitivity_central_diff(pv_up, pv_down, bump_bp);
-            series.push((label, cs01));
-            total += cs01;
-        }
+                let cs01 = sensitivity_central_diff(pv_up, pv_down, bump_bp);
+                series.push((label, cs01));
+                total += cs01;
+            }
+
+            Ok((series, total))
+        })?;
 
         let series_id = MetricId::custom(format!("bucketed_cs01_hazard::{}", hazard_id.as_str()));
         context.store_bucketed_series(series_id, series);

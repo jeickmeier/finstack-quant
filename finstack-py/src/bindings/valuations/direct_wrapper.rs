@@ -6,6 +6,7 @@ use finstack_valuations::pricer::{
     canonical_instrument_json, canonical_instrument_json_from_str,
     metric_value_from_instrument_json, present_standard_option_greeks_from_instrument_json,
     pretty_instrument_json, price_instrument_json, price_instrument_json_with_metrics,
+    validate_instrument_json,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -57,6 +58,12 @@ pub(super) fn from_json_payload(type_tag: &str, json: &str) -> PyResult<String> 
 
 pub(super) fn pretty_json(json: &str) -> PyResult<String> {
     pretty_instrument_json(json).map_err(display_to_py)
+}
+
+pub(super) fn validate_payload(json: &str) -> PyResult<()> {
+    validate_instrument_json(json)
+        .map(|_| ())
+        .map_err(display_to_py)
 }
 
 pub(super) fn price_payload(

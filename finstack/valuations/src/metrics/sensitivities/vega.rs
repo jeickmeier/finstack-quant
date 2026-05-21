@@ -179,7 +179,8 @@ where
             .vol_surface_id
             .ok_or_else(|| finstack_core::Error::from(finstack_core::InputError::Invalid))?;
 
-        let base_ctx = context.curves.as_ref();
+        let curves = std::sync::Arc::clone(&context.curves);
+        let base_ctx = curves.as_ref();
         let vol_surface = base_ctx.get_surface(vol_surface_id.as_str())?;
 
         let as_of = context.as_of;
@@ -190,39 +191,41 @@ where
         let target_total = if let Some(existing) = context.computed.get(&MetricId::Vega) {
             *existing
         } else {
-            // Central difference O(h²) — consistent with bucketed approach.
-            let mut scratch = base_ctx.clone();
-            let token_up =
-                scratch.apply_surface_bump_in_place(vol_surface_id.as_str(), vol_bump(bump_pct))?;
-            let pv_up = context.reprice_money(&scratch, as_of)?;
-            scratch.revert_scratch_bump(token_up)?;
+            context.with_market_scratch(|ctx, scratch| {
+                // Central difference O(h²) — consistent with bucketed approach.
+                let token_up = scratch
+                    .apply_surface_bump_in_place(vol_surface_id.as_str(), vol_bump(bump_pct))?;
+                let pv_up = ctx.reprice_money(scratch, as_of)?;
+                scratch.revert_scratch_bump(token_up)?;
 
-            // The additive down-bump `σ - h` clamps at zero wherever `σ < h`,
-            // making a central difference divided by the full `2h` biased.
-            // Detect the clamp via the surface's minimum vol and fall back to
-            // a one-sided forward difference near zero vol.
-            let min_vol = min_grid_vol(&vol_surface);
-            if min_vol.map(|m| m < bump_pct).unwrap_or(false) {
-                tracing::warn!(
-                    surface_id = %vol_surface_id,
-                    min_vol = min_vol,
-                    bump = bump_pct,
-                    "key-rate vega parallel down-bump would clamp σ at 0; \
-                     using one-sided forward difference"
-                );
-                let pv_base = context.reprice_money(base_ctx, as_of)?;
-                (pv_up.amount() - pv_base.amount()) / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
-            } else {
-                let token_down = scratch
-                    .apply_surface_bump_in_place(vol_surface_id.as_str(), vol_bump(-bump_pct))?;
-                let pv_down = context.reprice_money(&scratch, as_of)?;
-                scratch.revert_scratch_bump(token_down)?;
-                (pv_up.amount() - pv_down.amount()) / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
-            }
+                // The additive down-bump `σ - h` clamps at zero wherever `σ < h`,
+                // making a central difference divided by the full `2h` biased.
+                // Detect the clamp via the surface's minimum vol and fall back to
+                // a one-sided forward difference near zero vol.
+                let min_vol = min_grid_vol(&vol_surface);
+                if min_vol.map(|m| m < bump_pct).unwrap_or(false) {
+                    tracing::warn!(
+                        surface_id = %vol_surface_id,
+                        min_vol = min_vol,
+                        bump = bump_pct,
+                        "key-rate vega parallel down-bump would clamp σ at 0; \
+                         using one-sided forward difference"
+                    );
+                    let pv_base = ctx.reprice_money(base_ctx, as_of)?;
+                    Ok((pv_up.amount() - pv_base.amount())
+                        / (bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL))
+                } else {
+                    let token_down = scratch.apply_surface_bump_in_place(
+                        vol_surface_id.as_str(),
+                        vol_bump(-bump_pct),
+                    )?;
+                    let pv_down = ctx.reprice_money(scratch, as_of)?;
+                    scratch.revert_scratch_bump(token_down)?;
+                    Ok((pv_up.amount() - pv_down.amount())
+                        / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL))
+                }
+            })?
         };
-
-        let mut raw_matrix = Vec::new();
-        let mut raw_total = NeumaierAccumulator::new();
 
         let use_ratio_strikes = self.strikes.iter().all(|k| *k <= 10.0);
         let strike_grid: Vec<f64> = if use_ratio_strikes {
@@ -244,30 +247,34 @@ where
             self.strikes.clone()
         };
 
-        let mut scratch = base_ctx.clone();
-        for &expiry in &self.expiries {
-            let mut row = Vec::new();
-            for &strike in &strike_grid {
-                // Central differences: O(h²) accuracy, consistent with other Greeks
-                let bumped_up = vol_surface.bump_point(expiry, strike, bump_pct)?;
-                let bumped_down = vol_surface.bump_point(expiry, strike, -bump_pct)?;
-                scratch.insert_surface_mut(bumped_up);
-                let pv_up = context.reprice_money(&scratch, as_of)?;
-                scratch.insert_surface_mut(std::sync::Arc::clone(&vol_surface));
+        let (raw_matrix, raw_total) = context.with_market_scratch(|ctx, scratch| {
+            let mut raw_matrix = Vec::new();
+            let mut raw_total = NeumaierAccumulator::new();
 
-                scratch.insert_surface_mut(bumped_down);
-                let pv_down = context.reprice_money(&scratch, as_of)?;
-                scratch.insert_surface_mut(std::sync::Arc::clone(&vol_surface));
+            for &expiry in &self.expiries {
+                let mut row = Vec::new();
+                for &strike in &strike_grid {
+                    // Central differences: O(h²) accuracy, consistent with other Greeks
+                    let bumped_up = vol_surface.bump_point(expiry, strike, bump_pct)?;
+                    let bumped_down = vol_surface.bump_point(expiry, strike, -bump_pct)?;
+                    scratch.insert_surface_mut(bumped_up);
+                    let pv_up = ctx.reprice_money(scratch, as_of)?;
+                    scratch.insert_surface_mut(std::sync::Arc::clone(&vol_surface));
 
-                let vega = (pv_up.amount() - pv_down.amount())
-                    / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL);
-                row.push(vega);
-                raw_total.add(vega);
+                    scratch.insert_surface_mut(bumped_down);
+                    let pv_down = ctx.reprice_money(scratch, as_of)?;
+                    scratch.insert_surface_mut(std::sync::Arc::clone(&vol_surface));
+
+                    let vega = (pv_up.amount() - pv_down.amount())
+                        / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL);
+                    row.push(vega);
+                    raw_total.add(vega);
+                }
+                raw_matrix.push(row);
             }
-            raw_matrix.push(row);
-        }
 
-        let raw_total = raw_total.total();
+            Ok((raw_matrix, raw_total.total()))
+        })?;
 
         // Normalize bucketed vegas so they partition the parallel vega.
         let (matrix, scale) = scaled_bucketed_vega_matrix(raw_matrix, raw_total, target_total);

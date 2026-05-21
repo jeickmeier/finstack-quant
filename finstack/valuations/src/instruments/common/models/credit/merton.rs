@@ -24,7 +24,7 @@
 use finstack_core::market_data::term_structures::HazardCurve;
 use finstack_core::math::norm_cdf;
 use finstack_core::math::solver::{BrentSolver, Solver};
-use finstack_core::{InputError, Result};
+use finstack_core::{Error, InputError, Result};
 
 use finstack_core::math::random::{poisson_inverse_cdf, RandomNumberGenerator};
 
@@ -841,7 +841,8 @@ impl MertonModel {
     /// # Errors
     ///
     /// Returns an error if `tenors` is empty, contains non-positive values,
-    /// or if the `HazardCurve` builder fails.
+    /// if the implied survival curve is non-monotonic, or if the `HazardCurve`
+    /// builder fails.
     pub fn to_hazard_curve(
         &self,
         id: &str,
@@ -881,9 +882,19 @@ impl MertonModel {
 
         // Subsequent points: λ_i = -ln(S(t_{i+1}) / S(t_i)) / (t_{i+1} - t_i)
         for i in 1..sorted_tenors.len() {
+            if survivals[i] > survivals[i - 1] {
+                return Err(Error::Validation(format!(
+                    "Merton hazard bootstrap produced non-monotonic survival: \
+                     S({:.6}y)={:.12} > S({:.6}y)={:.12}",
+                    sorted_tenors[i],
+                    survivals[i],
+                    sorted_tenors[i - 1],
+                    survivals[i - 1]
+                )));
+            }
             let dt = sorted_tenors[i] - sorted_tenors[i - 1];
             let lambda_i = -(survivals[i] / survivals[i - 1]).ln() / dt;
-            knots.push((sorted_tenors[i], lambda_i.max(0.0)));
+            knots.push((sorted_tenors[i], lambda_i));
         }
 
         HazardCurve::builder(id)
@@ -1324,6 +1335,23 @@ mod tests {
             hc_risky.hazard_rate(3.0) > hc_safe.hazard_rate(3.0),
             "Riskier firm should have higher hazard rate"
         );
+    }
+
+    #[test]
+    fn to_hazard_curve_rejects_non_monotonic_survival() {
+        // V < B with positive drift can make terminal PD fall with horizon,
+        // which implies increasing survival and a negative hazard segment.
+        let m = MertonModel::new(98.0, 0.30, 100.0, 0.10).expect("valid");
+        let base = time::Date::from_calendar_date(2026, time::Month::March, 1).expect("valid date");
+
+        let survival_1y = 1.0 - m.default_probability(1.0);
+        let survival_5y = 1.0 - m.default_probability(5.0);
+        assert!(
+            survival_5y > survival_1y,
+            "fixture must have increasing survival: 1Y={survival_1y}, 5Y={survival_5y}"
+        );
+
+        assert!(m.to_hazard_curve("BAD", base, &[1.0, 5.0], 0.40).is_err());
     }
 
     #[test]

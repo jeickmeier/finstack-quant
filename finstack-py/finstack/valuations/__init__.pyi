@@ -66,6 +66,13 @@ from finstack.valuations import credit_derivatives as credit_derivatives
 from finstack.valuations import exotics as exotics
 from finstack.valuations import fx as fx
 from finstack.valuations import instruments as instruments
+from finstack.valuations.credit import (
+    CreditState as CreditState,
+    DynamicRecoverySpec as DynamicRecoverySpec,
+    EndogenousHazardSpec as EndogenousHazardSpec,
+    MertonModel as MertonModel,
+    ToggleExerciseModel as ToggleExerciseModel,
+)
 from finstack.valuations.envelope import (
     CalibrationEnvelope as CalibrationEnvelope,
     CalibrationPlan as CalibrationPlan,
@@ -91,12 +98,16 @@ __all__ = [
     "fx",
     "instruments",
     "CreditFactorModel",
+    "CreditState",
     "CreditCalibrator",
+    "DynamicRecoverySpec",
+    "EndogenousHazardSpec",
     "LevelsAtDate",
     "PeriodDecomposition",
     "FactorCovarianceForecast",
     "decompose_levels",
     "decompose_period",
+    "MertonModel",
     "ValuationResult",
     "validate_instrument_json",
     "price_instrument",
@@ -156,6 +167,7 @@ __all__ = [
     "SabrCalibrator",
     "instrument_cashflows",
     "instrument_cashflows_json",
+    "ToggleExerciseModel",
 ]
 
 class ValuationResult:

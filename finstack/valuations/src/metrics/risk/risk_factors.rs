@@ -104,7 +104,7 @@ impl RiskFactorType {
 /// Extract risk factors from an instrument's market data dependencies.
 ///
 /// This function inspects the instrument's curve dependencies and extracts
-/// risk factors at standard tenor buckets (see `STANDARD_BUCKETS_YEARS.to_vec()`).
+/// risk factors at standard tenor buckets (see `STANDARD_BUCKETS_YEARS`).
 /// The risk factors can then be used
 /// to apply historical market shifts for VaR calculation.
 ///
@@ -147,14 +147,12 @@ where
     let deps = instrument.curve_dependencies()?;
 
     // Standard tenors for IR/credit curve factors
-    let standard_tenors = STANDARD_BUCKETS_YEARS.to_vec();
-
     extract_curve_factors(
         &mut factors,
         &mut seen,
         &deps.discount_curves,
         market,
-        &standard_tenors,
+        &STANDARD_BUCKETS_YEARS,
         |m, id| m.get_discount(id).is_ok(),
         |curve_id, tenor_years| RiskFactorType::DiscountRate {
             curve_id: curve_id.clone(),
@@ -167,7 +165,7 @@ where
         &mut seen,
         &deps.forward_curves,
         market,
-        &standard_tenors,
+        &STANDARD_BUCKETS_YEARS,
         |m, id| m.get_forward(id).is_ok(),
         |curve_id, tenor_years| RiskFactorType::ForwardRate {
             curve_id: curve_id.clone(),
@@ -180,7 +178,7 @@ where
         &mut seen,
         &deps.credit_curves,
         market,
-        &standard_tenors,
+        &STANDARD_BUCKETS_YEARS,
         |m, id| m.get_hazard(id).is_ok(),
         |curve_id, tenor_years| RiskFactorType::CreditSpread {
             curve_id: curve_id.clone(),
@@ -723,10 +721,9 @@ mod tests {
         );
 
         // Verify we're using standard tenors
-        let standard_tenors = STANDARD_BUCKETS_YEARS.to_vec();
         for (_, tenor) in &discount_factors {
             assert!(
-                standard_tenors.contains(tenor),
+                STANDARD_BUCKETS_YEARS.contains(tenor),
                 "Tenor {} should be in standard bucket list",
                 tenor
             );

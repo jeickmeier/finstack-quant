@@ -2,7 +2,7 @@
 
 use super::direct_wrapper::{
     build_from_py, from_json_payload, greeks_dict, metric_value, pretty_json, price_payload,
-    price_payload_with_metrics,
+    price_payload_with_metrics, validate_payload,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
@@ -49,6 +49,10 @@ macro_rules! exotic_class {
 
             fn to_json(&self) -> PyResult<String> {
                 pretty_json(&self.json)
+            }
+
+            fn validate(&self) -> PyResult<()> {
+                validate_payload(&self.json)
             }
 
             #[pyo3(signature = (market, as_of, model="default"))]

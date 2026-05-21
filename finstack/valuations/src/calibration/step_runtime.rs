@@ -16,8 +16,9 @@ use crate::calibration::targets::svi::SviSurfaceTarget;
 use crate::calibration::targets::swaption::SwaptionVolTarget;
 use crate::calibration::targets::vol::VolSurfaceTarget;
 use crate::calibration::targets::xccy_basis::XccyBasisTarget;
+use crate::calibration::validation::surfaces::validate_surface;
 use crate::calibration::validation::ValidationMode;
-use crate::calibration::{CalibrationReport, CurveValidator, SurfaceValidator};
+use crate::calibration::{CalibrationReport, CurveValidator};
 use crate::market::quotes::market_quote::MarketQuote;
 use crate::market::quotes::vol::VolQuote;
 use finstack_core::dates::{DayCount, DayCountContext};
@@ -253,7 +254,7 @@ pub(crate) fn execute_params(
                 );
             let new_report = attach_validation_result(
                 new_report,
-                surface.validate(&global_config.validation),
+                validate_surface(&surface, &global_config.validation),
                 global_config,
             );
             Ok(StepOutcome {

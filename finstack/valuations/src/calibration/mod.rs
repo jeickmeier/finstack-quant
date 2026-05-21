@@ -139,7 +139,9 @@ pub use solver::SolverConfig;
 
 /// Validation types for curves and surfaces.
 pub use validation::curves::CurveValidator;
-pub use validation::surfaces::SurfaceValidator;
+pub use validation::surfaces::{
+    validate_butterfly_spread, validate_calendar_spread, validate_surface, validate_vol_bounds,
+};
 pub use validation::{RateBounds, RateBoundsPolicy, ValidationConfig, ValidationMode};
 
 /// Calibration diagnostics and results.
