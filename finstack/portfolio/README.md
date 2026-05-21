@@ -1,32 +1,28 @@
 # Finstack Portfolio
 
-`finstack-portfolio` provides portfolio construction, valuation aggregation,
-grouping, selective repricing, scenario application, margin aggregation, factor
-risk decomposition, and optimization on top of the wider Finstack ecosystem.
+`finstack-portfolio` builds portfolios from entities and positions, values them in a
+base currency, aggregates risk metrics and cashflows, applies scenarios, and runs
+margin, factor-risk, and optimization workflows on top of `finstack-core` and
+`finstack-valuations`.
 
-## What This Crate Covers
+## Capabilities
 
-- Entity-aware portfolio containers with optional dummy-entity support for
-  standalone instruments.
-- Position quantity scaling via explicit units such as `Units`, `Notional`,
-  `FaceValue`, and `Percentage`.
-- Base-currency portfolio valuation and per-position drill-down.
-- Portfolio-level metric aggregation, grouping, cashflow ladders, margin, and
-  advanced analytics.
-- Optional scenario application and Polars DataFrame exports.
+- Entity-aware portfolios with optional dummy entities for standalone instruments.
+- Position scaling via `PositionUnit` (`Units`, `Notional`, `FaceValue`, `Percentage`).
+- Base-currency valuation with per-position drill-down.
+- Metric aggregation, attribute/book grouping, cashflow ladders, margin, factor risk,
+  liquidity scoring, performance attribution, and tabular exports (`TableEnvelope`).
+- Scenario stress via `apply_and_revalue` (uses `finstack-scenarios`).
 
-## Core Conventions
+## Conventions
 
-- `Portfolio::base_ccy` is the reporting currency for totals and portfolio-level
-  analytics.
-- `Position::quantity` is interpreted by `PositionUnit`; it is not always a
-  literal number of units.
-- Summable risk metrics are FX-converted to the portfolio base currency before
-  aggregation.
-- Selective repricing relies on each instrument's declared market dependencies.
-  Instruments with unresolved dependencies are repriced conservatively.
+- `Portfolio::base_ccy` is the reporting currency for totals and portfolio-level analytics.
+- `Position::quantity` is interpreted by `PositionUnit`; it is not always a share count.
+- Summable risk metrics are FX-converted to base currency before aggregation.
+- Selective repricing (`revalue_affected`) uses each instrument's declared market
+  dependencies; unresolved dependencies trigger full repricing.
 
-## Quick Start
+## Quick start
 
 ```rust
 use finstack_core::config::FinstackConfig;
@@ -64,7 +60,7 @@ let position = Position::new(
     1.0,
     PositionUnit::Units,
 )?
-.with_tag("asset_class", "cash");
+.with_text_attribute("asset_class", "cash");
 
 let portfolio = PortfolioBuilder::new("MY_FUND")
     .base_ccy(Currency::USD)
@@ -79,98 +75,55 @@ println!("Portfolio total: {}", valuation.total_base_ccy);
 # }
 ```
 
-## Main Workflows
+## Workflows
 
-### Valuation and metrics
+| Task | Entry point |
+|------|-------------|
+| Valuation | `value_portfolio` |
+| Metric rollup | `aggregate_metrics` |
+| Grouping | `aggregate_by_attribute`, `aggregate_by_multiple_attributes`, `aggregate_by_book` |
+| Partial repricing | `revalue_affected` |
+| Scenario + revalue | `scenarios::apply_and_revalue` |
+| Margin | `PortfolioMarginAggregator` |
+| Factor risk | `factor_model` module |
+| Optimization | `optimization` module |
+| Cashflows | `cashflows` module |
+| Tables | `positions_to_table`, `metrics_to_table`, … |
 
-Use `value_portfolio` to compute per-position and aggregate PV, then
-`aggregate_metrics` to roll up summable risk in base currency.
+## `PositionUnit`
 
-### Grouping and reporting
+- `Units`: scale by share or contract count.
+- `Notional(Option<Currency>)`: scale by notional; use `1.0` when the instrument PV
+  already reflects its configured notional.
+- `FaceValue`: scale by held face amount.
+- `Percentage`: percentage points (`50.0` → 50% → `0.50` internally).
 
-Use `aggregate_by_attribute`, `aggregate_by_multiple_attributes`, and
-`aggregate_by_book` to roll up results by user tags or book hierarchy.
+## FX and reporting
 
-### Selective repricing
-
-Use `revalue_affected` when only a subset of market factors changed and the
-portfolio's dependency index can identify affected positions.
-
-### Scenarios
-
-With the `scenarios` feature enabled, use `apply_scenario` or
-`apply_and_revalue` to clone the portfolio, mutate market data, and compute
-stressed results.
-
-### Advanced analytics
-
-The crate also exposes:
-
-- `margin` for netting-set and SIMM-style aggregation.
-- `factor_model` for factor assignment and risk decomposition.
-- `optimization` for deterministic LP-based portfolio optimization.
-- `cashflows` for portfolio cashflow ladders and base-currency bucketing.
-
-## Quantity Semantics
-
-`PositionUnit` controls how `Position::scale_value` interprets `quantity`:
-
-- `Units`: direct scaling by number of shares or contracts.
-- `Notional(Option<Currency>)`: direct scaling by notional amount. Use `1.0`
-  when the instrument already returns a total PV for its configured notional.
-- `FaceValue`: direct scaling by held face amount.
-- `Percentage`: always interpreted in percentage points, so `50.0` means `50%`
-  and is converted internally to `0.50`.
-
-## FX and Reporting Semantics
-
-- Position values are stored both in native currency and portfolio base
-  currency.
-- Portfolio-level totals and summable metrics are reported in base currency.
-- Cashflow conversion helpers use spot-equivalent FX for all dates; for
-  forward-sensitive reporting, derive forward FX explicitly outside this crate.
-- Attribution distinguishes instrument FX risk from FX translation caused by
-  reporting a non-base-currency position in the portfolio base currency.
+- Position values are stored in native and base currency.
+- Portfolio totals and summable metrics use base currency.
+- Cashflow FX helpers use spot-equivalent rates for all dates; use explicit forward FX
+  outside this crate when forward-sensitive reporting is required.
+- Attribution separates instrument FX risk from base-currency translation effects.
 
 ## Serialization
 
-Use `Portfolio::to_spec` and `Portfolio::from_spec` for JSON-friendly
-serialization:
+`Portfolio::to_spec` / `Portfolio::from_spec` produce JSON-friendly specs. Round-trip
+reconstruction requires each instrument to implement `to_instrument_json()`. Positions
+with `instrument_spec: None` need an external instrument registry on load.
 
-```rust
-use finstack_portfolio::portfolio::PortfolioSpec;
+## Parallelism
 
-# fn round_trip(portfolio: &finstack_portfolio::Portfolio) -> finstack_portfolio::Result<()> {
-let spec = portfolio.to_spec();
-let json = serde_json::to_string(&spec).expect("serialization should succeed");
-let decoded: PortfolioSpec = serde_json::from_str(&json).expect("deserialization should succeed");
-let rebuilt = finstack_portfolio::Portfolio::from_spec(decoded)?;
-assert_eq!(rebuilt.id, portfolio.id);
-# Ok(())
-# }
+Valuation and metric collection use Rayon; there is no feature flag to disable it.
+
+## Examples and tests
+
+```bash
+cargo run -p finstack-portfolio --example portfolio_optimization
+cargo test -p finstack-portfolio
+cargo test -p finstack-portfolio --doc
 ```
-
-Round-trip reconstruction requires each instrument to support
-`to_instrument_json()`. If a position serializes with `instrument_spec: None`,
-an external instrument registry is required to rebuild it.
-
-## Feature Flags
-
-- `scenarios`: enables scenario application helpers.
-
-Rayon-backed parallel valuation and metric collection are always enabled (the
-crate depends on `rayon` directly); there is no opt-in feature gate.
-
-## Examples and Verification
-
-- Optimization example:
-  `cargo run -p finstack-portfolio --example portfolio_optimization`
-- Crate tests:
-  `cargo test -p finstack-portfolio`
-- Doc tests:
-  `cargo test -p finstack-portfolio --doc`
 
 ## References
 
-Canonical quantitative and market-convention references used across Finstack
-live in [`docs/REFERENCES.md`](../../docs/REFERENCES.md).
+Quantitative references: [`docs/REFERENCES.md`](../../docs/REFERENCES.md).

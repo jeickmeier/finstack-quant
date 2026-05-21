@@ -1,84 +1,54 @@
 # Finstack Scenarios
 
-`finstack-scenarios` provides deterministic scenario composition and scenario
-application for market data, statement models, instrument-level shocks, and
-time roll-forward workflows.
+`finstack-scenarios` applies deterministic shocks and time rolls to market data,
+financial statement models, and instrument collections. Scenarios are described as
+serde-friendly specs and executed by a single engine.
 
-## What This Crate Covers
+## Core types
 
-The crate centers on a small set of core types:
+| Type | Role |
+|------|------|
+| `ScenarioSpec` | Named scenario with metadata and ordered `OperationSpec` list |
+| `OperationSpec` | Shock or roll operation (curves, FX, equity, vol, statements, instruments, time) |
+| `ScenarioEngine` | Composes and applies specs |
+| `ExecutionContext` | Mutable market data, statement model, optional instruments, `as_of` |
+| `ApplicationReport` | Applied operation count and warnings |
+| `RateBindingSpec` | Links statement nodes to curves via `OperationSpec::RateBinding` |
 
-- `ScenarioSpec`: a named scenario with metadata and ordered operations.
-- `OperationSpec`: the supported shock and roll-forward operations.
-- `ScenarioEngine`: composition and application engine.
-- `ExecutionContext`: mutable application context for market data, statement
-  models, rate bindings, and the as-of date.
-- `ApplicationReport`: warnings and execution details returned by application.
-- `RateBindingSpec`: optional bridge between statement nodes and market curves,
-  applied through `OperationSpec::RateBinding`.
+## Operation families
 
-## Supported Operation Families
+- **Market data**: FX, equity, discount/forward/hazard/inflation curves, base correlation,
+  volatility surfaces.
+- **Statements**: forecast percent/assign, rate bindings.
+- **Instruments**: price and spread shocks by type or attribute selector.
+- **Time**: horizon roll-forward with carry/theta-aware paths.
 
-### Market data shocks
+## Composition
 
-- FX shocks
-- equity price shocks
-- discount, forward, hazard, and inflation curve shifts
-- base-correlation shifts
-- volatility-surface shifts
+Scenarios merge deterministically with stable operation ordering and priority-based
+conflict resolution. Market, statement, and time operations share one application path.
 
-### Statement operations
+## Dependencies
 
-- forecast percentage changes
-- forecast value assignment
-- curve-linked rate bindings for statement workflows
+- `finstack-core` — market data and dates
+- `finstack-statements` — statement models
+- `finstack-valuations` — pricing-aware rolls and instrument shocks
 
-### Instrument operations
+Bindings: `finstack-py`, `finstack-wasm`.
 
-- price shocks by instrument type
-- spread shocks by instrument type
-- attribute-based selectors where the underlying workflow provides the needed
-  instrument metadata
+## Usage
 
-### Time operations
+1. Build a `ScenarioSpec` from `OperationSpec` values (or load a template from
+   `templates`).
+2. Fill `ExecutionContext` with market data, an optional statement model, and `as_of`.
+3. Call `ScenarioEngine::apply`.
+4. Read `ApplicationReport` and use the mutated context for downstream pricing.
 
-- horizon roll-forward with carry and theta-aware workflows
+See crate-level rustdoc for a runnable example.
 
-## Composition Semantics
-
-- Scenarios compose deterministically.
-- Operation ordering is stable.
-- Priority values control merge behavior.
-- The wire format is serde-friendly for storage and pipelines.
-- Market, statement, and time operations share one application model instead of
-  separate ad hoc engines.
-
-## Where It Fits
-
-`finstack-scenarios` sits between the lower-level crates and the binding
-surfaces:
-
-- It uses `finstack-core` for market data and dates.
-- It integrates with `finstack-statements` for statement-model workflows.
-- It integrates with `finstack-valuations` for pricing-aware scenario and
-  roll-forward flows.
-- It is exposed through both `finstack-py` and `finstack-wasm`.
-
-## Typical Usage
-
-Most applications follow this pattern:
-
-1. Build a `ScenarioSpec` from one or more `OperationSpec` values.
-2. Construct an `ExecutionContext` with market data, a statement model, and an
-   `as_of` date.
-3. Apply the scenario with `ScenarioEngine`.
-4. Consume the resulting `ApplicationReport` alongside the mutated context.
-
-## Verification
+## Tests
 
 ```bash
-cargo fmt -p finstack-scenarios
-cargo clippy -p finstack-scenarios --all-targets -- -D warnings
 cargo test -p finstack-scenarios
 ```
 

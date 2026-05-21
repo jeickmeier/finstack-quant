@@ -13,8 +13,6 @@
 //! - All major instrument types
 //! - Cross-currency positions
 //! - Various position sizes
-//!
-//! Market Standards Review (Week 5)
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_cashflows::builder::specs::{CouponType, FixedCouponSpec};

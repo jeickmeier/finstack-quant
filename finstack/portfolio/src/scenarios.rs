@@ -1,8 +1,7 @@
 //! Scenario application for portfolios.
 //!
-//! This module is only available when the `scenarios` feature is enabled.
-//! It provides helpers to apply scenario specifications to portfolios and
-//! optionally re-value them using the modified market data.
+//! Applies [`ScenarioSpec`](finstack_scenarios::spec::ScenarioSpec) to a cloned
+//! portfolio and market context, then optionally re-values with the stressed data.
 
 use crate::error::{Error, Result};
 use crate::portfolio::Portfolio;

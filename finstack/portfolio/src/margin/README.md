@@ -66,10 +66,10 @@ println!("Netting sets: {}", result.netting_set_count());
   `ImMethodology` surface; venue-specific external CCP integrations are outside
   this crate.
 
-## Verification
+## Tests
 
 ```bash
-cargo test -p finstack-portfolio margin::
+cargo test -p finstack-portfolio --test margin_aggregation --test margin_serialization
 ```
 
 ## References
