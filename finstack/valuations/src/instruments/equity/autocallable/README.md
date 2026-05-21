@@ -41,9 +41,3 @@ let pv = note.value(&market_context, as_of)?;
 - PV plus path-based Greeks (delta/vega/theta) via bump-and-revalue in the metrics registry when MC is enabled.
 - Scenario metrics for probability of call, expected coupons, and final payoff distribution (via captured paths).
 - Sensitivity to barriers/vol levels can be computed through ad-hoc bump scripts using the pricer hooks.
-
-## Future Enhancements
-
-- Add closed-form or semi-analytic approximations for speed when barriers are far OTM/ITM.
-- Support stochastic volatility/jumps and quanto effects for cross-ccy underlyings.
-- Enrich reporting with per-observation call probabilities and digital-Greek decompositions.

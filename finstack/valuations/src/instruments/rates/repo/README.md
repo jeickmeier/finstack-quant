@@ -169,9 +169,3 @@ if repo.has_margin() {
 - DV01 on discount curve via generic bump calculators.
 - Carry/roll to settlement via day-count accrual of repo interest.
 - Margin deficit/excess calculations via `RepoMarginSpec` methods.
-
-## Future Enhancements
-
-- Support triparty eligibility schedules and collateral substitution events.
-- Include fail/recall penalties and optional early termination features.
-- Margin interest accrual cashflow generation.

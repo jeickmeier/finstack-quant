@@ -170,8 +170,7 @@ let stoch = StochasticUtilizationSpec {
     seed: Some(42),
     antithetic: false,
     use_sobol_qmc: false,
-    #[cfg(feature = "mc")]
-    mc_config: None, // or Some(McConfig { ... })
+    mc_config: None, // or Some(McConfig { ... }) for stochastic dynamics
 };
 ```
 
@@ -272,9 +271,3 @@ All extensions should preserve the unified engine paradigm to maintain parity an
 - PV, facility-level DV01/CS01/Theta/Bucketed DV01 via generic calculators using cashflow outputs.
 - Utilization metrics (peak/average), fee attribution, and carry/roll analyses.
 - Scenario metrics from stochastic paths: distribution of utilization, loss-adjusted PV, and covenant breach statistics when modeled.
-
-## Future Enhancements
-
-- Add GAAP/IFRS effective interest treatment and CECL/expected-loss hooks.
-- Enrich stochastic engine with jump/regime processes and multi-currency support with FX hedging.
-- Provide prebuilt stress packs (utilization/rate/credit) and visualization for drawdown/liquidity analytics.

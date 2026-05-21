@@ -51,9 +51,3 @@ let pv = cap.value(&market_context, Date::from_calendar_date(2024, Month::Januar
 - PV plus cap/floor par strike (implied volatility to match price), delta/vega/theta via bump-and-revalue.
 - DV01 on discount curve and forward-curve sensitivities (parallel/key-rate) through generic calculators.
 - Bucketed caplet contributions for attribution.
-
-## Future Enhancements
-
-- Add displaced-diffusion pricing path for shifted/lognormal low-rate regimes.
-- Support SABR/shifted-lognormal smile integration for more accurate vol skews.
-- Include gamma/volga analytics and callable-cap style optionality extensions.

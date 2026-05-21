@@ -44,9 +44,3 @@ let pv = trade.value(&market_context, as_of)?;
 - PV in quote currency; FX delta equal to base notional in base currency and −PV in quote currency.
 - Exposure reporting by currency; simple scenario shocks via FX rate bumps.
 - No DV01/CS01 since no rate discounting unless user-layer applies it.
-
-## Future Enhancements
-
-- Add forward/points support and broken-date interpolation for delivery beyond spot.
-- Include bid/ask spread and transaction-cost modeling.
-- Provide settlement netting and counterparty exposure hooks.

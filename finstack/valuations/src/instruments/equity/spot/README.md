@@ -38,9 +38,3 @@ let pv = equity.value(&market_context, as_of_date)?;
 - PV, share count, and currency exposure; simple delta = shares with respect to spot.
 - DV01 (if discounting applied) via generic calculators.
 - Dividend yield sensitivity via bump-and-revalue when yield ID provided.
-
-## Future Enhancements
-
-- Add borrow cost/financing spread modeling for short/levered positions.
-- Support corporate action adjustments (splits/dividends) through convenience helpers.
-- Provide richer risk decomposition (beta attribution, factor exposures) via integration hooks.

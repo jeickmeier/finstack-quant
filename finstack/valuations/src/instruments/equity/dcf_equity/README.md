@@ -152,9 +152,3 @@ All new fields are optional with serde defaults:
 - `equity_bridge`, `shares_outstanding`, `valuation_discounts` default to `None`.
 - `dilution_securities` defaults to empty.
 - Old serialized JSON (without new fields) deserializes correctly.
-
-## Future Enhancements
-
-- Add probabilistic/scenario-weighted DCF paths and WACC/growth sensitivity matrices.
-- Support OPM (Option Pricing Method) for 409A equity allocation across share classes.
-- Provide Monte Carlo on key drivers (revenue growth, margins, multiples).

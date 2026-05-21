@@ -106,9 +106,3 @@ Smoothing methods available:
 - **Tail dependence coefficient** (λ_L): Indicates copula's ability to capture joint extreme defaults.
 - Correlation and recovery sensitivities (Correlation01, Recovery01).
 - Arbitrage validation results with detailed violation reporting.
-
-## Future Enhancements
-
-- Support bespoke portfolios and name-level heterogeneity (hazard/recovery per name).
-- Provide tranche option (STO/CDO2) hooks and dynamic spread modeling for risk scenarios.
-- Monte Carlo simulation mode for complex path-dependent features.

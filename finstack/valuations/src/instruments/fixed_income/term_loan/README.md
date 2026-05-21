@@ -1,8 +1,8 @@
-# Term Loan Instrument Module
+# Term loan
 
-Comprehensive implementation of institutional term loans with support for delayed-draw facilities (DDTL), payment-in-kind (PIK) features, covenant-driven events, amortization schedules, and embedded call options.
+Institutional term loans: DDTL, PIK, covenant-driven events, amortization, and embedded calls.
 
-## Table of Contents
+## Contents
 
 - [Overview](#overview)
 - [Module Structure](#module-structure)
@@ -722,17 +722,6 @@ cargo tarpaulin --packages finstack-valuations --exclude-files "**/tests/*"
 - EIR amortization schedules are reporting-only (do not change PV/metrics).
 - Covenant modeling is limited to the provided toggles/step-ups/sweeps; bespoke legal triggers require extensions.
 - Pricing excludes funding-side adjustments (FVA/CVA/DVA) and assumes single-currency loans.
-
----
-
-## Future Enhancements
-
-Planned features (currently experimental or not implemented):
-
-1. **Advanced PIK schedules**: Time-varying PIK fractions (`PikSpec`)
-2. **Revolver integration**: Combining DDTL with revolving credit features
-3. **CECL support**: Expected credit loss provisioning hooks
-4. **GAAP/IFRS reporting**: Standardized disclosures and amortization tables
 
 ---
 

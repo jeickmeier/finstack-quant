@@ -54,7 +54,7 @@ the asset value falls below the debt barrier.
 | `from_target_pd()` | Brent solver on B to match a target cumulative PD                |
 | `credit_grades()`  | CreditGrades construction from equity observables                |
 
-**Monte Carlo** (feature-gated: `mc`)
+**Monte Carlo**
 
 `simulate_paths()` generates forward asset-value paths under GBM or
 jump-diffusion dynamics with optional antithetic variates.
@@ -292,12 +292,6 @@ Unit tests are co-located in each module. Run with:
 
 ```bash
 cargo test -p finstack-valuations -- instruments::common::models::credit
-```
-
-Monte Carlo tests require the `mc` feature:
-
-```bash
-cargo test -p finstack-valuations --features mc -- instruments::common::models::credit::merton::tests::simulate
 ```
 
 Python binding tests:

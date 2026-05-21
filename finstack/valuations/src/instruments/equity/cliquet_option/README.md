@@ -41,9 +41,3 @@ let pv = option.value(&market_context, as_of)?;
 - PV plus MC bump-and-revalue Greeks (delta/vega/theta) and path statistics (expected local/global payoffs).
 - Probability of hitting local/global caps/floors derivable from captured paths when enabled.
 - Scenario sensitivities to vol and spot via registry bump hooks.
-
-## Future Enhancements
-
-- Add semi-analytic approximations for additive cliquets to reduce MC runtime.
-- Support stochastic volatility and jump diffusion for equity-linked structures.
-- Provide gradient-based Greeks (pathwise/LR) for lower variance in MC mode.

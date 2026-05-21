@@ -38,9 +38,3 @@ let pv = linker.value(&market_context, as_of_date)?;
 - PV, real yield/par real rate solving, break-even inflation (difference vs nominal curve), and DV01 on discount curve.
 - Inflation sensitivity via index/curve bumps; deflation floor value attribution where applicable.
 - Accrued indexation and coupon accrual reporting.
-
-## Future Enhancements
-
-- Add seasonality decomposition and explicit seasonality-adjusted interpolation.
-- Support stochastic inflation and correlation with rates for risk scenarios.
-- Include callable linker features and convexity adjustments vs nominal curve.

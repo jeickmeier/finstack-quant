@@ -1,105 +1,62 @@
 # Finstack Valuations
 
-`finstack-valuations` is the pricing and risk engine for the Finstack
-workspace. It combines broad instrument coverage with deterministic valuation,
-cashflow-aware risk metrics, calibration, attribution, covenant tooling, and
-schema-friendly result types.
+`finstack-valuations` prices instruments, computes risk metrics, calibrates market structures, attributes P&L, and evaluates covenants. Results use deterministic numerics and schema-versioned JSON where serialization applies.
 
-## What This Crate Owns
+## Layout
 
-The crate is organized around a few major subsystems:
+| Path | Role |
+|------|------|
+| `src/instruments/` | Instrument types, pricing, JSON loading |
+| `src/metrics/` | `MetricId`, registries, sensitivity calculators |
+| `src/calibration/` | Calibration plans, solvers, validation |
+| `src/market/` | Quotes, conventions, quote-to-instrument builders |
+| `src/attribution/` | Parallel, waterfall, and metrics-based P&L attribution |
+| `src/covenants/` | Covenant evaluation and forward projection |
+| `src/results/` | `ValuationResult` and export helpers |
+| `src/correlation/` | Correlation, copula, and factor models for credit structures |
+| `schemas/` | Generated JSON Schema artifacts |
 
-- `src/instruments/`: instrument definitions, builders, pricing hooks, JSON
-  loading, and instrument-specific docs.
-- `src/metrics/`: metric identifiers, registries, dependency-aware calculators,
-  scalar metrics, and bucketed sensitivities.
-- `src/calibration/`: calibration plans, solvers, targets, validation, and
-  bump helpers for market structures.
-- `src/attribution/`: parallel, waterfall, and metrics-based P&L attribution.
-- `src/covenants/`: covenant types, engines, schedules, and forward-looking
-  covenant workflows.
-- `src/results/`: valuation result envelopes and export helpers.
-- `schemas/`: generated JSON Schema artifacts for external API contracts.
+## Dependencies
 
-## Instrument Coverage
+- `finstack-core` — dates, money, market data, math
+- `finstack-cashflows` — schedules and accrual
+- `finstack-analytics` — shared analytics helpers
+- `finstack-margin` — margin and XVA integrations
+- `finstack-monte-carlo` — simulation paths (used by selected pricers)
 
-The instrument library spans 40+ instrument types across the main asset-class
-families:
+Bindings: umbrella `finstack` (`valuations` feature), `finstack-py`, `finstack-wasm`.
 
-- **Fixed income**: bonds, convertibles, inflation-linked bonds, term loans,
-  revolving credit facilities.
-- **Rates**: deposits, swaps, basis swaps, inflation swaps, FRAs, swaptions,
-  rate futures, CMS options, repos.
-- **Credit**: single-name CDS, CDS indices, CDS tranches, CDS options, and
-  structured credit.
-- **Equity and exotics**: spot, vanilla options, Asian, barrier, lookback,
-  autocallable, cliquet, range accrual, variance swaps.
-- **FX**: spot, swaps, vanilla options, barrier options, quanto options.
-- **Cross-asset and private markets**: total return swaps, basket instruments,
-  private-markets funds.
-
-## Ecosystem Dependencies
-
-`finstack-valuations` builds on other workspace crates:
-
-- `finstack-core` for dates, money, market data, and math primitives.
-- `finstack-cashflows` for schedule construction, accrual, and aggregation.
-- `finstack-margin` for margin and XVA integrations.
-- `finstack-monte-carlo` for optional advanced simulation workflows.
-
-Credit correlation, copula, factor-model, and stochastic-recovery tooling used
-by structured-credit and CDS-tranche workflows lives inside this crate, in the
-[`correlation`](src/correlation) submodule.
-
-This crate is also surfaced through:
-
-- the umbrella `finstack` crate via the `valuations` feature
-- `finstack-py`
-- `finstack-wasm`
-
-## Feature Flags
+## Features
 
 | Feature | Default | Purpose |
-|---|---|---|
-| `parallel` | yes | Enables rayon-backed parallel execution in supported valuation paths. |
-| `mc` | no | Enables advanced Monte Carlo workflows via `finstack-monte-carlo` and margin/XVA MC support. |
-| `slow` | no | Enables slower long-running tests and benchmarks. |
-| `ts_export` | no | Enables TypeScript export support for selected schema-oriented workflows. |
+|---------|---------|---------|
+| `ts_export` | off | TypeScript export for selected schema types |
+| `fx-vanna-volga` | off | FX barrier Vanna–Volga smile correction (research; not registered in the default pricer registry) |
 
-## Typical Dependency Setup
-
-Depend on the crate directly:
+## Usage
 
 ```toml
 [dependencies]
-finstack-valuations = { path = "../finstack/valuations", features = ["mc"] }
+finstack-valuations = { path = "../finstack/valuations" }
 ```
 
-Or consume it through the umbrella crate:
+Or via the umbrella crate:
 
 ```toml
 [dependencies]
 finstack = { path = "../finstack", features = ["valuations"] }
 ```
 
-## Additional Module Docs
+Crate API docs: `cargo doc -p finstack-valuations --open`.
 
-For deeper coverage, use the crate-local READMEs:
-
-- `src/instruments/README.md`
-- `src/metrics/README.md`
-- `src/calibration/README.md`
-- `src/attribution/README.md`
-- `src/covenants/README.md`
-- `src/results/README.md`
-- `schemas/README.md`
+Module READMEs under `src/` cover calibration, metrics, instruments, attribution, and related areas.
 
 ## Verification
 
 ```bash
-cargo fmt -p finstack-valuations
-cargo clippy -p finstack-valuations --all-targets --all-features -- -D warnings
-cargo test -p finstack-valuations --all-features
+mise run rust-fmt
+mise run rust-clippy
+mise run rust-test
 ```
 
 ## License

@@ -95,9 +95,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - PV plus Greeks (delta/gamma/vega/theta/rho) from analytic (Euro) or tree (Amer/Bermudan) methods.
 - Implied volatility solver; scenario PVs via bump-and-revalue on spot/vol/rates.
 - Contract-size scaling and cash/physical settlement support in reporting.
-
-## Future Enhancements
-
-- Add explicit Bermudan exercise schedule support and early-exercise policy controls.
-- Support local/stochastic volatility smile models and jump diffusion variants.
-- Provide American option greeks via lattice differentiation or Barone-Adesi/Whaley approximations.

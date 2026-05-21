@@ -44,9 +44,3 @@ let pv = option.value(&market_context, as_of_date)?;
 - PV plus Greeks (delta/gamma/vega/theta/rho) analytically; MC bump-and-revalue when enabled.
 - Barrier hit probability proxies via MC path statistics; carry sensitivity via domestic/foreign curve bumps.
 - Scenario PVs for barrier shifts and vol surface tweaks.
-
-## Future Enhancements
-
-- Add discrete-monitoring corrections and barrier smoothing techniques for FX calendar specifics.
-- Support stochastic/local vol and jumps; quanto adjustments for cross-currency settlements.
-- Include early-exercise/windowed barrier styles if demanded by products.

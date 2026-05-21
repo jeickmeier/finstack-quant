@@ -86,9 +86,3 @@ let result = pricer.price_dyn(&swaption, &market_context, as_of_date)?;
 - Delta, gamma, vega via bump-and-revalue on the Hull-White tree.
 - Exercise probability profile showing risk-neutral exercise distribution.
 - Bermudan premium (Bermudan value minus first-exercise European value).
-
-## Future Enhancements
-
-- Support stochastic rate models (LMM) and smile-consistent Bermudan pricing.
-- Provide callable CMS/INF structures interop and more settlement-style options.
-- Add ISDA-compliant exact cash settlement calculation.

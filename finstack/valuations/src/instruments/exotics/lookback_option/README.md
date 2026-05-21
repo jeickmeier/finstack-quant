@@ -38,9 +38,3 @@ let pv = option.value(&market_context, as_of_date)?;
 - PV plus Greeks (delta/gamma/vega/theta/rho) from analytic formulas; MC bump-and-revalue available when enabled.
 - Path stats (expected min/max, payoff distribution) via MC path capture.
 - Scenario shocks on spot/vol/rates through registry bump hooks.
-
-## Future Enhancements
-
-- Add discrete-monitoring bias corrections and analytical approximations for seasoned paths.
-- Support early-exercise/lookback American features via tree/LSMC methods.
-- Incorporate stochastic/local volatility and jump processes for better tail behavior.

@@ -38,9 +38,3 @@ let pv = fut.value(&market_context, as_of_date)?;
 - PV, implied rate, convexity adjustment amount, and tick PV based on contract specs.
 - DV01 to discount/forward curves via bumping; sensitivity to convexity vol when supplied.
 - Carry/roll to next IMM via forward curve interpolation.
-
-## Future Enhancements
-
-- Add exchange-specific delivery options and cheapest-to-deliver style adjustments where applicable.
-- Support normal/Bachelier modeling for low-rate environments and alt convexity models.
-- Provide margining P&L simulation hooks and daily settlement impact analytics.

@@ -38,9 +38,3 @@ let pv = fra.value(&market_context, as_of_date)?;
 - PV, par FRA rate (solve K s.t. PV=0), and DV01 on discount/forward curves via bump calculators.
 - Accrual factor and payoff breakdown for reporting.
 - Simple sensitivity to fixing/reset lag via schedule recomputation.
-
-## Future Enhancements
-
-- Add convexity adjustment utilities for futures vs FRA comparison.
-- Support multi-period FRA strips and averaging constructs.
-- Provide bucketed curve sensitivities and scenario stress helpers out of the box.

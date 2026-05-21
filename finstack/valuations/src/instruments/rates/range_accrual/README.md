@@ -103,9 +103,3 @@ The `validate()` method checks:
 - Assumes GBM dynamics; no stochastic volatility or jumps
 - Discrete observation only; no continuous monitoring adjustment
 - Quanto handling uses correlation/vol inputs; no full multi-currency simulation
-
-## Future Enhancements
-
-- Support stochastic volatility/jumps and correlated multi-asset ranges
-- Add continuous monitoring adjustment factor
-- Provide gradient/adjoint Greeks for lower-variance sensitivity estimates

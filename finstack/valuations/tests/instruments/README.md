@@ -1,6 +1,6 @@
 # Instrument Test Suite
 
-Comprehensive test coverage for all financial instruments in the finstack valuations library.
+Per-instrument tests for `finstack-valuations` pricing, metrics, and JSON fixtures.
 
 ## Test Organization Patterns
 
@@ -315,24 +315,6 @@ cargo test --lib instruments -- --include-ignored
 
 # Run slow tests only
 cargo test --lib instruments -- --ignored
-```
-
-### Monte Carlo Tests
-
-MC-dependent tests are feature-gated:
-
-```rust
-#[test]
-#[cfg(feature = "mc")]
-fn test_mc_pricing() {
-    // ...
-}
-```
-
-Run MC tests with:
-
-```bash
-cargo test --lib --features mc
 ```
 
 ## Contributing

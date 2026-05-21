@@ -146,8 +146,3 @@ let mtm = cds.mtm_for_vm(&market, as_of)?;
 - Accrual-on-default impact, protection/premium leg PV decomposition, expected loss.
 - Upfront-to-spread conversions and clean/dirty accrual reporting.
 - Initial margin (SIMM-based) and variation margin via `Marginable` trait.
-
-## Future Enhancements
-
-- Add stochastic recovery and correlation hooks; richer accrual-on-default conventions (market fallbacks).
-- Extend bucketed CS01 to tenor-specific hazard bumps and credit-curve smoothing diagnostics.

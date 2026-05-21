@@ -1,8 +1,8 @@
-# Bond Futures
+# Bond future
 
-Comprehensive support for government bond futures (UST, Bund, Gilt) with deliverable basket mechanics, CTD selection, and full risk analytics.
+Government bond futures (UST, Bund, Gilt): deliverable basket, CTD selection, conversion factor, and risk metrics.
 
-## Table of Contents
+## Contents
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)

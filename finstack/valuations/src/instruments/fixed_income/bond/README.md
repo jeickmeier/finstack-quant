@@ -1,16 +1,13 @@
-# Bond Module
+# Bond
 
-Comprehensive bond instrument implementation supporting fixed-rate, floating-rate, callable/putable, amortizing, and PIK bonds with advanced pricing and risk metrics.
+Fixed, floating, callable/utable, amortizing, and PIK bonds with discount, hazard, tree (OAS), and structural-credit pricing paths.
 
 ## Overview
 
-The bond module provides a complete implementation of bond instruments with:
-
-- **Multiple bond types**: Fixed-rate, floating-rate (FRNs), zero-coupon, amortizing, callable/putable, PIK (payment-in-kind)
-- **Multiple pricing engines**: Discount curve, hazard-rate (credit), tree-based (OAS), and Merton MC (structural credit)
-- **Comprehensive metrics**: Price, yield, duration, convexity, spreads, and risk measures
-- **Market conventions**: Support for US Treasury, UK Gilt, Eurozone, and Japanese conventions
-- **Holder-view cashflows**: Consistent positive cashflow convention for long positions
+- **Types**: Fixed, FRN, zero, amortizing, callable/putable, PIK
+- **Engines**: Discount (`BondEngine`), hazard, binomial tree + OAS, Merton MC for structural credit
+- **Metrics**: Price, yield, duration, convexity, spreads (Z, OAS, I, ASW, DM), DV01
+- **Cashflows**: Holder-view positive amounts for long positions
 
 ## Module Structure
 

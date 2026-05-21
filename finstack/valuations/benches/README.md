@@ -1,476 +1,54 @@
-# Finstack Valuations Benchmarks
+# Valuations benchmarks
 
-Performance benchmarks for critical pricing operations.
+Criterion benchmarks for pricing, metrics, calibration, and attribution hot paths.
 
-**Market Standards Review (Week 5)** - Added to track regression in pricing latency.
-
-## Running Benchmarks
+## Run
 
 ```bash
-# Run all benchmarks
-cargo bench --package finstack-valuations
+# All benches
+cargo bench -p finstack-valuations
 
-# Run specific benchmark
-cargo bench --package finstack-valuations --bench bond_pricing
-cargo bench --package finstack-valuations --bench swap_pricing
-cargo bench --package finstack-valuations --bench option_pricing
-cargo bench --package finstack-valuations --bench cds_pricing
-cargo bench --package finstack-valuations --bench cds_option_pricing
-cargo bench --package finstack-valuations --bench cds_tranche_pricing
-cargo bench --package finstack-valuations --bench swaption_pricing
-cargo bench --package finstack-valuations --bench cds_index_pricing
-cargo bench --package finstack-valuations --bench structured_credit_pricing
-cargo bench --package finstack-valuations --bench convertible_pricing
-cargo bench --package finstack-valuations --bench calibration
-cargo bench --package finstack-valuations --bench bucketed_risk
-cargo bench --package finstack-valuations --bench fx_pricing
-cargo bench --package finstack-valuations --bench linear_rates
-cargo bench --package finstack-valuations --bench equity_pricing
-cargo bench --package finstack-valuations --bench commodity_pricing
-cargo bench --package finstack-valuations --bench inflation_pricing
-cargo bench --package finstack-valuations --bench fi_misc_pricing
-cargo bench --package finstack-valuations --bench attribution
-cargo bench --package finstack-valuations --bench metrics
-cargo bench --package finstack-valuations --bench fx_dates
+# One bench
+cargo bench -p finstack-valuations --bench bond_pricing
 
-# MC exotics (requires mc feature)
-cargo bench --package finstack-valuations --bench mc_exotics_pricing --features mc
+# Faster iteration
+cargo bench -p finstack-valuations -- --quick
 
-# Quick mode (fewer samples)
-cargo bench --package finstack-valuations -- --quick
-
-# Compare against baseline (after running once)
-cargo bench --package finstack-valuations --bench bond_pricing -- --save-baseline my_baseline
-cargo bench --package finstack-valuations --bench bond_pricing -- --baseline my_baseline
+# Save / compare baseline
+cargo bench -p finstack-valuations --bench bond_pricing -- --save-baseline main
+cargo bench -p finstack-valuations --bench bond_pricing -- --baseline main
 ```
 
-## Benchmark Suite
-
-### bond_pricing.rs - Bond Instruments (22 scenarios)
-
-- **bond_pv**: Present value calculation (2Y, 5Y, 10Y, 30Y)
-- **bond_ytm_solve**: YTM solver with Newton-Raphson + Brent (2Y, 5Y, 10Y, 30Y)
-- **bond_duration**: Modified duration and convexity (2Y, 5Y, 10Y, 30Y)
-- **bond_dv01**: Dollar value of 01 (2Y, 5Y, 10Y, 30Y)
-- **bond_tree_pricing**: Short-rate tree PV for callable bonds (5Y, 10Y, 30Y)
-- **bond_tree_oas**: Option-adjusted spread solver via `TreePricer` (5Y, 10Y, 30Y)
-- **bond_spread_metrics**: Z-spread, I-spread, ASW par/market, and discount margin cases
-
-### swap_pricing.rs - Interest Rate Swaps (12 scenarios)
-
-- **swap_pv**: Present value (2Y, 5Y, 10Y, 30Y)
-- **swap_dv01**: DV01 calculation (2Y, 5Y, 10Y, 30Y)
-- **swap_par_rate**: Par rate and annuity (2Y, 5Y, 10Y, 30Y)
-
-### option_pricing.rs - Equity Options (11 scenarios)
-
-- **option_pv**: Black-Scholes PV (3M, 6M, 12M, 24M)
-- **option_greeks**: Full Greeks set (delta, gamma, vega, theta, rho) (3M, 6M, 12M)
-
-### cds_pricing.rs - Credit Default Swaps (12 scenarios)
-
-- **cds_pv**: NPV with ISDA integration (1Y, 3Y, 5Y, 10Y)
-- **cds_cs01**: Credit spread 01 (1Y, 3Y, 5Y, 10Y)
-- **cds_par_spread**: Par spread calculation (1Y, 3Y, 5Y, 10Y)
-
-### cashflow_generation.rs - Cashflow Building (22 scenarios)
-
-- **bond_cashflow_generation**: Bond schedule generation (2Y, 5Y, 10Y, 30Y)
-- **swap_cashflow_generation**: Swap schedule generation (2Y, 5Y, 10Y, 30Y)
-- **schedule_builder_fixed**: Fixed coupon schedule building (2Y, 5Y, 10Y, 30Y)
-- **kahan_summation**: Precision-preserving aggregation (10, 20, 50, 100, 200, 500 flows)
-
-### cds_option_pricing.rs - CDS Options (19 scenarios)
-
-- **cds_option_npv**: Black76 on spreads NPV (call/put, 3M-1Y expiry, 5Y-10Y CDS)
-- **cds_option_greeks**: Individual Greeks (delta, gamma, vega, theta)
-- **cds_option_all_greeks**: Sequential Greeks calculation
-- **cds_option_implied_vol**: Implied volatility solver (Newton-Raphson + Brent)
-
-### cds_tranche_pricing.rs - CDS Tranches (35+ scenarios)
-
-- **cds_tranche_npv**: Gaussian Copula pricing (equity, junior mezz, senior mezz, senior)
-- **cds_tranche_cs01**: Credit spread sensitivity
-- **cds_tranche_correlation_delta**: Correlation sensitivity
-- **cds_tranche_jump_to_default**: Immediate default impact
-- **cds_tranche_par_spread**: Fair spread calculation
-- **cds_tranche_all_metrics**: Full metrics suite
-- **cds_tranche_heterogeneous**: Heterogeneous portfolios (10, 25, 50, 125 issuers)
-
-### swaption_pricing.rs - Swaptions (20+ scenarios)
-
-- **swaption_pv**: Black76 present value (3Mx5Y, 6Mx5Y, 12Mx5Y, 12Mx10Y)
-- **swaption_sabr**: SABR-implied volatility pricing (3Mx5Y, 6Mx5Y, 12Mx5Y, 12Mx10Y)
-- **swaption_greeks**: Greeks calculation (delta, gamma, vega, theta) (3Mx5Y, 6Mx5Y, 12Mx10Y)
-- **swaption_forward_rate**: Forward swap rate calculation (3Mx5Y, 6Mx5Y, 12Mx5Y, 12Mx10Y)
-- **swaption_annuity**: Swap annuity factor calculation (3Mx5Y, 6Mx5Y, 12Mx5Y, 12Mx10Y)
-
-### cds_index_pricing.rs - CDS Indices (23+ scenarios)
-
-- **cds_index_pv_single**: NPV with single curve (1Y, 3Y, 5Y, 10Y)
-- **cds_index_pv_constituents**: NPV with constituents (10, 25, 50, 125 names)
-- **cds_index_par_spread**: Par spread calculation (1Y, 3Y, 5Y, 10Y)
-- **cds_index_cs01**: Credit spread 01 (1Y, 3Y, 5Y, 10Y)
-- **cds_index_risky_pv01**: Risky PV01 (1Y, 3Y, 5Y, 10Y)
-- **cds_index_metrics**: All metrics suite (3Y, 5Y, 10Y)
-
-### structured_credit_pricing.rs - Structured Credit (50+ scenarios)
-
-- **structured_credit_npv**: NPV by deal type (ABS, CLO, CMBS, RMBS)
-- **structured_credit_cashflows**: Cashflow generation with waterfall (10, 25, 50, 100 assets)
-- **structured_credit_wal**: Weighted average life (CLO, RMBS)
-- **structured_credit_duration**: Modified duration and spread duration
-- **structured_credit_cs01**: Credit spread 01 (10, 25, 50 assets)
-- **structured_credit_pool_metrics**: Pool metrics (WAC, WAS, WAM, diversity) (10-200 assets)
-- **structured_credit_warf**: Weighted average rating factor (25-200 assets)
-- **structured_credit_prices**: Price suite (dirty, clean, accrued)
-- **structured_credit_full_metrics**: All metrics combined (50 assets)
-- **structured_credit_scaling**: Scaling with pool size (10-500 assets)
-
-### convertible_pricing.rs - Convertible Bonds (40+ scenarios)
-
-- **convertible_npv_binomial**: Binomial tree pricing (25, 50, 100, 200 steps)
-- **convertible_npv_trinomial**: Trinomial tree pricing (25, 50, 100, 200 steps)
-- **convertible_npv_moneyness**: NPV by moneyness (OTM, ATM, ITM)
-- **convertible_npv_features**: Standard, callable, zero-coupon
-- **convertible_npv_volatility**: Volatility sensitivity (low, std, high)
-- **convertible_greeks**: Full Greeks suite (25, 50, 100 steps)
-- **convertible_greeks_moneyness**: Greeks by moneyness (OTM, ATM, ITM)
-- **convertible_metrics**: Price with metrics (delta, gamma, vega, rho, theta)
-- **convertible_parity**: Parity calculation by moneyness
-- **convertible_convergence**: Tree convergence (10-500 steps)
-
-### bucketed_risk.rs - Bucketed Risk Metrics (15+ scenarios)
-
-- **bond_bucketed_dv01**: Bond bucketed DV01 (11 buckets) vs parallel DV01
-- **swap_bucketed_dv01**: Swap bucketed DV01 by tenor (5Y, 10Y, 30Y)
-- **bond_bucketed_dv01_by_tenor**: Bond bucketed DV01 scaling with maturity (2Y-30Y)
-- **cds_bucketed_cs01**: CDS bucketed CS01 (11 buckets) vs parallel CS01
-- **cds_bucketed_cs01_by_tenor**: CDS bucketed CS01 scaling with maturity (2Y-30Y)
-- **combined_metrics**: Parallel vs bucketed vs both (bond/CDS)
-
-### calibration.rs - Market Data Calibration (45+ scenarios)
-
-- **discount_curve_small**: Discount curve bootstrap (8 instruments)
-- **discount_curve_medium**: Discount curve bootstrap (16 instruments)
-- **discount_curve_large**: Discount curve bootstrap (22 instruments)
-- **discount_curve_interp**: Interpolation methods (Linear, MonotoneConvex, CubicHermite)
-- **forward_curve**: Forward curve calibration (4, 8, 16 FRAs)
-- **hazard_curve**: Credit curve calibration (3, 6 tenors)
-- **simple_calibration_small**: End-to-end minimal market calibration
-- **simple_calibration_medium**: Rates + credit calibration
-- **simple_calibration_full**: Complete market calibration with vol surfaces
-- **calibration_solver**: Solver comparison (Newton, Brent, Hybrid)
-- **base_correlation_small**: Base correlation curve (3 tranches)
-- **base_correlation_full**: Base correlation curve (5 tranches)
-- **inflation_curve**: CPI curve calibration (3, 5, 10 tenors)
-- **sabr_surface_small**: SABR vol surface (2 expiries × 5 strikes)
-- **sabr_surface_medium**: SABR vol surface (4 expiries × 7 strikes)
-- **swaption_vol_small**: Swaption vol calibration (2 exp × 2 ten)
-- **swaption_vol_medium**: Swaption vol calibration (3 exp × 3 ten)
-
-### fx_pricing.rs - FX Instruments
-
-- **fx_spot_pv**: FX spot valuation (EUR/USD)
-- **fx_swap_pv**: FX swap PV by tenor (1M, 3M, 1Y)
-- **fx_forward_pv**: FX forward PV by maturity (1M, 3M, 6M, 1Y)
-- **fx_option_pv**: FX option Black-Scholes PV (3M, 6M, 12M)
-- **fx_option_greeks**: FX option Greeks (Delta, Gamma, Vega, Theta, Rho)
-- **ndf_pv**: Non-deliverable forward PV (CNY/USD)
-
-### linear_rates.rs - Linear Rates Instruments
-
-- **deposit_pv**: Deposit PV by tenor (1M, 3M, 6M, 1Y)
-- **fra_pv**: Forward rate agreement PV (3x6, 6x9, 6x12)
-- **basis_swap_pv**: Basis swap PV by tenor (2Y, 5Y, 10Y)
-- **cap_floor_pv**: Cap/floor PV (2Y, 5Y caps)
-- **cap_floor_greeks**: Cap Greeks (Delta, Gamma, Vega, DV01)
-- **repo_pv**: Term repo PV
-- **ir_future_pv**: Interest rate future PV
-
-### equity_pricing.rs - Equity Non-Option Instruments
-
-- **equity_pv**: Equity spot PV
-- **equity_trs_pv**: Equity total return swap PV (1Y, 3Y, 5Y)
-- **equity_index_future_pv**: Index future PV (near, far expiry)
-- **variance_swap_pv**: Variance swap PV (3M, 6M, 1Y)
-
-### commodity_pricing.rs - Commodity Instruments
-
-- **commodity_forward_pv**: Commodity forward PV (3M, 6M, 1Y)
-- **commodity_swap_pv**: Commodity swap PV (1Y, 2Y, 5Y)
-- **commodity_option_pv**: Commodity option PV (3M, 6M, 12M)
-- **commodity_option_greeks**: Commodity option Greeks (Delta, Gamma, Vega, Theta)
-
-### inflation_pricing.rs - Inflation Instruments
-
-- **inflation_swap_pv**: Inflation swap PV (2Y, 5Y, 10Y)
-- **inflation_cap_floor_pv**: Inflation cap/floor PV (2Y, 5Y caps; 5Y floor)
-- **inflation_linked_bond_pv**: TIPS-style ILB PV (5Y, 10Y)
-
-### fi_misc_pricing.rs - Fixed Income Miscellaneous
-
-- **term_loan_pv**: Term loan PV (3Y, 5Y, 7Y)
-- **revolving_credit_pv**: Revolving credit PV (3Y, 5Y)
-- **agency_mbs_pv**: Agency MBS passthrough and TBA PV
-
-### mc_exotics_pricing.rs - Monte Carlo Exotics (requires `mc` feature)
-
-- **asian_option_mc**: Asian option MC pricing (1K, 2.5K, 5K paths)
-- **lookback_option_mc**: Lookback option MC pricing (1K, 2.5K, 5K paths)
-- **autocallable_mc**: Autocallable MC pricing (1K, 2.5K, 5K paths)
-
-### attribution.rs - P&L Attribution
-
-- **attribution_parallel_1_bond**: Parallel attribution on single bond
-- **attribution_waterfall_1_bond**: Waterfall attribution on single bond
-- **attribution_parallel_5_bonds**: Parallel attribution on 5-bond portfolio
-
-### metrics.rs - Metrics Pipeline
-
-- **metrics_bond_9_standard_metrics**: Full metrics suite on bond (DV01, Convexity, Duration, YTM, Clean/Dirty/Accrued, Theta)
-- **metrics_bond_3_pricing_metrics**: Pricing-only metrics (Clean, Dirty, Accrued)
-- **metrics_scaling**: Metric count scaling (1, 3, 5, 10 metrics)
-- **metrics_portfolio_5_bonds_3_metrics**: Mini-portfolio metrics (5 bonds × 3 metrics)
-
-### fx_dates.rs - FX Settlement Dates
-
-- **add_joint_business_days**: Joint business day calculation (USD/EUR, GBP/JPY)
-- **roll_spot_date**: FX spot settlement date (T+2 various pairs)
-- **fx_settlement_scenarios**: Settlement across date scenarios (weekday, weekend, year-end, holiday)
-- **fx_settlement_batch**: Batch settlement (100 trades)
-- **calendar_complexity**: Calendar complexity scaling (weekends-only vs 1 vs 2 calendars)
-
-## Typical Performance (M1 Mac, Release Build)
-
-| Operation | Tenor | Latency | Note |
-|-----------|-------|---------|------|
-| **Bonds** | | | |
-| Bond PV | 5Y | ~5-10 μs | Fast path, no metrics |
-| Bond YTM | 5Y | ~50-70 μs | Iterative solver |
-| Bond Duration | 10Y | ~40-50 μs | Numerical bumping |
-| Bond DV01 | 10Y | ~45-60 μs | Bump + reprice |
-| Callable Tree PV | 10Y | ~0.86 ms | Ho-Lee tree, 100 steps |
-| Callable OAS Solver | 10Y | ~8.6 ms | Tree pricer + Brent |
-| Z-Spread | 10Y | ~75 μs | Dirty-price root find |
-| I-Spread | 10Y | ~75 μs | Swap proxy par leg |
-| ASW Par | 10Y | ~65 μs | Discount curve annuity |
-| ASW Market | 10Y | ~80 μs | Adds dirty price reconciliation |
-| Discount Margin | 5Y FRN | ~160 μs | Floating-note solver |
-| Bond Cashflow Gen | 30Y | ~15-20 μs | 60 semi-annual flows |
-| **Swaps** | | | |
-| Swap PV | 5Y | ~15-25 μs | Fixed + float legs |
-| Swap DV01 | 5Y | ~35-50 μs | Bump + reprice |
-| Swap Par Rate | 5Y | ~25-40 μs | Annuity + rate |
-| Swap Cashflow Gen | 30Y | ~20-30 μs | 120 quarterly flows |
-| **Options** | | | |
-| Option PV | 6M | ~2-5 μs | Black-Scholes analytical |
-| Option Greeks | 6M | ~5-10 μs | All 5 Greeks analytical |
-| **Credit** | | | |
-| CDS PV | 5Y | ~50-100 μs | ISDA integration |
-| CDS CS01 | 5Y | ~100-150 μs | Credit bump + reprice |
-| CDS Par Spread | 5Y | ~100-150 μs | Risky annuity calc |
-| **CDS Options** | | | |
-| CDS Option NPV | 6M | ~50-100 μs | Black76 on spreads |
-| CDS Option Greeks | 6M | ~150-250 μs | All Greeks sequential |
-| CDS Option Implied Vol | 6M | ~500-800 μs | Iterative solver |
-| **CDS Tranches** | | | |
-| Tranche NPV (Homog.) | 5Y | ~300-500 μs | Gauss-Hermite integration |
-| Tranche NPV (Hetero.) | 5Y 125 names | ~1-2 ms | SPA/convolution |
-| Tranche CS01 | 5Y | ~600-1000 μs | Bump + reprice |
-| Tranche Corr Delta | 5Y | ~600-1000 μs | Correlation bump |
-| Tranche Par Spread | 5Y | ~600-1000 μs | Premium/protection balance |
-| **Swaptions** | | | |
-| Swaption PV (Black) | 6Mx5Y | ~20-40 μs | Forward rate + annuity + Black76 |
-| Swaption PV (SABR) | 6Mx5Y | ~50-100 μs | SABR vol + Black76 |
-| Swaption Greeks | 6Mx5Y | ~100-200 μs | Delta, gamma, vega, theta |
-| Forward Swap Rate | 6Mx5Y | ~15-30 μs | Discount factors + annuity |
-| Swap Annuity | 6Mx5Y | ~10-25 μs | Schedule + DFs |
-| **CDS Indices** | | | |
-| Index PV (Single) | 5Y | ~100-200 μs | Synthetic CDS |
-| Index PV (10 names) | 5Y | ~1-2 ms | Constituents aggregation |
-| Index PV (125 names) | 5Y | ~10-15 ms | Full index |
-| Index Par Spread | 5Y | ~200-400 μs | Risky annuity |
-| Index CS01 | 5Y | ~200-400 μs | Credit bump |
-| Index Risky PV01 | 5Y | ~200-400 μs | Premium leg sensitivity |
-| **Structured Credit** | | | |
-| SC NPV (CLO) | 10 assets | ~500-800 μs | Waterfall + discounting |
-| SC NPV (CLO) | 50 assets | ~2-3 ms | Larger pool |
-| SC NPV (CLO) | 200 assets | ~8-12 ms | Full deal |
-| SC Cashflows | 25 assets | ~400-700 μs | Schedule generation |
-| SC WAL | CLO/RMBS | ~600-1000 μs | Weighted average life |
-| SC Duration | 25 assets | ~1-2 ms | Modified + spread duration |
-| SC CS01 | 25 assets | ~2-3 ms | Credit spread sensitivity |
-| SC Pool Metrics | 50 assets | ~300-600 μs | WAC, WAS, WAM, diversity |
-| SC WARF | 100 assets | ~200-400 μs | Rating factor calc |
-| SC Prices | 20 assets | ~800-1200 μs | Dirty, clean, accrued |
-| SC Full Metrics | 50 assets | ~5-8 ms | All metrics combined |
-| **Convertible Bonds** | | | |
-| Convertible PV (Binomial) | 50 steps | ~300-600 μs | Tree-based hybrid pricing |
-| Convertible PV (Binomial) | 200 steps | ~1.5-2.5 ms | Higher accuracy |
-| Convertible PV (Trinomial) | 50 steps | ~500-900 μs | Trinomial tree |
-| Convertible Greeks | 50 steps | ~2-4 ms | All Greeks (bump-reprice) |
-| Convertible Parity | - | ~5-10 μs | Equity conversion value |
-| Convertible Convergence | 500 steps | ~8-12 ms | Maximum accuracy |
-| **Calibration** | | | |
-| Discount Curve | 8 instruments | ~135-140 μs | Bootstrap with solver |
-| Discount Curve | 16 instruments | ~295-300 μs | Medium curve |
-| Discount Curve | 22 instruments | ~730-770 μs | Large curve |
-| Forward Curve | 4 FRAs | ~220-225 μs | Short-end calibration |
-| Forward Curve | 16 FRAs | ~910-925 μs | Full curve |
-| Hazard Curve | 3 tenors | ~840-850 μs | Credit spread bootstrap |
-| Hazard Curve | 6 tenors | ~2.5-2.6 ms | Full credit curve |
-| Simple Calibration | Minimal | ~200-205 μs | Deposits + swaps only |
-| Simple Calibration | Medium | ~4.7-4.8 ms | Rates + credit |
-| Simple Calibration | Full | ~5.2-5.3 ms | Complete market with vol |
-| Base Correlation | 3 tranches | ~1.0-1.1 s | Sequential bootstrap |
-| Base Correlation | 5 tranches | ~1.6-1.7 s | Full tranche curve |
-| Inflation Curve | 3 tenors | ~150-200 μs | CPI curve bootstrap |
-| Inflation Curve | 10 tenors | ~500-600 μs | Full CPI curve |
-| SABR Surface | 2exp×5strikes | ~80-100 μs | Small vol surface |
-| SABR Surface | 4exp×7strikes | ~200-250 μs | Medium vol surface |
-| Swaption Vol | 2exp×2ten | ~150-200 μs | Small swaption surface |
-| Swaption Vol | 3exp×3ten | ~350-400 μs | Medium swaption surface |
-| **Cashflows** | | | |
-| Schedule Builder | 30Y | ~11 μs | Fixed semi-annual |
-| Kahan Sum | 20 flows | ~60 ns | Fast path |
-| Kahan Sum | 100 flows | ~500 ns | Precision path |
-| Kahan Sum | 500 flows | ~2.5 μs | Long leg |
-
-## Viewing Results
-
-After running benchmarks, results are available in:
-
-- **Terminal:** Summary statistics
-- **HTML Report:** `target/criterion/*/report/index.html`
-- **CSV Data:** `target/criterion/*/base/raw.csv`
-
-Open HTML report:
-
-```bash
-open target/criterion/bond_pv/report/index.html
-```
-
-## Regression Tracking
-
-To track performance over time:
-
-1. **Establish baseline:**
-
-   ```bash
-   cargo bench --package finstack-valuations -- --save-baseline initial
-   ```
-
-2. **Compare after changes:**
-
-   ```bash
-   cargo bench --package finstack-valuations -- --baseline initial
-   ```
-
-3. **Results show:**
-   - Performance changes (faster/slower)
-   - Statistical significance
-   - Confidence intervals
-
-## Optimization Targets
-
-Based on Market Standards Review recommendations:
-
-- **Bond YTM:** Target < 100μs p99 (currently ~70μs p50) ✅
-- **Swap PV:** Target < 50μs p99 (currently ~25μs p50) ✅
-- **Option Greeks:** Target < 20μs p99 (currently ~10μs p50) ✅
-- **CDS Par Spread:** Target < 200μs p99 (currently ~150μs p50) ✅
-
-All targets met in initial benchmarking.
-
-## Portfolio-Level Benchmarks
-
-Portfolio-level benchmarks are located in the `finstack-portfolio` package:
-
-```bash
-cargo bench --package finstack-portfolio
-```
-
-See `finstack/portfolio/benches/README.md` for portfolio benchmark documentation.
-
-## Profiling & Allocation Tracking
-
-### Memory Profiling with dhat
-
-To profile allocations and identify memory hotspots, use the `dhat-heap` feature:
-
-```bash
-# Enable dhat profiling feature
-cargo bench --package finstack-valuations --features dhat-heap --bench bond_pricing
-```
-
-The dhat profiler will generate `dhat-heap.json` containing:
-
-- Total allocation counts and bytes
-- Peak memory usage (RSS)
-- Top allocation sites by count and size
-- Call stacks for each allocation
-
-View the report:
-
-```bash
-# Use dhat viewer (install: cargo install dhat-viewer)
-dhat-viewer dhat-heap.json
-
-# Or upload to https://nnethercote.github.io/dh_view/dh_view.html
-```
-
-### CPU Profiling with Flamegraphs
-
-For CPU profiling on Linux/macOS:
-
-```bash
-# Install flamegraph tool
-cargo install flamegraph
-
-# Profile a specific benchmark
-cargo flamegraph --bench bond_pricing --package finstack-valuations
-
-# Open flamegraph.svg to identify hot code paths
-```
-
-### Before/After Comparison Workflow
-
-1. **Establish pre-optimization baseline:**
-
-   ```bash
-   cargo bench --package finstack-valuations -- --save-baseline pre-opt
-   ```
-
-2. **Make performance changes**
-
-3. **Compare against baseline:**
-
-   ```bash
-   cargo bench --package finstack-valuations -- --baseline pre-opt
-   ```
-
-4. **Look for improvements:**
-   - Green percentages: faster (good!)
-   - Red percentages: slower (regression)
-   - Statistical significance shown in output
-
-### Micro-benchmark for Market Context Reuse
-
-The optimization to reuse MarketContext in DV01/CS01 calculations can be verified with:
-
-```bash
-# Run specific risk benchmarks
-cargo bench --package finstack-valuations --bench bucketed_risk
-
-# Compare bond bucketed DV01 (11 key-rate bumps)
-# Expected: ~20-25% faster after MarketContext reuse optimization
-```
+## Suite (high level)
+
+| Bench | Focus |
+|-------|--------|
+| `bond_pricing` | PV, YTM, duration, DV01, tree/OAS, spreads |
+| `swap_pricing` | IRS PV, DV01, par rate |
+| `option_pricing` | Equity option PV and Greeks |
+| `cds_pricing` / `cds_option_pricing` / `cds_tranche_pricing` / `cds_index_pricing` | Credit instruments |
+| `swaption_pricing` | Black and SABR swaptions |
+| `structured_credit_pricing` / `convertible_pricing` | Structured and hybrid FI |
+| `calibration` | Curve and surface bootstrap |
+| `bucketed_risk` | Key-rate vs parallel risk |
+| `cashflow_generation` | Schedules and Kahan summation |
+| `fx_pricing` / `linear_rates` / `equity_pricing` / `commodity_pricing` / `inflation_pricing` / `fi_misc_pricing` | Other asset classes |
+| `attribution` / `attribution_scale` | P&L attribution |
+| `metrics` | Metrics pipeline |
+| `mc_exotics_pricing` / `merton_mc_pricing` | Monte Carlo paths (when MC pricers are enabled in the build) |
+
+See each `benches/*.rs` file for scenario names.
+
+## Output
+
+- Terminal summary from Criterion
+- HTML: `target/criterion/<bench>/<group>/report/index.html`
+
+## Portfolio benches
+
+Portfolio-scale benches live in `finstack/portfolio/benches/`.
 
 ## Notes
 
-- Benchmarks use **release build** (optimized)
-- Results may vary by hardware
-- Criterion automatically determines sample size for statistical significance
-- Use `--quick` for faster iteration during development
-- For production builds, consider PGO (Profile-Guided Optimization) with release-perf profile
+- Benches use release builds.
+- Latency tables in older docs are indicative only; re-measure on your hardware after material changes.

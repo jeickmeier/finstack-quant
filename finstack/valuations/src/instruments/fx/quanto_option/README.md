@@ -38,9 +38,3 @@ let pv = option.value(&market_context, as_of_date)?;
 - PV plus Greeks (delta/gamma/vega/theta/rho) to equity and FX via analytic or MC bump-and-revalue.
 - Correlation and FX vol sensitivity through scenario bumps; implied vol solver in domestic currency.
 - DV01 on domestic curve for discounting exposure.
-
-## Future Enhancements
-
-- Add stochastic correlation and local/stochastic vol coupling between equity and FX.
-- Support early-exercise quanto options and barrier-style quanto hybrids.
-- Provide calibration helpers for quanto drift adjustments from observed markets.

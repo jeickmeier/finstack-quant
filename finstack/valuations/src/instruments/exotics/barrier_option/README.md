@@ -46,9 +46,3 @@ let pv = option.value(&market_context, as_of)?;
 - PV plus Greeks (delta/gamma/vega/theta/rho) from analytical formulas; MC Greeks via bump-and-revalue when enabled.
 - Barrier sensitivities (vanna/volga-style) accessible through surface bumps; digital probability of knock-in/out observable from MC paths.
 - Scenario PVs for barrier shifts and vol skews supported through registry bump hooks.
-
-## Future Enhancements
-
-- Add analytical discrete-monitoring corrections (Broadie–Glasserman) for tighter parity with exchange pricing.
-- Support stochastic/local volatility smile adjustments and jump-diffusion tails.
-- Expand rebate handling to include delayed/continuous rebate payment timing.

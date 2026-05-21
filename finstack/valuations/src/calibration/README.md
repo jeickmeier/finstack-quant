@@ -1,6 +1,6 @@
-# Calibration Module
+# Calibration
 
-The `calibration` module provides a high-performance, plan-driven framework for calibrating market data structures (curves, surfaces, correlations) from liquid market instruments.
+Plan-driven calibration of discount, forward, hazard, inflation, volatility, and base-correlation structures from market quotes.
 
 ## Functionality
 
@@ -136,9 +136,8 @@ worst-fit quotes in `convergence_reason` on failure, even when
 1. Define the instrument's quote type in `market/quotes/`.
 2. Update the `targets/` logic to support building and pricing the new instrument.
 
-## Performance and Reliability
+## Reliability
 
-- **Allocation-aware Hot Loops**: Solver inner iterations (Brent / LM residual evaluation) reuse buffers via `RefCell<Vec<_>>` and avoid heap allocations. Per-knot reporting allocates one small `String` per residual key, which is `O(n_quotes)` not `O(n_iters × n_quotes)` — negligible relative to solver cost.
-- **Deterministic**: Calibration results are deterministic given the same inputs and configuration. Multi-start uses Halton sequences (no system RNG); residual maps use `BTreeMap` for stable ordering.
-- **Strict Validation**: Optional strict mode ensures all conventions are explicitly defined.
-- **Production Diagnostics**: When a global-solve calibration fails, the `convergence_reason` includes the top-3 worst-fit quotes inline (no need to re-run with `compute_diagnostics=true` to know which instruments drove the failure). For full per-quote sensitivity / condition number, set `config.compute_diagnostics = true`.
+- Solver loops reuse buffers where possible; residual keys use stable `BTreeMap` ordering.
+- Runs are deterministic for fixed inputs (Halton multi-start, no system RNG).
+- Global-solve failures include the top three worst-fit quotes in `convergence_reason`; set `compute_diagnostics = true` for full Jacobian diagnostics.

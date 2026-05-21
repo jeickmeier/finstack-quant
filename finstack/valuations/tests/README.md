@@ -1,6 +1,6 @@
-# Valuations Test Suite
+# Valuations tests
 
-Comprehensive test coverage for the `finstack_valuations` crate, covering instrument pricing, risk metrics, cashflow generation, calibration, and integration testing.
+Integration and unit tests for `finstack-valuations`: instruments, cashflows, calibration, metrics, and golden vectors.
 
 ## Directory Structure
 
@@ -458,22 +458,12 @@ fn test_bond_pricing_at_par() {
   - `test_dv01_positive_for_long_position`
   - `test_calibration_reprices_inputs`
 
-### Feature-Gated Tests
+### Slow / ignored tests
 
-Monte Carlo tests are feature-gated:
-
-```rust
-#[test]
-#[cfg(feature = "mc")]
-fn test_mc_option_pricing_convergence() {
-    // ...
-}
-```
-
-Run MC tests with:
+Long-running or vendor-golden tests may use `#[ignore]`. Run them explicitly:
 
 ```bash
-cargo test --test instruments --features mc
+cargo test -p finstack-valuations -- --ignored
 ```
 
 ## Test Categories

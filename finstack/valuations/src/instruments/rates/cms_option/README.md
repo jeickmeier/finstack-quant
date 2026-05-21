@@ -41,9 +41,3 @@ let pv = opt.value(&market_context, as_of)?;
 - PV plus strike/vol sensitivity (delta/vega) via bump-and-revalue; forward CMS rate and annuity reported per period for attribution.
 - DV01 on discount/forward curves using generic calculators; bucketed contributions per fixing.
 - Par strike solving support (implied strike for zero PV) through solver hooks.
-
-## Future Enhancements
-
-- Add SABR/LMM-based convexity adjustments for long-tenor CMS instruments.
-- Support Bermudan CMS caps/floors and callable CMS structures.
-- Introduce smile-consistent vol sourcing and interpolation diagnostics.

@@ -38,9 +38,3 @@ let pv = fund.value(&market_context, fund.events.last().unwrap().date)?;
 - LP/GP cashflow breakdown, distributed vs undistributed capital, and achieved IRR/MOIC per ledger outputs.
 - PV and discount-rate sensitivity via bumping; preferred-return shortfall or promote earned diagnostics.
 - Period-level cashflow timelines for reporting.
-
-## Future Enhancements
-
-- Add scenario engines for deal-level performance (probabilistic proceeds/distributions).
-- Support multi-currency funds with embedded FX treatment and hedging hooks.
-- Include clawback/escrow mechanics and recycling provisions in waterfall spec.

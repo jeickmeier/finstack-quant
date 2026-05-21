@@ -38,9 +38,3 @@ let pv = swap.value(&market_context, as_of_date)?;
 - PV, implied variance/vol (solve strike for zero PV), and realized variance diagnostics from input series.
 - Delta/vega proxies via bumping underlying price path or strike; DV01 on discount curve via generic calculator.
 - Exposure reports in variance and volatility terms for hedging alignment.
-
-## Future Enhancements
-
-- Add corridor/conditional variance features and gamma swaps.
-- Support stochastic volatility models for forward variance projection and fair strike estimation.
-- Provide realized path builders and corporate-action aware return cleaners.

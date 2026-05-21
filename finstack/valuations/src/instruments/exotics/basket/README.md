@@ -38,9 +38,3 @@ let pv = basket.value(&market_context, as_of_date)?;
 - NAV and per-constituent contributions; expense drag impact.
 - Optional DV01/FX exposure metrics via underlying instruments’ metrics when constituent instruments are provided.
 - Aggregate currency exposure and AUM-style totals for reporting.
-
-## Future Enhancements
-
-- Add drift/vol attribution and tracking-error style diagnostics.
-- Support scheduled rebalancing rules and turnover costs.
-- Provide built-in stress reporting (single-name shocks, FX shocks) with cached constituent impacts.

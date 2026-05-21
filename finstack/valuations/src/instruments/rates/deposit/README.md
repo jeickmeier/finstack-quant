@@ -42,8 +42,3 @@ let pv = dep.value(&market_context, as_of)?;
 - PV and par/forward deposit rate solved from discount curve.
 - DV01 on discount curve via generic bump calculators.
 - Accrued interest as-of valuation date when within deposit period.
-
-## Future Enhancements
-
-- Add support for compounding/linear vs ACT/360 accrual toggles.
-- Include callable/extendable deposit variants if needed.

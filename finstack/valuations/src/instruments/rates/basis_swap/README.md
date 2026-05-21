@@ -61,9 +61,3 @@ let pv = swap.value(&market_context, Date::from_calendar_date(2024, Month::Janua
 - PV plus par basis spread, DV01 (parallel and key-rate) using generic DV01 calculators over the discount curve.
 - Forward basis (spread to par) available by solving for zero-NPV spread.
 - Cashflow PV breakdown by leg for attribution.
-
-## Future Enhancements
-
-- Add funding/CSA basis adjustments and convexity corrections for long-dated tenors.
-- Support stochastic basis modeling and curve-consistent bootstrapping aids.
-- Include spread-attribution and carry/roll analytics in the metrics set.

@@ -41,9 +41,3 @@ let pv = option.value(&market_context, as_of)?;
 - PV (base) plus option Greeks (delta, gamma, vega, theta, rho) from analytic or MC paths.
 - Scenario PV / bump-and-revalue hooks through the shared metrics registry; supports stressed vol/spot/rate bumps.
 - Path diagnostics (payoff distributions, standard error) available when MC is enabled and path capture is on.
-
-## Future Enhancements
-
-- Add discrete-monitoring bias correction for arithmetic averaging and better control-variate calibration.
-- Support local-vol/stochastic-vol smile adjustments beyond flat/clamped surfaces.
-- Add early-exercise/Bermudan-style averaging support with tree/LSMC pricing.

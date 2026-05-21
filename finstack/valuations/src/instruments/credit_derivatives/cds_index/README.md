@@ -89,8 +89,3 @@ let par = idx.par_spread(&market_context, as_of)?;
 - Expected loss uses constituents (if provided) with per-name curves/recoveries; otherwise index-level curve.
 - Jump-to-default uses constituent weights when present; otherwise infers name count from standard index name.
 - Weight diagnostics (sum/normalization) for data quality checks.
-
-## Future Enhancements
-
-- Provide roll mechanics and curve-building helpers around series rolls.
-- Support stochastic spread simulation and correlation for scenario analytics.

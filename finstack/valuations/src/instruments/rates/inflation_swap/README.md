@@ -38,9 +38,3 @@ let pv = swap.value(&market_context, as_of_date)?;
 - PV, break-even inflation (solve fixed rate to zero PV), and DV01 on discount curve.
 - Inflation sensitivity via CPI/index curve bumps; lag sensitivity through schedule recomputation.
 - Contribution split between fixed and inflation legs for attribution.
-
-## Future Enhancements
-
-- Add couponized (periodic) inflation swap support with per-period accrual and payment schedules.
-- Include seasonality and convexity adjustments vs nominal/real curves.
-- Support stochastic inflation models and correlation with rates for stress testing.

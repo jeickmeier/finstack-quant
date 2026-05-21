@@ -40,9 +40,3 @@ let pv = swap.value(&market_context, as_of_date)?;
 - PV plus forward points and par far rate implied from curves.
 - DV01 on domestic/foreign curves and FX delta exposures via bump-and-revalue.
 - Cashflow breakdown by near/far legs for attribution.
-
-## Future Enhancements
-
-- Add CSA/basis spread handling and discount-curve alignment diagnostics.
-- Support broken-date interpolation for near/far beyond standard tenors.
-- Provide FX swaption hooks or optional early termination features.

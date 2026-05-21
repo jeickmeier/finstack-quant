@@ -38,9 +38,3 @@ let pv = option.value(&market_context, as_of_date)?;
 - PV plus Greeks (delta/gamma/vega/theta/rho) from analytic formulas.
 - Implied volatility solver and bump-and-revalue scenario metrics on spot, carry, and vol.
 - DV01 on domestic curve for discounting exposure; FX delta in both base/quote terms.
-
-## Future Enhancements
-
-- Add American/barrier-style adjustments or link to barrier pricers for hybrids.
-- Support smile-consistent local-vol/stochastic-vol models and skew-aware greeks.
-- Provide quanto adjustments and proxy hedging analytics for cross-ccy exposures.
