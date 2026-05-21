@@ -20,14 +20,23 @@
 //! [`finstack_monte_carlo::traits::Payoff`]); the harness is entirely agnostic to the product-specific
 //! cashflow logic.
 //!
-//! # In-sample upward bias
+//! # In-sample upward bias and split-sample option
 //!
-//! Regression and pricing share the same path set, which biases the reported
-//! PV *upward* relative to the true callable value. The bias is typically
-//! modest for standard swaption/Bermudan setups with `num_paths ≳ 10⁴` and
-//! the default basis, but grows with richer bases and fewer paths. Consumers
-//! seeking an unbiased estimate should run training and pricing on disjoint
-//! path sets or complement this estimator with a dual upper bound.
+//! Plain Longstaff-Schwartz regresses continuation values and prices the
+//! callable on the **same** path set, which biases the reported PV *upward*
+//! relative to the true callable value (the optimizer sees its own noise as
+//! signal). The bias is typically modest for standard swaption/Bermudan
+//! setups with `num_paths ≳ 10⁴` and the default basis, but grows with richer
+//! bases and fewer paths.
+//!
+//! Setting [`RateExoticMcConfig::oos_lsmc`](crate::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig::oos_lsmc)
+//! to `true` switches to a split-sample estimator: even-indexed raw streams
+//! drive the regression, odd-indexed streams are priced under that fitted
+//! policy. The pricing half evaluates an out-of-sample (sub-optimal but
+//! noise-independent) policy and is unbiased for that policy — yielding a
+//! conservative lower-side complement to the in-sample upper-biased estimate.
+//! Standard error rises by roughly √2 because only half the paths drive the
+//! aggregation; combine the two bounds for an unbiased bracket.
 
 use crate::instruments::rates::exotics_shared::exercise::ExerciseBoundaryPayoff;
 use crate::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig;
@@ -186,6 +195,15 @@ impl RateExoticHw1fLsmcPricer {
         // -- Phase 2: backward LSMC induction ----------------------------------
         let mut cashflow = deterministic_pv.clone();
 
+        // Split-sample partition. Path `p` belongs to raw stream `p / multiplicity`;
+        // partitioning by stream parity keeps each antithetic pair together and
+        // gives a deterministic, seed-stable train/price split. When
+        // `oos_lsmc` is off, every path is treated as both train and price
+        // (i.e. the classic in-sample Longstaff-Schwartz estimator).
+        let oos = self.config.oos_lsmc;
+        let is_train = |p: usize| !oos || (p / multiplicity).is_multiple_of(2);
+        let is_price = |p: usize| !oos || !(p / multiplicity).is_multiple_of(2);
+
         // Regression scratch buffers hoisted out of the exercise-date loop;
         // cleared (not freed) per date so allocations are reused. Each date
         // fully repopulates them before use, so this is bit-identical.
@@ -203,6 +221,13 @@ impl RateExoticHw1fLsmcPricer {
             let mut num_basis: usize = 0;
 
             for (p, &cf) in cashflow.iter().enumerate() {
+                // In split-sample mode, only train paths feed the regression.
+                // The fitted coefficients are still applied to every path below
+                // so the backward rollback propagates correctly; aggregation
+                // at the end then restricts to the pricing half.
+                if !is_train(p) {
+                    continue;
+                }
                 let flat = p * n_ex + ex_idx;
                 if exercise_inactive[flat] {
                     continue;
@@ -232,17 +257,26 @@ impl RateExoticHw1fLsmcPricer {
                     active_paths.len(),
                     num_basis,
                 )?;
-                for (k, &p) in active_paths.iter().enumerate() {
-                    let offset = k * num_basis;
-                    let basis_row = &active_basis[offset..offset + num_basis];
-                    let mut cont_hat = 0.0_f64;
-                    for (b, c) in basis_row.iter().zip(coeffs.iter()) {
-                        cont_hat += b * c;
-                    }
+                // Apply the fitted rule to every path (in-sample mode: all
+                // paths were also in `active_paths`; split-sample mode: price
+                // paths get the rule out-of-sample). Recomputing basis is
+                // marginally cheaper than carrying a path-id → row index map
+                // and keeps the split-sample path uniform with the baseline.
+                for (p, cf) in cashflow.iter_mut().enumerate() {
                     let flat = p * n_ex + ex_idx;
+                    if exercise_inactive[flat] {
+                        continue;
+                    }
                     let exercise_value = exercise_values[flat];
+                    if exercise_value <= 0.0 {
+                        continue;
+                    }
+                    let r = exercise_short_rates[flat];
+                    let basis = basis_payoff.continuation_basis(ex_idx, t_ex, r);
+                    let cont_hat: f64 =
+                        basis.iter().zip(coeffs.iter()).map(|(b, c)| b * c).sum();
                     if exercise_value < cont_hat {
-                        cashflow[p] = exercise_value;
+                        *cf = exercise_value;
                     }
                 }
             } else {
@@ -261,8 +295,13 @@ impl RateExoticHw1fLsmcPricer {
         }
 
         // -- Phase 3: aggregate ------------------------------------------------
+        // In split-sample mode, only the pricing half (out-of-sample under the
+        // train-fitted policy) contributes to the reported estimate.
         let mut stats = OnlineStats::new();
-        for &v in &cashflow {
+        for (p, &v) in cashflow.iter().enumerate() {
+            if !is_price(p) {
+                continue;
+            }
             stats.update(v);
         }
 
@@ -404,5 +443,35 @@ mod tests {
         // With call_price=1.0, call_value == notional, and deterministic PV is
         // also notional. Issuer is indifferent; cashflow[p] stays at notional.
         assert!((est.mean.amount() - 1_000_000.0).abs() < 1e-6);
+    }
+
+    /// Split-sample (out-of-sample) LSMC should also reach par on the degenerate
+    /// no-benefit-to-exercise setup, and report stats over the pricing half only.
+    #[test]
+    fn oos_lsmc_noexercise_equals_par_and_uses_half_paths() {
+        let pricer = RateExoticHw1fLsmcPricer {
+            process_params: HullWhite1FParams::new(0.05, 0.001, 0.0),
+            r0: 0.03,
+            event_times: vec![1.0, 2.0],
+            exercise_times: vec![1.0, 2.0],
+            call_prices: vec![1.0, 1.0],
+            notional: 1_000_000.0,
+            config: RateExoticMcConfig {
+                num_paths: 400,
+                antithetic: false, // partition by raw stream parity is easiest to verify without anti
+                oos_lsmc: true,
+                ..Default::default()
+            },
+            currency: Currency::USD,
+        };
+        let est = pricer
+            .price(|| ParPayoff {
+                notional: 1_000_000.0,
+            })
+            .expect("ok");
+        // Same indifference argument as in-sample: cashflow[p] stays at notional.
+        assert!((est.mean.amount() - 1_000_000.0).abs() < 1e-6);
+        // The pricing half is half the path count: 200 of 400.
+        assert_eq!(est.num_paths, 200);
     }
 }

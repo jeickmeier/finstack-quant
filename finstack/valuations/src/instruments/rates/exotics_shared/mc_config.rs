@@ -21,6 +21,19 @@ pub struct RateExoticMcConfig {
     /// Polynomial basis degree for LSMC regression (only used by
     /// [`crate::instruments::rates::exotics_shared::hw1f_lsmc`]).
     pub basis_degree: usize,
+    /// Split-sample (out-of-sample) LSMC pricing.
+    ///
+    /// When `true`, paths are partitioned by stream parity: even-indexed
+    /// streams are used to fit the continuation-value regression, odd-indexed
+    /// streams are used to price under that fitted policy. This removes the
+    /// well-known positive in-sample bias of plain Longstaff-Schwartz at the
+    /// cost of roughly √2× more standard error (half the paths drive the
+    /// estimate). Aggregation reports stats on the pricing half only.
+    ///
+    /// Default is `false` (in-sample / Longstaff-Schwartz baseline) to keep
+    /// existing pricing reproducible; enable for conservative bracketing of
+    /// the true callable value.
+    pub oos_lsmc: bool,
 }
 
 impl Default for RateExoticMcConfig {
@@ -34,6 +47,7 @@ impl Default for RateExoticMcConfig {
             antithetic: defaults.antithetic,
             min_steps_between_events: defaults.min_steps_between_events,
             basis_degree: defaults.basis_degree,
+            oos_lsmc: false,
         }
     }
 }
@@ -73,6 +87,9 @@ impl RateExoticMcConfig {
         }
         if let Some(v) = obj.get("mc_basis_degree").and_then(|x| x.as_u64()) {
             cfg.basis_degree = (v as usize).clamp(1, 4);
+        }
+        if let Some(v) = obj.get("mc_oos_lsmc").and_then(|x| x.as_bool()) {
+            cfg.oos_lsmc = v;
         }
         Ok(cfg)
     }

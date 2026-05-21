@@ -454,45 +454,53 @@ impl InflationCapFloor {
                 deterministic_rate
             };
 
+            let inputs = CapletFloorletInputs {
+                is_cap: self.option_type.is_cap(),
+                notional: self.notional.amount(),
+                strike,
+                forward: forward_rate,
+                discount_factor: df,
+                volatility: sigma,
+                time_to_fixing: t_fix,
+                accrual_year_fraction: accrual,
+                currency: self.notional.currency(),
+            };
             let leg_pv = match model {
-                ModelKey::Normal => normal_ir::price_caplet_floorlet(CapletFloorletInputs {
-                    is_cap: self.option_type.is_cap(),
-                    notional: self.notional.amount(),
-                    strike,
-                    forward: forward_rate,
-                    discount_factor: df,
-                    volatility: sigma,
-                    time_to_fixing: t_fix,
-                    accrual_year_fraction: accrual,
-                    currency: self.notional.currency(),
-                })?,
+                ModelKey::Normal => normal_ir::price_caplet_floorlet(inputs)?,
                 _ => {
-                    // Black-76 model requires positive forward and strike
-                    if t_fix > 0.0 && forward_rate <= 0.0 {
-                        return Err(finstack_core::Error::Validation(format!(
-                            "Black model requires positive forward inflation rate (got {:.4}%). \
-                             Use ModelKey::Normal for deflation scenarios.",
-                            forward_rate * 100.0
-                        )));
+                    // Black-76 requires a strictly positive forward and strike.
+                    // For deflation scenarios (forward_rate ≤ 0) or non-positive
+                    // strikes, transparently fall back to Bachelier (Normal)
+                    // with the input lognormal vol converted to a normal vol
+                    // via the standard mapping — matching how the regular cap/
+                    // floor pricer handles the negative-rate regime. This makes
+                    // inflation cap/floor pricing safe under deflation without
+                    // requiring the user to manually switch models per quote.
+                    let needs_normal_fallback =
+                        t_fix > 0.0 && (forward_rate <= 0.0 || strike <= 0.0);
+                    if needs_normal_fallback {
+                        tracing::debug!(
+                            forward = forward_rate,
+                            strike,
+                            t_fix,
+                            "inflation cap/floor: forward/strike non-positive, \
+                             falling back from Black-76 to Bachelier (normal)"
+                        );
+                        let normal_vol =
+                            crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
+                                sigma,
+                                forward_rate,
+                                strike,
+                                t_fix,
+                                None,
+                            );
+                        normal_ir::price_caplet_floorlet(CapletFloorletInputs {
+                            volatility: normal_vol,
+                            ..inputs
+                        })?
+                    } else {
+                        black_ir::price_caplet_floorlet(inputs)?
                     }
-                    if t_fix > 0.0 && strike <= 0.0 {
-                        return Err(finstack_core::Error::Validation(format!(
-                            "Black model requires positive strike (got {:.4}%). \
-                             Use ModelKey::Normal for zero/negative strikes.",
-                            strike * 100.0
-                        )));
-                    }
-                    black_ir::price_caplet_floorlet(CapletFloorletInputs {
-                        is_cap: self.option_type.is_cap(),
-                        notional: self.notional.amount(),
-                        strike,
-                        forward: forward_rate,
-                        discount_factor: df,
-                        volatility: sigma,
-                        time_to_fixing: t_fix,
-                        accrual_year_fraction: accrual,
-                        currency: self.notional.currency(),
-                    })?
                 }
             };
 
