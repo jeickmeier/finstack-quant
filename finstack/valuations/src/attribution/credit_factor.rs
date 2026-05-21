@@ -58,6 +58,21 @@ pub struct CreditFactorDetailOptions {
     /// When true, populate `LevelPnl.by_bucket` for every level. When false,
     /// only `LevelPnl.total` is populated. Defaults to `true`.
     pub include_per_bucket_breakdown: bool,
+    /// Minimum fraction of the absolute (L1) hazard-curve move that the
+    /// signed (mean) move must reach for the back-solved-CS01 decomposition
+    /// (`compute_credit_factor_detail`) to be considered well-conditioned.
+    ///
+    /// Default: `1e-3`. Below this threshold the curve is dominated by
+    /// shape (twist) and the back-solve `CS01 = −credit_pnl / Δs̄` produces a
+    /// non-physical CS01; the decomposition is then suppressed (audit rec
+    /// #13: the threshold was previously a hardcoded constant, now tunable
+    /// per book so that books with naturally noisier hazard curves can
+    /// relax it without forking the code).
+    ///
+    /// Setting this to `0.0` disables the guard (NOT recommended for any
+    /// production use — the resulting CS01 is meaningless when the move is
+    /// purely a twist).
+    pub parallel_fraction_floor: f64,
 }
 
 impl Default for CreditFactorDetailOptions {
@@ -65,6 +80,7 @@ impl Default for CreditFactorDetailOptions {
         Self {
             include_per_issuer_adder: false,
             include_per_bucket_breakdown: true,
+            parallel_fraction_floor: 1e-3,
         }
     }
 }
@@ -512,6 +528,7 @@ mod tests {
         let opts = CreditFactorDetailOptions {
             include_per_issuer_adder: false,
             include_per_bucket_breakdown: false,
+            parallel_fraction_floor: 1e-3,
         };
         let detail = compute_credit_factor_attribution(&model, &opts, &positions, &period).unwrap();
         for level in &detail.levels {

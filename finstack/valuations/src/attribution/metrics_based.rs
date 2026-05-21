@@ -222,6 +222,89 @@ fn measure_per_tenor_discount_shift(
     )
 }
 
+/// Mean of the per-tenor *absolute* discount-curve zero-rate shift (bp) on
+/// the standard tenor grid.
+///
+/// Where [`measure_discount_curve_shift`] returns the signed mean (which
+/// collapses toward zero for a twist), this returns the L1 mean so a
+/// non-parallel move still registers a large magnitude. Used by the
+/// rates-convexity block to detect "the average is small but the curve
+/// genuinely moved" — see audit rec #6.
+///
+/// Returns `0.0` if either side's curve is missing.
+fn discount_curve_abs_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> f64 {
+    use finstack_core::market_data::diff::STANDARD_TENORS;
+    let (Ok(c0), Ok(c1)) = (
+        market_t0.get_discount(curve_id),
+        market_t1.get_discount(curve_id),
+    ) else {
+        return 0.0;
+    };
+    let mut total_abs = 0.0;
+    let mut count = 0usize;
+    for &t in STANDARD_TENORS {
+        if t <= 0.0 {
+            continue;
+        }
+        let z0 = c0.zero(t);
+        let z1 = c1.zero(t);
+        if z0.is_finite() && z1.is_finite() {
+            total_abs += (z1 - z0).abs() * 10_000.0;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        0.0
+    } else {
+        total_abs / count as f64
+    }
+}
+
+/// Mean of the per-tenor *absolute* hazard shift (bp) on the standard grid.
+/// See [`discount_curve_abs_shift_bp`] for the rationale.
+fn hazard_curve_abs_shift_bp_metric(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> f64 {
+    use finstack_core::market_data::diff::STANDARD_TENORS;
+    let (Ok(c0), Ok(c1)) = (
+        market_t0.get_hazard(curve_id),
+        market_t1.get_hazard(curve_id),
+    ) else {
+        return 0.0;
+    };
+    let mut total_abs = 0.0;
+    let mut count = 0usize;
+    for &t in STANDARD_TENORS {
+        if t <= 0.0 {
+            continue;
+        }
+        let h0 = c0.hazard_rate(t);
+        let h1 = c1.hazard_rate(t);
+        if h0.is_finite() && h1.is_finite() {
+            total_abs += (h1 - h0).abs() * 10_000.0;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        0.0
+    } else {
+        total_abs / count as f64
+    }
+}
+
+/// Threshold below which a signed mean shift is considered "twist-dominated"
+/// relative to its L1 magnitude. When `|avg_signed| < TWIST_FRACTION_THRESHOLD
+/// * avg_abs`, the convexity term `½·γ·avg_signed²` understates the true
+/// quadratic contribution, and downstream consumers should fall back to a
+/// per-tenor convexity (or to parallel/waterfall attribution).
+const TWIST_FRACTION_THRESHOLD: f64 = 1e-2;
+
 fn add_cross_factor_term(
     by_pair: &mut IndexMap<String, Money>,
     total: &mut f64,
@@ -640,6 +723,25 @@ pub fn attribute_pnl_metrics_based(
     //
     // LIMITATION: Assumes parallel/average shifts and small moves; for large or non-parallel
     // moves, use bump-and-reprice curve gamma when available.
+    //
+    // TWIST GUARD (audit rec #6): if the signed average is much smaller than
+    // the L1 (absolute) average, the curves were twisted (e.g. short-end +50bp,
+    // long-end −50bp averages to ~0). In that regime the scalar convexity term
+    // `½·γ·avg²` collapses to ≈0 even though the true second-order
+    // contribution `½·Δrᵀ·H·Δr` is non-trivial. Emit a note so the consumer
+    // knows the convexity number is *not* a real upper bound.
+    let avg_rate_abs_shift_bp: Option<f64> = {
+        let mut total = 0.0;
+        let mut count = 0usize;
+        for curve_id in &market_deps.curve_dependencies().discount_curves {
+            let v = discount_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
+            if v > 0.0 {
+                total += v;
+                count += 1;
+            }
+        }
+        if count > 0 { Some(total / count as f64) } else { None }
+    };
     if let Some(avg_shift) = convexity_avg_shift_bp {
         let rc = RoundingContext::default();
         let convexity_opt = val_t0
@@ -685,6 +787,22 @@ pub fn attribute_pnl_metrics_based(
                 avg_shift.abs(),
                 LARGE_RATE_MOVE_THRESHOLD_BP
             ));
+        }
+
+        // Twist-domination warning (audit rec #6).
+        if let Some(abs_shift) = avg_rate_abs_shift_bp {
+            if abs_shift > 0.0
+                && avg_shift.abs() < TWIST_FRACTION_THRESHOLD * abs_shift
+            {
+                attribution.meta.notes.push(format!(
+                    "Rates convexity may be understated: discount curves twisted \
+                     (signed mean shift {:.3}bp vs L1 mean shift {:.3}bp); the \
+                     scalar `½·γ·avg²` term collapses for twist-dominated moves. \
+                     Consider per-tenor (key-rate) convexity or parallel/waterfall \
+                     attribution for an accurate second-order contribution.",
+                    avg_shift, abs_shift
+                ));
+            }
         }
     }
 
@@ -756,6 +874,34 @@ pub fn attribute_pnl_metrics_based(
                 avg_shift.abs(),
                 LARGE_SPREAD_MOVE_THRESHOLD_BP
             ));
+        }
+
+        // Credit-curve twist guard (audit rec #6): same logic as the rates
+        // convexity block — when |signed avg| << L1 avg, the scalar CS-Gamma
+        // term `½·γ·Δs²` collapses for a twist that genuinely moved.
+        let credit_abs_shift_bp: Option<f64> = {
+            let mut total = 0.0;
+            let mut count = 0usize;
+            for curve_id in &market_deps.curve_dependencies().credit_curves {
+                let v = hazard_curve_abs_shift_bp_metric(curve_id.as_str(), market_t0, market_t1);
+                if v > 0.0 {
+                    total += v;
+                    count += 1;
+                }
+            }
+            if count > 0 { Some(total / count as f64) } else { None }
+        };
+        if let Some(abs_shift) = credit_abs_shift_bp {
+            if abs_shift > 0.0
+                && avg_shift.abs() < TWIST_FRACTION_THRESHOLD * abs_shift
+            {
+                attribution.meta.notes.push(format!(
+                    "Credit convexity may be understated: hazard curves twisted \
+                     (signed mean shift {:.3}bp vs L1 mean shift {:.3}bp); the \
+                     scalar `½·γ·avg²` term collapses for twist-dominated moves.",
+                    avg_shift, abs_shift
+                ));
+            }
         }
     }
 
@@ -879,6 +1025,18 @@ pub fn attribute_pnl_metrics_based(
             }
         }
 
+        // Cross-factor terms (audit rec #5).
+        //
+        // Same six pairs as the parallel attribution (see
+        // [`crate::attribution::parallel::attribute_pnl_parallel_with_credit_model`]
+        // for the economic justification of the selection): Rates×Credit,
+        // Rates×Vol, Spot×Vol, Spot×Credit, FX×Vol, FX×Rates. Each multiplies a
+        // mixed second-partial (`CrossGamma_X_Y` metric) by the two observed
+        // moves; the result enters `cross_factor_pnl` instead of either
+        // factor's univariate P&L. Pairs not listed flow into the residual
+        // bucket and may be material for books loaded on inflation /
+        // structured / non-standard cross-effects — for those, prefer
+        // parallel/waterfall attribution.
         let mut cross_total = 0.0;
         let mut cross_by_pair = IndexMap::new();
         let currency = val_t1.value.currency();

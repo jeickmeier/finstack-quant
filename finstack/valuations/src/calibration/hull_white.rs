@@ -379,6 +379,43 @@ const SIGMA_MAX: f64 = 2.0;
 /// approximation-regime discussion (W-38).
 const SWAPTION_VEGA_FLOOR: f64 = 1e-8;
 
+/// Apply [`SWAPTION_VEGA_FLOOR`] (or the supplied floor) to a quote-level vega
+/// and surface the substitution to the caller.
+///
+/// Why this exists: when `actual_vega` is below the floor (deep OTM short
+/// expiry, stale quote, zero quoted vol), the LM residual scaling
+/// `(price_error) / vega` is replaced by `(price_error) / floor`. With
+/// `floor = 1e-8`, that scaling factor is `1e8`, so the quote can dominate
+/// the Gauss-Newton step while LM reports a clean termination. The audit
+/// recommendation (item 1) is to surface every floor hit so the analyst can
+/// drop or down-weight the offending quote.
+///
+/// Returns the floored vega; pushes a per-quote diagnostic into `hits` when
+/// the floor was applied. The caller is responsible for forwarding `hits`
+/// into the `CalibrationReport` metadata.
+fn floor_vega_and_record(
+    actual_vega: f64,
+    floor: f64,
+    quote_label: &str,
+    hits: &mut Vec<String>,
+) -> f64 {
+    if !actual_vega.is_finite() || actual_vega < floor {
+        tracing::warn!(
+            quote = quote_label,
+            actual_vega = actual_vega,
+            vega_floor = floor,
+            "HW1F vega floor applied: residual scaling (1/vega) is capped; \
+             this quote may dominate the LM objective. Review or drop the quote."
+        );
+        hits.push(format!(
+            "{quote_label}: actual_vega={actual_vega:.3e} below floor {floor:.3e}"
+        ));
+        floor
+    } else {
+        actual_vega
+    }
+}
+
 /// Number of deterministic multi-start restarts used for HW1F calibration.
 const HW_NUM_RESTARTS: usize = 5;
 /// Halton perturbation scale (50%) applied to each parameter on restart.
@@ -647,6 +684,23 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
 ///    plumbing (multi-start, diagnostics, error reporting) as curve calibration.
 /// 4. Uses the unconstrained parameterisation: `(ln κ, ln σ)`.
 ///
+/// # Residual scaling (ATM assumption)
+///
+/// Each per-quote residual is `(price_model − price_mkt) / vega`, where
+/// `vega` is the *ATM* Bachelier / Black-76 vega evaluated via
+/// [`swaption_atm_vega`] (strike = forward swap rate). This linearisation
+/// converges to the right minimiser when the calibration set is at-the-money
+/// or close to it: at ATM the strike-vol slope is small and the ATM-vega
+/// is a good proxy for the true `dPrice/dVol`. For materially off-ATM
+/// quotes (deep ITM/OTM swaptions), the ATM-vega proxy under- or over-scales
+/// the residual depending on the smile, and the LM objective is then a
+/// *distorted* (but still descent-compatible) surface. If you need to
+/// calibrate to a smile, weight or down-weight off-ATM quotes externally,
+/// or invest in true implied-vol-error iteration as in Andersen-Piterbarg
+/// (*Interest Rate Modeling* Vol III §3.3). A `vega_floor_hits` count is
+/// reported in the result metadata; investigate any non-zero count before
+/// trusting the calibrated `(κ, σ)`.
+///
 /// # Errors
 ///
 /// Returns an error if:
@@ -702,6 +756,7 @@ pub fn calibrate_hull_white_to_swaptions(
     // No accruals supplied → constant-`dt` schedule (legacy behaviour).
     let mut prepared = Vec::with_capacity(n_quotes);
     let mut fwd_swap_rates = Vec::with_capacity(n_quotes);
+    let mut vega_floor_hits: Vec<String> = Vec::new();
     for q in quotes {
         let (annuity, fwd_rate) = compute_swap_annuity_and_rate(df, q.expiry, q.tenor, ppy);
         let market_price = compute_swaption_market_price(
@@ -711,8 +766,14 @@ pub fn calibrate_hull_white_to_swaptions(
             q.volatility,
             q.is_normal_vol,
         );
-        let vega = swaption_atm_vega(annuity, fwd_rate, q.expiry, q.volatility, q.is_normal_vol)
-            .max(SWAPTION_VEGA_FLOOR);
+        let raw_vega = swaption_atm_vega(annuity, fwd_rate, q.expiry, q.volatility, q.is_normal_vol);
+        let label = format!("{}Yx{}Y", q.expiry, q.tenor);
+        let vega = floor_vega_and_record(
+            raw_vega,
+            SWAPTION_VEGA_FLOOR,
+            &label,
+            &mut vega_floor_hits,
+        );
         prepared.push(PreparedSwaption {
             market_price,
             fwd_swap_rate: fwd_rate,
@@ -768,7 +829,11 @@ pub fn calibrate_hull_white_to_swaptions(
             "residual_weighting",
             "1/vega (vega-weighted price residual)".to_string(),
         )
-        .with_metadata("swap_frequency", format!("{frequency:?}"));
+        .with_metadata("swap_frequency", format!("{frequency:?}"))
+        .with_metadata("vega_floor_hits", vega_floor_hits.len().to_string());
+    if !vega_floor_hits.is_empty() {
+        report = report.with_metadata("vega_floor_hits_detail", vega_floor_hits.join("; "));
+    }
 
     if !(KAPPA_MIN..=KAPPA_MAX).contains(&params.kappa) {
         return Err(finstack_core::Error::Validation(format!(
@@ -848,6 +913,7 @@ pub fn calibrate_hull_white_to_swaptions_with_schedules(
 
     let mut prepared = Vec::with_capacity(n_quotes);
     let mut fwd_swap_rates = Vec::with_capacity(n_quotes);
+    let mut vega_floor_hits: Vec<String> = Vec::new();
     for (q, sched) in quotes.iter().zip(schedules.iter()) {
         let accruals_slice: Option<&[f64]> = if !sched.is_empty() { Some(sched) } else { None };
         let (annuity, fwd_rate) =
@@ -859,8 +925,14 @@ pub fn calibrate_hull_white_to_swaptions_with_schedules(
             q.volatility,
             q.is_normal_vol,
         );
-        let vega = swaption_atm_vega(annuity, fwd_rate, q.expiry, q.volatility, q.is_normal_vol)
-            .max(SWAPTION_VEGA_FLOOR);
+        let raw_vega = swaption_atm_vega(annuity, fwd_rate, q.expiry, q.volatility, q.is_normal_vol);
+        let label = format!("{}Yx{}Y", q.expiry, q.tenor);
+        let vega = floor_vega_and_record(
+            raw_vega,
+            SWAPTION_VEGA_FLOOR,
+            &label,
+            &mut vega_floor_hits,
+        );
         let stored_accruals = accruals_slice.map(|s| s.to_vec().into_boxed_slice());
         prepared.push(PreparedSwaption {
             market_price,
@@ -912,7 +984,11 @@ pub fn calibrate_hull_white_to_swaptions_with_schedules(
             "1/vega (vega-weighted price residual)".to_string(),
         )
         .with_metadata("swap_frequency", format!("{frequency:?}"))
-        .with_metadata("schedule_source", "real_day_count".to_string());
+        .with_metadata("schedule_source", "real_day_count".to_string())
+        .with_metadata("vega_floor_hits", vega_floor_hits.len().to_string());
+    if !vega_floor_hits.is_empty() {
+        report = report.with_metadata("vega_floor_hits_detail", vega_floor_hits.join("; "));
+    }
 
     if !(KAPPA_MIN..=KAPPA_MAX).contains(&params.kappa) {
         return Err(finstack_core::Error::Validation(format!(
@@ -979,18 +1055,25 @@ pub fn calibrate_hull_white_to_cap_floors(
             )
         })
         .collect();
+    let mut vega_floor_hits: Vec<String> = Vec::new();
     let vegas: Vec<f64> = quotes
         .iter()
         .map(|quote| {
-            cap_floor_bachelier_vega(
+            let raw = cap_floor_bachelier_vega(
                 discount_df,
                 forward_df,
                 quote.maturity,
                 quote.strike,
                 quote.volatility,
                 frequency,
-            )
-            .max(1e-8)
+            );
+            let label = format!(
+                "{}Y_{}_{:.6}",
+                quote.maturity,
+                if quote.is_cap { "cap" } else { "floor" },
+                quote.strike
+            );
+            floor_vega_and_record(raw, SWAPTION_VEGA_FLOOR, &label, &mut vega_floor_hits)
         })
         .collect();
 
@@ -1032,6 +1115,7 @@ pub fn calibrate_hull_white_to_cap_floors(
             quotes.len(),
             true,
             frequency,
+            &vega_floor_hits,
         );
         return Ok((HullWhiteParams::new(fixed, sigma)?, report));
     }
@@ -1087,6 +1171,7 @@ pub fn calibrate_hull_white_to_cap_floors(
         quotes.len(),
         false,
         frequency,
+        &vega_floor_hits,
     );
 
     Ok((HullWhiteParams::new(params.kappa, params.sigma)?, report))
@@ -1100,8 +1185,9 @@ fn enrich_cap_floor_report(
     quote_count: usize,
     fixed_kappa: bool,
     frequency: SwapFrequency,
+    vega_floor_hits: &[String],
 ) -> CalibrationReport {
-    report
+    let mut r = report
         .with_model_version(finstack_core::versions::HULL_WHITE_1F)
         .with_metadata("kappa", format!("{kappa:.6}"))
         .with_metadata("sigma", format!("{sigma:.6}"))
@@ -1113,6 +1199,11 @@ fn enrich_cap_floor_report(
         )
         .with_metadata("calibration_family", "cap_floor_hw1f".to_string())
         .with_metadata("frequency", format!("{frequency:?}"))
+        .with_metadata("vega_floor_hits", vega_floor_hits.len().to_string());
+    if !vega_floor_hits.is_empty() {
+        r = r.with_metadata("vega_floor_hits_detail", vega_floor_hits.join("; "));
+    }
+    r
 }
 
 /// ATM vega for a swaption expressed in the same volatility units as the

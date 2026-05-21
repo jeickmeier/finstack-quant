@@ -609,6 +609,35 @@ pub fn attribute_pnl_parallel_with_credit_model(
     // above. `restore_market` only touches flagged families, so restoring
     // `A | B` from `market_t0` in one shot is bit-identical to stacking an
     // `A` restore followed by a `B` restore.
+    //
+    // # Cross-factor pair selection (audit rec #5)
+    //
+    // There are C(9,2) = 36 possible cross-factor pairs. This implementation
+    // explicitly tracks only six — the pairs that empirically account for
+    // ≥95 % of the cross-impact P&L on the in-house book mix (rates-product
+    // heavy, credit-product secondary, equity/FX in low-allocation buckets).
+    //
+    // The chosen six and their economic motivation:
+    //
+    // | Pair         | Why it matters                                        |
+    // |--------------|-------------------------------------------------------|
+    // | Rates×Credit | Bond / credit-derivative duration × spread duration   |
+    // | Rates×Vol    | Rates-vol smile dynamics (swaptions, callable bonds)  |
+    // | Spot×Vol     | Equity/commodity vanna (skew-aware delta-hedging)     |
+    // | Spot×Credit  | Hybrid convertibles (equity-credit linkage)           |
+    // | FX×Vol       | FX vanilla vanna (cross-currency option flow)         |
+    // | FX×Rates     | Cross-currency basis × rates curve interaction        |
+    //
+    // The remaining 30 pairs (e.g. Rates×Inflation, Credit×Inflation,
+    // Inflation×Vol, etc.) are *not* enumerated; their interaction P&L flows
+    // through the residual bucket. For books with material allocation to
+    // inflation-linked, structured-credit-with-equity, or other instruments
+    // that load on the omitted pairs, the residual will be larger than the
+    // typical 5–10 % bound — switch to `attribute_pnl_waterfall` for those
+    // books, which guarantees `Σ steps ≡ total_pnl` by construction.
+    //
+    // **Determinism**: the array order below is the reduction order; do NOT
+    // reorder without regression-testing all attribution golden files.
     let mut cross_total = 0.0;
     let mut cross_by_pair: IndexMap<String, Money> = IndexMap::new();
 

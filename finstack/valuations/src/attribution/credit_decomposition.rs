@@ -109,17 +109,21 @@ impl AttributionSpec {
         // into a nonsensical CS01. Surface the degeneracy instead of producing
         // a meaningless decomposition.
         //
-        // `PARALLEL_FRACTION_FLOOR` requires the signed move to be at least
-        // this fraction of the absolute move for the parallel back-solve to be
-        // trusted; below it the move is dominated by curve-shape (twist).
-        const PARALLEL_FRACTION_FLOOR: f64 = 1e-3;
-        if avg_shift_bp.abs() < PARALLEL_FRACTION_FLOOR * avg_abs_shift_bp.abs() {
+        // The threshold is `CreditFactorDetailOptions::parallel_fraction_floor`
+        // (audit rec #13: previously hardcoded `1e-3`, now tunable per book —
+        // books with structurally noisy hazard curves can relax it without
+        // forking the code). Setting it to `0.0` disables the guard entirely.
+        let parallel_fraction_floor = self.credit_factor_detail_options.parallel_fraction_floor;
+        if parallel_fraction_floor > 0.0
+            && avg_shift_bp.abs() < parallel_fraction_floor * avg_abs_shift_bp.abs()
+        {
             notes.push(format!(
                 "credit_factor_detail unavailable: hazard curve(s) twisted \
-                 (signed avg shift {:.6}bp vs absolute avg shift {:.6}bp); a \
-                 single back-solved CS01 cannot represent a non-parallel move \
-                 and -credit_pnl/ds_i would be ill-conditioned",
-                avg_shift_bp, avg_abs_shift_bp
+                 (signed avg shift {:.6}bp vs absolute avg shift {:.6}bp; \
+                 parallel_fraction_floor={:.3e}); a single back-solved CS01 \
+                 cannot represent a non-parallel move and -credit_pnl/ds_i \
+                 would be ill-conditioned",
+                avg_shift_bp, avg_abs_shift_bp, parallel_fraction_floor
             ));
             return Ok(None);
         }

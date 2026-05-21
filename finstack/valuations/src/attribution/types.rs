@@ -152,8 +152,36 @@ pub enum AttributionFactor {
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PnlAttribution {
-    /// Total P&L (val_t1 - val_t0).
+    /// Total P&L *as reported by this attribution*.
+    ///
+    /// In the standard total-return convention (the default carry path uses
+    /// [`crate::attribution::helpers::apply_total_return_carry`]), this is
+    /// `(val_t1 − val_t0) + coupon_income_between(T0, T1)`. Cashflows received
+    /// during the period are added back so that
+    /// `total_pnl == carry + factor_sum + residual` holds: the `carry` field
+    /// includes the coupon income, and reconciliation against the user's
+    /// observed val_t1 − val_t0 must subtract the coupon_income out of
+    /// `total_pnl` to recover the pure mark-to-market move.
+    ///
+    /// **For a raw mark-to-market view that excludes intra-period cashflows,
+    /// read [`Self::mark_to_market_pnl`].** That field, when present, is the
+    /// untouched `val_t1 − val_t0` and never absorbs coupon income.
     pub total_pnl: Money,
+
+    /// Pure mark-to-market change: `val_t1 − val_t0` with **no** intra-period
+    /// cashflow adjustment.
+    ///
+    /// Added in audit rec #2 to separate the raw user-input price change from
+    /// the total-return view stamped on `total_pnl`. When the attribution path
+    /// added coupon_income to `total_pnl` (the standard total-return convention
+    /// in parallel / waterfall / taylor attribution), this field still reports
+    /// the raw `val_t1 − val_t0` so a downstream consumer that computed their
+    /// own total from the underlying valuations can reconcile cleanly.
+    ///
+    /// Additive serde extension: pre-existing JSON without this field
+    /// deserializes with `None`. New attribution runs populate it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mark_to_market_pnl: Option<Money>,
 
     /// Carry P&L (theta + accruals).
     pub carry: Money,
@@ -730,6 +758,11 @@ impl PnlAttribution {
 
         Self {
             total_pnl,
+            // Audit rec #2: the raw mark-to-market is whatever the caller
+            // passed as `total_pnl` *before* any total-return adjustment.
+            // Stored as Some() at construction; downstream apply_total_return_carry
+            // leaves this untouched even as it mutates total_pnl.
+            mark_to_market_pnl: Some(total_pnl),
             carry: zero,
             rates_curves_pnl: zero,
             credit_curves_pnl: zero,
@@ -802,6 +835,9 @@ impl PnlAttribution {
     /// Useful for scaling per-unit attribution to position quantity.
     pub fn scale(&mut self, factor: f64) {
         self.total_pnl *= factor;
+        if let Some(m) = self.mark_to_market_pnl.as_mut() {
+            *m *= factor;
+        }
         self.carry *= factor;
         self.rates_curves_pnl *= factor;
         self.credit_curves_pnl *= factor;
@@ -952,6 +988,9 @@ impl PnlAttribution {
             self.meta.notes.push(note);
             self.residual = Money::new(0.0, self.total_pnl.currency());
             self.meta.residual_pct = 0.0;
+            // Audit rec #3: surface the failure so `residual_within_tolerance`
+            // does NOT report a "clean" 0 residual after a validation error.
+            self.result_invalid = true;
             return Err(e);
         }
 
@@ -1007,11 +1046,18 @@ impl PnlAttribution {
             &mut self.meta.notes,
         )?;
 
-        self.residual = self.total_pnl.checked_sub(attributed_sum).map_err(|e| {
-            let note = format!("Failed to compute residual: {}", e);
-            self.meta.notes.push(note.clone());
-            e
-        })?;
+        self.residual = match self.total_pnl.checked_sub(attributed_sum) {
+            Ok(r) => r,
+            Err(e) => {
+                let note = format!("Failed to compute residual: {}", e);
+                self.meta.notes.push(note);
+                self.residual = Money::new(0.0, self.total_pnl.currency());
+                self.meta.residual_pct = 0.0;
+                // Audit rec #3: as above — flag invalid so tolerance checks fail.
+                self.result_invalid = true;
+                return Err(e);
+            }
+        };
 
         // Compute residual percentage (handle zero total_pnl) via RoundingContext
         let rc = &self.meta.rounding;
@@ -1039,6 +1085,13 @@ impl PnlAttribution {
     ///
     /// `true` if residual is within tolerance.
     pub fn residual_within_tolerance(&self, pct_tolerance: f64, abs_tolerance: f64) -> bool {
+        // Audit rec #3: if residual computation failed, `residual` was reset to 0
+        // and a clean tolerance check would falsely succeed. Refuse to claim
+        // "within tolerance" when the attribution is flagged invalid.
+        if self.result_invalid {
+            return false;
+        }
+
         let abs_residual = self.residual.amount().abs();
         let abs_total = self.total_pnl.amount().abs();
 
@@ -1415,5 +1468,72 @@ mod tests {
         attr.compute_residual().unwrap();
 
         assert!((attr.residual.amount() - 50.0).abs() < 1e-10);
+    }
+
+    /// Audit rec #2: `mark_to_market_pnl` must capture the raw `val_t1 − val_t0`
+    /// supplied at construction time and stay frozen even if `total_pnl` is
+    /// later mutated by `apply_total_return_carry`. This is what lets a
+    /// consumer reconcile against their own computation of the price change.
+    #[test]
+    fn test_mark_to_market_pnl_captured_at_construction_and_preserved() {
+        use crate::attribution::helpers::apply_total_return_carry;
+        let raw_pnl = Money::new(1000.0, Currency::USD);
+        let mut attr = PnlAttribution::new(
+            raw_pnl,
+            "TEST-MTM",
+            date!(2025 - 01 - 01),
+            date!(2025 - 01 - 02),
+            AttributionMethod::Parallel,
+        );
+
+        // Sanity: mark_to_market_pnl mirrors total_pnl at construction.
+        assert_eq!(attr.mark_to_market_pnl.map(|m| m.amount()), Some(1000.0));
+
+        // Simulate total-return adjustment (coupon income paid in period).
+        let coupon = Money::new(50.0, Currency::USD);
+        let theta = Money::new(30.0, Currency::USD);
+        apply_total_return_carry(&mut attr, theta, coupon).expect("carry add");
+
+        // total_pnl is now total-return (1000 + 50 = 1050); mark-to-market
+        // must still report the raw pre-coupon price change (1000).
+        assert_eq!(attr.total_pnl.amount(), 1050.0);
+        assert_eq!(
+            attr.mark_to_market_pnl.map(|m| m.amount()),
+            Some(1000.0),
+            "mark_to_market_pnl must not absorb coupon adjustment"
+        );
+    }
+
+    /// Audit rec #3: when compute_residual fails because a factor is in a
+    /// different currency from total_pnl, the attribution must report itself
+    /// as invalid, and `residual_within_tolerance` must refuse to claim
+    /// success even though `residual == 0` was set by the failure path.
+    #[test]
+    fn test_failed_residual_marks_invalid_and_blocks_tolerance_check() {
+        let total = Money::new(1000.0, Currency::USD);
+        let mut attr = PnlAttribution::new(
+            total,
+            "TEST",
+            date!(2025 - 01 - 01),
+            date!(2025 - 01 - 02),
+            AttributionMethod::Parallel,
+        );
+        // Deliberately mismatched currency so validate_currencies errors out.
+        attr.rates_curves_pnl = Money::new(600.0, Currency::EUR);
+
+        let err = attr.compute_residual();
+        assert!(err.is_err(), "currency mismatch must error");
+        assert!(attr.result_invalid, "result_invalid must be set on failure");
+        // residual was reset to zero — without the result_invalid guard the
+        // tolerance check below would falsely succeed.
+        assert_eq!(attr.residual.amount(), 0.0);
+        assert!(
+            !attr.residual_within_tolerance(0.1, 1.0),
+            "tolerance check MUST fail when result_invalid is set, regardless of residual value"
+        );
+        assert!(
+            !attr.residual_within_meta_tolerance(),
+            "meta-tolerance check MUST also fail when result_invalid is set"
+        );
     }
 }

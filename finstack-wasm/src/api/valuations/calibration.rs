@@ -3,6 +3,18 @@
 //! Mirrors the Python `calibrate` / `validate_calibration_json` surface plus
 //! Phase 4 diagnostics (`dryRun`, `dependencyGraphJson`).
 //!
+//! # Number safety
+//!
+//! Counts (`iterations`, `residual_evals`, `lm_jacobian_evals`) are embedded
+//! inside the JSON result envelope rather than crossed as raw `usize`. JS's
+//! `JSON.parse` reads them as IEEE-754 doubles; values above
+//! `Number.MAX_SAFE_INTEGER` (2^53 − 1) would round silently. In practice
+//! iteration counts stay under ~10⁴ for any non-pathological calibration, so
+//! the [`crate::utils::check_js_safe_count`] guard is not threaded through
+//! the JSON path. If a future getter exposes a raw `usize` across the
+//! boundary (e.g. a `report.iterations() -> usize` accessor), route it
+//! through that guard first.
+//!
 //! On error, all four functions throw a JS `Error` with `name =
 //! "CalibrationEnvelopeError"` and a structured `cause` property carrying
 //! the serialized `EnvelopeError` payload. Standard `try/catch (e)` exposes

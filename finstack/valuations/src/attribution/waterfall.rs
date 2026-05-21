@@ -607,30 +607,22 @@ impl<'a> WaterfallContext<'a> {
 
     /// Update the current accumulated value by adding a factor's P&L delta.
     ///
-    /// # Numerical Precision Note
+    /// # Numerical Precision (audit rec #7)
     ///
-    /// This method uses simple sequential addition rather than Kahan summation.
-    /// For the standard 9-factor waterfall attribution, this is acceptable because:
+    /// The audit recommended a Kahan/Neumaier-compensated accumulator on the
+    /// suspicion that the ~9·ε drift of naive `f64 +` would matter at $1B+
+    /// notional. On closer inspection that drift does not exist on this code
+    /// path: `Money::checked_add` is backed by `rust_decimal::Decimal`
+    /// arithmetic, which is **exact** within its 28-digit precision envelope.
+    /// The only IEEE-754 rounding step is the single `Decimal → f64`
+    /// conversion when a downstream consumer calls `.amount()`. Compensating
+    /// a chain of decimal additions for f64 rounding errors that don't occur
+    /// would be net noise.
     ///
-    /// - IEEE 754 f64 has ~15-16 significant digits
-    /// - With 9 additions, accumulated relative error is bounded by ~9 × ε ≈ 2e-15
-    /// - For typical P&L values ($1M or less), this represents sub-cent precision
-    ///
-    /// If you extend the waterfall to >20 factors or work with very large notionals
-    /// ($1B+), consider implementing Kahan summation:
-    ///
-    /// ```ignore
-    /// // Kahan summation pseudocode
-    /// let compensation = 0.0;
-    /// for delta in deltas {
-    ///     let y = delta - compensation;
-    ///     let t = sum + y;
-    ///     compensation = (t - sum) - y;
-    ///     sum = t;
-    /// }
-    /// ```
-    ///
-    /// For most production use cases, the current implementation is sufficient.
+    /// If a future change replaces the `Money` storage with `f64`, or
+    /// inserts an f64 short-circuit on this hot path, the right fix would be
+    /// `finstack_core::math::NeumaierAccumulator` on the amount channel with
+    /// the currency check still gating the operation.
     fn update_current_value(&mut self, prev_val: Money, delta: Money) -> Result<()> {
         self.current_val = prev_val
             .checked_add(delta)
@@ -690,5 +682,72 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    /// Audit rec #7 verification: confirm that Money's Decimal-backed
+    /// arithmetic does not drift over many small same-currency adds, even at
+    /// large notional. The audit recommendation of a Kahan/Neumaier
+    /// accumulator turned out to be redundant because `Money::checked_add` is
+    /// exact within the Decimal envelope — this test pins that invariant so a
+    /// future Decimal→f64 substitution would be caught.
+    #[test]
+    fn waterfall_money_decimal_accumulator_is_exact_at_large_notional() {
+        use finstack_core::market_data::context::MarketContext;
+        let market = MarketContext::new();
+        let instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument> = Arc::new(
+            TestInstrument::new("TEST-DEC", Money::new(0.0, Currency::USD)),
+        );
+        let mut ctx = WaterfallContext {
+            target_instrument: &instrument,
+            current_instrument: Arc::clone(&instrument),
+            current_market: market.clone(),
+            current_val: Money::new(1.0e9, Currency::USD),
+            market_t1: &market,
+            as_of_t0: date!(2025 - 01 - 15),
+            as_of_t1: date!(2025 - 01 - 16),
+            strict_validation: false,
+            num_repricings: 0,
+        };
+
+        // Apply 30 increments of 0.1; ideal answer is exactly 1_000_000_003.
+        for _ in 0..30 {
+            let prev = ctx.current_val;
+            ctx.update_current_value(prev, Money::new(0.1, Currency::USD))
+                .expect("same-currency add must succeed");
+        }
+
+        // Decimal arithmetic is exact for these inputs; the only rounding
+        // step is the final Decimal → f64 conversion, bounded by ~1 ULP at
+        // 1e9 (≈ 1.2e-7). Allow 1e-6 to absorb that single rounding.
+        let got = ctx.current_val.amount();
+        assert!(
+            (got - 1_000_000_003.0).abs() < 1e-6,
+            "Money/Decimal accumulator unexpectedly drifted: got {got}, want 1_000_000_003"
+        );
+    }
+
+    /// Audit rec #7: currency mismatch must still surface as a hard error —
+    /// the waterfall accumulator must never silently coerce currencies.
+    #[test]
+    fn waterfall_currency_mismatch_still_errors() {
+        use finstack_core::market_data::context::MarketContext;
+        let market = MarketContext::new();
+        let instrument: Arc<dyn crate::instruments::common_impl::traits::Instrument> = Arc::new(
+            TestInstrument::new("TEST-CCY", Money::new(0.0, Currency::USD)),
+        );
+        let mut ctx = WaterfallContext {
+            target_instrument: &instrument,
+            current_instrument: Arc::clone(&instrument),
+            current_market: market.clone(),
+            current_val: Money::new(100.0, Currency::USD),
+            market_t1: &market,
+            as_of_t0: date!(2025 - 01 - 15),
+            as_of_t1: date!(2025 - 01 - 16),
+            strict_validation: false,
+            num_repricings: 0,
+        };
+
+        let result = ctx.update_current_value(ctx.current_val, Money::new(10.0, Currency::EUR));
+        assert!(result.is_err(), "mixed-currency add must fail");
     }
 }
