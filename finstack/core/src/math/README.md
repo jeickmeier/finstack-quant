@@ -10,20 +10,24 @@ The `math` module in `finstack-core` provides **deterministic numerical building
 - **Time grids**: Year‑fraction grids for simulation time stepping
 - **Special functions and numerically stable summation**: Normal distribution, error function, and robust summation utilities
 
-Everything is accessible via `finstack_core::math`, which re‑exports the most commonly used functions and types:
+`finstack_core::math` re-exports the common entry points from `mod.rs`:
 
-- **Root finding**: `Solver`, `NewtonSolver`, `BrentSolver`
-- **Multi‑dimensional optimization**: `MultiSolver`, `LevenbergMarquardtSolver`, `AnalyticalDerivatives`
-- **Integration**: `GaussHermiteQuadrature`, `gauss_legendre_integrate`, `adaptive_simpson`, `trapezoidal_rule`, `simpson_rule`
+- **Root finding**: `Solver`, `NewtonSolver`, `BrentSolver`, `BracketHint`
+- **Multi-dimensional optimization**: `LevenbergMarquardtSolver`, `AnalyticalDerivatives`
+- **Integration**: `GaussHermiteQuadrature`, `GaussLaguerreQuadrature`, `gauss_legendre_integrate`, `adaptive_simpson`, `trapezoidal_rule`, `simpson_rule`
 - **Interpolation**: `LinearDf`, `LogLinearDf`, `MonotoneConvex`, `CubicHermite`, `InterpFn`, `ExtrapolationPolicy`
+- **Compounding**: `Compounding` (rate convention conversions)
 - **Linear algebra**: `cholesky_decomposition`, `apply_correlation`, `CholeskyError`
-- **Random numbers**: `RandomNumberGenerator`, `Pcg64Rng`, `box_muller_transform`, `SobolRng`, `BrownianBridge`, `poisson_inverse_cdf`, `pca_ordering`
-- **Distributions**: `binomial_distribution`, `binomial_probability`, `log_binomial_coefficient`, `log_factorial`, `sample_beta`
+- **Random numbers**: `RandomNumberGenerator`, `Pcg64Rng`, `SobolRng`, `box_muller_transform`
+- **Distributions**: `binomial_distribution`, `binomial_probability`, `sample_beta`, and related helpers
 - **Probability**: `joint_probabilities`, `correlation_bounds`, `CorrelatedBernoulli`
 - **Special functions**: `erf`, `norm_cdf`, `norm_pdf`, `standard_normal_inv_cdf`
-- **Statistics**: `mean`, `variance`, `mean_var`, `covariance`, `correlation`, `moment_match`, `OnlineStats`, `OnlineCovariance`, `required_samples`
-- **Summation**: `kahan_sum`, `pairwise_sum`, `stable_sum`
+- **Statistics**: `mean`, `variance`, `covariance`, `correlation`, `OnlineStats`, `OnlineCovariance`, `required_samples`
+- **Summation**: `kahan_sum`, `neumaier_sum`, `NeumaierAccumulator`
 - **Time grids**: `TimeGrid`, `TimeGridError`
+
+Additional types (`BrownianBridge`, `pca_ordering`, volatility models, etc.) live
+in submodules — import them explicitly when needed.
 
 ---
 
@@ -145,11 +149,11 @@ Everything is accessible via `finstack_core::math`, which re‑exports the most 
 - **`NewtonSolver`**:
   - Adaptive finite‑difference derivative, configurable tolerance/iteration/step limits.
   - `solve_with_derivative` lets callers supply an analytic derivative for better performance and robustness.
-- **`MultiSolver`** and **`LevenbergMarquardtSolver`**:
+- **`LevenbergMarquardtSolver`**:
   - `minimize` for scalar objectives with optional box constraints.
-  - `solve_system_with_dim_stats` for residual‑based systems, internally converted to least‑squares.
-  - `solve_system_with_jacobian_stats` when analytic Jacobian is available (2× faster).
-  - `AnalyticalDerivatives` trait allows exact gradients/Jacobians when available.
+  - `solve_system_with_dim_stats` for residual-based systems.
+  - `solve_system_with_jacobian_stats` when an analytic Jacobian is available.
+  - `AnalyticalDerivatives` supplies exact gradients/Jacobians when available.
 
 These solvers are used extensively throughout the project (e.g., IRR/XIRR, implied vols, curve calibration) and are the preferred way to do numeric solving instead of ad‑hoc loops.
 
@@ -182,8 +186,8 @@ These solvers are used extensively throughout the project (e.g., IRR/XIRR, impli
   - `mean`, `variance`, `covariance`, `correlation` avoid catastrophic cancellation via Kahan/Welford/Chan algorithms.
   - Realized variance methods support both simple price series and OHLC data.
 - **Summation**:
-  - `kahan_sum` and `neumaier_sum` are the building blocks for numerically robust aggregation.
-  - `stable_sum` is the “default” deterministic summation used in higher‑level code.
+  - `kahan_sum` and `neumaier_sum` provide compensated summation.
+  - `NeumaierAccumulator` supports incremental aggregation.
 
 ---
 
@@ -323,91 +327,9 @@ weighting formula.
 
 ---
 
-## Adding New Features
+## Extending
 
-The `math` module is **shared numerical infrastructure** across the workspace. When extending it, keep changes **small, deterministic, and well‑documented**, and prefer **numerically stable algorithms** over ad‑hoc implementations.
-
-### General Guidelines
-
-- **Determinism**:
-  - Avoid non‑deterministic behavior (no global RNGs, no unordered parallel reductions).
-  - When parallelizing in higher‑level crates, ensure that serial and parallel paths produce the same results.
-- **Numerical stability**:
-  - Prefer algorithms that minimize cancellation and rounding error (Kahan/Neumaier summation, Welford/Chan statistics).
-  - Be explicit about tolerances, thresholds, and failure modes in doc comments.
-- **Error handling**:
-  - Public APIs should return `crate::Result<T>` or a clear error enum (like `CholeskyError`) instead of panicking.
-  - Use `InputError` for invalid input shapes, ranges, or parameters where applicable.
-- **Documentation and tests**:
-  - Add module‑level and function‑level docs with mathematical definitions and references.
-  - Include doctested examples where reasonable.
-  - Add unit tests for:
-    - Happy‑path numerical behavior.
-    - Edge cases (extreme values, degenerate inputs).
-    - Regression tests where past bugs existed.
-
-### New Solver or Optimization Algorithms
-
-- Prefer adding new algorithms to:
-  - `solver.rs` for 1D problems (e.g., new bracketed or derivative‑free methods).
-  - `solver_multi.rs` for multi‑parameter calibration (e.g., additional quasi‑Newton methods).
-- Requirements:
-  - Expose a small, well‑documented configuration struct with sensible `Default`.
-  - Integrate with existing traits (`Solver`, `MultiSolver`) where possible.
-  - Clearly document convergence properties, guarantees (or lack thereof), and typical use cases.
-  - Add tests on simple analytic problems (e.g., polynomials, spheres, Rosenbrock‑style functions).
-
-### New Integration or Interpolation Schemes
-
-- **Integration**:
-  - Add new quadrature schemes or variants to `integration.rs`.
-  - Document the integration domain (finite interval vs. infinite, weighting) and intended use.
-  - Provide examples integrating simple functions with known analytic integrals.
-- **Interpolation**:
-  - Add new strategies under `interp::strategies` and corresponding wiring in `types`/`wrappers`.
-  - Preserve existing behavior and serialization for current interpolation types.
-  - Document arbitrage and monotonicity properties (e.g., forward‑rate positivity, slope constraints).
-  - Add tests:
-    - Shape and monotonicity.
-    - Edge behavior and extrapolation under each `ExtrapolationPolicy`.
-
-### New Distributions or Special Functions
-
-- **Distributions**:
-  - Add new distributions to `distributions.rs` when they are broadly useful for risk or pricing (e.g., Poisson, Normal‑Inverse‑Gaussian).
-  - Use log‑space or other stable parameterizations for tails and large parameters.
-  - Provide clear mathematical definitions and references in doc comments.
-- **Special functions**:
-  - Where possible, delegate to a well‑tested crate (like `statrs`) for core implementations.
-  - If implementing directly:
-    - Document approximation ranges and error bounds.
-    - Include references to standard texts or papers.
-
-### New Linear Algebra or Statistics Utilities
-
-- **Linear algebra**:
-  - Keep routines small and focused (e.g., new decompositions or transforms directly useful to finance).
-  - For large‑scale matrix work, prefer higher‑level crates (e.g., `ndarray`, `nalgebra`) in application code instead of expanding this module excessively.
-  - Maintain clear error types and avoid silent fallbacks for invalid matrices.
-- **Statistics**:
-  - Place scalar/vector statistics in `stats.rs`, reusing summation helpers from `summation.rs`.
-  - Be explicit about whether functions compute population or sample statistics.
-  - Add tests comparing to known values and simple analytic cases.
-
-### Internal Utilities
-
-- Place low‑level helpers that are shared across `math` modules in the relevant file and keep them `pub(crate)` unless they are part of a stable public surface.
-- Avoid leaking implementation details to higher‑level crates; expose small, composable, well‑documented functions instead.
-
----
-
-## When to Use This Module vs. Higher‑Level Crates
-
-- **Use `core::math` when**:
-  - You need numerical primitives (solvers, integrators, statistics, interpolation) to implement pricing, risk, or calibration logic.
-  - You are building new curves, instruments, or models and need stable numerical building blocks.
-- **Use higher‑level crates (`valuations`, `scenarios`, `portfolio`, `statements`) when**:
-  - You are implementing full instrument pricing, risk aggregation, or scenario logic.
-  - You need domain‑specific semantics (cashflows, term structures, statements) on top of these numerical primitives.
-
-Keeping this separation clear helps ensure that `core::math` remains **small, deterministic, and reusable** across Rust, Python, and WASM bindings.
+Add solvers to `solver.rs` or `solver_multi.rs`, interpolation strategies under
+`interp/`, and distribution helpers to `distributions.rs`. Public APIs return
+`crate::Result<T>`. Prefer numerically stable algorithms (Kahan/Neumaier,
+Welford/Chan) and include unit tests with known analytic values.

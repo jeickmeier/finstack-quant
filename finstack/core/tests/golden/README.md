@@ -1,21 +1,22 @@
-# Golden Test Data - finstack-core
+# Golden test data
 
-This directory contains golden test fixtures for validating finstack-core implementations
-against known reference values.
+Reference fixtures for validating finstack-core implementations against known
+values.
 
-## Directory Structure
+## Layout
 
 ```
 golden/
-├── README.md           # This file
+├── README.md
+├── mod.rs
+├── daycount_quantlib_tests.rs
+├── variance_tests.rs
 └── data/
-    ├── daycount_quantlib.json  # Day count convention QuantLib parity tests
-    └── realized_variance.json  # Variance estimator golden tests
+    ├── daycount_quantlib.json
+    └── realized_variance.json
 ```
 
-## Fixture Format
-
-All fixtures use the canonical golden suite JSON format:
+## Fixture format
 
 ```json
 {
@@ -23,7 +24,7 @@ All fixtures use the canonical golden suite JSON format:
     "suite_id": "unique_id",
     "description": "What this suite tests",
     "reference_source": {
-      "name": "Source name (required)",
+      "name": "Source name",
       "version": "1.0",
       "vendor": "Organization",
       "url": "https://..."
@@ -35,7 +36,7 @@ All fixtures use the canonical golden suite JSON format:
     "status": "certified",
     "schema_version": 1
   },
-  "cases": [...]
+  "cases": []
 }
 ```
 
@@ -43,42 +44,36 @@ All fixtures use the canonical golden suite JSON format:
 
 ### `daycount_quantlib.json`
 
-Day count convention tests validated against QuantLib output:
-- **30/360 US (Bond Basis)**: ISDA 2006 §4.16(f) end-of-month rules
-- **30E/360 (Eurobond)**: ISDA 2006 §4.16(g) - no Feb EOM rule
-- **Act/Act ISDA**: Year boundary splitting
-- **Act/365L (AFB)**: Feb 29 detection logic
+Day-count conventions validated against QuantLib output:
 
-**Reference Sources**:
-- QuantLib 1.32 (quantlib.org)
-- ISDA (2006). "2006 ISDA Definitions." Sections 4.16(b), 4.16(d)-(g).
+- 30/360 US (Bond Basis) — ISDA 2006 §4.16(f)
+- 30E/360 (Eurobond) — ISDA 2006 §4.16(g)
+- Act/Act ISDA — year-boundary splitting
+- Act/365L (AFB) — Feb 29 detection
+
+References: QuantLib 1.32; ISDA 2006 Definitions §4.16.
 
 ### `realized_variance.json`
 
-Tests for realized variance estimators:
-- **Parkinson (1980)**: High-low range estimator
-- **Garman-Klass (1980)**: OHLC estimator
+Realized variance estimators:
 
-**Reference Sources**:
-- Parkinson, M. (1980). "The Extreme Value Method for Estimating the Variance of the Rate of Return." *Journal of Business*, 53(1), 61-65.
-- Garman, M. B., & Klass, M. J. (1980). "On the Estimation of Security Price Volatilities from Historical Data." *Journal of Business*, 53(1), 67-78.
+- Parkinson (1980) — high-low range
+- Garman-Klass (1980) — OHLC
 
-## Adding New Fixtures
+## Adding fixtures
 
-1. Create a new JSON file in `data/`
-2. Include full provenance in `meta`:
-   - `reference_source.name` (required)
-   - `generated.at` (required)
-   - `generated.by` (required)
-3. Set `status` to `"provisional"` until validated
-4. Update this README with fixture documentation
-5. Change `status` to `"certified"` after review
+1. Add JSON under `data/` with full `meta` provenance
+2. Set `status` to `"provisional"` until validated
+3. Document the suite here
+4. Set `status` to `"certified"` after review
 
-## Using the Golden Framework
+## Using the golden framework
+
+Golden loading and assertions live in `finstack-test-utils`:
 
 ```rust
-use finstack_core::golden::{load_suite_from_path, GoldenAssert};
-use finstack_core::golden_path;
+use finstack_test_utils::golden::{load_suite_from_path, GoldenAssert};
+use finstack_test_utils::golden_path;
 
 #[test]
 fn test_my_feature() {
@@ -88,7 +83,11 @@ fn test_my_feature() {
     for case in &suite.cases {
         let actual = compute_something(&case.inputs);
         let assert = GoldenAssert::new(&suite.meta, &case.id);
-        assert.abs("metric", actual, case.expected.value, case.expected.tolerance).unwrap();
+        assert
+            .abs("metric", actual, case.expected.value, case.expected.tolerance)
+            .unwrap();
     }
 }
 ```
+
+See `finstack/core/tests/golden/daycount_quantlib_tests.rs` for a working example.

@@ -1,87 +1,50 @@
-## Finstack Core `src/` Overview
+# finstack-core `src/` overview
 
-The `finstack-core` crate provides the low‑level, deterministic building blocks for the Finstack ecosystem:
-currencies and money, date and calendar utilities, numerical methods, expression evaluation, and
-market‑data term structures. Everything under `src/` is designed to be:
+Low-level, deterministic building blocks for the Finstack workspace:
 
-- **Deterministic**: serial and parallel runs produce the same results.
-- **Currency‑safe**: no implicit FX; all cross‑currency math is explicit and auditable.
-- **Serde‑stable**: public types have well‑defined, versioned wire formats.
+- **Deterministic** — serial and parallel runs match
+- **Currency-safe** — no implicit FX; cross-currency math is explicit
+- **Serde-stable** — public types have versioned wire formats
 
-If you are writing pricing, risk, or reporting logic in other Finstack crates, you will almost always
-depend on types and traits defined here.
+## Top-level modules
 
-## Directory Structure
+| Module | Role |
+|--------|------|
+| `lib.rs` | Crate entry point and public module declarations |
+| `config.rs` | Numeric mode, rounding policy, `FinstackConfig`, `ResultsMeta` |
+| `currency.rs` | ISO-4217 currency enum; generated tables under `generated/` |
+| `money/` | `Money`, rounding, FX matrix and providers — see [`money/README.md`](money/README.md) |
+| `dates/` | Calendars, day-count, schedules, tenors, periods — see [`dates/README.md`](dates/README.md) |
+| `market_data/` | Term structures, surfaces, scalars, `MarketContext` — see [`market_data/README.md`](market_data/README.md) |
+| `math/` | Interpolation, solvers, integration, statistics — see [`math/README.md`](math/README.md) |
+| `expr/` | Scalar expression engine — see [`expr/README.md`](expr/README.md) |
+| `cashflow/` | Cashflow primitives, NPV, IRR/XIRR — see [`cashflow/README.md`](cashflow/README.md) |
+| `types/` | Phantom-typed IDs, rates, ratings — see [`types/README.md`](types/README.md) |
+| `credit/` | PD/LGD/migration primitives |
+| `factor_model/` | Covariance, dependency, and matching utilities |
+| `math/volatility/` | Volatility models and option pricing formulas |
+| `error.rs` | Unified `Error` type |
+| `explain.rs` | Computation tracing |
+| `generated/` | Build-time currency and calendar tables |
 
-Top‑level modules in `finstack/core/src`:
+## Quick examples
 
-- **`lib.rs`**: Crate entry point, crate‑level docs, and public module declarations.
-- **`config.rs`**: Numeric mode, rounding policy, `FinstackConfig`, and `ResultsMeta`/`RoundingContext`.
-- **`currency.rs`**: ISO‑4217 currency enum and metadata; integrates with generated tables under `generated/`.
-- **`money/`**: Currency‑tagged `Money` type, rounding helpers, FX matrix/provider implementations, and
-  conversion policies. See `money/README.md` for details.
-- **`dates/`**: Date/time facade over the `time` crate, plus calendars, business‑day logic, day‑count
-  conventions, IMM helpers, tenors, schedules, and period builders. See `dates/README.md` for details.
-- **`market_data/`**: Term structures (discount/forward/hazard/inflation/credit index/base correlation),
-  scalar time series, inflation indices, dividend and bump utilities, and `MarketContext` for
-  aggregating market data. See `market_data/README.md`.
-- **`math/`**: Interpolation framework, root‑finding solvers, integration, statistics, random numbers,
-  summation utilities, and basic linear algebra. See `math/README.md`.
-- **`expr/`**: Expression engine (AST, planner, evaluator) with scalar DAG and cached execution paths.
-  See `expr/README.md`.
-- **`cashflow/`**: Cashflow primitives, discounting helpers, XIRR/IRR, and performance utilities.
-  See `cashflow/README.md`.
-- **`types/`**: Newtype identifiers (`CurveId`, `InstrumentId`, etc.), rate types, ratings, and shared
-  scalar types. See `types/README.md`.
-- **`math/volatility/`**: Volatility models, conversion helpers, and option pricing formulas.
-- **`error.rs`**: Unified error type (`Error`) and input/validation error variants; re‑exported as
-  `finstack_core::Error`.
-- **`explain.rs`**: Explainability infrastructure for tracing and annotating computations.
-- **`generated/`**: Code generated at build time (currencies, calendars, Chinese New Year tables).
-
-Most submodules have their own `README.md` with deeper explanations and design notes.
-
-## Using `finstack-core`
-
-### As a dependency
-
-In an external crate, add `finstack-core` as a dependency (check crates.io or this workspace’s
-`Cargo.toml` for the current version):
-
-```toml
-[dependencies]
-finstack-core = "x.y.z" # replace with the latest published version
-```
-
-Inside this workspace, other crates depend on the local `finstack-core` via the workspace `Cargo.toml`.
-
-### Example: currency‑safe money
-
-Import the types you need explicitly:
+### Currency-safe money
 
 ```rust
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
 
 fn main() -> finstack_core::Result<()> {
-    // Work with strongly typed currencies
-    let eur = Currency::EUR;
-
-    // Construct monetary amounts (stored as scaled integers internally)
-    let subtotal = Money::new(49.50, eur);
-    let tax      = Money::new(9.90, eur);
-
-    // Checked arithmetic refuses to mix currencies
+    let subtotal = Money::new(49.50, Currency::EUR);
+    let tax = Money::new(9.90, Currency::EUR);
     let total = subtotal.checked_add(tax)?;
     assert_eq!(format!("{}", total), "EUR 59.40");
-
     Ok(())
 }
 ```
 
-### Example: dates, calendars, and day‑count
-
-Date helpers wrap the `time` crate and provide business‑day logic and standard conventions:
+### Day count
 
 ```rust
 use finstack_core::dates::{create_date, DayCount, DayCountContext};
@@ -89,22 +52,15 @@ use time::Month;
 
 fn main() -> finstack_core::Result<()> {
     let start = create_date(2025, Month::January, 1)?;
-    let end   = create_date(2026, Month::January, 1)?;
-
-    // Actual/Actual (ISDA) year fraction
+    let end = create_date(2026, Month::January, 1)?;
     let yf = DayCount::ActAct
         .year_fraction(start, end, DayCountContext::default())?;
-
     assert!((yf - 1.0).abs() < 1e-9);
     Ok(())
 }
 ```
 
-For business‑day conventions and holiday calendars, see the examples in `dates/README.md`.
-
-### Example: discount curves and present value
-
-`market_data::term_structures` provides bootstrapped discount curves and related primitives:
+### Discount curve
 
 ```rust
 use finstack_core::dates::create_date;
@@ -114,76 +70,34 @@ use time::Month;
 
 fn main() -> finstack_core::Result<()> {
     let base_date = create_date(2025, Month::January, 1)?;
-
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots([(0.0, 1.0), (5.0, 0.9)])
         .interp(InterpStyle::MonotoneConvex)
         .build()?;
-
-    let df_3y = curve.df(3.0);
-    assert!(df_3y < 1.0);
-
+    assert!(curve.df(3.0) < 1.0);
     Ok(())
 }
 ```
 
-For richer examples (bootstrapping from instruments, hazard curves, inflation, etc.), see
-`market_data/README.md` and the `finstack/core/tests/` directory.
+## Extending the crate
 
-## Adding New Features to `core/src`
+Extend the module that owns the domain primitive. Preserve determinism,
+currency safety, and stable serde field names. Add unit tests beside the
+implementation and integration tests under `finstack/core/tests/` when behavior
+spans modules.
 
-When extending `finstack-core`, prefer evolving existing modules over adding ad‑hoc utilities.
-The high‑level process is:
+Common patterns:
 
-- **1. Choose the right module**
-  - **Domain primitives** (IDs, rates, ratings): extend `types/`.
-  - **Money/FX**: extend `money/` (`types.rs`, `fx.rs`, `fx/providers.rs`, `rounding.rs`).
-  - **Dates/calendars/day‑count**: extend `dates/` and its submodules.
-  - **Term structures and market observables**: extend `market_data/`.
-  - **Numerical methods**: extend `math/`.
-  - **Expressions**: extend `expr/`.
-  - **Cashflows**: extend `cashflow/` primitives and helpers.
+- **New calendar** — JSON under `data/calendars/`, rebuild, tests in `tests/dates/`
+- **New day-count** — variant in `dates/daycount.rs` with tests
+- **New interpolation** — implementation under `math/interp/`, wired through `InterpStyle`
+- **New term structure** — module under `market_data/term_structures/` with builder, traits, and `MarketContext` integration
 
-- **2. Design with core invariants in mind**
-  - **Determinism**: serial ≡ parallel; avoid time‑dependent behavior and randomness.
-  - **Currency‑safety**: never perform implicit FX; require an `FxProvider`/`FxMatrix` and document
-    `FxConversionPolicy`.
-  - **Serde stability**: for new public types, either derive `Serialize`/`Deserialize` with stable
-    field names or introduce `*State`/`*Spec` DTOs with `to_state`/`from_state` helpers.
-  - **Type safety**: prefer newtype IDs from `types::id` (`CurveId`, `InstrumentId`, etc.) over raw
-    `String`.
+See module READMEs and `AGENTS.md` for binding and naming conventions.
 
-- **3. Wire the new code**
-  - Add a new module or file under the appropriate directory.
-  - Expose it via the parent `mod.rs` and, if appropriate, through `lib.rs`.
-  - Ensure any new public APIs have clear, concise docs and at least one example.
+## Further reading
 
-- **4. Test thoroughly**
-  - Add unit tests close to the implementation (`mod tests { … }`).
-  - Add integration or golden tests under `finstack/core/tests/` where behavior spans modules
-    (e.g., new day‑count conventions, new term structure types, or new FX policies).
-  - For serialization, add round‑trip tests and keep field names stable.
-
-### Common Extension Patterns
-
-- **New calendar**: add a JSON definition under `finstack/core/data/calendars/`, let `build.rs`
-  regenerate `generated` code, and add tests under `core/tests/dates/`.
-- **New day‑count convention**: add a variant to `dates::DayCount`, implement its logic in
-  `dates/daycount.rs`, and add unit and integration tests.
-- **New interpolation method**: add an implementation under `math/interp/`, extend `InterpStyle`,
-  and ensure tests cover knot handling, extrapolation, and edge cases.
-- **New term structure**: add a module under `market_data/term_structures/` with a concrete type,
-  trait implementations (`TermStructure`, `Discounting`/`Forward`/`Survival`, etc.), a serializable
-  state type, and integration with `MarketContext`.
-- **New FX provider or policy**: extend `money/fx.rs` or `money/fx/providers.rs`, keep caching
-  bounded and deterministic, and ensure applied policies are visible in results metadata.
-
-## Further Reading
-
-- **Module‑level READMEs**: `cashflow/README.md`, `dates/README.md`, `expr/README.md`,
-  `market_data/README.md`, `math/README.md`, `money/README.md`, `types/README.md`.
-- **Workspace book**: high‑level architecture, crate responsibilities, and design philosophy live
-  under `book/src/`.
-- **Tests and examples**: see `finstack/core/tests/` and `finstack/examples/core/` for concrete
-  end‑to‑end usage patterns.
+- Module READMEs linked above
+- Integration tests: `finstack/core/tests/`
+- Workspace architecture: `AGENTS.md`

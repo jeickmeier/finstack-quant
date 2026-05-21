@@ -169,8 +169,8 @@ These types are stored inside `MarketContext` under `prices`, `series`, and `inf
   - Collateral: `map_collateral` (CSA code → discount curve ID).
   - Dividends and market history: `insert_dividends`, `insert_market_history`.
 - **Type-safe getters**
-  - Curves: `get_discount`, `get_forward`, `get_hazard`, `get_inflation`, `get_base_correlation` (and `_ref` borrowing variants).
-  - Surfaces and indices: `surface`, `surface`, `price`, `series`, `inflation_index`, `inflation_index_ref`, `dividend_schedule`, `credit_index`, `credit_index_ref`, `collateral`, `collateral_ref`.
+  - Curves: `get_discount`, `get_forward`, `get_hazard`, `get_inflation_curve`, `get_base_correlation` (and `_ref` borrowing variants).
+  - Surfaces and indices: `surface`, `get_price`, `get_series`, `get_inflation_index`, `dividend_schedule`, `credit_index`, `collateral`.
   - Introspection: `curve_ids`, `curves_of_type`, `count_by_type`, `stats`, `is_empty`, `total_objects`.
 - **Scenario support**
   - `bump` for curve/surface/price/time-series bumps keyed by `CurveId`.
@@ -359,74 +359,10 @@ assert_eq!(ctx.stats().total_curves, round_tripped.stats().total_curves);
 
 ---
 
-## Adding New Features
+## Extending
 
-The `market_data` module is **core infrastructure** and must remain deterministic, currency-safe, and serde-stable. When extending it, follow the patterns in `.cursor/rules/rust/crates/core.mdc` and keep changes small and composable.
-
-### Adding a New Term Structure Type
-
-1. **Create a new file** under `term_structures/` (e.g., `cds_curve.rs`):
-   - Define a concrete struct and a builder with:
-     - `id: CurveId`.
-     - `base_date: Date`, `day_count: DayCount` (where applicable).
-     - Validated knot vectors (use `validate_knots` where appropriate).
-   - Implement `TermStructure` and any domain-specific traits (e.g., `Discounting`, `Forward`, `Survival`) that make sense.
-2. **Integrate interpolation**
-   - Use `math::interp::InterpStyle` and wire it through the builder.
-   - Validate monotonicity or positivity invariants as required by the domain.
-3. **Serde and state**
-   - Add a `*State` DTO if the runtime type cannot cleanly derive serde.
-   - Implement `to_state` / `from_state` if necessary and integrate with `CurveState` / `MarketContextState`.
-4. **Wire into `MarketContext`**
-   - Consider extending `CurveStorage` and `MarketContext` insert/get helpers if the new curve should be first-class.
-   - Update tests in `core/tests` to cover serialization and integration.
-
-### Adding a New Surface Type
-
-1. **Implement the surface**
-   - Add a module under `surfaces/` (e.g., `dividend_surface.rs`) with:
-     - Builder for the 2D grid (axes, values, validation).
-     - Interpolation and extrapolation helpers.
-2. **Re-export and integrate**
-   - Re-export from `surfaces/mod.rs`.
-   - If you want it addressable via `CurveId` and bumps, add:
-     - Storage in `MarketContext` (similar to `VolSurface`).
-     - `Bumpable` implementation and, if needed, `MarketBump` variants.
-3. **Serde**
-   - Add `Serialize`/`Deserialize` (or a `*State` DTO) with stable field names.
-   - Extend `MarketContextState` if the surface is stored there.
-
-### Adding New Scalars or Time-Series Types
-
-1. **Extend `MarketScalar` or add new helpers** in `scalars/primitives.rs` only when there is a broadly useful new scalar concept.
-2. **Preserve serde stability**
-   - Use `serde(rename_all = "snake_case")` and defaults for new variants/fields.
-   - Do not rename existing variants or fields.
-3. **Integrate with `MarketContext`**
-   - Use `insert_price`, `insert_series`, or new helpers if the type warrants its own map.
-   - Add tests that ensure round-trip via `MarketContextState`.
-
-### Extending Bumps and Diff Utilities
-
-- **New bump behavior**
-  - Prefer modeling domain-specific bumping inside curve/surface implementations via the internal `Bumpable` traits.
-  - Add new helpers on `BumpSpec` (e.g., new unit styles) only when there is a clear market-standard need.
-  - Keep `MarketBump` variants orthogonal and stable; avoid breaking existing variants or serde names.
-- **New diff metrics**
-  - Implement new shift-measurement helpers in `diff.rs` when:
-    - They map to concrete risk metrics (e.g., bucketed CS01, vol skews).
-    - They operate on `MarketContext` and return deterministic, well-documented values.
-  - Add tests for symmetry, sign conventions, and edge cases (missing curves/surfaces).
-
-### Extending MarketContext
-
-- When adding new stored objects:
-  - Add fields to `MarketContext` with clear doc comments.
-  - Update `MarketContextState` and its `From<&MarketContext>` / `TryFrom<MarketContextState>` implementations.
-  - Extend `stats`, `total_objects`, and any relevant iterators.
-- Avoid:
-  - Introducing hidden global state or singletons.
-  - Implicit FX conversions (all FX flows should go through `FxMatrix` and explicit policies).
-  - Renaming existing serialized fields or variants in `MarketContextState`.
-
-By following these patterns, new market data types remain **composable**, **deterministic**, and **compatible** across Rust, Python, and WASM bindings.
+New term structures go under `term_structures/` with a builder, validated knots,
+`TermStructure` trait impls, and optional `*State` DTOs. Wire into `MarketContext`
+when the type is first-class. New surfaces follow the same pattern under
+`surfaces/`. Preserve stable serde field names and add tests under
+`finstack/core/tests/market_data/`.

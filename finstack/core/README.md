@@ -1,47 +1,44 @@
 # finstack-core
 
-`finstack-core` is the foundational crate for the Finstack workspace. It owns
-the shared types and utilities that higher-level crates build on: currencies,
-money, rates, dates, calendars, market data containers, cashflow primitives,
-math helpers, configuration, and the expression engine.
+Foundational crate for the Finstack workspace: currencies, money, rates, dates,
+calendars, market data containers, cashflow primitives, math helpers,
+configuration, and the expression engine.
 
-## What This Crate Covers
+## Coverage
 
-- **Types and money**: currencies, money amounts, rates, basis points,
-  percentages, credit ratings, and other shared typed wrappers.
+- **Types and money**: currencies, monetary amounts, rates, basis points,
+  percentages, credit ratings, phantom-typed IDs
 - **Dates and calendars**: business-day conventions, holiday calendars, day
-  counts, tenors, period identifiers, fiscal period helpers, and schedule
-  utilities.
+  counts, tenors, period identifiers, schedule utilities
 - **Market data**: discount, forward, hazard, inflation, and base-correlation
-  curves, volatility surfaces, FX matrices, time series, and market contexts.
-- **Cashflow primitives**: shared dated cashflow types used across schedules
-  and pricing crates.
+  curves; volatility surfaces; FX matrices; scalars; `MarketContext`
+- **Cashflow primitives**: dated cashflow types, NPV, IRR/XIRR
 - **Math and numerics**: interpolation, solvers, integration, statistics,
-  matrix helpers, and compensated summation.
-- **Expression engine**: AST-based expression evaluation and lowering utilities
-  used by statement-oriented workflows.
-- **Configuration**: rounding policies and shared runtime settings.
+  summation, volatility helpers
+- **Expression engine**: AST-based scalar evaluation for time-series formulas
+- **Credit and factor model**: migration matrices, PD/LGD helpers, covariance
+  and matching utilities
+- **Configuration**: rounding policies and shared runtime settings
 
-## Module Map
+## Module docs
 
-The main crate-local documentation lives in the module READMEs under `src/`:
+Deeper module notes live under `src/`:
 
-- `src/README.md`
-- `src/dates/README.md`
-- `src/market_data/README.md`
-- `src/math/README.md`
-- `src/cashflow/README.md`
-- `src/expr/README.md`
-- `src/money/README.md`
-- `src/types/README.md`
+- [`src/README.md`](src/README.md)
+- [`src/dates/README.md`](src/dates/README.md)
+- [`src/market_data/README.md`](src/market_data/README.md)
+- [`src/math/README.md`](src/math/README.md)
+- [`src/cashflow/README.md`](src/cashflow/README.md)
+- [`src/expr/README.md`](src/expr/README.md)
+- [`src/money/README.md`](src/money/README.md)
+- [`src/types/README.md`](src/types/README.md)
 
-## Cargo Features
+## Cargo features
 
-`finstack-core` currently defines no crate-local Cargo features. Shared
-capabilities such as serde wire formats, tracing calls, and golden-test helpers
-are compiled as part of the crate.
+`finstack-core` defines no crate-local Cargo features. Serde wire formats,
+tracing hooks, and golden-test helpers compile unconditionally.
 
-## Typical Usage
+## Usage
 
 Depend on the crate directly:
 
@@ -50,23 +47,21 @@ Depend on the crate directly:
 finstack-core = { path = "../finstack/core" }
 ```
 
-Or consume it through the umbrella crate:
+Or through the umbrella crate:
 
 ```toml
 [dependencies]
 finstack = { path = "../finstack" }
 ```
 
-## Where It Fits
+## Related crates
 
-Reach for `finstack-core` when you need shared primitives and deterministic
-building blocks. Reach for adjacent crates when you need more specialized
-behavior:
+Use adjacent crates for domain-specific workflows:
 
-- `finstack-cashflows` for schedule construction and accrual workflows.
-- `finstack-valuations` for pricing, metrics, calibration, and attribution.
-- `finstack-statements` for financial statement modeling and evaluation.
-- `finstack-analytics` for return-series performance and risk analytics.
+- `finstack-cashflows` — schedule construction and accrual
+- `finstack-valuations` — pricing, metrics, calibration, attribution
+- `finstack-statements` — financial statement modeling
+- `finstack-analytics` — return-series performance and risk analytics
 
 ## Verification
 

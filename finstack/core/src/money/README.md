@@ -12,25 +12,14 @@ The design enforces **currency safety** (no implicit cross‑currency math), **a
 
 ## Module layout
 
-- **`mod.rs`**: public entry point
-  - Re‑exports `Money`.
-  - Exposes the `fx` submodule.
-- **`types.rs`**: implementation of the `Money` type
-  - Constructor (`new`) and accessors.
-  - Checked and unchecked arithmetic.
-  - Formatting helpers and the `money!` macro.
-  - `Money::convert` for FX‑aware conversion.
-- **`rounding.rs`**: internal rounding helpers
-  - Defines `AmountRepr = rust_decimal::Decimal`.
-  - Implements deterministic rounding and scalar math for `Money`.
-- **`fx.rs`**: FX traits and matrix
-  - `FxProvider`, `FxMatrix`, `FxConfig`, `FxQuery`, `FxConversionPolicy`, `FxRateResult`, `FxPolicyMeta`.
-  - Bounded LRU cache and simple triangulation via a pivot currency.
-- **`fx/providers.rs`**: standard FX providers
-  - `SimpleFxProvider`: in‑memory quote store with reciprocal support.
-  - `BumpedFxProvider`: wraps another provider and overrides a single pair for bump/scenario analysis.
-
-All public APIs are documented with examples in the Rustdoc comments; this README focuses on the big picture and common patterns.
+- **`mod.rs`**: re-exports `Money` and the `fx` submodule
+- **`types.rs`**: `Money` construction, checked arithmetic, formatting, `money!` macro
+- **`rounding.rs`**: internal rounding helpers (`AmountRepr = rust_decimal::Decimal`)
+- **`fx/`**: FX traits and matrix
+  - `provider.rs` — `FxProvider`, `FxRate`
+  - `matrix.rs` — `FxMatrix` with LRU cache and triangulation
+  - `types.rs` — `FxConfig`, `FxQuery`, `FxConversionPolicy`, `FxRateResult`, `FxPolicyMeta`
+  - `providers.rs` — `SimpleFxProvider`, `BumpedFxProvider`
 
 ---
 
@@ -342,40 +331,8 @@ This pattern keeps **money arithmetic currency‑safe** and **FX sourcing explic
 
 ---
 
-## Adding new features to `core::money`
+## Extending
 
-When extending this module, keep in mind the core invariants from the `core` rules:
-
-- **No implicit FX**: never introduce cross‑currency arithmetic that does not go through `FxProvider`/`FxMatrix`.
-- **Determinism and precision**: keep all arithmetic on `Decimal` (`AmountRepr`) and apply rounding via `RoundingMode` and `FinstackConfig`.
-- **Stable serde**: for any new public type, keep serialization field names and defaults stable.
-- **No `unsafe`** and no panics in public code paths (use `crate::Result<T>` and `crate::Error`).
-
-### Examples of safe extensions
-
-- **New formatting helpers for `Money`**
-  - Add methods on `Money` that build on existing rounding/formatting helpers.
-  - Do **not** change `Display` semantics without a migration plan.
-- **New FX conversion policies**
-  - Add variants to `FxConversionPolicy` (with `#[non_exhaustive]` preserved).
-  - Update documentation and tests to cover the new strategy.
-  - Adapt any providers that need to recognize the new policy.
-- **Custom FX providers**
-  - Implement `FxProvider` in a new type under `fx::providers` or another appropriate module.
-  - Keep behavior deterministic; avoid time‑dependent logic in tests.
-  - Return stable, meaningful errors when data is missing.
-- **Matrix/metadata enhancements**
-  - If you need richer FX metadata in higher‑level crates, consider extending `FxPolicyMeta` or adding dedicated `*State`/`*Spec` types that can be serialized.
-
-### Checklist for contributions
-
-- **Docs**: Add Rustdoc comments and at least one example for any new public API.
-- **Tests**:
-  - Unit tests in the `money` or `money::fx` modules.
-  - Integration/serialization tests under `finstack/core/tests/` when adding wire types or behavior relied on by bindings.
-- **Config integration**:
-  - Reuse `FinstackConfig` where rounding or FX policy behavior needs to be configurable.
-- **Bindings awareness**:
-  - Keep public APIs stable and easily mirrored in Python/WASM bindings (avoid complex generics or non‑serde‑friendly shapes for surface types).
-
-By following these patterns, new features in `core::money` will remain **deterministic, currency‑safe, and binding‑friendly** while fitting cleanly into the rest of the Finstack core.
+Keep currency safety and deterministic `Decimal` arithmetic. New FX providers
+implement `FxProvider` under `fx/providers.rs`. New `FxConversionPolicy` variants
+must preserve `#[non_exhaustive]` compatibility and stable serde names.

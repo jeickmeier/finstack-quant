@@ -265,58 +265,9 @@ let result = compiled.eval(
 
 ---
 
-## Extending the Expression Engine
+## Extending
 
-This section describes how to add **new functions** safely.
-
-### Adding a New Function
-
-1. **Add a variant to `Function` in `ast.rs`**
-   - Add a new enum case with a clear doc comment.
-   - If the function is meant for `core::expr` evaluation, keep it in the **scalar** family (no cross‑currency math, no external IO).
-   - If the function is *statements‑only*, document that clearly and ensure the core evaluator never tries to execute it.
-
-2. **Implement scalar evaluation in `eval.rs`**
-   - Add a helper like `fn eval_my_func(&self, arg_results: &[&[f64]]) -> Vec<f64>` or an `_into` variant that writes into a buffer.
-   - Update `eval_function_core` to dispatch your new `Function` variant.
-   - Prefer writing into an existing output slice when possible (see `eval_rolling_*_into`, `eval_std_into`, etc.) to minimise allocations:
-     - Reuse `ScratchArena` buffers (`tmp`, `window`) for sort‑heavy or windowed logic.
-     - Avoid per‑row allocations inside hot loops.
-
-3. **Update cost model in `dag.rs`**
-   - In `DagBuilder::estimate_cost`, add an appropriate cost estimate for the new `Function`:
-     - Cheap element‑wise ops: single‑digit cost.
-     - Multi‑pass or sorting operations: higher costs (similar to `RollingMedian`, `Rank`, `Quantile`).
-   - This influences which nodes the cache strategy recommends for caching.
-
-4. **Add tests**
-   - Add focused scalar tests in `eval.rs` (or nearby) that:
-     - Check both “normal” values and edge cases (`NaN`, zeros, small windows, etc.).
-   - If the function interacts heavily with DAG behaviour or caching, add a test in `dag.rs` or a dedicated integration‑style test that:
-     - Builds a small expression graph with shared sub‑expressions.
-     - Asserts that the new node is deduplicated and/or appears in the cache strategy as expected.
-
-5. **Update docs**
-   - Update this `README.md` and the module docs in `mod.rs` / `ast.rs` to mention the new function and its semantics.
-
-### Working with Caching
-
-If you need to tune caching behaviour beyond the defaults:
-
-- Use `CompiledExpr::with_planning(ast, meta)` to get an `ExecutionPlan` with a `CacheStrategy`.
-- Attach a cache sized for your workload with `.with_cache(budget_mb)` or per‑call via `EvalOpts.cache_budget_mb`.
-- Inspect cache behavior through expression benchmarks or by instrumenting the internal cache state when tuning budgets.
-
----
-
-## When *Not* to Use `core::expr`
-
-`core::expr` is intentionally minimal and **scalar**:
-
-- For currency‑aware arithmetic, FX, or anything that must respect `Amount`/`Currency` invariants,
-  use the higher‑level **statements**, **valuations**, or **portfolio** layers.
-- For heavy DataFrame‑level pushdown, use the statement or valuation engines built on top of this scalar layer.
-- For cross‑currency or policy‑aware math, use the dedicated primitives in `core::money`, `core::dates`, and `core::market_data`.
-
-Use `core::expr` when you need **fast, deterministic, scalar expressions over `f64` slices** with
-good caching and DAG planning, typically as a building block inside larger engines.
+Add scalar functions to `Function` in `ast.rs`, implement evaluation in
+`eval.rs`, and update cost estimates in `dag.rs`. Statement-layer functions
+(`Sum`, `Ttm`, `Annualize`, etc.) must not be dispatched from `core::expr` —
+the evaluator panics if they are invoked here.

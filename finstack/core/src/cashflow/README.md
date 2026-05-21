@@ -13,10 +13,9 @@ This module focuses on **small, composable types** and **deterministic numerics*
 ## Module Structure
 
 - **`mod.rs`**
-  - Public entrypoint for the cashflow module.
   - Re‑exports:
     - `primitives::{CashFlow, CFKind}`
-    - `discounting::{npv, Discountable}`
+    - `discounting::{npv, npv_with_ctx, npv_amounts, npv_amounts_with_ctx, npv_prediscounted_money, Discountable}`
     - `xirr::{irr, xirr, xirr_with_daycount, xirr_with_daycount_ctx}`
 - **`primitives.rs`**
   - Defines:
@@ -216,73 +215,9 @@ When integrating from higher‑level crates, treat these errors as **input valid
 
 ---
 
-## Adding New Features
+## Extending
 
-The `cashflow` module is **core infrastructure** for the rest of Finstack. When extending it, keep changes **small, deterministic, and instrument‑agnostic**.
-
-### Extending `CFKind`
-
-Add a new `CFKind` variant when you need a **new semantic classification** of cashflows that:
-
-- Is expected to be reused across multiple instruments or products.
-- Represents a distinct category for risk, accounting, or reporting (not just a view/sign change).
-
-Checklist:
-
-- Add the variant with clear doc comments that are **view‑agnostic**.
-- Do **not** change or remove existing variants or their serde names (serialization stability).
-- Add unit tests to `primitives.rs` that:
-  - Construct a `CashFlow` with the new kind.
-  - Call `validate()` to ensure invariants hold.
-
-Instrument‑specific labels or views (e.g., “BorrowerInterestOutflow”) should be modeled in the `valuations` crate on top of `CFKind`, not here.
-
-### New Cashflow Primitives or Fields
-
-If you need to extend `CashFlow` itself:
-
-- Keep the struct **compact**; check the size bound test and update it if there is a justified change.
-- Document new fields thoroughly and update `CashFlow::validate()` to enforce invariants.
-- Ensure serde wire formats remain stable:
-  - Use defaults for new optional fields.
-  - Avoid renaming existing serialized fields.
-
-### New Discounting Helpers
-
-New functionality that depends on discount curves should:
-
-- Live in `discounting.rs` (not in `primitives`).
-- Accept a `Discounting` implementation and explicit `Date` / `DayCount` arguments.
-- Enforce **currency safety**:
-  - All `Money` inputs must share the same currency.
-  - FX conversions must occur outside this module via `FxProvider`.
-- Use `signed_year_fraction` for year fractions and propagate `Result` from day‑count operations.
-- Include:
-  - Module‑level and function‑level docs with examples.
-  - Unit tests for:
-    - Empty/invalid input behavior.
-    - Happy paths with simple discount curves (e.g., flat curve in tests).
-
-### New Performance or XIRR Variants
-
-If you need additional performance metrics or alternative IRR/XIRR flavors:
-
-- Put **IRR/XIRR logic** in `xirr.rs`.
-- Reuse solvers from `math::solver` / `math::solver_multi`; do not introduce ad‑hoc solvers.
-- Follow the documentation standards:
-  - Explain the financial model and assumptions.
-  - Include formulas and references to textbooks or standards (GIPS, Excel, etc.).
-  - Provide doctested examples.
-
----
-
-## When to Use This Module vs. `valuations`
-
-- **Use `core::cashflow` when**:
-  - You need generic cashflow primitives, curve‑based NPV helpers, or IRR/XIRR calculations.
-  - You are implementing new instruments or analytics in `valuations` and need reusable building blocks.
-- **Use `valuations` when**:
-  - You are constructing full instrument pricing, risk metrics, or portfolio aggregation.
-  - You need instrument‑specific schedules, amortization logic, or embedded options.
-
-Keeping this boundary clean ensures the `core` crate remains small, deterministic, and reusable across bindings (Python, WASM) and higher‑level analytics crates.
+Add instrument-agnostic primitives only. New `CFKind` variants need stable serde
+names and view-agnostic docs. Discounting helpers belong in `discounting.rs` and
+must enforce currency safety. IRR/XIRR logic stays in `xirr.rs` using
+`math::solver` traits.

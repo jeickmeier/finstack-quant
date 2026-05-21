@@ -1,46 +1,28 @@
-# Types Module
+# Types module
 
-`finstack_core::types` is the home for the crate's small, reusable scalar/domain types.
-It currently exposes three groups of public API:
+`finstack_core::types` holds small, reusable scalar and domain types:
 
-- Phantom-typed identifiers from `id.rs`
-- Rate/unit wrappers from `rates.rs`
-- Credit-rating helpers from `ratings.rs`
+- Phantom-typed identifiers (`id.rs`)
+- Rate and unit wrappers (`rates.rs`)
+- Credit-rating helpers (`ratings.rs`)
+- Lightweight attribute bags (`attributes.rs`)
 
-The public surface is intentionally narrow. This module does **not** re-export
-`Currency`, `Date`, `OffsetDateTime`, `PrimitiveDateTime`, `Timestamp`, or
-`HashMap`. Import those from their owning modules instead.
+This module does **not** re-export `Currency`, `Date`, `OffsetDateTime`,
+`PrimitiveDateTime`, or `HashMap`. Import those from their owning modules.
 
-## Public Exports
+## Public exports
 
-From `types/mod.rs`, the current public exports are:
+From `types/mod.rs`:
 
-- IDs: `Id`, `TypeTag`, `CalendarId`, `CurveId`, `DealId`, `IndexId`, `InstrumentId`, `PoolId`, `PriceId`, `UnderlyingId`
-- Rates: `Rate`, `Bps`, `Percentage`
-- Ratings: `CreditRating`, `RatingLabel`, `RatingFactorTable`, `moodys_warf_factor`
+- **IDs**: `Id`, `CalendarId`, `CurveId`, `DealId`, `IndexId`, `InstrumentId`,
+  `IssuerId`, `PoolId`, `PriceId`, `UnderlyingId`
+- **Rates**: `Rate`, `Bps`, `Percentage`
+- **Ratings**: `CreditRating`, `RatingLabel`, `RatingFactorTable`, `moodys_warf_factor`
+- **Metadata**: `Attributes`
 
-## Module Notes
+## Usage
 
-### `id.rs`
-
-Provides strongly typed string identifiers backed by `Arc<str>` and phantom
-markers so curve, instrument, index, and other IDs cannot be mixed
-accidentally at compile time.
-
-### `rates.rs`
-
-Provides lightweight wrappers for decimal rates, basis points, and percentages.
-Use these for quoting, configuration, and rate/unit conversion rather than raw
-`f64` where units matter.
-
-### `ratings.rs`
-
-Provides normalized rating enums, notch handling, display labels, parsing, and
-factor-table helpers such as Moody's WARF mappings.
-
-## Usage Examples
-
-### Typed Identifiers
+### Typed identifiers
 
 ```rust
 use finstack_core::types::{CurveId, InstrumentId};
@@ -52,7 +34,7 @@ assert_eq!(curve_id.as_str(), "USD-OIS");
 assert_eq!(instrument_id.as_str(), "US912828XG60");
 ```
 
-### Rates and Percentages
+### Rates and percentages
 
 ```rust
 use finstack_core::types::{Bps, Percentage, Rate};
@@ -66,7 +48,7 @@ assert_eq!(spread.as_decimal(), 0.0025);
 assert_eq!(pct.as_decimal(), 0.125);
 ```
 
-### Credit Ratings
+### Credit ratings
 
 ```rust
 use finstack_core::types::{CreditRating, RatingLabel, moodys_warf_factor};
@@ -81,9 +63,11 @@ let factor = moodys_warf_factor(CreditRating::B).unwrap();
 assert_eq!(factor, 2720.0);
 ```
 
-## Extension Guidance
+## Conventions
 
-- Add new identifier aliases only when they are broadly useful across the platform.
-- Keep rate helpers deterministic and unit-explicit.
-- Keep rating parsing conservative and preserve stable external representations.
-- Treat new names in `types/mod.rs` as long-lived public API.
+- `Rate` stores decimal rates (`5%` → `0.05`)
+- `Bps` stores basis points (`25 bp` → `25.0`)
+- `Percentage` stores whole-percent values (`25%` → `25.0`)
+- Typed IDs use `Arc<str>` internally; serialization uses the string form
+
+New names added to `types/mod.rs` are long-lived public API.
