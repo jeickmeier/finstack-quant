@@ -34,7 +34,8 @@
 //! - Heston, CIR, Hull-White, jump-diffusion, Bates, and Schwartz-Smith models
 //! - [`discretization::exact::ExactGbm`] and other exact schemes
 //! - Euler / Milstein / QE discretizations, path-dependent payoffs, LSMC, Greeks,
-//!   and advanced variance reduction
+//!   control variates, and antithetic pairing (see [`variance_reduction`] and
+//!   `vr-experimental` for offline estimators)
 //! - deterministic seed helpers in [`crate::seed`]
 //! - vanilla and exotic payoffs and the core [`traits`] / [`engine`] infrastructure
 //!

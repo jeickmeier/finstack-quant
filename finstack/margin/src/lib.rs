@@ -17,10 +17,9 @@
 )]
 #![doc(test(attr(allow(clippy::expect_used))))]
 
-//! Margin, collateral, and XVA (valuation adjustments) framework.
+//! Margin, collateral, XVA configuration, and regulatory capital helpers.
 //!
-//! This crate provides a standalone home for margin and collateral primitives
-//! extracted from `finstack-valuations`.
+//! See the [crate README](../README.md) for workflows, embedded data, and examples.
 
 /// Margin calculation engines.
 pub mod calculators;
@@ -34,7 +33,7 @@ pub(crate) mod registry;
 pub mod traits;
 /// Margin and collateral domain types.
 pub mod types;
-/// XVA valuation-adjustment models and exposure engines.
+/// XVA configuration types (`types`); exposure and adjustment engines are crate-internal.
 pub mod xva;
 
 /// Regulatory capital frameworks (FRTB SBA, SA-CCR).

@@ -6,19 +6,9 @@ random streams, stochastic processes, discretization schemes, payoffs, pricing
 engines, captured-path diagnostics, variance reduction, and Monte Carlo result
 types with explicit currencies.
 
-The crate is designed around a small set of composable traits:
-
-- `RandomStream` for deterministic random-number generation
-- `StochasticProcess` for model dynamics
-- `Discretization` for time stepping
-- `Payoff` for pathwise payoff logic
-- `McEngine` for orchestration and statistics
-
-Most users start in one of three places:
-
-- `finstack_monte_carlo::prelude::*` for ergonomic imports
-- `engine::McEngine` for the fully generic simulation loop
-- `pricer::european::EuropeanPricer` for a compact GBM-only entry point
+Composable traits: `RandomStream`, `StochasticProcess`, `Discretization`, `Payoff`,
+and `McEngine`. Typical entry points: `prelude`, `engine::McEngine`, or
+`pricer::european::EuropeanPricer` for GBM Europeans only.
 
 ## What This Crate Covers
 
@@ -40,10 +30,8 @@ Available functionality:
   independent path set
 - Monte Carlo Greeks via pathwise, likelihood-ratio, and finite-difference
   estimators, including paired common-random-number variants
-  (`finite_diff_delta_crn` / `finite_diff_gamma_crn`) that report the true
-  per-path paired standard error — typically 1–2 orders of magnitude
-  tighter than the conservative independence bound, which matters when
-  sizing hedge ratios
+  (`finite_diff_delta_crn` / `finite_diff_gamma_crn`) report paired
+  standard errors from a common-random-number bump loop (serial only)
 - Online summary statistics and currency-aware pricing results
 - Optional captured-path datasets for diagnostics and visualization
 - Variance-reduction tools: antithetic pairing (engine-native) and control
@@ -211,14 +199,9 @@ captured [`ExercisePolicy`] across multiple pricing scenarios.
 
 Finite-difference Greeks come in two flavours:
 
-- The default `finite_diff_delta` / `finite_diff_gamma` report a
-  conservative independence-bound stderr that overstates the true error by
-  one to two orders of magnitude when CRN cancellation kicks in.
-- The paired variants `finite_diff_delta_crn` / `finite_diff_gamma_crn`
-  drive a per-path paired loop and report the true paired standard error —
-  use them whenever the stderr will be propagated into hedge sizing or risk
-  budgets. They are serial-only (paired stderr requires deterministic
-  per-path pairing).
+- `finite_diff_delta` / `finite_diff_gamma` use an independence-bound stderr.
+- `finite_diff_delta_crn` / `finite_diff_gamma_crn` use per-path paired bumps
+  and report paired stderr (serial only).
 
 ```rust,no_run
 use finstack_core::currency::Currency;
@@ -493,5 +476,5 @@ Useful anchors include:
 - [`#heston-1993`](../../docs/REFERENCES.md#heston-1993)
 - [`#hull-options-futures`](../../docs/REFERENCES.md#hull-options-futures)
 
-Module-level docs should remain the source of truth for process-specific
-assumptions, model conventions, and numerical-method details.
+Process- and scheme-specific assumptions live in module docs under `src/`.
+See [`src/README.md`](src/README.md) for the directory map.
