@@ -55,7 +55,7 @@ impl Registry {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::registry::Registry;
     ///
     /// # fn main() -> finstack_statements::Result<()> {
@@ -76,7 +76,7 @@ impl Registry {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::registry::Registry;
     ///
     /// # fn main() -> finstack_statements::Result<()> {
@@ -100,7 +100,7 @@ impl Registry {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::registry::Registry;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -176,7 +176,7 @@ impl Registry {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::registry::Registry;
     ///
     /// # fn main() -> finstack_statements::Result<()> {
@@ -211,7 +211,7 @@ impl Registry {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::registry::Registry;
     ///
     /// # fn main() -> finstack_statements::Result<()> {

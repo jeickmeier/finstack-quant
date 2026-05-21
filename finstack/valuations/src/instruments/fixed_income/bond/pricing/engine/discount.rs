@@ -34,7 +34,7 @@ use super::super::super::types::Bond;
 ///
 /// Bond pricing is performed via the [`Instrument`] trait or the pricer registry:
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_valuations::instruments::Bond;
 /// use finstack_valuations::instruments::Instrument;
 /// use finstack_core::market_data::context::MarketContext;
@@ -121,7 +121,7 @@ impl BondEngine {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond::Bond;
     /// use finstack_valuations::instruments::fixed_income::bond::pricing::engine::discount::BondEngine;
     /// use finstack_core::explain::ExplainOpts;

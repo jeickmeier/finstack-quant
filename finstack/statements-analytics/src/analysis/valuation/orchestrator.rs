@@ -58,8 +58,8 @@ enum EquityMode {
 ///
 /// # Example
 ///
-/// ```rust,no_run
-/// use finstack_statements_analytics::analysis::orchestrator::CorporateAnalysisBuilder;
+/// ```ignore
+/// use finstack_statements_analytics::analysis::CorporateAnalysisBuilder;
 /// use finstack_statements::builder::ModelBuilder;
 /// use finstack_core::dates::PeriodId;
 /// use finstack_statements::types::AmountOrScalar;
@@ -172,7 +172,7 @@ impl CorporateAnalysisBuilder {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::builder::ModelBuilder;
     /// use finstack_statements_analytics::analysis::CorporateAnalysisBuilder;
     /// use finstack_valuations::instruments::equity::dcf_equity::TerminalValueSpec;

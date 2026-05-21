@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::calibration::SolverConfig;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {

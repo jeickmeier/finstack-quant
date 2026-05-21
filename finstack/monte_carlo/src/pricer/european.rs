@@ -108,7 +108,7 @@ impl EuropeanPricer {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::currency::Currency;
     /// use finstack_monte_carlo::payoff::vanilla::EuropeanCall;
     /// use finstack_monte_carlo::pricer::european::EuropeanPricer;

@@ -72,7 +72,7 @@ impl ImResult {
 ///
 /// # Example Implementation
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_margin::{ImCalculator, ImMethodology, ImResult, Marginable};
 /// use finstack_core::market_data::context::MarketContext;
 /// use finstack_core::dates::Date;

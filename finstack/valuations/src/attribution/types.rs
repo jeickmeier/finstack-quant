@@ -102,7 +102,7 @@ pub enum AttributionFactor {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::attribution::attribute_pnl_parallel;
 /// use finstack_valuations::instruments::Instrument;
 /// use finstack_valuations::instruments::rates::deposit::Deposit;

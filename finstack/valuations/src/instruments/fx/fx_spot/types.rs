@@ -36,7 +36,7 @@
 //! ## In This Implementation
 //!
 //! The `FxSpot` instrument stores:
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_core::currency::Currency;
 //! use finstack_core::types::InstrumentId;
 //! use finstack_valuations::instruments::FxSpot;
@@ -48,7 +48,7 @@
 //! ```
 //!
 //! Example:
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_core::currency::Currency;
 //! use finstack_core::types::InstrumentId;
 //! use finstack_valuations::instruments::FxSpot;

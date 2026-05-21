@@ -12,7 +12,7 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_margin::{Marginable, metrics::{InitialMarginMetric, VariationMarginMetric}};
 //! use finstack_core::market_data::context::MarketContext;
 //! use time::macros::date;

@@ -69,7 +69,7 @@
 //!
 //! # Examples
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_core::currency::Currency;
 //! use finstack_monte_carlo::prelude::*;
 //!

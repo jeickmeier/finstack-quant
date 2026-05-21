@@ -52,7 +52,7 @@
 //!
 //! ## Loading fixtures
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_test_utils::golden::{load_suite_from_path, is_suite_ready};
 //! use finstack_test_utils::golden_path;
 //!
@@ -72,7 +72,7 @@
 //!
 //! ## Making assertions
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_test_utils::golden::{GoldenAssert, assert_abs, Tolerance};
 //! use finstack_test_utils::golden_assert;
 //!
@@ -88,7 +88,7 @@
 //!
 //! ## Path macros
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_test_utils::{golden_path, golden_data_dir, golden_dir};
 //!
 //! // Get paths relative to calling crate's CARGO_MANIFEST_DIR

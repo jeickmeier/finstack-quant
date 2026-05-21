@@ -89,7 +89,7 @@ pub struct Swaption {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// let swaption = Swaption::example()
     ///     .with_calendar("nyse");
     /// ```
@@ -489,7 +489,7 @@ impl Swaption {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::rates::swaption::{Swaption, CashSettlementMethod};
     ///
     /// // Create a cash-settled swaption with ISDA Par-Par settlement

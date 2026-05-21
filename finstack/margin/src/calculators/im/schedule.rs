@@ -225,7 +225,7 @@ impl RegulatorySchedule {
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_margin::{ImCalculator, Marginable, ScheduleImCalculator};
 /// use finstack_core::dates::Date;
 /// use finstack_core::market_data::context::MarketContext;

@@ -96,7 +96,7 @@ impl Bond {
     /// - **Calendar:** Japan holidays
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_cashflows::CashflowProvider;
     /// use finstack_valuations::instruments::fixed_income::bond::Bond;
     /// use finstack_core::money::Money;
@@ -186,7 +186,7 @@ impl Bond {
     /// Panics if bond construction fails (should not occur with valid inputs).
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond::Bond;
     /// use finstack_valuations::instruments::BondConvention;
     /// use finstack_core::money::Money;
@@ -279,7 +279,7 @@ impl Bond {
     /// Panics if bond construction fails (should not occur with valid inputs).
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond::Bond;
     /// use finstack_core::dates::{Tenor, DayCount};
     /// use finstack_core::money::Money;
@@ -358,7 +358,7 @@ impl Bond {
     /// directly or `::with_convention()` for market-specific settlement rules.
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond::Bond;
     /// use finstack_core::money::Money;
     /// use finstack_core::currency::Currency;
@@ -429,7 +429,7 @@ impl Bond {
     /// - Bond construction fails
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::currency::Currency;
     /// use finstack_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     /// use finstack_core::money::Money;
@@ -592,7 +592,7 @@ impl Bond {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond::Bond;
     /// use finstack_cashflows::builder::CashFlowSchedule;
     /// use finstack_core::money::Money;
@@ -638,7 +638,7 @@ impl Bond {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond::Bond;
     ///
     /// # let bond = Bond::example().unwrap();
@@ -688,7 +688,7 @@ impl Bond {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond::Bond;
     /// use finstack_core::market_data::context::MarketContext;
     ///

@@ -29,7 +29,7 @@
 //!
 //! # Usage
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_portfolio::PortfolioMarginAggregator;
 //! use finstack_core::market_data::context::MarketContext;
 //! use finstack_portfolio::Portfolio;

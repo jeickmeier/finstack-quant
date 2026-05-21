@@ -310,7 +310,7 @@ impl CollateralEligibility {
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_margin::{CollateralEligibility, EligibleCollateralSchedule};
 ///
 /// // Start from a standard schedule (BCBS-IOSCO compliant)

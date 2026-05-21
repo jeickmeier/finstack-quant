@@ -52,7 +52,7 @@ use finstack_core::Result;
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_valuations::instruments::commodity::CommoditySpreadOption;
 /// use finstack_valuations::instruments::OptionType;
 /// use finstack_core::types::{CurveId, InstrumentId};

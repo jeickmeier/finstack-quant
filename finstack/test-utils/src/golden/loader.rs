@@ -26,7 +26,7 @@ use std::path::Path;
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_test_utils::golden::load_suite_from_path;
 ///
 /// let suite = load_suite_from_path::<MyTestCase>("tests/golden/data/my_suite.json")?;
@@ -103,7 +103,7 @@ where
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_test_utils::golden::load_cases_from_dir;
 ///
 /// let cases = load_cases_from_dir::<CdsVector>("tests/golden/cds/", Some("schema"))?;
@@ -207,7 +207,7 @@ pub fn is_suite_ready(meta: &SuiteMeta, label: &str) -> bool {
 ///
 /// This is typically used in test code:
 ///
-/// ```rust,ignore
+/// ```ignore
 /// let path = golden_path(env!("CARGO_MANIFEST_DIR"), "data/my_suite.json");
 /// ```
 pub fn golden_path(manifest_dir: &str, relative_path: &str) -> std::path::PathBuf {
@@ -240,7 +240,7 @@ pub fn golden_dir(manifest_dir: &str) -> std::path::PathBuf {
 ///
 /// # Usage
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_test_utils::golden_path;
 ///
 /// let path = golden_path!("data/my_suite.json");
@@ -257,7 +257,7 @@ macro_rules! golden_path {
 ///
 /// # Usage
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_test_utils::golden_data_dir;
 ///
 /// let dir = golden_data_dir!();
@@ -274,7 +274,7 @@ macro_rules! golden_data_dir {
 ///
 /// # Usage
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_test_utils::golden_dir;
 ///
 /// let dir = golden_dir!();

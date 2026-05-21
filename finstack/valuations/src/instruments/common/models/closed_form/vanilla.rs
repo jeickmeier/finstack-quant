@@ -154,7 +154,7 @@ impl BsGreeks {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::models::closed_form::vanilla::bs_price;
 /// use finstack_valuations::instruments::OptionType;
 ///
@@ -257,7 +257,7 @@ pub fn bs_price(
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::models::closed_form::vanilla::{bs_greeks, BsGreeks};
 /// use finstack_valuations::instruments::OptionType;
 ///

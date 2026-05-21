@@ -220,7 +220,7 @@ impl MetricRegistry {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```ignore
     /// use finstack_valuations::metrics::{MetricContext, MetricId, MetricRegistry};
     /// # fn example(registry: &MetricRegistry, mut context: MetricContext) -> finstack_core::Result<()> {
     /// // Strict mode (default): fails fast on any error

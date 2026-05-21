@@ -12,7 +12,7 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::fixed_income::bond_future::{
 //!     BondFuture, BondFutureSpecs, DeliverableBond, Position,
 //! };

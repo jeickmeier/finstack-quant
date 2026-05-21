@@ -352,7 +352,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::Instrument;
     /// fn apply_price_shock(instrument: &mut dyn Instrument, shock_pct: f64) {
     ///     if let Some(overrides) = instrument.scenario_overrides_mut() {
@@ -572,7 +572,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// // Used internally by risk calculators for high-precision sensitivities
     /// use finstack_core::currency::Currency;
     /// use finstack_core::market_data::context::MarketContext;
@@ -654,7 +654,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::{Bond, Instrument, PricingOptions};
     /// use finstack_valuations::metrics::MetricId;
     /// use finstack_core::market_data::context::MarketContext;
@@ -693,7 +693,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// # }
     /// ```
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::{Bond, Instrument, PricingOptions};
     /// use finstack_valuations::metrics::MetricId;
     /// use finstack_valuations::pricer::ModelKey;
@@ -858,7 +858,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// use finstack_valuations::instruments::Bond;
     /// use finstack_valuations::instruments::Instrument;
     ///

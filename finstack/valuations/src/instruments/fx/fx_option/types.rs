@@ -362,7 +362,7 @@ impl FxOption {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// let spot = 1.10; // EUR/USD
     /// let df_domestic = 0.97; // USD discount factor
     /// let df_foreign = 0.98; // EUR discount factor
@@ -398,7 +398,7 @@ impl FxOption {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// let forward = 1.111;
     /// let vol = 0.10; // 10% vol
     /// let t = 0.5; // 6 months

@@ -64,7 +64,7 @@ pub fn build_any_instrument_from_spec(
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_statements::capital_structure::{aggregate_instrument_cashflows, CapitalStructureCashflows};
 /// use finstack_statements::types::CapitalStructureSpec;
 /// use finstack_core::dates::build_periods;

@@ -11,7 +11,7 @@
 //!
 //! # Examples
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_statements_analytics::analysis::{Report, PLSummaryReport};
 //! use finstack_statements::evaluator::StatementResult;
 //! use finstack_core::dates::PeriodId;

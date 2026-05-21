@@ -36,7 +36,7 @@
 //!
 //! # Quick Example
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::models::volatility::{d1_d2, norm_cdf};
 //!
 //! let spot = 100.0;

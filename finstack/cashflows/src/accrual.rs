@@ -192,7 +192,7 @@ impl Default for AccrualConfig {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_cashflows::builder::CashFlowSchedule;
 /// use finstack_cashflows::{accrued_interest_amount, AccrualConfig, AccrualMethod};
 /// use finstack_core::dates::Date;

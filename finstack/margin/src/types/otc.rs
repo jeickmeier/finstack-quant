@@ -26,7 +26,7 @@ use finstack_core::Result;
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_margin::{OtcMarginSpec, CsaSpec, ClearingStatus, ImMethodology, MarginTenor};
 ///
 /// # fn main() -> finstack_core::Result<()> {

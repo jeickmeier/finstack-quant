@@ -95,7 +95,7 @@ fn scaled_bucketed_vega_matrix(
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_valuations::instruments::EquityOption;
 /// use finstack_valuations::metrics::KeyRateVega;
 ///
@@ -123,7 +123,7 @@ impl<I> KeyRateVega<I> {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// // KeyRateVega is internal - use MetricId::KeyRateVega via price_with_metrics
     /// use finstack_valuations::metrics::sensitivities::vega::KeyRateVega;
     /// use finstack_valuations::instruments::EquityOption;
@@ -147,7 +147,7 @@ impl<I> KeyRateVega<I> {
     ///
     /// # Examples
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// // KeyRateVega is internal - use MetricId::KeyRateVega via price_with_metrics
     /// use finstack_valuations::metrics::sensitivities::vega::KeyRateVega;
     /// use finstack_valuations::instruments::EquityOption;

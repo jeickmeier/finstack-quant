@@ -153,7 +153,7 @@ pub(crate) fn scaled_central_diff_by_width(
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```ignore
 /// // This function is internal - use Delta metric calculators for public API
 /// use finstack_valuations::metrics::core::finite_difference::bump_scalar_price;
 /// use finstack_core::market_data::context::MarketContext;
@@ -258,7 +258,7 @@ where
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```ignore
 /// // This function is internal - use DV01 metric calculators for public API
 /// use finstack_valuations::metrics::core::finite_difference::bump_discount_curve_parallel;
 /// use finstack_core::market_data::context::MarketContext;

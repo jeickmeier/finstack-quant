@@ -610,7 +610,7 @@ impl FloatingLegParams {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// use finstack_valuations::instruments::common_impl::pricing::swap_legs::FloatingLegParams;
     ///
     /// // Standard USD SOFR swap: 2-day lookback, 2-day payment delay

@@ -116,7 +116,7 @@ pub struct TotalReturnLegParams<'a> {
 ///
 /// # Example Implementation
 ///
-/// ```rust,ignore
+/// ```ignore
 /// impl TrsReturnModel for EquityReturn {
 ///     fn period_return(
 ///         &self,

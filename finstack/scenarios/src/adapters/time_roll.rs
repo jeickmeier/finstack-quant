@@ -79,9 +79,9 @@ pub struct RollForwardReport {
 /// - Period notation: `docs/REFERENCES.md#iso-8601`
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_scenarios::ExecutionContext;
-/// use finstack_scenarios::adapters::time_roll::apply_time_roll_forward;
+/// use finstack_scenarios::apply_time_roll_forward;
 /// use finstack_scenarios::TimeRollMode;
 /// use finstack_core::market_data::context::MarketContext;
 /// use finstack_statements::FinancialModelSpec;

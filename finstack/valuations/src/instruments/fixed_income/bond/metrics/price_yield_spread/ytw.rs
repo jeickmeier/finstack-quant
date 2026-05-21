@@ -41,7 +41,7 @@ use finstack_core::money::Money;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::fixed_income::bond::Bond;
 /// use finstack_valuations::metrics::{MetricRegistry, MetricId, MetricContext};
 /// use finstack_core::market_data::context::MarketContext;

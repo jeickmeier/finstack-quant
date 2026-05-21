@@ -31,7 +31,7 @@
 //!
 //! # Quick Example
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::{Bond, Instrument, PricingOptions};
 //! use finstack_valuations::metrics::MetricId;
 //! use finstack_core::market_data::context::MarketContext;

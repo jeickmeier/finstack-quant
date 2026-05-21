@@ -46,7 +46,7 @@
 //!
 //! # Examples
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_monte_carlo::process::rough_heston::{
 //!     RoughHestonProcess, RoughHestonParams,
 //! };

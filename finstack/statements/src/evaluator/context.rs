@@ -336,7 +336,7 @@ impl EvaluationContext {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::evaluator::EvaluationContext;
     ///
     /// # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {

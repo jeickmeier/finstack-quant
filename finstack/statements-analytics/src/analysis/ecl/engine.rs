@@ -156,7 +156,7 @@ impl EclConfig {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_statements_analytics::analysis::ecl::{
+/// use finstack_statements_analytics::analysis::{
 ///     EclConfigBuilder, LgdType, MacroScenario,
 /// };
 ///
@@ -376,7 +376,7 @@ pub struct ExposureEclResult {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_statements_analytics::analysis::ecl::{
+/// use finstack_statements_analytics::analysis::{
 ///     compute_ecl_single, EclConfig, Exposure, QualitativeFlags, RawPdCurve, Stage,
 /// };
 ///
@@ -495,7 +495,7 @@ pub fn compute_ecl_single(
 /// # Examples
 ///
 /// ```rust
-/// use finstack_statements_analytics::analysis::ecl::{
+/// use finstack_statements_analytics::analysis::{
 ///     compute_ecl_weighted, EclConfig, Exposure, MacroScenario, PdTermStructure,
 ///     QualitativeFlags, RawPdCurve, Stage,
 /// };
@@ -641,7 +641,7 @@ fn validate_scenario_weights<'a>(
 /// # Examples
 ///
 /// ```rust
-/// use finstack_statements_analytics::analysis::ecl::{
+/// use finstack_statements_analytics::analysis::{
 ///     EclConfig, EclEngine, MacroScenario, PdTermStructure, RawPdCurve,
 /// };
 ///

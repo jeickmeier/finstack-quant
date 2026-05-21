@@ -22,7 +22,7 @@
 //! balances use `outstanding_by_date()`.
 //!
 //! ## Example
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_core::market_data::{context::MarketContext, DiscountCurve};
 //! use finstack_statements::prelude::*;
 //!

@@ -70,7 +70,7 @@ use serde::{Deserialize, Serialize};
 /// use finstack_statements::builder::ModelBuilder;
 /// use finstack_statements::evaluator::Evaluator;
 /// use finstack_statements::types::AmountOrScalar;
-/// use finstack_statements_analytics::analysis::credit::AdjustedNetDebtSpec;
+/// use finstack_statements_analytics::analysis::AdjustedNetDebtSpec;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let period = PeriodId::quarter(2025, 1);
@@ -130,7 +130,7 @@ impl AdjustedNetDebtSpec {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_statements_analytics::analysis::credit::AdjustedNetDebtSpec;
+    /// use finstack_statements_analytics::analysis::AdjustedNetDebtSpec;
     ///
     /// let spec = AdjustedNetDebtSpec::builder("debt".into())
     ///     .cash("cash".into())
@@ -182,7 +182,7 @@ impl AdjustedNetDebtSpec {
     /// use finstack_statements::builder::ModelBuilder;
     /// use finstack_statements::evaluator::Evaluator;
     /// use finstack_statements::types::AmountOrScalar;
-    /// use finstack_statements_analytics::analysis::credit::AdjustedNetDebtSpec;
+    /// use finstack_statements_analytics::analysis::AdjustedNetDebtSpec;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let period = PeriodId::quarter(2025, 1);
@@ -259,7 +259,7 @@ impl AdjustedNetDebtSpec {
     /// use finstack_statements::builder::ModelBuilder;
     /// use finstack_statements::evaluator::Evaluator;
     /// use finstack_statements::types::AmountOrScalar;
-    /// use finstack_statements_analytics::analysis::credit::AdjustedNetDebtSpec;
+    /// use finstack_statements_analytics::analysis::AdjustedNetDebtSpec;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let q1 = PeriodId::quarter(2025, 1);
@@ -414,7 +414,7 @@ impl AdjustedNetDebtSpecBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_statements_analytics::analysis::credit::AdjustedNetDebtSpec;
+    /// use finstack_statements_analytics::analysis::AdjustedNetDebtSpec;
     ///
     /// let spec = AdjustedNetDebtSpec::builder("debt".into())
     ///     .cash("cash".into())

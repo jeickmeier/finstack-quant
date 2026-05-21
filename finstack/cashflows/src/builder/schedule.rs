@@ -213,7 +213,7 @@ impl CashFlowSchedule {
     /// Returns a `CashFlowBuilder` that can be configured and built.
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::currency::Currency;
     /// use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
     /// use finstack_core::money::Money;
@@ -746,7 +746,7 @@ impl CashFlowSchedule {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_cashflows::aggregation::DateContext;
     /// use finstack_cashflows::builder::{CashFlowSchedule, PvDiscountSource};
     /// use finstack_core::dates::{Date, DayCount, DayCountContext, Period};

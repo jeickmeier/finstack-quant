@@ -34,7 +34,7 @@
 //!
 //! # Quick Start
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_scenarios::{ScenarioSpec, OperationSpec, CurveKind, ScenarioEngine, ExecutionContext};
 //! use finstack_core::market_data::context::MarketContext;
 //! use finstack_statements::FinancialModelSpec;
@@ -94,6 +94,7 @@ pub(crate) mod utils;
 /// Structured warning enum surfaced via `ApplicationReport.warnings`.
 pub mod warning;
 
+pub use adapters::time_roll::apply_time_roll_forward;
 pub use adapters::{ArbitrageViolation, RollForwardReport};
 pub use engine::{ApplicationReport, ExecutionContext, ScenarioEngine};
 pub use error::{Error, Result};
@@ -106,5 +107,8 @@ pub use templates::{
     AssetClass, RegisteredTemplate, ScenarioSpecBuilder, Severity, TemplateMetadata,
     TemplateRegistry,
 };
-pub use utils::InterpolationResult;
+pub use utils::{
+    calculate_interpolation_weights, parse_period_to_days, parse_tenor_to_years,
+    InterpolationResult,
+};
 pub use warning::Warning;

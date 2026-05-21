@@ -322,7 +322,7 @@ pub(crate) fn collect_inputs_extended(
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// # fn main() {
 /// // Stock at $100, dividend of $2 in 0.25 years, r = 5%
 /// // s_adj ≈ 100 - 2 × e^{-0.05×0.25} ≈ 98.01

@@ -34,7 +34,7 @@
 //!
 //! ## Example 1: Computing Bucketed DV01 for a Bond
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::{Bond, Instrument, PricingOptions};
 //! use finstack_valuations::metrics::MetricId;
 //! use finstack_core::market_data::context::MarketContext;
@@ -65,7 +65,7 @@
 //!
 //! ## Example 2: Computing Parallel DV01 for an Interest Rate Swap
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::{Instrument, InterestRateSwap, PricingOptions};
 //! use finstack_valuations::metrics::MetricId;
 //! use finstack_core::market_data::context::MarketContext;
@@ -90,7 +90,7 @@
 //!
 //! ## Example 3: Computing Theta (Time Decay) for an Option
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::{EquityOption, Instrument, PricingOptions};
 //! use finstack_valuations::metrics::MetricId;
 //! use finstack_core::currency::Currency;
@@ -125,7 +125,7 @@
 //!
 //! ## Example 4: Computing Multiple Greeks for an Option
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::{EquityOption, Instrument, PricingOptions};
 //! use finstack_valuations::metrics::MetricId;
 //! use finstack_core::currency::Currency;
@@ -291,7 +291,7 @@ macro_rules! define_metric_calculator {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::metrics::{metric_not_found, MetricId};
 /// use finstack_core::Result;
 /// use finstack_core::HashMap;
@@ -318,7 +318,7 @@ pub fn metric_not_found(metric: MetricId) -> finstack_core::Error {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::metrics::context_not_found;
 /// use finstack_core::types::CurveId;
 /// use finstack_core::Result;

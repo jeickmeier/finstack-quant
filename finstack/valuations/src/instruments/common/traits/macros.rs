@@ -15,7 +15,7 @@
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```ignore
 /// impl Instrument for MyInstrument {
 ///     impl_instrument_base!(InstrumentType::MyInstrument);
 ///

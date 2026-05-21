@@ -22,7 +22,7 @@
 //!
 //! # Quick Example
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_valuations::instruments::rates::InterestRateSwap;
 //! use finstack_valuations::instruments::{FixedLegSpec, FloatLegSpec};
 //! use finstack_valuations::instruments::rates::irs::{FloatingLegCompounding, PayReceive};
@@ -33,6 +33,7 @@
 //! use rust_decimal_macros::dec;
 //! use time::macros::date;
 //!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a 5-year USD payer swap (pay fixed, receive floating)
 //! let swap = InterestRateSwap::builder()
 //!     .id(InstrumentId::new("IRS-5Y-USD"))
@@ -41,13 +42,14 @@
 //!     .fixed(FixedLegSpec {
 //!         discount_curve_id: "USD-OIS".into(),
 //!         rate: dec!(0.04),  // 4% fixed rate
-//!         freq: Tenor::semi_annual(),
-//!         dc: DayCount::Thirty360,
+//!         frequency: Tenor::semi_annual(),
+//!         day_count: DayCount::Thirty360,
 //!         bdc: BusinessDayConvention::ModifiedFollowing,
 //!         calendar_id: Some("usny".to_string()),
 //!         stub: StubKind::None,
 //!         start: date!(2025-01-15),
 //!         end: date!(2030-01-15),
+//!         end_of_month: false,
 //!         par_method: None,
 //!         compounding_simple: true,
 //!         payment_lag_days: 0,
@@ -56,8 +58,8 @@
 //!         discount_curve_id: "USD-OIS".into(),
 //!         forward_curve_id: "USD-SOFR-3M".into(),
 //!         spread_bp: dec!(0.0),
-//!         freq: Tenor::quarterly(),
-//!         dc: DayCount::Act360,
+//!         frequency: Tenor::quarterly(),
+//!         day_count: DayCount::Act360,
 //!         bdc: BusinessDayConvention::ModifiedFollowing,
 //!         calendar_id: Some("usny".to_string()),
 //!         stub: StubKind::None,
@@ -65,11 +67,13 @@
 //!         fixing_calendar_id: None,
 //!         start: date!(2025-01-15),
 //!         end: date!(2030-01-15),
+//!         end_of_month: false,
 //!         compounding: FloatingLegCompounding::Simple,
 //!         payment_lag_days: 0,
 //!     })
 //!     .build()?;
 //! swap.validate()?;
+//! # Ok(()) }
 //! ```
 //!
 //! # Risk Metrics

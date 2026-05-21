@@ -444,7 +444,7 @@ where
 ///
 /// # Usage
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_test_utils::golden_assert;
 ///
 /// golden_assert!(assert_abs("suite", "case", "metric", actual, expected, 0.01));
@@ -462,7 +462,7 @@ macro_rules! golden_assert {
 ///
 /// # Usage
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_test_utils::golden_check;
 ///
 /// let mut errors = Vec::new();
@@ -489,7 +489,7 @@ macro_rules! golden_check {
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_test_utils::golden::GoldenAssert;
 ///
 /// let assert = GoldenAssert::new(&suite.meta, "case_123");

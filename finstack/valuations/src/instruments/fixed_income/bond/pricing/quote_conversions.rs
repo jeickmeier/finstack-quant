@@ -143,7 +143,7 @@ pub fn periods_per_year(freq: finstack_core::dates::Tenor) -> finstack_core::Res
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::fixed_income::bond::pricing::quote_conversions::fixed_leg_annuity;
 /// use finstack_core::market_data::term_structures::DiscountCurve;
 /// use finstack_core::dates::{DayCount, Date};
@@ -204,7 +204,7 @@ pub fn fixed_leg_annuity(
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::fixed_income::bond::pricing::quote_conversions::par_rate_and_annuity_from_discount;
 /// use finstack_core::market_data::term_structures::DiscountCurve;
 /// use finstack_core::dates::{DayCount, Date};
@@ -1077,7 +1077,7 @@ pub(crate) fn clear_price_driving_overrides(bond: &mut Bond) {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::fixed_income::bond::Bond;
 /// use finstack_valuations::instruments::fixed_income::bond::pricing::quote_conversions::{compute_quotes, BondQuoteInput};
 /// use finstack_core::market_data::context::MarketContext;

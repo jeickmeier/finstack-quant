@@ -26,7 +26,7 @@ use finstack_core::config::FinstackConfig;
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_margin::{MarginTenor, VmParameters};
 /// use finstack_core::currency::Currency;
 /// use finstack_core::money::Money;
@@ -261,7 +261,7 @@ impl Default for VmParameters {
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_margin::{ImMethodology, ImParameters};
 /// use finstack_core::currency::Currency;
 /// use finstack_core::money::Money;

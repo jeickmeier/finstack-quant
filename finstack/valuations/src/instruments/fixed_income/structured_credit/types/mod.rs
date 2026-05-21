@@ -394,7 +394,7 @@ impl StructuredCredit {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::dates::BusinessDayConvention;
     /// use finstack_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
     ///

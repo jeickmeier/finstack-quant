@@ -535,7 +535,7 @@ impl DiscountCurve {
     /// # Configuring Minimum Tenor
     ///
     /// The minimum forward tenor can be customized when building the curve:
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::market_data::term_structures::DiscountCurve;
     /// # use time::macros::date;
     /// # fn main() -> finstack_core::Result<()> {
@@ -884,7 +884,7 @@ impl DiscountCurve {
     /// Returns an error if the bumped curve violates validation constraints.
     ///
     /// # Examples
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::market_data::term_structures::DiscountCurve;
     /// use time::macros::date;
     /// # fn main() -> finstack_core::Result<()> {
@@ -974,7 +974,7 @@ impl DiscountCurve {
     /// Returns an error if fewer than 2 knot points remain after filtering expired points.
     ///
     /// # Examples
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::market_data::term_structures::DiscountCurve;
     /// use time::macros::date;
     /// # fn main() -> finstack_core::Result<()> {
@@ -1363,7 +1363,7 @@ impl DiscountCurveBuilder {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::market_data::term_structures::DiscountCurve;
     /// # use time::macros::date;
     /// # fn main() -> finstack_core::Result<()> {

@@ -42,8 +42,9 @@
 //!
 //! # Examples
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_valuations::error::{CorrelationError, Error, PricingError, ValidationError};
+//! use finstack_valuations::pricer::InstrumentType;
 //!
 //! // Domain errors automatically wrap into the unified type
 //! let pricing_err: Error = PricingError::type_mismatch(

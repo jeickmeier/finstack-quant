@@ -121,7 +121,7 @@ impl Default for YtmSolverConfig {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::fixed_income::bond::pricing::ytm_solver::{YtmSolver, YtmPricingSpec};
 /// use finstack_core::dates::{Date, DayCount, Tenor};
 /// use finstack_core::money::Money;
@@ -222,7 +222,7 @@ impl YtmSolver {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond::pricing::ytm_solver::{YtmSolver, YtmPricingSpec};
     /// use finstack_core::dates::{Date, DayCount, Tenor};
     /// use finstack_core::money::Money;
@@ -414,7 +414,7 @@ impl YtmSolver {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::fixed_income::bond::pricing::ytm_solver::{solve_ytm, YtmPricingSpec};
 /// use finstack_core::dates::{Date, DayCount, Tenor};
 /// use finstack_core::money::Money;

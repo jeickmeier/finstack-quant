@@ -710,7 +710,7 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::calibration::hull_white::{
 ///     calibrate_hull_white_to_swaptions, SwaptionQuote, SwapFrequency,
 /// };

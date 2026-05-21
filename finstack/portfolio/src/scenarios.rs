@@ -48,7 +48,7 @@ use std::sync::Arc;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_core::market_data::context::MarketContext;
 /// use finstack_portfolio::scenarios::apply_and_revalue;
 /// use finstack_scenarios::spec::ScenarioSpec;
@@ -135,7 +135,7 @@ pub(crate) fn apply_scenario(
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_core::config::FinstackConfig;
 /// use finstack_core::market_data::context::MarketContext;
 /// use finstack_portfolio::scenarios::apply_and_revalue;

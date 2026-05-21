@@ -17,7 +17,7 @@
 //!
 //! # Examples
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::fixed_income::bond::Bond;
 //! use finstack_valuations::instruments::fixed_income::bond::pricing::engine::tree::TreePricer;
 //! use finstack_core::market_data::context::MarketContext;

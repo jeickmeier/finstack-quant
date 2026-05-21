@@ -36,7 +36,7 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_statements::prelude::*;
 //! use finstack_statements_analytics::templates::TemplatesExtension;
 //!

@@ -47,7 +47,7 @@ use finstack_core::dates::{BusinessDayConvention, Date, DayCount, HolidayCalenda
 ///
 /// # Examples
 /// ```
-/// # use finstack_scenarios::utils::parse_tenor_to_years;
+/// # use finstack_scenarios::parse_tenor_to_years;
 /// assert!((parse_tenor_to_years("1Y").unwrap() - 1.0).abs() < 1e-6);
 /// assert!((parse_tenor_to_years("6M").unwrap() - 0.5).abs() < 1e-6);
 /// assert!((parse_tenor_to_years("1W").unwrap() - (7.0 / 365.0)).abs() < 1e-3);
@@ -212,7 +212,7 @@ pub fn tenor_years_from_binding(
 ///
 /// # Examples
 /// ```
-/// # use finstack_scenarios::utils::parse_period_to_days;
+/// # use finstack_scenarios::parse_period_to_days;
 /// assert_eq!(parse_period_to_days("1D").unwrap(), 1);
 /// assert_eq!(parse_period_to_days("1W").unwrap(), 7);
 /// assert_eq!(parse_period_to_days("1M").unwrap(), 30); // 365/12 rounded
@@ -260,7 +260,7 @@ pub struct InterpolationResult {
 /// # Example
 ///
 /// ```rust
-/// use finstack_scenarios::utils::calculate_interpolation_weights;
+/// use finstack_scenarios::calculate_interpolation_weights;
 ///
 /// let knots = vec![1.0, 2.0, 5.0, 10.0];
 ///

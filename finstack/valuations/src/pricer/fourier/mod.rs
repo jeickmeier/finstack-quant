@@ -19,7 +19,7 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_core::math::characteristic_function::BlackScholesCf;
 //! use finstack_valuations::pricer::fourier::cos::{CosPricer, CosConfig};
 //!

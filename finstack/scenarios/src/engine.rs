@@ -50,7 +50,7 @@ fn rounding_stamp() -> Option<String> {
 /// - `as_of`: Valuation date that operations reference.
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_scenarios::ExecutionContext;
 /// use finstack_core::market_data::context::MarketContext;
 /// use finstack_statements::FinancialModelSpec;

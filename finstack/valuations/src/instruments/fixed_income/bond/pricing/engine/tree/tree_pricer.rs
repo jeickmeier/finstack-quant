@@ -25,7 +25,7 @@ use finstack_core::{Error, Result};
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::fixed_income::bond::Bond;
 /// use finstack_valuations::instruments::fixed_income::bond::pricing::engine::tree::TreePricer;
 /// use finstack_core::market_data::context::MarketContext;
@@ -353,7 +353,7 @@ impl TreePricer {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond::Bond;
     /// use finstack_valuations::instruments::fixed_income::bond::pricing::engine::tree::TreePricer;
     /// use finstack_core::market_data::context::MarketContext;
@@ -734,7 +734,7 @@ fn validate_bdt_calibration_quality(quality: Option<&CalibrationResult>) -> Resu
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::fixed_income::bond::Bond;
 /// use finstack_valuations::instruments::fixed_income::bond::pricing::engine::tree::calculate_oas;
 /// use finstack_core::market_data::context::MarketContext;

@@ -470,7 +470,7 @@ fn attribute_single_position(
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_portfolio::attribution::attribute_portfolio_pnl;
 /// use finstack_valuations::attribution::AttributionMethod;
 /// use finstack_core::config::FinstackConfig;

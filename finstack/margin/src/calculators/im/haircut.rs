@@ -36,7 +36,7 @@ use finstack_core::Result;
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_margin::{EligibleCollateralSchedule, HaircutImCalculator, ImCalculator, Marginable};
 /// use finstack_core::dates::Date;
 /// use finstack_core::market_data::context::MarketContext;

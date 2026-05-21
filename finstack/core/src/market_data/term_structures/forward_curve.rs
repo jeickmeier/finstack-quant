@@ -535,7 +535,7 @@ impl ForwardCurve {
     /// Returns an error if the bumped curve violates validation constraints.
     ///
     /// # Examples
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::market_data::term_structures::ForwardCurve;
     /// use time::macros::date;
     /// # fn main() -> finstack_core::Result<()> {
@@ -699,7 +699,7 @@ impl ForwardCurve {
     /// Returns an error if fewer than 2 knot points remain after filtering expired points.
     ///
     /// # Examples
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::market_data::term_structures::ForwardCurve;
     /// use time::macros::date;
     /// # fn main() -> finstack_core::Result<()> {

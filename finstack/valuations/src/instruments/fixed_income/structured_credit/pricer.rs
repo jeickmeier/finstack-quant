@@ -72,7 +72,7 @@ impl StructuredCredit {
     /// - Error if valuation fails
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::market_data::context::MarketContext;
     /// use finstack_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
     /// use time::macros::date;

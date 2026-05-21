@@ -58,7 +58,7 @@ use super::super::super::types::Bond;
 ///
 /// Use `SimpleBondHazardPricer` for public API access to hazard-rate pricing:
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_valuations::instruments::Bond;
 /// use finstack_valuations::pricer::{Pricer, PricerRegistry};
 /// use finstack_core::market_data::context::MarketContext;

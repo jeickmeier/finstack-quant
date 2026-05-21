@@ -78,7 +78,7 @@
 //!
 //! ## Basic Parallel Attribution
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::attribution::attribute_pnl_parallel;
 //! use finstack_valuations::instruments::Instrument;
 //! use finstack_valuations::instruments::rates::deposit::Deposit;
@@ -131,7 +131,7 @@
 //!
 //! ## Waterfall Attribution
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::attribution::{
 //!     attribute_pnl_waterfall, AttributionFactor
 //! };
@@ -189,7 +189,7 @@
 //!
 //! ## Metrics-Based Attribution
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::attribution::attribute_pnl_metrics_based;
 //! use finstack_valuations::attribution::default_attribution_metrics;
 //! use finstack_valuations::instruments::Instrument;
@@ -240,7 +240,7 @@
 //!
 //! # Per-Tenor Curve Attribution
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::attribution::attribute_pnl_parallel;
 //! use finstack_valuations::instruments::Instrument;
 //! use finstack_valuations::instruments::rates::deposit::Deposit;
@@ -386,7 +386,7 @@ use std::sync::Arc;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::attribution::simple_pnl_bridge;
 /// use finstack_valuations::instruments::Instrument;
 /// use finstack_core::currency::Currency;

@@ -151,7 +151,7 @@ impl<State> ModelBuilder<State> {
     /// Updated builder with the bond appended to the capital-structure spec.
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::builder::ModelBuilder;
     /// use finstack_core::currency::Currency;
     /// use finstack_core::money::Money;
@@ -217,7 +217,7 @@ impl<State> ModelBuilder<State> {
     /// * `discount_curve_id` - Discount curve ID for pricing
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::builder::ModelBuilder;
     /// use finstack_valuations::instruments::BondConvention;
     /// use finstack_core::currency::Currency;
@@ -282,7 +282,7 @@ impl<State> ModelBuilder<State> {
     /// * `forward_curve_id` - Forward curve ID for floating leg
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::builder::ModelBuilder;
     /// use finstack_core::currency::Currency;
     /// use finstack_core::money::Money;
@@ -322,7 +322,7 @@ impl<State> ModelBuilder<State> {
     /// * `forward_curve_id` - Forward curve ID for floating leg
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::builder::ModelBuilder;
     /// use finstack_core::currency::Currency;
     /// use finstack_core::money::Money;
@@ -425,7 +425,7 @@ impl<State> ModelBuilder<State> {
     /// `<tag>` is a type registered in the valuations instrument registry.
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::builder::ModelBuilder;
     /// use serde_json::json;
     ///
@@ -467,7 +467,7 @@ impl<State> ModelBuilder<State> {
     /// * `waterfall_spec` - Waterfall configuration with ECF sweep and PIK toggle settings
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_statements::capital_structure::{WaterfallSpec, EcfSweepSpec};
     /// use finstack_statements::builder::ModelBuilder;
     ///

@@ -178,7 +178,7 @@ pub enum SwaptionSettlement {
 ///
 /// For production systems requiring ISDA compliance, use [`IsdaParPar`](Self::IsdaParPar):
 ///
-/// ```rust,ignore
+/// ```ignore
 /// let swaption = Swaption::example()
 ///     .with_cash_settlement_method(CashSettlementMethod::IsdaParPar);
 /// ```

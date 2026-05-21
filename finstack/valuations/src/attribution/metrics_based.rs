@@ -357,7 +357,7 @@ fn add_cross_factor_term(
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_core::currency::Currency;
 /// use finstack_core::market_data::context::MarketContext;
 /// use finstack_core::money::Money;

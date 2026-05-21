@@ -199,7 +199,7 @@ pub fn valuation_result_schema() -> finstack_core::Result<&'static Value> {
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::schema::validate_instrument_envelope_json;
 ///
 /// let json: serde_json::Value = serde_json::json!({

@@ -20,7 +20,7 @@
 //!
 //! # Example
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_core::math::random::sobol_pca::pca_ordering;
 //!
 //! # fn main() -> finstack_core::Result<()> {

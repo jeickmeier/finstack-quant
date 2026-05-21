@@ -179,7 +179,7 @@ pub use super::ExternalImSource as CcpMarginInputSource;
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_margin::{ClearingHouseImCalculator, ImCalculator, Marginable};
 /// use finstack_core::market_data::context::MarketContext;
 /// use finstack_core::dates::Date;

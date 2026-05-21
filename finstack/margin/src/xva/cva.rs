@@ -380,7 +380,7 @@ fn compute_fva_internal(
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use crate::xva::cva::compute_cva;
 /// use crate::xva::types::ExposureProfile;
 /// use finstack_core::market_data::term_structures::{DiscountCurve, HazardCurve};

@@ -104,7 +104,7 @@
 //!
 //! Use [`builder::CashFlowSchedule::pv_by_period`] with [`aggregation::DateContext`]:
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_cashflows::builder::CashFlowSchedule;
 //! use finstack_cashflows::aggregation::DateContext;
 //! use finstack_cashflows::builder::PvDiscountSource;

@@ -188,7 +188,7 @@ impl HullWhiteTree {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// use finstack_valuations::instruments::models::trees::HullWhiteTree;
     /// use finstack_valuations::instruments::models::trees::HullWhiteTreeConfig;
     ///

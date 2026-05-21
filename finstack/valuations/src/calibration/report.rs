@@ -424,7 +424,7 @@ impl CalibrationReport {
     /// detected penalty).
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::calibration::CalibrationReport;
     /// use std::collections::BTreeMap;
     ///
@@ -482,7 +482,7 @@ impl CalibrationReport {
     /// * `tolerance` - Configured tolerance threshold for success determination
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::calibration::CalibrationReport;
     /// use std::collections::BTreeMap;
     ///

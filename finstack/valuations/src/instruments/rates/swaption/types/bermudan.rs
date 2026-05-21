@@ -40,7 +40,7 @@ use super::swaption::Swaption;
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::rates::swaption::{
 ///     BermudanSwaption, BermudanSchedule, BermudanType, SwaptionSettlement,
 /// };

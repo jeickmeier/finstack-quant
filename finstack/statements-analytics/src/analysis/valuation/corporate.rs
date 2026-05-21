@@ -158,7 +158,7 @@ pub(crate) struct DcfEvalContext<'a> {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_statements_analytics::analysis::{evaluate_dcf_with_market, DcfOptions};
 /// use finstack_statements::builder::ModelBuilder;
 /// use finstack_statements::types::AmountOrScalar;

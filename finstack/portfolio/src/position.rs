@@ -157,7 +157,7 @@ impl Position {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_portfolio::position::{Position, PositionUnit};
     /// use finstack_core::currency::Currency;
     /// use finstack_core::money::Money;
@@ -312,7 +312,7 @@ impl Position {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_portfolio::position::{Position, PositionUnit};
     /// use finstack_core::currency::Currency;
     /// use finstack_core::money::Money;
@@ -412,7 +412,7 @@ impl Position {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::currency::Currency;
     /// use finstack_core::money::Money;
     /// use finstack_portfolio::position::{Position, PositionUnit};

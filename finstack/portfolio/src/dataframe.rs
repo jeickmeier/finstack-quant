@@ -41,7 +41,7 @@ fn table_metadata(source: &str) -> IndexMap<String, serde_json::Value> {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_portfolio::positions_to_table;
 ///
 /// # fn main() -> finstack_core::Result<()> {

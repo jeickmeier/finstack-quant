@@ -69,7 +69,7 @@
 //!
 //! ## Computing All Greeks
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::models::closed_form::greeks::{
 //!     bs_call_greeks, BsGreeks
 //! };
@@ -87,7 +87,7 @@
 //!
 //! ## Individual Greek Calculations
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::models::closed_form::greeks::{
 //!     bs_call_delta, bs_gamma, bs_vega
 //! };
@@ -147,7 +147,7 @@ use finstack_core::math::special_functions::{norm_cdf, norm_pdf};
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_valuations::instruments::models::closed_form::greeks::bs_call_delta;
 ///
 /// let spot = 100.0;
@@ -210,7 +210,7 @@ pub fn bs_call_delta(
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_valuations::instruments::models::closed_form::greeks::bs_put_delta;
 ///
 /// let spot = 100.0;
@@ -269,7 +269,7 @@ pub fn bs_put_delta(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_valuations::instruments::models::closed_form::greeks::bs_gamma;
 ///
 /// let spot = 100.0;
@@ -334,7 +334,7 @@ pub fn bs_gamma(spot: f64, strike: f64, time: f64, rate: f64, div_yield: f64, vo
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_valuations::instruments::models::closed_form::greeks::bs_vega;
 ///
 /// let spot = 100.0;

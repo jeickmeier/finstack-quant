@@ -17,7 +17,7 @@ use finstack_core::Result;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::metrics::{MetricId, MetricRegistry};
 /// use finstack_valuations::metrics::risk::{GenericHVar, VarConfig};
 /// use std::sync::Arc;

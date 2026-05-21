@@ -39,7 +39,7 @@
 //!
 //! Or build a custom option:
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_valuations::instruments::exotics::{AsianOption, AveragingMethod};
 //! use finstack_valuations::instruments::OptionType;
 //! use finstack_core::currency::Currency;
@@ -48,6 +48,7 @@
 //! use finstack_core::types::{CurveId, InstrumentId};
 //! use time::macros::date;
 //!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let fixing_dates = vec![
 //!     date!(2025-01-31), date!(2025-02-28), date!(2025-03-31),
 //!     date!(2025-04-30), date!(2025-05-31), date!(2025-06-30),
@@ -64,9 +65,10 @@
 //!     .notional(Money::new(100_000.0, Currency::USD))
 //!     .day_count(DayCount::Act365F)
 //!     .discount_curve_id(CurveId::new("USD-OIS"))
-//!     .spot_id("SPX-SPOT".to_string())
+//!     .spot_id("SPX-SPOT".to_string().into())
 //!     .vol_surface_id(CurveId::new("SPX-VOL"))
 //!     .build()?;
+//! # Ok(()) }
 //! ```
 //!
 //! # Academic References

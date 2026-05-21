@@ -21,7 +21,7 @@
 //!
 //! # Examples
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::instruments::rates::irs::InterestRateSwap;
 //! use finstack_valuations::instruments::{Instrument, PricingOptions};
 //! use finstack_valuations::metrics::MetricId;

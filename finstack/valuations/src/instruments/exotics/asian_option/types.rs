@@ -86,7 +86,7 @@ impl std::str::FromStr for AveragingMethod {
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```ignore
 /// // For production: pre-adjust fixing dates using business day logic
 /// let fixing_dates = generate_monthly_schedule(start, end)
 ///     .into_iter()

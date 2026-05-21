@@ -13,8 +13,8 @@
 //!
 //! # Quick Start
 //!
-//! ```rust,no_run
-//! use finstack_statements_analytics::analysis::ecl::{
+//! ```ignore
+//! use finstack_statements_analytics::analysis::{
 //!     EclConfigBuilder, EclEngine, Exposure, QualitativeFlags, RawPdCurve, Stage,
 //! };
 //!

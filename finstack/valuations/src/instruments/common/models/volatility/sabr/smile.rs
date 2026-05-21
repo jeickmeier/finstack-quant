@@ -84,7 +84,7 @@ impl SABRSmile {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// use finstack_valuations::instruments::models::volatility::sabr::{
     ///     SABRParameters, SABRModel, SABRSmile,
     /// };
@@ -158,7 +158,7 @@ impl SABRSmile {
     /// `ArbitrageValidationResult` containing any violations found.
     ///
     /// # Example
-    /// ```rust,ignore
+    /// ```ignore
     /// let result = smile.validate_no_arbitrage(&strikes, 0.05, 0.02)?;
     /// if !result.is_arbitrage_free() {
     ///     println!("Warning: {} butterfly violations found",
@@ -284,7 +284,7 @@ impl SABRSmile {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// let repaired_vols = smile.repair_arbitrage(&strikes, 0.05, 0.02, 10)?;
     /// ```
     ///

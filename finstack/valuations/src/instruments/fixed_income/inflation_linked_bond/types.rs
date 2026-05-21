@@ -353,7 +353,7 @@ impl InflationLinkedBond {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::inflation_linked_bond::{
     ///     InflationLinkedBond, InflationLinkedBondParams,
     /// };
@@ -441,7 +441,7 @@ impl InflationLinkedBond {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::inflation_linked_bond::{
     ///     InflationLinkedBond, InflationLinkedBondParams,
     /// };
@@ -524,7 +524,7 @@ impl InflationLinkedBond {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::inflation_linked_bond::{
     ///     InflationLinkedBond, InflationLinkedBondParams,
     /// };

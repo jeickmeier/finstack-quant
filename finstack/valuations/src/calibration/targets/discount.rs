@@ -73,7 +73,7 @@ pub(crate) struct DiscountCurveTargetParams {
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```ignore
 /// // DiscountCurveTarget is internal - use the calibration API instead
 /// use finstack_valuations::calibration::{calibrate_discount_curve, DiscountCurveParams};
 ///

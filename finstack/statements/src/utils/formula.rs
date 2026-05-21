@@ -101,7 +101,7 @@ pub(crate) fn replace_standalone_identifier(
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```ignore
 /// // Low-level helper; prefer higher-level APIs when possible.
 /// use finstack_statements::formula::extract_all_identifiers;
 /// ```
@@ -214,7 +214,7 @@ fn collect_identifiers_from_ast(
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```ignore
 /// // Low-level helper; prefer higher-level APIs when possible.
 /// use crate::utils::formula::extract_identifiers;
 /// ```
@@ -249,7 +249,7 @@ pub(crate) fn extract_identifiers(
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```ignore
 /// // Low-level helper; prefer higher-level APIs when possible.
 /// use crate::utils::formula::qualify_identifiers;
 /// ```

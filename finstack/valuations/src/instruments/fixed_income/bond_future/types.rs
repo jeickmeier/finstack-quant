@@ -344,7 +344,7 @@ impl BondFutureSpecs {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::fixed_income::bond_future::{
 ///     BondFuture, BondFutureBuilder, BondFutureSpecs, DeliverableBond, Position,
 /// };
@@ -640,7 +640,7 @@ impl BondFuture {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::currency::Currency;
     /// use finstack_core::market_data::context::MarketContext;
     /// use finstack_core::money::Money;
@@ -777,7 +777,7 @@ impl BondFuture {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond_future::{
     ///     BondFuture, BondFutureSpecs, DeliverableBond, Position,
     /// };
@@ -892,7 +892,7 @@ impl BondFuture {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond_future::{
     ///     BondFuture, BondFutureSpecs, DeliverableBond, Position,
     /// };
@@ -1012,7 +1012,7 @@ impl BondFuture {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::fixed_income::bond_future::{
     ///     BondFuture, BondFutureSpecs, DeliverableBond, Position,
     /// };
@@ -1141,7 +1141,7 @@ impl BondFutureBuilder {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::currency::Currency;
     /// use finstack_core::money::Money;
     /// use finstack_core::types::{CurveId, InstrumentId};

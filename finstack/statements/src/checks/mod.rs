@@ -7,7 +7,7 @@
 //!
 //! # Quick start
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_statements::checks::CheckSuite;
 //! ```
 

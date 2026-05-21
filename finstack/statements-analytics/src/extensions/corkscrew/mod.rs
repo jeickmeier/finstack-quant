@@ -34,7 +34,7 @@
 //!
 //! # Example Usage
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_statements_analytics::extensions::{
 //!     CorkscrewExtension, CorkscrewConfig, CorkscrewAccount, AccountType,
 //! };

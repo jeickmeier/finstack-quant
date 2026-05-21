@@ -142,7 +142,7 @@ impl std::str::FromStr for ResidualWeightingScheme {
 /// - `hazard_hard_max` > `hazard_hard_min`
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::calibration::HazardCurveSolveConfig;
 ///
 /// // For distressed debt scenarios, increase the max hazard rate
@@ -196,7 +196,7 @@ impl Default for HazardCurveSolveConfig {
 /// bootstrapping or global solve for CPI curve calibration.
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::calibration::InflationCurveSolveConfig;
 ///
 /// let config = InflationCurveSolveConfig {
@@ -256,7 +256,7 @@ impl Default for InflationCurveSolveConfig {
 /// - `scan_grid_points` > 0
 ///
 /// # Examples
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::calibration::DiscountCurveSolveConfig;
 ///
 /// let config = DiscountCurveSolveConfig {

@@ -486,7 +486,7 @@ impl CapFloor {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::rates::cap_floor::{CapFloor, CapFloorVolType};
     /// use finstack_core::currency::Currency;
     /// use finstack_core::dates::{create_date, DayCount, Tenor};

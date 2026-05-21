@@ -28,23 +28,12 @@
 //!
 //! # Quick Example
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_valuations::instruments::credit_derivatives::CreditDefaultSwap;
-//! use finstack_core::currency::Currency;
-//! use finstack_core::money::Money;
-//! use finstack_core::types::InstrumentId;
-//! use time::macros::date;
 //!
-//! let cds = CreditDefaultSwap::builder()
-//!     .id(InstrumentId::new("CDS-AAPL-5Y"))
-//!     .reference_entity("AAPL".to_string())
-//!     .notional(Money::new(10_000_000.0, Currency::USD))
-//!     .effective_date(date!(2025-03-20))
-//!     .maturity(date!(2030-03-20))
-//!     .running_spread_bps(100.0)
-//!     .discount_curve_id("USD-OIS".into())
-//!     .hazard_curve_id("AAPL-CDS".into())
-//!     .build();
+//! // Canonical 5-year investment-grade CDS with standard ISDA conventions.
+//! let cds = CreditDefaultSwap::example();
+//! cds.validate().unwrap();
 //! ```
 //!
 //! # References

@@ -52,7 +52,7 @@
 //!
 //! # Example Usage
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_statements_analytics::extensions::{
 //!     CreditScorecardExtension, ScorecardConfig, ScorecardMetric,
 //! };

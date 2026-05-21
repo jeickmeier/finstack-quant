@@ -16,7 +16,7 @@
 //! use [`OnlineCovariance`](crate::online_stats::OnlineCovariance)
 //! to compute covariance incrementally:
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_monte_carlo::online_stats::OnlineCovariance;
 //!
 //! let mut cov = OnlineCovariance::new();

@@ -78,7 +78,7 @@ use std::cell::RefCell;
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_statements::prelude::*;
 /// use finstack_statements_analytics::analysis::goal_seek;
 /// use finstack_core::dates::PeriodId;

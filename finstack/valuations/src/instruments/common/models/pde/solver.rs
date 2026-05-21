@@ -14,7 +14,7 @@ use super::stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};
 ///
 /// # Examples
 ///
-/// ```rust,ignore
+/// ```ignore
 /// let solver = Solver1DBuilder::new()
 ///     .grid(Grid1D::sinh_concentrated(-5.0, 5.0, 200, 0.0, 0.1)?)
 ///     .crank_nicolson(100)

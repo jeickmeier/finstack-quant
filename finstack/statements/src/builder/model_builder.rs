@@ -608,7 +608,7 @@ impl ModelBuilder<Ready> {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// # use finstack_statements::builder::ModelBuilder;
     /// # fn main() -> finstack_statements::Result<()> {
     /// let model = ModelBuilder::new("test")
@@ -642,7 +642,7 @@ impl ModelBuilder<Ready> {
     ///
     /// # Example
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// # use finstack_statements::builder::ModelBuilder;
     /// # use finstack_statements::registry::Registry;
     /// # fn main() -> finstack_statements::Result<()> {

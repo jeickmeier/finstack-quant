@@ -183,7 +183,7 @@ impl TreeGreeks {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// let coarse = tree_n.calculate_greeks(...)?;
     /// let fine = tree_2n.calculate_greeks(...)?;
     /// let improved = TreeGreeks::richardson_extrapolate(&coarse, &fine);

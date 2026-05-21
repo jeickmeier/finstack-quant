@@ -13,7 +13,7 @@
 //!
 //! # Usage
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_monte_carlo::engine_fractional::simulate_path_fractional;
 //!
 //! // Pre-generate fBM increments for the full path…

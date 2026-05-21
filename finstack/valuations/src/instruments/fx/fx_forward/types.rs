@@ -294,7 +294,7 @@ impl FxForward {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```ignore
     /// // USD/CAD forward (T+1 settlement)
     /// let usdcad = FxForward::from_trade_date_auto(
     ///     "USDCAD-1M",

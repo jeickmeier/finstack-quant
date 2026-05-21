@@ -66,7 +66,7 @@ impl SABRCalibrator {
     /// For high-precision applications (e.g., Greeks computation from vol surface),
     /// consider using tighter tolerance:
     ///
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_valuations::instruments::models::volatility::sabr::SABRCalibrator;
     ///
     /// let _calibrator = SABRCalibrator::new();

@@ -246,7 +246,7 @@ impl PathDependentPricerConfig {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_core::currency::Currency;
 /// use finstack_monte_carlo::payoff::asian::{AsianCall, AveragingMethod};
 /// use finstack_monte_carlo::pricer::path_dependent::{

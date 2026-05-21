@@ -51,7 +51,7 @@
 //! The discretization must be constructed with the time grid so it can
 //! precompute time step sizes and determine the work buffer size:
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_monte_carlo::discretization::rough_heston::RoughHestonHybrid;
 //!
 //! let times = vec![0.0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0];

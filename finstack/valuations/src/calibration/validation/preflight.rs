@@ -34,7 +34,7 @@ use finstack_core::Result;
 /// Returns an error if validation fails, with a descriptive message.
 ///
 /// # Examples
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_valuations::calibration::validation::preflight_step;
 ///
 /// // Validate before execution

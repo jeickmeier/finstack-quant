@@ -7,7 +7,7 @@
 //!
 //! ## Example 1: Computing 1-Day Theta for an Equity Option
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_valuations::instruments::{EquityOption, Instrument, PricingOptions};
 //! use finstack_valuations::metrics::{standard_registry, MetricId};
 //! use finstack_core::currency::Currency;
@@ -47,7 +47,7 @@
 //!
 //! ## Example 2: Computing Custom Period Theta (1 Week)
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_valuations::instruments::{EquityOption, Instrument, PricingOptions};
 //! use finstack_valuations::metrics::{standard_registry, MetricId};
 //! use finstack_core::currency::Currency;
@@ -89,7 +89,7 @@
 //!
 //! ## Example 3: Bond Carry (Theta with Coupon Accrual)
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_valuations::instruments::{Bond, Instrument, PricingOptions, PricingOverrides};
 //! use finstack_valuations::metrics::{standard_registry, MetricId};
 //! use finstack_core::dates::create_date;
@@ -125,7 +125,7 @@
 //! When an instrument expires before the theta period ends, theta is automatically
 //! capped at the expiry date:
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_valuations::instruments::{EquityOption, Instrument, PricingOptions};
 //! use finstack_valuations::metrics::{standard_registry, MetricId};
 //! use finstack_core::currency::Currency;

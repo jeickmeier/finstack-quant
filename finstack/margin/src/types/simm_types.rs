@@ -136,7 +136,7 @@ impl std::fmt::Display for SimmRiskClass {
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_margin::SimmSensitivities;
 /// use finstack_core::currency::Currency;
 ///

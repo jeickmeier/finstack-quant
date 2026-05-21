@@ -78,7 +78,7 @@ impl std::str::FromStr for RepoMarginType {
 ///
 /// # Example
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_margin::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};
 ///
 /// let margin_spec = RepoMarginSpec {

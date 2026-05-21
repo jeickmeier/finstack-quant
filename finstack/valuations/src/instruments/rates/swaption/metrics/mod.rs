@@ -67,7 +67,7 @@ pub(crate) fn register_swaption_metrics(registry: &mut MetricRegistry) {
 ///
 /// # Example
 ///
-/// ```rust,ignore
+/// ```ignore
 /// use finstack_valuations::instruments::rates::swaption::HullWhiteParams;
 ///
 /// // Calibrate parameters to your vol surface first

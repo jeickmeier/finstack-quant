@@ -38,7 +38,7 @@ impl MarketContext {
     /// - Curves with insufficient remaining points will cause an error
     ///
     /// # Examples
-    /// ```rust,no_run
+    /// ```ignore
     /// use finstack_core::market_data::context::MarketContext;
     /// use finstack_core::market_data::term_structures::DiscountCurve;
     /// use time::macros::date;

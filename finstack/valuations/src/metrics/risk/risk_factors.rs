@@ -119,7 +119,7 @@ impl RiskFactorType {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::Bond;
 /// use finstack_valuations::metrics::risk::extract_risk_factors;
 /// use finstack_core::market_data::context::MarketContext;

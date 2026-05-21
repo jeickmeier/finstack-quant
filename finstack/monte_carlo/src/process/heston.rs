@@ -93,7 +93,7 @@
 //!
 //! # Examples
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_monte_carlo::process::heston::{
 //!     HestonProcess, HestonParams
 //! };

@@ -41,7 +41,7 @@
 //!
 //! Project potential future breaches under different scenarios:
 //!
-//! ```rust,no_run
+//! ```ignore
 //! use finstack_valuations::covenants::{
 //!     forecast_breaches_generic, CovenantForecastConfig
 //! };

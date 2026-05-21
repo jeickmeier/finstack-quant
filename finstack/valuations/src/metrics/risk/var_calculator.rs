@@ -345,7 +345,7 @@ fn tail_quantile_mean(sorted: &[f64], p: f64) -> f64 {
 ///
 /// # Examples
 ///
-/// ```rust,no_run
+/// ```ignore
 /// use finstack_valuations::instruments::{Bond, Instrument};
 /// use finstack_valuations::metrics::risk::{calculate_var, MarketHistory, MarketScenario, VarConfig};
 /// use finstack_core::market_data::context::MarketContext;

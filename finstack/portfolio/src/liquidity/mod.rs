@@ -26,7 +26,7 @@
 //!
 //! # Usage
 //!
-//! ```rust,ignore
+//! ```ignore
 //! use finstack_portfolio::liquidity::{
 //!     LiquidityProfile, LiquidityConfig, LvarCalculator,
 //!     score_portfolio_liquidity, roll_effective_spread,
