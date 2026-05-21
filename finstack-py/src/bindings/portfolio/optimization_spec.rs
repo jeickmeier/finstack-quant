@@ -31,9 +31,9 @@ use pyo3::types::{PyModule, PyType};
 
 use finstack_portfolio::optimization::{
     self as opt, CandidatePosition, Constraint, Inequality, MetricExpr, MissingMetricPolicy,
-    Objective, OptimizationParameters, OptimizationStatus, PerPositionMetric, PortfolioOptimizationResult,
-    PortfolioOptimizationSpec, PositionFilter, TradeDirection, TradeSpec, TradeType, TradeUniverse,
-    WeightingScheme,
+    Objective, OptimizationParameters, OptimizationStatus, PerPositionMetric,
+    PortfolioOptimizationResult, PortfolioOptimizationSpec, PositionFilter, TradeDirection,
+    TradeSpec, TradeType, TradeUniverse, WeightingScheme,
 };
 use finstack_portfolio::types::{AttributeTest, AttributeValue, ComparisonOp, PositionId};
 use finstack_valuations::metrics::MetricId;
@@ -228,17 +228,23 @@ impl std::hash::Hash for PyInequality {
 impl PyInequality {
     #[classmethod]
     fn le(_cls: &Bound<'_, PyType>) -> Self {
-        Self { inner: Inequality::Le }
+        Self {
+            inner: Inequality::Le,
+        }
     }
 
     #[classmethod]
     fn ge(_cls: &Bound<'_, PyType>) -> Self {
-        Self { inner: Inequality::Ge }
+        Self {
+            inner: Inequality::Ge,
+        }
     }
 
     #[classmethod]
     fn eq(_cls: &Bound<'_, PyType>) -> Self {
-        Self { inner: Inequality::Eq }
+        Self {
+            inner: Inequality::Eq,
+        }
     }
 
     #[getter]
@@ -283,17 +289,23 @@ impl std::hash::Hash for PyTradeDirection {
 impl PyTradeDirection {
     #[classmethod]
     fn buy(_cls: &Bound<'_, PyType>) -> Self {
-        Self { inner: TradeDirection::Buy }
+        Self {
+            inner: TradeDirection::Buy,
+        }
     }
 
     #[classmethod]
     fn sell(_cls: &Bound<'_, PyType>) -> Self {
-        Self { inner: TradeDirection::Sell }
+        Self {
+            inner: TradeDirection::Sell,
+        }
     }
 
     #[classmethod]
     fn hold(_cls: &Bound<'_, PyType>) -> Self {
-        Self { inner: TradeDirection::Hold }
+        Self {
+            inner: TradeDirection::Hold,
+        }
     }
 
     #[getter]
@@ -332,17 +344,23 @@ impl std::hash::Hash for PyTradeType {
 impl PyTradeType {
     #[classmethod]
     fn existing(_cls: &Bound<'_, PyType>) -> Self {
-        Self { inner: TradeType::Existing }
+        Self {
+            inner: TradeType::Existing,
+        }
     }
 
     #[classmethod]
     fn new_position(_cls: &Bound<'_, PyType>) -> Self {
-        Self { inner: TradeType::NewPosition }
+        Self {
+            inner: TradeType::NewPosition,
+        }
     }
 
     #[classmethod]
     fn close_out(_cls: &Bound<'_, PyType>) -> Self {
-        Self { inner: TradeType::CloseOut }
+        Self {
+            inner: TradeType::CloseOut,
+        }
     }
 
     #[getter]
@@ -426,7 +444,9 @@ impl PyPerPositionMetric {
             parse_comparison_op(op)?,
             parse_attribute_value(text, number)?,
         );
-        Ok(Self::from_inner(PerPositionMetric::AttributeIndicator(test)))
+        Ok(Self::from_inner(PerPositionMetric::AttributeIndicator(
+            test,
+        )))
     }
 
     /// Constant scalar applied to every position.
@@ -538,14 +558,18 @@ impl PyPositionFilter {
     #[classmethod]
     #[pyo3(text_signature = "(cls, filters)")]
     fn and_(_cls: &Bound<'_, PyType>, filters: Vec<PyPositionFilter>) -> Self {
-        Self::from_inner(PositionFilter::And(filters.into_iter().map(|f| f.inner).collect()))
+        Self::from_inner(PositionFilter::And(
+            filters.into_iter().map(|f| f.inner).collect(),
+        ))
     }
 
     /// Match positions matched by ANY of the supplied filters.
     #[classmethod]
     #[pyo3(text_signature = "(cls, filters)")]
     fn or_(_cls: &Bound<'_, PyType>, filters: Vec<PyPositionFilter>) -> Self {
-        Self::from_inner(PositionFilter::Or(filters.into_iter().map(|f| f.inner).collect()))
+        Self::from_inner(PositionFilter::Or(
+            filters.into_iter().map(|f| f.inner).collect(),
+        ))
     }
 
     /// Parse from JSON (matches the on-wire Rust shape).
@@ -710,9 +734,7 @@ impl PyObjective {
     #[getter]
     fn expr(&self) -> PyMetricExpr {
         match &self.inner {
-            Objective::Maximize(e) | Objective::Minimize(e) => {
-                PyMetricExpr::from_inner(e.clone())
-            }
+            Objective::Maximize(e) | Objective::Minimize(e) => PyMetricExpr::from_inner(e.clone()),
         }
     }
 
@@ -1154,12 +1176,16 @@ impl PyTradeSpec {
 
     #[getter]
     fn trade_type(&self) -> PyTradeType {
-        PyTradeType { inner: self.inner.trade_type }
+        PyTradeType {
+            inner: self.inner.trade_type,
+        }
     }
 
     #[getter]
     fn direction(&self) -> PyTradeDirection {
-        PyTradeDirection { inner: self.inner.direction }
+        PyTradeDirection {
+            inner: self.inner.direction,
+        }
     }
 
     #[getter]
@@ -1487,10 +1513,7 @@ impl PyPortfolioOptimizationSpec {
 /// `PortfolioOptimizationResult` implements `Serialize` but not
 /// `Deserialize` in the Rust source, so this wrapper exposes ``to_json``
 /// only — there is no ``from_json``.
-#[pyclass(
-    name = "PortfolioOptimizationResult",
-    module = "finstack.portfolio"
-)]
+#[pyclass(name = "PortfolioOptimizationResult", module = "finstack.portfolio")]
 pub struct PyPortfolioOptimizationResult {
     pub(crate) inner: PortfolioOptimizationResult,
 }

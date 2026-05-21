@@ -18,10 +18,7 @@ const RECOVERY_CONSISTENCY_TOL: f64 = 1e-6;
 /// protection-leg PV is silently mis-scaled. This is a configuration bug, not
 /// a legitimate use case, so we surface it as a hard error at the pricer entry.
 #[inline]
-pub(super) fn validate_recovery_consistency(
-    cds_recovery: f64,
-    surv: &HazardCurve,
-) -> Result<()> {
+pub(super) fn validate_recovery_consistency(cds_recovery: f64, surv: &HazardCurve) -> Result<()> {
     let curve_recovery = surv.recovery_rate();
     if (cds_recovery - curve_recovery).abs() > RECOVERY_CONSISTENCY_TOL {
         return Err(Error::Validation(format!(

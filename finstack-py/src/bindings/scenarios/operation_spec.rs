@@ -143,7 +143,13 @@ impl PyCurveKind {
 // ---------------------------------------------------------------------------
 
 /// Category of volatility surface targeted by a scenario operation.
-#[pyclass(name = "VolSurfaceKind", module = "finstack.scenarios", eq, hash, frozen)]
+#[pyclass(
+    name = "VolSurfaceKind",
+    module = "finstack.scenarios",
+    eq,
+    hash,
+    frozen
+)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyVolSurfaceKind {
     pub(crate) inner: VolSurfaceKind,
@@ -197,7 +203,13 @@ impl PyVolSurfaceKind {
 // ---------------------------------------------------------------------------
 
 /// Tenor-pillar alignment strategy for curve-node operations.
-#[pyclass(name = "TenorMatchMode", module = "finstack.scenarios", eq, hash, frozen)]
+#[pyclass(
+    name = "TenorMatchMode",
+    module = "finstack.scenarios",
+    eq,
+    hash,
+    frozen
+)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyTenorMatchMode {
     pub(crate) inner: TenorMatchMode,

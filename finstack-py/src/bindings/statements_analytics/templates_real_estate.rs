@@ -740,9 +740,7 @@ impl PyPropertyTemplateNodes {
     ) -> Self {
         Self {
             inner: rust_re::PropertyTemplateNodes {
-                rent_roll: rent_roll
-                    .map(|r| r.inner)
-                    .unwrap_or_default(),
+                rent_roll: rent_roll.map(|r| r.inner).unwrap_or_default(),
                 other_income_total_node: other_income_total_node.to_string(),
                 egi_node: egi_node.to_string(),
                 management_fee_node: management_fee_node.to_string(),
@@ -873,11 +871,9 @@ fn add_rent_roll(
     let spec = extract_model_ref(model)?.into_owned();
     let (builder, meta, capital_structure) = rebuild_builder(spec)?;
     let lease_specs: Vec<rust_re::LeaseSpec> = leases.into_iter().map(|l| l.inner).collect();
-    let nodes_inner = nodes
-        .map(|n| n.inner)
-        .unwrap_or_default();
-    let builder = rust_re::add_rent_roll(builder, &lease_specs, &nodes_inner)
-        .map_err(display_to_py)?;
+    let nodes_inner = nodes.map(|n| n.inner).unwrap_or_default();
+    let builder =
+        rust_re::add_rent_roll(builder, &lease_specs, &nodes_inner).map_err(display_to_py)?;
     finalize_builder(builder, meta, capital_structure)
 }
 
@@ -894,8 +890,7 @@ fn add_rent_roll_rental_revenue(
 ) -> PyResult<String> {
     let spec = extract_model_ref(model)?.into_owned();
     let (builder, meta, capital_structure) = rebuild_builder(spec)?;
-    let lease_specs: Vec<rust_re::SimpleLeaseSpec> =
-        leases.into_iter().map(|l| l.inner).collect();
+    let lease_specs: Vec<rust_re::SimpleLeaseSpec> = leases.into_iter().map(|l| l.inner).collect();
     let builder = rust_re::add_rent_roll_rental_revenue(builder, &lease_specs, total_rent_node)
         .map_err(display_to_py)?;
     finalize_builder(builder, meta, capital_structure)
@@ -931,9 +926,7 @@ fn add_property_operating_statement(
     let other_refs: Vec<&str> = other_income_nodes.iter().map(String::as_str).collect();
     let opex_refs: Vec<&str> = opex_nodes.iter().map(String::as_str).collect();
     let capex_refs: Vec<&str> = capex_nodes.iter().map(String::as_str).collect();
-    let nodes_inner = nodes
-        .map(|n| n.inner)
-        .unwrap_or_default();
+    let nodes_inner = nodes.map(|n| n.inner).unwrap_or_default();
     let fee = management_fee.map(|f| f.inner);
     let builder = rust_re::add_property_operating_statement(
         builder,

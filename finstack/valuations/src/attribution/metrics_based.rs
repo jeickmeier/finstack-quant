@@ -740,7 +740,11 @@ pub fn attribute_pnl_metrics_based(
                 count += 1;
             }
         }
-        if count > 0 { Some(total / count as f64) } else { None }
+        if count > 0 {
+            Some(total / count as f64)
+        } else {
+            None
+        }
     };
     if let Some(avg_shift) = convexity_avg_shift_bp {
         let rc = RoundingContext::default();
@@ -791,9 +795,7 @@ pub fn attribute_pnl_metrics_based(
 
         // Twist-domination warning (audit rec #6).
         if let Some(abs_shift) = avg_rate_abs_shift_bp {
-            if abs_shift > 0.0
-                && avg_shift.abs() < TWIST_FRACTION_THRESHOLD * abs_shift
-            {
+            if abs_shift > 0.0 && avg_shift.abs() < TWIST_FRACTION_THRESHOLD * abs_shift {
                 attribution.meta.notes.push(format!(
                     "Rates convexity may be understated: discount curves twisted \
                      (signed mean shift {:.3}bp vs L1 mean shift {:.3}bp); the \
@@ -889,12 +891,14 @@ pub fn attribute_pnl_metrics_based(
                     count += 1;
                 }
             }
-            if count > 0 { Some(total / count as f64) } else { None }
+            if count > 0 {
+                Some(total / count as f64)
+            } else {
+                None
+            }
         };
         if let Some(abs_shift) = credit_abs_shift_bp {
-            if abs_shift > 0.0
-                && avg_shift.abs() < TWIST_FRACTION_THRESHOLD * abs_shift
-            {
+            if abs_shift > 0.0 && avg_shift.abs() < TWIST_FRACTION_THRESHOLD * abs_shift {
                 attribution.meta.notes.push(format!(
                     "Credit convexity may be understated: hazard curves twisted \
                      (signed mean shift {:.3}bp vs L1 mean shift {:.3}bp); the \

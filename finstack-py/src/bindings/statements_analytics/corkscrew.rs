@@ -374,7 +374,10 @@ impl PyCorkscrewExtension {
     ) -> PyResult<PyCorkscrewReport> {
         let model = extract_model_ref(model)?;
         let results = extract_results_ref(results)?;
-        let inner = self.inner.execute(&model, &results).map_err(display_to_py)?;
+        let inner = self
+            .inner
+            .execute(&model, &results)
+            .map_err(display_to_py)?;
         Ok(PyCorkscrewReport { inner })
     }
 }

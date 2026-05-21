@@ -140,11 +140,7 @@ pub struct PyScorecardConfig {
 impl PyScorecardConfig {
     #[new]
     #[pyo3(signature = (rating_scale="S&P", metrics=Vec::new(), min_rating=None))]
-    fn new(
-        rating_scale: &str,
-        metrics: Vec<PyScorecardMetric>,
-        min_rating: Option<&str>,
-    ) -> Self {
+    fn new(rating_scale: &str, metrics: Vec<PyScorecardMetric>, min_rating: Option<&str>) -> Self {
         Self {
             inner: rust_scorecards::ScorecardConfig {
                 rating_scale: rating_scale.to_string(),
@@ -328,7 +324,10 @@ impl PyCreditScorecardExtension {
     ) -> PyResult<PyScorecardReport> {
         let model = extract_model_ref(model)?;
         let results = extract_results_ref(results)?;
-        let inner = self.inner.execute(&model, &results).map_err(display_to_py)?;
+        let inner = self
+            .inner
+            .execute(&model, &results)
+            .map_err(display_to_py)?;
         Ok(PyScorecardReport { inner })
     }
 }

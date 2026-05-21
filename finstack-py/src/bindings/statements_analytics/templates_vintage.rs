@@ -66,9 +66,8 @@ fn apply_vintage(
     for (node_id, node_spec) in nodes {
         builder.insert_node(node_id, node_spec);
     }
-    let builder =
-        rust_vintage::add_vintage_buildup(builder, name, new_volume_node, decay_curve)
-            .map_err(display_to_py)?;
+    let builder = rust_vintage::add_vintage_buildup(builder, name, new_volume_node, decay_curve)
+        .map_err(display_to_py)?;
     let mut new_spec = builder.build().map_err(display_to_py)?;
     new_spec.meta = meta;
     new_spec.capital_structure = capital_structure;

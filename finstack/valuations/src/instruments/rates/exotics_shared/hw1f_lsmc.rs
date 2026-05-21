@@ -273,8 +273,7 @@ impl RateExoticHw1fLsmcPricer {
                     }
                     let r = exercise_short_rates[flat];
                     let basis = basis_payoff.continuation_basis(ex_idx, t_ex, r);
-                    let cont_hat: f64 =
-                        basis.iter().zip(coeffs.iter()).map(|(b, c)| b * c).sum();
+                    let cont_hat: f64 = basis.iter().zip(coeffs.iter()).map(|(b, c)| b * c).sum();
                     if exercise_value < cont_hat {
                         *cf = exercise_value;
                     }

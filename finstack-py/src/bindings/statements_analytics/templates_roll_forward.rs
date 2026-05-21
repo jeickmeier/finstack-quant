@@ -67,9 +67,8 @@ fn apply_roll_forward(
     for (node_id, node_spec) in nodes {
         builder.insert_node(node_id, node_spec);
     }
-    let builder =
-        rust_roll_forward::add_roll_forward(builder, name, increases, decreases)
-            .map_err(display_to_py)?;
+    let builder = rust_roll_forward::add_roll_forward(builder, name, increases, decreases)
+        .map_err(display_to_py)?;
     let mut new_spec = builder.build().map_err(display_to_py)?;
     new_spec.meta = meta;
     new_spec.capital_structure = capital_structure;

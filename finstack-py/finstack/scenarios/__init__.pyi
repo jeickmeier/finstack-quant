@@ -502,9 +502,7 @@ class OperationSpec:
         ...
 
     @classmethod
-    def instrument_price_pct_by_attr(
-        cls, attrs: list[tuple[str, str]], pct: float
-    ) -> OperationSpec:
+    def instrument_price_pct_by_attr(cls, attrs: list[tuple[str, str]], pct: float) -> OperationSpec:
         """Instrument price shock by exact attribute match.
 
         ``attrs`` is a list of ``(key, value)`` pairs preserving order.
@@ -566,9 +564,7 @@ class OperationSpec:
         ...
 
     @classmethod
-    def vol_surface_parallel_pct(
-        cls, surface_kind: VolSurfaceKind, surface_id: str, pct: float
-    ) -> OperationSpec:
+    def vol_surface_parallel_pct(cls, surface_kind: VolSurfaceKind, surface_id: str, pct: float) -> OperationSpec:
         """Parallel percent shift to a volatility surface."""
         ...
 
@@ -600,23 +596,17 @@ class OperationSpec:
         ...
 
     @classmethod
-    def instrument_spread_bp_by_attr(
-        cls, attrs: list[tuple[str, str]], bp: float
-    ) -> OperationSpec:
+    def instrument_spread_bp_by_attr(cls, attrs: list[tuple[str, str]], bp: float) -> OperationSpec:
         """Instrument spread shock (basis points) by exact attribute match."""
         ...
 
     @classmethod
-    def instrument_price_pct_by_type(
-        cls, instrument_types: list[str], pct: float
-    ) -> OperationSpec:
+    def instrument_price_pct_by_type(cls, instrument_types: list[str], pct: float) -> OperationSpec:
         """Instrument price shock by ``InstrumentType`` (snake_case strings)."""
         ...
 
     @classmethod
-    def instrument_spread_bp_by_type(
-        cls, instrument_types: list[str], bp: float
-    ) -> OperationSpec:
+    def instrument_spread_bp_by_type(cls, instrument_types: list[str], bp: float) -> OperationSpec:
         """Instrument spread shock by ``InstrumentType`` (snake_case strings)."""
         ...
 
@@ -658,9 +648,7 @@ class OperationSpec:
         ...
 
     @classmethod
-    def hierarchy_base_corr_parallel_pts(
-        cls, target_json: str, points: float
-    ) -> OperationSpec:
+    def hierarchy_base_corr_parallel_pts(cls, target_json: str, points: float) -> OperationSpec:
         """Hierarchy-targeted base-correlation parallel shift."""
         ...
 

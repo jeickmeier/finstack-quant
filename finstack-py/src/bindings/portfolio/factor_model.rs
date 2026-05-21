@@ -19,19 +19,19 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use pyo3::exceptions::{PyValueError, PyKeyError};
+use pyo3::exceptions::{PyKeyError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
 
 use finstack_portfolio::factor_model::{
-    self as fm, CreditVolReport, DecompositionConfig, DecompositionMethod,
-    FactorAssignmentReport, FactorContribution, FactorContributionDelta,
-    HistoricalPositionDecomposer, LevelVolContribution, ParametricPositionDecomposer,
-    PositionAssignment, PositionBudgetEntry, PositionEsContribution,
-    PositionFactorContribution, PositionResidualContribution, PositionRiskDecomposition,
-    PositionVarContribution, PositionVolContribution, ResidualContributionSource, RiskBudget,
-    RiskBudgetResult, RiskDecomposition, StressAttribution, StressPositionEntry, StressResult,
-    TailScenarioBreakdown, UnmatchedEntry, VolHorizon, WhatIfResult,
+    self as fm, CreditVolReport, DecompositionConfig, DecompositionMethod, FactorAssignmentReport,
+    FactorContribution, FactorContributionDelta, HistoricalPositionDecomposer,
+    LevelVolContribution, ParametricPositionDecomposer, PositionAssignment, PositionBudgetEntry,
+    PositionEsContribution, PositionFactorContribution, PositionResidualContribution,
+    PositionRiskDecomposition, PositionVarContribution, PositionVolContribution,
+    ResidualContributionSource, RiskBudget, RiskBudgetResult, RiskDecomposition, StressAttribution,
+    StressPositionEntry, StressResult, TailScenarioBreakdown, UnmatchedEntry, VolHorizon,
+    WhatIfResult,
 };
 use finstack_portfolio::types::PositionId;
 
@@ -50,8 +50,7 @@ fn to_position_ids(ids: Vec<String>) -> Vec<PositionId> {
 /// `core::Error::Validation` shape into a `PyValueError` so the same matrix
 /// validation diagnostics surface from both the Python and WASM bindings.
 fn flatten_square_matrix(matrix: Vec<Vec<f64>>, n: usize, label: &str) -> PyResult<Vec<f64>> {
-    fm::flatten_square_matrix(matrix, n, label)
-        .map_err(|e| PyValueError::new_err(e.to_string()))
+    fm::flatten_square_matrix(matrix, n, label).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 /// Convert a Rust `DecompositionMethod` to a stable Python string.
@@ -67,11 +66,7 @@ fn decomposition_method_label(method: DecompositionMethod) -> &'static str {
 // ---------------------------------------------------------------------------
 
 /// Aggregate contribution of a single factor to portfolio risk.
-#[pyclass(
-    name = "FactorContribution",
-    module = "finstack.portfolio",
-    frozen
-)]
+#[pyclass(name = "FactorContribution", module = "finstack.portfolio", frozen)]
 #[derive(Clone)]
 pub struct PyFactorContribution {
     pub(crate) inner: FactorContribution,
@@ -610,8 +605,7 @@ impl PyPositionBudgetEntry {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PositionBudgetEntry =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PositionBudgetEntry = serde_json::from_str(json_str).map_err(display_to_py)?;
         Ok(Self::from_inner(inner))
     }
 
@@ -919,8 +913,7 @@ impl PyStressPositionEntry {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: StressPositionEntry =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: StressPositionEntry = serde_json::from_str(json_str).map_err(display_to_py)?;
         Ok(Self::from_inner(inner))
     }
 
@@ -961,11 +954,7 @@ impl PyStressPositionEntry {
 }
 
 /// Breakdown of a single tail scenario.
-#[pyclass(
-    name = "TailScenarioBreakdown",
-    module = "finstack.portfolio",
-    frozen
-)]
+#[pyclass(name = "TailScenarioBreakdown", module = "finstack.portfolio", frozen)]
 #[derive(Clone)]
 pub struct PyTailScenarioBreakdown {
     pub(crate) inner: TailScenarioBreakdown,
@@ -982,8 +971,7 @@ impl PyTailScenarioBreakdown {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: TailScenarioBreakdown =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: TailScenarioBreakdown = serde_json::from_str(json_str).map_err(display_to_py)?;
         Ok(Self::from_inner(inner))
     }
 
@@ -1209,11 +1197,7 @@ impl PyUnmatchedEntry {
 }
 
 /// Assignment results for a portfolio-level factor mapping pass.
-#[pyclass(
-    name = "FactorAssignmentReport",
-    module = "finstack.portfolio",
-    frozen
-)]
+#[pyclass(name = "FactorAssignmentReport", module = "finstack.portfolio", frozen)]
 #[derive(Clone)]
 pub struct PyFactorAssignmentReport {
     pub(crate) inner: FactorAssignmentReport,
@@ -1275,11 +1259,7 @@ impl PyFactorAssignmentReport {
 // ---------------------------------------------------------------------------
 
 /// Aggregated risk contribution for a single hierarchy level.
-#[pyclass(
-    name = "LevelVolContribution",
-    module = "finstack.portfolio",
-    frozen
-)]
+#[pyclass(name = "LevelVolContribution", module = "finstack.portfolio", frozen)]
 #[derive(Clone)]
 pub struct PyLevelVolContribution {
     pub(crate) inner: LevelVolContribution,
@@ -1306,7 +1286,11 @@ impl PyLevelVolContribution {
     /// Per-bucket contributions keyed by the bucket path.
     #[getter]
     fn by_bucket(&self) -> HashMap<String, f64> {
-        self.inner.by_bucket.iter().map(|(k, v)| (k.clone(), *v)).collect()
+        self.inner
+            .by_bucket
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect()
     }
 
     fn __repr__(&self) -> String {
@@ -1418,10 +1402,12 @@ impl PyCreditVolReport {
     /// Optional per-position breakdown; ``None`` when not requested.
     #[getter]
     fn by_position(&self) -> Option<Vec<PyPositionVolContribution>> {
-        self.inner
-            .by_position_optional
-            .as_ref()
-            .map(|rows| rows.iter().cloned().map(PyPositionVolContribution::from_inner).collect())
+        self.inner.by_position_optional.as_ref().map(|rows| {
+            rows.iter()
+                .cloned()
+                .map(PyPositionVolContribution::from_inner)
+                .collect()
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -1743,7 +1729,9 @@ fn position_component_var(
         .iter()
         .find(|c| c.position_id.as_str() == position_id)
         .map(|c| c.component_var)
-        .ok_or_else(|| PyKeyError::new_err(format!("position '{position_id}' not in decomposition")))
+        .ok_or_else(|| {
+            PyKeyError::new_err(format!("position '{position_id}' not in decomposition"))
+        })
 }
 
 // ---------------------------------------------------------------------------

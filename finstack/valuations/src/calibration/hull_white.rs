@@ -766,14 +766,11 @@ pub fn calibrate_hull_white_to_swaptions(
             q.volatility,
             q.is_normal_vol,
         );
-        let raw_vega = swaption_atm_vega(annuity, fwd_rate, q.expiry, q.volatility, q.is_normal_vol);
+        let raw_vega =
+            swaption_atm_vega(annuity, fwd_rate, q.expiry, q.volatility, q.is_normal_vol);
         let label = format!("{}Yx{}Y", q.expiry, q.tenor);
-        let vega = floor_vega_and_record(
-            raw_vega,
-            SWAPTION_VEGA_FLOOR,
-            &label,
-            &mut vega_floor_hits,
-        );
+        let vega =
+            floor_vega_and_record(raw_vega, SWAPTION_VEGA_FLOOR, &label, &mut vega_floor_hits);
         prepared.push(PreparedSwaption {
             market_price,
             fwd_swap_rate: fwd_rate,
@@ -925,14 +922,11 @@ pub fn calibrate_hull_white_to_swaptions_with_schedules(
             q.volatility,
             q.is_normal_vol,
         );
-        let raw_vega = swaption_atm_vega(annuity, fwd_rate, q.expiry, q.volatility, q.is_normal_vol);
+        let raw_vega =
+            swaption_atm_vega(annuity, fwd_rate, q.expiry, q.volatility, q.is_normal_vol);
         let label = format!("{}Yx{}Y", q.expiry, q.tenor);
-        let vega = floor_vega_and_record(
-            raw_vega,
-            SWAPTION_VEGA_FLOOR,
-            &label,
-            &mut vega_floor_hits,
-        );
+        let vega =
+            floor_vega_and_record(raw_vega, SWAPTION_VEGA_FLOOR, &label, &mut vega_floor_hits);
         let stored_accruals = accruals_slice.map(|s| s.to_vec().into_boxed_slice());
         prepared.push(PreparedSwaption {
             market_price,
