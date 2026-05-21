@@ -258,30 +258,27 @@ FxOptionVanilla = TypedDict(
 
 # --- inflation (externally tagged; payload nested under variant key) ------
 
-InflationSwapPayload = TypedDict(
-    "InflationSwapPayload",
-    {
-        "id": str,
-        "maturity": str,
-        "rate": float,
-        "index": str,
-        "convention": str,
-    },
-)
-"""Zero-coupon inflation swap payload (nested under ``inflation_swap``)."""
 
-YoyInflationSwapPayload = TypedDict(
-    "YoyInflationSwapPayload",
-    {
-        "id": str,
-        "maturity": str,
-        "rate": float,
-        "index": str,
-        "frequency": Tenor,
-        "convention": str,
-    },
-)
-"""Year-on-year inflation swap payload (nested under ``yo_y_inflation_swap``)."""
+class InflationSwapPayload(TypedDict):
+    """Zero-coupon inflation swap payload (nested under ``inflation_swap``)."""
+
+    id: str
+    maturity: str
+    rate: float
+    index: str
+    convention: str
+
+
+class YoyInflationSwapPayload(TypedDict):
+    """Year-on-year inflation swap payload (nested under ``yo_y_inflation_swap``)."""
+
+    id: str
+    maturity: str
+    rate: float
+    index: str
+    frequency: Tenor
+    convention: str
+
 
 InflationSwapQuote = TypedDict(
     "InflationSwapQuote",
@@ -308,47 +305,42 @@ character run between case boundaries).
 
 # --- vol (externally tagged) -----------------------------------------------
 
-OptionVolPayload = TypedDict(
-    "OptionVolPayload",
-    {
-        "id": str,
-        "underlying": str,
-        "expiry": str,
-        "strike": float,
-        "vol": float,
-        "option_type": Literal["call", "put"],
-        "convention": str,
-    },
-)
-"""Equity/commodity option implied-vol payload."""
 
-SwaptionVolPayload = TypedDict(
-    "SwaptionVolPayload",
-    {
-        "id": str,
-        "expiry": str,
-        "maturity": str,
-        "strike": float,
-        "vol": float,
-        "quote_type": str,
-        "convention": str,
-    },
-)
-"""Swaption implied-vol payload."""
+class OptionVolPayload(TypedDict):
+    """Equity/commodity option implied-vol payload."""
 
-CapFloorVolPayload = TypedDict(
-    "CapFloorVolPayload",
-    {
-        "id": str,
-        "expiry": str,
-        "strike": float,
-        "vol": float,
-        "quote_type": str,
-        "is_cap": bool,
-        "convention": str,
-    },
-)
-"""Cap/floor implied-vol payload."""
+    id: str
+    underlying: str
+    expiry: str
+    strike: float
+    vol: float
+    option_type: Literal["call", "put"]
+    convention: str
+
+
+class SwaptionVolPayload(TypedDict):
+    """Swaption implied-vol payload."""
+
+    id: str
+    expiry: str
+    maturity: str
+    strike: float
+    vol: float
+    quote_type: str
+    convention: str
+
+
+class CapFloorVolPayload(TypedDict):
+    """Cap/floor implied-vol payload."""
+
+    id: str
+    expiry: str
+    strike: float
+    vol: float
+    quote_type: str
+    is_cap: bool
+    convention: str
+
 
 OptionVolQuote = TypedDict(
     "OptionVolQuote",
@@ -496,274 +488,235 @@ MarketQuote = (
 
 # --- quote-bearing variants ------------------------------------------------
 
-RateQuoteDepositDatum = TypedDict(
-    "RateQuoteDepositDatum",
-    {
-        "kind": Literal["rate_quote"],
-        "type": Literal["deposit"],
-        "id": str,
-        "index": str,
-        "pillar": Pillar,
-        "rate": float,
-    },
-)
-"""Deposit rate quote as a flat ``MarketDatum``."""
 
-RateQuoteFraDatum = TypedDict(
-    "RateQuoteFraDatum",
-    {
-        "kind": Literal["rate_quote"],
-        "type": Literal["fra"],
-        "id": str,
-        "index": str,
-        "start": Pillar,
-        "end": Pillar,
-        "rate": float,
-    },
-)
-"""FRA quote as a flat ``MarketDatum``."""
+class RateQuoteDepositDatum(TypedDict):
+    """Deposit rate quote as a flat ``MarketDatum``."""
 
-RateQuoteFuturesDatum = TypedDict(
-    "RateQuoteFuturesDatum",
-    {
-        "kind": Literal["rate_quote"],
-        "type": Literal["futures"],
-        "id": str,
-        "contract": str,
-        "expiry": str,
-        "price": float,
-        "convexity_adjustment": NotRequired[float | None],
-        "vol_surface_id": NotRequired[str | None],
-    },
-)
-"""Interest-rate futures quote as a flat ``MarketDatum``."""
+    kind: Literal["rate_quote"]
+    type: Literal["deposit"]
+    id: str
+    index: str
+    pillar: Pillar
+    rate: float
 
-RateQuoteSwapDatum = TypedDict(
-    "RateQuoteSwapDatum",
-    {
-        "kind": Literal["rate_quote"],
-        "type": Literal["swap"],
-        "id": str,
-        "index": str,
-        "pillar": Pillar,
-        "rate": float,
-        "spread_decimal": NotRequired[float | None],
-    },
-)
-"""IRS par-rate quote as a flat ``MarketDatum``."""
 
-CdsParSpreadDatum = TypedDict(
-    "CdsParSpreadDatum",
-    {
-        "kind": Literal["cds_quote"],
-        "type": Literal["cds_par_spread"],
-        "id": str,
-        "entity": str,
-        "convention": CdsConventionKey,
-        "pillar": Pillar,
-        "spread_bp": float,
-        "recovery_rate": float,
-    },
-)
-"""CDS par-spread quote as a flat ``MarketDatum``."""
+class RateQuoteFraDatum(TypedDict):
+    """FRA quote as a flat ``MarketDatum``."""
 
-CdsUpfrontDatum = TypedDict(
-    "CdsUpfrontDatum",
-    {
-        "kind": Literal["cds_quote"],
-        "type": Literal["cds_upfront"],
-        "id": str,
-        "entity": str,
-        "convention": CdsConventionKey,
-        "pillar": Pillar,
-        "running_spread_bp": float,
-        "upfront_pct": float,
-        "recovery_rate": float,
-    },
-)
-"""CDS upfront + running quote as a flat ``MarketDatum``."""
+    kind: Literal["rate_quote"]
+    type: Literal["fra"]
+    id: str
+    index: str
+    start: Pillar
+    end: Pillar
+    rate: float
 
-CdsTrancheDatum = TypedDict(
-    "CdsTrancheDatum",
-    {
-        "kind": Literal["cds_tranche_quote"],
-        "type": Literal["cds_tranche"],
-        "id": str,
-        "index": str,
-        "attachment": float,
-        "detachment": float,
-        "maturity": str,
-        "upfront_pct": float,
-        "running_spread_bp": float,
-        "convention": CdsConventionKey,
-    },
-)
-"""CDS tranche quote as a flat ``MarketDatum``."""
 
-FxForwardOutrightDatum = TypedDict(
-    "FxForwardOutrightDatum",
-    {
-        "kind": Literal["fx_quote"],
-        "type": Literal["forward_outright"],
-        "id": str,
-        "convention": str,
-        "pillar": Pillar,
-        "forward_rate": float,
-    },
-)
-"""FX outright-forward quote as a flat ``MarketDatum``."""
+class RateQuoteFuturesDatum(TypedDict):
+    """Interest-rate futures quote as a flat ``MarketDatum``."""
 
-FxSwapOutrightDatum = TypedDict(
-    "FxSwapOutrightDatum",
-    {
-        "kind": Literal["fx_quote"],
-        "type": Literal["swap_outright"],
-        "id": str,
-        "convention": str,
-        "far_pillar": Pillar,
-        "near_rate": float,
-        "far_rate": float,
-    },
-)
-"""FX swap-outright quote as a flat ``MarketDatum``."""
+    kind: Literal["rate_quote"]
+    type: Literal["futures"]
+    id: str
+    contract: str
+    expiry: str
+    price: float
+    convexity_adjustment: NotRequired[float | None]
+    vol_surface_id: NotRequired[str | None]
 
-FxOptionVanillaDatum = TypedDict(
-    "FxOptionVanillaDatum",
-    {
-        "kind": Literal["fx_quote"],
-        "type": Literal["option_vanilla"],
-        "id": str,
-        "convention": str,
-        "expiry": str,
-        "strike": float,
-        "option_type": Literal["call", "put"],
-        "vol_surface_id": str,
-    },
-)
-"""FX vanilla-option quote as a flat ``MarketDatum``."""
 
-InflationSwapDatum = TypedDict(
-    "InflationSwapDatum",
-    {
-        "kind": Literal["inflation_quote"],
-        "inflation_swap": InflationSwapPayload,
-    },
-)
-"""Zero-coupon inflation swap quote as a ``MarketDatum`` (nested payload)."""
+class RateQuoteSwapDatum(TypedDict):
+    """IRS par-rate quote as a flat ``MarketDatum``."""
 
-YoyInflationSwapDatum = TypedDict(
-    "YoyInflationSwapDatum",
-    {
-        "kind": Literal["inflation_quote"],
-        "yo_y_inflation_swap": YoyInflationSwapPayload,
-    },
-)
-"""Year-on-year inflation swap quote as a ``MarketDatum`` (nested payload)."""
+    kind: Literal["rate_quote"]
+    type: Literal["swap"]
+    id: str
+    index: str
+    pillar: Pillar
+    rate: float
+    spread_decimal: NotRequired[float | None]
 
-OptionVolDatum = TypedDict(
-    "OptionVolDatum",
-    {
-        "kind": Literal["vol_quote"],
-        "option_vol": OptionVolPayload,
-    },
-)
-"""Equity/commodity option vol quote as a ``MarketDatum`` (nested payload)."""
 
-SwaptionVolDatum = TypedDict(
-    "SwaptionVolDatum",
-    {
-        "kind": Literal["vol_quote"],
-        "swaption_vol": SwaptionVolPayload,
-    },
-)
-"""Swaption vol quote as a ``MarketDatum`` (nested payload)."""
+class CdsParSpreadDatum(TypedDict):
+    """CDS par-spread quote as a flat ``MarketDatum``."""
 
-CapFloorVolDatum = TypedDict(
-    "CapFloorVolDatum",
-    {
-        "kind": Literal["vol_quote"],
-        "cap_floor_vol": CapFloorVolPayload,
-    },
-)
-"""Cap/floor vol quote as a ``MarketDatum`` (nested payload)."""
+    kind: Literal["cds_quote"]
+    type: Literal["cds_par_spread"]
+    id: str
+    entity: str
+    convention: CdsConventionKey
+    pillar: Pillar
+    spread_bp: float
+    recovery_rate: float
 
-XccyBasisSwapDatum = TypedDict(
-    "XccyBasisSwapDatum",
-    {
-        "kind": Literal["xccy_quote"],
-        "type": Literal["basis_swap"],
-        "id": str,
-        "convention": str,
-        "far_pillar": Pillar,
-        "basis_spread_bp": float,
-        "spot_fx": NotRequired[float | None],
-    },
-)
-"""Cross-currency basis-swap quote as a flat ``MarketDatum``."""
 
-BondCleanPriceDatum = TypedDict(
-    "BondCleanPriceDatum",
-    {
-        "kind": Literal["bond_quote"],
-        "type": Literal["fixed_rate_bullet_clean_price"],
-        "id": str,
-        "currency": str,
-        "issue_date": str,
-        "maturity": str,
-        "coupon_rate": float,
-        "convention": str,
-        "clean_price_pct": float,
-    },
-)
-"""Fixed-rate bullet bond clean-price quote as a flat ``MarketDatum``."""
+class CdsUpfrontDatum(TypedDict):
+    """CDS upfront + running quote as a flat ``MarketDatum``."""
 
-BondZSpreadDatum = TypedDict(
-    "BondZSpreadDatum",
-    {
-        "kind": Literal["bond_quote"],
-        "type": Literal["fixed_rate_bullet_z_spread"],
-        "id": str,
-        "currency": str,
-        "issue_date": str,
-        "maturity": str,
-        "coupon_rate": float,
-        "convention": str,
-        "z_spread": float,
-    },
-)
-"""Fixed-rate bullet bond Z-spread quote as a flat ``MarketDatum``."""
+    kind: Literal["cds_quote"]
+    type: Literal["cds_upfront"]
+    id: str
+    entity: str
+    convention: CdsConventionKey
+    pillar: Pillar
+    running_spread_bp: float
+    upfront_pct: float
+    recovery_rate: float
 
-BondOasDatum = TypedDict(
-    "BondOasDatum",
-    {
-        "kind": Literal["bond_quote"],
-        "type": Literal["fixed_rate_bullet_oas"],
-        "id": str,
-        "currency": str,
-        "issue_date": str,
-        "maturity": str,
-        "coupon_rate": float,
-        "convention": str,
-        "oas": float,
-    },
-)
-"""Fixed-rate bullet bond OAS quote as a flat ``MarketDatum``."""
 
-BondYtmDatum = TypedDict(
-    "BondYtmDatum",
-    {
-        "kind": Literal["bond_quote"],
-        "type": Literal["fixed_rate_bullet_ytm"],
-        "id": str,
-        "currency": str,
-        "issue_date": str,
-        "maturity": str,
-        "coupon_rate": float,
-        "convention": str,
-        "ytm": float,
-    },
-)
-"""Fixed-rate bullet bond YTM quote as a flat ``MarketDatum``."""
+class CdsTrancheDatum(TypedDict):
+    """CDS tranche quote as a flat ``MarketDatum``."""
+
+    kind: Literal["cds_tranche_quote"]
+    type: Literal["cds_tranche"]
+    id: str
+    index: str
+    attachment: float
+    detachment: float
+    maturity: str
+    upfront_pct: float
+    running_spread_bp: float
+    convention: CdsConventionKey
+
+
+class FxForwardOutrightDatum(TypedDict):
+    """FX outright-forward quote as a flat ``MarketDatum``."""
+
+    kind: Literal["fx_quote"]
+    type: Literal["forward_outright"]
+    id: str
+    convention: str
+    pillar: Pillar
+    forward_rate: float
+
+
+class FxSwapOutrightDatum(TypedDict):
+    """FX swap-outright quote as a flat ``MarketDatum``."""
+
+    kind: Literal["fx_quote"]
+    type: Literal["swap_outright"]
+    id: str
+    convention: str
+    far_pillar: Pillar
+    near_rate: float
+    far_rate: float
+
+
+class FxOptionVanillaDatum(TypedDict):
+    """FX vanilla-option quote as a flat ``MarketDatum``."""
+
+    kind: Literal["fx_quote"]
+    type: Literal["option_vanilla"]
+    id: str
+    convention: str
+    expiry: str
+    strike: float
+    option_type: Literal["call", "put"]
+    vol_surface_id: str
+
+
+class InflationSwapDatum(TypedDict):
+    """Zero-coupon inflation swap quote as a ``MarketDatum`` (nested payload)."""
+
+    kind: Literal["inflation_quote"]
+    inflation_swap: InflationSwapPayload
+
+
+class YoyInflationSwapDatum(TypedDict):
+    """Year-on-year inflation swap quote as a ``MarketDatum`` (nested payload)."""
+
+    kind: Literal["inflation_quote"]
+    yo_y_inflation_swap: YoyInflationSwapPayload
+
+
+class OptionVolDatum(TypedDict):
+    """Equity/commodity option vol quote as a ``MarketDatum`` (nested payload)."""
+
+    kind: Literal["vol_quote"]
+    option_vol: OptionVolPayload
+
+
+class SwaptionVolDatum(TypedDict):
+    """Swaption vol quote as a ``MarketDatum`` (nested payload)."""
+
+    kind: Literal["vol_quote"]
+    swaption_vol: SwaptionVolPayload
+
+
+class CapFloorVolDatum(TypedDict):
+    """Cap/floor vol quote as a ``MarketDatum`` (nested payload)."""
+
+    kind: Literal["vol_quote"]
+    cap_floor_vol: CapFloorVolPayload
+
+
+class XccyBasisSwapDatum(TypedDict):
+    """Cross-currency basis-swap quote as a flat ``MarketDatum``."""
+
+    kind: Literal["xccy_quote"]
+    type: Literal["basis_swap"]
+    id: str
+    convention: str
+    far_pillar: Pillar
+    basis_spread_bp: float
+    spot_fx: NotRequired[float | None]
+
+
+class BondCleanPriceDatum(TypedDict):
+    """Fixed-rate bullet bond clean-price quote as a flat ``MarketDatum``."""
+
+    kind: Literal["bond_quote"]
+    type: Literal["fixed_rate_bullet_clean_price"]
+    id: str
+    currency: str
+    issue_date: str
+    maturity: str
+    coupon_rate: float
+    convention: str
+    clean_price_pct: float
+
+
+class BondZSpreadDatum(TypedDict):
+    """Fixed-rate bullet bond Z-spread quote as a flat ``MarketDatum``."""
+
+    kind: Literal["bond_quote"]
+    type: Literal["fixed_rate_bullet_z_spread"]
+    id: str
+    currency: str
+    issue_date: str
+    maturity: str
+    coupon_rate: float
+    convention: str
+    z_spread: float
+
+
+class BondOasDatum(TypedDict):
+    """Fixed-rate bullet bond OAS quote as a flat ``MarketDatum``."""
+
+    kind: Literal["bond_quote"]
+    type: Literal["fixed_rate_bullet_oas"]
+    id: str
+    currency: str
+    issue_date: str
+    maturity: str
+    coupon_rate: float
+    convention: str
+    oas: float
+
+
+class BondYtmDatum(TypedDict):
+    """Fixed-rate bullet bond YTM quote as a flat ``MarketDatum``."""
+
+    kind: Literal["bond_quote"]
+    type: Literal["fixed_rate_bullet_ytm"]
+    id: str
+    currency: str
+    issue_date: str
+    maturity: str
+    coupon_rate: float
+    convention: str
+    ytm: float
+
 
 # --- snapshot variants -----------------------------------------------------
 
@@ -1418,9 +1371,9 @@ __all__ = [
     "VolSurfacePrior",
     "VolSurfaceStep",
     "VolatilityIndexCurvePrior",
+    "XccyBasisStep",
     "XccyBasisSwapDatum",
     "XccyBasisSwapQuote",
-    "XccyBasisStep",
     "YoyInflationSwapDatum",
     "YoyInflationSwapPayload",
     "YoyInflationSwapQuote",

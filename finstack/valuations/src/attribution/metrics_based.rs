@@ -298,11 +298,10 @@ fn hazard_curve_abs_shift_bp_metric(
     }
 }
 
-/// Threshold below which a signed mean shift is considered "twist-dominated"
-/// relative to its L1 magnitude. When `|avg_signed| < TWIST_FRACTION_THRESHOLD
-/// * avg_abs`, the convexity term `½·γ·avg_signed²` understates the true
-/// quadratic contribution, and downstream consumers should fall back to a
-/// per-tenor convexity (or to parallel/waterfall attribution).
+/// Threshold below which a signed mean shift is considered twist-dominated
+/// relative to its L1 magnitude. Below this level, signed-average convexity
+/// understates the true quadratic contribution, so downstream consumers should
+/// fall back to per-tenor convexity.
 const TWIST_FRACTION_THRESHOLD: f64 = 1e-2;
 
 fn add_cross_factor_term(

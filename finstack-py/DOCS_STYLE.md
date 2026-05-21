@@ -6,7 +6,7 @@ the Rust source semantics.
 
 Counterpart: [`finstack-wasm/DOCS_STYLE.md`](../finstack-wasm/DOCS_STYLE.md).
 
-### Where docs live
+## Where docs live
 
 - **Source of truth**: Rust `///` doc comments on `#[pyfunction]`, `#[pyclass]`, and `#[pymethods]` items in `finstack-py/src/bindings/**`.
 - **PyO3 mapping**: PyO3 forwards `///` doc comments verbatim into Python `__doc__`. Whatever you write in the Rust source is what users see at the Python REPL via `help(thing)`.
