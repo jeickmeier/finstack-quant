@@ -27,11 +27,8 @@
 //! assert_eq!(swap.underlying.ticker, "NG");
 //! ```
 
-/// Pricer for commodity swaps.
-pub(crate) mod pricer;
 mod types;
 
-pub use pricer::CommoditySwapDiscountingPricer;
 pub use types::CommoditySwap;
 
 /// Metrics submodule for commodity swap risk measures.

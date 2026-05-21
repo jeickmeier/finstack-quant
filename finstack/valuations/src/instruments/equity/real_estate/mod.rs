@@ -11,5 +11,4 @@ mod types;
 
 pub use levered::LeveredRealEstateEquity;
 pub use levered_pricer::LeveredRealEstateDiscountingPricer;
-pub use pricer::RealEstateAssetDiscountingPricer;
 pub use types::{RealEstateAsset, RealEstatePropertyType, RealEstateValuationMethod};

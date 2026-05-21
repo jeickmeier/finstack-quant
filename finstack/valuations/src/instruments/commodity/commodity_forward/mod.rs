@@ -35,11 +35,8 @@
 //! assert_eq!(forward.underlying.ticker, "CL");
 //! ```
 
-/// Pricer for commodity forwards.
-pub(crate) mod pricer;
 mod types;
 
-pub use pricer::CommodityForwardDiscountingPricer;
 pub use types::CommodityForward;
 pub use types::Position;
 pub use types::SettlementType;

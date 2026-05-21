@@ -1,18 +1,10 @@
 //! Real estate asset pricer implementation.
 
 use super::RealEstateAsset;
-use crate::instruments::common_impl::traits::Instrument;
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
-use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::Error as CoreError;
-
-/// Pricer for real estate assets (DCF/direct cap).
-pub struct RealEstateAssetDiscountingPricer;
 
 pub(crate) fn compute_pv(
     asset: &RealEstateAsset,
@@ -326,42 +318,6 @@ fn year_fraction(asset: &RealEstateAsset, start: Date, end: Date) -> finstack_co
     asset
         .day_count
         .year_fraction(start, end, DayCountContext::default())
-}
-
-impl Pricer for RealEstateAssetDiscountingPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::RealEstateAsset, ModelKey::Discounting)
-    }
-
-    #[tracing::instrument(
-        name = "real_estate.discounting.price_dyn",
-        level = "debug",
-        skip(self, instrument, market),
-        fields(inst_id = %instrument.id(), as_of = %as_of),
-        err,
-    )]
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
-        let asset = instrument
-            .as_any()
-            .downcast_ref::<RealEstateAsset>()
-            .ok_or_else(|| {
-                PricingError::type_mismatch(InstrumentType::RealEstateAsset, instrument.key())
-            })?;
-
-        let value = compute_pv(asset, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
-                PricingErrorContext::from_instrument(asset).model(ModelKey::Discounting),
-            )
-        })?;
-
-        Ok(ValuationResult::stamped(asset.id(), as_of, value))
-    }
 }
 
 #[cfg(test)]
