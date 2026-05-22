@@ -254,55 +254,76 @@ impl MetricCalculator for DiscountMarginCalculator {
 
 #[cfg(test)]
 mod tests {
-    /// Issue B regression: the pricing-failure residual in the DM objective must have a
-    /// monotone, non-sign-changing form.  The pre-fix code used `1e12 * sign(dm)`, which
-    /// flips sign at `dm = 0`.  That hands Brent a sign-changing bracket  straddling zero
-    /// even when every pricing attempt fails, causing fake convergence to DM ≈ 0.
+    use super::*;
+    use crate::metrics::MetricContext;
+    use finstack_core::currency::Currency;
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_core::money::Money;
+    use std::sync::Arc;
+    use time::macros::date;
+
+    /// Issue B regression: when every `pv_given_dm` call fails (e.g. missing forward
+    /// curve), the DM solver must surface an error rather than silently returning a
+    /// near-zero DM.
     ///
-    /// This test simulates the objective directly: for a sequence of DM values spanning
-    /// the sign boundary (negative → positive), the residual returned on pricing failure
-    /// must NOT change sign.  If it does, Brent would find a spurious bracket.
+    /// With the pre-fix residual `1e12 * sign(dm)`, Brent found a fake sign-changing
+    /// bracket straddling `dm = 0` and "converged" to a meaningless DM ≈ 0. The flat
+    /// `+1e12` residual introduced by the fix gives Brent no sign-changing bracket, so
+    /// `solver.solve(...)` returns `Err` and the captured pricing error is surfaced.
     ///
-    /// After the fix the residual is a constant +1e12 regardless of `dm` sign.
-    /// Issue B regression: the pricing-failure residual in the DM objective must have a
-    /// monotone, non-sign-changing form.  The pre-fix code used `1e12 * sign(dm)`, which
-    /// flips sign at `dm = 0`.  That hands Brent a sign-changing bracket  straddling zero
-    /// even when every pricing attempt fails, causing fake convergence to DM ≈ 0.
-    ///
-    /// After the fix the residual is a constant +1e12 regardless of `dm` sign, so Brent
-    /// finds no sign-changing bracket and surfaces a convergence failure (or the captured
-    /// pricing error) instead of a fake root.
+    /// This test drives the real `DiscountMarginCalculator::calculate` path: a valid FRN
+    /// is constructed with only the discount curve present; the forward/projection curve
+    /// is intentionally omitted so every internal `pv_given_dm` call returns a
+    /// missing-curve error.
     #[test]
     fn dm_failure_residual_must_not_change_sign_across_zero() {
-        let dm_values: &[f64] = &[
-            -1.0, -0.5, -0.1, -0.01, -1e-6, 0.0, 1e-6, 0.01, 0.1, 0.5, 1.0,
-        ];
+        let as_of = date!(2025 - 01 - 01);
 
-        // FIXED expression — the residual that the `Err` branch now returns.
-        // It must be constant (+1e12) regardless of dm sign.
-        let fixed_residuals: Vec<f64> = dm_values.iter().map(|_| 1e12_f64).collect();
+        // Valid FRN that references the "USD-SOFR-3M" projection curve.
+        let bond = crate::instruments::Bond::floating(
+            "DM-UNIT-MISSING-FWD",
+            Money::new(1_000_000.0, Currency::USD),
+            "USD-SOFR-3M",
+            200,
+            as_of,
+            date!(2030 - 01 - 01),
+            finstack_core::dates::Tenor::quarterly(),
+            finstack_core::dates::DayCount::Act360,
+            "USD-OIS",
+        )
+        .expect("bond construction should succeed");
 
-        let sign_changes = fixed_residuals
-            .windows(2)
-            .filter(|w| w[0].signum() != w[1].signum())
-            .count();
+        // Market with only the discount curve — forward curve intentionally absent so
+        // every pv_given_dm call inside the objective fails with a missing-curve error.
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (5.0, 0.80)])
+            .build()
+            .expect("discount curve should build");
+        let market = Arc::new(MarketContext::new().insert(disc));
 
-        assert_eq!(
-            sign_changes, 0,
-            "DM objective failure residual must not change sign across dm = 0. \
-             A sign change at dm=0 creates a fake bracket for Brent. \
-             Found {} sign change(s) in residuals: {:?}",
-            sign_changes, fixed_residuals
+        let mut mctx = MetricContext::new(
+            Arc::new(bond),
+            market,
+            as_of,
+            Money::new(1_000_000.0, Currency::USD),
+            MetricContext::default_config(),
         );
 
-        // All residuals must be positive (reflecting that on failure the DM
-        // price diverges to +∞, so price - target is large positive).
-        for &r in &fixed_residuals {
-            assert!(
-                r > 0.0,
-                "DM failure residual must be positive, got {}",
-                r
-            );
-        }
+        let calc = DiscountMarginCalculator::default();
+        let result = calc.calculate(&mut mctx);
+
+        // With the flat +1e12 residual, the bracket search finds no sign change and
+        // solver.solve() returns Err — the captured missing-curve error is surfaced.
+        // Before the fix, the sign-flipping residual allowed Brent to "converge" to
+        // dm ≈ 0, and the pricing error guard then also returned Err but only after
+        // unnecessary fake convergence; removing either guard would yield Ok(~0.0).
+        assert!(
+            result.is_err(),
+            "DM solver must return Err when every pv_given_dm call fails (missing forward \
+             curve), not Ok({:?})",
+            result.ok()
+        );
     }
 }
