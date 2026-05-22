@@ -803,40 +803,67 @@ mod cs_gamma_consistency {
         );
     }
 
-    /// Property: CS-Gamma should be negative for a protection buyer
-    /// (the convexity of a long-protection CDS is negative: as spreads widen,
-    /// the positive CS01 effect grows, meaning PV is concave in spread — but
-    /// wait, this is credit: for a protection buyer (long default exposure),
-    /// the payoff function is concave in spread around par, so CS-Gamma < 0
-    /// for in-the-money protection and the sign can vary).
+    /// Fallback path: when the hazard curve has NO par-spread points (so
+    /// `used_rebootstrap = false`), CS-Gamma must still be finite and
+    /// non-trivially non-zero, computed via the direct hazard-rate shift path.
     ///
-    /// Rather than asserting a fixed sign, this test simply checks that CS-Gamma
-    /// is finite and has the same sign as the numerical CS01 derivative.
+    /// This exercises a code path that `cs_gamma_equals_numerical_derivative_of_cs01`
+    /// does NOT cover (that test always uses a curve with par-spread points).
     #[test]
-    fn cs_gamma_is_finite_and_consistent_sign() {
+    fn cs_gamma_fallback_direct_shift_is_finite_without_par_spreads() {
         let as_of = date!(2025 - 01 - 01);
         let maturity = as_of.add_months(60); // 5Y CDS
 
         let cds = crate::finstack_test_utils::cds_buy_protection(
-            "CS_GAMMA_SIGN",
+            "CS_GAMMA_FALLBACK",
             Money::new(10_000_000.0, Currency::USD),
             200.0,
             as_of,
             maturity,
             "USD-OIS",
-            "TEST-CREDIT",
+            "TEST-CREDIT-NOPAR",
         )
         .expect("CDS construction should succeed");
 
-        let (disc, hazard_base) = build_curves_with_par_spreads(0.0);
-        let market_base = MarketContext::new()
-            .insert(disc)
-            .insert(hazard_base);
-        let cs_gamma = compute_metric(&cds, &market_base, as_of, MetricId::CsGamma);
+        // Hazard curve has NO par-spread points — forces the direct hazard-rate
+        // shift fallback (`used_rebootstrap = false`).
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([
+                (0.0f64, 1.0f64),
+                (1.0f64, (-0.04f64).exp()),
+                (5.0f64, (-0.04f64 * 5.0).exp()),
+                (10.0f64, (-0.04f64 * 10.0).exp()),
+            ])
+            .build()
+            .unwrap();
+        let hazard_no_par = HazardCurve::builder("TEST-CREDIT-NOPAR")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .recovery_rate(0.40)
+            .knots(vec![
+                (0.0, 0.020),
+                (1.0, 0.025),
+                (5.0, 0.035),
+                (10.0, 0.045),
+            ])
+            // Intentionally no `.par_spreads(...)` — stays on fallback path.
+            .build()
+            .unwrap();
+
+        let market = MarketContext::new().insert(disc).insert(hazard_no_par);
+        let cs_gamma = compute_metric(&cds, &market, as_of, MetricId::CsGamma);
 
         assert!(
             cs_gamma.is_finite(),
-            "CS-Gamma should be finite, got {cs_gamma}"
+            "CS-Gamma (fallback path) should be finite, got {cs_gamma}"
+        );
+        // The fallback computes a genuine second-order finite difference, so the
+        // result should be non-zero for a standard vanilla CDS.
+        assert!(
+            cs_gamma.abs() > 0.0,
+            "CS-Gamma (fallback path) should be non-zero for a live CDS, got {cs_gamma}"
         );
     }
 }

@@ -107,10 +107,37 @@ impl MetricCalculator for CsGammaCalculator {
             let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
             let hazard_ref = hazard.as_ref();
 
-            // Determine whether par-spread re-bootstrapping is available
-            // (same probe as compute_parallel_cs01_with_context_raw).
+            // Determine whether par-spread re-bootstrapping is available by
+            // attempting the 0-shift bootstrap probe — exactly as
+            // `compute_parallel_cs01_with_context_raw` does.  A weak check
+            // (par-spread points exist) would allow a deal whose bootstrap
+            // *fails* to silently fall back to a hazard-rate shift while CS01
+            // surfaces a hard error — precisely the CS01/CS-Gamma inconsistency
+            // this file was written to eliminate.
             let has_par_points = hazard_ref.par_spread_points().next().is_some();
-            let used_rebootstrap = discount_id.is_some() && has_par_points;
+            let used_rebootstrap = if discount_id.is_some() && has_par_points {
+                bump_hazard_spreads_with_doc_clause_and_valuation_convention(
+                    hazard_ref,
+                    base_ctx,
+                    &BumpRequest::Parallel(0.0),
+                    discount_id.as_ref(),
+                    Some(doc_clause),
+                    Some(valuation_convention),
+                )
+                .map_err(|e| finstack_core::Error::Calibration {
+                    message: format!(
+                        "CS-Gamma hazard curve re-calibration failed for '{}': {} \
+                         (cannot compute CS-Gamma under market-standard par spread bump \
+                         methodology)",
+                        hazard_id.as_str(),
+                        e
+                    ),
+                    category: "cs_gamma_rebootstrap".to_string(),
+                })?;
+                true
+            } else {
+                false
+            };
 
             // Helper: build the bumped hazard curve for a given shift.
             let make_bumped = |shift_bp: f64| -> finstack_core::Result<_> {
