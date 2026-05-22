@@ -690,12 +690,38 @@ impl MetricId {
 
     /// Cross-gamma between spot price and implied volatility.
     ///
-    /// Mixed second derivative: ∂²V / (∂S × ∂σ).
+    /// Mixed second derivative ∂²V / (∂S × ∂σ), normalised to
+    /// **percentage-point** moves in both factors.
+    ///
+    /// Produced by `CrossFactorCalculator` (SpotVol pair) via a four-corner
+    /// central finite difference whose denominators are:
+    /// - spot: `spot_bump_pct × 100`  (e.g. 1.0 per 1 % spot move)
+    /// - vol: `vol_bump_abs × 100`    (e.g. 1.0 per 1 vol-point move)
+    ///
+    /// Units: currency per (1 pct-pt spot move) per (1 vol-point move).
+    ///
+    /// **Attribution contract**: multiply by `avg_spot_shift_pct` (percentage-
+    /// point spot change) and `avg_vol_shift_abs` (vol-point change) to obtain
+    /// the cross P&L.
+    ///
+    /// **Do NOT confuse with `Vanna`**, which is expressed per unit-spot per
+    /// decimal-vol and differs by a factor of S₀ / 10_000.
     pub const CrossGammaSpotVol: Self = Self(Cow::Borrowed("cross_gamma_spot_vol"));
 
     /// Cross-gamma between spot price and credit spreads.
     ///
-    /// Mixed second derivative: ∂²V / (∂S × ∂s).
+    /// Mixed second derivative ∂²V / (∂S × ∂s), normalised to
+    /// **percentage-point** spot moves and **basis-point** credit spread moves.
+    ///
+    /// Produced by `CrossFactorCalculator` (SpotCredit pair) via a four-corner
+    /// central finite difference whose denominators are:
+    /// - spot: `spot_bump_pct × 100`  (e.g. 1.0 per 1 % spot move)
+    /// - credit: `credit_bump_bp`     (e.g. 1.0 per 1 bp credit move)
+    ///
+    /// Units: currency per (1 pct-pt spot move) per (1 bp credit spread move).
+    ///
+    /// **Attribution contract**: multiply by `avg_spot_shift_pct` (percentage-
+    /// point spot change) and `avg_credit_shift_bp` (bp credit spread change).
     pub const CrossGammaSpotCredit: Self = Self(Cow::Borrowed("cross_gamma_spot_credit"));
 
     /// Cross-gamma between FX rates and implied volatility.

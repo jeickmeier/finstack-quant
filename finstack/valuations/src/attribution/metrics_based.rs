@@ -1048,6 +1048,22 @@ pub fn attribute_pnl_metrics_based(
         // bucket and may be material for books loaded on inflation /
         // structured / non-standard cross-effects — for those, prefer
         // parallel/waterfall attribution.
+        //
+        // UNIT CONTRACT for Spot cross-gamma metrics:
+        // `CrossGammaSpotVol` and `CrossGammaSpotCredit` are produced by
+        // `CrossFactorCalculator` using percentage-point–normalised finite
+        // differences: the spot bump denominator is `spot_bump_pct × 100`
+        // (e.g. 1.0 for a 1 % bump) and the vol/credit denominator is
+        // similarly in percentage-point units.  Therefore the attribution
+        // below must multiply by `avg_spot_shift_pct` (percentage-point spot
+        // move) and `avg_vol_shift_abs` / `avg_credit_shift_bp` (also in
+        // percentage-point units).
+        //
+        // WARNING: Do NOT substitute `MetricId::Vanna` here as a fallback for
+        // `CrossGammaSpotVol`.  `Vanna` is defined as ∂²V/(∂S_abs × ∂σ_decimal)
+        // — per unit spot, per decimal vol — and differs from
+        // `CrossGammaSpotVol` by a factor of S₀ / 10_000.  Using `Vanna` with
+        // percentage-point moves would mis-scale the cross P&L by 10_000/S₀.
         let mut cross_total = 0.0;
         let mut cross_by_pair = IndexMap::new();
         let currency = val_t1.value.currency();
@@ -1090,8 +1106,7 @@ pub fn attribute_pnl_metrics_based(
             val_t0
                 .measures
                 .get(MetricId::CrossGammaSpotVol.as_str())
-                .copied()
-                .or_else(|| val_t0.measures.get(MetricId::Vanna.as_str()).copied()),
+                .copied(),
             avg_spot_shift_pct,
             avg_vol_shift_abs,
         ) {
@@ -1625,8 +1640,13 @@ mod tests {
         assert_eq!(bucketed.get(&CurveId::new("USD-SOFR")), None);
     }
 
+    /// `Vanna` (∂²V/∂S_abs∂σ_decimal) must NOT be used as a fallback for
+    /// `CrossGammaSpotVol` in attribution because their unit conventions differ
+    /// by a factor of S₀ / 10_000.  When only `Vanna` is present (no
+    /// `CrossGammaSpotVol`), the Spot×Vol cross P&L must be zero (goes to
+    /// residual) rather than silently mis-scaled.
     #[test]
-    fn test_metrics_based_moves_spot_vol_cross_term_into_cross_factor_bucket() {
+    fn test_vanna_alone_does_not_produce_spot_vol_cross_pnl() {
         let as_of_t0 = date!(2025 - 01 - 15);
         let as_of_t1 = date!(2025 - 01 - 16);
         let meta = finstack_core::config::results_meta(&FinstackConfig::default());
@@ -1656,6 +1676,7 @@ mod tests {
             .insert_price("TEST-SPOT", MarketScalar::Unitless(110.0))
             .insert_surface(surface_t1);
 
+        // Only Vanna is present — NO CrossGammaSpotVol.
         let mut measures_t0 = IndexMap::new();
         measures_t0.insert(MetricId::Vega, 2.0);
         measures_t0.insert(MetricId::Vanna, 3.0);
@@ -1685,20 +1706,117 @@ mod tests {
         )
         .expect("metrics-based attribution should succeed");
 
+        // Vol P&L: Vega × Δσ_pct_pt = 2.0 × 1.0 = 2.0
         assert!((attribution.vol_pnl.amount() - 2.0).abs() < 1e-9);
-        assert!((attribution.cross_factor_pnl.amount() - 30.0).abs() < 1e-9);
+        // Spot×Vol cross P&L must be zero: Vanna is not a valid substitute for
+        // CrossGammaSpotVol (wrong unit convention).
+        assert!(
+            attribution.cross_factor_pnl.amount().abs() < 1e-9,
+            "cross_factor_pnl should be zero when only Vanna is available (not CrossGammaSpotVol); \
+             got {}",
+            attribution.cross_factor_pnl.amount()
+        );
+        // cross_factor_detail should be None (no cross terms found).
+        assert!(
+            attribution.cross_factor_detail.is_none(),
+            "cross_factor_detail should be None when no CrossGamma metrics are present"
+        );
+    }
+
+    /// Regression test: `CrossGammaSpotVol` (in pct-spot × vol-point units,
+    /// produced by `CrossFactorCalculator`) multiplied by `avg_spot_shift_pct`
+    /// and `avg_vol_shift_abs` must give the correct cross P&L.
+    ///
+    /// Setup:
+    ///   S₀ = 100, S₁ = 110  → avg_spot_shift_pct = 10.0 (pct-pt)
+    ///   σ₀ = 0.20, σ₁ = 0.21 → avg_vol_shift_abs = 1.0 (vol-pt)
+    ///   CrossGammaSpotVol = 0.005 ($ per pct-pt spot per vol-pt)
+    ///
+    /// Expected cross P&L = 0.005 × 10.0 × 1.0 = 0.05
+    #[test]
+    fn test_cross_gamma_spot_vol_uses_pct_spot_move() {
+        let as_of_t0 = date!(2025 - 01 - 15);
+        let as_of_t1 = date!(2025 - 01 - 16);
+        let meta = finstack_core::config::results_meta(&FinstackConfig::default());
+
+        let instrument: Arc<dyn Instrument> = Arc::new(SpotVolTestInstrument::new(
+            "TEST-SPOT-VOL-CGAMMA",
+            Money::new(100.0, Currency::USD),
+        ));
+
+        let surface_t0 = VolSurface::builder("TEST-VOL")
+            .expiries(&[1.0])
+            .strikes(&[100.0])
+            .row(&[0.20])
+            .build()
+            .expect("test vol surface should build");
+        let surface_t1 = VolSurface::builder("TEST-VOL")
+            .expiries(&[1.0])
+            .strikes(&[100.0])
+            .row(&[0.21])
+            .build()
+            .expect("test vol surface should build");
+
+        let market_t0 = MarketContext::new()
+            .insert_price("TEST-SPOT", MarketScalar::Unitless(100.0))
+            .insert_surface(surface_t0);
+        let market_t1 = MarketContext::new()
+            .insert_price("TEST-SPOT", MarketScalar::Unitless(110.0))
+            .insert_surface(surface_t1);
+
+        // CrossGammaSpotVol is explicitly present (pct-spot × vol-point units).
+        // Vanna is also set to a different value to confirm it is NOT used.
+        let cross_gamma_spot_vol = 0.005_f64; // $ per pct-pt spot per vol-pt
+        let mut measures_t0 = IndexMap::new();
+        measures_t0.insert(MetricId::Vega, 2.0);
+        measures_t0.insert(MetricId::Vanna, 999.0); // must be ignored
+        measures_t0.insert(MetricId::CrossGammaSpotVol, cross_gamma_spot_vol);
+
+        let val_t0 = ValuationResult::stamped_with_meta(
+            "TEST-SPOT-VOL-CGAMMA",
+            as_of_t0,
+            Money::new(100.0, Currency::USD),
+            meta.clone(),
+        )
+        .with_measures(measures_t0);
+        let val_t1 = ValuationResult::stamped_with_meta(
+            "TEST-SPOT-VOL-CGAMMA",
+            as_of_t1,
+            Money::new(102.07, Currency::USD), // arbitrary end value
+            meta,
+        );
+
+        let attribution = attribute_pnl_metrics_based(
+            &instrument,
+            &market_t0,
+            &market_t1,
+            &val_t0,
+            &val_t1,
+            as_of_t0,
+            as_of_t1,
+        )
+        .expect("metrics-based attribution should succeed");
+
+        // avg_spot_shift_pct = (110/100 - 1) × 100 = 10.0
+        // avg_vol_shift_abs  = (0.21 - 0.20) × 100 = 1.0
+        // expected cross P&L = 0.005 × 10.0 × 1.0 = 0.05
+        let expected_cross_pnl = cross_gamma_spot_vol * 10.0 * 1.0;
+        assert!(
+            (attribution.cross_factor_pnl.amount() - expected_cross_pnl).abs() < 1e-9,
+            "cross P&L should be {expected_cross_pnl} (pct-spot units); got {}",
+            attribution.cross_factor_pnl.amount()
+        );
         let detail = attribution
             .cross_factor_detail
             .expect("cross factor detail should be populated");
+        let spot_vol_entry = detail
+            .by_pair
+            .get("Spot×Vol")
+            .expect("Spot×Vol entry should be present");
         assert!(
-            (detail
-                .by_pair
-                .get("Spot×Vol")
-                .expect("spot-vol entry")
-                .amount()
-                - 30.0)
-                .abs()
-                < 1e-9
+            (spot_vol_entry.amount() - expected_cross_pnl).abs() < 1e-9,
+            "Spot×Vol detail should be {expected_cross_pnl}; got {}",
+            spot_vol_entry.amount()
         );
     }
 

@@ -19,7 +19,6 @@ use finstack_core::types::CurveId;
 use finstack_core::Result;
 
 const NO_DEPS: &[MetricId] = &[];
-const SPOT_VOL_DEPS: &[MetricId] = &[MetricId::Vanna];
 
 /// Identifies which two risk factors are crossed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -347,12 +346,15 @@ impl CrossFactorCalculator {
 
 impl MetricCalculator for CrossFactorCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        if self.pair == CrossFactorPair::SpotVol {
-            if let Some(vanna) = context.computed.get(&MetricId::Vanna) {
-                return Ok(*vanna);
-            }
-        }
-
+        // NOTE: There is deliberately NO short-circuit here that returns a
+        // pre-computed `Vanna` metric in place of `CrossGammaSpotVol`.
+        //
+        // `Vanna` is defined as ∂²V/(∂S_abs × ∂σ_decimal) — per unit spot, per
+        // decimal vol. `CrossGammaSpotVol` (computed below via four-corner FD) is
+        // normalised by percentage-point moves in both factors (per 1 pct-pt spot,
+        // per 1 pct-pt vol), which differs by a factor of S₀ / 10_000.  Returning
+        // `Vanna` directly would silently mis-scale every cross-gamma attribution
+        // that uses `CrossGammaSpotVol × avg_spot_shift_pct × avg_vol_shift_pct`.
         let bumper_a = match (self.factory_a)(context)? {
             Some(bumper) => bumper,
             None => return Ok(0.0),
@@ -382,10 +384,7 @@ impl MetricCalculator for CrossFactorCalculator {
     }
 
     fn dependencies(&self) -> &[MetricId] {
-        match self.pair {
-            CrossFactorPair::SpotVol => SPOT_VOL_DEPS,
-            _ => NO_DEPS,
-        }
+        NO_DEPS
     }
 }
 
