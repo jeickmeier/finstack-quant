@@ -486,11 +486,15 @@ fn test_quantlib_parity_rho() {
 
     let rho = *result.measures.get("rho").unwrap();
 
-    // Rho should be finite and reasonable
+    // Rho should be finite and reasonable.
+    // Swaption Rho is the sensitivity to the discount curve only (the forward
+    // swap rate is held fixed).  This is the pure discounting sensitivity and
+    // is much smaller than the delta-dominated DV01.  The old bound of [50,
+    // 200_000] was calibrated against the incorrect dual-curve combined figure;
+    // with the correct discount-only wiring the value is ~5 per bp on a 1M
+    // notional 1Y-5Y ATM swaption.
     assert!(rho.is_finite(), "Rho should be finite");
-
-    // For 1M notional swaption, rho (per 1%) typically in range
-    assert_reasonable(rho.abs(), 50.0, 200_000.0, "Rho magnitude");
+    assert_reasonable(rho.abs(), 0.1, 10_000.0, "Rho magnitude");
 }
 
 #[test]

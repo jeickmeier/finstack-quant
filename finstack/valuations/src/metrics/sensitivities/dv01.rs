@@ -69,6 +69,12 @@ pub(crate) enum RateCurveSelection {
     All,
     /// Include only forward/projection curves.
     ForwardOnly,
+    /// Include only the discount/funding curve.
+    ///
+    /// Use this for Rho calculations where only the discount curve is bumped,
+    /// leaving the forward swap rate (and hence the option's intrinsic value)
+    /// unchanged — which is the correct definition of option rho.
+    DiscountOnly,
 }
 
 /// Configuration for DV01 calculations.
@@ -119,6 +125,22 @@ impl Dv01CalculatorConfig {
         }
     }
 
+    /// Create config for parallel bump of the discount/funding curve only.
+    ///
+    /// This is the correct configuration for option **Rho**: bumping only the
+    /// discount curve isolates pure discounting sensitivity while leaving the
+    /// forward swap rate (and hence the option's intrinsic value) unchanged.
+    /// Contrast with `parallel_combined()` which bumps both discount and forward
+    /// curves and conflates Rho with Delta.
+    pub(crate) fn parallel_discount_only() -> Self {
+        Self {
+            mode: Dv01ComputationMode::ParallelCombined,
+            buckets: Cow::Borrowed(&[]),
+            series_id: MetricId::BucketedDv01,
+            curve_selection: RateCurveSelection::DiscountOnly,
+        }
+    }
+
     /// Create config for parallel DV01 over forward/projection curves only.
     pub(crate) fn parallel_forward_only() -> Self {
         Self {
@@ -163,6 +185,7 @@ impl Dv01CalculatorConfig {
                 RateCurveSelection::All,
                 RatesCurveKind::Discount | RatesCurveKind::Forward
             ) | (RateCurveSelection::ForwardOnly, RatesCurveKind::Forward)
+                | (RateCurveSelection::DiscountOnly, RatesCurveKind::Discount)
         )
     }
 }
@@ -297,6 +320,7 @@ where
                 !deps.discount_curves.is_empty() || !deps.forward_curves.is_empty()
             }
             RateCurveSelection::ForwardOnly => !deps.forward_curves.is_empty(),
+            RateCurveSelection::DiscountOnly => !deps.discount_curves.is_empty(),
         };
 
         if curves.is_empty() && has_rate_deps {

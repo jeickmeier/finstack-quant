@@ -1,6 +1,7 @@
 //! Rho (interest rate sensitivity) tests
 
 use crate::swaption::common::*;
+use finstack_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::metrics::MetricId;
 
@@ -45,10 +46,14 @@ fn test_rho_parallel_bump_validation() {
         .unwrap();
     let rho_analytical = *result.measures.get("rho").unwrap();
 
-    // Rho should be finite and reasonable for ATM swaption
+    // Rho should be finite and reasonable for ATM swaption.
+    // Swaption Rho is the sensitivity to the DISCOUNT curve only (the forward
+    // swap rate is held fixed).  For a 1M notional, 1Y-5Y payer swaption the
+    // discount-only rho is a small positive number — much smaller than the
+    // delta-dominated DV01 — and falls well below the old dual-curve figure.
     assert!(rho_analytical.is_finite(), "Rho should be finite");
-    // Rho for 1M notional 1Y into 5Y should be in a reasonable per‑bp range
-    assert_reasonable(rho_analytical.abs(), 10.0, 1_000.0, "Rho magnitude");
+    // Discount-only rho per 1bp for 1M notional 1Y into 5Y swaption.
+    assert_reasonable(rho_analytical.abs(), 0.1, 500.0, "Rho magnitude");
 }
 
 #[test]
@@ -139,5 +144,87 @@ fn test_rho_magnitude_scales_with_tenor() {
     assert!(
         rho_long.abs() > rho_short.abs(),
         "Longer tenor should have higher rho magnitude"
+    );
+}
+
+/// Regression test: swaption Rho must equal a discount-curve-ONLY bump-and-reprice.
+///
+/// The correct option rho is the sensitivity to the discount/funding rate while
+/// the forward swap rate (and vol) are held fixed.  The previous wiring used
+/// `parallel_combined()` which moved BOTH the discount and forward curves, thereby
+/// conflating Rho with Delta.
+///
+/// This test:
+/// 1. Computes the reference rho manually: bump only `USD_OIS` (the discount
+///    curve) by +1bp, reprice, take the forward difference.
+/// 2. Computes a dual-curve reference: bump BOTH `USD_OIS` and `USD_LIBOR_3M`
+///    by +1bp, reprice, forward difference.
+/// 3. Asserts `MetricId::Rho` matches the discount-only reference (within 1bp
+///    tolerance) and does NOT match the dual-curve reference.
+#[test]
+fn test_rho_is_discount_curve_only_not_dual_curve() {
+    let (as_of, expiry, swap_start, swap_end) = standard_dates();
+    // Use separate discount and forward curves so the two bumps are distinct.
+    let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
+    let market = create_flat_market(as_of, 0.05, 0.30);
+
+    // --- Reference: discount-curve-ONLY forward bump +1bp ---
+    let market_disc_up = market
+        .bump([MarketBump::Curve {
+            id: "USD_OIS".to_string().into(),
+            spec: BumpSpec::parallel_bp(1.0),
+        }])
+        .expect("discount bump should succeed");
+    let pv_base = swaption.value(&market, as_of).unwrap().amount();
+    let pv_disc_up = swaption.value(&market_disc_up, as_of).unwrap().amount();
+    let rho_discount_only = pv_disc_up - pv_base;
+
+    // --- Reference: DUAL-curve forward bump +1bp (the old/wrong wiring) ---
+    let market_both_up = market
+        .bump([
+            MarketBump::Curve {
+                id: "USD_OIS".to_string().into(),
+                spec: BumpSpec::parallel_bp(1.0),
+            },
+            MarketBump::Curve {
+                id: "USD_LIBOR_3M".to_string().into(),
+                spec: BumpSpec::parallel_bp(1.0),
+            },
+        ])
+        .expect("dual bump should succeed");
+    let pv_both_up = swaption.value(&market_both_up, as_of).unwrap().amount();
+    let rho_dual_curve = pv_both_up - pv_base;
+
+    // --- Metric Rho ---
+    let result = swaption
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Rho],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+    let rho_metric = *result.measures.get("rho").unwrap();
+
+    // The wired Rho must match the discount-only reference (the central-difference
+    // version should agree with the forward-difference to within ~1 dollar for
+    // typical convexity at 1bp bump size).
+    let tol = 1.0; // $1 on a $1M notional, 1Y-5Y swaption
+    assert!(
+        (rho_metric - rho_discount_only).abs() < tol,
+        "Rho metric ({rho_metric:.4}) must match discount-only bump ({rho_discount_only:.4}); \
+         difference {:.4} exceeds tolerance {tol}",
+        (rho_metric - rho_discount_only).abs()
+    );
+
+    // The discount-only and dual-curve values must differ meaningfully (i.e., the
+    // forward curve contributes a non-trivial amount to the dual-curve figure).
+    // For a payer swaption the forward-curve sensitivity (delta) dominates, so the
+    // two should differ by at least 50% of the dual-curve magnitude.
+    let dual_contribution = (rho_dual_curve - rho_discount_only).abs();
+    assert!(
+        dual_contribution > 0.5 * rho_dual_curve.abs().max(rho_discount_only.abs()),
+        "Dual-curve and discount-only rho should differ materially: \
+         dual={rho_dual_curve:.4}, disc_only={rho_discount_only:.4}, diff={dual_contribution:.4}"
     );
 }
