@@ -74,14 +74,30 @@ where
             .downcast_ref::<I>()
             .ok_or_else(|| PricingError::type_mismatch(self.instrument_type, instrument.key()))?;
 
+        // Resolve the effective valuation date. Most instruments return the
+        // requested `as_of` unchanged; instruments that anchor valuation to
+        // their own state (e.g. a private markets fund) override
+        // `resolve_pricing_as_of` and the resolved date is used for both the
+        // PV computation and the result stamp.
+        let effective_as_of = typed_instrument.resolve_pricing_as_of(market, as_of);
+
         // Compute the base (unshocked) present value; scenario shocks are
         // applied by the metrics pipeline exactly once.
-        let pv = typed_instrument.base_value(market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let pv = typed_instrument
+            .base_value(market, effective_as_of)
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
 
         // Return stamped result
-        Ok(ValuationResult::stamped(typed_instrument.id(), as_of, pv))
+        Ok(ValuationResult::stamped(
+            typed_instrument.id(),
+            effective_as_of,
+            pv,
+        ))
     }
 }
 

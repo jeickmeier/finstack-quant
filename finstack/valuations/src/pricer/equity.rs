@@ -84,11 +84,12 @@ pub fn register_equity_pricers(registry: &mut PricerRegistry) {
         crate::instruments::LeveredRealEstateEquity
     );
 
-    // Private Markets Fund
-    registry.register(
+    // Private Markets Fund - uses GenericInstrumentPricer; the fund anchors its
+    // valuation date via `Instrument::resolve_pricing_as_of`.
+    register_generic!(
+        registry,
         InstrumentType::PrivateMarketsFund,
-        ModelKey::Discounting,
-        crate::instruments::equity::pe_fund::pricer::PrivateMarketsFundDiscountingPricer,
+        crate::instruments::equity::pe_fund::PrivateMarketsFund
     );
 
     // Equity Option - PDE Crank-Nicolson 1D (Black-Scholes)

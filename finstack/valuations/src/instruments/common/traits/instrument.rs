@@ -515,6 +515,31 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     //   by the metrics pipeline.
     fn base_value(&self, market: &MarketContext, as_of: Date) -> finstack_core::Result<Money>;
 
+    /// Resolve the effective valuation date used to price and stamp this instrument.
+    ///
+    /// Most instruments price and stamp their result with the `as_of` requested
+    /// by the caller. The default implementation therefore returns `requested`
+    /// unchanged.
+    ///
+    /// A small number of instruments derive their own valuation date from their
+    /// own state or market data and intentionally ignore the requested `as_of`
+    /// (e.g. a private markets fund anchors valuation to its discount curve's
+    /// base date, or to its last event date when undiscounted). Such instruments
+    /// override this method; the generic pricer then uses the returned date for
+    /// both the [`Instrument::base_value`] computation and the result stamp.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market data context (may be consulted to derive the date)
+    /// * `requested` - The valuation date requested by the caller
+    ///
+    /// # Returns
+    ///
+    /// The effective valuation date to use for pricing and stamping.
+    fn resolve_pricing_as_of(&self, _market: &MarketContext, requested: Date) -> Date {
+        requested
+    }
+
     /// Compute the scenario-adjusted present value.
     ///
     /// Default implementation invokes [`Instrument::base_value`] and applies any

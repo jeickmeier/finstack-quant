@@ -1,10 +1,6 @@
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::pe_fund::waterfall::{AllocationLedger, EquityWaterfallEngine};
 use crate::instruments::equity::pe_fund::PrivateMarketsFund;
-use crate::pricer::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
-use crate::results::ValuationResult;
+use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 
@@ -52,72 +48,32 @@ pub(crate) fn compute_pv(
     }
 }
 
-/// Simplified discounting pricer for private markets funds.
-pub struct PrivateMarketsFundDiscountingPricer;
-
-impl PrivateMarketsFundDiscountingPricer {
-    /// Create a new private markets fund pricer
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for PrivateMarketsFundDiscountingPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Pricer for PrivateMarketsFundDiscountingPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::PrivateMarketsFund, ModelKey::Discounting)
-    }
-
-    #[tracing::instrument(
-        name = "pe_fund.discounting.price_dyn",
-        level = "debug",
-        skip(self, instrument, market),
-        fields(inst_id = %instrument.id(), as_of = %_as_of),
-        err,
-    )]
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        _as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
-        let fund =
-            expect_inst::<PrivateMarketsFund>(instrument, InstrumentType::PrivateMarketsFund)?;
-
-        let err_ctx = || PricingErrorContext::from_instrument(fund).model(ModelKey::Discounting);
-
-        let as_of = if let Some(ref discount_curve_id) = fund.discount_curve_id {
-            let disc = market
-                .get_discount(discount_curve_id.as_str())
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        err_ctx().curve_id(discount_curve_id.as_str()),
-                    )
-                })?;
-            disc.base_date()
-        } else {
-            fund.events
-                .iter()
-                .map(|evt| evt.date)
-                .max()
-                .ok_or_else(|| {
-                    PricingError::model_failure_with_context(
-                        "Private markets fund requires at least one event to derive valuation date"
-                            .to_string(),
-                        err_ctx(),
-                    )
-                })?
-        };
-
-        let pv = compute_pv(fund, market)
-            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), err_ctx()))?;
-
-        Ok(ValuationResult::stamped(fund.id(), as_of, pv))
+/// Resolve the effective valuation date for a private markets fund.
+///
+/// Private markets funds intentionally ignore the caller's requested `as_of`
+/// and anchor valuation to their own state:
+///
+/// - When a discount curve is configured, the curve's `base_date()` is used.
+/// - Otherwise, the latest event date is used (IRR-only / undiscounted path).
+///
+/// If neither anchor is available (curve lookup fails, or no events exist),
+/// the requested date is returned unchanged; the subsequent
+/// [`compute_pv`] call then surfaces the underlying error.
+pub(crate) fn resolve_as_of(
+    fund: &PrivateMarketsFund,
+    market: &MarketContext,
+    requested: Date,
+) -> Date {
+    if let Some(ref discount_curve_id) = fund.discount_curve_id {
+        market
+            .get_discount(discount_curve_id.as_str())
+            .map(|disc| disc.base_date())
+            .unwrap_or(requested)
+    } else {
+        fund.events
+            .iter()
+            .map(|evt| evt.date)
+            .max()
+            .unwrap_or(requested)
     }
 }

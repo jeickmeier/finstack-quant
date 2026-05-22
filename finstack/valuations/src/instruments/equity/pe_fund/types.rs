@@ -140,6 +140,10 @@ impl Instrument for PrivateMarketsFund {
         pricer::compute_pv(self, curves)
     }
 
+    fn resolve_pricing_as_of(&self, market: &MarketContext, requested: Date) -> Date {
+        pricer::resolve_as_of(self, market, requested)
+    }
+
     fn effective_start_date(&self) -> Option<Date> {
         None
     }

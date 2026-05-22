@@ -51,7 +51,6 @@ pub use metrics::{
     calculate_irr, register_private_markets_fund_metrics, CarryAccruedCalculator, DpiLpCalculator,
     GpIrrCalculator, LpIrrCalculator, MoicLpCalculator, TvpiLpCalculator,
 };
-pub use pricer::PrivateMarketsFundDiscountingPricer;
 pub use types::PrivateMarketsFund;
 pub use waterfall::{
     AllocationLedger, AllocationRow, CatchUpMode, ClawbackSettle, ClawbackSpec,
