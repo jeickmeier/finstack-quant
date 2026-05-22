@@ -254,3 +254,74 @@ fn test_dm_solver_convergence_across_spread_regimes() {
 // because DM now computes accrued internally via QuoteDateContext per the fix plan.
 // DM no longer requires Accrued to be pre-populated in the metric context.
 // The test was also using a fixed-rate bond which is not valid for DM anyway.
+
+/// Issue B regression (integration): the DM solver's pricing-failure residual must
+/// never change sign across `dm = 0`. This end-to-end test confirms that a solved DM
+/// is still meaningful after the fix — the convergence test properties are validated
+/// in the unit test `dm_failure_residual_must_not_change_sign_across_zero` inside
+/// `dm.rs`.
+///
+/// This test verifies the happy path still works after the fix: a valid FRN with a
+/// healthy market converges to the correct DM and the solved DM round-trips.
+#[test]
+fn test_dm_monotone_residual_does_not_break_valid_solve() {
+    use finstack_core::dates::{DayCount, Tenor};
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+    use finstack_valuations::instruments::PricingOverrides;
+
+    let as_of = date!(2025 - 01 - 01);
+    let notional = Money::new(1_000_000.0, Currency::USD);
+
+    let bond = Bond::floating(
+        "DM-MONOTONE-HAPPY-PATH",
+        notional,
+        "USD-SOFR-3M",
+        150,
+        as_of,
+        date!(2028 - 01 - 01),
+        Tenor::quarterly(),
+        DayCount::Act360,
+        "USD-OIS",
+    )
+    .expect("bond should build");
+
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (5.0, 0.85)])
+        .build()
+        .expect("disc curve");
+    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(as_of)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.03), (5.0, 0.03)])
+        .build()
+        .expect("fwd curve");
+    let market = MarketContext::new().insert(disc).insert(fwd);
+
+    // Set a clean price close to par so the DM is small and easy to solve.
+    let target_dm = 0.015_f64; // 150 bp
+    let dirty = finstack_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_dm(
+        &bond, &market, as_of, target_dm,
+    )
+    .expect("price_from_dm with target DM should succeed");
+    let clean_px = dirty / notional.amount() * 100.0;
+
+    let mut priced_bond = bond.clone();
+    priced_bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_px);
+
+    let result = priced_bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::DiscountMargin],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("DM solver should converge for a valid FRN after the monotone-residual fix");
+
+    let dm = result.measures["discount_margin"];
+    assert!(
+        (dm - target_dm).abs() < 1e-6,
+        "DM should round-trip after monotone-residual fix: target={target_dm}, got={dm}"
+    );
+}

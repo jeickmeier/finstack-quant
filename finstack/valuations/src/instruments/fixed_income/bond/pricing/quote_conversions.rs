@@ -964,7 +964,10 @@ pub fn price_from_z_spread(
                 .year_fraction(quote_date, *d, DayCountContext::default())?;
 
         let df = disc.df_between_dates(quote_date, *d)?;
-        let df_z = z_spread_discount_factor(df, t_from_quote, z, compounds_per_year);
+        // Propagate Err from `z_spread_discount_factor` so callers receive a
+        // clear curve-data or spread-domain error rather than Ok(INFINITY) or
+        // Ok(NaN) when the base DF or compounding denominator is non-positive.
+        let df_z = z_spread_discount_factor(df, t_from_quote, z, compounds_per_year)?;
         pv.add(a.amount() * df_z);
     }
     Ok(pv.total())

@@ -4,6 +4,7 @@ use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_core::dates::{Date, DayCountContext};
 use finstack_core::math::solver::{BrentSolver, Solver};
 use std::borrow::Cow;
+use std::cell::RefCell;
 
 /// Configuration for Z-spread solver with maturity-aware bracket sizing.
 ///
@@ -193,25 +194,44 @@ pub(crate) fn bond_z_spread_compounding_frequency(bond: &Bond) -> f64 {
     }
 }
 
+/// Compute the z-spread discount factor for a single cashflow.
+///
+/// Returns `Err` in two degenerate cases that must not silently propagate
+/// non-finite values into PV accumulators:
+///
+/// - `df_base <= 0` or non-finite: the base discount curve has produced an
+///   invalid discount factor (curve-data error, not a solvable point).
+/// - `denom = 1 + (base_rate + z) / m <= 0`: the total spread-adjusted rate
+///   produces a non-positive compounding base. This can only happen for
+///   extremely negative spreads that are outside any realistic range; returning
+///   `INFINITY` (the old behaviour) would silently corrupt PV sums and confuse
+///   the Brent bracket search with non-finite residuals.
 pub(crate) fn z_spread_discount_factor(
     df_base: f64,
     t: f64,
     z: f64,
     compounds_per_year: f64,
-) -> f64 {
+) -> finstack_core::Result<f64> {
     if t <= 0.0 {
-        return df_base;
+        return Ok(df_base);
     }
     if !df_base.is_finite() || df_base <= 0.0 {
-        return f64::NAN;
+        return Err(finstack_core::Error::Validation(format!(
+            "z_spread_discount_factor: non-positive or non-finite base discount factor ({df_base}); \
+             this is a curve-data error"
+        )));
     }
     let m = compounds_per_year.max(1.0);
     let base_rate = m * (df_base.powf(-1.0 / (m * t)) - 1.0);
     let denom = 1.0 + (base_rate + z) / m;
     if denom <= 0.0 || !denom.is_finite() {
-        return f64::INFINITY;
+        return Err(finstack_core::Error::Validation(format!(
+            "z_spread_discount_factor: non-positive compounding denominator ({denom}) \
+             for z={z:.6e}, base_rate={base_rate:.6e}, m={m}; \
+             spread is too negative for this cashflow"
+        )));
     }
-    denom.powf(-m * t)
+    Ok(denom.powf(-m * t))
 }
 
 impl MetricCalculator for ZSpreadCalculator {
@@ -271,13 +291,36 @@ impl MetricCalculator for ZSpreadCalculator {
             })
             .collect::<finstack_core::Result<Vec<_>>>()?;
 
+        // Capture the first z-spread pricing error encountered inside the
+        // objective so a bad-curve-data failure is surfaced as the real cause
+        // rather than an opaque `SolverConvergenceFailed`.
+        let pricing_error: RefCell<Option<finstack_core::Error>> = RefCell::new(None);
+
         // Objective: PV_z(z) - target_value_ccy = 0
+        //
+        // When `z_spread_discount_factor` returns `Err` (non-positive DF or
+        // non-positive compounding denominator), we capture the first error and
+        // return a large positive residual (+1e12) so Brent can report a
+        // convergence failure instead of silently propagating NaN/Inf values
+        // into the PV accumulator.
         let objective = |z: f64| -> f64 {
-            // Optimized PV calculation using pre-computed flows
             let mut pv = finstack_core::math::summation::NeumaierAccumulator::new();
             for (t, df_base, amt) in &cached_flows {
-                let df_z = z_spread_discount_factor(*df_base, *t, z, compounds_per_year);
-                pv.add(amt * df_z);
+                match z_spread_discount_factor(*df_base, *t, z, compounds_per_year) {
+                    Ok(df_z) => pv.add(amt * df_z),
+                    Err(e) => {
+                        let mut slot = pricing_error.borrow_mut();
+                        if slot.is_none() {
+                            *slot = Some(e);
+                        }
+                        drop(slot);
+                        // Large positive residual: price diverges to +∞ when the
+                        // spread is extremely negative (below the compounding
+                        // floor). This keeps the residual monotone and prevents
+                        // Brent from manufacturing a fake sign-changing bracket.
+                        return 1e12;
+                    }
+                }
             }
             pv.total() - target_value_ccy
         };
@@ -289,6 +332,12 @@ impl MetricCalculator for ZSpreadCalculator {
             .tolerance(self.config.tolerance)
             .initial_bracket_size(Some(bracket));
         let z = solver.solve(objective, 0.0)?;
+
+        // Surface any pricing error that occurred inside the objective instead
+        // of returning a potentially meaningless spread.
+        if let Some(err) = pricing_error.into_inner() {
+            return Err(err);
+        }
 
         Ok(z)
     }

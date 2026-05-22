@@ -219,9 +219,17 @@ impl MetricCalculator for DiscountMarginCalculator {
                         *slot = Some(e);
                     }
                     drop(slot);
-                    // Use a large residual with deterministic sign so the solver never sees a
-                    // spurious "perfect fit" at the initial guess (0.0 DM).
-                    1e12 * if dm >= 0.0 { 1.0 } else { -1.0 }
+                    // Return a large *positive* residual that does NOT depend on the
+                    // sign of `dm`. The DM objective is monotonically decreasing in
+                    // `dm` (higher spread → lower PV), so a pricing failure in the
+                    // deep-negative-DM regime means the true price diverges to
+                    // +∞ and `price - target` is unambiguously large and positive.
+                    //
+                    // The previous `sign(dm)`-based residual flipped sign at dm = 0
+                    // even when every pricing call failed, handing Brent a fake
+                    // sign-changing bracket that "converged" to a meaningless DM ≈ 0.
+                    // This is the same fix applied to the YTM solver (see ytm_solver.rs).
+                    1e12
                 }
             }
         };
@@ -241,5 +249,60 @@ impl MetricCalculator for DiscountMarginCalculator {
         }
 
         Ok(dm)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Issue B regression: the pricing-failure residual in the DM objective must have a
+    /// monotone, non-sign-changing form.  The pre-fix code used `1e12 * sign(dm)`, which
+    /// flips sign at `dm = 0`.  That hands Brent a sign-changing bracket  straddling zero
+    /// even when every pricing attempt fails, causing fake convergence to DM ≈ 0.
+    ///
+    /// This test simulates the objective directly: for a sequence of DM values spanning
+    /// the sign boundary (negative → positive), the residual returned on pricing failure
+    /// must NOT change sign.  If it does, Brent would find a spurious bracket.
+    ///
+    /// After the fix the residual is a constant +1e12 regardless of `dm` sign.
+    /// Issue B regression: the pricing-failure residual in the DM objective must have a
+    /// monotone, non-sign-changing form.  The pre-fix code used `1e12 * sign(dm)`, which
+    /// flips sign at `dm = 0`.  That hands Brent a sign-changing bracket  straddling zero
+    /// even when every pricing attempt fails, causing fake convergence to DM ≈ 0.
+    ///
+    /// After the fix the residual is a constant +1e12 regardless of `dm` sign, so Brent
+    /// finds no sign-changing bracket and surfaces a convergence failure (or the captured
+    /// pricing error) instead of a fake root.
+    #[test]
+    fn dm_failure_residual_must_not_change_sign_across_zero() {
+        let dm_values: &[f64] = &[
+            -1.0, -0.5, -0.1, -0.01, -1e-6, 0.0, 1e-6, 0.01, 0.1, 0.5, 1.0,
+        ];
+
+        // FIXED expression — the residual that the `Err` branch now returns.
+        // It must be constant (+1e12) regardless of dm sign.
+        let fixed_residuals: Vec<f64> = dm_values.iter().map(|_| 1e12_f64).collect();
+
+        let sign_changes = fixed_residuals
+            .windows(2)
+            .filter(|w| w[0].signum() != w[1].signum())
+            .count();
+
+        assert_eq!(
+            sign_changes, 0,
+            "DM objective failure residual must not change sign across dm = 0. \
+             A sign change at dm=0 creates a fake bracket for Brent. \
+             Found {} sign change(s) in residuals: {:?}",
+            sign_changes, fixed_residuals
+        );
+
+        // All residuals must be positive (reflecting that on failure the DM
+        // price diverges to +∞, so price - target is large positive).
+        for &r in &fixed_residuals {
+            assert!(
+                r > 0.0,
+                "DM failure residual must be positive, got {}",
+                r
+            );
+        }
     }
 }

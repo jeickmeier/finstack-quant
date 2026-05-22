@@ -1365,3 +1365,112 @@ fn test_z_spread_roundtrip_with_settlement_lag() {
          relative_error={price_error:.6e}"
     );
 }
+
+/// Issue A regression: `price_from_z_spread` must return `Err` (not `Ok(INFINITY)` or `Ok(NaN)`)
+/// when the z-spread is so extremely negative that the compounding denominator
+/// `1 + (base_rate + z) / m` goes non-positive.
+///
+/// Before the fix, `z_spread_discount_factor` silently returned `f64::INFINITY` on a
+/// non-positive denominator. `price_from_z_spread` accumulated the infinity into the
+/// `NeumaierAccumulator` and returned `Ok(f64::INFINITY)` — a wrong-but-non-finite
+/// result with no error signal to the caller.
+#[test]
+fn test_z_spread_negative_denom_returns_err_not_infinity() {
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_valuations::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread;
+
+    let as_of = date!(2025 - 01 - 01);
+    let maturity = date!(2030 - 01 - 01);
+    let notional = Money::new(1_000_000.0, Currency::USD);
+
+    let mut bond = Bond::fixed(
+        "ZSPR-NEG-DENOM",
+        notional,
+        0.05,
+        as_of,
+        maturity,
+        "USD-OIS",
+    )
+    .expect("bond should build");
+    bond.settlement_convention = None;
+
+    // Flat curve at 3% -> base_rate ≈ 0.03 for each cashflow.
+    // With m = 1, denom = 1 + (0.03 + z). Setting z = -2.0 (-200%) makes
+    // denom = 1 + (0.03 - 2.0) = -0.97 <= 0.  price_from_z_spread should
+    // propagate this as Err, not return Ok(INFINITY).
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (5.0, 0.861)])
+        .build()
+        .expect("curve");
+    let market = MarketContext::new().insert(disc);
+
+    // z = -5.0 drives the compounding denominator well below zero for m=2
+    // (semi-annual, the default for Bond::fixed):
+    //   denom = 1 + (base_rate + z) / m ≈ 1 + (0.03 - 5.0) / 2 = -1.485
+    let extreme_negative_z = -5.0_f64;
+    let result = price_from_z_spread(&bond, &market, as_of, extreme_negative_z);
+
+    assert!(
+        result.is_err(),
+        "price_from_z_spread with a non-positive compounding denominator must return Err, \
+         not Ok(INFINITY) or Ok(NaN). Got: {:?}",
+        result
+    );
+}
+
+/// Issue A regression (solver path): when every cashflow's z-spread discount factor
+/// is non-finite because the z-spread bracket extends into the non-positive denominator
+/// regime, the `ZSpreadCalculator` solver must surface a clear error — not silently
+/// return a spurious finite spread caused by an opaque bracket failure.
+///
+/// We verify this by quoting a bond at a price that can only be matched by a z-spread
+/// so extremely negative that the compounding denominator goes non-positive for every
+/// candidate z in the Brent bracket.  The solver must return `Err`.
+#[test]
+fn test_z_spread_solver_non_positive_base_df_returns_err() {
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+
+    let as_of = date!(2025 - 01 - 01);
+    let notional = Money::new(1_000_000.0, Currency::USD);
+
+    let mut bond = Bond::fixed(
+        "ZSPR-BAD-DF",
+        notional,
+        0.05,
+        as_of,
+        date!(2030 - 01 - 01),
+        "USD-OIS",
+    )
+    .expect("bond should build");
+    bond.settlement_convention = None;
+
+    // Healthy curve — the z-spread solver will scan both sides of the bracket.
+    let disc = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (5.0, 0.861)])
+        .build()
+        .expect("curve");
+    let market = MarketContext::new().insert(disc);
+
+    // Quote an astronomically high price (10× par): no physically valid spread
+    // can match this — the solver must fail rather than return a meaningless z.
+    bond.pricing_overrides =
+        PricingOverrides::default().with_quoted_clean_price(10_000.0_f64);
+
+    let result = bond.price_with_metrics(
+        &market,
+        as_of,
+        &[MetricId::ZSpread],
+        finstack_valuations::instruments::PricingOptions::default(),
+    );
+
+    assert!(
+        result.is_err(),
+        "Z-spread solver against an unreachable price target must return Err, \
+         not a meaningless finite spread. Got: {:?}",
+        result
+    );
+}
