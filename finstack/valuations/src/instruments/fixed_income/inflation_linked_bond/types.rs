@@ -936,6 +936,14 @@ impl InflationLinkedBond {
             .max(1e-6); // guard against zero / expired bond
 
         let n_f = periods_per_year(self.frequency).unwrap_or(1.0).max(1.0);
+        // ILB coupon frequencies are always an integer number of periods per
+        // year (annual/semi-annual/quarterly/monthly); a non-integer here would
+        // mean an unsupported tenor whose compounding cannot be expressed as
+        // `Compounding::Periodic(n)`.
+        debug_assert!(
+            (n_f.fract()).abs() < 1e-9,
+            "non-integer coupon frequency {n_f} per year is unsupported for breakeven compounding"
+        );
         let n_u32 = n_f.round() as u32;
         let real_compounding = NonZeroU32::new(n_u32)
             .map(Compounding::Periodic)
