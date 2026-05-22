@@ -601,6 +601,9 @@ impl<'de> Deserialize<'de> for TrancheStructure {
         #[derive(Deserialize)]
         struct RawTrancheStructure {
             tranches: Vec<Tranche>,
+            // Deserialized but intentionally ignored: `TrancheStructure::new`
+            // recomputes `total_size` from tranche balances, which is the
+            // authoritative value, so any stored figure is discarded.
             #[allow(dead_code)]
             total_size: Money,
         }
@@ -668,8 +671,12 @@ impl TrancheStructure {
         // ascending as the tie-break for pari-passu notes.
         let mut order: Vec<usize> = (0..tranches.len()).collect();
         order.sort_by(|&a, &b| {
-            (tranches[a].seniority as u8)
-                .cmp(&(tranches[b].seniority as u8))
+            // `TrancheSeniority` derives `Ord` (Senior < Mezzanine <
+            // Subordinated < Equity); the input-index tie-break orders
+            // genuinely pari-passu notes by the order the caller supplied them.
+            tranches[a]
+                .seniority
+                .cmp(&tranches[b].seniority)
                 .then(a.cmp(&b))
         });
         for (rank, &idx) in order.iter().enumerate() {
