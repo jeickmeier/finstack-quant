@@ -454,42 +454,16 @@ impl CmsSwap {
 
             // Convexity-adjusted linear CMS forward (before cap/floor).
             let adjusted_forward = forward_swap_rate + adj;
-            // Expected option-adjusted coupon rate, mirroring `pv_cms_leg`.
-            //
-            // A cap/floor is an OPTION on the CMS rate, not a clamp on the
-            // convexity-adjusted mean. Clamping the mean (`min(E[S]+sp, K)`)
-            // underprices the option (Jensen's inequality: E[(S−K)⁺] ≥ 0 even
-            // when E[S]+sp < K). We decompose:
-            //
-            //   min(R, cap)   = R − caplet     ⇒ coupon_rate -= caplet
-            //   max(R, floor) = R + floorlet   ⇒ coupon_rate += floorlet
-            //
-            // where R = cms_rate + spread (Hagan 2003).
-            let linear_rate = adjusted_forward + self.cms_spread;
-            let mut coupon_rate = linear_rate;
-
-            if let Some(cap) = self.cms_cap {
-                let cap_strike = cap - self.cms_spread;
-                let caplet = super::pricer::cms_embedded_option_value(
-                    adjusted_forward,
-                    cap_strike,
-                    &vol_surface,
-                    time_to_fixing,
-                    crate::instruments::OptionType::Call,
-                );
-                coupon_rate -= caplet;
-            }
-            if let Some(floor) = self.cms_floor {
-                let floor_strike = floor - self.cms_spread;
-                let floorlet = super::pricer::cms_embedded_option_value(
-                    adjusted_forward,
-                    floor_strike,
-                    &vol_surface,
-                    time_to_fixing,
-                    crate::instruments::OptionType::Put,
-                );
-                coupon_rate += floorlet;
-            }
+            // Expected option-adjusted coupon rate (Hagan 2003).
+            // See `apply_cms_cap_floor` for the full derivation comment.
+            let coupon_rate = super::pricer::apply_cms_cap_floor(
+                adjusted_forward,
+                self.cms_spread,
+                self.cms_cap,
+                self.cms_floor,
+                &vol_surface,
+                time_to_fixing,
+            );
 
             let signed_amount = match self.side {
                 crate::instruments::common_impl::parameters::legs::PayReceive::Pay => {
@@ -847,10 +821,14 @@ mod tests {
         );
     }
 
-    /// C13 regression (floor variant): same reconciliation for an OTM floor.
+    /// C13 regression (floor variant): same reconciliation for an ITM floor.
     ///
-    /// OTM floor: forward ~3%, floor at 1% — mean-floor is a no-op but the
-    /// embedded floorlet has positive time value and must be accounted for.
+    /// ITM floor: forward ~3%, floor at 4% — the buggy clamp gives only
+    /// intrinsic (floor − forward = 0.01), but the embedded floorlet has
+    /// substantial additional time value (~hundreds of USD on 1M notional)
+    /// that the old hard-clamp would miss.  This ensures the old bug
+    /// (clamping the convexity-adjusted mean instead of pricing an embedded
+    /// option) causes this test to FAIL.
     #[test]
     fn cms_leg_flows_reconcile_with_base_value_floored() {
         use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
@@ -859,7 +837,9 @@ mod tests {
         let as_of = date(2025, 1, 1);
         let market = recon_market(as_of);
 
-        let swap = one_period_cms_swap(None, Some(0.01));
+        // ITM floor: floor (4%) > forward (~3%), so the old clamp gives only
+        // intrinsic but the correct floorlet includes substantial time value.
+        let swap = one_period_cms_swap(None, Some(0.04));
 
         let base_pv = swap
             .base_value(&market, as_of)

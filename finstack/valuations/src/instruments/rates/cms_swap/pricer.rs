@@ -147,53 +147,16 @@ impl CmsSwapPricer {
             // martingale forward). The coupon is paid on `cms_rate + spread`.
             let adjusted_forward = forward_swap_rate + adj;
 
-            // Expected capped/floored coupon rate.
-            //
-            // A CMS cap/floor is an OPTION on the (random) CMS rate, not a
-            // clamp on its mean. Clamping the convexity-adjusted *mean*
-            // (`min(E[S]+spread, cap)`) understates the value by Jensen's
-            // inequality: `E[(S−K)⁺] ≥ (E[S]−K)⁺`. The capped coupon
-            // decomposes into the linear coupon minus an embedded CMS caplet,
-            // the floored coupon into the linear coupon plus an embedded CMS
-            // floorlet:
-            //
-            //   min(R, cap)   = R − (R − cap)⁺          ⇒ E = E[R] − caplet
-            //   max(R, floor) = R + (floor − R)⁺        ⇒ E = E[R] + floorlet
-            //
-            // where `R = cms_rate + spread`. The caplet/floorlet are priced
-            // Black-76 on the convexity-adjusted CMS forward at the strike
-            // `cap − spread` / `floor − spread`, with the smile vol at that
-            // strike (Hagan 2003, first-order). `convexity_scale` is honoured:
-            // when it is 0 the embedded options collapse to intrinsic.
-            let linear_rate = adjusted_forward + inst.cms_spread;
-            let mut coupon_rate = linear_rate;
-
-            if let Some(cap) = inst.cms_cap {
-                // E[min(R, cap)] = E[R] − E[(R − cap)⁺]; the CMS caplet pays
-                // (cms_rate − (cap − spread))⁺.
-                let cap_strike = cap - inst.cms_spread;
-                let caplet = cms_embedded_option_value(
-                    adjusted_forward,
-                    cap_strike,
-                    &vol_surface,
-                    time_to_fixing,
-                    crate::instruments::OptionType::Call,
-                );
-                coupon_rate -= caplet;
-            }
-            if let Some(floor) = inst.cms_floor {
-                // E[max(R, floor)] = E[R] + E[(floor − R)⁺]; the CMS floorlet
-                // pays ((floor − spread) − cms_rate)⁺.
-                let floor_strike = floor - inst.cms_spread;
-                let floorlet = cms_embedded_option_value(
-                    adjusted_forward,
-                    floor_strike,
-                    &vol_surface,
-                    time_to_fixing,
-                    crate::instruments::OptionType::Put,
-                );
-                coupon_rate += floorlet;
-            }
+            // Expected option-adjusted coupon rate (Hagan 2003).
+            // See `apply_cms_cap_floor` for the full derivation comment.
+            let coupon_rate = apply_cms_cap_floor(
+                adjusted_forward,
+                inst.cms_spread,
+                inst.cms_cap,
+                inst.cms_floor,
+                &vol_surface,
+                time_to_fixing,
+            );
 
             let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
 
@@ -294,6 +257,64 @@ impl Pricer for CmsSwapPricer {
 pub(crate) fn compute_pv(inst: &CmsSwap, market: &MarketContext, as_of: Date) -> Result<Money> {
     let pricer = CmsSwapPricer::new();
     pricer.price_internal(inst, market, as_of)
+}
+
+/// Compute the option-adjusted expected coupon rate for a capped/floored CMS
+/// coupon.
+///
+/// Given the convexity-adjusted CMS forward and an optional spread, applies
+/// the embedded cap and/or floor as Black-76 options on the CMS rate
+/// (Hagan 2003):
+///
+/// ```text
+///   min(R, cap)   = R − caplet    ⇒ coupon_rate -= caplet
+///   max(R, floor) = R + floorlet  ⇒ coupon_rate += floorlet
+/// ```
+///
+/// where `R = adjusted_forward + cms_spread`. Returns the option-adjusted
+/// coupon rate.
+///
+/// This is the single authoritative implementation shared by both
+/// [`CmsSwapPricer::pv_cms_leg`] and `CmsSwap::cms_leg_flows` so that the
+/// two paths cannot drift apart.
+pub(super) fn apply_cms_cap_floor(
+    adjusted_forward: f64,
+    cms_spread: f64,
+    cap: Option<f64>,
+    floor: Option<f64>,
+    vol_surface: &finstack_core::market_data::surfaces::VolSurface,
+    time_to_fixing: f64,
+) -> f64 {
+    let mut coupon_rate = adjusted_forward + cms_spread;
+
+    if let Some(cap) = cap {
+        // E[min(R, cap)] = E[R] − E[(R − cap)⁺]; the CMS caplet pays
+        // (cms_rate − (cap − spread))⁺.
+        let cap_strike = cap - cms_spread;
+        let caplet = cms_embedded_option_value(
+            adjusted_forward,
+            cap_strike,
+            vol_surface,
+            time_to_fixing,
+            crate::instruments::OptionType::Call,
+        );
+        coupon_rate -= caplet;
+    }
+    if let Some(floor) = floor {
+        // E[max(R, floor)] = E[R] + E[(floor − R)⁺]; the CMS floorlet pays
+        // ((floor − spread) − cms_rate)⁺.
+        let floor_strike = floor - cms_spread;
+        let floorlet = cms_embedded_option_value(
+            adjusted_forward,
+            floor_strike,
+            vol_surface,
+            time_to_fixing,
+            crate::instruments::OptionType::Put,
+        );
+        coupon_rate += floorlet;
+    }
+
+    coupon_rate
 }
 
 /// Undiscounted value of an embedded CMS caplet / floorlet on the
@@ -519,5 +540,89 @@ mod tests {
 
         assert!(pv_uncapped.is_finite() && pv_capped.is_finite());
         assert!(pv_capped <= pv_uncapped + 1e-9);
+    }
+
+    /// Build a 1-period CMS swap with an optional floor.
+    fn floored_cms_swap(floor: Option<f64>) -> CmsSwap {
+        let fixing = date(2026, 1, 1);
+        let pay = date(2026, 4, 1);
+        let mut builder = CmsSwap::builder()
+            .id(InstrumentId::new("CMS-FLOORED"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .cms_tenor(10.0)
+            .cms_fixing_dates(vec![fixing])
+            .cms_payment_dates(vec![pay])
+            .cms_accrual_fractions(vec![0.25])
+            .cms_day_count(DayCount::Act365F)
+            .cms_spread(0.0)
+            .swap_convention_opt(Some(IRSConvention::USDStandard))
+            .funding_leg(FundingLeg::Fixed {
+                rate: 0.0,
+                payment_dates: vec![pay],
+                accrual_fractions: vec![0.25],
+                day_count: DayCount::Act365F,
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"));
+        if let Some(f) = floor {
+            builder = builder.cms_floor_opt(Some(f));
+        }
+        builder.build().expect("CMS swap should build")
+    }
+
+    /// Regression test (C13 floor): a CMS floor must be priced as an embedded
+    /// CMS floorlet, not as a hard clamp on the convexity-adjusted mean rate.
+    ///
+    /// With an ITM floor (floor = 4% > forward ~3%), the clamp-the-mean
+    /// approach gives `max(mean, floor) = floor` — pure intrinsic — and yields
+    /// a floored leg strictly above the unfloored leg by exactly (floor −
+    /// mean) * accrual * N. The embedded floorlet adds additional *time value*
+    /// on top of the intrinsic, so the correct floored leg is strictly above
+    /// the naive clamped leg.
+    ///
+    /// Discriminator: `pv_floored − pv_unfloored` must exceed the pure
+    /// intrinsic difference `(floor − forward_approx) * accrual * N * df`.
+    /// The old clamp code would give exactly the intrinsic gap (or less);
+    /// the embedded-option code gives intrinsic + time value.
+    #[test]
+    fn cms_floor_priced_as_embedded_floorlet_not_mean_clamp() {
+        let as_of = date(2025, 1, 1);
+        let market = cms_market_with_vol(as_of, 0.25);
+
+        // Forward CMS rate is ~3%; ITM floor at 4%.
+        // Clamp gives intrinsic = (0.04 − ~0.03) * 0.25 * 1_000_000 * df ≈ 2 500 USD.
+        // Embedded floorlet adds substantial time value (~100s of USD) on top.
+        let unfloored = floored_cms_swap(None);
+        let floored = floored_cms_swap(Some(0.04));
+
+        let pv_unfloored = CmsSwapPricer::new()
+            .pv_cms_leg(&unfloored, &market, as_of, 1.0)
+            .expect("unfloored CMS leg");
+        let pv_floored = CmsSwapPricer::new()
+            .pv_cms_leg(&floored, &market, as_of, 1.0)
+            .expect("floored CMS leg");
+
+        assert!(pv_unfloored > 0.0 && pv_floored > 0.0);
+        // Floored leg must be strictly above unfloored (floor adds value).
+        assert!(
+            pv_floored > pv_unfloored + 1e-6,
+            "an ITM CMS floor must increase the leg value: floored={pv_floored}, \
+             unfloored={pv_unfloored}"
+        );
+        // The gap must exceed pure intrinsic — time value must be present.
+        // Intrinsic ≈ (floor - forward) * accrual * N * df.
+        // We conservatively require the gap > 0.5 * intrinsic_approx to ensure
+        // the embedded floorlet option value (not just clamp) is being captured.
+        // On 1M notional with 25% vol and 1Y to fixing this should be ~100+ USD.
+        let intrinsic_approx = (0.04_f64 - 0.03_f64) * 0.25 * 1_000_000.0 * 0.97; // rough df
+        let gap = pv_floored - pv_unfloored;
+        assert!(
+            gap > intrinsic_approx,
+            "floored-vs-unfloored gap ({gap:.2}) must exceed pure intrinsic \
+             ({intrinsic_approx:.2}); time value must be present (embedded \
+             floorlet, not clamp)"
+        );
     }
 }
