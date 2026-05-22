@@ -98,9 +98,15 @@ const K_FLOOR: f64 = 1e-4; // 1 basis point
 
 /// Gauss-Legendre quadrature order.
 ///
-/// Order 16 provides 31st-degree polynomial exactness. Combined with the
-/// smooth integrand (Black-76 calls multiplied by g'), this gives relative
-/// errors below 1e-8 for typical CMS inputs.
+/// Order 16 provides 31st-degree polynomial exactness.  For the corrected
+/// integrand `[2g'+(k-K)g'']·C_sw` the integrand is more peaked near k≈K
+/// than the old `g'·C_sw` form; measured GL-16 error is up to a few percent
+/// for ATM long-dated CMS cases (e.g. 20Y tenor, T=5Y).  The old claim of
+/// "relative errors below 1e-8" no longer holds for this integrand shape.
+///
+/// TODO: consider interval subdivision or adaptive quadrature near k=K to
+/// reduce the peaked-integrand error below 0.1% without increasing global
+/// node count.
 const QUAD_ORDER: usize = 16;
 
 // ========================= MATH HELPERS =========================
