@@ -1,5 +1,6 @@
 use super::config::{
     CDSTranchePricer, ADAPTIVE_INTEGRATION_HIGH, ADAPTIVE_INTEGRATION_LOW, NUMERICAL_TOLERANCE,
+    PROBABILITY_CLIP,
 };
 use crate::correlation::recovery::RecoveryModel;
 use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
@@ -346,7 +347,15 @@ impl CDSTranchePricer {
 
             if self.params.copula_spec.is_gaussian() {
                 let quad = self.select_quadrature()?;
-                let default_threshold = standard_normal_inv_cdf(default_prob);
+                // Clamp to the same open-interval guard used by the heterogeneous
+                // path (`default_threshold_for_copula`).  `get_default_probability`
+                // already clamps to `[0, 1]`, but extreme values at the boundary
+                // (0 → −∞, 1 → +∞) still produce non-finite thresholds and
+                // incorrect EL integrals.  Clamping to `[PROBABILITY_CLIP, 1−PROBABILITY_CLIP]`
+                // keeps the probit finite and matches the heterogeneous branch.
+                let default_prob_clamped =
+                    default_prob.clamp(PROBABILITY_CLIP, 1.0 - PROBABILITY_CLIP);
+                let default_threshold = standard_normal_inv_cdf(default_prob_clamped);
                 let integrand = |z: f64| {
                     let p = self.conditional_default_probability_enhanced(
                         default_threshold,

@@ -68,13 +68,19 @@ impl CDSTranchePricer {
     }
 
     /// Get default probability for the index at a given maturity.
+    ///
+    /// Clamps the result to `[0.0, 1.0]` to guard against floating-point rounding
+    /// in the credit-curve interpolation producing a survival probability marginally
+    /// outside `[0, 1]`.  Without the clamp a negative `default_prob` would reach
+    /// `standard_normal_inv_cdf` (via the homogeneous Gaussian path), which panics
+    /// for arguments strictly outside `[0, 1]` (see Task C2).
     pub(super) fn get_default_probability(
         &self,
         index_data: &CreditIndexData,
         maturity_years: f64,
     ) -> Result<f64> {
         let survival_prob = index_data.index_credit_curve.sp(maturity_years);
-        Ok(1.0 - survival_prob)
+        Ok((1.0 - survival_prob).clamp(0.0, 1.0))
     }
 
     /// Calculate years from the credit curve base date.

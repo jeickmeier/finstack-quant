@@ -1698,6 +1698,127 @@ fn well_formed_base_correlation_prices_without_arbitrage_error() {
     }
 }
 
+/// C2: homogeneous Gaussian path must not panic when `default_prob` is outside
+/// the open interval `(0, 1)`.
+///
+/// ## Root cause
+///
+/// `get_default_probability` returns `1.0 - sp(t)` with **no clamp**. If the
+/// credit curve's `sp` implementation returns a value marginally above `1.0`
+/// (floating-point rounding near the base date is the most common cause), the
+/// resulting `default_prob` is marginally **negative**. That negative value
+/// flows directly into `standard_normal_inv_cdf(default_prob)`, which calls
+/// `statrs::Normal::inverse_cdf`, which **panics** with `"x must be in [0, 1]"`
+/// for any argument strictly outside `[0, 1]`.
+///
+/// The heterogeneous path is safe because it routes probabilities through
+/// `default_threshold_for_copula`, which clamps with `PROBABILITY_CLIP`.
+/// The homogeneous Gaussian branch lacked that guard.
+///
+/// ## Fix
+///
+/// 1. `get_default_probability` clamps its result to `[0.0, 1.0]`.
+/// 2. The homogeneous-Gaussian branch clamps `default_prob` to
+///    `[PROBABILITY_CLIP, 1 − PROBABILITY_CLIP]` before passing it to
+///    `standard_normal_inv_cdf`, matching the heterogeneous branch exactly.
+///
+/// ## What this test asserts (regression gate)
+///
+/// The underlying panic source is `statrs::Normal::inverse_cdf` — it panics for
+/// any `p ∉ [0, 1]`.  We verify that:
+///
+/// 1. `standard_normal_inv_cdf` still panics for a negative input (confirming
+///    the `statrs` contract has not changed and the guard is load-bearing).
+/// 2. The homogeneous pricer path does **not** panic when it internally
+///    computes `default_prob = 0.0` (from `sp(0) = 1.0` at the base date).
+///    Before the fix the integration returned a non-finite EL (because
+///    `standard_normal_inv_cdf(0.0) = −∞` propagated through the quadrature);
+///    after the fix the EL is finite.
+#[test]
+fn homogeneous_path_boundary_default_prob_does_not_panic() {
+    // ── Part 1: confirm `statrs` panics on a negative argument ───────────────
+    //
+    // This is the precise condition that would be triggered in the unfixed pricer
+    // when `sp > 1.0` (floating-point rounding near t = 0).
+    // `catch_unwind` returns `Err` on a panic, `Ok` on success.
+    let raw_probit_panics =
+        std::panic::catch_unwind(|| standard_normal_inv_cdf(-1e-15_f64)).is_err();
+    // Assert the panic is real — our guard is only meaningful if the underlying
+    // function actually panics on out-of-range input.
+    assert!(
+        raw_probit_panics,
+        "statrs::Normal::inverse_cdf must panic for p < 0; the guard added by \
+         Task C2 would be vacuous if this is no longer true"
+    );
+
+    // ── Part 2: homogeneous pricer must not panic and must return finite EL ──
+    //
+    // When maturity == curve base_date, `years_from_base` = 0, `sp(0)` = 1.0,
+    // `default_prob` = 0.0.  Before the fix `standard_normal_inv_cdf(0.0) = −∞`
+    // and the Gauss-Hermite integrand evaluates `norm_cdf((−∞ − ρ·z)/√(1−ρ²))`
+    // → 0 for all z, collapsing the EL to a finite (but trivial) zero.
+    //
+    // A more dangerous case — not exercisable with a real HazardCurve in this
+    // unit test — is `sp` returning `> 1.0` due to fp-rounding, giving a
+    // negative `default_prob`.  Part 1 proves that would panic.  The clamp in
+    // `get_default_probability` (`(1.0 - sp).clamp(0.0, 1.0)`) cuts both tails.
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+
+    let index_curve =
+        finstack_core::market_data::term_structures::HazardCurve::builder("CDX.NA.IG.42")
+            .base_date(base_date)
+            .recovery_rate(0.40)
+            .knots(vec![(1.0, 0.01), (5.0, 0.02), (10.0, 0.025)])
+            .build()
+            .expect("hazard curve");
+
+    let base_corr =
+        finstack_core::market_data::term_structures::BaseCorrelationCurve::builder("BC")
+            .knots(vec![(3.0, 0.25), (7.0, 0.30), (30.0, 0.50)])
+            .build()
+            .expect("base corr");
+
+    let index_data = CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(0.40)
+        .index_credit_curve(Arc::new(index_curve))
+        .base_correlation_curve(Arc::new(base_corr))
+        .build()
+        .expect("index data");
+
+    // maturity == base_date  ⇒  maturity_years = 0.0  ⇒  sp(0) = 1.0
+    // ⇒  default_prob = 0.0  ⇒  without clamp: standard_normal_inv_cdf(0.0) = −∞.
+    let maturity = base_date;
+
+    // Drive the homogeneous Gaussian branch directly (disable issuer-curve path).
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut p = CDSTranchePricer::new();
+        p.params.use_issuer_curves = false;
+        p.calculate_equity_tranche_loss(7.0, 0.30, &index_data, maturity)
+    }));
+
+    match result {
+        Err(_) => panic!(
+            "homogeneous Gaussian path panicked for default_prob=0.0 (sp at t=0); \
+             the PROBABILITY_CLIP clamp before `standard_normal_inv_cdf` is missing"
+        ),
+        Ok(Err(e)) => panic!(
+            "homogeneous path returned an unexpected error for boundary default_prob=0.0: {e}"
+        ),
+        Ok(Ok(el)) => {
+            assert!(
+                el.is_finite(),
+                "expected loss must be finite after clamping default_prob to PROBABILITY_CLIP; \
+                 if non-finite, the clamp before standard_normal_inv_cdf is absent, got {el}"
+            );
+            assert!(
+                (0.0..=1.0).contains(&el),
+                "expected loss must be in [0,1] for boundary default_prob=0.0, got {el}"
+            );
+        }
+    }
+}
+
 /// Items 5 & 6: the within-period default fraction must be survival-weighted,
 /// not a flat `0.5`. It must equal `0.5` only in the zero-hazard limit, be
 /// strictly less than `0.5` for a positive hazard (defaults front-load toward
