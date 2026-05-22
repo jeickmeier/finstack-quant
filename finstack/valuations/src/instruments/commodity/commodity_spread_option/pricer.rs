@@ -33,7 +33,11 @@ use finstack_core::math::norm_cdf;
 use finstack_core::money::Money;
 
 /// Minimum denominator for Kirk's approximation (F2 + K).
-/// Below this threshold, we fall back to intrinsic value.
+/// When `k_adj = F2 + K <= KIRK_DENOM_EPSILON` (zero or negative), the
+/// Black-76 mapping `ln(F1/k_adj)` is undefined and Kirk's formula breaks
+/// down entirely. In that region we fall back to the discounted intrinsic
+/// value `df*(F1-F2-K)` for the call; the put is worthless by put-call
+/// parity. This guard covers both the near-zero and strictly negative cases.
 const KIRK_DENOM_EPSILON: f64 = 1e-10;
 
 /// Compute the present value of a commodity spread option using Kirk's approximation.
@@ -107,10 +111,12 @@ fn kirk_price(
     let k_adj = f2 + inst.strike;
 
     // Guard: if K_adj <= 0 (or near-zero), Kirk's approximation breaks down.
-    // When k_adj < 0, Black76 would compute ln(F1/k_adj) for a negative
-    // denominator, producing NaN. A negative adjusted strike means the call
-    // is always exercised (deep ITM): value = df*(F1-F2-K), and the put is
-    // worthless. The same guard also covers the near-zero case |k_adj|<epsilon.
+    // A non-positive k_adj = F2 + K makes ln(F1/k_adj) undefined (NaN for
+    // negative, -inf for zero). Under Kirk's framework the best available
+    // approximation is the discounted forward spread df*(F1-F2-K) for the
+    // call; the put is then worthless by put-call parity. Note: the spread
+    // payoff (F1_T - F2_T - K)^+ can still expire worthless in Monte-Carlo
+    // paths even when k_adj <= 0 — this is an approximation, not a certainty.
     if k_adj <= KIRK_DENOM_EPSILON {
         let price = match inst.option_type {
             OptionType::Call => (f1 - f2 - inst.strike).max(0.0) * df,
@@ -154,8 +160,8 @@ fn kirk_price(
 
 /// Black-76 call price.
 fn black76_call(forward: f64, strike: f64, sigma: f64, t: f64, df: f64) -> f64 {
-    let d1 = crate::instruments::common_impl::models::d1_black76(forward, strike, sigma, t);
-    let d2 = crate::instruments::common_impl::models::d2_black76(forward, strike, sigma, t);
+    let (d1, d2) =
+        crate::instruments::common_impl::models::d1_d2_black76(forward, strike, sigma, t);
 
     df * (forward * norm_cdf(d1) - strike * norm_cdf(d2))
 }
@@ -164,8 +170,8 @@ fn black76_call(forward: f64, strike: f64, sigma: f64, t: f64, df: f64) -> f64 {
 ///
 /// P = df * (strike * N(-d2) - forward * N(-d1))
 fn black76_put(forward: f64, strike: f64, sigma: f64, t: f64, df: f64) -> f64 {
-    let d1 = crate::instruments::common_impl::models::d1_black76(forward, strike, sigma, t);
-    let d2 = crate::instruments::common_impl::models::d2_black76(forward, strike, sigma, t);
+    let (d1, d2) =
+        crate::instruments::common_impl::models::d1_d2_black76(forward, strike, sigma, t);
 
     df * (strike * norm_cdf(-d2) - forward * norm_cdf(-d1))
 }
@@ -529,14 +535,14 @@ mod tests {
         assert!(pv_put > 0.0, "Put price should be positive, got {}", pv_put);
     }
 
-    /// Test that the Kirk put is priced DIRECTLY (not via put-call parity).
+    /// Verify that the direct Black-76 put formula agrees with a 2-D Monte Carlo
+    /// reference for a near-ATM spread put.
     ///
-    /// The near-ATM put is compared against a 2-D Monte Carlo reference.
-    /// The direct Black-76 put formula must match MC within tolerance.
-    ///
-    /// With the old parity-derived formula `P = C - df*(F1-F2-K)`, the Kirk
-    /// approximation error enters the put with the wrong sign for near-ATM puts,
-    /// causing a systematic bias. The direct formula avoids this.
+    /// Both the direct `P = df*(K_adj*N(-d2) - F1*N(-d1))` and a parity-derived
+    /// `P = C - df*(F1-F2-K)` are numerically identical (Black-76 satisfies
+    /// put-call parity exactly). This test simply confirms the implementation
+    /// produces a put price consistent with an independent MC simulation within
+    /// Kirk's approximation tolerance (~3%).
     #[test]
     fn put_priced_directly_matches_monte_carlo() {
         use std::f64::consts::PI;
