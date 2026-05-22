@@ -305,18 +305,56 @@ fn hazard_curve_abs_shift_bp_metric(
 /// fall back to per-tenor convexity.
 const TWIST_FRACTION_THRESHOLD: f64 = 1e-2;
 
+/// Construct a factor P&L [`Money`] from a computed `f64` amount.
+///
+/// If `amount` is non-finite (NaN or ±Inf), this function:
+/// - Appends a diagnostic note to `notes`,
+/// - Sets `*result_invalid = true` so [`PnlAttribution::result_invalid`] is
+///   propagated to callers, and
+/// - Returns a **zero sentinel** in `currency` so the attribution can continue
+///   and produce a complete (though flagged-invalid) result rather than
+///   panicking inside [`Money::new`].
+///
+/// For finite amounts it delegates directly to [`Money::new`], which is
+/// guaranteed not to panic.
+#[inline]
+fn factor_money_or_invalid(
+    amount: f64,
+    currency: finstack_core::currency::Currency,
+    label: &str,
+    notes: &mut Vec<String>,
+    result_invalid: &mut bool,
+) -> Money {
+    if amount.is_finite() {
+        Money::new(amount, currency)
+    } else {
+        notes.push(format!(
+            "Non-finite factor P&L ({amount:?}) for {label}; attribution flagged invalid"
+        ));
+        *result_invalid = true;
+        Money::new(0.0, currency)
+    }
+}
+
 fn add_cross_factor_term(
     by_pair: &mut IndexMap<String, Money>,
     total: &mut f64,
     label: &str,
     pnl: f64,
     currency: finstack_core::currency::Currency,
+    notes: &mut Vec<String>,
+    result_invalid: &mut bool,
 ) {
-    if pnl.abs() < 1e-12 {
+    if pnl.is_finite() && pnl.abs() < 1e-12 {
         return;
     }
-    *total += pnl;
-    by_pair.insert(label.to_string(), Money::new(pnl, currency));
+    let money = factor_money_or_invalid(pnl, currency, label, notes, result_invalid);
+    // Only accumulate into total if finite; the sentinel zero already keeps the
+    // sum well-behaved when result_invalid is set.
+    if pnl.is_finite() {
+        *total += pnl;
+    }
+    by_pair.insert(label.to_string(), money);
 }
 
 /// Perform metrics-based P&L attribution for an instrument.
@@ -442,6 +480,11 @@ pub fn attribute_pnl_metrics_based(
         None,
     );
 
+    // W56: track whether any non-finite factor P&L was encountered. When true
+    // we set `attribution.result_invalid = true` before returning so that
+    // `residual_within_tolerance` correctly refuses to report a clean result.
+    let mut non_finite_detected = false;
+
     // Extract time period in days
     let time_period_days = (as_of_t1 - as_of_t0).whole_days() as f64;
 
@@ -543,32 +586,75 @@ pub fn attribute_pnl_metrics_based(
     // - Formula: Theta × Δt (where Δt is time period in days)
     // - Carry decomposition metrics, when present, are scaled over the same horizon.
     let ccy = val_t1.value.currency();
-    let legacy_theta = val_t0
-        .measures
-        .get(MetricId::Theta.as_str())
-        .map(|theta| Money::new(theta * time_period_days, ccy));
+    let legacy_theta = val_t0.measures.get(MetricId::Theta.as_str()).map(|theta| {
+        factor_money_or_invalid(
+            theta * time_period_days,
+            ccy,
+            "carry/theta",
+            &mut attribution.meta.notes,
+            &mut non_finite_detected,
+        )
+    });
 
     if let Some(carry_total) = val_t0.measures.get(MetricId::CarryTotal.as_str()) {
-        attribution.carry = Money::new(carry_total * time_period_days, ccy);
+        attribution.carry = factor_money_or_invalid(
+            carry_total * time_period_days,
+            ccy,
+            "carry total",
+            &mut attribution.meta.notes,
+            &mut non_finite_detected,
+        );
 
-        let get_scaled = |id: MetricId| {
-            val_t0
-                .measures
-                .get(id.as_str())
-                .map(|value| Money::new(value * time_period_days, ccy))
+        let get_scaled = |id: MetricId,
+                          notes: &mut Vec<String>,
+                          flag: &mut bool|
+         -> Option<Money> {
+            val_t0.measures.get(id.as_str()).map(|value| {
+                factor_money_or_invalid(
+                    value * time_period_days,
+                    ccy,
+                    id.as_str(),
+                    notes,
+                    flag,
+                )
+            })
         };
 
         attribution.carry_detail = Some(CarryDetail {
             total: attribution.carry,
-            coupon_income: get_scaled(MetricId::CouponIncome).map(SourceLine::scalar),
-            pull_to_par: get_scaled(MetricId::PullToPar),
-            roll_down: get_scaled(MetricId::RollDown).map(SourceLine::scalar),
-            funding_cost: get_scaled(MetricId::FundingCost),
+            coupon_income: get_scaled(
+                MetricId::CouponIncome,
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
+            )
+            .map(SourceLine::scalar),
+            pull_to_par: get_scaled(
+                MetricId::PullToPar,
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
+            ),
+            roll_down: get_scaled(
+                MetricId::RollDown,
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
+            )
+            .map(SourceLine::scalar),
+            funding_cost: get_scaled(
+                MetricId::FundingCost,
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
+            ),
             theta: legacy_theta,
         });
     } else if let Some(theta) = val_t0.measures.get(MetricId::Theta.as_str()) {
         let carry_amount = theta * time_period_days;
-        attribution.carry = Money::new(carry_amount, ccy);
+        attribution.carry = factor_money_or_invalid(
+            carry_amount,
+            ccy,
+            "carry/theta",
+            &mut attribution.meta.notes,
+            &mut non_finite_detected,
+        );
         attribution.carry_detail = Some(CarryDetail {
             total: attribution.carry,
             coupon_income: None,
@@ -641,7 +727,13 @@ pub fn attribute_pnl_metrics_based(
             curves_with_data += 1;
         }
         rates_pnl = rates_acc.total();
-        attribution.rates_curves_pnl = Money::new(rates_pnl, val_t1.value.currency());
+        attribution.rates_curves_pnl = factor_money_or_invalid(
+            rates_pnl,
+            val_t1.value.currency(),
+            "rates curves P&L (key-rate)",
+            &mut attribution.meta.notes,
+            &mut non_finite_detected,
+        );
 
         if shift_terms > 0 {
             // Mean per-tenor shift across all (curve, tenor) cells with data —
@@ -675,7 +767,13 @@ pub fn attribute_pnl_metrics_based(
             }
         }
 
-        attribution.rates_curves_pnl = Money::new(rates_pnl, val_t1.value.currency());
+        attribution.rates_curves_pnl = factor_money_or_invalid(
+            rates_pnl,
+            val_t1.value.currency(),
+            "rates curves P&L (bucketed)",
+            &mut attribution.meta.notes,
+            &mut non_finite_detected,
+        );
 
         if curves_with_data > 0 {
             convexity_avg_shift_bp = Some(total_shift / curves_with_data as f64);
@@ -702,7 +800,13 @@ pub fn attribute_pnl_metrics_based(
         rates_pnl = dv01 * avg_shift;
         convexity_avg_shift_bp = avg_rate_shift_bp;
 
-        attribution.rates_curves_pnl = Money::new(rates_pnl, val_t1.value.currency());
+        attribution.rates_curves_pnl = factor_money_or_invalid(
+            rates_pnl,
+            val_t1.value.currency(),
+            "rates curves P&L (aggregate dv01)",
+            &mut attribution.meta.notes,
+            &mut non_finite_detected,
+        );
 
         // Add note about averaging limitation
         if rate_curves_measured > 1 {
@@ -776,9 +880,12 @@ pub fn attribute_pnl_metrics_based(
             let p0 = val_t0.value.amount();
             let convexity_pnl = 0.5 * p0 * convexity * shift_decimal * shift_decimal;
 
-            attribution.rates_curves_pnl = Money::new(
+            attribution.rates_curves_pnl = factor_money_or_invalid(
                 attribution.rates_curves_pnl.amount() + convexity_pnl,
                 val_t1.value.currency(),
+                "rates convexity P&L",
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
             );
         }
 
@@ -838,7 +945,13 @@ pub fn attribute_pnl_metrics_based(
         };
 
         let credit_amount = cs01 * avg_shift;
-        attribution.credit_curves_pnl = Money::new(credit_amount, val_t1.value.currency());
+        attribution.credit_curves_pnl = factor_money_or_invalid(
+            credit_amount,
+            val_t1.value.currency(),
+            "credit curves P&L",
+            &mut attribution.meta.notes,
+            &mut non_finite_detected,
+        );
 
         // Add note about averaging limitation
         if credit_curves_measured > 1 {
@@ -866,9 +979,12 @@ pub fn attribute_pnl_metrics_based(
             let shift_decimal = avg_shift / 10_000.0;
             let gamma_pnl = 0.5 * cs_gamma * shift_decimal * shift_decimal;
 
-            attribution.credit_curves_pnl = Money::new(
+            attribution.credit_curves_pnl = factor_money_or_invalid(
                 attribution.credit_curves_pnl.amount() + gamma_pnl,
                 val_t1.value.currency(),
+                "credit gamma P&L",
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
             );
         }
 
@@ -926,7 +1042,13 @@ pub fn attribute_pnl_metrics_based(
         // FX01 × spot change (FX01 is typically per 1% move)
         if let Some(fx_shift) = fx_shift_pct {
             let fx_amount = fx01 * fx_shift;
-            attribution.fx_pnl = Money::new(fx_amount, val_t1.value.currency());
+            attribution.fx_pnl = factor_money_or_invalid(
+                fx_amount,
+                val_t1.value.currency(),
+                "FX P&L",
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
+            );
         } else {
             note_warning(
                 &mut attribution,
@@ -950,16 +1072,25 @@ pub fn attribute_pnl_metrics_based(
         if let Some(vol_shift) = avg_vol_shift_abs {
             // vol_shift is already in percentage points
             let vol_amount = vega * vol_shift;
-            attribution.vol_pnl = Money::new(vol_amount, val_t1.value.currency());
+            attribution.vol_pnl = factor_money_or_invalid(
+                vol_amount,
+                val_t1.value.currency(),
+                "vol P&L",
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
+            );
 
             // 5b. Volatility convexity (Volga - second-order)
             if let Some(volga) = val_t0.measures.get(MetricId::Volga.as_str()) {
                 // Volga term: ½ × Volga × (Δσ)²
                 let volga_pnl = 0.5 * volga * vol_shift * vol_shift;
 
-                attribution.vol_pnl = Money::new(
+                attribution.vol_pnl = factor_money_or_invalid(
                     attribution.vol_pnl.amount() + volga_pnl,
                     val_t1.value.currency(),
+                    "volga P&L",
+                    &mut attribution.meta.notes,
+                    &mut non_finite_detected,
                 );
             }
 
@@ -1032,8 +1163,13 @@ pub fn attribute_pnl_metrics_based(
             }
 
             if spots_found > 0 {
-                attribution.market_scalars_pnl =
-                    Money::new(total_spot_pnl, val_t1.value.currency());
+                attribution.market_scalars_pnl = factor_money_or_invalid(
+                    total_spot_pnl,
+                    val_t1.value.currency(),
+                    "market scalars (delta/gamma) P&L",
+                    &mut attribution.meta.notes,
+                    &mut non_finite_detected,
+                );
             }
         }
 
@@ -1083,6 +1219,8 @@ pub fn attribute_pnl_metrics_based(
                 "Rates×Credit",
                 cross_gamma * rate_shift * credit_shift,
                 currency,
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
             );
         }
 
@@ -1100,6 +1238,8 @@ pub fn attribute_pnl_metrics_based(
                 "Rates×Vol",
                 cross_gamma * rate_shift * vol_shift,
                 currency,
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
             );
         }
 
@@ -1117,6 +1257,8 @@ pub fn attribute_pnl_metrics_based(
                 "Spot×Vol",
                 cross_gamma * spot_shift * vol_shift,
                 currency,
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
             );
         }
 
@@ -1134,6 +1276,8 @@ pub fn attribute_pnl_metrics_based(
                 "Spot×Credit",
                 cross_gamma * spot_shift * credit_shift,
                 currency,
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
             );
         }
 
@@ -1151,6 +1295,8 @@ pub fn attribute_pnl_metrics_based(
                 "FX×Vol",
                 cross_gamma * fx_shift * vol_shift,
                 currency,
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
             );
         }
 
@@ -1168,11 +1314,19 @@ pub fn attribute_pnl_metrics_based(
                 "FX×Rates",
                 cross_gamma * fx_shift * rate_shift,
                 currency,
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
             );
         }
 
         if !cross_by_pair.is_empty() {
-            attribution.cross_factor_pnl = Money::new(cross_total, currency);
+            attribution.cross_factor_pnl = factor_money_or_invalid(
+                cross_total,
+                currency,
+                "cross-factor P&L total",
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
+            );
             attribution.cross_factor_detail = Some(CrossFactorDetail {
                 total: attribution.cross_factor_pnl,
                 by_pair: cross_by_pair,
@@ -1194,9 +1348,12 @@ pub fn attribute_pnl_metrics_based(
                 measure_scalar_absolute_shift(scalar_id.as_str(), market_t0, market_t1)
             {
                 let div_amount = dividend01 * div_abs_shift;
-                attribution.market_scalars_pnl = Money::new(
+                attribution.market_scalars_pnl = factor_money_or_invalid(
                     attribution.market_scalars_pnl.amount() + div_amount,
                     val_t1.value.currency(),
+                    "dividend P&L",
+                    &mut attribution.meta.notes,
+                    &mut non_finite_detected,
                 );
             }
         }
@@ -1231,7 +1388,13 @@ pub fn attribute_pnl_metrics_based(
 
         // First-order: Inflation01 × Δi (Δi in basis points)
         let inflation_amount = inflation01 * avg_shift;
-        attribution.inflation_curves_pnl = Money::new(inflation_amount, val_t1.value.currency());
+        attribution.inflation_curves_pnl = factor_money_or_invalid(
+            inflation_amount,
+            val_t1.value.currency(),
+            "inflation P&L",
+            &mut attribution.meta.notes,
+            &mut non_finite_detected,
+        );
 
         // Second-order: Inflation convexity (if available)
         if let Some(inflation_convexity) =
@@ -1239,11 +1402,21 @@ pub fn attribute_pnl_metrics_based(
         {
             let shift_decimal = avg_shift / 10_000.0;
             let convexity_pnl = 0.5 * inflation_convexity * shift_decimal * shift_decimal;
-            attribution.inflation_curves_pnl = Money::new(
+            attribution.inflation_curves_pnl = factor_money_or_invalid(
                 attribution.inflation_curves_pnl.amount() + convexity_pnl,
                 val_t1.value.currency(),
+                "inflation convexity P&L",
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
             );
         }
+    }
+
+    // W56: propagate the non-finite flag BEFORE finalize_attribution so that
+    // compute_residual sees result_invalid = true and doesn't attempt to
+    // construct a residual from a (potentially sentinel) attributed sum.
+    if non_finite_detected {
+        attribution.result_invalid = true;
     }
 
     // Metadata - use reasonable tolerances for metrics-based attribution.
@@ -1949,6 +2122,127 @@ mod tests {
                 .any(|n| n.contains("key-rate")),
             "a note must record key-rate attribution; notes: {:?}",
             attribution.meta.notes
+        );
+    }
+
+    /// W56: a NaN/Inf factor sensitivity must produce `result_invalid = true`
+    /// instead of panicking inside `Money::new`.
+    ///
+    /// Injects `f64::NAN` as the aggregate `Dv01` metric (the fallback path
+    /// that reads `val_t0.measures["dv01"]` and computes `dv01 * avg_shift`)
+    /// then asserts the attribution returns without panic and sets
+    /// `result_invalid = true`.
+    #[test]
+    fn nan_factor_sensitivity_sets_result_invalid_instead_of_panicking() {
+        let as_of_t0 = date!(2025 - 01 - 15);
+        let as_of_t1 = date!(2025 - 01 - 16);
+        let meta = finstack_core::config::results_meta(&FinstackConfig::default());
+
+        // A TestInstrument with one discount curve so a measurable rate shift
+        // exists — that keeps us in the `dv01 * avg_shift` branch where a NaN
+        // DV01 will flow into `Money::new`.
+        let instrument: Arc<dyn Instrument> = Arc::new(
+            TestInstrument::new("NAN-DV01", Money::new(100_000.0, Currency::USD))
+                .with_discount_curves(&["USD-OIS"]),
+        );
+
+        let market_t0 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t0, 0.02));
+        let market_t1 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t1, 0.0201));
+
+        // Inject NaN as the Dv01 sensitivity — simulates an overflowed or
+        // corrupt Greek value reaching the attribution engine.
+        let mut measures_t0 = IndexMap::new();
+        measures_t0.insert(MetricId::Dv01, f64::NAN);
+
+        let val_t0 = ValuationResult::stamped_with_meta(
+            "NAN-DV01",
+            as_of_t0,
+            Money::new(100_000.0, Currency::USD),
+            meta.clone(),
+        )
+        .with_measures(measures_t0);
+        let val_t1 = ValuationResult::stamped_with_meta(
+            "NAN-DV01",
+            as_of_t1,
+            Money::new(99_600.0, Currency::USD),
+            meta,
+        );
+
+        // Must NOT panic; must return Ok(_) with result_invalid = true.
+        let attribution = attribute_pnl_metrics_based(
+            &instrument,
+            &market_t0,
+            &market_t1,
+            &val_t0,
+            &val_t1,
+            as_of_t0,
+            as_of_t1,
+        )
+        .expect("attribution must not return Err on NaN sensitivity");
+
+        assert!(
+            attribution.result_invalid,
+            "result_invalid must be true when a NaN factor sensitivity is detected; \
+             got result_invalid = false"
+        );
+
+        // Residual should be a finite sentinel (zero), not NaN/Inf.
+        assert!(
+            attribution.residual.amount().is_finite(),
+            "residual must be finite (sentinel zero) when result_invalid; got {}",
+            attribution.residual.amount()
+        );
+    }
+
+    /// W56 (Inf variant): same contract with +Inf sensitivity.
+    #[test]
+    fn inf_factor_sensitivity_sets_result_invalid_instead_of_panicking() {
+        let as_of_t0 = date!(2025 - 01 - 15);
+        let as_of_t1 = date!(2025 - 01 - 16);
+        let meta = finstack_core::config::results_meta(&FinstackConfig::default());
+
+        let instrument: Arc<dyn Instrument> = Arc::new(
+            TestInstrument::new("INF-DV01", Money::new(100_000.0, Currency::USD))
+                .with_discount_curves(&["USD-OIS"]),
+        );
+        let market_t0 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t0, 0.02));
+        let market_t1 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t1, 0.0201));
+
+        let mut measures_t0 = IndexMap::new();
+        measures_t0.insert(MetricId::Dv01, f64::INFINITY);
+
+        let val_t0 = ValuationResult::stamped_with_meta(
+            "INF-DV01",
+            as_of_t0,
+            Money::new(100_000.0, Currency::USD),
+            meta.clone(),
+        )
+        .with_measures(measures_t0);
+        let val_t1 = ValuationResult::stamped_with_meta(
+            "INF-DV01",
+            as_of_t1,
+            Money::new(99_600.0, Currency::USD),
+            meta,
+        );
+
+        let attribution = attribute_pnl_metrics_based(
+            &instrument,
+            &market_t0,
+            &market_t1,
+            &val_t0,
+            &val_t1,
+            as_of_t0,
+            as_of_t1,
+        )
+        .expect("attribution must not return Err on Inf sensitivity");
+
+        assert!(
+            attribution.result_invalid,
+            "result_invalid must be true for Inf factor sensitivity"
+        );
+        assert!(
+            attribution.residual.amount().is_finite(),
+            "residual must be finite sentinel when result_invalid"
         );
     }
 }
