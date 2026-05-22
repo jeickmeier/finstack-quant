@@ -282,21 +282,21 @@ impl MertonModel {
                 let d_plus = (log_v_h + mu * horizon) / sigma_sqrt_t;
                 let d_minus = (log_v_h - mu * horizon) / sigma_sqrt_t;
 
-                // Black-Cox reflection term `(V/H)^(-2*mu/sigma^2) * N(d_minus)`.
+                // Black-Cox reflection term `(V/H)^(-2*mu/sigma^2) * N(-d_minus)`.
                 // The power factor `(V/H)^exponent` overflows to `+inf` for a
                 // large `|exponent|` (e.g. a strongly negative drift, or a low
-                // vol with a high rate). When `N(d_minus)` simultaneously
+                // vol with a high rate). When `N(-d_minus)` simultaneously
                 // underflows to `0` the naive product is `inf * 0 = NaN`,
                 // which would survive the final `clamp(0, 1)`.
                 //
-                // The Gaussian tail `N(d_minus)` decays as `exp(-d_minus^2/2)`,
+                // The Gaussian tail `N(-d_minus)` decays as `exp(-d_minus^2/2)`,
                 // which dominates the (at most exponential-in-`d_minus`) power
-                // factor, so the term tends to `0` whenever `N(d_minus)` does.
+                // factor, so the term tends to `0` whenever `N(-d_minus)` does.
                 // Guard that case, then evaluate the surviving product in
                 // log-space so a genuinely large term overflows cleanly to
                 // `+inf` (and clamps to `1`) instead of producing a `NaN`.
                 let exponent = -2.0 * mu / (sigma * sigma);
-                let nd_minus = norm_cdf(d_minus);
+                let nd_minus = norm_cdf(-d_minus);
                 let reflection_term = if nd_minus <= 0.0 {
                     0.0
                 } else {
@@ -1913,6 +1913,56 @@ mod tests {
         assert!(
             (gbm_terminal - jd_terminal).abs() > 1.0,
             "JD should produce different terminal values"
+        );
+    }
+
+    /// Regression test for the Black-Cox first-passage reflection-term sign.
+    ///
+    /// When the risk-neutral log-drift mu = r - q - 0.5*sigma^2 is exactly 0,
+    /// d_plus == d_minus == d = ln(V/H) / (sigma*sqrt(T)), so the correct
+    /// Black-Cox formula collapses to:
+    ///
+    ///   PD = N(-d) + (V/H)^0 * N(-d) = 2*N(-d)
+    ///
+    /// With the original buggy code (N(+d_minus) instead of N(-d_minus)) the
+    /// reflection term becomes N(d) = 1 - N(-d), yielding PD = 1.0 — certain
+    /// default for a healthy, well-capitalised firm.
+    #[test]
+    fn first_passage_zero_drift_reflection_sign() {
+        // Parameters chosen so mu = r - q - 0.5*sigma^2 = 0 exactly.
+        // r = 0.5 * sigma^2, q = 0.0, sigma = 0.2  =>  r = 0.02.
+        let sigma: f64 = 0.2;
+        let r = 0.5 * sigma * sigma; // = 0.02
+        let t = 3.0_f64;
+        let v = 120.0_f64;
+        let b = 100.0_f64;
+
+        let model = MertonModel::new_with_dynamics(
+            v,
+            sigma,
+            b,
+            r,
+            0.0, // payout_rate = 0
+            BarrierType::FirstPassage {
+                barrier_growth_rate: 0.0,
+            },
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid model");
+
+        let pd = model.default_probability(t);
+
+        // When mu = 0, H = B (no barrier growth), d = ln(V/B) / (sigma*sqrt(T)).
+        let d = (v / b).ln() / (sigma * t.sqrt());
+        let expected = 2.0 * norm_cdf(-d);
+
+        assert!(
+            (pd - expected).abs() < 1e-10,
+            "Black-Cox zero-drift PD should be 2*N(-d) = {expected:.10}, got {pd:.10}"
+        );
+        assert!(
+            pd < 1.0,
+            "Healthy firm (V > B) with zero drift must have PD < 1.0, got {pd}"
         );
     }
 }
