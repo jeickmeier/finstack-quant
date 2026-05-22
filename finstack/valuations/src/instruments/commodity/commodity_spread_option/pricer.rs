@@ -26,12 +26,7 @@
 //! - Kirk, E. (1995). "Correlation in the Energy Markets."
 
 use crate::instruments::commodity::commodity_spread_option::CommoditySpreadOption;
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::OptionType;
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
-};
-use crate::results::ValuationResult;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::norm_cdf;
@@ -162,61 +157,10 @@ fn black76_call(forward: f64, strike: f64, sigma: f64, t: f64, df: f64) -> f64 {
     df * (forward * norm_cdf(d1) - strike * norm_cdf(d2))
 }
 
-/// Commodity spread option pricer using Kirk's approximation.
-pub struct CommoditySpreadOptionKirkPricer {
-    model: ModelKey,
-}
-
-impl CommoditySpreadOptionKirkPricer {
-    /// Create a new commodity spread option pricer with Black-76 model key.
-    pub fn new() -> Self {
-        Self {
-            model: ModelKey::Black76,
-        }
-    }
-
-    /// Create a pricer with a specific model key.
-    pub fn with_model(model: ModelKey) -> Self {
-        Self { model }
-    }
-}
-
-impl Default for CommoditySpreadOptionKirkPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Pricer for CommoditySpreadOptionKirkPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::CommoditySpreadOption, self.model)
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> PricingResult<ValuationResult> {
-        let spread_opt = instrument
-            .as_any()
-            .downcast_ref::<CommoditySpreadOption>()
-            .ok_or_else(|| {
-                PricingError::type_mismatch(InstrumentType::CommoditySpreadOption, instrument.key())
-            })?;
-
-        let pv = spread_opt.value(market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-
-        Ok(ValuationResult::stamped(spread_opt.id(), as_of, pv))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::OptionType;
+    use crate::instruments::common_impl::traits::Instrument;
     use finstack_core::currency::Currency;
     use finstack_core::dates::DayCount;
     use finstack_core::market_data::context::MarketContext;

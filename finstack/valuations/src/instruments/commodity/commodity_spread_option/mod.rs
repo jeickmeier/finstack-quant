@@ -9,5 +9,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use pricer::CommoditySpreadOptionKirkPricer;
 pub use types::CommoditySpreadOption;

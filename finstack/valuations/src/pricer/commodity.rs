@@ -29,14 +29,16 @@ pub fn register_commodity_pricers(registry: &mut PricerRegistry) {
     registry.register(
         InstrumentType::CommodityOption,
         ModelKey::Black76,
-        crate::instruments::commodity::commodity_option::pricer::CommodityOptionBlackPricer::default(),
+        crate::instruments::common_impl::GenericInstrumentPricer::<
+            crate::instruments::CommodityOption,
+        >::new(InstrumentType::CommodityOption, ModelKey::Black76),
     );
     registry.register(
         InstrumentType::CommodityOption,
         ModelKey::Discounting,
-        crate::instruments::commodity::commodity_option::pricer::CommodityOptionBlackPricer::with_model(
-            ModelKey::Discounting,
-        ),
+        crate::instruments::common_impl::GenericInstrumentPricer::<
+            crate::instruments::CommodityOption,
+        >::new(InstrumentType::CommodityOption, ModelKey::Discounting),
     );
 
     // Commodity Asian Option
@@ -50,14 +52,18 @@ pub fn register_commodity_pricers(registry: &mut PricerRegistry) {
     registry.register(
         InstrumentType::CommoditySwaption,
         ModelKey::Black76,
-        crate::instruments::commodity::commodity_swaption::pricer::CommoditySwaptionBlackPricer::default(),
+        crate::instruments::common_impl::GenericInstrumentPricer::<
+            crate::instruments::CommoditySwaption,
+        >::new(InstrumentType::CommoditySwaption, ModelKey::Black76),
     );
 
     // Commodity Spread Option (Kirk's approximation)
     registry.register(
         InstrumentType::CommoditySpreadOption,
         ModelKey::Black76,
-        crate::instruments::commodity::commodity_spread_option::pricer::CommoditySpreadOptionKirkPricer::default(),
+        crate::instruments::common_impl::GenericInstrumentPricer::<
+            crate::instruments::CommoditySpreadOption,
+        >::new(InstrumentType::CommoditySpreadOption, ModelKey::Black76),
     );
 
     // Commodity Option - Monte Carlo Schwartz-Smith

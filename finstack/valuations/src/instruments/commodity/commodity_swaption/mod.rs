@@ -30,9 +30,6 @@
 
 /// Metrics submodule for commodity swaption risk measures.
 pub(crate) mod metrics;
-/// Pricer for commodity swaptions.
-pub(crate) mod pricer;
 mod types;
 
-pub use pricer::CommoditySwaptionBlackPricer;
 pub use types::CommoditySwaption;
