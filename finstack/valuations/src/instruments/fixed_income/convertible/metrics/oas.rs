@@ -51,7 +51,11 @@ impl MetricCalculator for OasCalculator {
             })?;
 
         let accrued = calculate_accrued_interest(bond, as_of)?;
-        let target_dirty = quoted_clean + accrued;
+        // `quoted_clean` is percentage-of-par (e.g. 99.5 = 99.5% of face).
+        // `accrued` and the model price are both notional-scaled currency amounts.
+        // Scale the percentage quote to notional so the solver objective compares
+        // commensurate values — mirroring the term-loan `target_price_from_quote_or_model`.
+        let target_dirty = quoted_clean * bond.notional.amount() / 100.0 + accrued;
 
         let tree_type = ConvertibleTreeType::Binomial(100);
         let base_market = context.curves.as_ref();
@@ -123,6 +127,124 @@ impl MetricCalculator for OasCalculator {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use crate::instruments::fixed_income::convertible::{
+        AntiDilutionPolicy, ConversionPolicy, ConversionSpec, ConvertibleBond, DividendAdjustment,
+    };
+    use crate::instruments::PricingOverrides;
+    use crate::metrics::{MetricCalculator, MetricContext};
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+    use finstack_core::market_data::scalars::MarketScalar;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_core::money::Money;
+    use finstack_core::prelude::FinstackConfig;
+    use time::Month;
+
+    use crate::cashflow::builder::specs::{CouponType, FixedCouponSpec};
+    use crate::instruments::common_impl::traits::Instrument;
+
+    fn make_bond_with_quote(notional_usd: f64, quoted_clean_pct: f64) -> ConvertibleBond {
+        let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
+
+        let fixed_coupon = FixedCouponSpec {
+            coupon_type: CouponType::Cash,
+            rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
+            freq: Tenor::semi_annual(),
+            dc: DayCount::Act365F,
+            bdc: BusinessDayConvention::Following,
+            calendar_id: "weekends_only".to_string(),
+            stub: StubKind::None,
+            end_of_month: false,
+            payment_lag_days: 0,
+        };
+
+        let mut overrides = PricingOverrides::default();
+        overrides.market_quotes.quoted_clean_price = Some(quoted_clean_pct);
+
+        ConvertibleBond {
+            id: "TEST_CB_OAS".to_string().into(),
+            notional: Money::new(notional_usd, Currency::USD),
+            issue_date: issue,
+            maturity,
+            discount_curve_id: "USD-OIS".into(),
+            credit_curve_id: None,
+            settlement_days: None,
+            recovery_rate: None,
+            conversion: ConversionSpec {
+                ratio: Some(10.0),
+                price: None,
+                policy: ConversionPolicy::Voluntary,
+                anti_dilution: AntiDilutionPolicy::None,
+                dividend_adjustment: DividendAdjustment::None,
+                dilution_events: Vec::new(),
+            },
+            underlying_equity_id: Some("AAPL".to_string()),
+            call_put: None,
+            soft_call_trigger: None,
+            fixed_coupon: Some(fixed_coupon),
+            floating_coupon: None,
+            pricing_overrides: overrides,
+            attributes: Default::default(),
+        }
+    }
+
+    fn make_market(base_date: Date) -> finstack_core::market_data::MarketContext {
+        let discount_curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots([(0.0, 1.0), (10.0, 0.90)])
+            .interp(finstack_core::math::interp::InterpStyle::Linear)
+            .build()
+            .expect("should succeed");
+
+        finstack_core::market_data::MarketContext::new()
+            .insert(discount_curve)
+            .insert_price("AAPL", MarketScalar::Unitless(150.0))
+            .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+            .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02))
+    }
+
+    /// Regression: quoted_clean_price is percentage-of-par, so it must be scaled
+    /// by notional/100 before adding notional-scaled accrued interest to form the
+    /// dirty price target.  Before the fix the solver compared ~$1e6 model price
+    /// against ~102 target (pct + accrued), couldn't bracket, and returned an
+    /// error or a pinned boundary value.
+    ///
+    /// With a $1,000,000 notional and a 102.0% clean quote the expected target
+    /// dirty is ~$1,020,000 + small accrued — well within the solver's bracket.
+    /// The resulting OAS should be a finite decimal spread in (-10%, +50%).
+    #[test]
+    fn oas_quoted_clean_price_scaled_to_notional() {
+        let notional = 1_000_000.0;
+        let quoted_clean_pct = 102.0; // 102% of par
+        let bond = make_bond_with_quote(notional, quoted_clean_pct);
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let market = make_market(as_of);
+        let instrument: Arc<dyn Instrument> = Arc::new(bond);
+        let base_value = instrument.value(&market, as_of).expect("base value");
+        let mut ctx = MetricContext::new(
+            instrument,
+            Arc::new(market),
+            as_of,
+            base_value,
+            Arc::new(FinstackConfig::default()),
+        );
+        let result = super::OasCalculator.calculate(&mut ctx);
+        assert!(
+            result.is_ok(),
+            "OAS solver should converge with correctly scaled target; got: {:?}",
+            result.err()
+        );
+        let oas = result.unwrap();
+        assert!(
+            oas > -0.10 && oas < 0.50,
+            "OAS should be in (-10%, +50%) range; got {oas}"
+        );
+        assert!(oas.is_finite(), "OAS must be finite; got {oas}");
+    }
+
     /// Regression test for the Cell-based error capture pattern.
     ///
     /// An earlier version used `if captured_err.take().is_none() { set(Some(e)) }`
