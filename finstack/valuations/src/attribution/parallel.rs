@@ -105,7 +105,7 @@ enum ParallelFactorSpec {
     Market {
         factor: ParallelRestoredFactor,
         flags: CurveRestoreFlags,
-        snapshot: MarketSnapshot,
+        snapshot: Box<MarketSnapshot>,
     },
     ModelParams {
         snapshot: model_params::ModelParamsSnapshot,
@@ -473,49 +473,49 @@ pub fn attribute_pnl_parallel_with_credit_model(
             factor_specs.push(ParallelFactorSpec::Market {
                 factor: ParallelRestoredFactor::Discount,
                 flags: CurveRestoreFlags::DISCOUNT,
-                snapshot: discount_snap,
+                snapshot: Box::new(discount_snap),
             });
         }
         if !forward_snap.forward_curves.is_empty() {
             factor_specs.push(ParallelFactorSpec::Market {
                 factor: ParallelRestoredFactor::Forward,
                 flags: CurveRestoreFlags::FORWARD,
-                snapshot: forward_snap,
+                snapshot: Box::new(forward_snap),
             });
         }
         if !credit_snapshot.hazard_curves.is_empty() {
             factor_specs.push(ParallelFactorSpec::Market {
                 factor: ParallelRestoredFactor::Credit,
                 flags: CurveRestoreFlags::CREDIT,
-                snapshot: credit_snapshot.clone(),
+                snapshot: Box::new(credit_snapshot.clone()),
             });
         }
         if !inflation_snap.inflation_curves.is_empty() {
             factor_specs.push(ParallelFactorSpec::Market {
                 factor: ParallelRestoredFactor::Inflation,
                 flags: CurveRestoreFlags::INFLATION,
-                snapshot: inflation_snap,
+                snapshot: Box::new(inflation_snap),
             });
         }
         if !correlation_snap.base_correlation_curves.is_empty() {
             factor_specs.push(ParallelFactorSpec::Market {
                 factor: ParallelRestoredFactor::Correlations,
                 flags: CurveRestoreFlags::CORRELATION,
-                snapshot: correlation_snap,
+                snapshot: Box::new(correlation_snap),
             });
         }
         if fx_snap.fx.is_some() {
             factor_specs.push(ParallelFactorSpec::Market {
                 factor: ParallelRestoredFactor::FX,
                 flags: CurveRestoreFlags::FX,
-                snapshot: fx_snap,
+                snapshot: Box::new(fx_snap),
             });
         }
         if !vol_snap.surfaces.is_empty() {
             factor_specs.push(ParallelFactorSpec::Market {
                 factor: ParallelRestoredFactor::Volatility,
                 flags: CurveRestoreFlags::VOL,
-                snapshot: vol_snap,
+                snapshot: Box::new(vol_snap),
             });
         }
         let has_scalars = !scalars_snap.prices.is_empty()
@@ -526,7 +526,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
             factor_specs.push(ParallelFactorSpec::Market {
                 factor: ParallelRestoredFactor::MarketScalars,
                 flags: CurveRestoreFlags::SCALARS,
-                snapshot: scalars_snap,
+                snapshot: Box::new(scalars_snap),
             });
         }
 
