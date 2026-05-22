@@ -186,7 +186,10 @@ fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedule {
         DayCount::Act365F,
         finstack_cashflows::ScheduleBuildOpts {
             notional_hint: Some(Money::new(1_000_000.0, Currency::USD)),
-            meta: Some(CashFlowMeta::default()),
+            meta: Some(CashFlowMeta {
+                issue_date: Some(base),
+                ..Default::default()
+            }),
             ..Default::default()
         },
     )

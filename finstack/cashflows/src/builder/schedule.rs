@@ -180,13 +180,57 @@ impl Discountable for CashFlowSchedule {
         base: Date,
         dc: Option<DayCount>,
     ) -> finstack_core::Result<Money> {
-        let flows: Vec<(Date, Money)> = self
-            .flows
-            .iter()
-            .filter(|cf| cf.kind != CFKind::DefaultedNotional)
-            .map(|cf| (cf.date, cf.amount))
-            .collect();
-        finstack_core::cashflow::npv(disc, base, dc, &flows)
+        // Compute NPV directly without allocating an intermediate Vec.
+        // Two-pass approach: first find currency and check non-empty,
+        // then compute the discounted sum.
+
+        let mut ccy = None;
+
+        // First pass: determine currency and validate non-empty
+        for cf in &self.flows {
+            if cf.kind == CFKind::DefaultedNotional {
+                continue;
+            }
+            if ccy.is_none() {
+                ccy = Some(cf.amount.currency());
+            }
+        }
+
+        let ccy = match ccy {
+            Some(c) => c,
+            None => return Err(finstack_core::error::InputError::TooFewPoints.into()),
+        };
+        let day_count = dc.unwrap_or_else(|| disc.day_count());
+        let curve_base = disc.base_date();
+        let ctx = finstack_core::dates::DayCountContext::default();
+        let t_base = day_count.signed_year_fraction(curve_base, base, ctx)?;
+        let df_base = disc.df(t_base);
+
+        if !df_base.is_finite() || df_base <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "npv: discount factor at the valuation date ({base}) is invalid: {df_base}"
+            )));
+        }
+
+        // Second pass: accumulate discounted amounts
+        let mut total = Money::new(0.0, ccy);
+        for cf in &self.flows {
+            if cf.kind == CFKind::DefaultedNotional {
+                continue;
+            }
+            if cf.amount.currency() != ccy {
+                return Err(finstack_core::Error::CurrencyMismatch {
+                    expected: ccy,
+                    actual: cf.amount.currency(),
+                });
+            }
+            let t = day_count.signed_year_fraction(curve_base, cf.date, ctx)?;
+            let df = disc.df(t) / df_base;
+            let disc_amt = cf.amount * df;
+            total = total.checked_add(disc_amt)?;
+        }
+
+        Ok(total)
     }
 }
 

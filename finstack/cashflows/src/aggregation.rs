@@ -259,8 +259,13 @@ where
     T: HasDate,
     F: FnMut(&T, f64, f64) -> Money,
 {
-    let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> = IndexMap::new();
-    let mut per_ccy: IndexMap<Currency, NeumaierAccumulator> = IndexMap::new();
+    // Pre-size the outer map to avoid reallocations during insertion.
+    let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
+        IndexMap::with_capacity(periods.len());
+    // Reusable buffer for per-currency accumulation across periods.
+    let mut per_ccy: IndexMap<Currency, NeumaierAccumulator> = IndexMap::with_capacity(4);
+    // Reusable buffer for building the inner result map.
+    let mut result_buf: IndexMap<Currency, Money> = IndexMap::with_capacity(4);
 
     for (p, flows_in_period) in iter_by_period(sorted, periods) {
         if flows_in_period.is_empty() {
@@ -274,11 +279,18 @@ where
             let ccy = pv.currency();
             per_ccy.entry(ccy).or_default().add(pv.amount());
         }
-        let mut result: IndexMap<Currency, Money> = IndexMap::with_capacity(per_ccy.len());
-        for (&ccy, acc) in &per_ccy {
-            result.insert(ccy, Money::new(acc.total(), ccy));
+
+        // Skip periods with no value (all flows filtered to zero)
+        if per_ccy.is_empty() {
+            continue;
         }
-        out.insert(p.id, result);
+
+        // Build result from accumulated per-currency values, reusing the buffer.
+        result_buf.clear();
+        for (&ccy, acc) in &per_ccy {
+            result_buf.insert(ccy, Money::new(acc.total(), ccy));
+        }
+        out.insert(p.id, result_buf.clone());
     }
 
     Ok(out)
@@ -294,8 +306,12 @@ fn pv_by_period_precomputed(
         periods.windows(2).all(|w| w[0].start <= w[1].start),
         "pv_by_period_precomputed requires periods sorted by start date"
     );
-    let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> = IndexMap::new();
-    let mut per_ccy: IndexMap<Currency, NeumaierAccumulator> = IndexMap::new();
+    // Pre-size the outer map to avoid reallocations.
+    let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
+        IndexMap::with_capacity(periods.len());
+    // Reusable buffers for per-currency accumulation and result building.
+    let mut per_ccy: IndexMap<Currency, NeumaierAccumulator> = IndexMap::with_capacity(4);
+    let mut result_buf: IndexMap<Currency, Money> = IndexMap::with_capacity(4);
     let mut flow_idx = 0usize;
     let n = sorted.len();
 
@@ -312,11 +328,11 @@ fn pv_by_period_precomputed(
         }
 
         if !per_ccy.is_empty() {
-            let mut result: IndexMap<Currency, Money> = IndexMap::with_capacity(per_ccy.len());
+            result_buf.clear();
             for (&ccy, acc) in &per_ccy {
-                result.insert(ccy, Money::new(acc.total(), ccy));
+                result_buf.insert(ccy, Money::new(acc.total(), ccy));
             }
-            out.insert(p.id, result);
+            out.insert(p.id, result_buf.clone());
         }
     }
 

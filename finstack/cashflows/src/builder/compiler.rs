@@ -21,7 +21,6 @@
 //! least two dates.
 
 use crate::builder::{AmortizationSpec, Notional};
-use std::collections::BTreeSet;
 
 use finstack_core::dates::{Date, DayCount, HolidayCalendar, Tenor};
 use finstack_core::money::Money;
@@ -265,6 +264,10 @@ pub(super) struct CompiledSchedules {
     pub(super) float_schedules: Vec<FloatSchedule>,
 }
 
+/// Collect all relevant dates for cashflow schedule building.
+///
+/// Uses Vec with sort_unstable + dedup instead of BTreeSet for better
+/// performance with typical schedule sizes (<10k dates).
 pub(super) fn collect_dates(
     issue: Date,
     maturity: Date,
@@ -274,51 +277,64 @@ pub(super) fn collect_dates(
     fixed_fees: &[(Date, Money)],
     notional: &Notional,
 ) -> Vec<Date> {
-    let mut set: BTreeSet<Date> = BTreeSet::new();
-    set.insert(issue);
-    set.insert(maturity);
+    // Estimate capacity: issue/maturity + 3 dates per schedule period + fees + amort dates
+    let estimated_periods: usize = fixed_schedules
+        .iter()
+        .map(|s| s.dates.len())
+        .chain(float_schedules.iter().map(|s| s.dates.len()))
+        .sum();
+    let estimated_capacity = 2 + estimated_periods * 3 + fixed_fees.len() + 16;
+
+    let mut dates: Vec<Date> = Vec::with_capacity(estimated_capacity);
+    dates.push(issue);
+    dates.push(maturity);
 
     // Collect all fixed coupon dates (accrual boundaries + payment dates)
     for schedule in fixed_schedules {
-        extend_period_dates(&mut set, schedule.prev.values());
+        for period in schedule.prev.values() {
+            dates.push(period.accrual_start);
+            dates.push(period.accrual_end);
+            dates.push(period.payment_date);
+        }
     }
 
     // Collect all floating coupon dates (accrual boundaries + payment dates)
     for schedule in float_schedules {
-        extend_period_dates(&mut set, schedule.prev.values());
+        for period in schedule.prev.values() {
+            dates.push(period.accrual_start);
+            dates.push(period.accrual_end);
+            dates.push(period.payment_date);
+        }
     }
 
     // Collect all periodic fee dates (accrual boundaries + payment dates)
-    for dates in periodic_fee_date_slices {
-        set.extend(dates.iter().copied());
+    for dates_slice in periodic_fee_date_slices {
+        dates.extend_from_slice(dates_slice);
     }
 
     // Collect all fixed fee dates
-    set.extend(fixed_fees.iter().map(|(d, _)| *d));
+    for (d, _) in fixed_fees {
+        dates.push(*d);
+    }
 
     // Collect amortization dates
     match &notional.amort {
         AmortizationSpec::CustomPrincipal { items } => {
-            set.extend(items.iter().map(|(d, _)| *d));
+            for (d, _) in items {
+                dates.push(*d);
+            }
         }
         AmortizationSpec::StepRemaining { schedule } => {
-            set.extend(schedule.iter().map(|(d, _)| *d));
+            for (d, _) in schedule {
+                dates.push(*d);
+            }
         }
         _ => {}
     }
 
-    set.into_iter().collect()
-}
-
-fn extend_period_dates<'a>(
-    set: &mut BTreeSet<Date>,
-    periods: impl IntoIterator<Item = &'a SchedulePeriod>,
-) {
-    for period in periods {
-        set.insert(period.accrual_start);
-        set.insert(period.accrual_end);
-        set.insert(period.payment_date);
-    }
+    dates.sort_unstable();
+    dates.dedup();
+    dates
 }
 
 struct StepUpCompileInput<'a> {
@@ -530,24 +546,28 @@ pub(super) fn compute_coupon_schedules(
     let payment_pieces: &[PaymentProgramPiece] = &builder.payment_program;
 
     // Validate windows are within [issue, maturity] and build boundary grid
-    let mut bounds: BTreeSet<Date> = BTreeSet::new();
-    bounds.insert(issue);
-    bounds.insert(maturity);
+    // Use Vec + sort_unstable for better performance than BTreeSet for small N
+    let mut bounds: Vec<Date> =
+        Vec::with_capacity(2 + coupon_pieces.len() * 2 + payment_pieces.len() * 2);
+    bounds.push(issue);
+    bounds.push(maturity);
     for p in coupon_pieces {
         if !p.window.is_within(issue, maturity) {
             return Err(InputError::Invalid.into());
         }
-        bounds.insert(p.window.start);
-        bounds.insert(p.window.end);
+        bounds.push(p.window.start);
+        bounds.push(p.window.end);
     }
     for p in payment_pieces {
         if !p.window.is_within(issue, maturity) {
             return Err(InputError::Invalid.into());
         }
-        bounds.insert(p.window.start);
-        bounds.insert(p.window.end);
+        bounds.push(p.window.start);
+        bounds.push(p.window.end);
     }
-    let grid: Vec<Date> = bounds.into_iter().collect();
+    bounds.sort_unstable();
+    bounds.dedup();
+    let grid: Vec<Date> = bounds;
     if grid.len() < 2 {
         return Err(InputError::TooFewPoints.into());
     }
