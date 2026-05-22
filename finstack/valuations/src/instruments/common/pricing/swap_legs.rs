@@ -836,7 +836,10 @@ where
         // single-fixing floor/cap path.
         let is_compounded = !matches!(params.compounding_method, CompoundingMethod::Simple);
 
-        // Determine the index rate: use historical fixing if reset is in the past,
+        // Pre-compute per-fixing floor/cap decimals used by the compounded paths.
+        // These are stripped from the `calculate_floating_rate` call below for
+        // compounded legs to avoid double-application (the helpers bake them in
+        // per daily fixing; term-rate legs keep the single-fixing path instead).
         let index_floor_decimal = params
             .rate_params
             .index_floor_bp
@@ -846,7 +849,24 @@ where
             .index_cap_bp
             .map(|bp| bp * crate::constants::ONE_BASIS_POINT);
 
-        // otherwise project from the forward curve
+        // Routing: choose the correct rate source for this period.
+        //
+        //   • Compounded leg, accrual period has started (`accrual_start <= as_of`):
+        //     delegate to `compounded_spliced_projection`, which handles both
+        //     in-progress coupons (realized daily fixings spliced with projected
+        //     forwards) and fully-accrued-but-unpaid coupons (all-realized daily
+        //     compound when every observation date precedes `as_of`).
+        //
+        //   • Simple (term-rate / IBOR) leg with a past reset: look up the single
+        //     historical fixing at `reset_date`. Compounded legs with a past reset
+        //     date never reach this branch — their accrual start is also in the
+        //     past, so they are handled above.
+        //
+        //   • Simple leg with a future reset: project the rate from the forward
+        //     curve at `reset_date` (correct window for a term-rate index).
+        //
+        //   • Compounded leg, accrual period is entirely in the future: compute the
+        //     true daily-compounded coupon via `compounded_forward_projection`.
         let index_rate = if is_compounded && period.accrual_start <= as_of {
             // OIS / RFR coupon whose accrual period has started (`accrual_start
             // <= as_of`). This covers two cases handled uniformly by
@@ -2482,13 +2502,17 @@ mod tests {
         let params = float_ois(0.0, 0, 2);
 
         // Supply realized overnight fixings for every weekday in [accrual_start, accrual_end).
-        let fixing_rate = 0.035_f64;
+        // Use a non-flat ramp (mirror of the in-progress test) so that a buggy
+        // implementation that returns a plain simple-rate approximation instead of
+        // the true daily compound cannot accidentally match the expected value.
         let mut fixing_obs: Vec<(Date, f64)> = Vec::new();
         {
             let mut d = accrual_start;
+            let mut i = 0u32;
             while d < accrual_end {
-                fixing_obs.push((d, fixing_rate));
+                fixing_obs.push((d, 0.03 + 0.0001 * f64::from(i)));
                 d = d.add_weekdays(1);
+                i += 1;
             }
         }
         let fixings = ScalarTimeSeries::new("FIXING:TEST-FWD", fixing_obs.clone(), None)
@@ -2507,19 +2531,22 @@ mod tests {
         )
         .expect("payment-lagged fully-accrued compounded coupon must not hard-error (R1 regression)");
 
-        // Independently compute the all-realized daily compound for a flat fixing_rate.
-        // With a constant daily rate r, CF = ∏(1 + r·dᵢ) = (1 + r·τ) (approximately).
-        // More precisely, re-compound day by day from fixing_obs.
+        // Independently compute the all-realized daily compound from the ramp fixings.
+        // This reference loop is intentionally separate from the production helper so
+        // that a regression in `compounded_spliced_projection` would be caught here.
         let mut acc = 1.0_f64;
         {
+            let mut idx = 0usize;
             let mut d = accrual_start;
             while d < accrual_end {
                 let nxt = d.add_weekdays(1).min(accrual_end);
                 let dcf = fwd_dc
                     .year_fraction(d, nxt, DayCountContext::default())
                     .expect("dcf");
-                acc *= 1.0 + fixing_rate * dcf;
+                let r = fixing_obs[idx].1;
+                acc *= 1.0 + r * dcf;
                 d = nxt;
+                idx += 1;
             }
         }
         let expected_rate = (acc - 1.0) / year_fraction;
@@ -2533,6 +2560,18 @@ mod tests {
             (implied_rate - expected_rate).abs() < 1e-9,
             "fully-accrued payment-lagged OIS coupon must equal the all-realized \
              daily compound: implied={implied_rate:.8}, expected={expected_rate:.8}"
+        );
+
+        // Discriminating assertion: the true daily compound of a non-flat ramp must
+        // differ from the naive arithmetic-average simple rate by more than 1e-5.
+        // A bug that returns the simple/average rate instead of the daily compound
+        // would produce a value close to the average and fail this check.
+        let naive_avg = fixing_obs.iter().map(|(_, r)| r).sum::<f64>() / fixing_obs.len() as f64;
+        assert!(
+            (implied_rate - naive_avg).abs() > 1e-5,
+            "daily-compounded result must differ from the naive average rate by >1e-5 \
+             (guards against a regression that skips daily compounding): \
+             implied={implied_rate:.8}, naive_avg={naive_avg:.8}"
         );
 
         // Sanity: PV must be positive (positive rate, future payment).
