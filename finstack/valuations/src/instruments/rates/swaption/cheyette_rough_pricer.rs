@@ -45,6 +45,18 @@ pub struct CheyetteRoughConfig {
     pub num_steps: usize,
     /// Polynomial degree for LSMC regression basis.
     pub basis_degree: usize,
+    /// When true, refuse to price with hardcoded uncalibrated model parameters.
+    ///
+    /// The pricer registry (`finstack_valuations::pricer::exotics`) sets this
+    /// on the registered Cheyette rough-vol pricer so callers reaching the
+    /// registry receive a clear error rather than a silently-wrong price.
+    /// Direct constructor callers retain the permissive default (`false`) for
+    /// testing and bespoke workflows.
+    ///
+    /// The parameters gated by this flag are: `kappa`, `eta`, `H` (Hurst
+    /// exponent) and `rho`. These fully determine the rough-vol smile and must
+    /// be calibrated to the swaption surface before production use.
+    pub enforce_calibration: bool,
 }
 
 impl Default for CheyetteRoughConfig {
@@ -56,6 +68,7 @@ impl Default for CheyetteRoughConfig {
             num_paths: defaults.num_paths,
             num_steps: defaults.num_steps,
             basis_degree: defaults.basis_degree,
+            enforce_calibration: false,
         }
     }
 }
@@ -71,7 +84,10 @@ impl Default for CheyetteRoughConfig {
 ///
 /// The default Cheyette parameters (kappa=0.03, eta=1.5, H=0.1, rho=-0.5)
 /// are generic starting values.  For production use, these should be
-/// calibrated to the swaption volatility surface.
+/// calibrated to the swaption volatility surface.  When this pricer is
+/// invoked via the pricing registry, `enforce_calibration` is set to `true`
+/// and the pricer refuses to price — returning `PricingError::ModelFailure`
+/// — until calibrated parameters are supplied.
 #[derive(Default)]
 pub struct BermudanSwaptionCheyetteRoughPricer {
     config: CheyetteRoughConfig,
@@ -87,6 +103,11 @@ struct SwapValueInputs {
 }
 
 impl BermudanSwaptionCheyetteRoughPricer {
+    /// Create a pricer with an explicit configuration.
+    pub fn with_config(config: CheyetteRoughConfig) -> Self {
+        Self { config }
+    }
+
     /// Build the phi(t) forward curve as (time, rate) pairs from the discount curve.
     fn build_phi_points(disc: &dyn Discounting, maturity: f64) -> Vec<(f64, f64)> {
         let num_points = 50;
@@ -238,6 +259,25 @@ impl BermudanSwaptionCheyetteRoughPricer {
         })?;
         if ttm <= 0.0 {
             return Ok((Money::new(0.0, swaption.notional.currency()), 0.0));
+        }
+
+        // Guard: refuse uncalibrated defaults when enforcement is enabled (as
+        // the pricer registry does).  kappa, eta, H, and rho fully determine
+        // the rough-vol smile; without calibration the resulting price is
+        // arbitrary.  Mirrors the enforce_calibration guard in BermudanSwaptionPricer.
+        if self.config.enforce_calibration {
+            return Err(PricingError::model_failure_with_context(
+                format!(
+                    "Bermudan swaption {} reached the Cheyette rough-vol pricer with \
+                     hardcoded, uncalibrated model parameters (κ=0.03, η=1.5, H=0.1, \
+                     ρ=-0.5). These parameters fully determine the rough-vol smile and \
+                     must be calibrated to the swaption volatility surface before \
+                     production use. This pricer is currently a research prototype — \
+                     use a calibrated model (HullWhite1F, LmmMonteCarlo) for production pricing.",
+                    swaption.id,
+                ),
+                PricingErrorContext::default(),
+            ));
         }
 
         let strike = swaption.strike_f64().map_err(|e| {
@@ -623,10 +663,17 @@ impl Pricer for BermudanSwaptionCheyetteRoughPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_core::dates::Date;
+    use crate::instruments::rates::swaption::types::BermudanSchedule;
+    use crate::pricer::Pricer;
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::{Date, DayCount, Tenor};
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::DiscountCurve;
     use finstack_core::market_data::traits::{Discounting, TermStructure};
+    use finstack_core::money::Money;
     use finstack_core::types::CurveId;
     use time::macros::date;
+    use time::Month;
 
     /// Steep discount curve: instantaneous forward rises linearly from
     /// `f0` at t=0 to `f0 + slope*t`, so `P(0, t) = exp(-(f0*t + 0.5*slope*t^2))`.
@@ -753,5 +800,98 @@ mod tests {
             "payer swap value should rise under a positive rate shock: \
              base={base}, shocked={shocked}"
         );
+    }
+
+    // --- Calibration-guard tests (W22) ---
+
+    fn build_cheyette_market(as_of: Date) -> MarketContext {
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([
+                (0.0, 1.0),
+                (1.0, (-0.03_f64).exp()),
+                (5.0, (-0.03_f64 * 5.0).exp()),
+                (10.0, (-0.03_f64 * 10.0).exp()),
+            ])
+            .build()
+            .expect("discount curve");
+        MarketContext::new().insert(curve)
+    }
+
+    fn build_cheyette_bermudan(as_of: Date) -> BermudanSwaption {
+        let swap_start = Date::from_calendar_date(2026, Month::January, 17).expect("date");
+        let swap_end = Date::from_calendar_date(2031, Month::January, 17).expect("date");
+        let first_ex = Date::from_calendar_date(2027, Month::January, 17).expect("date");
+        let schedule = BermudanSchedule::co_terminal(first_ex, swap_end, Tenor::annual())
+            .expect("schedule");
+        let mut b = BermudanSwaption::new_payer(
+            "BERM-CHEYETTE-TEST",
+            Money::new(1_000_000.0, Currency::USD),
+            0.03,
+            swap_start,
+            swap_end,
+            schedule,
+            "USD-OIS",
+            "USD-OIS",
+            "USD-SWPNVOL",
+        )
+        .expect("bermudan");
+        b.day_count = DayCount::Thirty360;
+        let _ = as_of;
+        b
+    }
+
+    /// W22 regression: the Cheyette rough-vol pricer, when invoked via the
+    /// registry path (enforce_calibration=true), must refuse with an Err.
+    ///
+    /// This test is expected to FAIL on the pre-fix code (which silently
+    /// prices) and PASS after the enforce_calibration guard is added.
+    #[test]
+    fn cheyette_rough_pricer_refuses_when_enforce_calibration_is_true() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("date");
+        let market = build_cheyette_market(as_of);
+        let swaption = build_cheyette_bermudan(as_of);
+
+        // Simulate registry instantiation (enforce_calibration = true)
+        let pricer = BermudanSwaptionCheyetteRoughPricer::with_config(CheyetteRoughConfig {
+            enforce_calibration: true,
+            ..Default::default()
+        });
+
+        let result = pricer.price_dyn(&swaption, &market, as_of);
+        assert!(
+            result.is_err(),
+            "Cheyette rough-vol pricer must refuse when enforce_calibration=true, \
+             but got Ok({:?})",
+            result.ok().map(|r| r.value)
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("uncalibrated") || err_msg.contains("calibrat"),
+            "Error message should mention calibration, got: {err_msg}"
+        );
+    }
+
+    /// W22 complement: the pricer with default config (enforce_calibration=false)
+    /// does NOT return an error due to the calibration guard. (It may still
+    /// fail for other reasons, e.g. missing vol surface — that is acceptable.)
+    #[test]
+    fn cheyette_rough_pricer_permissive_without_enforce_calibration() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("date");
+        let market = build_cheyette_market(as_of);
+        let swaption = build_cheyette_bermudan(as_of);
+
+        // Default config: enforce_calibration = false
+        let pricer = BermudanSwaptionCheyetteRoughPricer::default();
+
+        let result = pricer.price_dyn(&swaption, &market, as_of);
+        // If it errors it must NOT be due to the calibration guard
+        if let Err(ref e) = result {
+            let msg = e.to_string();
+            assert!(
+                !msg.contains("uncalibrated model parameters"),
+                "Default pricer must not trigger calibration guard, got: {msg}"
+            );
+        }
     }
 }

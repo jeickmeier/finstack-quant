@@ -50,6 +50,11 @@ pub struct BermudanSwaptionLmmPricer {
 }
 
 impl BermudanSwaptionLmmPricer {
+    /// Create a pricer with an explicit configuration.
+    pub fn with_config(config: LmmBermudanConfig) -> Self {
+        Self { config }
+    }
+
     /// Build LMM parameters from a Bermudan swaption and its discount curve.
     ///
     /// Constructs the tenor schedule from the fixed-leg frequency, bootstraps
@@ -576,5 +581,72 @@ mod tests {
         let pv = result.value.amount();
         assert!(pv.is_finite(), "price must be finite, got {pv}");
         assert!(pv >= 0.0, "swaption price must be non-negative, got {pv}");
+    }
+
+    // --- Calibration-guard tests (W23) ---
+
+    /// W23 regression: the LMM Bermudan pricer, when invoked via the registry
+    /// path (enforce_calibration=true), must refuse with an Err.
+    ///
+    /// This test is expected to FAIL on the pre-fix code (which silently
+    /// prices) and PASS after the enforce_calibration guard is added.
+    #[test]
+    fn lmm_bermudan_pricer_refuses_when_enforce_calibration_is_true() {
+        use crate::pricer::Pricer as _;
+
+        let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("date");
+        let market = build_market(as_of);
+        let swaption = build_bermudan(as_of);
+
+        // Simulate registry instantiation (enforce_calibration = true)
+        let pricer = BermudanSwaptionLmmPricer::with_config(
+            crate::instruments::rates::swaption::pricing::lmm_bermudan::LmmBermudanConfig {
+                enforce_calibration: true,
+                ..Default::default()
+            },
+        );
+
+        let result = pricer.price_dyn(&swaption, &market, as_of);
+        assert!(
+            result.is_err(),
+            "LMM Bermudan pricer must refuse when enforce_calibration=true, \
+             but got Ok({:?})",
+            result.ok().map(|r| r.value)
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("uncalibrated") || err_msg.contains("calibrat"),
+            "Error message should mention calibration, got: {err_msg}"
+        );
+    }
+
+    /// W23 complement: the pricer with default config (enforce_calibration=false)
+    /// does NOT error due to the calibration guard.
+    #[test]
+    fn lmm_bermudan_pricer_permissive_without_enforce_calibration() {
+        use crate::pricer::Pricer as _;
+
+        let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("date");
+        let market = build_market(as_of);
+        let swaption = build_bermudan(as_of);
+
+        // Default config: enforce_calibration = false
+        // Note: this goes through build_lmm_params which requires
+        // a discount curve — that's present. The vol surface is also
+        // present, so calibrate_base_vol will succeed.
+        let pricer = BermudanSwaptionLmmPricer::default();
+
+        // We don't assert Ok here because the full MC is slow (#[ignore]),
+        // but we do assert it doesn't error for the calibration guard reason.
+        // The actual pricing might produce a value or succeed; what we verify
+        // is absence of the calibration-guard error.
+        let result = pricer.price_dyn(&swaption, &market, as_of);
+        if let Err(ref e) = result {
+            let msg = e.to_string();
+            assert!(
+                !msg.contains("uncalibrated structural parameters"),
+                "Default pricer must not trigger calibration guard, got: {msg}"
+            );
+        }
     }
 }

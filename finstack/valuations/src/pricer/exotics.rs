@@ -212,20 +212,41 @@ pub fn register_exotic_pricers(registry: &mut PricerRegistry) {
         crate::instruments::exotics::asian_option::heston_mc_pricer::AsianOptionHestonMcPricer::default(),
     );
 
-    // Bermudan Swaption - LMM Monte Carlo
-
+    // Bermudan Swaption - LMM Monte Carlo.
+    //
+    // Registered with `enforce_calibration`: the factor loading *shape*
+    // (α=0.4 linear decay, 2-factor) and the `base_vol` scale are not
+    // calibrated per-period. Only the overall Rebonato `base_vol` is fitted
+    // to the longest co-terminal European swaption. Callers must be aware
+    // this is a structural prototype; the guard refuses pricing via the
+    // registry so callers are redirected to a calibrated model.
     registry.register(
         InstrumentType::BermudanSwaption,
         ModelKey::LmmMonteCarlo,
-        crate::instruments::rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer::default(),
+        crate::instruments::rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer::with_config(
+            crate::instruments::rates::swaption::pricing::lmm_bermudan::LmmBermudanConfig {
+                enforce_calibration: true,
+                ..Default::default()
+            },
+        ),
     );
 
-    // Bermudan Swaption - Cheyette Rough Vol Monte Carlo
-
+    // Bermudan Swaption - Cheyette Rough Vol Monte Carlo.
+    //
+    // Registered with `enforce_calibration`: kappa, eta, H (Hurst exponent)
+    // and rho are all hardcoded defaults that fully determine the rough-vol
+    // smile. Without calibration the resulting price is arbitrary. The guard
+    // refuses pricing via the registry so callers are directed to a
+    // calibrated model.
     registry.register(
         InstrumentType::BermudanSwaption,
         ModelKey::MonteCarloCheyetteRoughVol,
-        crate::instruments::rates::swaption::cheyette_rough_pricer::BermudanSwaptionCheyetteRoughPricer::default(),
+        crate::instruments::rates::swaption::cheyette_rough_pricer::BermudanSwaptionCheyetteRoughPricer::with_config(
+            crate::instruments::rates::swaption::cheyette_rough_pricer::CheyetteRoughConfig {
+                enforce_calibration: true,
+                ..Default::default()
+            },
+        ),
     );
 
     // Exotic rate products require explicit stochastic or replication models.
