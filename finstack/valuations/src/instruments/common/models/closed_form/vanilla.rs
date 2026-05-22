@@ -44,7 +44,7 @@
 //! - Black, F., & Scholes, M. (1973). "The Pricing of Options and Corporate Liabilities."
 //! - Garman, M. B., & Kohlhagen, S. W. (1983). "Foreign Currency Option Values."
 
-use crate::instruments::common_impl::models::volatility::black::d1_d2;
+use crate::instruments::common_impl::models::volatility::black::{d1_d2, d1_d2_black76};
 use crate::instruments::common_impl::parameters::OptionType;
 use std::fmt;
 
@@ -350,6 +350,58 @@ pub fn bs_greeks(
         rho_r,
         rho_q,
     }
+}
+
+/// Black-76 undiscounted call price (option on a forward).
+///
+/// Returns `(forward - strike).max(0.0)` for degenerate inputs
+/// (`t <= 0`, `sigma <= 0`, `forward <= 0`, or `strike <= 0`).
+///
+/// # Arguments
+///
+/// * `forward` - Forward price F
+/// * `strike`  - Strike price K
+/// * `sigma`   - Implied volatility σ (annualized)
+/// * `t`       - Time to expiration T (in years)
+///
+/// # Returns
+///
+/// Undiscounted call price: `F·N(d1) - K·N(d2)`.
+/// Multiply by a discount factor at the call site to obtain a present value.
+#[must_use]
+#[inline]
+pub(crate) fn black76_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
+    if t <= 0.0 || sigma <= 0.0 || forward <= 0.0 || strike <= 0.0 {
+        return (forward - strike).max(0.0);
+    }
+    let (d1, d2) = d1_d2_black76(forward, strike, sigma, t);
+    forward * finstack_core::math::norm_cdf(d1) - strike * finstack_core::math::norm_cdf(d2)
+}
+
+/// Black-76 undiscounted put price (option on a forward).
+///
+/// Returns `(strike - forward).max(0.0)` for degenerate inputs
+/// (`t <= 0`, `sigma <= 0`, `forward <= 0`, or `strike <= 0`).
+///
+/// # Arguments
+///
+/// * `forward` - Forward price F
+/// * `strike`  - Strike price K
+/// * `sigma`   - Implied volatility σ (annualized)
+/// * `t`       - Time to expiration T (in years)
+///
+/// # Returns
+///
+/// Undiscounted put price: `K·N(-d2) - F·N(-d1)`.
+/// Multiply by a discount factor at the call site to obtain a present value.
+#[must_use]
+#[inline]
+pub(crate) fn black76_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
+    if t <= 0.0 || sigma <= 0.0 || forward <= 0.0 || strike <= 0.0 {
+        return (strike - forward).max(0.0);
+    }
+    let (d1, d2) = d1_d2_black76(forward, strike, sigma, t);
+    strike * finstack_core::math::norm_cdf(-d2) - forward * finstack_core::math::norm_cdf(-d1)
 }
 
 #[cfg(test)]

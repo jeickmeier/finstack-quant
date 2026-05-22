@@ -26,10 +26,10 @@
 //! - Kirk, E. (1995). "Correlation in the Energy Markets."
 
 use crate::instruments::commodity::commodity_spread_option::CommoditySpreadOption;
+use crate::instruments::common_impl::models::{black76_call, black76_put};
 use crate::instruments::OptionType;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
-use finstack_core::math::norm_cdf;
 use finstack_core::money::Money;
 
 /// Minimum denominator for Kirk's approximation (F2 + K).
@@ -148,33 +148,16 @@ fn kirk_price(
 
     // Black-76 on F1 vs K_adj with sigma_kirk
     match inst.option_type {
-        OptionType::Call => Ok(black76_call(f1, k_adj, sigma_kirk, t, df)),
+        OptionType::Call => Ok(df * black76_call(f1, k_adj, sigma_kirk, t)),
         OptionType::Put => {
             // Price the put DIRECTLY with the Black-76 put formula.
             // P = df * (K_adj * N(-d2) - F1 * N(-d1))
             // This avoids injecting Kirk approximation error via put-call parity.
-            Ok(black76_put(f1, k_adj, sigma_kirk, t, df))
+            Ok(df * black76_put(f1, k_adj, sigma_kirk, t))
         }
     }
 }
 
-/// Black-76 call price.
-fn black76_call(forward: f64, strike: f64, sigma: f64, t: f64, df: f64) -> f64 {
-    let (d1, d2) =
-        crate::instruments::common_impl::models::d1_d2_black76(forward, strike, sigma, t);
-
-    df * (forward * norm_cdf(d1) - strike * norm_cdf(d2))
-}
-
-/// Black-76 put price (direct formula, not derived via put-call parity).
-///
-/// P = df * (strike * N(-d2) - forward * N(-d1))
-fn black76_put(forward: f64, strike: f64, sigma: f64, t: f64, df: f64) -> f64 {
-    let (d1, d2) =
-        crate::instruments::common_impl::models::d1_d2_black76(forward, strike, sigma, t);
-
-    df * (strike * norm_cdf(-d2) - forward * norm_cdf(-d1))
-}
 
 #[cfg(test)]
 mod tests {

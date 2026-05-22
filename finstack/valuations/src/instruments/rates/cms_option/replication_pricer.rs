@@ -63,7 +63,7 @@
 //!   (2nd ed.). Springer. §13.7.
 //! - Hagan, P. S. (2003). "Convexity Conundrums." *Wilmott Magazine*, March, 38–44.
 
-use crate::instruments::common_impl::models::d1_d2_black76;
+use crate::instruments::common_impl::models::{black76_call, black76_put};
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_option::types::CmsOption;
@@ -143,30 +143,6 @@ fn tenor_to_m(freq: Tenor) -> f64 {
         TenorUnit::Weeks => 52.0 / freq.count as f64,
         TenorUnit::Days => 360.0 / freq.count as f64,
     }
-}
-
-/// Black-76 undiscounted call price (option on a forward).
-///
-/// Returns `(F - K)^+` for zero-vol or zero-time-to-expiry.
-#[inline]
-fn black76_call(forward: f64, strike: f64, vol: f64, t: f64) -> f64 {
-    if t <= 0.0 || vol <= 0.0 || forward <= 0.0 || strike <= 0.0 {
-        return (forward - strike).max(0.0);
-    }
-    let (d1, d2) = d1_d2_black76(forward, strike, vol, t);
-    forward * finstack_core::math::norm_cdf(d1) - strike * finstack_core::math::norm_cdf(d2)
-}
-
-/// Black-76 undiscounted put price (option on a forward).
-///
-/// Returns `(K - F)^+` for zero-vol or zero-time-to-expiry.
-#[inline]
-fn black76_put(forward: f64, strike: f64, vol: f64, t: f64) -> f64 {
-    if t <= 0.0 || vol <= 0.0 || forward <= 0.0 || strike <= 0.0 {
-        return (strike - forward).max(0.0);
-    }
-    let (d1, d2) = d1_d2_black76(forward, strike, vol, t);
-    strike * finstack_core::math::norm_cdf(-d2) - forward * finstack_core::math::norm_cdf(-d1)
 }
 
 // ========================= PRICER STRUCT =========================

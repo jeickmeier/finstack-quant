@@ -22,6 +22,8 @@ pub mod volatility;
 
 // Re-export commonly used items from submodules for convenience
 #[allow(unused_imports)]
+pub(crate) use closed_form::{black76_call, black76_put};
+#[allow(unused_imports)]
 pub use closed_form::{
     arithmetic_asian_call_tw, arithmetic_asian_put_tw, barrier_call_continuous,
     barrier_put_continuous, black76_implied_vol, bs_call_delta, bs_call_greeks, bs_call_rho,
