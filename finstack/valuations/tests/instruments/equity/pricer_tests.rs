@@ -6,8 +6,9 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::scalars::MarketScalar;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::money::Money;
-use finstack_valuations::instruments::equity::spot::{EquityPricer, SimpleEquityDiscountingPricer};
+use finstack_valuations::instruments::equity::spot::EquityPricer;
 use finstack_valuations::instruments::equity::Equity;
+use finstack_valuations::instruments::pricing::GenericInstrumentPricer;
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::pricer::{InstrumentType, ModelKey, Pricer};
 
@@ -177,7 +178,7 @@ fn test_equity_forward_value() {
 
 #[test]
 fn test_simple_equity_pricer_key() {
-    let pricer = SimpleEquityDiscountingPricer::new();
+    let pricer = GenericInstrumentPricer::<Equity>::discounting(InstrumentType::Equity);
     let key = pricer.key();
 
     assert_eq!(key.instrument, InstrumentType::Equity);
@@ -194,7 +195,7 @@ fn test_simple_equity_pricer_price_dyn() {
     let curve = build_flat_curve(0.05, base_date, "USD");
     let market = MarketContext::new().insert(curve);
 
-    let pricer = SimpleEquityDiscountingPricer::new();
+    let pricer = GenericInstrumentPricer::<Equity>::discounting(InstrumentType::Equity);
     let instrument: &dyn Instrument = &equity;
     let as_of =
         finstack_core::dates::Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -225,7 +226,7 @@ fn test_simple_equity_pricer_type_mismatch() {
     .unwrap();
 
     let market = MarketContext::new();
-    let pricer = SimpleEquityDiscountingPricer::new();
+    let pricer = GenericInstrumentPricer::<Equity>::discounting(InstrumentType::Equity);
     let instrument: &dyn Instrument = &bond;
     let as_of =
         finstack_core::dates::Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -233,14 +234,6 @@ fn test_simple_equity_pricer_type_mismatch() {
     // Should fail with type mismatch
     let result = pricer.price_dyn(instrument, &market, as_of);
     assert!(result.is_err());
-}
-
-#[test]
-fn test_simple_equity_pricer_default() {
-    let pricer1 = SimpleEquityDiscountingPricer::new();
-    let pricer2 = SimpleEquityDiscountingPricer::new(); // Same as default
-
-    assert_eq!(pricer1.key(), pricer2.key());
 }
 
 #[test]

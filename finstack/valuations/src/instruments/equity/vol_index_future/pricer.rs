@@ -1,17 +1,8 @@
 //! Volatility index future pricer implementation.
 
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::vol_index_future::VolatilityIndexFuture;
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
-};
-use crate::results::ValuationResult;
-use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
-
-/// Registry-facing pricer for volatility index futures.
-pub struct VolIndexFutureDiscountingPricer;
 
 pub(crate) fn compute_pv(
     future: &VolatilityIndexFuture,
@@ -61,52 +52,13 @@ pub(crate) fn delta_vol(future: &VolatilityIndexFuture) -> f64 {
     -sign * future.num_contracts() * future.contract_specs.multiplier
 }
 
-impl Default for VolIndexFutureDiscountingPricer {
-    fn default() -> Self {
-        Self
-    }
-}
-
-impl Pricer for VolIndexFutureDiscountingPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::VolatilityIndexFuture, ModelKey::Discounting)
-    }
-
-    #[tracing::instrument(
-        name = "vol_index_future.discounting.price_dyn",
-        level = "debug",
-        skip(self, instrument, market),
-        fields(inst_id = %instrument.id(), as_of = %as_of),
-        err,
-    )]
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> PricingResult<ValuationResult> {
-        let future = instrument
-            .as_any()
-            .downcast_ref::<VolatilityIndexFuture>()
-            .ok_or_else(|| {
-                PricingError::type_mismatch(InstrumentType::VolatilityIndexFuture, instrument.key())
-            })?;
-        let pv = compute_pv(future, market).map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
-                PricingErrorContext::from_instrument(future).model(ModelKey::Discounting),
-            )
-        })?;
-        Ok(ValuationResult::stamped(future.id(), as_of, pv))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Attributes;
+    use crate::instruments::common_impl::traits::{Attributes, Instrument};
     use crate::instruments::rates::ir_future::Position;
     use finstack_core::currency::Currency;
+    use finstack_core::dates::Date;
     use finstack_core::market_data::term_structures::{DiscountCurve, VolatilityIndexCurve};
     use finstack_core::types::{CurveId, InstrumentId};
     use time::Month;

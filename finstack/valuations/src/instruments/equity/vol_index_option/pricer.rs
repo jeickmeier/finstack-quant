@@ -1,20 +1,12 @@
 //! Volatility index option pricer implementation.
 
 use crate::instruments::common_impl::models::volatility::black::{d1_black76, d2_black76};
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::vol_index_option::VolatilityIndexOption;
 use crate::instruments::OptionType;
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
-};
-use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::norm_cdf;
 use finstack_core::money::Money;
-
-/// Registry-facing pricer for volatility index options.
-pub struct VolIndexOptionDiscountingPricer;
 
 pub(crate) fn compute_pv(
     option: &VolatilityIndexOption,
@@ -255,50 +247,10 @@ pub(crate) fn time_value(
     Ok(compute_pv_raw(option, context, as_of)? - intrinsic_value(option, context, as_of)?)
 }
 
-impl Default for VolIndexOptionDiscountingPricer {
-    fn default() -> Self {
-        Self
-    }
-}
-
-impl Pricer for VolIndexOptionDiscountingPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::VolatilityIndexOption, ModelKey::Discounting)
-    }
-
-    #[tracing::instrument(
-        name = "vol_index_option.discounting.price_dyn",
-        level = "debug",
-        skip(self, instrument, market),
-        fields(inst_id = %instrument.id(), as_of = %as_of),
-        err,
-    )]
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> PricingResult<ValuationResult> {
-        let option = instrument
-            .as_any()
-            .downcast_ref::<VolatilityIndexOption>()
-            .ok_or_else(|| {
-                PricingError::type_mismatch(InstrumentType::VolatilityIndexOption, instrument.key())
-            })?;
-        let pv = compute_pv(option, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
-                PricingErrorContext::from_instrument(option).model(ModelKey::Discounting),
-            )
-        })?;
-        Ok(ValuationResult::stamped(option.id(), as_of, pv))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Attributes;
+    use crate::instruments::common_impl::traits::{Attributes, Instrument};
     use crate::instruments::{ExerciseStyle, OptionType};
     use finstack_core::currency::Currency;
     use finstack_core::market_data::surfaces::VolSurface;

@@ -1,21 +1,13 @@
 use crate::instruments::common_impl::models::closed_form::vanilla::bs_price;
 use crate::instruments::common_impl::parameters::market::OptionType;
 use crate::instruments::common_impl::pricing::variance_replication::carr_madan_forward_variance;
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::variance_swap::VarianceSwap;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
-use crate::results::ValuationResult;
 use finstack_core::{
     dates::Date, market_data::context::MarketContext, math::stats::realized_variance, money::Money,
     Result,
 };
-
-/// Registry-facing pricer for variance swaps.
-pub struct SimpleVarianceSwapDiscountingPricer;
 
 /// Degraded fallback estimate of forward variance from a vol surface when full
 /// Carr–Madan replication is unavailable (W-39).
@@ -602,48 +594,6 @@ pub(crate) fn remaining_forward_variance(
              falling back to contract strike_variance (level 4/4 — swap will mark to zero)"
         );
         Ok(inst.strike_variance)
-    }
-}
-
-impl Default for SimpleVarianceSwapDiscountingPricer {
-    fn default() -> Self {
-        Self
-    }
-}
-
-impl Pricer for SimpleVarianceSwapDiscountingPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::VarianceSwap, ModelKey::Discounting)
-    }
-
-    #[tracing::instrument(
-        name = "variance_swap.discounting.price_dyn",
-        level = "debug",
-        skip(self, instrument, market),
-        fields(inst_id = %instrument.id(), as_of = %as_of),
-        err,
-    )]
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let swap = instrument
-            .as_any()
-            .downcast_ref::<VarianceSwap>()
-            .ok_or_else(|| {
-                PricingError::type_mismatch(InstrumentType::VarianceSwap, instrument.key())
-            })?;
-
-        let pv = compute_pv(swap, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(
-                e.to_string(),
-                PricingErrorContext::from_instrument(swap).model(ModelKey::Discounting),
-            )
-        })?;
-
-        Ok(ValuationResult::stamped(swap.id(), as_of, pv))
     }
 }
 

@@ -49,5 +49,4 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use pricer::VolIndexOptionDiscountingPricer;
 pub use types::{VolIndexOptionSpecs, VolatilityIndexOption};

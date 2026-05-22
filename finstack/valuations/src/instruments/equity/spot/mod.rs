@@ -51,6 +51,6 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 mod types;
 
-pub use pricer::{EquityPricer, SimpleEquityDiscountingPricer};
+pub use pricer::EquityPricer;
 pub use types::Equity;
 pub use types::Ticker;

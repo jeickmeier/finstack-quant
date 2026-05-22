@@ -12,7 +12,9 @@ pub fn register_equity_pricers(registry: &mut PricerRegistry) {
     registry.register(
         InstrumentType::Equity,
         ModelKey::Discounting,
-        crate::instruments::equity::spot::pricer::SimpleEquityDiscountingPricer,
+        crate::instruments::common_impl::GenericInstrumentPricer::<
+            crate::instruments::equity::Equity,
+        >::discounting(InstrumentType::Equity),
     );
 
     // Equity Option
@@ -48,7 +50,9 @@ pub fn register_equity_pricers(registry: &mut PricerRegistry) {
     registry.register(
         InstrumentType::VarianceSwap,
         ModelKey::Discounting,
-        crate::instruments::equity::variance_swap::pricer::SimpleVarianceSwapDiscountingPricer,
+        crate::instruments::common_impl::GenericInstrumentPricer::<
+            crate::instruments::equity::variance_swap::VarianceSwap,
+        >::discounting(InstrumentType::VarianceSwap),
     );
 
     // Equity Index Future - uses GenericInstrumentPricer
@@ -64,14 +68,18 @@ pub fn register_equity_pricers(registry: &mut PricerRegistry) {
     registry.register(
         InstrumentType::VolatilityIndexFuture,
         ModelKey::Discounting,
-        crate::instruments::equity::vol_index_future::pricer::VolIndexFutureDiscountingPricer,
+        crate::instruments::common_impl::GenericInstrumentPricer::<
+            crate::instruments::equity::vol_index_future::VolatilityIndexFuture,
+        >::discounting(InstrumentType::VolatilityIndexFuture),
     );
 
     // Volatility Index Option
     registry.register(
         InstrumentType::VolatilityIndexOption,
         ModelKey::Discounting,
-        crate::instruments::equity::vol_index_option::pricer::VolIndexOptionDiscountingPricer,
+        crate::instruments::common_impl::GenericInstrumentPricer::<
+            crate::instruments::equity::vol_index_option::VolatilityIndexOption,
+        >::discounting(InstrumentType::VolatilityIndexOption),
     );
 
     // Real Estate Asset - uses GenericInstrumentPricer (curve dependencies)

@@ -74,7 +74,6 @@ pub(crate) mod metrics;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-pub use pricer::SimpleVarianceSwapDiscountingPricer;
 pub use types::{PayReceive, VarianceSwap};
 
 // Re-export from core
