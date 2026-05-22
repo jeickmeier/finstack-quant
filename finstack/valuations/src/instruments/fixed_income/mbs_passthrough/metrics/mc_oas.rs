@@ -189,6 +189,11 @@ fn rate_adjusted_smm(base_smm: f64, current_rate: f64, base_rate: f64, sensitivi
 /// Projects monthly cashflows using rate-dependent prepayment and
 /// discounts each cashflow at the path's short rate + OAS.
 ///
+/// The `as_of` date is used to compute the pool's actual seasoning at the
+/// valuation date.  Each projection step adds `month + 1` on top of that
+/// base so that the PSA/CPR ramp reflects the true pool age rather than
+/// treating every valuation as if the pool were newly issued.
+///
 /// # Errors
 ///
 /// Returns `Error::Validation` when the prepayment model returns an
@@ -199,6 +204,7 @@ fn price_on_path(
     base_rate: f64,
     oas: f64,
     prepay_sensitivity: f64,
+    as_of: Date,
 ) -> Result<f64> {
     let monthly_coupon_rate = mbs.pass_through_rate / 12.0;
     let monthly_mortgage_rate = mbs.wac / 12.0;
@@ -222,8 +228,11 @@ fn price_on_path(
         let step_df = (-(current_rate + oas) * dt).exp();
         cumulative_df *= step_df;
 
-        // Seasoning for base PSA SMM
-        let seasoning = mbs.seasoning_months(mbs.issue_date) + month as u32 + 1;
+        // Seasoning for base PSA SMM: start from the pool's actual age at
+        // the valuation date (`as_of`) and add the per-step offset so the
+        // PSA ramp/plateau reflects the true pool age, not a fresh-issue ramp.
+        let base_seasoning = mbs.seasoning_months(as_of);
+        let seasoning = base_seasoning + month as u32 + 1;
         let base_smm = mbs.prepayment_model.smm(seasoning)?;
         if !base_smm.is_finite() || !(0.0..=1.0).contains(&base_smm) {
             return Err(CoreError::Validation(format!(
@@ -306,7 +315,7 @@ pub(crate) fn calculate_mc_oas(
     mbs: &AgencyMbsPassthrough,
     market_price_pct: f64,
     market: &MarketContext,
-    _as_of: Date,
+    as_of: Date,
     config: &McOasConfig,
 ) -> Result<McOasResult> {
     let market_price = market_price_pct / 100.0 * mbs.current_face.amount();
@@ -356,7 +365,7 @@ pub(crate) fn calculate_mc_oas(
     let objective = |oas: f64| -> f64 {
         let mut total = 0.0_f64;
         for path in &paths {
-            match price_on_path(mbs, path, initial_rate, oas, config.prepay_rate_sensitivity) {
+            match price_on_path(mbs, path, initial_rate, oas, config.prepay_rate_sensitivity, as_of) {
                 Ok(pv) => total += pv,
                 Err(e) => {
                     if pricing_error.borrow().is_none() {
@@ -403,6 +412,7 @@ pub(crate) fn calculate_mc_oas(
             initial_rate,
             oas,
             config.prepay_rate_sensitivity,
+            as_of,
         )?);
     }
 
@@ -558,7 +568,9 @@ mod tests {
             if balance < 0.01 {
                 break;
             }
-            let seasoning = mbs.seasoning_months(mbs.issue_date) + month as u32 + 1;
+            // Use issue_date as as_of (fresh pool) to match price_on_path convention.
+            let base_seasoning = mbs.seasoning_months(mbs.issue_date);
+            let seasoning = base_seasoning + month as u32 + 1;
             let base_smm = mbs.prepayment_model.smm(seasoning).expect("smm");
             let smm = rate_adjusted_smm(base_smm, base_rate, base_rate, 7.0);
 
@@ -591,7 +603,9 @@ mod tests {
         );
 
         // And price_on_path itself must run without producing a non-finite PV.
-        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0).expect("price");
+        // Use the MBS issue date so seasoning starts at 0 (fresh pool).
+        let as_of = mbs.issue_date;
+        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, as_of).expect("price");
         assert!(
             pv.is_finite() && pv > 0.0,
             "path PV must be finite/positive"
@@ -614,7 +628,7 @@ mod tests {
         let total: f64 = paths
             .iter()
             .map(|path| {
-                price_on_path(&mbs, path, 0.04, 0.0, config.prepay_rate_sensitivity)
+                price_on_path(&mbs, path, 0.04, 0.0, config.prepay_rate_sensitivity, as_of)
                     .expect("test fixture is well-formed")
             })
             .sum();
@@ -652,6 +666,112 @@ mod tests {
             result.oas > 0.0,
             "OAS should be positive for discount price, got {}",
             result.oas
+        );
+    }
+
+    /// C10 regression: MC-OAS must project prepayment from actual pool seasoning,
+    /// not restart the PSA ramp at month 0 for every valuation.
+    ///
+    /// A seasoned pool (issued years before `as_of`) sits well into the PSA
+    /// plateau (CPR ≈ 6% for 100 PSA once seasoning > 30 months).  A freshly-
+    /// issued pool starts on the ramp (CPR < 6% for the first 30 months).
+    /// Under the bug, both pools use `seasoning = 0 + month + 1`, producing
+    /// identical SMMs and therefore identical prices — even though the seasoned
+    /// pool has materially faster prepayment at every projection step.
+    ///
+    /// The test asserts that the two pools produce different prices on the same
+    /// flat-rate path when the correct base-seasoning is applied.
+    #[test]
+    fn mc_oas_projects_prepayment_from_actual_pool_seasoning() {
+        use crate::cashflow::builder::specs::PrepaymentModelSpec;
+        use crate::instruments::fixed_income::mbs_passthrough::{AgencyProgram, PoolType};
+        use finstack_core::currency::Currency;
+        use finstack_core::dates::DayCount;
+        use finstack_core::money::Money;
+        use finstack_core::types::{CurveId, InstrumentId};
+        use time::Month;
+
+        // Valuation date: 2026-01-15
+        let as_of = Date::from_calendar_date(2026, Month::January, 15).expect("valid");
+
+        // Fresh pool: issued at as_of → seasoning = 0 at valuation
+        let fresh_issue = Date::from_calendar_date(2026, Month::January, 1).expect("valid");
+        let fresh_mbs = AgencyMbsPassthrough::builder()
+            .id(InstrumentId::new("FRESH-MBS"))
+            .pool_id("FRESH-POOL".into())
+            .agency(AgencyProgram::Fnma)
+            .pool_type(PoolType::Generic)
+            .original_face(Money::new(1_000_000.0, Currency::USD))
+            .current_face(Money::new(1_000_000.0, Currency::USD))
+            .current_factor(1.0)
+            .wac(0.045)
+            .pass_through_rate(0.04)
+            .servicing_fee_rate(0.0025)
+            .guarantee_fee_rate(0.0025)
+            .wam(360)
+            .issue_date(fresh_issue)
+            .maturity(Date::from_calendar_date(2056, Month::January, 1).expect("valid"))
+            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Thirty360)
+            .build()
+            .expect("valid fresh mbs");
+
+        // Seasoned pool: issued 5 years before as_of → seasoning ≈ 60 months
+        // (well into the PSA plateau, CPR = 6% at 100 PSA)
+        let seasoned_issue = Date::from_calendar_date(2021, Month::January, 1).expect("valid");
+        let seasoned_mbs = AgencyMbsPassthrough::builder()
+            .id(InstrumentId::new("SEASONED-MBS"))
+            .pool_id("SEASONED-POOL".into())
+            .agency(AgencyProgram::Fnma)
+            .pool_type(PoolType::Generic)
+            .original_face(Money::new(1_000_000.0, Currency::USD))
+            .current_face(Money::new(1_000_000.0, Currency::USD))
+            .current_factor(1.0)
+            .wac(0.045)
+            .pass_through_rate(0.04)
+            .servicing_fee_rate(0.0025)
+            .guarantee_fee_rate(0.0025)
+            .wam(360)
+            .issue_date(seasoned_issue)
+            .maturity(Date::from_calendar_date(2051, Month::January, 1).expect("valid"))
+            .prepayment_model(PrepaymentModelSpec::psa(1.0))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Thirty360)
+            .build()
+            .expect("valid seasoned mbs");
+
+        // Verify the base-seasonings differ as expected
+        assert_eq!(fresh_mbs.seasoning_months(as_of), 0);
+        let seasoned_base = seasoned_mbs.seasoning_months(as_of);
+        assert!(
+            seasoned_base >= 59,
+            "expected ≥59 months seasoning, got {seasoned_base}"
+        );
+
+        // Use a flat short-rate path so the only difference is seasoning
+        let base_rate = 0.04f64;
+        let wam = 360usize;
+        let flat_path = RatePath {
+            rates: vec![base_rate; wam + 1],
+        };
+
+        let fresh_pv =
+            price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, as_of).expect("fresh pv");
+        let seasoned_pv = price_on_path(&seasoned_mbs, &flat_path, base_rate, 0.0, 7.0, as_of)
+            .expect("seasoned pv");
+
+        // The seasoned pool (60+ months, PSA plateau at 100 PSA ≈ 6% CPR) must
+        // price differently from the fresh pool (still on the ramp, CPR < 6%).
+        // Under the bug both pools produce identical PVs (diff = 0).  After the
+        // fix the faster prepayment of the seasoned pool shortens its average
+        // life, producing a measurable price difference.  Even on a flat
+        // discount path the PV difference exceeds $10 on a $1M pool.
+        assert!(
+            (fresh_pv - seasoned_pv).abs() > 10.0,
+            "seasoned pool (60+ months, PSA plateau) must price differently from fresh pool \
+             (PSA ramp); fresh_pv={fresh_pv:.2} seasoned_pv={seasoned_pv:.2} diff={:.2}",
+            (fresh_pv - seasoned_pv).abs()
         );
     }
 
