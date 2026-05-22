@@ -140,8 +140,11 @@ impl MarketDependencies {
     }
 
     /// Build dependencies from a JSON-tagged instrument representation.
+    ///
+    /// Routes through `InstrumentJson::into_boxed` so JSON-loaded instruments
+    /// stay on the same dependency path as trait-object pricing.
     pub fn from_instrument_json(instrument: &InstrumentJson) -> finstack_core::Result<Self> {
-        instrument.market_dependencies()
+        instrument.clone().into_boxed()?.market_dependencies()
     }
 }
 

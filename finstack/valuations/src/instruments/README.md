@@ -40,7 +40,10 @@ Instruments load through `InstrumentEnvelope` (`json_loader.rs`) with schema `fi
 
 1. Add the type under the appropriate asset-class directory.
 2. Implement `Instrument` and register the pricer in `src/pricer/`.
-3. Add a variant to `InstrumentJson` in `json_loader.rs` (variant, `into_boxed`, and deserialize match arm).
+3. Add a variant to the `InstrumentJson` enum in `json_loader.rs`, then add a
+   single line to the `with_instrument_json_registry!` macro (the registry is
+   the single source of truth — `into_boxed`, the deserialize tag map, and the
+   schema-parity check are all generated from it; no per-site hand edits).
 4. Add `InstrumentType` in `src/pricer/mod.rs`.
 5. Register metrics in the instrument’s `metrics/mod.rs`.
 6. Add tests under `tests/instruments/<name>/` and regenerate schemas when the public JSON shape changes (`mise run rust-gen-schemas`).

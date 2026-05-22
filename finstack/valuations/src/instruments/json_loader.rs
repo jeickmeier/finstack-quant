@@ -310,31 +310,6 @@ macro_rules! instrument_json_into_boxed_match {
     };
 }
 
-macro_rules! instrument_json_from_dyn_match {
-    (
-        [$instrument:expr]
-        $(plain: $variant:ident($ty:ty) => $tag:literal @ $schema_path:literal $(, $alias:literal)*;)*
-        $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_schema_path:literal $(, $boxed_alias:literal)*;)*
-    ) => {{
-        let instrument = $instrument;
-        'match_instrument: {
-            $(
-                if let Some(concrete) = instrument.as_any().downcast_ref::<$ty>() {
-                    break 'match_instrument Some(InstrumentJson::$variant(concrete.clone()));
-                }
-            )*
-            $(
-                if let Some(concrete) = instrument.as_any().downcast_ref::<$boxed_ty>() {
-                    break 'match_instrument Some(InstrumentJson::$boxed_variant(Box::new(
-                        concrete.clone(),
-                    )));
-                }
-            )*
-            None
-        }
-    }};
-}
-
 macro_rules! instrument_json_parse_tagged_match {
     (
         [$ty:expr, $spec:expr]
@@ -400,23 +375,6 @@ impl InstrumentJson {
         validate_loaded_instrument(instrument.as_ref())?;
         Ok(instrument)
     }
-
-    /// Convert a concrete instrument trait object into its tagged JSON form.
-    ///
-    /// Returns `None` when the instrument is not part of the JSON registry.
-    pub fn from_instrument(
-        instrument: &dyn crate::instruments::common_impl::traits::Instrument,
-    ) -> Option<Self> {
-        with_instrument_json_registry!(instrument_json_from_dyn_match, instrument)
-    }
-
-    /// Return the market-data dependencies declared by the wrapped instrument.
-    ///
-    /// This keeps JSON-loaded instruments on the same dependency path as
-    /// trait-object pricing and attribution.
-    pub fn market_dependencies(&self) -> Result<MarketDependencies> {
-        self.clone().into_boxed()?.market_dependencies()
-    }
 }
 
 #[derive(Deserialize)]
@@ -441,7 +399,7 @@ fn parse_tagged_value(value: serde_json::Value) -> serde_json::Result<Instrument
     let TaggedInstrumentValue { ty, spec } = serde_json::from_value(value)?;
     // The tag -> variant dispatch (and its unknown-variant tag list) is
     // generated from the single `with_instrument_json_registry!` registry,
-    // keeping it in sync with `into_boxed`/`from_instrument`/`schema.rs`.
+    // keeping it in sync with `into_boxed`/`schema.rs`.
     with_instrument_json_registry!(instrument_json_parse_tagged_match, ty, spec)
 }
 
@@ -479,16 +437,6 @@ impl InstrumentEnvelope {
     fn finalize_loaded_instrument(instrument: Box<DynInstrument>) -> Result<Box<DynInstrument>> {
         validate_loaded_instrument(instrument.as_ref())?;
         Ok(instrument)
-    }
-
-    /// Convert a concrete instrument into a versioned JSON envelope.
-    ///
-    /// Returns `None` when the instrument does not participate in the JSON
-    /// registry.
-    pub fn from_instrument(
-        instrument: &dyn crate::instruments::common_impl::traits::Instrument,
-    ) -> Option<Self> {
-        InstrumentJson::from_instrument(instrument).map(Self::new)
     }
 
     /// Load an instrument from a JSON value.
@@ -739,28 +687,6 @@ mod tests {
             .expect("Tagged instrument payload should deserialize without envelope");
 
         assert_eq!(instrument.id(), "TEST-BARE");
-    }
-
-    #[test]
-    fn test_envelope_from_instrument_serializes_supported_types() {
-        let bond = Bond::fixed(
-            "TEST-ENVELOPE",
-            Money::new(1_000_000.0, Currency::USD),
-            0.05,
-            Date::from_calendar_date(2024, Month::January, 1).expect("Valid test date"),
-            Date::from_calendar_date(2034, Month::January, 1).expect("Valid test date"),
-            "USD-OIS",
-        )
-        .expect("Bond::fixed should succeed with valid parameters");
-
-        let envelope = InstrumentEnvelope::from_instrument(&bond)
-            .expect("Bond should participate in the instrument JSON registry");
-
-        assert_eq!(envelope.schema, InstrumentEnvelope::CURRENT_SCHEMA);
-        match envelope.instrument {
-            InstrumentJson::Bond(serialized) => assert_eq!(serialized.id, bond.id),
-            _ => panic!("Expected Bond variant"),
-        }
     }
 
     #[test]
