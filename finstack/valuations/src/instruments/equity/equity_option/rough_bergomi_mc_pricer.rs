@@ -170,6 +170,30 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
                 )
             })?;
 
+        // W-31: `collect_inputs_extended` applies the escrowed-dividend model
+        // (spot shift + `q = 0`) when `discrete_dividends` is non-empty. The
+        // escrowed-dividend identity holds only under Black-Scholes; under the
+        // rough Bergomi stochastic-vol dynamics it is invalid, so feeding the
+        // escrowed spot into the MC silently mis-prices a single-stock option
+        // with discrete dividends. Reject it explicitly rather than price it
+        // wrong.
+        if equity_option
+            .discrete_dividends
+            .iter()
+            .any(|(ex_date, _)| *ex_date > as_of && *ex_date <= equity_option.expiry)
+        {
+            return Err(crate::pricer::PricingError::model_failure_with_context(
+                "rough Bergomi Monte Carlo pricing does not support discrete \
+                 dividends: the escrowed-dividend spot adjustment is a \
+                 Black-Scholes-only construct and is invalid under stochastic \
+                 volatility. Use the Black-Scholes pricer for discrete \
+                 dividends, or supply a continuous dividend yield instead."
+                    .to_string(),
+                crate::pricer::PricingErrorContext::from_instrument(equity_option)
+                    .model(crate::pricer::ModelKey::MonteCarloRoughBergomi),
+            ));
+        }
+
         let inputs = collect_inputs_extended(equity_option, market, as_of).map_err(|e| {
             crate::pricer::PricingError::model_failure_with_context(
                 e.to_string(),

@@ -160,6 +160,98 @@ fn rbergomi_atm_price_stable_across_hurst() {
     );
 }
 
+/// Rough Bergomi MC must reject an in-window discrete dividend (ex-date
+/// strictly after `as_of` and at/before expiry) because the escrowed-dividend
+/// spot adjustment applied by `collect_inputs_extended` is a Black-Scholes-only
+/// construct and is invalid under stochastic volatility.
+///
+/// This mirrors the identical guards in `heston_mc_pricer` and
+/// `rough_heston_mc_pricer` (W-31).
+#[test]
+fn rbergomi_rejects_in_window_discrete_dividend() {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+    // Ex-date strictly inside the option's life.
+    let ex_date = date!(2024 - 06 - 15);
+
+    let market = rbergomi_market(as_of, 100.0, 0.20, 0.0, 1.9, 0.1, -0.9);
+
+    let mut call = create_call(as_of, expiry, 100.0);
+    call.discrete_dividends = vec![(ex_date, 2.0)];
+    call.pricing_overrides.model_config.mc_paths = Some(500);
+
+    let registry = standard_registry();
+    let result = registry.price_with_metrics(
+        &call,
+        ModelKey::MonteCarloRoughBergomi,
+        &market,
+        as_of,
+        &[],
+        PricingOptions::default(),
+    );
+
+    assert!(
+        result.is_err(),
+        "rBergomi MC must return Err for in-window discrete dividend, got Ok"
+    );
+    let msg = result.unwrap_err().to_string().to_lowercase();
+    assert!(
+        msg.contains("discrete dividend") || msg.contains("discrete_dividend"),
+        "error message should mention discrete dividends, got: {msg}"
+    );
+}
+
+/// Rough Bergomi MC must still price successfully when a discrete dividend's
+/// ex-date is outside the option's life (already past or after expiry) — the
+/// guard must not be over-broad.
+#[test]
+fn rbergomi_accepts_out_of_window_discrete_dividend() {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+    // Ex-date is before `as_of` — outside the window, so no rejection.
+    let ex_date_past = date!(2023 - 06 - 15);
+    // Ex-date is after `expiry` — also outside the window.
+    let ex_date_future = date!(2025 - 06 - 15);
+
+    let market = rbergomi_market(as_of, 100.0, 0.20, 0.0, 1.9, 0.1, -0.9);
+
+    let registry = standard_registry();
+
+    // Past ex-date: should succeed.
+    let mut call_past = create_call(as_of, expiry, 100.0);
+    call_past.discrete_dividends = vec![(ex_date_past, 2.0)];
+    call_past.pricing_overrides.model_config.mc_paths = Some(500);
+    let result_past = registry.price_with_metrics(
+        &call_past,
+        ModelKey::MonteCarloRoughBergomi,
+        &market,
+        as_of,
+        &[],
+        PricingOptions::default(),
+    );
+    assert!(
+        result_past.is_ok(),
+        "rBergomi MC should succeed when ex-date is before as_of: {result_past:?}"
+    );
+
+    // Future ex-date (after expiry): should succeed.
+    let mut call_future = create_call(as_of, expiry, 100.0);
+    call_future.discrete_dividends = vec![(ex_date_future, 2.0)];
+    call_future.pricing_overrides.model_config.mc_paths = Some(500);
+    let result_future = registry.price_with_metrics(
+        &call_future,
+        ModelKey::MonteCarloRoughBergomi,
+        &market,
+        as_of,
+        &[],
+        PricingOptions::default(),
+    );
+    assert!(
+        result_future.is_ok(),
+        "rBergomi MC should succeed when ex-date is after expiry: {result_future:?}"
+    );
+}
+
 /// The notional scales the rBergomi PV linearly.
 #[test]
 fn rbergomi_price_scales_with_notional() {
