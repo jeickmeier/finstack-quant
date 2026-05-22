@@ -370,27 +370,52 @@ use crate::instruments::common_impl::traits::{CurveDependencies, Instrument};
 use crate::metrics::MetricCalculator;
 use std::marker::PhantomData;
 
+/// Outcome of resolving an instrument's CS01 curve dependencies.
+enum Cs01Curves {
+    /// Instrument declares a credit curve; carries the resolved hazard and
+    /// (optional) discount curve IDs.
+    Resolved(CurveId, Option<CurveId>),
+    /// Instrument declares no credit curve. Calculators configured with
+    /// `empty_credit_curve_zero` report CS01 as `0.0` in this case; otherwise
+    /// this is surfaced as a validation error.
+    NoCreditCurve,
+}
+
 /// Resolve the primary credit (hazard) and discount curve IDs from an instrument's
-/// declared curve dependencies. Returns an error when no credit curve is declared.
+/// declared curve dependencies.
+///
+/// Returns [`Cs01Curves::NoCreditCurve`] when no credit curve is declared so the
+/// caller can decide whether that is a hard error or a graceful `0.0`.
 fn resolve_cs01_curves<I: Instrument + CurveDependencies>(
     instrument: &I,
-    metric_name: &str,
-) -> finstack_core::Result<(CurveId, Option<CurveId>)> {
+) -> finstack_core::Result<Cs01Curves> {
     let curves = instrument.curve_dependencies()?;
-    let hazard_id = curves.credit_curves.first().cloned().ok_or_else(|| {
-        finstack_core::Error::Validation(format!(
-            "Instrument {} has no credit curve dependencies for {} calculation",
-            instrument.id(),
-            metric_name
-        ))
-    })?;
+    let Some(hazard_id) = curves.credit_curves.first().cloned() else {
+        return Ok(Cs01Curves::NoCreditCurve);
+    };
     let discount_id = curves.discount_curves.first().cloned();
-    Ok((hazard_id, discount_id))
+    Ok(Cs01Curves::Resolved(hazard_id, discount_id))
+}
+
+/// Build the validation error raised when a CS01 calculator that requires a
+/// credit curve is applied to an instrument that declares none.
+fn missing_credit_curve_error<I: Instrument>(
+    instrument: &I,
+    metric_name: &str,
+) -> finstack_core::Error {
+    finstack_core::Error::Validation(format!(
+        "Instrument {} has no credit curve dependencies for {} calculation",
+        instrument.id(),
+        metric_name
+    ))
 }
 
 /// Generic BucketedCs01 calculator that works for any instrument implementing
 /// the required traits.
 pub(crate) struct GenericBucketedCs01<I> {
+    /// When `true`, an instrument with no credit curve reports CS01 as `0.0`
+    /// instead of raising a validation error.
+    empty_credit_curve_zero: bool,
     _phantom: PhantomData<I>,
 }
 
@@ -398,12 +423,27 @@ pub(crate) struct GenericBucketedCs01<I> {
 ///
 /// Computes CS01 by applying a parallel bump to the entire hazard curve.
 pub(crate) struct GenericParallelCs01<I> {
+    /// When `true`, an instrument with no credit curve reports CS01 as `0.0`
+    /// instead of raising a validation error.
+    empty_credit_curve_zero: bool,
     _phantom: PhantomData<I>,
 }
 
 impl<I> Default for GenericParallelCs01<I> {
     fn default() -> Self {
         Self {
+            empty_credit_curve_zero: false,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> GenericParallelCs01<I> {
+    /// Construct a calculator that reports CS01 as `0.0` for instruments with
+    /// no credit curve, rather than raising a validation error.
+    pub(crate) fn with_empty_credit_curve_zero() -> Self {
+        Self {
+            empty_credit_curve_zero: true,
             _phantom: PhantomData,
         }
     }
@@ -415,7 +455,13 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let (hazard_id, discount_id) = resolve_cs01_curves(instrument, "CS01")?;
+        let (hazard_id, discount_id) = match resolve_cs01_curves(instrument)? {
+            Cs01Curves::Resolved(hazard_id, discount_id) => (hazard_id, discount_id),
+            Cs01Curves::NoCreditCurve if self.empty_credit_curve_zero => return Ok(0.0),
+            Cs01Curves::NoCreditCurve => {
+                return Err(missing_credit_curve_error(instrument, "CS01"))
+            }
+        };
 
         let bump_bp =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?
@@ -456,6 +502,18 @@ where
 impl<I> Default for GenericBucketedCs01<I> {
     fn default() -> Self {
         Self {
+            empty_credit_curve_zero: false,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> GenericBucketedCs01<I> {
+    /// Construct a calculator that reports CS01 as `0.0` for instruments with
+    /// no credit curve, rather than raising a validation error.
+    pub(crate) fn with_empty_credit_curve_zero() -> Self {
+        Self {
+            empty_credit_curve_zero: true,
             _phantom: PhantomData,
         }
     }
@@ -467,7 +525,13 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let (hazard_id, discount_id) = resolve_cs01_curves(instrument, "CS01")?;
+        let (hazard_id, discount_id) = match resolve_cs01_curves(instrument)? {
+            Cs01Curves::Resolved(hazard_id, discount_id) => (hazard_id, discount_id),
+            Cs01Curves::NoCreditCurve if self.empty_credit_curve_zero => return Ok(0.0),
+            Cs01Curves::NoCreditCurve => {
+                return Err(missing_credit_curve_error(instrument, "CS01"))
+            }
+        };
 
         let defaults =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
@@ -514,12 +578,27 @@ where
 /// Unlike `GenericParallelCs01` which bumps par spreads and re-bootstraps,
 /// this directly shifts hazard rates. Registered as `MetricId::Cs01Hazard`.
 pub(crate) struct GenericParallelCs01Hazard<I> {
+    /// When `true`, an instrument with no credit curve reports CS01 as `0.0`
+    /// instead of raising a validation error.
+    empty_credit_curve_zero: bool,
     _phantom: PhantomData<I>,
 }
 
 impl<I> Default for GenericParallelCs01Hazard<I> {
     fn default() -> Self {
         Self {
+            empty_credit_curve_zero: false,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> GenericParallelCs01Hazard<I> {
+    /// Construct a calculator that reports CS01 as `0.0` for instruments with
+    /// no credit curve, rather than raising a validation error.
+    pub(crate) fn with_empty_credit_curve_zero() -> Self {
+        Self {
+            empty_credit_curve_zero: true,
             _phantom: PhantomData,
         }
     }
@@ -531,7 +610,13 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let (hazard_id, _discount_id) = resolve_cs01_curves(instrument, "CS01Hazard")?;
+        let (hazard_id, _discount_id) = match resolve_cs01_curves(instrument)? {
+            Cs01Curves::Resolved(hazard_id, discount_id) => (hazard_id, discount_id),
+            Cs01Curves::NoCreditCurve if self.empty_credit_curve_zero => return Ok(0.0),
+            Cs01Curves::NoCreditCurve => {
+                return Err(missing_credit_curve_error(instrument, "CS01Hazard"))
+            }
+        };
 
         let bump_bp =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?
@@ -576,12 +661,27 @@ where
 /// this directly shifts hazard rates at each tenor. Registered as
 /// `MetricId::BucketedCs01Hazard`.
 pub(crate) struct GenericBucketedCs01Hazard<I> {
+    /// When `true`, an instrument with no credit curve reports CS01 as `0.0`
+    /// instead of raising a validation error.
+    empty_credit_curve_zero: bool,
     _phantom: PhantomData<I>,
 }
 
 impl<I> Default for GenericBucketedCs01Hazard<I> {
     fn default() -> Self {
         Self {
+            empty_credit_curve_zero: false,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> GenericBucketedCs01Hazard<I> {
+    /// Construct a calculator that reports CS01 as `0.0` for instruments with
+    /// no credit curve, rather than raising a validation error.
+    pub(crate) fn with_empty_credit_curve_zero() -> Self {
+        Self {
+            empty_credit_curve_zero: true,
             _phantom: PhantomData,
         }
     }
@@ -593,7 +693,13 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let (hazard_id, _discount_id) = resolve_cs01_curves(instrument, "BucketedCs01Hazard")?;
+        let (hazard_id, _discount_id) = match resolve_cs01_curves(instrument)? {
+            Cs01Curves::Resolved(hazard_id, discount_id) => (hazard_id, discount_id),
+            Cs01Curves::NoCreditCurve if self.empty_credit_curve_zero => return Ok(0.0),
+            Cs01Curves::NoCreditCurve => {
+                return Err(missing_credit_curve_error(instrument, "BucketedCs01Hazard"))
+            }
+        };
 
         let defaults =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
