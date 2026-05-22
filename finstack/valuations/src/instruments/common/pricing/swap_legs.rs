@@ -448,24 +448,34 @@ pub(crate) fn compounded_forward_projection(
     Ok((compound_factor - 1.0) / period_year_fraction)
 }
 
-/// Project the daily-compounded equivalent rate for an **in-progress** OIS / RFR
-/// leg whose accrual period straddles the valuation date.
+/// Compute the daily-compounded equivalent rate for an OIS / RFR coupon period
+/// that has **started** on or before the valuation date (`accrual_start <= as_of`).
 ///
-/// When a `Compounded` / `CompoundedWithShift` / `Average` coupon period
-/// satisfies `accrual_start <= as_of < accrual_end`, the period rate is a daily
-/// compound of two spliced sub-periods:
+/// This covers two cases:
 ///
-/// * **realized** overnight fixings for the daily sub-periods whose observation
-///   date is strictly before `as_of` (sourced from the historical `fixings`
-///   series), and
-/// * **projected** overnight forwards for the daily sub-periods on or after
-///   `as_of` (read from `fwd`, exactly as [`compounded_forward_projection`]).
+/// * **In-progress** (`accrual_start <= as_of < accrual_end`): the period
+///   straddles `as_of`. The rate is a daily compound of two spliced sub-periods:
+///   - **realized** overnight fixings for the daily sub-periods whose observation
+///     date is strictly before `as_of` (sourced from the historical `fixings`
+///     series), and
+///   - **projected** overnight forwards for the daily sub-periods on or after
+///     `as_of` (read from `fwd`, exactly as [`compounded_forward_projection`]).
 ///
-/// The two strips are compounded into a single product
-/// `CF = ∏ᵢ (1 + rᵢ · dᵢ)` and the function returns the equivalent simple rate
-/// `R = (CF − 1) / τ`, matching the contract of [`compounded_forward_projection`]
-/// so the surrounding `pv_floating_leg` framework can apply spread, gearing and
-/// the all-in floor/cap uniformly.
+/// * **Fully accrued but unpaid** (`accrual_end <= as_of < payment_date`, i.e.
+///   `payment_lag_days > 0`): every sub-period's observation date is strictly
+///   before `as_of`, so the helper naturally produces an all-realized daily
+///   compound with no projected component. This is the economically correct
+///   result — the coupon rate is fully determined by historical fixings.
+///
+/// The two sub-cases unify cleanly: the per-sub-period realized-vs-projected
+/// split (`obs_start < as_of → realized, else projected`) correctly yields
+/// all-realized when `as_of >= accrual_end`, because every `obs_start` in
+/// `[accrual_start, accrual_end)` is then strictly before `as_of`.
+///
+/// Both cases return the equivalent simple rate `R = (CF − 1) / τ`, matching
+/// the contract of [`compounded_forward_projection`] so the surrounding
+/// `pv_floating_leg` framework can apply spread, gearing and the all-in
+/// floor/cap uniformly.
 ///
 /// Treating an in-progress OIS coupon as a single term fixing at the reset date
 /// (the IBOR-style path) silently mis-prices every seasoned RFR swap — the
@@ -489,17 +499,17 @@ pub(crate) fn compounded_forward_projection(
 /// # Realized fixings
 ///
 /// Historical overnight fixings are looked up by **exact observation date**
-/// (`ScalarTimeSeries::value_on_exact`): a missing realized overnight fixing for
-/// an in-progress coupon is a hard error, never a silently carried-forward or
-/// projected value.
+/// (`ScalarTimeSeries::value_on_exact`): a missing realized overnight fixing is
+/// a hard error, never a silently carried-forward or projected value.
 ///
 /// # Errors
 ///
 /// Returns a validation error if the accrual period is malformed
 /// (`accrual_end <= accrual_start`), if `period_year_fraction` is non-positive,
-/// if the period does not actually straddle `as_of`, if a daily/observation
-/// date step fails, if a sub-period day-count fraction is non-positive, or if a
-/// required realized overnight fixing is missing from `fixings`.
+/// if the accrual period has not yet started (`accrual_start > as_of`), if a
+/// daily/observation date step fails, if a sub-period day-count fraction is
+/// non-positive, or if a required realized overnight fixing is missing from
+/// `fixings`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn compounded_spliced_projection(
     fwd: &ForwardCurve,
@@ -530,14 +540,20 @@ pub(crate) fn compounded_spliced_projection(
             period_year_fraction, accrual_start, accrual_end
         )));
     }
-    // This helper is only correct for a genuinely in-progress period; a
-    // fully-past or fully-future period must be routed elsewhere.
-    if !(accrual_start <= as_of && as_of < accrual_end) {
+    // This helper requires the accrual period to have started: `accrual_start
+    // <= as_of`. It correctly handles both the in-progress case
+    // (`as_of < accrual_end`) and the fully-accrued-but-unpaid case
+    // (`as_of >= accrual_end`, which arises when `payment_lag_days > 0`).
+    // In the latter case every sub-period observation date is strictly before
+    // `as_of`, so the per-sub-period splice naturally yields all-realized.
+    // A fully-future period (`accrual_start > as_of`) must be routed to
+    // `compounded_forward_projection` instead.
+    if accrual_start > as_of {
         return Err(finstack_core::Error::Validation(format!(
-            "compounded_spliced_projection requires an in-progress period \
-             (accrual_start <= as_of < accrual_end); got accrual_start={}, \
-             as_of={}, accrual_end={}.",
-            accrual_start, as_of, accrual_end
+            "compounded_spliced_projection requires the accrual period to have \
+             started (accrual_start <= as_of); got accrual_start={}, as_of={}. \
+             Route fully-future periods through compounded_forward_projection.",
+            accrual_start, as_of
         )));
     }
 
@@ -832,15 +848,24 @@ where
 
         // otherwise project from the forward curve
         let index_rate = if is_compounded && period.accrual_start <= as_of {
-            // In-progress (or fully-realized-but-unpaid) OIS / RFR coupon: the
-            // period straddles `as_of`. Splice realized daily overnight fixings
-            // (period start -> as_of) with projected overnight forwards
-            // (as_of -> period end), daily-compounded per the leg's convention.
+            // OIS / RFR coupon whose accrual period has started (`accrual_start
+            // <= as_of`). This covers two cases handled uniformly by
+            // `compounded_spliced_projection`:
             //
-            // Treating this as a single term fixing at the reset date — the
-            // IBOR-style path below — silently mis-prices every seasoned RFR
-            // swap, since the realized portion is itself a daily compound of
-            // many overnight fixings, not one rate.
+            //   1. In-progress (`as_of < accrual_end`): splices realized daily
+            //      fixings (period start → as_of) with projected overnight
+            //      forwards (as_of → period end).
+            //
+            //   2. Fully accrued but unpaid (`accrual_end <= as_of <
+            //      payment_date`, payment_lag_days > 0): every sub-period
+            //      observation date is before `as_of`, so the helper yields an
+            //      all-realized daily compound with no projected component —
+            //      the correct settled coupon rate.
+            //
+            // Treating either case as a single term fixing at the reset date
+            // — the IBOR-style path below — silently mis-prices every seasoned
+            // RFR swap; the realized portion is itself a daily compound of many
+            // overnight fixings, not one rate.
             compounded_spliced_projection(
                 fwd,
                 fixings,
@@ -2411,6 +2436,107 @@ mod tests {
             "in-progress compounded coupon must not collapse to the single \
              reset-date fixing: implied={implied_rate}, single_fixing={single_fixing}"
         );
+    }
+
+    // ==================== R1 REGRESSION: PAYMENT-LAGGED FULLY-ACCRUED COMPOUNDED COUPON ====================
+
+    /// Regression for R1: a payment-lagged compounded OIS coupon that is **fully
+    /// accrued but not yet paid** (`accrual_end <= as_of < payment_date`) must
+    /// not hard-error.
+    ///
+    /// Before the fix, `pv_floating_leg`'s routing predicate fired
+    /// (`is_compounded && accrual_start <= as_of`) and called
+    /// `compounded_spliced_projection`, whose guard required
+    /// `as_of < accrual_end` and returned a validation error.
+    ///
+    /// After the fix the guard is relaxed to `accrual_start <= as_of`, so the
+    /// helper naturally computes an all-realized daily compound
+    /// (`∏(1+rᵢdᵢ)−1)/τ` with every sub-period drawn from historical fixings —
+    /// exactly the correct value for a fully-accrued coupon.
+    #[test]
+    fn pv_floating_leg_compounded_fully_accrued_unpaid_payment_lag_returns_ok() {
+        let base_date = date(2024, 1, 1);
+        let disc = test_discount_curve(base_date);
+        let fwd = test_forward_curve(base_date);
+
+        // Coupon: Jan 1 -> Apr 1 2024 (Q1).
+        // Payment lag: 2 business days → payment_date = Apr 3 2024 (Tue).
+        // as_of: Apr 2 2024 — AFTER accrual_end but BEFORE payment_date.
+        let accrual_start = date(2024, 1, 1);
+        let accrual_end = date(2024, 4, 1);
+        let as_of = date(2024, 4, 2); // past accrual_end, payment not yet made
+
+        let fwd_dc = fwd.day_count();
+        let year_fraction = fwd_dc
+            .year_fraction(accrual_start, accrual_end, DayCountContext::default())
+            .expect("yf");
+
+        let periods = vec![LegPeriod {
+            accrual_start,
+            accrual_end,
+            reset_date: Some(accrual_start),
+            year_fraction,
+        }];
+
+        // OIS params with 2-day payment lag, no spread.
+        let params = float_ois(0.0, 0, 2);
+
+        // Supply realized overnight fixings for every weekday in [accrual_start, accrual_end).
+        let fixing_rate = 0.035_f64;
+        let mut fixing_obs: Vec<(Date, f64)> = Vec::new();
+        {
+            let mut d = accrual_start;
+            while d < accrual_end {
+                fixing_obs.push((d, fixing_rate));
+                d = d.add_weekdays(1);
+            }
+        }
+        let fixings = ScalarTimeSeries::new("FIXING:TEST-FWD", fixing_obs.clone(), None)
+            .expect("fixings series");
+
+        // Before the fix this returns Err (guard fires: as_of >= accrual_end).
+        // After the fix it must return Ok.
+        let pv = pv_floating_leg(
+            periods.into_iter(),
+            1_000_000.0,
+            &params,
+            &disc,
+            &fwd,
+            as_of,
+            Some(&fixings),
+        )
+        .expect("payment-lagged fully-accrued compounded coupon must not hard-error (R1 regression)");
+
+        // Independently compute the all-realized daily compound for a flat fixing_rate.
+        // With a constant daily rate r, CF = ∏(1 + r·dᵢ) = (1 + r·τ) (approximately).
+        // More precisely, re-compound day by day from fixing_obs.
+        let mut acc = 1.0_f64;
+        {
+            let mut d = accrual_start;
+            while d < accrual_end {
+                let nxt = d.add_weekdays(1).min(accrual_end);
+                let dcf = fwd_dc
+                    .year_fraction(d, nxt, DayCountContext::default())
+                    .expect("dcf");
+                acc *= 1.0 + fixing_rate * dcf;
+                d = nxt;
+            }
+        }
+        let expected_rate = (acc - 1.0) / year_fraction;
+
+        // The payment is in the future (Apr 3), so we discount to as_of.
+        let payment_date = accrual_end.add_weekdays(2); // 2 BD lag
+        let df = robust_relative_df(&disc, as_of, payment_date).expect("df");
+        let implied_rate = pv / (1_000_000.0 * year_fraction * df);
+
+        assert!(
+            (implied_rate - expected_rate).abs() < 1e-9,
+            "fully-accrued payment-lagged OIS coupon must equal the all-realized \
+             daily compound: implied={implied_rate:.8}, expected={expected_rate:.8}"
+        );
+
+        // Sanity: PV must be positive (positive rate, future payment).
+        assert!(pv > 0.0, "PV of a positive-rate OIS coupon must be positive; got {pv}");
     }
 
     // ==================== ANNUITY GUARD DIAGNOSTIC TEST ====================
