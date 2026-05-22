@@ -121,6 +121,33 @@ pub enum OasPriceBasis {
 }
 
 // ---------------------------------------------------------------------------
+// Shared numeric validation helper
+// ---------------------------------------------------------------------------
+
+/// Check a batch of optional scalars for finiteness (and optional non-negativity).
+///
+/// Each entry is `(value, must_be_nonneg)`: an unset `value` is skipped. A
+/// `must_be_nonneg = false` field need only be finite (failing with
+/// [`InputError::Invalid`]); a `must_be_nonneg = true` field must be both finite
+/// and `>= 0` (failing with [`InputError::NegativeValue`]). Shared by the numeric
+/// `validate()` impls below so the per-field `if let Some` bodies are not repeated.
+fn check_finite_fields(fields: &[(Option<f64>, bool)]) -> finstack_core::Result<()> {
+    use finstack_core::InputError;
+    for &(value, must_be_nonneg) in fields {
+        if let Some(v) = value {
+            if must_be_nonneg {
+                if !(v.is_finite() && v >= 0.0) {
+                    return Err(InputError::NegativeValue.into());
+                }
+            } else if !v.is_finite() {
+                return Err(InputError::Invalid.into());
+            }
+        }
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Sub-struct: Market quote overrides
 // ---------------------------------------------------------------------------
 
@@ -251,13 +278,10 @@ impl MarketQuoteOverrides {
     /// mutual exclusivity among price-driving fields.
     pub fn validate(&self) -> finstack_core::Result<()> {
         use finstack_core::InputError;
-        let finite = |v: f64| v.is_finite();
-        let nonneg = |v: f64| v.is_finite() && v >= 0.0;
 
-        // Finiteness checks for every optional scalar. Prices may be negative
-        // (e.g. deep-distress), spreads and yields may be negative but must be
-        // finite; implied vol and CDS spreads must be non-negative.
-        for (v, must_be_nonneg) in [
+        // Prices, spreads and yields may be negative (e.g. deep-distress) but
+        // must be finite; implied vol and CDS spreads must be non-negative.
+        check_finite_fields(&[
             (self.quoted_clean_price, false),
             (self.quoted_dirty_price_ccy, false),
             (self.quoted_ytm, false),
@@ -267,27 +291,10 @@ impl MarketQuoteOverrides {
             (self.quoted_discount_margin, false),
             (self.quoted_i_spread, false),
             (self.quoted_asw_market, false),
-        ] {
-            if let Some(v) = v {
-                if must_be_nonneg {
-                    if !nonneg(v) {
-                        return Err(InputError::NegativeValue.into());
-                    }
-                } else if !finite(v) {
-                    return Err(InputError::Invalid.into());
-                }
-            }
-        }
-        if let Some(v) = self.implied_volatility {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
-        if let Some(v) = self.cds_quote_bp {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
+            (self.implied_volatility, true),
+            (self.cds_quote_bp, true),
+        ])?;
+
         // Mutual exclusivity: at most one price-driving field set at a time.
         if self.price_driver_count() > 1 {
             return Err(InputError::Invalid.into());
@@ -345,44 +352,16 @@ pub struct BumpConfig {
 impl BumpConfig {
     /// Validate bump sizes for non-negativity.
     pub fn validate(&self) -> finstack_core::Result<()> {
-        use finstack_core::InputError;
-        let nonneg = |v: f64| v.is_finite() && v >= 0.0;
-        if let Some(v) = self.ytm_bump_decimal {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
-        if let Some(v) = self.spot_bump_pct {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
-        if let Some(v) = self.vol_bump_pct {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
-        if let Some(v) = self.rate_bump_bp {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
-        if let Some(v) = self.rho_bump_decimal {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
-        if let Some(v) = self.vega_bump_decimal {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
-        if let Some(v) = self.credit_spread_bump_bp {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
-        Ok(())
+        // Every bump size must be finite and non-negative.
+        check_finite_fields(&[
+            (self.ytm_bump_decimal, true),
+            (self.spot_bump_pct, true),
+            (self.vol_bump_pct, true),
+            (self.rate_bump_bp, true),
+            (self.rho_bump_decimal, true),
+            (self.vega_bump_decimal, true),
+            (self.credit_spread_bump_bp, true),
+        ])
     }
 }
 
@@ -513,7 +492,6 @@ impl ModelConfig {
     /// Validate model config (tree steps > 0, non-negative vol/friction).
     pub fn validate(&self) -> finstack_core::Result<()> {
         use finstack_core::InputError;
-        let nonneg = |v: f64| v.is_finite() && v >= 0.0;
         if let Some(steps) = self.tree_steps {
             if steps == 0 {
                 return Err(InputError::Invalid.into());
@@ -524,17 +502,11 @@ impl ModelConfig {
                 return Err(InputError::Invalid.into());
             }
         }
-        if let Some(v) = self.call_friction_cents {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
-        if let Some(v) = self.mean_reversion {
-            if !nonneg(v) {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
-        Ok(())
+        // Friction and mean reversion must be finite and non-negative.
+        check_finite_fields(&[
+            (self.call_friction_cents, true),
+            (self.mean_reversion, true),
+        ])
     }
 }
 
@@ -560,6 +532,8 @@ pub struct InstrumentPricingOverrides {
 impl InstrumentPricingOverrides {
     /// Build instrument-owned pricing inputs from the compatibility wrapper.
     pub fn from_pricing_overrides(pricing_overrides: &PricingOverrides) -> Self {
+        // Clone the sub-structs `PricingOverrides` owns by composition rather
+        // than re-listing each field, so this stays correct when fields are added.
         Self {
             market_quotes: pricing_overrides.market_quotes.clone(),
             model_config: pricing_overrides.model_config.clone(),
@@ -638,14 +612,9 @@ pub struct MetricPricingOverrides {
 impl MetricPricingOverrides {
     /// Build metric-only overrides from the compatibility `PricingOverrides` wrapper.
     pub fn from_pricing_overrides(pricing_overrides: &PricingOverrides) -> Self {
-        Self {
-            bump_config: pricing_overrides.metrics.bump_config.clone(),
-            mc_seed_scenario: pricing_overrides.metrics.mc_seed_scenario.clone(),
-            theta_period: pricing_overrides.metrics.theta_period.clone(),
-            breakeven_config: pricing_overrides.metrics.breakeven_config,
-            bond_risk_basis: pricing_overrides.metrics.bond_risk_basis,
-            var_config: pricing_overrides.metrics.var_config.clone(),
-        }
+        // `PricingOverrides` owns the metric overrides by composition, so clone
+        // the whole sub-struct instead of re-listing each field.
+        pricing_overrides.metrics.clone()
     }
 
     /// Validate metric override fields.
@@ -756,14 +725,8 @@ impl ScenarioPricingOverrides {
 
     /// Validate scenario shocks for finiteness.
     pub fn validate(&self) -> finstack_core::Result<()> {
-        use finstack_core::InputError;
-
-        if let Some(v) = self.scenario_price_shock_pct {
-            if !v.is_finite() {
-                return Err(InputError::Invalid.into());
-            }
-        }
-        Ok(())
+        // A price shock may be negative (a downside scenario) but must be finite.
+        check_finite_fields(&[(self.scenario_price_shock_pct, false)])
     }
 
     /// Apply the configured price shock to a present value.
@@ -1025,11 +988,14 @@ impl PricingOverrides {
         self
     }
 
+    // The bump/metric builders below delegate to the identical
+    // `MetricPricingOverrides` methods so the builder bodies live in one place.
+
     /// Set custom spot bump size (as percentage, e.g., 0.01 for 1%).
     ///
     /// Overrides both standard and adaptive calculations when set.
     pub fn with_spot_bump(mut self, bump_pct: f64) -> Self {
-        self.metrics.bump_config.spot_bump_pct = Some(bump_pct);
+        self.metrics = self.metrics.with_spot_bump(bump_pct);
         self
     }
 
@@ -1037,7 +1003,7 @@ impl PricingOverrides {
     ///
     /// Overrides both standard and adaptive calculations when set.
     pub fn with_vol_bump(mut self, bump_pct: f64) -> Self {
-        self.metrics.bump_config.vol_bump_pct = Some(bump_pct);
+        self.metrics = self.metrics.with_vol_bump(bump_pct);
         self
     }
 
@@ -1045,13 +1011,13 @@ impl PricingOverrides {
     ///
     /// Overrides both standard and adaptive calculations when set.
     pub fn with_rate_bump(mut self, bump_bp: f64) -> Self {
-        self.metrics.bump_config.rate_bump_bp = Some(bump_bp);
+        self.metrics = self.metrics.with_rate_bump(bump_bp);
         self
     }
 
     /// Set custom credit spread bump size (in basis points, e.g., 1.0 for 1bp).
     pub fn with_credit_spread_bump(mut self, bump_bp: f64) -> Self {
-        self.metrics.bump_config.credit_spread_bump_bp = Some(bump_bp);
+        self.metrics = self.metrics.with_credit_spread_bump(bump_bp);
         self
     }
 
@@ -1059,13 +1025,13 @@ impl PricingOverrides {
 
     /// Set theta period for time decay calculations.
     pub fn with_theta_period(mut self, period: impl Into<String>) -> Self {
-        self.metrics.theta_period = Some(period.into());
+        self.metrics = self.metrics.with_theta_period(period);
         self
     }
 
     /// Set breakeven configuration.
     pub fn with_breakeven_config(mut self, config: BreakevenConfig) -> Self {
-        self.metrics.breakeven_config = Some(config);
+        self.metrics = self.metrics.with_breakeven_config(config);
         self
     }
 
@@ -1074,19 +1040,19 @@ impl PricingOverrides {
     /// The scenario name (e.g., "delta_up", "vega_down") is used to derive
     /// a deterministic seed from the instrument ID, ensuring reproducibility.
     pub fn with_mc_seed_scenario(mut self, scenario: impl Into<String>) -> Self {
-        self.metrics.mc_seed_scenario = Some(scenario.into());
+        self.metrics = self.metrics.with_mc_seed_scenario(scenario);
         self
     }
 
     /// Set bond risk basis for duration, convexity, and DV01-style metrics.
     pub fn with_bond_risk_basis(mut self, basis: BondRiskBasis) -> Self {
-        self.metrics.bond_risk_basis = Some(basis);
+        self.metrics = self.metrics.with_bond_risk_basis(basis);
         self
     }
 
     /// Set Historical VaR / Expected Shortfall configuration.
     pub fn with_var_config(mut self, config: crate::metrics::risk::VarConfig) -> Self {
-        self.metrics.var_config = Some(config);
+        self.metrics = self.metrics.with_var_config(config);
         self
     }
 
