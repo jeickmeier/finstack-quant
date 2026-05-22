@@ -33,7 +33,7 @@
 //! The formulas handle the special case where r = q (rate equals dividend yield) using
 //! L'Hôpital's rule limiting forms to avoid division by zero.
 
-use finstack_core::math::special_functions::norm_cdf;
+use finstack_core::math::special_functions::{norm_cdf, norm_pdf};
 
 /// Tolerance for the r = q (b = r − q → 0) degeneracy.
 ///
@@ -272,14 +272,26 @@ pub fn floating_strike_lookback_call(
     // General form: S·e^{-rT}·(σ²/(2b))·[R^{-2b/σ²}·N(-d₃) - e^{bT}·N(-a₁)]
     // where d₃ = a₁ - 2b√T/σ (Goldman, Sosin & Gatto 1979; Haug 2007 §6).
     let term3 = if b.abs() < RATE_EQ_DIV_TOL {
-        // Limiting form when b → 0 via L'Hôpital's rule, derived independently.
-        // Uses a₂ (not d₃) because the L'Hôpital derivation yields this form
-        // directly; d₃ and a₂ are distinct at b = 0 (d₃ → a₁, a₂ = a₁ − σ√T).
+        // L'Hôpital limiting form as b = r − q → 0.
         //
-        // `log_ratio.abs()` guards against floating-point sign noise
-        // when S ≈ S_min (log_ratio ≈ 0).
+        // The general bracket is:
+        //   (σ²/(2b))·[R^{-2b/σ²}·N(-d₃) − e^{bT}·N(−a₁)]
+        // where R = S/S_min, d₃ = a₁ − 2b√T/σ.
+        //
+        // Taylor-expanding to first order in b:
+        //   R^{-2b/σ²} ≈ 1 − (2b/σ²)·ln R
+        //   N(-d₃) = N(-a₁ + 2b√T/σ) ≈ N(-a₁) + φ(a₁)·(2b√T/σ)
+        //   e^{bT}  ≈ 1 + bT
+        //
+        // Collecting O(b) terms in the bracket and dividing by 2b/σ² gives:
+        //   σ√T·φ(a₁) − ln(R)·N(−a₁) − (σ²/2)·T·N(−a₁)
+        //
+        // Hence term3 = S·e^{-rT}·[σ√T·φ(a₁) − log_ratio·N(−a₁) − (σ²/2)·T·N(−a₁)]
         let log_ratio = (spot / s_min).ln();
-        spot * df * vol2 * time * (log_ratio.abs() * norm_cdf(-a2) + norm_cdf(-a1))
+        spot * df
+            * (vol * sqrt_t * norm_pdf(a1)
+                - log_ratio * norm_cdf(-a1)
+                - 0.5 * vol2 * time * norm_cdf(-a1))
     } else {
         let d3 = a1 - 2.0 * b * sqrt_t / vol;
         let power = -2.0 * b / vol2;
@@ -359,10 +371,27 @@ pub fn floating_strike_lookback_put(
     // Reflection-principle correction — put tracks the maximum, so the reflected
     // drift is -b, giving d₃' = b₁ + 2b√T/σ (sign opposite to the call's d₃).
     let term3 = if b.abs() < RATE_EQ_DIV_TOL {
-        // Limiting form when b → 0, derived independently (symmetric to call).
-        // Uses b₂ (not d₃'); see call branch for rationale.
-        let log_ratio = (spot / s_max).ln();
-        spot * df * vol2 * time * (log_ratio.abs() * norm_cdf(b2) + norm_cdf(b1))
+        // L'Hôpital limiting form as b = r − q → 0 (symmetric to the call).
+        //
+        // The general put bracket is:
+        //   (σ²/(2b))·[R_put^{-2b/σ²}·N(d₃') − e^{bT}·N(b₁)]
+        // where R_put = S/S_max, d₃' = b₁ + 2b√T/σ.
+        //
+        // Taylor-expanding to first order in b (same algebra as call):
+        //   R_put^{-2b/σ²} ≈ 1 − (2b/σ²)·ln(S/S_max)
+        //   N(d₃') = N(b₁ + 2b√T/σ) ≈ N(b₁) + φ(b₁)·(2b√T/σ)
+        //   e^{bT}  ≈ 1 + bT
+        //
+        // Collecting O(b) terms and noting ln(S/S_max) = −ln(S_max/S):
+        //   σ√T·φ(b₁) + ln(S_max/S)·N(b₁) − (σ²/2)·T·N(b₁)
+        //
+        // Hence term3 = S·e^{-rT}·[σ√T·φ(b₁) − log_ratio·N(b₁) − (σ²/2)·T·N(b₁)]
+        // where log_ratio = ln(S/S_max) so −log_ratio = ln(S_max/S).
+        let log_ratio = (spot / s_max).ln(); // negative since S ≤ S_max
+        spot * df
+            * (vol * sqrt_t * norm_pdf(b1)
+                - log_ratio * norm_cdf(b1)
+                - 0.5 * vol2 * time * norm_cdf(b1))
     } else {
         let d3_put = b1 + 2.0 * b * sqrt_t / vol;
         let power = -2.0 * b / vol2;
@@ -632,6 +661,48 @@ mod tests {
             "Seasoned ITM lookback put {} should be >= PV of intrinsic {}",
             price,
             intrinsic_pv
+        );
+    }
+
+    #[test]
+    fn test_r_eq_q_limiting_branch_matches_general_formula() {
+        // Regression test: the r=q limiting branch must be continuous with the general
+        // formula. We evaluate one point strictly INSIDE the tolerance band (hits the
+        // limiting form) and one point strictly OUTSIDE (hits the general formula).
+        //
+        // RATE_EQ_DIV_TOL = 1e-7.  Choosing r = q (inside) and r = q + 2e-7 (outside).
+        // The two prices must agree to within ~1e-5 relative.  The previous (buggy)
+        // limiting form disagreed by ~18%.
+        let spot = 100.0_f64;
+        let s_min = 95.0_f64;
+        let s_max = 105.0_f64;
+        let time = 1.0_f64;
+        let vol = 0.2_f64;
+        let q = 0.05_f64;
+
+        // --- Floating-strike lookback CALL ---
+        // inside tolerance: r = q exactly  (|b| = 0, limiting branch)
+        let call_limit = floating_strike_lookback_call(spot, time, q, q, vol, s_min);
+        // outside tolerance: r = q + 2e-7   (|b| = 2e-7 > 1e-7, general formula)
+        let r_outside = q + 2e-7;
+        let call_general = floating_strike_lookback_call(spot, time, r_outside, q, vol, s_min);
+
+        let rel_diff_call = (call_limit - call_general).abs() / call_general.abs().max(1e-10);
+        assert!(
+            rel_diff_call < 1e-4,
+            "Floating-strike call: limiting form {call_limit:.6} vs general {call_general:.6}, \
+             rel_diff={rel_diff_call:.2e} (must be < 1e-4)"
+        );
+
+        // --- Floating-strike lookback PUT ---
+        let put_limit = floating_strike_lookback_put(spot, time, q, q, vol, s_max);
+        let put_general = floating_strike_lookback_put(spot, time, r_outside, q, vol, s_max);
+
+        let rel_diff_put = (put_limit - put_general).abs() / put_general.abs().max(1e-10);
+        assert!(
+            rel_diff_put < 1e-4,
+            "Floating-strike put: limiting form {put_limit:.6} vs general {put_general:.6}, \
+             rel_diff={rel_diff_put:.2e} (must be < 1e-4)"
         );
     }
 
