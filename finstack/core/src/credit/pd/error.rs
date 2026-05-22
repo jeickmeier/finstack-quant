@@ -1,9 +1,11 @@
 //! Error types for PD calibration and term structure construction.
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Errors from PD calibration and term structure construction.
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Clone, PartialEq, Error, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum PdCalibrationError {
     /// PD value is not in the valid range (0, 1).
     #[error("PD value {value} is outside (0, 1)")]

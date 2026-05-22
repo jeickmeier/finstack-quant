@@ -141,6 +141,7 @@ impl DividendSchedule {
     /// Create a [`DividendScheduleBuilder`] for constructing a new schedule.
     ///
     /// This is the preferred entry point, consistent with other curve builders.
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> DividendScheduleBuilder {
         DividendScheduleBuilder::new(id)
     }

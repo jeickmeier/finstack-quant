@@ -171,6 +171,7 @@ impl VolatilityIndexCurve {
     ///
     /// **Defaults:** Linear interpolation with Flat extrapolation maintains
     /// stable tail levels consistent with mean reversion expectations.
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> VolatilityIndexCurveBuilder {
         VolatilityIndexCurveBuilder {
             id: id.into(),

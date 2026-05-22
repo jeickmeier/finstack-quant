@@ -332,6 +332,7 @@ impl TryFrom<RawParametricCurve> for ParametricCurve {
 
 impl ParametricCurve {
     /// Start building a parametric curve.
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> ParametricCurveBuilder {
         ParametricCurveBuilder {
             id: id.into(),

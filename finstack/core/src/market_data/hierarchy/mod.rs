@@ -181,6 +181,7 @@ impl MarketDataHierarchy {
     }
 
     /// Start building a hierarchy with the fluent builder API.
+    #[must_use]
     pub fn builder() -> HierarchyBuilder {
         HierarchyBuilder::new()
     }

@@ -317,6 +317,7 @@ impl Tranche {
     }
 
     /// Creates a new builder.
+    #[must_use]
     pub fn builder() -> TrancheBuilder {
         TrancheBuilder::new()
     }
@@ -623,7 +624,7 @@ impl TrancheStructure {
             return Err(finstack_core::InputError::TooFewPoints.into());
         }
 
-        // Validate structure
+        // Validate structure@
         Self::validate_structure(&tranches)?;
 
         // Assign deterministic, distinct payment priorities by structural rank.

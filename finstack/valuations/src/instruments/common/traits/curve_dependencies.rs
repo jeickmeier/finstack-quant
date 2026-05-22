@@ -56,6 +56,7 @@ impl InstrumentCurves {
     }
 
     /// Start building a curve collection.
+    #[must_use]
     pub fn builder() -> InstrumentCurvesBuilder {
         InstrumentCurvesBuilder::default()
     }

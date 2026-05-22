@@ -48,7 +48,7 @@
 // should import from `finstack_core` directly.
 pub(crate) use finstack_core::{dates, error, math};
 
-type Result<T> = finstack_core::Result<T>;
+pub(crate) type Result<T> = finstack_core::Result<T>;
 
 pub(crate) mod aggregation;
 pub(crate) mod benchmark;

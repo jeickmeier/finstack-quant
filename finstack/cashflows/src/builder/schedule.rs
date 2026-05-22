@@ -246,6 +246,7 @@ impl CashFlowSchedule {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn builder() -> super::CashFlowBuilder {
         super::CashFlowBuilder::default()
     }

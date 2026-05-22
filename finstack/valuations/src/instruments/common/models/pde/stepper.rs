@@ -19,7 +19,8 @@ use super::problem::PdeProblem1D;
 /// - [`StepperError::NonPositiveStep`] — a non-positive time step `dt`
 ///   (e.g. a non-positive maturity, or `n_steps` so small the step is
 ///   degenerate) was requested.
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum StepperError {
     /// An explicit or under-damped (`theta < 0.5`) theta scheme was asked to
     /// take a time step larger than the CFL / von-Neumann stability limit.

@@ -18,7 +18,8 @@ use super::problem::PdeProblem1D;
 const THOMAS_PIVOT_REL_EPS: f64 = 1e-12;
 
 /// Error raised by the tridiagonal Thomas solver.
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum ThomasError {
     /// A pivot in the Thomas forward elimination became degenerate — either
     /// non-finite, or negligibly small relative to the terms that formed it.

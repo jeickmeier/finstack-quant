@@ -244,6 +244,7 @@ impl ForwardCurve {
     /// **Defaults:** The builder infers day-count and reset-lag conventions from
     /// the curve ID when possible, then uses Linear interpolation with FlatForward
     /// extrapolation.
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>, tenor_years: f64) -> ForwardCurveBuilder {
         let id: CurveId = id.into();
         let defaults = infer_forward_curve_defaults(id.as_str());

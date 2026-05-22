@@ -240,7 +240,8 @@ pub(crate) fn find_nearest(pts: &[f64], x: f64) -> usize {
 }
 
 /// Errors during grid construction.
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum PdeGridError {
     /// Grid requires more points.
     #[error("Grid needs at least {min} points, got {n}")]

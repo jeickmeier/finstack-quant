@@ -1062,6 +1062,7 @@ impl DiscountCurve {
     /// possible (for example `USD-OIS -> Act360`, `GBP-SONIA -> Act365F`). Synthetic
     /// IDs without a market hint fall back to `Act365F`. Interpolation defaults to
     /// MonotoneConvex with FlatForward extrapolation.
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> DiscountCurveBuilder {
         let id: CurveId = id.into();
         let day_count = infer_discount_curve_day_count(id.as_str());

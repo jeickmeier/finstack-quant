@@ -79,6 +79,7 @@ pub struct Solver2D {
 
 impl Solver2D {
     /// Create a solver builder.
+    #[must_use]
     pub fn builder() -> Solver2DBuilder {
         Solver2DBuilder::new()
     }
@@ -270,7 +271,8 @@ impl PdeSolution2D {
 }
 
 /// Errors during 2D solver construction or execution.
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum PdeSolver2DError {
     /// No grid was specified.
     #[error("2D PDE solver requires a grid")]

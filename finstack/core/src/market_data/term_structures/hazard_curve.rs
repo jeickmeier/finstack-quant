@@ -218,6 +218,7 @@ impl TryFrom<RawHazardCurve> for HazardCurve {
 
 impl HazardCurve {
     /// Start building a hazard curve with identifier `id`.
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> HazardCurveBuilder {
         // Epoch date - unwrap_or provides defensive fallback for infallible operation
         let base =

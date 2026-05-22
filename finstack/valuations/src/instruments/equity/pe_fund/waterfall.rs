@@ -143,6 +143,7 @@ fn default_irr_basis() -> DayCount {
 
 impl WaterfallSpec {
     /// Create a new waterfall specification builder.
+    #[must_use]
     pub fn builder() -> WaterfallSpecBuilder {
         WaterfallSpecBuilder::new()
     }

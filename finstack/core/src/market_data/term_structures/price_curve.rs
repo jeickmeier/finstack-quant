@@ -173,6 +173,7 @@ impl PriceCurve {
     ///
     /// **Defaults:** Linear interpolation with Flat extrapolation maintains
     /// stable tail prices consistent with typical commodity curve behavior.
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> PriceCurveBuilder {
         PriceCurveBuilder {
             id: id.into(),

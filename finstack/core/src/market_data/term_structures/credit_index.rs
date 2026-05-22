@@ -54,6 +54,7 @@ pub struct CreditIndexData {
 
 impl CreditIndexData {
     /// Create a new credit index data builder.
+    #[must_use]
     pub fn builder() -> CreditIndexDataBuilder {
         CreditIndexDataBuilder::default()
     }

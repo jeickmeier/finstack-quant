@@ -1,12 +1,14 @@
 //! Error types for credit migration model operations.
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Errors produced by credit migration model operations.
 ///
 /// Covers validation failures for rating scales, transition matrices,
 /// generator matrices, and numerical failures in matrix computations.
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Clone, PartialEq, Error, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum MigrationError {
     /// Matrix is not square.
     #[error("matrix is not square: {rows}x{cols}")]

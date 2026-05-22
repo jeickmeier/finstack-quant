@@ -395,14 +395,38 @@ pub(crate) fn shift_credit_curves_par_spread(
         let bumped = if discount_id.is_some() && cur.par_spread_points().next().is_some() {
             match bump_hazard_spreads(cur.as_ref(), base_market, &req, discount_id) {
                 Ok(c) => c,
-                Err(_) => bump_hazard_shift(cur.as_ref(), &req)?,
+                Err(_) => bump_hazard_for_par_spread_move(cur.as_ref(), delta_bp)?,
             }
         } else {
-            bump_hazard_shift(cur.as_ref(), &req)?
+            bump_hazard_for_par_spread_move(cur.as_ref(), delta_bp)?
         };
         new_market = new_market.insert(bumped);
     }
     Ok(new_market)
+}
+
+/// Fallback hazard-rate bump reproducing a par CDS spread move of `par_spread_bp`
+/// when the curve cannot be re-bootstrapped (no par-spread points, or no
+/// discount curve).
+///
+/// `measure_par_spread_shift` derives the par-spread move of an un-quoted
+/// hazard curve from the credit-triangle identity `s ≈ λ·(1 − R)`, so the
+/// hazard-rate move equivalent to a `par_spread_bp` par-spread move is
+/// `par_spread_bp / (1 − R)`. Bumping the hazard rate by that keeps the
+/// cascade's par-spread `delta_bp` and the applied bump unit-consistent — a
+/// direct `par_spread_bp` hazard bump would understate the move by the LGD
+/// factor and leak `(1 − LGD)·credit_pnl` into `curve_shape`.
+fn bump_hazard_for_par_spread_move(
+    hazard: &finstack_core::market_data::term_structures::HazardCurve,
+    par_spread_bp: f64,
+) -> Result<finstack_core::market_data::term_structures::HazardCurve> {
+    let lgd = 1.0 - hazard.recovery_rate();
+    let hazard_bp = if lgd.abs() > 1e-12 {
+        par_spread_bp / lgd
+    } else {
+        par_spread_bp
+    };
+    bump_hazard_shift(hazard, &BumpRequest::Parallel(hazard_bp))
 }
 
 /// Replace the running market's hazard curves (for `curve_ids`) with the T1
@@ -665,9 +689,14 @@ mod tests {
         Arc::new(bond)
     }
 
+    // Recovery 0 → LGD = 1, so the par CDS spread move (`measure_par_spread_shift`)
+    // equals the hazard-rate move. These tests assert on the cascade's bp
+    // arithmetic (factor ordering, adder reconciliation), so keeping par-spread
+    // and hazard units coincident isolates that structure from the LGD scaling.
     fn hazard(id: &str, as_of: finstack_core::dates::Date, rate: f64) -> HazardCurve {
         HazardCurve::builder(id)
             .base_date(as_of)
+            .recovery_rate(0.0)
             .knots([(1.0, rate), (5.0, rate)])
             .build()
             .unwrap()

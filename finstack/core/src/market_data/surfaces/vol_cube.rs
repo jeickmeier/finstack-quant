@@ -132,6 +132,7 @@ fn validate_axis(axis: &[f64]) -> crate::Result<()> {
 
 impl VolCube {
     /// Start building a new vol cube with identifier `id`.
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> VolCubeBuilder {
         VolCubeBuilder {
             id: id.into(),

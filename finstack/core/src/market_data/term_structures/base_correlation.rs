@@ -347,6 +347,7 @@ impl TryFrom<RawBaseCorrelationCurve> for BaseCorrelationCurve {
 
 impl BaseCorrelationCurve {
     /// Create a new base correlation curve builder.
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> BaseCorrelationCurveBuilder {
         BaseCorrelationCurveBuilder::new(id)
     }

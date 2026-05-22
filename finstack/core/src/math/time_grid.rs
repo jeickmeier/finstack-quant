@@ -72,7 +72,7 @@ pub struct TimeGrid {
 }
 
 /// Error type for time grid construction and validation
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[error("Invalid time grid: {0}")]
 pub struct TimeGridError(String);
 

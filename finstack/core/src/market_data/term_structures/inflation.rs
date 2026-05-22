@@ -225,6 +225,7 @@ impl InflationCurve {
     ///     .expect("InflationCurve builder should succeed");
     /// assert!(curve.inflation_rate(0.0, 5.0) > 0.0);
     /// ```
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> InflationCurveBuilder {
         let base_date =
             Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);

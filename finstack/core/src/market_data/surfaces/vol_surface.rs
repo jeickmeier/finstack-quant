@@ -209,6 +209,7 @@ impl VolSurface {
     /// # Ok(())
     /// # }
     /// ```
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> VolSurfaceBuilder {
         VolSurfaceBuilder {
             id: id.into(),

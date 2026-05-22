@@ -126,6 +126,7 @@ impl TryFrom<RawBasisSpreadCurve> for BasisSpreadCurve {
 
 impl BasisSpreadCurve {
     /// Start building a basis spread curve for the given `id`.
+    #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> BasisSpreadCurveBuilder {
         BasisSpreadCurveBuilder {
             id: id.into(),

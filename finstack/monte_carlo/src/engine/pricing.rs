@@ -106,6 +106,7 @@ pub(crate) fn validate_discounted_payoff(
 
 impl McEngine {
     /// Create a builder with the crate's default engine settings.
+    #[must_use]
     pub fn builder() -> McEngineBuilder {
         McEngineBuilder::new()
     }

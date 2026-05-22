@@ -109,6 +109,7 @@ pub struct Solver1D {
 
 impl Solver1D {
     /// Create a solver builder.
+    #[must_use]
     pub fn builder() -> Solver1DBuilder {
         Solver1DBuilder::new()
     }
@@ -369,7 +370,8 @@ impl PdeSolution {
 }
 
 /// Errors during solver construction or execution.
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum PdeSolverError {
     /// No grid was specified in the builder.
     #[error("PDE solver requires a spatial grid")]

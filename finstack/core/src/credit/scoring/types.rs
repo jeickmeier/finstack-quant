@@ -42,7 +42,8 @@ pub enum ScoringZone {
 }
 
 /// Errors from credit scoring model computation.
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Clone, PartialEq, Error, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum CreditScoringError {
     /// An input ratio is NaN or infinite.
     #[error("input field '{field}' is not finite: {value}")]

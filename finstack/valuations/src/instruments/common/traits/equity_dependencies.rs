@@ -86,6 +86,7 @@ impl EquityInstrumentDeps {
     ///     .build()
     ///     .expect("infallible");
     /// ```
+    #[must_use]
     pub fn builder() -> EquityInstrumentDepsBuilder {
         EquityInstrumentDepsBuilder::default()
     }
