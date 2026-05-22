@@ -306,7 +306,7 @@ pub(crate) fn compute_pv(inst: &CmsSwap, market: &MarketContext, as_of: Date) ->
 ///
 /// Returns the intrinsic value when the option has expired or is degenerate
 /// (`time_to_fixing ≤ 0`, non-positive forward/strike, or non-positive vol).
-fn cms_embedded_option_value(
+pub(super) fn cms_embedded_option_value(
     adjusted_forward: f64,
     strike: f64,
     vol_surface: &finstack_core::market_data::surfaces::VolSurface,

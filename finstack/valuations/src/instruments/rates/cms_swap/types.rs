@@ -403,7 +403,6 @@ impl CmsSwap {
         market: &finstack_core::market_data::context::MarketContext,
         as_of: Date,
     ) -> finstack_core::Result<Vec<(Date, Money)>> {
-        use crate::instruments::common_impl::pricing::time::rate_period_on_dates;
         use crate::instruments::rates::cms_option::pricer::convexity_adjustment;
         use finstack_core::dates::{DateExt, DayCountContext};
 
@@ -453,28 +452,57 @@ impl CmsSwap {
                 0.0
             };
 
-            let mut adjusted_rate = forward_swap_rate + adj + self.cms_spread;
+            // Convexity-adjusted linear CMS forward (before cap/floor).
+            let adjusted_forward = forward_swap_rate + adj;
+            // Expected option-adjusted coupon rate, mirroring `pv_cms_leg`.
+            //
+            // A cap/floor is an OPTION on the CMS rate, not a clamp on the
+            // convexity-adjusted mean. Clamping the mean (`min(E[S]+sp, K)`)
+            // underprices the option (Jensen's inequality: E[(S−K)⁺] ≥ 0 even
+            // when E[S]+sp < K). We decompose:
+            //
+            //   min(R, cap)   = R − caplet     ⇒ coupon_rate -= caplet
+            //   max(R, floor) = R + floorlet   ⇒ coupon_rate += floorlet
+            //
+            // where R = cms_rate + spread (Hagan 2003).
+            let linear_rate = adjusted_forward + self.cms_spread;
+            let mut coupon_rate = linear_rate;
+
             if let Some(cap) = self.cms_cap {
-                adjusted_rate = adjusted_rate.min(cap);
+                let cap_strike = cap - self.cms_spread;
+                let caplet = super::pricer::cms_embedded_option_value(
+                    adjusted_forward,
+                    cap_strike,
+                    &vol_surface,
+                    time_to_fixing,
+                    crate::instruments::OptionType::Call,
+                );
+                coupon_rate -= caplet;
             }
             if let Some(floor) = self.cms_floor {
-                adjusted_rate = adjusted_rate.max(floor);
+                let floor_strike = floor - self.cms_spread;
+                let floorlet = super::pricer::cms_embedded_option_value(
+                    adjusted_forward,
+                    floor_strike,
+                    &vol_surface,
+                    time_to_fixing,
+                    crate::instruments::OptionType::Put,
+                );
+                coupon_rate += floorlet;
             }
 
             let signed_amount = match self.side {
                 crate::instruments::common_impl::parameters::legs::PayReceive::Pay => {
-                    -adjusted_rate * accrual_fraction * self.notional.amount()
+                    -coupon_rate * accrual_fraction * self.notional.amount()
                 }
                 crate::instruments::common_impl::parameters::legs::PayReceive::Receive => {
-                    adjusted_rate * accrual_fraction * self.notional.amount()
+                    coupon_rate * accrual_fraction * self.notional.amount()
                 }
             };
             flows.push((
                 payment_date,
                 Money::new(signed_amount, self.notional.currency()),
             ));
-
-            let _ = rate_period_on_dates; // keep import path checked in sync with pricer logic
         }
 
         Ok(flows)
@@ -704,6 +732,161 @@ mod tests {
         );
         assert!(flows.iter().any(|(_, money)| money.amount() > 0.0));
         assert!(flows.iter().any(|(_, money)| money.amount() < 0.0));
+    }
+
+    /// Build a shared market context for reconciliation tests: flat 3% OIS,
+    /// flat 3% forward curve, flat 25% vol surface with enough knots.
+    fn recon_market(as_of: Date) -> finstack_core::market_data::context::MarketContext {
+        use finstack_core::market_data::surfaces::VolSurface;
+        use finstack_core::types::CurveId;
+
+        let strikes = vec![0.005, 0.02, 0.03, 0.04, 0.06, 0.10];
+        let expiries = vec![0.25, 1.0, 2.0, 5.0, 15.0];
+        let mut builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
+            .expiries(&expiries)
+            .strikes(&strikes);
+        for _ in &expiries {
+            builder = builder.row(&vec![0.25_f64; strikes.len()]);
+        }
+        let vol_surface = builder.build().expect("vol surface");
+
+        finstack_core::market_data::context::MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 15.0))
+            .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.03, 15.0))
+            .insert_surface(vol_surface)
+    }
+
+    /// Build a 1-period CMS swap that settles well in the future (1Y fixing,
+    /// 1.25Y payment), with a zero-rate funding leg so base_value == pv_cms_leg.
+    fn one_period_cms_swap(cap: Option<f64>, floor: Option<f64>) -> CmsSwap {
+        let fixing = date(2026, 1, 1);
+        let pay = date(2026, 4, 1);
+        let mut builder = CmsSwap::builder()
+            .id(InstrumentId::new("CMS-RECON"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            // Receive CMS so base_value = pv_cms − pv_funding
+            .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .cms_tenor(10.0)
+            .cms_fixing_dates(vec![fixing])
+            .cms_payment_dates(vec![pay])
+            .cms_accrual_fractions(vec![0.25])
+            .cms_day_count(DayCount::Act365F)
+            .cms_spread(0.0)
+            .swap_convention_opt(Some(
+                crate::instruments::common_impl::parameters::IRSConvention::USDStandard,
+            ))
+            // Zero fixed rate so pv_funding = 0 and base_value == pv_cms
+            .funding_leg(FundingLeg::Fixed {
+                rate: 0.0,
+                payment_dates: vec![pay],
+                accrual_fractions: vec![0.25],
+                day_count: DayCount::Act365F,
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"));
+        if let Some(c) = cap {
+            builder = builder.cms_cap_opt(Some(c));
+        }
+        if let Some(f) = floor {
+            builder = builder.cms_floor_opt(Some(f));
+        }
+        builder.build().expect("CMS swap should build")
+    }
+
+    /// C13 regression: discounting cms_leg_flows must reconcile with base_value
+    /// for a CMS swap with an OTM cap (the hard-clamp bug makes them diverge).
+    ///
+    /// For a Receive CMS swap with zero funding leg:
+    ///   base_value = pv_cms_leg = sum_i coupon_rate_i * accrual_i * df_i * N
+    ///   cms_leg_flows[i] = +coupon_rate_i * accrual_i * N (positive, Receive side)
+    ///   => sum_i df_i * cms_leg_flows[i]  must equal  base_value
+    ///
+    /// We use `relative_df_discount_curve` (same helper the pricer uses) to
+    /// discount, so that any curve-interpolation details cancel exactly.
+    #[test]
+    fn cms_leg_flows_reconcile_with_base_value_capped() {
+        use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
+        use crate::instruments::common_impl::traits::Instrument;
+
+        let as_of = date(2025, 1, 1);
+        let market = recon_market(as_of);
+
+        // OTM cap: forward CMS rate ~3%; cap at 6% — clamp is a no-op but
+        // the embedded caplet carries positive time value.
+        let swap = one_period_cms_swap(Some(0.06), None);
+
+        // base_value uses the pricer (embedded-option path) — this is the ground truth.
+        let base_pv = swap
+            .base_value(&market, as_of)
+            .expect("base_value")
+            .amount();
+
+        // Discount cms_leg_flows using the same curve + helper the pricer uses.
+        let discount_curve = market
+            .get_discount(swap.discount_curve_id.as_ref())
+            .expect("discount curve");
+        let flows = swap
+            .cms_leg_flows(&market, as_of)
+            .expect("cms_leg_flows");
+        let discounted_sum: f64 = flows
+            .iter()
+            .map(|(pay_date, money)| {
+                let df = relative_df_discount_curve(discount_curve.as_ref(), as_of, *pay_date)
+                    .expect("df");
+                df * money.amount()
+            })
+            .sum();
+
+        // Reconciliation: must agree within 1 currency unit on a 1M notional.
+        assert!(
+            (discounted_sum - base_pv).abs() < 1.0,
+            "capped CMS: discounted cms_leg_flows ({discounted_sum:.4}) must match \
+             base_value ({base_pv:.4}); gap = {:.4}",
+            (discounted_sum - base_pv).abs()
+        );
+    }
+
+    /// C13 regression (floor variant): same reconciliation for an OTM floor.
+    ///
+    /// OTM floor: forward ~3%, floor at 1% — mean-floor is a no-op but the
+    /// embedded floorlet has positive time value and must be accounted for.
+    #[test]
+    fn cms_leg_flows_reconcile_with_base_value_floored() {
+        use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
+        use crate::instruments::common_impl::traits::Instrument;
+
+        let as_of = date(2025, 1, 1);
+        let market = recon_market(as_of);
+
+        let swap = one_period_cms_swap(None, Some(0.01));
+
+        let base_pv = swap
+            .base_value(&market, as_of)
+            .expect("base_value")
+            .amount();
+
+        let discount_curve = market
+            .get_discount(swap.discount_curve_id.as_ref())
+            .expect("discount curve");
+        let flows = swap
+            .cms_leg_flows(&market, as_of)
+            .expect("cms_leg_flows");
+        let discounted_sum: f64 = flows
+            .iter()
+            .map(|(pay_date, money)| {
+                let df = relative_df_discount_curve(discount_curve.as_ref(), as_of, *pay_date)
+                    .expect("df");
+                df * money.amount()
+            })
+            .sum();
+
+        assert!(
+            (discounted_sum - base_pv).abs() < 1.0,
+            "floored CMS: discounted cms_leg_flows ({discounted_sum:.4}) must match \
+             base_value ({base_pv:.4}); gap = {:.4}",
+            (discounted_sum - base_pv).abs()
+        );
     }
 
     #[test]
