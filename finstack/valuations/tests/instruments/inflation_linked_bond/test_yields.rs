@@ -127,19 +127,29 @@ fn test_real_yield_uses_quoted_price_when_available() {
     let as_of = d(2025, 1, 2);
 
     // Act - calculate yield using explicit price vs quoted price
-    let y_explicit = ilb.real_yield(105.0, &ctx, as_of).unwrap();
+    let y_explicit_street = ilb.real_yield(105.0, &ctx, as_of).unwrap();
 
-    // Breakeven uses quoted_clean internally and exact Fisher equation:
-    // breakeven = (1 + nominal) / (1 + real) - 1
-    // Solving for real: real = (1 + nominal) / (1 + breakeven) - 1
-    let nominal_yield = 0.03;
+    // Breakeven uses quoted_clean internally. `breakeven_inflation` now converts
+    // the Street-compounded real yield to annual before applying the Fisher identity,
+    // so the roundtrip must also compare in annual compounding.
+    //
+    // Convert Street real yield to annual for the consistency check:
+    //   annual = (1 + street_semi/2)^2 - 1  (for semi-annual ILB, f=2)
+    // We use the time-to-maturity for the Compounding::convert_rate path via:
+    //   real_annual = (1 + y/2)^2 - 1  (exact for any t since it goes through the DF).
+    let f = 2.0_f64; // semi-annual ILB
+    let y_explicit_annual = (1.0 + y_explicit_street / f).powf(f) - 1.0;
+
+    // The nominal yield passed to breakeven_inflation is expected in annual convention.
+    let nominal_yield = 0.03_f64; // already annual
     let be = ilb.breakeven_inflation(nominal_yield, &ctx, as_of).unwrap();
-    let y_from_breakeven = (1.0 + nominal_yield) / (1.0 + be) - 1.0;
+    // Invert the annual Fisher identity: real_annual = (1 + nominal) / (1 + be) - 1
+    let y_from_breakeven_annual = (1.0 + nominal_yield) / (1.0 + be) - 1.0;
 
-    // Assert - should be consistent
+    // Assert - both in annual compounding, should be consistent
     assert_approx_eq(
-        y_explicit,
-        y_from_breakeven,
+        y_explicit_annual,
+        y_from_breakeven_annual,
         0.001,
         "yield consistency with quoted price",
     );
@@ -256,15 +266,21 @@ fn test_breakeven_inflation_fisher_equation() {
     let (ctx, _) = market_context_with_index();
     let as_of = d(2025, 1, 2);
 
-    let real_yield = ilb.real_yield(100.0, &ctx, as_of).unwrap();
-    let nominal_yield = 0.04; // 4%
+    let real_yield_street = ilb.real_yield(100.0, &ctx, as_of).unwrap();
+    // `breakeven_inflation` converts the Street-compounded real yield to annual
+    // before applying Fisher identity. Convert here for the expected value.
+    // sample_tips() uses semi-annual frequency, so f = 2.
+    let f = 2.0_f64;
+    let real_yield_annual = (1.0 + real_yield_street / f).powf(f) - 1.0;
+    let nominal_yield = 0.04; // 4% annual (what we pass to breakeven_inflation)
 
     // Act
     let breakeven = ilb.breakeven_inflation(nominal_yield, &ctx, as_of).unwrap();
 
-    // Assert - Exact Fisher equation: (1 + nominal) = (1 + real) × (1 + breakeven)
-    // So: breakeven = (1 + nominal) / (1 + real) - 1
-    let expected_breakeven = (1.0 + nominal_yield) / (1.0 + real_yield) - 1.0;
+    // Assert - Exact Fisher equation applied in annual compounding:
+    // (1 + nominal_annual) = (1 + real_annual) × (1 + breakeven)
+    // So: breakeven = (1 + nominal_annual) / (1 + real_annual) - 1
+    let expected_breakeven = (1.0 + nominal_yield) / (1.0 + real_yield_annual) - 1.0;
     assert_approx_eq(
         breakeven,
         expected_breakeven,

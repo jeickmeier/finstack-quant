@@ -493,7 +493,10 @@ fn test_breakeven_inflation_metric_consistency() {
         .unwrap();
     let breakeven_via_framework = result.measures[MetricId::BreakevenInflation.as_str()];
 
-    // Direct calculation (using discount curve zero rate as proxy for nominal)
+    // Direct calculation (using annually-compounded discount curve zero rate as nominal).
+    // `BreakevenInflationCalculator` uses `disc.zero_annual(t)` so the direct call
+    // must also use the annually-compounded zero to stay on the same basis as the
+    // internally-converted annual real yield inside `breakeven_inflation`.
     let disc = ctx.get_discount(ilb.discount_curve_id.as_str()).unwrap();
     let t = disc
         .day_count()
@@ -503,7 +506,7 @@ fn test_breakeven_inflation_metric_consistency() {
             finstack_core::dates::DayCountContext::default(),
         )
         .unwrap();
-    let nominal_yield = disc.zero(t);
+    let nominal_yield = disc.zero_annual(t); // annual convention, matching the calculator
     let breakeven_direct = ilb.breakeven_inflation(nominal_yield, &ctx, as_of).unwrap();
 
     // Assert - should be identical since both use the same calculation path

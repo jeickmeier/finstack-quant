@@ -882,7 +882,20 @@ impl InflationLinkedBond {
     /// `(1 + nominal) = (1 + real) × (1 + inflation)`
     ///
     /// Solving for inflation:
-    /// `breakeven = (1 + nominal) / (1 + real) - 1`
+    /// `breakeven = (1 + nominal_eff) / (1 + real_eff) - 1`
+    ///
+    /// where both yields are expressed in **effective-annual compounding** before
+    /// the Fisher identity is applied.  The Fisher identity is only exact when
+    /// both legs share the same compounding basis; mixing conventions (e.g.
+    /// a continuous nominal with a semi-annual real yield) introduces a
+    /// systematic bias of several basis points.
+    ///
+    /// # Arguments
+    ///
+    /// * `nominal_bond_yield` — yield of the comparable nominal bond, quoted in
+    ///   **effective-annual (annually-compounded)** convention.
+    ///   When calling from `BreakevenInflationCalculator`, this comes from
+    ///   `disc_curve.zero_annual(t)`.
     ///
     /// This is more accurate than the simplified approximation (`nominal - real`)
     /// at higher inflation levels where the cross-term becomes significant.
@@ -892,6 +905,10 @@ impl InflationLinkedBond {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_core::Result<f64> {
+        use crate::instruments::fixed_income::bond::pricing::quote_conversions::periods_per_year;
+        use finstack_core::math::Compounding;
+        use std::num::NonZeroU32;
+
         let clean_price = self.quoted_clean.ok_or_else(|| {
             finstack_core::Error::Validation(
                 "Breakeven inflation requires a quoted clean price. \
@@ -899,12 +916,36 @@ impl InflationLinkedBond {
                     .to_string(),
             )
         })?;
-        let real_yield = self.real_yield(clean_price, curves, as_of)?;
+        let real_yield_street = self.real_yield(clean_price, curves, as_of)?;
 
-        // Fisher equation: (1 + nominal) = (1 + real) * (1 + inflation)
-        // Exact solution: breakeven = (1 + nominal) / (1 + real) - 1
-        // Guard against division by zero for extreme negative real yields
-        let denominator = 1.0 + real_yield;
+        // Convert the Street-compounded (periodic, aligned with coupon frequency)
+        // real yield to effective-annual compounding so both legs of the Fisher
+        // identity use the same basis.
+        //
+        // Street convention: DF = (1 + y/f)^(-f*t), so
+        //   r_annual = (1 + y/f)^f − 1  (for t = 1, or equivalently via DF round-trip).
+        //
+        // We use Compounding::convert_rate which goes through the DF:
+        //   df = (1 + y/f)^(-f*t)  then  r_ann = df^(-1/t) - 1
+        //
+        // For annual frequency, Periodic(1) == Annual, so no correction is applied.
+        let t = self
+            .day_count
+            .year_fraction(as_of, self.maturity, DayCountContext::default())
+            .unwrap_or(1.0)
+            .max(1e-6); // guard against zero / expired bond
+
+        let n_f = periods_per_year(self.frequency).unwrap_or(1.0).max(1.0);
+        let n_u32 = n_f.round() as u32;
+        let real_compounding = NonZeroU32::new(n_u32)
+            .map(Compounding::Periodic)
+            .unwrap_or(Compounding::Annual);
+        let real_yield_annual =
+            real_compounding.convert_rate(real_yield_street, t, &Compounding::Annual);
+
+        // Both yields are now effective-annual. Apply the exact Fisher identity.
+        // Guard against division by zero for extreme negative real yields.
+        let denominator = 1.0 + real_yield_annual;
         if denominator <= 0.0 {
             return Err(finstack_core::InputError::NonPositiveValue.into());
         }
@@ -1127,6 +1168,127 @@ mod tests {
     use finstack_core::currency::Currency;
     use finstack_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use time::Month;
+
+    // ── C8 regression: breakeven inflation compounding convention ──────────────
+
+    /// Regression test for C8: the Fisher identity is only exact when both the
+    /// nominal yield and the real yield are expressed in the **same** compounding
+    /// convention.  Prior to this fix, `breakeven_inflation` applied the Fisher
+    /// formula directly to a Street-compounded (semi-annual) real yield and an
+    /// annually-compounded nominal yield, mixing conventions.
+    ///
+    /// Setup: a 10-year semi-annual ILB with a 4% real coupon priced at par.
+    /// At par the real yield equals the coupon rate: 4 % (Street / semi-annual).
+    /// The annual equivalent is (1 + 0.04/2)^2 − 1 = 4.04 %.
+    ///
+    /// With an 8% annually-compounded nominal yield:
+    ///   correct  breakeven = (1.08) / (1.0404) − 1 ≈ 3.8062 %
+    ///   (wrong)  breakeven = (1.08) / (1.04)   − 1 ≈ 3.8462 %     [~4 bp error]
+    ///
+    /// The test therefore:
+    ///   • verifies the result is within 0.5 bp of the analytically-correct value
+    ///   • verifies the result is NOT within 0.5 bp of the convention-mismatched value
+    #[test]
+    fn breakeven_inflation_uses_consistent_annual_compounding_c8() {
+        let as_of = d(2024, Month::January, 15);
+        let maturity = d(2034, Month::January, 15); // 10-year bond
+
+        // Flat discount curve (not used in the calculation itself, just needed
+        // for the MarketContext that real_yield passes through).
+        let discount = DiscountCurve::builder("USD-NOM")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (10.0, 1.0)])
+            .build()
+            .expect("discount curve");
+        let inflation = InflationCurve::builder("US-CPI")
+            .base_date(as_of)
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (10.0, 100.0)])
+            .build()
+            .expect("inflation curve");
+        let market = MarketContext::new().insert(discount).insert(inflation);
+
+        // Semi-annual ILB with a 4% real coupon, priced at par (100).
+        // At par the real YTM equals the coupon: 4 % Street (semi-annual).
+        let mut bond = InflationLinkedBond {
+            id: InstrumentId::new("ILB-C8"),
+            notional: Money::new(1_000_000.0, Currency::USD),
+            real_coupon: Decimal::try_from(0.04).expect("valid coupon"),
+            frequency: Tenor::semi_annual(),
+            day_count: DayCount::Thirty360,
+            issue_date: as_of,
+            maturity,
+            base_index: 100.0,
+            base_date: as_of,
+            indexation_method: IndexationMethod::TIPS,
+            lag: InflationLag::None,
+            deflation_protection: DeflationProtection::MaturityOnly,
+            bdc: BusinessDayConvention::Following,
+            stub: StubKind::None,
+            calendar_id: None,
+            discount_curve_id: CurveId::new("USD-NOM"),
+            inflation_index_id: CurveId::new("US-CPI"),
+            quoted_clean: Some(100.0), // par → real yield == coupon (4 % semi-annual)
+            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            attributes: Attributes::new(),
+        };
+
+        // The nominal yield is expressed in annual compounding (effective annual).
+        let nominal_annual = 0.08_f64;
+
+        // Analytically correct breakeven using annual Fisher identity:
+        //   real_annual  = (1 + 0.04/2)^2 − 1 = 1.02^2 − 1
+        //   breakeven    = (1 + nominal_annual) / (1 + real_annual) − 1
+        let real_semi_annual = 0.04_f64;
+        let real_annual = (1.0 + real_semi_annual / 2.0).powi(2) - 1.0; // 4.04 %
+        let expected_breakeven = (1.0 + nominal_annual) / (1.0 + real_annual) - 1.0;
+
+        // The convention-mismatched (wrong) result for comparison.
+        let wrong_breakeven = (1.0 + nominal_annual) / (1.0 + real_semi_annual) - 1.0;
+
+        // The difference between the correct and wrong answer must be at least 3 bp —
+        // confirming this is a genuine discriminator, not a trivial check.
+        let discrimination = (wrong_breakeven - expected_breakeven).abs();
+        assert!(
+            discrimination > 3e-4,
+            "test is not discriminating: wrong={wrong_breakeven:.6}, correct={expected_breakeven:.6}, diff={discrimination:.6}"
+        );
+
+        let result = bond
+            .breakeven_inflation(nominal_annual, &market, as_of)
+            .expect("breakeven_inflation should succeed");
+
+        // Must be within 0.5 bp of the analytically-correct answer.
+        let tol = 5e-5; // 0.5 bp
+        assert!(
+            (result - expected_breakeven).abs() < tol,
+            "breakeven mismatch: got {result:.6} ({:.4}%), expected {expected_breakeven:.6} ({:.4}%), diff = {:.2} bp",
+            result * 100.0,
+            expected_breakeven * 100.0,
+            (result - expected_breakeven).abs() * 10_000.0,
+        );
+
+        // Must NOT be within 0.5 bp of the convention-mismatched value.
+        assert!(
+            (result - wrong_breakeven).abs() > tol,
+            "result {result:.6} is suspiciously close to the convention-mismatched value {wrong_breakeven:.6}"
+        );
+
+        // Mutation: verify annual frequency bond uses a different correction factor.
+        // Annual Street == Annual compounding, so no convention gap → both old and
+        // new code agree, confirming the fix is frequency-aware.
+        bond.frequency = Tenor::annual();
+        bond.real_coupon = Decimal::try_from(0.04).expect("valid");
+        let result_annual_freq = bond
+            .breakeven_inflation(nominal_annual, &market, as_of)
+            .expect("annual-freq breakeven");
+        // For annual frequency Street ≡ Annual, so the correction is zero;
+        // result should be within 0.5 bp of the "wrong" annual calculation.
+        assert!(
+            (result_annual_freq - wrong_breakeven).abs() < tol,
+            "annual-freq bond should not be corrected: got {result_annual_freq:.6}, wrong={wrong_breakeven:.6}"
+        );
+    }
 
     fn d(year: i32, month: Month, day: u8) -> Date {
         Date::from_calendar_date(year, month, day).expect("valid date")

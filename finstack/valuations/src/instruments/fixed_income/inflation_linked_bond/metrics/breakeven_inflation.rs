@@ -22,7 +22,10 @@ impl MetricCalculator for BreakevenInflationCalculator {
         let day_count = disc_curve.day_count();
         let base_date = disc_curve.base_date();
         let t = day_count.year_fraction(base_date, ilb.maturity, DayCountContext::default())?;
-        let nominal_yield = disc_curve.zero(t);
+        // Use annually-compounded (effective-annual) zero rate so that the
+        // nominal yield passed to `breakeven_inflation` is on the same basis as
+        // the real yield after its Street→Annual conversion inside that method.
+        let nominal_yield = disc_curve.zero_annual(t);
 
         ilb.breakeven_inflation(nominal_yield, curves, context.as_of)
     }
