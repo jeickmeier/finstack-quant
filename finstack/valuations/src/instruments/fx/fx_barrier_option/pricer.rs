@@ -1141,7 +1141,7 @@ mod tests {
             analytical_pv
         );
 
-        // MC and analytical must agree within 10% (MC tolerance for 50K paths)
+        // MC and analytical must agree within 10% (MC tolerance for 100K paths)
         let rel_err = (mc_pv - analytical_pv).abs() / analytical_pv;
         assert!(
             rel_err < 0.10,
