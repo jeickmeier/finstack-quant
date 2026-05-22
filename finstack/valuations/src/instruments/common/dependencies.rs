@@ -69,15 +69,6 @@ impl MarketDependencies {
         Ok(deps)
     }
 
-    /// Build dependencies from an instrument implementing [`EquityDependencies`].
-    pub fn from_equity_dependencies<T: EquityDependencies>(
-        instrument: &T,
-    ) -> finstack_core::Result<Self> {
-        let mut deps = Self::new();
-        deps.add_equity_dependencies(instrument.equity_dependencies()?);
-        Ok(deps)
-    }
-
     /// Build dependencies from an instrument implementing both curve and equity traits.
     pub fn from_curves_and_equity<T: CurveDependencies + EquityDependencies>(
         instrument: &T,

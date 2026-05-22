@@ -85,14 +85,6 @@ where
     }
 }
 
-// Special case for CDS which uses HazardRate model
-impl GenericInstrumentPricer<crate::instruments::CreditDefaultSwap> {
-    /// Create a CDS hazard rate pricer.
-    pub fn cds() -> Self {
-        Self::new(InstrumentType::CDS, ModelKey::HazardRate)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

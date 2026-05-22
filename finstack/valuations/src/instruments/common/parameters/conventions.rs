@@ -612,30 +612,6 @@ impl CommodityConvention {
             CommodityConvention::BrentCrude | CommodityConvention::Copper => Currency::USD, // LME quotes in USD
         }
     }
-
-    /// Standard unit of measurement for this commodity.
-    pub fn unit(&self) -> &'static str {
-        match self {
-            CommodityConvention::WTICrude | CommodityConvention::BrentCrude => "BBL",
-            CommodityConvention::NaturalGas => "MMBTU",
-            CommodityConvention::Gold | CommodityConvention::Silver => "OZ",
-            CommodityConvention::Copper => "MT",
-            CommodityConvention::Agricultural => "BU", // Bushels
-            CommodityConvention::Power => "MWH",
-        }
-    }
-
-    /// Exchange identifier for this commodity.
-    pub fn exchange(&self) -> &'static str {
-        match self {
-            CommodityConvention::WTICrude | CommodityConvention::NaturalGas => "NYMEX",
-            CommodityConvention::BrentCrude => "ICE",
-            CommodityConvention::Gold | CommodityConvention::Silver => "COMEX",
-            CommodityConvention::Copper => "LME",
-            CommodityConvention::Agricultural => "CBOT",
-            CommodityConvention::Power => "CME",
-        }
-    }
 }
 
 impl std::fmt::Display for CommodityConvention {
@@ -1011,18 +987,6 @@ mod tests {
         assert_eq!(CommodityConvention::Copper.calendar_id(), "lme");
         assert_eq!(CommodityConvention::Agricultural.calendar_id(), "cbot");
         assert_eq!(CommodityConvention::Power.calendar_id(), "nerc");
-    }
-
-    #[test]
-    fn commodity_convention_units() {
-        assert_eq!(CommodityConvention::WTICrude.unit(), "BBL");
-        assert_eq!(CommodityConvention::BrentCrude.unit(), "BBL");
-        assert_eq!(CommodityConvention::NaturalGas.unit(), "MMBTU");
-        assert_eq!(CommodityConvention::Gold.unit(), "OZ");
-        assert_eq!(CommodityConvention::Silver.unit(), "OZ");
-        assert_eq!(CommodityConvention::Copper.unit(), "MT");
-        assert_eq!(CommodityConvention::Agricultural.unit(), "BU");
-        assert_eq!(CommodityConvention::Power.unit(), "MWH");
     }
 
     #[test]

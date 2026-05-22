@@ -163,7 +163,6 @@ pub mod cashflow_export {
 pub use common_impl::fx_dates::{
     add_joint_business_days, adjust_joint_calendar, roll_spot_date, ResolvedCalendarPair,
 };
-pub use common_impl::helpers::validate_currency_consistency;
 pub use finstack_core::dates::fx::resolve_calendar;
 
 // === Category Modules ===

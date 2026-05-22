@@ -230,39 +230,6 @@ pub fn rate_period_on_dates(fwd: &ForwardCurve, start: Date, end: Date) -> Resul
     Ok(fwd.rate_period(t_start, t_end))
 }
 
-// ---------------------------------------------------------------------------
-// Combined Helpers for Options Pricing
-// ---------------------------------------------------------------------------
-
-/// Compute time to expiry for volatility surface lookup.
-///
-/// For volatility surfaces, we typically use the instrument's day count since
-/// vol surfaces are quoted in instrument conventions. This helper just provides
-/// a consistent interface.
-///
-/// # Arguments
-///
-/// * `as_of` - Valuation date
-/// * `expiry` - Option expiry date
-/// * `day_count` - Day count convention (typically instrument's)
-///
-/// # Returns
-///
-/// Year fraction from `as_of` to `expiry`, or 0.0 if expiry <= as_of.
-#[inline]
-#[allow(dead_code)]
-pub fn time_to_expiry(
-    as_of: Date,
-    expiry: Date,
-    day_count: finstack_core::dates::DayCount,
-) -> Result<f64> {
-    if expiry <= as_of {
-        return Ok(0.0);
-    }
-    let t = day_count.year_fraction(as_of, expiry, DayCountContext::default())?;
-    Ok(t.max(0.0))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -405,32 +372,6 @@ mod tests {
             rate > 0.0 && rate < 0.1,
             "Forward rate should be reasonable: {}",
             rate
-        );
-    }
-
-    #[test]
-    fn time_to_expiry_expired_returns_zero() {
-        let as_of = date(2024, 7, 1);
-        let expiry = date(2024, 1, 1); // Already expired
-
-        let t = time_to_expiry(as_of, expiry, DayCount::Act365F).expect("should succeed");
-        assert!(
-            (t - 0.0).abs() < 1e-12,
-            "Expired option should have t=0: {}",
-            t
-        );
-    }
-
-    #[test]
-    fn time_to_expiry_future() {
-        let as_of = date(2024, 1, 1);
-        let expiry = date(2025, 1, 1);
-
-        let t = time_to_expiry(as_of, expiry, DayCount::Act365F).expect("should succeed");
-        assert!(
-            (t - 1.0).abs() < 0.01,
-            "1 year to expiry should be ~1.0: {}",
-            t
         );
     }
 
