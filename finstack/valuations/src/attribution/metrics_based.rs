@@ -18,7 +18,8 @@
 //! 5. **Volatility**:
 //!    - First-order: Vega × Δσ
 //!    - Second-order: ½ × Volga × (Δσ)²
-//!    - Cross-term: Vanna × Δspot × Δσ
+//!    - Cross-term: CrossGammaSpotVol × Δspot_pct × Δσ_vol_pt
+//!      (NOT Vanna — see the unit-contract note at the cross-factor site)
 //! 6. **Market Scalars** (for options):
 //!    - First-order: Delta × Δspot
 //!    - Second-order: ½ × Gamma × (Δspot)²
@@ -1056,8 +1057,8 @@ pub fn attribute_pnl_metrics_based(
         // (e.g. 1.0 for a 1 % bump) and the vol/credit denominator is
         // similarly in percentage-point units.  Therefore the attribution
         // below must multiply by `avg_spot_shift_pct` (percentage-point spot
-        // move) and `avg_vol_shift_abs` / `avg_credit_shift_bp` (also in
-        // percentage-point units).
+        // move), `avg_vol_shift_abs` (vol points) and `avg_credit_shift_bp`
+        // (basis points) — each matching its cross-gamma metric's convention.
         //
         // WARNING: Do NOT substitute `MetricId::Vanna` here as a fallback for
         // `CrossGammaSpotVol`.  `Vanna` is defined as ∂²V/(∂S_abs × ∂σ_decimal)
