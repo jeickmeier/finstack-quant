@@ -341,15 +341,20 @@ pub(crate) fn remaining_forward_variance(
     let surface = context.get_surface(inst.vol_surface_id.as_str())?;
     let dom = context.get_discount(inst.domestic_discount_curve_id.as_str())?;
     let for_curve = context.get_discount(inst.foreign_discount_curve_id.as_str())?;
-    let t_dom = dom
-        .day_count()
-        .year_fraction(as_of, inst.maturity, DayCountContext::default())?;
-    let t_for =
-        for_curve
-            .day_count()
-            .year_fraction(as_of, inst.maturity, DayCountContext::default())?;
-    let df_dom = dom.df(t_dom.max(0.0));
-    let df_for = for_curve.df(t_for.max(0.0));
+    // Date-based discount factors: `df_between_dates(as_of, maturity)` resolves the
+    // year fraction on the curve's own time axis as a ratio `df(to)/df(from)`, so it
+    // correctly represents the forward DF over `[as_of, maturity]` regardless of
+    // where `as_of` sits relative to the curve's `base_date`.
+    //
+    // The previous code called `curve.df(yf(as_of, maturity))`, which looks up the
+    // *spot* DF at `yf(as_of, maturity)` years from the curve's `base_date` — i.e.
+    // the DF from `base_date` to roughly `base_date + yf(as_of, mat)`, not from
+    // `as_of` to `mat`.  For a non-flat term structure (or any `as_of != base_date`)
+    // this gives the wrong rate and therefore the wrong GK forward.  The terminal-PV
+    // discount in this same function was already corrected to use `df_between_dates`
+    // (see lines 66, 83); this aligns the forward-recovery path with that fix.
+    let df_dom = dom.df_between_dates(as_of, inst.maturity)?;
+    let df_for = for_curve.df_between_dates(as_of, inst.maturity)?;
 
     let r_d = zero_rate_from_df(df_dom, t, "FxVarianceSwap domestic discount")?;
     let r_f = zero_rate_from_df(df_for, t, "FxVarianceSwap foreign discount")?;
@@ -533,6 +538,199 @@ mod tests {
             (pv.amount() - count_pv.amount()).abs() > 1e-6,
             "FX seasoned MTM must differ from observation-count weighting"
         );
+    }
+
+    /// W39 regression: `remaining_forward_variance` must recover the GK forward
+    /// via date-based discount factors. The buggy code calls `curve.df(yf(as_of,
+    /// mat))`, which looks up the *spot* DF at `yf(as_of, mat)` years from the
+    /// curve's `base_date` — i.e. the wrong time point on the curve's axis.
+    /// The correct DF for the period `[as_of, mat]` is
+    /// `curve.df_between_dates(as_of, mat)` = `df(yf(base, mat)) / df(yf(base, as_of))`.
+    ///
+    /// These two differ whenever the curve is non-flat (i.e. the spot rate at
+    /// `yf(as_of, mat)` from `base` ≠ the forward rate over `[as_of, mat]`).
+    /// The fixture uses a three-knot stepped curve (r_high for [0, as_of],
+    /// r_low for [as_of, mat]) so the two lookups diverge materially.
+    #[test]
+    fn fx_variance_swap_forward_recovery_is_date_based() {
+        use crate::instruments::common_impl::traits::Attributes;
+        use crate::instruments::fx::fx_variance_swap::types::PayReceive;
+        use finstack_core::dates::{DayCount, DayCountContext, Tenor};
+        use finstack_core::market_data::surfaces::VolSurface;
+        use finstack_core::math::stats::RealizedVarMethod;
+        use finstack_core::types::{CurveId, InstrumentId};
+
+        // Three dates:
+        //   base_date  = 2025-01-02  (curve anchor)
+        //   as_of      = 2025-07-01  (~0.5y from base)
+        //   maturity   = 2026-01-02  (~1.0y from base, ~0.5y from as_of)
+        //
+        // Stepped (non-flat) curves so the spot DF at `yf(as_of, mat)` from base
+        // is materially different from the forward DF over `[as_of, mat]`:
+        //   Domestic: r_near = 10% for [base, as_of], r_far = 0% for [as_of, mat].
+        //     df_between(as_of, mat) ≈ 1.0  (zero rate going forward)
+        //     dom.df(yf(as_of,mat) ≈ 0.5) ≈ exp(-0.10*0.5) ≈ 0.951 (WRONG — reads near segment)
+        //   Foreign: r_near = 0% for [base, as_of], r_far = 10% for [as_of, mat].
+        //     df_between(as_of, mat) ≈ exp(-0.10*0.5) ≈ 0.951
+        //     for_curve.df(0.5)      ≈ 1.0             (WRONG — reads near segment)
+        //
+        //   Date-based fwd  ≈ spot * exp((r_d=0 − r_f=0.10) * 0.5) ≈ 1.10 * 0.951 ≈ 1.046
+        //   Axis-buggy  fwd ≈ spot * exp((r_d≈10% − r_f≈0%) * 0.5) ≈ 1.10 * 1.051 ≈ 1.156
+        //   Gap ≈ 0.11 >> 1e-3.
+        //
+        // Vol surface has a strong strike slope ([0.9→30%, 1.3→5%]) so ATM-vol²
+        // is noticeably different at the two forwards.  Two-strike surface forces
+        // Carr-Madan to return None → ATM-vol² fallback is used.
+        let curve_base = date!(2025 - 01 - 02);
+        let as_of = date!(2025 - 07 - 01);
+        let start = date!(2025 - 07 - 02);
+        let maturity = date!(2026 - 01 - 02);
+
+        // Knot times in Act365F from curve_base.
+        // t_near ≈ yf(2025-01-02, 2025-07-01) = 180/365 ≈ 0.4932
+        // t_mat  ≈ yf(2025-01-02, 2026-01-02) = 365/365 = 1.0000
+        let t_near: f64 = 0.4932;
+        let t_mat: f64 = 1.0000;
+
+        // Domestic: r_near = 10%, r_far = 0%.
+        let df_near_dom = (-0.10_f64 * t_near).exp();
+        let df_mat_dom = df_near_dom; // exp(-0 * segment) = 1, so no further discount
+
+        // Foreign: r_near = 0%, r_far = 10%.
+        let df_near_for = 1.0_f64; // exp(-0 * t_near) = 1
+        let df_mat_for = df_near_for * (-0.10_f64 * (t_mat - t_near)).exp();
+
+        let usd_curve = DiscountCurve::builder("USD-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (t_near, df_near_dom), (t_mat, df_mat_dom)])
+            .build()
+            .expect("usd curve");
+        let eur_curve = DiscountCurve::builder("EUR-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (t_near, df_near_for), (t_mat, df_mat_for)])
+            .build()
+            .expect("eur curve");
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .expect("valid rate");
+        // Two-strike surface: forces Carr-Madan fallback to ATM-vol².
+        // Strong slope: 30% at 0.9, 5% at 1.3 → ATM vol is sensitive to forward.
+        let surface = VolSurface::builder("EURUSD-VOL")
+            .expiries(&[1.0])
+            .strikes(&[0.9, 1.3])
+            .row(&[0.30, 0.05])
+            .build()
+            .expect("surface");
+        let market = MarketContext::new()
+            .insert(usd_curve)
+            .insert(eur_curve)
+            .insert_fx(FxMatrix::new(Arc::new(provider)))
+            .insert_surface(surface);
+
+        let swap = FxVarianceSwap::builder()
+            .id(InstrumentId::new("FXVAR-FWD-W39"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .spot_id("EURUSD".to_string())
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .strike_variance(0.04)
+            .start_date(start)
+            .maturity(maturity)
+            .observation_freq(Tenor::daily())
+            .realized_var_method(RealizedVarMethod::CloseToClose)
+            .side(PayReceive::Receive)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
+            .vol_surface_id(CurveId::new("EURUSD-VOL"))
+            .day_count(DayCount::Act365F)
+            .attributes(Attributes::new())
+            .build()
+            .expect("pre-start fx swap");
+
+        // ── Verify the fixture exposes a meaningful gap ───────────────────────
+        let dom = market.get_discount("USD-OIS").expect("usd curve");
+        let for_curve = market.get_discount("EUR-OIS").expect("eur curve");
+
+        // Correct: forward DF from as_of to maturity.
+        let df_dom_date = dom.df_between_dates(as_of, maturity).expect("date df dom");
+        let df_for_date = for_curve
+            .df_between_dates(as_of, maturity)
+            .expect("date df for");
+
+        // Buggy: spot DF at yf(as_of, mat) from base_date.
+        let t_dom_axis = dom
+            .day_count()
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("yf dom");
+        let t_for_axis = for_curve
+            .day_count()
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("yf for");
+        let df_dom_bug = dom.df(t_dom_axis.max(0.0));
+        let df_for_bug = for_curve.df(t_for_axis.max(0.0));
+
+        assert!(
+            (df_dom_date - df_dom_bug).abs() > 1e-3,
+            "fixture must expose domestic DF gap: date={df_dom_date} axis={df_dom_bug}"
+        );
+        assert!(
+            (df_for_date - df_for_bug).abs() > 1e-3,
+            "fixture must expose foreign DF gap: date={df_for_date} axis={df_for_bug}"
+        );
+
+        // ── Derive expected (date-based) and buggy forwards ───────────────────
+        let spot = 1.10_f64;
+        let t = swap
+            .day_count
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("yf");
+        let r_d_date =
+            crate::instruments::common_impl::helpers::zero_rate_from_df(df_dom_date, t, "dom")
+                .expect("r_d date");
+        let r_f_date =
+            crate::instruments::common_impl::helpers::zero_rate_from_df(df_for_date, t, "for")
+                .expect("r_f date");
+        let fwd_expected = spot * ((r_d_date - r_f_date) * t).exp();
+
+        let r_d_bug =
+            crate::instruments::common_impl::helpers::zero_rate_from_df(df_dom_bug, t, "dom")
+                .expect("r_d bug");
+        let r_f_bug =
+            crate::instruments::common_impl::helpers::zero_rate_from_df(df_for_bug, t, "for")
+                .expect("r_f bug");
+        let fwd_bug = spot * ((r_d_bug - r_f_bug) * t).exp();
+
+        assert!(
+            (fwd_expected - fwd_bug).abs() > 1e-3,
+            "fixture must produce different GK forwards: date={fwd_expected} axis={fwd_bug}"
+        );
+
+        // ── Assert the fixed pricer uses the date-based forward ───────────────
+        // With a 3-strike surface the Carr-Madan replication falls back to ATM vol².
+        // ATM vol is looked up at (t, fwd) — so the forward choice determines variance.
+        // We assert that remaining_forward_variance matches the date-based result.
+        let surface_ref = market.get_surface("EURUSD-VOL").expect("surface");
+        let vol_expected = surface_ref.value_clamped(t, fwd_expected.max(1e-12));
+        let expected_variance = vol_expected * vol_expected;
+
+        let vol_bug = surface_ref.value_clamped(t, fwd_bug.max(1e-12));
+        let bug_variance = vol_bug * vol_bug;
+
+        let actual = remaining_forward_variance(&swap, &market, as_of)
+            .expect("forward variance must succeed");
+
+        // If the surface is flat the vol lookup isn't fwd-sensitive — skip the
+        // forward-dependence check and just assert the call succeeds.
+        if (expected_variance - bug_variance).abs() > 1e-8 {
+            assert!(
+                (actual - expected_variance).abs() < (actual - bug_variance).abs(),
+                "remaining_forward_variance must use date-based forward: \
+                 actual={actual} date_expected={expected_variance} axis_bug={bug_variance}"
+            );
+        }
     }
 
     /// Item 4 regression: the terminal PV discount must be date-based. When the
