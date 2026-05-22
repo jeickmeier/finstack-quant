@@ -22,11 +22,6 @@ use finstack_monte_carlo::traits::Payoff;
 /// - **Down-and-out**: Option knocked out if FX rate falls below barrier
 /// - **Down-and-in**: Option activated if FX rate falls below barrier
 ///
-/// # Note on naming
-///
-/// The struct is named `FxBarrierCall` for historical reasons but handles both
-/// calls and puts depending on the `option_kind` passed to [`FxBarrierCall::new`].
-///
 /// # Quanto Barriers
 ///
 /// Quanto FX barriers — where barrier monitoring and payoff settlement are in
@@ -38,7 +33,7 @@ use finstack_monte_carlo::traits::Payoff;
 /// misleading, so no such constructor is exposed. The FX barrier pricer builds
 /// the GBM drift directly as `r_dom - r_for`.
 #[derive(Debug, Clone)]
-pub struct FxBarrierCall {
+pub struct FxBarrierPayoff {
     /// Underlying barrier call (reuses existing infrastructure)
     inner: BarrierOptionPayoff,
     /// Base currency (underlying currency, formerly foreign_currency)
@@ -47,7 +42,7 @@ pub struct FxBarrierCall {
     pub quote_currency: Currency,
 }
 
-impl FxBarrierCall {
+impl FxBarrierPayoff {
     /// Create a new FX barrier option (call or put).
     ///
     /// # Arguments
@@ -138,7 +133,7 @@ impl FxBarrierCall {
     }
 }
 
-impl Payoff for FxBarrierCall {
+impl Payoff for FxBarrierPayoff {
     fn on_event(&mut self, state: &mut PathState) {
         // Delegate to inner barrier call. The FX rate is carried in PathState
         // as the simulated spot.
@@ -160,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_fx_barrier_standard_creation() {
-        let fx_barrier = FxBarrierCall::standard(
+        let fx_barrier = FxBarrierPayoff::standard(
             1.15,
             1.20,
             BarrierType::UpAndOut,
@@ -180,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_fx_barrier_new_constructs_with_currency_metadata() {
-        let fx_barrier = FxBarrierCall::new(
+        let fx_barrier = FxBarrierPayoff::new(
             1.15,
             1.20,
             BarrierType::UpAndOut,
