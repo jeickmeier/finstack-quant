@@ -3,42 +3,36 @@
 //! Covers: CommodityForward, CommoditySwap, CommodityOption,
 //! CommodityAsianOption, CommoditySwaption, CommoditySpreadOption.
 
-use super::{InstrumentType, ModelKey, PricerRegistry};
+use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register pricers for commodity instruments.
 pub fn register_commodity_pricers(registry: &mut PricerRegistry) {
     // Commodity Forward
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::CommodityForward,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::CommodityForward,
-        >::discounting(InstrumentType::CommodityForward),
+        crate::instruments::CommodityForward
     );
 
     // Commodity Swap
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::CommoditySwap,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::CommoditySwap,
-        >::discounting(InstrumentType::CommoditySwap),
+        crate::instruments::CommoditySwap
     );
 
     // Commodity Option
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::CommodityOption,
-        ModelKey::Black76,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::CommodityOption,
-        >::new(InstrumentType::CommodityOption, ModelKey::Black76),
+        crate::instruments::CommodityOption,
+        ModelKey::Black76
     );
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::CommodityOption,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::CommodityOption,
-        >::new(InstrumentType::CommodityOption, ModelKey::Discounting),
+        crate::instruments::CommodityOption,
+        ModelKey::Discounting
     );
 
     // Commodity Asian Option
@@ -49,21 +43,19 @@ pub fn register_commodity_pricers(registry: &mut PricerRegistry) {
     );
 
     // Commodity Swaption
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::CommoditySwaption,
-        ModelKey::Black76,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::CommoditySwaption,
-        >::new(InstrumentType::CommoditySwaption, ModelKey::Black76),
+        crate::instruments::CommoditySwaption,
+        ModelKey::Black76
     );
 
     // Commodity Spread Option (Kirk's approximation)
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::CommoditySpreadOption,
-        ModelKey::Black76,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::CommoditySpreadOption,
-        >::new(InstrumentType::CommoditySpreadOption, ModelKey::Black76),
+        crate::instruments::CommoditySpreadOption,
+        ModelKey::Black76
     );
 
     // Commodity Option - Monte Carlo Schwartz-Smith

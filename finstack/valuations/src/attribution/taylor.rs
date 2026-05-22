@@ -80,6 +80,19 @@ impl Default for TaylorAttributionConfig {
     }
 }
 
+impl TaylorAttributionConfig {
+    /// Validates configuration parameters.
+    pub fn validate(&self) -> Result<()> {
+        if self.vol_bump <= 0.0 || self.vol_bump > 0.20 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Volatility bump size must be strictly positive and no greater than 20% (0.20), got {:.4}",
+                self.vol_bump
+            )));
+        }
+        Ok(())
+    }
+}
+
 fn record_taylor_factor_result(
     factor_kind: &str,
     factor_id: &CurveId,
@@ -186,6 +199,7 @@ pub fn attribute_pnl_taylor(
     as_of_t1: Date,
     config: &TaylorAttributionConfig,
 ) -> Result<TaylorAttributionResult> {
+    config.validate()?;
     let pv_t0 = reprice_instrument(instrument, market_t0, as_of_t0)?;
     let pv_t1 = reprice_instrument(instrument, market_t1, as_of_t1)?;
     let actual_pnl = pv_t1.amount() - pv_t0.amount();
@@ -440,7 +454,7 @@ pub fn attribute_pnl_taylor_standard(
                 Money::new(ci_val, ccy)
             };
             let theta_only = Money::new(factor_money.amount() - ci.amount(), ccy);
-            apply_total_return_carry(&mut attribution, theta_only, ci)?;
+            apply_total_return_carry(&mut attribution, theta_only, ci, None)?;
         }
     }
 
@@ -901,6 +915,24 @@ mod tests {
         assert_eq!(config.rate_bump_bp, 1.0);
         assert_eq!(config.credit_bump_bp, 1.0);
         assert_eq!(config.vol_bump, 0.01);
+    }
+
+    #[test]
+    fn test_taylor_config_validation() {
+        let mut config = TaylorAttributionConfig::default();
+        assert!(config.validate().is_ok());
+
+        config.vol_bump = 0.20;
+        assert!(config.validate().is_ok());
+
+        config.vol_bump = 0.21;
+        assert!(config.validate().is_err());
+
+        config.vol_bump = 0.0;
+        assert!(config.validate().is_err());
+
+        config.vol_bump = -0.01;
+        assert!(config.validate().is_err());
     }
 
     #[test]

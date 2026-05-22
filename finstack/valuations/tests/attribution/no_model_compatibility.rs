@@ -97,6 +97,7 @@ fn pre_pr7_envelope_json() -> String {
         model_params_t0: None,
         credit_factor_model: None,
         credit_factor_detail_options: Default::default(),
+        full_cross_attribution: false,
     };
     let envelope = AttributionEnvelope::new(spec);
     let mut value = serde_json::to_value(&envelope).expect("serialize");
@@ -187,6 +188,7 @@ fn run_attribution(method: AttributionMethod) -> PnlAttribution {
         model_params_t0: None,
         credit_factor_model: None,
         credit_factor_detail_options: Default::default(),
+        full_cross_attribution: false,
     };
 
     AttributionEnvelope::new(spec)

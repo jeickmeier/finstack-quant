@@ -70,6 +70,7 @@ fn test_attribution_envelope_json_roundtrip() {
         model_params_t0: None,
         credit_factor_model: None,
         credit_factor_detail_options: Default::default(),
+        full_cross_attribution: false,
     };
 
     let envelope = AttributionEnvelope::new(spec);
@@ -145,6 +146,7 @@ fn test_attribution_envelope_execute_rejects_unknown_schema() {
         model_params_t0: None,
         credit_factor_model: None,
         credit_factor_detail_options: Default::default(),
+        full_cross_attribution: false,
     };
 
     let mut envelope = AttributionEnvelope::new(spec);
@@ -214,6 +216,7 @@ fn test_attribution_envelope_waterfall_roundtrip() {
         model_params_t0: None,
         credit_factor_model: None,
         credit_factor_detail_options: Default::default(),
+        full_cross_attribution: false,
     };
 
     let envelope = AttributionEnvelope::new(spec);
@@ -325,6 +328,7 @@ fn test_attribution_envelope_to_from_json_helpers() {
         model_params_t0: None,
         credit_factor_model: None,
         credit_factor_detail_options: Default::default(),
+        full_cross_attribution: false,
     };
 
     let envelope = AttributionEnvelope::new(spec);

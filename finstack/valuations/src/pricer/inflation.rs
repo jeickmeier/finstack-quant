@@ -2,26 +2,22 @@
 //!
 //! Covers: InflationSwap, YoYInflationSwap, InflationCapFloor.
 
-use super::{InstrumentType, ModelKey, PricerRegistry};
+use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register pricers for inflation instruments (swaps, caps/floors).
 pub fn register_inflation_pricers(registry: &mut PricerRegistry) {
     // Inflation Swap
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::InflationSwap,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::InflationSwap,
-        >::discounting(InstrumentType::InflationSwap),
+        crate::instruments::InflationSwap
     );
 
     // YoY Inflation Swap
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::YoYInflationSwap,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::rates::inflation_swap::YoYInflationSwap,
-        >::discounting(InstrumentType::YoYInflationSwap),
+        crate::instruments::rates::inflation_swap::YoYInflationSwap
     );
 
     // Inflation Cap/Floor

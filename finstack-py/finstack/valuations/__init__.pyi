@@ -890,6 +890,7 @@ def attribute_pnl(
     as_of_t1: str,
     method: str | dict,
     config: dict | None = None,
+    full_cross_attribution: bool | None = None,
 ) -> str:
     """Run P&L attribution for a single instrument.
 
@@ -908,6 +909,7 @@ def attribute_pnl(
             ``{"Waterfall": ["Carry", "RatesCurves", ...]}``,
             ``"MetricsBased"``, or ``{"Taylor": {"include_gamma": True, ...}}``.
         config: Optional config overrides (tolerance, metrics, bump sizes).
+        full_cross_attribution: Option to compute all 36 cross-factor pairs when enabled.
 
     Returns:
         Compact JSON ``PnlAttribution`` payload.

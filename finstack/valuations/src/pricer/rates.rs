@@ -3,7 +3,7 @@
 //! Covers: Bond, IRS, FRA, BasisSwap, Deposit, InterestRateFuture, IrFutureOption,
 //! BondFuture, CapFloor, Swaption, Repo, DCF.
 
-use super::{InstrumentType, ModelKey, PricerRegistry};
+use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register a minimal set of pricers for rates instruments.
 ///
@@ -11,12 +11,10 @@ use super::{InstrumentType, ModelKey, PricerRegistry};
 /// too memory intensive.
 pub fn register_rates_pricers(registry: &mut PricerRegistry) {
     // Bond pricers
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::Bond,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::fixed_income::bond::Bond,
-        >::discounting(InstrumentType::Bond),
+        crate::instruments::fixed_income::bond::Bond
     );
     registry.register(
         InstrumentType::Bond,
@@ -35,48 +33,38 @@ pub fn register_rates_pricers(registry: &mut PricerRegistry) {
     );
 
     // Interest Rate Swaps
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::IRS,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::InterestRateSwap,
-        >::discounting(InstrumentType::IRS),
+        crate::instruments::InterestRateSwap
     );
 
     // FRA
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::FRA,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::ForwardRateAgreement,
-        >::discounting(InstrumentType::FRA),
+        crate::instruments::ForwardRateAgreement
     );
 
     // Basis Swap
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::BasisSwap,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::rates::basis_swap::BasisSwap,
-        >::discounting(InstrumentType::BasisSwap),
+        crate::instruments::rates::basis_swap::BasisSwap
     );
 
     // Deposit
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::Deposit,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::Deposit,
-        >::discounting(InstrumentType::Deposit),
+        crate::instruments::Deposit
     );
 
     // Interest Rate Future
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::InterestRateFuture,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::rates::ir_future::InterestRateFuture,
-        >::discounting(InstrumentType::InterestRateFuture),
+        crate::instruments::rates::ir_future::InterestRateFuture
     );
 
     // IR Future Option
@@ -122,12 +110,10 @@ pub fn register_rates_pricers(registry: &mut PricerRegistry) {
     );
 
     // Repo
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::Repo,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::rates::repo::Repo,
-        >::discounting(InstrumentType::Repo),
+        crate::instruments::rates::repo::Repo
     );
 
     // DCF (Discounted Cash Flow)

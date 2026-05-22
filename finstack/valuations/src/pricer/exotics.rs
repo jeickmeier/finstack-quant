@@ -3,18 +3,16 @@
 //! Covers: Basket, AsianOption, BarrierOption, LookbackOption, QuantoOption,
 //! Autocallable, CmsOption, CmsSwap, CliquetOption, RangeAccrual, BermudanSwaption.
 
-use super::{InstrumentType, ModelKey, PricerRegistry};
+use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register pricers for exotic instruments (barriers, lookbacks, Asians,
 /// autocallables, quantos, cliquets, range accruals, Bermudan swaptions).
 pub fn register_exotic_pricers(registry: &mut PricerRegistry) {
     // Basket
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::Basket,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::exotics::basket::Basket,
-        >::discounting(InstrumentType::Basket),
+        crate::instruments::exotics::basket::Basket
     );
 
     // Asian Option

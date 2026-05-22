@@ -164,6 +164,7 @@ pub(crate) fn apply_total_return_carry(
     attribution: &mut PnlAttribution,
     theta: Money,
     coupon_income: Money,
+    roll_down: Option<Money>,
 ) -> Result<()> {
     attribution.carry = theta.checked_add(coupon_income)?;
     if coupon_income.amount().abs() > 0.0 {
@@ -173,7 +174,7 @@ pub(crate) fn apply_total_return_carry(
         total: attribution.carry,
         coupon_income: Some(SourceLine::scalar(coupon_income)),
         pull_to_par: None,
-        roll_down: None,
+        roll_down: roll_down.map(SourceLine::scalar),
         funding_cost: None,
         theta: Some(theta),
     });

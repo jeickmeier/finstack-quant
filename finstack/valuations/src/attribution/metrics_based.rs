@@ -803,6 +803,10 @@ pub fn attribute_pnl_metrics_based(
                      attribution for an accurate second-order contribution.",
                     avg_shift, abs_shift
                 ));
+                attribution
+                    .meta
+                    .notes
+                    .push("Rates convexity: unreliable / bounds-exceeded".to_string());
             }
         }
     }
@@ -904,6 +908,10 @@ pub fn attribute_pnl_metrics_based(
                      scalar `½·γ·avg²` term collapses for twist-dominated moves.",
                     avg_shift, abs_shift
                 ));
+                attribution
+                    .meta
+                    .notes
+                    .push("Credit convexity: unreliable / bounds-exceeded".to_string());
             }
         }
     }

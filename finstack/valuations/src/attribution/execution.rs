@@ -53,6 +53,7 @@ impl AttributionSpec {
                 self.model_params_t0.as_ref(),
                 resolved_credit_model.as_ref(),
                 &self.credit_factor_detail_options,
+                self.full_cross_attribution,
             )?,
 
             AttributionMethod::Waterfall(order) => attribute_pnl_waterfall_with_credit_model(

@@ -4,17 +4,15 @@
 //! EquityIndexFuture, VolatilityIndexFuture, VolatilityIndexOption,
 //! RealEstateAsset, LeveredRealEstateEquity, PrivateMarketsFund.
 
-use super::{InstrumentType, ModelKey, PricerRegistry};
+use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register pricers for equity instruments.
 pub fn register_equity_pricers(registry: &mut PricerRegistry) {
     // Equity
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::Equity,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::equity::Equity,
-        >::discounting(InstrumentType::Equity),
+        crate::instruments::equity::Equity
     );
 
     // Equity Option
@@ -38,66 +36,52 @@ pub fn register_equity_pricers(registry: &mut PricerRegistry) {
     );
 
     // Equity TRS
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::EquityTotalReturnSwap,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::equity::equity_trs::EquityTotalReturnSwap,
-        >::discounting(InstrumentType::EquityTotalReturnSwap),
+        crate::instruments::equity::equity_trs::EquityTotalReturnSwap
     );
 
     // Variance Swap
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::VarianceSwap,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::equity::variance_swap::VarianceSwap,
-        >::discounting(InstrumentType::VarianceSwap),
+        crate::instruments::equity::variance_swap::VarianceSwap
     );
 
     // Equity Index Future - uses GenericInstrumentPricer
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::EquityIndexFuture,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::EquityIndexFuture,
-        >::discounting(InstrumentType::EquityIndexFuture),
+        crate::instruments::EquityIndexFuture
     );
 
     // Volatility Index Future
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::VolatilityIndexFuture,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::equity::vol_index_future::VolatilityIndexFuture,
-        >::discounting(InstrumentType::VolatilityIndexFuture),
+        crate::instruments::equity::vol_index_future::VolatilityIndexFuture
     );
 
     // Volatility Index Option
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::VolatilityIndexOption,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::equity::vol_index_option::VolatilityIndexOption,
-        >::discounting(InstrumentType::VolatilityIndexOption),
+        crate::instruments::equity::vol_index_option::VolatilityIndexOption
     );
 
     // Real Estate Asset - uses GenericInstrumentPricer (curve dependencies)
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::RealEstateAsset,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::RealEstateAsset,
-        >::discounting(InstrumentType::RealEstateAsset),
+        crate::instruments::RealEstateAsset
     );
 
     // Levered Real Estate Equity - uses GenericInstrumentPricer
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::LeveredRealEstateEquity,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::LeveredRealEstateEquity,
-        >::discounting(InstrumentType::LeveredRealEstateEquity),
+        crate::instruments::LeveredRealEstateEquity
     );
 
     // Private Markets Fund

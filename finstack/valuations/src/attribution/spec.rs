@@ -99,6 +99,9 @@ pub struct AttributionSpec {
     /// `credit_factor_model` is `None`.
     #[serde(default)]
     pub credit_factor_detail_options: CreditFactorDetailOptions,
+    /// Option to compute all 36 cross-factor pairs when enabled
+    #[serde(default)]
+    pub full_cross_attribution: bool,
 }
 
 /// Optional configuration for attribution runs.
@@ -152,6 +155,7 @@ impl AttributionSpec {
                 .transpose()?,
             credit_factor_model: None,
             credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            full_cross_attribution: false,
         })
     }
 }
@@ -291,6 +295,7 @@ mod tests {
             config: None,
             credit_factor_model: None,
             credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            full_cross_attribution: false,
         };
 
         let envelope = AttributionEnvelope::new(spec);
@@ -444,6 +449,7 @@ mod tests {
             config: None,
             credit_factor_model: None,
             credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            full_cross_attribution: false,
         };
 
         let envelope = AttributionEnvelope::new(spec);

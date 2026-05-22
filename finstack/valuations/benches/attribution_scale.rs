@@ -427,6 +427,7 @@ impl CreditFixture {
                     model_params_t0: None,
                     credit_factor_model: Some(model_ref.clone()),
                     credit_factor_detail_options: CreditFactorDetailOptions::default(),
+                    full_cross_attribution: false,
                 };
                 AttributionEnvelope::new(spec)
             })

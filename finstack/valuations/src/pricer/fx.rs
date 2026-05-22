@@ -3,35 +3,21 @@
 //! Covers: FxSpot, FxSwap, XccySwap, FxOption, FxVarianceSwap, FxForward, Ndf,
 //! FxBarrierOption, FxDigitalOption, FxTouchOption.
 
-use super::{InstrumentType, ModelKey, PricerRegistry};
+use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register pricers for FX instruments.
 pub fn register_fx_pricers(registry: &mut PricerRegistry) {
     // FX Spot
-    registry.register(
-        InstrumentType::FxSpot,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::FxSpot,
-        >::discounting(InstrumentType::FxSpot),
-    );
+    register_generic!(registry, InstrumentType::FxSpot, crate::instruments::FxSpot);
 
     // FX Swap
-    registry.register(
-        InstrumentType::FxSwap,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::FxSwap,
-        >::discounting(InstrumentType::FxSwap),
-    );
+    register_generic!(registry, InstrumentType::FxSwap, crate::instruments::FxSwap);
 
     // XCCY Swap
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::XccySwap,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::XccySwap,
-        >::discounting(InstrumentType::XccySwap),
+        crate::instruments::XccySwap
     );
 
     // FX Option
@@ -49,22 +35,14 @@ pub fn register_fx_pricers(registry: &mut PricerRegistry) {
     );
 
     // FX Forward - uses GenericInstrumentPricer (curve dependencies)
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::FxForward,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::FxForward,
-        >::discounting(InstrumentType::FxForward),
+        crate::instruments::FxForward
     );
 
     // NDF (Non-Deliverable Forward) - uses GenericInstrumentPricer (curve dependencies)
-    registry.register(
-        InstrumentType::Ndf,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<crate::instruments::Ndf>::discounting(
-            InstrumentType::Ndf,
-        ),
-    );
+    register_generic!(registry, InstrumentType::Ndf, crate::instruments::Ndf);
 
     // FX Barrier Option
 

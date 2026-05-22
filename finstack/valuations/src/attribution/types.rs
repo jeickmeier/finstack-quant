@@ -1492,7 +1492,7 @@ mod tests {
         // Simulate total-return adjustment (coupon income paid in period).
         let coupon = Money::new(50.0, Currency::USD);
         let theta = Money::new(30.0, Currency::USD);
-        apply_total_return_carry(&mut attr, theta, coupon).expect("carry add");
+        apply_total_return_carry(&mut attr, theta, coupon, None).expect("carry add");
 
         // total_pnl is now total-return (1000 + 50 = 1050); mark-to-market
         // must still report the raw pre-coupon price change (1000).

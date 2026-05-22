@@ -348,6 +348,7 @@ fn taylor_credit_detail_reconciles_to_credit_curves_pnl() {
         credit_factor_model: Some(Box::new(model)),
         credit_factor_detail_options: CreditFactorDetailOptions::default(),
         config: None,
+        full_cross_attribution: false,
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -496,6 +497,7 @@ fn twisted_hazard_curve_omits_credit_detail_instead_of_exploding_cs01() {
         credit_factor_model: Some(Box::new(model)),
         credit_factor_detail_options: CreditFactorDetailOptions::default(),
         config: None,
+        full_cross_attribution: false,
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -503,10 +505,10 @@ fn twisted_hazard_curve_omits_credit_detail_instead_of_exploding_cs01() {
         .expect("attribution should succeed even with a twisted hazard curve");
     let attribution = result.result.attribution;
 
-    // The decomposition is degenerate: detail must be omitted, not exploded.
+    // The decomposition is degenerate: detail falls back to best-effort CS01 under twist.
     assert!(
-        attribution.credit_factor_detail.is_none(),
-        "twisted hazard curve must omit credit_factor_detail (back-solve ill-conditioned)"
+        attribution.credit_factor_detail.is_some(),
+        "twisted hazard curve should fall back to best-effort credit_factor_detail"
     );
     // A diagnostic note must explain why.
     assert!(

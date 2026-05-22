@@ -67,6 +67,7 @@ fn spec_rejects_unknown_metrics() {
             rounding_scale: None,
             rate_bump_bp: None,
         }),
+        full_cross_attribution: false,
     };
 
     let envelope = AttributionEnvelope::new(spec);

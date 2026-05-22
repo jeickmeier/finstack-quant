@@ -99,7 +99,7 @@ impl AttributionSpec {
             return Ok(None);
         }
 
-        let ds_i = avg_shift_bp;
+        let mut ds_i = avg_shift_bp;
 
         // Guard the back-solve `CS01 = -credit_pnl / ds_i` against a
         // divide-by-near-zero. The back-solve is only well-conditioned when the
@@ -117,15 +117,15 @@ impl AttributionSpec {
         if parallel_fraction_floor > 0.0
             && avg_shift_bp.abs() < parallel_fraction_floor * avg_abs_shift_bp.abs()
         {
+            let sign = if avg_shift_bp < 0.0 { -1.0 } else { 1.0 };
+            ds_i = sign * avg_abs_shift_bp;
             notes.push(format!(
-                "credit_factor_detail unavailable: hazard curve(s) twisted \
+                "credit_factor_detail best-effort fallback: hazard curve(s) twisted \
                  (signed avg shift {:.6}bp vs absolute avg shift {:.6}bp; \
-                 parallel_fraction_floor={:.3e}); a single back-solved CS01 \
-                 cannot represent a non-parallel move and -credit_pnl/ds_i \
-                 would be ill-conditioned",
+                 parallel_fraction_floor={:.3e}); using absolute avg shift for \
+                 conditioning",
                 avg_shift_bp, avg_abs_shift_bp, parallel_fraction_floor
             ));
-            return Ok(None);
         }
 
         // 6. Back-solve the effective CS01 from the existing credit_curves_pnl
@@ -290,11 +290,33 @@ impl AttributionSpec {
         // 3. Sample base rate r and spread s at the bond's tenor (or 5y
         //    fallback). Use the instrument's expiry when available.
         let tenor_date = instrument.expiry().unwrap_or_else(|| {
-            // 5y fallback from as_of_t0.
-            let dur_days = (5.0 * 365.25) as i64;
-            self.as_of_t0
-                .checked_add(time::Duration::days(dur_days))
-                .unwrap_or(self.as_of_t0)
+            let cal_code = instrument
+                .attributes()
+                .get_meta("calendar")
+                .or_else(|| instrument.attributes().get_meta("calendar_id"))
+                .unwrap_or("usny");
+            let calendar = finstack_core::dates::CalendarRegistry::global()
+                .resolve_str(cal_code)
+                .or_else(|| finstack_core::dates::CalendarRegistry::global().resolve_str("usny"));
+            let _day_count = instrument
+                .attributes()
+                .get_meta("day_count")
+                .or_else(|| instrument.attributes().get_meta("daycount"))
+                .and_then(|dc| dc.parse::<finstack_core::dates::DayCount>().ok())
+                .unwrap_or(finstack_core::dates::DayCount::Act365F);
+            let tenor = finstack_core::dates::Tenor::new(5, finstack_core::dates::TenorUnit::Years);
+            tenor
+                .add_to_date(
+                    self.as_of_t0,
+                    calendar,
+                    finstack_core::dates::BusinessDayConvention::Following,
+                )
+                .unwrap_or_else(|_| {
+                    let dur_days = (5.0 * 365.25) as i64;
+                    self.as_of_t0
+                        .checked_add(time::Duration::days(dur_days))
+                        .unwrap_or(self.as_of_t0)
+                })
         });
         let r = disc
             .zero_rate_on_date(tenor_date, Compounding::Continuous)

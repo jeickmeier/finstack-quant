@@ -65,6 +65,40 @@ mod rates;
 
 use std::sync::{Arc, OnceLock};
 
+/// Register a [`GenericInstrumentPricer`](crate::instruments::common_impl::GenericInstrumentPricer)
+/// for an instrument type, collapsing the repetitive registration boilerplate
+/// shared by every asset-class shard.
+///
+/// Two forms are supported:
+///
+/// - `register_generic!(registry, InstrumentType::Foo, crate::instruments::FooType);`
+///   registers the discounting pricer (`GenericInstrumentPricer::<T>::discounting`)
+///   under `ModelKey::Discounting`.
+/// - `register_generic!(registry, InstrumentType::Foo, crate::instruments::FooType, ModelKey::Bar);`
+///   registers `GenericInstrumentPricer::<T>::new(InstrumentType::Foo, ModelKey::Bar)`
+///   under the explicit model key.
+///
+/// Both forms expand to a single `registry.register(...)` call with behavior
+/// byte-identical to the hand-written registrations they replace.
+macro_rules! register_generic {
+    ($registry:expr, $inst:expr, $ty:ty $(,)?) => {
+        $registry.register(
+            $inst,
+            $crate::pricer::ModelKey::Discounting,
+            $crate::instruments::common_impl::GenericInstrumentPricer::<$ty>::discounting($inst),
+        )
+    };
+    ($registry:expr, $inst:expr, $ty:ty, $model:expr $(,)?) => {
+        $registry.register(
+            $inst,
+            $model,
+            $crate::instruments::common_impl::GenericInstrumentPricer::<$ty>::new($inst, $model),
+        )
+    };
+}
+
+pub(crate) use register_generic;
+
 /// Register all standard pricers explicitly.
 ///
 /// This function keeps the full registration list in one visible place while

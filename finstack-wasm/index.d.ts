@@ -1602,7 +1602,8 @@ export interface ValuationsNamespace {
     asOfT0: string,
     asOfT1: string,
     methodJson: string,
-    configJson?: string
+    configJson?: string,
+    fullCrossAttribution?: boolean
   ): string;
   /** Run attribution from a full JSON AttributionEnvelope. */
   attributePnlFromSpec(specJson: string): string;

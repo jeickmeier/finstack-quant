@@ -319,7 +319,25 @@ pub fn attribute_pnl_waterfall_with_credit_model(
                 )
                 .unwrap_or(0.0);
                 let coupon_income = Money::new(coupon_income_value, factor_pnl.currency());
-                apply_total_return_carry(&mut attribution, theta, coupon_income)?;
+
+                let roll_down_opt = if let Ok(val_res) = ctx.current_instrument.price_with_metrics(
+                    market_t0,
+                    as_of_t0,
+                    &[crate::metrics::MetricId::RollDown],
+                    crate::instruments::common_impl::traits::PricingOptions::default(),
+                ) {
+                    val_res
+                        .measures
+                        .get(crate::metrics::MetricId::RollDown.as_str())
+                        .copied()
+                } else {
+                    None
+                };
+                let time_period_days = (as_of_t1 - as_of_t0).whole_days() as f64;
+                let roll_down = roll_down_opt
+                    .map(|rd| Money::new(rd * time_period_days, factor_pnl.currency()));
+
+                apply_total_return_carry(&mut attribution, theta, coupon_income, roll_down)?;
             }
             AttributionFactor::RatesCurves => attribution.rates_curves_pnl = factor_pnl,
             AttributionFactor::CreditCurves => attribution.credit_curves_pnl = factor_pnl,

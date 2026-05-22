@@ -94,8 +94,9 @@ pub fn attribute_pnl(
     as_of_t1: &str,
     method_json: &str,
     config_json: Option<String>,
+    full_cross_attribution: Option<bool>,
 ) -> Result<String, JsValue> {
-    let spec = finstack_valuations::attribution::AttributionSpec::from_json_inputs(
+    let mut spec = finstack_valuations::attribution::AttributionSpec::from_json_inputs(
         instrument_json,
         market_t0_json,
         market_t1_json,
@@ -105,6 +106,9 @@ pub fn attribute_pnl(
         config_json.as_deref(),
     )
     .map_err(attribution_error_to_js)?;
+    if let Some(val) = full_cross_attribution {
+        spec.full_cross_attribution = val;
+    }
     let result = spec.execute().map_err(attribution_error_to_js)?;
     serde_json::to_string(&result.attribution).map_err(to_js_err)
 }

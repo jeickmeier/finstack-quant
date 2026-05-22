@@ -219,6 +219,7 @@ fn waterfall_credit_factor_detail_reconciles_to_credit_curves_pnl() {
         credit_factor_model: Some(Box::new(model)),
         credit_factor_detail_options: CreditFactorDetailOptions::default(),
         config: None,
+        full_cross_attribution: false,
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -290,6 +291,7 @@ fn waterfall_twisted_hazard_attributes_curve_shape_not_adder() {
         credit_factor_model: Some(Box::new(model)),
         credit_factor_detail_options: CreditFactorDetailOptions::default(),
         config: None,
+        full_cross_attribution: false,
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -360,6 +362,7 @@ fn parallel_credit_detail_plus_cross_effects_preserves_total() {
         credit_factor_model: Some(Box::new(model)),
         credit_factor_detail_options: CreditFactorDetailOptions::default(),
         config: None,
+        full_cross_attribution: false,
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -423,6 +426,7 @@ fn waterfall_no_model_keeps_default_credit_step() {
         credit_factor_model: None,
         credit_factor_detail_options: CreditFactorDetailOptions::default(),
         config: None,
+        full_cross_attribution: false,
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -454,6 +458,7 @@ fn parallel_model_with_unmapped_issuer_adds_diagnostic_note() {
         credit_factor_model: Some(Box::new(model)),
         credit_factor_detail_options: CreditFactorDetailOptions::default(),
         config: None,
+        full_cross_attribution: false,
     };
 
     let attribution = AttributionEnvelope::new(spec)
@@ -497,6 +502,7 @@ fn same_credit_total_different_hierarchy_different_detail() {
             credit_factor_model: Some(Box::new(model)),
             credit_factor_detail_options: CreditFactorDetailOptions::default(),
             config: None,
+            full_cross_attribution: false,
         };
         AttributionEnvelope::new(spec)
             .execute()

@@ -8,8 +8,8 @@
 //! CDS / CDSIndex / CDSTranche, `Black76` for CDSOption).
 
 use super::{
-    expect_inst, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry, PricingError,
-    PricingErrorContext, PricingResult,
+    expect_inst, register_generic, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry,
+    PricingError, PricingErrorContext, PricingResult,
 };
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::structured_credit::{
@@ -50,12 +50,10 @@ pub fn register_credit_pricers(registry: &mut PricerRegistry) {
     );
 
     // Structured Credit - unified pricer for ABS, CLO, CMBS, RMBS
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::StructuredCredit,
-        ModelKey::Discounting,
-        crate::instruments::common_impl::GenericInstrumentPricer::<
-            crate::instruments::fixed_income::structured_credit::StructuredCredit,
-        >::discounting(InstrumentType::StructuredCredit),
+        crate::instruments::fixed_income::structured_credit::StructuredCredit
     );
 
     registry.register(

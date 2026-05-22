@@ -56,7 +56,7 @@ use pyo3::types::PyDict;
 /// >>> print(attr.explain())
 /// >>> attr.to_dataframe()
 #[pyfunction]
-#[pyo3(signature = (instrument_json, market_t0_json, market_t1_json, as_of_t0, as_of_t1, method, config=None))]
+#[pyo3(signature = (instrument_json, market_t0_json, market_t1_json, as_of_t0, as_of_t1, method, config=None, full_cross_attribution=None))]
 #[allow(clippy::too_many_arguments)]
 fn attribute_pnl(
     py: Python<'_>,
@@ -67,12 +67,13 @@ fn attribute_pnl(
     as_of_t1: &str,
     method: &Bound<'_, PyAny>,
     config: Option<&Bound<'_, PyAny>>,
+    full_cross_attribution: Option<bool>,
 ) -> PyResult<String> {
     let method_json = py_to_json_string(py, method, "method")?;
     let config_json = config
         .map(|value| py_to_json_string(py, value, "config"))
         .transpose()?;
-    let spec = finstack_valuations::attribution::AttributionSpec::from_json_inputs(
+    let mut spec = finstack_valuations::attribution::AttributionSpec::from_json_inputs(
         instrument_json,
         market_t0_json,
         market_t1_json,
@@ -82,6 +83,10 @@ fn attribute_pnl(
         config_json.as_deref(),
     )
     .map_err(display_to_py)?;
+
+    if let Some(val) = full_cross_attribution {
+        spec.full_cross_attribution = val;
+    }
 
     // GIL is released for the entire attribution computation. The closure body
     // accesses no Python objects (`spec` is a fully-deserialized Rust value
