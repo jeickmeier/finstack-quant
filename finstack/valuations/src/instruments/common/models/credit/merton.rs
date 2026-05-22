@@ -243,7 +243,7 @@ impl MertonModel {
     ///   Let mu = r - q - sigma^2/2, H = B * exp(g * T).
     ///   d_plus  = (ln(V/H) + mu * T) / (sigma * sqrt(T))
     ///   d_minus = (ln(V/H) - mu * T) / (sigma * sqrt(T))
-    ///   PD = N(-d_plus) + (V/H)^(-2*mu/sigma^2) * N(d_minus)
+    ///   PD = N(-d_plus) + (V/H)^(-2*mu/sigma^2) * N(-d_minus)
     ///
     /// The first-passage result is clamped to `[0, 1]` because the two-term
     /// approximation can slightly exceed 1.0 when the risk-neutral drift
@@ -1963,6 +1963,53 @@ mod tests {
         assert!(
             pd < 1.0,
             "Healthy firm (V > B) with zero drift must have PD < 1.0, got {pd}"
+        );
+    }
+
+    #[test]
+    fn first_passage_nonzero_drift_reflection_sign() {
+        // Parameters chosen so mu = r - q - 0.5*sigma^2 != 0.
+        // r = 0.05, q = 0.01, sigma = 0.20  =>  mu = 0.05 - 0.01 - 0.02 = 0.02 (positive drift).
+        let sigma: f64 = 0.20;
+        let r = 0.05_f64;
+        let q = 0.01_f64;
+        let t = 3.0_f64;
+        let v = 120.0_f64;
+        let b = 100.0_f64;
+
+        let model = MertonModel::new_with_dynamics(
+            v,
+            sigma,
+            b,
+            r,
+            q,
+            BarrierType::FirstPassage {
+                barrier_growth_rate: 0.0,
+            },
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid model");
+
+        let pd = model.default_probability(t);
+
+        // Closed-form reference (mu != 0, barrier_growth_rate = 0 => H = B).
+        let mu = r - q - 0.5 * sigma * sigma; // = 0.02
+        let sqrt_t = t.sqrt();
+        let sigma_sqrt_t = sigma * sqrt_t;
+        let log_v_h = (v / b).ln();
+        let d_plus = (log_v_h + mu * t) / sigma_sqrt_t;
+        let d_minus = (log_v_h - mu * t) / sigma_sqrt_t;
+        let exponent = -2.0 * mu / (sigma * sigma);
+        let expected =
+            norm_cdf(-d_plus) + (v / b).powf(exponent) * norm_cdf(-d_minus);
+
+        assert!(
+            (pd - expected).abs() < 1e-10,
+            "Black-Cox non-zero-drift PD should be {expected:.10}, got {pd:.10}"
+        );
+        assert!(
+            pd < 1.0,
+            "Healthy firm (V > B) with positive drift must have PD < 1.0, got {pd}"
         );
     }
 }
