@@ -11,7 +11,6 @@
 //! - ParSpread (Bloomberg CDSO ATM forward spread in bp)
 //! - Implied Volatility (placeholder)
 
-mod cs01;
 pub(crate) mod delta;
 mod dv01;
 pub(crate) mod gamma;
@@ -24,6 +23,79 @@ mod theta;
 pub(crate) mod vega;
 
 use crate::metrics::MetricRegistry;
+
+/// Per-deal CS01 conventions for [`CDSOption`].
+///
+/// Drives the generic credit CS01 calculator
+/// ([`crate::metrics::sensitivities::cs01::CreditParallelCs01`]). The CDS
+/// option does not carry its own doc clause / valuation convention; CS01 is a
+/// quote-spread risk measured against the *synthetic underlying CDS*, so the
+/// conventions are read off `synthetic_underlying_cds`.
+///
+/// `cs01_precheck` reproduces the two legacy guards: a `0.0` short-circuit
+/// once the option has expired, and a hard calibration error when the hazard
+/// curve carries no CDS quote / par-spread points.
+///
+/// CDS options price through their `value` path (Bloomberg CDSO), so
+/// `cs01_use_pricer_registry` returns `false` to keep scenario overrides and
+/// avoid the registry's raw path skipping them.
+impl crate::metrics::sensitivities::cs01::CdsCs01Conventions
+    for crate::instruments::credit_derivatives::cds_option::CDSOption
+{
+    fn cs01_bootstrap_convention(
+        &self,
+        as_of: finstack_core::dates::Date,
+    ) -> finstack_core::Result<(
+        crate::market::conventions::ids::CdsDocClause,
+        crate::instruments::credit_derivatives::cds::CdsValuationConvention,
+    )> {
+        // CS01 is a quote-spread risk measured against the synthetic
+        // underlying CDS; its doc clause and valuation convention drive the
+        // hazard re-bootstrap.
+        let synthetic =
+            crate::instruments::credit_derivatives::cds_option::pricer::synthetic_underlying_cds(
+                self, as_of,
+            )?;
+        Ok((
+            crate::instruments::credit_derivatives::cds::metrics::market_doc_clause(&synthetic),
+            synthetic.valuation_convention,
+        ))
+    }
+
+    fn cs01_precheck(
+        &self,
+        context: &crate::metrics::MetricContext,
+        hazard_id: &finstack_core::types::CurveId,
+    ) -> finstack_core::Result<Option<f64>> {
+        let as_of = context.as_of;
+        if as_of >= self.expiry {
+            tracing::debug!(
+                instrument_id = %self.id,
+                as_of = %as_of,
+                expiry = %self.expiry,
+                "CDS Option CS01: Instrument already expired, returning 0.0"
+            );
+            return Ok(Some(0.0));
+        }
+
+        let hazard = context.curves.get_hazard(hazard_id.as_str())?;
+        if hazard.par_spread_points().next().is_none() {
+            return Err(finstack_core::Error::Calibration {
+                message: format!(
+                    "CDS option '{}' CS01 requires CDS quote/par-spread points on hazard curve '{}'",
+                    self.id,
+                    hazard_id.as_str()
+                ),
+                category: "cs01_quote_bump".to_string(),
+            });
+        }
+        Ok(None)
+    }
+
+    fn cs01_use_pricer_registry(&self) -> bool {
+        false
+    }
+}
 
 /// Register all CDS Option metrics with the registry
 pub(crate) fn register_cds_option_metrics(registry: &mut MetricRegistry) {
@@ -45,7 +117,9 @@ pub(crate) fn register_cds_option_metrics(registry: &mut MetricRegistry) {
             (Delta, delta::DeltaCalculator),
             (Gamma, gamma::GammaCalculator),
             (Vega, vega::VegaCalculator),
-            (Cs01, cs01::Cs01Calculator),
+            (Cs01, crate::metrics::sensitivities::cs01::CreditParallelCs01::<
+                crate::instruments::credit_derivatives::cds_option::CDSOption,
+            >::default()),
             (SpreadDv01, spread_dv01::UnderlyingSpreadDv01Calculator),
             (Dv01, dv01::CdsOptionDv01Calculator),
             (Theta, theta::ThetaCalculator),

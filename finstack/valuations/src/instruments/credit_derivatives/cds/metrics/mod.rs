@@ -15,7 +15,6 @@
 //! - Jump to default (includes accrued premium)
 //! - Jump to default LGD only (excludes accrued premium)
 
-mod cs01;
 mod cs_gamma;
 mod dv01;
 mod expected_loss;
@@ -84,6 +83,39 @@ pub(crate) fn hazard_with_deal_quote(
     ))
 }
 
+/// Per-deal CS01 conventions for [`CreditDefaultSwap`].
+///
+/// Drives the generic credit CS01 calculators
+/// ([`crate::metrics::sensitivities::cs01::CreditParallelCs01`] /
+/// [`CreditBucketedCs01`](crate::metrics::sensitivities::cs01::CreditBucketedCs01))
+/// so the hazard curve is re-bootstrapped under this CDS's doc clause and
+/// valuation convention. The optional curve override reproduces the legacy
+/// deal-quote hazard substitution.
+impl crate::metrics::sensitivities::cs01::CdsCs01Conventions
+    for crate::instruments::credit_derivatives::cds::CreditDefaultSwap
+{
+    fn cs01_bootstrap_convention(
+        &self,
+        _as_of: finstack_core::dates::Date,
+    ) -> finstack_core::Result<(
+        crate::market::conventions::ids::CdsDocClause,
+        crate::instruments::credit_derivatives::cds::CdsValuationConvention,
+    )> {
+        Ok((market_doc_clause(self), self.valuation_convention))
+    }
+
+    fn cs01_curve_override(
+        &self,
+        curves: &finstack_core::market_data::context::MarketContext,
+        hazard_id: &finstack_core::types::CurveId,
+        _as_of: finstack_core::dates::Date,
+    ) -> finstack_core::Result<Option<finstack_core::market_data::context::MarketContext>> {
+        let hazard = curves.get_hazard(hazard_id.as_str())?;
+        Ok(hazard_with_deal_quote(self, hazard.as_ref())?
+            .map(|quote_hazard| curves.clone().insert(quote_hazard)))
+    }
+}
+
 /// Register all CDS metrics with the registry
 pub(crate) fn register_cds_metrics(registry: &mut MetricRegistry) {
     use crate::metrics::MetricId;
@@ -117,8 +149,12 @@ pub(crate) fn register_cds_metrics(registry: &mut MetricRegistry) {
         metrics: [
             (ParSpread, par_spread::ParSpreadCalculator),
             (RiskyAnnuity, risky_annuity::RiskyAnnuityCalculator),
-            (Cs01, cs01::CdsCs01Calculator),
-            (BucketedCs01, cs01::CdsBucketedCs01Calculator),
+            (Cs01, crate::metrics::sensitivities::cs01::CreditParallelCs01::<
+                crate::instruments::credit_derivatives::cds::CreditDefaultSwap,
+            >::default()),
+            (BucketedCs01, crate::metrics::sensitivities::cs01::CreditBucketedCs01::<
+                crate::instruments::credit_derivatives::cds::CreditDefaultSwap,
+            >::default()),
             (CsGamma, cs_gamma::CsGammaCalculator),
             (ProtectionLegPv, pv_protection::ProtectionLegPvCalculator),
             (PremiumLegPv, pv_premium::PremiumLegPvCalculator),

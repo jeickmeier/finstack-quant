@@ -748,6 +748,261 @@ where
     }
 }
 
+// ===== Credit-Convention-Aware CS01 Calculators =====
+
+/// Per-deal CS01 conventions supplied by credit instruments (CDS, CDS Option).
+///
+/// The generic [`GenericParallelCs01`] / [`GenericBucketedCs01`] calculators
+/// re-bootstrap the hazard curve under fixed `doc_clause: None` /
+/// `cds_valuation_convention: None`. For genuine credit instruments those are
+/// **per-deal** quote-convention inputs to the par-spread→hazard bootstrap, so
+/// they must be read off the specific instrument at `calculate()` time rather
+/// than baked into a per-type calculator.
+///
+/// This trait collects every credit-specific CS01 input so the
+/// [`CreditParallelCs01`] / [`CreditBucketedCs01`] calculators can fully
+/// reproduce the behaviour of the former bespoke `cds` / `cds_option` CS01
+/// calculators with byte-identical output.
+pub(crate) trait CdsCs01Conventions {
+    /// Doc clause and valuation convention used to re-bootstrap the hazard
+    /// curve from par spreads.
+    ///
+    /// `as_of` is supplied so instruments that derive the convention from a
+    /// date-dependent synthetic underlying (e.g. a CDS option) can build it
+    /// against the actual valuation date.
+    fn cs01_bootstrap_convention(
+        &self,
+        as_of: finstack_core::dates::Date,
+    ) -> finstack_core::Result<(CdsDocClause, CdsValuationConvention)>;
+
+    /// Optional pre-check run before the CS01 compute.
+    ///
+    /// Returning `Ok(Some(v))` short-circuits CS01 to `v` (e.g. a CDS option
+    /// past expiry reports `0.0`). Returning `Err(..)` surfaces a hard
+    /// validation/calibration error (e.g. a CDS option whose hazard curve
+    /// carries no par-spread points). `Ok(None)` proceeds normally.
+    fn cs01_precheck(
+        &self,
+        _context: &MetricContext,
+        _hazard_id: &CurveId,
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(None)
+    }
+
+    /// Optional replacement market context applied for the duration of the
+    /// CS01 compute (e.g. a CDS with a deal-level quote override swaps in a
+    /// hazard curve rebuilt from that quote). `None` leaves `context.curves`
+    /// unchanged.
+    fn cs01_curve_override(
+        &self,
+        _curves: &MarketContext,
+        _hazard_id: &CurveId,
+        _as_of: finstack_core::dates::Date,
+    ) -> finstack_core::Result<Option<MarketContext>> {
+        Ok(None)
+    }
+
+    /// Whether the reval closure should route through the pricer registry
+    /// (`true`, the standard path) or call `Instrument::value_raw` directly
+    /// (`false`). CDS options price via their `value` path; routing through
+    /// the registry would skip scenario overrides, so they opt out.
+    fn cs01_use_pricer_registry(&self) -> bool {
+        true
+    }
+}
+
+/// Build the reval closure used by the credit CS01 calculators, honouring the
+/// instrument's [`CdsCs01Conventions::cs01_use_pricer_registry`] preference.
+fn credit_cs01_reval(
+    context: &MetricContext,
+    use_registry: bool,
+) -> impl FnMut(&MarketContext) -> finstack_core::Result<f64> {
+    let inst_arc = Arc::clone(&context.instrument);
+    let (model, registry) = context.clone_pricer_dispatch();
+    let as_of = context.as_of;
+    move |temp_ctx: &MarketContext| {
+        if use_registry {
+            if let (Some(model), Some(registry)) = (model, registry.as_ref()) {
+                return registry
+                    .price_raw(inst_arc.as_ref(), model, temp_ctx, as_of)
+                    .map_err(Into::into);
+            }
+        }
+        inst_arc.value_raw(temp_ctx, as_of)
+    }
+}
+
+/// Credit-convention-aware parallel CS01 calculator.
+///
+/// Behaves like [`GenericParallelCs01`] but reads the per-deal `doc_clause`
+/// and `cds_valuation_convention` (and optional pre-check / curve override)
+/// from the instrument via [`CdsCs01Conventions`]. Used by `CreditDefaultSwap`
+/// and `CDSOption`.
+pub(crate) struct CreditParallelCs01<I> {
+    _phantom: PhantomData<I>,
+}
+
+impl<I> Default for CreditParallelCs01<I> {
+    fn default() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> MetricCalculator for CreditParallelCs01<I>
+where
+    I: Instrument + CurveDependencies + CdsCs01Conventions + 'static,
+{
+    fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
+        let instrument: &I = context.instrument_as()?;
+        let hazard_id = match resolve_cs01_curves(instrument)? {
+            Cs01Curves::Resolved(hazard_id, _discount_id) => hazard_id,
+            Cs01Curves::NoCreditCurve => {
+                return Err(missing_credit_curve_error(instrument, "CS01"))
+            }
+        };
+
+        // Re-borrow per step to keep the instrument borrow short-lived.
+        if let Some(v) = context
+            .instrument_as::<I>()?
+            .cs01_precheck(context, &hazard_id)?
+        {
+            return Ok(v);
+        }
+
+        let (doc_clause, valuation_convention) = context
+            .instrument_as::<I>()?
+            .cs01_bootstrap_convention(context.as_of)?;
+        let use_registry = context.instrument_as::<I>()?.cs01_use_pricer_registry();
+
+        let original_curves = Arc::clone(&context.curves);
+        if let Some(override_ctx) = context.instrument_as::<I>()?.cs01_curve_override(
+            original_curves.as_ref(),
+            &hazard_id,
+            context.as_of,
+        )? {
+            context.curves = Arc::new(override_ctx);
+        }
+
+        // Resolve the discount curve from whatever context is now active.
+        let discount_id = context
+            .instrument_as::<I>()?
+            .curve_dependencies()?
+            .discount_curves
+            .first()
+            .cloned();
+
+        let bump_bp =
+            sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?
+                .credit_spread_bump_bp;
+
+        let reval = credit_cs01_reval(context, use_registry);
+
+        let cs01_result = compute_parallel_cs01_with_context_raw(
+            context,
+            &hazard_id,
+            discount_id.as_ref(),
+            bump_bp,
+            Some(doc_clause),
+            Some(valuation_convention),
+            reval,
+        );
+        context.curves = original_curves;
+        let cs01 = cs01_result?;
+
+        context.computed.insert(
+            MetricId::custom(format!("cs01::{}", hazard_id.as_str())),
+            cs01,
+        );
+
+        Ok(cs01)
+    }
+}
+
+/// Credit-convention-aware bucketed (key-rate) CS01 calculator.
+///
+/// Behaves like [`GenericBucketedCs01`] but reads the per-deal CDS bootstrap
+/// convention from the instrument via [`CdsCs01Conventions`].
+pub(crate) struct CreditBucketedCs01<I> {
+    _phantom: PhantomData<I>,
+}
+
+impl<I> Default for CreditBucketedCs01<I> {
+    fn default() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<I> MetricCalculator for CreditBucketedCs01<I>
+where
+    I: Instrument + CurveDependencies + CdsCs01Conventions + 'static,
+{
+    fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
+        let instrument: &I = context.instrument_as()?;
+        let hazard_id = match resolve_cs01_curves(instrument)? {
+            Cs01Curves::Resolved(hazard_id, _discount_id) => hazard_id,
+            Cs01Curves::NoCreditCurve => {
+                return Err(missing_credit_curve_error(instrument, "bucketed CS01"))
+            }
+        };
+
+        if let Some(v) = context
+            .instrument_as::<I>()?
+            .cs01_precheck(context, &hazard_id)?
+        {
+            return Ok(v);
+        }
+
+        let (doc_clause, valuation_convention) = context
+            .instrument_as::<I>()?
+            .cs01_bootstrap_convention(context.as_of)?;
+        let use_registry = context.instrument_as::<I>()?.cs01_use_pricer_registry();
+
+        let original_curves = Arc::clone(&context.curves);
+        if let Some(override_ctx) = context.instrument_as::<I>()?.cs01_curve_override(
+            original_curves.as_ref(),
+            &hazard_id,
+            context.as_of,
+        )? {
+            context.curves = Arc::new(override_ctx);
+        }
+
+        let discount_id = context
+            .instrument_as::<I>()?
+            .curve_dependencies()?
+            .discount_curves
+            .first()
+            .cloned();
+
+        let defaults =
+            sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
+        let buckets = defaults.cs01_buckets_years;
+        let bump_bp = defaults.credit_spread_bump_bp;
+
+        let reval = credit_cs01_reval(context, use_registry);
+
+        let series_id = MetricId::custom(format!("bucketed_cs01::{}", hazard_id.as_str()));
+        let bucketed_result = compute_key_rate_cs01_series_with_context_raw(
+            context,
+            &hazard_id,
+            discount_id.as_ref(),
+            KeyRateCs01Request {
+                series_id,
+                bucket_times_years: buckets,
+                bump_bp,
+                doc_clause: Some(doc_clause),
+                cds_valuation_convention: Some(valuation_convention),
+            },
+            reval,
+        );
+        context.curves = original_curves;
+        bucketed_result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

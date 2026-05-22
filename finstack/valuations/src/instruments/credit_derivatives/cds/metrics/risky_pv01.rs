@@ -5,7 +5,6 @@
 //! and is priced clean, the calculator delegates to the CS01 path so the
 //! reported PV01 is consistent with the deal-quote-based hazard rebootstrap.
 
-use super::cs01::CdsCs01Calculator;
 use crate::instruments::credit_derivatives::cds::pricer::CDSPricer;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -21,7 +20,10 @@ impl MetricCalculator for RiskyPv01Calculator {
             cds.uses_clean_price() && cds.pricing_overrides.market_quotes.cds_quote_bp.is_some()
         };
         if use_deal_quote {
-            return CdsCs01Calculator.calculate(context);
+            return crate::metrics::sensitivities::cs01::CreditParallelCs01::<
+                CreditDefaultSwap,
+            >::default()
+            .calculate(context);
         }
 
         let cds: &CreditDefaultSwap = context.instrument_as()?;
