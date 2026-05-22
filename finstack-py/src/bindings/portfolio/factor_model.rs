@@ -66,7 +66,12 @@ fn decomposition_method_label(method: DecompositionMethod) -> &'static str {
 // ---------------------------------------------------------------------------
 
 /// Aggregate contribution of a single factor to portfolio risk.
-#[pyclass(name = "FactorContribution", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "FactorContribution",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyFactorContribution {
     pub(crate) inner: FactorContribution,
@@ -133,7 +138,8 @@ impl PyFactorContribution {
 #[pyclass(
     name = "PositionFactorContribution",
     module = "finstack.portfolio",
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone)]
 pub struct PyPositionFactorContribution {
@@ -194,7 +200,8 @@ impl PyPositionFactorContribution {
 #[pyclass(
     name = "PositionResidualContribution",
     module = "finstack.portfolio",
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone)]
 pub struct PyPositionResidualContribution {
@@ -267,7 +274,12 @@ impl PyPositionResidualContribution {
 // ---------------------------------------------------------------------------
 
 /// Portfolio-level decomposition of total risk across common factors and residuals.
-#[pyclass(name = "RiskDecomposition", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "RiskDecomposition",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyRiskDecomposition {
     pub(crate) inner: RiskDecomposition,
@@ -359,7 +371,8 @@ impl PyRiskDecomposition {
 #[pyclass(
     name = "PositionVarContribution",
     module = "finstack.portfolio",
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone)]
 pub struct PyPositionVarContribution {
@@ -425,7 +438,12 @@ impl PyPositionVarContribution {
 }
 
 /// Per-position component ES and marginal ES.
-#[pyclass(name = "PositionEsContribution", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "PositionEsContribution",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyPositionEsContribution {
     pub(crate) inner: PositionEsContribution,
@@ -491,7 +509,8 @@ impl PyPositionEsContribution {
 #[pyclass(
     name = "PositionRiskDecomposition",
     module = "finstack.portfolio",
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone)]
 pub struct PyPositionRiskDecomposition {
@@ -588,7 +607,12 @@ impl PyPositionRiskDecomposition {
 // ---------------------------------------------------------------------------
 
 /// Per-position budget comparison entry.
-#[pyclass(name = "PositionBudgetEntry", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "PositionBudgetEntry",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyPositionBudgetEntry {
     pub(crate) inner: PositionBudgetEntry,
@@ -652,7 +676,12 @@ impl PyPositionBudgetEntry {
 }
 
 /// Budget evaluation result across positions.
-#[pyclass(name = "RiskBudgetResult", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "RiskBudgetResult",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyRiskBudgetResult {
     pub(crate) inner: RiskBudgetResult,
@@ -716,7 +745,8 @@ impl PyRiskBudgetResult {
 #[pyclass(
     name = "FactorContributionDelta",
     module = "finstack.portfolio",
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone)]
 pub struct PyFactorContributionDelta {
@@ -774,7 +804,12 @@ impl PyFactorContributionDelta {
 // ---------------------------------------------------------------------------
 
 /// Result of a position what-if scenario.
-#[pyclass(name = "WhatIfResult", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "WhatIfResult",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyWhatIfResult {
     pub(crate) inner: WhatIfResult,
@@ -835,7 +870,12 @@ impl PyWhatIfResult {
 // ---------------------------------------------------------------------------
 
 /// Result of a factor-stress scenario.
-#[pyclass(name = "StressResult", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "StressResult",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyStressResult {
     pub(crate) inner: StressResult,
@@ -896,7 +936,12 @@ impl PyStressResult {
 // ---------------------------------------------------------------------------
 
 /// Single position's contribution to tail stress.
-#[pyclass(name = "StressPositionEntry", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "StressPositionEntry",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyStressPositionEntry {
     pub(crate) inner: StressPositionEntry,
@@ -954,7 +999,12 @@ impl PyStressPositionEntry {
 }
 
 /// Breakdown of a single tail scenario.
-#[pyclass(name = "TailScenarioBreakdown", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "TailScenarioBreakdown",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyTailScenarioBreakdown {
     pub(crate) inner: TailScenarioBreakdown,
@@ -1011,7 +1061,12 @@ impl PyTailScenarioBreakdown {
 }
 
 /// Per-position attribution of portfolio losses in tail scenarios.
-#[pyclass(name = "StressAttribution", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "StressAttribution",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyStressAttribution {
     pub(crate) inner: StressAttribution,
@@ -1088,7 +1143,12 @@ impl PyStressAttribution {
 /// dependency variant tree is wide enough that the binding exposes it as a
 /// JSON-serialized vector via :meth:`mappings_json` rather than a fully
 /// structured Python type.
-#[pyclass(name = "PositionAssignment", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "PositionAssignment",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyPositionAssignment {
     pub(crate) inner: PositionAssignment,
@@ -1151,7 +1211,12 @@ impl PyPositionAssignment {
 }
 
 /// Single unmatched dependency surfaced during assignment.
-#[pyclass(name = "UnmatchedEntry", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "UnmatchedEntry",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyUnmatchedEntry {
     pub(crate) inner: UnmatchedEntry,
@@ -1197,7 +1262,12 @@ impl PyUnmatchedEntry {
 }
 
 /// Assignment results for a portfolio-level factor mapping pass.
-#[pyclass(name = "FactorAssignmentReport", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "FactorAssignmentReport",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyFactorAssignmentReport {
     pub(crate) inner: FactorAssignmentReport,
@@ -1259,7 +1329,12 @@ impl PyFactorAssignmentReport {
 // ---------------------------------------------------------------------------
 
 /// Aggregated risk contribution for a single hierarchy level.
-#[pyclass(name = "LevelVolContribution", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "LevelVolContribution",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyLevelVolContribution {
     pub(crate) inner: LevelVolContribution,
@@ -1307,7 +1382,8 @@ impl PyLevelVolContribution {
 #[pyclass(
     name = "PositionVolContribution",
     module = "finstack.portfolio",
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone)]
 pub struct PyPositionVolContribution {
@@ -1354,16 +1430,15 @@ impl PyPositionVolContribution {
 }
 
 /// Aggregated vol report grouped by hierarchy level.
-#[pyclass(name = "CreditVolReport", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "CreditVolReport",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyCreditVolReport {
     pub(crate) inner: CreditVolReport,
-}
-
-impl PyCreditVolReport {
-    pub(crate) fn from_inner(inner: CreditVolReport) -> Self {
-        Self { inner }
-    }
 }
 
 #[pymethods]
@@ -1432,7 +1507,12 @@ impl PyCreditVolReport {
 ///   - ``VolHorizon.unconditional()``
 ///   - ``VolHorizon.n_steps(n)``
 ///   - ``VolHorizon.parse("one_step" | "unconditional" | '{"n_steps": N}')``
-#[pyclass(name = "VolHorizon", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "VolHorizon",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone, Copy)]
 pub struct PyVolHorizon {
     pub(crate) inner: VolHorizon,
@@ -1506,7 +1586,11 @@ impl PyVolHorizon {
 // ---------------------------------------------------------------------------
 
 /// Configuration for position-level VaR decomposition.
-#[pyclass(name = "DecompositionConfig", module = "finstack.portfolio")]
+#[pyclass(
+    name = "DecompositionConfig",
+    module = "finstack.portfolio",
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyDecompositionConfig {
     pub(crate) inner: DecompositionConfig,

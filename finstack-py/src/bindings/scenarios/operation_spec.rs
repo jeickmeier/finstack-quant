@@ -71,7 +71,14 @@ fn parse_hierarchy_target(json: &str) -> PyResult<HierarchyTarget> {
 ///
 /// Mirrors [`finstack_scenarios::CurveKind`]. Serde renames `forward` and
 /// `par_cds` are preserved on the JSON wire format.
-#[pyclass(name = "CurveKind", module = "finstack.scenarios", eq, hash, frozen)]
+#[pyclass(
+    name = "CurveKind",
+    module = "finstack.scenarios",
+    eq,
+    hash,
+    frozen,
+    from_py_object
+)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyCurveKind {
     pub(crate) inner: CurveKind,
@@ -148,7 +155,8 @@ impl PyCurveKind {
     module = "finstack.scenarios",
     eq,
     hash,
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyVolSurfaceKind {
@@ -208,7 +216,8 @@ impl PyVolSurfaceKind {
     module = "finstack.scenarios",
     eq,
     hash,
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyTenorMatchMode {
@@ -255,7 +264,14 @@ impl PyTenorMatchMode {
 // ---------------------------------------------------------------------------
 
 /// Calendar-vs-business-day semantics for time-roll operations.
-#[pyclass(name = "TimeRollMode", module = "finstack.scenarios", eq, hash, frozen)]
+#[pyclass(
+    name = "TimeRollMode",
+    module = "finstack.scenarios",
+    eq,
+    hash,
+    frozen,
+    from_py_object
+)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyTimeRollMode {
     pub(crate) inner: TimeRollMode,
@@ -309,7 +325,14 @@ impl PyTimeRollMode {
 // ---------------------------------------------------------------------------
 
 /// Compounding convention for rate-extraction operations.
-#[pyclass(name = "Compounding", module = "finstack.scenarios", eq, hash, frozen)]
+#[pyclass(
+    name = "Compounding",
+    module = "finstack.scenarios",
+    eq,
+    hash,
+    frozen,
+    from_py_object
+)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyCompounding {
     pub(crate) inner: Compounding,
@@ -389,7 +412,12 @@ impl PyCompounding {
 /// Configuration linking a statement rate node to a market curve.
 ///
 /// Mirrors [`finstack_scenarios::spec::RateBindingSpec`].
-#[pyclass(name = "RateBindingSpec", module = "finstack.scenarios", frozen)]
+#[pyclass(
+    name = "RateBindingSpec",
+    module = "finstack.scenarios",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyRateBindingSpec {
     pub(crate) inner: RateBindingSpec,
@@ -494,7 +522,12 @@ impl PyRateBindingSpec {
 /// type — Python callers should treat ``to_json`` output as the canonical wire
 /// representation and pass it straight to ``build_scenario_spec`` or
 /// ``ScenarioEngine`` consumers.
-#[pyclass(name = "OperationSpec", module = "finstack.scenarios", frozen)]
+#[pyclass(
+    name = "OperationSpec",
+    module = "finstack.scenarios",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyOperationSpec {
     pub(crate) inner: OperationSpec,

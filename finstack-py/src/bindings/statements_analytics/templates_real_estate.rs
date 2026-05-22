@@ -342,7 +342,8 @@ impl PyRenewalSpec {
     module = "finstack.statements_analytics",
     eq,
     hash,
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyLeaseGrowthConvention {
@@ -603,7 +604,8 @@ impl PyRentRollOutputNodes {
     module = "finstack.statements_analytics",
     eq,
     hash,
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyManagementFeeBase {

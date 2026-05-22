@@ -23,7 +23,8 @@ use pyo3::prelude::*;
     module = "finstack.statements_analytics",
     eq,
     hash,
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PyAccountType {

@@ -24,7 +24,6 @@
 
 use std::str::FromStr;
 
-use indexmap::IndexMap;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
@@ -90,7 +89,8 @@ fn parse_comparison_op(op: &str) -> PyResult<ComparisonOp> {
     module = "finstack.portfolio",
     eq,
     hash,
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PyWeightingScheme {
@@ -151,7 +151,8 @@ impl PyWeightingScheme {
     module = "finstack.portfolio",
     eq,
     hash,
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PyMissingMetricPolicy {
@@ -207,7 +208,14 @@ impl PyMissingMetricPolicy {
 }
 
 /// Inequality / equality operator (`<=`, `>=`, `==`).
-#[pyclass(name = "Inequality", module = "finstack.portfolio", eq, hash, frozen)]
+#[pyclass(
+    name = "Inequality",
+    module = "finstack.portfolio",
+    eq,
+    hash,
+    frozen,
+    from_py_object
+)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PyInequality {
     pub(crate) inner: Inequality,
@@ -267,7 +275,8 @@ impl PyInequality {
     module = "finstack.portfolio",
     eq,
     hash,
-    frozen
+    frozen,
+    from_py_object
 )]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PyTradeDirection {
@@ -323,7 +332,14 @@ impl PyTradeDirection {
 }
 
 /// Trade type (existing / new position / close-out).
-#[pyclass(name = "TradeType", module = "finstack.portfolio", eq, hash, frozen)]
+#[pyclass(
+    name = "TradeType",
+    module = "finstack.portfolio",
+    eq,
+    hash,
+    frozen,
+    from_py_object
+)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PyTradeType {
     pub(crate) inner: TradeType,
@@ -378,7 +394,12 @@ impl PyTradeType {
 }
 
 /// Per-position metric source (clone-only declarative wrapper).
-#[pyclass(name = "PerPositionMetric", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "PerPositionMetric",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyPerPositionMetric {
     pub(crate) inner: PerPositionMetric,
@@ -493,7 +514,12 @@ impl PyPerPositionMetric {
 // ---------------------------------------------------------------------------
 
 /// Declarative filter selecting which positions a rule applies to.
-#[pyclass(name = "PositionFilter", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "PositionFilter",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyPositionFilter {
     pub(crate) inner: PositionFilter,
@@ -609,7 +635,12 @@ impl PyPositionFilter {
 // ---------------------------------------------------------------------------
 
 /// Portfolio-level metric expression (`WeightedSum` / `ValueWeightedAverage`).
-#[pyclass(name = "MetricExpr", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "MetricExpr",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyMetricExpr {
     pub(crate) inner: MetricExpr,
@@ -683,7 +714,12 @@ impl PyMetricExpr {
 // ---------------------------------------------------------------------------
 
 /// Optimization direction and target.
-#[pyclass(name = "Objective", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "Objective",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyObjective {
     pub(crate) inner: Objective,
@@ -748,7 +784,12 @@ impl PyObjective {
 // ---------------------------------------------------------------------------
 
 /// Declarative constraint specification.
-#[pyclass(name = "Constraint", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "Constraint",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyConstraint {
     pub(crate) inner: Constraint,
@@ -917,7 +958,11 @@ impl PyConstraint {
 /// Construction from Python is not yet supported (requires the instrument
 /// binding bridge). The wrapper is exposed so result types and getters can
 /// return it.
-#[pyclass(name = "CandidatePosition", module = "finstack.portfolio")]
+#[pyclass(
+    name = "CandidatePosition",
+    module = "finstack.portfolio",
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyCandidatePosition {
     pub(crate) inner: CandidatePosition,
@@ -972,7 +1017,7 @@ impl PyCandidatePosition {
 /// Construction from Python is not yet supported (candidate instruments
 /// require the instrument binding bridge). The wrapper exists so callers
 /// can hold an existing universe and inspect it.
-#[pyclass(name = "TradeUniverse", module = "finstack.portfolio")]
+#[pyclass(name = "TradeUniverse", module = "finstack.portfolio", from_py_object)]
 #[derive(Clone)]
 pub struct PyTradeUniverse {
     pub(crate) inner: TradeUniverse,
@@ -1034,7 +1079,12 @@ impl PyTradeUniverse {
 // ---------------------------------------------------------------------------
 
 /// Status of an optimization run (mirrors `OptimizationStatus`).
-#[pyclass(name = "OptimizationStatus", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "OptimizationStatus",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyOptimizationStatus {
     pub(crate) inner: OptimizationStatus,
@@ -1138,7 +1188,12 @@ impl PyOptimizationStatus {
 // ---------------------------------------------------------------------------
 
 /// Trade specification for a single position.
-#[pyclass(name = "TradeSpec", module = "finstack.portfolio", frozen)]
+#[pyclass(
+    name = "TradeSpec",
+    module = "finstack.portfolio",
+    frozen,
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyTradeSpec {
     pub(crate) inner: TradeSpec,
@@ -1233,7 +1288,11 @@ impl PyTradeSpec {
 // ---------------------------------------------------------------------------
 
 /// Optimization parameters without an embedded portfolio.
-#[pyclass(name = "OptimizationParameters", module = "finstack.portfolio")]
+#[pyclass(
+    name = "OptimizationParameters",
+    module = "finstack.portfolio",
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyOptimizationParameters {
     pub(crate) inner: OptimizationParameters,
@@ -1367,7 +1426,11 @@ impl PyOptimizationParameters {
 /// The portfolio body is held as a ``PortfolioSpec`` JSON payload so this
 /// wrapper does not depend on the larger ``PortfolioSpec`` binding (which
 /// remains JSON-first elsewhere in the portfolio bindings).
-#[pyclass(name = "PortfolioOptimizationSpec", module = "finstack.portfolio")]
+#[pyclass(
+    name = "PortfolioOptimizationSpec",
+    module = "finstack.portfolio",
+    from_py_object
+)]
 #[derive(Clone)]
 pub struct PyPortfolioOptimizationSpec {
     pub(crate) inner: PortfolioOptimizationSpec,
