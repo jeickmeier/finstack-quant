@@ -19,16 +19,6 @@ This directory contains the active project skills for maintaining the finstack R
 | `senior-code-review` | Broad fallback review when no specialist applies | Any specialist skill fits |
 | `consistency-reviewer` | Naming, convention inventory, pattern drift | Dedupe/API-surface consolidation |
 
-## Retired Or Demoted Skills
-
-The previous `code-simplifier`, `simplicity-auditor`, and `dead-code-removal` skills are kept under `.agents/retired-skills/` for reference. Their active responsibilities moved into `refactor`, `finstack-simplify`, `quality-gate-triage`, and `production-release-prep`.
-
-The old `documentation-cleanup` and `documentation-reviewer` split is now `documentation-maintainer`.
-
-The old `python-binding-reviewer` is now `binding-parity-reviewer`.
-
-The old `bug_hunting` skill is now `quality-gate-triage`.
-
 ## Catalog Rule
 
 Add a new top-level skill only when the trigger, workflow, and output are distinct. Otherwise add a reference, example, output, or eval to an existing skill.
