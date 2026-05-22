@@ -23,6 +23,7 @@
 
 use super::factors::{CurveRestoreFlags, MarketSnapshot};
 use super::helpers::*;
+use super::metrics_based::extract_keyrate_cs01_per_curve;
 use super::types::*;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::metrics::bump_surface_vol_absolute;
@@ -30,7 +31,8 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::diff::{
-    measure_hazard_curve_shift, measure_vol_surface_shift, TenorSamplingMethod,
+    measure_credit_curve_shift, measure_per_tenor_credit_curve_shift, measure_vol_surface_shift,
+    TenorSamplingMethod,
 };
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
@@ -93,6 +95,10 @@ impl TaylorAttributionConfig {
     }
 }
 
+/// Record a successful Taylor factor result. `repricings` is the actual number
+/// of bump-and-reprice calls the factor performed — a key-rate factor bumps
+/// every bucket up and down, so it is far more than the 2 a single parallel
+/// bump would cost.
 fn record_taylor_factor_result(
     factor_kind: &str,
     factor_id: &CurveId,
@@ -100,6 +106,7 @@ fn record_taylor_factor_result(
     factors: &mut Vec<TaylorFactorResult>,
     total_explained: &mut f64,
     num_repricings: &mut usize,
+    repricings: usize,
 ) {
     match result {
         Ok(result) => {
@@ -107,7 +114,7 @@ fn record_taylor_factor_result(
             if let Some(g) = result.gamma_pnl {
                 *total_explained += g;
             }
-            *num_repricings += 2;
+            *num_repricings += repricings;
             factors.push(result);
         }
         Err(e) => {
@@ -200,9 +207,13 @@ pub fn attribute_pnl_taylor(
     config: &TaylorAttributionConfig,
 ) -> Result<TaylorAttributionResult> {
     config.validate()?;
+    validate_attribution_period(as_of_t0, as_of_t1)?;
     let pv_t0 = reprice_instrument(instrument, market_t0, as_of_t0)?;
     let pv_t1 = reprice_instrument(instrument, market_t1, as_of_t1)?;
-    let actual_pnl = pv_t1.amount() - pv_t0.amount();
+    // Decimal-exact difference: subtracting two large `.amount()` f64s loses
+    // precision at high notionals, and `checked_sub` also rejects a currency
+    // mismatch instead of silently differencing across currencies.
+    let actual_pnl = pv_t1.checked_sub(pv_t0)?.amount();
 
     let mut factors = Vec::new();
     let mut total_explained = 0.0;
@@ -231,6 +242,7 @@ pub fn attribute_pnl_taylor(
             &mut factors,
             &mut total_explained,
             &mut num_repricings,
+            2 * KEY_RATE_BUCKETS_YEARS.len(),
         );
     }
 
@@ -256,20 +268,50 @@ pub fn attribute_pnl_taylor(
             &mut factors,
             &mut total_explained,
             &mut num_repricings,
+            2 * KEY_RATE_BUCKETS_YEARS.len(),
         );
     }
 
-    // Credit sensitivities (CS01 per hazard curve)
-    let credit_results = market_deps
-        .curve_dependencies()
-        .credit_curves
+    // Credit sensitivities — credit-curve move, key-rate aware.
+    //
+    // Hazard curves are measured in par CDS spread moves; discount-style credit
+    // curves (for example convertible risky discount curves) are measured in zero
+    // rate moves. `BucketedCs01` is requested once here; instruments without that
+    // calculator yield no per-tenor keys and the per-curve `compute_credit_factor`
+    // falls back to an aggregate CS01 times an average credit-curve move.
+    let credit_curves = &market_deps.curve_dependencies().credit_curves;
+    let credit_keyrate = if credit_curves.is_empty() {
+        None
+    } else {
+        instrument
+            .price_with_metrics(
+                market_t0,
+                as_of_t0,
+                &[crate::metrics::MetricId::BucketedCs01],
+                crate::instruments::common_impl::traits::PricingOptions::default(),
+            )
+            .ok()
+            .map(|vr| extract_keyrate_cs01_per_curve(&vr.measures, credit_curves))
+    };
+    let credit_results = credit_curves
         .par_iter()
         .map(|curve_id| {
+            let keyrate = credit_keyrate
+                .as_ref()
+                .and_then(|m| m.get(curve_id))
+                .map(|v| v.as_slice());
             (
                 curve_id.clone(),
-                compute_credit_factor(
-                    instrument, market_t0, market_t1, as_of_t0, pv_t0, curve_id, config,
-                ),
+                compute_credit_factor(CreditFactorInputs {
+                    instrument,
+                    market_t0,
+                    market_t1,
+                    as_of_t0,
+                    pv_t0,
+                    curve_id,
+                    config,
+                    keyrate,
+                }),
             )
         })
         .collect::<Vec<_>>();
@@ -281,6 +323,7 @@ pub fn attribute_pnl_taylor(
             &mut factors,
             &mut total_explained,
             &mut num_repricings,
+            2,
         );
     }
 
@@ -303,6 +346,7 @@ pub fn attribute_pnl_taylor(
             &mut factors,
             &mut total_explained,
             &mut num_repricings,
+            2,
         );
     }
 
@@ -412,9 +456,21 @@ pub fn attribute_pnl_taylor_standard(
         None,
     );
 
+    // Taylor factor P&Ls arrive as raw f64s; a degenerate curve or bump can
+    // make one non-finite. Route every f64 → Money construction through
+    // `factor_money_or_invalid` so a NaN/Inf flags the attribution invalid
+    // instead of panicking inside `Money::new`.
+    let mut non_finite_detected = false;
+
     for factor in &taylor.factors {
         let pnl_amount = factor.explained_pnl + factor.gamma_pnl.unwrap_or(0.0);
-        let factor_money = Money::new(pnl_amount, ccy);
+        let factor_money = factor_money_or_invalid(
+            pnl_amount,
+            ccy,
+            &factor.factor_name,
+            &mut attribution.meta.notes,
+            &mut non_finite_detected,
+        );
 
         if factor.factor_name.starts_with("Rates:") || factor.factor_name.starts_with("Forward:") {
             attribution.rates_curves_pnl = Money::new(
@@ -451,11 +507,23 @@ pub fn attribute_pnl_taylor_standard(
                     ccy,
                 )
                 .unwrap_or(0.0);
-                Money::new(ci_val, ccy)
+                factor_money_or_invalid(
+                    ci_val,
+                    ccy,
+                    "Theta coupon income",
+                    &mut attribution.meta.notes,
+                    &mut non_finite_detected,
+                )
             };
             let theta_only = Money::new(factor_money.amount() - ci.amount(), ccy);
             apply_total_return_carry(&mut attribution, theta_only, ci, None)?;
         }
+    }
+
+    // Propagate the non-finite flag before `finalize_attribution` so the
+    // residual / tolerance machinery treats the result as invalid.
+    if non_finite_detected {
+        attribution.result_invalid = true;
     }
 
     finalize_attribution(
@@ -701,16 +769,77 @@ fn compute_forward_factor(
     })
 }
 
-/// Compute credit (CS01) attribution for a single hazard curve.
-fn compute_credit_factor(
-    instrument: &Arc<dyn Instrument>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
+/// Compute credit (CS01) attribution for a single credit curve.
+///
+/// The credit curve may be a `HazardCurve` (CDS-family instruments) or a
+/// `DiscountCurve` (the Tsiveriotis–Zhang risky discount curve a convertible
+/// bond prices off). [`measure_credit_curve_shift`] /
+/// [`measure_per_tenor_credit_curve_shift`] measure the move in whichever basis
+/// the instrument's own CS01 is defined on — par CDS spread for a hazard curve,
+/// zero rate for a discount-style credit curve — so the move always pairs
+/// unit-correctly with the CS01 (pairing a par-spread CS01 with a hazard-rate
+/// move would overstate by 1/(1−R)).
+///
+/// When per-tenor CS01 is available (`keyrate`, from `BucketedCs01`), the
+/// explained P&L is the key-rate sum `Σ_tenor CS01_t × Δs_t` — correct for
+/// non-parallel (steepener / twist) credit-curve moves. Otherwise it falls back
+/// to a parallel bump: an aggregate CS01 times the average credit-curve move.
+struct CreditFactorInputs<'a> {
+    instrument: &'a Arc<dyn Instrument>,
+    market_t0: &'a MarketContext,
+    market_t1: &'a MarketContext,
     as_of_t0: Date,
     pv_t0: Money,
-    curve_id: &CurveId,
-    config: &TaylorAttributionConfig,
-) -> Result<TaylorFactorResult> {
+    curve_id: &'a CurveId,
+    config: &'a TaylorAttributionConfig,
+    keyrate: Option<&'a [(f64, f64)]>,
+}
+
+fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorResult> {
+    let CreditFactorInputs {
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        pv_t0,
+        curve_id,
+        config,
+        keyrate,
+    } = inputs;
+
+    // Key-rate path: per-tenor CS01 × per-tenor credit-curve move.
+    if let Some(buckets) = keyrate.filter(|b| !b.is_empty()) {
+        let tenors: Vec<f64> = buckets.iter().map(|(t, _)| *t).collect();
+        let shifts =
+            measure_per_tenor_credit_curve_shift(curve_id.as_str(), market_t0, market_t1, &tenors)?;
+        let explained = finstack_core::math::neumaier_sum(
+            buckets
+                .iter()
+                .zip(shifts.iter())
+                .map(|((_, cs01), shift)| cs01 * shift),
+        );
+        let total_cs01 = finstack_core::math::neumaier_sum(buckets.iter().map(|(_, c)| *c));
+        let avg_move = if shifts.is_empty() {
+            0.0
+        } else {
+            finstack_core::math::neumaier_sum(shifts.iter().copied()) / shifts.len() as f64
+        };
+        return Ok(TaylorFactorResult {
+            factor_name: format!("Credit:{}", curve_id),
+            sensitivity: total_cs01,
+            market_move: avg_move,
+            explained_pnl: explained,
+            // Key-rate path is first-order only; per-tenor CS-gamma is not
+            // modelled. `include_gamma` credit convexity is available via the
+            // parallel-bump fallback below.
+            gamma_pnl: None,
+        });
+    }
+
+    // Fallback: parallel bump of the credit curve. A `parallel_bp` bump is a
+    // par-spread shock on a hazard curve and a zero-rate shock on a
+    // discount-style credit curve; either way `cs01` and the move below share
+    // that basis, so they pair unit-correctly.
     let bumped_up = market_t0.bump([MarketBump::Curve {
         id: curve_id.clone(),
         spec: BumpSpec::parallel_bp(config.credit_bump_bp),
@@ -723,10 +852,10 @@ fn compute_credit_factor(
     }])?;
     let pv_down = reprice_instrument(instrument, &bumped_down, as_of_t0)?;
 
-    // Central difference CS01: O(h²) accuracy
+    // Central difference CS01: O(h²) accuracy, $ per bp of credit-curve move.
     let cs01 = (pv_up.amount() - pv_down.amount()) / (2.0 * config.credit_bump_bp);
 
-    let spread_move_bp = measure_hazard_curve_shift(
+    let spread_move_bp = measure_credit_curve_shift(
         curve_id.as_str(),
         market_t0,
         market_t1,
@@ -1227,6 +1356,60 @@ mod tests {
             taylor.factors.iter().any(|f| f.factor_name == "Fx"),
             "expected an Fx factor, got {:?}",
             taylor.factors
+        );
+    }
+
+    /// Audit N2: a non-finite Taylor factor P&L must flag the attribution
+    /// invalid rather than panicking inside `Money::new` (which panics on
+    /// NaN/Inf). A zero `rate_bump_bp` makes the central-difference DV01 a
+    /// 0/0 = NaN, exercising the guard end-to-end.
+    #[test]
+    fn taylor_standard_flags_non_finite_factor_instead_of_panicking() {
+        use finstack_core::market_data::term_structures::DiscountCurve;
+        use finstack_core::math::interp::InterpStyle;
+
+        let as_of_t0 = date!(2025 - 01 - 15);
+        let as_of_t1 = date!(2025 - 01 - 16);
+
+        let instrument: Arc<dyn Instrument> = Arc::new(
+            TestInstrument::new("NF-001", Money::new(1000.0, Currency::USD))
+                .with_discount_curves(&["USD-OIS"]),
+        );
+
+        let curve = |base, df1| {
+            DiscountCurve::builder("USD-OIS")
+                .base_date(base)
+                .knots(vec![(0.0, 1.0), (1.0, df1)])
+                .interp(InterpStyle::Linear)
+                .build()
+                .expect("discount curve")
+        };
+        let market_t0 = MarketContext::new().insert(curve(as_of_t0, 0.98));
+        let market_t1 = MarketContext::new().insert(curve(as_of_t1, 0.97));
+
+        // A zero rate bump makes the central-difference DV01 a 0/0 = NaN.
+        let config = TaylorAttributionConfig {
+            rate_bump_bp: 0.0,
+            ..TaylorAttributionConfig::default()
+        };
+
+        let attribution = attribute_pnl_taylor_standard(
+            &instrument,
+            &market_t0,
+            &market_t1,
+            as_of_t0,
+            as_of_t1,
+            &config,
+        )
+        .expect("taylor standard must return a flagged result, never panic");
+
+        assert!(
+            attribution.result_invalid,
+            "a non-finite Taylor factor must set result_invalid"
+        );
+        assert!(
+            !attribution.residual_within_meta_tolerance(),
+            "an invalid attribution must not pass the tolerance check"
         );
     }
 }

@@ -1,4 +1,4 @@
-//! Build the initial [`MarketContext`] for a v3 [`CalibrationEnvelope`].
+//! Build the initial `MarketContext` for a v3 `CalibrationEnvelope`.
 //!
 //! Replaces the legacy `MarketContext::try_from(MarketContextState)` path used
 //! by the v2 envelope. The v3 envelope splits market inputs into:

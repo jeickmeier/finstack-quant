@@ -359,22 +359,59 @@ impl PyPnlAttribution {
         self.inner.meta.notes.clone()
     }
 
-    /// Check if residual is within tolerance.
+    /// True if the attribution was flagged invalid (e.g. a non-finite factor
+    /// sensitivity, or a residual that could not be computed). When ``True``,
+    /// ``residual`` / ``residual_pct`` are not meaningful and the tolerance
+    /// checks return ``False``.
+    #[getter]
+    fn result_invalid(&self) -> bool {
+        self.inner.result_invalid
+    }
+
+    /// Check whether the residual is within tolerance.
+    ///
+    /// With no arguments this uses the attribution's own stored,
+    /// method-appropriate tolerances — identical to
+    /// :meth:`residual_within_meta_tolerance` and consistent with the native
+    /// (Rust) check. Pass explicit values to override either threshold.
     ///
     /// Parameters
     /// ----------
-    /// pct_tolerance : float
-    ///     Percentage tolerance (e.g. 0.1 for 0.1%).
-    /// abs_tolerance : float
-    ///     Absolute tolerance (e.g. 100.0 for $100).
+    /// pct_tolerance : float, optional
+    ///     Percentage tolerance (e.g. 0.1 for 0.1%). Defaults to the
+    ///     attribution's stored ``meta.tolerance_pct``.
+    /// abs_tolerance : float, optional
+    ///     Absolute tolerance. Defaults to the attribution's stored
+    ///     ``meta.tolerance_abs``.
     ///
     /// Returns
     /// -------
     /// bool
-    #[pyo3(signature = (pct_tolerance=0.1, abs_tolerance=1.0))]
-    fn residual_within_tolerance(&self, pct_tolerance: f64, abs_tolerance: f64) -> bool {
-        self.inner
-            .residual_within_tolerance(pct_tolerance, abs_tolerance)
+    #[pyo3(signature = (pct_tolerance=None, abs_tolerance=None))]
+    fn residual_within_tolerance(
+        &self,
+        pct_tolerance: Option<f64>,
+        abs_tolerance: Option<f64>,
+    ) -> bool {
+        self.inner.residual_within_tolerance(
+            pct_tolerance.unwrap_or(self.inner.meta.tolerance_pct),
+            abs_tolerance.unwrap_or(self.inner.meta.tolerance_abs),
+        )
+    }
+
+    /// Check whether the residual is within the attribution's stored,
+    /// method-appropriate tolerances (``meta.tolerance_pct`` /
+    /// ``meta.tolerance_abs``).
+    ///
+    /// This matches the native ``residual_within_meta_tolerance`` check and is
+    /// the recommended pass/fail gate — the per-method tolerances differ
+    /// (waterfall is far tighter than metrics-based or Taylor).
+    ///
+    /// Returns
+    /// -------
+    /// bool
+    fn residual_within_meta_tolerance(&self) -> bool {
+        self.inner.residual_within_meta_tolerance()
     }
 
     /// Human-readable tree explanation (non-zero factors only).

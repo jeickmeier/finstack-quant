@@ -12,7 +12,7 @@ pub use duration::{
     calculate_tranche_duration, MacaulayDurationCalculator, ModifiedDurationCalculator,
 };
 pub use spreads::{
-    calculate_tranche_cs01, calculate_tranche_z_spread, Cs01Calculator, SpreadDurationCalculator,
-    ZSpreadCalculator,
+    calculate_tranche_cs01, calculate_tranche_z_spread, BucketedCs01Calculator, Cs01Calculator,
+    SpreadDurationCalculator, ZSpreadCalculator,
 };
 pub use ytm::YtmCalculator;

@@ -231,6 +231,52 @@ pub(crate) fn finalize_attribution(
     attribution.meta.tolerance_pct = tolerance_pct;
 }
 
+/// Construct a factor P&L [`Money`] from a computed `f64` amount.
+///
+/// If `amount` is non-finite (NaN or ±Inf), this function:
+/// - Appends a diagnostic note to `notes`,
+/// - Sets `*result_invalid = true` so [`crate::attribution::PnlAttribution::result_invalid`]
+///   is propagated to callers, and
+/// - Returns a **zero sentinel** in `currency` so the attribution can continue
+///   and produce a complete (though flagged-invalid) result rather than
+///   panicking inside [`Money::new`], which panics on non-finite input.
+///
+/// For finite amounts it delegates directly to [`Money::new`].
+#[inline]
+pub(crate) fn factor_money_or_invalid(
+    amount: f64,
+    currency: Currency,
+    label: &str,
+    notes: &mut Vec<String>,
+    result_invalid: &mut bool,
+) -> Money {
+    if amount.is_finite() {
+        Money::new(amount, currency)
+    } else {
+        notes.push(format!(
+            "Non-finite factor P&L ({amount:?}) for {label}; attribution flagged invalid"
+        ));
+        *result_invalid = true;
+        Money::new(0.0, currency)
+    }
+}
+
+/// Validate that the attribution period is well-formed: `as_of_t1 >= as_of_t0`.
+///
+/// A reversed period silently flips the sign of theta / carry (`time_period_days`
+/// goes negative) and produces a nonsensical decomposition, so it is rejected
+/// at every attribution entry point. A zero-length period (`t1 == t0`) is
+/// permitted — same-day attribution is a degenerate but valid request, with
+/// theta zero over zero elapsed time.
+pub(crate) fn validate_attribution_period(as_of_t0: Date, as_of_t1: Date) -> Result<()> {
+    if as_of_t1 < as_of_t0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "attribution period is reversed: as_of_t1 ({as_of_t1}) precedes as_of_t0 ({as_of_t0})"
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,6 +305,27 @@ mod tests {
                 Err(Error::Validation("FX rate not found".to_string()))
             }
         }
+    }
+
+    #[test]
+    fn validate_attribution_period_accepts_forward_and_same_day() {
+        assert!(
+            validate_attribution_period(date!(2025 - 01 - 15), date!(2025 - 01 - 16)).is_ok(),
+            "a forward period must be accepted"
+        );
+        // Same-day attribution is degenerate but permitted (theta over zero days).
+        assert!(
+            validate_attribution_period(date!(2025 - 01 - 15), date!(2025 - 01 - 15)).is_ok(),
+            "a zero-length period must be accepted"
+        );
+    }
+
+    #[test]
+    fn validate_attribution_period_rejects_reversed_period() {
+        assert!(
+            validate_attribution_period(date!(2025 - 01 - 16), date!(2025 - 01 - 15)).is_err(),
+            "a reversed period (t1 < t0) must be rejected"
+        );
     }
 
     #[test]

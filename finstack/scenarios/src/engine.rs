@@ -6,7 +6,7 @@
 //! - enforce a repeatable ordering of operations
 //! - dispatch each `OperationSpec` variant to the appropriate adapter function
 //!   via a centralized exhaustive `match`
-//! - batch market bumps so the underlying [`MarketContext`] is cloned at most
+//! - batch market bumps so the underlying `MarketContext` is cloned at most
 //!   once per scenario application instead of once per operation
 //! - collect reporting metadata about how many operations ran and any
 //!   warnings produced during execution
@@ -734,7 +734,7 @@ impl ScenarioEngine {
     /// 0. Time roll-forward, if present
     /// 1. Market data (FX, equities, vol surfaces, curves, base correlation) — all
     ///    [`MarketBump`] effects accumulated during this phase are applied to the
-    ///    context in a single batched [`MarketContext::bump`] call.
+    ///    context in a single batched market bump call.
     /// 2. Rate bindings update (if configured)
     /// 3. Statement forecast adjustments
     /// 4. Statement re-evaluation

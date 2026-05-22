@@ -1,6 +1,8 @@
 //! Credit-factor attribution detail and carry decomposition helpers.
 
-use super::credit_cascade::{build_credit_factor_attribution, plan_credit_cascade};
+use super::credit_cascade::{
+    build_credit_factor_attribution, plan_credit_cascade, shift_hazard_curves, CreditStepKind,
+};
 use super::credit_factor::CreditFactorModelRef;
 use super::spec::AttributionSpec;
 use super::types::PnlAttribution;
@@ -10,19 +12,19 @@ use finstack_core::Result;
 
 impl AttributionSpec {
     /// Compute the optional `credit_factor_detail` field for a finished
-    /// per-instrument attribution. The single instrument is treated as a
-    /// one-position portfolio: its issuer id (read from
+    /// per-instrument attribution. The instrument's issuer (from
     /// `instrument.attributes().meta["credit::issuer_id"]`) is matched against
-    /// `model.issuer_betas`, and a synthetic `CS01_i` is back-solved from the
-    /// already-computed `credit_curves_pnl` and the observed average ΔS on the
-    /// instrument's hazard curves so that
-    /// `credit_curves_pnl ≡ -CS01_i × ΔS_i` holds by construction.
+    /// `model.issuer_betas`; the credit-factor cascade supplies the per-factor
+    /// par-spread moves (`β·ΔF` / `Δadder`), and a **real** aggregate par-spread
+    /// CS01 — measured by a parallel par-spread bump — gives each factor's P&L
+    /// as `−CS01 × Δs_factor`.
     ///
-    /// This satisfies the reconciliation invariant
-    /// `generic_pnl + Σ levels.total + adder_pnl_total ≡ credit_curves_pnl`
-    /// for the single-instrument case. Multi-position wiring (true per-curve
-    /// CS01 sums across a portfolio) is a portfolio-layer concern outside the
-    /// PR-7 valuations scope.
+    /// The non-parallel (twist / curve-shape) part is the closing residual
+    /// `curve_shape_pnl = credit_curves_pnl − Σ(parallel factor steps)`, so the
+    /// reconciliation invariant
+    /// `generic + Σ levels + adder + curve_shape ≡ credit_curves_pnl`
+    /// holds exactly. A twisted credit curve simply lands in `curve_shape_pnl`
+    /// — there is no divide-by-near-zero and no twist guard.
     pub(crate) fn compute_credit_factor_detail(
         &self,
         model_ref: &CreditFactorModelRef,
@@ -32,7 +34,6 @@ impl AttributionSpec {
         attribution: &PnlAttribution,
         notes: &mut Vec<String>,
     ) -> Result<Option<super::CreditFactorAttribution>> {
-        use finstack_core::market_data::diff::{measure_hazard_curve_shift, TenorSamplingMethod};
         use finstack_core::money::Money;
         use finstack_core::types::IssuerId;
 
@@ -63,79 +64,10 @@ impl AttributionSpec {
             return Ok(None);
         }
 
-        // 4. Measure per-credit-curve shifts on the instrument's dependencies.
-        //    Track BOTH the signed average move (`ds_i`, used for the
-        //    back-solve) AND the absolute (L1) per-tenor move. A twisted curve
-        //    — short tenors up, long tenors down — averages close to zero even
-        //    though the curve genuinely moved; the L1 magnitude exposes that.
-        let market_deps = instrument.market_dependencies()?;
-        let credit_curves = &market_deps.curve_dependencies().credit_curves;
-        if credit_curves.is_empty() {
-            return Ok(None);
-        }
-        let mut total_shift_bp = 0.0;
-        let mut total_abs_shift_bp = 0.0;
-        let mut count = 0usize;
-        for curve_id in credit_curves {
-            if let Ok(shift) = measure_hazard_curve_shift(
-                curve_id.as_str(),
-                market_t0,
-                market_t1,
-                TenorSamplingMethod::Standard,
-            ) {
-                total_shift_bp += shift;
-                total_abs_shift_bp +=
-                    hazard_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
-                count += 1;
-            }
-        }
-        if count == 0 {
-            return Ok(None);
-        }
-        let avg_shift_bp = total_shift_bp / count as f64;
-        let avg_abs_shift_bp = total_abs_shift_bp / count as f64;
-        if avg_abs_shift_bp.abs() < 1e-12 {
-            // No meaningful spread move at all; nothing to decompose.
-            return Ok(None);
-        }
-
-        let mut ds_i = avg_shift_bp;
-
-        // Guard the back-solve `CS01 = -credit_pnl / ds_i` against a
-        // divide-by-near-zero. The back-solve is only well-conditioned when the
-        // signed parallel move `ds_i` is a meaningful fraction of the curve's
-        // total (L1) move. When the curve twisted, `|ds_i|` collapses toward
-        // zero while `credit_pnl` stays large, so `-credit_pnl / ds_i` explodes
-        // into a nonsensical CS01. Surface the degeneracy instead of producing
-        // a meaningless decomposition.
-        //
-        // The threshold is `CreditFactorDetailOptions::parallel_fraction_floor`
-        // (audit rec #13: previously hardcoded `1e-3`, now tunable per book —
-        // books with structurally noisy hazard curves can relax it without
-        // forking the code). Setting it to `0.0` disables the guard entirely.
-        let parallel_fraction_floor = self.credit_factor_detail_options.parallel_fraction_floor;
-        if parallel_fraction_floor > 0.0
-            && avg_shift_bp.abs() < parallel_fraction_floor * avg_abs_shift_bp.abs()
-        {
-            let sign = if avg_shift_bp < 0.0 { -1.0 } else { 1.0 };
-            ds_i = sign * avg_abs_shift_bp;
-            notes.push(format!(
-                "credit_factor_detail best-effort fallback: hazard curve(s) twisted \
-                 (signed avg shift {:.6}bp vs absolute avg shift {:.6}bp; \
-                 parallel_fraction_floor={:.3e}); using absolute avg shift for \
-                 conditioning",
-                avg_shift_bp, avg_abs_shift_bp, parallel_fraction_floor
-            ));
-        }
-
-        // 6. Back-solve the effective CS01 from the existing credit_curves_pnl
-        //    so the reconciliation `generic + Σlevels + adder ≡
-        //    credit_curves_pnl` holds exactly. Here ds_i is in bp and CS01 is
-        //    the dollar move per ΔS_i, so:
-        //        credit_curves_pnl = -CS01 × ΔS_i  →  CS01 = -credit_pnl / ΔS_i
-        let credit_pnl_amt = attribution.credit_curves_pnl.amount();
-        let cs01_amt = -credit_pnl_amt / ds_i;
-
+        // 4. Plan the credit-factor cascade. It resolves the issuer, its hazard
+        //    curves and the per-factor par-spread moves (`β·ΔF` / `Δadder`).
+        //    Returns None when no cascade can be planned (unmapped issuer, no
+        //    hazard exposure, …).
         let Some(cascade) = plan_credit_cascade(
             model,
             instrument,
@@ -147,16 +79,58 @@ impl AttributionSpec {
         else {
             return Ok(None);
         };
-        let step_pnls: Vec<Money> = cascade
+
+        // 5. Real aggregate CS01: bump every hazard curve the instrument depends
+        //    on with the *same* `shift_hazard_curves` bump the cascade applies
+        //    to its steps, central-differenced. Measuring CS01 with the
+        //    identical bump guarantees `cs01_amt` and the cascade's per-step
+        //    `delta_bp` share units exactly, so `−cs01_amt × delta_bp` is
+        //    consistent. This real CS01 replaces the former synthetic
+        //    `−credit_pnl / ds_i` back-solve, whose divide-by-near-zero forced
+        //    the twist workaround (`parallel_fraction_floor`).
+        let cs01_bump_bp = 1.0_f64;
+        let pv_up = instrument.value(
+            &shift_hazard_curves(market_t0, &cascade.hazard_curve_ids, cs01_bump_bp)?,
+            self.as_of_t0,
+        )?;
+        let pv_down = instrument.value(
+            &shift_hazard_curves(market_t0, &cascade.hazard_curve_ids, -cs01_bump_bp)?,
+            self.as_of_t0,
+        )?;
+        let cs01_amt = (pv_up.amount() - pv_down.amount()) / (2.0 * cs01_bump_bp);
+
+        // 6. Each parallel factor step's P&L is its own contribution
+        //    `−CS01 × Δs_factor`; the `CurveShape` step absorbs the non-parallel
+        //    residual so `generic + Σ levels + adder + curve_shape ≡
+        //    credit_curves_pnl` closes exactly. A twisted credit curve simply
+        //    lands in `curve_shape` — no twist guard needed.
+        let ccy = attribution.credit_curves_pnl.currency();
+        let mut step_pnls: Vec<Money> = cascade
             .steps
             .iter()
             .map(|step| {
-                Money::new(
-                    -cs01_amt * step.delta_bp,
-                    attribution.credit_curves_pnl.currency(),
-                )
+                if matches!(step.kind, CreditStepKind::CurveShape) {
+                    Money::new(0.0, ccy)
+                } else {
+                    // P&L = ∂PV/∂s × Δs_factor. `cs01_amt` is already the signed
+                    // PV sensitivity to an up-bump, so no extra negation.
+                    Money::new(cs01_amt * step.delta_bp, ccy)
+                }
             })
             .collect();
+        let parallel_sum: f64 = step_pnls
+            .iter()
+            .zip(cascade.steps.iter())
+            .filter(|(_, s)| !matches!(s.kind, CreditStepKind::CurveShape))
+            .map(|(pnl, _)| pnl.amount())
+            .sum();
+        let curve_shape_amt = attribution.credit_curves_pnl.amount() - parallel_sum;
+        for (pnl, step) in step_pnls.iter_mut().zip(cascade.steps.iter()) {
+            if matches!(step.kind, CreditStepKind::CurveShape) {
+                *pnl = Money::new(curve_shape_amt, ccy);
+            }
+        }
+
         let detail = build_credit_factor_attribution(
             model,
             &cascade,
@@ -167,48 +141,6 @@ impl AttributionSpec {
     }
 }
 
-/// Absolute (L1) hazard-curve shift in basis points, averaged over the standard
-/// tenor grid.
-///
-/// Where [`measure_hazard_curve_shift`](finstack_core::market_data::diff::measure_hazard_curve_shift)
-/// returns the *signed* mean shift (which collapses toward zero for a twisted
-/// curve), this returns the mean of the per-tenor absolute shifts, so a
-/// non-parallel move still registers a large magnitude. Returns `0.0` when
-/// either side's curve is missing.
-fn hazard_curve_abs_shift_bp(
-    curve_id: &str,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-) -> f64 {
-    use finstack_core::market_data::diff::STANDARD_TENORS;
-
-    let (Ok(curve_t0), Ok(curve_t1)) = (
-        market_t0.get_hazard(curve_id),
-        market_t1.get_hazard(curve_id),
-    ) else {
-        return 0.0;
-    };
-
-    let mut total_abs = 0.0;
-    let mut count = 0usize;
-    for &t in STANDARD_TENORS {
-        if t <= 0.0 {
-            continue;
-        }
-        let h0 = curve_t0.hazard_rate(t);
-        let h1 = curve_t1.hazard_rate(t);
-        if h0.is_finite() && h1.is_finite() {
-            total_abs += (h1 - h0).abs() * 10_000.0;
-            count += 1;
-        }
-    }
-    if count == 0 {
-        0.0
-    } else {
-        total_abs / count as f64
-    }
-}
-
 impl AttributionSpec {
     /// Split `carry_detail.coupon_income` and `carry_detail.roll_down` into
     /// rates / credit parts and emit the per-factor
@@ -216,8 +148,9 @@ impl AttributionSpec {
     ///
     /// # Math (§7.3, §7.5)
     ///
-    /// At `as_of_t0`, sample base discount rate `r` and the issuer's hazard
-    /// rate `s` at the bond's tenor. With total yield `r + s`:
+    /// At `as_of_t0`, sample base discount rate `r` and the issuer's credit
+    /// spread `s = hazard × (1 − recovery)` at the bond's tenor. With total
+    /// risky yield `r + s`:
     ///
     /// - `coupon.credit_part = coupon.total × s / (r + s)`
     /// - `coupon.rates_part  = coupon.total − coupon.credit_part`
@@ -321,7 +254,12 @@ impl AttributionSpec {
         let r = disc
             .zero_rate_on_date(tenor_date, Compounding::Continuous)
             .unwrap_or(0.0);
-        let s = haz.hazard_rate_on_date(tenor_date).unwrap_or(0.0);
+        // Credit triangle: the spread driving the credit share of yield is the
+        // hazard rate scaled by LGD = 1 − recovery (O'Kane, "Modelling
+        // Single-name and Multi-name Credit Derivatives", Ch. 5; Hull Ch. 24).
+        // The bare hazard rate would overstate the credit portion by 1/(1−R).
+        let hazard = haz.hazard_rate_on_date(tenor_date).unwrap_or(0.0);
+        let s = hazard * (1.0 - haz.recovery_rate());
 
         // 4. Split coupon_income proportionally to r and s.
         // coupon_income must be present; if not, skip the decomposition entirely.

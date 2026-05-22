@@ -163,6 +163,17 @@ pub struct PortfolioAttribution {
 
     /// Aggregate scalars detail (optional).
     pub scalars_detail: Option<ScalarsAttribution>,
+
+    /// True if any constituent position's attribution was flagged invalid
+    /// (for example, a non-finite factor sensitivity — see
+    /// [`PnlAttribution::result_invalid`]). When `true`, the portfolio
+    /// aggregates and [`PortfolioAttribution::reconciliation_check`] are not
+    /// trustworthy and must not be relied on for reporting.
+    ///
+    /// Defaults to `false`; results serialized before this field existed
+    /// deserialize as `false`.
+    #[serde(default)]
+    pub result_invalid: bool,
 }
 
 fn default_zero_usd_money() -> Money {
@@ -213,12 +224,15 @@ const N_BUCKETS: usize = 13;
 /// and makes the bucket-to-output mapping a single point of truth.
 struct FactorAccumulator {
     buckets: [NeumaierAccumulator; N_BUCKETS],
+    /// Set once any folded-in position carried `result_invalid = true`.
+    result_invalid: bool,
 }
 
 impl FactorAccumulator {
     fn new() -> Self {
         Self {
             buckets: [NeumaierAccumulator::new(); N_BUCKETS],
+            result_invalid: false,
         }
     }
 
@@ -235,6 +249,8 @@ impl FactorAccumulator {
         pos_attr: &PnlAttribution,
         convert: &impl Fn(Money) -> Result<Money>,
     ) -> Result<()> {
+        // A single invalid constituent makes the whole aggregate untrustworthy.
+        self.result_invalid |= pos_attr.result_invalid;
         self.add(
             FactorBucket::TotalPnl,
             convert(pos_attr.total_pnl)?.amount(),
@@ -309,6 +325,7 @@ impl FactorAccumulator {
             fx_detail: None,
             vol_detail: None,
             scalars_detail: None,
+            result_invalid: self.result_invalid,
         }
     }
 }
@@ -727,6 +744,10 @@ impl PortfolioAttribution {
     /// This uses the portfolio-level (base-currency) aggregates, so no
     /// additional FX conversion is needed.
     ///
+    /// If [`PortfolioAttribution::result_invalid`] is set, `is_reconciled` is
+    /// forced to `false` regardless of the numeric residual: an aggregate built
+    /// from a corrupted constituent must never be reported as reconciled.
+    ///
     /// # Arguments
     ///
     /// * `tolerance` - Absolute tolerance in base-currency units (e.g. 0.01
@@ -747,7 +768,10 @@ impl PortfolioAttribution {
         acc.add(self.fx_translation_pnl.amount());
 
         let total_residual = self.total_pnl.amount() - acc.total();
-        let is_reconciled = total_residual.abs() <= tolerance;
+        // A portfolio aggregated from an invalid constituent cannot be trusted
+        // to reconcile, even if the (equally corrupted) buckets happen to net
+        // to within tolerance — never report `is_reconciled` in that case.
+        let is_reconciled = !self.result_invalid && total_residual.abs() <= tolerance;
 
         ReconciliationReport {
             total_residual,
@@ -835,6 +859,7 @@ mod tests {
             fx_detail: None,
             vol_detail: None,
             scalars_detail: None,
+            result_invalid: false,
         };
 
         let csv = portfolio_attr.to_csv();
@@ -882,6 +907,7 @@ mod tests {
             fx_detail: None,
             vol_detail: None,
             scalars_detail: None,
+            result_invalid: false,
         };
 
         let csv = portfolio_attr.position_detail_to_csv();
@@ -915,6 +941,7 @@ mod tests {
             fx_detail: None,
             vol_detail: None,
             scalars_detail: None,
+            result_invalid: false,
         };
         let rendered = explained.explain();
         assert!(rendered.contains("Portfolio P&L: USD 200.00"));
@@ -944,6 +971,7 @@ mod tests {
             fx_detail: None,
             vol_detail: None,
             scalars_detail: None,
+            result_invalid: false,
         };
         let zero_rendered = zero_total.explain();
         assert!(zero_rendered.contains("Carry: USD 5.00 (0.0%)"));
@@ -975,6 +1003,7 @@ mod tests {
             fx_detail: None,
             vol_detail: None,
             scalars_detail: None,
+            result_invalid: false,
         };
 
         let report = portfolio_attr.reconciliation_check(0.01);
@@ -1016,6 +1045,7 @@ mod tests {
             fx_detail: None,
             vol_detail: None,
             scalars_detail: None,
+            result_invalid: false,
         };
 
         let report = portfolio_attr.reconciliation_check(0.01);
@@ -1050,6 +1080,7 @@ mod tests {
             fx_detail: None,
             vol_detail: None,
             scalars_detail: None,
+            result_invalid: false,
         };
 
         let report = portfolio_attr.reconciliation_check(0.01);
@@ -1061,6 +1092,68 @@ mod tests {
             (report.total_residual - 400.0).abs() < 1e-10,
             "residual should be 400.0, got {}",
             report.total_residual
+        );
+    }
+
+    /// Audit (Portfolio): a single invalid constituent must flag the whole
+    /// aggregate invalid so downstream reporting can refuse to trust it.
+    #[test]
+    fn portfolio_aggregation_propagates_position_result_invalid() {
+        let good = sample_position_attr("GOOD", 50.0, 5.0, 2.0);
+        let mut bad = sample_position_attr("BAD", 100.0, 10.0, 5.0);
+        bad.result_invalid = true;
+
+        let identity = |m: Money| -> Result<Money> { Ok(m) };
+        let mut acc = FactorAccumulator::new();
+        acc.add_converted(&good, &identity)
+            .expect("same-currency add");
+        acc.add_converted(&bad, &identity)
+            .expect("same-currency add");
+
+        let portfolio = acc.into_portfolio_attribution(Currency::USD, IndexMap::new());
+        assert!(
+            portfolio.result_invalid,
+            "one invalid position must flag the whole portfolio invalid"
+        );
+    }
+
+    /// Audit (Portfolio): `reconciliation_check` must never report a result as
+    /// reconciled when `result_invalid` is set, even if the corrupted buckets
+    /// happen to net to within tolerance.
+    #[test]
+    fn reconciliation_check_fails_when_result_invalid_even_if_numbers_net() {
+        let base = Currency::USD;
+        let zero = Money::new(0.0, base);
+        let attr = PortfolioAttribution {
+            total_pnl: Money::new(100.0, base),
+            carry: Money::new(100.0, base),
+            rates_curves_pnl: zero,
+            credit_curves_pnl: zero,
+            inflation_curves_pnl: zero,
+            correlations_pnl: zero,
+            fx_pnl: zero,
+            fx_translation_pnl: zero,
+            cross_factor_pnl: zero,
+            vol_pnl: zero,
+            model_params_pnl: zero,
+            market_scalars_pnl: zero,
+            residual: zero,
+            by_position: IndexMap::new(),
+            rates_detail: None,
+            credit_detail: None,
+            inflation_detail: None,
+            correlations_detail: None,
+            fx_detail: None,
+            vol_detail: None,
+            scalars_detail: None,
+            result_invalid: true,
+        };
+        // The buckets net exactly to total_pnl, so a numeric-only check would
+        // pass — the result_invalid gate must still force is_reconciled false.
+        let report = attr.reconciliation_check(0.01);
+        assert!(
+            !report.is_reconciled,
+            "must not report reconciled when result_invalid is set"
         );
     }
 }

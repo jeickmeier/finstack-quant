@@ -3,9 +3,9 @@
 //! Pricing primitives — NPV, par spread, theta, implied volatility — that
 //! flow through the [`bloomberg_quadrature`](super::bloomberg_quadrature)
 //! numerical-quadrature engine. Greek metrics (delta, gamma, vega) live
-//! alongside their `MetricCalculator` definitions under
-//! [`super::metrics`]; the `CDSOption::{delta, gamma, vega}` methods are
-//! thin pass-throughs to those canonical implementations.
+//! alongside their `MetricCalculator` definitions in the metrics module;
+//! the `CDSOption::{delta, gamma, vega}` methods are thin pass-throughs
+//! to those canonical implementations.
 //!
 //! # References
 //!

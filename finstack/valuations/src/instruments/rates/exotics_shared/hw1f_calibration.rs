@@ -2,7 +2,7 @@
 //!
 //! Precedence:
 //! 1. Explicit overrides in `PricingOverrides.model_config` (keys `hw1f_kappa`, `hw1f_sigma`).
-//! 2. Pre-calibrated parameters read from the [`MarketContext`] scalar store.
+//! 2. Pre-calibrated parameters read from the `MarketContext` scalar store.
 //!    A prior Hull-White calibration step (`StepParams::HullWhite` /
 //!    `StepParams::CapFloorHullWhite`) writes solved κ/σ as named scalars under
 //!    the keys produced by

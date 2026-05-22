@@ -616,7 +616,7 @@ impl TrancheStructure {
     /// Create new tranche structure.
     ///
     /// After structural validation this assigns each tranche a distinct,
-    /// strictly-increasing `payment_priority` (see [`Self::assign_priorities`]),
+    /// strictly-increasing `payment_priority` (see `Self::assign_priorities`),
     /// so that multiple notes at one `TrancheSeniority` are ranked correctly.
     pub fn new(mut tranches: Vec<Tranche>) -> finstack_core::Result<Self> {
         if tranches.is_empty() {

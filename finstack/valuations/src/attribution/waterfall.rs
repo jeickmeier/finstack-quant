@@ -226,6 +226,7 @@ pub fn attribute_pnl_waterfall_with_credit_model(
             "Waterfall attribution requires non-empty factor_order".to_string(),
         ));
     }
+    validate_attribution_period(as_of_t0, as_of_t1)?;
 
     // Step 1: Price at T₀
     // Use T₀ model parameters for T₀ valuation if available

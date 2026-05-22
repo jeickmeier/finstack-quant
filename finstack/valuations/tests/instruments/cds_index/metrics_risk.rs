@@ -432,6 +432,99 @@ fn test_cs01_single_vs_constituents() {
 }
 
 #[test]
+fn test_bucketed_cs01_reconciles_to_parallel_single_curve() {
+    // Key-rate (bucketed) par-spread CS01 must reconcile to the parallel `Cs01`.
+    // The bucketed calculator applies the par-spread shock one standard tenor at
+    // a time; each curve par point is bumped by exactly one bucket, so the
+    // per-tenor series sums to the parallel CS01.
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+
+    let idx = standard_single_curve_index("CDX-BKT-SC", start, end, 10_000_000.0);
+    let ctx = standard_market_context(as_of);
+
+    let result = idx
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::Cs01, MetricId::BucketedCs01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+
+    let cs01 = *result.measures.get("cs01").expect("cs01 present");
+    let bucketed = *result
+        .measures
+        .get("bucketed_cs01")
+        .expect("bucketed_cs01 present");
+    assert!(
+        cs01.is_finite() && bucketed.is_finite(),
+        "CS01 metrics must be finite (cs01={cs01}, bucketed={bucketed})"
+    );
+    assert_positive(bucketed, "BucketedCs01");
+    assert_relative_eq(bucketed, cs01, 0.02, "BucketedCs01 total vs parallel Cs01");
+
+    let series_sum: f64 = result
+        .measures
+        .iter()
+        .filter(|(k, _)| k.as_str().starts_with("bucketed_cs01::"))
+        .map(|(_, v)| *v)
+        .sum();
+    assert_relative_eq(series_sum, cs01, 0.02, "per-tenor series vs parallel Cs01");
+}
+
+#[test]
+fn test_bucketed_cs01_reconciles_to_parallel_constituents() {
+    // Same reconciliation in `Constituents` mode: the bucketed calculator bumps
+    // every constituent curve at each tenor and reprices the index end-to-end.
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+    let ctx = multi_constituent_market_context(as_of, 5);
+
+    let idx = standard_constituents_index("CDX-BKT-CONST", start, end, 10_000_000.0, 5);
+
+    let result = idx
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::Cs01, MetricId::BucketedCs01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+
+    let cs01 = *result.measures.get("cs01").expect("cs01 present");
+    let bucketed = *result
+        .measures
+        .get("bucketed_cs01")
+        .expect("bucketed_cs01 present");
+    assert!(
+        cs01.is_finite() && bucketed.is_finite(),
+        "CS01 metrics must be finite (cs01={cs01}, bucketed={bucketed})"
+    );
+    assert_relative_eq(
+        bucketed,
+        cs01,
+        0.02,
+        "BucketedCs01 total vs parallel Cs01 (constituents)",
+    );
+
+    let series_sum: f64 = result
+        .measures
+        .iter()
+        .filter(|(k, _)| k.as_str().starts_with("bucketed_cs01::"))
+        .map(|(_, v)| *v)
+        .sum();
+    assert_relative_eq(
+        series_sum,
+        cs01,
+        0.02,
+        "per-tenor series vs parallel Cs01 (constituents)",
+    );
+}
+
+#[test]
 fn test_all_risk_metrics_together() {
     // Test: All risk metrics computed together
     let start = date!(2025 - 01 - 01);

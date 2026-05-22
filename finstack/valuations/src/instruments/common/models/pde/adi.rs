@@ -259,7 +259,7 @@ fn check_peclet(problem: &dyn PdeProblem2D, grid: &Grid2D, t: f64) -> Result<(),
 
 /// Modified Craig-Sneyd (MCS) ADI time stepper for 2D problems.
 ///
-/// Uses `theta = 1/3` (see [`MCS_THETA`]). Optionally applies Rannacher-style
+/// Uses `theta = 1/3` (MCS theta). Optionally applies Rannacher-style
 /// smoothing: fully-implicit (`theta = 1.0`) steps near the terminal condition
 /// to damp the non-smooth payoff, then `theta = 1/3` for the remaining steps.
 ///

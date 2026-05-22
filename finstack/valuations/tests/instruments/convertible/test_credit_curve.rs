@@ -228,6 +228,65 @@ fn test_dv01_and_cs01_are_distinct() {
     );
 }
 
+/// Key-rate (bucketed) CS01 must reconcile to the parallel CS01.
+///
+/// `ConvertibleBucketedCs01Calculator` applies a *triangular key-rate* shock to
+/// the credit curve at each standard bucket tenor. Because the triangular
+/// weights are a partition of unity over every relevant cashflow tenor, the
+/// summed key-rate shocks equal a single parallel shock, so the per-bucket
+/// central-difference CS01s sum (to within finite-difference tolerance) to the
+/// parallel CS01 produced by `Cs01Calculator`.
+#[test]
+fn test_convertible_bucketed_cs01_reconciles_to_parallel() {
+    let bond = create_convertible_with_credit();
+    let market = create_market_context_with_credit(200.0);
+
+    let result = bond
+        .price_with_metrics(
+            &market,
+            dates::base_date(),
+            &[MetricId::Cs01, MetricId::BucketedCs01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("should compute Cs01 and BucketedCs01");
+
+    let cs01 = *result
+        .measures
+        .get("cs01")
+        .expect("parallel Cs01 should be computed");
+    let bucketed = *result
+        .measures
+        .get("bucketed_cs01")
+        .expect("BucketedCs01 should be computed");
+
+    assert!(
+        cs01.is_finite() && bucketed.is_finite(),
+        "CS01 metrics must be finite (cs01={cs01}, bucketed={bucketed})"
+    );
+    assert!(
+        cs01.abs() > 1e-6,
+        "parallel CS01 should be non-trivial for a convertible with a credit curve: {cs01}"
+    );
+    // Summed triangular key-rate shocks = parallel shock → bucketed ≈ parallel.
+    // Tolerance covers third-order Taylor terms and tree discretisation noise.
+    assert!(
+        (bucketed - cs01).abs() <= 1e-5 + 1e-4 * cs01.abs(),
+        "bucketed CS01 ({bucketed}) must reconcile to parallel CS01 ({cs01})"
+    );
+
+    // The per-tenor series must also be present and sum to the same total.
+    let series_sum: f64 = result
+        .measures
+        .iter()
+        .filter(|(k, _)| k.as_str().starts_with("bucketed_cs01::"))
+        .map(|(_, v)| *v)
+        .sum();
+    assert!(
+        (series_sum - cs01).abs() <= 1e-5 + 1e-4 * cs01.abs(),
+        "per-tenor bucketed_cs01 series ({series_sum}) must sum to parallel CS01 ({cs01})"
+    );
+}
+
 #[test]
 fn test_recovery_rate_increases_price() {
     // With recovery > 0, the credit spread effect is reduced, so PV increases.

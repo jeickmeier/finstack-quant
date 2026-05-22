@@ -38,8 +38,8 @@ use finstack_core::Result;
 
 /// Simulate a single Monte Carlo path with fractional noise injection.
 ///
-/// Thin wrapper over the shared per-path loop with a [`NoiseHook::InjectFbm`]
-/// hook that overwrites `z[fbm_z_index]` with `fbm_increments[step]` after
+/// Thin wrapper over the shared per-path loop with a noise injection hook
+/// that overwrites `z[fbm_z_index]` with `fbm_increments[step]` after
 /// drawing i.i.d. shocks. Correlation is not applied; rough-volatility schemes
 /// encode their factor structure inside `disc.step`.
 ///

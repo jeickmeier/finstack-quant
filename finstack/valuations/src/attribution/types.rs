@@ -155,7 +155,7 @@ pub struct PnlAttribution {
     /// Total P&L *as reported by this attribution*.
     ///
     /// In the standard total-return convention (the default carry path uses
-    /// [`crate::attribution::helpers::apply_total_return_carry`]), this is
+    /// the internal total-return carry helper), this is
     /// `(val_t1 − val_t0) + coupon_income_between(T0, T1)`. Cashflows received
     /// during the period are added back so that
     /// `total_pnl == carry + factor_sum + residual` holds: the `carry` field
@@ -581,7 +581,13 @@ impl<'de> Deserialize<'de> for SourceLine {
 /// and Shift as distinct P&L components.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct CarryDetail {
-    /// Total carry P&L (sum of all components).
+    /// Total carry P&L. Equals `theta + coupon_income` on the repricing-based
+    /// paths, or the `CarryTotal` metric on the metrics-based path.
+    ///
+    /// NOTE: this is **not** the sum of every field below. `theta` is the
+    /// pre-decomposition aggregate that already contains `pull_to_par` and
+    /// `roll_down`, so summing `theta` together with those sub-lines would
+    /// double-count. See each field's own doc for its role in the breakdown.
     pub total: Money,
 
     /// Coupon/interest income received during the period (with optional
@@ -903,6 +909,10 @@ impl PnlAttribution {
         if let Some(d) = &mut self.credit_factor_detail {
             d.generic_pnl *= factor;
             d.adder_pnl_total *= factor;
+            // `curve_shape_pnl` is a signed P&L component and load-bearing for
+            // the `generic + Σlevels + adder + curve_shape ≡ credit_curves_pnl`
+            // reconciliation invariant — it MUST scale with the rest.
+            d.curve_shape_pnl *= factor;
             for level in &mut d.levels {
                 level.total *= factor;
                 for v in level.by_bucket.values_mut() {
@@ -914,6 +924,9 @@ impl PnlAttribution {
                     *v *= factor;
                 }
             }
+            // `adder_magnitude` is a diagnostic absolute value (= |adder_pnl_total|);
+            // scale by |factor| so it stays non-negative for short positions.
+            scale_money_opt(&mut d.adder_magnitude, factor.abs());
         }
         if let Some(d) = &mut self.credit_carry_decomposition {
             d.rates_carry_total *= factor;
@@ -1291,6 +1304,10 @@ impl AttributionMethod {
                 MetricId::Theta,
                 MetricId::Dv01,
                 MetricId::Cs01,
+                // Per-tenor par-spread CS01 — drives key-rate credit attribution
+                // when available (CDS-family instruments); otherwise the
+                // aggregate `Cs01` path is used.
+                MetricId::BucketedCs01,
                 MetricId::Vega,
                 MetricId::Delta,
                 MetricId::Fx01,
@@ -1534,6 +1551,78 @@ mod tests {
         assert!(
             !attr.residual_within_meta_tolerance(),
             "meta-tolerance check MUST also fail when result_invalid is set"
+        );
+    }
+
+    /// Audit N1: `scale()` must scale every component of `credit_factor_detail`
+    /// — including `curve_shape_pnl` and the `adder_magnitude` diagnostic — so
+    /// the reconciliation invariant `generic + Σlevels + adder + curve_shape ≡
+    /// credit_curves_pnl` survives scaling to position quantity.
+    #[test]
+    fn test_scale_preserves_credit_factor_detail_reconciliation() {
+        let usd = Currency::USD;
+        let mut attr = PnlAttribution::new(
+            Money::new(100.0, usd),
+            "BOND-SCALE",
+            date!(2025 - 01 - 15),
+            date!(2025 - 02 - 15),
+            AttributionMethod::Parallel,
+        );
+        attr.credit_curves_pnl = Money::new(100.0, usd);
+        attr.credit_factor_detail = Some(CreditFactorAttribution {
+            model_id: "test/0".to_string(),
+            generic_pnl: Money::new(40.0, usd),
+            levels: vec![LevelPnl {
+                level_name: "rating".to_string(),
+                total: Money::new(30.0, usd),
+                by_bucket: BTreeMap::new(),
+            }],
+            adder_pnl_total: Money::new(20.0, usd),
+            curve_shape_pnl: Money::new(10.0, usd),
+            adder_pnl_by_issuer: None,
+            adder_magnitude: Some(Money::new(20.0, usd)),
+        });
+
+        let reconciles = |a: &PnlAttribution| {
+            let d = a.credit_factor_detail.as_ref().expect("detail");
+            let sum = d.generic_pnl.amount()
+                + d.levels.iter().map(|l| l.total.amount()).sum::<f64>()
+                + d.adder_pnl_total.amount()
+                + d.curve_shape_pnl.amount();
+            (sum - a.credit_curves_pnl.amount()).abs() < 1e-9
+        };
+        assert!(reconciles(&attr), "fixture must reconcile before scaling");
+
+        attr.scale(0.5);
+        let d = attr.credit_factor_detail.as_ref().expect("detail");
+        assert_eq!(
+            d.curve_shape_pnl.amount(),
+            5.0,
+            "curve_shape_pnl must scale"
+        );
+        assert_eq!(
+            d.adder_magnitude.map(|m| m.amount()),
+            Some(10.0),
+            "adder_magnitude must scale"
+        );
+        assert!(
+            reconciles(&attr),
+            "reconciliation invariant must survive scaling"
+        );
+
+        // A negative scale (short position) must keep adder_magnitude non-negative.
+        attr.scale(-1.0);
+        assert_eq!(
+            attr.credit_factor_detail
+                .as_ref()
+                .and_then(|d| d.adder_magnitude)
+                .map(|m| m.amount()),
+            Some(10.0),
+            "adder_magnitude is a |.| diagnostic — stays non-negative under negative scale"
+        );
+        assert!(
+            reconciles(&attr),
+            "reconciliation survives a negative scale"
         );
     }
 }

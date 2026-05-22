@@ -917,7 +917,7 @@ pub fn price_from_ytw(
 /// convention, a settlement-anchored quantity: [`ZSpreadCalculator`] solves it
 /// with discounting and year-fractions measured from the bond's settlement
 /// (`quote_date`), not from `as_of`. This inverter mirrors that exactly — it
-/// derives the same `quote_date` internally via [`QuoteDateContext`] and
+/// derives the same `quote_date` internally via `QuoteDateContext` and
 /// anchors all discounting there. As a result the documented round-trip
 ///
 /// ```text

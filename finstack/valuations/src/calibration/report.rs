@@ -409,8 +409,8 @@ impl CalibrationReport {
     /// Explicitly mark the report as having encountered penalty residuals during
     /// the solve (W-41: provenance-based penalty detection).
     ///
-    /// The magnitude-based threshold in [`compute_residual_diagnostics`] cannot
-    /// detect small penalty values produced by [`fill_penalty`](super::solver::GlobalFitOptimizer)
+    /// The magnitude-based threshold in `compute_residual_diagnostics` cannot
+    /// detect small penalty values produced by `fill_penalty` in the optimizer
     /// when bound violations are tiny (e.g., `PENALTY * d/(1+d) ≪ RESIDUAL_PENALTY_ABS_MIN`).
     /// Callers that KNOW bound violations occurred during solving (e.g., because their
     /// `clamp_to_bounds` count was non-zero) MUST call `with_has_penalty_residuals(true)` so

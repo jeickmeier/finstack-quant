@@ -439,8 +439,8 @@ impl XccySwap {
     /// MtM-reset basis swap) is unaffected; the silent override only matters if
     /// a caller deliberately mismatches these fields.
     ///
-    /// FX-matrix reachability requires a runtime [`MarketContext`] and is therefore
-    /// checked separately by [`Self::validate_fx_reachable`] at the start of
+    /// FX-matrix reachability requires a runtime `MarketContext` and is therefore
+    /// checked separately by `validate_fx_reachable` at the start of
     /// `base_value`. A passing `validate()` does *not* imply the swap is priceable —
     /// it only guarantees the static configuration is well-formed.
     pub fn validate(&self) -> Result<()> {

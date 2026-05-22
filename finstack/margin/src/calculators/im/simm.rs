@@ -406,7 +406,7 @@ impl SimmCalculator {
     /// # Errors
     ///
     /// Returns an error if the embedded margin registry cannot be loaded or if
-    /// the resolved [`SimmParams`] fails the completeness invariants checked by
+    /// the resolved SIMM parameters fail the completeness invariants checked by
     /// `validate_simm_params`.
     pub fn new(version: SimmVersion) -> Result<Self> {
         Self::build_from_registry(version, embedded_registry()?)
@@ -426,7 +426,7 @@ impl SimmCalculator {
     /// # Errors
     ///
     /// Returns an error if the margin registry cannot be loaded from `cfg` or if
-    /// the merged [`SimmParams`] fails the completeness invariants checked by
+    /// the merged SIMM parameters fail the completeness invariants checked by
     /// `validate_simm_params` — catches broken config overlays at load time
     /// rather than as silent miscalculations during margin runs.
     pub fn from_finstack_config(

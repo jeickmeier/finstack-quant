@@ -432,3 +432,120 @@ pub fn calculate_tranche_cs01(
 
     Ok(bumped_pv.total() - base_pv.total())
 }
+
+/// Locate the tenor bucket(s) for year fraction `t`, with a triangular weight.
+///
+/// Returns `(lo, hi, w_hi)`: `t`'s sensitivity is split `(1 - w_hi)` to
+/// `buckets[lo]` and `w_hi` to `buckets[hi]`. At or beyond the grid ends,
+/// `lo == hi` and the whole weight lands in one bucket. The two weights always
+/// sum to 1, so a per-cashflow split reconciles exactly to the parallel total.
+fn locate_bucket(t: f64, buckets: &[f64]) -> (usize, usize, f64) {
+    let last = buckets.len() - 1;
+    if t <= buckets[0] {
+        return (0, 0, 0.0);
+    }
+    if t >= buckets[last] {
+        return (last, last, 0.0);
+    }
+    for i in 0..last {
+        if t < buckets[i + 1] {
+            let w = (t - buckets[i]) / (buckets[i + 1] - buckets[i]);
+            return (i, i + 1, w);
+        }
+    }
+    (last, last, 0.0)
+}
+
+/// Key-rate (bucketed) CS01 calculator for structured credit.
+///
+/// Mirrors [`Cs01Calculator`] — a 1 bp z-spread shock — but attributes each
+/// cashflow's spread sensitivity to standard tenor buckets via triangular
+/// (linear) allocation by the cashflow's year fraction. Because each
+/// cashflow's two triangular weights sum to 1, the per-bucket CS01s sum
+/// **exactly** to the parallel z-spread CS01.
+///
+/// There is no credit *curve* here — the z-spread is a scalar — so "key-rate"
+/// means *where in time* the spread sensitivity sits, not a per-tenor curve
+/// bump. The per-tenor series is stored under
+/// `bucketed_cs01::{discount_curve_id}`.
+pub struct BucketedCs01Calculator;
+
+impl MetricCalculator for BucketedCs01Calculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        use crate::metrics::sensitivities::config::{
+            format_bucket_label_cow, STANDARD_BUCKETS_YEARS,
+        };
+
+        let base_spread = context
+            .computed
+            .get(&MetricId::ZSpread)
+            .copied()
+            .ok_or_else(|| {
+                finstack_core::Error::from(finstack_core::InputError::NotFound {
+                    id: "metric:ZSpread".to_string(),
+                })
+            })?;
+        let bumped_spread = base_spread + ONE_BASIS_POINT;
+        let as_of = context.as_of;
+
+        let disc_curve_id = context.discount_curve_id.clone().ok_or_else(|| {
+            finstack_core::Error::from(finstack_core::InputError::NotFound {
+                id: "discount_curve_id".to_string(),
+            })
+        })?;
+
+        // Collect (year_fraction, discount_factor, amount) for surviving flows
+        // into owned data, so no borrow of `context` outlives the curve/cashflow
+        // reads — `store_bucketed_series` below needs `&mut context`.
+        let cached: Vec<(f64, f64, f64)> = {
+            let flows = context.cashflows.as_ref().ok_or_else(|| {
+                finstack_core::Error::from(finstack_core::InputError::NotFound {
+                    id: "context.cashflows".to_string(),
+                })
+            })?;
+            let disc = context.curves.get_discount(disc_curve_id.as_str())?;
+            let base_date = disc.base_date();
+            let day_count = DayCount::Act365F;
+            flows
+                .iter()
+                .filter(|(date, _)| *date > as_of)
+                .map(|(date, amount)| -> Result<(f64, f64, f64)> {
+                    let t =
+                        day_count.year_fraction(base_date, *date, DayCountContext::default())?;
+                    let df = disc.df_on_date_curve(*date)?;
+                    Ok((t, df, amount.amount()))
+                })
+                .collect::<Result<Vec<_>>>()?
+        };
+
+        // Each cashflow's z-spread CS01 contribution, triangular-allocated to
+        // the surrounding standard tenor buckets.
+        let buckets = STANDARD_BUCKETS_YEARS;
+        let mut bucket_pnl = vec![0.0_f64; buckets.len()];
+        for (t, df, amt) in &cached {
+            let sens = amt * df * ((-bumped_spread * t).exp() - (-base_spread * t).exp());
+            let (lo, hi, w_hi) = locate_bucket(*t, &buckets);
+            bucket_pnl[lo] += sens * (1.0 - w_hi);
+            if hi != lo {
+                bucket_pnl[hi] += sens * w_hi;
+            }
+        }
+
+        let series: Vec<(std::borrow::Cow<'static, str>, f64)> = buckets
+            .iter()
+            .zip(bucket_pnl.iter())
+            .map(|(&t, &pnl)| (format_bucket_label_cow(t), pnl))
+            .collect();
+        let total: f64 = bucket_pnl.iter().sum();
+
+        context.store_bucketed_series(
+            MetricId::custom(format!("bucketed_cs01::{}", disc_curve_id.as_str())),
+            series,
+        );
+        Ok(total)
+    }
+
+    fn dependencies(&self) -> &[MetricId] {
+        &[MetricId::ZSpread]
+    }
+}

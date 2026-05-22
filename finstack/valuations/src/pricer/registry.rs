@@ -121,7 +121,7 @@ impl PricerRegistry {
     /// Register a pricer for a specific (instrument type, model) combination.
     ///
     /// If a pricer already exists for this key it is replaced, a warning is
-    /// emitted, and the colliding key is recorded in [`Self::duplicate_keys`]
+    /// emitted, and the colliding key is recorded in `Self::duplicate_keys`
     /// so the standard-registry build can fail loudly. Overwriting is a
     /// legitimate operation for test setup and monkey-patching; use
     /// [`PricerRegistry::try_register`] when a duplicate must be rejected

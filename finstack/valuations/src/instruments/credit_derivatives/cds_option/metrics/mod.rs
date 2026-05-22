@@ -120,6 +120,9 @@ pub(crate) fn register_cds_option_metrics(registry: &mut MetricRegistry) {
             (Cs01, crate::metrics::sensitivities::cs01::CreditParallelCs01::<
                 crate::instruments::credit_derivatives::cds_option::CDSOption,
             >::default()),
+            (BucketedCs01, crate::metrics::sensitivities::cs01::CreditBucketedCs01::<
+                crate::instruments::credit_derivatives::cds_option::CDSOption,
+            >::default()),
             (SpreadDv01, spread_dv01::UnderlyingSpreadDv01Calculator),
             (Dv01, dv01::CdsOptionDv01Calculator),
             (Theta, theta::ThetaCalculator),

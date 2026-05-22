@@ -8,6 +8,7 @@
 //! - Par spread (bps)
 //! - Risky PV01
 //! - CS01 (approximate)
+//! - Bucketed CS01 (key-rate, per-tenor par-spread)
 //! - Protection leg PV
 //! - Premium leg PV
 //! - Expected loss
@@ -47,6 +48,7 @@ pub(crate) fn register_cds_index_metrics(registry: &mut MetricRegistry) {
         metrics: [
             (ParSpread, simple::ParSpreadCalculator),
             (Cs01, cs01::Cs01Calculator),
+            (BucketedCs01, cs01::CdsIndexBucketedCs01Calculator),
             (Cs01Hazard, cs01::Cs01HazardCalculator),
             (ProtectionLegPv, simple::ProtectionLegPvCalculator),
             (PremiumLegPv, simple::PremiumLegPvCalculator),

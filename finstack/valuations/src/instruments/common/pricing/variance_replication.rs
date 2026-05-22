@@ -79,7 +79,7 @@ const WING_SUBDIVISIONS: usize = 64;
 /// - the strike grid is too short, non-monotone, or non-finite,
 /// - the forward is non-finite or non-positive,
 /// - the surface returns a non-positive / sub-floor volatility for a sampled
-///   strike (a broken surface is reported, not clamped — see [`MIN_USABLE_VOL`]),
+///   strike (a broken surface is reported, not clamped — see the internal MIN_USABLE_VOL constant),
 /// - the result is non-finite or non-positive.
 pub fn carr_madan_forward_variance(
     strikes: &[f64],

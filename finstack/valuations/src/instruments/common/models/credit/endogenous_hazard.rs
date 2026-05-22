@@ -148,7 +148,7 @@ impl EndogenousHazardSpec {
     /// Compute the hazard rate at a given leverage level.
     ///
     /// The result is always finite, floored at 0.0 (never negative), and
-    /// capped at [`MAX_HAZARD_RATE`](Self::MAX_HAZARD_RATE) so a divergent
+    /// capped at `MAX_HAZARD_RATE` so a divergent
     /// mapping cannot produce a non-finite (`inf`/`NaN`) rate. A degenerate
     /// tabular table (empty, or with mismatched vector lengths — reachable
     /// only via `Deserialize`, since the constructor validates) yields `0.0`.

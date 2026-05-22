@@ -26,7 +26,7 @@ use finstack_core::dates::{BusinessDayConvention, Date, DayCount, HolidayCalenda
 /// - Years: 1Y = 1 year
 ///
 /// For calendar-aware calculations that respect business days and holidays, use
-/// [`parse_tenor_to_years_with_context`].
+/// `finstack_core::dates::Tenor::add_to_date`.
 ///
 /// # Arguments
 /// - `tenor`: Tenor string in formats like "1D", "1W", "3M", "5Y".
@@ -196,8 +196,7 @@ pub fn tenor_years_from_binding(
 ///
 /// Anchored date arithmetic (e.g. advancing a valuation date by a tenor,
 /// or deriving a forward start) must instead use
-/// [`finstack_core::dates::Tenor::add_to_date`] or
-/// [`parse_tenor_to_years_with_context`], both of which honour the
+/// `finstack_core::dates::Tenor::add_to_date`, which honours the
 /// valuation date, calendar, and business-day convention.
 ///
 /// # Arguments

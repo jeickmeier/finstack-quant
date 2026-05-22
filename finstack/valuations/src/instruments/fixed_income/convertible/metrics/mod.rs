@@ -126,6 +126,7 @@ pub(crate) fn register_convertible_metrics(registry: &mut MetricRegistry) {
             (Vega, greeks::VegaCalculator),
             (Rho, greeks::RhoCalculator),
             (Cs01, cs01::Cs01Calculator),
+            (BucketedCs01, cs01::BucketedCs01Calculator),
             (Dv01, crate::metrics::UnifiedDv01Calculator::<
                 crate::instruments::ConvertibleBond,
             >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),

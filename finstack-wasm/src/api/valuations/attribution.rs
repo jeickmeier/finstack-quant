@@ -81,6 +81,37 @@ fn error_variant_name(err: &finstack_core::Error) -> &'static str {
     }
 }
 
+/// Extract a human-readable message from a caught panic payload.
+fn panic_message(panic: &(dyn std::any::Any + Send)) -> String {
+    if let Some(s) = panic.downcast_ref::<&str>() {
+        (*s).to_string()
+    } else if let Some(s) = panic.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "unknown panic payload".to_string()
+    }
+}
+
+/// Run an attribution `execute()` call, converting a Rust panic into a
+/// catchable `AttributionError` `JsValue` instead of letting it unwind to the
+/// wasm boundary. An uncaught unwind there `abort`s the whole module instance,
+/// killing every subsequent call from the JS host.
+fn catch_attribution_panic<T>(
+    label: &str,
+    f: impl FnOnce() -> Result<T, finstack_core::Error>,
+) -> Result<T, JsValue> {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+        Ok(Ok(value)) => Ok(value),
+        Ok(Err(err)) => Err(attribution_error_to_js(err)),
+        Err(panic) => Err(attribution_error_to_js(finstack_core::Error::internal(
+            format!(
+                "attribution panicked in {label}: {}",
+                panic_message(panic.as_ref())
+            ),
+        ))),
+    }
+}
+
 /// Run P&L attribution for a single instrument.
 ///
 /// Accepts the instrument JSON, two market snapshots, dates, and a
@@ -109,7 +140,7 @@ pub fn attribute_pnl(
     if let Some(val) = full_cross_attribution {
         spec.full_cross_attribution = val;
     }
-    let result = spec.execute().map_err(attribution_error_to_js)?;
+    let result = catch_attribution_panic("attributePnl", || spec.execute())?;
     serde_json::to_string(&result.attribution).map_err(to_js_err)
 }
 
@@ -120,7 +151,7 @@ pub fn attribute_pnl(
 pub fn attribute_pnl_from_spec(spec_json: &str) -> Result<String, JsValue> {
     let envelope: finstack_valuations::attribution::AttributionEnvelope =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
-    let result_envelope = envelope.execute().map_err(attribution_error_to_js)?;
+    let result_envelope = catch_attribution_panic("attributePnlFromSpec", || envelope.execute())?;
     serde_json::to_string(&result_envelope).map_err(to_js_err)
 }
 

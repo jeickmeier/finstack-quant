@@ -189,10 +189,10 @@ pub struct CDSTranchePricerConfig {
     ///
     /// This field is no longer read by the pricer. It previously held a fixed
     /// `0.5` mid-period fraction; the engine now integrates the within-period
-    /// default timing against the index credit curve
-    /// ([`CDSTranchePricer::within_period_default_fraction`]) — a
-    /// survival-weighted fraction that is `< 0.5` for a positive hazard and
-    /// is consistent with the single-name CDS analytic accrual-on-default.
+    /// default timing against the index credit curve (via
+    /// `within_period_default_fraction`) — a survival-weighted fraction that
+    /// is `< 0.5` for a positive hazard and is consistent with the single-name
+    /// CDS analytic accrual-on-default.
     /// The field is retained for struct-construction compatibility and will
     /// be removed in a future release.
     #[deprecated(
@@ -383,8 +383,8 @@ pub enum HeteroMethod {
 /// copula dispatch and quadrature selection from hot integration loops.
 ///
 /// **Cache invariant:** `params.copula_spec` and `params.quadrature_order` must
-/// not be mutated after the first call to [`Self::copula`] or quadrature
-/// selection. To change either, construct a new pricer via [`Self::with_params`].
+/// not be mutated after the first call to `Self::copula` or quadrature
+/// selection. To change either, construct a new pricer via `Self::with_params`.
 /// Other config fields (`grid_step`, `hetero_method`, `use_issuer_curves`, etc.)
 /// are *not* cached and may be mutated freely.
 pub struct CDSTranchePricer {

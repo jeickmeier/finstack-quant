@@ -198,7 +198,7 @@ impl IrFutureOption {
     ///
     /// # Errors
     ///
-    /// Propagates a day-count failure from [`time_to_expiry`](Self::time_to_expiry).
+    /// Propagates a day-count failure from internal time-to-expiry calculation.
     pub fn delta(&self, as_of: Date) -> finstack_core::Result<f64> {
         let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.volatility <= 0.0 {
@@ -230,7 +230,7 @@ impl IrFutureOption {
     ///
     /// # Errors
     ///
-    /// Propagates a day-count failure from [`time_to_expiry`](Self::time_to_expiry).
+    /// Propagates a day-count failure from internal time-to-expiry calculation.
     pub fn gamma(&self, as_of: Date) -> finstack_core::Result<f64> {
         let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.volatility <= 0.0 || self.futures_price <= 0.0 {
@@ -247,7 +247,7 @@ impl IrFutureOption {
     ///
     /// # Errors
     ///
-    /// Propagates a day-count failure from [`time_to_expiry`](Self::time_to_expiry).
+    /// Propagates a day-count failure from internal time-to-expiry calculation.
     pub fn vega_per_pct(&self, as_of: Date) -> finstack_core::Result<f64> {
         let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.futures_price <= 0.0 {
@@ -267,7 +267,7 @@ impl IrFutureOption {
     ///
     /// # Errors
     ///
-    /// Propagates a day-count failure from [`time_to_expiry`](Self::time_to_expiry).
+    /// Propagates a day-count failure from internal time-to-expiry calculation.
     pub fn theta_daily(&self, as_of: Date) -> finstack_core::Result<f64> {
         let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.volatility <= 0.0 || self.futures_price <= 0.0 {

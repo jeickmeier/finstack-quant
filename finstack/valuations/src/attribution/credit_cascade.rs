@@ -152,7 +152,10 @@ pub(crate) fn plan_credit_cascade(
         return Ok(None);
     }
 
-    // Measure average ΔS_i across the issuer's hazard curves (in bp).
+    // Measure the average ΔS_i across the issuer's hazard curves (in bp). The
+    // cascade is internally hazard-consistent: this `measure_hazard_curve_shift`
+    // pairs with `shift_hazard_curves`, which the cascade reprice path and the
+    // credit-detail CS01 both apply — so step `delta_bp` and CS01 share units.
     let mut total_shift_bp = 0.0;
     let mut count = 0usize;
     for curve_id in &credit_curves {

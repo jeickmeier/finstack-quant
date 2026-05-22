@@ -73,7 +73,7 @@ pub struct DcfOptions {
     pub wacc_denominator_epsilon: f64,
     /// Exit-multiple sensitivity bump (default: `ExitMultipleBump::Absolute(1.0)`).
     ///
-    /// Use [`ExitMultipleBump::Relative`] for a proportional shock,
+    /// Use `ExitMultipleBump::Relative` for a proportional shock,
     /// e.g. `Relative(0.10)` for ±10% of the base multiple. Absolute
     /// bumps are clamped at zero on the downside.
     pub exit_multiple_bump: ExitMultipleBump,

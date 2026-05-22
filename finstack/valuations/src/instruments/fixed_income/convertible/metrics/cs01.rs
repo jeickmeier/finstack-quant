@@ -25,8 +25,12 @@
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::metrics::bump_discount_curve_parallel;
-use crate::metrics::{MetricCalculator, MetricContext};
+use crate::metrics::sensitivities::config::{format_bucket_label_cow, STANDARD_BUCKETS_YEARS};
+use crate::metrics::{MetricCalculator, MetricContext, MetricId};
+use finstack_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_core::Result;
+use std::borrow::Cow;
+use std::sync::Arc;
 
 /// CS01 calculator for convertible bonds.
 pub(crate) struct Cs01Calculator;
@@ -57,5 +61,83 @@ impl MetricCalculator for Cs01Calculator {
         let cs01 = (pv_up - pv_down) / 2.0;
 
         Ok(cs01)
+    }
+}
+
+/// Triangular key-rate bump spec for bucket `i` of `buckets`.
+///
+/// The triangular weight runs `buckets[i-1] → buckets[i] → buckets[i+1]`, so
+/// the sum of all bucket bumps is a parallel bump (partition of unity) — hence
+/// the per-bucket CS01s sum to the parallel CS01.
+fn key_rate_spec(i: usize, bump_bp: f64, buckets: &[f64]) -> BumpSpec {
+    let prev = if i == 0 { 0.0 } else { buckets[i - 1] };
+    let target = buckets[i];
+    let next = if i + 1 == buckets.len() {
+        f64::INFINITY
+    } else {
+        buckets[i + 1]
+    };
+    BumpSpec::triangular_key_rate_bp(prev, target, next, bump_bp)
+}
+
+/// Key-rate (bucketed) CS01 calculator for convertible bonds.
+///
+/// Mirrors [`Cs01Calculator`] but applies a *triangular key-rate* shock to the
+/// credit curve at each standard bucket tenor instead of a single parallel
+/// shock, producing a per-tenor CS01 series. The per-bucket CS01s sum (within
+/// the usual key-rate tolerance) to the parallel CS01.
+///
+/// The series is stored under `bucketed_cs01::{credit_curve_id}` so downstream
+/// consumers read it exactly like the generic `BucketedCs01`. Like the parallel
+/// calculator, when `credit_curve_id` is `None` (or the bond has expired) CS01
+/// is `0.0` and no series is stored.
+pub(crate) struct BucketedCs01Calculator;
+
+impl MetricCalculator for BucketedCs01Calculator {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        let as_of = context.as_of;
+        let (credit_curve_id, maturity) = {
+            let bond: &ConvertibleBond = context.instrument_as()?;
+            (bond.credit_curve_id.clone(), bond.maturity)
+        };
+
+        if as_of >= maturity {
+            return Ok(0.0);
+        }
+        let curve_id = match credit_curve_id {
+            Some(id) => id,
+            None => return Ok(0.0),
+        };
+
+        let bump_bp = 1.0;
+        // Clone the Arcs so no borrow of `context` outlives the reprice loop —
+        // `store_bucketed_series` below needs `&mut context`.
+        let curves = Arc::clone(&context.curves);
+        let instrument = Arc::clone(&context.instrument);
+
+        let mut series: Vec<(Cow<'static, str>, f64)> = Vec::new();
+        let mut total = 0.0;
+        for (i, &t) in STANDARD_BUCKETS_YEARS.iter().enumerate() {
+            let up = curves.bump([MarketBump::Curve {
+                id: curve_id.clone(),
+                spec: key_rate_spec(i, bump_bp, &STANDARD_BUCKETS_YEARS),
+            }])?;
+            let down = curves.bump([MarketBump::Curve {
+                id: curve_id.clone(),
+                spec: key_rate_spec(i, -bump_bp, &STANDARD_BUCKETS_YEARS),
+            }])?;
+            let pv_up = instrument.value(&up, as_of)?.amount();
+            let pv_down = instrument.value(&down, as_of)?.amount();
+            // Central difference, $ per bp of spread at this bucket.
+            let cs01 = (pv_up - pv_down) / (2.0 * bump_bp);
+            series.push((format_bucket_label_cow(t), cs01));
+            total += cs01;
+        }
+
+        context.store_bucketed_series(
+            MetricId::custom(format!("bucketed_cs01::{}", curve_id.as_str())),
+            series,
+        );
+        Ok(total)
     }
 }

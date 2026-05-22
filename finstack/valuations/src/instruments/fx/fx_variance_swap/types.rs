@@ -212,7 +212,7 @@ impl FxVarianceSwap {
     /// Fraction of the observation period elapsed at `as_of`, measured by the
     /// instrument's day-count convention.
     ///
-    /// This is the seasoning weight the pricer ([`pricer::compute_pv`]) uses to
+    /// This is the seasoning weight the pricer (`pricer::compute_pv`) uses to
     /// blend already-annualized realized and forward variance. Risk metrics
     /// (vega, variance vega, expected variance) must use the *same* weight as
     /// the booked PV; an observation-count fraction only coincides for

@@ -124,8 +124,8 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Propagates errors from [`multi_factor_greeks`] when factor inputs are
-    /// mismatched, non-finite, insufficient, or numerically singular.
+    /// Propagates errors from the underlying multi-factor greeks calculation
+    /// when factor inputs are mismatched, non-finite, insufficient, or numerically singular.
     pub fn multi_factor_greeks(
         &self,
         ticker_idx: usize,

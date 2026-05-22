@@ -539,3 +539,94 @@ fn same_credit_total_different_hierarchy_different_detail() {
         );
     }
 }
+
+/// Regression (audit C1): the parallel credit cascade must attribute each
+/// step's *own* contribution — `val(T0 hazard + step bp) − val(T0 hazard)` —
+/// not the complement `val_t1 − val(T0 hazard + step bp)`. The complement
+/// formula drove every moved factor's P&L toward zero and dumped a large
+/// spurious offset (≈ −2 × credit P&L) into `curve_shape_pnl`; only the
+/// back-solved sum reconciled, so a sum-only test could not catch it.
+#[test]
+fn parallel_credit_cascade_attributes_each_step_to_its_own_contribution() {
+    let (as_of_t0, as_of_t1) = standard_period();
+    let market_t0 = make_market_state(flat_discount(as_of_t0), flat_hazard(as_of_t0, 0.01));
+    let market_t1 = make_market_state(flat_discount(as_of_t1), flat_hazard(as_of_t1, 0.02));
+
+    let run = |method: AttributionMethod| {
+        let spec = AttributionSpec {
+            instrument: InstrumentJson::Bond(make_bond()),
+            market_t0: market_t0.clone(),
+            market_t1: market_t1.clone(),
+            as_of_t0,
+            as_of_t1,
+            method,
+            model_params_t0: None,
+            credit_factor_model: Some(Box::new(make_model(vec![
+                HierarchyDimension::Rating,
+                HierarchyDimension::Region,
+            ]))),
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            config: None,
+            full_cross_attribution: false,
+        };
+        AttributionEnvelope::new(spec)
+            .execute()
+            .expect("attribution should succeed")
+            .result
+            .attribution
+    };
+
+    let parallel = run(AttributionMethod::Parallel);
+    let waterfall = run(AttributionMethod::Waterfall(default_waterfall_order()));
+
+    let p = parallel
+        .credit_factor_detail
+        .as_ref()
+        .expect("parallel credit detail");
+    let w = waterfall
+        .credit_factor_detail
+        .as_ref()
+        .expect("waterfall credit detail");
+    let credit_pnl = parallel.credit_curves_pnl.amount();
+    assert!(
+        credit_pnl.abs() > 1.0,
+        "flat hazard move must produce material credit P&L, got {credit_pnl}"
+    );
+
+    // (1) A flat (parallel) hazard move has essentially no curve-shape residual.
+    // The buggy complement formula instead produced curve_shape ≈ -2 × credit_pnl.
+    assert!(
+        p.curve_shape_pnl.amount().abs() <= 1e-6 + 0.05 * credit_pnl.abs(),
+        "flat move must leave curve_shape ~0, got {} vs credit_pnl {credit_pnl}",
+        p.curve_shape_pnl.amount()
+    );
+
+    // (2) The parallel bp-bump steps must themselves sum to ~credit_pnl, not
+    // ~N × credit_pnl as the complement formula produced.
+    let parallel_part = p.generic_pnl.amount()
+        + p.levels.iter().map(|l| l.total.amount()).sum::<f64>()
+        + p.adder_pnl_total.amount();
+    assert!(
+        (parallel_part - credit_pnl).abs() <= 1e-6 + 0.05 * credit_pnl.abs(),
+        "parallel steps must sum to ~credit_pnl, got {parallel_part} vs {credit_pnl}"
+    );
+
+    // (3) The generic step reprices an identical market in both methods (a
+    // generic-sized bump applied to the same T0-hazard base), so its P&L must
+    // match the waterfall generic component. The buggy complement formula made
+    // the parallel generic component the full credit P&L instead.
+    assert!(
+        (p.generic_pnl.amount() - w.generic_pnl.amount()).abs()
+            <= 1e-6 + 1e-6 * w.generic_pnl.amount().abs(),
+        "parallel generic_pnl {} must match waterfall generic_pnl {}",
+        p.generic_pnl.amount(),
+        w.generic_pnl.amount()
+    );
+
+    // Sum still reconciles (the back-solve guarantees this with or without the
+    // bug — kept as a sanity check, not the regression guard).
+    assert!(
+        (parallel_part + p.curve_shape_pnl.amount() - credit_pnl).abs() < 1e-6,
+        "credit_factor_detail must reconcile to credit_curves_pnl"
+    );
+}

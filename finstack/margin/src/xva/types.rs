@@ -241,9 +241,8 @@ pub struct XvaResult {
 
     /// Potential Future Exposure profile: `(time, PFE(t))`.
     ///
-    /// **IMPORTANT** — the deterministic CVA engine in
-    /// [`compute_cva`](super::cva::compute_cva) has a single path, so
-    /// the distribution of exposures collapses to a point mass at
+    /// **IMPORTANT** — the deterministic CVA engine has a single path,
+    /// so the distribution of exposures collapses to a point mass at
     /// `max(V(t), 0)`. In that degenerate case every quantile (and the
     /// mean) equals `EPE(t)`, and this field holds the EPE path, not a
     /// tail quantile. The name is retained so downstream systems keep
@@ -290,8 +289,8 @@ pub struct XvaResult {
 
 /// Diagnostics from exposure simulation capturing data quality metrics.
 ///
-/// Populated by [`compute_exposure_profile`](super::exposure::compute_exposure_profile)
-/// to let callers distinguish genuine zero exposure from missing data.
+/// Populated by the exposure computation engine to let callers distinguish
+/// genuine zero exposure from missing data.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct ExposureDiagnostics {
     /// Number of time grid points where market data could not be rolled forward.

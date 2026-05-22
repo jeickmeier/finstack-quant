@@ -839,8 +839,7 @@ pub enum TimeRollMode {
 /// convention, while `day_count` optionally overrides the curve's native day
 /// count when converting `tenor` into a year fraction.
 ///
-/// Supported `day_count` override strings are the aliases accepted by
-/// [`crate::utils::parse_day_count_override`], including `act/360`,
+/// Supported `day_count` override strings include `act/360`,
 /// `act/365f`, `act/act`, `30/360`, and `30e/360`.
 ///
 /// # Examples

@@ -8,12 +8,12 @@
 //! # Discrete-monitoring correction
 //!
 //! Barrier hits are evaluated with the exact log-Brownian-bridge
-//! conditional-crossing law (see [`crate::barriers::bridge`]). The bridge
-//! already removes essentially all of the discrete-monitoring bias, so the
-//! Broadie–Glasserman–Kou / Gobet–Miri barrier *shift* — an alternative
-//! first-order correction for plain discrete checking — is deliberately
-//! **not** applied on top of it; doing so would double-count the
-//! correction. The true (unshifted) barrier is always passed to the bridge.
+//! conditional-crossing law. The bridge already removes essentially all
+//! of the discrete-monitoring bias, so the Broadie–Glasserman–Kou / Gobet–Miri
+//! barrier *shift* — an alternative first-order correction for plain discrete
+//! checking — is deliberately **not** applied on top of it; doing so would
+//! double-count the correction. The true (unshifted) barrier is always passed
+//! to the bridge.
 //!
 //! # Local volatility under stochastic-vol models
 //!

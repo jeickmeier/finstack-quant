@@ -201,6 +201,123 @@ pub fn measure_hazard_curve_shift(
     ))
 }
 
+/// Measure the average **par CDS spread** shift on a hazard curve (basis points).
+///
+/// This is the par-spread analogue of [`measure_hazard_curve_shift`]: it samples
+/// the par CDS spread (via `HazardCurve::cds_quote_bp`) rather than the raw
+/// hazard rate. Credit sensitivities (`Cs01`, `BucketedCs01`) are defined per bp
+/// of **par-spread** move, so attribution must pair them with this — pairing a
+/// par-spread CS01 with a hazard-rate move overstates credit P&L by a factor of
+/// `1 / (1 - recovery)`.
+pub fn measure_par_spread_shift(
+    curve_id: impl AsRef<str>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    method: TenorSamplingMethod,
+) -> Result<f64> {
+    let curve_t0 = market_t0.get_hazard(&curve_id)?;
+    let curve_t1 = market_t1.get_hazard(&curve_id)?;
+
+    let t0_knots: Vec<f64> = curve_t0.knot_points().map(|(t, _)| t).collect();
+    let tenors = match method {
+        TenorSamplingMethod::Dynamic => t0_knots.as_slice(),
+        _ => method.tenors(None),
+    };
+
+    let interp_t0 = curve_t0.par_interp();
+    let interp_t1 = curve_t1.par_interp();
+    // `cds_quote_bp` already returns basis points → scaling factor 1.0.
+    Ok(measure_average_shift(
+        tenors,
+        1.0,
+        |t| curve_t0.cds_quote_bp(t, interp_t0),
+        |t| curve_t1.cds_quote_bp(t, interp_t1),
+    ))
+}
+
+/// Measure the **per-tenor** par CDS spread shift (basis points) at the given
+/// tenors.
+///
+/// Unlike [`measure_par_spread_shift`] (which averages over a tenor grid), this
+/// returns the shift at each requested tenor so callers can pair it with a
+/// per-tenor (key-rate) `BucketedCs01`, attributing non-parallel (twisted)
+/// credit-curve moves correctly. Returns one entry per input tenor, in order.
+pub fn measure_per_tenor_par_spread_shift(
+    curve_id: impl AsRef<str>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    tenors: &[f64],
+) -> Result<Vec<f64>> {
+    let curve_t0 = market_t0.get_hazard(&curve_id)?;
+    let curve_t1 = market_t1.get_hazard(&curve_id)?;
+    let interp_t0 = curve_t0.par_interp();
+    let interp_t1 = curve_t1.par_interp();
+    Ok(tenors
+        .iter()
+        .map(|&t| curve_t1.cds_quote_bp(t, interp_t1) - curve_t0.cds_quote_bp(t, interp_t0))
+        .collect())
+}
+
+/// Measure the average **credit-curve** shift (basis points), accepting either
+/// curve representation a credit-risky instrument may use.
+///
+/// A credit curve declared in an instrument's `credit_curves` dependency can be
+/// modelled two ways:
+///
+/// - a [`HazardCurve`](crate::market_data::term_structures::HazardCurve) — the
+///   move is the **par CDS spread** shift ([`measure_par_spread_shift`]), the
+///   basis a hazard-curve `Cs01` is defined on; or
+/// - a [`DiscountCurve`](crate::market_data::term_structures::DiscountCurve) —
+///   e.g. the Tsiveriotis–Zhang risky discount curve a convertible bond prices
+///   off — the move is the **zero-rate** shift
+///   ([`measure_discount_curve_shift`]), the basis a discount-style `Cs01` is
+///   bumped on.
+///
+/// The hazard interpretation is tried first, falling back to the discount
+/// interpretation, so the returned move is always unit-consistent with the
+/// instrument's own CS01. Used by P&L attribution so credit-spread P&L from a
+/// convertible's risky discount curve is attributed to the credit factor
+/// rather than leaking into the residual.
+pub fn measure_credit_curve_shift(
+    curve_id: impl AsRef<str>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    method: TenorSamplingMethod,
+) -> Result<f64> {
+    let curve_id = curve_id.as_ref();
+    if let Ok(shift) = measure_par_spread_shift(curve_id, market_t0, market_t1, method.clone()) {
+        return Ok(shift);
+    }
+    measure_discount_curve_shift(curve_id, market_t0, market_t1, method)
+}
+
+/// Measure the **per-tenor** credit-curve shift (basis points) at the given
+/// tenors, accepting either curve representation.
+///
+/// The per-tenor counterpart of [`measure_credit_curve_shift`] (see that
+/// function for the hazard / discount duality): tries the par CDS spread
+/// interpretation first ([`measure_per_tenor_par_spread_shift`]); on failure
+/// falls back to the per-tenor discount zero-rate shift. Returns one entry per
+/// input tenor, in order, so callers can pair it with a per-tenor (key-rate)
+/// `BucketedCs01`.
+pub fn measure_per_tenor_credit_curve_shift(
+    curve_id: impl AsRef<str>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    tenors: &[f64],
+) -> Result<Vec<f64>> {
+    let curve_id = curve_id.as_ref();
+    if let Ok(shifts) = measure_per_tenor_par_spread_shift(curve_id, market_t0, market_t1, tenors) {
+        return Ok(shifts);
+    }
+    let curve_t0 = market_t0.get_discount(curve_id)?;
+    let curve_t1 = market_t1.get_discount(curve_id)?;
+    Ok(tenors
+        .iter()
+        .map(|&t| (curve_t1.zero(t) - curve_t0.zero(t)) * 10_000.0)
+        .collect())
+}
+
 /// Measure average inflation rate shift (basis points).
 pub fn measure_inflation_curve_shift(
     curve_id: impl AsRef<str>,
@@ -598,6 +715,152 @@ mod tests {
         .expect("Market diff calculation should succeed in test");
 
         assert!((shift - 25.0).abs() < 1.0, "Expected ~25bp, got {}", shift);
+    }
+
+    #[test]
+    fn test_par_spread_shift_is_hazard_shift_scaled_by_lgd() {
+        let base_date = sample_date();
+        let curve_t0 = HazardCurve::builder("CORP-01")
+            .base_date(base_date)
+            .recovery_rate(0.4)
+            .knots(vec![(1.0, 0.01), (5.0, 0.02), (10.0, 0.025)])
+            .build()
+            .expect("hazard curve t0 should build");
+        let curve_t1 = HazardCurve::builder("CORP-01")
+            .base_date(base_date)
+            .recovery_rate(0.4)
+            .knots(vec![(1.0, 0.0125), (5.0, 0.0225), (10.0, 0.0275)])
+            .build()
+            .expect("hazard curve t1 should build");
+        let market_t0 = MarketContext::new().insert(curve_t0);
+        let market_t1 = MarketContext::new().insert(curve_t1);
+
+        let hazard_shift = measure_hazard_curve_shift(
+            "CORP-01",
+            &market_t0,
+            &market_t1,
+            TenorSamplingMethod::Standard,
+        )
+        .expect("hazard shift");
+        let par_shift = measure_par_spread_shift(
+            "CORP-01",
+            &market_t0,
+            &market_t1,
+            TenorSamplingMethod::Standard,
+        )
+        .expect("par-spread shift");
+
+        // With no stored par quotes, `cds_quote_bp` falls back to λ·(1−R)·1e4,
+        // so the par-spread move is the hazard-rate move scaled by LGD = 1−R.
+        assert!(
+            (hazard_shift - 25.0).abs() < 1.0,
+            "hazard shift ~25bp, got {hazard_shift}"
+        );
+        assert!(
+            (par_shift - 15.0).abs() < 1.0,
+            "par-spread shift ~15bp (25 × 0.6), got {par_shift}"
+        );
+
+        let per_tenor = measure_per_tenor_par_spread_shift(
+            "CORP-01",
+            &market_t0,
+            &market_t1,
+            &[1.0, 5.0, 10.0],
+        )
+        .expect("per-tenor par-spread shift");
+        assert_eq!(per_tenor.len(), 3, "one entry per requested tenor");
+        for s in per_tenor {
+            assert!(
+                (s - 15.0).abs() < 1.0,
+                "per-tenor par-spread move ~15bp, got {s}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_credit_curve_shift_falls_back_to_discount_zero_rate() {
+        // A credit curve modelled as a `DiscountCurve` (e.g. a convertible's
+        // risky discount curve) has no par CDS quote — `measure_credit_curve_shift`
+        // must fall back to the zero-rate shift instead of erroring.
+        let base_date = sample_date();
+        let curve = |rate: f64| {
+            DiscountCurve::builder("USD-CREDIT")
+                .base_date(base_date)
+                .knots([(0.0, 1.0), (10.0, (-rate * 10.0).exp())])
+                .interp(InterpStyle::LogLinear)
+                .build()
+                .expect("discount curve should build")
+        };
+        // +40bp move in the risky discount curve's zero rate.
+        let market_t0 = MarketContext::new().insert(curve(0.05));
+        let market_t1 = MarketContext::new().insert(curve(0.054));
+
+        let shift = measure_credit_curve_shift(
+            "USD-CREDIT",
+            &market_t0,
+            &market_t1,
+            TenorSamplingMethod::Standard,
+        )
+        .expect("credit-curve shift should fall back to discount measurement");
+        assert!(
+            (shift - 40.0).abs() < 1.0,
+            "expected ~40bp zero-rate shift, got {shift}"
+        );
+
+        let per_tenor = measure_per_tenor_credit_curve_shift(
+            "USD-CREDIT",
+            &market_t0,
+            &market_t1,
+            &[1.0, 5.0, 10.0],
+        )
+        .expect("per-tenor credit-curve shift should fall back to discount measurement");
+        assert_eq!(per_tenor.len(), 3, "one entry per requested tenor");
+        for s in per_tenor {
+            assert!(
+                (s - 40.0).abs() < 1.0,
+                "per-tenor zero-rate shift ~40bp, got {s}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_credit_curve_shift_uses_par_spread_for_hazard_curve() {
+        // For a `HazardCurve`, `measure_credit_curve_shift` must use the par
+        // CDS spread move (== hazard shift × LGD), matching `measure_par_spread_shift`.
+        let base_date = sample_date();
+        let curve_t0 = HazardCurve::builder("CORP-01")
+            .base_date(base_date)
+            .recovery_rate(0.4)
+            .knots(vec![(1.0, 0.01), (5.0, 0.02), (10.0, 0.025)])
+            .build()
+            .expect("hazard curve t0");
+        let curve_t1 = HazardCurve::builder("CORP-01")
+            .base_date(base_date)
+            .recovery_rate(0.4)
+            .knots(vec![(1.0, 0.0125), (5.0, 0.0225), (10.0, 0.0275)])
+            .build()
+            .expect("hazard curve t1");
+        let market_t0 = MarketContext::new().insert(curve_t0);
+        let market_t1 = MarketContext::new().insert(curve_t1);
+
+        let credit_shift = measure_credit_curve_shift(
+            "CORP-01",
+            &market_t0,
+            &market_t1,
+            TenorSamplingMethod::Standard,
+        )
+        .expect("credit shift");
+        let par_shift = measure_par_spread_shift(
+            "CORP-01",
+            &market_t0,
+            &market_t1,
+            TenorSamplingMethod::Standard,
+        )
+        .expect("par-spread shift");
+        assert_eq!(
+            credit_shift, par_shift,
+            "hazard-curve credit shift must equal the par-spread shift"
+        );
     }
 
     #[test]

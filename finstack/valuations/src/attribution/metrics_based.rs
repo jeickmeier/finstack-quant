@@ -53,7 +53,7 @@
 //! | Convexity | dimensionless | Percentage second derivative: (∂²P/∂r²) / P |
 //! | IrConvexity | dimensionless | Same as Convexity (alias for swaps) |
 //! | CS01 | $ / bp | Dollar change per 1bp spread shift |
-//! | CsGamma | $ / bp² | Dollar second derivative per bp² spread change |
+//! | CsGamma | $ / decimal² | Dollar second derivative ∂²V/∂s² (spread in decimal) |
 //! | Vega | $ / vol point | Dollar change per 1% absolute vol shift |
 //! | Volga | $ / vol point² | Dollar second derivative per vol point² |
 //! | Theta | $ / day | Dollar time decay per calendar day |
@@ -74,9 +74,10 @@ use finstack_core::config::{RoundingContext, ZeroKind};
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::diff::{
-    measure_discount_curve_shift, measure_fx_shift, measure_hazard_curve_shift,
-    measure_inflation_curve_shift, measure_scalar_absolute_shift, measure_scalar_shift,
-    measure_vol_surface_shift, TenorSamplingMethod,
+    measure_credit_curve_shift, measure_discount_curve_shift, measure_fx_shift,
+    measure_inflation_curve_shift, measure_per_tenor_credit_curve_shift,
+    measure_scalar_absolute_shift, measure_scalar_shift, measure_vol_surface_shift,
+    TenorSamplingMethod,
 };
 #[cfg(test)]
 use finstack_core::market_data::term_structures::DiscountCurve;
@@ -200,6 +201,41 @@ fn extract_keyrate_dv01_per_curve(
     result
 }
 
+/// Extract per-curve **key-rate** (per-tenor) par-spread CS01 sensitivities.
+///
+/// The `BucketedCs01` calculator (par-spread re-bootstrap) flattens its
+/// per-tenor series into the `measures` map under composite keys
+/// `bucketed_cs01::{curve}::{tenor_label}` (e.g. `bucketed_cs01::ACME-HAZ::5y`),
+/// mirroring `bucketed_dv01`. This walks the standard bucket grid and collects,
+/// per curve, the `(tenor_years, cs01)` pairs that are present.
+///
+/// Returns a map `curve → Vec<(tenor_years, cs01)>`; a curve is absent when none
+/// of its per-tenor keys were found (caller then falls back to aggregate CS01).
+pub(crate) fn extract_keyrate_cs01_per_curve(
+    measures: &indexmap::IndexMap<MetricId, f64>,
+    curve_ids: &[CurveId],
+) -> HashMap<CurveId, Vec<(f64, f64)>> {
+    use crate::metrics::sensitivities::config::{STANDARD_BUCKETS_YEARS, STANDARD_BUCKET_LABELS};
+
+    let mut result: HashMap<CurveId, Vec<(f64, f64)>> = HashMap::default();
+    for curve_id in curve_ids {
+        let mut buckets: Vec<(f64, f64)> = Vec::new();
+        for (&tenor_years, label) in STANDARD_BUCKETS_YEARS
+            .iter()
+            .zip(STANDARD_BUCKET_LABELS.iter())
+        {
+            let key = format!("bucketed_cs01::{}::{}", curve_id.as_str(), label);
+            if let Some(&cs01) = measures.get(key.as_str()) {
+                buckets.push((tenor_years, cs01));
+            }
+        }
+        if !buckets.is_empty() {
+            result.insert(curve_id.clone(), buckets);
+        }
+    }
+    result
+}
+
 /// Measure the per-tenor discount-curve zero-rate shift (in basis points) at
 /// the supplied tenors.
 ///
@@ -265,76 +301,11 @@ fn discount_curve_abs_shift_bp(
     }
 }
 
-/// Mean of the per-tenor *absolute* hazard shift (bp) on the standard grid.
-/// See [`discount_curve_abs_shift_bp`] for the rationale.
-fn hazard_curve_abs_shift_bp_metric(
-    curve_id: &str,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-) -> f64 {
-    use finstack_core::market_data::diff::STANDARD_TENORS;
-    let (Ok(c0), Ok(c1)) = (
-        market_t0.get_hazard(curve_id),
-        market_t1.get_hazard(curve_id),
-    ) else {
-        return 0.0;
-    };
-    let mut total_abs = 0.0;
-    let mut count = 0usize;
-    for &t in STANDARD_TENORS {
-        if t <= 0.0 {
-            continue;
-        }
-        let h0 = c0.hazard_rate(t);
-        let h1 = c1.hazard_rate(t);
-        if h0.is_finite() && h1.is_finite() {
-            total_abs += (h1 - h0).abs() * 10_000.0;
-            count += 1;
-        }
-    }
-    if count == 0 {
-        0.0
-    } else {
-        total_abs / count as f64
-    }
-}
-
 /// Threshold below which a signed mean shift is considered twist-dominated
 /// relative to its L1 magnitude. Below this level, signed-average convexity
 /// understates the true quadratic contribution, so downstream consumers should
 /// fall back to per-tenor convexity.
 const TWIST_FRACTION_THRESHOLD: f64 = 1e-2;
-
-/// Construct a factor P&L [`Money`] from a computed `f64` amount.
-///
-/// If `amount` is non-finite (NaN or ±Inf), this function:
-/// - Appends a diagnostic note to `notes`,
-/// - Sets `*result_invalid = true` so [`PnlAttribution::result_invalid`] is
-///   propagated to callers, and
-/// - Returns a **zero sentinel** in `currency` so the attribution can continue
-///   and produce a complete (though flagged-invalid) result rather than
-///   panicking inside [`Money::new`].
-///
-/// For finite amounts it delegates directly to [`Money::new`], which is
-/// guaranteed not to panic.
-#[inline]
-fn factor_money_or_invalid(
-    amount: f64,
-    currency: finstack_core::currency::Currency,
-    label: &str,
-    notes: &mut Vec<String>,
-    result_invalid: &mut bool,
-) -> Money {
-    if amount.is_finite() {
-        Money::new(amount, currency)
-    } else {
-        notes.push(format!(
-            "Non-finite factor P&L ({amount:?}) for {label}; attribution flagged invalid"
-        ));
-        *result_invalid = true;
-        Money::new(0.0, currency)
-    }
-}
 
 fn add_cross_factor_term(
     by_pair: &mut IndexMap<String, Money>,
@@ -460,6 +431,8 @@ pub fn attribute_pnl_metrics_based(
     as_of_t0: Date,
     as_of_t1: Date,
 ) -> Result<PnlAttribution> {
+    validate_attribution_period(as_of_t0, as_of_t1)?;
+
     // Total P&L — use date-specific FX to stay consistent with factor decomposition
     let total_pnl = compute_pnl_with_fx(
         val_t0.value,
@@ -531,7 +504,7 @@ pub fn attribute_pnl_metrics_based(
         let mut total = 0.0;
         let mut count = 0usize;
         for curve_id in &market_deps.curve_dependencies().credit_curves {
-            if let Ok(shift) = measure_hazard_curve_shift(
+            if let Ok(shift) = measure_credit_curve_shift(
                 curve_id.as_str(),
                 market_t0,
                 market_t1,
@@ -914,113 +887,130 @@ pub fn attribute_pnl_metrics_based(
     // 3. Credit curves attribution (CS01)
     //
     // METRIC DEFINITION:
-    // - CS01: Dollar value of 1 basis point credit spread change ($ / bp)
-    // - Formula: CS01 × Δs (where Δs is spread shift in basis points)
+    // - Cs01 / BucketedCs01: $ per bp of credit-curve move ($ / bp).
+    // - Formula: PnL = Σ_curve Σ_tenor BucketedCs01_{curve,tenor} × Δs_{curve,tenor}
+    //   where Δs is the credit-curve move from `measure_credit_curve_shift` /
+    //   `measure_per_tenor_credit_curve_shift`. Those measure the move in
+    //   whichever basis the instrument's CS01 is defined on: a par CDS spread
+    //   move for a hazard curve (CDS-family), or a zero-rate move for a
+    //   discount-style credit curve (a convertible's Tsiveriotis–Zhang risky
+    //   discount curve). Pairing a par-spread CS01 with a hazard-rate move would
+    //   overstate credit P&L by 1/(1−R), so the move always matches the CS01.
     //
-    // NOTE: Current implementation uses aggregate CS01 and average spread shift,
-    // which ignores name-specific credit effects. For more accurate attribution,
-    // use bucketed CS01 metrics (CS01 per curve) if available.
-    //
-    // Ideal formula: PnL = Σ(CS01_i × Shift_i) for each curve i
-    // Current formula: PnL = CS01_total × avg(Shift_i)
-    if let Some(cs01) = val_t0.measures.get(MetricId::Cs01.as_str()) {
+    // Accuracy ladder (best first):
+    //   (a) key-rate: per-tenor BucketedCs01 × per-tenor credit-curve move —
+    //       correct for non-parallel (steepener / twist) credit-curve moves.
+    //   (b) aggregate: Cs01 × avg(credit-curve move). Coarser; assumes parallel.
+    let credit_curve_ids = &market_deps.curve_dependencies().credit_curves;
+    let keyrate_cs01 = extract_keyrate_cs01_per_curve(&val_t0.measures, credit_curve_ids);
+    let mut credit_has_data = false;
+    // Mean par-spread shift fed to the credit-convexity (second-order) block.
+    let mut credit_convexity_avg_shift_bp: Option<f64> = None;
+
+    if !keyrate_cs01.is_empty() {
+        // KEY-RATE AWARE: pair per-tenor BucketedCs01 with the per-tenor
+        // par-spread move. A credit-curve steepener is attributed per tenor
+        // instead of collapsing to an average-shift × parallel-CS01 product —
+        // so no twist guard / omit-on-twist workaround is needed.
+        let mut credit_acc = NeumaierAccumulator::new();
+        let mut shift_acc = NeumaierAccumulator::new();
+        let mut shift_terms = 0usize;
+        let mut curves_with_data = 0usize;
+        for curve_id in credit_curve_ids {
+            let Some(buckets) = keyrate_cs01.get(curve_id) else {
+                continue;
+            };
+            let tenors: Vec<f64> = buckets.iter().map(|(t, _)| *t).collect();
+            let Ok(shifts) = measure_per_tenor_credit_curve_shift(
+                curve_id.as_str(),
+                market_t0,
+                market_t1,
+                &tenors,
+            ) else {
+                continue;
+            };
+            for ((_, cs01), shift) in buckets.iter().zip(shifts.iter()) {
+                credit_acc.add(cs01 * shift);
+                shift_acc.add(*shift);
+                shift_terms += 1;
+            }
+            curves_with_data += 1;
+        }
+        attribution.credit_curves_pnl = factor_money_or_invalid(
+            credit_acc.total(),
+            val_t1.value.currency(),
+            "credit curves P&L (key-rate)",
+            &mut attribution.meta.notes,
+            &mut non_finite_detected,
+        );
+        credit_has_data = true;
+        if shift_terms > 0 {
+            credit_convexity_avg_shift_bp = Some(shift_acc.total() / shift_terms as f64);
+        }
+        if curves_with_data > 0 {
+            attribution.meta.notes.push(format!(
+                "Credit attribution computed using key-rate (per-tenor) BucketedCs01 across \
+                 {} curve(s); non-parallel credit-curve moves are attributed per tenor",
+                curves_with_data
+            ));
+        }
+    } else if let Some(cs01) = val_t0.measures.get(MetricId::Cs01.as_str()) {
+        // Aggregate fallback: parallel CS01 × average credit-curve move.
         let avg_shift = if let Some(avg_shift) = avg_credit_shift_bp {
             avg_shift
         } else {
             note_warning(
                 &mut attribution,
-                "Credit attribution has CS01 but no measurable hazard-curve shift; credit P&L set to zero",
+                "Credit attribution has Cs01 but no measurable credit-curve shift; credit P&L set to zero",
                 instrument.id(),
                 "credit_curves",
             );
             0.0
         };
-
-        let credit_amount = cs01 * avg_shift;
         attribution.credit_curves_pnl = factor_money_or_invalid(
-            credit_amount,
+            cs01 * avg_shift,
             val_t1.value.currency(),
             "credit curves P&L",
             &mut attribution.meta.notes,
             &mut non_finite_detected,
         );
-
-        // Add note about averaging limitation
+        credit_has_data = true;
+        credit_convexity_avg_shift_bp = avg_credit_shift_bp;
         if credit_curves_measured > 1 {
             attribution.meta.notes.push(format!(
-                "Credit attribution uses average shift across {} curves; \
-                 consider using bucketed CS01 metrics for better accuracy",
+                "Credit attribution uses aggregate Cs01 with average credit-curve shift across \
+                 {} curves; provide BucketedCs01 for key-rate-aware attribution of \
+                 non-parallel moves",
                 credit_curves_measured
             ));
         }
+    }
 
-        // 3b. Credit curves gamma (second-order)
-        //
-        // UNIT CONTRACT:
-        // - CS-Gamma: Dollar second derivative in $ per decimal² (NOT $ per bp²)
-        // - This is the raw second derivative: ∂²V/∂s² where s is spread in decimal
-        // - Formula: ΔP_gamma = ½ × CS-Gamma × (Δs_decimal)²
-        //
-        // Example: If CS-Gamma = $1,000,000 and spread moves 10bp (0.001 decimal):
-        //   gamma_pnl = 0.5 × $1M × (0.001)² = 0.5 × $1M × 1e-6 = $0.50
-        //
-        // To convert from "$ per bp²" to our convention: multiply by 10,000² = 1e8
-        if let Some(cs_gamma) = val_t0.measures.get(MetricId::CsGamma.as_str()) {
-            // CS-Gamma term: ½ × CS-Gamma × (Δs_decimal)²
-            // avg_shift is in basis points, convert to decimal for formula
-            let shift_decimal = avg_shift / 10_000.0;
-            let gamma_pnl = 0.5 * cs_gamma * shift_decimal * shift_decimal;
-
-            attribution.credit_curves_pnl = factor_money_or_invalid(
-                attribution.credit_curves_pnl.amount() + gamma_pnl,
-                val_t1.value.currency(),
-                "credit gamma P&L",
-                &mut attribution.meta.notes,
-                &mut non_finite_detected,
-            );
-        }
-
-        // Check for large credit spread moves that may exceed approximation accuracy
-        if avg_shift.abs() > LARGE_SPREAD_MOVE_THRESHOLD_BP {
-            attribution.meta.notes.push(format!(
-                "Warning: Large credit spread move ({:.0}bp) exceeds {}bp threshold; \
-                 consider parallel/waterfall attribution for more accurate results",
-                avg_shift.abs(),
-                LARGE_SPREAD_MOVE_THRESHOLD_BP
-            ));
-        }
-
-        // Credit-curve twist guard (audit rec #6): same logic as the rates
-        // convexity block — when |signed avg| << L1 avg, the scalar CS-Gamma
-        // term `½·γ·Δs²` collapses for a twist that genuinely moved.
-        let credit_abs_shift_bp: Option<f64> = {
-            let mut total = 0.0;
-            let mut count = 0usize;
-            for curve_id in &market_deps.curve_dependencies().credit_curves {
-                let v = hazard_curve_abs_shift_bp_metric(curve_id.as_str(), market_t0, market_t1);
-                if v > 0.0 {
-                    total += v;
-                    count += 1;
-                }
+    // 3b. Credit curves gamma (second-order).
+    //
+    // UNIT CONTRACT: CsGamma is ∂²V/∂s² in $ per decimal² of *par spread*.
+    //   ΔP_gamma = ½ × CsGamma × (Δs_decimal)², Δs = mean par-spread move.
+    if credit_has_data {
+        if let Some(avg_shift) = credit_convexity_avg_shift_bp {
+            if let Some(cs_gamma) = val_t0.measures.get(MetricId::CsGamma.as_str()) {
+                let shift_decimal = avg_shift / 10_000.0;
+                let gamma_pnl = 0.5 * cs_gamma * shift_decimal * shift_decimal;
+                attribution.credit_curves_pnl = factor_money_or_invalid(
+                    attribution.credit_curves_pnl.amount() + gamma_pnl,
+                    val_t1.value.currency(),
+                    "credit gamma P&L",
+                    &mut attribution.meta.notes,
+                    &mut non_finite_detected,
+                );
             }
-            if count > 0 {
-                Some(total / count as f64)
-            } else {
-                None
-            }
-        };
-        if let Some(abs_shift) = credit_abs_shift_bp {
-            if abs_shift > 0.0 && avg_shift.abs() < TWIST_FRACTION_THRESHOLD * abs_shift {
+
+            if avg_shift.abs() > LARGE_SPREAD_MOVE_THRESHOLD_BP {
                 attribution.meta.notes.push(format!(
-                    "Credit convexity may be understated: hazard curves twisted \
-                     (signed mean shift {:.3}bp vs L1 mean shift {:.3}bp); the \
-                     scalar `½·γ·avg²` term collapses for twist-dominated moves.",
-                    avg_shift, abs_shift
+                    "Warning: Large credit spread move ({:.0}bp) exceeds {}bp threshold; \
+                     consider parallel/waterfall attribution for more accurate results",
+                    avg_shift.abs(),
+                    LARGE_SPREAD_MOVE_THRESHOLD_BP
                 ));
-                attribution
-                    .meta
-                    .notes
-                    .push("Credit convexity: unreliable / bounds-exceeded".to_string());
             }
         }
     }
@@ -1193,6 +1183,14 @@ pub fn attribute_pnl_metrics_based(
         // — per unit spot, per decimal vol — and differs from
         // `CrossGammaSpotVol` by a factor of S₀ / 10_000.  Using `Vanna` with
         // percentage-point moves would mis-scale the cross P&L by 10_000/S₀.
+        //
+        // TWIST LIMITATION: the rate/credit cross terms below multiply the
+        // mixed second-partial by the *signed average* shifts
+        // (`avg_rate_shift_bp`, `avg_credit_shift_bp`). For a twisted curve
+        // those averages collapse toward zero, so the cross P&L is understated
+        // — the same caveat the rates/credit convexity blocks already emit a
+        // twist note for. Prefer parallel/waterfall attribution when curves are
+        // twisted and cross-gamma materiality matters.
         let mut cross_total = 0.0;
         let mut cross_by_pair = IndexMap::new();
         let currency = val_t1.value.currency();

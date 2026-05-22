@@ -688,7 +688,7 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
 ///
 /// Each per-quote residual is `(price_model − price_mkt) / vega`, where
 /// `vega` is the *ATM* Bachelier / Black-76 vega evaluated via
-/// [`swaption_atm_vega`] (strike = forward swap rate). This linearisation
+/// `swaption_atm_vega` (strike = forward swap rate). This linearisation
 /// converges to the right minimiser when the calibration set is at-the-money
 /// or close to it: at ATM the strike-vol slope is small and the ATM-vega
 /// is a good proxy for the true `dPrice/dVol`. For materially off-ATM

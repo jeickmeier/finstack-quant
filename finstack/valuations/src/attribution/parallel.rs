@@ -324,10 +324,12 @@ pub fn attribute_pnl_parallel(
 /// When `credit_factor_model` is `Some(_)` and the instrument has a
 /// resolvable issuer + hazard exposure, each parallel-bump cascade step
 /// (`generic`, level_k, `adder`) is isolated as its own parallel factor:
-/// starting from T1 markets, hazard curves are reverted to T0 and then bumped
-/// by the step's per-issuer `β·ΔF` (or `Δadder`) bp; the reprice differential
-/// is the step's parallel P&L. The non-parallel hazard residual is attributed
-/// to the `curve_shape` step, back-solved as
+/// starting from T1 markets with the hazard curves reverted to T0, each step
+/// bumps those T0 hazard curves by the step's per-issuer `β·ΔF` (or `Δadder`)
+/// bp and reprices. The step P&L is that bump's **own contribution**,
+/// `val(T0 hazard + step bp) − val(T0 hazard)` — not `val_t1 − val(T0 hazard +
+/// step bp)`, which would be the complement of the step. The non-parallel
+/// hazard residual is attributed to the `curve_shape` step, back-solved as
 /// `credit_curves_pnl − Σ(parallel steps)` so that `Σ steps ≡ credit_curves_pnl`
 /// holds exactly (audit item #1) — no `CreditCascadeResidual` cross-factor
 /// entry is needed.
@@ -360,6 +362,8 @@ pub fn attribute_pnl_parallel_with_credit_model(
     credit_factor_detail_options: &CreditFactorDetailOptions,
     full_cross_attribution: bool,
 ) -> Result<PnlAttribution> {
+    validate_attribution_period(as_of_t0, as_of_t1)?;
+
     let mut num_repricings = 0;
 
     // Step 1: Price at T₀ and T₁
@@ -418,7 +422,11 @@ pub fn attribute_pnl_parallel_with_credit_model(
     // from FX translation effects. The FX factor (Step 7) captures all
     // translation P&L, ensuring consistent summation.
     let market_frozen = market_t0.clone();
-    let val_carry = reprice_instrument(instrument, &market_frozen, as_of_t1)?;
+    // Carry must isolate *pure time passage*: it reprices the T₀-parameter
+    // instrument (`instrument_t0`), not `instrument`. Using `instrument` here
+    // would fold any T₀→T₁ model-parameter drift into theta, since `val_t0`
+    // was itself priced with `instrument_t0`.
+    let val_carry = reprice_instrument(&instrument_t0, &market_frozen, as_of_t1)?;
     num_repricings += 1;
 
     let theta = compute_pnl(val_t0, val_carry, val_t1.currency(), market_t1, as_of_t1)?;
@@ -427,7 +435,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
     // coupon drops out of PV but the holder receives it as cash — including it
     // here aligns with GenericThetaAny (carry = PV roll + realized cashflows).
     let coupon_income_value = collect_cashflows_in_period(
-        instrument.as_ref(),
+        instrument_t0.as_ref(),
         &market_frozen,
         as_of_t0,
         as_of_t1,
@@ -1040,15 +1048,33 @@ pub fn attribute_pnl_parallel_with_credit_model(
                     CurveRestoreFlags::CREDIT,
                 );
 
+                // Base value for the cascade: the instrument priced at T1
+                // markets with the issuer's hazard curves reverted to T0 —
+                // exactly the reference point `credit_curves_pnl` is measured
+                // against. Reuse the Step-4 credit reprice when present;
+                // otherwise reprice once here.
+                let base_credit_val = match val_with_t0_credit {
+                    Some(v) => v,
+                    None => {
+                        num_repricings += 1;
+                        reprice_instrument(instrument, &market_t0_credit, as_of_t1)?
+                    }
+                };
+
                 // Each parallel-bump cascade step (Generic / Level / Adder)
                 // bumps the T0 hazard curves by exactly that step's bp from the
                 // same `market_t0_credit` base — the running market is not
                 // chained between steps, so the steps are fully independent.
-                // The `CurveShape` step is NOT a bp bump: it represents the
-                // non-parallel hazard residual and is back-solved below so the
-                // decomposition closes exactly (`Σ steps ≡ credit_curves_pnl`).
-                // Reprice the bp-bump steps in parallel, collect in cascade
-                // order, then reduce sequentially for bit-identical results.
+                // The step P&L is that bump's OWN contribution,
+                // `val(T0 hazard + step bp) − val(T0 hazard)`. Measuring
+                // `val_t1 − val(T0 hazard + step bp)` would instead attribute
+                // the complement of the step, collapsing every moved factor's
+                // P&L toward zero. The `CurveShape` step is NOT a bp bump: it
+                // represents the non-parallel hazard residual and is back-solved
+                // below so the decomposition closes exactly
+                // (`Σ steps ≡ credit_curves_pnl`). Reprice the bp-bump steps in
+                // parallel, collect in cascade order, then reduce sequentially
+                // for bit-identical results.
                 let mut step_pnls: Vec<Money> = cascade
                     .steps
                     .par_iter()
@@ -1064,7 +1090,13 @@ pub fn attribute_pnl_parallel_with_credit_model(
                             step.delta_bp,
                         )?;
                         let reprice = reprice_instrument(instrument, &market_step, as_of_t1)?;
-                        compute_pnl(reprice, val_t1, val_t1.currency(), market_t1, as_of_t1)
+                        compute_pnl(
+                            base_credit_val,
+                            reprice,
+                            val_t1.currency(),
+                            market_t1,
+                            as_of_t1,
+                        )
                     })
                     .collect::<Result<Vec<Money>>>()?;
                 // CurveShape steps did not cost a reprice.

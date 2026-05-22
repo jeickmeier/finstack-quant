@@ -362,28 +362,47 @@ fn taylor_credit_detail_reconciles_to_credit_curves_pnl() {
         .as_ref()
         .expect("credit_factor_detail must be Some for Taylor with credit_factor_model");
 
-    // Reconciliation invariant: generic + Σ levels.total + adder ≡ credit_curves_pnl.
-    let attributed = detail.generic_pnl.amount()
+    // Reconciliation invariant: generic + Σ levels + adder + curve_shape ≡
+    // credit_curves_pnl. `curve_shape` carries the non-parallel residual —
+    // here, the convexity of the +100bp move not captured by a 1bp CS01.
+    let parallel_part = detail.generic_pnl.amount()
         + detail.levels.iter().map(|l| l.total.amount()).sum::<f64>()
         + detail.adder_pnl_total.amount();
+    let attributed = parallel_part + detail.curve_shape_pnl.amount();
     let expected = attribution.credit_curves_pnl.amount();
     assert!(
-        (attributed - expected).abs() < 1e-8,
+        (attributed - expected).abs() < 1e-6,
         "taylor end-to-end reconciliation failed: attributed={attributed}, credit_curves_pnl={expected}"
     );
-    assert!((detail.generic_pnl.amount() - expected * 0.10).abs() < 1e-8);
-    assert!((detail.levels[0].total.amount() - expected * 0.25).abs() < 1e-8);
-    assert!((detail.levels[1].total.amount() - expected * 0.15).abs() < 1e-8);
-    assert!((detail.adder_pnl_total.amount() - expected * 0.50).abs() < 1e-8);
+    // The hazard move is parallel, so the factor steps carry the bulk of the
+    // credit P&L; curve_shape is only the small convexity residual.
+    assert!(
+        detail.curve_shape_pnl.amount().abs() < 0.25 * expected.abs(),
+        "parallel move: curve_shape should be a small residual, got {} vs credit_pnl {expected}",
+        detail.curve_shape_pnl.amount()
+    );
+    // Each factor widened the spread, so every step shares the sign of the
+    // (loss-making) total credit P&L.
+    assert!(
+        detail.generic_pnl.amount() * expected > 0.0,
+        "generic should share the credit P&L sign"
+    );
+    assert!(
+        detail.adder_pnl_total.amount() * expected > 0.0,
+        "adder should share the credit P&L sign"
+    );
 }
 
-/// Audit item #8: when the hazard curve twists (short tenors up, long tenors
-/// down) the signed average spread shift `ds_i` collapses toward zero while the
-/// credit P&L stays material. The effective-CS01 back-solve `-credit_pnl / ds_i`
-/// would explode; `compute_credit_factor_detail` must instead detect the
-/// degeneracy, omit `credit_factor_detail`, and emit a diagnostic note.
+/// A non-parallel (twisted) hazard-curve move no longer omits or explodes the
+/// credit-factor detail. `compute_credit_factor_detail` measures a real CS01
+/// (no `−credit_pnl / ds_i` back-solve) and routes the non-parallel residual
+/// into `curve_shape_pnl`, so the detail is produced and reconciles. (Taylor's
+/// first-order credit P&L is itself signed-average-based, so for a pure twist
+/// it is near zero — the meaningful "twist → curve_shape" magnitude check is
+/// the full-reval waterfall test
+/// `waterfall_twisted_hazard_attributes_curve_shape_not_adder`.)
 #[test]
-fn twisted_hazard_curve_omits_credit_detail_instead_of_exploding_cs01() {
+fn twisted_hazard_curve_does_not_omit_or_explode_credit_detail() {
     use finstack_valuations::attribution::TaylorAttributionConfig;
 
     let as_of_t0 = create_date(2025, Month::January, 1).unwrap();
@@ -505,21 +524,28 @@ fn twisted_hazard_curve_omits_credit_detail_instead_of_exploding_cs01() {
         .expect("attribution should succeed even with a twisted hazard curve");
     let attribution = result.result.attribution;
 
-    // The decomposition is degenerate: detail falls back to best-effort CS01 under twist.
+    // The detail is produced — a twist is no longer a reason to omit it.
+    let detail = attribution
+        .credit_factor_detail
+        .as_ref()
+        .expect("credit_factor_detail must be Some for a twisted curve");
+
+    // It reconciles, with the non-parallel residual carried by curve_shape.
+    let attributed = detail.generic_pnl.amount()
+        + detail.levels.iter().map(|l| l.total.amount()).sum::<f64>()
+        + detail.adder_pnl_total.amount()
+        + detail.curve_shape_pnl.amount();
+    let credit_pnl = attribution.credit_curves_pnl.amount();
     assert!(
-        attribution.credit_factor_detail.is_some(),
-        "twisted hazard curve should fall back to best-effort credit_factor_detail"
+        (attributed - credit_pnl).abs() < 1e-6,
+        "reconciliation must hold under a twist: attributed={attributed}, credit_curves_pnl={credit_pnl}"
     );
-    // A diagnostic note must explain why.
+    // Every reported number stays finite — no blown synthetic-CS01 divide.
     assert!(
-        attribution.meta.notes.iter().any(|n| n.contains("twist")),
-        "a diagnostic note must flag the hazard-curve twist; notes were: {:?}",
-        attribution.meta.notes
-    );
-    // Sanity: every reported number stays finite (no NaN/∞ from a blown divide).
-    assert!(
-        attribution.credit_curves_pnl.amount().is_finite(),
-        "credit_curves_pnl must remain finite"
+        credit_pnl.is_finite()
+            && detail.curve_shape_pnl.amount().is_finite()
+            && detail.generic_pnl.amount().is_finite(),
+        "all credit-detail numbers must remain finite"
     );
 }
 

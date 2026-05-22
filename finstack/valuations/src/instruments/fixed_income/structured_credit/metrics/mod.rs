@@ -82,8 +82,11 @@ pub fn register_structured_credit_metrics(registry: &mut crate::metrics::MetricR
             (Ytm, risk::YtmCalculator),
             (ZSpread, risk::ZSpreadCalculator),
             (Cs01, risk::Cs01Calculator),
-            // Note: BucketedCs01 not registered - StructuredCredit uses pool-based credit models
-            // (CDR/default rates) rather than a credit curve
+            // BucketedCs01: key-rate z-spread CS01 — the parallel z-spread shock
+            // attributed to standard tenor buckets by cashflow year fraction.
+            // (StructuredCredit has no credit curve; the z-spread is a scalar,
+            // so "key-rate" here is a time-bucketing of that scalar's effect.)
+            (BucketedCs01, risk::BucketedCs01Calculator),
             (SpreadDuration, risk::SpreadDurationCalculator),
             // Pool metrics
             (WAM, pool::WamCalculator),

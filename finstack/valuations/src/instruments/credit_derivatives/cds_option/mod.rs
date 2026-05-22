@@ -20,11 +20,11 @@
 //! with the lognormal mean calibrated to the no-knockout forward
 //! present value at expiry (DOCS 2055833 §1.2). The Bloomberg model
 //! has been the default and only pricer since the closed-form
-//! Black-on-spreads engine was decommissioned upstream; the
-//! [`bloomberg_quadrature`] module implements the integration, the
-//! [`pricer`] module exposes the bare pricing primitives (`npv`,
+//! Black-on-spreads engine was decommissioned upstream.
+//! The internal bloomberg_quadrature module implements the integration,
+//! the internal pricer module exposes the bare pricing primitives (`npv`,
 //! `theta`, `implied_vol`, the synthetic underlying CDS builder), and
-//! Greek metrics (Δ, Γ, vega) live in [`metrics`].
+//! Greek metrics (Δ, Γ, vega) are computed via the metrics module.
 //!
 //! # Greeks at a glance
 //!
