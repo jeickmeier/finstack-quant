@@ -17,6 +17,7 @@ use finstack_core::money::Money;
 // MC-specific imports
 use crate::instruments::fx::fx_barrier_option::monte_carlo::FxBarrierCall;
 use finstack_monte_carlo::payoff::barrier::BarrierType as McBarrierType;
+use finstack_monte_carlo::payoff::barrier::OptionKind as McOptionKind;
 use finstack_monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
@@ -85,10 +86,15 @@ impl FxBarrierOptionMcPricer {
         // `GbmParams`) fully describes the dynamics. Quanto barriers are not
         // supported by this 1D MC payoff — see `FxBarrierCall` docs.
         let mc_barrier_type: McBarrierType = inst.barrier_type.into();
+        let mc_option_kind = match inst.option_type {
+            crate::instruments::OptionType::Call => McOptionKind::Call,
+            crate::instruments::OptionType::Put => McOptionKind::Put,
+        };
         let payoff = FxBarrierCall::new(
             inst.strike,
             inst.barrier,
             mc_barrier_type,
+            mc_option_kind,
             inst.notional.amount(),
             maturity_step,
             sigma,
@@ -1020,6 +1026,130 @@ mod tests {
         assert!(
             msg.contains("Vanna-Volga") && msg.contains("smile quotes"),
             "expected smile-quote error, got: {msg}"
+        );
+    }
+
+    /// Regression: MC pricer must honour option_type for puts.
+    ///
+    /// A deep-ITM down-and-out put (spot well below strike, barrier far below spot
+    /// so the barrier is never hit) priced via the MC path (use_gobet_miri = true)
+    /// must be close to the analytical price.  Under the bug the MC path hardcodes
+    /// OptionKind::Call and returns max(S-K,0) ≈ 0 for this deep-ITM put, while
+    /// the analytical path returns max(K-S,0) * df ≈ a large positive number.
+    #[test]
+    fn mc_barrier_put_honours_option_type() {
+        let as_of = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
+        let expiry = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+
+        // Deep-ITM down-and-out put: spot=1.10, strike=1.30, barrier=0.80
+        // spot is well below strike => put is deep ITM.
+        // barrier=0.80 is far below spot=1.10 => very unlikely to knock out.
+        // We use a moderate vol so the MC path stays active.
+        let mc_option = FxBarrierOption::builder()
+            .id("FXBAR-MC-PUT-BUG".into())
+            .strike(1.30)
+            .barrier(0.80)
+            .rebate_opt(None)
+            .option_type(OptionType::Put)
+            .barrier_type(BarrierType::DownAndOut)
+            .expiry(expiry)
+            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .day_count(finstack_core::dates::DayCount::Act365F)
+            .use_gobet_miri(true) // force MC path
+            .domestic_discount_curve_id("USD-OIS".into())
+            .foreign_discount_curve_id("EUR-OIS".into())
+            .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
+            .vol_surface_id("EURUSD-VOL".into())
+            .pricing_overrides(crate::instruments::PricingOverrides::default())
+            .attributes(crate::instruments::common_impl::traits::Attributes::new())
+            .build()
+            .expect("mc put option");
+
+        // Matching analytical option (use_gobet_miri=false for analytical pricer)
+        let analytical_option = FxBarrierOption::builder()
+            .id("FXBAR-ANAL-PUT-BUG".into())
+            .strike(1.30)
+            .barrier(0.80)
+            .rebate_opt(None)
+            .option_type(OptionType::Put)
+            .barrier_type(BarrierType::DownAndOut)
+            .expiry(expiry)
+            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .day_count(finstack_core::dates::DayCount::Act365F)
+            .use_gobet_miri(false)
+            .domestic_discount_curve_id("USD-OIS".into())
+            .foreign_discount_curve_id("EUR-OIS".into())
+            .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
+            .vol_surface_id("EURUSD-VOL".into())
+            .pricing_overrides(crate::instruments::PricingOverrides::default())
+            .attributes(crate::instruments::common_impl::traits::Attributes::new())
+            .build()
+            .expect("analytical put option");
+
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .build()
+                    .expect("dom curve"),
+            )
+            .insert(
+                DiscountCurve::builder("EUR-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 0.98)])
+                    .build()
+                    .expect("for curve"),
+            )
+            .insert_surface(
+                VolSurface::builder("EURUSD-VOL")
+                    .expiries(&[0.25, 0.5, 1.0])
+                    .strikes(&[0.9, 1.1, 1.3])
+                    .row(&[0.10, 0.10, 0.10])
+                    .row(&[0.10, 0.10, 0.10])
+                    .row(&[0.10, 0.10, 0.10])
+                    .build()
+                    .expect("vol surface"),
+            )
+            .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
+
+        use crate::instruments::common_impl::traits::Instrument;
+
+        let mc_pv = mc_option
+            .value(&market, as_of)
+            .expect("MC put price")
+            .amount();
+
+        let analytical_pv = analytical_option
+            .value(&market, as_of)
+            .expect("analytical put price")
+            .amount();
+
+        // Both must be positive (deep ITM put, barrier not hit)
+        assert!(
+            mc_pv > 0.0,
+            "MC put price should be positive (deep ITM), got {}",
+            mc_pv
+        );
+        assert!(
+            analytical_pv > 0.0,
+            "Analytical put price should be positive (deep ITM), got {}",
+            analytical_pv
+        );
+
+        // MC and analytical must agree within 10% (MC tolerance for 50K paths)
+        let rel_err = (mc_pv - analytical_pv).abs() / analytical_pv;
+        assert!(
+            rel_err < 0.10,
+            "MC put price {} differs from analytical {} by {:.1}% (>10%), \
+             option_type is likely being ignored in MC path",
+            mc_pv,
+            analytical_pv,
+            rel_err * 100.0
         );
     }
 }

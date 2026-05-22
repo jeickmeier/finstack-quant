@@ -10,7 +10,7 @@ use finstack_monte_carlo::payoff::barrier::{BarrierOptionPayoff, BarrierType, Op
 use finstack_monte_carlo::traits::PathState;
 use finstack_monte_carlo::traits::Payoff;
 
-/// FX barrier call option payoff.
+/// FX barrier option payoff (call or put).
 ///
 /// Wraps the generic [`BarrierOptionPayoff`] with FX currency metadata for use
 /// by the FX barrier Monte Carlo pricer.
@@ -21,6 +21,11 @@ use finstack_monte_carlo::traits::Payoff;
 /// - **Up-and-in**: Option activated if FX rate rises above barrier
 /// - **Down-and-out**: Option knocked out if FX rate falls below barrier
 /// - **Down-and-in**: Option activated if FX rate falls below barrier
+///
+/// # Note on naming
+///
+/// The struct is named `FxBarrierCall` for historical reasons but handles both
+/// calls and puts depending on the `option_kind` passed to [`FxBarrierCall::new`].
 ///
 /// # Quanto Barriers
 ///
@@ -43,13 +48,14 @@ pub struct FxBarrierCall {
 }
 
 impl FxBarrierCall {
-    /// Create a new FX barrier call option.
+    /// Create a new FX barrier option (call or put).
     ///
     /// # Arguments
     ///
     /// * `strike` - Strike price (in foreign currency units)
     /// * `barrier` - Barrier level (in foreign currency units)
     /// * `barrier_type` - Type of barrier (up/down, in/out)
+    /// * `option_kind` - Whether this is a call or put
     /// * `notional` - Notional amount
     /// * `maturity_step` - Step index at maturity
     /// * `sigma` - FX volatility
@@ -63,6 +69,7 @@ impl FxBarrierCall {
         strike: f64,
         barrier: f64,
         barrier_type: BarrierType,
+        option_kind: OptionKind,
         notional: f64,
         maturity_step: usize,
         sigma: f64,
@@ -80,7 +87,7 @@ impl FxBarrierCall {
             strike,
             barrier,
             barrier_type,
-            OptionKind::Call,
+            option_kind,
             rebate,
             notional,
             maturity_step,
@@ -106,6 +113,7 @@ impl FxBarrierCall {
         strike: f64,
         barrier: f64,
         barrier_type: BarrierType,
+        option_kind: OptionKind,
         notional: f64,
         maturity_step: usize,
         sigma: f64,
@@ -117,6 +125,7 @@ impl FxBarrierCall {
             strike,
             barrier,
             barrier_type,
+            option_kind,
             notional,
             maturity_step,
             sigma,
@@ -155,6 +164,7 @@ mod tests {
             1.15,
             1.20,
             BarrierType::UpAndOut,
+            OptionKind::Call,
             1_000_000.0,
             100,
             0.12,
@@ -174,6 +184,7 @@ mod tests {
             1.15,
             1.20,
             BarrierType::UpAndOut,
+            OptionKind::Call,
             1_000_000.0,
             100,
             0.12,
