@@ -358,7 +358,7 @@ fn engine_apply_rejects_invalid_spec() {
     let mut model = FinancialModelSpec::new("test", vec![]);
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,

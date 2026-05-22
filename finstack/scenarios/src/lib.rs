@@ -24,6 +24,14 @@
 //! and financial statement forecasts. It enables what-if analysis and stress testing
 //! without requiring a full DSL parser.
 //!
+//! This is the cross-domain scenario surface. [`ScenarioSpec`] can mutate a
+//! supplied [`ExecutionContext`] across market data, instruments, rate bindings,
+//! and statement forecast nodes. A statement model is optional: market-only and
+//! instrument-only callers can pass `None`, while statement operations return a
+//! typed error if no model is supplied. Statement-local named scenario sets live
+//! in `finstack-statements-analytics`; those evaluate scalar model overrides and
+//! do not apply market or instrument shocks.
+//!
 //! # API Layers
 //!
 //! Most callers start with:
@@ -64,7 +72,7 @@
 //! let engine = ScenarioEngine::default();
 //! let mut ctx = ExecutionContext {
 //!     market: &mut market,
-//!     model: &mut model,
+//!     model: Some(&mut model),
 //!     instruments: None,
 //!     rate_bindings: None,
 //!     calendar: None,

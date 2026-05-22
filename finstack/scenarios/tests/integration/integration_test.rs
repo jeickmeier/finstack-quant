@@ -48,7 +48,7 @@ fn test_curve_parallel_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -108,7 +108,7 @@ fn test_equity_price_shock() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -203,7 +203,7 @@ fn test_vol_surface_parallel_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -250,7 +250,7 @@ fn test_base_correlation_parallel_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,

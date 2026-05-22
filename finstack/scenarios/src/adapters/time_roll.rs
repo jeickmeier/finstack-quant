@@ -93,7 +93,7 @@ pub struct RollForwardReport {
 /// let as_of = date!(2025 - 01 - 01);
 /// let mut ctx = ExecutionContext {
 ///     market: &mut market,
-///     model: &mut model,
+///     model: Some(&mut model),
 ///     instruments: None,
 ///     rate_bindings: None,
 ///     calendar: None,
@@ -383,7 +383,7 @@ mod tests {
         let expected_date = base_date + time::Duration::days(31);
         let mut ctx = ExecutionContext {
             market: &mut market,
-            model: &mut model,
+            model: Some(&mut model),
             instruments: Some(&mut instruments),
             rate_bindings: None,
             calendar: None,

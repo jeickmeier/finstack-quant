@@ -22,6 +22,7 @@ use finstack_core::market_data::hierarchy::{
 use finstack_core::types::CurveId;
 use finstack_core::{HashMap, HashSet};
 use finstack_statements::types::NodeId;
+use finstack_statements::FinancialModelSpec;
 use finstack_valuations::instruments::DynInstrument;
 use indexmap::IndexMap;
 
@@ -35,13 +36,14 @@ fn rounding_stamp() -> Option<String> {
 /// Execution context for scenario application.
 ///
 /// The context pins all mutable state that a scenario can touch — market data,
-/// statement models, instrument inventories, and rate bindings — together with
-/// the current valuation date.
+/// optional statement models, instrument inventories, and rate bindings —
+/// together with the current valuation date.
 ///
 /// # Fields
 /// - `market`: Shared market data collection that stores curves, surfaces,
 ///   FX matrices, and spot prices.
-/// - `model`: Financial statement model being shocked.
+/// - `model`: Optional financial statement model being shocked. Market-only
+///   and instrument-only scenarios can leave this as `None`.
 /// - `instruments`: Optional set of instruments to receive price/spread shocks
 ///   and to calculate carry/theta for time rolls.
 /// - `rate_bindings`: Optional mapping from statement node identifiers to
@@ -61,7 +63,7 @@ fn rounding_stamp() -> Option<String> {
 /// let as_of = date!(2025 - 01 - 01);
 /// let ctx = ExecutionContext {
 ///     market: &mut market,
-///     model: &mut model,
+///     model: Some(&mut model),
 ///     instruments: None,
 ///     rate_bindings: None,
 ///     calendar: None,
@@ -74,8 +76,11 @@ pub struct ExecutionContext<'a> {
     /// Market data context (curves, surfaces, FX, etc.).
     pub market: &'a mut finstack_core::market_data::context::MarketContext,
 
-    /// Financial statements model.
-    pub model: &'a mut finstack_statements::FinancialModelSpec,
+    /// Optional financial statements model.
+    ///
+    /// Statement forecast operations and rate bindings require this to be
+    /// `Some`; market-only scenarios can pass `None`.
+    pub model: Option<&'a mut FinancialModelSpec>,
 
     /// Optional vector of instruments for price/spread shocks and carry calculations.
     pub instruments: Option<&'a mut Vec<Box<DynInstrument>>>,
@@ -848,9 +853,12 @@ impl ScenarioEngine {
                     )));
                 }
 
+                let Some(model) = ctx.model.as_deref_mut() else {
+                    return Err(crate::error::Error::missing_statement_model("rate binding"));
+                };
                 match crate::adapters::statements::update_rate_from_binding(
                     binding,
-                    ctx.model,
+                    model,
                     ctx.market,
                     ctx.calendar,
                 ) {
@@ -878,9 +886,14 @@ impl ScenarioEngine {
                         if let Some(rb) = &mut ctx.rate_bindings {
                             rb.insert(binding.node_id.clone(), binding.clone());
                         }
+                        let Some(model) = ctx.model.as_deref_mut() else {
+                            return Err(crate::error::Error::missing_statement_model(
+                                "rate binding",
+                            ));
+                        };
                         match crate::adapters::statements::update_rate_from_binding(
                             &binding,
-                            ctx.model,
+                            model,
                             ctx.market,
                             ctx.calendar,
                         ) {
@@ -904,8 +917,13 @@ impl ScenarioEngine {
                         }
                     }
                     ScenarioEffect::StmtForecastPercent { node_id, pct } => {
+                        let Some(model) = ctx.model.as_deref_mut() else {
+                            return Err(crate::error::Error::missing_statement_model(
+                                "statement forecast percent",
+                            ));
+                        };
                         match crate::adapters::statements::apply_forecast_percent(
-                            ctx.model,
+                            model,
                             node_id.as_str(),
                             pct,
                         ) {
@@ -925,8 +943,13 @@ impl ScenarioEngine {
                         }
                     }
                     ScenarioEffect::StmtForecastAssign { node_id, value } => {
+                        let Some(model) = ctx.model.as_deref_mut() else {
+                            return Err(crate::error::Error::missing_statement_model(
+                                "statement forecast assign",
+                            ));
+                        };
                         match crate::adapters::statements::apply_forecast_assign(
-                            ctx.model,
+                            model,
                             node_id.as_str(),
                             value,
                             None,
@@ -954,7 +977,12 @@ impl ScenarioEngine {
         // Phase 4: Re-evaluate statements only if statement work was performed.
         if applied_stmt_ops > 0 || has_rate_bindings {
             let _span = tracing::info_span!("phase_4_reevaluate").entered();
-            match crate::adapters::statements::reevaluate_model(ctx.model) {
+            let Some(model) = ctx.model.as_deref_mut() else {
+                return Err(crate::error::Error::missing_statement_model(
+                    "statement re-evaluation",
+                ));
+            };
+            match crate::adapters::statements::reevaluate_model(model) {
                 Ok(eval_warnings) => warnings.extend(eval_warnings),
                 Err(e) => warnings.push(Warning::ModelReevaluationFailed {
                     reason: e.to_string(),
@@ -1365,7 +1393,7 @@ mod tests {
         let engine = ScenarioEngine::new();
         let mut ctx = ExecutionContext {
             market: &mut market,
-            model: &mut model,
+            model: Some(&mut model),
             instruments: None,
             rate_bindings: None,
             calendar: None,
@@ -1407,7 +1435,7 @@ mod tests {
         let engine = ScenarioEngine::new();
         let mut ctx = ExecutionContext {
             market: &mut market,
-            model: &mut model,
+            model: Some(&mut model),
             instruments: None,
             rate_bindings: None,
             calendar: None,
@@ -1427,5 +1455,81 @@ mod tests {
             "expected HierarchyNoMatch warning, got {:?}",
             report.warnings
         );
+    }
+
+    #[test]
+    fn market_only_context_applies_without_statement_model() {
+        use crate::spec::TimeRollMode;
+        use finstack_core::market_data::context::MarketContext;
+        use time::macros::date;
+
+        let mut market = MarketContext::new();
+        let scenario = ScenarioSpec {
+            id: "market_only_roll".into(),
+            name: None,
+            description: None,
+            operations: vec![OperationSpec::TimeRollForward {
+                period: "1D".into(),
+                apply_shocks: false,
+                roll_mode: TimeRollMode::CalendarDays,
+            }],
+            priority: 0,
+            resolution_mode: Default::default(),
+        };
+
+        let engine = ScenarioEngine::new();
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: None,
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of: date!(2025 - 01 - 01),
+        };
+
+        let report = engine
+            .apply(&scenario, &mut ctx)
+            .expect("market-only scenario should not require a statement model");
+
+        assert_eq!(report.operations_applied, 1);
+        assert_eq!(ctx.as_of, date!(2025 - 01 - 02));
+    }
+
+    #[test]
+    fn statement_operation_without_model_errors_clearly() {
+        use finstack_core::market_data::context::MarketContext;
+        use time::macros::date;
+
+        let mut market = MarketContext::new();
+        let scenario = ScenarioSpec {
+            id: "missing_model".into(),
+            name: None,
+            description: None,
+            operations: vec![OperationSpec::StmtForecastPercent {
+                node_id: "Revenue".into(),
+                pct: -10.0,
+            }],
+            priority: 0,
+            resolution_mode: Default::default(),
+        };
+
+        let engine = ScenarioEngine::new();
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: None,
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of: date!(2025 - 01 - 01),
+        };
+
+        let err = engine
+            .apply(&scenario, &mut ctx)
+            .expect_err("statement operation should require a statement model");
+
+        assert!(matches!(
+            err,
+            crate::error::Error::MissingStatementModel { .. }
+        ));
     }
 }

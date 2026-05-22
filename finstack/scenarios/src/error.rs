@@ -71,6 +71,13 @@ pub enum Error {
         node_id: String,
     },
 
+    /// A statement operation was requested without a statement model in the execution context.
+    #[error("Statement model required for scenario operation '{operation}'")]
+    MissingStatementModel {
+        /// Scenario operation that needs a statement model.
+        operation: String,
+    },
+
     /// Curve type mismatch.
     #[error("Curve type mismatch: expected {expected}, got {actual}")]
     CurveTypeMismatch {
@@ -152,6 +159,17 @@ impl Error {
     pub fn node_not_found(node_id: impl Into<String>) -> Self {
         Self::NodeNotFound {
             node_id: node_id.into(),
+        }
+    }
+
+    /// Create an error for statement operations without a model in the execution context.
+    ///
+    /// # Arguments
+    ///
+    /// - `operation`: Operation that requires a statement model.
+    pub fn missing_statement_model(operation: impl Into<String>) -> Self {
+        Self::MissingStatementModel {
+            operation: operation.into(),
         }
     }
 

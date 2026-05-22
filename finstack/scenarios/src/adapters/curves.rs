@@ -749,7 +749,7 @@ mod tests {
         let engine = ScenarioEngine::new();
         let mut ctx = ExecutionContext {
             market: &mut market,
-            model: &mut model,
+            model: Some(&mut model),
             instruments: None,
             rate_bindings: None,
             calendar: None,
@@ -777,7 +777,7 @@ mod tests {
         let mut model = FinancialModelSpec::new("demo", vec![]);
         let ctx = ExecutionContext {
             market: &mut market,
-            model: &mut model,
+            model: Some(&mut model),
             instruments: None,
             rate_bindings: None,
             calendar: None,
@@ -805,7 +805,7 @@ mod tests {
         let mut model = FinancialModelSpec::new("demo", vec![]);
         let ctx = ExecutionContext {
             market: &mut market,
-            model: &mut model,
+            model: Some(&mut model),
             instruments: None,
             rate_bindings: None,
             calendar: None,

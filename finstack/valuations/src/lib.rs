@@ -268,7 +268,7 @@
 //! - `FxSwap`: FX forwards and swaps
 //! - `Basket`: Multi-asset baskets
 //!
-//! ## Exotic Options (requires `mc` feature)
+//! ## Exotic Options
 //! - `AsianOption`: Asian (average price/strike) options
 //! - `BarrierOption`: Barrier options (knock-in/out)
 //! - `LookbackOption`: Lookback options
@@ -298,7 +298,7 @@
 //! - **Trinomial trees**: Short rate models, convertibles
 //! - **Hull-White**: Interest rate trees for callable bonds
 //!
-//! ## Monte Carlo (requires `mc` feature)
+//! ## Monte Carlo
 //! - **Geometric Brownian Motion**: Standard equity/FX simulation
 //! - **Heston**: Stochastic volatility with Andersen QE discretization
 //! - **Longstaff-Schwartz**: American and Bermudan options via LSM
@@ -316,7 +316,7 @@
 //!
 //! - **Vectorized execution**: Polars-based expression engine for time-series
 //! - **Caching**: Intermediate results (curves, cashflows) cached per valuation
-//! - **Parallelism**: Optional Rayon parallelism without changing results
+//! - **Parallelism**: Rayon-backed paths preserve deterministic results
 //! - **Lazy evaluation**: Metrics computed only when requested
 //!
 //! # Error Handling
@@ -329,9 +329,9 @@
 //!
 //! # Feature Flags
 //!
-//! - `mc`: Enable Monte Carlo pricing (adds ~200KB to binary)
-//! - `serde`: Enable serialization/deserialization
-//! - `parallel`: Enable Rayon parallelism (deterministic results maintained)
+//! - `ts_export`: Enable TypeScript type export support for schema tooling.
+//! - `fx-vanna-volga`: Build the experimental Vanna-Volga smile-correction
+//!   pricer for FX barrier research and calibration.
 //!
 //! # References
 //!

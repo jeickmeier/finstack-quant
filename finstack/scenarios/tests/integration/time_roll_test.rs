@@ -34,7 +34,7 @@ fn test_time_roll_1_day() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -79,7 +79,7 @@ fn test_time_roll_negative_period_is_rejected() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -120,7 +120,7 @@ fn test_time_roll_1_month() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -157,7 +157,7 @@ fn test_time_roll_1_year() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -239,7 +239,7 @@ fn test_time_roll_with_bond_carry() {
         let engine = ScenarioEngine::new();
         let mut ctx = ExecutionContext {
             market: &mut market,
-            model: &mut model,
+            model: Some(&mut model),
             instruments: Some(&mut instruments),
             rate_bindings: None,
             calendar: None,

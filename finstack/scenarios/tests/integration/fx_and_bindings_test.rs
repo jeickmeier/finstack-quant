@@ -49,7 +49,7 @@ fn test_fx_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -104,7 +104,7 @@ fn test_fx_shock_preserves_other_quotes() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -182,7 +182,7 @@ fn test_rate_binding() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings,
         calendar: None,

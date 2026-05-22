@@ -5,6 +5,12 @@
 //! - [`types`] — shared types for sensitivity analysis
 //! - [`variance`] — baseline vs comparison variance and bridge decomposition
 //! - [`monte_carlo`] — re-exports of Monte Carlo types from the evaluator
+//!
+//! This module is intentionally statement-local. [`ScenarioSet`] evaluates named
+//! scalar overrides against a [`finstack_statements::FinancialModelSpec`] and
+//! compares the resulting statement outputs. Cross-domain market, instrument,
+//! rate-binding, and time-roll shocks belong to `finstack-scenarios`
+//! (`ScenarioSpec` + `ExecutionContext`), not this module.
 
 pub(crate) mod monte_carlo;
 pub(crate) mod scenario_set;

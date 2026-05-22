@@ -8,7 +8,6 @@ use crate::portfolio::Portfolio;
 use finstack_core::market_data::context::MarketContext;
 use finstack_scenarios::engine::{ApplicationReport, ExecutionContext, ScenarioEngine};
 use finstack_scenarios::spec::ScenarioSpec;
-use finstack_statements::types::FinancialModelSpec;
 use finstack_valuations::instruments::DynInstrument;
 use std::sync::Arc;
 
@@ -80,13 +79,10 @@ pub(crate) fn apply_scenario(
         })
         .collect();
 
-    // Create a dummy financial model for the execution context
-    let mut model = FinancialModelSpec::new("portfolio_dummy", vec![]);
-
     // Build execution context
     let mut ctx = ExecutionContext {
         market: &mut market_copy,
-        model: &mut model,
+        model: None,
         instruments: Some(&mut instruments),
         rate_bindings: None,
         calendar: None,

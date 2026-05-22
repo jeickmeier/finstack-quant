@@ -36,7 +36,7 @@ fn test_zero_percent_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -77,7 +77,7 @@ fn test_negative_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -118,7 +118,7 @@ fn test_very_large_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -162,7 +162,7 @@ fn test_negative_100_percent_shock_on_equity_is_accepted() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -199,7 +199,7 @@ fn test_shock_beyond_negative_100_percent_on_equity_is_accepted() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -239,7 +239,7 @@ fn test_negative_100_percent_fx_shock_is_rejected() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -273,7 +273,7 @@ fn test_shock_nonexistent_market_data() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -306,7 +306,7 @@ fn test_shock_nonexistent_statement_node() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -355,7 +355,7 @@ fn test_curve_parallel_shock_zero_bp() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -397,7 +397,7 @@ fn test_statement_shock_negative_percent() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -440,7 +440,7 @@ fn test_curve_shock_nonexistent_curve() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -482,7 +482,7 @@ fn test_statement_assign_extreme_value() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,

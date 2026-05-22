@@ -62,7 +62,7 @@ fn test_statement_forecast_percent() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -127,7 +127,7 @@ fn test_statement_forecast_assign() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,

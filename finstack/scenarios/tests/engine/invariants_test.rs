@@ -58,7 +58,7 @@ fn test_discount_curve_df_monotonic_after_parallel_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -126,7 +126,7 @@ fn test_discount_curve_df_monotonic_after_node_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -191,7 +191,7 @@ fn test_forward_curve_rates_finite_after_parallel_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -260,7 +260,7 @@ fn test_forward_curve_rates_finite_after_node_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -325,7 +325,7 @@ fn test_base_correlation_bounds_after_parallel_shock() {
     let as_of = date!(2025 - 01 - 01);
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -386,7 +386,7 @@ fn test_base_correlation_bounds_after_bucket_shock() {
     let as_of = date!(2025 - 01 - 01);
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -445,7 +445,7 @@ fn test_vol_surface_non_negative_after_parallel_shock() {
     let as_of = date!(2025 - 01 - 01);
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -513,7 +513,7 @@ fn test_vol_surface_non_negative_after_bucket_shock() {
     let as_of = date!(2025 - 01 - 01);
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,

@@ -188,12 +188,11 @@ impl HorizonAnalysis {
         // 1. Price at t0
         let initial_value = instrument.value(market_t0, as_of_t0)?;
 
-        // 2. Clone market and build execution context
+        // 2. Clone market and build a market-only execution context
         let mut market_t1 = market_t0.clone();
-        let mut model = finstack_statements::FinancialModelSpec::new("__horizon_temp__", vec![]);
         let mut ctx = ExecutionContext {
             market: &mut market_t1,
-            model: &mut model,
+            model: None,
             instruments: None,
             rate_bindings: None,
             calendar: None,

@@ -34,7 +34,7 @@ fn to_json_string<T: serde::Serialize>(value: &T) -> Result<String, JsValue> {
 fn apply_with_context(
     spec: &finstack_scenarios::ScenarioSpec,
     market: &mut finstack_core::market_data::context::MarketContext,
-    model: &mut finstack_statements::FinancialModelSpec,
+    model: Some(&mut finstack_statements)::FinancialModelSpec,
     as_of: time::Date,
 ) -> Result<finstack_scenarios::engine::ApplicationReport, JsValue> {
     let engine = finstack_scenarios::ScenarioEngine::new();

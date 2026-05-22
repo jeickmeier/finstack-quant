@@ -47,7 +47,7 @@ fn test_vol_bucket_filtering_by_tenor() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -117,7 +117,7 @@ fn test_vol_bucket_filtering_by_strike() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -176,7 +176,7 @@ fn test_basecorr_bucket_filtering() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -240,7 +240,7 @@ fn test_basecorr_bucket_filtering_uses_tight_detachment_match() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -286,7 +286,7 @@ fn test_basecorr_bucket_filtering_reports_clamp_and_no_match() {
 
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,

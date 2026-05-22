@@ -109,7 +109,7 @@ fn hierarchy_curve_parallel_bp_resolves_to_individual_bumps() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -203,7 +203,7 @@ fn cumulative_mode_stacks_shocks_down_tree() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -304,7 +304,7 @@ fn most_specific_wins_keeps_only_deepest_shock() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -377,7 +377,7 @@ fn engine_works_with_resolution_mode_field() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -650,7 +650,7 @@ fn most_specific_wins_uses_matched_node_depth_not_target_path_depth() {
 
     let mut hierarchy_ctx = ExecutionContext {
         market: &mut hierarchy_market,
-        model: &mut hierarchy_model,
+        model: Some(&mut hierarchy_model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -658,7 +658,7 @@ fn most_specific_wins_uses_matched_node_depth_not_target_path_depth() {
     };
     let mut direct_ctx = ExecutionContext {
         market: &mut direct_market,
-        model: &mut direct_model,
+        model: Some(&mut direct_model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -765,7 +765,7 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
 
     let mut hierarchy_ctx = ExecutionContext {
         market: &mut hierarchy_market,
-        model: &mut hierarchy_model,
+        model: Some(&mut hierarchy_model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -773,7 +773,7 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
     };
     let mut direct_ctx = ExecutionContext {
         market: &mut direct_market,
-        model: &mut direct_model,
+        model: Some(&mut direct_model),
         instruments: None,
         rate_bindings: None,
         calendar: None,

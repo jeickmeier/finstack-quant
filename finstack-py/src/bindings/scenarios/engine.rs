@@ -28,7 +28,7 @@ fn set_report_items(
 fn apply_with_context(
     spec: &finstack_scenarios::ScenarioSpec,
     market: &mut finstack_core::market_data::context::MarketContext,
-    model: &mut finstack_statements::FinancialModelSpec,
+    model: Option<&mut finstack_statements::FinancialModelSpec>,
     as_of: time::Date,
 ) -> finstack_scenarios::Result<finstack_scenarios::engine::ApplicationReport> {
     let engine = finstack_scenarios::ScenarioEngine::new();
@@ -79,7 +79,7 @@ fn apply_scenario<'py>(
 
     // Release the GIL for scenario application: shifts + re-pricing can run for seconds.
     let (report, market, model) = py.detach(|| {
-        let report = apply_with_context(&spec, &mut market, &mut model, date);
+        let report = apply_with_context(&spec, &mut market, Some(&mut model), date);
         (report, market, model)
     });
     let report = report.map_err(display_to_py)?;
@@ -128,7 +128,7 @@ fn apply_scenario_to_market<'py>(
     let date = super::parse_date(as_of)?;
 
     let (report, market) = py.detach(|| {
-        let report = apply_with_context(&spec, &mut market, &mut model, date);
+        let report = apply_with_context(&spec, &mut market, Some(&mut model), date);
         (report, market)
     });
     let report = report.map_err(display_to_py)?;

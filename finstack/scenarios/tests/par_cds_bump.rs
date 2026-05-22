@@ -58,7 +58,7 @@ fn test_par_cds_bump_integration() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,
@@ -139,7 +139,7 @@ fn test_par_cds_bump_reprices_credit_bond() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market_after,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None,
         rate_bindings: None,
         calendar: None,

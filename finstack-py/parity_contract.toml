@@ -526,6 +526,7 @@ root_exports = [
     "SabrSmile",
     "WasmMarket",
     "asianOptionPrice",
+    "AttributionParams",
     "attributePnl",
     "attributePnlFromSpec",
     "barrierCall",
@@ -593,6 +594,7 @@ python_only = [
 
 # Root exports with no Python snake_case twin (WASM JSON helpers / handles).
 wasm_only = [
+    "AttributionParams",
     "WasmMarket",
     "validateValuationResultJson",
 ]

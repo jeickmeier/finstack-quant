@@ -362,7 +362,7 @@ mod tests {
         {
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -392,7 +392,7 @@ mod tests {
         let mut model = finstack_statements::FinancialModelSpec::new("test", vec![]);
         let ctx = ExecutionContext {
             market: &mut market,
-            model: &mut model,
+            model: Some(&mut model),
             instruments: None,
             rate_bindings: None,
             calendar: None,

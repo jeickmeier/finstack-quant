@@ -274,7 +274,7 @@ fn bench_curve_parallel_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -329,7 +329,7 @@ fn bench_curve_node_shock(c: &mut Criterion) {
                     let mut model = FinancialModelSpec::new("test", vec![]);
                     let mut ctx = ExecutionContext {
                         market: &mut market,
-                        model: &mut model,
+                        model: Some(&mut model),
                         instruments: None,
                         rate_bindings: None,
                         calendar: None,
@@ -372,7 +372,7 @@ fn bench_fx_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -419,7 +419,7 @@ fn bench_equity_shock(c: &mut Criterion) {
                     let mut model = FinancialModelSpec::new("test", vec![]);
                     let mut ctx = ExecutionContext {
                         market: &mut market,
-                        model: &mut model,
+                        model: Some(&mut model),
                         instruments: None,
                         rate_bindings: None,
                         calendar: None,
@@ -464,7 +464,7 @@ fn bench_vol_surface_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -501,7 +501,7 @@ fn bench_vol_surface_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -543,7 +543,7 @@ fn bench_base_correlation_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -579,7 +579,7 @@ fn bench_base_correlation_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -621,7 +621,7 @@ fn bench_statement_operations(c: &mut Criterion) {
             let mut model = create_financial_model();
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -655,7 +655,7 @@ fn bench_statement_operations(c: &mut Criterion) {
             let mut model = create_financial_model();
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -734,7 +734,7 @@ fn bench_complex_multi_operation(c: &mut Criterion) {
                     let mut model = create_financial_model();
                     let mut ctx = ExecutionContext {
                         market: &mut market,
-                        model: &mut model,
+                        model: Some(&mut model),
                         instruments: None,
                         rate_bindings: None,
                         calendar: None,
@@ -885,7 +885,7 @@ fn bench_rate_bindings(c: &mut Criterion) {
             let mut model = create_financial_model();
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: rate_bindings.clone(),
                 calendar: None,
@@ -929,7 +929,7 @@ fn bench_hazard_curve_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -966,7 +966,7 @@ fn bench_hazard_curve_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -1009,7 +1009,7 @@ fn bench_credit_vol_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -1046,7 +1046,7 @@ fn bench_credit_vol_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,
@@ -1094,7 +1094,7 @@ fn bench_instrument_spread_shock(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None, // Would contain CDS/Bond instruments in real scenario
                 rate_bindings: None,
                 calendar: None,
@@ -1164,7 +1164,7 @@ fn bench_comprehensive_credit_scenario(c: &mut Criterion) {
             let mut model = FinancialModelSpec::new("test", vec![]);
             let mut ctx = ExecutionContext {
                 market: &mut market,
-                model: &mut model,
+                model: Some(&mut model),
                 instruments: None,
                 rate_bindings: None,
                 calendar: None,

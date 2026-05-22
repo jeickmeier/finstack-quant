@@ -80,7 +80,7 @@ fn test_instrument_type_price_shock_matching() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: Some(&mut instruments),
         rate_bindings: None,
         calendar: None,
@@ -157,7 +157,7 @@ fn test_instrument_type_spread_shock_matching() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: Some(&mut instruments),
         rate_bindings: None,
         calendar: None,
@@ -262,7 +262,7 @@ fn test_instrument_attr_price_shock_matching() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: Some(&mut instruments),
         rate_bindings: None,
         calendar: None,
@@ -327,7 +327,7 @@ fn test_instrument_attr_price_shock_no_matches() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: Some(&mut instruments),
         rate_bindings: None,
         calendar: None,
@@ -365,7 +365,7 @@ fn test_instrument_shock_empty_list() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: Some(&mut instruments),
         rate_bindings: None,
         calendar: None,
@@ -420,7 +420,7 @@ fn test_instrument_shock_no_matching_types() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: Some(&mut instruments),
         rate_bindings: None,
         calendar: None,
@@ -452,7 +452,7 @@ fn test_instrument_shock_without_instruments_provided() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: None, // No instruments provided
         rate_bindings: None,
         calendar: None,
@@ -534,7 +534,7 @@ fn test_instrument_shock_multiple_types() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: Some(&mut instruments),
         rate_bindings: None,
         calendar: None,
@@ -570,7 +570,7 @@ fn test_empty_attr_filter_is_rejected() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: Some(&mut instruments),
         rate_bindings: None,
         calendar: None,
@@ -627,7 +627,7 @@ fn test_attr_filter_ignores_tags_uses_meta_only() {
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
-        model: &mut model,
+        model: Some(&mut model),
         instruments: Some(&mut instruments),
         rate_bindings: None,
         calendar: None,
