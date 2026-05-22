@@ -466,15 +466,24 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                 0.0
             };
             if pool_factor < cleanup_threshold && pool_factor > 0.0 {
-                // Available cash for redemption = remaining pool outstanding.
-                // The equity holder purchases remaining collateral and uses proceeds
-                // to redeem notes in seniority order.
-                let mut available_for_redemption = state.pool_outstanding.amount();
-
-                // Deduct pending recovery queue balance (defaults not yet recovered)
-                let pending_losses = state.recovery_queue.pending_amount(state.base_ccy);
-                available_for_redemption =
-                    (available_for_redemption - pending_losses.amount()).max(0.0);
+                // Available cash for redemption = remaining pool outstanding
+                // PLUS any pending recoveries in the lag queue.
+                //
+                // `pool_outstanding` has already been debited by gross defaults
+                // each period (line ~2032), so it does NOT include defaulted
+                // notional. `recovery_queue.pending_amount()` holds future cash
+                // *inflows* — lagged recovery proceeds on already-defaulted
+                // collateral that have not yet matured. At the cleanup call the
+                // equity holder purchases the remaining pool, realising these
+                // recoveries immediately. They are therefore ADDITIVE to the
+                // cash available to redeem the notes, not deductive.
+                //
+                // The previous code subtracted them (using the misleading name
+                // `pending_losses`), understating available cash, under-paying
+                // senior tranches, and leaving recovery value stranded.
+                let pending_recoveries = state.recovery_queue.pending_amount(state.base_ccy);
+                let mut available_for_redemption =
+                    state.pool_outstanding.amount() + pending_recoveries.amount();
 
                 // Stub-period start for accrued-interest calculation: the last
                 // payment date (or closing) up to this cleanup-call date.
@@ -1263,6 +1272,160 @@ mod tests {
             sched2 > buggy_sched2 + 1_000.0,
             "frozen-payment scheduled principal {sched2:.2} must materially \
              exceed the buggy recomputed-payment value {buggy_sched2:.2}"
+        );
+    }
+
+    // ── W-26: cleanup-call redemption must INCLUDE pending recoveries ───────
+
+    /// A deal that accumulates a large recovery queue before the cleanup call
+    /// fires. This requires a HIGH CDR (many defaults) with a LONG recovery
+    /// lag (24 months), and a cleanup threshold that is crossed purely by
+    /// defaults (no CPR). With CDR ≈ 30% annual the pool drops to ~10% of
+    /// original balance in ~77 months (~6.5 years), at which point the
+    /// recovery queue holds roughly 3.6 M in pending inflows. The pool
+    /// outstanding at cleanup is only ~1 M, so:
+    ///
+    ///   buggy  : available = 1M − 3.6M → clamped to 0 → tranche paid nothing
+    ///   correct: available = 1M + 3.6M = 4.6M → tranche fully redeemed
+    ///
+    /// The tranche's remaining balance at cleanup is ~4.6 M (original − write-
+    /// downs), so the correct code fully retires it while the buggy code leaves
+    /// it unpaid (final_balance ≫ 0).
+    fn cleanup_with_large_recovery_queue_deal() -> StructuredCredit {
+        let start = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
+        // Long maturity so the deal runs to cleanup before expiring.
+        let maturity = Date::from_calendar_date(2035, Month::January, 1).expect("valid date");
+        let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(10_000_000.0, Currency::USD),
+            0.06,
+            maturity,
+            DayCount::Thirty360,
+        ));
+        // Single senior tranche; the equity shortfall is equity's problem.
+        let senior = Tranche::new(
+            "A",
+            0.0,
+            80.0, // 80% of original balance = 8 M face
+            Seniority::Senior,
+            Money::new(8_000_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            maturity,
+        )
+        .expect("senior tranche");
+        let equity = Tranche::new(
+            "E",
+            80.0,
+            100.0, // junior 20% = 2 M face
+            Seniority::Equity,
+            Money::new(2_000_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.0 },
+            maturity,
+        )
+        .expect("equity tranche");
+        let mut instrument = StructuredCredit::new_abs(
+            "ABS-BIG-RECOVERY-QUEUE",
+            pool,
+            TrancheStructure::new(vec![senior, equity]).expect("structure"),
+            start,
+            maturity,
+            "USD-OIS",
+        )
+        .with_payment_calendar("nyse")
+        .with_cleanup_call(0.10)
+        .expect("cleanup call");
+        // CDR=30%: heavy defaults drive the pool below 10% factor in ~77 months.
+        // No prepayments: the cleanup is triggered purely by defaults.
+        // Recovery_lag=24 months: at the cleanup date the entire recovery queue
+        // (from up to 77 prior default periods) is still pending.
+        instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.30);
+        instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 24);
+        instrument
+    }
+
+    /// W-26 — cleanup-call redemption must ADD pending recoveries to available
+    /// cash, not subtract them.
+    ///
+    /// `RecoveryQueue::pending_amount()` represents future cash *inflows* —
+    /// recovery proceeds from already-defaulted collateral that have not yet
+    /// matured through the lag period. At the cleanup call, the equity holder
+    /// purchases the remaining pool (including distressed assets / recovery
+    /// rights), so these inflows are realised immediately. They must be ADDED
+    /// to `pool_outstanding` when computing `available_for_redemption`.
+    ///
+    /// The buggy code subtracted them:
+    ///   `available = pool_outstanding − pending_recoveries`
+    /// causing `available` to clamp to zero when pending_recoveries > pool_outstanding,
+    /// so the senior tranche is paid nothing at the cleanup call and retains
+    /// a large unpaid final balance.
+    ///
+    /// The fix adds them:
+    ///   `available = pool_outstanding + pending_recoveries`
+    /// which fully funds the remaining tranche claims.
+    ///
+    /// Assertion: after the fix, the senior tranche's final_balance must be
+    /// zero (fully redeemed). With the bug, it would be ~4 M (the pending
+    /// recoveries that were silently subtracted and then lost).
+    #[test]
+    fn cleanup_call_redemption_includes_pending_recovery_queue() {
+        let instrument = cleanup_with_large_recovery_queue_deal();
+        let start = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
+        let market = MarketContext::new().insert(
+            finstack_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
+                .base_date(start)
+                .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.88), (15.0, 0.70)])
+                .build()
+                .expect("curve"),
+        );
+
+        let results =
+            run_simulation_with_source(&instrument, &market, start, &mut DeterministicPoolFlowSource)
+                .expect("simulation");
+
+        let tranche = results.get("A").expect("tranche A result");
+
+        // Identify the cleanup-call date (simulation terminates there).
+        let cleanup_date = tranche
+            .cashflows
+            .iter()
+            .map(|(d, _)| *d)
+            .max()
+            .expect("at least one cashflow");
+
+        // Principal retired at the cleanup call on the senior tranche.
+        let principal_on_cleanup: f64 = tranche
+            .principal_flows
+            .iter()
+            .filter(|(d, _)| *d == cleanup_date)
+            .map(|(_, m)| m.amount())
+            .sum();
+
+        let final_balance = tranche.final_balance.amount();
+
+        // With CDR=30% and a 24-month recovery lag, the recovery queue at
+        // cleanup holds ~3.6 M in pending inflows while pool_outstanding ≈ 1 M.
+        //
+        // Buggy (subtract): available = max(0, 1M − 3.6M) = 0 → senior gets
+        // $0 principal at the cleanup call → final_balance stays at ~4 M.
+        //
+        // Correct (add): available = 1M + 3.6M = 4.6M → senior fully redeemed
+        // → final_balance = 0.
+        //
+        // The senior tranche's final balance must be zero after the fix.
+        assert!(
+            final_balance < 1.0,
+            "senior tranche must be fully redeemed at the cleanup call; \
+             final_balance={final_balance:.2} (non-zero means pending recoveries \
+             were subtracted instead of added, leaving the tranche unredeemed)"
+        );
+
+        // The cleanup call must have retired some principal on the senior tranche.
+        assert!(
+            principal_on_cleanup > WRITEDOWN_DE_MINIMIS,
+            "cleanup call must retire senior principal; got {principal_on_cleanup:.2} \
+             (under the buggy subtraction available_for_redemption clamps to 0)"
         );
     }
 
