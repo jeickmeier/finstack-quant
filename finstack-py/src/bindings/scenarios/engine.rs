@@ -124,11 +124,10 @@ fn apply_scenario_to_market<'py>(
     let spec: finstack_scenarios::ScenarioSpec =
         serde_json::from_str(scenario_json).map_err(display_to_py)?;
     let mut market = extract_market(market)?;
-    let mut model = finstack_statements::FinancialModelSpec::new("__scenario_temp__", vec![]);
     let date = super::parse_date(as_of)?;
 
     let (report, market) = py.detach(|| {
-        let report = apply_with_context(&spec, &mut market, Some(&mut model), date);
+        let report = apply_with_context(&spec, &mut market, None, date);
         (report, market)
     });
     let report = report.map_err(display_to_py)?;

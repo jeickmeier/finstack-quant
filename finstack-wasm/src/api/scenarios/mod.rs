@@ -3,13 +3,9 @@
 //! Exposes scenario specification parsing, validation, composition,
 //! and built-in template access via JSON round-trip functions.
 
-use std::sync::OnceLock;
-
 use crate::utils::to_js_err;
+use std::sync::OnceLock;
 use wasm_bindgen::prelude::*;
-
-/// Placeholder model ID used when applying scenarios to market data only.
-const MARKET_ONLY_MODEL_ID: &str = "__scenario_market_only__";
 
 /// Lazily-initialised builtin template registry.  Constructed once on first
 /// access, then reused for the lifetime of the WASM module.
@@ -34,7 +30,7 @@ fn to_json_string<T: serde::Serialize>(value: &T) -> Result<String, JsValue> {
 fn apply_with_context(
     spec: &finstack_scenarios::ScenarioSpec,
     market: &mut finstack_core::market_data::context::MarketContext,
-    model: Some(&mut finstack_statements)::FinancialModelSpec,
+    model: Option<&mut finstack_statements::FinancialModelSpec>,
     as_of: time::Date,
 ) -> Result<finstack_scenarios::engine::ApplicationReport, JsValue> {
     let engine = finstack_scenarios::ScenarioEngine::new();
@@ -199,7 +195,7 @@ pub fn apply_scenario(
     let mut model: finstack_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
     let date = parse_date(as_of)?;
-    let report = apply_with_context(&spec, &mut market, &mut model, date)?;
+    let report = apply_with_context(&spec, &mut market, Some(&mut model), date)?;
 
     let out = serde_json::json!({
         "market_json": to_json_string(&market)?,
@@ -223,9 +219,8 @@ pub fn apply_scenario_to_market(
         serde_json::from_str(scenario_json).map_err(to_js_err)?;
     let mut market: finstack_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
-    let mut model = finstack_statements::FinancialModelSpec::new(MARKET_ONLY_MODEL_ID, vec![]);
     let date = parse_date(as_of)?;
-    let report = apply_with_context(&spec, &mut market, &mut model, date)?;
+    let report = apply_with_context(&spec, &mut market, None, date)?;
 
     let out = serde_json::json!({
         "market_json": to_json_string(&market)?,

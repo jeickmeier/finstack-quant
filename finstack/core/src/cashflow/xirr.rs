@@ -263,33 +263,35 @@ pub fn xirr_with_daycount_ctx(
         ));
     }
 
-    // Sort cashflows by date to ensure correct time calculation
-    let mut sorted_flows = flows.to_vec();
-    sorted_flows.sort_by_key(|k| k.0);
+    // Find the earliest date (anchor) to compute year fractions from.
+    // This avoids sorting by date first; we sort once by year fraction.
+    let first_date = flows.iter().map(|(d, _)| *d).min().ok_or_else(|| {
+        crate::Error::Validation("Cashflows must contain at least one flow".to_string())
+    })?;
 
-    let first_date = sorted_flows[0].0;
-
-    // Precompute (year_fraction, amount) once for performance and
-    // propagate any day-count errors rather than masking/panicking.
-    let mut years_and_amounts: Vec<(f64, f64)> = Vec::with_capacity(sorted_flows.len());
-    for (date, amount) in sorted_flows.iter().copied() {
+    // Compute (year_fraction, amount) for all flows in a single pass.
+    // Sorting by year fraction happens below after collection.
+    let mut years_and_amounts: Vec<(f64, f64)> = Vec::with_capacity(flows.len());
+    for (date, amount) in flows.iter().copied() {
         let years = day_count.signed_year_fraction(first_date, date, ctx)?;
         years_and_amounts.push((years, amount));
     }
 
+    // Sort once by year fraction (f64 total ordering).
+    years_and_amounts.sort_by(|a, b| a.0.total_cmp(&b.0));
+
     // Aggregate entries with identical year-fractions by summing amounts.
     // This deduplicates same-date flows, reduces iteration cost, and avoids
     // f64 summation noise from carrying redundant entries.
-    years_and_amounts.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut aggregated: Vec<(f64, f64)> = Vec::with_capacity(years_and_amounts.len());
-    for (t, amount) in &years_and_amounts {
+    for (t, amount) in years_and_amounts {
         if let Some(last) = aggregated.last_mut() {
             if (last.0 - t).abs() < 1e-12 {
                 last.1 += amount;
                 continue;
             }
         }
-        aggregated.push((*t, *amount));
+        aggregated.push((t, amount));
     }
 
     solve_rate_of_return(aggregated, guess)
