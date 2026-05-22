@@ -78,6 +78,7 @@ impl std::str::FromStr for DigitalPayoutType {
     serde::Deserialize,
     schemars::JsonSchema,
 )]
+#[builder(validate = FxDigitalOption::validate)]
 #[serde(deny_unknown_fields)]
 pub struct FxDigitalOption {
     /// Unique instrument identifier
@@ -128,6 +129,39 @@ impl crate::instruments::common_impl::traits::CurveDependencies for FxDigitalOpt
 }
 
 impl FxDigitalOption {
+    /// Validate FX digital option input invariants.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        crate::instruments::common_impl::validation::validate_distinct_currencies(
+            self.base_currency,
+            self.quote_currency,
+            "FxDigitalOption",
+        )?;
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            self.strike,
+            "FxDigitalOption strike",
+        )?;
+        crate::instruments::common_impl::validation::validate_f64_finite(
+            self.strike,
+            "FxDigitalOption strike",
+        )?;
+        crate::instruments::common_impl::validation::validate_money_gt(
+            self.notional,
+            0.0,
+            "FxDigitalOption notional",
+        )?;
+        crate::instruments::common_impl::validation::validate_money_finite(
+            self.notional,
+            "FxDigitalOption notional",
+        )?;
+        if self.notional.currency() != self.base_currency {
+            return Err(finstack_core::Error::CurrencyMismatch {
+                expected: self.base_currency,
+                actual: self.notional.currency(),
+            });
+        }
+        Ok(())
+    }
+
     /// Create a canonical example FX digital option for testing and documentation.
     ///
     /// Returns an EUR/USD cash-or-nothing digital call expiring on the
@@ -266,6 +300,110 @@ crate::impl_empty_cashflow_provider!(
 mod tests {
     use super::*;
     use std::str::FromStr;
+
+    // -----------------------------------------------------------------------
+    // Validation tests
+    // -----------------------------------------------------------------------
+
+    fn base_digital_builder(
+    ) -> crate::instruments::fx::fx_digital_option::types::FxDigitalOptionBuilder {
+        use finstack_core::types::{CurveId, InstrumentId};
+        FxDigitalOption::builder()
+            .id(InstrumentId::new("FXDIG-VALID"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .strike(1.12)
+            .option_type(OptionType::Call)
+            .payout_type(DigitalPayoutType::CashOrNothing)
+            .payout_amount(Money::new(1_000_000.0, Currency::USD))
+            .expiry(time::macros::date!(2027 - 01 - 15))
+            .day_count(DayCount::Act365F)
+            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
+            .vol_surface_id(CurveId::new("EURUSD-VOL"))
+            .pricing_overrides(crate::instruments::PricingOverrides::default())
+            .attributes(crate::instruments::common_impl::traits::Attributes::new())
+    }
+
+    #[test]
+    fn validation_valid_digital_option_builds_ok() {
+        assert!(base_digital_builder().build().is_ok());
+    }
+
+    #[test]
+    fn validation_rejects_same_currencies() {
+        let result = base_digital_builder()
+            .base_currency(Currency::USD)
+            .quote_currency(Currency::USD)
+            // notional must match base_currency — set both to USD to get a clean test
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .build();
+        assert!(
+            result.is_err(),
+            "FxDigitalOption must reject identical base and quote currencies"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_non_positive_strike() {
+        let result = base_digital_builder().strike(0.0).build();
+        assert!(result.is_err(), "FxDigitalOption must reject strike = 0");
+        let result = base_digital_builder().strike(-1.0).build();
+        assert!(
+            result.is_err(),
+            "FxDigitalOption must reject negative strike"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_nan_strike() {
+        let result = base_digital_builder().strike(f64::NAN).build();
+        assert!(result.is_err(), "FxDigitalOption must reject NaN strike");
+    }
+
+    #[test]
+    fn validation_rejects_inf_strike() {
+        let result = base_digital_builder().strike(f64::INFINITY).build();
+        assert!(
+            result.is_err(),
+            "FxDigitalOption must reject infinite strike"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_zero_notional() {
+        let result = base_digital_builder()
+            .notional(Money::new(0.0, Currency::EUR))
+            .build();
+        assert!(
+            result.is_err(),
+            "FxDigitalOption must reject zero notional"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_negative_notional() {
+        let result = base_digital_builder()
+            .notional(Money::new(-100.0, Currency::EUR))
+            .build();
+        assert!(
+            result.is_err(),
+            "FxDigitalOption must reject negative notional"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_notional_currency_mismatch() {
+        // Notional in USD but base_currency = EUR
+        let result = base_digital_builder()
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .build();
+        assert!(
+            result.is_err(),
+            "FxDigitalOption must reject notional currency != base_currency"
+        );
+    }
 
     #[test]
     fn digital_payout_type_fromstr_display_roundtrip() {

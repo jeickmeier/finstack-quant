@@ -161,6 +161,7 @@ impl std::str::FromStr for PayoutTiming {
     serde::Deserialize,
     schemars::JsonSchema,
 )]
+#[builder(validate = FxTouchOption::validate)]
 #[serde(deny_unknown_fields)]
 pub struct FxTouchOption {
     /// Unique instrument identifier
@@ -222,6 +223,32 @@ impl crate::instruments::common_impl::traits::CurveDependencies for FxTouchOptio
 }
 
 impl FxTouchOption {
+    /// Validate FX touch option input invariants.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        crate::instruments::common_impl::validation::validate_distinct_currencies(
+            self.base_currency,
+            self.quote_currency,
+            "FxTouchOption",
+        )?;
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            self.barrier_level,
+            "FxTouchOption barrier_level",
+        )?;
+        crate::instruments::common_impl::validation::validate_f64_finite(
+            self.barrier_level,
+            "FxTouchOption barrier_level",
+        )?;
+        crate::instruments::common_impl::validation::validate_f64_non_negative(
+            self.payout_amount.amount(),
+            "FxTouchOption payout_amount",
+        )?;
+        crate::instruments::common_impl::validation::validate_money_finite(
+            self.payout_amount,
+            "FxTouchOption payout_amount",
+        )?;
+        Ok(())
+    }
+
     /// Create a canonical example FX touch option expiring on the
     /// project-wide stable example epoch.
     pub fn example() -> finstack_core::Result<Self> {
@@ -534,6 +561,113 @@ mod tests {
         assert_payout_timing("athit", PayoutTiming::AtHit);
         assert_payout_timing("atexpiry", PayoutTiming::AtExpiry);
         assert!(PayoutTiming::from_str("invalid").is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Validation tests
+    // -----------------------------------------------------------------------
+
+    fn base_touch_builder() -> crate::instruments::fx::fx_touch_option::types::FxTouchOptionBuilder
+    {
+        use finstack_core::types::{CurveId, InstrumentId};
+        FxTouchOption::builder()
+            .id(InstrumentId::new("FXTOUCH-VALID"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .barrier_level(1.05)
+            .touch_type(TouchType::OneTouch)
+            .barrier_direction(BarrierDirection::Down)
+            .payout_amount(Money::new(1_000_000.0, Currency::USD))
+            .payout_timing(PayoutTiming::AtExpiry)
+            .expiry(time::macros::date!(2027 - 01 - 15))
+            .day_count(DayCount::Act365F)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
+            .vol_surface_id(CurveId::new("EURUSD-VOL"))
+            .pricing_overrides(crate::instruments::PricingOverrides::default())
+            .attributes(crate::instruments::common_impl::traits::Attributes::new())
+    }
+
+    #[test]
+    fn validation_valid_touch_option_builds_ok() {
+        assert!(base_touch_builder().build().is_ok());
+    }
+
+    #[test]
+    fn validation_rejects_same_currencies() {
+        let result = base_touch_builder()
+            .base_currency(Currency::USD)
+            .quote_currency(Currency::USD)
+            .build();
+        assert!(
+            result.is_err(),
+            "FxTouchOption must reject identical base and quote currencies"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_non_positive_barrier_level() {
+        let result = base_touch_builder().barrier_level(0.0).build();
+        assert!(
+            result.is_err(),
+            "FxTouchOption must reject barrier_level = 0"
+        );
+        let result = base_touch_builder().barrier_level(-1.0).build();
+        assert!(
+            result.is_err(),
+            "FxTouchOption must reject negative barrier_level"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_nan_barrier_level() {
+        let result = base_touch_builder().barrier_level(f64::NAN).build();
+        assert!(
+            result.is_err(),
+            "FxTouchOption must reject NaN barrier_level"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_inf_barrier_level() {
+        let result = base_touch_builder()
+            .barrier_level(f64::INFINITY)
+            .build();
+        assert!(
+            result.is_err(),
+            "FxTouchOption must reject infinite barrier_level"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_negative_payout_amount() {
+        let result = base_touch_builder()
+            .payout_amount(Money::new(-1.0, Currency::USD))
+            .build();
+        assert!(
+            result.is_err(),
+            "FxTouchOption must reject negative payout_amount"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Money::new requires finite amount")]
+    fn validation_rejects_nan_payout_amount() {
+        // Money::new panics on NaN before the builder validate hook can run;
+        // this test documents that the type system prevents non-finite payout amounts.
+        let _ = Money::new(f64::NAN, Currency::USD);
+    }
+
+    #[test]
+    fn validation_accepts_zero_payout_amount() {
+        // Zero payout is legitimate (no-touch semantics allow it)
+        let result = base_touch_builder()
+            .payout_amount(Money::new(0.0, Currency::USD))
+            .build();
+        assert!(
+            result.is_ok(),
+            "FxTouchOption must accept zero payout_amount"
+        );
     }
 
     /// Item 8 regression: the FD spot bumps in `option_delta`/`option_gamma`

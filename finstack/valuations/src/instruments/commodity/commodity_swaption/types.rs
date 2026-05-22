@@ -79,6 +79,7 @@ use finstack_core::Result;
     serde::Deserialize,
     schemars::JsonSchema,
 )]
+#[builder(validate = CommoditySwaption::validate)]
 pub struct CommoditySwaption {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -131,6 +132,38 @@ pub struct CommoditySwaption {
 }
 
 impl CommoditySwaption {
+    /// Validate commodity swaption input invariants.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        // expiry <= swap_start < swap_end
+        crate::instruments::common_impl::validation::validate_date_range_non_strict(
+            self.expiry,
+            self.swap_start,
+            "CommoditySwaption expiry/swap_start",
+        )?;
+        crate::instruments::common_impl::validation::validate_date_range_strict(
+            self.swap_start,
+            self.swap_end,
+            "CommoditySwaption swap_start/swap_end",
+        )?;
+        // notional > 0
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            self.notional,
+            "CommoditySwaption notional",
+        )?;
+        // fixed_price must be finite (negative strikes can be legitimate for spread commodities)
+        crate::instruments::common_impl::validation::validate_f64_finite(
+            self.fixed_price,
+            "CommoditySwaption fixed_price",
+        )?;
+        // swap_frequency count must be > 0 (count is u32, so only zero is invalid)
+        if self.swap_frequency.count == 0 {
+            return Err(finstack_core::Error::Validation(
+                "CommoditySwaption swap_frequency count must be positive (got 0)".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Create a canonical example commodity swaption for testing and documentation.
     ///
     /// Returns a natural gas European call swaption.
@@ -572,6 +605,153 @@ crate::impl_empty_cashflow_provider!(
 mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
+
+    // -----------------------------------------------------------------------
+    // Validation tests
+    // -----------------------------------------------------------------------
+
+    fn base_swaption_builder() -> CommoditySwaptionBuilder {
+        use finstack_core::dates::TenorUnit;
+        CommoditySwaption::builder()
+            .id(InstrumentId::new("NG-SWAPTION-VALID"))
+            .underlying(CommodityUnderlyingParams::new(
+                "Energy",
+                "NG",
+                "MMBTU",
+                Currency::USD,
+            ))
+            .option_type(OptionType::Call)
+            .expiry(Date::from_calendar_date(2025, time::Month::June, 15).expect("valid date"))
+            .swap_start(Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"))
+            .swap_end(
+                Date::from_calendar_date(2026, time::Month::June, 30).expect("valid date"),
+            )
+            .swap_frequency(Tenor::new(1, TenorUnit::Months))
+            .fixed_price(3.50)
+            .notional(10_000.0)
+            .forward_curve_id(CurveId::new("NG-FORWARD"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .vol_surface_id(CurveId::new("NG-VOL"))
+    }
+
+    #[test]
+    fn validation_valid_swaption_builds_ok() {
+        assert!(base_swaption_builder().build().is_ok());
+    }
+
+    #[test]
+    fn validation_rejects_swap_start_after_swap_end() {
+        // swap_start == swap_end: invalid
+        let result = base_swaption_builder()
+            .swap_start(Date::from_calendar_date(2026, time::Month::June, 30).expect("valid date"))
+            .swap_end(Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"))
+            .build();
+        assert!(
+            result.is_err(),
+            "CommoditySwaption must reject swap_start > swap_end"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_swap_start_equal_swap_end() {
+        let same_date =
+            Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+        let result = base_swaption_builder()
+            .swap_start(same_date)
+            .swap_end(same_date)
+            .build();
+        assert!(
+            result.is_err(),
+            "CommoditySwaption must reject swap_start == swap_end"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_expiry_after_swap_start() {
+        // expiry > swap_start: invalid
+        let result = base_swaption_builder()
+            .expiry(Date::from_calendar_date(2025, time::Month::August, 1).expect("valid date"))
+            .swap_start(Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"))
+            .build();
+        assert!(
+            result.is_err(),
+            "CommoditySwaption must reject expiry > swap_start"
+        );
+    }
+
+    #[test]
+    fn validation_accepts_expiry_equal_swap_start() {
+        // expiry == swap_start is allowed (option expires exactly when swap starts)
+        let same_date =
+            Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+        let result = base_swaption_builder()
+            .expiry(same_date)
+            .swap_start(same_date)
+            .build();
+        assert!(
+            result.is_ok(),
+            "CommoditySwaption must allow expiry == swap_start"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_zero_notional() {
+        let result = base_swaption_builder().notional(0.0).build();
+        assert!(
+            result.is_err(),
+            "CommoditySwaption must reject zero notional"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_negative_notional() {
+        let result = base_swaption_builder().notional(-1000.0).build();
+        assert!(
+            result.is_err(),
+            "CommoditySwaption must reject negative notional"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_nan_fixed_price() {
+        let result = base_swaption_builder().fixed_price(f64::NAN).build();
+        assert!(
+            result.is_err(),
+            "CommoditySwaption must reject NaN fixed_price"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_inf_fixed_price() {
+        let result = base_swaption_builder()
+            .fixed_price(f64::INFINITY)
+            .build();
+        assert!(
+            result.is_err(),
+            "CommoditySwaption must reject infinite fixed_price"
+        );
+    }
+
+    #[test]
+    fn validation_accepts_negative_fixed_price() {
+        // Negative fixed price is legitimate for certain commodity spreads
+        let result = base_swaption_builder().fixed_price(-1.0).build();
+        assert!(
+            result.is_ok(),
+            "CommoditySwaption must allow negative fixed_price"
+        );
+    }
+
+    #[test]
+    fn validation_rejects_zero_frequency_count() {
+        let result = base_swaption_builder()
+            .swap_frequency(Tenor::new(0, finstack_core::dates::TenorUnit::Months))
+            .build();
+        assert!(
+            result.is_err(),
+            "CommoditySwaption must reject swap_frequency with count = 0"
+        );
+    }
 
     #[test]
     fn test_commodity_swaption_example() {
