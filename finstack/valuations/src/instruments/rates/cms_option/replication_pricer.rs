@@ -10,13 +10,13 @@
 //! For a CMS **caplet** (pays `(S_T - K)^+` at `T_pay`):
 //!
 //! ```text
-//! V = g(K) × C_sw(K) + ∫_K^{K_max} g'(k) × C_sw(k) dk
+//! V = g(K) × C_sw(K) + ∫_K^{K_max} [2·g'(k) + (k-K)·g''(k)] × C_sw(k) dk
 //! ```
 //!
 //! For a CMS **floorlet** (pays `(K - S_T)^+` at `T_pay`):
 //!
 //! ```text
-//! V = g(K) × P_sw(K) − ∫_{K_min}^K g'(k) × P_sw(k) dk
+//! V = g(K) × P_sw(K) − ∫_{K_min}^K [2·g'(k) + (k-K)·g''(k)] × P_sw(k) dk
 //! ```
 //!
 //! Note the **minus** sign — unlike the caplet, the floorlet integral runs
@@ -34,7 +34,8 @@
 //!   subsumes the market annuity — see the in-body note)
 //! - `P_sw(k) = A_par(k) × Black76_put(F, k, σ(k), T)` — annuity-measure receiver
 //!   swaption price (same annuity-consistency rule)
-//! - `g'(k)` — first derivative of `g`, computed via central differences
+//! - `g'(k)`, `g''(k)` — first and second derivatives of `g`, computed via central /
+//!   non-uniform 3-point second differences with step `G_PRIME_H = 1e-4`
 //! - Integration uses 16-point Gauss-Legendre quadrature over ±6σ from the strike
 //!
 //! # Par Annuity Formula
@@ -296,8 +297,8 @@ impl CmsReplicationPricer {
 
                 match inst.option_type {
                     OptionType::Call => {
-                        // Caplet formula:
-                        //   V = g(K) · C_sw(K) + ∫_K^{K_max} g'(k) · C_sw(k) dk
+                        // Caplet formula (exact static replication, Andersen-Piterbarg §16.2):
+                        //   V = g(K) · C_sw(K) + ∫_K^{K_max} [2·g'(k) + (k-K)·g''(k)] · C_sw(k) dk
                         //
                         // Upper bound K_max = K + 6σ ensures ≤ 1e-9 truncation error.
                         let k_max = (strike + N_STD_CUTOFF * std_dev).max(strike * 1.05);
@@ -305,24 +306,37 @@ impl CmsReplicationPricer {
                         // Boundary term: g(K) · C_sw(K) = DF_pay · Black76_call(K).
                         let boundary = g_times_c(strike, vol_at_strike, true);
 
-                        // Integral term: ∫_K^{K_max} g'(k) · C_sw(k) dk.
+                        // Integral term: ∫_K^{K_max} [2·g'(k) + (k-K)·g''(k)] · C_sw(k) dk.
                         //
-                        // With C_sw(k) = A_par(k)·Black76(k), the integrand is
-                        // g'(k)·A_par(k)·Black76(k). Expanding g(k)=DF_pay/A_par(k):
-                        //   g'(k)·A_par(k) = DF_pay · (−A_par'(k)/A_par(k))
-                        // so the integrand stays annuity-consistent.
+                        // g'(k) via non-uniform central differences (k_lo clamped at K_FLOOR).
+                        // g''(k) via non-uniform 3-point second difference reusing the same
+                        // k_lo/k_hi nodes; reverts to standard (g_hi−2g_ctr+g_lo)/h² when
+                        // both spacings equal G_PRIME_H.
                         let integral = gauss_legendre_integrate(
                             |k: f64| {
                                 let v = vol_surface.value_clamped(ttf, k);
                                 let c_sw = par_annuity(k.max(K_FLOOR), cms_tenor, m)
                                     * black76_call(forward_rate, k, v, ttf);
-                                // g'(k) via central differences; clamp lower node at K_FLOOR
+                                // Nodes for finite differences.
                                 let k_lo = (k - G_PRIME_H).max(K_FLOOR);
                                 let k_hi = k + G_PRIME_H;
-                                let g_prime = (df_pay / par_annuity(k_hi, cms_tenor, m)
-                                    - df_pay / par_annuity(k_lo, cms_tenor, m))
-                                    / (k_hi - k_lo);
-                                g_prime * c_sw
+                                let g_lo = df_pay / par_annuity(k_lo, cms_tenor, m);
+                                let g_hi = df_pay / par_annuity(k_hi, cms_tenor, m);
+                                let g_ctr = df_pay / par_annuity(k.max(K_FLOOR), cms_tenor, m);
+                                let h_lo = k - k_lo;
+                                let h_hi = k_hi - k; // always G_PRIME_H
+                                // g'(k): non-uniform central difference.
+                                let g_prime = (g_hi - g_lo) / (h_lo + h_hi);
+                                // g''(k): non-uniform 3-point second difference.
+                                // Guard against zero denominator when k_lo is clamped to k.
+                                let denom = h_lo * h_hi * (h_lo + h_hi);
+                                let g_pp = if denom > 0.0 {
+                                    2.0 * (h_lo * g_hi - (h_lo + h_hi) * g_ctr + h_hi * g_lo)
+                                        / denom
+                                } else {
+                                    0.0
+                                };
+                                (2.0 * g_prime + (k - strike) * g_pp) * c_sw
                             },
                             strike,
                             k_max,
@@ -335,7 +349,7 @@ impl CmsReplicationPricer {
 
                     OptionType::Put => {
                         // Floorlet formula (Andersen-Piterbarg §16.2, IBP derivation):
-                        //   V = g(K) · P_sw(K) − ∫_{K_min}^K g'(k) · P_sw(k) dk
+                        //   V = g(K) · P_sw(K) − ∫_{K_min}^K [2·g'(k) + (k-K)·g''(k)] · P_sw(k) dk
                         //
                         // Note the MINUS sign.  g(k) = DF_pay / A_par(k) is strictly
                         // INCREASING in k (because A_par(k) is strictly decreasing), so
@@ -343,24 +357,40 @@ impl CmsReplicationPricer {
                         // V_floor < g(K)·P_sw(K), consistent with CMS convexity raising
                         // the payment-measure forward above the swap forward and thereby
                         // reducing the in-the-money probability for a floorlet.
+                        // For k < K, (k-K) < 0, so the g'' term subtracts from the
+                        // effective integrand, reducing the magnitude of the subtracted
+                        // integral and raising V_floor slightly relative to the g'-only formula.
                         let k_min = (strike - N_STD_CUTOFF * std_dev).max(K_FLOOR);
 
                         // Boundary term: g(K) · P_sw(K) = DF_pay · Black76_put(K).
                         let boundary = g_times_c(strike, vol_at_strike, false);
 
-                        // Integral term: ∫_{K_min}^K g'(k) · P_sw(k) dk.
+                        // Integral term: ∫_{K_min}^K [2·g'(k) + (k-K)·g''(k)] · P_sw(k) dk.
                         let integral = gauss_legendre_integrate(
                             |k: f64| {
                                 let v = vol_surface.value_clamped(ttf, k);
                                 let p_sw = par_annuity(k.max(K_FLOOR), cms_tenor, m)
                                     * black76_put(forward_rate, k, v, ttf);
-                                // g'(k) via central differences
+                                // Nodes for finite differences.
                                 let k_lo = (k - G_PRIME_H).max(K_FLOOR);
                                 let k_hi = k + G_PRIME_H;
-                                let g_prime = (df_pay / par_annuity(k_hi, cms_tenor, m)
-                                    - df_pay / par_annuity(k_lo, cms_tenor, m))
-                                    / (k_hi - k_lo);
-                                g_prime * p_sw
+                                let g_lo = df_pay / par_annuity(k_lo, cms_tenor, m);
+                                let g_hi = df_pay / par_annuity(k_hi, cms_tenor, m);
+                                let g_ctr = df_pay / par_annuity(k.max(K_FLOOR), cms_tenor, m);
+                                let h_lo = k - k_lo;
+                                let h_hi = k_hi - k;
+                                // g'(k): non-uniform central difference.
+                                let g_prime = (g_hi - g_lo) / (h_lo + h_hi);
+                                // g''(k): non-uniform 3-point second difference.
+                                // Guard against zero denominator when k_lo is clamped to k.
+                                let denom = h_lo * h_hi * (h_lo + h_hi);
+                                let g_pp = if denom > 0.0 {
+                                    2.0 * (h_lo * g_hi - (h_lo + h_hi) * g_ctr + h_hi * g_lo)
+                                        / denom
+                                } else {
+                                    0.0
+                                };
+                                (2.0 * g_prime + (k - strike) * g_pp) * p_sw
                             },
                             k_min,
                             strike,
