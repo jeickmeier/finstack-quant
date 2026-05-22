@@ -15,6 +15,48 @@
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
+/// Parameters for P&L attribution via [`attribute_pnl`].
+#[wasm_bindgen]
+#[derive(Default)]
+pub struct AttributionParams {
+    instrument_json: String,
+    market_t0_json: String,
+    market_t1_json: String,
+    as_of_t0: String,
+    as_of_t1: String,
+    method_json: String,
+    config_json: Option<String>,
+    full_cross_attribution: Option<bool>,
+}
+
+#[wasm_bindgen]
+impl AttributionParams {
+    #[wasm_bindgen(constructor)]
+    #[wasm_bindgen(js_name = new)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        instrument_json: String,
+        market_t0_json: String,
+        market_t1_json: String,
+        as_of_t0: String,
+        as_of_t1: String,
+        method_json: String,
+        config_json: Option<String>,
+        full_cross_attribution: Option<bool>,
+    ) -> Self {
+        Self {
+            instrument_json,
+            market_t0_json,
+            market_t1_json,
+            as_of_t0,
+            as_of_t1,
+            method_json,
+            config_json,
+            full_cross_attribution,
+        }
+    }
+}
+
 /// Map a `finstack_core::Error` raised by attribution into a structured JS
 /// error.
 ///
@@ -114,30 +156,22 @@ fn catch_attribution_panic<T>(
 
 /// Run P&L attribution for a single instrument.
 ///
-/// Accepts the instrument JSON, two market snapshots, dates, and a
-/// method descriptor.  Returns the `PnlAttribution` result as JSON.
+/// Accepts an [`AttributionParams`] struct with the instrument JSON, two market
+/// snapshots, dates, and a method descriptor. Returns the `PnlAttribution`
+/// result as JSON.
 #[wasm_bindgen(js_name = attributePnl)]
-pub fn attribute_pnl(
-    instrument_json: &str,
-    market_t0_json: &str,
-    market_t1_json: &str,
-    as_of_t0: &str,
-    as_of_t1: &str,
-    method_json: &str,
-    config_json: Option<String>,
-    full_cross_attribution: Option<bool>,
-) -> Result<String, JsValue> {
+pub fn attribute_pnl(params: &AttributionParams) -> Result<String, JsValue> {
     let mut spec = finstack_valuations::attribution::AttributionSpec::from_json_inputs(
-        instrument_json,
-        market_t0_json,
-        market_t1_json,
-        as_of_t0,
-        as_of_t1,
-        method_json,
-        config_json.as_deref(),
+        &params.instrument_json,
+        &params.market_t0_json,
+        &params.market_t1_json,
+        &params.as_of_t0,
+        &params.as_of_t1,
+        &params.method_json,
+        params.config_json.as_deref(),
     )
     .map_err(attribution_error_to_js)?;
-    if let Some(val) = full_cross_attribution {
+    if let Some(val) = params.full_cross_attribution {
         spec.full_cross_attribution = val;
     }
     let result = catch_attribution_panic("attributePnl", || spec.execute())?;

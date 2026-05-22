@@ -12,10 +12,19 @@
 use crate::bindings::extract::extract_model_ref;
 use crate::errors::display_to_py;
 use finstack_core::dates::PeriodId;
-use finstack_statements::builder::ModelBuilder;
-use finstack_statements::types::FinancialModelSpec;
+use finstack_statements::builder::{ModelBuilder, Ready};
+use finstack_statements::types::{CapitalStructureSpec, FinancialModelSpec};
 use finstack_statements_analytics::templates::real_estate as rust_re;
+use indexmap::IndexMap;
 use pyo3::prelude::*;
+use serde_json::Value;
+
+/// Rebuilt model builder with preserved metadata.
+type RebuiltBuilder = (
+    ModelBuilder<Ready>,
+    IndexMap<String, Value>,
+    Option<CapitalStructureSpec>,
+);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -25,13 +34,7 @@ fn parse_period(s: &str) -> PyResult<PeriodId> {
     s.parse().map_err(display_to_py)
 }
 
-fn rebuild_builder(
-    spec: FinancialModelSpec,
-) -> PyResult<(
-    ModelBuilder<finstack_statements::builder::Ready>,
-    indexmap::IndexMap<String, serde_json::Value>,
-    Option<finstack_statements::types::CapitalStructureSpec>,
-)> {
+fn rebuild_builder(spec: FinancialModelSpec) -> PyResult<RebuiltBuilder> {
     let meta = spec.meta.clone();
     let capital_structure = spec.capital_structure.clone();
     let id = spec.id.clone();

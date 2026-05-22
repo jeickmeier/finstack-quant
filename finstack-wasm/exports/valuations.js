@@ -99,6 +99,7 @@ export const valuations = {
   snowballCouponProfile: wasm.snowballCouponProfile,
   cmsSpreadOptionIntrinsic: wasm.cmsSpreadOptionIntrinsic,
   callableRangeAccrualAccrued: wasm.callableRangeAccrualAccrued,
+  AttributionParams: wasm.AttributionParams,
   attributePnl: wasm.attributePnl,
   attributePnlFromSpec: wasm.attributePnlFromSpec,
   validateAttributionJson: wasm.validateAttributionJson,
