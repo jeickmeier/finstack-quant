@@ -591,6 +591,12 @@ fn decompose_factor_risk(
         .map(finstack_core::factor_model::FactorId::new)
         .collect();
 
+    if sensitivities.n_factors == 0 {
+        return Err(PyValueError::new_err(
+            "sensitivity matrix has no factors; decomposition requires at least one factor",
+        ));
+    }
+
     let mut matrix = finstack_valuations::factor_model::SensitivityMatrix::zeros(
         sensitivities.position_ids.clone(),
         factor_ids,
