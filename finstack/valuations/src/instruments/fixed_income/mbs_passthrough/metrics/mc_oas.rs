@@ -217,6 +217,12 @@ fn price_on_path(
     let wam = mbs.wam as usize;
     let num_steps = path.rates.len().saturating_sub(1).min(wam);
 
+    // Seasoning base for the PSA SMM ramp: the pool's actual age at the
+    // valuation date (`as_of`). Loop-invariant, so computed once here; the
+    // per-step offset below makes the PSA ramp/plateau reflect the true pool
+    // age rather than a fresh-issue ramp.
+    let base_seasoning = mbs.seasoning_months(as_of);
+
     for month in 0..num_steps {
         if balance < 0.01 {
             break;
@@ -228,10 +234,6 @@ fn price_on_path(
         let step_df = (-(current_rate + oas) * dt).exp();
         cumulative_df *= step_df;
 
-        // Seasoning for base PSA SMM: start from the pool's actual age at
-        // the valuation date (`as_of`) and add the per-step offset so the
-        // PSA ramp/plateau reflects the true pool age, not a fresh-issue ramp.
-        let base_seasoning = mbs.seasoning_months(as_of);
         let seasoning = base_seasoning + month as u32 + 1;
         let base_smm = mbs.prepayment_model.smm(seasoning)?;
         if !base_smm.is_finite() || !(0.0..=1.0).contains(&base_smm) {
