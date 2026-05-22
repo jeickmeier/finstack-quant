@@ -448,6 +448,168 @@ pub(crate) fn compounded_forward_projection(
     Ok((compound_factor - 1.0) / period_year_fraction)
 }
 
+/// Project the daily-compounded equivalent rate for an **in-progress** OIS / RFR
+/// leg whose accrual period straddles the valuation date.
+///
+/// When a `Compounded` / `CompoundedWithShift` / `Average` coupon period
+/// satisfies `accrual_start <= as_of < accrual_end`, the period rate is a daily
+/// compound of two spliced sub-periods:
+///
+/// * **realized** overnight fixings for the daily sub-periods whose observation
+///   date is strictly before `as_of` (sourced from the historical `fixings`
+///   series), and
+/// * **projected** overnight forwards for the daily sub-periods on or after
+///   `as_of` (read from `fwd`, exactly as [`compounded_forward_projection`]).
+///
+/// The two strips are compounded into a single product
+/// `CF = ∏ᵢ (1 + rᵢ · dᵢ)` and the function returns the equivalent simple rate
+/// `R = (CF − 1) / τ`, matching the contract of [`compounded_forward_projection`]
+/// so the surrounding `pv_floating_leg` framework can apply spread, gearing and
+/// the all-in floor/cap uniformly.
+///
+/// Treating an in-progress OIS coupon as a single term fixing at the reset date
+/// (the IBOR-style path) silently mis-prices every seasoned RFR swap — the
+/// realized portion is a daily compound of many overnight fixings, not one rate.
+///
+/// # Observation shift
+///
+/// `observation_shift_days` (the ISDA lookback) shifts the **observation**
+/// window back by that many business days while the day-count weights stay
+/// anchored to the accrual sub-period. The realized-vs-projected split is
+/// decided on the (shifted) observation start date: a sub-period whose
+/// observation start is strictly before `as_of` is realized, otherwise it is
+/// projected.
+///
+/// # Per-fixing index floor / cap
+///
+/// `index_floor` / `index_cap`, when present, are applied to **each daily rate**
+/// `rᵢ` — realized or projected — before it enters the product, the
+/// economically correct treatment for an RFR cap/floor strip.
+///
+/// # Realized fixings
+///
+/// Historical overnight fixings are looked up by **exact observation date**
+/// (`ScalarTimeSeries::value_on_exact`): a missing realized overnight fixing for
+/// an in-progress coupon is a hard error, never a silently carried-forward or
+/// projected value.
+///
+/// # Errors
+///
+/// Returns a validation error if the accrual period is malformed
+/// (`accrual_end <= accrual_start`), if `period_year_fraction` is non-positive,
+/// if the period does not actually straddle `as_of`, if a daily/observation
+/// date step fails, if a sub-period day-count fraction is non-positive, or if a
+/// required realized overnight fixing is missing from `fixings`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn compounded_spliced_projection(
+    fwd: &ForwardCurve,
+    fixings: Option<&ScalarTimeSeries>,
+    fixing_id: &str,
+    accrual_start: Date,
+    accrual_end: Date,
+    as_of: Date,
+    period_year_fraction: f64,
+    observation_shift_days: i32,
+    calendar_id: Option<&str>,
+    index_floor: Option<f64>,
+    index_cap: Option<f64>,
+) -> Result<f64> {
+    if accrual_end <= accrual_start {
+        return Err(finstack_core::Error::Validation(format!(
+            "Compounded OIS leg has a malformed accrual period: accrual_end ({}) \
+             is not strictly after accrual_start ({}). A zero- or negative-length \
+             period cannot be daily-compounded; check the schedule generation.",
+            accrual_end, accrual_start
+        )));
+    }
+    if !period_year_fraction.is_finite() || period_year_fraction <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "Compounded OIS leg has a non-positive or non-finite period year \
+             fraction ({:.3e}) for {} -> {}; cannot normalize the \
+             daily-compounded coupon.",
+            period_year_fraction, accrual_start, accrual_end
+        )));
+    }
+    // This helper is only correct for a genuinely in-progress period; a
+    // fully-past or fully-future period must be routed elsewhere.
+    if !(accrual_start <= as_of && as_of < accrual_end) {
+        return Err(finstack_core::Error::Validation(format!(
+            "compounded_spliced_projection requires an in-progress period \
+             (accrual_start <= as_of < accrual_end); got accrual_start={}, \
+             as_of={}, accrual_end={}.",
+            accrual_start, as_of, accrual_end
+        )));
+    }
+
+    let fwd_dc = fwd.day_count();
+    let fwd_base = fwd.base_date();
+    let curve_time = |d: Date| -> Result<f64> {
+        if d <= fwd_base {
+            Ok(0.0)
+        } else {
+            fwd_dc.year_fraction(fwd_base, d, DayCountContext::default())
+        }
+    };
+
+    // ∏(1 + rᵢ·dᵢ) over the daily sub-periods, splicing realized and projected.
+    let mut compound_factor = 1.0_f64;
+
+    let mut d = accrual_start;
+    while d < accrual_end {
+        let next_d = shift_business_days(d, 1, calendar_id)?.min(accrual_end);
+
+        // Day-count weight dᵢ is anchored to the accrual sub-period.
+        let dcf = fwd_dc.year_fraction(d, next_d, DayCountContext::default())?;
+        if dcf <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Compounded OIS leg produced a non-positive day-count fraction \
+                 ({:.3e}) for the daily sub-period {} -> {}.",
+                dcf, d, next_d
+            )));
+        }
+
+        // Observation window: shift back by the lookback.
+        let (obs_start, obs_end) = if observation_shift_days == 0 {
+            (d, next_d)
+        } else {
+            (
+                shift_business_days(d, -observation_shift_days, calendar_id)?,
+                shift_business_days(next_d, -observation_shift_days, calendar_id)?,
+            )
+        };
+
+        // Splice point: an observation strictly before `as_of` is realized;
+        // an observation on/after `as_of` is projected from the forward curve.
+        let mut r = if obs_start < as_of {
+            finstack_core::market_data::fixings::require_fixing_value_exact(
+                fixings, fixing_id, obs_start, as_of,
+            )?
+        } else {
+            let ts = curve_time(obs_start)?;
+            let te = curve_time(obs_end)?;
+            if te > ts {
+                fwd.rate_period(ts, te)
+            } else {
+                fwd.rate(ts)
+            }
+        };
+
+        // Per-fixing floor/cap: each daily caplet/floorlet, not the average.
+        if let Some(floor) = index_floor {
+            r = r.max(floor);
+        }
+        if let Some(cap) = index_cap {
+            r = r.min(cap);
+        }
+
+        compound_factor *= 1.0 + r * dcf;
+        d = next_d;
+    }
+
+    // Equivalent simple rate: R · τ = CF − 1.
+    Ok((compound_factor - 1.0) / period_year_fraction)
+}
+
 /// Parameters for pricing a floating rate leg.
 ///
 /// This struct wraps [`FloatingRateParams`] and adds swap-specific fields for
@@ -659,13 +821,51 @@ where
         let is_compounded = !matches!(params.compounding_method, CompoundingMethod::Simple);
 
         // Determine the index rate: use historical fixing if reset is in the past,
+        let index_floor_decimal = params
+            .rate_params
+            .index_floor_bp
+            .map(|bp| bp * crate::constants::ONE_BASIS_POINT);
+        let index_cap_decimal = params
+            .rate_params
+            .index_cap_bp
+            .map(|bp| bp * crate::constants::ONE_BASIS_POINT);
+
         // otherwise project from the forward curve
-        let index_rate = if reset_date < as_of {
-            // Past reset: require historical fixing (exact date match for term resets).
-            // Pass the actual forward-curve identifier so the resulting validation
-            // error tells the operator which index reset is missing — at 2 AM,
-            // "fixing required for 'floating-leg' on 2025-04-15" is unactionable;
-            // "fixing required for 'USD-SOFR-3M' on 2025-04-15" is.
+        let index_rate = if is_compounded && period.accrual_start <= as_of {
+            // In-progress (or fully-realized-but-unpaid) OIS / RFR coupon: the
+            // period straddles `as_of`. Splice realized daily overnight fixings
+            // (period start -> as_of) with projected overnight forwards
+            // (as_of -> period end), daily-compounded per the leg's convention.
+            //
+            // Treating this as a single term fixing at the reset date — the
+            // IBOR-style path below — silently mis-prices every seasoned RFR
+            // swap, since the realized portion is itself a daily compound of
+            // many overnight fixings, not one rate.
+            compounded_spliced_projection(
+                fwd,
+                fixings,
+                fwd.id().as_str(),
+                period.accrual_start,
+                period.accrual_end,
+                as_of,
+                period.year_fraction,
+                params.observation_shift_days,
+                params.calendar_id.as_deref(),
+                index_floor_decimal,
+                index_cap_decimal,
+            )?
+        } else if reset_date < as_of {
+            // Past reset, term-rate (`Simple`) leg: require a single historical
+            // fixing (exact date match). Pass the actual forward-curve
+            // identifier so the resulting validation error tells the operator
+            // which index reset is missing — at 2 AM, "fixing required for
+            // 'floating-leg' on 2025-04-15" is unactionable; "fixing required
+            // for 'USD-SOFR-3M' on 2025-04-15" is.
+            //
+            // Compounded legs never reach here: a compounded leg whose reset is
+            // in the past either straddles `as_of` (handled above) or — with a
+            // reset lag placing the reset before a still-future accrual start —
+            // falls through to the future-reset compounded branch below.
             finstack_core::market_data::fixings::require_fixing_value_exact(
                 fixings,
                 fwd.id().as_str(),
@@ -691,10 +891,9 @@ where
             fwd.rate(t_reset)
         } else {
             // Future reset, OIS / genuinely-compounding leg (`Compounded`,
-            // `CompoundedWithShift`, `Average`): the coupon is true daily
-            // compounding `(∏(1+rᵢ·dᵢ)−1)/τ` with the ISDA observation shift
-            // applied. The simple arithmetic-average forward used previously
-            // dropped the daily-compounding convexity and the lookback.
+            // `CompoundedWithShift`, `Average`) whose accrual period is entirely
+            // in the future: the coupon is true daily compounding
+            // `(∏(1+rᵢ·dᵢ)−1)/τ` with the ISDA observation shift applied.
             //
             // The index floor/cap (if any) are applied per daily fixing here;
             // they are stripped below so `calculate_floating_rate` does not
@@ -706,14 +905,8 @@ where
                 period.year_fraction,
                 params.observation_shift_days,
                 params.calendar_id.as_deref(),
-                params
-                    .rate_params
-                    .index_floor_bp
-                    .map(|bp| bp * crate::constants::ONE_BASIS_POINT),
-                params
-                    .rate_params
-                    .index_cap_bp
-                    .map(|bp| bp * crate::constants::ONE_BASIS_POINT),
+                index_floor_decimal,
+                index_cap_decimal,
             )?
         };
 
@@ -2098,6 +2291,125 @@ mod tests {
             (implied_rate - expected).abs() < 1e-9,
             "per-fixing-floored compounded rate must equal the daily-compounded \
              floor: implied={implied_rate}, expected={expected}"
+        );
+    }
+
+    /// Regression for [R1]: a `Compounded` / `CompoundedWithShift` / `Average`
+    /// (OIS / RFR) leg whose current coupon period **straddles** `as_of`
+    /// (`reset_date < as_of <= accrual_end`) must price that coupon by
+    /// **splicing** realized daily overnight fixings (period start -> as_of) with
+    /// projected overnight forwards (as_of -> period end), daily-compounded per
+    /// the leg's convention -- NOT by fetching a single term fixing at the reset
+    /// date.
+    ///
+    /// Failure mode locked in: the pre-R1 code took the `reset_date < as_of`
+    /// branch and called `require_fixing_value_exact`, treating the in-progress
+    /// OIS coupon as one term fixing. That mis-prices every seasoned RFR swap.
+    /// The expected coupon is computed independently below as the spliced
+    /// compound `(prod(1+r_i d_i)-1)/tau`.
+    #[test]
+    fn pv_floating_leg_compounded_straddling_period_splices_realized_and_projected() {
+        let base_date = date(2024, 1, 1);
+        let disc = test_discount_curve(base_date);
+        let fwd = test_forward_curve(base_date);
+
+        // Seasoned OIS swap: the current coupon runs Jan 1 -> Apr 1 2024 and the
+        // valuation date Feb 15 sits *inside* it (reset_date < as_of < accrual_end).
+        let accrual_start = date(2024, 1, 1);
+        let accrual_end = date(2024, 4, 1);
+        let as_of = date(2024, 2, 15);
+        let fwd_dc = fwd.day_count();
+        let year_fraction = fwd_dc
+            .year_fraction(accrual_start, accrual_end, DayCountContext::default())
+            .expect("yf");
+
+        let periods = vec![LegPeriod {
+            accrual_start,
+            accrual_end,
+            reset_date: Some(accrual_start),
+            year_fraction,
+        }];
+
+        // Compounded leg, no observation shift, no spread (isolate the coupon).
+        let params = float_compounded(0.0);
+
+        // Supply a realized daily overnight fixing for every weekday in the
+        // historical sub-period [accrual_start, as_of). Use a non-flat ramp so
+        // the splice cannot be mimicked by any single term fixing.
+        let mut fixing_obs: Vec<(Date, f64)> = Vec::new();
+        {
+            let mut d = accrual_start;
+            let mut i = 0u32;
+            while d < as_of {
+                fixing_obs.push((d, 0.03 + 0.0001 * f64::from(i)));
+                d = d.add_weekdays(1);
+                i += 1;
+            }
+        }
+        let fixings = ScalarTimeSeries::new("FIXING:TEST-FWD", fixing_obs.clone(), None)
+            .expect("fixings series");
+
+        let pv = pv_floating_leg(
+            periods.into_iter(),
+            1_000_000.0,
+            &params,
+            &disc,
+            &fwd,
+            as_of,
+            Some(&fixings),
+        )
+        .expect("should price seasoned OIS swap");
+
+        let payment_date = accrual_end; // no payment lag
+        let df = robust_relative_df(&disc, as_of, payment_date).expect("df");
+        let implied_rate = pv / (1_000_000.0 * year_fraction * df);
+
+        // Independent reference: splice realized fixings with projected forwards.
+        let fixing_lookup = |d: Date| -> f64 {
+            fixing_obs
+                .iter()
+                .find(|(fd, _)| *fd == d)
+                .map(|(_, v)| *v)
+                .expect("realized fixing for historical sub-period")
+        };
+        let mut acc = 1.0_f64;
+        let mut d = accrual_start;
+        while d < accrual_end {
+            let nxt = d.add_weekdays(1).min(accrual_end);
+            let dcf = fwd_dc
+                .year_fraction(d, nxt, DayCountContext::default())
+                .expect("dcf");
+            let r = if d < as_of {
+                fixing_lookup(d)
+            } else {
+                let ts = fwd_dc
+                    .year_fraction(base_date, d, DayCountContext::default())
+                    .expect("ts");
+                let te = fwd_dc
+                    .year_fraction(base_date, nxt, DayCountContext::default())
+                    .expect("te");
+                if te > ts {
+                    fwd.rate_period(ts, te)
+                } else {
+                    fwd.rate(ts)
+                }
+            };
+            acc *= 1.0 + r * dcf;
+            d = nxt;
+        }
+        let expected_spliced = (acc - 1.0) / year_fraction;
+
+        assert!(
+            (implied_rate - expected_spliced).abs() < 1e-9,
+            "in-progress compounded coupon must equal the spliced realized/projected \
+             daily compound: implied={implied_rate}, expected={expected_spliced}"
+        );
+
+        let single_fixing = fixing_lookup(accrual_start);
+        assert!(
+            (implied_rate - single_fixing).abs() > 1e-4,
+            "in-progress compounded coupon must not collapse to the single \
+             reset-date fixing: implied={implied_rate}, single_fixing={single_fixing}"
         );
     }
 
