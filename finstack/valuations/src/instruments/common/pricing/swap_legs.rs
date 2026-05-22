@@ -25,7 +25,6 @@ use finstack_core::market_data::scalars::ScalarTimeSeries;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::market_data::term_structures::ForwardCurve;
 use finstack_core::math::NeumaierAccumulator;
-use finstack_core::types::{Bps, Rate};
 use finstack_core::Result;
 
 use serde::{Deserialize, Serialize};
@@ -120,56 +119,6 @@ pub enum CompoundingMethod {
     /// rate = Σ(r_i × d_i) / D
     /// ```
     Average,
-}
-
-impl CompoundingMethod {
-    /// Returns true if this method requires daily fixings.
-    ///
-    /// Simple rates only need a single fixing at reset date.
-    /// All other methods need a fixing for each day in the accrual period.
-    #[must_use]
-    pub fn requires_daily_fixings(&self) -> bool {
-        match self {
-            CompoundingMethod::Simple => false,
-            CompoundingMethod::Compounded
-            | CompoundingMethod::CompoundedWithShift
-            | CompoundingMethod::Average => true,
-        }
-    }
-
-    /// Returns true if this method uses observation shift (lookback).
-    #[must_use]
-    pub fn uses_observation_shift(&self) -> bool {
-        matches!(self, CompoundingMethod::CompoundedWithShift)
-    }
-
-    /// Returns the standard observation shift for common indices.
-    ///
-    /// This is a convenience method for common cases. For full control,
-    /// set `observation_shift_days` in [`FloatingLegParams`] explicitly.
-    ///
-    /// # Arguments
-    ///
-    /// * `index_name` - Index identifier (case-insensitive)
-    ///
-    /// # Returns
-    ///
-    /// Standard observation shift in business days, or 0 if unknown.
-    #[must_use]
-    pub fn standard_shift_for_index(index_name: &str) -> i32 {
-        let name_lower = index_name.to_lowercase();
-        if name_lower.contains("sofr")
-            || name_lower.contains("estr")
-            || name_lower.contains("tonar")
-            || name_lower.contains("tona")
-        {
-            2 // Standard 2-day lookback
-        } else {
-            // SONIA uses payment delay rather than lookback, so shift is 0
-            // Default for other indices: no shift
-            0
-        }
-    }
 }
 
 /// Minimum threshold for annuity values to avoid divide-by-zero in par spread calculations.
@@ -511,7 +460,8 @@ pub(crate) fn compounded_forward_projection(
 /// - [`CompoundingMethod::Simple`]: Single fixing at reset date (IBOR, Term SOFR)
 /// - [`CompoundingMethod::CompoundedWithShift`]: Daily compounding with lookback (OIS standard)
 ///
-/// For OIS swaps, use [`with_ois_compounding`](Self::with_ois_compounding) for standard setup.
+/// For OIS swaps, set `compounding_method` to [`CompoundingMethod::CompoundedWithShift`]
+/// and populate `observation_shift_days`.
 ///
 /// # Validation
 ///
@@ -546,147 +496,6 @@ pub struct FloatingLegParams {
 }
 
 impl FloatingLegParams {
-    /// Create params with just spread (most common case for term rates).
-    ///
-    /// Uses [`CompoundingMethod::Simple`] (appropriate for IBOR, Term SOFR).
-    pub fn with_spread(spread_bp: f64) -> Self {
-        Self {
-            rate_params: FloatingRateParams::with_spread(spread_bp),
-            ..Default::default()
-        }
-    }
-
-    /// Create params with spread specified in basis points.
-    pub fn with_spread_bps(spread_bp: Bps) -> Self {
-        Self {
-            rate_params: FloatingRateParams {
-                spread_bp: spread_bp.as_bps() as f64,
-                ..Default::default()
-            },
-            ..Default::default()
-        }
-    }
-
-    /// Create params with spread and payment delay.
-    pub fn with_spread_and_delay(spread_bp: f64, payment_lag_days: i32) -> Self {
-        Self {
-            rate_params: FloatingRateParams::with_spread(spread_bp),
-            payment_lag_days,
-            ..Default::default()
-        }
-    }
-
-    /// Create params with spread in basis points and payment delay.
-    pub fn with_spread_and_delay_bps(spread_bp: Bps, payment_lag_days: i32) -> Self {
-        Self {
-            rate_params: FloatingRateParams {
-                spread_bp: spread_bp.as_bps() as f64,
-                ..Default::default()
-            },
-            payment_lag_days,
-            ..Default::default()
-        }
-    }
-
-    /// Create params from rate params with payment delay.
-    pub fn from_rate_params(rate_params: FloatingRateParams, payment_lag_days: i32) -> Self {
-        Self {
-            rate_params,
-            payment_lag_days,
-            ..Default::default()
-        }
-    }
-
-    /// Create params for OIS (overnight index swap) with standard compounding.
-    ///
-    /// This is the recommended constructor for RFR swaps (SOFR, ESTR, SONIA, etc.).
-    /// It sets up daily compounding with observation shift.
-    ///
-    /// # Arguments
-    ///
-    /// * `spread_bp` - Spread in basis points
-    /// * `observation_shift_days` - Lookback period in business days (typically 2)
-    /// * `payment_lag_days` - Payment delay in business days (typically 2)
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use finstack_valuations::instruments::common_impl::pricing::swap_legs::FloatingLegParams;
-    ///
-    /// // Standard USD SOFR swap: 2-day lookback, 2-day payment delay
-    /// let sofr_params = FloatingLegParams::with_ois_compounding(0.0, 2, 2);
-    ///
-    /// // GBP SONIA: no lookback, no payment delay
-    /// let sonia_params = FloatingLegParams::with_ois_compounding(0.0, 0, 0);
-    /// ```
-    pub fn with_ois_compounding(
-        spread_bp: f64,
-        observation_shift_days: i32,
-        payment_lag_days: i32,
-    ) -> Self {
-        Self {
-            rate_params: FloatingRateParams::with_spread(spread_bp),
-            payment_lag_days,
-            calendar_id: None,
-            compounding_method: CompoundingMethod::CompoundedWithShift,
-            observation_shift_days,
-        }
-    }
-
-    /// Create params for OIS with spread specified in basis points.
-    pub fn with_ois_compounding_bps(
-        spread_bp: Bps,
-        observation_shift_days: i32,
-        payment_lag_days: i32,
-    ) -> Self {
-        Self {
-            rate_params: FloatingRateParams {
-                spread_bp: spread_bp.as_bps() as f64,
-                ..Default::default()
-            },
-            payment_lag_days,
-            calendar_id: None,
-            compounding_method: CompoundingMethod::CompoundedWithShift,
-            observation_shift_days,
-        }
-    }
-
-    /// Create standard USD SOFR OIS params.
-    ///
-    /// Uses market conventions:
-    /// - Daily compounding with 2-day observation shift
-    /// - 2-day payment delay
-    pub fn usd_sofr(spread_bp: f64) -> Self {
-        Self::with_ois_compounding(spread_bp, 2, 2)
-    }
-
-    /// Create standard EUR ESTR OIS params.
-    ///
-    /// Uses market conventions:
-    /// - Daily compounding with 2-day observation shift
-    /// - 2-day payment delay
-    pub fn eur_estr(spread_bp: f64) -> Self {
-        Self::with_ois_compounding(spread_bp, 2, 2)
-    }
-
-    /// Create standard GBP SONIA OIS params.
-    ///
-    /// Uses market conventions:
-    /// - Daily compounding without observation shift
-    /// - No payment delay (same-day payment)
-    pub fn gbp_sonia(spread_bp: f64) -> Self {
-        Self::with_ois_compounding(spread_bp, 0, 0)
-    }
-
-    /// Create standard JPY TONAR OIS params.
-    ///
-    /// Uses market conventions:
-    /// - Daily compounding with 2-day observation shift
-    /// - 2-day payment delay
-    pub fn jpy_tonar(spread_bp: f64) -> Self {
-        Self::with_ois_compounding(spread_bp, 2, 2)
-    }
-
     /// Create params with full configuration.
     #[allow(clippy::too_many_arguments)]
     pub fn full(
@@ -717,86 +526,6 @@ impl FloatingLegParams {
         }
     }
 
-    /// Create params with full configuration including compounding settings.
-    #[allow(clippy::too_many_arguments)]
-    pub fn full_with_compounding(
-        spread_bp: f64,
-        gearing: f64,
-        gearing_includes_spread: bool,
-        index_floor_bp: Option<f64>,
-        index_cap_bp: Option<f64>,
-        all_in_floor_bp: Option<f64>,
-        all_in_cap_bp: Option<f64>,
-        payment_lag_days: i32,
-        calendar_id: Option<String>,
-        compounding_method: CompoundingMethod,
-        observation_shift_days: i32,
-    ) -> Self {
-        Self {
-            rate_params: FloatingRateParams {
-                spread_bp,
-                gearing,
-                gearing_includes_spread,
-                index_floor_bp,
-                index_cap_bp,
-                all_in_floor_bp,
-                all_in_cap_bp,
-            },
-            payment_lag_days,
-            calendar_id,
-            compounding_method,
-            observation_shift_days,
-        }
-    }
-
-    /// Create params with spread and floor/cap values specified in basis points.
-    #[allow(clippy::too_many_arguments)]
-    pub fn full_bps(
-        spread_bp: Bps,
-        gearing: f64,
-        gearing_includes_spread: bool,
-        index_floor_bp: Option<Bps>,
-        index_cap_bp: Option<Bps>,
-        all_in_floor_bp: Option<Bps>,
-        all_in_cap_bp: Option<Bps>,
-        payment_lag_days: i32,
-        calendar_id: Option<String>,
-    ) -> Self {
-        Self {
-            rate_params: FloatingRateParams {
-                spread_bp: spread_bp.as_bps() as f64,
-                gearing,
-                gearing_includes_spread,
-                index_floor_bp: index_floor_bp.map(|v| v.as_bps() as f64),
-                index_cap_bp: index_cap_bp.map(|v| v.as_bps() as f64),
-                all_in_floor_bp: all_in_floor_bp.map(|v| v.as_bps() as f64),
-                all_in_cap_bp: all_in_cap_bp.map(|v| v.as_bps() as f64),
-            },
-            payment_lag_days,
-            calendar_id,
-            compounding_method: CompoundingMethod::Simple,
-            observation_shift_days: 0,
-        }
-    }
-
-    /// Set the compounding method (builder pattern).
-    pub fn with_compounding(mut self, method: CompoundingMethod) -> Self {
-        self.compounding_method = method;
-        self
-    }
-
-    /// Set the observation shift (builder pattern).
-    pub fn with_observation_shift(mut self, days: i32) -> Self {
-        self.observation_shift_days = days;
-        self
-    }
-
-    /// Set the calendar ID (builder pattern).
-    pub fn with_calendar(mut self, calendar_id: impl Into<String>) -> Self {
-        self.calendar_id = Some(calendar_id.into());
-        self
-    }
-
     /// Validate the floating leg parameters.
     ///
     /// Checks that:
@@ -812,7 +541,12 @@ impl FloatingLegParams {
         self.rate_params.validate()?;
 
         // Warn if observation shift is set but compounding doesn't use it
-        if self.observation_shift_days != 0 && !self.compounding_method.uses_observation_shift() {
+        if self.observation_shift_days != 0
+            && !matches!(
+                self.compounding_method,
+                CompoundingMethod::CompoundedWithShift
+            )
+        {
             // Not an error, but the shift will be ignored
             // Could add logging here if needed
         }
@@ -821,9 +555,13 @@ impl FloatingLegParams {
     }
 
     /// Returns true if this leg uses daily compounded rates (OIS).
+    ///
+    /// Simple (term-rate) legs only need a single fixing at the reset date;
+    /// every other compounding method needs a fixing for each day in the
+    /// accrual period.
     #[must_use]
     pub fn is_ois_style(&self) -> bool {
-        self.compounding_method.requires_daily_fixings()
+        !matches!(self.compounding_method, CompoundingMethod::Simple)
     }
 }
 
@@ -1028,36 +766,6 @@ pub struct FixedLegParams {
 }
 
 impl FixedLegParams {
-    /// Create params with rate and day count.
-    pub fn new(rate: f64, day_count: DayCount) -> Self {
-        Self {
-            rate,
-            day_count,
-            payment_lag_days: 0,
-            calendar_id: None,
-        }
-    }
-
-    /// Create params with a typed rate and day count.
-    pub fn new_rate(rate: Rate, day_count: DayCount) -> Self {
-        Self::new(rate.as_decimal(), day_count)
-    }
-
-    /// Create params with rate, day count, and payment delay.
-    pub fn with_delay(rate: f64, day_count: DayCount, payment_lag_days: i32) -> Self {
-        Self {
-            rate,
-            day_count,
-            payment_lag_days,
-            calendar_id: None,
-        }
-    }
-
-    /// Create params with a typed rate, day count, and payment delay.
-    pub fn with_delay_rate(rate: Rate, day_count: DayCount, payment_lag_days: i32) -> Self {
-        Self::with_delay(rate.as_decimal(), day_count, payment_lag_days)
-    }
-
     /// Validate fixed leg parameters.
     ///
     /// Checks that:
@@ -1305,6 +1013,58 @@ mod tests {
             .expect("valid date")
     }
 
+    /// Test-only floating-leg params with just a spread (term-rate / `Simple`).
+    fn float_spread(spread_bp: f64) -> FloatingLegParams {
+        FloatingLegParams {
+            rate_params: FloatingRateParams::with_spread(spread_bp),
+            ..Default::default()
+        }
+    }
+
+    /// Test-only floating-leg params with a spread and payment delay.
+    fn float_spread_delay(spread_bp: f64, payment_lag_days: i32) -> FloatingLegParams {
+        FloatingLegParams {
+            rate_params: FloatingRateParams::with_spread(spread_bp),
+            payment_lag_days,
+            ..Default::default()
+        }
+    }
+
+    /// Test-only OIS floating-leg params (daily compounding with observation shift).
+    fn float_ois(
+        spread_bp: f64,
+        observation_shift_days: i32,
+        payment_lag_days: i32,
+    ) -> FloatingLegParams {
+        FloatingLegParams {
+            rate_params: FloatingRateParams::with_spread(spread_bp),
+            payment_lag_days,
+            calendar_id: None,
+            compounding_method: CompoundingMethod::CompoundedWithShift,
+            observation_shift_days,
+        }
+    }
+
+    /// Test-only floating-leg params using [`CompoundingMethod::Compounded`]
+    /// (daily compounding, no observation shift).
+    fn float_compounded(spread_bp: f64) -> FloatingLegParams {
+        FloatingLegParams {
+            rate_params: FloatingRateParams::with_spread(spread_bp),
+            compounding_method: CompoundingMethod::Compounded,
+            ..Default::default()
+        }
+    }
+
+    /// Test-only fixed-leg params with a rate and day count.
+    fn fixed_rate(rate: f64, day_count: DayCount) -> FixedLegParams {
+        FixedLegParams {
+            rate,
+            day_count,
+            payment_lag_days: 0,
+            calendar_id: None,
+        }
+    }
+
     fn test_discount_curve(base_date: Date) -> DiscountCurve {
         DiscountCurve::builder(CurveId::new("TEST-DISC"))
             .base_date(base_date)
@@ -1375,7 +1135,7 @@ mod tests {
             },
         ];
 
-        let params = FloatingLegParams::with_spread(100.0); // 100 bps
+        let params = float_spread(100.0); // 100 bps
         let pv = pv_floating_leg(
             periods.into_iter(),
             1_000_000.0,
@@ -1485,7 +1245,7 @@ mod tests {
             year_fraction: 0.25,
         }];
 
-        let params = FloatingLegParams::with_spread(100.0);
+        let params = float_spread(100.0);
         let result = pv_floating_leg(
             periods.into_iter(),
             1_000_000.0,
@@ -1533,7 +1293,7 @@ mod tests {
         )
         .expect("fixings series");
 
-        let params = FloatingLegParams::with_spread(100.0); // 100 bps spread
+        let params = float_spread(100.0); // 100 bps spread
         let pv = pv_floating_leg(
             periods.into_iter(),
             1_000_000.0,
@@ -1571,7 +1331,7 @@ mod tests {
         }];
 
         // Without payment delay - should skip the period (accrual_end <= as_of would be true in old logic)
-        let params_no_delay = FloatingLegParams::with_spread(100.0);
+        let params_no_delay = float_spread(100.0);
 
         // Provide fixings since reset_date < as_of
         let fixings =
@@ -1597,7 +1357,7 @@ mod tests {
         );
 
         // With 2-day payment delay - should NOT skip (payment_date = Apr 3 > as_of = Apr 2)
-        let params_with_delay = FloatingLegParams::with_spread_and_delay(100.0, 2);
+        let params_with_delay = float_spread_delay(100.0, 2);
         let pv_with_delay = pv_floating_leg(
             periods.into_iter(),
             1_000_000.0,
@@ -1637,7 +1397,7 @@ mod tests {
             },
         ];
 
-        let params = FixedLegParams::new(0.03, DayCount::Thirty360);
+        let params = fixed_rate(0.03, DayCount::Thirty360);
         let pv = pv_fixed_leg(periods.into_iter(), 1_000_000.0, &params, &disc, base_date)
             .expect("should price");
 
@@ -1664,7 +1424,7 @@ mod tests {
             year_fraction: 0.5,
         }];
 
-        let params = FixedLegParams::new(f64::NAN, DayCount::Thirty360);
+        let params = fixed_rate(f64::NAN, DayCount::Thirty360);
         let result = pv_fixed_leg(periods.into_iter(), 1_000_000.0, &params, &disc, base_date);
         assert!(result.is_err(), "Should reject NaN rate");
     }
@@ -1776,20 +1536,6 @@ mod tests {
             result.is_err(),
             "Should reject zero annuity (all periods expired)"
         );
-    }
-
-    #[test]
-    fn floating_leg_params_from_rate_params() {
-        let rate_params = FloatingRateParams {
-            spread_bp: 200.0,
-            index_floor_bp: Some(100.0),
-            ..Default::default()
-        };
-        let leg_params = FloatingLegParams::from_rate_params(rate_params, 2);
-
-        assert_eq!(leg_params.rate_params.spread_bp, 200.0);
-        assert_eq!(leg_params.rate_params.index_floor_bp, Some(100.0));
-        assert_eq!(leg_params.payment_lag_days, 2);
     }
 
     // ==================== W-48: term-rate fixing-date projection ====================
@@ -1916,7 +1662,7 @@ mod tests {
         }];
 
         // OIS-style leg, no observation shift (isolates the compounding effect).
-        let params = FloatingLegParams::with_ois_compounding(0.0, 0, 0);
+        let params = float_ois(0.0, 0, 0);
 
         let pv = pv_floating_leg(
             periods.into_iter(),
@@ -2095,8 +1841,7 @@ mod tests {
         }];
 
         // Compounded leg, no observation shift.
-        let params =
-            FloatingLegParams::with_spread(0.0).with_compounding(CompoundingMethod::Compounded);
+        let params = float_compounded(0.0);
 
         let pv = pv_floating_leg(
             periods.into_iter(),
@@ -2187,7 +1932,7 @@ mod tests {
         };
 
         let price = |shift: i32| -> f64 {
-            let params = FloatingLegParams::with_ois_compounding(0.0, shift, 0);
+            let params = float_ois(0.0, shift, 0);
             pv_floating_leg(
                 std::iter::once(period.clone()),
                 1_000_000.0,
@@ -2228,8 +1973,7 @@ mod tests {
             reset_date: Some(date(2024, 7, 1)),
             year_fraction: 0.0,
         };
-        let params =
-            FloatingLegParams::with_spread(0.0).with_compounding(CompoundingMethod::Compounded);
+        let params = float_compounded(0.0);
         let result = pv_floating_leg(
             vec![degenerate].into_iter(),
             1_000_000.0,
@@ -2299,19 +2043,21 @@ mod tests {
         // Floor at 10% — far above every daily forward on the steep curve over
         // this window (forwards there are well under 10%).
         let floor_bp = 1000.0; // 10%
-        let params = FloatingLegParams::full_with_compounding(
-            0.0,
-            1.0,
-            true,
-            Some(floor_bp), // index floor
-            None,
-            None,
-            None,
-            0,
-            None,
-            CompoundingMethod::Compounded,
-            0,
-        );
+        let params = FloatingLegParams {
+            rate_params: FloatingRateParams {
+                spread_bp: 0.0,
+                gearing: 1.0,
+                gearing_includes_spread: true,
+                index_floor_bp: Some(floor_bp), // index floor
+                index_cap_bp: None,
+                all_in_floor_bp: None,
+                all_in_cap_bp: None,
+            },
+            payment_lag_days: 0,
+            calendar_id: None,
+            compounding_method: CompoundingMethod::Compounded,
+            observation_shift_days: 0,
+        };
 
         let pv = pv_floating_leg(
             periods.into_iter(),
