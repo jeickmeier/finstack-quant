@@ -37,6 +37,7 @@ use crate::instruments::common_impl::parameters::legs::{
 use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
 use finstack_core::dates::{Date, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
+use finstack_core::market_data::scalars::ScalarTimeSeries;
 use finstack_core::market_data::term_structures::ForwardCurve;
 use finstack_core::math::NeumaierAccumulator;
 use finstack_core::money::Money;
@@ -52,12 +53,23 @@ use crate::instruments::common_impl::pricing::time::{
 /// `OvernightCompounded` (OIS / RFR) legs daily-compound the overnight forward
 /// and return the equivalent simple rate `(∏(1+rᵢ·dᵢ)−1)/τ`, capturing the
 /// daily-compounding convexity the arithmetic average drops.
+///
+/// For `OvernightCompounded` periods that have already started
+/// (`period_start <= as_of < period_end`), the function splices realized daily
+/// fixings (from `fixings`) with projected overnight forwards, matching the
+/// behaviour of `compounded_spliced_projection` used by `pv_floating_leg`.
+/// Fully-future periods (`period_start > as_of`) are projected entirely from the
+/// forward curve via `compounded_forward_projection`. A missing realized fixing
+/// for an in-progress period is a hard error (not a silent projection).
+#[allow(clippy::too_many_arguments)]
 fn financing_period_rate(
     financing: &FinancingLegSpec,
     fwd: &ForwardCurve,
+    fixings: Option<&ScalarTimeSeries>,
     period_start: Date,
     period_end: Date,
     period_year_fraction: f64,
+    as_of: Date,
     calendar_id: &str,
 ) -> finstack_core::Result<f64> {
     match financing.compounding {
@@ -66,22 +78,43 @@ fn financing_period_rate(
             // The daily-compounding observation grid needs either a registered
             // holiday calendar or `None` (weekday-only stepping). The
             // weekends-only sentinel and an empty id both mean weekday-only,
-            // which `compounded_forward_projection` expresses as `None`.
+            // which the compounded helpers express as `None`.
             let obs_calendar = match calendar_id {
                 "" => None,
                 id if id == crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID => None,
                 id => Some(id),
             };
-            super::swap_legs::compounded_forward_projection(
-                fwd,
-                period_start,
-                period_end,
-                period_year_fraction,
-                0, // no observation lookback modelled for the TRS funding leg
-                obs_calendar,
-                None,
-                None,
-            )
+
+            if period_start <= as_of {
+                // In-progress (or fully-accrued-but-unpaid) period: splice realized
+                // daily fixings with projected forwards.  A missing fixing is a hard
+                // error — consistent with `pv_floating_leg` / `swap_legs`.
+                super::swap_legs::compounded_spliced_projection(
+                    fwd,
+                    fixings,
+                    fwd.id().as_str(),
+                    period_start,
+                    period_end,
+                    as_of,
+                    period_year_fraction,
+                    0, // no observation lookback modelled for the TRS funding leg
+                    obs_calendar,
+                    None,
+                    None,
+                )
+            } else {
+                // Fully-future period: project entirely from the forward curve.
+                super::swap_legs::compounded_forward_projection(
+                    fwd,
+                    period_start,
+                    period_end,
+                    period_year_fraction,
+                    0, // no observation lookback modelled for the TRS funding leg
+                    obs_calendar,
+                    None,
+                    None,
+                )
+            }
         }
     }
 }
@@ -288,6 +321,17 @@ impl TrsEngine {
 
         let disc = context.get_discount(financing.discount_curve_id.as_str())?;
         let fwd = context.get_forward(financing.forward_curve_id.as_str())?;
+        // For OvernightCompounded legs, realized fixings for in-progress periods
+        // are sourced from MarketContext using the canonical `FIXING:{forward_curve_id}`
+        // key.  The same pattern is used by `basis_swap` / `pv_floating_leg`.
+        // `get_fixing_series` returns `None` (not an error) when absent; the
+        // error is deferred to `financing_period_rate` when a fixing is actually
+        // required for an in-progress period.
+        let fixings = finstack_core::market_data::fixings::get_fixing_series(
+            context,
+            financing.forward_curve_id.as_str(),
+        )
+        .ok();
         let period_schedule = schedule.period_schedule()?;
 
         let mut total_pv = NeumaierAccumulator::new();
@@ -316,12 +360,16 @@ impl TrsEngine {
 
             // Project the period rate per the leg's compounding convention
             // (simple term-rate average vs daily-compounded OIS).
+            // For in-progress OIS periods, splices realized fixings with projected
+            // forwards; fully-future periods use forward-curve projection only.
             let fwd_rate = financing_period_rate(
                 financing,
                 fwd.as_ref(),
+                fixings,
                 period_start,
                 period_end,
                 yf,
+                as_of,
                 schedule.params.calendar_id.as_str(),
             )?;
             let total_rate = fwd_rate + spread_decimal;
@@ -434,6 +482,11 @@ impl TrsEngine {
 
         let disc = context.get_discount(financing.discount_curve_id.as_str())?;
         let fwd = context.get_forward(financing.forward_curve_id.as_str())?;
+        let fixings = finstack_core::market_data::fixings::get_fixing_series(
+            context,
+            financing.forward_curve_id.as_str(),
+        )
+        .ok();
         let period_schedule = schedule.period_schedule()?;
 
         let mut total_pv = NeumaierAccumulator::new();
@@ -453,12 +506,15 @@ impl TrsEngine {
 
             // Project the period rate per the leg's compounding convention
             // (simple term-rate average vs daily-compounded OIS).
+            // In-progress OIS periods splice realized fixings with projected forwards.
             let fwd_rate = financing_period_rate(
                 financing,
                 fwd.as_ref(),
+                fixings,
                 period_start,
                 period_end,
                 yf,
+                as_of,
                 schedule.params.calendar_id.as_str(),
             )?;
             let payment = notional.amount() * fwd_rate * yf;
@@ -757,6 +813,193 @@ mod tests {
         assert!(
             (expected - naive).abs() > 1e-6,
             "Expected curve-based forward/DF to differ from naive time mapping"
+        );
+    }
+
+    /// Regression test: an in-progress `OvernightCompounded` financing period that
+    /// straddles `as_of` must splice realized daily fixings (period_start → as_of)
+    /// with projected forwards (as_of → period_end), NOT project the whole period
+    /// from the forward curve. This test verifies that the spliced result differs
+    /// from the all-projected result, and matches a hand-computed expected value.
+    #[test]
+    fn trs_financing_leg_ois_in_progress_splices_realized_and_projected() {
+        use finstack_core::market_data::scalars::ScalarTimeSeries;
+
+        // Period: 2025-01-06 (Mon) → 2025-02-03 (Mon), 28 days. as_of = 2025-01-20 (Mon, mid-period).
+        // Both endpoints are Mondays so ModifiedFollowing leaves them unchanged.
+        // Realized fixings for Jan 6..17 (2 full weeks), projected from Jan 20 onward.
+        let period_start = date(2025, 1, 6);
+        let period_end = date(2025, 2, 3);
+        let as_of = date(2025, 1, 20);
+
+        // Flat OIS forward at 5 % (overnight tenor ~ 1/365).
+        let fwd = ForwardCurve::builder(CurveId::new("SOFR"), 1.0 / 365.0)
+            .base_date(period_start)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.05), (1.0, 0.05)])
+            .build()
+            .expect("forward curve");
+
+        // Realized fixings at 4 % for every weekday in Jan 01..15.
+        // (Weekday-only grid: Jan 1 is Wednesday; we enumerate Jan 1–15 weekdays.)
+        let realized_dates: Vec<Date> = {
+            let mut ds = Vec::new();
+            let mut d = period_start;
+            while d < as_of {
+                let wd = d.weekday();
+                use time::Weekday;
+                if !matches!(wd, Weekday::Saturday | Weekday::Sunday) {
+                    ds.push(d);
+                }
+                d = d.next_day().expect("next day");
+            }
+            ds
+        };
+        let realized_obs: Vec<(Date, f64)> = realized_dates.iter().map(|&d| (d, 0.04)).collect();
+        let fixing_series = ScalarTimeSeries::new("FIXING:SOFR", realized_obs, None)
+            .expect("fixing series");
+
+        let disc = DiscountCurve::builder(CurveId::new("DISC"))
+            .base_date(as_of)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 1.0), (1.0, 1.0)])
+            .build()
+            .expect("discount curve");
+
+        let ctx = MarketContext::new()
+            .insert(disc)
+            .insert(fwd.clone())
+            .insert_series(fixing_series.clone());
+
+        // TRS with a single monthly period (period_start → period_end).
+        // Use StubKind::Short so ScheduleBuilder does not require an exact integer
+        // multiple of the tenor between start and end dates.
+        let schedule = TrsScheduleSpec::from_params(
+            period_start,
+            period_end,
+            ScheduleParams {
+                freq: Tenor::monthly(),
+                dc: DayCount::Act365F,
+                bdc: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::ShortBack,
+                end_of_month: false,
+                payment_lag_days: 0,
+            },
+        );
+
+        let financing = FinancingLegSpec {
+            discount_curve_id: CurveId::new("DISC"),
+            forward_curve_id: CurveId::new("SOFR"),
+            spread_bp: Decimal::ZERO,
+            day_count: DayCount::Act360,
+            compounding: FinancingRateCompounding::OvernightCompounded,
+        };
+
+        let notional = Money::new(1_000_000.0, Currency::USD);
+        let pv_spliced = TrsEngine::pv_financing_leg(
+            &financing,
+            &schedule,
+            notional,
+            &ctx,
+            as_of,
+        )
+        .expect("pv_spliced");
+
+        // Compute expected spliced compound independently:
+        // realized sub-period: weekdays in [Jan 6, Jan 17], each at 4 %
+        // projected sub-period: weekdays in [Jan 20, Feb 3), each at 5 %
+        let ctx_dc = DayCountContext::default();
+        use time::Weekday;
+        let mut cf = 1.0_f64;
+        let mut d = period_start;
+        while d < period_end {
+            let next_d = {
+                // Step one weekday forward (weekends_only calendar → skip Sat/Sun)
+                let mut nd = d.next_day().expect("next");
+                while matches!(nd.weekday(), Weekday::Saturday | Weekday::Sunday) {
+                    nd = nd.next_day().expect("next");
+                }
+                nd.min(period_end)
+            };
+            let dcf = DayCount::Act360
+                .year_fraction(d, next_d, ctx_dc)
+                .expect("dcf");
+            let r = if d < as_of { 0.04 } else { 0.05 };
+            cf *= 1.0 + r * dcf;
+            d = next_d;
+        }
+        let yf = DayCount::Act360
+            .year_fraction(period_start, period_end, ctx_dc)
+            .expect("yf");
+        let expected_rate = (cf - 1.0) / yf;
+        let expected_pv = 1_000_000.0 * expected_rate * yf; // df = 1
+
+        // Compute the all-projected value (the buggy result before the fix).
+        let ctx_no_fixings = MarketContext::new()
+            .insert(
+                DiscountCurve::builder(CurveId::new("DISC"))
+                    .base_date(as_of)
+                    .day_count(DayCount::Act360)
+                    .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .build()
+                    .expect("disc no_fixings"),
+            )
+            .insert(fwd);
+        let pv_all_projected = TrsEngine::pv_financing_leg(
+            &financing,
+            &schedule,
+            notional,
+            &ctx_no_fixings,
+            as_of,
+        );
+        // Before the fix, this would succeed (no fixings required) and give a
+        // different value; after the fix it must fail (fixings missing for an
+        // in-progress period) OR we simply verify that pv_spliced matches expected.
+
+        // The spliced PV must match the hand-computed expected value.
+        let diff = (pv_spliced.amount() - expected_pv).abs();
+        assert!(
+            diff < 1.0, // within $1 on $1M notional
+            "Spliced PV ({:.2}) must match expected ({:.2}); diff = {:.4}",
+            pv_spliced.amount(),
+            expected_pv,
+            diff
+        );
+
+        // The all-projected path (no fixings) must error after the fix, because
+        // a missing realized fixing for an in-progress OIS period is a hard error.
+        assert!(
+            pv_all_projected.is_err(),
+            "In-progress OIS financing period without fixings must error after the fix"
+        );
+
+        // The spliced result must differ materially from the all-projected-at-5%
+        // result (which would be CF_5pct - 1 normalized, i.e. biased high since
+        // the realized sub-period was actually at 4%).
+        let mut cf_all5 = 1.0_f64;
+        let mut d2 = period_start;
+        while d2 < period_end {
+            let next_d = {
+                let mut nd = d2.next_day().expect("next");
+                while matches!(nd.weekday(), Weekday::Saturday | Weekday::Sunday) {
+                    nd = nd.next_day().expect("next");
+                }
+                nd.min(period_end)
+            };
+            let dcf = DayCount::Act360
+                .year_fraction(d2, next_d, ctx_dc)
+                .expect("dcf");
+            cf_all5 *= 1.0 + 0.05 * dcf;
+            d2 = next_d;
+        }
+        let rate_all5 = (cf_all5 - 1.0) / yf;
+        let pv_all5 = 1_000_000.0 * rate_all5 * yf;
+        assert!(
+            (pv_spliced.amount() - pv_all5).abs() > 100.0,
+            "Spliced PV ({:.2}) must differ materially from all-5% projected ({:.2})",
+            pv_spliced.amount(),
+            pv_all5
         );
     }
 
