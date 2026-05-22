@@ -1,0 +1,12 @@
+{
+  "skill_name": "quality-gate-triage",
+  "evals": [
+    {
+      "id": 1,
+      "name": "precommit-clippy-unwrap",
+      "prompt": "mise pre-commit-run failed with a clippy unwrap_used error in finstack-py/src/bindings/valuations/attribution.rs. Diagnose it, fix the root cause, and run the smallest relevant verification.",
+      "expected_output": "A triage response that identifies the first real clippy error, fixes the binding error path without adding an allow, and verifies with targeted build/lint/test commands.",
+      "files": []
+    }
+  ]
+}

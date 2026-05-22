@@ -1,6 +1,6 @@
 ---
 name: finstack-simplify
-description: Use whenever the user asks to simplify, dedupe, audit, or refactor any part of the finstack Rust workspace (core, analytics, valuations, statements, statements-analytics, scenarios, portfolio, margin, correlation, monte_carlo) or its Python/WASM bindings. Trigger on phrases like "simplify the X module", "find duplicates in Y", "there's too much slop in Z", "clean up this crate", "audit complexity", "reduce API surface", "collapse pathways", "dedupe X", or "this feels over-engineered". Also trigger when the user mentions vibe-coded code, parallel APIs, wrapper bloat, registry drift, builder sprawl, or any sign of parallel pathways for the same capability. Runs a phased Audit → Plan → Refactor → Verify loop tailored to the finstack triplet (Rust canonical → PyO3 Python → wasm-bindgen WASM), respects determinism / Decimal / currency / serde-parity invariants, and enforces the project's `mise run lint-* && mise run test-* && rebuild bindings` cycle after every refactor slice.
+description: Simplifies, dedupes, audits, and refactors finstack Rust crates and Python/WASM bindings when the user mentions slop, wrapper bloat, parallel APIs, registry drift, builder sprawl, API-surface reduction, or over-engineering. Runs a phased Audit -> Plan -> Refactor -> Verify loop that preserves Rust-canonical behavior, binding parity, Decimal/currency/serde invariants, and project `mise run` verification.
 ---
 
 # finstack-simplify
@@ -13,7 +13,7 @@ A phased simplification workflow for the **finstack** workspace (Rust core + Pyt
 
 Trigger when the user is asking to simplify, audit, refactor, or dedupe *any* part of finstack. Even weak signals count: "this feels over-engineered", "why are there two ways to build a curve", "the checks module is a mess", "find dead code in margin". If the user is clearly working on something finstack-adjacent (Rust workspace, PyO3 bindings, wasm-bindgen bindings, parity, builders, registries), default to using this skill over a generic simplify skill.
 
-**Do NOT use** for: generic non-finstack code, pure bug hunting with no simplicity angle (use `bug_hunting`), performance tuning without a simplicity angle (use `performance-reviewer`), or new feature work.
+**Do NOT use** for: generic non-finstack code, pure bug hunting with no simplicity angle (use `quality-gate-triage`), performance tuning without a simplicity angle (use `performance-reviewer`), or new feature work.
 
 ## The core loop
 
@@ -74,7 +74,7 @@ Run the **full finstack verify stack** for the affected layers. These commands a
 - Python touched: `mise run python-lint && mise run python-test` (and `mise run python-build` if you changed Rust code that PyO3 binds — debug builds are too slow for portfolio valuation; AGENTS.md mandates release profile)
 - Parity impact: re-run `finstack-py/tests/parity` and check `parity_contract.toml` is still green.
 
-**Never run `cargo test` directly** — project rule: no doc tests in the loop.
+Prefer the repo `mise run` tasks from `AGENTS.md` for verification. Use focused checks while iterating and broader `mise run all-*` gates only when the slice is broad enough to justify them.
 
 All output must be **100% green** before moving to the next slice. Paste the actual command output in your response so the user can verify; never claim green without showing it.
 
@@ -106,6 +106,8 @@ After Verify passes, offer the user three options: (a) continue to the next slic
 - `examples/audit-report.md` — the Phase 1 deliverable format.
 - `examples/consolidation-plan.md` — the Phase 2 deliverable format.
 - `examples/refactor-diff.md` — the per-slice Phase 3 deliverable format.
+- `outputs/completed-audit-report.md` — sample completed audit output.
+- `evals/evals.json` — realistic prompts for trigger and workflow checks.
 
 **Do not invent alternate formats.** The user reviews many of these; consistent shape matters more than creative presentation.
 
@@ -121,6 +123,6 @@ After Verify passes, offer the user three options: (a) continue to the next slic
 
 - Not a code generator. Outputs are audits, plans, and targeted diffs.
 - Not a performance optimizer — use `performance-reviewer` for that.
-- Not a bug finder — use `bug_hunting` for that.
-- Not a generic simplifier — use `simplicity-auditor` or `code-simplifier` for non-finstack code.
+- Not a bug finder — use `quality-gate-triage` for that.
+- Not a generic simplifier — use `refactor` for behavior-preserving implementation or `senior-code-review` for broad fallback review.
 - Not a rewrite-the-world tool. If the answer is "rewrite this crate from scratch", this skill has failed; surface that as a finding and stop.

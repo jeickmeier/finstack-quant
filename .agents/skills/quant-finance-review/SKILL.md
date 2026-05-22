@@ -58,6 +58,12 @@ Use when the user points at a file, pricer, risk routine, or asset class. Go dee
 ### Library assessment
 Use when the user asks for a broader audit or gap analysis. Check coverage, extensibility, defaults, and whether the library is credible against QuantLib, Bloomberg, or standard desk expectations.
 
+### Numerical regression review
+Use when the user asks about golden tests, tolerance drift, solver stability, finite-difference Greeks, calibration reproducibility, NaN/inf handling, or benchmark/reference price comparisons. Open `references/numerical-regression.md` and report the exact regression surface and tolerance policy.
+
+### Market convention review
+Use when the user asks about day counts, calendars, settlement lags, fixing publication, curve roles, shock units, clean/dirty price, FX policy, or credit curve conventions. Open the relevant `market-standards/` file and `references/finstack-module-index.md`.
+
 ## Workflow
 
 1. **Scope the instrument and asset class**
@@ -125,6 +131,8 @@ Use the lighter files first; open the deeper references only when needed.
 
 ### Quant references
 - `references/production-audit-playbook.md`
+- `references/finstack-module-index.md`
+- `references/numerical-regression.md`
 - `references/numerical-methods.md`
 - `references/pricing-models.md`
 - `references/risk-models.md`

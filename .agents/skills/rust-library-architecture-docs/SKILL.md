@@ -187,3 +187,7 @@ When reporting back:
 - Call out any areas that remain inferred, unchecked, or intentionally omitted.
 
 The docs are the deliverable. Keep the summary short.
+
+## Resources
+
+- `outputs/crate-architecture-doc.md` - example source-backed architecture document.

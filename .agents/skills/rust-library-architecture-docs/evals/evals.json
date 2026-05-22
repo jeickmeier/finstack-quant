@@ -1,0 +1,12 @@
+{
+  "skill_name": "rust-library-architecture-docs",
+  "evals": [
+    {
+      "id": 1,
+      "name": "document-valuations-attribution",
+      "prompt": "Create source-backed architecture docs for the valuations attribution module, including public API boundaries, binding exposure, evidence log, and verification guidance.",
+      "expected_output": "A concise architecture doc that separates current behavior from recommendations and cites source/tests/bindings checked.",
+      "files": []
+    }
+  ]
+}

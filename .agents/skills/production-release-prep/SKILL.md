@@ -1,6 +1,6 @@
 ---
 name: production-release-prep
-description: Prepares codebase for production release by removing dead code, eliminating deprecated APIs, auditing documentation completeness, and verifying release hygiene across all components (Rust, Python, WASM, UI). Use when the user asks to "prepare for release", "clean up for production", "remove dead code", "remove deprecated code", "audit release readiness", or before tagging a new version.
+description: Prepares finstack for production release by orchestrating deprecated API removal, documentation readiness, semver review, dependency/security audits, performance regression checks, version metadata, release notes, and final quality gates. Use for release readiness, tagging, or publish-prep work; use quality-gate-triage or finstack-simplify for narrow failure or cleanup tasks.
 ---
 
 # Production Release Preparation
@@ -130,9 +130,9 @@ rg '_v2|_v3|_old|_legacy|_compat|allow\(deprecated\)' --type rust -g '!target/'
 
 ### 3a. Public API documentation
 
-Run the existing documentation reviewer for detailed coverage:
+Run the documentation maintainer for detailed coverage:
 
-> For detailed API doc standards, see the [documentation-reviewer skill](../documentation-reviewer/SKILL.md).
+> For detailed API doc standards, see the [documentation-maintainer skill](../documentation-maintainer/SKILL.md).
 
 Quick automated check:
 
@@ -160,9 +160,7 @@ Verify these files are current and accurate:
 All examples must compile and produce correct output:
 
 ```bash
-# Rust examples
-./scripts/run-examples.sh
-# Python examples
+# Python notebook examples
 uv run python finstack-py/examples/notebooks/run_all_notebooks.py
 # Check for examples referencing deprecated/removed APIs
 rg -l 'deprecated_function_name' finstack/examples/ finstack-py/examples/
@@ -296,14 +294,17 @@ cargo publish -p finstack-core --dry-run
 ### 6f. Binary size check
 
 ```bash
-cargo bloat --release --crates -p finstack-py```
+cargo bloat --release --crates -p finstack-py
+```
 
 Review for unexpected size regressions from the previous release.
 
 ### 6g. API parity
 
 ```bash
-uv run python scripts/audits/compare_apis.py```
+mise run python-build
+mise run wasm-build
+```
 
 Verify Python and WASM bindings expose all intended public APIs.
 
@@ -411,6 +412,7 @@ After completing the audit, produce a release readiness report:
 
 ## Additional resources
 
-- Dead code and simplification: see [simplicity-auditor](../simplicity-auditor/SKILL.md)
-- API documentation standards: see [documentation-reviewer](../documentation-reviewer/SKILL.md)
+- Dead code and simplification: see [finstack-simplify](../finstack-simplify/SKILL.md)
+- API documentation standards: see [documentation-maintainer](../documentation-maintainer/SKILL.md)
 - Naming and pattern consistency: see [consistency-reviewer](../consistency-reviewer/SKILL.md)
+- Release checklist: see [release-checklist-rfin.md](references/release-checklist-rfin.md)

@@ -1,6 +1,6 @@
 ---
 name: consistency-reviewer
-description: Reviews code for cross-module consistency including naming conventions, pattern drift, missed Rust std-lib opportunities, duplicate functionality, and convention violations. Use when auditing for consistency, reviewing naming conventions, checking for pattern drift, finding duplicated logic, or when the user asks to "make consistent", "unify patterns", "check conventions", or "find inconsistencies".
+description: Reviews finstack code for cross-module consistency: naming conventions, pattern drift, Rust/Python/WASM naming triplets, builder/error/module conventions, and convention inventory updates. Use when the user asks to make patterns consistent, unify naming, check conventions, or find pattern drift. Prefer finstack-simplify for dedupe/API-surface consolidation and refactor for implementation changes.
 ---
 
 # Consistency Reviewer
@@ -130,7 +130,7 @@ Work through each category. For every check, compare **at least 3 instances** ac
 
 - [ ] All `pub` items have doc comments (or none do within a module -- pick one)
 - [ ] Doc comment style: `///` vs `//!` used consistently
-- [ ] Examples in docs: consistent format (`# Examples` section with ```` ```rust ```` blocks)
+- [ ] Examples in docs: consistent format (`# Examples` section with fenced Rust code blocks)
 - [ ] Module-level docs: consistent presence and format across similar modules
 - [ ] Math notation: consistent use of LaTeX/Unicode across doc comments
 

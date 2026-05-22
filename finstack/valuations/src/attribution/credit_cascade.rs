@@ -32,11 +32,12 @@ use finstack_core::factor_model::matching::{
     bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
 };
 use finstack_core::market_data::context::MarketContext;
-use finstack_core::market_data::diff::{measure_hazard_curve_shift, TenorSamplingMethod};
+use finstack_core::market_data::diff::{measure_par_spread_shift, TenorSamplingMethod};
 use finstack_core::market_data::scalars::MarketScalar;
 use finstack_core::types::{CurveId, IssuerId};
 use finstack_core::Result;
 
+use crate::calibration::bumps::hazard::bump_hazard_spreads;
 use crate::calibration::bumps::{bump_hazard_shift, BumpRequest};
 use crate::factor_model::{decompose_levels, decompose_period};
 use crate::instruments::common_impl::traits::Instrument;
@@ -93,6 +94,11 @@ pub(crate) struct CreditCascade {
     pub issuer_id: IssuerId,
     /// Hazard curve ids the instrument depends on.
     pub hazard_curve_ids: Vec<CurveId>,
+    /// Discount curve id used to re-bootstrap the hazard curves when applying a
+    /// par-spread cascade step (`shift_credit_curves_par_spread`). `None` when
+    /// the instrument declares no discount curve — the par-spread bump then
+    /// degrades to a direct hazard-rate shift.
+    pub discount_curve_id: Option<CurveId>,
     /// Ordered cascade steps: generic, then one per hierarchy level, then adder.
     pub steps: Vec<CreditCascadeStep>,
     /// Level names (one per hierarchy dimension), used to build
@@ -145,21 +151,28 @@ pub(crate) fn plan_credit_cascade(
     };
     let tags = issuer_row.tags.clone();
 
-    // Resolve hazard curves from the instrument's market dependencies.
+    // Resolve hazard + discount curves from the instrument's market dependencies.
     let market_deps = instrument.market_dependencies()?;
     let credit_curves: Vec<CurveId> = market_deps.curve_dependencies().credit_curves.to_vec();
     if credit_curves.is_empty() {
         return Ok(None);
     }
+    let discount_curve_id: Option<CurveId> = market_deps
+        .curve_dependencies()
+        .discount_curves
+        .first()
+        .cloned();
 
-    // Measure the average ΔS_i across the issuer's hazard curves (in bp). The
-    // cascade is internally hazard-consistent: this `measure_hazard_curve_shift`
-    // pairs with `shift_hazard_curves`, which the cascade reprice path and the
-    // credit-detail CS01 both apply — so step `delta_bp` and CS01 share units.
+    // Measure the average **par CDS spread** ΔS_i across the issuer's hazard
+    // curves (in bp). The cascade is par-spread-consistent: this
+    // `measure_par_spread_shift` pairs with `shift_credit_curves_par_spread`,
+    // which the cascade reprice path and the credit-detail CS01 both apply — so
+    // step `delta_bp` and CS01 share units (par CDS spread bp) and reconcile to
+    // the par-spread `credit_curves_pnl`.
     let mut total_shift_bp = 0.0;
     let mut count = 0usize;
     for curve_id in &credit_curves {
-        if let Ok(shift) = measure_hazard_curve_shift(
+        if let Ok(shift) = measure_par_spread_shift(
             curve_id.as_str(),
             market_t0,
             market_t1,
@@ -250,6 +263,7 @@ pub(crate) fn plan_credit_cascade(
         return Ok(Some(CreditCascade {
             issuer_id,
             hazard_curve_ids: credit_curves,
+            discount_curve_id,
             steps,
             level_names,
         }));
@@ -325,6 +339,7 @@ pub(crate) fn plan_credit_cascade(
     Ok(Some(CreditCascade {
         issuer_id,
         hazard_curve_ids: credit_curves,
+        discount_curve_id,
         steps,
         level_names,
     }))
@@ -347,26 +362,44 @@ fn factor_move_bp(
     Some(t1 - t0)
 }
 
-/// Apply an additive parallel bp-shift to every hazard curve in `curve_ids`
-/// from `base_market`, returning a new MarketContext with the shifted curves.
-/// Non-hazard families on `base_market` are preserved.
-pub(crate) fn shift_hazard_curves(
+/// Apply a parallel **par CDS spread** shift (in bp) to every hazard curve in
+/// `curve_ids` from `base_market`, returning a new MarketContext with the
+/// shifted curves.
+///
+/// A curve carrying par CDS spread points is re-bootstrapped from those points
+/// shifted by `delta_bp` (the canonical par-spread methodology, matching the
+/// `Cs01` / `BucketedCs01` metrics). A curve with no par points — or when no
+/// discount curve is available to re-bootstrap against — falls back to a direct
+/// hazard-rate shift, exactly the fallback the canonical `Cs01` metric itself
+/// uses. Non-hazard families on `base_market` are preserved.
+///
+/// Used by the credit-factor cascade so the per-issuer step `delta_bp`, the
+/// credit-detail CS01, and `credit_curves_pnl` are all expressed in the same
+/// par CDS spread basis.
+pub(crate) fn shift_credit_curves_par_spread(
     base_market: &MarketContext,
     curve_ids: &[CurveId],
+    discount_id: Option<&CurveId>,
     delta_bp: f64,
 ) -> Result<MarketContext> {
-    // For each curve, take its current state from base_market, bump in-place,
-    // and re-insert into a clone of base_market.
     let mut new_market = base_market.clone();
     if delta_bp == 0.0 {
         return Ok(new_market);
     }
+    let req = BumpRequest::Parallel(delta_bp);
     for curve_id in curve_ids {
         let cur = match base_market.get_hazard(curve_id.as_str()) {
             Ok(c) => c,
             Err(_) => continue,
         };
-        let bumped = bump_hazard_shift(cur.as_ref(), &BumpRequest::Parallel(delta_bp))?;
+        let bumped = if discount_id.is_some() && cur.par_spread_points().next().is_some() {
+            match bump_hazard_spreads(cur.as_ref(), base_market, &req, discount_id) {
+                Ok(c) => c,
+                Err(_) => bump_hazard_shift(cur.as_ref(), &req)?,
+            }
+        } else {
+            bump_hazard_shift(cur.as_ref(), &req)?
+        };
         new_market = new_market.insert(bumped);
     }
     Ok(new_market)

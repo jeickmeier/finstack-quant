@@ -79,7 +79,7 @@ mise run rust-lint
 mise run rust-test
 ```
 
-**Never run `cargo test` directly.** Project rule from `.cursor/rules/project-rules.md`: no Rust doc tests in the loop.
+Prefer the repo's `mise run` tasks from `AGENTS.md`. Use focused checks while iterating, then broader lint/test gates when the refactor slice crosses crate or binding boundaries.
 
 ### If the slice touches Rust that is bound to Python
 

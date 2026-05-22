@@ -157,3 +157,8 @@ These are review shortcuts. Replace them with source, caller, and test evidence.
 - Rejecting all abstractions instead of checking whether they protect real boundaries.
 - Ignoring examples and tests even though they reveal intended public usage.
 - Treating branch-local compatibility as sacred. Preserve shipped interfaces, persisted data, and documented public APIs; simplify unshipped work directly.
+
+## Resources
+
+- `references/finstack-workspace-map.md` - crate roles, dependency direction, binding surfaces, and common architecture risks.
+- `outputs/architecture-review.md` - example architecture review output.

@@ -1,15 +1,13 @@
 ---
 name: senior-code-review
 description: >
-  Senior hedge fund code review and deep audit expertise focused on performance,
-  simplicity, and rejecting over-engineering. Two modes: Code Review for targeted
-  file/PR reviews, and Deep Audit for thorough module-level production readiness
-  assessment with phased analysis and graded output. Use when the user asks to
-  "review code", "check this implementation", "is this over-engineered", "simplify
-  this code", "review for performance", "audit this module", "deep audit", "check
-  code quality", or needs guidance on writing production code that is lean, fast,
-  and maintainable for a hedge fund.
-version: 0.1.0
+  General senior hedge-fund code review fallback focused on correctness,
+  simplicity, production readiness, and avoiding over-engineering. Use when the
+  user asks for a broad review and no narrower finstack specialist applies.
+  Prefer quant-finance-review for pricing/risk/numerics, performance-reviewer
+  for benchmark or hot-path work, rust-architecture-review for crate structure,
+  binding-parity-reviewer for Python/WASM parity, and finstack-simplify for
+  dedupe or API-surface consolidation.
 ---
 
 # Senior Hedge Fund Code Reviewer
@@ -88,7 +86,7 @@ Ask: *"Has anyone actually profiled this, or are we optimizing by superstition?"
 
 ## Modes
 
-This skill operates in two modes based on scope: **Code Review** for targeted reviews of specific files or changes, and **Deep Audit** for thorough module-level production readiness assessment.
+This skill operates in two modes based on scope: **Code Review** for targeted reviews of specific files or changes, and **Deep Audit** for thorough module-level production readiness assessment. If the task is clearly quant, binding, architecture, performance, documentation, release, or quality-gate triage, use that specialist skill instead.
 
 ---
 

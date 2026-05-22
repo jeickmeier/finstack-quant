@@ -1,7 +1,8 @@
 //! Credit-factor attribution detail and carry decomposition helpers.
 
 use super::credit_cascade::{
-    build_credit_factor_attribution, plan_credit_cascade, shift_hazard_curves, CreditStepKind,
+    build_credit_factor_attribution, plan_credit_cascade, shift_credit_curves_par_spread,
+    CreditStepKind,
 };
 use super::credit_factor::CreditFactorModelRef;
 use super::spec::AttributionSpec;
@@ -80,21 +81,34 @@ impl AttributionSpec {
             return Ok(None);
         };
 
-        // 5. Real aggregate CS01: bump every hazard curve the instrument depends
-        //    on with the *same* `shift_hazard_curves` bump the cascade applies
-        //    to its steps, central-differenced. Measuring CS01 with the
-        //    identical bump guarantees `cs01_amt` and the cascade's per-step
-        //    `delta_bp` share units exactly, so `−cs01_amt × delta_bp` is
-        //    consistent. This real CS01 replaces the former synthetic
-        //    `−credit_pnl / ds_i` back-solve, whose divide-by-near-zero forced
-        //    the twist workaround (`parallel_fraction_floor`).
+        // 5. Real aggregate **par-spread** CS01: bump every hazard curve the
+        //    instrument depends on with the *same* `shift_credit_curves_par_spread`
+        //    bump the cascade applies to its steps, central-differenced.
+        //    Measuring CS01 with the identical par-spread bump guarantees
+        //    `cs01_amt` and the cascade's per-step `delta_bp` share units exactly
+        //    (par CDS spread bp), so `cs01_amt × delta_bp` is consistent and the
+        //    decomposition reconciles to the par-spread `credit_curves_pnl`.
+        //    This real CS01 replaces the former synthetic `−credit_pnl / ds_i`
+        //    back-solve, whose divide-by-near-zero forced the twist workaround
+        //    (`parallel_fraction_floor`).
         let cs01_bump_bp = 1.0_f64;
+        let disc = cascade.discount_curve_id.as_ref();
         let pv_up = instrument.value(
-            &shift_hazard_curves(market_t0, &cascade.hazard_curve_ids, cs01_bump_bp)?,
+            &shift_credit_curves_par_spread(
+                market_t0,
+                &cascade.hazard_curve_ids,
+                disc,
+                cs01_bump_bp,
+            )?,
             self.as_of_t0,
         )?;
         let pv_down = instrument.value(
-            &shift_hazard_curves(market_t0, &cascade.hazard_curve_ids, -cs01_bump_bp)?,
+            &shift_credit_curves_par_spread(
+                market_t0,
+                &cascade.hazard_curve_ids,
+                disc,
+                -cs01_bump_bp,
+            )?,
             self.as_of_t0,
         )?;
         let cs01_amt = (pv_up.amount() - pv_down.amount()) / (2.0 * cs01_bump_bp);

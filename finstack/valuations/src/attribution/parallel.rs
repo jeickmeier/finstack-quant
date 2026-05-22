@@ -23,7 +23,7 @@
 //! - Model parameters attribution requires instrument-specific support (see model_params.rs)
 
 use super::credit_cascade::{
-    build_credit_factor_attribution, plan_credit_cascade, shift_hazard_curves,
+    build_credit_factor_attribution, plan_credit_cascade, shift_credit_curves_par_spread,
 };
 use super::credit_factor::CreditFactorDetailOptions;
 use super::factors::*;
@@ -1084,9 +1084,10 @@ pub fn attribute_pnl_parallel_with_credit_model(
                             // below as the closing residual.
                             return Ok(Money::new(0.0, val_t1.currency()));
                         }
-                        let market_step = shift_hazard_curves(
+                        let market_step = shift_credit_curves_par_spread(
                             &market_t0_credit,
                             &cascade.hazard_curve_ids,
+                            cascade.discount_curve_id.as_ref(),
                             step.delta_bp,
                         )?;
                         let reprice = reprice_instrument(instrument, &market_step, as_of_t1)?;

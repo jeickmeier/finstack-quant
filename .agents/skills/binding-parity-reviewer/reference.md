@@ -7,18 +7,17 @@ finstack-py/
 ├── src/                    # Rust binding code (PyO3)
 │   ├── lib.rs             # Main entry, module registration
 │   ├── errors.rs          # Exception hierarchy, error mapping
-│   ├── core/              # Core domain bindings
-│   │   ├── common/
-│   │   │   ├── args.rs    # Flexible type extraction
-│   │   │   └── labels.rs  # Label normalization
+│   ├── bindings/          # Rust binding modules
+│   │   ├── common/        # Shared argument extraction helpers
+│   │   ├── core/          # Core domain bindings
 │   │   ├── currency.rs
 │   │   ├── money.rs
 │   │   ├── dates/
 │   │   └── market_data/
-│   ├── valuations/        # Instrument bindings
-│   ├── statements/        # Statement evaluation
-│   ├── scenarios/         # Scenario engine
-│   └── portfolio/         # Portfolio management
+│   │   ├── valuations/    # Instrument bindings
+│   │   ├── statements/    # Statement evaluation
+│   │   ├── scenarios/     # Scenario engine
+│   │   └── portfolio/     # Portfolio management
 └── finstack/              # Python package
     ├── __init__.py        # Package initialization
     ├── *.pyi              # Type stubs (auto-generated)

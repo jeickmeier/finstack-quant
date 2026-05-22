@@ -1,6 +1,6 @@
 ---
 name: refactor
-description: Improve existing code structure without changing externally observable behavior. Use when Codex needs to refactor, clean up, simplify, reduce complexity, extract helpers or modules, rename symbols, reduce duplication, tighten types or invariants, split large functions or files, or make existing code easier and safer to extend without rewriting from scratch.
+description: Improves existing code structure without changing externally observable behavior. Use for behavior-preserving implementation refactors after scope is clear: extracting helpers/modules, renaming symbols, tightening types, splitting large files, or removing understood dead paths. Prefer finstack-simplify for finstack-wide dedupe/API-surface audits, binding-parity-reviewer for cross-language API drift, and documentation-maintainer for doc-only work.
 ---
 
 # Refactor
@@ -66,7 +66,7 @@ Do not load every reference by default. Open only the file that matches the curr
 - Primitive obsession: introduce a domain type only when it clarifies meaning or enforces an invariant used in multiple places.
 - Nested branching: prefer guard clauses, focused validation helpers, or a simple dispatch table; do not reach for polymorphism by default.
 - Indirection overload: inline wrappers that add no policy, safety, or reuse value.
-- Dead code: remove it once live callers are understood; use `dead-code-removal` instead of broad manual sweeps.
+- Dead code: remove it once live callers are understood; use `quality-gate-triage` for failure-driven cleanup or `production-release-prep` for release-wide dead-code sweeps.
 - API surface bloat: converge on one obvious path and remove wrappers when the user scope allows it.
 
 ## Pattern selection rules
@@ -100,10 +100,10 @@ Do not load every reference by default. Open only the file that matches the curr
 
 ## Coordinate with adjacent skills when needed
 
-- Use `simplicity-auditor` when the primary goal is converging multiple pathways into one obvious path.
+- Use `finstack-simplify` when the primary goal is converging multiple finstack pathways into one obvious path.
 - Use `consistency-reviewer` when the main problem is cross-module naming or pattern drift.
-- Use `dead-code-removal` when the task is broad unused-code cleanup.
-- Use `documentation-reviewer` when the refactor changes public APIs, docs, or stub surfaces significantly.
+- Use `quality-gate-triage` when the task is driven by a failing lint/test/pre-commit/CI output.
+- Use `documentation-maintainer` when the refactor changes public APIs, docs, examples, or stub surfaces significantly.
 
 ## Output expectations
 

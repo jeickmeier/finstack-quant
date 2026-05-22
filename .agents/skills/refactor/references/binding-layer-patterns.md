@@ -74,7 +74,7 @@ A refactor may be internal in Rust but still require export updates if names or 
 ## Binding-specific examples from this repo
 
 - `finstack-py/src/lib.rs` registers core and package-level exports through explicit `register()` calls and `__all__` lists.
-- `finstack-py/src/core/currency.rs` shows the thin wrapper pattern, local extraction helper, and module registration flow.
+- `finstack-py/src/bindings/core/currency.rs` shows the thin wrapper pattern, local extraction helper, and module registration flow.
 - `finstack-py/finstack/valuations/__init__.py` shows the Python-side re-export surface that can drift if a Rust module layout changes.
 
 ## Common mistakes during refactor

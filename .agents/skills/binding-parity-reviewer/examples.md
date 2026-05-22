@@ -302,7 +302,7 @@ impl Curve {
     }
 }
 
-// In finstack-py/src/core/market_data/curve.rs
+// In finstack-py/src/bindings/core/market_data/curve.rs
 #[pymethods]
 impl PyCurve {
     fn rate_at(&self, tenor: f64) -> PyResult<f64> {

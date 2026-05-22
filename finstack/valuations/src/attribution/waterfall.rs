@@ -33,8 +33,8 @@
 //! - Recommended for risk reporting where sum must equal total
 
 use super::credit_cascade::{
-    build_credit_factor_attribution, plan_credit_cascade, shift_hazard_curves, snap_hazard_to_t1,
-    CreditCascade, CreditStepKind,
+    build_credit_factor_attribution, plan_credit_cascade, shift_credit_curves_par_spread,
+    snap_hazard_to_t1, CreditCascade, CreditStepKind,
 };
 use super::credit_factor::CreditFactorDetailOptions;
 use super::factors::*;
@@ -423,6 +423,17 @@ impl<'a> WaterfallContext<'a> {
         let base_currency = self.current_val.currency();
         let mut total = Money::new(0.0, base_currency);
 
+        // Credit base: the running market *before* the credit cascade — its
+        // credit curves are still T0. Par-spread re-bootstrap bumps do not
+        // compose cleanly under chaining, so each parallel step's market is
+        // built as a SINGLE par-spread bump of the cumulative bp from this
+        // fixed base (not chained off the previous step's re-bootstrapped
+        // curve). The marginal step P&L `val(cumᵏ) − val(cumᵏ⁻¹)` still
+        // telescopes to `val(T1 credit) − val(T0 credit) ≡ credit_curves_pnl`.
+        let credit_base = self.current_market.clone();
+        let discount_id = cascade.discount_curve_id.as_ref();
+        let mut cumulative_bp = 0.0_f64;
+
         for (idx, step) in cascade.steps.iter().enumerate() {
             let prev_val = self.current_val;
             let new_market = match step.kind {
@@ -432,18 +443,17 @@ impl<'a> WaterfallContext<'a> {
                     // (steepening / twist) residual remains, and makes the
                     // cascade end-state match the legacy single Credit step
                     // exactly so `Σ steps ≡ credit_curves_pnl` still holds.
-                    snap_hazard_to_t1(
-                        &self.current_market,
-                        self.market_t1,
-                        &cascade.hazard_curve_ids,
-                    )
+                    snap_hazard_to_t1(&credit_base, self.market_t1, &cascade.hazard_curve_ids)
                 }
-                // Generic / Level(k) / Adder all apply a *parallel* bp bump.
+                // Generic / Level(k) / Adder all apply a *parallel* par-spread
+                // bp bump; accumulate and re-bootstrap once from the fixed base.
                 CreditStepKind::Generic | CreditStepKind::Level(_) | CreditStepKind::Adder => {
-                    shift_hazard_curves(
-                        &self.current_market,
+                    cumulative_bp += step.delta_bp;
+                    shift_credit_curves_par_spread(
+                        &credit_base,
                         &cascade.hazard_curve_ids,
-                        step.delta_bp,
+                        discount_id,
+                        cumulative_bp,
                     )?
                 }
             };
