@@ -21,17 +21,18 @@ pub fn register_fx_pricers(registry: &mut PricerRegistry) {
     );
 
     // FX Option
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::FxOption,
-        ModelKey::Black76,
-        crate::instruments::fx::fx_option::pricer::SimpleFxOptionBlackPricer,
+        crate::instruments::FxOption,
+        ModelKey::Black76
     );
 
     // FX Variance Swap
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::FxVarianceSwap,
-        ModelKey::Discounting,
-        crate::instruments::fx::fx_variance_swap::pricer::SimpleFxVarianceSwapDiscountingPricer,
+        crate::instruments::FxVarianceSwap
     );
 
     // FX Forward - uses GenericInstrumentPricer (curve dependencies)
@@ -61,16 +62,18 @@ pub fn register_fx_pricers(registry: &mut PricerRegistry) {
     // cannot be parameterized per trade.
 
     // FX Digital Option
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::FxDigitalOption,
-        ModelKey::Black76,
-        crate::instruments::fx::fx_digital_option::SimpleFxDigitalOptionPricer,
+        crate::instruments::FxDigitalOption,
+        ModelKey::Black76
     );
 
     // FX Touch Option
-    registry.register(
+    register_generic!(
+        registry,
         InstrumentType::FxTouchOption,
-        ModelKey::Black76,
-        crate::instruments::fx::fx_touch_option::SimpleFxTouchOptionPricer,
+        crate::instruments::FxTouchOption,
+        ModelKey::Black76
     );
 }

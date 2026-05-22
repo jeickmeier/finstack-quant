@@ -2,17 +2,12 @@
 
 use crate::instruments::common_impl::models::{bs_greeks, bs_price};
 use crate::instruments::common_impl::parameters::OptionType;
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::fx_option::FxOption;
 use crate::instruments::fx::shared::{
     collect_fx_option_inputs as collect_shared_fx_option_inputs,
     collect_fx_option_inputs_no_vol as collect_shared_fx_option_inputs_no_vol,
     FxOptionInputRequest, FxSpotSource,
 };
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
-use crate::results::ValuationResult;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
@@ -321,41 +316,10 @@ fn price_gk_core(
     bs_price(spot, strike, r_d, r_f, sigma, t, option_type)
 }
 
-/// Registry-facing pricer for vanilla FX options. Always dispatches at
-/// [`ModelKey::Black76`] (Garman-Kohlhagen).
-#[derive(Default)]
-pub struct SimpleFxOptionBlackPricer;
-
-impl Pricer for SimpleFxOptionBlackPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::FxOption, ModelKey::Black76)
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: finstack_core::dates::Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let fx_option = instrument
-            .as_any()
-            .downcast_ref::<FxOption>()
-            .ok_or_else(|| {
-                PricingError::type_mismatch(InstrumentType::FxOption, instrument.key())
-            })?;
-
-        let pv = compute_pv(fx_option, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-
-        Ok(ValuationResult::stamped(fx_option.id(), as_of, pv))
-    }
-}
-
 #[cfg(test)]
 mod delegation_tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Attributes;
+    use crate::instruments::common_impl::traits::{Attributes, Instrument};
     use crate::instruments::{ExerciseStyle, PricingOverrides, SettlementType};
     use finstack_core::currency::Currency;
     use finstack_core::dates::{Date, DayCount};

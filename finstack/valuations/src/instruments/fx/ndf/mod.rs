@@ -91,11 +91,8 @@
 //! - [`crate::instruments::fx::fx_forward::FxForward`] for deliverable forwards
 //! - [`crate::instruments::fx::fx_swap::FxSwap`] for FX swap instruments
 
-/// Pricer for NDF instruments.
-pub(crate) mod pricer;
 mod types;
 
-pub use pricer::NdfDiscountingPricer;
 pub use types::{Ndf, NdfFixingSource, NdfQuoteConvention};
 
 /// Metrics submodule for NDF risk measures.

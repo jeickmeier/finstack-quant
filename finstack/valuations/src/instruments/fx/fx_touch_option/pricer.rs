@@ -1,14 +1,9 @@
 //! FX touch option pricer implementation.
 
 use crate::instruments::common_impl::helpers::zero_rate_from_df;
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::fx_touch_option::types::{
     BarrierDirection, FxTouchOption, PayoutTiming, TouchType,
 };
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
-use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::fx::FxQuery;
@@ -221,41 +216,10 @@ fn price_touch(
     })
 }
 
-/// FX touch option pricer using Rubinstein-Reiner closed-form.
-/// Always dispatches at [`ModelKey::Black76`].
-#[derive(Default)]
-pub struct SimpleFxTouchOptionPricer;
-
-impl Pricer for SimpleFxTouchOptionPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::FxTouchOption, ModelKey::Black76)
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: finstack_core::dates::Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let fx_touch = instrument
-            .as_any()
-            .downcast_ref::<FxTouchOption>()
-            .ok_or_else(|| {
-                PricingError::type_mismatch(InstrumentType::FxTouchOption, instrument.key())
-            })?;
-
-        let pv = compute_pv(fx_touch, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-
-        Ok(ValuationResult::stamped(fx_touch.id(), as_of, pv))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Attributes;
+    use crate::instruments::common_impl::traits::{Attributes, Instrument};
     use crate::instruments::PricingOverrides;
     use finstack_core::currency::Currency;
     use finstack_core::dates::{Date, DayCount};

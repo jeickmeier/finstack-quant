@@ -2,15 +2,10 @@
 
 use crate::instruments::common_impl::models::volatility::black::d1_d2;
 use crate::instruments::common_impl::parameters::OptionType;
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::fx_digital_option::types::{DigitalPayoutType, FxDigitalOption};
 use crate::instruments::fx::shared::{
     collect_fx_option_inputs, FxOptionInputRequest, FxSpotSource,
 };
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
-use crate::results::ValuationResult;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
@@ -435,41 +430,10 @@ fn greeks_digital(
     }
 }
 
-/// FX digital option pricer using Garman-Kohlhagen adapted closed-form.
-/// Always dispatches at [`ModelKey::Black76`].
-#[derive(Default)]
-pub struct SimpleFxDigitalOptionPricer;
-
-impl Pricer for SimpleFxDigitalOptionPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::FxDigitalOption, ModelKey::Black76)
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: finstack_core::dates::Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let fx_digital = instrument
-            .as_any()
-            .downcast_ref::<FxDigitalOption>()
-            .ok_or_else(|| {
-                PricingError::type_mismatch(InstrumentType::FxDigitalOption, instrument.key())
-            })?;
-
-        let pv = compute_pv(fx_digital, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-
-        Ok(ValuationResult::stamped(fx_digital.id(), as_of, pv))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Attributes;
+    use crate::instruments::common_impl::traits::{Attributes, Instrument};
     use crate::instruments::{OptionType, PricingOverrides};
     use finstack_core::currency::Currency;
     use finstack_core::dates::{Date, DayCount};

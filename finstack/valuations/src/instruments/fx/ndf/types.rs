@@ -864,6 +864,17 @@ impl crate::instruments::common_impl::traits::Instrument for Ndf {
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<finstack_core::money::Money> {
+        // Reject economically impossible NDFs where the fixing date falls after
+        // maturity. `Ndf::validate` enforces this at construction, but a direct
+        // field assignment can bypass it; guarding here ensures the value path
+        // never silently prices a malformed contract.
+        if self.fixing_date > self.maturity {
+            return Err(finstack_core::Error::Validation(format!(
+                "NDF {} fixing_date ({}) must be on or before maturity ({})",
+                self.id, self.fixing_date, self.maturity
+            )));
+        }
+
         Self::validate_rate("contract_rate", self.contract_rate)?;
         if let Some(rate) = self.fixing_rate {
             Self::validate_rate("fixing_rate", rate)?;
@@ -978,6 +989,7 @@ impl CashflowProvider for Ndf {
 mod tests {
     use super::*;
     use crate::cashflow::CashflowProvider;
+    use std::sync::Arc;
     use time::Month;
 
     #[test]
@@ -1464,6 +1476,178 @@ mod tests {
         assert_eq!(flows[0].0, maturity);
         assert_eq!(flows[0].1.currency(), Currency::USD);
         assert!(flows[0].1.amount() > 0.0);
+    }
+
+    fn create_test_market(as_of: Date) -> MarketContext {
+        use finstack_core::market_data::term_structures::DiscountCurve;
+        use finstack_core::money::fx::{FxMatrix, SimpleFxProvider};
+
+        let usd_curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots(vec![(0.0, 1.0), (0.5, 0.9753), (1.0, 0.9512)])
+            .build()
+            .expect("should build");
+
+        let fx_provider = {
+            let p = Arc::new(SimpleFxProvider::new());
+            p.set_quote(Currency::CNY, Currency::USD, 7.25)
+                .expect("valid rate");
+            p
+        };
+        let fx_matrix = FxMatrix::new(fx_provider);
+
+        MarketContext::new().insert(usd_curve).insert_fx(fx_matrix)
+    }
+
+    #[test]
+    fn test_ndf_value_at_market() {
+        use crate::instruments::common_impl::traits::Instrument;
+
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid date");
+        let market = create_test_market(as_of);
+
+        let ndf = Ndf::builder()
+            .id(InstrumentId::new("TEST"))
+            .base_currency(Currency::CNY)
+            .settlement_currency(Currency::USD)
+            .fixing_date(Date::from_calendar_date(2024, Month::April, 13).expect("valid date"))
+            .maturity(Date::from_calendar_date(2024, Month::April, 15).expect("valid date"))
+            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .contract_rate(7.25)
+            .forward_rate_override_opt(Some(7.25))
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .quote_convention(NdfQuoteConvention::BasePerSettlement)
+            .build()
+            .expect("valid");
+
+        let pv = ndf.value(&market, as_of).expect("should price");
+        assert!(
+            pv.amount().abs() < 1000.0,
+            "At-market NDF PV should be near zero, got {}",
+            pv.amount()
+        );
+        assert_eq!(pv.currency(), Currency::USD);
+    }
+
+    #[test]
+    fn test_ndf_value_with_fixing_rate() {
+        use crate::instruments::common_impl::traits::Instrument;
+
+        let as_of = Date::from_calendar_date(2024, Month::April, 14).expect("valid date");
+        let market = create_test_market(as_of);
+
+        let ndf = Ndf::builder()
+            .id(InstrumentId::new("TEST"))
+            .base_currency(Currency::CNY)
+            .settlement_currency(Currency::USD)
+            .fixing_date(Date::from_calendar_date(2024, Month::April, 13).expect("valid date"))
+            .maturity(Date::from_calendar_date(2024, Month::April, 15).expect("valid date"))
+            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .contract_rate(7.25)
+            .fixing_rate_opt(Some(7.30))
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .quote_convention(NdfQuoteConvention::BasePerSettlement)
+            .build()
+            .expect("valid");
+
+        let pv = ndf.value(&market, as_of).expect("should price");
+        assert!(
+            pv.amount() > 0.0,
+            "NDF with favorable fixing should have positive PV"
+        );
+        assert_eq!(pv.currency(), Currency::USD);
+    }
+
+    #[test]
+    fn test_ndf_value_unfavorable_fixing() {
+        use crate::instruments::common_impl::traits::Instrument;
+
+        let as_of = Date::from_calendar_date(2024, Month::April, 14).expect("valid date");
+        let market = create_test_market(as_of);
+
+        let ndf = Ndf::builder()
+            .id(InstrumentId::new("TEST"))
+            .base_currency(Currency::CNY)
+            .settlement_currency(Currency::USD)
+            .fixing_date(Date::from_calendar_date(2024, Month::April, 13).expect("valid date"))
+            .maturity(Date::from_calendar_date(2024, Month::April, 15).expect("valid date"))
+            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .contract_rate(7.25)
+            .fixing_rate_opt(Some(7.20))
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .quote_convention(NdfQuoteConvention::BasePerSettlement)
+            .build()
+            .expect("valid");
+
+        let pv = ndf.value(&market, as_of).expect("should price");
+        assert!(
+            pv.amount() < 0.0,
+            "NDF with unfavorable fixing should have negative PV"
+        );
+    }
+
+    #[test]
+    fn test_ndf_value_expired() {
+        use crate::instruments::common_impl::traits::Instrument;
+
+        let as_of = Date::from_calendar_date(2024, Month::April, 20).expect("valid date");
+        let market = create_test_market(as_of);
+
+        let ndf = Ndf::builder()
+            .id(InstrumentId::new("TEST"))
+            .base_currency(Currency::CNY)
+            .settlement_currency(Currency::USD)
+            .fixing_date(Date::from_calendar_date(2024, Month::April, 13).expect("valid date"))
+            .maturity(Date::from_calendar_date(2024, Month::April, 15).expect("valid date"))
+            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .contract_rate(7.25)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .quote_convention(NdfQuoteConvention::BasePerSettlement)
+            .build()
+            .expect("valid");
+
+        let pv = ndf
+            .value(&market, as_of)
+            .expect("expired trades value as zero");
+        assert_eq!(pv.amount(), 0.0);
+    }
+
+    /// Audit F2: the `fixing_date > maturity` guard, previously stranded in the
+    /// unregistered `NdfDiscountingPricer`, now lives in `base_value` so it runs
+    /// on every valuation. `Ndf::validate` rejects this at construction, so we
+    /// mutate the field directly to reach the value path.
+    #[test]
+    fn test_ndf_value_rejects_fixing_after_maturity() {
+        use crate::instruments::common_impl::traits::Instrument;
+
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid date");
+        let market = create_test_market(as_of);
+
+        let mut ndf = Ndf::builder()
+            .id(InstrumentId::new("TEST"))
+            .base_currency(Currency::CNY)
+            .settlement_currency(Currency::USD)
+            .fixing_date(Date::from_calendar_date(2024, Month::April, 13).expect("valid date"))
+            .maturity(Date::from_calendar_date(2024, Month::April, 15).expect("valid date"))
+            .notional(Money::new(10_000_000.0, Currency::CNY))
+            .contract_rate(7.25)
+            .forward_rate_override_opt(Some(7.25))
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .quote_convention(NdfQuoteConvention::BasePerSettlement)
+            .build()
+            .expect("valid");
+
+        // Directly bypass the builder validation to create a malformed NDF.
+        ndf.maturity = Date::from_calendar_date(2024, Month::April, 12).expect("valid date");
+
+        let err = ndf
+            .value(&market, as_of)
+            .expect_err("fixing_date after maturity must error");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("fixing_date") && msg.contains("maturity"),
+            "error should mention the fixing/maturity ordering: {msg}"
+        );
     }
 
     #[test]

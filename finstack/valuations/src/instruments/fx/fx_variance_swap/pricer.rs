@@ -6,10 +6,6 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::fx_variance_swap::FxVarianceSwap;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
-use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
-};
-use crate::results::ValuationResult;
 use finstack_core::{
     dates::{Date, DateExt, DayCountContext},
     market_data::context::MarketContext,
@@ -17,9 +13,6 @@ use finstack_core::{
     money::Money,
     Result,
 };
-
-/// Registry-facing pricer for FX variance swaps.
-pub(crate) struct SimpleFxVarianceSwapDiscountingPricer;
 
 pub(crate) fn compute_pv(
     inst: &FxVarianceSwap,
@@ -404,42 +397,9 @@ pub(crate) fn remaining_forward_variance(
     })
 }
 
-impl Default for SimpleFxVarianceSwapDiscountingPricer {
-    fn default() -> Self {
-        Self
-    }
-}
-
-impl Pricer for SimpleFxVarianceSwapDiscountingPricer {
-    fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::FxVarianceSwap, ModelKey::Discounting)
-    }
-
-    fn price_dyn(
-        &self,
-        instrument: &dyn Instrument,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> std::result::Result<ValuationResult, PricingError> {
-        let swap = instrument
-            .as_any()
-            .downcast_ref::<FxVarianceSwap>()
-            .ok_or_else(|| {
-                PricingError::type_mismatch(InstrumentType::FxVarianceSwap, instrument.key())
-            })?;
-
-        let pv = compute_pv(swap, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-
-        Ok(ValuationResult::stamped(swap.id(), as_of, pv))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Instrument;
     use finstack_core::currency::Currency;
     use finstack_core::dates::Date;
     use finstack_core::market_data::context::MarketContext;
