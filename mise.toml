@@ -155,7 +155,7 @@ description = "Build Python bindings in-place (pass --release for optimized buil
 usage = '''
 flag "--release" help="Build with release profile (slower compile, faster runtime)"
 '''
-run = 'uv run --project finstack-py maturin develop --manifest-path finstack-py/Cargo.toml{% if flag(name="release") == "true" %} --release{% endif %}'
+run = 'uv run --project finstack-py maturin develop --manifest-path finstack-py/Cargo.toml{% if usage.release %} --release{% endif %}'
 
 [tasks.python-test]
 description = "Run Python tests"
