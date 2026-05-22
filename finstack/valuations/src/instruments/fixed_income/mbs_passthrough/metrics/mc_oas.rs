@@ -367,7 +367,14 @@ pub(crate) fn calculate_mc_oas(
     let objective = |oas: f64| -> f64 {
         let mut total = 0.0_f64;
         for path in &paths {
-            match price_on_path(mbs, path, initial_rate, oas, config.prepay_rate_sensitivity, as_of) {
+            match price_on_path(
+                mbs,
+                path,
+                initial_rate,
+                oas,
+                config.prepay_rate_sensitivity,
+                as_of,
+            ) {
                 Ok(pv) => total += pv,
                 Err(e) => {
                     if pricing_error.borrow().is_none() {

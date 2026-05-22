@@ -472,7 +472,10 @@ mod tests {
             .value
             .amount();
 
-        assert!(overridden_pv.is_finite(), "PV must be finite: {overridden_pv}");
+        assert!(
+            overridden_pv.is_finite(),
+            "PV must be finite: {overridden_pv}"
+        );
         assert!(
             (overridden_pv - default_pv).abs() > 1e-9,
             "hw1f_sigma override must change PV vs default: override={overridden_pv}, default={default_pv}"
@@ -505,7 +508,10 @@ mod tests {
         // Set implied_volatility = 0.20 (a typical lognormal swaption vol) but
         // leave hw1f_sigma/hw1f_mean_reversion unset. If the bug is present,
         // 0.20 would be fed into the HW tree as σ, producing a wildly different PV.
-        swaption_with_iv.pricing_overrides.market_quotes.implied_volatility = Some(0.20);
+        swaption_with_iv
+            .pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.20);
         let pv_with_iv = SwaptionHullWhitePricer::default()
             .price_internal(&swaption_with_iv, &market, as_of)
             .expect("iv-only pricing should succeed")

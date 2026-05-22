@@ -1384,15 +1384,8 @@ fn test_z_spread_negative_denom_returns_err_not_infinity() {
     let maturity = date!(2030 - 01 - 01);
     let notional = Money::new(1_000_000.0, Currency::USD);
 
-    let mut bond = Bond::fixed(
-        "ZSPR-NEG-DENOM",
-        notional,
-        0.05,
-        as_of,
-        maturity,
-        "USD-OIS",
-    )
-    .expect("bond should build");
+    let mut bond = Bond::fixed("ZSPR-NEG-DENOM", notional, 0.05, as_of, maturity, "USD-OIS")
+        .expect("bond should build");
     bond.settlement_convention = None;
 
     // Flat curve at 3% -> base_rate ≈ 0.03 for each cashflow.
@@ -1457,8 +1450,7 @@ fn test_z_spread_solver_non_positive_base_df_returns_err() {
 
     // Quote an astronomically high price (10× par): no physically valid spread
     // can match this — the solver must fail rather than return a meaningless z.
-    bond.pricing_overrides =
-        PricingOverrides::default().with_quoted_clean_price(10_000.0_f64);
+    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(10_000.0_f64);
 
     let result = bond.price_with_metrics(
         &market,

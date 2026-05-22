@@ -95,9 +95,7 @@ impl MetricCalculator for CsGammaCalculator {
         let original_curves = Arc::clone(&context.curves);
         {
             let hazard = original_curves.get_hazard(hazard_id.as_str())?;
-            if let Some(quote_hazard) =
-                super::hazard_with_deal_quote(cds, hazard.as_ref())?
-            {
+            if let Some(quote_hazard) = super::hazard_with_deal_quote(cds, hazard.as_ref())? {
                 context.curves = Arc::new(original_curves.as_ref().clone().insert(quote_hazard));
             }
         }

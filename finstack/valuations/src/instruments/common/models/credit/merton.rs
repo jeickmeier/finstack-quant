@@ -2000,8 +2000,7 @@ mod tests {
         let d_plus = (log_v_h + mu * t) / sigma_sqrt_t;
         let d_minus = (log_v_h - mu * t) / sigma_sqrt_t;
         let exponent = -2.0 * mu / (sigma * sigma);
-        let expected =
-            norm_cdf(-d_plus) + (v / b).powf(exponent) * norm_cdf(-d_minus);
+        let expected = norm_cdf(-d_plus) + (v / b).powf(exponent) * norm_cdf(-d_minus);
 
         assert!(
             (pd - expected).abs() < 1e-10,

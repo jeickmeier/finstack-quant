@@ -440,7 +440,10 @@ mod tests {
             .value
             .amount();
 
-        assert!(overridden_pv.is_finite(), "PV must be finite: {overridden_pv}");
+        assert!(
+            overridden_pv.is_finite(),
+            "PV must be finite: {overridden_pv}"
+        );
         assert!(
             (overridden_pv - default_pv).abs() > 1e-9,
             "hw1f_sigma override must change PV vs default: override={overridden_pv}, default={default_pv}"
@@ -465,7 +468,10 @@ mod tests {
 
         // Typical lognormal cap vol (0.20) with NO hw1f_sigma set.
         // If the bug were present, this would feed 0.20 into the HW tree as σ.
-        cap_with_iv.pricing_overrides.market_quotes.implied_volatility = Some(0.20);
+        cap_with_iv
+            .pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.20);
         let pv_with_iv = CapFloorHullWhitePricer
             .price_internal(&cap_with_iv, &market, as_of)
             .expect("iv-only pricing should succeed")

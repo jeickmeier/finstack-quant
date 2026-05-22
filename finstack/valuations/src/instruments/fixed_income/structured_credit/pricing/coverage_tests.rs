@@ -683,28 +683,47 @@ mod tests {
         // Capital stack (most senior first, lowest attachment): A-1 0-25,
         // A-2 25-50, A-3 50-75, Equity 75-100. Passed in seniority order.
         let a1 = Tranche::new(
-            "A-1", 0.0, 25.0, Seniority::Senior,
-            Money::new(25_000.0, Currency::USD), cpn(), mat,
+            "A-1",
+            0.0,
+            25.0,
+            Seniority::Senior,
+            Money::new(25_000.0, Currency::USD),
+            cpn(),
+            mat,
         )
         .expect("tranche");
         let a2 = Tranche::new(
-            "A-2", 25.0, 50.0, Seniority::Senior,
-            Money::new(25_000.0, Currency::USD), cpn(), mat,
+            "A-2",
+            25.0,
+            50.0,
+            Seniority::Senior,
+            Money::new(25_000.0, Currency::USD),
+            cpn(),
+            mat,
         )
         .expect("tranche");
         let a3 = Tranche::new(
-            "A-3", 50.0, 75.0, Seniority::Senior,
-            Money::new(25_000.0, Currency::USD), cpn(), mat,
+            "A-3",
+            50.0,
+            75.0,
+            Seniority::Senior,
+            Money::new(25_000.0, Currency::USD),
+            cpn(),
+            mat,
         )
         .expect("tranche");
         let equity = Tranche::new(
-            "EQUITY", 75.0, 100.0, Seniority::Equity,
-            Money::new(25_000.0, Currency::USD), cpn(), mat,
+            "EQUITY",
+            75.0,
+            100.0,
+            Seniority::Equity,
+            Money::new(25_000.0, Currency::USD),
+            cpn(),
+            mat,
         )
         .expect("tranche");
 
-        let tranches =
-            TrancheStructure::new(vec![a1, a2, a3, equity]).expect("structure");
+        let tranches = TrancheStructure::new(vec![a1, a2, a3, equity]).expect("structure");
 
         // senior_to(A-2) must include A-1 only — not A-2 itself, not A-3/Equity.
         let senior_to_a2: Vec<&str> = tranches
@@ -720,8 +739,7 @@ mod tests {
 
         // The OC denominator for a junior tranche (A-3) = its own balance plus
         // ALL senior notes (A-1 + A-2). All three senior notes must contribute.
-        let oc_denominator =
-            tranches.senior_balance("A-3").amount() + 25_000.0;
+        let oc_denominator = tranches.senior_balance("A-3").amount() + 25_000.0;
         assert_eq!(
             oc_denominator, 75_000.0,
             "A-3 OC denominator must include A-1 + A-2 + A-3 balances"

@@ -1380,9 +1380,13 @@ mod tests {
                 .expect("curve"),
         );
 
-        let results =
-            run_simulation_with_source(&instrument, &market, start, &mut DeterministicPoolFlowSource)
-                .expect("simulation");
+        let results = run_simulation_with_source(
+            &instrument,
+            &market,
+            start,
+            &mut DeterministicPoolFlowSource,
+        )
+        .expect("simulation");
 
         let tranche = results.get("A").expect("tranche A result");
 

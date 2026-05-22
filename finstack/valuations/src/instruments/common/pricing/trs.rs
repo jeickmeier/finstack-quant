@@ -856,8 +856,8 @@ mod tests {
             ds
         };
         let realized_obs: Vec<(Date, f64)> = realized_dates.iter().map(|&d| (d, 0.04)).collect();
-        let fixing_series = ScalarTimeSeries::new("FIXING:SOFR", realized_obs, None)
-            .expect("fixing series");
+        let fixing_series =
+            ScalarTimeSeries::new("FIXING:SOFR", realized_obs, None).expect("fixing series");
 
         let disc = DiscountCurve::builder(CurveId::new("DISC"))
             .base_date(as_of)
@@ -897,14 +897,8 @@ mod tests {
         };
 
         let notional = Money::new(1_000_000.0, Currency::USD);
-        let pv_spliced = TrsEngine::pv_financing_leg(
-            &financing,
-            &schedule,
-            notional,
-            &ctx,
-            as_of,
-        )
-        .expect("pv_spliced");
+        let pv_spliced = TrsEngine::pv_financing_leg(&financing, &schedule, notional, &ctx, as_of)
+            .expect("pv_spliced");
 
         // Compute expected spliced compound independently:
         // realized sub-period: weekdays in [Jan 6, Jan 17], each at 4 %
@@ -946,13 +940,8 @@ mod tests {
                     .expect("disc no_fixings"),
             )
             .insert(fwd);
-        let pv_all_projected = TrsEngine::pv_financing_leg(
-            &financing,
-            &schedule,
-            notional,
-            &ctx_no_fixings,
-            as_of,
-        );
+        let pv_all_projected =
+            TrsEngine::pv_financing_leg(&financing, &schedule, notional, &ctx_no_fixings, as_of);
         // Before the fix, this would succeed (no fixings required) and give a
         // different value; after the fix it must fail (fixings missing for an
         // in-progress period) OR we simply verify that pv_spliced matches expected.

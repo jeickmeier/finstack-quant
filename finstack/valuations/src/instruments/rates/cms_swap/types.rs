@@ -800,9 +800,7 @@ mod tests {
         let discount_curve = market
             .get_discount(swap.discount_curve_id.as_ref())
             .expect("discount curve");
-        let flows = swap
-            .cms_leg_flows(&market, as_of)
-            .expect("cms_leg_flows");
+        let flows = swap.cms_leg_flows(&market, as_of).expect("cms_leg_flows");
         let discounted_sum: f64 = flows
             .iter()
             .map(|(pay_date, money)| {
@@ -849,9 +847,7 @@ mod tests {
         let discount_curve = market
             .get_discount(swap.discount_curve_id.as_ref())
             .expect("discount curve");
-        let flows = swap
-            .cms_leg_flows(&market, as_of)
-            .expect("cms_leg_flows");
+        let flows = swap.cms_leg_flows(&market, as_of).expect("cms_leg_flows");
         let discounted_sum: f64 = flows
             .iter()
             .map(|(pay_date, money)| {

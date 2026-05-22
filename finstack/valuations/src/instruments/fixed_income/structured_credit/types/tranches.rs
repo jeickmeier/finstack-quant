@@ -686,8 +686,7 @@ impl TrancheStructure {
         // Priorities are distinct and contiguous (1..=n) by construction.
         debug_assert!(
             {
-                let mut prios: Vec<u32> =
-                    tranches.iter().map(|t| t.payment_priority).collect();
+                let mut prios: Vec<u32> = tranches.iter().map(|t| t.payment_priority).collect();
                 prios.sort_unstable();
                 prios == (1..=tranches.len() as u32).collect::<Vec<_>>()
             },

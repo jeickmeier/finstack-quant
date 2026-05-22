@@ -285,10 +285,8 @@ impl TarnPricer {
                 events.push(CouponEvent {
                     accrual_fraction,
                     discount_factor,
-                    forward_coeffs: term_forward.period_coeffs(
-                        fixing_time,
-                        inst.floating_tenor.to_years_simple(),
-                    ),
+                    forward_coeffs: term_forward
+                        .period_coeffs(fixing_time, inst.floating_tenor.to_years_simple()),
                     needs_path_sample: true,
                 });
                 continue;

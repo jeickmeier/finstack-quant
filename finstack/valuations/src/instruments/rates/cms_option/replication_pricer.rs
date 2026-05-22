@@ -307,7 +307,7 @@ impl CmsReplicationPricer {
                                 let g_ctr = df_pay / par_annuity(k.max(K_FLOOR), cms_tenor, m);
                                 let h_lo = k - k_lo;
                                 let h_hi = k_hi - k; // always G_PRIME_H
-                                // g'(k): non-uniform central difference.
+                                                     // g'(k): non-uniform central difference.
                                 let g_prime = (g_hi - g_lo) / (h_lo + h_hi);
                                 // g''(k): non-uniform 3-point second difference.
                                 // Guard against zero denominator when k_lo is clamped to k.

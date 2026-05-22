@@ -605,20 +605,12 @@ pub fn attribute_pnl_metrics_based(
             &mut non_finite_detected,
         );
 
-        let get_scaled = |id: MetricId,
-                          notes: &mut Vec<String>,
-                          flag: &mut bool|
-         -> Option<Money> {
-            val_t0.measures.get(id.as_str()).map(|value| {
-                factor_money_or_invalid(
-                    value * time_period_days,
-                    ccy,
-                    id.as_str(),
-                    notes,
-                    flag,
-                )
-            })
-        };
+        let get_scaled =
+            |id: MetricId, notes: &mut Vec<String>, flag: &mut bool| -> Option<Money> {
+                val_t0.measures.get(id.as_str()).map(|value| {
+                    factor_money_or_invalid(value * time_period_days, ccy, id.as_str(), notes, flag)
+                })
+            };
 
         attribution.carry_detail = Some(CarryDetail {
             total: attribution.carry,

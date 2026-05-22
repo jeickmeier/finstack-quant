@@ -376,10 +376,7 @@ mod tests {
         let result = base_digital_builder()
             .notional(Money::new(0.0, Currency::EUR))
             .build();
-        assert!(
-            result.is_err(),
-            "FxDigitalOption must reject zero notional"
-        );
+        assert!(result.is_err(), "FxDigitalOption must reject zero notional");
     }
 
     #[test]

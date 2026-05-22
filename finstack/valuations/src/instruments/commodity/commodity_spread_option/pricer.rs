@@ -158,7 +158,6 @@ fn kirk_price(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -628,7 +627,11 @@ mod tests {
             "Call with k_adj<0 must be finite, got {}",
             pv
         );
-        assert!(!pv.is_nan(), "Call with k_adj<0 must not be NaN, got {}", pv);
+        assert!(
+            !pv.is_nan(),
+            "Call with k_adj<0 must not be NaN, got {}",
+            pv
+        );
 
         // Expected: discounted intrinsic = df * (F1 - F2 - K) = df * 170
         let disc = market.get_discount("USD-OIS").expect("discount curve");

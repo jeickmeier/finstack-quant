@@ -623,9 +623,7 @@ mod tests {
             .option_type(OptionType::Call)
             .expiry(Date::from_calendar_date(2025, time::Month::June, 15).expect("valid date"))
             .swap_start(Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date"))
-            .swap_end(
-                Date::from_calendar_date(2026, time::Month::June, 30).expect("valid date"),
-            )
+            .swap_end(Date::from_calendar_date(2026, time::Month::June, 30).expect("valid date"))
             .swap_frequency(Tenor::new(1, TenorUnit::Months))
             .fixed_price(3.50)
             .notional(10_000.0)
@@ -654,8 +652,7 @@ mod tests {
 
     #[test]
     fn validation_rejects_swap_start_equal_swap_end() {
-        let same_date =
-            Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+        let same_date = Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
         let result = base_swaption_builder()
             .swap_start(same_date)
             .swap_end(same_date)
@@ -682,8 +679,7 @@ mod tests {
     #[test]
     fn validation_accepts_expiry_equal_swap_start() {
         // expiry == swap_start is allowed (option expires exactly when swap starts)
-        let same_date =
-            Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
+        let same_date = Date::from_calendar_date(2025, time::Month::July, 1).expect("valid date");
         let result = base_swaption_builder()
             .expiry(same_date)
             .swap_start(same_date)
@@ -723,9 +719,7 @@ mod tests {
 
     #[test]
     fn validation_rejects_inf_fixed_price() {
-        let result = base_swaption_builder()
-            .fixed_price(f64::INFINITY)
-            .build();
+        let result = base_swaption_builder().fixed_price(f64::INFINITY).build();
         assert!(
             result.is_err(),
             "CommoditySwaption must reject infinite fixed_price"

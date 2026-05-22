@@ -630,9 +630,7 @@ mod tests {
 
     #[test]
     fn validation_rejects_inf_barrier_level() {
-        let result = base_touch_builder()
-            .barrier_level(f64::INFINITY)
-            .build();
+        let result = base_touch_builder().barrier_level(f64::INFINITY).build();
         assert!(
             result.is_err(),
             "FxTouchOption must reject infinite barrier_level"

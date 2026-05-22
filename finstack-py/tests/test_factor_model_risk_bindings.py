@@ -6,17 +6,16 @@ Covers:
 
 from __future__ import annotations
 
-import json
 from datetime import date
-
-import pytest
+import json
 
 from finstack.core.market_data import DiscountCurve, MarketContext
+import pytest
+
 from finstack.valuations import (
     compute_factor_sensitivities,
     decompose_factor_risk,
 )
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -68,7 +67,8 @@ def _market_and_positions() -> tuple[MarketContext, str]:
 
 
 def test_decompose_factor_risk_zero_factors_raises_value_error() -> None:
-    """Regression: decompose_factor_risk must raise ValueError (not abort/panic)
+    """Regression: decompose_factor_risk must raise ValueError (not abort/panic).
+
     when the sensitivity matrix has n_factors == 0.
 
     Before the fix, chunks_exact(0) panicked across the PyO3 boundary, causing
@@ -84,9 +84,7 @@ def test_decompose_factor_risk_zero_factors_raises_value_error() -> None:
         market,
         "2025-01-15",
     )
-    assert zero_factor_matrix.n_factors == 0, (
-        "Precondition: matrix must have n_factors == 0 for this regression test"
-    )
+    assert zero_factor_matrix.n_factors == 0, "Precondition: matrix must have n_factors == 0 for this regression test"
 
     # Dummy covariance for a zero-factor model.
     cov_json = json.dumps({"factor_ids": [], "n": 0, "data": []})

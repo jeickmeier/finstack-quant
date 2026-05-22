@@ -692,12 +692,7 @@ mod cs_gamma_consistency {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .recovery_rate(0.40)
-            .knots(vec![
-                (0.0, 0.02),
-                (1.0, 0.025),
-                (5.0, 0.035),
-                (10.0, 0.045),
-            ])
+            .knots(vec![(0.0, 0.02), (1.0, 0.025), (5.0, 0.035), (10.0, 0.045)])
             .par_spreads(par_spreads)
             .build()
             .unwrap();
@@ -711,7 +706,9 @@ mod cs_gamma_consistency {
         as_of: time::Date,
         metric: MetricId,
     ) -> f64 {
-        let pv = cds.value(market, as_of).expect("CDS valuation should succeed");
+        let pv = cds
+            .value(market, as_of)
+            .expect("CDS valuation should succeed");
         let registry = standard_registry();
         let mut context = MetricContext::new(
             Arc::new(cds.clone()),
@@ -766,15 +763,11 @@ mod cs_gamma_consistency {
         let outer_shift_bp = 5.0;
 
         let (disc_up, hazard_up) = build_curves_with_par_spreads(outer_shift_bp);
-        let market_up = MarketContext::new()
-            .insert(disc_up)
-            .insert(hazard_up);
+        let market_up = MarketContext::new().insert(disc_up).insert(hazard_up);
         let cs01_up = compute_metric(&cds, &market_up, as_of, MetricId::Cs01);
 
         let (disc_dn, hazard_dn) = build_curves_with_par_spreads(-outer_shift_bp);
-        let market_dn = MarketContext::new()
-            .insert(disc_dn)
-            .insert(hazard_dn);
+        let market_dn = MarketContext::new().insert(disc_dn).insert(hazard_dn);
         let cs01_dn = compute_metric(&cds, &market_dn, as_of, MetricId::Cs01);
 
         // Numerical derivative of CS01, unit-converted to match CS-Gamma.

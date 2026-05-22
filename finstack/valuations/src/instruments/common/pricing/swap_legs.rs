@@ -2529,7 +2529,9 @@ mod tests {
             as_of,
             Some(&fixings),
         )
-        .expect("payment-lagged fully-accrued compounded coupon must not hard-error (R1 regression)");
+        .expect(
+            "payment-lagged fully-accrued compounded coupon must not hard-error (R1 regression)",
+        );
 
         // Independently compute the all-realized daily compound from the ramp fixings.
         // This reference loop is intentionally separate from the production helper so
@@ -2575,7 +2577,10 @@ mod tests {
         );
 
         // Sanity: PV must be positive (positive rate, future payment).
-        assert!(pv > 0.0, "PV of a positive-rate OIS coupon must be positive; got {pv}");
+        assert!(
+            pv > 0.0,
+            "PV of a positive-rate OIS coupon must be positive; got {pv}"
+        );
     }
 
     // ==================== ANNUITY GUARD DIAGNOSTIC TEST ====================
