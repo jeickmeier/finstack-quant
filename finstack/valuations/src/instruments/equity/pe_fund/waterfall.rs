@@ -715,13 +715,21 @@ impl<'a> EquityWaterfallEngine<'a> {
                 }
 
                 Tranche::PreferredIrr { irr } => {
-                    // Calculate required amount to achieve target IRR
-                    let required = self.calculate_preferred_amount(
+                    // `calculate_preferred_amount` returns the total LP amount needed at
+                    // `allocation_date` to reach `target_irr`, using only events strictly
+                    // before that date.  Earlier tranches within this same distribution
+                    // (captured in `lp_allocated_in_call_so_far`) are invisible to the
+                    // IRR solve because they haven't been persisted to `all_events` yet.
+                    // We subtract that same-date offset so the preferred tier only awards
+                    // the incremental cash still needed on top of what the LP already
+                    // received from earlier tranches in this distribution call.
+                    let gross_required = self.calculate_preferred_amount(
                         *irr,
                         params.all_events,
                         params.allocation_date,
                         lp_unreturned,
                     )?;
+                    let required = (gross_required - lp_allocated_in_call_so_far).max(0.0);
                     let allocation = remaining_amount.min(required);
                     remaining_amount -= allocation;
                     lp_allocated_in_call_so_far += allocation;
@@ -839,6 +847,12 @@ impl<'a> EquityWaterfallEngine<'a> {
     }
 
     /// Calculate the amount needed for preferred return using robust root finding.
+    ///
+    /// Returns the total LP amount required at `current_date` to achieve `target_irr`,
+    /// **not yet accounting for** `lp_already_allocated_same_date`.  The call site
+    /// subtracts that offset before capping against `remaining_amount`, so the preferred
+    /// tier only allocates the incremental cash still needed above what earlier tranches
+    /// in the same distribution have already paid to the LP.
     fn calculate_preferred_amount(
         &self,
         target_irr: f64,
@@ -1537,6 +1551,79 @@ mod tests {
         for row in &ledger.rows {
             assert_eq!(row.period_key, None);
         }
+    }
+
+    /// Regression test: C16 — PreferredIrr tranche must not double-count same-date LP cash
+    /// already allocated by earlier tranches (e.g. ReturnOfCapital) within the same distribution.
+    ///
+    /// Setup: LP contributes $1 000 at t=0. At t=5y the fund returns $1 500.
+    /// Tranches: ReturnOfCapital → PreferredIrr(8%) → PromoteTier(80/20).
+    ///
+    /// RoC tranche allocates $1 000 to LP first.  Remaining $500 goes to preferred.
+    /// 8% IRR over 5y on $1 000 requires ~$1 469.33 total to LP.  The LP has already
+    /// received $1 000 as RoC, so the preferred tier should award at most ~$469.33 to LP.
+    ///
+    /// The buggy code omits the $1 000 same-date RoC cash from the IRR solve, making it
+    /// think the LP has received $0 so far on this date, so it computes ~$1 469 as the
+    /// preferred requirement — far more than the $500 remaining — and allocates the full
+    /// $500 to the preferred tier, leaving $0 for the promote tier.
+    ///
+    /// After the fix the preferred tier is correctly capped and the promote tier receives
+    /// its share of the remaining profit.
+    #[test]
+    fn preferred_irr_does_not_double_count_same_date_roc() {
+        let spec = WaterfallSpec::builder()
+            .style(WaterfallStyle::European)
+            .return_of_capital()
+            .preferred_irr(0.08)
+            .promote_tier(0.0, 0.8, 0.2)
+            .build()
+            .expect("Valid spec");
+
+        // LP contributes $1 000; fund distributes $1 500 five years later.
+        let events = vec![
+            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
+            FundEvent::distribution(test_date(2025, 1, 1), Money::new(1500.0, test_currency())),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let ledger = engine.run(&events).expect("Run succeeded");
+
+        let total_lp: f64 = ledger.rows.iter().map(|r| r.to_lp.amount()).sum();
+        let total_gp: f64 = ledger.rows.iter().map(|r| r.to_gp.amount()).sum();
+
+        // (1) Cash conservation: LP + GP must equal the $1 500 distribution exactly.
+        let total_distributed = total_lp + total_gp;
+        assert!(
+            (total_distributed - 1500.0).abs() < 1e-4,
+            "Cash not conserved: LP={total_lp:.4}, GP={total_gp:.4}, total={total_distributed:.4}"
+        );
+
+        // (2) The promote tier must receive some allocation (i.e. the preferred tier must NOT
+        //     consume the entire remaining amount after RoC just because it ignores same-date
+        //     RoC cash in the IRR solve).  GP gets 20% of profit above hurdle via promote.
+        //     Profit = $500.  At 8% IRR over 5y, preferred ~ $469.  Remaining for promote
+        //     = ~$31.  GP share ≈ 20% of ~$31 ≈ $6.  We just assert GP > 0.
+        assert!(
+            total_gp > 1e-4,
+            "GP received nothing — preferred tier consumed all remaining cash (double-count bug still present). GP={total_gp:.6}"
+        );
+
+        // (3) Preferred tranche allocation must be strictly less than what the buggy code
+        //     would compute.  Without the fix the preferred tier gets the full $500 remaining
+        //     (since it thinks LP needs ~$1469 but only $500 is left after RoC).
+        //     With the fix it gets less (the correct incremental preferred amount above RoC).
+        let preferred_lp: f64 = ledger
+            .rows
+            .iter()
+            .filter(|r| r.tranche.contains("Preferred Return"))
+            .map(|r| r.to_lp.amount())
+            .sum();
+        // Buggy value = 500.0 (full remaining).  Correct value < 500.0.
+        assert!(
+            preferred_lp < 499.99,
+            "Preferred tranche consumed full remaining amount — double-count bug likely still present. preferred_lp={preferred_lp:.4}"
+        );
     }
 
     #[test]
