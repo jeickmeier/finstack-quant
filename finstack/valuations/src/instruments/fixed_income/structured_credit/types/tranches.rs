@@ -247,7 +247,15 @@ pub struct Tranche {
     #[schemars(with = "Option<String>")]
     pub expected_maturity: Option<Date>,
 
-    /// Payment priority (1 = highest)
+    /// Payment priority (1 = most senior, paid first).
+    ///
+    /// On a standalone `Tranche` this is a *provisional* value derived from
+    /// `seniority` (see `Tranche::new`). It is **overwritten deterministically**
+    /// by [`TrancheStructure::new`] (and by deserialization of a
+    /// `TrancheStructure`), which ranks every tranche by structural seniority so
+    /// that multiple notes at one `TrancheSeniority` (e.g. Class A-1/A-2/A-3 all
+    /// `Senior`) receive distinct, strictly-increasing priorities. Do not rely
+    /// on this field outside of an assembled `TrancheStructure`.
     pub payment_priority: u32,
 
     /// Attributes for scenario selection
@@ -295,6 +303,9 @@ impl Tranche {
             can_reinvest: false,
             maturity,
             expected_maturity: None,
+            // Provisional: overwritten by `TrancheStructure::new` /
+            // `TrancheStructure` deserialization, which assigns a structurally
+            // ranked, distinct priority per note. See the field doc comment.
             payment_priority: match seniority {
                 TrancheSeniority::Senior => 1,
                 TrancheSeniority::Mezzanine => 2,
@@ -567,7 +578,7 @@ impl Default for TrancheBuilder {
 }
 
 /// Collection of tranches forming the capital structure
-#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct TrancheStructure {
     /// Ordered tranches (typically sorted by payment priority)
     pub tranches: Vec<Tranche>,
@@ -575,15 +586,45 @@ pub struct TrancheStructure {
     pub total_size: Money,
 }
 
+/// Deserialize a `TrancheStructure` through the same validation +
+/// `payment_priority` assignment path as [`TrancheStructure::new`].
+///
+/// The per-`Tranche` `payment_priority` stored in a serialized structure is
+/// only provisional (see `Tranche::new`); re-running assembly here guarantees
+/// deserialized structures carry structurally ranked, distinct priorities and
+/// makes any fixture-stored `payment_priority` purely cosmetic.
+impl<'de> Deserialize<'de> for TrancheStructure {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RawTrancheStructure {
+            tranches: Vec<Tranche>,
+            #[allow(dead_code)]
+            total_size: Money,
+        }
+        let raw = RawTrancheStructure::deserialize(deserializer)?;
+        TrancheStructure::new(raw.tranches).map_err(serde::de::Error::custom)
+    }
+}
+
 impl TrancheStructure {
-    /// Create new tranche structure
-    pub fn new(tranches: Vec<Tranche>) -> finstack_core::Result<Self> {
+    /// Create new tranche structure.
+    ///
+    /// After structural validation this assigns each tranche a distinct,
+    /// strictly-increasing `payment_priority` (see [`Self::assign_priorities`]),
+    /// so that multiple notes at one `TrancheSeniority` are ranked correctly.
+    pub fn new(mut tranches: Vec<Tranche>) -> finstack_core::Result<Self> {
         if tranches.is_empty() {
             return Err(finstack_core::InputError::TooFewPoints.into());
         }
 
         // Validate structure
         Self::validate_structure(&tranches)?;
+
+        // Assign deterministic, distinct payment priorities by structural rank.
+        Self::assign_priorities(&mut tranches);
 
         // Calculate total size
         let total_size = tranches.iter().try_fold(
@@ -595,6 +636,56 @@ impl TrancheStructure {
             tranches,
             total_size,
         })
+    }
+
+    /// Assign a structurally ranked, distinct `payment_priority` to each tranche.
+    ///
+    /// A real CLO/ABS carries multiple notes at one `TrancheSeniority` (Class
+    /// A-1, A-2, A-3 all `Senior`); deriving `payment_priority` from the
+    /// 4-valued seniority enum directly collapses them onto one value, which
+    /// breaks `senior_to` / `subordination_amount` (strict `<`/`>` filters) and
+    /// the OC/IC coverage denominators built on them.
+    ///
+    /// Ranking rule: `(TrancheSeniority discriminant ASCENDING, then original
+    /// input-vector index ASCENDING)`. The seniority enum
+    /// (`Senior < Mezzanine < Subordinated < Equity`) is the unambiguous
+    /// structural ordering — the senior class is paid first and gets priority
+    /// `1` (`1 = most senior`). The input-vector index breaks ties so that
+    /// multiple notes at one seniority receive *distinct* strictly-increasing
+    /// priorities; callers must therefore pass pari-passu Class A-1/A-2/A-3 in
+    /// seniority order.
+    ///
+    /// Ranking on the seniority enum (rather than `attachment_point`) is
+    /// deliberate: `attachment_point` is used inconsistently across the
+    /// codebase's deals (some put the senior class at `0%`, some at the top of
+    /// the stack), whereas `TrancheSeniority` is unambiguous. This preserves
+    /// the historical relative ordering for every distinct-seniority deal and
+    /// only changes behavior for genuinely same-seniority notes (the bug).
+    ///
+    /// After assignment the priorities are `1..=n`, distinct and contiguous.
+    fn assign_priorities(tranches: &mut [Tranche]) {
+        // Rank indices by seniority discriminant ascending, input index
+        // ascending as the tie-break for pari-passu notes.
+        let mut order: Vec<usize> = (0..tranches.len()).collect();
+        order.sort_by(|&a, &b| {
+            (tranches[a].seniority as u8)
+                .cmp(&(tranches[b].seniority as u8))
+                .then(a.cmp(&b))
+        });
+        for (rank, &idx) in order.iter().enumerate() {
+            tranches[idx].payment_priority = (rank as u32) + 1;
+        }
+
+        // Priorities are distinct and contiguous (1..=n) by construction.
+        debug_assert!(
+            {
+                let mut prios: Vec<u32> =
+                    tranches.iter().map(|t| t.payment_priority).collect();
+                prios.sort_unstable();
+                prios == (1..=tranches.len() as u32).collect::<Vec<_>>()
+            },
+            "assigned payment priorities must be distinct and contiguous 1..=n"
+        );
     }
 
     /// Validate tranche structure for consistency

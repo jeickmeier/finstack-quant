@@ -669,6 +669,85 @@ mod tests {
         );
     }
 
+    /// C4 regression: a real CLO/ABS can carry several notes at one seniority
+    /// level (Class A-1, A-2, A-3 all `Senior`). `payment_priority` must rank
+    /// every note distinctly by structural seniority, NOT collapse them onto a
+    /// per-`TrancheSeniority` constant. If they collapse, `senior_to` returns
+    /// `[]` for same-seniority notes and the OC denominator omits them.
+    #[test]
+    fn test_same_seniority_notes_get_distinct_priorities_and_oc_denominator() {
+        use finstack_core::dates::Date as D;
+        let mat = D::from_calendar_date(2034, Month::January, 1).expect("date");
+        let cpn = || TrancheCoupon::Fixed { rate: 0.05 };
+        // Three Senior notes at distinct attachment points + an Equity note.
+        // Capital stack (most senior first, lowest attachment): A-1 0-25,
+        // A-2 25-50, A-3 50-75, Equity 75-100. Passed in seniority order.
+        let a1 = Tranche::new(
+            "A-1", 0.0, 25.0, Seniority::Senior,
+            Money::new(25_000.0, Currency::USD), cpn(), mat,
+        )
+        .expect("tranche");
+        let a2 = Tranche::new(
+            "A-2", 25.0, 50.0, Seniority::Senior,
+            Money::new(25_000.0, Currency::USD), cpn(), mat,
+        )
+        .expect("tranche");
+        let a3 = Tranche::new(
+            "A-3", 50.0, 75.0, Seniority::Senior,
+            Money::new(25_000.0, Currency::USD), cpn(), mat,
+        )
+        .expect("tranche");
+        let equity = Tranche::new(
+            "EQUITY", 75.0, 100.0, Seniority::Equity,
+            Money::new(25_000.0, Currency::USD), cpn(), mat,
+        )
+        .expect("tranche");
+
+        let tranches =
+            TrancheStructure::new(vec![a1, a2, a3, equity]).expect("structure");
+
+        // senior_to(A-2) must include A-1 only — not A-2 itself, not A-3/Equity.
+        let senior_to_a2: Vec<&str> = tranches
+            .senior_to("A-2")
+            .iter()
+            .map(|t| t.id.as_str())
+            .collect();
+        assert_eq!(
+            senior_to_a2,
+            vec!["A-1"],
+            "A-1 is the only note senior to A-2"
+        );
+
+        // The OC denominator for a junior tranche (A-3) = its own balance plus
+        // ALL senior notes (A-1 + A-2). All three senior notes must contribute.
+        let oc_denominator =
+            tranches.senior_balance("A-3").amount() + 25_000.0;
+        assert_eq!(
+            oc_denominator, 75_000.0,
+            "A-3 OC denominator must include A-1 + A-2 + A-3 balances"
+        );
+
+        // A-2's OC denominator reflects A-1's balance (senior_balance non-zero).
+        assert_eq!(
+            tranches.senior_balance("A-2").amount(),
+            25_000.0,
+            "A-2 senior_balance must equal A-1's balance"
+        );
+
+        // Priorities must be distinct and strictly increasing by seniority.
+        let p = |id: &str| {
+            tranches
+                .tranches
+                .iter()
+                .find(|t| t.id.as_str() == id)
+                .expect("tranche")
+                .payment_priority
+        };
+        assert!(p("A-1") < p("A-2"));
+        assert!(p("A-2") < p("A-3"));
+        assert!(p("A-3") < p("EQUITY"));
+    }
+
     /// W-21: an IC-test breach must produce a non-`None` cure amount equal to
     /// the senior interest shortfall, so IC-only breaches actually divert cash.
     #[test]

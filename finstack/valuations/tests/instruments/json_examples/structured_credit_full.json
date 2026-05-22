@@ -182,7 +182,7 @@
             "can_reinvest": true,
             "maturity": "2034-01-01",
             "expected_maturity": "2030-01-01",
-            "payment_priority": 4,
+            "payment_priority": 2,
             "attributes": {
               "tags": [
                 "equity"
