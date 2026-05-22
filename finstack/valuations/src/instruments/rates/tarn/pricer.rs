@@ -285,7 +285,10 @@ impl TarnPricer {
                 events.push(CouponEvent {
                     accrual_fraction,
                     discount_factor,
-                    forward_coeffs: term_forward.period_coeffs(fixing_time, accrual_fraction),
+                    forward_coeffs: term_forward.period_coeffs(
+                        fixing_time,
+                        inst.floating_tenor.to_years_simple(),
+                    ),
                     needs_path_sample: true,
                 });
                 continue;
@@ -297,11 +300,8 @@ impl TarnPricer {
                 // `[as_of, end]` while the coupon still accrues over the full
                 // `[start, end]`. A flat (short-rate-independent) coeff set
                 // bakes that rate in; the event consumes no path sample.
-                let remaining =
-                    inst.day_count
-                        .year_fraction(as_of, end, DayCountContext::default())?;
                 let seasoned_rate = term_forward
-                    .period_coeffs(0.0, remaining.max(0.0))
+                    .period_coeffs(0.0, inst.floating_tenor.to_years_simple())
                     .simple_forward(r0);
                 PeriodForwardCoeffs::from_flat_rate(seasoned_rate, accrual_fraction)
             };
@@ -748,5 +748,46 @@ mod tests {
         assert!(result
             .measures
             .contains_key(&MetricId::custom("mc_num_paths")));
+    }
+
+    /// Regression: the pricer must read `floating_tenor` when reconstructing the
+    /// HW1F term forward. If `floating_tenor` is ignored (bug), changing it from
+    /// 3M to 6M on semi-annual coupon periods leaves the PV unchanged because the
+    /// pricer always uses the coupon accrual fraction (= 0.5 yr) as the bond
+    /// tenor. On a sloped curve the 3M and 6M simple forwards differ, so the two
+    /// instruments MUST price differently once `floating_tenor` is respected.
+    #[test]
+    fn floating_tenor_affects_pv_on_sloped_curve() {
+        let as_of = date(2025, Month::January, 1);
+        let market = market(as_of, 0.02, 0.03);
+
+        // Semi-annual coupon periods, 3M floating index.
+        let tarn_3m = Tarn {
+            floating_tenor: Tenor::quarterly(),
+            ..test_tarn(1.0)
+        };
+        // Same instrument but 6M floating index.
+        let tarn_6m = test_tarn(1.0); // already floating_tenor = semi_annual()
+
+        let pv_3m = deterministic_pricer(32)
+            .price_estimate(&tarn_3m, &market, as_of)
+            .expect("3M price")
+            .mean
+            .amount();
+        let pv_6m = deterministic_pricer(32)
+            .price_estimate(&tarn_6m, &market, as_of)
+            .expect("6M price")
+            .mean
+            .amount();
+
+        // On a sloped curve the 3M and 6M simple forwards differ materially.
+        // A PV shift of at least $100 is expected; if the two are equal (within
+        // $1) the pricer is ignoring floating_tenor.
+        assert!(
+            (pv_3m - pv_6m).abs() > 100.0,
+            "pv_3m={pv_3m:.2} pv_6m={pv_6m:.2}: |Δ|={:.2} ≤ $100 — \
+             the pricer is ignoring floating_tenor",
+            (pv_3m - pv_6m).abs()
+        );
     }
 }
