@@ -418,6 +418,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
 
         impl #struct_name {
             #[doc = #builder_method_doc]
+            #[must_use]
             pub fn builder() -> #builder_name { #builder_name::new() }
         }
     };

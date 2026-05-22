@@ -29,6 +29,7 @@ pub struct CheckSuite {
 
 impl CheckSuite {
     /// Start building a new suite.
+    #[must_use]
     pub fn builder(name: impl Into<String>) -> CheckSuiteBuilder {
         CheckSuiteBuilder {
             name: name.into(),
