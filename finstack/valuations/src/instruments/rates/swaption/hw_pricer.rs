@@ -305,16 +305,24 @@ impl SwaptionHullWhitePricer {
 
 /// Build the HW1F override JSON blob from a swaption's typed pricing overrides.
 ///
-/// Maps `model_config.mean_reversion` → `hw1f_kappa` and
-/// `market_quotes.implied_volatility` → `hw1f_sigma`. Returns `Some` only when
-/// **both** are present, so that a partial override falls through to the
-/// calibrated-market-scalar / default branches in [`resolve_hw1f_params`].
+/// Reads `model_config.hw1f_mean_reversion` → `hw1f_kappa` and
+/// `model_config.hw1f_sigma` → `hw1f_sigma` (the Hull-White short-rate absolute
+/// volatility). Returns `Some` only when **both** are present, so that a partial
+/// override falls through to the calibrated-market-scalar / default branches in
+/// [`resolve_hw1f_params`].
+///
+/// # Unit contract
+///
+/// `hw1f_sigma` is a **short-rate** absolute volatility (annual decimal, ~0.005–0.015).
+/// It must NOT be confused with an option implied volatility (e.g. 0.20 lognormal),
+/// which lives in `market_quotes.implied_volatility`. Feeding an option vol directly
+/// into the HW tree would produce a ~13–40× mis-priced result.
 fn hw1f_overrides_json(swaption: &Swaption) -> Option<serde_json::Value> {
-    let kappa = swaption.pricing_overrides.model_config.mean_reversion?;
-    let sigma = swaption
+    let kappa = swaption
         .pricing_overrides
-        .market_quotes
-        .implied_volatility?;
+        .model_config
+        .hw1f_mean_reversion?;
+    let sigma = swaption.pricing_overrides.model_config.hw1f_sigma?;
     Some(serde_json::json!({ "hw1f_kappa": kappa, "hw1f_sigma": sigma }))
 }
 
@@ -423,10 +431,11 @@ mod tests {
             .value
             .amount();
 
-        // Add overrides matching the default params; PV should match default,
-        // not the market-scalar PV.
-        swaption.pricing_overrides.model_config.mean_reversion = Some(0.03);
-        swaption.pricing_overrides.market_quotes.implied_volatility = Some(0.01);
+        // Add HW1F-specific overrides (dedicated short-rate-vol field, NOT
+        // implied_volatility which is an option vol). PV must differ from the
+        // market-scalar PV.
+        swaption.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
+        swaption.pricing_overrides.model_config.hw1f_sigma = Some(0.01);
         let override_pv = SwaptionHullWhitePricer::default()
             .price_internal(&swaption, &market, as_of)
             .expect("override pricing should succeed")
@@ -436,6 +445,78 @@ mod tests {
         assert!(
             (override_pv - market_pv).abs() > 1e-9,
             "override PV ({override_pv}) must differ from market-scalar PV ({market_pv})"
+        );
+    }
+
+    /// Regression: `model_config.hw1f_sigma` (the dedicated short-rate σ field) must
+    /// reach the HW tree and change the PV. A different short-rate σ must produce a
+    /// different PV — confirming the dedicated channel is wired through.
+    #[test]
+    fn hw1f_sigma_override_field_reaches_tree() {
+        let (as_of, mut swaption, market) = example_single_curve();
+
+        // Default params PV.
+        let default_pv = SwaptionHullWhitePricer::default()
+            .price_internal(&swaption, &market, as_of)
+            .expect("default pricing should succeed")
+            .value
+            .amount();
+
+        // Override with a significantly different short-rate σ. The HW1F default
+        // σ is ~0.01; using 0.03 (3×) should produce a clearly different PV.
+        swaption.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
+        swaption.pricing_overrides.model_config.hw1f_sigma = Some(0.030);
+        let overridden_pv = SwaptionHullWhitePricer::default()
+            .price_internal(&swaption, &market, as_of)
+            .expect("hw1f_sigma override pricing should succeed")
+            .value
+            .amount();
+
+        assert!(overridden_pv.is_finite(), "PV must be finite: {overridden_pv}");
+        assert!(
+            (overridden_pv - default_pv).abs() > 1e-9,
+            "hw1f_sigma override must change PV vs default: override={overridden_pv}, default={default_pv}"
+        );
+    }
+
+    /// Regression (W26): `market_quotes.implied_volatility` must NOT be silently
+    /// treated as the HW1F short-rate σ. When only `implied_volatility` is set
+    /// (without the dedicated `hw1f_sigma`/`hw1f_mean_reversion` fields), the
+    /// pricer must fall through to the calibrated-scalar / default branch — NOT
+    /// use the option vol as the short-rate vol.
+    ///
+    /// Specifically: setting `implied_volatility = 0.20` (a typical lognormal
+    /// swaption vol) while leaving `hw1f_sigma = None` must yield the same PV
+    /// as leaving `implied_volatility` unset, because the HW pricer does not
+    /// consume `market_quotes.implied_volatility` for its short-rate σ.
+    #[test]
+    fn implied_volatility_is_not_used_as_hw1f_sigma() {
+        let (as_of, mut swaption_with_iv, market) = example_single_curve();
+        let (as_of2, swaption_no_iv, market2) = example_single_curve();
+        let _ = (as_of2, market2); // same values, use as_of/market throughout
+
+        // PV without implied_volatility set.
+        let pv_no_iv = SwaptionHullWhitePricer::default()
+            .price_internal(&swaption_no_iv, &market, as_of)
+            .expect("no-iv pricing should succeed")
+            .value
+            .amount();
+
+        // Set implied_volatility = 0.20 (a typical lognormal swaption vol) but
+        // leave hw1f_sigma/hw1f_mean_reversion unset. If the bug is present,
+        // 0.20 would be fed into the HW tree as σ, producing a wildly different PV.
+        swaption_with_iv.pricing_overrides.market_quotes.implied_volatility = Some(0.20);
+        let pv_with_iv = SwaptionHullWhitePricer::default()
+            .price_internal(&swaption_with_iv, &market, as_of)
+            .expect("iv-only pricing should succeed")
+            .value
+            .amount();
+
+        assert!(
+            (pv_with_iv - pv_no_iv).abs() < 1e-9,
+            "implied_volatility must NOT alter the HW tree pricing: \
+             pv_with_iv={pv_with_iv}, pv_no_iv={pv_no_iv} (diff={})",
+            (pv_with_iv - pv_no_iv).abs()
         );
     }
 }

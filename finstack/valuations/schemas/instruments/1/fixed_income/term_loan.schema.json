@@ -2286,6 +2286,22 @@
                     "null"
                   ]
                 },
+                "hw1f_mean_reversion": {
+                  "description": "Hull-White 1F mean-reversion speed override (κ), in annualised units.\n\nCompanion to [`Self::hw1f_sigma`]: both must be set for the explicit HW1F\noverride to take effect. Typical values: 0.01–0.10.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "hw1f_sigma": {
+                  "description": "Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.\n\nThis is the **short-rate** σ used directly in the HW1F stochastic differential\nequation `dr = [θ(t) − κr] dt + σ dW`. It is **not** an option implied\nvolatility (Black/Normal) and must not be confused with `implied_volatility`.\n\nTypical values: 0.005–0.015 (50–150 bp/year annualised short-rate vol).\nA value of 0.20 (a typical lognormal swaption vol) would be approximately\n13–40× too large and would produce a wildly mis-priced HW tree.\n\nMust be set together with [`Self::hw1f_mean_reversion`]; a partial override\n(only σ or only κ) falls through to the calibrated-scalar / default branch.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
                 "implied_volatility": {
                   "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",
                   "format": "double",

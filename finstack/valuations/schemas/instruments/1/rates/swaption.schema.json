@@ -264,7 +264,7 @@
               ]
             },
             "CashSettlementMethod": {
-              "description": "Cash settlement annuity method for cash-settled swaptions.\n\nDifferent methods exist for calculating the annuity factor used in cash settlement:\n\n# Market Background\n\nWhen a swaption is cash-settled, the payoff is:\n```text\nPayoff = Annuity × max(S - K, 0)  [for payer]\n```\n\nThe choice of annuity method affects the settlement amount and can result\nin differences of several basis points on notional for steep curves.\n\n# ⚠️ Production Recommendation\n\nFor production systems requiring ISDA compliance, use [`IsdaParPar`](Self::IsdaParPar):\n\n```rust,ignore\nlet swaption = Swaption::example()\n    .with_cash_settlement_method(CashSettlementMethod::IsdaParPar);\n```\n\nThe default `ParYield` method is a fast approximation suitable for:\n- Quick calculations and screening\n- Flat yield curve environments\n- Short-dated swaptions where precision is less critical\n\n# References\n\n- ISDA 2006 Definitions, Section 18.2\n- \"Interest Rate Models\" by Brigo & Mercurio, Chapter 6\n- Bloomberg VCUB/SWPM: Uses ISDA Par-Par for production",
+              "description": "Cash settlement annuity method for cash-settled swaptions.\n\nDifferent methods exist for calculating the annuity factor used in cash settlement:\n\n# Market Background\n\nWhen a swaption is cash-settled, the payoff is:\n```text\nPayoff = Annuity × max(S - K, 0)  [for payer]\n```\n\nThe choice of annuity method affects the settlement amount and can result\nin differences of several basis points on notional for steep curves.\n\n# ⚠️ Production Recommendation\n\nFor production systems requiring ISDA compliance, use [`IsdaParPar`](Self::IsdaParPar):\n\n```ignore\nlet swaption = Swaption::example()\n    .with_cash_settlement_method(CashSettlementMethod::IsdaParPar);\n```\n\nThe default `ParYield` method is a fast approximation suitable for:\n- Quick calculations and screening\n- Flat yield curve environments\n- Short-dated swaptions where precision is less critical\n\n# References\n\n- ISDA 2006 Definitions, Section 18.2\n- \"Interest Rate Models\" by Brigo & Mercurio, Chapter 6\n- Bloomberg VCUB/SWPM: Uses ISDA Par-Par for production",
               "oneOf": [
                 {
                   "const": "par_yield",
@@ -1562,6 +1562,22 @@
                     "null"
                   ]
                 },
+                "hw1f_mean_reversion": {
+                  "description": "Hull-White 1F mean-reversion speed override (κ), in annualised units.\n\nCompanion to [`Self::hw1f_sigma`]: both must be set for the explicit HW1F\noverride to take effect. Typical values: 0.01–0.10.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "hw1f_sigma": {
+                  "description": "Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.\n\nThis is the **short-rate** σ used directly in the HW1F stochastic differential\nequation `dr = [θ(t) − κr] dt + σ dW`. It is **not** an option implied\nvolatility (Black/Normal) and must not be confused with `implied_volatility`.\n\nTypical values: 0.005–0.015 (50–150 bp/year annualised short-rate vol).\nA value of 0.20 (a typical lognormal swaption vol) would be approximately\n13–40× too large and would produce a wildly mis-priced HW tree.\n\nMust be set together with [`Self::hw1f_mean_reversion`]; a partial override\n(only σ or only κ) falls through to the calibrated-scalar / default branch.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
                 "implied_volatility": {
                   "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",
                   "format": "double",
@@ -2221,7 +2237,7 @@
                 }
               ],
               "default": null,
-              "description": "Holiday calendar ID for schedule generation.\n\nControls business day adjustment and payment date calculation for the\nunderlying swap schedule. When `None`, uses weekends-only calendar\n(no holiday adjustments). For production use, set to the appropriate\ncurrency calendar (e.g., `\"nyse\"` for USD, `\"target\"` for EUR).\n\n# Example\n\n```rust,ignore\nlet swaption = Swaption::example()\n    .with_calendar(\"nyse\");\n```"
+              "description": "Holiday calendar ID for schedule generation.\n\nControls business day adjustment and payment date calculation for the\nunderlying swap schedule. When `None`, uses weekends-only calendar\n(no holiday adjustments). For production use, set to the appropriate\ncurrency calendar (e.g., `\"nyse\"` for USD, `\"target\"` for EUR).\n\n# Example\n\n```ignore\nlet swaption = Swaption::example()\n    .with_calendar(\"nyse\");\n```"
             },
             "cash_settlement_method": {
               "$ref": "#/$defs/CashSettlementMethod",

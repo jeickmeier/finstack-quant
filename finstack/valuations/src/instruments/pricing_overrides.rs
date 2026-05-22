@@ -434,6 +434,26 @@ pub struct ModelConfig {
     /// tighter rate dispersion at long maturities.
     /// When `None` or zero, the tree uses pure Ho-Lee dynamics (no mean reversion).
     pub mean_reversion: Option<f64>,
+    /// Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.
+    ///
+    /// This is the **short-rate** σ used directly in the HW1F stochastic differential
+    /// equation `dr = [θ(t) − κr] dt + σ dW`. It is **not** an option implied
+    /// volatility (Black/Normal) and must not be confused with `implied_volatility`.
+    ///
+    /// Typical values: 0.005–0.015 (50–150 bp/year annualised short-rate vol).
+    /// A value of 0.20 (a typical lognormal swaption vol) would be approximately
+    /// 13–40× too large and would produce a wildly mis-priced HW tree.
+    ///
+    /// Must be set together with [`Self::hw1f_mean_reversion`]; a partial override
+    /// (only σ or only κ) falls through to the calibrated-scalar / default branch.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hw1f_sigma: Option<f64>,
+    /// Hull-White 1F mean-reversion speed override (κ), in annualised units.
+    ///
+    /// Companion to [`Self::hw1f_sigma`]: both must be set for the explicit HW1F
+    /// override to take effect. Typical values: 0.01–0.10.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hw1f_mean_reversion: Option<f64>,
     /// Optional discount curve identifier for tree-based option/OAS models.
     ///
     /// Some vendor OAS screens use a model curve distinct from the bond's pricing
@@ -506,6 +526,8 @@ impl ModelConfig {
         check_finite_fields(&[
             (self.call_friction_cents, true),
             (self.mean_reversion, true),
+            (self.hw1f_sigma, true),
+            (self.hw1f_mean_reversion, true),
         ])
     }
 }

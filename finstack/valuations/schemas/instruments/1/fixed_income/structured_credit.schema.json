@@ -1546,7 +1546,7 @@
               ]
             },
             "CsaSpec": {
-              "description": "Credit Support Annex specification (ISDA standard).\n\nThe CSA governs the exchange of collateral between counterparties\nfor OTC derivatives. This specification captures all key commercial\nterms needed for margin calculation and management.\n\n# ISDA Documentation\n\nThis type represents terms from:\n- ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)\n- ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)\n\n# References\n\n- ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`\n- ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`\n- BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`\n\n# Example\n\n```rust,no_run\nuse finstack_margin::{\n    CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,\n    MarginCallTiming, ImMethodology, MarginTenor,\n};\nuse finstack_core::currency::Currency;\nuse finstack_core::money::Money;\n\n# fn main() -> finstack_core::Result<()> {\nlet csa = CsaSpec {\n    id: \"USD-CSA-2024\".to_string(),\n    base_currency: Currency::USD,\n    vm_params: VmParameters::regulatory_standard(Currency::USD)?,\n    im_params: Some(ImParameters::simm_standard(Currency::USD)?),\n    eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,\n    call_timing: MarginCallTiming::regulatory_standard()?,\n    collateral_curve_id: \"USD-OIS\".into(),\n};\n# Ok(())\n# }\n```",
+              "description": "Credit Support Annex specification (ISDA standard).\n\nThe CSA governs the exchange of collateral between counterparties\nfor OTC derivatives. This specification captures all key commercial\nterms needed for margin calculation and management.\n\n# ISDA Documentation\n\nThis type represents terms from:\n- ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)\n- ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)\n\n# References\n\n- ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`\n- ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`\n- BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`\n\n# Example\n\n```ignore\nuse finstack_margin::{\n    CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,\n    MarginCallTiming, ImMethodology, MarginTenor,\n};\nuse finstack_core::currency::Currency;\nuse finstack_core::money::Money;\n\n# fn main() -> finstack_core::Result<()> {\nlet csa = CsaSpec {\n    id: \"USD-CSA-2024\".to_string(),\n    base_currency: Currency::USD,\n    vm_params: VmParameters::regulatory_standard(Currency::USD)?,\n    im_params: Some(ImParameters::simm_standard(Currency::USD)?),\n    eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,\n    call_timing: MarginCallTiming::regulatory_standard()?,\n    collateral_curve_id: \"USD-OIS\".into(),\n};\n# Ok(())\n# }\n```",
               "properties": {
                 "base_currency": {
                   "$ref": "#/$defs/Currency",
@@ -2610,7 +2610,7 @@
               "type": "object"
             },
             "EligibleCollateralSchedule": {
-              "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```rust,no_run\nuse finstack_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_core::Error>(())\n```",
+              "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```ignore\nuse finstack_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_core::Error>(())\n```",
               "properties": {
                 "default_haircut": {
                   "description": "Default haircut for unlisted collateral (if accepted)\n\nIf None, only explicitly listed collateral types are accepted.",
@@ -3119,7 +3119,7 @@
               ]
             },
             "ImParameters": {
-              "description": "Initial margin parameters.\n\nInitial margin is collateral posted to cover potential future exposure (PFE)\nduring the close-out period following a default. IM is required for\nnon-centrally cleared derivatives under BCBS-IOSCO rules.\n\n# Margin Period of Risk (MPOR)\n\nThe MPOR determines the horizon over which PFE is calculated:\n- Standard: 10 business days for bilateral derivatives\n- Reduced: 5 days for certain liquid products\n\n# Example\n\n```rust,no_run\nuse finstack_margin::{ImMethodology, ImParameters};\nuse finstack_core::currency::Currency;\nuse finstack_core::money::Money;\n\nlet im_params = ImParameters {\n    methodology: ImMethodology::Simm,\n    mpor_days: 10,\n    threshold: Money::new(50_000_000.0, Currency::USD),\n    mta: Money::new(0.0, Currency::USD), // Combined with VM MTA\n    segregated: true,\n};\n```",
+              "description": "Initial margin parameters.\n\nInitial margin is collateral posted to cover potential future exposure (PFE)\nduring the close-out period following a default. IM is required for\nnon-centrally cleared derivatives under BCBS-IOSCO rules.\n\n# Margin Period of Risk (MPOR)\n\nThe MPOR determines the horizon over which PFE is calculated:\n- Standard: 10 business days for bilateral derivatives\n- Reduced: 5 days for certain liquid products\n\n# Example\n\n```ignore\nuse finstack_margin::{ImMethodology, ImParameters};\nuse finstack_core::currency::Currency;\nuse finstack_core::money::Money;\n\nlet im_params = ImParameters {\n    methodology: ImMethodology::Simm,\n    mpor_days: 10,\n    threshold: Money::new(50_000_000.0, Currency::USD),\n    mta: Money::new(0.0, Currency::USD), // Combined with VM MTA\n    segregated: true,\n};\n```",
               "properties": {
                 "methodology": {
                   "$ref": "#/$defs/ImMethodology",
@@ -3463,7 +3463,7 @@
               ]
             },
             "OtcMarginSpec": {
-              "description": "OTC derivative margin specification (ISDA CSA compliant).\n\nThis is the standard margin specification for bilateral and cleared\nOTC derivatives. It combines CSA terms with clearing-specific parameters.\n\n# Usage\n\nAttach this to any OTC derivative instrument that requires margining:\n- Interest Rate Swaps (IRS)\n- Credit Default Swaps (CDS)\n- CDS Indices\n- Total Return Swaps (TRS)\n\n# Example\n\n```rust,no_run\nuse finstack_margin::{OtcMarginSpec, CsaSpec, ClearingStatus, ImMethodology, MarginTenor};\n\n# fn main() -> finstack_core::Result<()> {\n// Bilateral (uncleared) derivative\nlet bilateral_spec = OtcMarginSpec::bilateral_simm(CsaSpec::usd_regulatory()?);\n\n// Cleared derivative\nlet cleared_spec = OtcMarginSpec::cleared(\"LCH\", finstack_core::currency::Currency::USD)?;\n# Ok(())\n# }\n```",
+              "description": "OTC derivative margin specification (ISDA CSA compliant).\n\nThis is the standard margin specification for bilateral and cleared\nOTC derivatives. It combines CSA terms with clearing-specific parameters.\n\n# Usage\n\nAttach this to any OTC derivative instrument that requires margining:\n- Interest Rate Swaps (IRS)\n- Credit Default Swaps (CDS)\n- CDS Indices\n- Total Return Swaps (TRS)\n\n# Example\n\n```ignore\nuse finstack_margin::{OtcMarginSpec, CsaSpec, ClearingStatus, ImMethodology, MarginTenor};\n\n# fn main() -> finstack_core::Result<()> {\n// Bilateral (uncleared) derivative\nlet bilateral_spec = OtcMarginSpec::bilateral_simm(CsaSpec::usd_regulatory()?);\n\n// Cleared derivative\nlet cleared_spec = OtcMarginSpec::cleared(\"LCH\", finstack_core::currency::Currency::USD)?;\n# Ok(())\n# }\n```",
               "properties": {
                 "clearing_status": {
                   "$ref": "#/$defs/ClearingStatus",
@@ -3985,6 +3985,22 @@
                 "credit_spread_bump_bp": {
                   "default": null,
                   "description": "Custom credit spread bump size override (in basis points, e.g., 1.0 for 1bp).\n\nUsed by CS01 calculations that bump par spreads / hazard calibration quotes.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "hw1f_mean_reversion": {
+                  "description": "Hull-White 1F mean-reversion speed override (κ), in annualised units.\n\nCompanion to [`Self::hw1f_sigma`]: both must be set for the explicit HW1F\noverride to take effect. Typical values: 0.01–0.10.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "hw1f_sigma": {
+                  "description": "Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.\n\nThis is the **short-rate** σ used directly in the HW1F stochastic differential\nequation `dr = [θ(t) − κr] dt + σ dW`. It is **not** an option implied\nvolatility (Black/Normal) and must not be confused with `implied_volatility`.\n\nTypical values: 0.005–0.015 (50–150 bp/year annualised short-rate vol).\nA value of 0.20 (a typical lognormal swaption vol) would be approximately\n13–40× too large and would produce a wildly mis-priced HW tree.\n\nMust be set together with [`Self::hw1f_mean_reversion`]; a partial override\n(only σ or only κ) falls through to the calibrated-scalar / default branch.",
                   "format": "double",
                   "type": [
                     "number",
@@ -4994,7 +5010,7 @@
                   "description": "Size and balances"
                 },
                 "payment_priority": {
-                  "description": "Payment priority (1 = highest)",
+                  "description": "Payment priority (1 = most senior, paid first).\n\nOn a standalone `Tranche` this is a *provisional* value derived from\n`seniority` (see `Tranche::new`). It is **overwritten deterministically**\nby [`TrancheStructure::new`] (and by deserialization of a\n`TrancheStructure`), which ranks every tranche by structural seniority so\nthat multiple notes at one `TrancheSeniority` (e.g. Class A-1/A-2/A-3 all\n`Senior`) receive distinct, strictly-increasing priorities. Do not rely\non this field outside of an assembled `TrancheStructure`.",
                   "format": "uint32",
                   "minimum": 0,
                   "type": "integer"
@@ -5236,7 +5252,7 @@
               ]
             },
             "VmParameters": {
-              "description": "Variation margin parameters.\n\nThese parameters govern the daily (or periodic) exchange of variation margin\nunder a CSA agreement. VM is exchanged to eliminate mark-to-market exposure.\n\n# ISDA CSA Standard Terms\n\nThe 2016 VM CSA introduced standardized terms for variation margin:\n- Zero threshold for in-scope entities\n- Daily exchange with T+1 settlement\n- Cash or highly liquid securities as collateral\n\n# Example\n\n```rust,no_run\nuse finstack_margin::{MarginTenor, VmParameters};\nuse finstack_core::currency::Currency;\nuse finstack_core::money::Money;\n\nlet vm_params = VmParameters {\n    threshold: Money::new(10_000_000.0, Currency::USD),\n    mta: Money::new(500_000.0, Currency::USD),\n    rounding: Money::new(10_000.0, Currency::USD),\n    independent_amount: Money::new(0.0, Currency::USD),\n    frequency: MarginTenor::Daily,\n    settlement_lag: 1,\n};\n```",
+              "description": "Variation margin parameters.\n\nThese parameters govern the daily (or periodic) exchange of variation margin\nunder a CSA agreement. VM is exchanged to eliminate mark-to-market exposure.\n\n# ISDA CSA Standard Terms\n\nThe 2016 VM CSA introduced standardized terms for variation margin:\n- Zero threshold for in-scope entities\n- Daily exchange with T+1 settlement\n- Cash or highly liquid securities as collateral\n\n# Example\n\n```ignore\nuse finstack_margin::{MarginTenor, VmParameters};\nuse finstack_core::currency::Currency;\nuse finstack_core::money::Money;\n\nlet vm_params = VmParameters {\n    threshold: Money::new(10_000_000.0, Currency::USD),\n    mta: Money::new(500_000.0, Currency::USD),\n    rounding: Money::new(10_000.0, Currency::USD),\n    independent_amount: Money::new(0.0, Currency::USD),\n    frequency: MarginTenor::Daily,\n    settlement_lag: 1,\n};\n```",
               "properties": {
                 "frequency": {
                   "$ref": "#/$defs/MarginTenor",

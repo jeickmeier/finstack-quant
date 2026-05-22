@@ -1151,7 +1151,7 @@
               ]
             },
             "EligibleCollateralSchedule": {
-              "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```rust,no_run\nuse finstack_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_core::Error>(())\n```",
+              "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```ignore\nuse finstack_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_core::Error>(())\n```",
               "properties": {
                 "default_haircut": {
                   "description": "Default haircut for unlisted collateral (if accepted)\n\nIf None, only explicitly listed collateral types are accepted.",
@@ -1367,6 +1367,22 @@
                 "credit_spread_bump_bp": {
                   "default": null,
                   "description": "Custom credit spread bump size override (in basis points, e.g., 1.0 for 1bp).\n\nUsed by CS01 calculations that bump par spreads / hazard calibration quotes.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "hw1f_mean_reversion": {
+                  "description": "Hull-White 1F mean-reversion speed override (κ), in annualised units.\n\nCompanion to [`Self::hw1f_sigma`]: both must be set for the explicit HW1F\noverride to take effect. Typical values: 0.01–0.10.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "hw1f_sigma": {
+                  "description": "Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.\n\nThis is the **short-rate** σ used directly in the HW1F stochastic differential\nequation `dr = [θ(t) − κr] dt + σ dW`. It is **not** an option implied\nvolatility (Black/Normal) and must not be confused with `implied_volatility`.\n\nTypical values: 0.005–0.015 (50–150 bp/year annualised short-rate vol).\nA value of 0.20 (a typical lognormal swaption vol) would be approximately\n13–40× too large and would produce a wildly mis-priced HW tree.\n\nMust be set together with [`Self::hw1f_mean_reversion`]; a partial override\n(only σ or only κ) falls through to the calibrated-scalar / default branch.",
                   "format": "double",
                   "type": [
                     "number",
@@ -1660,7 +1676,7 @@
               "type": "object"
             },
             "RepoMarginSpec": {
-              "description": "GMRA 2011 compliant repo margin specification.\n\nDefines margin maintenance parameters for repurchase agreements\nfollowing GMRA 2011 standards.\n\n# Example\n\n```rust,no_run\nuse finstack_margin::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};\n\nlet margin_spec = RepoMarginSpec {\n    margin_type: RepoMarginType::MarkToMarket,\n    margin_ratio: 1.02,           // 2% over-collateralization\n    margin_call_threshold: 0.01,  // 1% deviation triggers call\n    call_frequency: MarginTenor::Daily,\n    settlement_lag: 1,\n    pays_margin_interest: true,\n    margin_interest_rate: Some(0.05),\n    substitution_allowed: true,\n    eligible_substitutes: Some(EligibleCollateralSchedule::us_treasuries()?),\n};\n# Ok::<(), finstack_core::Error>(())\n```\n\n# GMRA 2011 References\n\n- Paragraph 4: Margin Maintenance\n- Paragraph 5: Income Payments\n- Paragraph 8: Substitution\n- Annex I: Margin Ratio and Haircut",
+              "description": "GMRA 2011 compliant repo margin specification.\n\nDefines margin maintenance parameters for repurchase agreements\nfollowing GMRA 2011 standards.\n\n# Example\n\n```ignore\nuse finstack_margin::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};\n\nlet margin_spec = RepoMarginSpec {\n    margin_type: RepoMarginType::MarkToMarket,\n    margin_ratio: 1.02,           // 2% over-collateralization\n    margin_call_threshold: 0.01,  // 1% deviation triggers call\n    call_frequency: MarginTenor::Daily,\n    settlement_lag: 1,\n    pays_margin_interest: true,\n    margin_interest_rate: Some(0.05),\n    substitution_allowed: true,\n    eligible_substitutes: Some(EligibleCollateralSchedule::us_treasuries()?),\n};\n# Ok::<(), finstack_core::Error>(())\n```\n\n# GMRA 2011 References\n\n- Paragraph 4: Margin Maintenance\n- Paragraph 5: Income Payments\n- Paragraph 8: Substitution\n- Annex I: Margin Ratio and Haircut",
               "properties": {
                 "call_frequency": {
                   "$ref": "#/$defs/MarginTenor",
