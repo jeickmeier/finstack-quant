@@ -43,7 +43,7 @@ impl AttributionSpec {
         // 1. Resolve issuer id from instrument attributes.
         let issuer_id_str = match instrument
             .attributes()
-            .get_meta(finstack_core::factor_model::matching::ISSUER_ID_META_KEY)
+            .get_meta(finstack_factor_model::matching::ISSUER_ID_META_KEY)
         {
             Some(s) => s.to_string(),
             None => return Ok(None),
@@ -190,9 +190,9 @@ impl AttributionSpec {
     ) -> Result<()> {
         use super::credit_factor::credit_factor_model_id;
         use super::types::{CreditCarryByLevel, CreditCarryDecomposition, LevelCarry, SourceLine};
-        use finstack_core::factor_model::credit_hierarchy::{dimension_key, HierarchyDimension};
         use finstack_core::math::Compounding;
         use finstack_core::money::Money;
+        use finstack_factor_model::credit_hierarchy::{dimension_key, HierarchyDimension};
         use std::collections::BTreeMap;
 
         // 0. Need a populated carry_detail to split.
@@ -205,7 +205,7 @@ impl AttributionSpec {
         // 1. Resolve issuer.
         let issuer_id_str = match instrument
             .attributes()
-            .get_meta(finstack_core::factor_model::matching::ISSUER_ID_META_KEY)
+            .get_meta(finstack_factor_model::matching::ISSUER_ID_META_KEY)
         {
             Some(s) => s.to_string(),
             None => return Ok(()),

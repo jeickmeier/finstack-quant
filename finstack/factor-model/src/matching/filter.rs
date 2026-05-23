@@ -1,5 +1,5 @@
-use crate::factor_model::dependency::{CurveType, DependencyType, MarketDependency};
-use crate::types::Attributes;
+use crate::primitives::dependency::{CurveType, DependencyType, MarketDependency};
+use finstack_core::types::Attributes;
 use serde::{Deserialize, Serialize};
 
 /// Filters on instrument metadata.
@@ -72,8 +72,8 @@ impl DependencyFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::factor_model::CurveType;
-    use crate::types::CurveId;
+    use crate::CurveType;
+    use finstack_core::types::CurveId;
 
     #[test]
     fn test_attribute_filter_empty_matches_all() {
@@ -223,8 +223,8 @@ mod tests {
             id: Some("USD/EUR".into()),
         };
         let dep = MarketDependency::FxPair {
-            base: crate::currency::Currency::USD,
-            quote: crate::currency::Currency::EUR,
+            base: finstack_core::currency::Currency::USD,
+            quote: finstack_core::currency::Currency::EUR,
         };
 
         assert!(filter.matches(&dep));

@@ -1,5 +1,5 @@
-use crate::currency::Currency;
-use crate::types::CurveId;
+use finstack_core::currency::Currency;
+use finstack_core::types::CurveId;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
@@ -44,10 +44,11 @@ impl crate::parse::NormalizedEnum for CurveType {
 }
 
 impl FromStr for CurveType {
-    type Err = crate::error::Error;
+    type Err = finstack_core::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        crate::parse::parse_normalized_enum(s).map_err(|_| crate::error::InputError::Invalid.into())
+        crate::parse::parse_normalized_enum(s)
+            .map_err(|_| finstack_core::InputError::Invalid.into())
     }
 }
 
@@ -104,10 +105,11 @@ impl crate::parse::NormalizedEnum for DependencyType {
 }
 
 impl FromStr for DependencyType {
-    type Err = crate::error::Error;
+    type Err = finstack_core::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        crate::parse::parse_normalized_enum(s).map_err(|_| crate::error::InputError::Invalid.into())
+        crate::parse::parse_normalized_enum(s)
+            .map_err(|_| finstack_core::InputError::Invalid.into())
     }
 }
 

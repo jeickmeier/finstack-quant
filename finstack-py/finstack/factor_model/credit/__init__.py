@@ -1,0 +1,25 @@
+"""Credit factor hierarchy artifacts, calibration, and decomposition."""
+
+from __future__ import annotations
+
+from finstack.finstack import factor_model as _factor_model
+
+_credit = _factor_model.credit
+
+CreditFactorModel = _credit.CreditFactorModel
+CreditCalibrator = _credit.CreditCalibrator
+LevelsAtDate = _credit.LevelsAtDate
+PeriodDecomposition = _credit.PeriodDecomposition
+FactorCovarianceForecast = _credit.FactorCovarianceForecast
+decompose_levels = _credit.decompose_levels
+decompose_period = _credit.decompose_period
+
+__all__: list[str] = [
+    "CreditCalibrator",
+    "CreditFactorModel",
+    "FactorCovarianceForecast",
+    "LevelsAtDate",
+    "PeriodDecomposition",
+    "decompose_levels",
+    "decompose_period",
+]

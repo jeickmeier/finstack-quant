@@ -28,6 +28,7 @@
 //! | `analytics`        | [`finstack_analytics`]            |
 //! | `cashflows`        | [`finstack_cashflows`]            |
 //! | `covenants`        | [`finstack_covenants`]            |
+//! | `factor_model`     | [`finstack_factor_model`]         |
 //! | `margin`           | [`finstack_margin`]               |
 //! | `monte_carlo`      | [`finstack_monte_carlo`]          |
 //! | `valuations`       | [`finstack_valuations`]           |
@@ -40,6 +41,7 @@ pub use finstack_analytics as analytics;
 pub use finstack_cashflows as cashflows;
 pub use finstack_core as core;
 pub use finstack_covenants as covenants;
+pub use finstack_factor_model as factor_model;
 pub use finstack_margin as margin;
 pub use finstack_monte_carlo as monte_carlo;
 pub use finstack_portfolio as portfolio;

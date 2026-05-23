@@ -459,9 +459,9 @@ pub type PoolId = Id<PoolTag>;
 pub type DealId = Id<DealTag>;
 /// Type-safe identifier for a credit issuer.
 ///
-/// This is the canonical key used throughout the credit factor model hierarchy:
-/// in [`crate::factor_model::credit_hierarchy::IssuerBetaRow`], in
-/// `VolState::idiosyncratic`, and anywhere a per-issuer lookup is required.
+/// This is the canonical key used throughout the credit factor model hierarchy
+/// in `finstack-factor-model`, in `VolState::idiosyncratic`, and anywhere
+/// a per-issuer lookup is required.
 pub type IssuerId = Id<IssuerTag>;
 
 #[cfg(test)]

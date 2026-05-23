@@ -63,7 +63,7 @@ impl fmt::Display for FactorType {
 }
 
 impl FromStr for FactorType {
-    type Err = crate::error::Error;
+    type Err = finstack_core::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let n = crate::parse::normalize_label(s);
@@ -83,7 +83,7 @@ impl FromStr for FactorType {
             "volatility" | "vol" => Ok(Self::Volatility),
             "commodity" => Ok(Self::Commodity),
             "inflation" => Ok(Self::Inflation),
-            _ => Err(crate::error::InputError::Invalid.into()),
+            _ => Err(finstack_core::InputError::Invalid.into()),
         }
     }
 }

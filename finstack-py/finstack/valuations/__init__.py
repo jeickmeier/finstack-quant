@@ -6,6 +6,7 @@ Bindings for the ``finstack-valuations`` Rust crate.
 import json as _json
 from typing import TYPE_CHECKING as _TYPE_CHECKING, Any as _Any
 
+from finstack.factor_model import credit as _factor_model_credit
 from finstack.finstack import valuations as _valuations
 from finstack.valuations import (
     correlation as correlation,
@@ -141,13 +142,13 @@ SabrModel = _valuations.SabrModel
 SabrSmile = _valuations.SabrSmile
 SabrCalibrator = _valuations.SabrCalibrator
 instrument_cashflows_json = _valuations.instrument_cashflows_json
-CreditFactorModel = _valuations.CreditFactorModel
-CreditCalibrator = _valuations.CreditCalibrator
-LevelsAtDate = _valuations.LevelsAtDate
-PeriodDecomposition = _valuations.PeriodDecomposition
-FactorCovarianceForecast = _valuations.FactorCovarianceForecast
-decompose_levels = _valuations.decompose_levels
-decompose_period = _valuations.decompose_period
+CreditFactorModel = _factor_model_credit.CreditFactorModel
+CreditCalibrator = _factor_model_credit.CreditCalibrator
+LevelsAtDate = _factor_model_credit.LevelsAtDate
+PeriodDecomposition = _factor_model_credit.PeriodDecomposition
+FactorCovarianceForecast = _factor_model_credit.FactorCovarianceForecast
+decompose_levels = _factor_model_credit.decompose_levels
+decompose_period = _factor_model_credit.decompose_period
 
 # Canonical structural-credit exports live at `finstack.valuations.*`; the
 # `finstack.valuations.credit` module remains only as an import-compatibility

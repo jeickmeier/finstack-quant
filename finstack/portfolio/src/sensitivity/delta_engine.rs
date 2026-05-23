@@ -1,13 +1,11 @@
 use super::traits::FactorSensitivityEngine;
 use finstack_core::dates::Date;
-use finstack_core::factor_model::{
-    BumpSizeConfig, FactorBumpUnit, FactorDefinition, MarketMapping,
-};
 use finstack_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, MarketBump};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::types::CurveId;
 use finstack_core::{Error, InputError, Result};
 use finstack_factor_model::sensitivity_matrix::SensitivityMatrix;
+use finstack_factor_model::{BumpSizeConfig, FactorBumpUnit, FactorDefinition, MarketMapping};
 use finstack_valuations::instruments::Instrument;
 
 use rayon::prelude::*;
@@ -493,8 +491,8 @@ mod tests {
         let instrument = MockInstrument::curve_zero("curve-inst", "USD-OIS", 5.0, 10_000.0);
         let positions = vec![("curve-pos".to_string(), &instrument as &dyn Instrument, 1.0)];
         let factors = vec![FactorDefinition {
-            id: finstack_core::factor_model::FactorId::new("rates"),
-            factor_type: finstack_core::factor_model::FactorType::Rates,
+            id: finstack_factor_model::FactorId::new("rates"),
+            factor_type: finstack_factor_model::FactorType::Rates,
             market_mapping: MarketMapping::CurveParallel {
                 curve_ids: vec![CurveId::new("USD-OIS")],
                 units: BumpUnits::RateBp,
@@ -518,8 +516,8 @@ mod tests {
         let instrument = MockInstrument::spot("spot-inst", "SPOT", 1.0);
         let positions = vec![("spot-pos".to_string(), &instrument as &dyn Instrument, 1.0)];
         let factors = vec![FactorDefinition {
-            id: finstack_core::factor_model::FactorId::new("equity"),
-            factor_type: finstack_core::factor_model::FactorType::Equity,
+            id: finstack_factor_model::FactorId::new("equity"),
+            factor_type: finstack_factor_model::FactorType::Equity,
             market_mapping: MarketMapping::EquitySpot {
                 tickers: vec!["SPOT".to_string()],
             },

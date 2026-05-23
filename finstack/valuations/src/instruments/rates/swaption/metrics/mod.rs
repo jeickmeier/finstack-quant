@@ -4,8 +4,6 @@
 //! maintainability. The module exposes a registration helper to wire metrics
 //! into the shared `MetricRegistry`.
 
-#![allow(dead_code)] // WIP: public API not yet wired into main pricing paths
-
 pub(crate) mod bermudan_greeks;
 mod delta;
 mod gamma;
@@ -148,15 +146,6 @@ pub(super) fn resolved_normal_sigma(
 /// Swaption metrics configuration constants.
 /// Centralizes scaling parameters to avoid magic numbers in calculators.
 pub(crate) mod config {
-
-    /// Basis points per unit (1.0 = 1 bp; 10000.0 = 100%).
-    pub(crate) const BP_PER_UNIT: f64 = 10000.0;
     /// Vega scale for 1% volatility change.
     pub(crate) const VOL_PCT_SCALE: f64 = 100.0;
-    /// Trading days per year for theta scaling (daily).
-    pub(crate) const THETA_DAYS_PER_YEAR: f64 = 365.0;
-    /// Discount curve parallel bump size in basis points for rho.
-    pub(crate) const DISC_BUMP_BP: f64 = 1.0;
-    /// Multiplier to convert 1bp PV change to per 1% rate move.
-    pub(crate) const RHO_PCT_PER_BP: f64 = 100.0;
 }

@@ -12,7 +12,9 @@
 //! name is obtained — kept separate to preserve the historical behavior at
 //! each call site without changing observable semantics.
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use serde_json::Value;
 
 /// Register `submodule` under `parent`, deriving the qualified path from the
 /// parent's `__package__` attribute and falling back to
@@ -97,4 +99,24 @@ fn submodule_name_by_package(
         .and_then(|v| v.extract::<String>().ok())
         .unwrap_or_else(|| parent_default_pkg.to_string());
     format!("{pkg}.{submod_name}")
+}
+
+/// Convert a Python object (e.g. dict or string) to a `serde_json::Value`.
+pub(crate) fn py_to_json_value<'py>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+    label: &str,
+) -> PyResult<Value> {
+    if let Ok(json) = obj.extract::<String>() {
+        return serde_json::from_str(&json)
+            .map_err(|e| PyValueError::new_err(format!("invalid {label} JSON: {e}")));
+    }
+
+    let json_mod = py.import("json")?;
+    let json: String = json_mod
+        .call_method1("dumps", (obj,))
+        .and_then(|value| value.extract())
+        .map_err(|e| PyValueError::new_err(format!("invalid {label}: {e}")))?;
+    serde_json::from_str(&json)
+        .map_err(|e| PyValueError::new_err(format!("invalid {label} JSON: {e}")))
 }

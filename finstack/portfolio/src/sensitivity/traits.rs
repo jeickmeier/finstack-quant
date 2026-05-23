@@ -1,8 +1,8 @@
 use finstack_core::dates::Date;
-use finstack_core::factor_model::FactorDefinition;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::Result;
 use finstack_factor_model::sensitivity_matrix::SensitivityMatrix;
+use finstack_factor_model::FactorDefinition;
 use finstack_valuations::instruments::Instrument;
 
 /// Engine for computing per-position, per-factor sensitivities.

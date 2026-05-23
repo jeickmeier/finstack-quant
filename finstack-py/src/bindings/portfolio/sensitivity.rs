@@ -585,10 +585,10 @@ fn decompose_factor_risk(
     covariance_json: &str,
     risk_measure: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyFactorRiskDecomposition> {
-    let factor_ids: Vec<finstack_core::factor_model::FactorId> = sensitivities
+    let factor_ids: Vec<finstack_factor_model::FactorId> = sensitivities
         .factor_ids
         .iter()
-        .map(finstack_core::factor_model::FactorId::new)
+        .map(finstack_factor_model::FactorId::new)
         .collect();
 
     if sensitivities.n_factors == 0 {
@@ -611,12 +611,12 @@ fn decompose_factor_risk(
         }
     }
 
-    let covariance: finstack_core::factor_model::FactorCovarianceMatrix =
+    let covariance: finstack_factor_model::FactorCovarianceMatrix =
         serde_json::from_str(covariance_json).map_err(display_to_py)?;
 
-    let measure: finstack_core::factor_model::RiskMeasure = match risk_measure {
+    let measure: finstack_factor_model::RiskMeasure = match risk_measure {
         Some(obj) => py_to_serde(py, obj, "risk_measure")?,
-        None => finstack_core::factor_model::RiskMeasure::Variance,
+        None => finstack_factor_model::RiskMeasure::Variance,
     };
 
     let decomposer = finstack_portfolio::factor_model::ParametricDecomposer;

@@ -54,8 +54,12 @@ pub use copula::{
     StudentTCopula,
 };
 pub use factor_model::{
-    cholesky_decompose, FactorModelKind, FactorSpec, MultiFactorModel, SingleFactorModel,
-    TwoFactorModel,
+    cholesky_decompose, LatentFactorKind, LatentFactorSpec, LatentMultiFactor, LatentSingleFactor,
+    LatentTwoFactor,
+};
+#[allow(deprecated)]
+pub use factor_model::{
+    FactorModelKind, FactorSpec, MultiFactorModel, SingleFactorModel, TwoFactorModel,
 };
 pub use finstack_analytics::correlation::{
     nearest_correlation_matrix, validate_correlation_matrix, Error, NearestCorrelationOpts, Result,

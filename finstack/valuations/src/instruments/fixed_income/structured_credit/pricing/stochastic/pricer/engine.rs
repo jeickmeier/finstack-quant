@@ -2,7 +2,7 @@
 
 use super::config::{PricingMode, StochasticPricerConfig};
 use super::result::{StochasticPricingResult, TranchePricingResult};
-use crate::correlation::{CopulaSpec, FactorSpec, RecoverySpec};
+use crate::correlation::{CopulaSpec, LatentFactorSpec, RecoverySpec};
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::{
     run_simulation_with_source, PerNameDefaultEngine, PerNamePeriodInput, PeriodPoolShock,
     StochasticPathFlowSource,
@@ -730,13 +730,13 @@ impl StochasticPricer {
 
     fn branching_variance_proxy(&self) -> f64 {
         let factor_var = match &self.config.tree_config.factor_spec {
-            FactorSpec::SingleFactor { volatility, .. } => volatility * volatility,
-            FactorSpec::TwoFactor {
+            LatentFactorSpec::SingleFactor { volatility, .. } => volatility * volatility,
+            LatentFactorSpec::TwoFactor {
                 credit_vol,
                 prepay_vol,
                 ..
             } => credit_vol * credit_vol + prepay_vol * prepay_vol,
-            FactorSpec::MultiFactor { volatilities, .. } => {
+            LatentFactorSpec::MultiFactor { volatilities, .. } => {
                 volatilities.iter().map(|v| v * v).sum::<f64>()
             }
         };

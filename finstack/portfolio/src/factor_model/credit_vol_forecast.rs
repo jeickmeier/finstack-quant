@@ -37,12 +37,12 @@
 
 use std::collections::BTreeMap;
 
-use finstack_core::factor_model::credit_hierarchy::{
+use finstack_core::types::IssuerId;
+use finstack_factor_model::credit_hierarchy::{
     CreditFactorModel, FactorVolModel, IdiosyncraticVolModel,
 };
-use finstack_core::factor_model::matching::CREDIT_GENERIC_FACTOR_ID;
-use finstack_core::factor_model::{FactorCovarianceMatrix, RiskMeasure};
-use finstack_core::types::IssuerId;
+use finstack_factor_model::matching::CREDIT_GENERIC_FACTOR_ID;
+use finstack_factor_model::{FactorCovarianceMatrix, RiskMeasure};
 
 use crate::factor_model::model::{FactorModel, FactorModelBuilder};
 use crate::factor_model::types::RiskDecomposition;
@@ -367,7 +367,7 @@ pub fn build_credit_vol_report(
     model: &CreditFactorModel,
     by_position: bool,
 ) -> CreditVolReport {
-    use finstack_core::factor_model::credit_hierarchy::HierarchyDimension;
+    use finstack_factor_model::credit_hierarchy::HierarchyDimension;
 
     let n_levels = model.hierarchy.levels.len();
     let mut by_level: Vec<LevelVolContribution> = (0..n_levels)
@@ -519,18 +519,18 @@ pub fn build_credit_vol_report(
 mod tests {
     use super::*;
     use finstack_core::dates::create_date;
-    use finstack_core::factor_model::credit_hierarchy::{
+    use finstack_core::market_data::bumps::BumpUnits;
+    use finstack_core::types::{CurveId, IssuerId};
+    use finstack_factor_model::credit_hierarchy::{
         CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
         FactorCorrelationMatrix, FactorVolModel, GenericFactorSpec, HierarchyDimension,
         IdiosyncraticVolModel, IssuerBetaPolicy, LevelsAtAnchor, VolState,
     };
-    use finstack_core::factor_model::matching::CreditHierarchicalConfig;
-    use finstack_core::factor_model::{
+    use finstack_factor_model::matching::CreditHierarchicalConfig;
+    use finstack_factor_model::{
         FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
         MarketMapping, MatchingConfig, PricingMode, RiskMeasure,
     };
-    use finstack_core::market_data::bumps::BumpUnits;
-    use finstack_core::types::{CurveId, IssuerId};
     use std::collections::BTreeMap;
     use time::Month;
 

@@ -129,10 +129,10 @@ pub fn decompose_factor_risk(
     }
 
     let input: SensInput = serde_json::from_str(sensitivities_json).map_err(to_js_err)?;
-    let factor_ids: Vec<finstack_core::factor_model::FactorId> = input
+    let factor_ids: Vec<finstack_factor_model::FactorId> = input
         .factor_ids
         .iter()
-        .map(finstack_core::factor_model::FactorId::new)
+        .map(finstack_factor_model::FactorId::new)
         .collect();
 
     let n_positions = input.position_ids.len();
@@ -147,12 +147,12 @@ pub fn decompose_factor_risk(
         }
     }
 
-    let covariance: finstack_core::factor_model::FactorCovarianceMatrix =
+    let covariance: finstack_factor_model::FactorCovarianceMatrix =
         serde_json::from_str(covariance_json).map_err(to_js_err)?;
 
-    let measure: finstack_core::factor_model::RiskMeasure = match risk_measure_json {
+    let measure: finstack_factor_model::RiskMeasure = match risk_measure_json {
         Some(ref json) => serde_json::from_str(json).map_err(to_js_err)?,
-        None => finstack_core::factor_model::RiskMeasure::Variance,
+        None => finstack_factor_model::RiskMeasure::Variance,
     };
 
     let decomposer = finstack_portfolio::factor_model::ParametricDecomposer;

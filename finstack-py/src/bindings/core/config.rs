@@ -1,14 +1,13 @@
 //! Python bindings for `finstack_core::config`.
 
+use crate::bindings::module_utils::py_to_json_value;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_core::config::{FinstackConfig, RoundingMode, ToleranceConfig};
 use finstack_core::currency::Currency;
 use finstack_core::Error;
 use finstack_core::InputError;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
-use serde_json::Value as JsonValue;
 
 /// Wrapper for [`RoundingMode`].
 #[pyclass(
@@ -286,25 +285,6 @@ impl PyFinstackConfig {
     fn __repr__(&self) -> String {
         "FinstackConfig(...)".to_string()
     }
-}
-
-fn py_to_json_value<'py>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-    label: &str,
-) -> PyResult<JsonValue> {
-    if let Ok(json) = obj.extract::<String>() {
-        return serde_json::from_str(&json)
-            .map_err(|err| serde_json_to_py(err, &format!("invalid {label} JSON")));
-    }
-
-    let json_mod = py.import("json")?;
-    let json: String = json_mod
-        .call_method1("dumps", (obj,))
-        .and_then(|value| value.extract())
-        .map_err(|err| PyValueError::new_err(format!("invalid {label}: {err}")))?;
-    serde_json::from_str(&json)
-        .map_err(|err| serde_json_to_py(err, &format!("invalid {label} JSON")))
 }
 
 /// Register the `finstack.core.config` submodule.

@@ -1,7 +1,7 @@
 use super::covariance::FactorCovarianceMatrix;
-use super::definition::FactorDefinition;
 use super::matching::MatchingConfig;
-use super::types::{FactorId, FactorType};
+use super::primitives::definition::FactorDefinition;
+use super::primitives::factor_types::{FactorId, FactorType};
 use super::UnmatchedPolicy;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
@@ -44,10 +44,11 @@ impl crate::parse::NormalizedEnum for PricingMode {
 }
 
 impl FromStr for PricingMode {
-    type Err = crate::error::Error;
+    type Err = finstack_core::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        crate::parse::parse_normalized_enum(s).map_err(|_| crate::error::InputError::Invalid.into())
+        crate::parse::parse_normalized_enum(s)
+            .map_err(|_| finstack_core::InputError::Invalid.into())
     }
 }
 
@@ -91,7 +92,7 @@ pub enum RiskMeasure {
 
 impl RiskMeasure {
     /// Validate any embedded confidence levels before downstream risk calculations use them.
-    pub fn validate(&self) -> crate::Result<()> {
+    pub fn validate(&self) -> finstack_core::Result<()> {
         match self {
             Self::Variance | Self::Volatility => Ok(()),
             Self::VaR { confidence } | Self::ExpectedShortfall { confidence } => {
@@ -101,11 +102,11 @@ impl RiskMeasure {
     }
 }
 
-fn validate_confidence(confidence: f64) -> crate::Result<()> {
+fn validate_confidence(confidence: f64) -> finstack_core::Result<()> {
     if confidence.is_finite() && confidence > 0.5 && confidence < 1.0 {
         Ok(())
     } else {
-        Err(crate::Error::Validation(format!(
+        Err(finstack_core::Error::Validation(format!(
             "RiskMeasure confidence must be in the open interval (0.5, 1), got {confidence}"
         )))
     }
@@ -244,7 +245,7 @@ impl BumpSizeConfig {
 /// downstream code validate against or convert to the mapping's
 /// expected unit.
 ///
-/// The variants intentionally mirror [`crate::market_data::bumps::BumpUnits`]
+/// The variants intentionally mirror [`finstack_core::market_data::bumps::BumpUnits`]
 /// plus `Absolute` (used by vol-point shifts where the magnitude is
 /// already a dimensionless number of vol points, not a fraction or
 /// percent of something).
@@ -343,7 +344,7 @@ impl FactorModelConfig {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] when any factor ID emitted by the
+    /// Returns [`finstack_core::Error::Validation`] when any factor ID emitted by the
     /// matching config is not declared in [`Self::factors`].
     ///
     /// # Limitations
@@ -351,12 +352,12 @@ impl FactorModelConfig {
     /// This validation only enumerates factor IDs for issuers known to the calibrated
     /// `issuer_betas`. If a runtime issuer with full tags is treated as `BucketOnly`,
     /// its bucket factor IDs are not checked here.
-    pub fn validate_matching_factor_ids(&self) -> crate::Result<()> {
+    pub fn validate_matching_factor_ids(&self) -> finstack_core::Result<()> {
         use std::collections::BTreeSet;
         let known: BTreeSet<&FactorId> = self.factors.iter().map(|f| &f.id).collect();
         for fid in self.matching.enumerate_factor_ids() {
             if !known.contains(&fid) {
-                return Err(crate::Error::Validation(format!(
+                return Err(finstack_core::Error::Validation(format!(
                     "FactorModelConfig: matcher references factor_id {fid:?} not present in factors"
                 )));
             }
@@ -372,12 +373,12 @@ mod tests {
     fn assert_parses_to(label: &str, expected: PricingMode) {
         assert!(matches!(label.parse::<PricingMode>(), Ok(value) if value == expected));
     }
-    use crate::factor_model::{
+    use crate::{
         FactorCovarianceMatrix, FactorDefinition, FactorType, MarketMapping, MatchingConfig,
         UnmatchedPolicy,
     };
-    use crate::market_data::bumps::BumpUnits;
-    use crate::types::CurveId;
+    use finstack_core::market_data::bumps::BumpUnits;
+    use finstack_core::types::CurveId;
 
     #[test]
     fn test_risk_measure_serde_roundtrip_for_all_variants() {
@@ -649,12 +650,12 @@ mod tests {
     // ------------------------------------------------------------------
     #[test]
     fn credit_hierarchical_config_rejects_unknown_factor_id() {
-        use crate::factor_model::credit_hierarchy::{
+        use crate::credit::hierarchy::{
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
-        use crate::factor_model::matching::{CreditHierarchicalConfig, DependencyFilter};
-        use crate::types::IssuerId;
+        use crate::matching::{CreditHierarchicalConfig, DependencyFilter};
+        use finstack_core::types::IssuerId;
         use std::collections::BTreeMap;
 
         let mut tags = BTreeMap::new();
@@ -734,13 +735,11 @@ mod tests {
         let config = FactorModelConfig {
             factors,
             covariance,
-            matching: MatchingConfig::MappingTable(vec![
-                crate::factor_model::matching::MappingRule {
-                    dependency_filter: crate::factor_model::matching::DependencyFilter::default(),
-                    attribute_filter: crate::factor_model::matching::AttributeFilter::default(),
-                    factor_id,
-                },
-            ]),
+            matching: MatchingConfig::MappingTable(vec![crate::matching::MappingRule {
+                dependency_filter: crate::matching::DependencyFilter::default(),
+                attribute_filter: crate::matching::AttributeFilter::default(),
+                factor_id,
+            }]),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
             bump_size: None,

@@ -2,20 +2,20 @@
 //!
 //! This module defines the canonical calibration artifact for the credit
 //! factor hierarchy. The central type is
-//! [`CreditFactorModel`](crate::factor_model::credit_hierarchy::CreditFactorModel), a
+//! [`CreditFactorModel`](crate::credit::hierarchy::CreditFactorModel), a
 //! fully self-contained JSON artifact produced by offline calibration and
 //! consumed at runtime by attribution, risk, and vol-forecast pipelines.
 //!
 //! # Schema version
 //!
-//! [`CreditFactorModel::SCHEMA_VERSION`](crate::factor_model::credit_hierarchy::CreditFactorModel::SCHEMA_VERSION)
+//! [`CreditFactorModel::SCHEMA_VERSION`](crate::credit::hierarchy::CreditFactorModel::SCHEMA_VERSION)
 //! is `"finstack.credit_factor_model/1"`.
 //! Consumers must check this field before trusting any other field.
 //!
 //! # Usage
 //!
 //! ```rust
-//! use finstack_core::factor_model::credit_hierarchy::CreditFactorModel;
+//! use finstack_factor_model::credit_hierarchy::CreditFactorModel;
 //!
 //! // Deserialize from JSON — call `model.validate()` to check schema_version and consistency
 //! let json = r#"{
@@ -59,9 +59,9 @@
 //! - `Vec<IssuerBetaRow>` is kept sorted by `issuer_id` so two calibrations on
 //!   the same inputs produce byte-identical JSON.
 
-use crate::dates::Date;
-use crate::factor_model::{FactorId, FactorModelConfig};
-use crate::types::IssuerId;
+use crate::{FactorId, FactorModelConfig};
+use finstack_core::dates::Date;
+use finstack_core::types::IssuerId;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -361,32 +361,32 @@ impl FactorCorrelationMatrix {
     /// - Any diagonal entry deviates from `1.0` by more than `1e-9`
     /// - The matrix is not symmetric within `1e-9`
     /// - the `factor_ids` list contains duplicates.
-    pub fn new(factor_ids: Vec<FactorId>, data: Vec<Vec<f64>>) -> crate::Result<Self> {
+    pub fn new(factor_ids: Vec<FactorId>, data: Vec<Vec<f64>>) -> finstack_core::Result<Self> {
         let n = factor_ids.len();
         let mut seen = std::collections::BTreeSet::new();
         for fid in &factor_ids {
             if !seen.insert(fid) {
-                return Err(crate::Error::Validation(format!(
+                return Err(finstack_core::Error::Validation(format!(
                     "FactorCorrelationMatrix: duplicate factor_id {fid:?}"
                 )));
             }
         }
         if data.len() != n {
-            return Err(crate::Error::Validation(format!(
+            return Err(finstack_core::Error::Validation(format!(
                 "FactorCorrelationMatrix: expected {n} rows, got {}",
                 data.len()
             )));
         }
         for (i, row) in data.iter().enumerate() {
             if row.len() != n {
-                return Err(crate::Error::Validation(format!(
+                return Err(finstack_core::Error::Validation(format!(
                     "FactorCorrelationMatrix: row {i} has length {}, expected {n}",
                     row.len()
                 )));
             }
             let diag = row[i];
             if (diag - 1.0).abs() > 1e-9 {
-                return Err(crate::Error::Validation(format!(
+                return Err(finstack_core::Error::Validation(format!(
                     "FactorCorrelationMatrix: diagonal entry [{i}][{i}] = {diag}, expected 1.0"
                 )));
             }
@@ -401,7 +401,7 @@ impl FactorCorrelationMatrix {
                 let lo = data[i][j];
                 let hi = data[j][i];
                 if (lo - hi).abs() > 1e-9 {
-                    return Err(crate::Error::Validation(format!(
+                    return Err(finstack_core::Error::Validation(format!(
                         "FactorCorrelationMatrix: not symmetric at [{i}][{j}]: {lo} vs {hi}"
                     )));
                 }
@@ -433,32 +433,32 @@ impl FactorCorrelationMatrix {
     /// - Any diagonal entry deviates from `1.0` by more than `1e-9`
     /// - The matrix is not symmetric within `1e-9`
     /// - `factor_ids` contains duplicates
-    pub fn check_structure(&self) -> crate::Result<()> {
+    pub fn check_structure(&self) -> finstack_core::Result<()> {
         let n = self.factor_ids.len();
         let mut seen = std::collections::BTreeSet::new();
         for fid in &self.factor_ids {
             if !seen.insert(fid) {
-                return Err(crate::Error::Validation(format!(
+                return Err(finstack_core::Error::Validation(format!(
                     "FactorCorrelationMatrix: duplicate factor_id {fid:?}"
                 )));
             }
         }
         if self.data.len() != n {
-            return Err(crate::Error::Validation(format!(
+            return Err(finstack_core::Error::Validation(format!(
                 "FactorCorrelationMatrix: expected {n} rows, got {}",
                 self.data.len()
             )));
         }
         for (i, row) in self.data.iter().enumerate() {
             if row.len() != n {
-                return Err(crate::Error::Validation(format!(
+                return Err(finstack_core::Error::Validation(format!(
                     "FactorCorrelationMatrix: row {i} has length {}, expected {n}",
                     row.len()
                 )));
             }
             let diag = row[i];
             if (diag - 1.0).abs() > 1e-9 {
-                return Err(crate::Error::Validation(format!(
+                return Err(finstack_core::Error::Validation(format!(
                     "FactorCorrelationMatrix: diagonal entry [{i}][{i}] = {diag}, expected 1.0"
                 )));
             }
@@ -469,7 +469,7 @@ impl FactorCorrelationMatrix {
                 let lo = self.data[i][j];
                 let hi = self.data[j][i];
                 if (lo - hi).abs() > 1e-9 {
-                    return Err(crate::Error::Validation(format!(
+                    return Err(finstack_core::Error::Validation(format!(
                         "FactorCorrelationMatrix: not symmetric at [{i}][{j}]: {lo} vs {hi}"
                     )));
                 }
@@ -690,10 +690,10 @@ impl CreditFactorModel {
     /// - `hierarchy.levels` contains duplicate dimension names.
     /// - `factor_histories` has vectors of inconsistent length.
     /// - `static_correlation` fails structural checks (shape, diagonal, symmetry, duplicate IDs).
-    pub fn validate(&self) -> crate::Result<()> {
+    pub fn validate(&self) -> finstack_core::Result<()> {
         // Schema version
         if self.schema_version != Self::SCHEMA_VERSION {
-            return Err(crate::Error::Validation(format!(
+            return Err(finstack_core::Error::Validation(format!(
                 "CreditFactorModel: expected schema_version {:?}, got {:?}",
                 Self::SCHEMA_VERSION,
                 self.schema_version
@@ -704,7 +704,7 @@ impl CreditFactorModel {
         let mut seen_issuers: BTreeSet<&IssuerId> = BTreeSet::new();
         for row in &self.issuer_betas {
             if !seen_issuers.insert(&row.issuer_id) {
-                return Err(crate::Error::Validation(format!(
+                return Err(finstack_core::Error::Validation(format!(
                     "CreditFactorModel: duplicate issuer_id {:?}",
                     row.issuer_id.as_str()
                 )));
@@ -721,7 +721,7 @@ impl CreditFactorModel {
                 HierarchyDimension::Custom(s) => format!("custom:{s}"),
             };
             if !seen_dims.insert(key.clone()) {
-                return Err(crate::Error::Validation(format!(
+                return Err(finstack_core::Error::Validation(format!(
                     "CreditFactorModel: duplicate hierarchy dimension {key:?}"
                 )));
             }
@@ -735,7 +735,7 @@ impl CreditFactorModel {
             let expected = hist.dates.len();
             for (fid, vals) in &hist.values {
                 if vals.len() != expected {
-                    return Err(crate::Error::Validation(format!(
+                    return Err(finstack_core::Error::Validation(format!(
                         "CreditFactorModel: factor_histories[{fid}] has {} entries, expected {expected}",
                         vals.len()
                     )));
@@ -754,11 +754,11 @@ impl CreditFactorModel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dates::create_date;
-    use crate::factor_model::{
+    use crate::{
         FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, FactorType, MarketMapping,
         MatchingConfig, PricingMode,
     };
+    use finstack_core::dates::create_date;
     use time::Month;
 
     // ------------------------------------------------------------------
@@ -901,8 +901,8 @@ mod tests {
                 id: factor_id.clone(),
                 factor_type: FactorType::Credit,
                 market_mapping: MarketMapping::CurveParallel {
-                    curve_ids: vec![crate::types::CurveId::new("CDX.IG")],
-                    units: crate::market_data::bumps::BumpUnits::RateBp,
+                    curve_ids: vec![finstack_core::types::CurveId::new("CDX.IG")],
+                    units: finstack_core::market_data::bumps::BumpUnits::RateBp,
                 },
                 description: None,
             };

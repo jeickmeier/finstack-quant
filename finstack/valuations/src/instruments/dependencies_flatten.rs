@@ -1,5 +1,5 @@
 use crate::instruments::common_impl::dependencies::MarketDependencies;
-use finstack_core::factor_model::{CurveType, MarketDependency};
+use finstack_factor_model::{CurveType, MarketDependency};
 
 /// Flattens aggregated market dependencies into individually matchable entries.
 #[must_use]

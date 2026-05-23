@@ -5,9 +5,9 @@ use super::{
     FullRepricingEngine, SensitivityMatrix,
 };
 use finstack_core::dates::Date;
-use finstack_core::factor_model::{BumpSizeConfig, FactorDefinition};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::{Error, Result};
+use finstack_factor_model::{BumpSizeConfig, FactorDefinition};
 use serde::Serialize;
 
 /// Default scenario count for symmetric P&L profile grids.

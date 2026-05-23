@@ -1,7 +1,7 @@
 use super::whatif::WhatIfEngine;
 use crate::error::{Error, Result};
 use crate::types::PositionId;
-use finstack_core::factor_model::FactorId;
+use finstack_factor_model::FactorId;
 
 /// Declarative factor-aware constraint surface for optimization.
 ///
@@ -74,15 +74,15 @@ mod tests {
     use crate::types::DUMMY_ENTITY_ID;
     use crate::Portfolio;
     use finstack_core::currency::Currency;
-    use finstack_core::factor_model::matching::{DependencyFilter, MappingRule, MatchingConfig};
-    use finstack_core::factor_model::{
-        CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition, FactorId,
-        FactorModelConfig, FactorType, MarketMapping, PricingMode, RiskMeasure, UnmatchedPolicy,
-    };
     use finstack_core::market_data::bumps::BumpUnits;
     use finstack_core::market_data::context::MarketContext;
     use finstack_core::money::Money;
     use finstack_core::types::{Attributes, CurveId};
+    use finstack_factor_model::matching::{DependencyFilter, MappingRule, MatchingConfig};
+    use finstack_factor_model::{
+        CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition, FactorId,
+        FactorModelConfig, FactorType, MarketMapping, PricingMode, RiskMeasure, UnmatchedPolicy,
+    };
     use finstack_valuations::instruments::Instrument;
     use finstack_valuations::instruments::MarketDependencies;
     use finstack_valuations::pricer::InstrumentType;
@@ -164,7 +164,7 @@ mod tests {
                         curve_type: Some(CurveType::Discount),
                         id: None,
                     },
-                    attribute_filter: finstack_core::factor_model::AttributeFilter::default(),
+                    attribute_filter: finstack_factor_model::AttributeFilter::default(),
                     factor_id: FactorId::new("Rates"),
                 }]),
                 pricing_mode: PricingMode::DeltaBased,

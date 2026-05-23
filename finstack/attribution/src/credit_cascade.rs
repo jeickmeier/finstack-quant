@@ -25,17 +25,17 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use finstack_core::dates::Date;
-use finstack_core::factor_model::credit_hierarchy::{
-    dimension_key, CreditFactorModel, HierarchyDimension, IssuerTags,
-};
-use finstack_core::factor_model::matching::{
-    bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
-};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::diff::{measure_par_spread_shift, TenorSamplingMethod};
 use finstack_core::market_data::scalars::MarketScalar;
 use finstack_core::types::{CurveId, IssuerId};
 use finstack_core::Result;
+use finstack_factor_model::credit_hierarchy::{
+    dimension_key, CreditFactorModel, HierarchyDimension, IssuerTags,
+};
+use finstack_factor_model::matching::{
+    bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
+};
 
 use finstack_factor_model::{decompose_levels, decompose_period};
 use finstack_valuations::calibration::bumps::{
@@ -571,19 +571,19 @@ mod tests {
     use super::*;
     use finstack_core::currency::Currency;
     use finstack_core::dates::create_date;
-    use finstack_core::factor_model::credit_hierarchy::{
-        AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
-        FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
-        IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
-    };
-    use finstack_core::factor_model::{
-        FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
-        MarketMapping, MatchingConfig, PricingMode,
-    };
     use finstack_core::market_data::bumps::BumpUnits;
     use finstack_core::market_data::scalars::MarketScalar;
     use finstack_core::market_data::term_structures::HazardCurve;
     use finstack_core::money::Money;
+    use finstack_factor_model::credit_hierarchy::{
+        AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
+        FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
+        IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
+    };
+    use finstack_factor_model::{
+        FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
+        MarketMapping, MatchingConfig, PricingMode,
+    };
     use finstack_valuations::instruments::Instrument;
     use finstack_valuations::instruments::{Attributes, Bond};
     use time::Month;

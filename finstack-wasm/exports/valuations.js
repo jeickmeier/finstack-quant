@@ -1,4 +1,5 @@
 import * as wasm from '../pkg/finstack_wasm.js';
+import { factor_model } from './factor_model.js';
 import { correlation } from './valuations/correlation.js';
 import { fx } from './valuations/fx.js';
 
@@ -43,13 +44,13 @@ export const valuations = {
     listStandardMetricsGrouped: wasm.listStandardMetricsGrouped,
   },
   // Credit factor hierarchy
-  CreditFactorModel: wasm.CreditFactorModel,
-  CreditCalibrator: wasm.CreditCalibrator,
-  LevelsAtDate: wasm.LevelsAtDate,
-  PeriodDecomposition: wasm.PeriodDecomposition,
-  FactorCovarianceForecast: wasm.FactorCovarianceForecast,
-  decomposeLevels: wasm.decomposeLevels,
-  decomposePeriod: wasm.decomposePeriod,
+  CreditFactorModel: factor_model.credit.CreditFactorModel,
+  CreditCalibrator: factor_model.credit.CreditCalibrator,
+  LevelsAtDate: factor_model.credit.LevelsAtDate,
+  PeriodDecomposition: factor_model.credit.PeriodDecomposition,
+  FactorCovarianceForecast: factor_model.credit.FactorCovarianceForecast,
+  decomposeLevels: factor_model.credit.decomposeLevels,
+  decomposePeriod: factor_model.credit.decomposePeriod,
   validateValuationResultJson: wasm.validateValuationResultJson,
   // Calibration: build a MarketContext from raw quotes.
   // ⚠️ BLOCKING: calibration can be CPU-heavy; callers must run it behind an

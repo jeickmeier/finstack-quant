@@ -4,7 +4,7 @@
 //! # Algorithm overview
 //!
 //! The calibration is a sequential "peel-the-onion" identical in structure to
-//! [`crate::credit_decomposition::decompose_levels`] but operating
+//! [`crate::credit::decomposition::decompose_levels`] but operating
 //! on a *time series* of issuer spreads rather than a single snapshot:
 //!
 //! 1. Classify each issuer as `IssuerBeta` or `BucketOnly` based on the
@@ -35,7 +35,7 @@
 //! # Reuse with PR-3
 //!
 //! The anchoring step (step 7) implements the same math as
-//! [`decompose_levels`][crate::credit_decomposition::decompose_levels]
+//! [`decompose_levels`][crate::credit::decomposition::decompose_levels]
 //! but is called via a private helper because we don't yet have a fully
 //! assembled [`CreditFactorModel`] at that point in the pipeline.
 //!
@@ -49,25 +49,23 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use finstack_core::dates::Date;
-use finstack_core::factor_model::credit_hierarchy::{
+use crate::credit::hierarchy::{
     dimension_key, AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec,
     DateRange, FactorCorrelationMatrix, FactorHistories, FactorVolModel, FitQuality, FoldUpRecord,
     GenericFactorSpec, IdiosyncraticVolModel, IssuerBetaMode, IssuerBetaOverride, IssuerBetaPolicy,
     IssuerBetaRow, IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor, VolState,
 };
+use finstack_core::dates::Date;
 
+use crate::matching::{bucket_factor_id, CreditHierarchicalConfig, CREDIT_GENERIC_FACTOR_ID};
+use crate::{
+    FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
+    MarketMapping, MatchingConfig, PricingMode,
+};
 use finstack_analytics::correlation::nearest_correlation::{
     nearest_correlation_matrix, NearestCorrelationOpts,
 };
 use finstack_analytics::correlation::validate_correlation_matrix;
-use finstack_core::factor_model::matching::{
-    bucket_factor_id, CreditHierarchicalConfig, CREDIT_GENERIC_FACTOR_ID,
-};
-use finstack_core::factor_model::{
-    FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
-    MarketMapping, MatchingConfig, PricingMode,
-};
 use finstack_core::market_data::bumps::BumpUnits;
 use finstack_core::types::IssuerId;
 
@@ -502,6 +500,25 @@ impl CreditCalibrator {
 
         model.validate()?;
         Ok(model)
+    }
+}
+
+impl crate::calibration::FactorCalibrator for CreditCalibrator {
+    type Config = CreditCalibrationConfig;
+    type Inputs = CreditCalibrationInputs;
+    type Model = CreditFactorModel;
+    type Diagnostics = CalibrationDiagnostics;
+
+    fn config(&self) -> &Self::Config {
+        &self.config
+    }
+
+    fn calibrate(&self, inputs: Self::Inputs) -> Result<Self::Model> {
+        Self::calibrate(self, inputs)
+    }
+
+    fn diagnostics(model: &Self::Model) -> &Self::Diagnostics {
+        &model.diagnostics
     }
 }
 
@@ -1297,7 +1314,7 @@ struct AnchorOutcome {
 /// Step 7: anchor levels at as_of (level space, not return space).
 ///
 /// Implements the same peel-the-onion math as
-/// [`crate::credit_decomposition::decompose_levels`] but uses
+/// [`crate::credit::decomposition::decompose_levels`] but uses
 /// the calibrated betas from step 4-5. We don't have a complete
 /// `CreditFactorModel` yet, so this is a self-contained re-implementation.
 fn anchor_levels(
@@ -1332,71 +1349,31 @@ fn anchor_levels(
         bucket_paths.insert(issuer.clone(), paths);
     }
 
-    // PC peel.
-    let unit = unit_betas(num_levels);
-    let mut residuals: BTreeMap<IssuerId, f64> = BTreeMap::new();
-    for (issuer, spread) in asof_spreads {
-        let b = betas.get(issuer).unwrap_or(&unit);
-        residuals.insert(issuer.clone(), spread - b.pc * generic_at_asof);
-    }
-
-    // Per-level peel.
-    // Range loop over the hierarchy level index — see the parallel comment
-    // in `run_peel`.
-    let mut by_level: Vec<LevelAnchor> = Vec::with_capacity(num_levels);
-    #[allow(clippy::needless_range_loop)]
-    for k in 0..num_levels {
-        // Bucket means over non-folded issuers.
-        let mut sums: BTreeMap<String, (f64, usize)> = BTreeMap::new();
-        for issuer in asof_spreads.keys() {
-            let folded_at_k = folded
-                .get(issuer)
-                .map(|f| f.get(k).copied().unwrap_or(false))
-                .unwrap_or(false);
-            if folded_at_k {
-                continue;
-            }
-            let path = &bucket_paths[issuer][k];
-            let r = residuals[issuer];
-            let entry = sums.entry(path.clone()).or_insert((0.0, 0));
-            entry.0 += r;
-            entry.1 += 1;
-        }
-        let mut values: BTreeMap<String, f64> = BTreeMap::new();
-        for (bucket, (sum, count)) in sums {
-            let mean = if count > 0 { sum / (count as f64) } else { 0.0 };
-            values.insert(bucket, mean);
-        }
-
-        // Subtract β_i^level_k · L_k(g_i^k) from each issuer's residual.
-        for issuer in asof_spreads.keys() {
-            let folded_at_k = folded
-                .get(issuer)
-                .map(|f| f.get(k).copied().unwrap_or(false))
-                .unwrap_or(false);
-            if folded_at_k {
-                continue;
-            }
-            let b = betas.get(issuer).unwrap_or(&unit);
-            let path = &bucket_paths[issuer][k];
-            let level_value = values.get(path).copied().unwrap_or(0.0);
-            let prev = residuals[issuer];
-            residuals.insert(issuer.clone(), prev - b.levels[k] * level_value);
-        }
-
-        by_level.push(LevelAnchor {
+    let peel = super::peel::peel_single_observation(
+        asof_spreads,
+        generic_at_asof,
+        betas,
+        &bucket_paths,
+        folded,
+        num_levels,
+    );
+    let by_level: Vec<LevelAnchor> = peel
+        .by_level
+        .into_iter()
+        .enumerate()
+        .map(|(k, values)| LevelAnchor {
             level_index: k,
             dimension: hierarchy.levels[k].clone(),
             values,
-        });
-    }
+        })
+        .collect();
 
     Ok(AnchorOutcome {
         levels: LevelsAtAnchor {
             pc: generic_at_asof,
             by_level,
         },
-        adder: residuals,
+        adder: peel.adder,
     })
 }
 
@@ -1812,7 +1789,7 @@ fn build_diagnostics(
 #[cfg(test)]
 mod calibration_estimator_tests {
     use super::{factor_variances, sample_correlation_flat};
-    use finstack_core::factor_model::FactorId;
+    use crate::FactorId;
     use std::collections::BTreeMap;
 
     /// Audit item #5: on a sparse panel the pairwise-overlap mean differs from

@@ -1,7 +1,7 @@
 use super::{FactorId, FactorType};
-use crate::currency::Currency;
-use crate::market_data::bumps::{BumpSpec, BumpUnits};
-use crate::types::CurveId;
+use finstack_core::currency::Currency;
+use finstack_core::market_data::bumps::{BumpSpec, BumpUnits};
+use finstack_core::types::CurveId;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;

@@ -1,20 +1,27 @@
 # Factor Model
 
-Credit factor-model primitives: calibrate a hierarchical credit factor model
-from sparse issuer-spread history, decompose observed spreads into level
-factor values, and represent positions × factors sensitivity matrices.
+Canonical multi-asset factor-modelling primitives for finstack. This crate owns
+factor definitions, covariance matrices, dependency matching, credit hierarchy
+artifacts, credit calibration/decomposition, and the positions × factors
+`SensitivityMatrix`.
 
-This crate was carved out of `finstack-valuations` to shrink that umbrella
-crate's edit-rebuild loop. Callers import directly from
-`finstack_factor_model::*`; there is no re-export façade in
-`finstack-valuations`.
+Credit has the richest implementation today: a deterministic hierarchical
+calibrator from sparse issuer-spread history plus decomposition of observed
+spreads into level factor values. Rates, equity, FX, volatility, commodity, and
+inflation factors are first-class through the generic `FactorType`,
+`FactorDefinition`, `FactorModelConfig`, matching, covariance, and portfolio
+sensitivity/risk engines.
 
 ## Layout
 
 ```
 factor-model/
-├── credit_calibration.rs   # CreditCalibrator: peel-the-onion calibration
-├── credit_decomposition.rs # decompose_levels / decompose_period
+├── primitives/             # FactorId, FactorType, FactorDefinition, dependencies
+├── matching/               # Mapping-table, cascade, hierarchy matchers
+├── credit/                 # Credit hierarchy, calibration, decomposition
+├── calibration/            # Shared calibrator trait shape
+├── config.rs               # FactorModelConfig, RiskMeasure, bump config
+├── covariance.rs           # FactorCovarianceMatrix
 └── sensitivity_matrix.rs   # SensitivityMatrix: positions × factors
 ```
 
@@ -22,7 +29,32 @@ Pricing engines that take `&dyn Instrument` (delta and full-repricing) live
 in `finstack-portfolio::sensitivity` because they depend on the instrument
 trait surface.
 
-## Concepts
+## Generic capabilities
+
+The following are asset-class agnostic:
+
+- Factor identity and asset class tagging (`FactorId`, `FactorType`).
+- Factor-to-market mapping (`MarketMapping`) for curves, equity spot, FX, and
+  volatility surfaces.
+- Covariance validation and canonical factor ordering
+  (`FactorCovarianceMatrix`).
+- Dependency-to-factor matching (`MatchingConfig`, `MappingRule`,
+  `DependencyFilter`, `AttributeFilter`).
+- Risk interpretation and sensitivity extraction configuration
+  (`FactorModelConfig`, `RiskMeasure`, `PricingMode`, `BumpSizeConfig`).
+- Portfolio sensitivity/risk engines in `finstack-portfolio` that consume the
+  generic configuration.
+
+Credit-specific today:
+
+- `CreditFactorModel` as a self-contained hierarchy artifact.
+- `CreditCalibrator` and `decompose_levels` / `decompose_period`.
+- Credit hierarchy issuer beta, bucket folding, and idiosyncratic vol state.
+
+Future rates/equity/vol calibrators should implement `FactorCalibrator` and
+return their own model artifact while reusing the generic primitives above.
+
+## Credit concepts
 
 The credit factor model expresses each issuer spread `S_i` as a linear
 decomposition over a hierarchy of factors:
@@ -149,9 +181,8 @@ only the storage type plus accessors (`delta`, `set_delta`, `position_deltas`,
 
 ## Related
 
-- `finstack-core::factor_model` — canonical artifact types
-  (`CreditFactorModel`, `FactorModelConfig`, `FactorCovarianceMatrix`,
-  `CreditHierarchySpec`, `IssuerBetaPolicy`, …).
+- `finstack-core` — base primitives consumed by factor models (`Currency`,
+  `Date`, `CurveId`, `IssuerId`, market-data bump units, and errors).
 - `finstack-analytics` — `beta` OLS slope and `nearest_correlation_matrix`
   PSD repair used by the calibrator.
 - `finstack-portfolio::sensitivity` — sensitivity engines that consume the

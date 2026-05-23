@@ -5,16 +5,16 @@
 use std::collections::BTreeMap;
 
 use finstack_core::dates::create_date;
-use finstack_core::factor_model::credit_hierarchy::{
+use finstack_core::types::IssuerId;
+use finstack_factor_model::credit_hierarchy::{
     AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
     FactorCorrelationMatrix, FoldUpRecord, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
 };
-use finstack_core::factor_model::{
+use finstack_factor_model::{decompose_levels, decompose_period, DecompositionError, LevelsAtDate};
+use finstack_factor_model::{
     FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
 };
-use finstack_core::types::IssuerId;
-use finstack_factor_model::{decompose_levels, decompose_period, DecompositionError, LevelsAtDate};
 use time::Month;
 
 // ---------------------------------------------------------------------------

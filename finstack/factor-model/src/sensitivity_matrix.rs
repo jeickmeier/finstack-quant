@@ -3,7 +3,7 @@
 //! [`SensitivityMatrix`] is the canonical row-major dense layout used by the
 //! delta-based and full-repricing factor sensitivity engines.
 
-use finstack_core::factor_model::FactorId;
+use crate::FactorId;
 
 /// Positions x factors sensitivity matrix stored in row-major order.
 #[derive(Debug, Clone, PartialEq)]

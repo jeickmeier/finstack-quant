@@ -12,11 +12,16 @@ __all__ = [
     "Copula",
     "RecoverySpec",
     "RecoveryModel",
-    "FactorSpec",
+    "LatentFactorSpec",
+    "LatentFactor",
+    "LatentSingleFactor",
+    "LatentTwoFactor",
+    "LatentMultiFactor",
     "FactorModel",
+    "FactorSpec",
+    "MultiFactorModel",
     "SingleFactorModel",
     "TwoFactorModel",
-    "MultiFactorModel",
     "CorrelatedBernoulli",
     "correlation_bounds",
     "joint_probabilities",
@@ -339,20 +344,20 @@ class RecoveryModel:
         """Model name for diagnostics."""
         ...
 
-class FactorSpec:
+class LatentFactorSpec:
     """Factor model specification for configuration and deferred construction.
 
     Example
     -------
-    >>> from finstack.valuations.correlation import FactorSpec
-    >>> spec = FactorSpec.single_factor(0.2, 0.05)
+    >>> from finstack.valuations.correlation import LatentFactorSpec
+    >>> spec = LatentFactorSpec.single_factor(0.2, 0.05)
     >>> model = spec.build()
     >>> model.num_factors
     1
     """
 
     @classmethod
-    def single_factor(cls, volatility: float, mean_reversion: float) -> FactorSpec:
+    def single_factor(cls, volatility: float, mean_reversion: float) -> LatentFactorSpec:
         """Single-factor model specification.
 
         Parameters
@@ -364,13 +369,13 @@ class FactorSpec:
 
         Returns
         -------
-        FactorSpec
+        LatentFactorSpec
             Single-factor specification.
         """
         ...
 
     @classmethod
-    def two_factor(cls, prepay_vol: float, credit_vol: float, correlation: float) -> FactorSpec:
+    def two_factor(cls, prepay_vol: float, credit_vol: float, correlation: float) -> LatentFactorSpec:
         """Two-factor model (prepayment + credit) specification.
 
         Parameters
@@ -384,7 +389,7 @@ class FactorSpec:
 
         Returns
         -------
-        FactorSpec
+        LatentFactorSpec
             Two-factor specification.
         """
         ...
@@ -394,12 +399,12 @@ class FactorSpec:
         """Number of factors implied by this specification."""
         ...
 
-    def build(self) -> FactorModel:
-        """Build a concrete :class:`FactorModel` from this specification.
+    def build(self) -> LatentFactor:
+        """Build a concrete :class:`LatentFactor` from this specification.
 
         Returns
         -------
-        FactorModel
+        LatentFactor
             Concrete factor model.
 
         Raises
@@ -410,10 +415,10 @@ class FactorSpec:
         """
         ...
 
-class FactorModel:
+class LatentFactor:
     """Concrete factor model for correlated behavior.
 
-    Obtain an instance via :meth:`FactorSpec.build`.
+    Obtain an instance via :meth:`LatentFactorSpec.build`.
     """
 
     @property
@@ -458,13 +463,13 @@ class FactorModel:
         """
         ...
 
-class SingleFactorModel:
+class LatentSingleFactor:
     """Single-factor model (common market factor).
 
     Example
     -------
-    >>> from finstack.valuations.correlation import SingleFactorModel
-    >>> m = SingleFactorModel(volatility=0.2, mean_reversion=0.05)
+    >>> from finstack.valuations.correlation import LatentSingleFactor
+    >>> m = LatentSingleFactor(volatility=0.2, mean_reversion=0.05)
     >>> m.num_factors
     1
     """
@@ -496,13 +501,13 @@ class SingleFactorModel:
         """Number of factors (always 1)."""
         ...
 
-class TwoFactorModel:
+class LatentTwoFactor:
     """Two-factor model for prepayment and credit.
 
     Example
     -------
-    >>> from finstack.valuations.correlation import TwoFactorModel
-    >>> m = TwoFactorModel(prepay_vol=0.15, credit_vol=0.10, correlation=-0.2)
+    >>> from finstack.valuations.correlation import LatentTwoFactor
+    >>> m = LatentTwoFactor(prepay_vol=0.15, credit_vol=0.10, correlation=-0.2)
     >>> m.num_factors
     2
     """
@@ -522,23 +527,23 @@ class TwoFactorModel:
         ...
 
     @classmethod
-    def rmbs_standard(cls) -> TwoFactorModel:
+    def rmbs_standard(cls) -> LatentTwoFactor:
         """Standard RMBS calibration.
 
         Returns
         -------
-        TwoFactorModel
+        LatentTwoFactor
             Pre-calibrated RMBS model.
         """
         ...
 
     @classmethod
-    def clo_standard(cls) -> TwoFactorModel:
+    def clo_standard(cls) -> LatentTwoFactor:
         """Standard CLO calibration.
 
         Returns
         -------
-        TwoFactorModel
+        LatentTwoFactor
             Pre-calibrated CLO model.
         """
         ...
@@ -573,13 +578,13 @@ class TwoFactorModel:
         """Cholesky ``L[1][1]`` for correlated factor generation."""
         ...
 
-class MultiFactorModel:
+class LatentMultiFactor:
     """Multi-factor model with custom correlation structure.
 
     Example
     -------
-    >>> from finstack.valuations.correlation import MultiFactorModel
-    >>> m = MultiFactorModel(
+    >>> from finstack.valuations.correlation import LatentMultiFactor
+    >>> m = LatentMultiFactor(
     ...     num_factors=2,
     ...     volatilities=[0.2, 0.15],
     ...     correlations=[1.0, 0.3, 0.3, 1.0],
@@ -613,7 +618,7 @@ class MultiFactorModel:
         ...
 
     @classmethod
-    def uncorrelated(cls, num_factors: int, volatilities: Sequence[float]) -> MultiFactorModel:
+    def uncorrelated(cls, num_factors: int, volatilities: Sequence[float]) -> LatentMultiFactor:
         """Create an uncorrelated (identity) multi-factor model.
 
         Parameters
@@ -625,7 +630,7 @@ class MultiFactorModel:
 
         Returns
         -------
-        MultiFactorModel
+        LatentMultiFactor
             Uncorrelated factor model.
         """
         ...
@@ -879,3 +884,10 @@ def cholesky_decompose(matrix: Sequence[float], n: int) -> list[float]:
         If the matrix is invalid.
     """
     ...
+
+# Deprecated aliases retained for one release cycle.
+FactorSpec = LatentFactorSpec
+FactorModel = LatentFactor
+SingleFactorModel = LatentSingleFactor
+TwoFactorModel = LatentTwoFactor
+MultiFactorModel = LatentMultiFactor

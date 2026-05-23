@@ -41,18 +41,18 @@ fn parse_date(s: &str) -> PyResult<finstack_core::dates::Date> {
 ///     'finstack.credit_factor_model/1'
 #[pyclass(
     name = "CreditFactorModel",
-    module = "finstack.valuations",
+    module = "finstack.factor_model.credit",
     frozen,
     skip_from_py_object
 )]
 #[derive(Clone)]
 pub(crate) struct PyCreditFactorModel {
-    pub(crate) inner: finstack_core::factor_model::credit_hierarchy::CreditFactorModel,
+    pub(crate) inner: finstack_factor_model::credit_hierarchy::CreditFactorModel,
 }
 
 impl PyCreditFactorModel {
     pub(crate) fn from_inner(
-        inner: finstack_core::factor_model::credit_hierarchy::CreditFactorModel,
+        inner: finstack_factor_model::credit_hierarchy::CreditFactorModel,
     ) -> Self {
         Self { inner }
     }
@@ -74,7 +74,7 @@ impl PyCreditFactorModel {
     ///     ValueError: If the JSON is malformed or fails validation.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_core::factor_model::credit_hierarchy::CreditFactorModel =
+        let inner: finstack_factor_model::credit_hierarchy::CreditFactorModel =
             serde_json::from_str(json).map_err(display_to_py)?;
         inner.validate().map_err(display_to_py)?;
         Ok(Self { inner })
@@ -123,7 +123,7 @@ impl PyCreditFactorModel {
     /// Returns:
     ///     List of dimension names (e.g. ``["Rating", "Region", "Sector"]``).
     fn level_names(&self) -> Vec<String> {
-        use finstack_core::factor_model::credit_hierarchy::HierarchyDimension;
+        use finstack_factor_model::credit_hierarchy::HierarchyDimension;
         self.inner
             .hierarchy
             .levels
@@ -190,7 +190,7 @@ impl PyCreditFactorModel {
 ///     >>> model = cal.calibrate(json.dumps(inputs))  # doctest: +SKIP
 #[pyclass(
     name = "CreditCalibrator",
-    module = "finstack.valuations",
+    module = "finstack.factor_model.credit",
     skip_from_py_object
 )]
 #[derive(Clone)]
@@ -256,7 +256,7 @@ impl PyCreditCalibrator {
 ///     100.5
 #[pyclass(
     name = "LevelsAtDate",
-    module = "finstack.valuations",
+    module = "finstack.factor_model.credit",
     frozen,
     skip_from_py_object
 )]
@@ -367,7 +367,7 @@ impl PyLevelsAtDate {
 ///     0.3
 #[pyclass(
     name = "PeriodDecomposition",
-    module = "finstack.valuations",
+    module = "finstack.factor_model.credit",
     frozen,
     skip_from_py_object
 )]
@@ -503,7 +503,7 @@ fn decompose_levels(
     let runtime_tags: Option<
         std::collections::BTreeMap<
             finstack_core::types::IssuerId,
-            finstack_core::factor_model::credit_hierarchy::IssuerTags,
+            finstack_factor_model::credit_hierarchy::IssuerTags,
         >,
     > = match runtime_tags_json {
         Some(json) => Some(serde_json::from_str(json).map_err(display_to_py)?),
@@ -583,14 +583,14 @@ fn decompose_period(
 ///     >>> cov_json = fcf.covariance_at("one_step")  # doctest: +SKIP
 #[pyclass(
     name = "FactorCovarianceForecast",
-    module = "finstack.valuations",
+    module = "finstack.factor_model.credit",
     skip_from_py_object
 )]
 #[derive(Clone)]
 pub(crate) struct PyFactorCovarianceForecast {
     /// We store the model by value (cloned from the Python wrapper) so that
     /// `FactorCovarianceForecast<'a>` lifetime requirements don't escape.
-    model: finstack_core::factor_model::credit_hierarchy::CreditFactorModel,
+    model: finstack_factor_model::credit_hierarchy::CreditFactorModel,
 }
 
 /// Parse a horizon descriptor from a Python string.
@@ -676,7 +676,7 @@ impl PyFactorCovarianceForecast {
     ///         builder rejects the assembled configuration.
     fn factor_model_at(&self, horizon: &str, risk_measure_json: &str) -> PyResult<String> {
         let h = parse_vol_horizon(horizon)?;
-        let measure: finstack_core::factor_model::RiskMeasure =
+        let measure: finstack_factor_model::RiskMeasure =
             serde_json::from_str(risk_measure_json).map_err(display_to_py)?;
         let forecast = finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
         // Validate the model can be assembled at this horizon+measure.

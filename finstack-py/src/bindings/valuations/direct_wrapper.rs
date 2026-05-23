@@ -1,6 +1,7 @@
 //! Shared helpers for direct Python instrument wrappers.
 
 use crate::bindings::extract::extract_market_ref;
+use crate::bindings::module_utils::py_to_json_value;
 use crate::errors::display_to_py;
 use finstack_valuations::pricer::{
     canonical_instrument_json, canonical_instrument_json_from_str,
@@ -11,22 +12,6 @@ use finstack_valuations::pricer::{
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
-use serde_json::Value;
-
-fn py_to_json_value<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>, label: &str) -> PyResult<Value> {
-    if let Ok(json) = obj.extract::<String>() {
-        return serde_json::from_str(&json)
-            .map_err(|e| PyValueError::new_err(format!("invalid {label} JSON: {e}")));
-    }
-
-    let json_mod = py.import("json")?;
-    let json: String = json_mod
-        .call_method1("dumps", (obj,))
-        .and_then(|value| value.extract())
-        .map_err(|e| PyValueError::new_err(format!("invalid {label}: {e}")))?;
-    serde_json::from_str(&json)
-        .map_err(|e| PyValueError::new_err(format!("invalid {label} JSON: {e}")))
-}
 
 pub(super) fn build_from_py(
     py: Python<'_>,

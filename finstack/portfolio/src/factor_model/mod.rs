@@ -4,7 +4,7 @@
 //! portfolio-level factor analytics. Typical usage is:
 //!
 //! 1. Build a [`FactorModel`] from a declarative
-//!    [`finstack_core::factor_model::FactorModelConfig`].
+//!    [`finstack_factor_model::FactorModelConfig`].
 //! 2. Use [`FactorModel::assign_factors`] to inspect how portfolio positions map
 //!    to configured factors.
 //! 3. Use [`FactorModel::compute_sensitivities`] to produce a weighted
@@ -22,7 +22,7 @@
 //!
 //! - Factor IDs and covariance axes must match exactly in content and order.
 //! - Risk outputs are reported in the units implied by the configured
-//!   [`finstack_core::factor_model::RiskMeasure`].
+//!   [`finstack_factor_model::RiskMeasure`].
 //! - Strict unmatched-dependency handling should be used when factor coverage is
 //!   treated as part of the model contract rather than a best-effort mapping.
 //!

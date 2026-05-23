@@ -5,11 +5,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use finstack_core::dates::{create_date, Date};
-use finstack_core::factor_model::credit_hierarchy::{
+use finstack_core::types::IssuerId;
+use finstack_factor_model::credit_hierarchy::{
     AdderVolSource, CreditFactorModel, CreditHierarchySpec, FactorVolModel, GenericFactorSpec,
     HierarchyDimension, IssuerBetaMode, IssuerBetaOverride, IssuerBetaPolicy, IssuerTags,
 };
-use finstack_core::types::IssuerId;
 use finstack_factor_model::{
     BetaShrinkage, BucketSizeThresholds, CovarianceStrategy, CreditCalibrationConfig,
     CreditCalibrationInputs, CreditCalibrator, GenericFactorSeries, HistoryPanel, IssuerTagPanel,
@@ -452,9 +452,7 @@ fn all_bucket_only_calibration_succeeds() {
     let fh = model.factor_histories.as_ref().unwrap();
     assert!(fh
         .values
-        .contains_key(&finstack_core::factor_model::FactorId::new(
-            "credit::generic"
-        )));
+        .contains_key(&finstack_factor_model::FactorId::new("credit::generic")));
     assert!(!model.vol_state.factors.is_empty());
 
     // M-4: verify tag_taxonomy for a two-level Rating × Region hierarchy.
@@ -570,7 +568,7 @@ fn sparse_bucket_emits_none_for_empty_dates() {
         .factor_histories
         .as_ref()
         .expect("factor_histories present");
-    let ig_factor_id = finstack_core::factor_model::FactorId::new("credit::level0::Rating::IG");
+    let ig_factor_id = finstack_factor_model::FactorId::new("credit::level0::Rating::IG");
     let ig_history = fh
         .values
         .get(&ig_factor_id)

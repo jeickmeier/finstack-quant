@@ -135,10 +135,11 @@ impl crate::parse::NormalizedEnum for UnmatchedPolicy {
 }
 
 impl FromStr for UnmatchedPolicy {
-    type Err = crate::error::Error;
+    type Err = finstack_core::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        crate::parse::parse_normalized_enum(s).map_err(|_| crate::error::InputError::Invalid.into())
+        crate::parse::parse_normalized_enum(s)
+            .map_err(|_| finstack_core::InputError::Invalid.into())
     }
 }
 

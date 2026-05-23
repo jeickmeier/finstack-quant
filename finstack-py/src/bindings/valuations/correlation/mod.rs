@@ -9,8 +9,8 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 
 use finstack_valuations::correlation::{
-    self as corr, Copula, CopulaSpec, CorrelatedBernoulli, FactorModelKind, FactorSpec,
-    MultiFactorModel, RecoveryModel, RecoverySpec, SingleFactorModel, TwoFactorModel,
+    self as corr, Copula, CopulaSpec, CorrelatedBernoulli, LatentFactorKind, LatentFactorSpec,
+    LatentMultiFactor, LatentSingleFactor, LatentTwoFactor, RecoveryModel, RecoverySpec,
 };
 
 // ---------------------------------------------------------------------------
@@ -315,36 +315,36 @@ impl PyRecoveryModel {
 }
 
 // ---------------------------------------------------------------------------
-// FactorSpec
+// LatentFactorSpec
 // ---------------------------------------------------------------------------
 
 /// Factor model specification for configuration and deferred construction.
 #[pyclass(
-    name = "FactorSpec",
+    name = "LatentFactorSpec",
     module = "finstack.valuations.correlation",
     frozen,
     from_py_object
 )]
 #[derive(Clone, Debug)]
-pub struct PyFactorSpec {
+pub struct PyLatentFactorSpec {
     /// Inner Rust spec.
-    pub(crate) inner: FactorSpec,
+    pub(crate) inner: LatentFactorSpec,
 }
 
-impl PyFactorSpec {
-    /// Construct from an existing [`FactorSpec`].
-    pub(crate) fn from_inner(inner: FactorSpec) -> Self {
+impl PyLatentFactorSpec {
+    /// Construct from an existing [`LatentFactorSpec`].
+    pub(crate) fn from_inner(inner: LatentFactorSpec) -> Self {
         Self { inner }
     }
 }
 
 #[pymethods]
-impl PyFactorSpec {
+impl PyLatentFactorSpec {
     /// Single-factor model specification.
     #[classmethod]
     #[pyo3(text_signature = "(cls, volatility, mean_reversion)")]
     fn single_factor(_cls: &Bound<'_, PyType>, volatility: f64, mean_reversion: f64) -> Self {
-        Self::from_inner(FactorSpec::single_factor(volatility, mean_reversion))
+        Self::from_inner(LatentFactorSpec::single_factor(volatility, mean_reversion))
     }
 
     /// Two-factor model (prepayment + credit) specification.
@@ -356,7 +356,11 @@ impl PyFactorSpec {
         credit_vol: f64,
         correlation: f64,
     ) -> Self {
-        Self::from_inner(FactorSpec::two_factor(prepay_vol, credit_vol, correlation))
+        Self::from_inner(LatentFactorSpec::two_factor(
+            prepay_vol,
+            credit_vol,
+            correlation,
+        ))
     }
 
     /// Number of factors implied by this specification.
@@ -369,15 +373,15 @@ impl PyFactorSpec {
     ///
     /// Raises ``ValueError`` if a multi-factor specification contains an
     /// invalid volatility vector or correlation matrix.
-    fn build(&self) -> PyResult<PyFactorModel> {
+    fn build(&self) -> PyResult<PyLatentFactor> {
         self.inner
             .build()
-            .map(|inner| PyFactorModel { inner })
+            .map(|inner| PyLatentFactor { inner })
             .map_err(display_to_py)
     }
 
     fn __repr__(&self) -> String {
-        format!("FactorSpec({:?})", self.inner)
+        format!("LatentFactorSpec({:?})", self.inner)
     }
 }
 
@@ -387,19 +391,19 @@ impl PyFactorSpec {
 
 /// Concrete factor model for correlated behavior.
 ///
-/// Obtain an instance via ``FactorSpec.build()``.
+/// Obtain an instance via ``LatentFactorSpec.build()``.
 #[pyclass(
-    name = "FactorModel",
+    name = "LatentFactor",
     module = "finstack.valuations.correlation",
     frozen
 )]
-pub struct PyFactorModel {
+pub struct PyLatentFactor {
     /// Concrete factor-model dispatch enum.
-    pub(crate) inner: FactorModelKind,
+    pub(crate) inner: LatentFactorKind,
 }
 
 #[pymethods]
-impl PyFactorModel {
+impl PyLatentFactor {
     /// Number of factors in the model.
     #[getter]
     fn num_factors(&self) -> usize {
@@ -438,7 +442,7 @@ impl PyFactorModel {
 
     fn __repr__(&self) -> String {
         format!(
-            "FactorModel('{}', n={})",
+            "LatentFactor('{}', n={})",
             self.inner.model_name(),
             self.inner.num_factors()
         )
@@ -451,25 +455,25 @@ impl PyFactorModel {
 
 /// Single-factor model (common market factor).
 #[pyclass(
-    name = "SingleFactorModel",
+    name = "LatentSingleFactor",
     module = "finstack.valuations.correlation",
     frozen,
     from_py_object
 )]
 #[derive(Clone, Debug)]
-pub struct PySingleFactorModel {
+pub struct PyLatentSingleFactor {
     /// Inner Rust model.
-    pub(crate) inner: SingleFactorModel,
+    pub(crate) inner: LatentSingleFactor,
 }
 
 #[pymethods]
-impl PySingleFactorModel {
+impl PyLatentSingleFactor {
     /// Create a single-factor model.
     #[new]
     #[pyo3(text_signature = "(volatility, mean_reversion)")]
     fn new(volatility: f64, mean_reversion: f64) -> Self {
         Self {
-            inner: SingleFactorModel::new(volatility, mean_reversion),
+            inner: LatentSingleFactor::new(volatility, mean_reversion),
         }
     }
 
@@ -493,7 +497,7 @@ impl PySingleFactorModel {
 
     fn __repr__(&self) -> String {
         format!(
-            "SingleFactorModel(vol={:.4}, mr={:.4})",
+            "LatentSingleFactor(vol={:.4}, mr={:.4})",
             self.inner.volatility(),
             self.inner.mean_reversion()
         )
@@ -502,25 +506,25 @@ impl PySingleFactorModel {
 
 /// Two-factor model for prepayment and credit.
 #[pyclass(
-    name = "TwoFactorModel",
+    name = "LatentTwoFactor",
     module = "finstack.valuations.correlation",
     frozen,
     from_py_object
 )]
 #[derive(Clone, Debug)]
-pub struct PyTwoFactorModel {
+pub struct PyLatentTwoFactor {
     /// Inner Rust model.
-    pub(crate) inner: TwoFactorModel,
+    pub(crate) inner: LatentTwoFactor,
 }
 
 #[pymethods]
-impl PyTwoFactorModel {
+impl PyLatentTwoFactor {
     /// Create a two-factor model.
     #[new]
     #[pyo3(text_signature = "(prepay_vol, credit_vol, correlation)")]
     fn new(prepay_vol: f64, credit_vol: f64, correlation: f64) -> Self {
         Self {
-            inner: TwoFactorModel::new(prepay_vol, credit_vol, correlation),
+            inner: LatentTwoFactor::new(prepay_vol, credit_vol, correlation),
         }
     }
 
@@ -528,7 +532,7 @@ impl PyTwoFactorModel {
     #[classmethod]
     fn rmbs_standard(_cls: &Bound<'_, PyType>) -> Self {
         Self {
-            inner: TwoFactorModel::rmbs_standard(),
+            inner: LatentTwoFactor::rmbs_standard(),
         }
     }
 
@@ -536,7 +540,7 @@ impl PyTwoFactorModel {
     #[classmethod]
     fn clo_standard(_cls: &Bound<'_, PyType>) -> Self {
         Self {
-            inner: TwoFactorModel::clo_standard(),
+            inner: LatentTwoFactor::clo_standard(),
         }
     }
 
@@ -578,7 +582,7 @@ impl PyTwoFactorModel {
 
     fn __repr__(&self) -> String {
         format!(
-            "TwoFactorModel(prepay={:.4}, credit={:.4}, corr={:.4})",
+            "LatentTwoFactor(prepay={:.4}, credit={:.4}, corr={:.4})",
             self.inner.prepay_vol(),
             self.inner.credit_vol(),
             self.inner.correlation()
@@ -588,26 +592,26 @@ impl PyTwoFactorModel {
 
 /// Multi-factor model with custom correlation structure.
 #[pyclass(
-    name = "MultiFactorModel",
+    name = "LatentMultiFactor",
     module = "finstack.valuations.correlation",
     frozen,
     from_py_object
 )]
 #[derive(Clone, Debug)]
-pub struct PyMultiFactorModel {
+pub struct PyLatentMultiFactor {
     /// Inner Rust model.
-    pub(crate) inner: MultiFactorModel,
+    pub(crate) inner: LatentMultiFactor,
 }
 
 #[pymethods]
-impl PyMultiFactorModel {
+impl PyLatentMultiFactor {
     /// Create a validated multi-factor model.
     ///
     /// Raises ``ValueError`` if the correlation matrix is invalid.
     #[new]
     #[pyo3(text_signature = "(num_factors, volatilities, correlations)")]
     fn new(num_factors: usize, volatilities: Vec<f64>, correlations: Vec<f64>) -> PyResult<Self> {
-        MultiFactorModel::new(num_factors, volatilities, correlations)
+        LatentMultiFactor::new(num_factors, volatilities, correlations)
             .map(|m| Self { inner: m })
             .map_err(display_to_py)
     }
@@ -617,7 +621,7 @@ impl PyMultiFactorModel {
     #[pyo3(text_signature = "(cls, num_factors, volatilities)")]
     fn uncorrelated(_cls: &Bound<'_, PyType>, num_factors: usize, volatilities: Vec<f64>) -> Self {
         Self {
-            inner: MultiFactorModel::uncorrelated(num_factors, volatilities),
+            inner: LatentMultiFactor::uncorrelated(num_factors, volatilities),
         }
     }
 
@@ -646,7 +650,7 @@ impl PyMultiFactorModel {
     }
 
     fn __repr__(&self) -> String {
-        format!("MultiFactorModel(n={})", self.inner.num_factors())
+        format!("LatentMultiFactor(n={})", self.inner.num_factors())
     }
 }
 
@@ -864,12 +868,20 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCopula>()?;
     m.add_class::<PyRecoverySpec>()?;
     m.add_class::<PyRecoveryModel>()?;
-    m.add_class::<PyFactorSpec>()?;
-    m.add_class::<PyFactorModel>()?;
-    m.add_class::<PySingleFactorModel>()?;
-    m.add_class::<PyTwoFactorModel>()?;
-    m.add_class::<PyMultiFactorModel>()?;
+    m.add_class::<PyLatentFactorSpec>()?;
+    m.add_class::<PyLatentFactor>()?;
+    m.add_class::<PyLatentSingleFactor>()?;
+    m.add_class::<PyLatentTwoFactor>()?;
+    m.add_class::<PyLatentMultiFactor>()?;
     m.add_class::<PyCorrelatedBernoulli>()?;
+    // Backwards-compatible aliases for the pre-rename Python classes. New code
+    // should use the Latent* names so "factor model" refers to market-risk
+    // factor modelling across finstack.
+    m.setattr("FactorSpec", m.getattr("LatentFactorSpec")?)?;
+    m.setattr("FactorModel", m.getattr("LatentFactor")?)?;
+    m.setattr("SingleFactorModel", m.getattr("LatentSingleFactor")?)?;
+    m.setattr("TwoFactorModel", m.getattr("LatentTwoFactor")?)?;
+    m.setattr("MultiFactorModel", m.getattr("LatentMultiFactor")?)?;
     m.add_function(wrap_pyfunction!(correlation_bounds, &m)?)?;
     m.add_function(wrap_pyfunction!(joint_probabilities, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_correlation_matrix, &m)?)?;
@@ -883,6 +895,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "Copula",
             "RecoverySpec",
             "RecoveryModel",
+            "LatentFactorSpec",
+            "LatentFactor",
+            "LatentSingleFactor",
+            "LatentTwoFactor",
+            "LatentMultiFactor",
             "FactorSpec",
             "FactorModel",
             "SingleFactorModel",

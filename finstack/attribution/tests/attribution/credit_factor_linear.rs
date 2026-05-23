@@ -14,14 +14,6 @@ use finstack_attribution::{
 };
 use finstack_core::currency::Currency;
 use finstack_core::dates::{create_date, DayCount};
-use finstack_core::factor_model::credit_hierarchy::{
-    AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
-    FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
-    IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
-};
-use finstack_core::factor_model::{
-    FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
-};
 use finstack_core::market_data::context::{
     CurveState, MarketContextState, MARKET_CONTEXT_STATE_VERSION,
 };
@@ -29,7 +21,15 @@ use finstack_core::market_data::scalars::MarketScalar;
 use finstack_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, IssuerId};
+use finstack_factor_model::credit_hierarchy::{
+    AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
+    FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
+    IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
+};
 use finstack_factor_model::{decompose_levels, decompose_period, PeriodDecomposition};
+use finstack_factor_model::{
+    FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
+};
 use finstack_valuations::instruments::json_loader::InstrumentJson;
 use finstack_valuations::instruments::{Attributes, Bond};
 use std::collections::BTreeMap;

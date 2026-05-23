@@ -1,5 +1,5 @@
-use finstack_core::factor_model::{CurveType, FactorId, MarketDependency, RiskMeasure};
 use finstack_core::types::CurveId;
+use finstack_factor_model::{CurveType, FactorId, MarketDependency, RiskMeasure};
 use finstack_portfolio::factor_model::RiskDecomposition;
 use finstack_portfolio::factor_model::{
     FactorAssignmentReport, FactorConstraint, FactorContribution, FactorContributionDelta,

@@ -5,7 +5,7 @@
 // - **Integration tests**: Verify component interactions work correctly
 
 use crate::correlation::copula::{Copula, GaussianCopula};
-use crate::correlation::factor_model::FactorSpec;
+use crate::correlation::factor_model::LatentFactorSpec;
 use crate::correlation::recovery::RecoverySpec;
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::*;
 
@@ -211,16 +211,16 @@ mod property_tests {
     #[test]
     fn test_factor_spec_correlation_valid() {
         let specs = [
-            FactorSpec::single_factor(0.3, 0.1),
-            FactorSpec::two_factor(0.3, 0.4, 0.5),
-            FactorSpec::two_factor(0.3, 0.4, -0.5),
+            LatentFactorSpec::single_factor(0.3, 0.1),
+            LatentFactorSpec::two_factor(0.3, 0.4, 0.5),
+            LatentFactorSpec::two_factor(0.3, 0.4, -0.5),
         ];
 
         for spec in specs {
             let corr = match &spec {
-                FactorSpec::SingleFactor { .. } => 1.0, // Single factor is trivially valid
-                FactorSpec::TwoFactor { correlation, .. } => *correlation,
-                FactorSpec::MultiFactor { correlations, .. } => {
+                LatentFactorSpec::SingleFactor { .. } => 1.0, // Single factor is trivially valid
+                LatentFactorSpec::TwoFactor { correlation, .. } => *correlation,
+                LatentFactorSpec::MultiFactor { correlations, .. } => {
                     // Check all correlations in the matrix
                     for c in correlations {
                         assert!(

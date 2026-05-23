@@ -23,10 +23,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use finstack_core::dates::Date;
-use finstack_core::factor_model::credit_hierarchy::{
+use crate::credit::hierarchy::{
     CreditFactorModel, HierarchyDimension, IssuerBetaRow, IssuerBetas, IssuerTags,
 };
+use finstack_core::dates::Date;
 use finstack_core::types::IssuerId;
 
 // ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ use finstack_core::types::IssuerId;
 /// matching the convention used elsewhere in the credit hierarchy artifact.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LevelValuesAtDate {
-    /// Zero-based index of this level inside [`finstack_core::factor_model::credit_hierarchy::CreditHierarchySpec::levels`].
+    /// Zero-based index of this level inside [`crate::credit::hierarchy::CreditHierarchySpec::levels`].
     pub level_index: usize,
     /// Dimension identifier for this level, copied from the hierarchy spec.
     pub dimension: HierarchyDimension,
@@ -119,7 +119,7 @@ pub enum DecompositionError {
     MissingTag {
         /// The issuer with the missing tag.
         issuer_id: IssuerId,
-        /// Canonical key (per [`finstack_core::factor_model::credit_hierarchy::dimension_key`]) of the missing dimension.
+        /// Canonical key (per [`crate::credit::hierarchy::dimension_key`]) of the missing dimension.
         dimension: String,
     },
     /// The model is internally inconsistent — typically `IssuerBetas.levels`
@@ -287,7 +287,7 @@ pub fn decompose_levels(
     // any level is a hard error here; we surface the canonical dimension key.
     //
     // bucket_paths[issuer][k] = "IG.EU.FIN" or analogous.
-    let mut bucket_paths: BTreeMap<&IssuerId, Vec<String>> = BTreeMap::new();
+    let mut bucket_paths: BTreeMap<IssuerId, Vec<String>> = BTreeMap::new();
     for (issuer, r) in &resolved {
         let mut paths = Vec::with_capacity(num_levels);
         for k in 0..num_levels {
@@ -295,7 +295,7 @@ pub fn decompose_levels(
                 Some(p) => paths.push(p),
                 None => {
                     // Find the first missing dimension key for the diagnostic.
-                    use finstack_core::factor_model::credit_hierarchy::dimension_key;
+                    use crate::credit::hierarchy::dimension_key;
                     let missing_key = model.hierarchy.levels[..=k]
                         .iter()
                         .find(|dim| !r.tags.0.contains_key(&dimension_key(dim)))
@@ -308,80 +308,43 @@ pub fn decompose_levels(
                 }
             }
         }
-        bucket_paths.insert(*issuer, paths);
+        bucket_paths.insert((*issuer).clone(), paths);
     }
 
-    // ------------------------------------------------------------------
-    // Step 1 — PC peel.
-    // ------------------------------------------------------------------
-    let mut residuals: BTreeMap<&IssuerId, f64> = BTreeMap::new();
-    for (issuer, spread) in observed_spreads {
-        let r = &resolved[issuer];
-        residuals.insert(issuer, spread - r.betas.pc * observed_generic);
+    let betas_owned: BTreeMap<IssuerId, IssuerBetas> = resolved
+        .iter()
+        .map(|(issuer, resolved)| ((*issuer).clone(), resolved.betas.clone()))
+        .collect();
+    let mut folded_owned: BTreeMap<IssuerId, Vec<bool>> = BTreeMap::new();
+    for (issuer, level_index) in folded_pairs {
+        folded_owned
+            .entry(issuer)
+            .or_insert_with(|| vec![false; num_levels])[level_index] = true;
     }
-
-    // ------------------------------------------------------------------
-    // Step 2 — per-level peel.
-    // ------------------------------------------------------------------
-    let mut by_level: Vec<LevelValuesAtDate> = Vec::with_capacity(num_levels);
-    // We index into `bucket_paths[issuer][k]` and `r.betas.levels[k]` inside
-    // this loop, so a range-based loop is clearer than `enumerate()`-iterating
-    // over one of the structures and indexing into the other.
-    #[allow(clippy::needless_range_loop)]
-    for k in 0..num_levels {
-        // Aggregate: bucket → (sum, count) over the current residuals.
-        let mut sums: BTreeMap<String, (f64, usize)> = BTreeMap::new();
-        for issuer in observed_spreads.keys() {
-            if folded_pairs.contains(&(issuer.clone(), k)) {
-                continue;
-            }
-            let path = &bucket_paths[issuer][k];
-            let r_k = residuals[issuer];
-            let entry = sums.entry(path.clone()).or_insert((0.0, 0));
-            entry.0 += r_k;
-            entry.1 += 1;
-        }
-        // Convert to means.
-        let mut values: BTreeMap<String, f64> = BTreeMap::new();
-        for (bucket, (sum, count)) in sums {
-            // count is always >= 1 because every issuer contributes
-            // exactly one bucket entry above.
-            #[allow(clippy::cast_precision_loss)]
-            let mean = sum / count as f64;
-            values.insert(bucket, mean);
-        }
-
-        // Subtract β_i^level_k · L_k(g_i^k) from each issuer's residual.
-        for issuer in observed_spreads.keys() {
-            if folded_pairs.contains(&(issuer.clone(), k)) {
-                continue;
-            }
-            let r = &resolved[issuer];
-            let path = &bucket_paths[issuer][k];
-            let level_value = values[path];
-            let beta_k = r.betas.levels[k];
-            let prev = residuals[issuer];
-            residuals.insert(issuer, prev - beta_k * level_value);
-        }
-
-        by_level.push(LevelValuesAtDate {
+    let peel = super::peel::peel_single_observation(
+        observed_spreads,
+        observed_generic,
+        &betas_owned,
+        &bucket_paths,
+        &folded_owned,
+        num_levels,
+    );
+    let by_level: Vec<LevelValuesAtDate> = peel
+        .by_level
+        .into_iter()
+        .enumerate()
+        .map(|(k, values)| LevelValuesAtDate {
             level_index: k,
             dimension: model.hierarchy.levels[k].clone(),
             values,
-        });
-    }
-
-    // ------------------------------------------------------------------
-    // Step 3 — final residuals are the per-issuer adders.
-    // ------------------------------------------------------------------
-    let adder: BTreeMap<IssuerId, f64> =
-        residuals.into_iter().map(|(k, v)| (k.clone(), v)).collect();
+        })
+        .collect();
 
     Ok(LevelsAtDate {
         date: as_of,
         generic: observed_generic,
         by_level,
-        adder,
+        adder: peel.adder,
     })
 }
 

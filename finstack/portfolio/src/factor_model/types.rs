@@ -1,6 +1,6 @@
 use crate::types::PositionId;
-use finstack_core::factor_model::{FactorId, RiskMeasure};
 use finstack_core::types::IssuerId;
+use finstack_factor_model::{FactorId, RiskMeasure};
 use serde::{Deserialize, Serialize};
 
 /// Portfolio-level decomposition of total risk across common factors and residuals.
@@ -110,7 +110,7 @@ pub struct PositionFactorContribution {
 #[cfg(test)]
 mod tests {
     use super::{FactorContribution, RiskDecomposition};
-    use finstack_core::factor_model::{FactorId, RiskMeasure};
+    use finstack_factor_model::{FactorId, RiskMeasure};
 
     #[test]
     fn test_risk_decomposition_total_matches_sum() {

@@ -692,6 +692,29 @@ export declare function decomposePeriod(
   toLevels: LevelsAtDate
 ): PeriodDecomposition;
 
+export interface FactorModelCreditNamespace {
+  CreditFactorModel: typeof CreditFactorModel;
+  CreditCalibrator: typeof CreditCalibrator;
+  LevelsAtDate: typeof LevelsAtDate;
+  PeriodDecomposition: typeof PeriodDecomposition;
+  FactorCovarianceForecast: typeof FactorCovarianceForecast;
+  decomposeLevels(
+    model: CreditFactorModel,
+    observedSpreadsJson: string,
+    observedGeneric: number,
+    asOf: string,
+    runtimeTagsJson?: string
+  ): LevelsAtDate;
+  decomposePeriod(fromLevels: LevelsAtDate, toLevels: LevelsAtDate): PeriodDecomposition;
+}
+
+export interface FactorModelNamespace extends FactorModelCreditNamespace {
+  /** Credit factor hierarchy artifacts, calibration, and decomposition. */
+  credit: FactorModelCreditNamespace;
+}
+
+export declare const factor_model: FactorModelNamespace;
+
 // --- valuations.correlation -------------------------------------------------
 
 export interface Copula {

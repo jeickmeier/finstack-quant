@@ -113,10 +113,6 @@ name = "schedule_generation"
 harness = false
 
 [[bench]]
-name = "factor_model"
-harness = false
-
-[[bench]]
 name = "contention"
 harness = false
 

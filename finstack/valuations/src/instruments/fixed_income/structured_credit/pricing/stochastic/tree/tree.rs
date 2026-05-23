@@ -9,7 +9,7 @@ use super::{
     config::ScenarioTreeConfig,
     node::{ScenarioNode, ScenarioNodeId, ScenarioPath},
 };
-use crate::correlation::factor_model::FactorSpec;
+use crate::correlation::factor_model::LatentFactorSpec;
 use crate::correlation::recovery::RecoverySpec;
 use finstack_core::math::standard_normal_inv_cdf;
 use finstack_core::HashMap;
@@ -106,9 +106,9 @@ impl ScenarioTree {
         // This matches E[ΔZ] = 0 and Var[ΔZ] = σ²dt.
         // Falls back to uniform weights when σ²dt ∉ (0, 1).
         let vol = match &self.config.factor_spec {
-            FactorSpec::SingleFactor { volatility, .. } => *volatility,
-            FactorSpec::TwoFactor { prepay_vol, .. } => *prepay_vol,
-            FactorSpec::MultiFactor { volatilities, .. } => {
+            LatentFactorSpec::SingleFactor { volatility, .. } => *volatility,
+            LatentFactorSpec::TwoFactor { prepay_vol, .. } => *prepay_vol,
+            LatentFactorSpec::MultiFactor { volatilities, .. } => {
                 volatilities.first().copied().unwrap_or(1.0)
             }
         };
@@ -272,10 +272,10 @@ impl ScenarioTree {
 
         // Apply factor model structure
         match &self.config.factor_spec {
-            FactorSpec::SingleFactor { volatility, .. } => {
+            LatentFactorSpec::SingleFactor { volatility, .. } => {
                 vec![z * volatility]
             }
-            FactorSpec::TwoFactor {
+            LatentFactorSpec::TwoFactor {
                 prepay_vol,
                 credit_vol,
                 correlation,
@@ -288,7 +288,7 @@ impl ScenarioTree {
                 let z2 = correlation * z;
                 vec![z * prepay_vol, z2 * credit_vol]
             }
-            FactorSpec::MultiFactor { volatilities, .. } => {
+            LatentFactorSpec::MultiFactor { volatilities, .. } => {
                 // Use first volatility scaled by z
                 if let Some(vol) = volatilities.first() {
                     vec![z * vol]

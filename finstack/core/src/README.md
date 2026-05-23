@@ -21,7 +21,6 @@ Low-level building blocks for the Finstack workspace:
 | `cashflow/` | Cashflow primitives, NPV, IRR/XIRR — see [`cashflow/README.md`](cashflow/README.md) |
 | `types/` | Phantom-typed IDs, rates, ratings — see [`types/README.md`](types/README.md) |
 | `credit/` | PD/LGD/migration primitives |
-| `factor_model/` | Covariance, dependency, and matching utilities |
 | `math/volatility/` | Volatility models and option pricing formulas |
 | `error.rs` | Unified `Error` type |
 | `explain.rs` | Computation tracing |

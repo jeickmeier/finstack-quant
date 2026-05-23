@@ -33,12 +33,12 @@
 
 use std::collections::BTreeMap;
 
-use finstack_core::factor_model::credit_hierarchy::{
-    dimension_key, CreditFactorModel, HierarchyDimension, IssuerBetaRow,
-};
 use finstack_core::money::Money;
 use finstack_core::types::IssuerId;
 use finstack_core::Error;
+use finstack_factor_model::credit_hierarchy::{
+    dimension_key, CreditFactorModel, HierarchyDimension, IssuerBetaRow,
+};
 use serde::{Deserialize, Serialize};
 
 use super::types::{CreditFactorAttribution, LevelPnl};
@@ -298,15 +298,15 @@ mod tests {
     use super::*;
     use finstack_core::currency::Currency;
     use finstack_core::dates::create_date;
-    use finstack_core::factor_model::credit_hierarchy::{
+    use finstack_factor_model::credit_hierarchy::{
         AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
         FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
         IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
     };
-    use finstack_core::factor_model::{
+    use finstack_factor_model::{decompose_levels, decompose_period};
+    use finstack_factor_model::{
         FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
     };
-    use finstack_factor_model::{decompose_levels, decompose_period};
     use std::collections::BTreeMap;
     use time::Month;
 

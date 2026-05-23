@@ -264,26 +264,26 @@ fn bump_prepay_volatility(
     config: &ScenarioTreeConfig,
     bump: f64,
 ) -> Result<ScenarioTreeConfig, String> {
-    use crate::correlation::factor_model::FactorSpec;
+    use crate::correlation::factor_model::LatentFactorSpec;
 
     let mut new_config = config.clone();
 
     // Bump prepayment volatility in factor spec
     let new_factor_spec = match &config.factor_spec {
-        FactorSpec::SingleFactor {
+        LatentFactorSpec::SingleFactor {
             volatility,
             mean_reversion,
         } => {
             let new_vol = (volatility + bump).clamp(0.01, 2.0);
-            FactorSpec::single_factor(new_vol, *mean_reversion)
+            LatentFactorSpec::single_factor(new_vol, *mean_reversion)
         }
-        FactorSpec::TwoFactor {
+        LatentFactorSpec::TwoFactor {
             prepay_vol,
             credit_vol,
             correlation,
         } => {
             let new_prepay_vol = (prepay_vol + bump).clamp(0.01, 2.0);
-            FactorSpec::two_factor(new_prepay_vol, *credit_vol, *correlation)
+            LatentFactorSpec::two_factor(new_prepay_vol, *credit_vol, *correlation)
         }
         other => other.clone(),
     };

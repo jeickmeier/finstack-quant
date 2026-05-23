@@ -14,6 +14,7 @@ attribution: Any
 cashflows: Any
 core: Any
 covenants: Any
+factor_model: Any
 margin: Any
 monte_carlo: Any
 portfolio: Any

@@ -2,9 +2,6 @@
 
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
-use finstack_core::factor_model::{
-    BumpSizeConfig, FactorDefinition, FactorId, FactorType, MarketMapping,
-};
 use finstack_core::market_data::bumps::BumpUnits;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::DiscountCurve;
@@ -12,6 +9,9 @@ use finstack_core::math::interp::InterpStyle;
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
 use finstack_core::{InputError, Result};
+use finstack_factor_model::{
+    BumpSizeConfig, FactorDefinition, FactorId, FactorType, MarketMapping,
+};
 use finstack_portfolio::sensitivity::{
     DeltaBasedEngine, FactorSensitivityEngine, FullRepricingEngine,
 };

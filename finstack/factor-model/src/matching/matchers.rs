@@ -10,9 +10,9 @@
 //! [`super::credit`].
 
 use super::filter::{AttributeFilter, DependencyFilter};
-use crate::factor_model::dependency::MarketDependency;
-use crate::factor_model::types::FactorId;
-use crate::types::Attributes;
+use crate::primitives::dependency::MarketDependency;
+use crate::primitives::factor_types::FactorId;
+use finstack_core::types::Attributes;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 /// For most matchers this collapses to `(factor_id, 1.0)` — one entry per
 /// dependency, beta = 1. The credit hierarchy matcher (
 /// [`super::credit::CreditHierarchicalMatcher`]) emits multiple entries with
-/// calibrated betas read from a [`crate::factor_model::credit_hierarchy::IssuerBetaRow`].
+/// calibrated betas read from a [`crate::credit::hierarchy::IssuerBetaRow`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct FactorMatchEntry {
     /// Matched factor identifier.
@@ -283,8 +283,8 @@ impl FactorMatcher for CascadeMatcher {
 #[cfg(test)]
 mod tests_mapping_table {
     use super::*;
-    use crate::factor_model::dependency::{CurveType, DependencyType, MarketDependency};
-    use crate::types::CurveId;
+    use crate::primitives::dependency::{CurveType, DependencyType, MarketDependency};
+    use finstack_core::types::CurveId;
 
     #[test]
     fn test_empty_table_matches_nothing() {
@@ -388,8 +388,8 @@ mod tests_mapping_table {
 #[cfg(test)]
 mod tests_hierarchical {
     use super::*;
-    use crate::factor_model::dependency::MarketDependency;
-    use crate::types::CurveId;
+    use crate::primitives::dependency::MarketDependency;
+    use finstack_core::types::CurveId;
 
     fn credit_tree() -> FactorNode {
         FactorNode {
@@ -544,7 +544,7 @@ mod tests_hierarchical {
     fn test_scoped_hierarchical_matcher_filters_dependency_class() {
         let matcher = HierarchicalMatcher::new_scoped(
             DependencyFilter {
-                dependency_type: Some(crate::factor_model::DependencyType::Credit),
+                dependency_type: Some(crate::DependencyType::Credit),
                 curve_type: None,
                 id: None,
             },
@@ -567,8 +567,8 @@ mod tests_hierarchical {
 #[cfg(test)]
 mod tests_cascade {
     use super::*;
-    use crate::factor_model::dependency::{DependencyType, MarketDependency};
-    use crate::types::CurveId;
+    use crate::primitives::dependency::{DependencyType, MarketDependency};
+    use finstack_core::types::CurveId;
 
     #[test]
     fn test_cascade_tries_in_order() {

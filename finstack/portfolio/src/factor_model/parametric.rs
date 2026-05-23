@@ -4,7 +4,7 @@ use super::simulation::cholesky;
 use super::traits::RiskDecomposer;
 use super::types::{FactorContribution, PositionFactorContribution, RiskDecomposition};
 use crate::types::PositionId;
-use finstack_core::factor_model::{FactorCovarianceMatrix, RiskMeasure};
+use finstack_factor_model::{FactorCovarianceMatrix, RiskMeasure};
 
 use crate::sensitivity::SensitivityMatrix;
 
@@ -303,7 +303,7 @@ mod tests {
     use crate::factor_model::RiskDecomposer;
     use crate::sensitivity::SensitivityMatrix;
     use crate::types::PositionId;
-    use finstack_core::factor_model::{FactorCovarianceMatrix, FactorId, RiskMeasure};
+    use finstack_factor_model::{FactorCovarianceMatrix, FactorId, RiskMeasure};
 
     type TestResult = finstack_core::Result<()>;
 

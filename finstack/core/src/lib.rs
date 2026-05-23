@@ -113,8 +113,6 @@ pub mod explain;
 /// Internal expression engine used by statements for formula evaluation and
 /// time-series operations.
 pub mod expr;
-/// Factor-model primitives for statistical risk decomposition.
-pub mod factor_model;
 /// Market data curves, surfaces, scalars, and context storage.
 pub mod market_data;
 /// Numerical helpers (root finding, summation, stats)

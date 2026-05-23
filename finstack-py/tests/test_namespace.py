@@ -215,12 +215,12 @@ class TestCorrelationNamespace:
             CopulaSpec,
             CorrelatedBernoulli,
             FactorModel,
-            FactorSpec,
-            MultiFactorModel,
+            LatentFactorSpec,
+            LatentMultiFactor,
+            LatentSingleFactor,
+            LatentTwoFactor,
             RecoveryModel,
             RecoverySpec,
-            SingleFactorModel,
-            TwoFactorModel,
             cholesky_decompose,
             correlation_bounds,
             joint_probabilities,
@@ -232,6 +232,29 @@ class TestCorrelationNamespace:
         from finstack import valuations
 
         assert valuations.correlation.CopulaSpec is not None
+
+
+class TestFactorModelNamespace:
+    """Verify the factor_model subpackage mirrors the Rust crate boundary."""
+
+    def test_factor_model_credit_exports(self) -> None:
+        """Credit factor APIs should be available under finstack.factor_model.credit."""
+        from finstack.factor_model.credit import (  # noqa: F401
+            CreditCalibrator,
+            CreditFactorModel,
+            FactorCovarianceForecast,
+            LevelsAtDate,
+            PeriodDecomposition,
+            decompose_levels,
+            decompose_period,
+        )
+
+    def test_valuations_credit_factor_aliases_remain(self) -> None:
+        """Historical valuations aliases should point at the canonical namespace."""
+        from finstack import factor_model, valuations
+
+        assert valuations.CreditFactorModel is factor_model.credit.CreditFactorModel
+        assert valuations.CreditCalibrator is factor_model.credit.CreditCalibrator
 
 
 class TestMonteCarloNamespace:

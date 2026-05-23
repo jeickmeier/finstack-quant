@@ -21,8 +21,6 @@
 //! Vega = (V(σ+dσ) - V(σ-dσ)) / (2*dσ)
 //! ```
 
-#![allow(dead_code)] // WIP: public API not yet wired into main pricing paths
-
 use crate::calibration::hull_white::HullWhiteParams;
 use crate::instruments::rates::swaption::pricing::BermudanSwaptionTreeValuator;
 use crate::instruments::rates::swaption::{BermudanSwaption, CalibratedHullWhiteModel};
@@ -30,27 +28,21 @@ use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_core::dates::Date;
 use finstack_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_core::market_data::traits::Discounting;
-use finstack_core::types::{Bps, Percentage, Rate};
 use finstack_core::Result;
 
 /// Default bump size for parallel rate shift (1 basis point).
-#[allow(dead_code)] // May be used by external bindings or tests
 pub(crate) const DEFAULT_RATE_BUMP_BP: f64 = 1.0;
 
 /// Default bump size for volatility (1% relative).
-#[allow(dead_code)] // May be used by external bindings or tests
 pub(crate) const DEFAULT_VOL_BUMP_PCT: f64 = 0.01;
 
 /// Default Hull-White mean reversion.
-#[allow(dead_code)] // May be used by external bindings or tests
 pub(crate) const DEFAULT_KAPPA: f64 = 0.03;
 
 /// Default Hull-White volatility.
-#[allow(dead_code)] // May be used by external bindings or tests
 pub(crate) const DEFAULT_SIGMA: f64 = 0.01;
 
 /// Default tree steps for Greeks.
-#[allow(dead_code)] // May be used by external bindings or tests
 pub(crate) const DEFAULT_TREE_STEPS: usize = 50;
 
 /// Validates Hull–White parameters used by Bermudan Greek calculators.
@@ -108,31 +100,12 @@ impl BermudanDeltaCalculator {
         Self::default()
     }
 
-    /// Set bump size.
-    pub(crate) fn with_bump(mut self, bump_bp: f64) -> Self {
-        self.bump_bp = bump_bp;
-        self
-    }
-
-    /// Set bump size using typed basis points.
-    pub(crate) fn with_bump_bps(mut self, bump_bp: Bps) -> Self {
-        self.bump_bp = bump_bp.as_bps() as f64;
-        self
-    }
-
     /// Set Hull-White parameters.
     ///
     /// Invalid values are rejected when computing metrics (runtime validation).
     pub(crate) fn with_hw_params(mut self, kappa: f64, sigma: f64) -> Self {
         self.kappa = kappa;
         self.sigma = sigma;
-        self
-    }
-
-    /// Set Hull-White parameters using typed values.
-    pub(crate) fn with_hw_params_rate(mut self, kappa: Rate, sigma: Percentage) -> Self {
-        self.kappa = kappa.as_decimal();
-        self.sigma = sigma.as_decimal();
         self
     }
 
@@ -248,25 +221,12 @@ impl BermudanVegaCalculator {
         Self::default()
     }
 
-    /// Set volatility bump using a typed percentage.
-    pub(crate) fn with_bump_pct(mut self, bump_pct: Percentage) -> Self {
-        self.bump_pct = bump_pct.as_decimal();
-        self
-    }
-
     /// Set Hull-White parameters.
     ///
     /// Invalid values are rejected when computing metrics (runtime validation).
     pub(crate) fn with_hw_params(mut self, kappa: f64, sigma: f64) -> Self {
         self.kappa = kappa;
         self.sigma = sigma;
-        self
-    }
-
-    /// Set Hull-White parameters using typed values.
-    pub(crate) fn with_hw_params_rate(mut self, kappa: Rate, sigma: Percentage) -> Self {
-        self.kappa = kappa.as_decimal();
-        self.sigma = sigma.as_decimal();
         self
     }
 
@@ -371,25 +331,12 @@ impl BermudanGammaCalculator {
         Self::default()
     }
 
-    /// Set bump size using typed basis points.
-    pub(crate) fn with_bump_bps(mut self, bump_bp: Bps) -> Self {
-        self.bump_bp = bump_bp.as_bps() as f64;
-        self
-    }
-
     /// Set Hull-White parameters.
     ///
     /// Invalid values are rejected when computing metrics (runtime validation).
     pub(crate) fn with_hw_params(mut self, kappa: f64, sigma: f64) -> Self {
         self.kappa = kappa;
         self.sigma = sigma;
-        self
-    }
-
-    /// Set Hull-White parameters using typed values.
-    pub(crate) fn with_hw_params_rate(mut self, kappa: Rate, sigma: Percentage) -> Self {
-        self.kappa = kappa.as_decimal();
-        self.sigma = sigma.as_decimal();
         self
     }
 
@@ -470,17 +417,9 @@ impl MetricCalculator for BermudanGammaCalculator {
 // Exercise Probability Profile
 // ============================================================================
 
-/// Exercise probability profile for Bermudan swaptions.
-///
-/// Shows the risk-neutral probability of exercise at each exercise date.
+/// Exercise timing summary for Bermudan swaptions.
 #[derive(Debug, Clone)]
 pub(crate) struct ExerciseProbabilityProfile {
-    /// Exercise dates (year fractions)
-    pub(crate) exercise_times: Vec<f64>,
-    /// Conditional probabilities P(exercise at t | not exercised before t)
-    pub(crate) conditional_probs: Vec<f64>,
-    /// Cumulative probabilities P(exercised by t)
-    pub(crate) cumulative_probs: Vec<f64>,
     /// Expected exercise time
     pub(crate) expected_exercise_time: f64,
 }
@@ -497,7 +436,7 @@ impl ExerciseProbabilityProfile {
     /// * `exercise_times` - Exercise dates as year fractions (used for validation)
     ///
     /// # Returns
-    /// An `ExerciseProbabilityProfile` with actual computed probabilities
+    /// An `ExerciseProbabilityProfile` with the expected exercise time.
     pub(crate) fn from_valuator(
         valuator: &BermudanSwaptionTreeValuator,
         exercise_times: Vec<f64>,
@@ -508,35 +447,8 @@ impl ExerciseProbabilityProfile {
         let n = exercise_times.len();
         if n == 0 || tree_probs.is_empty() {
             return Self {
-                exercise_times,
-                conditional_probs: Vec::new(),
-                cumulative_probs: Vec::new(),
                 expected_exercise_time: 0.0,
             };
-        }
-
-        // Extract marginal probabilities (probability of exercise at each date)
-        // tree_probs returns Vec<(time, probability)>
-        let marginal_probs: Vec<f64> = tree_probs.iter().map(|(_, p)| *p).collect();
-
-        // Compute conditional probabilities: P(exercise at t | survived to t)
-        // conditional_prob[i] = marginal_prob[i] / (1 - cumulative_prob[i-1])
-        let mut conditional_probs = Vec::with_capacity(n);
-        let mut cumulative_probs = Vec::with_capacity(n);
-        let mut cumulative = 0.0;
-
-        for &marginal in &marginal_probs {
-            let survival = 1.0 - cumulative;
-            let conditional = if survival > 1e-10 {
-                marginal / survival
-            } else {
-                0.0
-            };
-            conditional_probs.push(conditional);
-
-            cumulative += marginal;
-            // Clamp cumulative to [0, 1] to handle numerical noise
-            cumulative_probs.push(cumulative.min(1.0));
         }
 
         // Expected exercise time = Σ t_i × P(exercise at t_i)
@@ -544,9 +456,6 @@ impl ExerciseProbabilityProfile {
         let expected_exercise_time: f64 = tree_probs.iter().map(|(t, p)| t * p).sum();
 
         Self {
-            exercise_times,
-            conditional_probs,
-            cumulative_probs,
             expected_exercise_time,
         }
     }
@@ -564,15 +473,6 @@ pub(crate) struct ExerciseProbabilityCalculator {
 }
 
 impl ExerciseProbabilityCalculator {
-    /// Create a new calculator with default (uncalibrated) parameters.
-    pub(crate) fn new() -> Self {
-        Self {
-            kappa: DEFAULT_KAPPA,
-            sigma: DEFAULT_SIGMA,
-            tree_steps: DEFAULT_TREE_STEPS,
-        }
-    }
-
     /// Create a new calculator with calibrated Hull-White parameters.
     ///
     /// Invalid values are rejected when computing metrics (runtime validation).
@@ -655,21 +555,6 @@ mod tests {
     }
 
     #[test]
-    fn test_exercise_probability_profile_construction() {
-        // Test manual construction of profile
-        let times = vec![1.0, 2.0, 3.0];
-        let profile = ExerciseProbabilityProfile {
-            exercise_times: times.clone(),
-            conditional_probs: vec![0.33, 0.33, 0.34],
-            cumulative_probs: vec![0.33, 0.66, 1.0],
-            expected_exercise_time: 2.0,
-        };
-
-        assert_eq!(profile.exercise_times.len(), 3);
-        assert!((profile.cumulative_probs[2] - 1.0).abs() < 0.01);
-    }
-
-    #[test]
     fn test_exercise_probability_profile_from_valuator() {
         // Integration test: verify from_valuator uses actual tree probabilities
         use crate::instruments::rates::swaption::{
@@ -747,28 +632,7 @@ mod tests {
             .expect("Valid exercise times");
         let profile = ExerciseProbabilityProfile::from_valuator(&valuator, exercise_times.clone());
 
-        // Verify profile has correct structure
-        assert_eq!(profile.exercise_times.len(), exercise_times.len());
-        assert_eq!(profile.conditional_probs.len(), exercise_times.len());
-        assert_eq!(profile.cumulative_probs.len(), exercise_times.len());
-
-        // Cumulative probabilities should be non-decreasing
-        for i in 1..profile.cumulative_probs.len() {
-            assert!(
-                profile.cumulative_probs[i] >= profile.cumulative_probs[i - 1] - 1e-10,
-                "Cumulative probs should be non-decreasing"
-            );
-        }
-
-        // Conditional probabilities should be in [0, 1]
-        for &p in &profile.conditional_probs {
-            assert!(
-                (0.0..=1.0 + 1e-10).contains(&p),
-                "Conditional probs should be in [0, 1]"
-            );
-        }
-
-        // Expected exercise time should be reasonable
+        // Expected exercise time should be reasonable.
         assert!(profile.expected_exercise_time >= 0.0);
     }
 }

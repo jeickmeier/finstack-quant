@@ -220,6 +220,7 @@ fn package_dts_documents_hand_facade_over_raw_wasm_bindgen_types() {
     assert!(dts.contains("not the package root contract"));
     assert!(dts.contains("export declare const core: CoreNamespace;"));
     assert!(dts.contains("export declare const analytics: AnalyticsNamespace;"));
+    assert!(dts.contains("export declare const factor_model: FactorModelNamespace;"));
     assert!(dts.contains("export declare const valuations: ValuationsNamespace;"));
     assert!(dts.contains("export declare const portfolio: PortfolioNamespace;"));
     assert!(dts.contains("generated `types/generated/*` files"));
@@ -339,4 +340,16 @@ fn valuations_dts_exposes_credit_namespaces() {
     assert!(dts.contains("cdsOptionExampleJson(): string;"));
     assert!(dts.contains("credit: ValuationCreditNamespace;"));
     assert!(dts.contains("creditDerivatives: CreditDerivativesNamespace;"));
+}
+
+#[test]
+fn factor_model_dts_exposes_credit_namespace() {
+    let dts = index_dts();
+
+    assert!(dts.contains("export interface FactorModelNamespace"));
+    assert!(dts.contains("export interface FactorModelCreditNamespace"));
+    assert!(dts.contains("credit: FactorModelCreditNamespace;"));
+    assert!(dts.contains("CreditFactorModel: typeof CreditFactorModel;"));
+    assert!(dts.contains("decomposeLevels("));
+    assert!(dts.contains("export declare const factor_model: FactorModelNamespace;"));
 }

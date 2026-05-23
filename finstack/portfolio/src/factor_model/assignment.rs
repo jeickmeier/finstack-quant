@@ -1,7 +1,7 @@
 use crate::types::PositionId;
-use finstack_core::factor_model::matching::FactorMatcher;
-use finstack_core::factor_model::{FactorId, MarketDependency};
 use finstack_core::types::Attributes;
+use finstack_factor_model::matching::FactorMatcher;
+use finstack_factor_model::{FactorId, MarketDependency};
 
 /// Assignment results for a portfolio-level factor mapping pass.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -69,11 +69,11 @@ pub(crate) fn assign_position_factors(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_core::factor_model::matching::{
+    use finstack_core::types::{Attributes, CurveId};
+    use finstack_factor_model::matching::{
         AttributeFilter, DependencyFilter, MappingRule, MappingTableMatcher,
     };
-    use finstack_core::factor_model::{CurveType, DependencyType, FactorId, MarketDependency};
-    use finstack_core::types::{Attributes, CurveId};
+    use finstack_factor_model::{CurveType, DependencyType, FactorId, MarketDependency};
 
     #[test]
     fn test_assign_position_factors_reports_matches_and_unmatched() {

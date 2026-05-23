@@ -12,14 +12,14 @@ mod bench_utils;
 
 use bench_utils::bench_iter;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use finstack_core::factor_model::matching::{
+use finstack_core::types::{Attributes, CurveId};
+use finstack_factor_model::matching::{
     AttributeFilter, CascadeMatcher, DependencyFilter, FactorMatcher, FactorNode,
     HierarchicalMatcher, MappingRule, MappingTableMatcher,
 };
-use finstack_core::factor_model::{
+use finstack_factor_model::{
     CurveType, DependencyType, FactorCovarianceMatrix, FactorId, MarketDependency,
 };
-use finstack_core::types::{Attributes, CurveId};
 use std::hint::black_box;
 
 fn make_factor_ids(n: usize) -> Vec<FactorId> {

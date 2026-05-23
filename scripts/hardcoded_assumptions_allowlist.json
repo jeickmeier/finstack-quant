@@ -412,7 +412,7 @@
     {
       "path": "finstack-py/src/bindings/valuations/correlation/mod.rs",
       "category": "structured_credit",
-      "contains": "\"TwoFactorModel(prepay={:.4}, credit={:.4}, corr={:.4})\",",
+      "contains": "\"LatentTwoFactor(prepay={:.4}, credit={:.4}, corr={:.4})\",",
       "reason": "Structured-credit formula, named standard factory, or diagnostic; mutable assumptions live in structured-credit/TBA registries."
     },
     {

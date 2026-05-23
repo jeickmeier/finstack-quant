@@ -32,10 +32,10 @@ use super::model_params;
 use super::types::*;
 use finstack_core::config::FinstackConfig;
 use finstack_core::dates::Date;
-use finstack_core::factor_model::credit_hierarchy::CreditFactorModel;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::Result;
+use finstack_factor_model::credit_hierarchy::CreditFactorModel;
 use finstack_valuations::instruments::Instrument;
 use indexmap::IndexMap;
 use rayon::prelude::*;
@@ -100,7 +100,7 @@ fn get_restore_flags(kind: ActiveFactorKind) -> CurveRestoreFlags {
 }
 
 #[derive(Clone)]
-enum ParallelFactorSpec {
+enum ParallelLatentFactorSpec {
     Market {
         factor: ParallelRestoredFactor,
         flags: CurveRestoreFlags,
@@ -112,7 +112,7 @@ enum ParallelFactorSpec {
 }
 
 struct FirstOrderRepriceResult {
-    spec: ParallelFactorSpec,
+    spec: ParallelLatentFactorSpec,
     pnl: Money,
     reprice_val: Money,
 }
@@ -460,49 +460,49 @@ pub fn attribute_pnl_parallel_with_credit_model(
         let mut factor_specs = Vec::new();
 
         if !discount_snap.discount_curves.is_empty() {
-            factor_specs.push(ParallelFactorSpec::Market {
+            factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Discount,
                 flags: CurveRestoreFlags::DISCOUNT,
                 snapshot: Box::new(discount_snap),
             });
         }
         if !forward_snap.forward_curves.is_empty() {
-            factor_specs.push(ParallelFactorSpec::Market {
+            factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Forward,
                 flags: CurveRestoreFlags::FORWARD,
                 snapshot: Box::new(forward_snap),
             });
         }
         if !credit_snapshot.hazard_curves.is_empty() {
-            factor_specs.push(ParallelFactorSpec::Market {
+            factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Credit,
                 flags: CurveRestoreFlags::CREDIT,
                 snapshot: Box::new(credit_snapshot.clone()),
             });
         }
         if !inflation_snap.inflation_curves.is_empty() {
-            factor_specs.push(ParallelFactorSpec::Market {
+            factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Inflation,
                 flags: CurveRestoreFlags::INFLATION,
                 snapshot: Box::new(inflation_snap),
             });
         }
         if !correlation_snap.base_correlation_curves.is_empty() {
-            factor_specs.push(ParallelFactorSpec::Market {
+            factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Correlations,
                 flags: CurveRestoreFlags::CORRELATION,
                 snapshot: Box::new(correlation_snap),
             });
         }
         if fx_snap.fx.is_some() {
-            factor_specs.push(ParallelFactorSpec::Market {
+            factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::FX,
                 flags: CurveRestoreFlags::FX,
                 snapshot: Box::new(fx_snap),
             });
         }
         if !vol_snap.surfaces.is_empty() {
-            factor_specs.push(ParallelFactorSpec::Market {
+            factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Volatility,
                 flags: CurveRestoreFlags::VOL,
                 snapshot: Box::new(vol_snap),
@@ -513,7 +513,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
             || !scalars_snap.inflation_indices.is_empty()
             || !scalars_snap.dividends.is_empty();
         if has_scalars {
-            factor_specs.push(ParallelFactorSpec::Market {
+            factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::MarketScalars,
                 flags: CurveRestoreFlags::SCALARS,
                 snapshot: Box::new(scalars_snap),
@@ -524,7 +524,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
             .cloned()
             .unwrap_or_else(|| model_params::extract_model_params(instrument));
         if !matches!(params_t0, model_params::ModelParamsSnapshot::None) {
-            factor_specs.push(ParallelFactorSpec::ModelParams {
+            factor_specs.push(ParallelLatentFactorSpec::ModelParams {
                 snapshot: params_t0,
             });
         }
@@ -533,7 +533,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
             .par_iter()
             .map(|spec| -> Result<FirstOrderRepriceResult> {
                 match spec {
-                    ParallelFactorSpec::Market {
+                    ParallelLatentFactorSpec::Market {
                         factor,
                         flags,
                         snapshot,
@@ -560,7 +560,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
                             reprice_val: reprice,
                         })
                     }
-                    ParallelFactorSpec::ModelParams { snapshot } => {
+                    ParallelLatentFactorSpec::ModelParams { snapshot } => {
                         let instrument_with_t0_params =
                             model_params::with_model_params(instrument, snapshot)?;
                         let reprice =
@@ -586,7 +586,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
         for res in first_order_results {
             num_repricings += 1;
             match &res.spec {
-                ParallelFactorSpec::Market { factor, .. } => match factor {
+                ParallelLatentFactorSpec::Market { factor, .. } => match factor {
                     ParallelRestoredFactor::Discount => {
                         val_with_t0_discount = Some(res.reprice_val);
                         attribution.rates_curves_pnl =
@@ -623,7 +623,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
                     }
                     _ => unreachable!(),
                 },
-                ParallelFactorSpec::ModelParams { .. } => {
+                ParallelLatentFactorSpec::ModelParams { .. } => {
                     val_with_t0_params = Some(res.reprice_val);
                     attribution.model_params_pnl = res.pnl;
                 }

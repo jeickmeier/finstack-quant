@@ -39,9 +39,9 @@ from finstack.statements_analytics import (
 from finstack.valuations.correlation import (
     CopulaSpec,
     CorrelatedBernoulli,
-    FactorSpec,
+    LatentFactorSpec,
+    LatentSingleFactor,
     RecoverySpec,
-    SingleFactorModel,
     correlation_bounds,
     validate_correlation_matrix,
 )
@@ -516,14 +516,14 @@ class TestCorrelationBenchmarks:
 
     def test_factor_model(self, benchmark) -> None:
         def _build_and_query():
-            spec = FactorSpec.single_factor(0.15, 0.5)
+            spec = LatentFactorSpec.single_factor(0.15, 0.5)
             model = spec.build()
             return model.diagonal_factor_contribution(0, 1.0)
 
         benchmark(_build_and_query)
 
     def test_single_factor_model_construction(self, benchmark) -> None:
-        benchmark(SingleFactorModel, 0.15, 0.5)
+        benchmark(LatentSingleFactor, 0.15, 0.5)
 
     def test_correlation_bounds(self, benchmark) -> None:
         benchmark(correlation_bounds, 0.3, 0.5)

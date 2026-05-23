@@ -2,7 +2,7 @@
 
 use super::types::RiskDecomposition;
 use crate::sensitivity::SensitivityMatrix;
-use finstack_core::factor_model::{FactorCovarianceMatrix, RiskMeasure};
+use finstack_factor_model::{FactorCovarianceMatrix, RiskMeasure};
 
 /// Common interface for engines that decompose portfolio risk into factor contributions.
 pub trait RiskDecomposer: Send + Sync {

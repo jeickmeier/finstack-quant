@@ -1,5 +1,5 @@
 use super::FactorId;
-use crate::collections::HashMap;
+use finstack_core::HashMap;
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// User-supplied factor covariance matrix with row-major storage.
@@ -25,7 +25,7 @@ impl FactorCovarianceMatrix {
     /// - factor identifiers are unique
     /// - the matrix is symmetric within a small floating-point tolerance
     /// - the matrix is positive semi-definite according to a Cholesky-style test
-    pub fn new(factor_ids: Vec<FactorId>, data: Vec<f64>) -> crate::Result<Self> {
+    pub fn new(factor_ids: Vec<FactorId>, data: Vec<f64>) -> finstack_core::Result<Self> {
         let n = factor_ids.len();
         if data.len() != n * n {
             return Err(crate::InputError::DimensionMismatch.into());
@@ -38,7 +38,7 @@ impl FactorCovarianceMatrix {
                 let lhs = data[i * n + j];
                 let rhs = data[j * n + i];
                 if (lhs - rhs).abs() > 1e-12 {
-                    return Err(crate::Error::Validation(format!(
+                    return Err(finstack_core::Error::Validation(format!(
                         "Covariance matrix is not symmetric at ({i}, {j})"
                     )));
                 }
@@ -46,7 +46,7 @@ impl FactorCovarianceMatrix {
         }
 
         if !Self::is_psd(&data, n) {
-            return Err(crate::Error::Validation(
+            return Err(finstack_core::Error::Validation(
                 "Covariance matrix is not positive semi-definite".to_string(),
             ));
         }
@@ -133,11 +133,11 @@ impl FactorCovarianceMatrix {
         covariance / (variance_lhs.sqrt() * variance_rhs.sqrt())
     }
 
-    fn build_index(factor_ids: &[FactorId]) -> crate::Result<HashMap<FactorId, usize>> {
+    fn build_index(factor_ids: &[FactorId]) -> finstack_core::Result<HashMap<FactorId, usize>> {
         let mut index = HashMap::with_capacity_and_hasher(factor_ids.len(), Default::default());
         for (idx, factor_id) in factor_ids.iter().cloned().enumerate() {
             if index.insert(factor_id.clone(), idx).is_some() {
-                return Err(crate::Error::Validation(format!(
+                return Err(finstack_core::Error::Validation(format!(
                     "Duplicate factor id '{factor_id}' in covariance matrix"
                 )));
             }

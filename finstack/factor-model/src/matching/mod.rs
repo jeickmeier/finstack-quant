@@ -5,7 +5,7 @@ mod credit;
 mod filter;
 mod matchers;
 
-pub use crate::factor_model::credit_hierarchy::dimension_key;
+pub use crate::credit::hierarchy::dimension_key;
 pub use config::{HierarchicalConfig, MatchingConfig};
 pub use credit::{
     bucket_factor_id, CreditHierarchicalConfig, CreditHierarchicalMatcher,

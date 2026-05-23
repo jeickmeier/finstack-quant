@@ -21,12 +21,12 @@
 
 use super::filter::DependencyFilter;
 use super::matchers::{FactorMatchEntry, FactorMatchError, FactorMatchResult, FactorMatcher};
-use crate::factor_model::credit_hierarchy::{
+use crate::credit::hierarchy::{
     dimension_key, CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerTags,
 };
-use crate::factor_model::dependency::MarketDependency;
-use crate::factor_model::types::FactorId;
-use crate::types::{Attributes, IssuerId};
+use crate::primitives::dependency::MarketDependency;
+use crate::primitives::factor_types::FactorId;
+use finstack_core::types::{Attributes, IssuerId};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ pub fn bucket_factor_id(
 /// emits factors for credit-side dependencies regardless of how the user
 /// configured `dependency_filter`.
 fn is_credit_dependency(dep: &MarketDependency) -> bool {
-    use crate::factor_model::dependency::CurveType;
+    use crate::primitives::dependency::CurveType;
     match dep {
         MarketDependency::CreditCurve { .. } => true,
         MarketDependency::Curve { curve_type, .. } => *curve_type == CurveType::Hazard,
@@ -279,11 +279,11 @@ fn tags_from_attributes(spec: &CreditHierarchySpec, attrs: &Attributes) -> Issue
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::factor_model::credit_hierarchy::{
+    use crate::credit::hierarchy::{
         AdderVolSource, IssuerBetaMode, IssuerBetaRow, IssuerBetas, IssuerTags,
     };
-    use crate::factor_model::dependency::{DependencyType, MarketDependency};
-    use crate::types::{Attributes, CurveId, IssuerId};
+    use crate::primitives::dependency::{DependencyType, MarketDependency};
+    use finstack_core::types::{Attributes, CurveId, IssuerId};
     use std::collections::BTreeMap;
 
     fn three_level_spec() -> CreditHierarchySpec {

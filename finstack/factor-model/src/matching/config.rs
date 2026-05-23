@@ -4,7 +4,7 @@ use super::matchers::{
     CascadeMatcher, FactorMatcher, FactorNode, HierarchicalMatcher, MappingRule,
     MappingTableMatcher,
 };
-use crate::factor_model::types::FactorId;
+use crate::primitives::factor_types::FactorId;
 use serde::{Deserialize, Serialize};
 
 /// Declarative configuration for a dependency-scoped hierarchical matcher.
@@ -33,7 +33,7 @@ pub enum MatchingConfig {
     /// Emits `(credit::generic, β_pc)` plus
     /// `(credit::level{idx}::{dim_path}::{val_path}, β_level{idx})` entries
     /// using calibrated betas from
-    /// [`crate::factor_model::credit_hierarchy::CreditFactorModel`].
+    /// [`crate::credit::hierarchy::CreditFactorModel`].
     CreditHierarchical(CreditHierarchicalConfig),
 }
 
@@ -58,7 +58,7 @@ impl MatchingConfig {
 
     /// Returns every factor identifier this matcher config can emit.
     ///
-    /// Used by [`FactorModelConfig`](crate::factor_model::FactorModelConfig)
+    /// Used by [`FactorModelConfig`](crate::FactorModelConfig)
     /// validation to verify that every factor
     /// the matcher can name is also defined in `factors`.
     #[must_use]
@@ -105,10 +105,10 @@ fn collect_node_factor_ids(node: &FactorNode, ids: &mut std::collections::BTreeS
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::factor_model::dependency::{DependencyType, MarketDependency};
-    use crate::factor_model::matching::{AttributeFilter, DependencyFilter};
-    use crate::factor_model::types::FactorId;
-    use crate::types::{Attributes, CurveId};
+    use crate::matching::{AttributeFilter, DependencyFilter};
+    use crate::primitives::dependency::{DependencyType, MarketDependency};
+    use crate::primitives::factor_types::FactorId;
+    use finstack_core::types::{Attributes, CurveId};
 
     #[test]
     fn test_matching_config_mapping_table() {

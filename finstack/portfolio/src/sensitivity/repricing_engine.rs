@@ -1,10 +1,10 @@
 use super::delta_engine::mapping_to_market_bumps;
 use super::traits::FactorSensitivityEngine;
 use finstack_core::dates::Date;
-use finstack_core::factor_model::{BumpSizeConfig, FactorDefinition, FactorId};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::{Error, Result};
 use finstack_factor_model::sensitivity_matrix::SensitivityMatrix;
+use finstack_factor_model::{BumpSizeConfig, FactorDefinition, FactorId};
 use finstack_valuations::instruments::Instrument;
 
 /// P&L profile for one factor across a scenario grid.
@@ -218,12 +218,12 @@ impl FactorSensitivityEngine for FullRepricingEngine {
 mod tests {
     use super::*;
     use finstack_core::currency::Currency;
-    use finstack_core::factor_model::{FactorType, MarketMapping};
     use finstack_core::market_data::bumps::BumpUnits;
     use finstack_core::market_data::term_structures::DiscountCurve;
     use finstack_core::math::interp::InterpStyle;
     use finstack_core::money::Money;
     use finstack_core::types::CurveId;
+    use finstack_factor_model::{FactorType, MarketMapping};
     use finstack_valuations::instruments::Attributes;
     use finstack_valuations::pricer::InstrumentType;
     use std::any::Any;

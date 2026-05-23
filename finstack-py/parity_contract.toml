@@ -36,7 +36,6 @@ dates         = { python = "finstack.core.dates",         status = "exists" }
 error         = { python = "finstack.core.error",         status = "missing" }
 explain       = { python = "finstack.core.explain",       status = "missing", note = "Explain helpers are not yet surfaced as a dedicated Python submodule" }
 expr          = { python = "finstack.core.expr",          status = "missing", note = "Expression APIs are not yet surfaced as a dedicated Python submodule" }
-factor_model  = { python = "finstack.core.factor_model",  status = "missing" }
 market_data   = { python = "finstack.core.market_data",   status = "exists" }
 math          = { python = "finstack.core.math",          status = "exists" }
 money         = { python = "finstack.core.money",         status = "exists" }
@@ -45,6 +44,23 @@ rating_scales = { python = "finstack.core.rating_scales", status = "exists" }
 types         = { python = "finstack.core.types",         status = "exists" }
 validation    = { python = "finstack.core.validation",    status = "missing" }
 # golden is feature-gated test-only — excluded (see [exclusions])
+
+# ---------------------------------------------------------------------------
+# finstack-factor-model  →  finstack.factor_model
+# ---------------------------------------------------------------------------
+[crates.factor_model]
+rust_crate = "finstack-factor-model"
+rust_lib   = "finstack/factor-model/src/lib.rs"
+python_package = "finstack.factor_model"
+visibility = "pub"
+status = "exists"
+note = "Generic factor-model primitives are Rust-first today; credit hierarchy APIs are exposed under finstack.factor_model.credit with valuations aliases retained for compatibility."
+
+[crates.factor_model.modules]
+primitives = { python = "finstack.factor_model.primitives", status = "missing", note = "FactorId/FactorType/FactorDefinition typed host-language constructors deferred; JSON contracts remain Rust-owned." }
+matching   = { python = "finstack.factor_model.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned." }
+credit     = { python = "finstack.factor_model.credit", status = "exists", note = "CreditFactorModel, CreditCalibrator, LevelsAtDate, PeriodDecomposition, FactorCovarianceForecast, decompose_levels, decompose_period." }
+calibration = { python = "finstack.factor_model.calibration", status = "missing", note = "Generic FactorCalibrator is a Rust trait and not directly host-language constructible." }
 
 # ---------------------------------------------------------------------------
 # finstack-analytics  →  finstack.analytics
@@ -162,7 +178,7 @@ calibration  = { python = "finstack.valuations",              status = "flattene
 correlation  = { python = "finstack.valuations.correlation",  status = "exists", note = "Former standalone finstack-correlation crate; nested under valuations" }
 credit       = { python = "finstack.valuations.credit",       status = "exists", note = "Structural credit models and PIK toggle helpers" }
 credit_derivatives = { python = "finstack.valuations.credit_derivatives", status = "exists", note = "Typed wrappers for CDS, CDS index, tranche, and option JSON pricing" }
-credit_factor_model = { python = "finstack.valuations", status = "exists", note = "CreditFactorModel, CreditCalibrator, LevelsAtDate, PeriodDecomposition, FactorCovarianceForecast, decompose_levels, decompose_period exposed flat on finstack.valuations" }
+credit_factor_model = { python = "finstack.factor_model.credit", status = "exists", note = "Canonical binding namespace moved with Rust crate to finstack.factor_model.credit; finstack.valuations root aliases remain for compatibility." }
 
 # Symbol-level pinning for the valuations domain. Names listed here MUST
 # resolve when imported from `finstack.valuations`. Adding a public name to
@@ -456,6 +472,7 @@ names = [
     "cashflows",
     "core",
     "covenants",
+    "factor_model",
     "margin",
     "monte_carlo",
     "portfolio",
@@ -480,6 +497,7 @@ namespaces = [
     "cashflows",
     "core",
     "covenants",
+    "factor_model",
     "margin",
     "monte_carlo",
     "portfolio",
@@ -496,7 +514,9 @@ namespaces = [
 # Rust `finstack-core` public surface — only the host-language-friendly
 # primitives that browser callers actually need. Modules outside this list
 # are deliberately not bound for WASM (e.g. `cashflow`, `config`, `credit`,
-# `expr`, `factor_model`, `explain`, `prelude`, `validation`).
+# `expr`, `explain`, `prelude`, `validation`). The standalone
+# `finstack-factor-model` crate is exposed through the separate top-level
+# `factor_model` WASM namespace.
 #
 # Python tracks the full `finstack-core` surface (see `[crates.core.modules]`
 # above) because it is the canonical consumer; WASM is opt-in per module.
@@ -520,7 +540,6 @@ excluded = [
     "credit",        # Credit registry not yet needed in browser callers
     "expr",          # Expression engine not exposed to WASM
     "explain",       # Trace/audit helpers are server/notebook-side concerns
-    "factor_model",  # Factor model API is Python-only today
     "prelude",       # Re-export bag; no host-language meaning
     "validation",    # Internal validation helpers
 ]

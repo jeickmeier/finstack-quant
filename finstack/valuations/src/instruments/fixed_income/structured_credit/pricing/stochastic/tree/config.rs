@@ -9,7 +9,7 @@ use super::super::{
     correlation::CorrelationStructure, default::StochasticDefaultSpec,
     prepayment::StochasticPrepaySpec,
 };
-use crate::correlation::factor_model::FactorSpec;
+use crate::correlation::factor_model::LatentFactorSpec;
 use crate::correlation::recovery::RecoverySpec;
 
 const MAX_NODE_CAPACITY: usize = 50_000_000;
@@ -132,7 +132,7 @@ pub(crate) struct ScenarioTreeConfig {
     pub branching: BranchingSpec,
 
     /// Factor model specification
-    pub factor_spec: FactorSpec,
+    pub factor_spec: LatentFactorSpec,
 
     /// Stochastic prepayment model specification
     pub prepay_spec: StochasticPrepaySpec,
@@ -166,7 +166,7 @@ impl ScenarioTreeConfig {
             num_periods: num_periods.max(1),
             horizon_years: horizon_years.max(0.1),
             branching,
-            factor_spec: FactorSpec::default(),
+            factor_spec: LatentFactorSpec::default(),
             prepay_spec: StochasticPrepaySpec::default(),
             default_spec: StochasticDefaultSpec::default(),
             recovery_spec: RecoverySpec::default(),
@@ -185,7 +185,7 @@ impl ScenarioTreeConfig {
             num_periods,
             horizon_years,
             branching: BranchingSpec::fixed(3),
-            factor_spec: FactorSpec::two_factor(0.20, 0.25, -0.30),
+            factor_spec: LatentFactorSpec::two_factor(0.20, 0.25, -0.30),
             prepay_spec: StochasticPrepaySpec::rmbs_agency(pool_coupon),
             default_spec: StochasticDefaultSpec::rmbs_standard(),
             recovery_spec: RecoverySpec::market_standard_stochastic(),
@@ -204,7 +204,7 @@ impl ScenarioTreeConfig {
             num_periods,
             horizon_years,
             branching: BranchingSpec::fixed(3),
-            factor_spec: FactorSpec::two_factor(0.15, 0.30, -0.20),
+            factor_spec: LatentFactorSpec::two_factor(0.15, 0.30, -0.20),
             prepay_spec: StochasticPrepaySpec::clo_standard(),
             default_spec: StochasticDefaultSpec::clo_standard(),
             recovery_spec: RecoverySpec::MarketCorrelated {
@@ -245,7 +245,7 @@ impl ScenarioTreeConfig {
     }
 
     /// Set the factor specification.
-    pub(crate) fn with_factor_spec(mut self, spec: FactorSpec) -> Self {
+    pub(crate) fn with_factor_spec(mut self, spec: LatentFactorSpec) -> Self {
         self.factor_spec = spec;
         self
     }
