@@ -9,7 +9,7 @@ use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 ///
 /// Intended for environments (like WASM) where registering *all* pricers may be
 /// too memory intensive.
-pub fn register_rates_pricers(registry: &mut PricerRegistry) {
+pub(crate) fn register_rates_pricers(registry: &mut PricerRegistry) {
     // Bond pricers
     register_generic!(
         registry,

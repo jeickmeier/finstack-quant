@@ -6,7 +6,7 @@
 use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register pricers for FX instruments.
-pub fn register_fx_pricers(registry: &mut PricerRegistry) {
+pub(crate) fn register_fx_pricers(registry: &mut PricerRegistry) {
     // FX Spot
     register_generic!(registry, InstrumentType::FxSpot, crate::instruments::FxSpot);
 

@@ -939,7 +939,7 @@ mod tests {
     #[test]
     fn fixed_leg_pv_uses_builder_payment_dates_once() {
         let fixture = load_bloomberg_fixture();
-        let as_of = crate::pricer::parse_as_of_date(&fixture.inputs.valuation_date)
+        let as_of = finstack_core::dates::parse_iso_date(&fixture.inputs.valuation_date)
             .expect("fixture valuation date parses");
         let irs = load_fixture_irs(&fixture);
         let market = load_fixture_market(&fixture);
@@ -969,7 +969,7 @@ mod tests {
     #[test]
     fn float_leg_pv_uses_schedule_payment_dates_once() {
         let fixture = load_bloomberg_fixture();
-        let as_of = crate::pricer::parse_as_of_date(&fixture.inputs.valuation_date)
+        let as_of = finstack_core::dates::parse_iso_date(&fixture.inputs.valuation_date)
             .expect("fixture valuation date parses");
         let irs = load_fixture_irs(&fixture);
         let market = load_fixture_market(&fixture);
@@ -1000,7 +1000,7 @@ mod tests {
     #[test]
     fn write_bloomberg_schedule_diagnostic_csv() {
         let fixture = load_bloomberg_fixture();
-        let as_of = crate::pricer::parse_as_of_date(&fixture.inputs.valuation_date)
+        let as_of = finstack_core::dates::parse_iso_date(&fixture.inputs.valuation_date)
             .expect("fixture valuation date parses");
         let irs = load_fixture_irs(&fixture);
         let market = load_fixture_market(&fixture);

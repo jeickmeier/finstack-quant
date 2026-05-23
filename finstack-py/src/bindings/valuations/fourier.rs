@@ -10,24 +10,12 @@
 //! off-ATM. Use `bs_cos_price` for all Black-Scholes Fourier pricing.
 
 use crate::errors::display_to_py;
-use finstack_core::math::characteristic_function::{BlackScholesCf, MertonJumpCf, VarianceGammaCf};
-use finstack_valuations::pricer::cos::{CosConfig, CosPricer};
+use finstack_valuations::pricer::cos::{
+    bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
+    vg_cos_price as rust_vg_cos_price, BlackScholesCosParams, MertonJumpCosParams,
+    VarianceGammaCosParams,
+};
 use pyo3::prelude::*;
-
-/// Build a [`CosConfig`] for the COS pricer.
-///
-/// When `n_terms` is `None` the term count is taken from
-/// [`CosConfig::default()`] — the single canonical source for the COS
-/// expansion default, shared with the WASM binding
-/// (`finstack-wasm/.../fourier.rs`). No COS default is hardcoded in the
-/// binding layer, so the Python and WASM defaults cannot drift from the core.
-fn cos_config(n_terms: Option<usize>) -> CosConfig {
-    let default = CosConfig::default();
-    CosConfig {
-        num_terms: n_terms.unwrap_or(default.num_terms),
-        ..default
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Black-Scholes
@@ -73,22 +61,17 @@ fn bs_cos_price(
     n_terms: Option<usize>,
 ) -> PyResult<f64> {
     py.detach(move || {
-        let cf = BlackScholesCf {
-            r: rate,
-            q: dividend,
-            sigma: vol,
-        };
-        let config = cos_config(n_terms);
-        let pricer = CosPricer::new(&cf, config);
-        if is_call {
-            pricer
-                .price_call(spot, strike, rate, maturity)
-                .map_err(display_to_py)
-        } else {
-            pricer
-                .price_put(spot, strike, rate, maturity)
-                .map_err(display_to_py)
-        }
+        rust_bs_cos_price(BlackScholesCosParams {
+            spot,
+            strike,
+            rate,
+            dividend,
+            vol,
+            maturity,
+            is_call,
+            n_terms,
+        })
+        .map_err(display_to_py)
     })
 }
 
@@ -142,24 +125,19 @@ fn vg_cos_price(
     n_terms: Option<usize>,
 ) -> PyResult<f64> {
     py.detach(move || {
-        let cf = VarianceGammaCf {
-            r: rate,
-            q: dividend,
+        rust_vg_cos_price(VarianceGammaCosParams {
+            spot,
+            strike,
+            rate,
+            dividend,
             sigma,
-            nu,
             theta,
-        };
-        let config = cos_config(n_terms);
-        let pricer = CosPricer::new(&cf, config);
-        if is_call {
-            pricer
-                .price_call(spot, strike, rate, maturity)
-                .map_err(display_to_py)
-        } else {
-            pricer
-                .price_put(spot, strike, rate, maturity)
-                .map_err(display_to_py)
-        }
+            nu,
+            maturity,
+            is_call,
+            n_terms,
+        })
+        .map_err(display_to_py)
     })
 }
 
@@ -216,25 +194,20 @@ fn merton_jump_cos_price(
     n_terms: Option<usize>,
 ) -> PyResult<f64> {
     py.detach(move || {
-        let cf = MertonJumpCf {
-            r: rate,
-            q: dividend,
+        rust_merton_jump_cos_price(MertonJumpCosParams {
+            spot,
+            strike,
+            rate,
+            dividend,
             sigma,
+            mu_jump,
+            sigma_jump,
             lambda,
-            mu_j: mu_jump,
-            sigma_j: sigma_jump,
-        };
-        let config = cos_config(n_terms);
-        let pricer = CosPricer::new(&cf, config);
-        if is_call {
-            pricer
-                .price_call(spot, strike, rate, maturity)
-                .map_err(display_to_py)
-        } else {
-            pricer
-                .price_put(spot, strike, rate, maturity)
-                .map_err(display_to_py)
-        }
+            maturity,
+            is_call,
+            n_terms,
+        })
+        .map_err(display_to_py)
     })
 }
 

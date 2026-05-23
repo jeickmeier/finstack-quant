@@ -6,7 +6,7 @@
 use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register pricers for commodity instruments.
-pub fn register_commodity_pricers(registry: &mut PricerRegistry) {
+pub(crate) fn register_commodity_pricers(registry: &mut PricerRegistry) {
     // Commodity Forward
     register_generic!(
         registry,

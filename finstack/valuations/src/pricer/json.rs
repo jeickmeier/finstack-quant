@@ -113,14 +113,6 @@ pub fn parse_boxed_instrument_json(
     InstrumentEnvelope::from_str(effective_json.as_ref())
 }
 
-/// Parse an ISO 8601 as-of date for JSON pricing helpers.
-///
-/// Thin re-export wrapper over [`finstack_core::dates::parse_iso_date`] kept
-/// for binding stability; new code should call the core helper directly.
-pub fn parse_as_of_date(as_of: &str) -> finstack_core::Result<time::Date> {
-    finstack_core::dates::parse_iso_date(as_of)
-}
-
 /// Parse a string model key used by the JSON pricing helpers.
 pub fn parse_model_key(model: &str) -> finstack_core::Result<ModelKey> {
     model
@@ -152,7 +144,7 @@ pub fn price_instrument_json(
     model: &str,
 ) -> finstack_core::Result<ValuationResult> {
     let instrument = parse_boxed_instrument_json(instrument_json, None)?;
-    let as_of = parse_as_of_date(as_of)?;
+    let as_of = finstack_core::dates::parse_iso_date(as_of)?;
     let model = resolve_model_key(instrument.as_ref(), model)?;
     let registry = shared_standard_registry();
     PricerRegistry::price_with_metrics_shared(
@@ -199,7 +191,7 @@ pub fn price_instrument_json_with_metrics_and_history(
     market_history_json: Option<&str>,
 ) -> finstack_core::Result<ValuationResult> {
     let instrument = parse_boxed_instrument_json(instrument_json, pricing_options)?;
-    let as_of = parse_as_of_date(as_of)?;
+    let as_of = finstack_core::dates::parse_iso_date(as_of)?;
     let model = resolve_model_key(instrument.as_ref(), model)?;
     let metric_ids: Vec<MetricId> = metrics
         .iter()

@@ -7,7 +7,7 @@ use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register pricers for exotic instruments (barriers, lookbacks, Asians,
 /// autocallables, quantos, cliquets, range accruals, Bermudan swaptions).
-pub fn register_exotic_pricers(registry: &mut PricerRegistry) {
+pub(crate) fn register_exotic_pricers(registry: &mut PricerRegistry) {
     // Basket
     register_generic!(
         registry,

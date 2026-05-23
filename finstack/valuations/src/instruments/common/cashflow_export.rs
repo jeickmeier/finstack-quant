@@ -41,7 +41,7 @@ use crate::instruments::fixed_income::mbs_passthrough::{
     generate_cashflows as mbs_generate_cashflows, AgencyMbsPassthrough,
 };
 use crate::instruments::json_loader::InstrumentEnvelope;
-use crate::pricer::{parse_as_of_date, shared_standard_registry, ModelKey, PricerKey};
+use crate::pricer::{shared_standard_registry, ModelKey, PricerKey};
 
 // ---------------------------------------------------------------------------
 // Envelope schema
@@ -166,7 +166,7 @@ fn build_envelope(
         )));
     }
 
-    let as_of_date = parse_as_of_date(as_of)
+    let as_of_date = finstack_core::dates::parse_iso_date(as_of)
         .map_err(|e| Error::Validation(format!("invalid as_of '{as_of}': {e}")))?;
 
     let instrument = InstrumentEnvelope::from_str(instrument_json)?;

@@ -11,7 +11,9 @@
 //!   European Options Based on Fourier-Cosine Series Expansions."
 //!   *SIAM J. Sci. Comput.*, 31(2), 826-848.
 
-use finstack_core::math::characteristic_function::CharacteristicFunction;
+use finstack_core::math::characteristic_function::{
+    BlackScholesCf, CharacteristicFunction, MertonJumpCf, VarianceGammaCf,
+};
 use finstack_core::math::NeumaierAccumulator;
 use num_complex::Complex64;
 use std::f64::consts::PI;
@@ -33,6 +35,163 @@ impl Default for CosConfig {
             num_terms: 128,
             truncation_l: 10.0,
         }
+    }
+}
+
+/// Inputs for Black-Scholes pricing via the COS method.
+#[derive(Debug, Clone, Copy)]
+pub struct BlackScholesCosParams {
+    /// Current spot price of the underlying.
+    pub spot: f64,
+    /// Option strike.
+    pub strike: f64,
+    /// Continuously-compounded risk-free rate.
+    pub rate: f64,
+    /// Continuous dividend yield.
+    pub dividend: f64,
+    /// Annualized volatility.
+    pub vol: f64,
+    /// Time to expiry in years.
+    pub maturity: f64,
+    /// `true` for call, `false` for put.
+    pub is_call: bool,
+    /// Optional COS term count; defaults to [`CosConfig::default`].
+    pub n_terms: Option<usize>,
+}
+
+/// Inputs for Variance Gamma pricing via the COS method.
+#[derive(Debug, Clone, Copy)]
+pub struct VarianceGammaCosParams {
+    /// Current spot price of the underlying.
+    pub spot: f64,
+    /// Option strike.
+    pub strike: f64,
+    /// Continuously-compounded risk-free rate.
+    pub rate: f64,
+    /// Continuous dividend yield.
+    pub dividend: f64,
+    /// Volatility of the subordinated Brownian motion.
+    pub sigma: f64,
+    /// Drift of the subordinated Brownian motion.
+    pub theta: f64,
+    /// Variance rate of the Gamma subordinator.
+    pub nu: f64,
+    /// Time to expiry in years.
+    pub maturity: f64,
+    /// `true` for call, `false` for put.
+    pub is_call: bool,
+    /// Optional COS term count; defaults to [`CosConfig::default`].
+    pub n_terms: Option<usize>,
+}
+
+/// Inputs for Merton jump-diffusion pricing via the COS method.
+#[derive(Debug, Clone, Copy)]
+pub struct MertonJumpCosParams {
+    /// Current spot price of the underlying.
+    pub spot: f64,
+    /// Option strike.
+    pub strike: f64,
+    /// Continuously-compounded risk-free rate.
+    pub rate: f64,
+    /// Continuous dividend yield.
+    pub dividend: f64,
+    /// Diffusion volatility.
+    pub sigma: f64,
+    /// Mean of log-jump size.
+    pub mu_jump: f64,
+    /// Standard deviation of log-jump size.
+    pub sigma_jump: f64,
+    /// Jump intensity, in expected jumps per year.
+    pub lambda: f64,
+    /// Time to expiry in years.
+    pub maturity: f64,
+    /// `true` for call, `false` for put.
+    pub is_call: bool,
+    /// Optional COS term count; defaults to [`CosConfig::default`].
+    pub n_terms: Option<usize>,
+}
+
+/// Price a European option under Black-Scholes using the COS method.
+pub fn bs_cos_price(params: BlackScholesCosParams) -> crate::pricer::PricingResult<f64> {
+    let cf = BlackScholesCf {
+        r: params.rate,
+        q: params.dividend,
+        sigma: params.vol,
+    };
+    price_from_cf(
+        &cf,
+        params.spot,
+        params.strike,
+        params.rate,
+        params.maturity,
+        params.is_call,
+        params.n_terms,
+    )
+}
+
+/// Price a European option under Variance Gamma using the COS method.
+pub fn vg_cos_price(params: VarianceGammaCosParams) -> crate::pricer::PricingResult<f64> {
+    let cf = VarianceGammaCf {
+        r: params.rate,
+        q: params.dividend,
+        sigma: params.sigma,
+        nu: params.nu,
+        theta: params.theta,
+    };
+    price_from_cf(
+        &cf,
+        params.spot,
+        params.strike,
+        params.rate,
+        params.maturity,
+        params.is_call,
+        params.n_terms,
+    )
+}
+
+/// Price a European option under Merton jump-diffusion using the COS method.
+pub fn merton_jump_cos_price(params: MertonJumpCosParams) -> crate::pricer::PricingResult<f64> {
+    let cf = MertonJumpCf {
+        r: params.rate,
+        q: params.dividend,
+        sigma: params.sigma,
+        lambda: params.lambda,
+        mu_j: params.mu_jump,
+        sigma_j: params.sigma_jump,
+    };
+    price_from_cf(
+        &cf,
+        params.spot,
+        params.strike,
+        params.rate,
+        params.maturity,
+        params.is_call,
+        params.n_terms,
+    )
+}
+
+fn cos_config(n_terms: Option<usize>) -> CosConfig {
+    let default = CosConfig::default();
+    CosConfig {
+        num_terms: n_terms.unwrap_or(default.num_terms),
+        ..default
+    }
+}
+
+fn price_from_cf(
+    cf: &dyn CharacteristicFunction,
+    spot: f64,
+    strike: f64,
+    rate: f64,
+    maturity: f64,
+    is_call: bool,
+    n_terms: Option<usize>,
+) -> crate::pricer::PricingResult<f64> {
+    let pricer = CosPricer::new(cf, cos_config(n_terms));
+    if is_call {
+        pricer.price_call(spot, strike, rate, maturity)
+    } else {
+        pricer.price_put(spot, strike, rate, maturity)
     }
 }
 

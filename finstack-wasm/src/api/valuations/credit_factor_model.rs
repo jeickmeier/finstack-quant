@@ -272,7 +272,7 @@ pub fn decompose_levels(
     let observed_spreads: std::collections::BTreeMap<finstack_core::types::IssuerId, f64> =
         serde_json::from_str(observed_spreads_json).map_err(to_js_err)?;
 
-    let date = finstack_valuations::pricer::parse_as_of_date(as_of).map_err(to_js_err)?;
+    let date = finstack_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
 
     let runtime_tags: Option<
         std::collections::BTreeMap<

@@ -78,7 +78,7 @@ pub fn compute_factor_sensitivities_json(
 ) -> Result<String> {
     let market: MarketContext = serde_json::from_str(market_json)
         .map_err(|e| Error::Validation(format!("invalid market JSON: {e}")))?;
-    let as_of = finstack_valuations::pricer::parse_as_of_date(as_of)?;
+    let as_of = finstack_core::dates::parse_iso_date(as_of)?;
     let matrix = compute_factor_sensitivities_from_json(
         positions_json,
         factors_json,
@@ -119,7 +119,7 @@ pub fn compute_pnl_profiles_json(
 ) -> Result<String> {
     let market: MarketContext = serde_json::from_str(market_json)
         .map_err(|e| Error::Validation(format!("invalid market JSON: {e}")))?;
-    let as_of = finstack_valuations::pricer::parse_as_of_date(as_of)?;
+    let as_of = finstack_core::dates::parse_iso_date(as_of)?;
     let profiles = compute_pnl_profiles_from_json(
         positions_json,
         factors_json,

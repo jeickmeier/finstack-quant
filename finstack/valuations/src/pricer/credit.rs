@@ -21,7 +21,7 @@ use finstack_core::market_data::context::MarketContext;
 use indexmap::IndexMap;
 
 /// Register pricers for credit instruments.
-pub fn register_credit_pricers(registry: &mut PricerRegistry) {
+pub(crate) fn register_credit_pricers(registry: &mut PricerRegistry) {
     // CDS
     registry.register(InstrumentType::CDS, ModelKey::HazardRate, CDSHazardPricer);
 

@@ -8,24 +8,12 @@
 //! `maturity` is time to expiry in years.
 
 use crate::utils::to_js_err;
-use finstack_core::math::characteristic_function::{BlackScholesCf, MertonJumpCf, VarianceGammaCf};
-use finstack_valuations::pricer::cos::{CosConfig, CosPricer};
+use finstack_valuations::pricer::cos::{
+    bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
+    vg_cos_price as rust_vg_cos_price, BlackScholesCosParams, MertonJumpCosParams,
+    VarianceGammaCosParams,
+};
 use wasm_bindgen::prelude::*;
-
-/// Build a [`CosConfig`] for the COS pricer.
-///
-/// When `n_terms` is `None` the term count is taken from
-/// [`CosConfig::default()`] — the single canonical source for the COS
-/// expansion default, shared with the Python binding (`fourier.rs`). No COS
-/// default is hardcoded in the binding layer, so the Python and WASM defaults
-/// cannot drift from the core.
-fn cos_config(n_terms: Option<usize>) -> CosConfig {
-    let default = CosConfig::default();
-    CosConfig {
-        num_terms: n_terms.unwrap_or(default.num_terms),
-        ..default
-    }
-}
 
 /// Price a European option under the Black-Scholes model using the COS method.
 #[wasm_bindgen(js_name = bsCosPrice)]
@@ -40,21 +28,17 @@ pub fn bs_cos_price(
     is_call: bool,
     n_terms: Option<usize>,
 ) -> Result<f64, JsValue> {
-    let cf = BlackScholesCf {
-        r: rate,
-        q: dividend,
-        sigma: vol,
-    };
-    let pricer = CosPricer::new(&cf, cos_config(n_terms));
-    if is_call {
-        pricer
-            .price_call(spot, strike, rate, maturity)
-            .map_err(to_js_err)
-    } else {
-        pricer
-            .price_put(spot, strike, rate, maturity)
-            .map_err(to_js_err)
-    }
+    rust_bs_cos_price(BlackScholesCosParams {
+        spot,
+        strike,
+        rate,
+        dividend,
+        vol,
+        maturity,
+        is_call,
+        n_terms,
+    })
+    .map_err(to_js_err)
 }
 
 /// Price a European option under the Variance Gamma model using the COS method.
@@ -72,23 +56,19 @@ pub fn vg_cos_price(
     is_call: bool,
     n_terms: Option<usize>,
 ) -> Result<f64, JsValue> {
-    let cf = VarianceGammaCf {
-        r: rate,
-        q: dividend,
+    rust_vg_cos_price(VarianceGammaCosParams {
+        spot,
+        strike,
+        rate,
+        dividend,
         sigma,
-        nu,
         theta,
-    };
-    let pricer = CosPricer::new(&cf, cos_config(n_terms));
-    if is_call {
-        pricer
-            .price_call(spot, strike, rate, maturity)
-            .map_err(to_js_err)
-    } else {
-        pricer
-            .price_put(spot, strike, rate, maturity)
-            .map_err(to_js_err)
-    }
+        nu,
+        maturity,
+        is_call,
+        n_terms,
+    })
+    .map_err(to_js_err)
 }
 
 /// Price a European option under Merton (1976) jump-diffusion using the COS method.
@@ -107,24 +87,20 @@ pub fn merton_jump_cos_price(
     is_call: bool,
     n_terms: Option<usize>,
 ) -> Result<f64, JsValue> {
-    let cf = MertonJumpCf {
-        r: rate,
-        q: dividend,
+    rust_merton_jump_cos_price(MertonJumpCosParams {
+        spot,
+        strike,
+        rate,
+        dividend,
         sigma,
+        mu_jump,
+        sigma_jump,
         lambda,
-        mu_j: mu_jump,
-        sigma_j: sigma_jump,
-    };
-    let pricer = CosPricer::new(&cf, cos_config(n_terms));
-    if is_call {
-        pricer
-            .price_call(spot, strike, rate, maturity)
-            .map_err(to_js_err)
-    } else {
-        pricer
-            .price_put(spot, strike, rate, maturity)
-            .map_err(to_js_err)
-    }
+        maturity,
+        is_call,
+        n_terms,
+    })
+    .map_err(to_js_err)
 }
 
 #[cfg(test)]

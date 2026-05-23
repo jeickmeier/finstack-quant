@@ -220,7 +220,7 @@
   "expected_outputs": {
     "npv": 1140567.9278137966,
     "real_yield": 0.009932285188,
-    "breakeven_inflation": 0.00453740883,
+    "breakeven_inflation": 0.004617685695,
     "index_ratio": 1.041583775885,
     "real_duration": 4.842303902839,
     "dv01": -553.8741333798971

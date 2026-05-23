@@ -16,7 +16,7 @@ use pyo3::types::PyDict;
 
 /// Parse an ISO 8601 date string.
 fn parse_date(s: &str) -> PyResult<finstack_core::dates::Date> {
-    finstack_valuations::pricer::parse_as_of_date(s).map_err(display_to_py)
+    finstack_core::dates::parse_iso_date(s).map_err(display_to_py)
 }
 
 // ---------------------------------------------------------------------------

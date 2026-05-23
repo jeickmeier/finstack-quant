@@ -599,19 +599,6 @@ impl ModelKey {
                 | Self::MonteCarloCheyetteRoughVol
         )
     }
-
-    /// Returns true when the model uses Monte Carlo or stochastic simulation infrastructure.
-    ///
-    /// This method is retained for source compatibility with older callers. The valuations
-    /// crate no longer exposes an `mc` Cargo feature; use [`Self::is_monte_carlo_model`] for
-    /// new code.
-    #[deprecated(
-        since = "0.4.1",
-        note = "use is_monte_carlo_model; Monte Carlo models are not gated by an mc feature"
-    )]
-    pub const fn requires_mc_feature(self) -> bool {
-        self.is_monte_carlo_model()
-    }
 }
 
 impl std::fmt::Display for ModelKey {

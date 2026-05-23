@@ -5,7 +5,7 @@
 use super::{register_generic, InstrumentType, ModelKey, PricerRegistry};
 
 /// Register pricers for inflation instruments (swaps, caps/floors).
-pub fn register_inflation_pricers(registry: &mut PricerRegistry) {
+pub(crate) fn register_inflation_pricers(registry: &mut PricerRegistry) {
     // Inflation Swap
     register_generic!(
         registry,
