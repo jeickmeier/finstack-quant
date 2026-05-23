@@ -6,20 +6,20 @@
 use finstack_core::dates::{Date, PeriodId, PeriodKind};
 use finstack_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use finstack_core::Result;
-use finstack_statements::evaluator::StatementResult;
-use finstack_statements::types::{FinancialModelSpec, ForecastMethod};
-use finstack_valuations::covenants::GenericCovenantForecast as ValuationCovenantForecast;
-use finstack_valuations::covenants::{
+use finstack_covenants::GenericCovenantForecast as ValuationCovenantForecast;
+use finstack_covenants::{
     forecast_breaches_generic, forecast_covenant_generic, CovenantEngine, CovenantForecastConfig,
     CovenantSpec, FutureBreach, ModelTimeSeries,
 };
+use finstack_statements::evaluator::StatementResult;
+use finstack_statements::types::{FinancialModelSpec, ForecastMethod};
 use indexmap::IndexMap;
 use serde_json::json;
 use time::Month;
 
 /// Forecast output envelope for covenant compliance projections.
 ///
-/// This is a re-exported type alias from `finstack-valuations` so statements
+/// This is a re-exported type alias from `finstack-covenants` so statements
 /// users can stay within the `finstack-statements::analysis` namespace.
 pub type CovenantForecast = ValuationCovenantForecast;
 
@@ -265,7 +265,7 @@ pub fn forecast_breaches(
 /// MaxCapex, MinLiquidity) return `None` so the forecast engine
 /// falls back to deterministic projection.
 fn default_driver_node_id(spec: &CovenantSpec) -> Option<&'static str> {
-    use finstack_valuations::covenants::CovenantType;
+    use finstack_covenants::CovenantType;
     match &spec.covenant.covenant_type {
         // Leverage ratios: EBITDA is the usual denominator and the
         // dominant source of volatility; gross and net debt variants
@@ -362,10 +362,9 @@ pub fn to_table(forecast: &CovenantForecast) -> Result<TableEnvelope> {
 mod tests {
     use super::*;
     use finstack_core::dates::{Date, Tenor};
+    use finstack_covenants::CovenantType;
+    use finstack_covenants::{Covenant, CovenantEngine, CovenantMetricId, CovenantSpec};
     use finstack_statements::evaluator::StatementResult;
-    use finstack_valuations::covenants::CovenantType;
-    use finstack_valuations::covenants::{Covenant, CovenantEngine, CovenantSpec};
-    use finstack_valuations::metrics::MetricId;
     use indexmap::IndexMap;
     use time::Month;
 
@@ -450,7 +449,7 @@ mod tests {
         );
         let spec = CovenantSpec {
             covenant,
-            metric_id: Some(MetricId::custom("NetDebtEbitda")),
+            metric_id: Some(CovenantMetricId::from("NetDebtEbitda")),
             threshold_schedule: None,
             custom_evaluator: None,
         };

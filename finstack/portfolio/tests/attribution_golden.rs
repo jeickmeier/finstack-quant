@@ -1,6 +1,7 @@
 mod common;
 
 use common::*;
+use finstack_attribution::AttributionMethod;
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
@@ -8,7 +9,6 @@ use finstack_portfolio::attribution::attribute_portfolio_pnl;
 use finstack_portfolio::position::{Position, PositionUnit};
 use finstack_portfolio::types::Entity;
 use finstack_portfolio::PortfolioBuilder;
-use finstack_valuations::attribution::AttributionMethod;
 use finstack_valuations::instruments::fixed_income::bond::Bond;
 use std::sync::Arc;
 use time::Duration;

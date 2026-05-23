@@ -8,6 +8,7 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+finstack-attribution = { path = "../attribution" }
 finstack-core = { path = "../core" }
 finstack-statements = { path = "../statements" }
 finstack-valuations = { path = "../valuations" }

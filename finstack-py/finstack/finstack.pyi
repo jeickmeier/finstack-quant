@@ -10,8 +10,10 @@ from __future__ import annotations
 from typing import Any
 
 analytics: Any
+attribution: Any
 cashflows: Any
 core: Any
+covenants: Any
 margin: Any
 monte_carlo: Any
 portfolio: Any

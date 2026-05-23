@@ -301,7 +301,7 @@ pub(crate) fn bump_discount_curve_parallel(
 /// - Vega calculations near zero vol may exhibit non-linearity due to this floor
 ///
 /// Prefer this helper for market-standard vega/volga/vanna definitions (derivatives w.r.t. σ).
-pub(crate) fn bump_surface_vol_absolute(
+pub fn bump_surface_vol_absolute(
     context: &finstack_core::market_data::context::MarketContext,
     vol_surface_id: &str,
     bump_abs: f64,

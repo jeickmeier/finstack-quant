@@ -719,47 +719,6 @@
                 }
               ]
             },
-            "CovenantSpec": {
-              "additionalProperties": false,
-              "description": "Covenant-driven events for term loans.\n\nAggregates all covenant-triggered or scheduled events that modify\nloan terms, including margin increases, PIK toggles, cash sweeps,\nand draw restrictions.",
-              "properties": {
-                "cash_sweeps": {
-                  "description": "Cash sweep (mandatory prepayment) schedule",
-                  "items": {
-                    "$ref": "#/$defs/CashSweepEvent"
-                  },
-                  "type": "array"
-                },
-                "draw_stop_dates": {
-                  "description": "Dates on which draws are prohibited (covenant breach or scheduled)",
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "margin_stepups": {
-                  "description": "Margin step-up schedule",
-                  "items": {
-                    "$ref": "#/$defs/MarginStepUp"
-                  },
-                  "type": "array"
-                },
-                "pik_toggles": {
-                  "description": "PIK toggle schedule",
-                  "items": {
-                    "$ref": "#/$defs/PikToggle"
-                  },
-                  "type": "array"
-                }
-              },
-              "required": [
-                "margin_stepups",
-                "pik_toggles",
-                "cash_sweeps",
-                "draw_stop_dates"
-              ],
-              "type": "object"
-            },
             "Currency": {
               "description": "ISO 4217 currency enumeration",
               "oneOf": [
@@ -2744,6 +2703,47 @@
                 }
               ]
             },
+            "TermLoanCovenantEvents": {
+              "additionalProperties": false,
+              "description": "Covenant-driven events for term loans.\n\nAggregates all covenant-triggered or scheduled events that modify\nloan terms, including margin increases, PIK toggles, cash sweeps,\nand draw restrictions.",
+              "properties": {
+                "cash_sweeps": {
+                  "description": "Cash sweep (mandatory prepayment) schedule",
+                  "items": {
+                    "$ref": "#/$defs/CashSweepEvent"
+                  },
+                  "type": "array"
+                },
+                "draw_stop_dates": {
+                  "description": "Dates on which draws are prohibited (covenant breach or scheduled)",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "margin_stepups": {
+                  "description": "Margin step-up schedule",
+                  "items": {
+                    "$ref": "#/$defs/MarginStepUp"
+                  },
+                  "type": "array"
+                },
+                "pik_toggles": {
+                  "description": "PIK toggle schedule",
+                  "items": {
+                    "$ref": "#/$defs/PikToggle"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "margin_stepups",
+                "pik_toggles",
+                "cash_sweeps",
+                "draw_stop_dates"
+              ],
+              "type": "object"
+            },
             "TermLoanOverrides": {
               "additionalProperties": false,
               "description": "Term loan specific overrides for covenants and schedule adjustments.",
@@ -2936,7 +2936,7 @@
             "covenants": {
               "anyOf": [
                 {
-                  "$ref": "#/$defs/CovenantSpec"
+                  "$ref": "#/$defs/TermLoanCovenantEvents"
                 },
                 {
                   "type": "null"

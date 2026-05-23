@@ -141,12 +141,12 @@ The following types were introduced with the credit factor hierarchy feature.
 They follow the additive-only rule; new `Option<T>` fields may be added between
 minor versions without a schema-version bump.
 
-- `CreditFactorAttribution` (`finstack_valuations::attribution::credit_factor`) —
+- `CreditFactorAttribution` (`finstack_attribution::credit_factor`) —
   additive, opt-in field on `PnlAttribution`; deserializing an older payload
   (missing field) produces `None`.
-- `CreditCarryDecomposition` (`finstack_valuations::attribution::credit_factor`) —
+- `CreditCarryDecomposition` (`finstack_attribution::credit_factor`) —
   additive, opt-in field on `PnlAttribution`; same rule as above.
-- `SourceLine` (`finstack_valuations::attribution::credit_factor`) — custom
+- `SourceLine` (`finstack_attribution::credit_factor`) — custom
   `Deserialize`: accepts both legacy `Money` shape and new tagged shape for
   backward compatibility.
 - `PositionResidualContribution` (`finstack_valuations::factor_model::credit`) —

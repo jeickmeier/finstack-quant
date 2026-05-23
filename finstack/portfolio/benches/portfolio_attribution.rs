@@ -20,9 +20,9 @@ use bench_common::{
     t1_date,
 };
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use finstack_attribution::AttributionMethod;
 use finstack_core::config::FinstackConfig;
 use finstack_portfolio::attribution::attribute_portfolio_pnl;
-use finstack_valuations::attribution::AttributionMethod;
 use std::hint::black_box;
 
 // ============================================================================

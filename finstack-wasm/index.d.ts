@@ -1045,6 +1045,34 @@ export interface CashflowsNamespace {
 
 export declare const cashflows: CashflowsNamespace;
 
+// --- covenants -------------------------------------------------------------
+
+/**
+ * JSON bridge to the Rust `finstack-covenants` crate.
+ */
+export interface CovenantsNamespace {
+  validateCovenantSpec(specJson: string): string;
+  validateCovenantReport(reportJson: string): string;
+  validateCovenantEngine(engineJson: string): string;
+  evaluateEngine(engineJson: string, metricsJson: string, asOf: string): string;
+  lboStandard(
+    initialLeverage: number,
+    interestCoverage: number,
+    fixedChargeCoverage: number,
+    maxCapex: number
+  ): string;
+  covLite(maxLeverage: number, maxSeniorLeverage: number): string;
+  realEstate(minDscr: number, minDebtYield: number, maxLtv: number): string;
+  projectFinance(
+    minDscr: number,
+    distributionLockupDscr: number,
+    minLiquidity: number,
+    maxNetLeverage: number
+  ): string;
+}
+
+export declare const covenants: CovenantsNamespace;
+
 // --- valuations ------------------------------------------------------------
 
 export declare class WasmMarket {
@@ -1594,8 +1622,15 @@ export interface ValuationsNamespace {
     couponRate: number,
     dayCountFraction: number
   ): number;
-  /** Run P&L attribution for a single instrument. */
-  attributePnl(
+}
+
+export declare const valuations: ValuationsNamespace;
+
+// --- attribution -----------------------------------------------------------
+
+export interface AttributionNamespace {
+  /** Parameters constructor emitted by wasm-bindgen for attribution calls. */
+  AttributionParams: new (
     instrumentJson: string,
     marketT0Json: string,
     marketT1Json: string,
@@ -1604,7 +1639,9 @@ export interface ValuationsNamespace {
     methodJson: string,
     configJson?: string,
     fullCrossAttribution?: boolean
-  ): string;
+  ) => unknown;
+  /** Run P&L attribution for a single instrument. */
+  attributePnl(params: unknown): string;
   /** Run attribution from a full JSON AttributionEnvelope. */
   attributePnlFromSpec(specJson: string): string;
   /** Validate an attribution specification JSON. */
@@ -1615,7 +1652,7 @@ export interface ValuationsNamespace {
   defaultAttributionMetrics(): string[];
 }
 
-export declare const valuations: ValuationsNamespace;
+export declare const attribution: AttributionNamespace;
 
 // --- statements ------------------------------------------------------------
 

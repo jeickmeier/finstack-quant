@@ -257,7 +257,7 @@ pub fn compute_horizon_return(
     method: Option<String>,
     config_json: Option<String>,
 ) -> Result<String, JsValue> {
-    use finstack_valuations::attribution::AttributionMethod;
+    use finstack_attribution::AttributionMethod;
     use finstack_valuations::instruments::InstrumentJson;
     use std::sync::Arc;
 
@@ -283,13 +283,13 @@ pub fn compute_horizon_return(
         "parallel" => AttributionMethod::Parallel,
         "waterfall" => {
             AttributionMethod::Waterfall(
-                finstack_valuations::attribution::default_waterfall_order(),
+                finstack_attribution::default_waterfall_order(),
             )
         }
         "metrics_based" => AttributionMethod::MetricsBased,
         "taylor" => {
             AttributionMethod::Taylor(
-                finstack_valuations::attribution::TaylorAttributionConfig::default(),
+                finstack_attribution::TaylorAttributionConfig::default(),
             )
         }
         other => return Err(to_js_err(format!(

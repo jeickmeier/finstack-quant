@@ -61,15 +61,15 @@
 
 use std::sync::Arc;
 
-use finstack_core::config::FinstackConfig;
-use finstack_core::dates::Date;
-use finstack_core::market_data::context::MarketContext;
-use finstack_core::money::Money;
-use finstack_valuations::attribution::{
+use finstack_attribution::{
     attribute_pnl_metrics_based, attribute_pnl_parallel, attribute_pnl_taylor_standard,
     attribute_pnl_waterfall, default_attribution_metrics, AttributionFactor, AttributionMethod,
     PnlAttribution,
 };
+use finstack_core::config::FinstackConfig;
+use finstack_core::dates::Date;
+use finstack_core::market_data::context::MarketContext;
+use finstack_core::money::Money;
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::instruments::PricingOptions;
 

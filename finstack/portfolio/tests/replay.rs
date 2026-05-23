@@ -1,4 +1,5 @@
 mod replay_tests {
+    use finstack_attribution::AttributionMethod;
     use finstack_core::config::FinstackConfig;
     use finstack_core::currency::Currency;
     use finstack_core::dates::DayCount;
@@ -10,7 +11,6 @@ mod replay_tests {
     use finstack_portfolio::replay::{ReplayConfig, ReplayMode, ReplayTimeline};
     use finstack_portfolio::types::Entity;
     use finstack_portfolio::Portfolio;
-    use finstack_valuations::attribution::AttributionMethod;
     use finstack_valuations::instruments::rates::deposit::Deposit;
     use std::sync::Arc;
     use time::macros::date;

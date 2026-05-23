@@ -12,7 +12,7 @@
           ]
         },
         "covenant_id": {
-          "description": "Stable machine-readable identifier (from\n[`crate::covenants::CovenantType::covenant_id`]).",
+          "description": "Stable machine-readable identifier (from\n[`crate::CovenantType::covenant_id`]).",
           "type": [
             "string",
             "null"

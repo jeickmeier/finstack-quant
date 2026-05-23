@@ -203,13 +203,17 @@ pub(crate) mod sensitivities;
 mod shared;
 
 // Core surface (supported)
+pub use core::finite_difference::bump_surface_vol_absolute;
 pub use core::ids::{MetricGroup, MetricId};
 pub use core::registry::MetricRegistry;
 pub use core::standard_registry::standard_registry;
 pub use core::traits::{MetricCalculator, MetricContext, Structured2D};
 /// Format a standard risk bucket (years) as a human-readable label.
-pub use sensitivities::config::format_bucket_label;
+pub use sensitivities::config::{
+    format_bucket_label, STANDARD_BUCKETS_YEARS, STANDARD_BUCKET_LABELS,
+};
 pub use sensitivities::cross_factor::{CrossFactorCalculator, CrossFactorPair};
+pub use sensitivities::theta::collect_cashflows_in_period;
 
 // -----------------------------------------------------------------------------
 // Crate-internal re-exports (NOT part of the public API)
@@ -219,9 +223,9 @@ pub use sensitivities::cross_factor::{CrossFactorCalculator, CrossFactorPair};
 // supported as a stable downstream API. Keep them `pub(crate)` so we can refactor module layout
 // without creating public breakage surface.
 pub(crate) use core::finite_difference::{
-    bump_discount_curve_parallel, bump_scalar_price, bump_sizes, bump_surface_vol_absolute,
-    central_diff_by_half_bump, central_diff_scalar_relative, replace_scalar_value,
-    scalar_numeric_value, scaled_central_diff_by_width,
+    bump_discount_curve_parallel, bump_scalar_price, bump_sizes, central_diff_by_half_bump,
+    central_diff_scalar_relative, replace_scalar_value, scalar_numeric_value,
+    scaled_central_diff_by_width,
 };
 pub(crate) use sensitivities::config::from_finstack_config_or_default as resolve_sensitivities_config;
 pub(crate) use sensitivities::cross_factor::{

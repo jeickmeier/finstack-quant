@@ -1,4 +1,4 @@
-"""Instrument pricing, risk metrics, and P&L attribution.
+"""Instrument pricing and risk metrics.
 
 Bindings for the ``finstack-valuations`` Rust crate.
 """
@@ -115,12 +115,6 @@ price_instrument = _valuations.price_instrument
 price_instrument_with_metrics = _valuations.price_instrument_with_metrics
 list_standard_metrics = _valuations.list_standard_metrics
 list_standard_metrics_grouped = _valuations.list_standard_metrics_grouped
-PnlAttribution = _valuations.PnlAttribution
-attribute_pnl = _valuations.attribute_pnl
-attribute_pnl_from_spec = _valuations.attribute_pnl_from_spec
-validate_attribution_json = _valuations.validate_attribution_json
-default_waterfall_order = _valuations.default_waterfall_order
-default_attribution_metrics = _valuations.default_attribution_metrics
 CalibrationResult = _valuations.CalibrationResult
 CalibrationEnvelopeError = _valuations.CalibrationEnvelopeError
 validate_calibration_json = _valuations.validate_calibration_json
@@ -278,7 +272,6 @@ __all__: list[str] = [
     "ParametricStep",
     "PeriodDecomposition",
     "Pillar",
-    "PnlAttribution",
     "PriceCurvePrior",
     "PriceDatum",
     "PriorMarketObject",
@@ -315,8 +308,6 @@ __all__: list[str] = [
     "YoyInflationSwapPayload",
     "YoyInflationSwapQuote",
     "asian_option_price",
-    "attribute_pnl",
-    "attribute_pnl_from_spec",
     "barrier_call",
     "black76_implied_vol",
     "bs_cos_price",
@@ -331,8 +322,6 @@ __all__: list[str] = [
     "credit_derivatives",
     "decompose_levels",
     "decompose_period",
-    "default_attribution_metrics",
-    "default_waterfall_order",
     "dependency_graph_json",
     "dry_run",
     "exotics",
@@ -349,7 +338,6 @@ __all__: list[str] = [
     "quanto_option_price",
     "snowball_coupon_profile",
     "tarn_coupon_profile",
-    "validate_attribution_json",
     "validate_calibration_json",
     "validate_instrument_json",
     "vg_cos_price",

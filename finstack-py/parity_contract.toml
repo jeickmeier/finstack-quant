@@ -86,6 +86,20 @@ note = "First binding slice is JSON-only: schedule build/validate/flows/accrual 
 json = { python = "finstack.cashflows", status = "exists", note = "build_cashflow_schedule, validate_cashflow_schedule, dated_flows, accrued_interest, bond_from_cashflows exposed flat on finstack.cashflows" }
 
 # ---------------------------------------------------------------------------
+# finstack-covenants  →  finstack.covenants
+# ---------------------------------------------------------------------------
+[crates.covenants]
+rust_crate = "finstack-covenants"
+rust_lib   = "finstack/covenants/src/lib.rs"
+python_package = "finstack.covenants"
+visibility = "pub"
+status = "exists"
+note = "First binding slice is JSON/map-backed: validation, templates, and engine evaluation."
+
+[crates.covenants.modules]
+json = { python = "finstack.covenants", status = "exists", note = "validate_covenant_spec, validate_covenant_report, validate_covenant_engine, evaluate_engine, and covenant templates exposed flat on finstack.covenants" }
+
+# ---------------------------------------------------------------------------
 # finstack-margin  →  finstack.margin
 # ---------------------------------------------------------------------------
 [crates.margin]
@@ -141,7 +155,6 @@ status = "exists"
 [crates.valuations.modules]
 # Top-level public modules. Symbol-level pinning for non-submodule public names
 # lives in [crates.valuations.symbols] below.
-attribution  = { python = "finstack.valuations",              status = "exists", note = "JSON-first helpers and the PnlAttribution wrapper are flattened onto finstack.valuations" }
 instruments  = { python = "finstack.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack.valuations.instruments; root aliases remain for compatibility" }
 fx           = { python = "finstack.valuations.fx",           status = "exists", note = "Direct FX instrument wrappers for Rust/WASM-supported FX instruments; no JSON-only workflow required" }
 exotics      = { python = "finstack.valuations.exotics",      status = "exists", note = "Python-only direct exotics wrappers; WASM exposes closed-form exotics helpers on the valuations facade instead of class wrappers" }
@@ -228,7 +241,6 @@ public = [
     "ParametricStep",
     "PeriodDecomposition",
     "Pillar",
-    "PnlAttribution",
     "PriceCurvePrior",
     "PriceDatum",
     "PriorMarketObject",
@@ -265,8 +277,6 @@ public = [
     "YoyInflationSwapPayload",
     "YoyInflationSwapQuote",
     "asian_option_price",
-    "attribute_pnl",
-    "attribute_pnl_from_spec",
     "barrier_call",
     "black76_implied_vol",
     "bs_cos_price",
@@ -278,8 +288,6 @@ public = [
     "cms_spread_option_intrinsic",
     "decompose_levels",
     "decompose_period",
-    "default_attribution_metrics",
-    "default_waterfall_order",
     "dependency_graph_json",
     "dry_run",
     "instrument_cashflows",
@@ -293,10 +301,30 @@ public = [
     "quanto_option_price",
     "snowball_coupon_profile",
     "tarn_coupon_profile",
-    "validate_attribution_json",
     "validate_calibration_json",
     "validate_instrument_json",
     "vg_cos_price",
+]
+
+
+# ---------------------------------------------------------------------------
+# finstack-attribution  →  finstack.attribution
+# ---------------------------------------------------------------------------
+[crates.attribution]
+rust_crate = "finstack-attribution"
+rust_lib   = "finstack/attribution/src/lib.rs"
+python_package = "finstack.attribution"
+visibility = "pub"
+status = "exists"
+
+[crates.attribution.symbols]
+public = [
+    "PnlAttribution",
+    "attribute_pnl",
+    "attribute_pnl_from_spec",
+    "default_attribution_metrics",
+    "default_waterfall_order",
+    "validate_attribution_json",
 ]
 
 # ---------------------------------------------------------------------------
@@ -424,8 +452,10 @@ utils     = { python = "finstack.scenarios.utils",     status = "missing" }
 file = "finstack/finstack.pyi"
 names = [
     "analytics",
+    "attribution",
     "cashflows",
     "core",
+    "covenants",
     "margin",
     "monte_carlo",
     "portfolio",
@@ -446,8 +476,10 @@ names = [
 file = "../finstack-wasm/index.js"
 namespaces = [
     "analytics",
+    "attribution",
     "cashflows",
     "core",
+    "covenants",
     "margin",
     "monte_carlo",
     "portfolio",
@@ -521,9 +553,6 @@ root_exports = [
     "SabrSmile",
     "WasmMarket",
     "asianOptionPrice",
-    "AttributionParams",
-    "attributePnl",
-    "attributePnlFromSpec",
     "barrierCall",
     "black76ImpliedVol",
     "bsCosPrice",
@@ -535,8 +564,6 @@ root_exports = [
     "cmsSpreadOptionIntrinsic",
     "decomposeLevels",
     "decomposePeriod",
-    "defaultAttributionMetrics",
-    "defaultWaterfallOrder",
     "dependencyGraphJson",
     "dryRun",
     "instrumentCashflowsJson",
@@ -552,7 +579,6 @@ root_exports = [
     "quantoOptionPrice",
     "snowballCouponProfile",
     "tarnCouponProfile",
-    "validateAttributionJson",
     "validateCalibrationJson",
     "validateInstrumentJson",
     "validateValuationResultJson",
@@ -571,7 +597,6 @@ python_only = [
     "HazardStep",
     "MarketQuote",
     "Pillar",
-    "PnlAttribution",
     "RateDeposit",
     "RateSwap",
     "Tenor",
@@ -581,7 +606,6 @@ python_only = [
 
 # Root exports with no Python snake_case twin (WASM JSON helpers / handles).
 wasm_only = [
-    "AttributionParams",
     "WasmMarket",
     "validateValuationResultJson",
 ]
@@ -612,13 +636,8 @@ tarn_coupon_profile = "tarnCouponProfile"
 snowball_coupon_profile = "snowballCouponProfile"
 cms_spread_option_intrinsic = "cmsSpreadOptionIntrinsic"
 callable_range_accrual_accrued = "callableRangeAccrualAccrued"
-attribute_pnl = "attributePnl"
-attribute_pnl_from_spec = "attributePnlFromSpec"
-validate_attribution_json = "validateAttributionJson"
 validate_calibration_json = "validateCalibrationJson"
 validate_instrument_json = "validateInstrumentJson"
-default_waterfall_order = "defaultWaterfallOrder"
-default_attribution_metrics = "defaultAttributionMetrics"
 decompose_levels = "decomposeLevels"
 decompose_period = "decomposePeriod"
 dependency_graph_json = "dependencyGraphJson"

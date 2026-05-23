@@ -8,7 +8,9 @@ export { default } from './pkg/finstack_wasm.js';
 
 export { core } from './exports/core.js';
 export { analytics } from './exports/analytics.js';
+export { attribution } from './exports/attribution.js';
 export { cashflows } from './exports/cashflows.js';
+export { covenants } from './exports/covenants.js';
 export { monte_carlo } from './exports/monte_carlo.js';
 export { margin } from './exports/margin.js';
 export { valuations } from './exports/valuations.js';

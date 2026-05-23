@@ -36,7 +36,7 @@ The `term_loan` module provides deterministic cashflow generation, pricing, and 
 ```
 term_loan/
 ├── mod.rs                  # Public API and re-exports
-├── spec.rs                 # Serde-stable specifications (TermLoanSpec, DdtlSpec, CovenantSpec)
+├── spec.rs                 # Serde-stable specifications (TermLoanSpec, DdtlSpec, TermLoanCovenantEvents)
 ├── types.rs                # Core instrument type (TermLoan) and trait implementations
 ├── cashflows.rs            # Deterministic cashflow generation engine
 ├── pricing.rs              # Discounting pricer
@@ -57,7 +57,7 @@ term_loan/
 - **`TermLoanSpec`**: Serializable specification for persistent storage
 - **`RateSpec`**: Fixed or floating rate specification
 - **`DdtlSpec`**: Delayed-draw features (commitment, draws, fees)
-- **`CovenantSpec`**: Covenant-driven events (sweeps, toggles, margin step-ups)
+- **`TermLoanCovenantEvents`**: Covenant-driven events (sweeps, toggles, margin step-ups)
 - **`AmortizationSpec`**: Principal repayment schedule
 
 ---
@@ -181,7 +181,7 @@ coupon_type: CouponType::Split {
 }
 
 // Dynamic PIK toggles via covenants
-covenants: Some(CovenantSpec {
+covenants: Some(TermLoanCovenantEvents {
     pik_toggles: vec![
         PikToggle {
             date: create_date(2026, Month::June, 30)?,
@@ -195,7 +195,7 @@ covenants: Some(CovenantSpec {
 ### 5. Covenant-Driven Events
 
 ```rust
-covenants: Some(CovenantSpec {
+covenants: Some(TermLoanCovenantEvents {
     // Margin step-ups (covenant penalties or rating migrations)
     margin_stepups: vec![
         MarginStepUp {
@@ -366,7 +366,7 @@ let loan = TermLoan::builder()
 ### Example 4: PIK Loan with Toggle
 
 ```rust
-let covenant_spec = CovenantSpec {
+let covenant_spec = TermLoanCovenantEvents {
     pik_toggles: vec![
         PikToggle {
             date: create_date(2027, Month::June, 30)?,
@@ -578,10 +578,10 @@ match &loan.amortization {
 
 ### Adding a New Covenant Event Type
 
-1. **Add field to `CovenantSpec`** in `spec.rs`:
+1. **Add field to `TermLoanCovenantEvents`** in `spec.rs`:
 
 ```rust
-pub struct CovenantSpec {
+pub struct TermLoanCovenantEvents {
     pub margin_stepups: Vec<MarginStepUp>,
     pub pik_toggles: Vec<PikToggle>,
     pub cash_sweeps: Vec<CashSweepEvent>,
@@ -666,7 +666,7 @@ PIK capitalization affects the outstanding principal path and is reflected in th
 
 ### Serde Stability
 
-All specification types (`TermLoanSpec`, `DdtlSpec`, `CovenantSpec`, etc.) use:
+All specification types (`TermLoanSpec`, `DdtlSpec`, `TermLoanCovenantEvents`, etc.) use:
 
 - `#[serde(deny_unknown_fields)]` for strict deserialization
 - Stable field names for long-lived pipelines and golden tests

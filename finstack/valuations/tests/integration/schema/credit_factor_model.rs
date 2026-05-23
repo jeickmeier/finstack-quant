@@ -26,7 +26,9 @@ fn credit_factor_model_schema() -> Value {
 
 /// Load and parse the attribution result schema.
 fn attribution_result_schema() -> Value {
-    let content = include_str!("../../../schemas/attribution/1/attribution_result.schema.json");
+    let content = include_str!(
+        "../../../../attribution/schemas/attribution/1/attribution_result.schema.json"
+    );
     serde_json::from_str(content).expect("attribution_result schema must be valid JSON")
 }
 

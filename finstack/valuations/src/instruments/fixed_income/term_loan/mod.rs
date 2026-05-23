@@ -87,9 +87,9 @@ pub(crate) mod types;
 // Re-export main type
 pub use overrides::TermLoanOverrides;
 pub use spec::{
-    AmortizationSpec, CashSweepEvent, CommitmentFeeBase, CommitmentStepDown, CovenantSpec,
-    DdtlSpec, DrawEvent, LoanCall, LoanCallSchedule, LoanCallType, OidEirSpec, OidPolicy,
-    PikToggle, TermLoanSpec,
+    AmortizationSpec, CashSweepEvent, CommitmentFeeBase, CommitmentStepDown, DdtlSpec, DrawEvent,
+    LoanCall, LoanCallSchedule, LoanCallType, OidEirSpec, OidPolicy, PikToggle,
+    TermLoanCovenantEvents, TermLoanSpec,
 };
 pub use types::{RateSpec, TermLoan};
 

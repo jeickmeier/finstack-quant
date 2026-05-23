@@ -80,7 +80,8 @@ const CANONICAL_ATTRIBUTION_FACTORS: &[&str] = &[
 
 #[test]
 fn test_attribution_factors_schema_parity() {
-    let schema_json = include_str!("../../../schemas/attribution/1/attribution.schema.json");
+    let schema_json =
+        include_str!("../../../../attribution/schemas/attribution/1/attribution.schema.json");
     let schema: Value = serde_json::from_str(schema_json).expect("Schema JSON should be valid");
 
     // The AttributionFactor enum may be in $defs or inline.

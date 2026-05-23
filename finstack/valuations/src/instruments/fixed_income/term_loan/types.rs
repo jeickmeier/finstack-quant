@@ -47,7 +47,7 @@ use finstack_core::types::{Bps, CurveId, InstrumentId, Rate};
 use finstack_core::InputError;
 
 use super::spec::{
-    AmortizationSpec, CovenantSpec, DdtlSpec, LoanCallSchedule, OidEirSpec, TermLoanSpec,
+    AmortizationSpec, DdtlSpec, LoanCallSchedule, OidEirSpec, TermLoanCovenantEvents, TermLoanSpec,
 };
 use crate::cashflow::builder::specs::CouponType;
 use crate::cashflow::builder::FloatingRateSpec;
@@ -264,7 +264,7 @@ pub struct TermLoan {
     pub ddtl: Option<DdtlSpec>,
 
     /// Optional covenant spec
-    pub covenants: Option<CovenantSpec>,
+    pub covenants: Option<TermLoanCovenantEvents>,
 
     /// Pricing overrides (quoted price, seed, etc.)
     #[builder(default)]
@@ -438,7 +438,7 @@ impl TermLoan {
         use finstack_core::dates::StubKind;
         use time::macros::date;
 
-        let covenants = CovenantSpec {
+        let covenants = TermLoanCovenantEvents {
             margin_stepups: vec![
                 super::spec::MarginStepUp {
                     date: date!(2026 - 01 - 15),
@@ -831,7 +831,7 @@ impl crate::instruments::common_impl::traits::CurveDependencies for TermLoan {
     }
 }
 
-impl crate::covenants::InstrumentMutator for TermLoan {
+impl finstack_covenants::InstrumentMutator for TermLoan {
     fn set_default_status(&mut self, is_default: bool, as_of: Date) -> finstack_core::Result<()> {
         self.attributes
             .meta

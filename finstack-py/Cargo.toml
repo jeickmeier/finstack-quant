@@ -21,9 +21,11 @@ default = []
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
+finstack-attribution = { path = "../finstack/attribution" }
 finstack-core = { path = "../finstack/core" }
 finstack-analytics = { path = "../finstack/analytics" }
 finstack-cashflows = { path = "../finstack/cashflows" }
+finstack-covenants = { path = "../finstack/covenants" }
 finstack-margin = { path = "../finstack/margin" }
 finstack-monte-carlo = { path = "../finstack/monte_carlo" }
 finstack-valuations = { path = "../finstack/valuations" }

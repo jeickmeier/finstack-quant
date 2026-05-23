@@ -1,9 +1,9 @@
-use crate::covenants::CovenantReport;
 use crate::metrics::MetricId;
 use finstack_core::config::{results_meta_now, FinstackConfig, ResultsMeta};
 use finstack_core::dates::Date;
 use finstack_core::explain::ExplanationTrace;
 use finstack_core::money::Money;
+use finstack_covenants::CovenantReport;
 
 use indexmap::IndexMap;
 
@@ -143,7 +143,7 @@ pub struct CreditDerivativeValuationDetails {
 ///
 /// ```rust
 /// use finstack_valuations::results::ValuationResult;
-/// use finstack_valuations::covenants::CovenantReport;
+/// use finstack_covenants::CovenantReport;
 /// use finstack_core::currency::Currency;
 /// use finstack_core::money::Money;
 /// use finstack_core::dates::create_date;
@@ -524,7 +524,7 @@ impl ValuationResult {
     ///
     /// ```rust
     /// use finstack_valuations::results::ValuationResult;
-    /// use finstack_valuations::covenants::CovenantReport;
+    /// use finstack_covenants::CovenantReport;
     /// use indexmap::IndexMap;
     /// # use finstack_core::currency::Currency;
     /// # use finstack_core::money::Money;
@@ -575,7 +575,7 @@ impl ValuationResult {
     ///
     /// ```rust
     /// use finstack_valuations::results::ValuationResult;
-    /// use finstack_valuations::covenants::CovenantReport;
+    /// use finstack_covenants::CovenantReport;
     /// # use finstack_core::currency::Currency;
     /// # use finstack_core::money::Money;
     /// # use finstack_core::dates::create_date;
@@ -630,7 +630,7 @@ impl ValuationResult {
     ///
     /// ```rust
     /// use finstack_valuations::results::ValuationResult;
-    /// use finstack_valuations::covenants::CovenantReport;
+    /// use finstack_covenants::CovenantReport;
     /// # use finstack_core::currency::Currency;
     /// # use finstack_core::money::Money;
     /// # use finstack_core::dates::create_date;
@@ -674,7 +674,7 @@ impl ValuationResult {
     ///
     /// ```rust
     /// use finstack_valuations::results::ValuationResult;
-    /// use finstack_valuations::covenants::CovenantReport;
+    /// use finstack_covenants::CovenantReport;
     /// # use finstack_core::currency::Currency;
     /// # use finstack_core::money::Money;
     /// # use finstack_core::dates::create_date;

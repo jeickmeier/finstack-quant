@@ -11,6 +11,7 @@ authors.workspace = true
 finstack-core = { path = "../core" }
 finstack-analytics = { path = "../analytics" }
 finstack-cashflows = { path = "../cashflows" }
+finstack-covenants = { path = "../covenants" }
 finstack-margin = { path = "../margin" }
 finstack-monte-carlo = { path = "../monte_carlo", default-features = false }
 finstack-factor-model = { path = "../factor-model" }
@@ -152,14 +153,6 @@ harness = false
 
 [[bench]]
 name = "inflation_pricing"
-harness = false
-
-[[bench]]
-name = "attribution"
-harness = false
-
-[[bench]]
-name = "attribution_scale"
 harness = false
 
 [[bench]]

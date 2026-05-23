@@ -1,11 +1,9 @@
 //! Python bindings for the `finstack-valuations` crate.
 //!
 //! Exposes the [`PyValuationResult`] envelope for pricing output,
-//! JSON-based instrument loading, the standard pricer pipeline, and
-//! P&L attribution across multiple methodologies.
+//! JSON-based instrument loading and the standard pricer pipeline.
 
 mod analytic;
-pub(crate) mod attribution;
 mod calibration;
 pub mod correlation;
 mod credit;
@@ -142,7 +140,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = PyModule::new(py, "valuations")?;
     m.setattr(
         "__doc__",
-        "Instrument pricing: bonds, swaps, options, calibration, attribution.",
+        "Instrument pricing: bonds, swaps, options, and calibration.",
     )?;
 
     m.add_class::<PyValuationResult>()?;
@@ -150,7 +148,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     pricing::register(py, &m)?;
     analytic::register(py, &m)?;
     sabr::register(py, &m)?;
-    attribution::register(py, &m)?;
     credit_factor_model::register(py, &m)?;
     calibration::register(py, &m)?;
     fourier::register(py, &m)?;
@@ -171,12 +168,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "instrument_cashflows_json",
             "list_standard_metrics",
             "list_standard_metrics_grouped",
-            "PnlAttribution",
-            "attribute_pnl",
-            "attribute_pnl_from_spec",
-            "validate_attribution_json",
-            "default_waterfall_order",
-            "default_attribution_metrics",
             "SensitivityMatrix",
             "FactorPnlProfile",
             "compute_factor_sensitivities",

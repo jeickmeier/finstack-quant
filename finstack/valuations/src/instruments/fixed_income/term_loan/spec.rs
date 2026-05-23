@@ -15,7 +15,7 @@
 //!
 //! - [`TermLoanSpec`]: Complete loan specification (serializable)
 //! - [`DdtlSpec`]: Delayed-draw term loan features
-//! - [`CovenantSpec`]: Covenant-driven events
+//! - [`TermLoanCovenantEvents`]: Covenant-driven events
 //! - [`AmortizationSpec`]: Principal repayment schedules
 //! - [`LoanCallSchedule`]: Borrower prepayment options
 //! - [`OidPolicy`]: Original issue discount handling
@@ -352,7 +352,7 @@ pub struct CashSweepEvent {
 /// and draw restrictions.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct CovenantSpec {
+pub struct TermLoanCovenantEvents {
     /// Margin step-up schedule
     pub margin_stepups: Vec<MarginStepUp>,
     /// PIK toggle schedule
@@ -542,14 +542,14 @@ pub struct TermLoanSpec {
     ///
     /// This field controls whether interest is paid in cash, capitalized (PIK),
     /// or split between the two. It does NOT control payment timing (which is
-    /// assumed to be in arrears). For dynamic PIK toggles, see `CovenantSpec::pik_toggles`.
+    /// assumed to be in arrears). For dynamic PIK toggles, see `TermLoanCovenantEvents::pik_toggles`.
     pub coupon_type: crate::cashflow::builder::specs::CouponType,
     /// Optional upfront origination fee
     pub upfront_fee: Option<Money>,
     /// Optional delayed-draw term loan features
     pub ddtl: Option<DdtlSpec>,
     /// Optional covenant-driven events
-    pub covenants: Option<CovenantSpec>,
+    pub covenants: Option<TermLoanCovenantEvents>,
     /// Pricing overrides (yield, price, etc.)
     pub pricing_overrides: PricingOverrides,
     /// Optional EIR amortization settings for reporting schedules

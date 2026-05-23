@@ -6,18 +6,18 @@
 use crate::error::{Error, Result};
 use crate::portfolio::Portfolio;
 use crate::types::PositionId;
+use finstack_attribution::{
+    attribute_pnl_metrics_based, attribute_pnl_parallel, default_attribution_metrics,
+    AttributionMethod, CorrelationsAttribution, CreditCurvesAttribution, FxAttribution,
+    InflationCurvesAttribution, PnlAttribution, RatesCurvesAttribution, ScalarsAttribution,
+    VolAttribution,
+};
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::summation::NeumaierAccumulator;
 use finstack_core::money::{fx::FxQuery, Money};
-use finstack_valuations::attribution::{
-    attribute_pnl_metrics_based, attribute_pnl_parallel, default_attribution_metrics,
-    AttributionMethod, CorrelationsAttribution, CreditCurvesAttribution, FxAttribution,
-    InflationCurvesAttribution, PnlAttribution, RatesCurvesAttribution, ScalarsAttribution,
-    VolAttribution,
-};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -369,7 +369,7 @@ fn attribute_single_position(
         }
 
         AttributionMethod::Waterfall(ref order) => {
-            let attr = finstack_valuations::attribution::attribute_pnl_waterfall(
+            let attr = finstack_attribution::attribute_pnl_waterfall(
                 &position.instrument,
                 market_t0,
                 market_t1,
@@ -435,7 +435,7 @@ fn attribute_single_position(
         }
 
         AttributionMethod::Taylor(ref taylor_config) => {
-            let attr = finstack_valuations::attribution::attribute_pnl_taylor_standard(
+            let attr = finstack_attribution::attribute_pnl_taylor_standard(
                 &position.instrument,
                 market_t0,
                 market_t1,
@@ -489,7 +489,7 @@ fn attribute_single_position(
 ///
 /// ```ignore
 /// use finstack_portfolio::attribution::attribute_portfolio_pnl;
-/// use finstack_valuations::attribution::AttributionMethod;
+/// use finstack_attribution::AttributionMethod;
 /// use finstack_core::config::FinstackConfig;
 /// use finstack_core::market_data::context::MarketContext;
 /// use finstack_portfolio::Portfolio;

@@ -3,7 +3,6 @@
 //! Split by domain:
 //! - [`pricing`] — instrument JSON validation, pricing, metric introspection.
 //! - [`analytic`] — closed-form option primitives (Black-Scholes, Black-76, IV).
-//! - [`attribution`] — P&L attribution across multiple methodologies.
 //! - [`credit_factor_model`] — credit factor hierarchy: calibration, level
 //!   decomposition, period decomposition, covariance forecast.
 //! - [`calibration`] — plan-driven calibration engine.
@@ -16,7 +15,6 @@
 //! - [`sabr`] — SABR parameters, model, smile, and calibrator.
 
 pub mod analytic;
-pub mod attribution;
 pub mod calibration;
 pub mod correlation;
 pub mod credit;

@@ -9,7 +9,9 @@ repository = "https://github.com/rustfin/rfin"
 [workspace]
 members = [
     "finstack/core",
+    "finstack/attribution",
     "finstack/cashflows",
+    "finstack/covenants",
     "finstack/monte_carlo",
     "finstack/margin",
     "finstack/analytics",
@@ -30,7 +32,9 @@ resolver = "2"
 # Exclude Python and WASM bindings from default builds and coverage
 default-members = [
     "finstack/core",
+    "finstack/attribution",
     "finstack/cashflows",
+    "finstack/covenants",
     "finstack/monte_carlo",
     "finstack/analytics",
     "finstack/margin",

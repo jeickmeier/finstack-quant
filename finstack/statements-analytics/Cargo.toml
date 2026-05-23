@@ -9,6 +9,7 @@ authors.workspace = true
 
 [dependencies]
 finstack-core = { path = "../core" }
+finstack-covenants = { path = "../covenants" }
 finstack-statements = { path = "../statements" }
 finstack-valuations = { path = "../valuations" }
 serde = { workspace = true }

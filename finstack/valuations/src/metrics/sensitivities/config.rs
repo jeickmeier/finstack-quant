@@ -12,11 +12,11 @@ use finstack_core::config::FinstackConfig;
 pub(crate) const SENSITIVITIES_CONFIG_KEY_V1: &str = "valuations.sensitivities.v1";
 
 /// Standard risk bucket grid in years used for IR DV01 and credit CS01.
-pub(crate) const STANDARD_BUCKETS_YEARS: [f64; 11] =
+pub const STANDARD_BUCKETS_YEARS: [f64; 11] =
     [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
 
 /// Standard bucket labels corresponding to [`STANDARD_BUCKETS_YEARS`].
-pub(crate) const STANDARD_BUCKET_LABELS: [&str; 11] = [
+pub const STANDARD_BUCKET_LABELS: [&str; 11] = [
     "3m", "6m", "1y", "2y", "3y", "5y", "7y", "10y", "15y", "20y", "30y",
 ];
 

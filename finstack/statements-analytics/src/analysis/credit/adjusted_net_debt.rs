@@ -35,12 +35,12 @@
 //!
 //! # Relationship to covenants
 //!
-//! The covenant engine ([`finstack_valuations::covenants`]) accepts any
+//! The covenant engine ([`finstack_covenants`]) accepts any
 //! scalar time-series via
-//! [`ModelTimeSeries`](finstack_valuations::covenants::ModelTimeSeries);
+//! [`ModelTimeSeries`](finstack_covenants::ModelTimeSeries);
 //! plugging the output of [`AdjustedNetDebtSpec::compute_series`] into a
 //! covenant with the
-//! [`CovenantType::MaxDebtToEBITDA`](finstack_valuations::covenants::CovenantType::MaxDebtToEBITDA)
+//! [`CovenantType::MaxDebtToEBITDA`](finstack_covenants::CovenantType::MaxDebtToEBITDA)
 //! variant produces a fully-adjusted
 //! leverage forecast without changing the covenant engine itself.
 //!

@@ -49,7 +49,7 @@ pub struct ReplayConfig {
     pub mode: ReplayMode,
     /// Attribution method (only used in `FullAttribution` mode).
     #[serde(default)]
-    pub attribution_method: finstack_valuations::attribution::AttributionMethod,
+    pub attribution_method: finstack_attribution::AttributionMethod,
     /// Valuation options forwarded to `value_portfolio`.
     #[serde(default)]
     pub valuation_options: crate::valuation::PortfolioValuationOptions,

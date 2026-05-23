@@ -194,7 +194,7 @@
 //! - [`crate::pricer`]: Pricing dispatch and registry infrastructure
 //! - [`crate::results`]: Valuation result envelopes and metadata
 //! - [`crate::constants`]: Common numerical constants (basis points, etc.)
-//! - [`crate::covenants`]: Covenant checking for structured products
+//! - [`finstack_covenants`]: Covenant checking for structured products
 //! - [`crate::schema`]: JSON Schema generation for API contracts
 //!
 //! # Semantic Contracts
@@ -225,8 +225,8 @@
 //!
 //! ## Layer 2: Extended API (Less Common)
 //! - [`crate::margin`]: Margin calculations (VM/IM/CSA) for collateralized derivatives
-//! - [`crate::attribution`]: P&L attribution analysis
-//! - [`crate::covenants`]: Covenant checking for structured products
+//! - `finstack-attribution`: P&L attribution analysis built on valuation results
+//! - [`finstack_covenants`]: Covenant checking for structured products
 //! - [`finstack_cashflows`]: Advanced cashflow schedule builders
 //! - [`crate::instruments`]: Shared traits and parameters, plus the
 //!   [`crate::instruments::pricing`] and [`crate::instruments::models`]
@@ -392,10 +392,6 @@ pub mod __private {
 #[macro_use]
 /// Financial instrument definitions and builders.
 pub mod instruments;
-/// P&L attribution analysis utilities.
-pub mod attribution;
-/// Covenant checking for structured products.
-pub mod covenants;
 /// Risk metric calculators and registries.
 pub mod metrics;
 

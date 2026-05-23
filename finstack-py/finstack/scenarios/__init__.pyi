@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from finstack.valuations import PnlAttribution
+from finstack.attribution import PnlAttribution
 
 __all__ = [
     "parse_scenario_spec",

@@ -291,7 +291,7 @@ fn term_loan_pik_toggle_and_cash_sweep() {
     let issue = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
 
-    let cov = term_loan::CovenantSpec {
+    let cov = term_loan::TermLoanCovenantEvents {
         margin_stepups: vec![],
         pik_toggles: vec![term_loan::PikToggle {
             date: Date::from_calendar_date(2025, time::Month::July, 1).unwrap(),

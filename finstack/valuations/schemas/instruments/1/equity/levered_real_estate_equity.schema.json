@@ -6397,7 +6397,7 @@
                 },
                 {
                   "additionalProperties": false,
-                  "description": "Student-t copula with specified degrees of freedom.\n\nCaptures tail dependence - joint extreme defaults are more likely\nthan Gaussian predicts. Lower df = more tail dependence.\n\nTypical calibration: df ∈ [4, 10] for CDX tranches.\n\n# Invariant\n\n`degrees_of_freedom` **must** be finite and `> 2`. The programmatic\nconstructor [`CopulaSpec::student_t`] panics on invalid input, but\ndeserialized specs (from config files, JSON, etc.) cannot panic —\n[`CopulaSpec::build`] silently clamps an out-of-range or non-finite\nvalue to `2.01` and emits a `tracing::warn!`. This is deliberate: it\npreserves forward\ncompatibility for serialized specs but means callers that round-trip\na spec may observe a changed `degrees_of_freedom`. Validate at the\nconfig-loading boundary if strict rejection is required.",
+                  "description": "Student-t copula with specified degrees of freedom.\n\nCaptures tail dependence - joint extreme defaults are more likely\nthan Gaussian predicts. Lower df = more tail dependence.\n\nTypical calibration: df ∈ [4, 10] for CDX tranches.\n\n# Invariant\n\n`degrees_of_freedom` **must** be finite and `> 2`. Programmatic\nconstruction and [`CopulaSpec::build`] both reject invalid values.",
                   "properties": {
                     "degrees_of_freedom": {
                       "description": "Degrees of freedom (must be > 2 for finite variance)",
@@ -6601,47 +6601,6 @@
                   "type": "object"
                 }
               ]
-            },
-            "CovenantSpec": {
-              "additionalProperties": false,
-              "description": "Covenant-driven events for term loans.\n\nAggregates all covenant-triggered or scheduled events that modify\nloan terms, including margin increases, PIK toggles, cash sweeps,\nand draw restrictions.",
-              "properties": {
-                "cash_sweeps": {
-                  "description": "Cash sweep (mandatory prepayment) schedule",
-                  "items": {
-                    "$ref": "#/$defs/CashSweepEvent"
-                  },
-                  "type": "array"
-                },
-                "draw_stop_dates": {
-                  "description": "Dates on which draws are prohibited (covenant breach or scheduled)",
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "margin_stepups": {
-                  "description": "Margin step-up schedule",
-                  "items": {
-                    "$ref": "#/$defs/MarginStepUp"
-                  },
-                  "type": "array"
-                },
-                "pik_toggles": {
-                  "description": "PIK toggle schedule",
-                  "items": {
-                    "$ref": "#/$defs/PikToggle"
-                  },
-                  "type": "array"
-                }
-              },
-              "required": [
-                "margin_stepups",
-                "pik_toggles",
-                "cash_sweeps",
-                "draw_stop_dates"
-              ],
-              "type": "object"
             },
             "CoverageTrigger": {
               "description": "Coverage test trigger specification",
@@ -18118,7 +18077,7 @@
                 "prepayment_spec": {
                   "$ref": "#/$defs/PrepaymentModelSpec",
                   "default": {
-                    "cpr": 0.1,
+                    "cpr": 0.2,
                     "curve": null
                   },
                   "description": "Prepayment model specification."
@@ -18151,7 +18110,7 @@
                 "recovery_spec": {
                   "$ref": "#/$defs/RecoveryModelSpec",
                   "default": {
-                    "rate": 0.4,
+                    "rate": 0.5,
                     "recovery_lag": 12
                   },
                   "description": "Recovery model specification."
@@ -18647,7 +18606,7 @@
                 "covenants": {
                   "anyOf": [
                     {
-                      "$ref": "#/$defs/CovenantSpec"
+                      "$ref": "#/$defs/TermLoanCovenantEvents"
                     },
                     {
                       "type": "null"
@@ -18785,6 +18744,47 @@
                 "discount_curve_id",
                 "amortization",
                 "attributes"
+              ],
+              "type": "object"
+            },
+            "TermLoanCovenantEvents": {
+              "additionalProperties": false,
+              "description": "Covenant-driven events for term loans.\n\nAggregates all covenant-triggered or scheduled events that modify\nloan terms, including margin increases, PIK toggles, cash sweeps,\nand draw restrictions.",
+              "properties": {
+                "cash_sweeps": {
+                  "description": "Cash sweep (mandatory prepayment) schedule",
+                  "items": {
+                    "$ref": "#/$defs/CashSweepEvent"
+                  },
+                  "type": "array"
+                },
+                "draw_stop_dates": {
+                  "description": "Dates on which draws are prohibited (covenant breach or scheduled)",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "margin_stepups": {
+                  "description": "Margin step-up schedule",
+                  "items": {
+                    "$ref": "#/$defs/MarginStepUp"
+                  },
+                  "type": "array"
+                },
+                "pik_toggles": {
+                  "description": "PIK toggle schedule",
+                  "items": {
+                    "$ref": "#/$defs/PikToggle"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "margin_stepups",
+                "pik_toggles",
+                "cash_sweeps",
+                "draw_stop_dates"
               ],
               "type": "object"
             },

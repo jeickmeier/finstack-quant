@@ -2,8 +2,8 @@
 
 //! Python bindings for horizon total return analysis.
 
+use crate::bindings::attribution::PyPnlAttribution;
 use crate::bindings::extract::extract_market_ref;
-use crate::bindings::valuations::attribution::PyPnlAttribution;
 use crate::errors::display_to_py;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -43,7 +43,7 @@ pub(crate) fn compute_horizon_return<'py>(
     method: &str,
     config: Option<&str>,
 ) -> PyResult<PyHorizonResult> {
-    use finstack_valuations::attribution::AttributionMethod;
+    use finstack_attribution::AttributionMethod;
     use finstack_valuations::instruments::InstrumentJson;
     use std::sync::Arc;
 
@@ -66,12 +66,12 @@ pub(crate) fn compute_horizon_return<'py>(
     let attribution_method = match method {
         "parallel" => AttributionMethod::Parallel,
         "waterfall" => {
-            AttributionMethod::Waterfall(finstack_valuations::attribution::default_waterfall_order())
+            AttributionMethod::Waterfall(finstack_attribution::default_waterfall_order())
         }
         "metrics_based" => AttributionMethod::MetricsBased,
-        "taylor" => AttributionMethod::Taylor(
-            finstack_valuations::attribution::TaylorAttributionConfig::default(),
-        ),
+        "taylor" => {
+            AttributionMethod::Taylor(finstack_attribution::TaylorAttributionConfig::default())
+        }
         other => {
             return Err(PyValueError::new_err(format!(
                 "Unknown attribution method '{other}'. Expected: parallel, waterfall, metrics_based, taylor"
@@ -191,7 +191,7 @@ impl PyHorizonResult {
 
     /// Factor contribution as decimal fraction of initial value.
     fn factor_contribution(&self, factor: &str) -> PyResult<f64> {
-        use finstack_valuations::attribution::AttributionFactor;
+        use finstack_attribution::AttributionFactor;
         let f = match factor {
             "carry" => AttributionFactor::Carry,
             "rates" | "rates_curves" => AttributionFactor::RatesCurves,
