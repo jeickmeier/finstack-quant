@@ -27,6 +27,7 @@ finstack-cashflows = { path = "../finstack/cashflows" }
 finstack-margin = { path = "../finstack/margin" }
 finstack-monte-carlo = { path = "../finstack/monte_carlo" }
 finstack-valuations = { path = "../finstack/valuations" }
+finstack-factor-model = { path = "../finstack/factor-model" }
 finstack-statements = { path = "../finstack/statements" }
 finstack-statements-analytics = { path = "../finstack/statements-analytics" }
 finstack-scenarios = { path = "../finstack/scenarios" }

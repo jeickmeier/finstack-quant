@@ -1,4 +1,4 @@
-//! Integration tests for [`finstack_valuations::factor_model::credit_calibration`].
+//! Integration tests for [`finstack_factor_model::credit_calibration`].
 //!
 //! Implements the seven required PR-4 tests from the design.
 
@@ -10,7 +10,7 @@ use finstack_core::factor_model::credit_hierarchy::{
     HierarchyDimension, IssuerBetaMode, IssuerBetaOverride, IssuerBetaPolicy, IssuerTags,
 };
 use finstack_core::types::IssuerId;
-use finstack_valuations::factor_model::{
+use finstack_factor_model::{
     BetaShrinkage, BucketSizeThresholds, CovarianceStrategy, CreditCalibrationConfig,
     CreditCalibrationInputs, CreditCalibrator, GenericFactorSeries, HistoryPanel, IssuerTagPanel,
     PanelSpace, VolModelChoice,

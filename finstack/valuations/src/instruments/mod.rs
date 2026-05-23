@@ -165,7 +165,9 @@ pub use common_impl::fx_dates::{
 };
 pub use finstack_core::dates::fx::resolve_calendar;
 
-pub(crate) mod dependencies_flatten;
+/// Flatten an instrument's structured `MarketDependencies` into a flat list of
+/// `MarketDependency` entries. Used by portfolio factor-model orchestration.
+pub mod dependencies_flatten;
 
 // === Category Modules ===
 /// Commodity derivatives.

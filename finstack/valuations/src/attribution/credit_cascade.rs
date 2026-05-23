@@ -39,8 +39,8 @@ use finstack_core::Result;
 
 use crate::calibration::bumps::hazard::bump_hazard_spreads;
 use crate::calibration::bumps::{bump_hazard_shift, BumpRequest};
-use crate::factor_model::{decompose_levels, decompose_period};
 use crate::instruments::common_impl::traits::Instrument;
+use finstack_factor_model::{decompose_levels, decompose_period};
 
 /// Threshold above which an adder step's absolute P&L is considered large
 /// enough to warrant a `tracing::warn!`. Expressed as a fraction of the

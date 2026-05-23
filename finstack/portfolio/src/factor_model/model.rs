@@ -39,7 +39,7 @@ use finstack_core::factor_model::{
 };
 use finstack_core::market_data::context::MarketContext;
 use finstack_valuations::calibration::bumps::{bump_hazard_shift, BumpRequest};
-use finstack_valuations::factor_model::decompose as flatten_dependencies;
+use finstack_valuations::instruments::dependencies_flatten::decompose as flatten_dependencies;
 use finstack_valuations::instruments::Instrument;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 

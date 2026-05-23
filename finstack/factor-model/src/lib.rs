@@ -2,9 +2,9 @@
 //! primitives.
 //!
 //! This crate was carved out of `finstack-valuations` to shrink the umbrella
-//! crate's edit-rebuild loop. The umbrella keeps a `factor_model` module that
-//! re-exports everything from here, so external call sites and bindings
-//! (`finstack_valuations::factor_model::*`) remain unchanged.
+//! crate's edit-rebuild loop. Callers import directly from
+//! `finstack_factor_model::*`; there is no longer a re-export façade in
+//! `finstack-valuations`.
 //!
 //! # Modules
 //!
@@ -16,8 +16,8 @@
 //! - [`sensitivity_matrix`]: Positions × factors sensitivity matrix layout.
 //!
 //! Engines that take `&dyn Instrument` (delta and full-repricing engines)
-//! remain in `finstack-valuations::factor_model::sensitivity` because they
-//! depend on the instrument trait surface.
+//! live in `finstack-portfolio::sensitivity` because they depend on the
+//! instrument trait surface.
 
 #![deny(missing_docs)]
 

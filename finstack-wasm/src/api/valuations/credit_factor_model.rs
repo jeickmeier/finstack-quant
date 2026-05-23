@@ -75,7 +75,7 @@ impl WasmCreditFactorModel {
 /// Configuration and inputs are passed as JSON strings.
 #[wasm_bindgen(js_name = CreditCalibrator)]
 pub struct WasmCreditCalibrator {
-    inner: finstack_valuations::factor_model::CreditCalibrator,
+    inner: finstack_factor_model::CreditCalibrator,
 }
 
 #[wasm_bindgen(js_class = CreditCalibrator)]
@@ -86,10 +86,10 @@ impl WasmCreditCalibrator {
     /// Throws if `config_json` is not a valid `CreditCalibrationConfig`.
     #[wasm_bindgen(constructor)]
     pub fn new(config_json: &str) -> Result<WasmCreditCalibrator, JsValue> {
-        let config: finstack_valuations::factor_model::CreditCalibrationConfig =
+        let config: finstack_factor_model::CreditCalibrationConfig =
             serde_json::from_str(config_json).map_err(to_js_err)?;
         Ok(Self {
-            inner: finstack_valuations::factor_model::CreditCalibrator::new(config),
+            inner: finstack_factor_model::CreditCalibrator::new(config),
         })
     }
 
@@ -100,7 +100,7 @@ impl WasmCreditCalibrator {
     /// # Errors
     /// Throws if inputs are structurally invalid or calibration fails.
     pub fn calibrate(&self, inputs_json: &str) -> Result<WasmCreditFactorModel, JsValue> {
-        let inputs: finstack_valuations::factor_model::CreditCalibrationInputs =
+        let inputs: finstack_factor_model::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(to_js_err)?;
         let model = self.inner.calibrate(inputs).map_err(to_js_err)?;
         Ok(WasmCreditFactorModel { inner: model })
@@ -128,9 +128,7 @@ fn dim_to_value(
     }
 }
 
-fn levels_at_date_to_value(
-    snap: &finstack_valuations::factor_model::LevelsAtDate,
-) -> serde_json::Value {
+fn levels_at_date_to_value(snap: &finstack_factor_model::LevelsAtDate) -> serde_json::Value {
     let by_level: Vec<serde_json::Value> = snap
         .by_level
         .iter()
@@ -163,7 +161,7 @@ fn levels_at_date_to_value(
 }
 
 fn period_decomposition_to_value(
-    pd: &finstack_valuations::factor_model::PeriodDecomposition,
+    pd: &finstack_factor_model::PeriodDecomposition,
 ) -> serde_json::Value {
     let by_level: Vec<serde_json::Value> = pd
         .by_level
@@ -208,7 +206,7 @@ fn period_decomposition_to_value(
 #[wasm_bindgen(js_name = LevelsAtDate)]
 pub struct WasmLevelsAtDate {
     #[wasm_bindgen(skip)]
-    pub inner: finstack_valuations::factor_model::LevelsAtDate,
+    pub inner: finstack_factor_model::LevelsAtDate,
 }
 
 #[wasm_bindgen(js_class = LevelsAtDate)]
@@ -231,7 +229,7 @@ impl WasmLevelsAtDate {
 #[wasm_bindgen(js_name = PeriodDecomposition)]
 pub struct WasmPeriodDecomposition {
     #[wasm_bindgen(skip)]
-    pub inner: finstack_valuations::factor_model::PeriodDecomposition,
+    pub inner: finstack_factor_model::PeriodDecomposition,
 }
 
 #[wasm_bindgen(js_class = PeriodDecomposition)]
@@ -286,7 +284,7 @@ pub fn decompose_levels(
         None => None,
     };
 
-    let inner = finstack_valuations::factor_model::decompose_levels(
+    let inner = finstack_factor_model::decompose_levels(
         &model.inner,
         &observed_spreads,
         observed_generic,
@@ -315,9 +313,8 @@ pub fn decompose_period(
     from_levels: &WasmLevelsAtDate,
     to_levels: &WasmLevelsAtDate,
 ) -> Result<WasmPeriodDecomposition, JsValue> {
-    let inner =
-        finstack_valuations::factor_model::decompose_period(&from_levels.inner, &to_levels.inner)
-            .map_err(to_js_err)?;
+    let inner = finstack_factor_model::decompose_period(&from_levels.inner, &to_levels.inner)
+        .map_err(to_js_err)?;
     Ok(WasmPeriodDecomposition { inner })
 }
 
@@ -420,7 +417,7 @@ mod tests {
         CreditFactorModel, CreditHierarchySpec, GenericFactorSpec, HierarchyDimension, IssuerTags,
     };
     use finstack_core::types::IssuerId;
-    use finstack_valuations::factor_model::{
+    use finstack_factor_model::{
         BucketSizeThresholds, CovarianceStrategy, CreditCalibrationConfig, CreditCalibrationInputs,
         CreditCalibrator, GenericFactorSeries, HistoryPanel, IssuerTagPanel, PanelSpace,
         VolModelChoice,
@@ -571,7 +568,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let levels_t0 = finstack_valuations::factor_model::decompose_levels(
+        let levels_t0 = finstack_factor_model::decompose_levels(
             &model,
             &spreads_t0,
             100.0,
@@ -580,7 +577,7 @@ mod tests {
         )
         .expect("decompose_levels t0");
 
-        let levels_t1 = finstack_valuations::factor_model::decompose_levels(
+        let levels_t1 = finstack_factor_model::decompose_levels(
             &model,
             &spreads_t1,
             100.5,
@@ -595,7 +592,7 @@ mod tests {
         assert_eq!(l0_val["date"].as_str().unwrap(), "2024-03-28");
 
         // decompose_period.
-        let period = finstack_valuations::factor_model::decompose_period(&levels_t0, &levels_t1)
+        let period = finstack_factor_model::decompose_period(&levels_t0, &levels_t1)
             .expect("decompose_period");
         let p_val = super::period_decomposition_to_value(&period);
         assert!(p_val.is_object());
@@ -671,7 +668,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let levels = finstack_valuations::factor_model::decompose_levels(
+        let levels = finstack_factor_model::decompose_levels(
             &model,
             &spreads,
             100.0,

@@ -19,6 +19,7 @@ finstack-margin = { path = "../finstack/margin" }
 finstack-statements = { path = "../finstack/statements" }
 finstack-statements-analytics = { path = "../finstack/statements-analytics" }
 finstack-valuations = { path = "../finstack/valuations", default-features = false }
+finstack-factor-model = { path = "../finstack/factor-model" }
 finstack-monte-carlo = { path = "../finstack/monte_carlo", default-features = false }
 finstack-scenarios = { path = "../finstack/scenarios" }
 finstack-portfolio = { path = "../finstack/portfolio", default-features = false }

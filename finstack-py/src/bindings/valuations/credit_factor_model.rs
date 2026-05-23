@@ -195,7 +195,7 @@ impl PyCreditFactorModel {
 )]
 #[derive(Clone)]
 pub(crate) struct PyCreditCalibrator {
-    inner: finstack_valuations::factor_model::CreditCalibrator,
+    inner: finstack_factor_model::CreditCalibrator,
 }
 
 #[pymethods]
@@ -209,10 +209,10 @@ impl PyCreditCalibrator {
     ///     ValueError: If ``config_json`` is not a valid ``CreditCalibrationConfig``.
     #[new]
     fn new(config_json: &str) -> PyResult<Self> {
-        let config: finstack_valuations::factor_model::CreditCalibrationConfig =
+        let config: finstack_factor_model::CreditCalibrationConfig =
             serde_json::from_str(config_json).map_err(display_to_py)?;
         Ok(Self {
-            inner: finstack_valuations::factor_model::CreditCalibrator::new(config),
+            inner: finstack_factor_model::CreditCalibrator::new(config),
         })
     }
 
@@ -229,7 +229,7 @@ impl PyCreditCalibrator {
     /// Raises:
     ///     ValueError: If inputs are structurally invalid or calibration fails.
     fn calibrate(&self, inputs_json: &str) -> PyResult<PyCreditFactorModel> {
-        let inputs: finstack_valuations::factor_model::CreditCalibrationInputs =
+        let inputs: finstack_factor_model::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(display_to_py)?;
         let model = self.inner.calibrate(inputs).map_err(display_to_py)?;
         Ok(PyCreditFactorModel::from_inner(model))
@@ -262,11 +262,11 @@ impl PyCreditCalibrator {
 )]
 #[derive(Clone)]
 pub(crate) struct PyLevelsAtDate {
-    inner: finstack_valuations::factor_model::LevelsAtDate,
+    inner: finstack_factor_model::LevelsAtDate,
 }
 
 impl PyLevelsAtDate {
-    fn from_inner(inner: finstack_valuations::factor_model::LevelsAtDate) -> Self {
+    fn from_inner(inner: finstack_factor_model::LevelsAtDate) -> Self {
         Self { inner }
     }
 }
@@ -373,11 +373,11 @@ impl PyLevelsAtDate {
 )]
 #[derive(Clone)]
 pub(crate) struct PyPeriodDecomposition {
-    inner: finstack_valuations::factor_model::PeriodDecomposition,
+    inner: finstack_factor_model::PeriodDecomposition,
 }
 
 impl PyPeriodDecomposition {
-    fn from_inner(inner: finstack_valuations::factor_model::PeriodDecomposition) -> Self {
+    fn from_inner(inner: finstack_factor_model::PeriodDecomposition) -> Self {
         Self { inner }
     }
 }
@@ -510,7 +510,7 @@ fn decompose_levels(
         None => None,
     };
 
-    let result = finstack_valuations::factor_model::decompose_levels(
+    let result = finstack_factor_model::decompose_levels(
         &model.inner,
         &observed_spreads,
         observed_generic,
@@ -554,9 +554,8 @@ fn decompose_period(
     from_levels: &PyLevelsAtDate,
     to_levels: &PyLevelsAtDate,
 ) -> PyResult<PyPeriodDecomposition> {
-    let result =
-        finstack_valuations::factor_model::decompose_period(&from_levels.inner, &to_levels.inner)
-            .map_err(display_to_py)?;
+    let result = finstack_factor_model::decompose_period(&from_levels.inner, &to_levels.inner)
+        .map_err(display_to_py)?;
     Ok(PyPeriodDecomposition::from_inner(result))
 }
 

@@ -365,8 +365,6 @@ pub(crate) mod contract_specs;
 pub mod correlation;
 /// Error types for pricing and valuation workflows.
 pub mod error;
-/// Factor-model integration helpers.
-pub mod factor_model;
 /// Margin calculation for collateralized derivatives.
 ///
 /// Provides VM (Variation Margin) and IM (Initial Margin) calculations,

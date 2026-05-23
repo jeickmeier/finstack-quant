@@ -2,7 +2,7 @@
 //!
 //! Given a calibrated [`CreditFactorModel`], a per-position list of CS01s and
 //! issuer ids, and the per-period factor moves produced by
-//! [`crate::factor_model::decompose_period`], [`compute_credit_factor_attribution`]
+//! [`finstack_factor_model::decompose_period`], [`compute_credit_factor_attribution`]
 //! returns a [`CreditFactorAttribution`] that obeys
 //!
 //! ```text
@@ -42,7 +42,7 @@ use finstack_core::Error;
 use serde::{Deserialize, Serialize};
 
 use super::types::{CreditFactorAttribution, LevelPnl};
-use crate::factor_model::PeriodDecomposition;
+use finstack_factor_model::PeriodDecomposition;
 
 /// Options controlling the level of detail emitted by
 /// [`compute_credit_factor_attribution`].
@@ -311,7 +311,6 @@ pub fn compute_credit_factor_attribution(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::factor_model::{decompose_levels, decompose_period};
     use finstack_core::currency::Currency;
     use finstack_core::dates::create_date;
     use finstack_core::factor_model::credit_hierarchy::{
@@ -322,6 +321,7 @@ mod tests {
     use finstack_core::factor_model::{
         FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
     };
+    use finstack_factor_model::{decompose_levels, decompose_period};
     use std::collections::BTreeMap;
     use time::Month;
 

@@ -25,11 +25,11 @@ use finstack_core::market_data::scalars::MarketScalar;
 use finstack_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, IssuerId};
+use finstack_factor_model::{decompose_levels, decompose_period, PeriodDecomposition};
 use finstack_valuations::attribution::{
     compute_credit_factor_attribution, AttributionEnvelope, AttributionMethod, AttributionSpec,
     CreditAttributionInput, CreditFactorDetailOptions, PnlAttribution,
 };
-use finstack_valuations::factor_model::{decompose_levels, decompose_period, PeriodDecomposition};
 use finstack_valuations::instruments::json_loader::InstrumentJson;
 use finstack_valuations::instruments::{Attributes, Bond};
 use std::collections::BTreeMap;

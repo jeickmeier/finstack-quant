@@ -17,12 +17,10 @@ use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criteri
 use finstack_core::factor_model::credit_hierarchy::{
     CreditHierarchySpec, HierarchyDimension, IssuerBetaPolicy,
 };
-use finstack_valuations::factor_model::{
+use finstack_factor_model::{
     BetaShrinkage, BucketSizeThresholds, CovarianceStrategy, PanelSpace, VolModelChoice,
 };
-use finstack_valuations::factor_model::{
-    CreditCalibrationConfig, CreditCalibrationInputs, CreditCalibrator,
-};
+use finstack_factor_model::{CreditCalibrationConfig, CreditCalibrationInputs, CreditCalibrator};
 use serde_json::{json, Value};
 use time::{Date, Month};
 

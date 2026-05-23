@@ -1,4 +1,4 @@
-//! Integration tests for [`finstack_valuations::factor_model::credit_decomposition`].
+//! Integration tests for [`finstack_factor_model::credit_decomposition`].
 //!
 //! Covers the six PR-3 acceptance tests plus structural error handling.
 
@@ -14,9 +14,7 @@ use finstack_core::factor_model::{
     FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
 };
 use finstack_core::types::IssuerId;
-use finstack_valuations::factor_model::{
-    decompose_levels, decompose_period, DecompositionError, LevelsAtDate,
-};
+use finstack_factor_model::{decompose_levels, decompose_period, DecompositionError, LevelsAtDate};
 use time::Month;
 
 // ---------------------------------------------------------------------------
