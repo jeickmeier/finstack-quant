@@ -1176,7 +1176,7 @@ class SensitivityMatrix:
     Construct via :func:`compute_factor_sensitivities`.
 
     Example:
-        >>> from finstack.valuations import compute_factor_sensitivities
+        >>> from finstack.portfolio import compute_factor_sensitivities
         >>> matrix = compute_factor_sensitivities(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
     """
 
@@ -1253,7 +1253,7 @@ class FactorPnlProfile:
     Construct via :func:`compute_pnl_profiles`.
 
     Example:
-        >>> from finstack.valuations import compute_pnl_profiles
+        >>> from finstack.portfolio import compute_pnl_profiles
         >>> profiles = compute_pnl_profiles(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
     """
 
@@ -1311,7 +1311,7 @@ def compute_factor_sensitivities(
         Positions-by-factors delta matrix.
 
     Example:
-        >>> from finstack.valuations import compute_factor_sensitivities
+        >>> from finstack.portfolio import compute_factor_sensitivities
         >>> matrix = compute_factor_sensitivities(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
         >>> matrix.to_dataframe()  # doctest: +SKIP
     """
@@ -1341,7 +1341,7 @@ def compute_pnl_profiles(
         One profile per factor, each containing scenario P&L for every position.
 
     Example:
-        >>> from finstack.valuations import compute_pnl_profiles
+        >>> from finstack.portfolio import compute_pnl_profiles
         >>> profiles = compute_pnl_profiles(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
         >>> profiles[0].to_dataframe(["bond_1", "equity_1"])  # doctest: +SKIP
     """
@@ -1360,7 +1360,7 @@ class FactorRiskDecomposition:
     detail.
 
     Example:
-        >>> from finstack.valuations import decompose_factor_risk  # doctest: +SKIP
+        >>> from finstack.portfolio import decompose_factor_risk  # doctest: +SKIP
         >>> result = decompose_factor_risk(sens, cov_json)  # doctest: +SKIP
         >>> result.total_risk  # doctest: +SKIP
         0.042
@@ -1454,7 +1454,7 @@ def decompose_factor_risk(
             invalid.
 
     Example:
-        >>> from finstack.valuations import compute_factor_sensitivities, decompose_factor_risk
+        >>> from finstack.portfolio import compute_factor_sensitivities, decompose_factor_risk
         >>> sens = compute_factor_sensitivities(pos, fac, mkt, "2025-01-15")  # doctest: +SKIP
         >>> result = decompose_factor_risk(sens, cov_json, "volatility")  # doctest: +SKIP
         >>> result.to_factor_dataframe()  # doctest: +SKIP

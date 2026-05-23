@@ -50,9 +50,9 @@ and Track-B (snapshot-only) live under
 ``finstack/valuations/examples/market_bootstrap/`` in the repository.
 
 This module also exposes pricing (:func:`price_instrument`,
-:func:`price_instrument_with_metrics`), P&L attribution
-risk decomposition (:func:`decompose_factor_risk`),
-SABR / Black-Scholes primitives, and credit-factor hierarchy tooling.
+:func:`price_instrument_with_metrics`), SABR / Black-Scholes primitives,
+and credit-factor hierarchy tooling. Portfolio factor sensitivities and
+risk decomposition live under :mod:`finstack.portfolio`.
 """
 
 from __future__ import annotations
