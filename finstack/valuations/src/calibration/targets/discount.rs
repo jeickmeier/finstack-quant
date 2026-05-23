@@ -115,7 +115,7 @@ pub(crate) struct DiscountCurveTarget {
 impl DiscountCurveTarget {
     /// Create a new [`DiscountCurveTarget`] from parameters.
     pub(crate) fn new(params: DiscountCurveTargetParams) -> Self {
-        let scratch = ContextScratch::from_config(params.base_context, &params.config);
+        let scratch = ContextScratch::new(params.base_context);
         Self {
             base_date: params.base_date,
             currency: params.currency,

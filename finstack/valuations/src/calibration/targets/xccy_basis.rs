@@ -71,8 +71,8 @@ pub(crate) struct XccyBasisTarget {
 
 impl XccyBasisTarget {
     /// Create a new cross-currency basis target.
-    pub(crate) fn new(params: XccyBasisTargetParams, config: &CalibrationConfig) -> Self {
-        let scratch = ContextScratch::from_config(params.base_context.clone(), config);
+    pub(crate) fn new(params: XccyBasisTargetParams) -> Self {
+        let scratch = ContextScratch::new(params.base_context.clone());
         Self { params, scratch }
     }
 
@@ -153,17 +153,14 @@ impl XccyBasisTarget {
         // Bootstrap requires strictly increasing pillar times. Sort the merged list.
         prepared_quotes.sort_by(|a, b| a.pillar_time().total_cmp(&b.pillar_time()));
 
-        let target = Self::new(
-            XccyBasisTargetParams {
-                base_date: schema_params.base_date,
-                curve_id: schema_params.curve_id.clone(),
-                domestic_discount: Arc::clone(&domestic_discount),
-                solve_interp: schema_params.interpolation,
-                extrapolation: schema_params.extrapolation,
-                base_context: context.clone(),
-            },
-            &config,
-        );
+        let target = Self::new(XccyBasisTargetParams {
+            base_date: schema_params.base_date,
+            curve_id: schema_params.curve_id.clone(),
+            domestic_discount: Arc::clone(&domestic_discount),
+            solve_interp: schema_params.interpolation,
+            extrapolation: schema_params.extrapolation,
+            base_context: context.clone(),
+        });
 
         let success_tolerance = Some(config.discount_curve.validation_tolerance);
 

@@ -235,47 +235,12 @@ impl<'a> ParallelBatchBuilder<'a> {
 }
 
 fn input_curve_ids(step: &CalibrationStep) -> Vec<CurveId> {
-    use crate::calibration::api::schema::StepParams;
-
-    match &step.params {
-        StepParams::Discount(_) => Vec::new(),
-        StepParams::Forward(p) => vec![p.discount_curve_id.clone()],
-        StepParams::Hazard(p) => vec![p.discount_curve_id.clone()],
-        StepParams::Inflation(p) => vec![p.discount_curve_id.clone()],
-        StepParams::VolSurface(p) => p
-            .discount_curve_id
-            .as_ref()
-            .map(|id| vec![id.clone()])
-            .unwrap_or_default(),
-        StepParams::SwaptionVol(p) => vec![p.discount_curve_id.clone()],
-        StepParams::BaseCorrelation(p) => vec![p.discount_curve_id.clone()],
-        StepParams::StudentT(p) => {
-            let mut inputs = vec![CurveId::from(p.base_correlation_curve_id.as_str())];
-            if let Some(discount_curve_id) = &p.discount_curve_id {
-                inputs.push(discount_curve_id.clone());
-            }
-            inputs
-        }
-        StepParams::HullWhite(p) => vec![p.curve_id.clone()],
-        StepParams::CapFloorHullWhite(p) => {
-            let mut inputs = vec![p.discount_curve_id.clone()];
-            if p.forward_curve_id != p.discount_curve_id {
-                inputs.push(p.forward_curve_id.clone());
-            }
-            inputs
-        }
-        StepParams::SviSurface(p) => p
-            .discount_curve_id
-            .as_ref()
-            .map(|id| vec![id.clone()])
-            .unwrap_or_default(),
-        StepParams::XccyBasis(p) => vec![p.domestic_discount_id.clone()],
-        StepParams::Parametric(p) => p
-            .discount_curve_id
-            .as_ref()
-            .map(|id| vec![id.clone()])
-            .unwrap_or_default(),
-    }
+    step.params
+        .io()
+        .reads
+        .into_iter()
+        .map(CurveId::from)
+        .collect()
 }
 
 /// Aggregated execution state for collecting results.

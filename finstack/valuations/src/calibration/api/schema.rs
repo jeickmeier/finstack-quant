@@ -193,6 +193,154 @@ pub enum StepParams {
     Parametric(ParametricCurveParams),
 }
 
+/// Primary output class used by runtime batching.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum StepPrimaryOutput {
+    /// Curve-like object in the market context.
+    Curve(CurveId),
+    /// Volatility surface/cube-like object in the market context.
+    Surface(CurveId),
+    /// Scalar value in the market context.
+    Scalar(String),
+}
+
+/// Static input/output metadata for a calibration step.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StepIo {
+    /// Step kind as serialized in envelope JSON.
+    pub(crate) kind: &'static str,
+    /// Curve / surface / scalar IDs the step reads.
+    pub(crate) reads: Vec<String>,
+    /// Curve / surface / scalar IDs the step writes.
+    pub(crate) writes: Vec<String>,
+    /// Primary output used to detect parallel-batch conflicts.
+    pub(crate) primary_output: StepPrimaryOutput,
+}
+
+impl StepParams {
+    /// Return the static dependency metadata for this step.
+    pub(crate) fn io(&self) -> StepIo {
+        match self {
+            StepParams::Discount(p) => StepIo {
+                kind: "discount",
+                reads: Vec::new(),
+                writes: vec![p.curve_id.to_string()],
+                primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
+            },
+            StepParams::Forward(p) => StepIo {
+                kind: "forward",
+                reads: vec![p.discount_curve_id.to_string()],
+                writes: vec![p.curve_id.to_string()],
+                primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
+            },
+            StepParams::Hazard(p) => StepIo {
+                kind: "hazard",
+                reads: vec![p.discount_curve_id.to_string()],
+                writes: vec![p.curve_id.to_string()],
+                primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
+            },
+            StepParams::Inflation(p) => StepIo {
+                kind: "inflation",
+                reads: vec![p.discount_curve_id.to_string()],
+                writes: vec![p.curve_id.to_string()],
+                primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
+            },
+            StepParams::VolSurface(p) => StepIo {
+                kind: "vol_surface",
+                reads: p
+                    .discount_curve_id
+                    .as_ref()
+                    .map(|id| vec![id.to_string()])
+                    .unwrap_or_default(),
+                writes: vec![p.surface_id.clone()],
+                primary_output: StepPrimaryOutput::Surface(CurveId::from(p.surface_id.as_str())),
+            },
+            StepParams::SwaptionVol(p) => StepIo {
+                kind: "swaption_vol",
+                reads: vec![p.discount_curve_id.to_string()],
+                writes: vec![p.surface_id.clone()],
+                primary_output: StepPrimaryOutput::Surface(CurveId::from(p.surface_id.as_str())),
+            },
+            StepParams::BaseCorrelation(p) => {
+                let curve_id = CurveId::from(format!("{}_CORR", p.index_id));
+                StepIo {
+                    kind: "base_correlation",
+                    reads: vec![p.discount_curve_id.to_string()],
+                    writes: vec![curve_id.to_string()],
+                    primary_output: StepPrimaryOutput::Curve(curve_id),
+                }
+            }
+            StepParams::StudentT(p) => {
+                let mut reads = vec![p.base_correlation_curve_id.clone()];
+                if let Some(discount_curve_id) = &p.discount_curve_id {
+                    reads.push(discount_curve_id.to_string());
+                }
+                let scalar_key = format!("{}_STUDENT_T_DF", p.tranche_instrument_id);
+                StepIo {
+                    kind: "student_t",
+                    reads,
+                    writes: vec![scalar_key.clone()],
+                    primary_output: StepPrimaryOutput::Scalar(scalar_key),
+                }
+            }
+            StepParams::HullWhite(p) => {
+                let scalar_key = format!("{}_HW1F", p.curve_id.as_str());
+                StepIo {
+                    kind: "hull_white",
+                    reads: vec![p.curve_id.to_string()],
+                    writes: vec![scalar_key.clone()],
+                    primary_output: StepPrimaryOutput::Scalar(scalar_key),
+                }
+            }
+            StepParams::CapFloorHullWhite(p) => {
+                let mut reads = vec![p.discount_curve_id.to_string()];
+                if p.forward_curve_id != p.discount_curve_id {
+                    reads.push(p.forward_curve_id.to_string());
+                }
+                let scalar_key = format!("{}_CAPFLOOR_HW1F", p.discount_curve_id.as_str());
+                StepIo {
+                    kind: "cap_floor_hull_white",
+                    reads,
+                    writes: vec![scalar_key.clone()],
+                    primary_output: StepPrimaryOutput::Scalar(scalar_key),
+                }
+            }
+            StepParams::SviSurface(p) => StepIo {
+                kind: "svi_surface",
+                reads: p
+                    .discount_curve_id
+                    .as_ref()
+                    .map(|id| vec![id.to_string()])
+                    .unwrap_or_default(),
+                writes: vec![p.surface_id.clone()],
+                primary_output: StepPrimaryOutput::Surface(CurveId::from(p.surface_id.as_str())),
+            },
+            StepParams::XccyBasis(p) => {
+                let mut writes = vec![p.curve_id.to_string()];
+                if let Some(basis_id) = &p.basis_spread_curve_id {
+                    writes.push(basis_id.to_string());
+                }
+                StepIo {
+                    kind: "xccy_basis",
+                    reads: vec![p.domestic_discount_id.to_string()],
+                    writes,
+                    primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
+                }
+            }
+            StepParams::Parametric(p) => StepIo {
+                kind: "parametric",
+                reads: p
+                    .discount_curve_id
+                    .as_ref()
+                    .map(|id| vec![id.to_string()])
+                    .unwrap_or_default(),
+                writes: vec![p.curve_id.to_string()],
+                primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
+            },
+        }
+    }
+}
+
 // =============================================================================
 // Step Parameter Structs
 // =============================================================================

@@ -734,11 +734,31 @@ pub fn calibrate_hull_white_to_swaptions(
     frequency: SwapFrequency,
     initial_guess: Option<HullWhiteParams>,
 ) -> finstack_core::Result<(HullWhiteParams, CalibrationReport)> {
+    calibrate_hull_white_to_swaptions_core(df, quotes, frequency, None, initial_guess, None)
+}
+
+fn calibrate_hull_white_to_swaptions_core(
+    df: &dyn Fn(f64) -> f64,
+    quotes: &[SwaptionQuote],
+    frequency: SwapFrequency,
+    schedules: Option<&[Vec<f64>]>,
+    initial_guess: Option<HullWhiteParams>,
+    schedule_source: Option<&'static str>,
+) -> finstack_core::Result<(HullWhiteParams, CalibrationReport)> {
     if quotes.len() < 2 {
         return Err(finstack_core::Error::Validation(format!(
             "Need at least 2 swaption quotes for HW1F calibration (2 free parameters), got {}",
             quotes.len()
         )));
+    }
+    if let Some(schedules) = schedules {
+        if schedules.len() != quotes.len() {
+            return Err(finstack_core::Error::Validation(format!(
+                "schedules.len() ({}) must match quotes.len() ({})",
+                schedules.len(),
+                quotes.len()
+            )));
+        }
     }
     for (i, q) in quotes.iter().enumerate() {
         if q.expiry <= 0.0 || q.tenor <= 0.0 || q.volatility <= 0.0 {
@@ -753,12 +773,23 @@ pub fn calibrate_hull_white_to_swaptions(
     let ppy = frequency.periods_per_year();
 
     // Pre-compute market data once; the LM hot loop only does numeric ops.
-    // No accruals supplied → constant-`dt` schedule (legacy behaviour).
     let mut prepared = Vec::with_capacity(n_quotes);
     let mut fwd_swap_rates = Vec::with_capacity(n_quotes);
     let mut vega_floor_hits: Vec<String> = Vec::new();
-    for q in quotes {
-        let (annuity, fwd_rate) = compute_swap_annuity_and_rate(df, q.expiry, q.tenor, ppy);
+    for (idx, q) in quotes.iter().enumerate() {
+        let accruals_slice = schedules.and_then(|s| {
+            let schedule = &s[idx];
+            if schedule.is_empty() {
+                None
+            } else {
+                Some(schedule.as_slice())
+            }
+        });
+        let (annuity, fwd_rate) = if let Some(accruals) = accruals_slice {
+            compute_swap_annuity_and_rate_inner(df, q.expiry, q.tenor, ppy, Some(accruals))
+        } else {
+            compute_swap_annuity_and_rate(df, q.expiry, q.tenor, ppy)
+        };
         let market_price = compute_swaption_market_price(
             annuity,
             fwd_rate,
@@ -775,7 +806,7 @@ pub fn calibrate_hull_white_to_swaptions(
             market_price,
             fwd_swap_rate: fwd_rate,
             vega,
-            accruals: None,
+            accruals: accruals_slice.map(|s| s.to_vec().into_boxed_slice()),
         });
         fwd_swap_rates.push(fwd_rate);
     }
@@ -828,6 +859,9 @@ pub fn calibrate_hull_white_to_swaptions(
         )
         .with_metadata("swap_frequency", format!("{frequency:?}"))
         .with_metadata("vega_floor_hits", vega_floor_hits.len().to_string());
+    if let Some(schedule_source) = schedule_source {
+        report = report.with_metadata("schedule_source", schedule_source.to_string());
+    }
     if !vega_floor_hits.is_empty() {
         report = report.with_metadata("vega_floor_hits_detail", vega_floor_hits.join("; "));
     }
@@ -883,117 +917,14 @@ pub fn calibrate_hull_white_to_swaptions_with_schedules(
     schedules: &[Vec<f64>],
     initial_guess: Option<HullWhiteParams>,
 ) -> finstack_core::Result<(HullWhiteParams, CalibrationReport)> {
-    if quotes.len() < 2 {
-        return Err(finstack_core::Error::Validation(format!(
-            "Need at least 2 swaption quotes for HW1F calibration (2 free parameters), got {}",
-            quotes.len()
-        )));
-    }
-    if schedules.len() != quotes.len() {
-        return Err(finstack_core::Error::Validation(format!(
-            "schedules.len() ({}) must match quotes.len() ({})",
-            schedules.len(),
-            quotes.len()
-        )));
-    }
-    for (i, q) in quotes.iter().enumerate() {
-        if q.expiry <= 0.0 || q.tenor <= 0.0 || q.volatility <= 0.0 {
-            return Err(finstack_core::Error::Validation(format!(
-                "Invalid swaption quote at index {i}: expiry={}, tenor={}, vol={}",
-                q.expiry, q.tenor, q.volatility
-            )));
-        }
-    }
-
-    let n_quotes = quotes.len();
-    let ppy = frequency.periods_per_year();
-
-    let mut prepared = Vec::with_capacity(n_quotes);
-    let mut fwd_swap_rates = Vec::with_capacity(n_quotes);
-    let mut vega_floor_hits: Vec<String> = Vec::new();
-    for (q, sched) in quotes.iter().zip(schedules.iter()) {
-        let accruals_slice: Option<&[f64]> = if !sched.is_empty() { Some(sched) } else { None };
-        let (annuity, fwd_rate) =
-            compute_swap_annuity_and_rate_inner(df, q.expiry, q.tenor, ppy, accruals_slice);
-        let market_price = compute_swaption_market_price(
-            annuity,
-            fwd_rate,
-            q.expiry,
-            q.volatility,
-            q.is_normal_vol,
-        );
-        let raw_vega =
-            swaption_atm_vega(annuity, fwd_rate, q.expiry, q.volatility, q.is_normal_vol);
-        let label = format!("{}Yx{}Y", q.expiry, q.tenor);
-        let vega =
-            floor_vega_and_record(raw_vega, SWAPTION_VEGA_FLOOR, &label, &mut vega_floor_hits);
-        let stored_accruals = accruals_slice.map(|s| s.to_vec().into_boxed_slice());
-        prepared.push(PreparedSwaption {
-            market_price,
-            fwd_swap_rate: fwd_rate,
-            vega,
-            accruals: stored_accruals,
-        });
-        fwd_swap_rates.push(fwd_rate);
-    }
-
-    let (default_kappa_init, default_sigma_init) = infer_hw_initial_guess(quotes, &fwd_swap_rates);
-    let kappa_init: f64 = initial_guess.map(|p| p.kappa).unwrap_or(default_kappa_init);
-    let sigma_init: f64 = initial_guess.map(|p| p.sigma).unwrap_or(default_sigma_init);
-    let x0 = [kappa_init.ln(), sigma_init.ln()];
-
-    let target = HullWhiteSwaptionTarget {
+    calibrate_hull_white_to_swaptions_core(
         df,
-        ppy,
-        initial_x0: x0,
-        prepared,
-    };
-
-    let mut config = CalibrationConfig::default();
-    config.solver = config.solver.with_tolerance(1e-12).with_max_iterations(300);
-
-    let multi_start = MultiStartConfig {
-        num_restarts: HW_NUM_RESTARTS,
-        perturbation_scale: HW_PERTURB_SCALE,
-    };
-
-    let (params, mut report) = GlobalFitOptimizer::optimize_with_multi_start(
-        &target,
         quotes,
-        &config,
-        Some(HW_VALIDATION_TOLERANCE),
-        Some(&multi_start),
-    )?;
-
-    report = report
-        .with_model_version(finstack_core::versions::HULL_WHITE_1F)
-        .with_metadata("type", "hull_white_1f".to_string())
-        .with_metadata("kappa", format!("{:.6}", params.kappa))
-        .with_metadata("sigma", format!("{:.6}", params.sigma))
-        .with_metadata("initial_kappa", format!("{kappa_init:.6}"))
-        .with_metadata("initial_sigma", format!("{sigma_init:.6}"))
-        .with_metadata("multi_start_restarts", HW_NUM_RESTARTS.to_string())
-        .with_metadata(
-            "residual_weighting",
-            "1/vega (vega-weighted price residual)".to_string(),
-        )
-        .with_metadata("swap_frequency", format!("{frequency:?}"))
-        .with_metadata("schedule_source", "real_day_count".to_string())
-        .with_metadata("vega_floor_hits", vega_floor_hits.len().to_string());
-    if !vega_floor_hits.is_empty() {
-        report = report.with_metadata("vega_floor_hits_detail", vega_floor_hits.join("; "));
-    }
-
-    if !(KAPPA_MIN..=KAPPA_MAX).contains(&params.kappa) {
-        return Err(finstack_core::Error::Validation(format!(
-            "Hull-White calibration produced κ = {:.6} outside the \
-             bounded range [{KAPPA_MIN}, {KAPPA_MAX}].",
-            params.kappa
-        )));
-    }
-
-    let params = HullWhiteParams::new(params.kappa, params.sigma)?;
-    Ok((params, report))
+        frequency,
+        Some(schedules),
+        initial_guess,
+        Some("real_day_count"),
+    )
 }
 
 /// Calibrate Hull-White 1-factor parameters to cap/floor market quotes.

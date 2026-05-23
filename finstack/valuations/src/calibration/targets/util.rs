@@ -1,4 +1,3 @@
-use crate::calibration::config::CalibrationConfig;
 use crate::calibration::prepared::CalibrationQuote;
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::market::build::context::BuildCtx;
@@ -152,19 +151,14 @@ pub(crate) struct ContextScratch {
 }
 
 impl ContextScratch {
-    /// Create a new scratch. Always reuses a single `RefCell<MarketContext>` via `insert_mut`
-    /// to avoid `MarketContext::clone()` per residual evaluation.
-    pub(crate) fn new(base_context: MarketContext, _use_parallel: bool) -> Self {
+    /// Create a new scratch. Always reuses a single `RefCell<MarketContext>` via
+    /// `insert_mut` to avoid `MarketContext::clone()` per residual evaluation.
+    pub(crate) fn new(base_context: MarketContext) -> Self {
         let reuse = Some(RefCell::new(base_context.clone()));
         Self {
             base_context,
             reuse,
         }
-    }
-
-    /// Like [`Self::new`] but reads `use_parallel` from a `CalibrationConfig`.
-    pub(crate) fn from_config(base_context: MarketContext, config: &CalibrationConfig) -> Self {
-        Self::new(base_context, config.use_parallel)
     }
 
     /// Borrow of the immutable base context — used when no curve insertion is needed.

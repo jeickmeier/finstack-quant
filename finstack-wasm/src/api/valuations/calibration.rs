@@ -40,19 +40,10 @@
 use crate::utils::to_js_err;
 use finstack_valuations::calibration::api::engine::{self, ExecuteError};
 use finstack_valuations::calibration::api::errors::EnvelopeError;
+#[cfg(test)]
 use finstack_valuations::calibration::api::schema::CalibrationEnvelope;
 use finstack_valuations::calibration::api::validate;
 use wasm_bindgen::prelude::*;
-
-/// Parse a `CalibrationEnvelope`, mapping a JSON failure to a structured
-/// [`EnvelopeError::JsonParse`] that carries the line/column diagnostic.
-fn parse_envelope(json: &str) -> Result<CalibrationEnvelope, EnvelopeError> {
-    serde_json::from_str(json).map_err(|e| EnvelopeError::JsonParse {
-        message: e.to_string(),
-        line: Some(e.line() as u32),
-        col: Some(e.column() as u32),
-    })
-}
 
 /// Native-testable core of [`validate_calibration_json`].
 ///
@@ -63,7 +54,7 @@ fn parse_envelope(json: &str) -> Result<CalibrationEnvelope, EnvelopeError> {
 /// fail, but the failure is *propagated* rather than masked by a silent `"{}"`
 /// fallback that would look like a successful validation to the JS caller.
 fn validate_calibration_json_inner(json: &str) -> Result<String, ExecuteError> {
-    let parsed = parse_envelope(json)?;
+    let parsed = validate::parse_envelope_v3(json)?;
     // Surface any re-serialization failure as an internal error rather than
     // returning a literal empty object that masquerades as a valid envelope.
     serde_json::to_string_pretty(&parsed).map_err(|e| {
@@ -85,7 +76,7 @@ pub fn validate_calibration_json(json: &str) -> Result<String, JsValue> {
 /// (which carries the structured `EnvelopeError` payload when the failure is
 /// envelope-related).
 fn calibrate_inner(envelope_json: &str) -> Result<String, ExecuteError> {
-    let envelope = parse_envelope(envelope_json)?;
+    let envelope = validate::parse_envelope_v3(envelope_json)?;
     let result = engine::execute_with_diagnostics(&envelope)?;
     // Serializing a freshly built result envelope cannot realistically fail;
     // surface any failure as an internal error rather than discarding it.

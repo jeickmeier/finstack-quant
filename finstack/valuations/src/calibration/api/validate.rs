@@ -23,7 +23,7 @@ use serde::Serialize;
 use std::collections::{BTreeSet, HashSet};
 
 use crate::calibration::api::errors::EnvelopeError;
-use crate::calibration::api::schema::{CalibrationEnvelope, CalibrationStep, StepParams};
+use crate::calibration::api::schema::{CalibrationEnvelope, CalibrationStep};
 use crate::market::quotes::{
     bond::BondQuote, cds::CdsQuote, cds_tranche::CDSTrancheQuote, fx::FxQuote,
     inflation::InflationQuote, market_quote::MarketQuote, rates::RateQuote, vol::VolQuote,
@@ -101,7 +101,7 @@ pub fn validate(envelope: &CalibrationEnvelope) -> ValidationReport {
 pub fn dry_run(envelope_json: &str) -> Result<String, EnvelopeError> {
     let envelope = parse_envelope_v3(envelope_json)?;
     let report = validate(&envelope);
-    Ok(serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string()))
+    serialize_pretty_json(&report, "ValidationReport")
 }
 
 /// JSON-friendly wrapper that returns just the dependency graph.
@@ -114,12 +114,19 @@ pub fn dependency_graph_json(envelope_json: &str) -> Result<String, EnvelopeErro
         initial_ids: sorted_initial,
         nodes,
     };
-    Ok(serde_json::to_string_pretty(&graph).unwrap_or_else(|_| "{}".to_string()))
+    serialize_pretty_json(&graph, "DependencyGraph")
 }
 
 // =============================================================================
 // Internal helpers
 // =============================================================================
+
+fn serialize_pretty_json<T: Serialize>(value: &T, target: &str) -> Result<String, EnvelopeError> {
+    serde_json::to_string_pretty(value).map_err(|err| EnvelopeError::JsonSerialize {
+        target: target.to_string(),
+        message: err.to_string(),
+    })
+}
 
 /// Parse a JSON envelope, returning a friendly error for legacy v2 envelopes.
 ///
@@ -164,122 +171,16 @@ fn build_nodes(steps: &[CalibrationStep]) -> Vec<DependencyNode> {
         .iter()
         .enumerate()
         .map(|(idx, step)| {
-            let (kind, reads, writes) = step_io(&step.params);
+            let io = step.params.io();
             DependencyNode {
                 step_index: idx,
                 step_id: step.id.clone(),
-                kind,
-                reads,
-                writes,
+                kind: io.kind.to_string(),
+                reads: io.reads,
+                writes: io.writes,
             }
         })
         .collect()
-}
-
-/// `(kind, reads, writes)` triple for each step variant.
-///
-/// Mirrors `step_runtime::output_key` for the write side; reads are sourced
-/// from the step's parameter struct (typically `*_curve_id` fields).
-fn step_io(params: &StepParams) -> (String, Vec<String>, Vec<String>) {
-    match params {
-        StepParams::Discount(p) => (
-            "discount".to_string(),
-            Vec::new(),
-            vec![p.curve_id.to_string()],
-        ),
-        StepParams::Forward(p) => (
-            "forward".to_string(),
-            vec![p.discount_curve_id.to_string()],
-            vec![p.curve_id.to_string()],
-        ),
-        StepParams::Hazard(p) => (
-            "hazard".to_string(),
-            vec![p.discount_curve_id.to_string()],
-            vec![p.curve_id.to_string()],
-        ),
-        StepParams::Inflation(p) => (
-            "inflation".to_string(),
-            vec![p.discount_curve_id.to_string()],
-            vec![p.curve_id.to_string()],
-        ),
-        StepParams::VolSurface(p) => {
-            let reads = p
-                .discount_curve_id
-                .as_ref()
-                .map(|c| vec![c.to_string()])
-                .unwrap_or_default();
-            ("vol_surface".to_string(), reads, vec![p.surface_id.clone()])
-        }
-        StepParams::SwaptionVol(p) => (
-            "swaption_vol".to_string(),
-            vec![p.discount_curve_id.to_string()],
-            vec![p.surface_id.clone()],
-        ),
-        StepParams::BaseCorrelation(p) => (
-            "base_correlation".to_string(),
-            vec![p.discount_curve_id.to_string()],
-            // Mirror step_runtime::output_key: writes "{index_id}_CORR".
-            vec![format!("{}_CORR", p.index_id)],
-        ),
-        StepParams::StudentT(p) => {
-            let mut reads = vec![p.base_correlation_curve_id.clone()];
-            if let Some(d) = &p.discount_curve_id {
-                reads.push(d.to_string());
-            }
-            (
-                "student_t".to_string(),
-                reads,
-                vec![format!("{}_STUDENT_T_DF", p.tranche_instrument_id)],
-            )
-        }
-        StepParams::HullWhite(p) => (
-            "hull_white".to_string(),
-            vec![p.curve_id.to_string()],
-            vec![format!("{}_HW1F", p.curve_id.as_str())],
-        ),
-        StepParams::CapFloorHullWhite(p) => {
-            let mut reads = vec![p.discount_curve_id.to_string()];
-            if p.forward_curve_id != p.discount_curve_id {
-                reads.push(p.forward_curve_id.to_string());
-            }
-            (
-                "cap_floor_hull_white".to_string(),
-                reads,
-                vec![format!("{}_CAPFLOOR_HW1F", p.discount_curve_id.as_str())],
-            )
-        }
-        StepParams::SviSurface(p) => {
-            let reads = p
-                .discount_curve_id
-                .as_ref()
-                .map(|c| vec![c.to_string()])
-                .unwrap_or_default();
-            ("svi_surface".to_string(), reads, vec![p.surface_id.clone()])
-        }
-        StepParams::XccyBasis(p) => {
-            let mut writes = vec![p.curve_id.to_string()];
-            if let Some(b) = &p.basis_spread_curve_id {
-                writes.push(b.to_string());
-            }
-            (
-                "xccy_basis".to_string(),
-                vec![p.domestic_discount_id.to_string()],
-                writes,
-            )
-        }
-        StepParams::Parametric(p) => {
-            let reads = p
-                .discount_curve_id
-                .as_ref()
-                .map(|c| vec![c.to_string()])
-                .unwrap_or_default();
-            (
-                "parametric".to_string(),
-                reads,
-                vec![p.curve_id.to_string()],
-            )
-        }
-    }
 }
 
 fn check_quote_sets(envelope: &CalibrationEnvelope, errors: &mut Vec<EnvelopeError>) {

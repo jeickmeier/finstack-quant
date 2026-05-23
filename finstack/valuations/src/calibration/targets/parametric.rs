@@ -62,12 +62,8 @@ pub(crate) struct ParametricCurveTarget {
 
 impl ParametricCurveTarget {
     /// Create a new parametric curve target with pre-computed sample times.
-    pub(crate) fn new(
-        params: ParametricCurveTargetParams,
-        sample_times: Vec<f64>,
-        config: &CalibrationConfig,
-    ) -> Self {
-        let scratch = ContextScratch::from_config(params.base_context.clone(), config);
+    pub(crate) fn new(params: ParametricCurveTargetParams, sample_times: Vec<f64>) -> Self {
+        let scratch = ContextScratch::new(params.base_context.clone());
         let residual_notional = params.residual_notional;
         Self {
             params,
@@ -203,7 +199,6 @@ impl ParametricCurveTarget {
                 residual_notional,
             },
             Self::build_sample_times(&prepared_quotes),
-            &config,
         );
         // A parametric (Nelson-Siegel / NSS) curve is a LEAST-SQUARES fit: with N > 4 (or
         // N > 6 for NSS) market quotes, the optimizer minimises ‖residuals‖² but cannot

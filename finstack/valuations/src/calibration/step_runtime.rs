@@ -1,4 +1,4 @@
-use crate::calibration::api::schema::{CalibrationStep, StepParams};
+use crate::calibration::api::schema::{CalibrationStep, StepParams, StepPrimaryOutput};
 use crate::calibration::config::CalibrationConfig;
 use crate::calibration::hull_white::{
     calibrate_hull_white_to_cap_floors, calibrate_hull_white_to_swaptions_with_schedules,
@@ -75,26 +75,10 @@ fn attach_validation_result(
 
 /// Compute the output key for batching without executing the step.
 pub(crate) fn output_key(step: &CalibrationStep) -> OutputKey {
-    match &step.params {
-        StepParams::Discount(p) => OutputKey::Curve(p.curve_id.clone()),
-        StepParams::Forward(p) => OutputKey::Curve(p.curve_id.clone()),
-        StepParams::Hazard(p) => OutputKey::Curve(p.curve_id.clone()),
-        StepParams::Inflation(p) => OutputKey::Curve(p.curve_id.clone()),
-        StepParams::BaseCorrelation(p) => {
-            OutputKey::Curve(CurveId::from(format!("{}_CORR", p.index_id)))
-        }
-        StepParams::VolSurface(p) => OutputKey::Surface(CurveId::from(p.surface_id.as_str())),
-        StepParams::SwaptionVol(p) => OutputKey::Surface(CurveId::from(p.surface_id.as_str())),
-        StepParams::StudentT(p) => {
-            OutputKey::Scalar(format!("{}_STUDENT_T_DF", p.tranche_instrument_id))
-        }
-        StepParams::HullWhite(p) => OutputKey::Scalar(format!("{}_HW1F", p.curve_id.as_str())),
-        StepParams::CapFloorHullWhite(p) => {
-            OutputKey::Scalar(format!("{}_CAPFLOOR_HW1F", p.discount_curve_id.as_str()))
-        }
-        StepParams::SviSurface(p) => OutputKey::Surface(CurveId::from(p.surface_id.as_str())),
-        StepParams::XccyBasis(p) => OutputKey::Curve(p.curve_id.clone()),
-        StepParams::Parametric(p) => OutputKey::Curve(p.curve_id.clone()),
+    match step.params.io().primary_output {
+        StepPrimaryOutput::Curve(id) => OutputKey::Curve(id),
+        StepPrimaryOutput::Surface(id) => OutputKey::Surface(id),
+        StepPrimaryOutput::Scalar(key) => OutputKey::Scalar(key),
     }
 }
 

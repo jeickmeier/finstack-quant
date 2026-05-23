@@ -70,7 +70,7 @@ pub(crate) struct ForwardCurveTarget {
 impl ForwardCurveTarget {
     /// Create a new `ForwardCurveTarget` from parameters.
     pub(crate) fn new(params: ForwardCurveTargetParams) -> Self {
-        let scratch = ContextScratch::from_config(params.base_context, &params.config);
+        let scratch = ContextScratch::new(params.base_context);
         Self {
             base_date: params.base_date,
             currency: params.currency,

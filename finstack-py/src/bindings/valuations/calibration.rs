@@ -10,9 +10,7 @@ use crate::errors::display_to_py;
 use finstack_core::market_data::context::MarketContext;
 use finstack_valuations::calibration::api::engine::{self, ExecuteError};
 use finstack_valuations::calibration::api::errors::EnvelopeError;
-use finstack_valuations::calibration::api::schema::{
-    CalibrationEnvelope, CalibrationResultEnvelope,
-};
+use finstack_valuations::calibration::api::schema::CalibrationResultEnvelope;
 use finstack_valuations::calibration::api::validate as validate_api;
 use numpy::PyArray1;
 use pyo3::create_exception;
@@ -304,16 +302,7 @@ impl PyCalibrationResult {
 ///     If the JSON is not a valid calibration envelope.
 #[pyfunction]
 fn validate_calibration_json(py: Python<'_>, json: &str) -> PyResult<String> {
-    let parsed: CalibrationEnvelope = serde_json::from_str(json).map_err(|e| {
-        envelope_error_to_py(
-            py,
-            &EnvelopeError::JsonParse {
-                message: e.to_string(),
-                line: Some(e.line() as u32),
-                col: Some(e.column() as u32),
-            },
-        )
-    })?;
+    let parsed = validate_api::parse_envelope_v3(json).map_err(|e| envelope_error_to_py(py, &e))?;
     serde_json::to_string_pretty(&parsed).map_err(display_to_py)
 }
 
@@ -380,16 +369,8 @@ fn dependency_graph_json(py: Python<'_>, json: &str) -> PyResult<String> {
 ///     If the JSON is invalid or calibration fails.
 #[pyfunction]
 fn calibrate(py: Python<'_>, json: &str) -> PyResult<PyCalibrationResult> {
-    let envelope: CalibrationEnvelope = serde_json::from_str(json).map_err(|e| {
-        envelope_error_to_py(
-            py,
-            &EnvelopeError::JsonParse {
-                message: e.to_string(),
-                line: Some(e.line() as u32),
-                col: Some(e.column() as u32),
-            },
-        )
-    })?;
+    let envelope =
+        validate_api::parse_envelope_v3(json).map_err(|e| envelope_error_to_py(py, &e))?;
     // Release the GIL for the duration of the solver: calibration can run for seconds.
     // The error is boxed inside the closure: `ExecuteError` is a large enum, and
     // an un-boxed large `Err` variant on the `detach` closure trips

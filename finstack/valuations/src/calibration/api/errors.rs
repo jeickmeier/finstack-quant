@@ -119,6 +119,13 @@ pub enum EnvelopeError {
         /// The unresolved quote identifier.
         id: String,
     },
+    /// A JSON response payload could not be serialized.
+    JsonSerialize {
+        /// Payload being serialized, e.g. `"ValidationReport"`.
+        target: String,
+        /// Serializer-provided error description.
+        message: String,
+    },
 }
 
 impl fmt::Display for EnvelopeError {
@@ -227,6 +234,9 @@ impl fmt::Display for EnvelopeError {
                 f,
                 "quote_set '{quote_set}' references id '{id}', which is not present in market_data as a quote"
             ),
+            EnvelopeError::JsonSerialize { target, message } => {
+                write!(f, "failed to serialize {target} as JSON: {message}")
+            }
         }
     }
 }
@@ -249,6 +259,7 @@ impl EnvelopeError {
             EnvelopeError::QuoteDataInvalid { .. } => "quote_data_invalid",
             EnvelopeError::DuplicateMarketDatumId { .. } => "duplicate_market_datum_id",
             EnvelopeError::QuoteIdNotInMarketData { .. } => "quote_id_not_in_market_data",
+            EnvelopeError::JsonSerialize { .. } => "json_serialize",
         }
     }
 
@@ -266,13 +277,22 @@ impl EnvelopeError {
             | EnvelopeError::QuoteDataInvalid { step_id, .. } => Some(step_id),
             EnvelopeError::JsonParse { .. }
             | EnvelopeError::DuplicateMarketDatumId { .. }
-            | EnvelopeError::QuoteIdNotInMarketData { .. } => None,
+            | EnvelopeError::QuoteIdNotInMarketData { .. }
+            | EnvelopeError::JsonSerialize { .. } => None,
         }
     }
 
     /// Serialize to pretty-printed JSON for cross-binding consumption.
     pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".to_string())
+        match serde_json::to_string_pretty(self) {
+            Ok(json) => json,
+            Err(err) => serde_json::json!({
+                "kind": "json_serialize",
+                "target": "EnvelopeError",
+                "message": err.to_string(),
+            })
+            .to_string(),
+        }
     }
 }
 

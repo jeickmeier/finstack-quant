@@ -17,6 +17,130 @@ use finstack_core::market_data::term_structures::ParInterp;
 use finstack_core::market_data::term_structures::Seniority;
 use finstack_core::types::CurveId;
 
+struct HazardParRecalibration<'a> {
+    hazard: &'a HazardCurve,
+    context: &'a MarketContext,
+    discount_id: &'a CurveId,
+    recovery_rate: f64,
+    doc_clause: CdsDocClause,
+    cds_valuation_convention: Option<CdsValuationConvention>,
+    quote_id_prefix: &'static str,
+    spread_bump: Option<&'a BumpRequest>,
+}
+
+fn require_discount_id(discount_id: Option<&CurveId>) -> finstack_core::Result<&CurveId> {
+    discount_id.ok_or_else(|| {
+        finstack_core::Error::Input(finstack_core::InputError::NotFound {
+            id: "discount curve for hazard recalibration".to_string(),
+        })
+    })
+}
+
+fn snapped_cds_tenor_months(tenor_years: f64) -> u32 {
+    let raw_months = (tenor_years * 12.0).round().max(1.0) as i32;
+    const STD_MONTHS: [i32; 11] = [3, 6, 12, 24, 36, 60, 84, 120, 180, 240, 360];
+    let mut snapped_months = raw_months;
+    if let Some(best) = STD_MONTHS
+        .iter()
+        .copied()
+        .min_by(|a, b| (raw_months - a).abs().cmp(&(raw_months - b).abs()))
+    {
+        if (raw_months - best).abs() <= 2 {
+            snapped_months = best;
+        } else {
+            // Fallback: nearest quarter-year multiple.
+            snapped_months = ((raw_months as f64 / 3.0).round() as i32).max(1) * 3;
+        }
+    }
+    snapped_months as u32
+}
+
+fn bumped_spread(spread_bp: f64, tenor_years: f64, bump: Option<&BumpRequest>) -> f64 {
+    let mut bumped = spread_bp;
+    match bump {
+        Some(BumpRequest::Parallel(bp)) => {
+            bumped += bp;
+        }
+        Some(BumpRequest::Tenors(targets)) => {
+            for (target_t, bp) in targets {
+                // Match against the original curve tenor, not the snapped CDS
+                // schedule tenor, so bucketed reports preserve irregular pillars.
+                if (tenor_years - target_t).abs() < 0.1 {
+                    bumped += bp;
+                }
+            }
+        }
+        None => {}
+    }
+    bumped
+}
+
+fn recalibrate_from_par_spreads(
+    request: HazardParRecalibration<'_>,
+) -> finstack_core::Result<HazardCurve> {
+    let par_points: Vec<(f64, f64)> = request.hazard.par_spread_points().collect();
+    if par_points.is_empty() {
+        return Err(finstack_core::Error::Input(
+            finstack_core::InputError::TooFewPoints,
+        ));
+    }
+
+    let base_date = request.hazard.base_date();
+    let currency = request.hazard.currency().unwrap_or(Currency::USD);
+    let seniority = request.hazard.seniority.unwrap_or(Seniority::Senior);
+    let issuer = request
+        .hazard
+        .issuer()
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "UNKNOWN".to_string());
+
+    let mut quotes = Vec::with_capacity(par_points.len());
+    for (tenor_years, spread_bp) in par_points {
+        quotes.push(CdsQuote::CdsParSpread {
+            id: format!("{}-{}-{:.4}", request.quote_id_prefix, issuer, tenor_years).into(),
+            entity: issuer.clone(),
+            // Use tenor pillars so CDS schedule generation can snap to market-standard
+            // IMM maturities. Using ad-hoc `Date` pillars can create invalid ranges.
+            pillar: crate::market::quotes::ids::Pillar::Tenor(Tenor::new(
+                snapped_cds_tenor_months(tenor_years),
+                TenorUnit::Months,
+            )),
+            spread_bp: bumped_spread(spread_bp, tenor_years, request.spread_bump),
+            recovery_rate: request.recovery_rate,
+            convention: crate::market::conventions::ids::CdsConventionKey {
+                currency,
+                doc_clause: request.doc_clause,
+            },
+        });
+    }
+
+    let market_quotes: Vec<MarketQuote> = quotes.into_iter().map(MarketQuote::Cds).collect();
+    let params = HazardCurveParams {
+        curve_id: request.hazard.id().clone(),
+        entity: issuer,
+        seniority,
+        currency,
+        base_date,
+        discount_curve_id: request.discount_id.clone(),
+        recovery_rate: request.recovery_rate,
+        notional: 1.0,
+        method: CalibrationMethod::Bootstrap,
+        interpolation: Default::default(),
+        par_interp: ParInterp::Linear,
+        doc_clause: Some(request.doc_clause.as_str().to_string()),
+        cds_valuation_convention: request.cds_valuation_convention,
+    };
+
+    // Re-calibration uses the default CalibrationConfig — see the "Calibration
+    // config — known limitation" note in this module's docs (`bumps/mod.rs`).
+    let cfg = CalibrationConfig::default();
+    let step = StepParams::Hazard(params.clone());
+    let (ctx, _report) =
+        step_runtime::execute_params_and_apply(&step, &market_quotes, request.context, &cfg)?;
+    let new_curve = ctx.get_hazard(params.curve_id.as_str())?.as_ref().clone();
+    Ok(new_curve)
+}
+
 /// Bump hazard curve by shocking par spreads and re-calibrating.
 ///
 /// This is the standard "Risk Re-calibration" approach. It extracts par
@@ -63,118 +187,17 @@ pub fn bump_hazard_spreads_with_doc_clause_and_valuation_convention(
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_core::Result<HazardCurve> {
-    // Check if we have necessary data for re-calibration
-    let par_points: Vec<(f64, f64)> = hazard.par_spread_points().collect();
-
-    let Some(discount_id) = discount_id else {
-        return Err(finstack_core::Error::Input(
-            finstack_core::InputError::NotFound {
-                id: "discount curve for hazard recalibration".to_string(),
-            },
-        ));
-    };
-
-    if par_points.is_empty() {
-        return Err(finstack_core::Error::Input(
-            finstack_core::InputError::TooFewPoints,
-        ));
-    }
-
-    // Construct CreditQuotes from par points with bumps applied
-    let base_date = hazard.base_date();
-    let currency = hazard.currency().unwrap_or(Currency::USD);
-    let recovery = hazard.recovery_rate();
-    let seniority = hazard.seniority.unwrap_or(Seniority::Senior);
-    let issuer = hazard
-        .issuer()
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "UNKNOWN".to_string());
-
-    let quote_doc_clause = doc_clause.unwrap_or(CdsDocClause::IsdaNa);
-    let mut quotes = Vec::new();
-
-    for (tenor_years, spread_bp) in par_points {
-        // Snap irregular year-fractions (often coming from date-based calibration) to standard
-        // CDS tenors for stable schedule generation and deterministic bump matching.
-        let raw_months = (tenor_years * 12.0).round().max(1.0) as i32;
-        const STD_MONTHS: [i32; 11] = [3, 6, 12, 24, 36, 60, 84, 120, 180, 240, 360];
-        let mut snapped_months = raw_months;
-        if let Some(best) = STD_MONTHS
-            .iter()
-            .copied()
-            .min_by(|a, b| (raw_months - a).abs().cmp(&(raw_months - b).abs()))
-        {
-            if (raw_months - best).abs() <= 2 {
-                snapped_months = best;
-            } else {
-                // Fallback: nearest quarter-year multiple.
-                snapped_months = ((raw_months as f64 / 3.0).round() as i32).max(1) * 3;
-            }
-        }
-        let mut bumped_spread = spread_bp;
-
-        // Apply bump
-        match bump {
-            BumpRequest::Parallel(bp) => {
-                bumped_spread += bp;
-            }
-            BumpRequest::Tenors(targets) => {
-                for (target_t, bp) in targets {
-                    // Match against the original curve tenor, not the snapped
-                    // CDS schedule tenor, so bucketed reports preserve
-                    // irregular pillars such as 7Y or 25Y.
-                    if (tenor_years - target_t).abs() < 0.1 {
-                        bumped_spread += bp;
-                    }
-                }
-            }
-        }
-
-        quotes.push(CdsQuote::CdsParSpread {
-            id: format!("BUMP-{}-{:.4}", issuer, tenor_years).into(),
-            entity: issuer.clone(),
-            // Use tenor pillars so CDS schedule generation can snap to market-standard
-            // IMM maturities. Using ad-hoc `Date` pillars can create invalid
-            // ranges (e.g. maturity before the next IMM coupon) and make the
-            // hazard bootstrap fail.
-            pillar: crate::market::quotes::ids::Pillar::Tenor(Tenor::new(
-                snapped_months as u32,
-                TenorUnit::Months,
-            )),
-            spread_bp: bumped_spread,
-            recovery_rate: recovery,
-            convention: crate::market::conventions::ids::CdsConventionKey {
-                currency,
-                doc_clause: quote_doc_clause,
-            },
-        });
-    }
-
-    let market_quotes: Vec<MarketQuote> = quotes.into_iter().map(MarketQuote::Cds).collect();
-    let params = HazardCurveParams {
-        curve_id: hazard.id().clone(),
-        entity: issuer,
-        seniority,
-        currency,
-        base_date,
-        discount_curve_id: discount_id.clone(),
-        recovery_rate: recovery,
-        notional: 1.0,
-        method: CalibrationMethod::Bootstrap,
-        interpolation: Default::default(),
-        par_interp: ParInterp::Linear,
-        doc_clause: Some(quote_doc_clause.as_str().to_string()),
+    let discount_id = require_discount_id(discount_id)?;
+    recalibrate_from_par_spreads(HazardParRecalibration {
+        hazard,
+        context,
+        discount_id,
+        recovery_rate: hazard.recovery_rate(),
+        doc_clause: doc_clause.unwrap_or(CdsDocClause::IsdaNa),
         cds_valuation_convention,
-    };
-
-    // Re-calibration uses the default CalibrationConfig — see the "Calibration
-    // config — known limitation" note in this module's docs (`bumps/mod.rs`).
-    let cfg = CalibrationConfig::default();
-    let step = StepParams::Hazard(params.clone());
-    let (ctx, _report) =
-        step_runtime::execute_params_and_apply(&step, &market_quotes, context, &cfg)?;
-    let new_curve = ctx.get_hazard(params.curve_id.as_str())?.as_ref().clone();
-    Ok(new_curve)
+        quote_id_prefix: "BUMP",
+        spread_bump: Some(bump),
+    })
 }
 
 /// Bump hazard curve directly (model hazard shift), without recalibration.
@@ -251,93 +274,21 @@ pub fn recalibrate_hazard_with_recovery_and_doc_clause_and_valuation_convention(
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_core::Result<HazardCurve> {
-    let par_points: Vec<(f64, f64)> = hazard.par_spread_points().collect();
-
-    let Some(discount_id) = discount_id else {
-        return Err(finstack_core::Error::Input(
-            finstack_core::InputError::NotFound {
-                id: "discount curve for hazard recalibration".to_string(),
-            },
-        ));
-    };
-
-    if par_points.is_empty() {
-        return Err(finstack_core::Error::Input(
-            finstack_core::InputError::TooFewPoints,
-        ));
-    }
-
     // Clamp recovery to a numerically safe range. R = 1 leaves zero LGD which
     // makes spreads non-identifying; we leave a small floor below 1.
     let new_recovery = new_recovery.clamp(0.0, 0.999_999);
 
-    let base_date = hazard.base_date();
-    let currency = hazard.currency().unwrap_or(Currency::USD);
-    let seniority = hazard.seniority.unwrap_or(Seniority::Senior);
-    let issuer = hazard
-        .issuer()
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "UNKNOWN".to_string());
-
-    let quote_doc_clause = doc_clause.unwrap_or(CdsDocClause::IsdaNa);
-    let mut quotes = Vec::with_capacity(par_points.len());
-    for (tenor_years, spread_bp) in par_points {
-        let raw_months = (tenor_years * 12.0).round().max(1.0) as i32;
-        const STD_MONTHS: [i32; 11] = [3, 6, 12, 24, 36, 60, 84, 120, 180, 240, 360];
-        let mut snapped_months = raw_months;
-        if let Some(best) = STD_MONTHS
-            .iter()
-            .copied()
-            .min_by(|a, b| (raw_months - a).abs().cmp(&(raw_months - b).abs()))
-        {
-            if (raw_months - best).abs() <= 2 {
-                snapped_months = best;
-            } else {
-                snapped_months = ((raw_months as f64 / 3.0).round() as i32).max(1) * 3;
-            }
-        }
-
-        quotes.push(CdsQuote::CdsParSpread {
-            id: format!("RECOVERY-RECALIB-{}-{:.4}", issuer, tenor_years).into(),
-            entity: issuer.clone(),
-            pillar: crate::market::quotes::ids::Pillar::Tenor(Tenor::new(
-                snapped_months as u32,
-                TenorUnit::Months,
-            )),
-            spread_bp,
-            recovery_rate: new_recovery,
-            convention: crate::market::conventions::ids::CdsConventionKey {
-                currency,
-                doc_clause: quote_doc_clause,
-            },
-        });
-    }
-
-    let market_quotes: Vec<MarketQuote> = quotes.into_iter().map(MarketQuote::Cds).collect();
-    let params = HazardCurveParams {
-        curve_id: hazard.id().clone(),
-        entity: issuer,
-        seniority,
-        currency,
-        base_date,
-        discount_curve_id: discount_id.clone(),
+    let discount_id = require_discount_id(discount_id)?;
+    recalibrate_from_par_spreads(HazardParRecalibration {
+        hazard,
+        context,
+        discount_id,
         recovery_rate: new_recovery,
-        notional: 1.0,
-        method: CalibrationMethod::Bootstrap,
-        interpolation: Default::default(),
-        par_interp: ParInterp::Linear,
-        doc_clause: Some(quote_doc_clause.as_str().to_string()),
+        doc_clause: doc_clause.unwrap_or(CdsDocClause::IsdaNa),
         cds_valuation_convention,
-    };
-
-    // Re-calibration uses the default CalibrationConfig — see the "Calibration
-    // config — known limitation" note in this module's docs (`bumps/mod.rs`).
-    let cfg = CalibrationConfig::default();
-    let step = StepParams::Hazard(params.clone());
-    let (ctx, _report) =
-        step_runtime::execute_params_and_apply(&step, &market_quotes, context, &cfg)?;
-    let new_curve = ctx.get_hazard(params.curve_id.as_str())?.as_ref().clone();
-    Ok(new_curve)
+        quote_id_prefix: "RECOVERY-RECALIB",
+        spread_bump: None,
+    })
 }
 
 /// Fallback: bump hazard rates directly (Model Sensitivity / Hazard Delta).
