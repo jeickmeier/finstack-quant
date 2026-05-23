@@ -130,6 +130,22 @@ pub use periods::{
     build_fiscal_periods, build_periods, FiscalConfig, Period, PeriodId, PeriodKind, PeriodPlan,
 };
 
+/// Parse an ISO 8601 (extended) date string into a [`Date`].
+///
+/// Convenience wrapper around [`time::Date::parse`] using the
+/// [`time::format_description::well_known::Iso8601::DEFAULT`] format. Returns
+/// a structured [`crate::Error::Validation`] on failure with the offending
+/// input echoed in the message.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Validation`] if `s` is not a valid ISO 8601 date.
+pub fn parse_iso_date(s: &str) -> crate::Result<Date> {
+    let format = time::format_description::well_known::Iso8601::DEFAULT;
+    Date::parse(s, &format)
+        .map_err(|e| crate::Error::Validation(format!("Invalid date '{s}': {e}")))
+}
+
 /// Safe date creation helper that returns a Result instead of panicking.
 ///
 /// This is a safer alternative to `Date::from_calendar_date(...).unwrap()`

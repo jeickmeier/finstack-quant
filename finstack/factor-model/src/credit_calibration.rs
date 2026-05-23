@@ -4,7 +4,7 @@
 //! # Algorithm overview
 //!
 //! The calibration is a sequential "peel-the-onion" identical in structure to
-//! [`crate::factor_model::credit_decomposition::decompose_levels`] but operating
+//! [`crate::credit_decomposition::decompose_levels`] but operating
 //! on a *time series* of issuer spreads rather than a single snapshot:
 //!
 //! 1. Classify each issuer as `IssuerBeta` or `BucketOnly` based on the
@@ -35,7 +35,7 @@
 //! # Reuse with PR-3
 //!
 //! The anchoring step (step 7) implements the same math as
-//! [`decompose_levels`][crate::factor_model::credit_decomposition::decompose_levels]
+//! [`decompose_levels`][crate::credit_decomposition::decompose_levels]
 //! but is called via a private helper because we don't yet have a fully
 //! assembled [`CreditFactorModel`] at that point in the pipeline.
 //!
@@ -57,8 +57,10 @@ use finstack_core::factor_model::credit_hierarchy::{
     IssuerBetaRow, IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor, VolState,
 };
 
-use crate::correlation::nearest_correlation::{nearest_correlation_matrix, NearestCorrelationOpts};
-use crate::correlation::validate_correlation_matrix;
+use finstack_analytics::correlation::nearest_correlation::{
+    nearest_correlation_matrix, NearestCorrelationOpts,
+};
+use finstack_analytics::correlation::validate_correlation_matrix;
 use finstack_core::factor_model::matching::{
     bucket_factor_id, CreditHierarchicalConfig, CREDIT_GENERIC_FACTOR_ID,
 };
@@ -69,7 +71,7 @@ use finstack_core::factor_model::{
 use finstack_core::market_data::bumps::BumpUnits;
 use finstack_core::types::IssuerId;
 
-use crate::error::{Error, Result};
+use finstack_core::{Error, Result};
 
 // ---------------------------------------------------------------------------
 // Public configuration types
@@ -277,7 +279,7 @@ impl CreditCalibrator {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Core`] (`Validation`) when:
+    /// Returns [`finstack_core::Error::Validation`] when:
     /// - any unsupported [`VolModelChoice`] or [`CovarianceStrategy`] is requested,
     /// - the inputs are structurally malformed (length mismatches, missing
     ///   `as_of` in the date grid, missing tags),
@@ -498,7 +500,7 @@ impl CreditCalibrator {
             diagnostics,
         };
 
-        model.validate().map_err(Error::from)?;
+        model.validate()?;
         Ok(model)
     }
 }
@@ -508,7 +510,7 @@ impl CreditCalibrator {
 // ---------------------------------------------------------------------------
 
 fn validation_err(msg: impl Into<String>) -> Error {
-    Error::Core(finstack_core::Error::Validation(msg.into()))
+    Error::Validation(msg.into())
 }
 
 fn validate_finite(label: impl std::fmt::Display, value: f64) -> Result<()> {
@@ -1295,7 +1297,7 @@ struct AnchorOutcome {
 /// Step 7: anchor levels at as_of (level space, not return space).
 ///
 /// Implements the same peel-the-onion math as
-/// [`crate::factor_model::credit_decomposition::decompose_levels`] but uses
+/// [`crate::credit_decomposition::decompose_levels`] but uses
 /// the calibrated betas from step 4-5. We don't have a complete
 /// `CreditFactorModel` yet, so this is a self-contained re-implementation.
 fn anchor_levels(

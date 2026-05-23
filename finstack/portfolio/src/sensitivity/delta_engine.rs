@@ -1,6 +1,4 @@
-use super::matrix::SensitivityMatrix;
 use super::traits::FactorSensitivityEngine;
-use crate::instruments::Instrument;
 use finstack_core::dates::Date;
 use finstack_core::factor_model::{
     BumpSizeConfig, FactorBumpUnit, FactorDefinition, MarketMapping,
@@ -9,6 +7,8 @@ use finstack_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, MarketBump
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::types::CurveId;
 use finstack_core::{Error, InputError, Result};
+use finstack_factor_model::sensitivity_matrix::SensitivityMatrix;
+use finstack_valuations::instruments::Instrument;
 
 use rayon::prelude::*;
 
@@ -242,14 +242,14 @@ impl FactorSensitivityEngine for DeltaBasedEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Attributes;
-    use crate::pricer::InstrumentType;
     use finstack_core::currency::Currency;
     use finstack_core::market_data::bumps::BumpUnits;
     use finstack_core::market_data::scalars::MarketScalar;
     use finstack_core::market_data::term_structures::DiscountCurve;
     use finstack_core::math::interp::InterpStyle;
     use finstack_core::money::Money;
+    use finstack_valuations::instruments::Attributes;
+    use finstack_valuations::pricer::InstrumentType;
     use std::any::Any;
     use time::macros::date;
 
@@ -267,9 +267,9 @@ mod tests {
         scale: f64,
     }
 
-    crate::impl_empty_cashflow_provider!(
+    finstack_valuations::impl_empty_cashflow_provider!(
         MockInstrument,
-        crate::cashflow::builder::CashflowRepresentation::NoResidual
+        finstack_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
     impl MockInstrument {

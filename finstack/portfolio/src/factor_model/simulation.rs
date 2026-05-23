@@ -2,8 +2,8 @@
 
 use super::traits::RiskDecomposer;
 use super::types::{FactorContribution, RiskDecomposition};
+use crate::sensitivity::SensitivityMatrix;
 use finstack_core::factor_model::{FactorCovarianceMatrix, RiskMeasure};
-use finstack_valuations::factor_model::sensitivity::SensitivityMatrix;
 
 const MATRIX_TOLERANCE: f64 = 1e-10;
 const ZERO_TOLERANCE: f64 = 1e-15;
@@ -587,8 +587,8 @@ impl RiskDecomposer for SimulationDecomposer {
 mod tests {
     use super::{cholesky, SimulationDecomposer};
     use crate::factor_model::RiskDecomposer;
+    use crate::sensitivity::SensitivityMatrix;
     use finstack_core::factor_model::{FactorCovarianceMatrix, FactorId, RiskMeasure};
-    use finstack_valuations::factor_model::sensitivity::SensitivityMatrix;
 
     type TestResult = finstack_core::Result<()>;
 

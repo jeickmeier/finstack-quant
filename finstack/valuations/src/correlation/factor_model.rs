@@ -44,112 +44,12 @@
 //!   `docs/REFERENCES.md#mcneil-frey-embrechts-qrm`
 
 use crate::correlation::error::{Error, Result};
+use finstack_analytics::correlation::validate_correlation_matrix;
 use finstack_core::math::linalg::{cholesky_correlation, CholeskyError, CorrelationFactor};
 
 /// Tolerance for correlation matrix validation.
+#[allow(dead_code)]
 const CORRELATION_TOLERANCE: f64 = 1e-10;
-
-/// Validate a correlation matrix for use in factor models.
-///
-/// Delegates to [`finstack_core::math::linalg::validate_correlation_matrix`] for
-/// validation logic. On failure, classifies the error into a specific
-/// [`crate::correlation::Error`] variant for diagnostics.
-///
-/// Checks:
-/// - Correct size (n×n flattened)
-/// - Unit diagonal
-/// - Symmetry
-/// - All values in [-1, 1]
-/// - Positive semi-definiteness (via Cholesky)
-///
-/// # Arguments
-/// * `matrix` - Flattened row-major correlation matrix
-/// * `n` - Number of factors (matrix should be n×n)
-///
-/// # Returns
-/// `Ok(())` if valid, or the first error found.
-///
-/// # Errors
-///
-/// Returns [`crate::correlation::Error`] when the flattened matrix has the wrong
-/// size, a non-unit diagonal, asymmetric entries, out-of-bounds correlations,
-/// or is not positive semidefinite.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_valuations::correlation::validate_correlation_matrix;
-///
-/// let corr = vec![1.0, 0.5, 0.5, 1.0];
-/// assert!(validate_correlation_matrix(&corr, 2).is_ok());
-/// ```
-pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<()> {
-    // Guard: core uses assert_eq! for size, so check before delegating
-    if matrix.len() != n * n {
-        return Err(Error::InvalidSize {
-            expected: n,
-            actual: matrix.len(),
-        });
-    }
-
-    // Delegate validation to core's canonical implementation
-    finstack_core::math::linalg::validate_correlation_matrix(matrix, n)
-        .map_err(|_| classify_correlation_error(matrix, n))
-}
-
-/// Classify a known-invalid correlation matrix into a specific error variant.
-///
-/// Called only on the error path after core validation has already failed.
-/// Runs lightweight checks to identify which property is violated.
-fn classify_correlation_error(matrix: &[f64], n: usize) -> Error {
-    // Check diagonal = 1
-    for i in 0..n {
-        let diag = matrix[i * n + i];
-        if (diag - 1.0).abs() > CORRELATION_TOLERANCE {
-            return Error::DiagonalNotOne {
-                index: i,
-                value: diag,
-            };
-        }
-    }
-
-    // Check bounds and symmetry
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let rho_ij = matrix[i * n + j];
-            let rho_ji = matrix[j * n + i];
-
-            if !(-1.0 - CORRELATION_TOLERANCE..=1.0 + CORRELATION_TOLERANCE).contains(&rho_ij) {
-                return Error::OutOfBounds {
-                    i,
-                    j,
-                    value: rho_ij,
-                };
-            }
-
-            let diff = (rho_ij - rho_ji).abs();
-            if diff > CORRELATION_TOLERANCE {
-                return Error::NotSymmetric { i, j, diff };
-            }
-        }
-    }
-
-    match cholesky_decompose(matrix, n) {
-        Err(Error::NotPositiveSemiDefinite { row }) => Error::NotPositiveSemiDefinite { row },
-        Err(err) => err,
-        Ok(_) => {
-            // Core validation rejected the matrix but every local check passed
-            // and the pivoted Cholesky now succeeds. This should be vanishingly
-            // rare (e.g. tolerance mismatch between core and this crate), but
-            // we prefer a loud signal over silently mislabeling the failure.
-            tracing::warn!(
-                n,
-                "classify_correlation_error: core rejected matrix but local checks and cholesky_decompose both succeeded; defaulting to NotPositiveSemiDefinite{{row=0}}"
-            );
-            Error::NotPositiveSemiDefinite { row: 0 }
-        }
-    }
-}
 
 /// Perform Cholesky decomposition of a correlation matrix using diagonal pivoting.
 /// Returns a [`CorrelationFactor`] that holds the lower triangular factor in the

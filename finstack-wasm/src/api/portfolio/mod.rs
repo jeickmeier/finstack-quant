@@ -47,6 +47,8 @@ use std::sync::Arc;
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
+pub mod sensitivity;
+
 // ---------------------------------------------------------------------------
 // Typed handle: Portfolio
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 //! JSON position parsing helpers for factor-model bindings.
 
-use crate::instruments::{DynInstrument, Instrument};
+use finstack_valuations::instruments::{DynInstrument, Instrument};
 use serde::Deserialize;
 
 /// A parsed factor-model position ready for repricing or sensitivity analysis.
@@ -36,7 +36,8 @@ pub fn parse_positions_json(positions_json: &str) -> finstack_core::Result<Vec<P
                     spec.id
                 ))
             })?;
-            let instrument = crate::pricer::parse_boxed_instrument_json(&instrument_json, None)?;
+            let instrument =
+                finstack_valuations::pricer::parse_boxed_instrument_json(&instrument_json, None)?;
             Ok(ParsedPosition {
                 id: spec.id,
                 instrument,
@@ -64,10 +65,10 @@ pub fn pricing_positions(positions: &[ParsedPosition]) -> Vec<(String, &dyn Inst
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::fixed_income::bond::Bond;
-    use crate::instruments::InstrumentJson;
     use finstack_core::currency::Currency;
     use finstack_core::money::Money;
+    use finstack_valuations::instruments::fixed_income::bond::Bond;
+    use finstack_valuations::instruments::InstrumentJson;
 
     #[test]
     fn parse_positions_json_builds_boxed_instruments() {

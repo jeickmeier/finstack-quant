@@ -165,6 +165,8 @@ pub use common_impl::fx_dates::{
 };
 pub use finstack_core::dates::fx::resolve_calendar;
 
+pub(crate) mod dependencies_flatten;
+
 // === Category Modules ===
 /// Commodity derivatives.
 pub mod commodity;

@@ -1,11 +1,11 @@
 use super::delta_engine::mapping_to_market_bumps;
-use super::matrix::SensitivityMatrix;
 use super::traits::FactorSensitivityEngine;
-use crate::instruments::Instrument;
 use finstack_core::dates::Date;
 use finstack_core::factor_model::{BumpSizeConfig, FactorDefinition, FactorId};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::{Error, Result};
+use finstack_factor_model::sensitivity_matrix::SensitivityMatrix;
+use finstack_valuations::instruments::Instrument;
 
 /// P&L profile for one factor across a scenario grid.
 #[derive(Debug, Clone, PartialEq)]
@@ -217,8 +217,6 @@ impl FactorSensitivityEngine for FullRepricingEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Attributes;
-    use crate::pricer::InstrumentType;
     use finstack_core::currency::Currency;
     use finstack_core::factor_model::{FactorType, MarketMapping};
     use finstack_core::market_data::bumps::BumpUnits;
@@ -226,6 +224,8 @@ mod tests {
     use finstack_core::math::interp::InterpStyle;
     use finstack_core::money::Money;
     use finstack_core::types::CurveId;
+    use finstack_valuations::instruments::Attributes;
+    use finstack_valuations::pricer::InstrumentType;
     use std::any::Any;
     use time::macros::date;
 
@@ -238,9 +238,9 @@ mod tests {
         scale: f64,
     }
 
-    crate::impl_empty_cashflow_provider!(
+    finstack_valuations::impl_empty_cashflow_provider!(
         MockInstrument,
-        crate::cashflow::builder::CashflowRepresentation::NoResidual
+        finstack_cashflows::builder::CashflowRepresentation::NoResidual
     );
 
     impl MockInstrument {

@@ -17,6 +17,7 @@ members = [
     "finstack/statements-analytics",
     "finstack/valuations",
     "finstack/valuations/macros",
+    "finstack/factor-model",
     "finstack/portfolio",
     "finstack/scenarios",
     "finstack/test-utils",
@@ -36,6 +37,7 @@ default-members = [
     "finstack/statements",
     "finstack/statements-analytics",
     "finstack/valuations",
+    "finstack/factor-model",
     "finstack/portfolio",
     "finstack/scenarios",
     "finstack"

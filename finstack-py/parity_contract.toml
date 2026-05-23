@@ -196,7 +196,6 @@ public = [
     "DynamicRecoverySpec",
     "EndogenousHazardSpec",
     "FactorCovarianceForecast",
-    "FactorPnlProfile",
     "FixingSeriesDatum",
     "ForwardCurvePrior",
     "ForwardStep",
@@ -240,12 +239,10 @@ public = [
     "RateQuoteFuturesDatum",
     "RateQuoteSwapDatum",
     "RateSwap",
-    "RiskDecomposition",
     "SabrCalibrator",
     "SabrModel",
     "SabrParameters",
     "SabrSmile",
-    "SensitivityMatrix",
     "StudentTStep",
     "SviSurfaceStep",
     "SwaptionVolDatum",
@@ -278,9 +275,6 @@ public = [
     "calibrate",
     "callable_range_accrual_accrued",
     "cms_spread_option_intrinsic",
-    "compute_factor_sensitivities",
-    "compute_pnl_profiles",
-    "decompose_factor_risk",
     "decompose_levels",
     "decompose_period",
     "default_attribution_metrics",
@@ -538,11 +532,6 @@ root_exports = [
     "calibrate",
     "callableRangeAccrualAccrued",
     "cmsSpreadOptionIntrinsic",
-    "computeFactorSensitivities",
-    "computeFactorSensitivitiesWithMarket",
-    "computePnlProfiles",
-    "computePnlProfilesWithMarket",
-    "decomposeFactorRisk",
     "decomposeLevels",
     "decomposePeriod",
     "defaultAttributionMetrics",
@@ -577,7 +566,6 @@ python_only = [
     "CalibrationResult",
     "CalibrationStep",
     "DiscountStep",
-    "FactorPnlProfile",
     "ForwardStep",
     "HazardStep",
     "MarketQuote",
@@ -585,8 +573,6 @@ python_only = [
     "PnlAttribution",
     "RateDeposit",
     "RateSwap",
-    "RiskDecomposition",
-    "SensitivityMatrix",
     "Tenor",
     "ValuationResult",
     "VolSurfaceStep",
@@ -632,11 +618,6 @@ validate_calibration_json = "validateCalibrationJson"
 validate_instrument_json = "validateInstrumentJson"
 default_waterfall_order = "defaultWaterfallOrder"
 default_attribution_metrics = "defaultAttributionMetrics"
-compute_factor_sensitivities = "computeFactorSensitivities"
-compute_factor_sensitivities_with_market = "computeFactorSensitivitiesWithMarket"
-compute_pnl_profiles = "computePnlProfiles"
-compute_pnl_profiles_with_market = "computePnlProfilesWithMarket"
-decompose_factor_risk = "decomposeFactorRisk"
 decompose_levels = "decomposeLevels"
 decompose_period = "decomposePeriod"
 dependency_graph_json = "dependencyGraphJson"

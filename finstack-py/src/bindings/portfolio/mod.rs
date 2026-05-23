@@ -14,6 +14,7 @@ mod performance;
 mod pipeline;
 mod position_risk;
 mod replay;
+mod sensitivity;
 mod spec;
 pub(crate) mod types;
 
@@ -60,6 +61,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     replay::register(py, &m)?;
     position_risk::register(py, &m)?;
     factor_model::register(py, &m)?;
+    sensitivity::register(py, &m)?;
     liquidity::register(py, &m)?;
     brinson::register(py, &m)?;
     performance::register(py, &m)?;

@@ -51,9 +51,10 @@ pub use copula::{
 };
 pub use error::{Error, Result};
 pub use factor_model::{
-    cholesky_decompose, validate_correlation_matrix, FactorModelKind, FactorSpec, MultiFactorModel,
-    SingleFactorModel, TwoFactorModel,
+    cholesky_decompose, FactorModelKind, FactorSpec, MultiFactorModel, SingleFactorModel,
+    TwoFactorModel,
 };
+pub use finstack_analytics::correlation::validate_correlation_matrix;
 pub use finstack_core::math::probability::{
     correlation_bounds, joint_probabilities, CorrelatedBernoulli,
 };

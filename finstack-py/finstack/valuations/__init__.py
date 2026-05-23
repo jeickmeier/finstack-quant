@@ -121,12 +121,6 @@ attribute_pnl_from_spec = _valuations.attribute_pnl_from_spec
 validate_attribution_json = _valuations.validate_attribution_json
 default_waterfall_order = _valuations.default_waterfall_order
 default_attribution_metrics = _valuations.default_attribution_metrics
-SensitivityMatrix = _valuations.SensitivityMatrix
-FactorPnlProfile = _valuations.FactorPnlProfile
-compute_factor_sensitivities = _valuations.compute_factor_sensitivities
-compute_pnl_profiles = _valuations.compute_pnl_profiles
-RiskDecomposition = _valuations.RiskDecomposition
-decompose_factor_risk = _valuations.decompose_factor_risk
 CalibrationResult = _valuations.CalibrationResult
 CalibrationEnvelopeError = _valuations.CalibrationEnvelopeError
 validate_calibration_json = _valuations.validate_calibration_json
@@ -253,7 +247,6 @@ __all__: list[str] = [
     "DynamicRecoverySpec",
     "EndogenousHazardSpec",
     "FactorCovarianceForecast",
-    "FactorPnlProfile",
     "FixingSeriesDatum",
     "ForwardCurvePrior",
     "ForwardStep",
@@ -297,12 +290,10 @@ __all__: list[str] = [
     "RateQuoteFuturesDatum",
     "RateQuoteSwapDatum",
     "RateSwap",
-    "RiskDecomposition",
     "SabrCalibrator",
     "SabrModel",
     "SabrParameters",
     "SabrSmile",
-    "SensitivityMatrix",
     "StudentTStep",
     "SviSurfaceStep",
     "SwaptionVolDatum",
@@ -335,12 +326,9 @@ __all__: list[str] = [
     "calibrate",
     "callable_range_accrual_accrued",
     "cms_spread_option_intrinsic",
-    "compute_factor_sensitivities",
-    "compute_pnl_profiles",
     "correlation",
     "credit",
     "credit_derivatives",
-    "decompose_factor_risk",
     "decompose_levels",
     "decompose_period",
     "default_attribution_metrics",

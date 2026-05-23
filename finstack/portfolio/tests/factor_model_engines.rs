@@ -12,7 +12,7 @@ use finstack_core::math::interp::InterpStyle;
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
 use finstack_core::{InputError, Result};
-use finstack_valuations::factor_model::{
+use finstack_portfolio::sensitivity::{
     DeltaBasedEngine, FactorSensitivityEngine, FullRepricingEngine,
 };
 use finstack_valuations::instruments::fixed_income::bond::Bond;

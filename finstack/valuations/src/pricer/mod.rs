@@ -47,11 +47,14 @@ pub use json::{
 pub use keys::{InstrumentType, ModelKey, PricerKey};
 pub use registry::{expect_inst, Pricer, PricerRegistry};
 
-// Fourier pricing methods (COS).
+// Fourier pricing via the Fang-Oosterlee (2008) COS method.
 //
-// The previously-exposed Lewis (2001) pricer was removed (known-divergent
-// off-ATM); see `fourier` module docs.
-pub mod fourier;
+// A Lewis (2001) pricer was previously exposed alongside COS but was known-
+// divergent off-ATM and silently dropped non-finite integrand panels behind a
+// `max(0.0)` clamp. It was removed; COS is the only Fourier method finstack
+// exposes, so the implementation lives directly in `pricer::cos` rather than
+// inside a single-member `pricer::fourier` namespace.
+pub mod cos;
 
 // Asset-class registration submodules
 mod commodity;

@@ -26,6 +26,9 @@ use super::{
     RiskDecomposition,
 };
 use crate::error::{Error, Result};
+use crate::sensitivity::{
+    DeltaBasedEngine, FactorSensitivityEngine, FullRepricingEngine, SensitivityMatrix,
+};
 use crate::Portfolio;
 use finstack_core::dates::Date;
 use finstack_core::factor_model::matching::ISSUER_ID_META_KEY;
@@ -37,9 +40,6 @@ use finstack_core::factor_model::{
 use finstack_core::market_data::context::MarketContext;
 use finstack_valuations::calibration::bumps::{bump_hazard_shift, BumpRequest};
 use finstack_valuations::factor_model::decompose as flatten_dependencies;
-use finstack_valuations::factor_model::sensitivity::{
-    DeltaBasedEngine, FactorSensitivityEngine, FullRepricingEngine, SensitivityMatrix,
-};
 use finstack_valuations::instruments::Instrument;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -514,8 +514,8 @@ impl FactorModel {
         as_of: Date,
         stresses: &[(finstack_core::factor_model::FactorId, f64)],
     ) -> Result<MarketContext> {
+        use crate::sensitivity::mapping_to_market_bumps;
         use finstack_core::factor_model::FactorBumpUnit;
-        use finstack_valuations::factor_model::mapping_to_market_bumps;
 
         let stress_by_id: HashMap<_, _> = stresses.iter().map(|(id, shift)| (id, *shift)).collect();
         for (factor_id, _) in stresses {
@@ -789,6 +789,7 @@ fn shift_credit_curves(
 mod tests {
     use super::*;
     use crate::position::{Position, PositionUnit};
+    use crate::sensitivity::{FactorSensitivityEngine, SensitivityMatrix};
     use crate::types::{PositionId, DUMMY_ENTITY_ID};
     use crate::Portfolio;
     use finstack_core::currency::Currency;
@@ -802,9 +803,6 @@ mod tests {
     use finstack_core::market_data::context::MarketContext;
     use finstack_core::money::Money;
     use finstack_core::types::{Attributes, CurveId};
-    use finstack_valuations::factor_model::sensitivity::{
-        FactorSensitivityEngine, SensitivityMatrix,
-    };
     use finstack_valuations::instruments::Instrument;
     use finstack_valuations::instruments::MarketDependencies;
     use finstack_valuations::pricer::InstrumentType;

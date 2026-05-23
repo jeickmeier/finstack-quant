@@ -11,7 +11,7 @@
 
 use crate::errors::display_to_py;
 use finstack_core::math::characteristic_function::{BlackScholesCf, MertonJumpCf, VarianceGammaCf};
-use finstack_valuations::pricer::fourier::{CosConfig, CosPricer};
+use finstack_valuations::pricer::cos::{CosConfig, CosPricer};
 use pyo3::prelude::*;
 
 /// Build a [`CosConfig`] for the COS pricer.

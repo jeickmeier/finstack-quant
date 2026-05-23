@@ -1,6 +1,6 @@
 //! Python bindings for the factor-model sensitivity engines.
 //!
-//! Wraps `finstack_valuations::factor_model` to expose delta-based and
+//! Wraps `finstack_portfolio::sensitivity` to expose delta-based and
 //! full-repricing factor sensitivities from Python, with DataFrame export.
 
 use crate::bindings::extract::extract_market;
@@ -11,7 +11,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
 const DEFAULT_PNL_SCENARIO_POINTS: usize =
-    finstack_valuations::factor_model::DEFAULT_PNL_SCENARIO_POINTS;
+    finstack_portfolio::sensitivity::DEFAULT_PNL_SCENARIO_POINTS;
 
 /// Serialize a Python object to JSON via `json.dumps`, then deserialize into `T`.
 fn py_to_serde<'py, T: serde::de::DeserializeOwned>(
@@ -37,7 +37,7 @@ fn py_to_serde<'py, T: serde::de::DeserializeOwned>(
 /// Construct via :func:`compute_factor_sensitivities`.
 #[pyclass(
     name = "SensitivityMatrix",
-    module = "finstack.valuations",
+    module = "finstack.portfolio",
     frozen,
     skip_from_py_object
 )]
@@ -50,7 +50,7 @@ struct PySensitivityMatrix {
 }
 
 impl PySensitivityMatrix {
-    fn from_inner(matrix: finstack_valuations::factor_model::SensitivityMatrix) -> Self {
+    fn from_inner(matrix: finstack_portfolio::sensitivity::SensitivityMatrix) -> Self {
         let position_ids = matrix.position_ids().to_vec();
         let factor_ids = matrix
             .factor_ids()
@@ -166,7 +166,7 @@ impl PySensitivityMatrix {
 /// Construct via :func:`compute_pnl_profiles`.
 #[pyclass(
     name = "FactorPnlProfile",
-    module = "finstack.valuations",
+    module = "finstack.portfolio",
     frozen,
     skip_from_py_object
 )]
@@ -178,7 +178,7 @@ struct PyFactorPnlProfile {
 }
 
 impl PyFactorPnlProfile {
-    fn from_inner(profile: &finstack_valuations::factor_model::FactorPnlProfile) -> Self {
+    fn from_inner(profile: &finstack_portfolio::sensitivity::FactorPnlProfile) -> Self {
         Self {
             factor_id: profile.factor_id.to_string(),
             shifts: profile.shifts.clone(),
@@ -294,7 +294,7 @@ fn compute_factor_sensitivities(
 
     let matrix = py
         .detach(move || {
-            finstack_valuations::factor_model::compute_factor_sensitivities_from_json(
+            finstack_portfolio::sensitivity::compute_factor_sensitivities_from_json(
                 &positions_json,
                 &factors_json,
                 &market,
@@ -352,7 +352,7 @@ fn compute_pnl_profiles(
 
     let profiles = py
         .detach(move || {
-            finstack_valuations::factor_model::compute_pnl_profiles_from_json(
+            finstack_portfolio::sensitivity::compute_pnl_profiles_from_json(
                 &positions_json,
                 &factors_json,
                 &market,
@@ -380,13 +380,13 @@ fn compute_pnl_profiles(
 /// factor-level contributions, each of which can be further drilled into
 /// per-position contributions.
 #[pyclass(
-    name = "RiskDecomposition",
-    module = "finstack.valuations",
+    name = "FactorRiskDecomposition",
+    module = "finstack.portfolio",
     frozen,
     skip_from_py_object
 )]
 #[derive(Clone)]
-struct PyRiskDecomposition {
+struct PyFactorRiskDecomposition {
     total_risk: f64,
     measure: String,
     residual_risk: f64,
@@ -399,7 +399,7 @@ struct PyRiskDecomposition {
     pfc_risk_contributions: Vec<f64>,
 }
 
-impl PyRiskDecomposition {
+impl PyFactorRiskDecomposition {
     fn from_inner(decomp: finstack_portfolio::factor_model::RiskDecomposition) -> Self {
         let measure = format!("{:?}", decomp.measure);
         let factor_ids: Vec<String> = decomp
@@ -453,7 +453,7 @@ impl PyRiskDecomposition {
 }
 
 #[pymethods]
-impl PyRiskDecomposition {
+impl PyFactorRiskDecomposition {
     /// Total portfolio risk under the selected measure.
     #[getter]
     fn total_risk(&self) -> f64 {
@@ -536,7 +536,7 @@ impl PyRiskDecomposition {
 
     fn __repr__(&self) -> String {
         format!(
-            "RiskDecomposition(measure={:?}, total_risk={:.6}, factors={}, positions={})",
+            "FactorRiskDecomposition(measure={:?}, total_risk={:.6}, factors={}, positions={})",
             self.measure,
             self.total_risk,
             self.factor_ids.len(),
@@ -584,7 +584,7 @@ fn decompose_factor_risk(
     sensitivities: &PySensitivityMatrix,
     covariance_json: &str,
     risk_measure: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyRiskDecomposition> {
+) -> PyResult<PyFactorRiskDecomposition> {
     let factor_ids: Vec<finstack_core::factor_model::FactorId> = sensitivities
         .factor_ids
         .iter()
@@ -597,7 +597,7 @@ fn decompose_factor_risk(
         ));
     }
 
-    let mut matrix = finstack_valuations::factor_model::SensitivityMatrix::zeros(
+    let mut matrix = finstack_portfolio::sensitivity::SensitivityMatrix::zeros(
         sensitivities.position_ids.clone(),
         factor_ids,
     );
@@ -631,7 +631,7 @@ fn decompose_factor_risk(
         })
         .map_err(display_to_py)?;
 
-    Ok(PyRiskDecomposition::from_inner(result))
+    Ok(PyFactorRiskDecomposition::from_inner(result))
 }
 
 // ---------------------------------------------------------------------------
@@ -642,7 +642,7 @@ fn decompose_factor_risk(
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySensitivityMatrix>()?;
     m.add_class::<PyFactorPnlProfile>()?;
-    m.add_class::<PyRiskDecomposition>()?;
+    m.add_class::<PyFactorRiskDecomposition>()?;
     m.add_function(pyo3::wrap_pyfunction!(compute_factor_sensitivities, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(compute_pnl_profiles, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(decompose_factor_risk, m)?)?;

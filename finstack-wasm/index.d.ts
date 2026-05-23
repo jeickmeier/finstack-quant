@@ -1613,54 +1613,6 @@ export interface ValuationsNamespace {
   defaultWaterfallOrder(): string[];
   /** Return the default metric IDs used by metrics-based attribution. */
   defaultAttributionMetrics(): string[];
-  /** Compute first-order factor sensitivities.
-   *
-   * ⚠️ BLOCKING: prefer `computeFactorSensitivitiesWithMarket` for repeated
-   * calls so market JSON is parsed once into `WasmMarket`.
-   */
-  computeFactorSensitivities(
-    positionsJson: string,
-    factorsJson: string,
-    marketJson: string,
-    asOf: string,
-    bumpConfigJson?: string
-  ): string;
-  /** Compute first-order factor sensitivities using a pre-parsed market. */
-  computeFactorSensitivitiesWithMarket(
-    positionsJson: string,
-    factorsJson: string,
-    market: WasmMarket,
-    asOf: string,
-    bumpConfigJson?: string
-  ): string;
-  /** Compute scenario P&L profiles via full repricing. */
-  computePnlProfiles(
-    positionsJson: string,
-    factorsJson: string,
-    marketJson: string,
-    asOf: string,
-    bumpConfigJson?: string,
-    nScenarioPoints?: number
-  ): string;
-  /** Compute scenario P&L profiles via full repricing using a pre-parsed market. */
-  computePnlProfilesWithMarket(
-    positionsJson: string,
-    factorsJson: string,
-    market: WasmMarket,
-    asOf: string,
-    bumpConfigJson?: string,
-    nScenarioPoints?: number
-  ): string;
-  /** Decompose portfolio risk into factor and position contributions.
-   *
-   * ⚠️ BLOCKING: sensitivity and covariance dimensions must match exactly;
-   * malformed matrices throw instead of producing partial decompositions.
-   */
-  decomposeFactorRisk(
-    sensitivitiesJson: string,
-    covarianceJson: string,
-    riskMeasureJson?: string
-  ): string;
 }
 
 export declare const valuations: ValuationsNamespace;
@@ -1856,6 +1808,54 @@ export interface PortfolioNamespace {
     referencePrice?: number | null
   ): string;
   kyleLambda(volumesJson: string, returnsJson: string): number;
+  /** Compute first-order factor sensitivities.
+   *
+   * ⚠️ BLOCKING: prefer `computeFactorSensitivitiesWithMarket` for repeated
+   * calls so market JSON is parsed once into `WasmMarket`.
+   */
+  computeFactorSensitivities(
+    positionsJson: string,
+    factorsJson: string,
+    marketJson: string,
+    asOf: string,
+    bumpConfigJson?: string
+  ): string;
+  /** Compute first-order factor sensitivities using a pre-parsed market. */
+  computeFactorSensitivitiesWithMarket(
+    positionsJson: string,
+    factorsJson: string,
+    market: WasmMarket,
+    asOf: string,
+    bumpConfigJson?: string
+  ): string;
+  /** Compute scenario P&L profiles via full repricing. */
+  computePnlProfiles(
+    positionsJson: string,
+    factorsJson: string,
+    marketJson: string,
+    asOf: string,
+    bumpConfigJson?: string,
+    nScenarioPoints?: number
+  ): string;
+  /** Compute scenario P&L profiles via full repricing using a pre-parsed market. */
+  computePnlProfilesWithMarket(
+    positionsJson: string,
+    factorsJson: string,
+    market: WasmMarket,
+    asOf: string,
+    bumpConfigJson?: string,
+    nScenarioPoints?: number
+  ): string;
+  /** Decompose portfolio risk into factor and position contributions.
+   *
+   * ⚠️ BLOCKING: sensitivity and covariance dimensions must match exactly;
+   * malformed matrices throw instead of producing partial decompositions.
+   */
+  decomposeFactorRisk(
+    sensitivitiesJson: string,
+    covarianceJson: string,
+    riskMeasureJson?: string
+  ): string;
 }
 
 export declare const portfolio: PortfolioNamespace;

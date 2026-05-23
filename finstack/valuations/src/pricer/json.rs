@@ -114,10 +114,11 @@ pub fn parse_boxed_instrument_json(
 }
 
 /// Parse an ISO 8601 as-of date for JSON pricing helpers.
+///
+/// Thin re-export wrapper over [`finstack_core::dates::parse_iso_date`] kept
+/// for binding stability; new code should call the core helper directly.
 pub fn parse_as_of_date(as_of: &str) -> finstack_core::Result<time::Date> {
-    let format = time::format_description::well_known::Iso8601::DEFAULT;
-    time::Date::parse(as_of, &format)
-        .map_err(|e| Error::Validation(format!("Invalid date '{as_of}': {e}")))
+    finstack_core::dates::parse_iso_date(as_of)
 }
 
 /// Parse a string model key used by the JSON pricing helpers.

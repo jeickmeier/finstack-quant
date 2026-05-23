@@ -9,7 +9,7 @@
 
 use crate::utils::to_js_err;
 use finstack_core::math::characteristic_function::{BlackScholesCf, MertonJumpCf, VarianceGammaCf};
-use finstack_valuations::pricer::fourier::{CosConfig, CosPricer};
+use finstack_valuations::pricer::cos::{CosConfig, CosPricer};
 use wasm_bindgen::prelude::*;
 
 /// Build a [`CosConfig`] for the COS pricer.

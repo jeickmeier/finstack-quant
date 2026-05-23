@@ -13,6 +13,7 @@ finstack-analytics = { path = "../analytics" }
 finstack-cashflows = { path = "../cashflows" }
 finstack-margin = { path = "../margin" }
 finstack-monte-carlo = { path = "../monte_carlo", default-features = false }
+finstack-factor-model = { path = "../factor-model" }
 finstack-valuations-macros = { path = "macros" }
 indexmap = { workspace = true, features = ["serde"] }
 smallvec = { version = "1.15", default-features = false, features = ["serde"] }

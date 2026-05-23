@@ -69,6 +69,7 @@ mod tests {
     use super::*;
     use crate::factor_model::{FactorModel, FactorModelBuilder};
     use crate::position::{Position, PositionUnit};
+    use crate::sensitivity::{FactorSensitivityEngine, SensitivityMatrix};
     use crate::test_utils::build_test_market_at;
     use crate::types::DUMMY_ENTITY_ID;
     use crate::Portfolio;
@@ -82,9 +83,6 @@ mod tests {
     use finstack_core::market_data::context::MarketContext;
     use finstack_core::money::Money;
     use finstack_core::types::{Attributes, CurveId};
-    use finstack_valuations::factor_model::sensitivity::{
-        FactorSensitivityEngine, SensitivityMatrix,
-    };
     use finstack_valuations::instruments::Instrument;
     use finstack_valuations::instruments::MarketDependencies;
     use finstack_valuations::pricer::InstrumentType;

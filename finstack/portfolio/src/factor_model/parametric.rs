@@ -6,7 +6,7 @@ use super::types::{FactorContribution, PositionFactorContribution, RiskDecomposi
 use crate::types::PositionId;
 use finstack_core::factor_model::{FactorCovarianceMatrix, RiskMeasure};
 
-use finstack_valuations::factor_model::sensitivity::SensitivityMatrix;
+use crate::sensitivity::SensitivityMatrix;
 
 /// Covariance-based decomposer for linear factor risk measures.
 ///
@@ -301,9 +301,9 @@ impl RiskDecomposer for ParametricDecomposer {
 mod tests {
     use super::ParametricDecomposer;
     use crate::factor_model::RiskDecomposer;
+    use crate::sensitivity::SensitivityMatrix;
     use crate::types::PositionId;
     use finstack_core::factor_model::{FactorCovarianceMatrix, FactorId, RiskMeasure};
-    use finstack_valuations::factor_model::sensitivity::SensitivityMatrix;
 
     type TestResult = finstack_core::Result<()>;
 

@@ -52,6 +52,7 @@ pub(crate) type Result<T> = finstack_core::Result<T>;
 
 pub(crate) mod aggregation;
 pub(crate) mod benchmark;
+pub mod correlation;
 pub(crate) mod drawdown;
 pub(crate) mod lookback;
 pub(crate) mod performance;

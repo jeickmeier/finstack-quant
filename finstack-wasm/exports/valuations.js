@@ -105,13 +105,4 @@ export const valuations = {
   validateAttributionJson: wasm.validateAttributionJson,
   defaultWaterfallOrder: wasm.defaultWaterfallOrder,
   defaultAttributionMetrics: wasm.defaultAttributionMetrics,
-  // ⚠️ BLOCKING: prefer computeFactorSensitivitiesWithMarket for repeated calls
-  // so large MarketContext JSON is parsed once into WasmMarket.
-  computeFactorSensitivities: wasm.computeFactorSensitivities,
-  computeFactorSensitivitiesWithMarket: wasm.computeFactorSensitivitiesWithMarket,
-  computePnlProfiles: wasm.computePnlProfiles,
-  computePnlProfilesWithMarket: wasm.computePnlProfilesWithMarket,
-  // ⚠️ BLOCKING: validate sensitivity/covariance dimensions before calling;
-  // malformed matrices throw instead of returning partial decompositions.
-  decomposeFactorRisk: wasm.decomposeFactorRisk,
 };

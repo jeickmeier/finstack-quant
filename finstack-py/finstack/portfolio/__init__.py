@@ -90,6 +90,12 @@ FactorContribution = _portfolio.FactorContribution
 PositionFactorContribution = _portfolio.PositionFactorContribution
 PositionResidualContribution = _portfolio.PositionResidualContribution
 RiskDecomposition = _portfolio.RiskDecomposition
+FactorRiskDecomposition = _portfolio.FactorRiskDecomposition
+SensitivityMatrix = _portfolio.SensitivityMatrix
+FactorPnlProfile = _portfolio.FactorPnlProfile
+compute_factor_sensitivities = _portfolio.compute_factor_sensitivities
+compute_pnl_profiles = _portfolio.compute_pnl_profiles
+decompose_factor_risk = _portfolio.decompose_factor_risk
 PositionVarContribution = _portfolio.PositionVarContribution
 PositionEsContribution = _portfolio.PositionEsContribution
 PositionRiskDecomposition = _portfolio.PositionRiskDecomposition
@@ -142,6 +148,8 @@ __all__: list[str] = [
     "FactorAssignmentReport",
     "FactorContribution",
     "FactorContributionDelta",
+    "FactorPnlProfile",
+    "FactorRiskDecomposition",
     "FinstackFxError",
     "FinstackOptimizationError",
     "FinstackValuationError",
@@ -171,6 +179,7 @@ __all__: list[str] = [
     "PositionVolContribution",
     "RiskBudgetResult",
     "RiskDecomposition",
+    "SensitivityMatrix",
     "StressAttribution",
     "StressPositionEntry",
     "StressResult",
@@ -191,7 +200,10 @@ __all__: list[str] = [
     "brinson_fachler",
     "build_portfolio_from_spec",
     "carino_link",
+    "compute_factor_sensitivities",
+    "compute_pnl_profiles",
     "days_to_liquidate",
+    "decompose_factor_risk",
     "evaluate_risk_budget",
     "evaluate_risk_budget_typed",
     "historical_var_decomposition",

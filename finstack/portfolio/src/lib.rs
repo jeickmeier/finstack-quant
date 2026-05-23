@@ -183,10 +183,19 @@ pub mod performance;
 pub mod portfolio;
 /// Position primitives and units.
 pub mod position;
+
 /// Embedded portfolio defaults registries.
 pub(crate) mod registry;
 /// Result envelopes for portfolio operations.
 pub mod results;
+/// Factor sensitivity engines (delta-based + full-repricing) and JSON façade.
+///
+/// Hosts engines that bump-and-reprice `&dyn Instrument` against a
+/// `MarketContext` to produce positions × factors sensitivity matrices and
+/// scenario-grid P&L profiles. Originally lived in
+/// `finstack-valuations::factor_model::sensitivity`; relocated here because
+/// these are portfolio-level analytics with no per-instrument metric semantics.
+pub mod sensitivity;
 /// Core portfolio entity and ID types.
 pub mod types;
 /// Portfolio valuation APIs.

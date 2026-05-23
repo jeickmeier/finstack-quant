@@ -11,6 +11,7 @@ authors.workspace = true
 finstack-core = { path = "../core" }
 nalgebra = "0.34"
 serde = { workspace = true }
+thiserror = { workspace = true }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 
 [dev-dependencies]

@@ -12,7 +12,7 @@ import json
 from finstack.core.market_data import DiscountCurve, MarketContext
 import pytest
 
-from finstack.valuations import (
+from finstack.portfolio import (
     compute_factor_sensitivities,
     decompose_factor_risk,
 )

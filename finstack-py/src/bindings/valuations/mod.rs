@@ -14,7 +14,6 @@ mod credit_factor_model;
 mod direct_wrapper;
 mod exotic_rates;
 mod exotics;
-mod factor_model;
 mod fourier;
 mod fx;
 mod pricing;
@@ -152,7 +151,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     analytic::register(py, &m)?;
     sabr::register(py, &m)?;
     attribution::register(py, &m)?;
-    factor_model::register(py, &m)?;
     credit_factor_model::register(py, &m)?;
     calibration::register(py, &m)?;
     fourier::register(py, &m)?;

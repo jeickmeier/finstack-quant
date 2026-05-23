@@ -2,13 +2,13 @@ use super::model::FactorModel;
 use super::RiskDecomposition;
 use crate::error::{Error, Result};
 use crate::position::Position;
+use crate::sensitivity::SensitivityMatrix;
 use crate::types::PositionId;
 use crate::Portfolio;
 use finstack_core::dates::Date;
 use finstack_core::factor_model::FactorId;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::summation::NeumaierAccumulator;
-use finstack_valuations::factor_model::sensitivity::SensitivityMatrix;
 
 /// Minimum portfolio size at which factor-stress repricing is run in parallel.
 const PARALLEL_FACTOR_STRESS_THRESHOLD: usize = 64;
@@ -253,6 +253,7 @@ mod tests {
     use super::*;
     use crate::factor_model::{FactorModel, FactorModelBuilder};
     use crate::position::{Position, PositionUnit};
+    use crate::sensitivity::{FactorSensitivityEngine, SensitivityMatrix};
     use crate::test_utils::build_test_market_at;
     use crate::types::{PositionId, DUMMY_ENTITY_ID};
     use crate::Portfolio;
@@ -266,9 +267,6 @@ mod tests {
     use finstack_core::market_data::context::MarketContext;
     use finstack_core::money::Money;
     use finstack_core::types::{Attributes, CurveId};
-    use finstack_valuations::factor_model::sensitivity::{
-        FactorSensitivityEngine, SensitivityMatrix,
-    };
     use finstack_valuations::instruments::Instrument;
     use finstack_valuations::instruments::MarketDependencies;
     use finstack_valuations::pricer::InstrumentType;

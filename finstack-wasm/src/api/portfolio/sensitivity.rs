@@ -1,6 +1,6 @@
 //! WASM bindings for factor-model sensitivities and risk decomposition.
 
-use super::market_handle::WasmMarket;
+use crate::api::valuations::market_handle::WasmMarket;
 use crate::utils::date::parse_iso_date;
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
@@ -20,7 +20,7 @@ pub fn compute_factor_sensitivities(
     bump_config_json: Option<String>,
 ) -> Result<String, JsValue> {
     parse_iso_date(as_of)?;
-    finstack_valuations::factor_model::compute_factor_sensitivities_json(
+    finstack_portfolio::sensitivity::compute_factor_sensitivities_json(
         positions_json,
         factors_json,
         market_json,
@@ -42,7 +42,7 @@ pub fn compute_factor_sensitivities_with_market(
     bump_config_json: Option<String>,
 ) -> Result<String, JsValue> {
     let as_of = parse_iso_date(as_of)?;
-    let matrix = finstack_valuations::factor_model::compute_factor_sensitivities_from_json(
+    let matrix = finstack_portfolio::sensitivity::compute_factor_sensitivities_from_json(
         positions_json,
         factors_json,
         market.inner(),
@@ -50,7 +50,7 @@ pub fn compute_factor_sensitivities_with_market(
         bump_config_json.as_deref(),
     )
     .map_err(to_js_err)?;
-    let output = finstack_valuations::factor_model::SensitivityMatrixJson::from(&matrix);
+    let output = finstack_portfolio::sensitivity::SensitivityMatrixJson::from(&matrix);
     serde_json::to_string(&output).map_err(to_js_err)
 }
 
@@ -68,7 +68,7 @@ pub fn compute_pnl_profiles(
     n_scenario_points: Option<usize>,
 ) -> Result<String, JsValue> {
     parse_iso_date(as_of)?;
-    finstack_valuations::factor_model::compute_pnl_profiles_json(
+    finstack_portfolio::sensitivity::compute_pnl_profiles_json(
         positions_json,
         factors_json,
         market_json,
@@ -90,18 +90,18 @@ pub fn compute_pnl_profiles_with_market(
     n_scenario_points: Option<usize>,
 ) -> Result<String, JsValue> {
     let as_of = parse_iso_date(as_of)?;
-    let profiles = finstack_valuations::factor_model::compute_pnl_profiles_from_json(
+    let profiles = finstack_portfolio::sensitivity::compute_pnl_profiles_from_json(
         positions_json,
         factors_json,
         market.inner(),
         as_of,
         bump_config_json.as_deref(),
-        n_scenario_points.unwrap_or(finstack_valuations::factor_model::DEFAULT_PNL_SCENARIO_POINTS),
+        n_scenario_points.unwrap_or(finstack_portfolio::sensitivity::DEFAULT_PNL_SCENARIO_POINTS),
     )
     .map_err(to_js_err)?;
-    let output: Vec<finstack_valuations::factor_model::FactorPnlProfileJson> = profiles
+    let output: Vec<finstack_portfolio::sensitivity::FactorPnlProfileJson> = profiles
         .iter()
-        .map(finstack_valuations::factor_model::FactorPnlProfileJson::from)
+        .map(finstack_portfolio::sensitivity::FactorPnlProfileJson::from)
         .collect();
     serde_json::to_string(&output).map_err(to_js_err)
 }
@@ -140,7 +140,7 @@ pub fn decompose_factor_risk(
     validate_sensitivity_data(&input.data, n_positions, n_factors).map_err(to_js_err)?;
 
     let mut matrix =
-        finstack_valuations::factor_model::SensitivityMatrix::zeros(input.position_ids, factor_ids);
+        finstack_portfolio::sensitivity::SensitivityMatrix::zeros(input.position_ids, factor_ids);
     for (pi, row) in input.data.iter().enumerate() {
         for (fi, &val) in row.iter().enumerate() {
             matrix.set_delta(pi, fi, val);

@@ -57,9 +57,9 @@
 //! ```
 
 pub use crate::correlation::Error as CorrelationError;
-pub use crate::factor_model::DecompositionError;
 pub use crate::instruments::fixed_income::structured_credit::utils::validation::ValidationError;
 pub use crate::pricer::{PricingError, PricingErrorContext, PricingResult};
+pub use finstack_factor_model::DecompositionError;
 
 /// Unified error type for the valuations crate.
 ///
