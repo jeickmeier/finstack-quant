@@ -8,7 +8,7 @@ use super::{
     StochasticDefault,
 };
 use crate::cashflow::builder::specs::DefaultModelSpec;
-use crate::instruments::common_impl::models::correlation::copula::CopulaSpec;
+use crate::correlation::copula::CopulaSpec;
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::calibrations::{
     clo_standard, rmbs_standard,
 };

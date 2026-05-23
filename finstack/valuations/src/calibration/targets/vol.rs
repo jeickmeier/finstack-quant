@@ -3,9 +3,9 @@ use crate::calibration::api::schema::VolSurfaceParams;
 use crate::calibration::config::CalibrationConfig;
 use crate::calibration::validation::ValidationConfig;
 use crate::calibration::CalibrationReport;
-use crate::instruments::common_impl::models::{SABRCalibrator, SABRModel, SABRParameters};
 use crate::market::quotes::market_quote::MarketQuote;
 use crate::market::quotes::vol::VolQuote;
+use crate::models::{SABRCalibrator, SABRModel, SABRParameters};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::scalars::MarketScalar;
 use finstack_core::market_data::surfaces::VolSurface;
@@ -417,10 +417,10 @@ Set params.expiry_extrapolation='clamp' to allow flat extrapolation.",
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::models::SABRParameters;
     use crate::instruments::OptionType;
     use crate::market::conventions::ids::OptionConventionId;
     use crate::market::quotes::ids::QuoteId;
+    use crate::models::SABRParameters;
     use finstack_core::dates::{Date, DateExt};
     use finstack_core::market_data::context::MarketContext;
     use finstack_core::market_data::term_structures::DiscountCurve;

@@ -16,10 +16,10 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::{DiscountCurve, HazardCurve, ParInterp};
 use finstack_core::math::interp::InterpStyle;
-use finstack_valuations::instruments::models::trees::tree_framework::{
+use finstack_valuations::models::trees::tree_framework::{
     NodeState, StateVariables, TreeModel, TreeValuator,
 };
-use finstack_valuations::instruments::models::trees::two_factor_rates_credit::{
+use finstack_valuations::models::trees::two_factor_rates_credit::{
     RatesCreditConfig, RatesCreditTree,
 };
 use time::Month;

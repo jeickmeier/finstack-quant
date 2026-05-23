@@ -389,7 +389,7 @@ fn price_expired_barrier(
 
 // ========================= ANALYTICAL PRICER =========================
 
-use crate::instruments::common_impl::models::closed_form::barrier::{
+use crate::models::closed_form::barrier::{
     barrier_call_continuous, barrier_put_continuous, barrier_rebate_continuous, BarrierParams,
     BarrierType as AnalyticalBarrierType,
 };
@@ -569,12 +569,12 @@ impl Pricer for BarrierOptionAnalyticalPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::models::closed_form::barrier::{
+    use crate::instruments::exotics::barrier_option::types::{BarrierOption, BarrierType};
+    use crate::instruments::{Attributes, OptionType, PricingOverrides};
+    use crate::models::closed_form::barrier::{
         barrier_call_continuous, barrier_put_continuous, barrier_rebate_continuous, down_out_call,
         BarrierParams, BarrierType as AnalyticalBarrierType,
     };
-    use crate::instruments::exotics::barrier_option::types::{BarrierOption, BarrierType};
-    use crate::instruments::{Attributes, OptionType, PricingOverrides};
     use finstack_core::currency::Currency;
     use finstack_core::dates::{DayCount, DayCountContext};
     use finstack_core::market_data::scalars::MarketScalar;

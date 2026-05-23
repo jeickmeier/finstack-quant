@@ -3,12 +3,10 @@ use crate::calibration::api::schema::{
 };
 use crate::calibration::config::CalibrationConfig;
 use crate::calibration::CalibrationReport;
-use crate::instruments::common_impl::models::{
-    vega_weight, SABRCalibrator, SABRModel, SABRParameters,
-};
 use crate::market::conventions::registry::ConventionRegistry;
 use crate::market::quotes::market_quote::MarketQuote;
 use crate::market::quotes::vol::VolQuote;
+use crate::models::{vega_weight, SABRCalibrator, SABRModel, SABRParameters};
 use finstack_core::dates::{
     BusinessDayConvention, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };

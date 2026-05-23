@@ -29,7 +29,7 @@
 //!   *Journal of Financial Economics*, 3(1-2), 167-179.
 
 use super::payoff::CapletFloorletInputs;
-use crate::instruments::common_impl::models::{d1_black76, d1_d2_black76};
+use crate::models::{d1_black76, d1_d2_black76};
 use finstack_core::math::{norm_cdf, norm_pdf};
 use finstack_core::money::Money;
 

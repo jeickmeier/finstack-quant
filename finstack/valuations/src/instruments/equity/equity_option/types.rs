@@ -503,15 +503,7 @@ impl EquityOption {
         };
         let k = self.strike;
         let target_unit = market_price / self.notional.amount();
-        crate::instruments::common_impl::models::bs_implied_vol(
-            spot,
-            k,
-            r,
-            q,
-            t,
-            self.option_type,
-            target_unit,
-        )
+        crate::models::bs_implied_vol(spot, k, r, q, t, self.option_type, target_unit)
     }
 }
 

@@ -55,10 +55,10 @@ use finstack_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, InstrumentId};
 use finstack_valuations::calibration::hull_white::HullWhiteParams;
-use finstack_valuations::instruments::models::{HullWhiteTree, HullWhiteTreeConfig};
 use finstack_valuations::instruments::rates::exotics_shared::RateExoticMcConfig;
 use finstack_valuations::instruments::rates::tarn::{Tarn, TarnPricer};
 use finstack_valuations::metrics::MetricId;
+use finstack_valuations::models::{HullWhiteTree, HullWhiteTreeConfig};
 use finstack_valuations::pricer::Pricer;
 use time::Month;
 

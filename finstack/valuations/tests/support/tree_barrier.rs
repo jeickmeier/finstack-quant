@@ -1,4 +1,4 @@
-use crate::instruments::common_impl::models::trees::BinomialTree;
+use crate::models::trees::BinomialTree;
 use crate::instruments::OptionMarketParams;
 
 #[test]

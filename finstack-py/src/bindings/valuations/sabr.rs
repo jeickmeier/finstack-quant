@@ -1,6 +1,6 @@
 //! SABR (Stochastic Alpha Beta Rho) volatility bindings.
 //!
-//! Exposes four classes from `finstack_valuations::instruments::models::volatility::sabr`:
+//! Exposes four classes from `finstack_valuations::models::volatility::sabr`:
 //!
 //! * [`SabrParameters`] — the four canonical parameters `(alpha, beta, nu, rho)`
 //!   plus an optional `shift` for negative-rate environments.
@@ -19,7 +19,7 @@
 //! functions; class-name casing is left to the binding layer.
 
 use crate::errors::display_to_py;
-use finstack_valuations::instruments::models::volatility::sabr::{
+use finstack_valuations::models::volatility::sabr::{
     SABRCalibrator, SABRModel, SABRParameters, SABRSmile,
 };
 use pyo3::exceptions::PyValueError;

@@ -1,8 +1,8 @@
 use super::super::super::super::types::Bond;
 use super::TreePricer;
-use crate::instruments::common_impl::models::trees::hull_white_tree::HullWhiteTree;
-use crate::instruments::common_impl::models::trees::tree_framework::map_date_to_step;
-use crate::instruments::common_impl::models::{NodeState, TreeValuator};
+use crate::models::trees::hull_white_tree::HullWhiteTree;
+use crate::models::trees::tree_framework::map_date_to_step;
+use crate::models::{NodeState, TreeValuator};
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::Result;

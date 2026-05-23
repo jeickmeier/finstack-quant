@@ -181,7 +181,7 @@ pub(crate) fn compute_pv(
 
 // ========================= ANALYTICAL PRICER =========================
 
-use crate::instruments::common_impl::models::closed_form::barrier::{
+use crate::models::closed_form::barrier::{
     barrier_call_continuous, barrier_put_continuous, barrier_rebate_continuous, BarrierParams,
     BarrierType as AnalyticalBarrierType,
 };

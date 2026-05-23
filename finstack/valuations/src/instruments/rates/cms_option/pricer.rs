@@ -32,9 +32,9 @@
 //!   Wilmott Magazine, March, 38-44.
 //! - Hull, J. (2018). "Options, Futures, and Other Derivatives."
 
-use crate::instruments::common_impl::models::d1_d2_black76;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_option::types::CmsOption;
+use crate::models::d1_d2_black76;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
 };

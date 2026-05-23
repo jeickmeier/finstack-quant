@@ -1,17 +1,13 @@
 use super::super::super::super::types::Bond;
 use super::bond_valuator::BondValuator;
 use super::config::{TreeModelChoice, TreePricerConfig};
-use crate::instruments::common_impl::models::trees::hull_white_tree::{
-    HullWhiteTree, HullWhiteTreeConfig,
-};
-use crate::instruments::common_impl::models::trees::short_rate_tree::CalibrationResult;
-use crate::instruments::common_impl::models::trees::two_factor_rates_credit::{
-    RatesCreditConfig, RatesCreditTree,
-};
-use crate::instruments::common_impl::models::{
+use crate::instruments::pricing_overrides::OasPriceBasis;
+use crate::models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
+use crate::models::trees::short_rate_tree::CalibrationResult;
+use crate::models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
+use crate::models::{
     short_rate_keys, ShortRateTree, ShortRateTreeConfig, StateVariables, TreeModel,
 };
-use crate::instruments::pricing_overrides::OasPriceBasis;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::solver::{BrentSolver, Solver};
@@ -759,7 +755,7 @@ pub fn calculate_oas(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::models::trees::short_rate_tree::CalibrationResult;
+    use crate::models::trees::short_rate_tree::CalibrationResult;
 
     #[test]
     fn bdt_calibration_quality_rejects_fallbacks_and_large_error() {

@@ -1,6 +1,5 @@
 //! FX option pricer implementation using the Garman-Kohlhagen model.
 
-use crate::instruments::common_impl::models::{bs_greeks, bs_price};
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::fx::fx_option::FxOption;
 use crate::instruments::fx::shared::{
@@ -8,6 +7,7 @@ use crate::instruments::fx::shared::{
     collect_fx_option_inputs_no_vol as collect_shared_fx_option_inputs_no_vol,
     FxOptionInputRequest, FxSpotSource,
 };
+use crate::models::{bs_greeks, bs_price};
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
@@ -164,7 +164,7 @@ fn implied_vol_impl(
     let _ = initial_guess;
     let target_unit = target_price / inst.notional.amount();
 
-    crate::instruments::common_impl::models::bs_implied_vol(
+    crate::models::bs_implied_vol(
         spot,
         inst.strike,
         r_d,
@@ -244,7 +244,7 @@ fn compute_greeks_impl(
         inst.option_type,
         THETA_DAYS_PER_YEAR,
     );
-    let d1 = crate::instruments::common_impl::models::d1(spot, inst.strike, r_d, sigma, t, r_f);
+    let d1 = crate::models::d1(spot, inst.strike, r_d, sigma, t, r_f);
     let d2 = d1 - sigma * t.sqrt();
     let cdf_d1 = finstack_core::math::norm_cdf(d1);
     let cdf_d2 = finstack_core::math::norm_cdf(d2);

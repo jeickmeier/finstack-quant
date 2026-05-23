@@ -334,8 +334,8 @@ pub(super) fn cms_embedded_option_value(
     time_to_fixing: f64,
     option_type: crate::instruments::OptionType,
 ) -> f64 {
-    use crate::instruments::common_impl::models::d1_d2_black76;
     use crate::instruments::OptionType;
+    use crate::models::d1_d2_black76;
 
     let intrinsic = match option_type {
         OptionType::Call => (adjusted_forward - strike).max(0.0),

@@ -336,7 +336,7 @@ pub(crate) fn compute_pv(
 /// - Applies quanto drift adjustment using FX spot for vol lookup when available
 /// - Includes historical fixings in the accrual calculation for mid-life valuations
 pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) -> Result<Money> {
-    use crate::instruments::common_impl::models::volatility::black::d1_d2_black76;
+    use crate::models::volatility::black::d1_d2_black76;
     use finstack_core::math::special_functions::norm_cdf;
 
     inst.validate()?;

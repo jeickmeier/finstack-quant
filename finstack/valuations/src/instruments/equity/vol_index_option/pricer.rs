@@ -1,8 +1,8 @@
 //! Volatility index option pricer implementation.
 
-use crate::instruments::common_impl::models::volatility::black::{d1_black76, d2_black76};
 use crate::instruments::equity::vol_index_option::VolatilityIndexOption;
 use crate::instruments::OptionType;
+use crate::models::volatility::black::{d1_black76, d2_black76};
 use finstack_core::dates::{Date, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::norm_cdf;

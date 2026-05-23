@@ -956,7 +956,7 @@ pub fn npv_with_lrm_greeks(
 // ========================= ANALYTICAL PRICERS =========================
 
 use crate::instruments::common_impl::helpers::collect_black_scholes_inputs;
-use crate::instruments::common_impl::models::closed_form::asian::{
+use crate::models::closed_form::asian::{
     arithmetic_asian_call_tw, arithmetic_asian_put_tw, geometric_asian_call, geometric_asian_put,
 };
 
@@ -1283,11 +1283,9 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::models::closed_form::asian::{
-        geometric_asian_call, geometric_asian_put,
-    };
     use crate::instruments::exotics::asian_option::{AsianOption, AveragingMethod};
     use crate::instruments::OptionType;
+    use crate::models::closed_form::asian::{geometric_asian_call, geometric_asian_put};
     use finstack_core::currency::Currency;
     use finstack_core::dates::{Date, DayCount, DayCountContext};
     use finstack_core::market_data::scalars::MarketScalar;

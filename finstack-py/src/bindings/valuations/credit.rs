@@ -1,7 +1,7 @@
 //! Python bindings for structural credit model specifications.
 
 use crate::errors::display_to_py;
-use finstack_valuations::instruments::models::credit::{
+use finstack_valuations::models::credit::{
     CreditState, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec, MertonModel,
     OptimalToggle, ThresholdDirection, ToggleExerciseModel,
 };

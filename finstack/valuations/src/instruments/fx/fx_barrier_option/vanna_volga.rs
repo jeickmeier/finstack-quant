@@ -30,13 +30,13 @@
 //!   Volatilities." Risk, January 2007.
 //! - Wystup, U. (2006). "FX Options and Structured Products." Wiley.
 
-use crate::instruments::common_impl::models::closed_form::barrier::{
+use crate::instruments::common_impl::parameters::OptionType;
+use crate::models::closed_form::barrier::{
     barrier_call_continuous, barrier_put_continuous, barrier_touch_probability, BarrierParams,
     BarrierType as AnalyticalBarrierType,
 };
-use crate::instruments::common_impl::models::closed_form::vanilla::bs_price;
-use crate::instruments::common_impl::models::volatility::black::d1_d2;
-use crate::instruments::common_impl::parameters::OptionType;
+use crate::models::closed_form::vanilla::bs_price;
+use crate::models::volatility::black::d1_d2;
 
 /// Survival-probability weight for the Vanna-Volga barrier correction.
 ///

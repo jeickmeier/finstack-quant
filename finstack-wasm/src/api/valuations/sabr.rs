@@ -6,7 +6,7 @@
 //! `SABRParameters`).
 
 use crate::utils::to_js_err;
-use finstack_valuations::instruments::models::volatility::sabr::{
+use finstack_valuations::models::volatility::sabr::{
     SABRCalibrator, SABRModel, SABRParameters, SABRSmile,
 };
 use wasm_bindgen::prelude::*;

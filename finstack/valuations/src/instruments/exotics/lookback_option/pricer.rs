@@ -299,7 +299,7 @@ pub(crate) fn compute_pv(
 
 // ========================= ANALYTICAL PRICER =========================
 
-use crate::instruments::common_impl::models::closed_form::lookback::{
+use crate::models::closed_form::lookback::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
 };
@@ -575,12 +575,12 @@ impl Pricer for LookbackOptionAnalyticalPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::models::closed_form::lookback::{
+    use crate::instruments::exotics::lookback_option::{LookbackOption, LookbackType};
+    use crate::instruments::{Attributes, OptionType, PricingOverrides};
+    use crate::models::closed_form::lookback::{
         fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
         floating_strike_lookback_put,
     };
-    use crate::instruments::exotics::lookback_option::{LookbackOption, LookbackType};
-    use crate::instruments::{Attributes, OptionType, PricingOverrides};
     use finstack_core::currency::Currency;
     use finstack_core::dates::DayCount;
     use finstack_core::market_data::scalars::MarketScalar;

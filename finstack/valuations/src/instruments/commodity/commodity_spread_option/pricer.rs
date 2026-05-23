@@ -26,8 +26,8 @@
 //! - Kirk, E. (1995). "Correlation in the Energy Markets."
 
 use crate::instruments::commodity::commodity_spread_option::CommoditySpreadOption;
-use crate::instruments::common_impl::models::{black76_call, black76_put};
 use crate::instruments::OptionType;
+use crate::models::{black76_call, black76_put};
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;

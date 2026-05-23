@@ -1,6 +1,6 @@
 // Unit tests for Hull-White tree construction and calibration.
 
-use crate::instruments::common_impl::models::trees::{HullWhiteTree, HullWhiteTreeConfig};
+use crate::models::trees::{HullWhiteTree, HullWhiteTreeConfig};
 use finstack_core::dates::Date;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::math::interp::InterpStyle;

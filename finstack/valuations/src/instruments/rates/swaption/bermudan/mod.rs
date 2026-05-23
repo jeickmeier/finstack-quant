@@ -1,10 +1,10 @@
 //! Bermudan swaption pricer implementations.
 
 use crate::calibration::hull_white::HullWhiteParams;
-use crate::instruments::common_impl::models::trees::HullWhiteTree;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::swaption::pricing::BermudanSwaptionTreeValuator;
 use crate::instruments::rates::swaption::BermudanSwaption;
+use crate::models::trees::HullWhiteTree;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };

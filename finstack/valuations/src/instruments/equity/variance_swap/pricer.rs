@@ -1,7 +1,7 @@
-use crate::instruments::common_impl::models::closed_form::vanilla::bs_price;
 use crate::instruments::common_impl::parameters::market::OptionType;
 use crate::instruments::common_impl::pricing::variance_replication::carr_madan_forward_variance;
 use crate::instruments::equity::variance_swap::VarianceSwap;
+use crate::models::closed_form::vanilla::bs_price;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_core::{

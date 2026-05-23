@@ -1,4 +1,4 @@
-use crate::instruments::common_impl::models::SABRParameters as InternalSabrParameters;
+use crate::models::SABRParameters as InternalSabrParameters;
 use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_core::Result;
 

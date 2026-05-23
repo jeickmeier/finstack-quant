@@ -4,8 +4,8 @@
 //! (absolute rate units), which is common in low/negative-rate environments.
 
 use super::payoff::CapletFloorletInputs;
-use crate::instruments::common_impl::models::volatility::normal::{bachelier_price, d_bachelier};
 use crate::instruments::common_impl::parameters::OptionType;
+use crate::models::volatility::normal::{bachelier_price, d_bachelier};
 use finstack_core::math::{norm_cdf, norm_pdf};
 use finstack_core::money::Money;
 

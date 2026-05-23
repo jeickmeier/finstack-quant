@@ -30,10 +30,10 @@
 use crate::cashflow::traits::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
-use crate::instruments::common_impl::models::volatility::black::{d1_black76, d1_d2_black76};
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Attributes;
+use crate::models::volatility::black::{d1_black76, d1_d2_black76};
 use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, DayCount, DayCountContext};
 use finstack_core::market_data::context::MarketContext;

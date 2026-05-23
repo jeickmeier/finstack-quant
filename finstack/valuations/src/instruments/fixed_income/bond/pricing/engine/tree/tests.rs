@@ -229,10 +229,8 @@ fn test_bond_valuator_street_call_redemption_includes_accrued_interest() {
 
 #[test]
 fn test_rates_credit_default_lowers_price() {
-    use crate::instruments::common_impl::models::trees::two_factor_rates_credit::{
-        RatesCreditConfig, RatesCreditTree,
-    };
-    use crate::instruments::common_impl::models::StateVariables;
+    use crate::models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
+    use crate::models::StateVariables;
     use finstack_core::market_data::term_structures::HazardCurve;
 
     let bond = create_test_bond();
@@ -297,7 +295,7 @@ fn test_rates_credit_default_lowers_price() {
     let valuator_high = BondValuator::new(bond.clone(), &ctx_high, as_of, time_to_maturity, steps)
         .expect("valuator");
 
-    use crate::instruments::common_impl::models::TreeModel;
+    use crate::models::TreeModel;
     let disc_low = ctx_low
         .get_discount("USD-OIS")
         .expect("Discount curve should exist");

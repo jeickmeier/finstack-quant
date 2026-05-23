@@ -6,7 +6,7 @@ mod test_utils {
     ));
 }
 
-use crate::instruments::common_impl::models::closed_form::barrier::{
+use crate::models::closed_form::barrier::{
     barrier_rebate_continuous, BarrierParams, BarrierType as AnalyticalBarrierType,
 };
 use crate::instruments::exotics::barrier_option::BarrierType;

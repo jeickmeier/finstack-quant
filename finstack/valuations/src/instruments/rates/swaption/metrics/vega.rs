@@ -62,7 +62,7 @@ impl MetricCalculator for VegaCalculator {
         let normal_by_negative_rate = inputs.forward <= 0.0 || strike <= 0.0;
         let use_normal = normal_by_model || normal_by_negative_rate;
         let vega_raw = if use_normal {
-            use crate::instruments::common_impl::models::volatility::normal::d_bachelier;
+            use crate::models::volatility::normal::d_bachelier;
             // For the negative-rate fallback `inputs.sigma` is a lognormal vol;
             // convert it to a normal vol so the Bachelier d-value — and hence
             // the vega — is correctly scaled. (Vega here measures sensitivity
@@ -82,7 +82,7 @@ impl MetricCalculator for VegaCalculator {
             let d = d_bachelier(inputs.forward, strike, normal_sigma, inputs.time_to_expiry);
             finstack_core::math::norm_pdf(d) * inputs.time_to_expiry.sqrt()
         } else {
-            use crate::instruments::common_impl::models::d1_black76;
+            use crate::models::d1_black76;
             let d1 = d1_black76(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
             inputs.forward * finstack_core::math::norm_pdf(d1) * inputs.time_to_expiry.sqrt()
         };

@@ -55,7 +55,7 @@ fn golden_sabr_fixtures_from_existing_json_files() {
 pub(crate) fn run_sabr_fixture(
     fixture: &crate::golden::schema::GoldenFixture,
 ) -> Result<std::collections::BTreeMap<String, f64>, String> {
-    use finstack_valuations::instruments::models::{SABRModel, SABRParameters};
+    use finstack_valuations::models::{SABRModel, SABRParameters};
     use serde::Deserialize;
 
     /// Wire format for a single strike entry in the fixture inputs.

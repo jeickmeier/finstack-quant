@@ -189,8 +189,8 @@ pub struct ConvertibleGreeks {
     pub rho: f64,
 }
 
-impl From<crate::instruments::common_impl::models::TreeGreeks> for ConvertibleGreeks {
-    fn from(g: crate::instruments::common_impl::models::TreeGreeks) -> Self {
+impl From<crate::models::TreeGreeks> for ConvertibleGreeks {
+    fn from(g: crate::models::TreeGreeks) -> Self {
         Self {
             price: g.price,
             delta: g.delta,

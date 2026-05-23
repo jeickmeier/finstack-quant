@@ -16,7 +16,7 @@ use finstack_core::money::Money;
 
 // ========================= ANALYTICAL PRICER =========================
 
-use crate::instruments::common_impl::models::closed_form::quanto::{quanto_call, quanto_put};
+use crate::models::closed_form::quanto::{quanto_call, quanto_put};
 
 /// Helper to collect inputs for quanto option pricing.
 fn collect_quanto_inputs(

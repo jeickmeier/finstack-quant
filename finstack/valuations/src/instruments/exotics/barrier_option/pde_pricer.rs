@@ -30,9 +30,7 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 
-use crate::instruments::common_impl::models::pde::{
-    BoundaryCondition, Grid1D, PdeProblem1D, Solver1D,
-};
+use crate::models::pde::{BoundaryCondition, Grid1D, PdeProblem1D, Solver1D};
 
 /// Black-Scholes PDE with barrier enforcement via boundary conditions.
 ///
@@ -408,7 +406,7 @@ impl BarrierOptionPdePricer {
     /// Uses the same grid and Rannacher stepper as [`Self::price_knock_out`] so
     /// that `KI = Vanilla - KO` is a consistent finite-difference difference.
     fn price_vanilla(&self, grid: &Grid1D, inputs: VanillaPdeInputs) -> Result<f64, PricingError> {
-        use crate::instruments::common_impl::models::pde::BlackScholesPde;
+        use crate::models::pde::BlackScholesPde;
 
         let pde = BlackScholesPde {
             sigma: inputs.sigma,
@@ -545,7 +543,7 @@ mod tests {
     /// met by the Rannacher solve but breached by an oscillating CN solve.
     #[test]
     fn w01_rannacher_knock_out_matches_analytical_continuous() {
-        use crate::instruments::common_impl::models::closed_form::barrier::down_out_call;
+        use crate::models::closed_form::barrier::down_out_call;
 
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);
@@ -681,7 +679,7 @@ mod tests {
     /// the leading-order error so the parity is tight.
     #[test]
     fn w08_knock_in_parity_consistent_with_shared_grid() {
-        use crate::instruments::common_impl::models::closed_form::barrier::down_out_call;
+        use crate::models::closed_form::barrier::down_out_call;
 
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);

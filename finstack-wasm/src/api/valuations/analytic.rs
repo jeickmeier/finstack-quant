@@ -1,7 +1,7 @@
 //! Closed-form analytic option primitives (Black-Scholes, Black-76, implied vol).
 //!
 //! Thin wasm-bindgen wrappers around the Rust closed-form formulas in
-//! `finstack_valuations::instruments::models::closed_form`.
+//! `finstack_valuations::models::closed_form`.
 //!
 //! All rates are continuously compounded decimals; `sigma` is annualized vol;
 //! `t` is time to expiry in years. Greeks scale matches the Rust crate:
@@ -9,16 +9,14 @@
 //! `thetaDays` day-count (ACT/365 by default).
 
 use crate::utils::to_js_err;
-use finstack_valuations::instruments::models::closed_form::implied_vol::{
-    black76_implied_vol, bs_implied_vol,
-};
-use finstack_valuations::instruments::models::closed_form::{
+use finstack_valuations::instruments::OptionType;
+use finstack_valuations::models::closed_form::implied_vol::{black76_implied_vol, bs_implied_vol};
+use finstack_valuations::models::closed_form::{
     arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks, bs_price, down_in_call,
     down_out_call, fixed_strike_lookback_call, fixed_strike_lookback_put,
     floating_strike_lookback_call, floating_strike_lookback_put, geometric_asian_call,
     geometric_asian_put, quanto_call, quanto_put, up_in_call, up_out_call,
 };
-use finstack_valuations::instruments::OptionType;
 use wasm_bindgen::prelude::*;
 
 fn option_type(is_call: bool) -> OptionType {

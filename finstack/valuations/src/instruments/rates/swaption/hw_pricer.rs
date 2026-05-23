@@ -26,13 +26,13 @@
 //!   Practice*, Chapter 4.
 
 use crate::instruments::common_impl::helpers::year_fraction;
-use crate::instruments::common_impl::models::trees::{HullWhiteTree, HullWhiteTreeConfig};
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::exotics_shared::{
     resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fResolveRequest,
 };
 use crate::instruments::rates::swaption::types::Swaption;
+use crate::models::trees::{HullWhiteTree, HullWhiteTreeConfig};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };

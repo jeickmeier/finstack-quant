@@ -79,8 +79,8 @@
 //! # API Layers
 //!
 //! - **Public**: `finstack_valuations::instruments::*` — instrument types, shared traits
-//!   (`Instrument`, `CurveDependencies`, ...), parameter types, and the `pricing`/`models`
-//!   sub-modules for shared pricing infrastructure and model primitives.
+//!   (`Instrument`, `CurveDependencies`, ...), parameter types, and the `pricing`
+//!   submodule for shared pricing infrastructure.
 //! - **Internal**: `common_impl` is crate-private plumbing; nothing below it needs to be
 //!   referenced from outside the crate.
 //!
@@ -137,9 +137,8 @@
 //! - Bond-market accrued-interest conventions: `docs/REFERENCES.md#icma-rule-book`
 //! - Fixed-income risk and hedging intuition: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 
-// Common functionality (traits, macros, models, helpers)
+// Common functionality (traits, macros, helpers)
 #[macro_use]
-#[path = "common/mod.rs"]
 pub(crate) mod common_impl;
 
 mod marginable;
@@ -147,11 +146,6 @@ mod marginable;
 /// Shared pricing infrastructure (schedules, generic pricers, TRS engine, etc.).
 pub mod pricing {
     pub use super::common_impl::pricing::*;
-}
-
-/// Pricing models (closed-form, trees, volatility, Monte Carlo, etc.).
-pub mod models {
-    pub use super::common_impl::models::*;
 }
 
 /// Per-flow cashflow export with DF / survival / PV columns.

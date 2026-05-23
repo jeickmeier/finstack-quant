@@ -15,7 +15,7 @@
 //!
 //! - **Continuous monitoring**: Analytical formulas (Reiner & Rubinstein 1991)
 //! - **Discrete monitoring**: Monte Carlo with barrier adjustment
-//! - See [`models::closed_form::barrier`](crate::instruments::models::closed_form::barrier) for formulas
+//! - See [`models::closed_form::barrier`](crate::models::closed_form::barrier) for formulas
 //!
 //! # Discrete Barrier Correction
 //!
@@ -31,7 +31,7 @@
 //!
 //! - [`BarrierOption`] for instrument struct
 //! - [`BarrierType`] for up/down and in/out classification
-//! - [`models::closed_form::barrier`](crate::instruments::models::closed_form::barrier) for pricing
+//! - [`models::closed_form::barrier`](crate::models::closed_form::barrier) for pricing
 
 pub(crate) mod metrics;
 pub(crate) mod pde_pricer;

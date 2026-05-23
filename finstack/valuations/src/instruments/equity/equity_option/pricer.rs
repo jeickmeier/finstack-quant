@@ -7,11 +7,11 @@
 //! instrument definitions.
 
 use crate::instruments::common_impl::helpers::year_fraction;
-use crate::instruments::common_impl::models::trees::binomial_tree::BinomialTree;
-use crate::instruments::common_impl::models::{bs_greeks, bs_price, BsGreeks};
 use crate::instruments::common_impl::parameters::{OptionMarketParams, OptionType};
 use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::instruments::ExerciseStyle;
+use crate::models::trees::binomial_tree::BinomialTree;
+use crate::models::{bs_greeks, bs_price, BsGreeks};
 use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, DayCount};
 use finstack_core::market_data::context::MarketContext;
@@ -798,10 +798,10 @@ impl crate::pricer::Pricer for SimpleEquityOptionBlackPricer {
 
 // ========================= HESTON FOURIER PRICER =========================
 
-use crate::instruments::common_impl::models::closed_form::heston::{
+use crate::instruments::common_impl::traits::Instrument;
+use crate::models::closed_form::heston::{
     heston_call_price_fourier, heston_put_price_fourier, HestonParams,
 };
-use crate::instruments::common_impl::traits::Instrument;
 
 /// Equity option Heston semi-analytical pricer (Fourier inversion).
 pub(crate) struct EquityOptionHestonFourierPricer;

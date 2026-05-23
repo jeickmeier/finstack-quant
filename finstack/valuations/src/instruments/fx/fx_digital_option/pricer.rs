@@ -1,11 +1,11 @@
 //! FX digital option pricer implementation.
 
-use crate::instruments::common_impl::models::volatility::black::d1_d2;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::fx::fx_digital_option::types::{DigitalPayoutType, FxDigitalOption};
 use crate::instruments::fx::shared::{
     collect_fx_option_inputs, FxOptionInputRequest, FxSpotSource,
 };
+use crate::models::volatility::black::d1_d2;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
@@ -514,7 +514,7 @@ mod tests {
     /// relative to the analytic result.
     #[test]
     fn w46_cash_or_nothing_theta_is_analytic_not_finite_difference() {
-        use crate::instruments::common_impl::models::volatility::black::d1_d2;
+        use crate::models::volatility::black::d1_d2;
 
         // Near-ATM inputs where non-linearity in t is highest.
         let spot = 1.20_f64;

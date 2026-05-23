@@ -6,7 +6,7 @@
 //! exports are flat by `js_name`, so this is a pure source reorganisation.
 
 use crate::utils::{check_js_safe_count, to_js_err};
-use finstack_valuations::instruments::models::credit::{
+use finstack_valuations::models::credit::{
     CreditState, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec, MertonModel,
     OptimalToggle, ThresholdDirection, ToggleExerciseModel,
 };

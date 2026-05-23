@@ -63,11 +63,11 @@
 //!   (2nd ed.). Springer. §13.7.
 //! - Hagan, P. S. (2003). "Convexity Conundrums." *Wilmott Magazine*, March, 38–44.
 
-use crate::instruments::common_impl::models::{black76_call, black76_put};
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_option::types::CmsOption;
 use crate::instruments::OptionType;
+use crate::models::{black76_call, black76_put};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
 };

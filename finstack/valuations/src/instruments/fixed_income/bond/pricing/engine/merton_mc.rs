@@ -1,9 +1,9 @@
 //! Merton Monte Carlo engine for PIK bonds with structural credit risk.
 //!
-//! Orchestrates [`crate::instruments::models::credit::MertonModel`],
-//! [`crate::instruments::models::credit::EndogenousHazardSpec`],
-//! [`crate::instruments::models::credit::DynamicRecoverySpec`], and
-//! [`crate::instruments::models::credit::ToggleExerciseModel`] into a
+//! Orchestrates [`crate::models::credit::MertonModel`],
+//! [`crate::models::credit::EndogenousHazardSpec`],
+//! [`crate::models::credit::DynamicRecoverySpec`], and
+//! [`crate::models::credit::ToggleExerciseModel`] into a
 //! unified Monte Carlo simulation for pricing bonds with PIK (payment-in-kind)
 //! features.
 //!
@@ -24,7 +24,7 @@
 //! This module is part of the standard valuations build and is selected through
 //! `ModelKey::MertonMc`.
 
-use crate::instruments::models::credit::{
+use crate::models::credit::{
     AssetDynamics, BarrierType, CreditState, DynamicRecoverySpec, EndogenousHazardSpec,
     MertonModel, ToggleExerciseModel,
 };
@@ -1023,7 +1023,7 @@ pub mod calibration {
     use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
     use crate::instruments::fixed_income::bond::types::Bond;
     use crate::instruments::fixed_income::bond::CashflowSpec;
-    use crate::instruments::models::credit::{AssetDynamics, BarrierType, MertonModel};
+    use crate::models::credit::{AssetDynamics, BarrierType, MertonModel};
     use finstack_core::dates::Date;
     use finstack_core::market_data::context::MarketContext;
     use finstack_core::{InputError, Result};
@@ -1282,8 +1282,8 @@ pub mod calibration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::models::credit::toggle_exercise::ThresholdDirection;
-    use crate::instruments::models::credit::{
+    use crate::models::credit::toggle_exercise::ThresholdDirection;
+    use crate::models::credit::{
         AssetDynamics, BarrierType, CreditStateVariable, DynamicRecoverySpec, EndogenousHazardSpec,
         MertonModel, ToggleExerciseModel,
     };

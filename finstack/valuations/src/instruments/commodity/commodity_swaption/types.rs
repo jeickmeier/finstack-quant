@@ -456,12 +456,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             return Ok(Some(0.0));
         }
 
-        let d1 = crate::instruments::common_impl::models::d1_black76(
-            forward,
-            self.fixed_price,
-            sigma,
-            t,
-        );
+        let d1 = crate::models::d1_black76(forward, self.fixed_price, sigma, t);
         let nd1 = norm_cdf(d1);
 
         let delta_unit = match self.option_type {
@@ -546,12 +541,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
 
         let forward = self.forward_swap_rate(market, as_of)?;
         let annuity = self.annuity(market, as_of)?;
-        let d1 = crate::instruments::common_impl::models::d1_black76(
-            forward,
-            self.fixed_price,
-            sigma,
-            t,
-        );
+        let d1 = crate::models::d1_black76(forward, self.fixed_price, sigma, t);
         // Vega = annuity * F * N'(d1) * sqrt(T) * 0.01 (per vol point)
         let vega_abs = annuity * forward * norm_pdf(d1) * t.sqrt();
         Ok(Some(vega_abs * 0.01 * self.notional))
@@ -580,8 +570,8 @@ fn black76_swaption_price(
         return intrinsic * annuity;
     }
 
-    let d1 = crate::instruments::common_impl::models::d1_black76(forward, strike, sigma, t);
-    let d2 = crate::instruments::common_impl::models::d2_black76(forward, strike, sigma, t);
+    let d1 = crate::models::d1_black76(forward, strike, sigma, t);
+    let d2 = crate::models::d2_black76(forward, strike, sigma, t);
 
     let price = match option_type {
         OptionType::Call => {

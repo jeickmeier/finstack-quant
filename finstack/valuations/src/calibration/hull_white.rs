@@ -49,7 +49,7 @@ use crate::calibration::solver::global::GlobalFitOptimizer;
 use crate::calibration::solver::multi_start::MultiStartConfig;
 use crate::calibration::solver::traits::GlobalSolveTarget;
 use crate::calibration::CalibrationReport;
-use crate::instruments::common_impl::models::trees::HullWhiteTreeConfig;
+use crate::models::trees::HullWhiteTreeConfig;
 
 /// Hull-White one-factor model parameters.
 ///

@@ -1,9 +1,9 @@
 use crate::instruments::common_impl::helpers::zero_rate_from_df;
-use crate::instruments::common_impl::models::bs_price;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::pricing::variance_replication::carr_madan_forward_variance;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::fx_variance_swap::FxVarianceSwap;
+use crate::models::bs_price;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_core::{

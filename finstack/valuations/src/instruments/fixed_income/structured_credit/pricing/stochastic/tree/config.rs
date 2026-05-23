@@ -9,8 +9,8 @@ use super::super::{
     correlation::CorrelationStructure, default::StochasticDefaultSpec,
     prepayment::StochasticPrepaySpec,
 };
-use crate::instruments::common_impl::models::correlation::factor_model::FactorSpec;
-use crate::instruments::common_impl::models::correlation::recovery::RecoverySpec;
+use crate::correlation::factor_model::FactorSpec;
+use crate::correlation::recovery::RecoverySpec;
 
 const MAX_NODE_CAPACITY: usize = 50_000_000;
 

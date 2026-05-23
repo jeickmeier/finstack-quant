@@ -291,7 +291,7 @@ mod gbm_barrier {
 /// The genuine `SABRModel` (the production pricer type) is exercised — not a
 /// re-implementation.
 mod sabr_beta {
-    use finstack_valuations::instruments::models::{SABRModel, SABRParameters};
+    use finstack_valuations::models::{SABRModel, SABRParameters};
 
     /// **β=1 ATM, ν=0 ⇒ vol = α, for any forward.**
     ///

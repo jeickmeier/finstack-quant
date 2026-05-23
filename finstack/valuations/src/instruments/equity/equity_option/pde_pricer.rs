@@ -15,8 +15,8 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 
-use crate::instruments::common_impl::models::pde::{BlackScholesPde, Grid1D, Solver1D};
 use crate::instruments::common_impl::parameters::OptionType;
+use crate::models::pde::{BlackScholesPde, Grid1D, Solver1D};
 
 /// Equity option pricer using 1D PDE (Crank-Nicolson) with Black-Scholes dynamics.
 ///

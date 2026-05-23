@@ -8,7 +8,7 @@ mod test_utils {
     ));
 }
 
-use crate::instruments::common_impl::models::closed_form::asian::{
+use crate::models::closed_form::asian::{
     geometric_asian_call, geometric_asian_put,
 };
 use crate::instruments::exotics::asian_option::{AsianOption, AveragingMethod};

@@ -1,7 +1,6 @@
 //! Commodity option instrument definition and pricing logic.
 
 use crate::impl_instrument_base;
-use crate::instruments::common_impl::models::trees::binomial_tree::BinomialTree;
 use crate::instruments::common_impl::parameters::{
     CommodityConvention, CommodityUnderlyingParams, OptionMarketParams,
 };
@@ -9,6 +8,7 @@ use crate::instruments::common_impl::traits::{
     Attributes, CurveDependencies, Instrument, InstrumentCurves,
 };
 use crate::instruments::{ExerciseStyle, OptionType, PricingOverrides, SettlementType};
+use crate::models::trees::binomial_tree::BinomialTree;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, DayCount, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
@@ -524,8 +524,8 @@ fn black76_unit_price(
         return intrinsic * df;
     }
 
-    let d1 = crate::instruments::common_impl::models::d1_black76(forward, strike, sigma, t);
-    let d2 = crate::instruments::common_impl::models::d2_black76(forward, strike, sigma, t);
+    let d1 = crate::models::d1_black76(forward, strike, sigma, t);
+    let d2 = crate::models::d2_black76(forward, strike, sigma, t);
 
     let price = match option_type {
         OptionType::Call => {
@@ -730,8 +730,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         let forward = self.forward_price(market, as_of)?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let df = disc.df_between_dates(as_of, self.expiry)?;
-        let d1 =
-            crate::instruments::common_impl::models::d1_black76(forward, self.strike, sigma, t);
+        let d1 = crate::models::d1_black76(forward, self.strike, sigma, t);
         let nd1 = norm_cdf(d1);
 
         let delta_unit = match self.option_type {
@@ -770,8 +769,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         let forward = self.forward_price(market, as_of)?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let df = disc.df_between_dates(as_of, self.expiry)?;
-        let d1 =
-            crate::instruments::common_impl::models::d1_black76(forward, self.strike, sigma, t);
+        let d1 = crate::models::d1_black76(forward, self.strike, sigma, t);
         let vega_abs = df * forward * norm_pdf(d1) * t.sqrt();
         Ok(Some(vega_abs * 0.01 * self.quantity * self.multiplier))
     }

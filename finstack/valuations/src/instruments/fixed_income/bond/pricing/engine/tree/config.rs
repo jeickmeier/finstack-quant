@@ -1,6 +1,6 @@
 use super::super::super::super::types::Bond;
-use crate::instruments::common_impl::models::trees::TreeCompounding;
 use crate::instruments::pricing_overrides::{OasPriceBasis, OasQuoteCompounding};
+use crate::models::trees::TreeCompounding;
 use finstack_core::types::CurveId;
 use finstack_core::types::Percentage;
 

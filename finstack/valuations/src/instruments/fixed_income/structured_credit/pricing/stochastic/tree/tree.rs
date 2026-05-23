@@ -9,8 +9,8 @@ use super::{
     config::ScenarioTreeConfig,
     node::{ScenarioNode, ScenarioNodeId, ScenarioPath},
 };
-use crate::instruments::common_impl::models::correlation::factor_model::FactorSpec;
-use crate::instruments::common_impl::models::correlation::recovery::RecoverySpec;
+use crate::correlation::factor_model::FactorSpec;
+use crate::correlation::recovery::RecoverySpec;
 use finstack_core::math::standard_normal_inv_cdf;
 use finstack_core::HashMap;
 
@@ -95,7 +95,7 @@ impl ScenarioTree {
     /// Build the tree using recombining trinomial branching.
     ///
     /// Mirrors the shared lattice geometry implemented in
-    /// `common::models::trees::trinomial_tree` to keep node growth at O(n²).
+    /// `crate::models::trees` to keep node growth at O(n²).
     fn build_recombining_tree(&mut self) -> Result<(), String> {
         let mut layer_map: HashMap<(usize, i32), usize> = HashMap::default();
         layer_map.insert((0, 0), 0);

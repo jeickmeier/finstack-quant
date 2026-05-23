@@ -9,16 +9,14 @@
 //!   credit-spread tree path
 //! - Apply `PricingOverrides::call_friction_cents` as an exercise threshold uplift
 
-use crate::instruments::common_impl::models::trees::two_factor_rates_credit::{
-    RatesCreditConfig, RatesCreditTree,
-};
-use crate::instruments::common_impl::models::{
-    short_rate_keys, NodeState, ShortRateTree, ShortRateTreeConfig, StateVariables, TreeModel,
-    TreeValuator,
-};
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::term_loan::cashflows::generate_cashflows;
 use crate::instruments::fixed_income::term_loan::TermLoan;
+use crate::models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
+use crate::models::{
+    short_rate_keys, NodeState, ShortRateTree, ShortRateTreeConfig, StateVariables, TreeModel,
+    TreeValuator,
+};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
 };

@@ -16,9 +16,9 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 
-use crate::instruments::common_impl::models::closed_form::heston::HestonParams as ClosedFormHestonParams;
-use crate::instruments::common_impl::models::pde::{Grid1D, Grid2D, HestonPde, Solver2D};
 use crate::instruments::common_impl::parameters::OptionType;
+use crate::models::closed_form::heston::HestonParams as ClosedFormHestonParams;
+use crate::models::pde::{Grid1D, Grid2D, HestonPde, Solver2D};
 
 /// Equity option pricer using 2D ADI PDE (Modified Craig-Sneyd) with Heston
 /// stochastic volatility dynamics.

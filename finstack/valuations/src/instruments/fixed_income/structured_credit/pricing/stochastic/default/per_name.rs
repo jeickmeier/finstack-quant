@@ -28,9 +28,7 @@
 //! [`PoolGranularity`] for pools granular enough that the limit is an
 //! acceptable, faster approximation.
 
-use crate::instruments::common_impl::models::correlation::copula::{
-    Copula, CopulaSpec, GaussianCopula,
-};
+use crate::correlation::copula::{Copula, CopulaSpec, GaussianCopula};
 use finstack_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
 use finstack_monte_carlo::rng::philox::PhiloxRng;
 use finstack_monte_carlo::traits::RandomStream;

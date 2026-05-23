@@ -1,6 +1,6 @@
 //! Closed-form analytic option primitives (Black-Scholes, Black-76, implied vol).
 //!
-//! Thin wrappers around `finstack_valuations::instruments::models::closed_form`
+//! Thin wrappers around `finstack_valuations::models::closed_form`
 //! that expose the per-unit pricing and Greek formulas to Python without
 //! requiring a full `MarketContext` / `Instrument` round trip.
 //!
@@ -14,16 +14,14 @@
 //!   want a business-day convention).
 
 use crate::errors::display_to_py;
-use finstack_valuations::instruments::models::closed_form::implied_vol::{
-    black76_implied_vol, bs_implied_vol,
-};
-use finstack_valuations::instruments::models::closed_form::{
+use finstack_valuations::instruments::OptionType;
+use finstack_valuations::models::closed_form::implied_vol::{black76_implied_vol, bs_implied_vol};
+use finstack_valuations::models::closed_form::{
     arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks, bs_price, down_in_call,
     down_out_call, fixed_strike_lookback_call, fixed_strike_lookback_put,
     floating_strike_lookback_call, floating_strike_lookback_put, geometric_asian_call,
     geometric_asian_put, quanto_call, quanto_put, up_in_call, up_out_call, BsGreeks,
 };
-use finstack_valuations::instruments::OptionType;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;

@@ -1,6 +1,5 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::helpers::year_fraction;
-use crate::instruments::common_impl::models::SABRModel;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
@@ -9,6 +8,7 @@ use crate::instruments::rates::irs::{
     FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, PayReceive,
 };
 use crate::instruments::PricingOverrides;
+use crate::models::SABRModel;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_core::market_data::context::MarketContext;
@@ -576,7 +576,7 @@ impl Swaption {
                 return val * annuity;
             }
 
-            use crate::instruments::common_impl::models::{d1_black76, d2_black76};
+            use crate::models::{d1_black76, d2_black76};
             let d1 = d1_black76(fwd, strike, vol, t);
             let d2 = d2_black76(fwd, strike, vol, t);
 
@@ -603,7 +603,7 @@ impl Swaption {
         as_of: Date,
     ) -> Result<Money> {
         self.price_model_base(curves, volatility, as_of, |fwd, strike, vol, t, annuity| {
-            use crate::instruments::common_impl::models::volatility::normal::bachelier_price;
+            use crate::models::volatility::normal::bachelier_price;
             bachelier_price(self.option_type, fwd, strike, vol, t, annuity)
         })
     }

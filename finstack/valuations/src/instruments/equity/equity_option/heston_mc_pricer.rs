@@ -4,10 +4,10 @@
 //! using Monte Carlo simulation with the QE (Quadratic Exponential) discretization
 //! scheme.
 
-use crate::instruments::common_impl::models::closed_form::heston::HestonParams as ClosedFormHestonParams;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::equity_option::pricer::collect_inputs_extended;
 use crate::instruments::equity::equity_option::types::EquityOption;
+use crate::models::closed_form::heston::HestonParams as ClosedFormHestonParams;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
 };

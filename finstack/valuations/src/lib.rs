@@ -229,9 +229,9 @@
 //! - `finstack-attribution`: P&L attribution analysis built on valuation results
 //! - [`finstack_covenants`]: Covenant checking for structured products
 //! - [`finstack_cashflows`]: Advanced cashflow schedule builders
-//! - [`crate::instruments`]: Shared traits and parameters, plus the
-//!   [`crate::instruments::pricing`] and [`crate::instruments::models`]
-//!   submodules for reusable schedules, pricing helpers, models, and MC primitives
+//! - [`crate::instruments`]: Shared traits and parameters, plus
+//!   [`crate::instruments::pricing`] for reusable schedules and pricing helpers
+//! - [`crate::models`]: Reusable pricing-model and numerical-method primitives
 //! - [`crate::market`]: Market quote schemas and conventions
 //! - [`crate::calibration::bumps`]: Shared re-calibration helpers for scenarios
 //!
@@ -368,6 +368,8 @@ pub mod correlation;
 pub mod error;
 /// Market quotes and conventions
 pub mod market;
+/// Pricing models and numerical methods.
+pub mod models;
 /// Convenient re-exports for pricing and risk calculations.
 pub mod prelude;
 /// Pricing dispatch and registry infrastructure.

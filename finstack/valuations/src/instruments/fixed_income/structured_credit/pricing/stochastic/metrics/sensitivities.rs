@@ -238,7 +238,7 @@ fn bump_recovery_correlation(
     config: &ScenarioTreeConfig,
     bump: f64,
 ) -> Result<ScenarioTreeConfig, String> {
-    use crate::instruments::common_impl::models::correlation::recovery::RecoverySpec;
+    use crate::correlation::recovery::RecoverySpec;
 
     let mut new_config = config.clone();
 
@@ -264,7 +264,7 @@ fn bump_prepay_volatility(
     config: &ScenarioTreeConfig,
     bump: f64,
 ) -> Result<ScenarioTreeConfig, String> {
-    use crate::instruments::common_impl::models::correlation::factor_model::FactorSpec;
+    use crate::correlation::factor_model::FactorSpec;
 
     let mut new_config = config.clone();
 

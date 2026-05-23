@@ -152,7 +152,7 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
         })
     }
 
-    fn tree(&self) -> &crate::instruments::common_impl::models::trees::HullWhiteTree {
+    fn tree(&self) -> &crate::models::trees::HullWhiteTree {
         self.model.tree().as_ref()
     }
 
