@@ -90,32 +90,6 @@ pub(crate) fn normalize_registry_id(id: &str) -> String {
     id.trim().to_string()
 }
 
-/// Build a lookup map from a registry file while mapping records to a derived value.
-pub(crate) fn build_lookup_map_mapped<R, K, V: Clone>(
-    file: RegistryFile<R>,
-    normalize_id: impl Fn(&str) -> K,
-    map_record: impl Fn(&R) -> V,
-) -> Result<HashMap<K, V>, Error>
-where
-    K: std::hash::Hash + Eq + std::fmt::Display,
-{
-    let mut map: HashMap<K, V> = HashMap::default();
-    for entry in file.entries {
-        let value = map_record(&entry.record);
-        for id in entry.ids {
-            let key = normalize_id(&id);
-            if map.contains_key(&key) {
-                return Err(Error::Validation(format!(
-                    "Duplicate registry id after normalization: '{}' (from '{}')",
-                    key, id
-                )));
-            }
-            map.insert(key, value.clone());
-        }
-    }
-    Ok(map)
-}
-
 /// Parse a JSON convention registry, convert each record, and re-key using a domain ID wrapper.
 ///
 /// This is the canonical helper for all simple convention loaders. It handles:
@@ -134,7 +108,7 @@ pub(crate) fn parse_and_rekey<R, Id, V>(
     map_record: impl Fn(&R) -> Result<V, Error>,
 ) -> Result<HashMap<Id, V>, Error>
 where
-    R: Clone + for<'de> serde::Deserialize<'de>,
+    R: for<'de> serde::Deserialize<'de>,
     Id: std::hash::Hash + Eq,
     V: Clone,
 {
@@ -145,11 +119,21 @@ where
     })?;
     file.validate_metadata(registry_name)?;
 
-    let string_map = build_lookup_map_mapped(file, normalize_registry_id, |rec| map_record(rec))?;
-
     let mut final_map = HashMap::default();
-    for (k, v) in string_map {
-        final_map.insert(make_id(k), v?);
+    let mut seen_ids: HashMap<String, ()> = HashMap::default();
+    for entry in file.entries {
+        let value = map_record(&entry.record)?;
+        for id in entry.ids {
+            let key = normalize_registry_id(&id);
+            if seen_ids.insert(key.clone(), ()).is_some() {
+                return Err(Error::Validation(format!(
+                    "Duplicate registry id after normalization: '{}' (from '{}')",
+                    key, id
+                )));
+            }
+            final_map.insert(make_id(key), value.clone());
+        }
     }
+
     Ok(final_map)
 }

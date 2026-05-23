@@ -7,17 +7,21 @@ source modules and documents how to extend the crate.
 
 | Path | Role | Public surface |
 |------|------|----------------|
-| `lib.rs` | Crate root; re-exports | `Performance`, `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult`, `CagrBasis`, `AnnualizationConvention`, `DatedSeries`, `RollingSharpe`, `RollingSortino`, `RollingVolatility`, `beta` |
+| `lib.rs` | Crate root; re-exports | `Performance`, `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult`, `CagrBasis`, `AnnualizationConvention`, `DatedSeries`, `RollingSharpe`, `RollingSortino`, `RollingVolatility`, `beta`, `correlation` |
 | `performance/` | Stateful orchestrator | `Performance`, `LookbackReturns` |
 | `risk_metrics/` | Return-based, tail, rolling metrics | Config and rolling result types only |
 | `benchmark.rs` | Benchmark-relative metrics | `beta`, result types |
+| `correlation/` | Row-major correlation validation and repair | Shared Rust infrastructure for valuations and factor-model crates; Python/WASM bindings live under valuations |
 | `drawdown.rs` | Drawdown paths and ratios | `DrawdownEpisode` |
 | `returns.rs` | Simple/excess/compounded returns | crate-internal |
 | `aggregation.rs` | Group-by-period stats | `PeriodStats` |
 | `lookback.rs` | MTD/QTD/YTD/FYTD index ranges | crate-internal |
 
-Building-block functions are `pub(crate)`. New callers should use `Performance`,
-not the free functions directly.
+Performance building-block functions are `pub(crate)`. New analytics callers
+should use `Performance`, not the free functions directly. The public
+`correlation` module is the exception: it is shared infrastructure for crates
+that need row-major correlation validation or repair without depending on
+`finstack-valuations`.
 
 ## `Performance` shape
 
@@ -30,7 +34,8 @@ not the free functions directly.
 ## Adding a scalar metric
 
 1. Add a pure function in the closest module (`returns`, `risk_metrics/return_based`, `risk_metrics/tail_risk`, `drawdown`, `benchmark`, or `aggregation`).
-2. Keep it `pub(crate)` unless it must be shared cross-crate (today only `beta` is public).
+2. Keep it `pub(crate)` unless it must be shared cross-crate (today only `beta`
+   and `correlation` are public outside the `Performance` facade).
 3. Add a thin `impl Performance` method in `performance/scalar.rs`, `performance/benchmark.rs`, or the relevant `performance/` submodule.
 4. Add unit tests in the building-block module.
 5. Wire Python/WASM bindings and `parity_contract.toml` when exposing the metric externally.

@@ -87,3 +87,4 @@ pub use build::cds::build_cds_instrument;
 pub use build::cds_tranche::{build_cds_tranche_instrument, CDSTrancheBuildOverrides};
 pub use build::context::BuildCtx;
 pub use build::rates::build_rate_instrument;
+pub use build::xccy::build_xccy_instrument;

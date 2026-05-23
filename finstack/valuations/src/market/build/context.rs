@@ -26,14 +26,11 @@ use crate::instruments::rates::irs::FloatingLegCompounding;
 /// |---------|---------------|---------------------|
 /// | **Rates** | `"discount"`, `"forward"` | *(none -- errors if missing)* |
 /// | **CDS** | `"discount"`, `"credit"` | *(none -- errors if missing)* |
-/// | **Bond** | *(none at context level)* | `"discount"` (falls back to convention's `default_discount_curve_id`) |
-/// | **FX** | *(none at context level)* | `"domestic_discount"`, `"foreign_discount"` (fall back to `"{CCY}-OIS"`) |
 /// | **XCCY** | *(none at context level)* | `"domestic_discount"`, `"foreign_discount"`, `"domestic_forward"`, `"foreign_forward"` (convention-derived defaults) |
 /// | **CDS Tranche** | `"discount"`, `"credit"` | *(none -- errors if missing)* |
 ///
-/// Blank entries in the **Required roles** column mean the builder can derive or
-/// default the relevant IDs from conventions or currencies. They do **not** mean
-/// the curve is economically irrelevant to the built instrument.
+/// This table covers the public quote-to-instrument builders re-exported from
+/// `crate::market`. Internal builders may use additional roles.
 ///
 /// # Examples
 ///
@@ -52,7 +49,7 @@ use crate::instruments::rates::irs::FloatingLegCompounding;
 /// assert_eq!(ctx.curve_id("discount"), Some("USD-OIS"));
 /// ```
 ///
-/// With default curve fallback:
+/// Minimal context with no curve roles:
 /// ```rust
 /// use finstack_valuations::market::BuildCtx;
 /// use finstack_core::dates::Date;
@@ -61,7 +58,7 @@ use crate::instruments::rates::irs::FloatingLegCompounding;
 /// let ctx = BuildCtx::new(
 ///     Date::from_calendar_date(2024, time::Month::January, 2).unwrap(),
 ///     1_000_000.0,
-///     HashMap::default(), // Empty - builders will use currency-based defaults
+///     HashMap::default(), // Builders that require roles will fail closed.
 /// );
 /// ```
 #[derive(Debug, Clone)]
@@ -84,8 +81,8 @@ pub struct BuildCtx {
     /// - `"credit"`: Credit curve for CDS instruments
     ///
     /// Missing-role behavior is builder-specific:
-    /// - rates and CDS builders error when required roles are absent
-    /// - bond, FX, and XCCY builders may derive defaults from conventions or currencies
+    /// - rates, CDS, and CDS tranche builders error when required roles are absent
+    /// - XCCY can derive curve IDs from conventions or currencies when roles are absent
     ///
     /// Do not assume that a missing role always falls back to a currency-based ID.
     /// Consult the builder-specific docs when the distinction matters.

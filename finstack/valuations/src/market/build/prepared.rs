@@ -2,17 +2,13 @@
 
 use crate::instruments::DynInstrument;
 use crate::market::build::cds::{build_cds_instrument, resolve_cds_quote_dates};
-use crate::market::build::helpers::{resolve_calendar, resolve_spot_date};
-use crate::market::build::rates::build_rate_instrument;
+use crate::market::build::rates::{build_rate_instrument, resolve_rate_quote_dates};
 use crate::market::build::xccy::build_xccy_instrument;
-use crate::market::conventions::registry::ConventionRegistry;
 use crate::market::quotes::cds::CdsQuote;
-use crate::market::quotes::ids::Pillar;
 use crate::market::quotes::rates::RateQuote;
 use crate::market::quotes::xccy::XccyQuote;
 use crate::market::BuildCtx;
-use finstack_core::dates::{adjust, Date, DateExt};
-use finstack_core::dates::{DayCount, DayCountContext, TenorUnit};
+use finstack_core::dates::{Date, DayCount, DayCountContext};
 use finstack_core::Result;
 use std::fmt;
 use std::sync::Arc;
@@ -139,7 +135,8 @@ pub(crate) fn prepare_rate_quote(
     base_date: Date,
     swap_use_payment_delay: bool,
 ) -> Result<PreparedQuote<RateQuote>> {
-    let maturity_date = rate_quote_pillar_date(&quote, build_ctx, swap_use_payment_delay)?;
+    let maturity_date =
+        resolve_rate_quote_dates(&quote, build_ctx, swap_use_payment_delay)?.pillar_date();
     let instrument = build_rate_instrument(&quote, build_ctx)?;
     let instrument: Arc<DynInstrument> = instrument.into();
 
@@ -152,92 +149,6 @@ pub(crate) fn prepare_rate_quote(
         maturity_date,
         pillar_time,
     ))
-}
-
-fn rate_quote_pillar_date(
-    quote: &RateQuote,
-    build_ctx: &BuildCtx,
-    swap_use_payment_delay: bool,
-) -> Result<Date> {
-    let registry = ConventionRegistry::try_global()?;
-    match quote {
-        RateQuote::Deposit { index, pillar, .. } => {
-            let conv = registry.require_rate_index(index)?;
-            let spot = resolve_spot_date(
-                build_ctx.as_of(),
-                &conv.market_calendar_id,
-                conv.market_settlement_days,
-                conv.market_business_day_convention,
-            )?;
-            let cal = resolve_calendar(&conv.market_calendar_id)?;
-            match pillar {
-                Pillar::Tenor(t) => {
-                    t.add_to_date(spot, Some(cal), conv.market_business_day_convention)
-                }
-                Pillar::Date(d) => adjust(*d, conv.market_business_day_convention, cal),
-            }
-        }
-        RateQuote::Fra {
-            index, end: pillar, ..
-        } => {
-            let conv = registry.require_rate_index(index)?;
-            let spot = resolve_spot_date(
-                build_ctx.as_of(),
-                &conv.market_calendar_id,
-                conv.market_settlement_days,
-                conv.market_business_day_convention,
-            )?;
-            let cal = resolve_calendar(&conv.market_calendar_id)?;
-            match pillar {
-                Pillar::Tenor(t) => {
-                    t.add_to_date(spot, Some(cal), conv.market_business_day_convention)
-                }
-                Pillar::Date(d) => adjust(*d, conv.market_business_day_convention, cal),
-            }
-        }
-        RateQuote::Futures {
-            contract, expiry, ..
-        } => {
-            let fut_conv = registry.require_ir_future(contract)?;
-            let idx_conv = registry.require_rate_index(&fut_conv.index_id)?;
-            let cal = resolve_calendar(&fut_conv.calendar_id)?;
-            let bdc = idx_conv.market_business_day_convention;
-            let expiry_date = adjust(*expiry, bdc, cal)?;
-            let period_start_unadj =
-                expiry_date.add_business_days(fut_conv.settlement_days, cal)?;
-            let period_start = adjust(period_start_unadj, bdc, cal)?;
-            let delivery_tenor = finstack_core::dates::Tenor::new(
-                fut_conv.delivery_months as u32,
-                TenorUnit::Months,
-            );
-            delivery_tenor.add_to_date(period_start, Some(cal), bdc)
-        }
-        RateQuote::Swap { index, pillar, .. } => {
-            let conv = registry.require_rate_index(index)?;
-            let spot = resolve_spot_date(
-                build_ctx.as_of(),
-                &conv.market_calendar_id,
-                conv.market_settlement_days,
-                conv.market_business_day_convention,
-            )?;
-            let cal = resolve_calendar(&conv.market_calendar_id)?;
-            let maturity = match pillar {
-                Pillar::Tenor(t) => {
-                    t.add_to_date(spot, Some(cal), conv.market_business_day_convention)?
-                }
-                Pillar::Date(d) => adjust(*d, conv.market_business_day_convention, cal)?,
-            };
-            if swap_use_payment_delay {
-                crate::instruments::common_impl::pricing::swap_legs::add_payment_delay(
-                    maturity,
-                    conv.default_payment_lag_days,
-                    Some(&conv.market_calendar_id),
-                )
-            } else {
-                Ok(maturity)
-            }
-        }
-    }
 }
 
 /// Prepare an XCCY basis-swap quote into an instrument + pillar time.
@@ -310,7 +221,7 @@ pub(crate) fn prepare_cds_quote(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::market::quotes::ids::QuoteId;
+    use crate::market::quotes::ids::{Pillar, QuoteId};
     use crate::market::quotes::rates::RateQuote;
     use finstack_core::HashMap;
     use time::Month;

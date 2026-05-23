@@ -92,8 +92,9 @@ already simple returns instead of prices.
 | `CagrBasis`, `AnnualizationConvention` | `risk_metrics` | Configuration types |
 | `DatedSeries`, `RollingSharpe`, `RollingSortino`, `RollingVolatility` | `risk_metrics` | Returned by `Performance::rolling_*` |
 | `beta` | `benchmark` | Freestanding OLS beta; also used by `finstack-valuations` |
+| `correlation` | `correlation` | Shared row-major correlation validation / repair infrastructure used by valuations and factor-model crates |
 
-All other functions are crate-internal (`pub(crate)`).
+All other analytics building-block functions are crate-internal (`pub(crate)`).
 
 ## Conventions
 
@@ -120,7 +121,7 @@ All other functions are crate-internal (`pub(crate)`).
 
 ## Bindings
 
-- Python: flat surface under `finstack.analytics`; see `finstack-py/parity_contract.toml`.
+- Python: flat performance surface under `finstack.analytics`; shared correlation utilities are bound under `finstack.valuations.correlation` for historical namespace compatibility. See `finstack-py/parity_contract.toml`.
 - WASM: mirrors `Performance`; result types serialize to JS objects via `serde-wasm-bindgen`.
 
 ## References

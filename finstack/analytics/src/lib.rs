@@ -19,10 +19,10 @@
 
 //! Performance analytics on numeric slices and `finstack_core::dates::Date`.
 //!
-//! [`Performance`] is the only entry point. Construct it from a price or
-//! return panel and every analytic — return / risk scalars, drawdown
-//! statistics, rolling windows, periodic returns (MTD / QTD / YTD / FYTD),
-//! benchmark alpha / beta, basic factor models — is a method on the
+//! [`Performance`] is the main entry point. Construct it from a price or
+//! return panel and every performance analytic — return / risk scalars,
+//! drawdown statistics, rolling windows, periodic returns (MTD / QTD / YTD /
+//! FYTD), benchmark alpha / beta, basic factor models — is a method on the
 //! resulting instance.
 //!
 //! Result and config types ([`PeriodStats`], [`DrawdownEpisode`],
@@ -32,8 +32,10 @@
 //! [`LookbackReturns`]) are re-exported here because `Performance` returns
 //! them.
 //!
-//! The single freestanding function exception is [`beta`], kept public for
-//! cross-crate use by `finstack-valuations`.
+//! Freestanding public exceptions are intentionally narrow:
+//! - [`beta`] is kept public for cross-crate regression use.
+//! - [`correlation`] owns shared row-major correlation-matrix validation and
+//!   repair infrastructure used by valuations and factor-model crates.
 //!
 //! Key conventions:
 //! - returns are simple decimal returns

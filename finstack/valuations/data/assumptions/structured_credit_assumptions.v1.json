@@ -5,9 +5,9 @@
     "seasonal_factor": 1.0
   },
   "credit_model_defaults": {
-    "prepayment_cpr_annual": 0.10,
+    "prepayment_cpr_annual": 0.20,
     "default_cdr_annual": 0.02,
-    "recovery_rate": 0.40,
+    "recovery_rate": 0.50,
     "recovery_lag_months": 12
   },
   "cmo_collateral_defaults": {

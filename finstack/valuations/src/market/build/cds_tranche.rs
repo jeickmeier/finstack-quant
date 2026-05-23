@@ -66,7 +66,8 @@ pub struct CDSTrancheBuildOverrides {
 impl CDSTrancheBuildOverrides {
     /// Create overrides with only the series specified.
     ///
-    /// All other fields default to `None` or `false`, meaning convention values will be used.
+    /// Optional convention fields default to `None`; `use_imm_dates` defaults to `true`
+    /// for standard CDS index-tranche schedules.
     ///
     /// # Arguments
     ///
@@ -84,6 +85,7 @@ impl CDSTrancheBuildOverrides {
     /// let overrides = CDSTrancheBuildOverrides::new(42);
     /// assert_eq!(overrides.series, 42);
     /// assert_eq!(overrides.frequency, None);
+    /// assert!(overrides.use_imm_dates);
     /// ```
     pub fn new(series: u16) -> Self {
         Self {
@@ -315,8 +317,6 @@ pub fn build_cds_tranche_instrument(
 
     Ok(Box::new(instrument))
 }
-
-// Helpers moved to build::helpers
 
 #[cfg(test)]
 mod tests {

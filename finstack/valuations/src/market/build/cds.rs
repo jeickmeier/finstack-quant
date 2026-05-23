@@ -291,8 +291,6 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<DynI
     Ok(Box::new(cds))
 }
 
-// Helpers moved to build::helpers
-
 #[cfg(test)]
 mod tests {
     use super::*;
