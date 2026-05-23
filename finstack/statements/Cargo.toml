@@ -10,7 +10,7 @@ authors.workspace = true
 [dependencies]
 finstack-core = { path = "../core" }
 finstack-cashflows = { path = "../cashflows" }
-finstack-valuations = { path = "../valuations" }
+finstack-valuations = { path = "../valuations", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
@@ -20,6 +20,10 @@ tracing = { version = "0.1", default-features = false }
 time = { workspace = true }
 rust_decimal = { workspace = true }
 strsim = "0.11.1"
+
+[features]
+default = ["valuation-integration"]
+valuation-integration = ["dep:finstack-valuations"]
 
 # rayon has no working thread pool on single-threaded wasm32; parallel
 # code paths are cfg-gated to native targets, so the dependency is too.

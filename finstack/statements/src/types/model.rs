@@ -280,9 +280,10 @@ pub struct CapitalStructureSpec {
 
 /// Debt instrument specification.
 ///
-/// An identifier paired with a canonical tagged instrument payload. The `spec`
-/// value is the registry's tagged form — `{"type": "<tag>", "spec": {...}}` —
-/// understood by `finstack_valuations::instruments::cashflow_provider_from_value`.
+/// An identifier paired with a canonical tagged instrument payload. With the
+/// default `valuation-integration` feature, the `spec` value is resolved through
+/// the valuations instrument registry from the tagged form
+/// `{"type": "<tag>", "spec": {...}}`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DebtInstrumentSpec {

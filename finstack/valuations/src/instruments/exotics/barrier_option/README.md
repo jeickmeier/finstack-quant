@@ -6,7 +6,7 @@
 - Call/put payoffs with explicit barrier level, Gobet–Miri adjustment toggle, and optional dividend yield.
 - Explicit dispatch by monitoring mode:
   - `use_gobet_miri = false`: analytical Reiner–Rubinstein (continuous monitoring)
-  - `use_gobet_miri = true`: Monte Carlo discrete-monitoring-corrected pricing (`mc` feature required)
+  - `use_gobet_miri = true`: Monte Carlo discrete-monitoring-corrected pricing
 
 ## Methodology & References
 
@@ -29,8 +29,8 @@ let pv = option.value(&market_context, as_of)?;
 ## Limitations / Known Issues
 
 - Continuous analytics assume log-normal GBM dynamics.
-- Discrete-monitoring mode requires `mc`; without it, pricing returns an explicit validation error (no silent fallback).
-- Monte Carlo pricing requires the `mc` feature and does not model stochastic volatility or jumps.
+- Discrete-monitoring mode requires a compatible Monte Carlo pricer; without one, pricing returns an explicit validation error (no silent fallback).
+- Monte Carlo pricing does not model stochastic volatility or jumps.
 - No American-style early exercise; rebates are paid at expiry only.
 
 ## Pricing Methodology

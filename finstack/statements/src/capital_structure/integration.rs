@@ -7,8 +7,9 @@
 //! both per-currency and (when FX is available) in the reporting currency.
 //!
 //! The single-instrument / single-period extraction lives in
-//! [`crate::capital_structure::period_flows`]. The JSON-spec → instrument
-//! constructor [`build_any_instrument_from_spec`] lives in this module.
+//! [`crate::capital_structure::period_flows`]. The optional JSON-spec →
+//! instrument constructor `build_any_instrument_from_spec()` is available with
+//! the `valuation-integration` feature.
 
 use crate::capital_structure::cashflows::{CapitalStructureCashflows, CashflowBreakdown};
 use crate::capital_structure::period_flows::period_snapshot_date;
@@ -29,15 +30,14 @@ pub use crate::capital_structure::period_flows::calculate_period_flows;
 
 /// Build a runtime instrument from a [`crate::types::DebtInstrumentSpec`].
 ///
-/// Delegates entirely to the canonical valuations instrument registry via
-/// [`finstack_valuations::instruments::cashflow_provider_from_value`]. The
-/// `spec` payload must be the registry's tagged form
-/// (`{"type": "...", "spec": {...}}`).
+/// Delegates to the canonical valuations instrument registry. The `spec`
+/// payload must be the registry's tagged form (`{"type": "...", "spec": {...}}`).
 ///
 /// # Errors
 ///
 /// Returns an error when the payload does not match a registered instrument
 /// type or fails spec validation.
+#[cfg(feature = "valuation-integration")]
 pub fn build_any_instrument_from_spec(
     spec: &crate::types::DebtInstrumentSpec,
 ) -> Result<Arc<dyn CashflowProvider + Send + Sync>> {

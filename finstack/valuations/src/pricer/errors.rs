@@ -210,7 +210,7 @@ fn format_context(ctx: &PricingErrorContext) -> String {
     }
 }
 
-/// Provide a more actionable error for MC-gated pricers in non-MC builds.
+/// Provide a more actionable error for missing Monte Carlo model registrations.
 ///
 /// `available_models` is appended to the message so analysts see which models
 /// they could use as fallbacks. Pass an empty slice when no registry context
@@ -219,17 +219,17 @@ pub(crate) fn actionable_unknown_pricer_message(
     key: PricerKey,
     available_models: &[ModelKey],
 ) -> Option<String> {
-    if key.model.requires_mc_feature() {
+    if key.model.is_monte_carlo_model() {
         let extra_hint = match (key.instrument, key.model) {
             (InstrumentType::BarrierOption, ModelKey::MonteCarloGBM)
             | (InstrumentType::LookbackOption, ModelKey::MonteCarloGBM)
             | (InstrumentType::FxBarrierOption, ModelKey::MonteCarloGBM) => {
-                " Rebuild with feature `mc` or switch the instrument back to its continuous-monitoring configuration."
+                " Switch the instrument back to its continuous-monitoring configuration, or register a compatible Monte Carlo pricer."
             }
             (InstrumentType::BermudanSwaption, ModelKey::MonteCarloHullWhite1F) => {
-                " Rebuild with feature `mc` or select a non-LSMC pricing model."
+                " Select a non-LSMC pricing model, or register a compatible Monte Carlo pricer."
             }
-            _ => " Rebuild with feature `mc` to enable this pricing model.",
+            _ => " Register a compatible Monte Carlo pricer or select one of the available models.",
         };
         return Some(format!(
             "No pricer found for instrument={} model={}.{}{}",

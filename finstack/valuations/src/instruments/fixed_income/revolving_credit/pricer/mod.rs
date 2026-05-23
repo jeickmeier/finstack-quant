@@ -5,7 +5,7 @@
 //!
 //! - [`RevolvingCreditPricer`]: Unified pricer that automatically selects method
 //! - [`unified`]: Core implementation of single-path and MC pricing
-//! - [`path_generator`]: 3-factor Monte Carlo path generation (requires `mc` feature)
+//! - [`path_generator`]: 3-factor Monte Carlo path generation
 //!
 //! # Usage
 //!
@@ -26,9 +26,9 @@
 //! let result = registry.get_price(&facility, &market, as_of)?;
 //! ```
 //!
-//! # Monte Carlo Pricing (requires `mc` feature)
+//! # Monte Carlo Pricing
 //!
-//! With the `mc` feature enabled, you can use full path capture for distribution analysis:
+//! Use full path capture for distribution analysis:
 //!
 //! ```ignore
 //! // MC pricing with full path capture

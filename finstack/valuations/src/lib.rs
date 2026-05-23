@@ -314,7 +314,8 @@
 //!
 //! # Performance
 //!
-//! - **Vectorized execution**: Polars-based expression engine for time-series
+//! - **Allocation-aware data paths**: compact Rust structs, deterministic maps,
+//!   and JSON/table exports for downstream DataFrame consumers
 //! - **Caching**: Intermediate results (curves, cashflows) cached per valuation
 //! - **Parallelism**: Rayon-backed paths preserve deterministic results
 //! - **Lazy evaluation**: Metrics computed only when requested

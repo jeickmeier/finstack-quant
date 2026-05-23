@@ -147,7 +147,7 @@ let pv = RevolvingCreditPricer::price(&facility, &market, as_of)?; // auto‑dis
 // Explicit deterministic
 let pv_det = RevolvingCreditPricer::price_deterministic(&facility, &market, as_of)?;
 
-// Stochastic with full path capture (requires `mc` feature)
+// Stochastic with full path capture
 let enhanced = RevolvingCreditPricer::price_with_paths(&facility_stoch, &market, as_of)?;
 let mean_pv = enhanced.mc_result.estimate.mean;
 let per_path = &enhanced.path_results; // PVs, cashflows, and 3‑factor trajectories
@@ -226,14 +226,14 @@ let irr_opt = calculate_path_irr(&cashflows_as_(t, amt), base_date, day_count);
   - Stochastic: principal deltas from utilization changes are posted at period end; accruals use average utilization in the period
 - Floating rates: deterministic forward projection with margin and optional floors; HW1F available via `McConfig` when stochastic rates are required.
 - Rounding and zero guards: consistent `RoundingContext` checks avoid emitting noise cashflows; safeguards applied to CIR params (e.g., Feller condition) to maintain numerical stability.
-- Feature flags: stochastic paths and advanced credit/rate dynamics require the `mc` feature; deterministic pricing and scheduling work without it.
+- Stochastic paths and advanced credit/rate dynamics use the workspace Monte Carlo infrastructure; deterministic pricing and scheduling remain the simpler path for standard facilities.
 
 ---
 
 ## Limitations / Known Issues
 
 - CSA/funding adjustments are external; discounting is curve-driven without embedded FVA/CVA/DVA.
-- Stochastic mode depends on the `mc` feature; without it, only deterministic utilization paths are available.
+- Stochastic mode depends on Monte Carlo market and model inputs; without those inputs, use deterministic utilization paths.
 - Covenant coverage is limited to the modeled triggers; bespoke covenants or restructuring events need explicit extensions.
 - Multi-currency facilities are not modeled; all amounts assume a single currency throughout the lifecycle.
 

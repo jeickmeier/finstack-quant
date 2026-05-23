@@ -6,7 +6,7 @@
 - **Bounds Type**: Supports both absolute bounds (e.g., rate levels) and relative bounds (e.g., 95%-105% of initial spot).
 - **Quanto Support**: Equity/FX correlation, FX vol surface, and FX spot for accurate drift adjustment.
 - **Mid-Life Valuations**: Historical fixing mechanism for valuations where some observations have already occurred.
-- **Two Pricing Methods**: Static replication (default) and Monte Carlo under the `mc` feature.
+- **Two Pricing Methods**: Static replication (default) and Monte Carlo.
 
 ## Pricing Methodology
 
@@ -99,7 +99,7 @@ The `validate()` method checks:
 
 ## Limitations / Known Issues
 
-- Requires `mc` feature for both pricing methods
+- Requires a compatible registered pricer for the selected pricing method
 - Assumes GBM dynamics; no stochastic volatility or jumps
 - Discrete observation only; no continuous monitoring adjustment
 - Quanto handling uses correlation/vol inputs; no full multi-currency simulation

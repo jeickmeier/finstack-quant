@@ -579,8 +579,11 @@ pub enum ModelKey {
 }
 
 impl ModelKey {
-    /// Returns true when the model is only available in builds with the `mc` feature.
-    pub const fn requires_mc_feature(self) -> bool {
+    /// Returns true when the model uses Monte Carlo or stochastic simulation infrastructure.
+    ///
+    /// Monte Carlo models are built into the standard crate configuration; this predicate
+    /// describes model behavior, not a Cargo feature gate.
+    pub const fn is_monte_carlo_model(self) -> bool {
         matches!(
             self,
             Self::MonteCarloGBM
@@ -595,6 +598,19 @@ impl ModelKey {
                 | Self::RoughHestonFourier
                 | Self::MonteCarloCheyetteRoughVol
         )
+    }
+
+    /// Returns true when the model uses Monte Carlo or stochastic simulation infrastructure.
+    ///
+    /// This method is retained for source compatibility with older callers. The valuations
+    /// crate no longer exposes an `mc` Cargo feature; use [`Self::is_monte_carlo_model`] for
+    /// new code.
+    #[deprecated(
+        since = "0.4.1",
+        note = "use is_monte_carlo_model; Monte Carlo models are not gated by an mc feature"
+    )]
+    pub const fn requires_mc_feature(self) -> bool {
+        self.is_monte_carlo_model()
     }
 }
 

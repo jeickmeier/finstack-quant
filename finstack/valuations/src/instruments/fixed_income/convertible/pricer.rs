@@ -508,8 +508,8 @@ impl ConvertibleBondValuator {
 
                 // BGK β = −ζ(1/2) / √(2π). Kept numerically identical to
                 // `finstack_monte_carlo::barriers::corrections::GOBET_MIRI_BETA`
-                // but defined locally because that module is gated behind
-                // the `mc` feature. Scaled by `required_fraction` for the
+                // but defined locally to keep this heuristic independent of
+                // the MC module layout. Scaled by `required_fraction` for the
                 // sustained observation requirement (heuristic extension).
                 const BGK_BETA: f64 = 0.582_597_157_939_010_6;
                 let adj = BGK_BETA * required_fraction * self.volatility * window_years.sqrt();

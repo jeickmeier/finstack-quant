@@ -26,7 +26,7 @@ let pv = option.value(&market_context, as_of)?;
 
 ## Limitations / Known Issues
 
-- Pricing requires the `mc` feature; no closed-form approximation is provided.
+- Pricing uses Monte Carlo; no closed-form approximation is provided.
 - Assumes GBM dynamics with deterministic dividend yield; no stochastic vol or jumps.
 - No early exercise; payoff is strictly European at final reset/payment.
 

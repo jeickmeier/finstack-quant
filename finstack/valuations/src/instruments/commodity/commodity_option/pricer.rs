@@ -1,8 +1,8 @@
 //! Commodity option pricer engine.
 //!
 //! Provides deterministic PV for `CommodityOption` using Black-76 for
-//! European exercise, binomial tree for American exercise, and (with
-//! the `mc` feature) Monte Carlo with Schwartz-Smith two-factor dynamics.
+//! European exercise, binomial tree for American exercise, and Monte Carlo
+//! with Schwartz-Smith two-factor dynamics.
 
 use crate::instruments::commodity::commodity_option::CommodityOption;
 use crate::instruments::common_impl::traits::Instrument;

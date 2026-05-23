@@ -4,7 +4,7 @@
 
 - Fixed- and floating-strike lookback options with call/put payoffs, optional observed min/max for seasoned positions.
 - Uses discount, vol, and dividend inputs plus notional scaling; supports continuous monitoring closed forms.
-- Optional Monte Carlo GBM pricer for path-dependent verification when `mc` feature is enabled.
+- Optional Monte Carlo GBM pricer for path-dependent verification.
 
 ## Methodology & References
 
@@ -24,7 +24,7 @@ let pv = option.value(&market_context, as_of_date)?;
 ## Limitations / Known Issues
 
 - Analytical formulas assume continuous monitoring; discrete monitoring bias not explicitly adjusted.
-- Monte Carlo path requires the `mc` feature and may need sufficient steps for barrier-like sensitivity.
+- Monte Carlo path may need sufficient steps for barrier-like sensitivity.
 - European payoff only; no early exercise.
 
 ## Pricing Methodology

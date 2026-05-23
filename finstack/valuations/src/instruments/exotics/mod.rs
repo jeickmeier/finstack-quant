@@ -25,8 +25,8 @@
 //!
 //! # Monte Carlo Requirements
 //!
-//! Path-dependent exotics require the `mc` feature for Monte Carlo pricing.
-//! Analytical formulas are available for some exotic types when applicable.
+//! Path-dependent exotics use the workspace Monte Carlo infrastructure for simulation-based
+//! pricing. Analytical formulas are available for some exotic types when applicable.
 //!
 //! # Quick Example
 //!

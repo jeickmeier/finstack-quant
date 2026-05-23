@@ -1572,7 +1572,7 @@
                 },
                 "use_gobet_miri": {
                   "default": false,
-                  "description": "Use Gobet-Miri discrete monitoring correction for barrier options.\n\nWhen true, uses a Monte Carlo correction for discrete monitoring\n(requires `mc` feature). When false, uses analytical continuous\nmonitoring pricing.",
+                  "description": "Use Gobet-Miri discrete monitoring correction for barrier options.\n\nWhen true, uses a Monte Carlo correction for discrete monitoring.\nWhen false, uses analytical continuous monitoring pricing.",
                   "type": "boolean"
                 },
                 "var_config": {

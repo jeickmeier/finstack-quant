@@ -1,7 +1,8 @@
 //! Capital Structure Integration
 //!
 //! This module provides integration between financial models and capital structure
-//! (debt instruments like bonds, swaps, loans) via the `finstack-valuations` crate.
+//! (debt instruments like bonds, swaps, loans). Valuation-backed instrument JSON
+//! construction is available through the default `valuation-integration` feature.
 //!
 //! ## Features
 //! - Construct bonds, swaps, and other debt instruments from specifications
@@ -18,7 +19,7 @@
 //! - `cs.debt_balance.{instrument_id}` - Outstanding debt balance for specific instrument
 //! - `cs.debt_balance.total` - Total outstanding debt balance
 //!
-//! Cashflows are classified by `CFKind` from `finstack-valuations`. Outstanding
+//! Cashflows are classified by `CFKind` from `finstack-cashflows`. Outstanding
 //! balances use `outstanding_by_date()`.
 //!
 //! ## Example
@@ -78,6 +79,7 @@ mod waterfall_spec;
 // Curated public facade — preserves the same public type set as the old `types.rs`.
 pub use cashflows::{CapitalStructureCashflows, CashflowBreakdown};
 pub use integration::aggregate_instrument_cashflows;
+#[cfg(feature = "valuation-integration")]
 pub use integration::build_any_instrument_from_spec;
 pub use period_flows::calculate_period_flows;
 pub use state::CapitalStructureState;

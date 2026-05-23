@@ -209,7 +209,7 @@ These are lower-priority but straightforward additions to existing bench files.
 
 | Group | Scenario | Description |
 |-------|----------|-------------|
-| `cliquet_option_mc` | `1K` / `5K` | MC periodic resets (requires `mc` feature) |
+| `cliquet_option_mc` | `1K` / `5K` | MC periodic resets |
 | `dcf_equity_pv` | `stable` / `growth` | Multi-stage DCF valuation |
 
 ### Extend `mc_exotics_pricing.rs`

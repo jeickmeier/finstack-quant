@@ -4,7 +4,7 @@
 
 - Supports arithmetic or geometric averaging via `AveragingMethod`, with optional past fixings for seasoned trades.
 - Call and put payoffs on an explicit fixing calendar, using discount and dividend/volatility surfaces from `MarketContext`.
-- Analytical pricing (Kemna–Vorst for geometric, Turnbull–Wakeman semi-analytical for arithmetic) with optional GBM Monte Carlo and control variates when the `mc` feature is enabled.
+- Analytical pricing (Kemna–Vorst for geometric, Turnbull–Wakeman semi-analytical for arithmetic) with optional GBM Monte Carlo and control variates.
 
 ## Methodology & References
 
@@ -26,7 +26,7 @@ let pv = option.value(&market_context, as_of)?;
 
 ## Limitations / Known Issues
 
-- Monte Carlo path requires the `mc` feature; otherwise pricing is analytic only.
+- Monte Carlo path requires a compatible Monte Carlo pricer; analytic pricing remains available for supported averaging methods.
 - Assumes GBM dynamics with flat volatility; does not model stochastic rates or local volatility.
 - European-style payoff only; no early exercise or American-style averaging features.
 

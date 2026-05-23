@@ -22,9 +22,7 @@ finstack-valuations = { path = "../finstack/valuations", default-features = fals
 finstack-monte-carlo = { path = "../finstack/monte_carlo", default-features = false }
 finstack-scenarios = { path = "../finstack/scenarios" }
 finstack-portfolio = { path = "../finstack/portfolio", default-features = false }
-# Pinned: extract_instrument relies on WasmRefCell internal layout (see mod.rs:260-393).
-# Bump only after verifying pointer-based extraction still works.
-wasm-bindgen = "=0.2.114"
+wasm-bindgen = "0.2.114"
 js-sys = "0.3"
 serde = { workspace = true }
 serde-wasm-bindgen = "0.6"

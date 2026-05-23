@@ -274,7 +274,7 @@ impl crate::instruments::common_impl::traits::Instrument for Snowball {
     ) -> finstack_core::Result<finstack_core::money::Money> {
         self.validate()?;
         Err(finstack_core::Error::Validation(
-            "Snowball/InverseFloater pricing requires Monte Carlo simulation (mc feature) \
+            "Snowball/InverseFloater pricing requires Monte Carlo simulation \
              for the snowball variant, or forward curve projection for inverse floater."
                 .to_string(),
         ))

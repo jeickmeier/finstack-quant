@@ -397,7 +397,7 @@ use crate::instruments::common_impl::models::closed_form::barrier::{
 ///
 /// β = -ζ(1/2) / √(2π) ≈ 0.5825971579390106 (full f64 precision). Kept
 /// numerically identical to `finstack_monte_carlo::barriers::corrections::GOBET_MIRI_BETA`
-/// but redefined here because that module is gated behind the `mc` feature.
+/// but redefined here to keep the analytical barrier path independent of the MC module layout.
 const BG_BETA: f64 = 0.582_597_157_939_010_6;
 
 /// Barrier option analytical pricer (continuous monitoring).

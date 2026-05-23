@@ -170,7 +170,7 @@ impl crate::instruments::common_impl::traits::Instrument for Tarn {
     ) -> finstack_core::Result<finstack_core::money::Money> {
         self.validate()?;
         Err(finstack_core::Error::Validation(
-            "TARN pricing requires Monte Carlo simulation (mc feature). \
+            "TARN pricing requires Monte Carlo simulation. \
              Use price_with_metrics with a MC pricer."
                 .to_string(),
         ))

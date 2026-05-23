@@ -19,9 +19,10 @@
 //! Aggregate across paths to produce clean price, expected/unexpected loss,
 //! expected shortfall, and path statistics.
 //!
-//! # Feature Gate
+//! # Runtime Contract
 //!
-//! This module requires the `mc` feature.
+//! This module is part of the standard valuations build and is selected through
+//! `ModelKey::MertonMc`.
 
 use crate::instruments::models::credit::{
     AssetDynamics, BarrierType, CreditState, DynamicRecoverySpec, EndogenousHazardSpec,

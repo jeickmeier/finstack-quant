@@ -400,9 +400,8 @@ pub struct ModelConfig {
     pub tree_steps: Option<usize>,
     /// Use Gobet-Miri discrete monitoring correction for barrier options.
     ///
-    /// When true, uses a Monte Carlo correction for discrete monitoring
-    /// (requires `mc` feature). When false, uses analytical continuous
-    /// monitoring pricing.
+    /// When true, uses a Monte Carlo correction for discrete monitoring.
+    /// When false, uses analytical continuous monitoring pricing.
     #[serde(default)]
     pub use_gobet_miri: bool,
     /// Merton Monte Carlo configuration for structural credit PIK pricing.

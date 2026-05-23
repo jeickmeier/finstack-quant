@@ -4,7 +4,7 @@
 
 - Equity option whose payoff is settled in a different currency with explicit equity/FX correlation input.
 - Separate domestic and foreign discount curves, equity vol surface, optional FX vol and FX rate IDs, and dividend yield support.
-- Analytical quanto-adjusted Black–Scholes pricing with optional Monte Carlo when `mc` feature is enabled.
+- Analytical quanto-adjusted Black-Scholes pricing with optional Monte Carlo.
 
 ## Methodology & References
 
@@ -24,7 +24,7 @@ let pv = option.value(&market_context, as_of_date)?;
 ## Limitations / Known Issues
 
 - Correlation assumed constant; no stochastic correlation or local-vol effects.
-- Monte Carlo path requires the `mc` feature; otherwise analytic path only.
+- Monte Carlo path requires a compatible Monte Carlo pricer; otherwise use the analytic path.
 - No early exercise support; payoff is European.
 
 ## Pricing Methodology

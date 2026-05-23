@@ -70,7 +70,7 @@ let result = pricer.price_dyn(&swaption, &market_context, as_of_date)?;
 ### Bermudan Swaptions
 
 - **Hull-White Tree**: Industry-standard trinomial tree with backward induction and optimal exercise at each node.
-- **LSMC**: Longstaff-Schwartz Monte Carlo with polynomial basis functions (requires `mc` feature).
+- **LSMC**: Longstaff-Schwartz Monte Carlo with polynomial basis functions.
 - Exercise boundary and risk-neutral exercise probabilities computed during pricing.
 
 ## Metrics

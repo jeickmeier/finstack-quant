@@ -4,15 +4,22 @@
 //! instruments to a financial model.
 
 use crate::builder::ModelBuilder;
+#[cfg(feature = "valuation-integration")]
 use crate::error::Result;
 use crate::types::{CapitalStructureSpec, DebtInstrumentSpec};
+#[cfg(feature = "valuation-integration")]
 use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+#[cfg(feature = "valuation-integration")]
 use finstack_core::money::Money;
+#[cfg(feature = "valuation-integration")]
 use finstack_core::types::{CurveId, InstrumentId};
+#[cfg(feature = "valuation-integration")]
 use finstack_valuations::instruments::rates::irs::FloatingLegCompounding;
+#[cfg(feature = "valuation-integration")]
 use finstack_valuations::instruments::{
     Bond, FixedLegSpec, FloatLegSpec, InstrumentJson, InterestRateSwap,
 };
+#[cfg(feature = "valuation-integration")]
 use rust_decimal::Decimal;
 
 /// Helper to ensure capital structure exists and return mutable reference.
@@ -33,6 +40,7 @@ fn ensure_capital_structure(cs: &mut Option<CapitalStructureSpec>) -> &mut Capit
 }
 
 /// Serialize a bond as a tagged instrument payload and push it to the capital structure.
+#[cfg(feature = "valuation-integration")]
 fn push_bond(
     cs: &mut Option<CapitalStructureSpec>,
     id_str: String,
@@ -48,6 +56,7 @@ fn push_bond(
 }
 
 /// Serialize a swap as a tagged instrument payload and push it to the capital structure.
+#[cfg(feature = "valuation-integration")]
 fn push_swap(
     cs: &mut Option<CapitalStructureSpec>,
     id_str: String,
@@ -62,6 +71,7 @@ fn push_swap(
 }
 
 /// Build an `InterestRateSwap` from leg parameters.
+#[cfg(feature = "valuation-integration")]
 #[allow(clippy::too_many_arguments)]
 fn build_swap_internal(
     id_str: &str,
@@ -174,6 +184,7 @@ impl<State> ModelBuilder<State> {
     /// # Ok(())
     /// # }
     /// ```
+    #[cfg(feature = "valuation-integration")]
     pub fn add_bond(
         mut self,
         id: impl Into<String>,
@@ -241,6 +252,7 @@ impl<State> ModelBuilder<State> {
     /// # }
     /// ```
     #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "valuation-integration")]
     pub fn add_bond_with_convention(
         mut self,
         id: impl Into<String>,
@@ -344,6 +356,7 @@ impl<State> ModelBuilder<State> {
     /// # }
     /// ```
     #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "valuation-integration")]
     pub fn add_swap(
         mut self,
         id: impl Into<String>,
@@ -383,6 +396,7 @@ impl<State> ModelBuilder<State> {
     /// - Fixed: Semi-annual, 30/360, Modified Following
     /// - Float: Quarterly, ACT/360, Modified Following
     #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "valuation-integration")]
     pub fn add_swap_with_conventions(
         mut self,
         id: impl Into<String>,
@@ -433,7 +447,7 @@ impl<State> ModelBuilder<State> {
     ///     "RCF-A",
     ///     json!({
     ///         "type": "revolving_credit",
-    ///         "spec": { /* RevolvingCredit fields; see finstack_valuations::instruments::RevolvingCredit */ }
+    ///         "spec": { /* instrument fields for the selected registry tag */ }
     ///     }),
     /// );
     /// # let _ = builder;

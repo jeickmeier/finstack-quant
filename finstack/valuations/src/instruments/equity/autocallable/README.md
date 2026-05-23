@@ -26,7 +26,7 @@ let pv = note.value(&market_context, as_of)?;
 
 ## Limitations / Known Issues
 
-- Pricing requires the `mc` feature; no closed-form approximation is provided.
+- Pricing uses Monte Carlo; no closed-form approximation is provided.
 - Assumes GBM dynamics with discrete observation; no quanto/correlation or stochastic vol support.
 - Does not model secondary-market features like issuer call delays, partial redemption, or path-dependent fees beyond the configured schedule.
 

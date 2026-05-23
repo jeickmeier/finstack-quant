@@ -133,7 +133,7 @@ impl crate::instruments::common_impl::traits::Instrument for CallableRangeAccrua
     ) -> finstack_core::Result<finstack_core::money::Money> {
         self.validate()?;
         Err(finstack_core::Error::Validation(
-            "Callable Range Accrual pricing requires LSMC or HW tree (mc feature). \
+            "Callable Range Accrual pricing requires LSMC or HW tree. \
              Use price_with_metrics with a MC pricer."
                 .to_string(),
         ))

@@ -234,7 +234,7 @@ impl crate::instruments::common_impl::traits::Instrument for LookbackOption {
     /// - `use_gobet_miri = false` -> analytical continuous-monitoring pricer
     /// - `use_gobet_miri = true` -> MC discrete-monitoring pricer
     ///
-    /// If `use_gobet_miri = true` but the crate is built without the `mc` feature,
+    /// If `use_gobet_miri = true` but no compatible Monte Carlo pricer is registered,
     /// this returns an error instead of silently falling back to continuous pricing.
     fn base_value(
         &self,
