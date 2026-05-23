@@ -1,0 +1,13 @@
+---
+description: Preserve source-backed golden expected values and tight tolerances
+globs: "finstack/valuations/tests/golden/data/**/*.json,finstack-py/tests/golden/**/*.py,finstack/valuations/tests/golden/**/*.rs"
+alwaysApply: false
+---
+
+# Source-Backed Golden Tests
+
+- For Bloomberg, QuantLib, or other external-source goldens, `expected_outputs` must come directly from the source artifact. Do not change expected values to match current Finstack output.
+- Tolerances must reflect source precision and market-standard numerical tolerance, not the size of current model discrepancies.
+- A failing source-backed golden is evidence of a modeling, convention, binding, or input-construction defect until proven otherwise.
+- Fix root causes in pricing models, risk methodology, curve construction, binding parity, or transcribed inputs. Do not use broad tolerances as reconciliation.
+- Keep reconciliation notes separate from assertions: source values remain the assertion target; model/source differences belong in `source_reference` until fixed.
