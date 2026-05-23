@@ -251,6 +251,7 @@ fn bump_recovery_correlation(
         } => {
             let new_corr = (factor_correlation + bump).clamp(-0.99, 0.99);
             RecoverySpec::market_correlated(*mean_recovery, *recovery_volatility, new_corr)
+                .map_err(|err| err.to_string())?
         }
         other => other.clone(),
     };

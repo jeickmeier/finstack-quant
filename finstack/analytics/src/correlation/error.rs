@@ -91,4 +91,20 @@ pub enum Error {
         /// The offending value.
         value: f64,
     },
+    /// Recovery-model input is invalid.
+    #[error("Invalid recovery input `{field}` = {value}: {requirement}")]
+    InvalidRecoveryInput {
+        /// Name of the invalid recovery input field.
+        field: String,
+        /// The offending value.
+        value: f64,
+        /// Human-readable requirement violated by the value.
+        requirement: String,
+    },
+    /// Student-t degrees of freedom is invalid.
+    #[error("Invalid Student-t degrees of freedom {value}: must be finite and > 2.0")]
+    InvalidStudentTDegreesOfFreedom {
+        /// The offending degrees-of-freedom value.
+        value: f64,
+    },
 }

@@ -28,7 +28,9 @@
 //! [`PoolGranularity`] for pools granular enough that the limit is an
 //! acceptable, faster approximation.
 
-use crate::instruments::common_impl::models::correlation::copula::{Copula, CopulaSpec};
+use crate::instruments::common_impl::models::correlation::copula::{
+    Copula, CopulaSpec, GaussianCopula,
+};
 use finstack_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
 use finstack_monte_carlo::rng::philox::PhiloxRng;
 use finstack_monte_carlo::traits::RandomStream;
@@ -115,7 +117,9 @@ impl PerNameCopulaDefault {
     /// Build a per-name simulator from a copula specification.
     pub(crate) fn new(copula_spec: &CopulaSpec, correlation: f64) -> Self {
         Self {
-            copula: copula_spec.build(),
+            copula: copula_spec
+                .build()
+                .unwrap_or_else(|_| Box::new(GaussianCopula::new())),
             correlation: correlation.clamp(0.0, 0.99),
             threshold_kind: ThresholdKind::from_spec(copula_spec),
         }

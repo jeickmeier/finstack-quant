@@ -33,14 +33,9 @@ impl WasmCopulaSpec {
     /// Student-t copula with specified degrees of freedom (must be > 2).
     #[wasm_bindgen(js_name = studentT)]
     pub fn student_t(df: f64) -> Result<WasmCopulaSpec, JsValue> {
-        if !df.is_finite() || df <= 2.0 {
-            return Err(to_js_err(
-                "Student-t degrees of freedom must be a finite number > 2",
-            ));
-        }
-        Ok(Self {
-            inner: CopulaSpec::student_t(df),
-        })
+        CopulaSpec::student_t(df)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
     }
 
     /// Random Factor Loading copula with stochastic correlation.
@@ -61,10 +56,11 @@ impl WasmCopulaSpec {
 
     /// Build a concrete copula from this specification.
     #[wasm_bindgen(js_name = build)]
-    pub fn build(&self) -> WasmCopula {
-        WasmCopula {
-            inner: self.inner.build(),
-        }
+    pub fn build(&self) -> Result<WasmCopula, JsValue> {
+        self.inner
+            .build()
+            .map(|inner| WasmCopula { inner })
+            .map_err(to_js_err)
     }
 
     /// True if this is a Gaussian spec.
@@ -135,22 +131,6 @@ pub struct WasmRecoverySpec {
     inner: corr::RecoverySpec,
 }
 
-/// Validate a recovery rate before it reaches the (silently clamping) core
-/// [`corr::RecoverySpec`] constructors.
-///
-/// The core builders clamp out-of-range inputs and propagate `NaN`, masking
-/// caller errors. Validating here — and throwing on bad input — keeps these
-/// constructors consistent with the validating `MultiFactorModel` siblings.
-fn validate_recovery_rate(value: f64, label: &str) -> Result<f64, JsValue> {
-    if !value.is_finite() {
-        return Err(to_js_err(format!("{label} must be finite, got {value}")));
-    }
-    if !(0.0..=1.0).contains(&value) {
-        return Err(to_js_err(format!("{label} must be in [0, 1], got {value}")));
-    }
-    Ok(value)
-}
-
 #[wasm_bindgen(js_class = RecoverySpec)]
 impl WasmRecoverySpec {
     /// Constant recovery rate.
@@ -158,10 +138,9 @@ impl WasmRecoverySpec {
     /// Throws if `rate` is not finite or lies outside `[0, 1]`.
     #[wasm_bindgen(js_name = constant)]
     pub fn constant(rate: f64) -> Result<WasmRecoverySpec, JsValue> {
-        let rate = validate_recovery_rate(rate, "recovery rate")?;
-        Ok(Self {
-            inner: corr::RecoverySpec::constant(rate),
-        })
+        corr::RecoverySpec::constant(rate)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
     }
 
     /// Market-correlated (Andersen-Sidenius) stochastic recovery.
@@ -174,20 +153,9 @@ impl WasmRecoverySpec {
         vol: f64,
         correlation: f64,
     ) -> Result<WasmRecoverySpec, JsValue> {
-        let mean = validate_recovery_rate(mean, "mean recovery")?;
-        if !vol.is_finite() {
-            return Err(to_js_err(format!(
-                "recovery volatility must be finite, got {vol}"
-            )));
-        }
-        if !correlation.is_finite() {
-            return Err(to_js_err(format!(
-                "factor correlation must be finite, got {correlation}"
-            )));
-        }
-        Ok(Self {
-            inner: corr::RecoverySpec::market_correlated(mean, vol, correlation),
-        })
+        corr::RecoverySpec::market_correlated(mean, vol, correlation)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
     }
 
     /// Expected (unconditional) recovery rate.
@@ -330,17 +298,19 @@ mod tests {
         let rfl = WasmCopulaSpec::random_factor_loading(0.5);
         assert!(!rfl.is_gaussian());
         assert!(!rfl.is_student_t());
-        let rfl_copula = rfl.build();
+        let rfl_copula = rfl.build().expect("RFL copula should build");
         assert_eq!(rfl_copula.num_factors(), 2);
 
         let mf = WasmCopulaSpec::multi_factor(2);
-        let mf_copula = mf.build();
+        let mf_copula = mf.build().expect("multi-factor copula should build");
         assert_eq!(mf_copula.num_factors(), 2);
     }
 
     #[test]
     fn wasm_copula_from_gaussian_spec() {
-        let copula = WasmCopulaSpec::gaussian().build();
+        let copula = WasmCopulaSpec::gaussian()
+            .build()
+            .expect("Gaussian copula should build");
         assert_eq!(copula.num_factors(), 1);
         assert_eq!(copula.model_name(), "One-Factor Gaussian Copula");
         assert_eq!(copula.tail_dependence(0.3), 0.0);
@@ -371,8 +341,8 @@ mod tests {
 
     #[test]
     fn wasm_recovery_spec_constant_rejects_out_of_range_and_nan() {
-        // The core `RecoverySpec::constant` silently clamps; the binding must
-        // instead reject rates outside [0, 1] and non-finite values.
+        // RecoverySpec::constant rejects rates outside [0, 1] and non-finite
+        // values at the Rust API boundary.
         assert!(
             WasmRecoverySpec::constant(1.5).is_err(),
             "recovery rate above 1 must be rejected, not clamped"
@@ -395,8 +365,7 @@ mod tests {
         // Mean recovery outside [0, 1] or non-finite must be rejected.
         assert!(WasmRecoverySpec::market_correlated(1.5, 0.1, 0.3).is_err());
         assert!(WasmRecoverySpec::market_correlated(f64::NAN, 0.1, 0.3).is_err());
-        // Non-finite vol / correlation must also be rejected (NaN survives the
-        // core's `clamp`, so it would otherwise leak into the model).
+        // Non-finite vol / correlation must also be rejected.
         assert!(WasmRecoverySpec::market_correlated(0.4, f64::NAN, 0.3).is_err());
         assert!(WasmRecoverySpec::market_correlated(0.4, 0.1, f64::INFINITY).is_err());
         // A fully valid spec is still accepted.

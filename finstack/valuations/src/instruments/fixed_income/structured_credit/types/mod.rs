@@ -612,7 +612,8 @@ impl StructuredCredit {
         tree_config.prepay_spec = prepay;
         tree_config.default_spec = default;
         tree_config.recovery_spec =
-            StochasticRecoverySpec::constant(self.credit_model.recovery_spec.rate);
+            StochasticRecoverySpec::constant(self.credit_model.recovery_spec.rate)
+                .map_err(|err| finstack_core::Error::Validation(err.to_string()))?;
         tree_config.correlation = correlation;
         tree_config.pool_coupon = self.pool.weighted_avg_coupon();
         tree_config.initial_balance = self.pool.total_balance()?.amount().max(1.0);

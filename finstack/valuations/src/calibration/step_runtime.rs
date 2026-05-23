@@ -623,7 +623,9 @@ mod tests {
             .expect("tranche");
 
         let pricer = CDSTranchePricer::with_params(
-            CDSTranchePricerConfig::default().with_student_t_copula(df),
+            CDSTranchePricerConfig::default()
+                .with_student_t_copula(df)
+                .expect("valid calibration fixture Student-t df"),
         );
         let upfront_pct = pricer
             .calculate_upfront(&tranche, &market, base_date)

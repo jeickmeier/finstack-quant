@@ -266,6 +266,28 @@ def _parse_valuations_js_root_exports(js_path: Path) -> set[str]:
     return keys
 
 
+def _parse_exported_const_object_keys(js_path: Path, const_name: str) -> set[str]:
+    """Extract first-level keys from `export const <name> = { ... }`."""
+    source = js_path.read_text().splitlines()
+    keys: set[str] = set()
+    depth = 0
+    pattern = f"export const {const_name} = {{"
+    for line in source:
+        if depth == 0:
+            if pattern in line:
+                depth = 1
+            continue
+        stripped = line.strip()
+        if depth == 1 and stripped and not stripped.startswith("//"):
+            key_match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:", stripped)
+            if key_match:
+                keys.add(key_match.group(1))
+        depth += line.count("{") - line.count("}")
+        if depth <= 0:
+            break
+    return keys
+
+
 def test_wasm_valuations_exports_match_contract() -> None:
     """`exports/valuations.js` root keys must match [wasm_valuations_subset]."""
     block = CONTRACT["wasm_valuations_subset"]
@@ -282,6 +304,25 @@ def test_wasm_valuations_exports_match_contract() -> None:
         f"  missing from JS: {sorted(expected_root - non_nested_actual)}\n"
         f"  unlisted in contract: {sorted(non_nested_actual - expected_root)}"
     )
+
+
+def test_wasm_valuations_nested_exports_match_contract() -> None:
+    """Nested `exports/valuations/*.js` facade keys must match the contract."""
+    block = CONTRACT["wasm_valuations_subset"]
+    nested_exports = block.get("nested_exports", {})
+    valuations_js_path = (CONTRACT_PATH.parent / block["js_export_file"]).resolve()
+    nested_dir = valuations_js_path.parent / "valuations"
+
+    for namespace, expected_names in nested_exports.items():
+        js_path = nested_dir / f"{namespace}.js"
+        assert js_path.exists(), f"nested valuations facade missing: {js_path}"
+        actual = _parse_exported_const_object_keys(js_path, namespace)
+        expected = set(expected_names)
+        assert actual == expected, (
+            f"valuations.{namespace} facade exports diverged from contract.\n"
+            f"  missing from JS: {sorted(expected - actual)}\n"
+            f"  unlisted in contract: {sorted(actual - expected)}"
+        )
 
 
 def test_wasm_valuations_python_js_map_matches_root_exports() -> None:

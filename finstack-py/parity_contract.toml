@@ -633,6 +633,20 @@ SabrCalibrator = "SabrCalibrator"
 calibrate = "calibrate"
 dry_run = "dryRun"
 
+# Nested facade exports pinned per namespace. These are intentional WASM
+# subsets; Python may expose additional direct classes for the same Rust module.
+[wasm_valuations_subset.nested_exports]
+correlation = [
+    "Copula",
+    "CopulaSpec",
+    "RecoveryModel",
+    "RecoverySpec",
+    "correlationBounds",
+    "jointProbabilities",
+    "nearestCorrelation",
+    "validateCorrelationMatrix",
+]
+
 # ---------------------------------------------------------------------------
 # Intentionally NOT covered by parity tests
 #

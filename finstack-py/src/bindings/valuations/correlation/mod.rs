@@ -5,7 +5,6 @@
 //! mirroring the Rust module [`finstack_valuations::correlation`].
 
 use crate::errors::display_to_py;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 
@@ -55,12 +54,9 @@ impl PyCopulaSpec {
     #[classmethod]
     #[pyo3(text_signature = "(cls, df)")]
     fn student_t(_cls: &Bound<'_, PyType>, df: f64) -> PyResult<Self> {
-        if df <= 2.0 {
-            return Err(PyValueError::new_err(
-                "Student-t degrees of freedom must be > 2",
-            ));
-        }
-        Ok(Self::from_inner(CopulaSpec::student_t(df)))
+        CopulaSpec::student_t(df)
+            .map(Self::from_inner)
+            .map_err(display_to_py)
     }
 
     /// Random Factor Loading copula with stochastic correlation.
@@ -81,10 +77,11 @@ impl PyCopulaSpec {
     }
 
     /// Build a concrete `Copula` from this specification.
-    fn build(&self) -> PyCopula {
-        PyCopula {
-            inner: self.inner.build(),
-        }
+    fn build(&self) -> PyResult<PyCopula> {
+        self.inner
+            .build()
+            .map(|inner| PyCopula { inner })
+            .map_err(display_to_py)
     }
 
     /// ``True`` if this is a Gaussian spec.
@@ -192,27 +189,6 @@ impl PyRecoverySpec {
     }
 }
 
-/// Validate a recovery rate before it reaches the (silently clamping) core
-/// [`RecoverySpec`] constructors.
-///
-/// The core builders clamp out-of-range inputs and propagate `NaN`, which
-/// masks caller errors. Validating here — and returning a `Result` — keeps
-/// these constructors consistent with the validating
-/// [`MultiFactorModel::new`] sibling.
-fn validate_recovery_rate(value: f64, label: &str) -> PyResult<f64> {
-    if !value.is_finite() {
-        return Err(PyValueError::new_err(format!(
-            "{label} must be finite, got {value}"
-        )));
-    }
-    if !(0.0..=1.0).contains(&value) {
-        return Err(PyValueError::new_err(format!(
-            "{label} must be in [0, 1], got {value}"
-        )));
-    }
-    Ok(value)
-}
-
 #[pymethods]
 impl PyRecoverySpec {
     /// Constant recovery rate.
@@ -222,8 +198,9 @@ impl PyRecoverySpec {
     #[classmethod]
     #[pyo3(text_signature = "(cls, rate)")]
     fn constant(_cls: &Bound<'_, PyType>, rate: f64) -> PyResult<Self> {
-        let rate = validate_recovery_rate(rate, "recovery rate")?;
-        Ok(Self::from_inner(RecoverySpec::constant(rate)))
+        RecoverySpec::constant(rate)
+            .map(Self::from_inner)
+            .map_err(display_to_py)
     }
 
     /// Market-correlated (Andersen-Sidenius) stochastic recovery.
@@ -238,22 +215,9 @@ impl PyRecoverySpec {
         vol: f64,
         correlation: f64,
     ) -> PyResult<Self> {
-        let mean = validate_recovery_rate(mean, "mean recovery")?;
-        if !vol.is_finite() {
-            return Err(PyValueError::new_err(format!(
-                "recovery volatility must be finite, got {vol}"
-            )));
-        }
-        if !correlation.is_finite() {
-            return Err(PyValueError::new_err(format!(
-                "factor correlation must be finite, got {correlation}"
-            )));
-        }
-        Ok(Self::from_inner(RecoverySpec::market_correlated(
-            mean,
-            vol,
-            correlation,
-        )))
+        RecoverySpec::market_correlated(mean, vol, correlation)
+            .map(Self::from_inner)
+            .map_err(display_to_py)
     }
 
     /// Market-standard stochastic recovery (40% mean, 25% vol, −40% corr).
@@ -402,10 +366,14 @@ impl PyFactorSpec {
     }
 
     /// Build a concrete factor model from this specification.
-    fn build(&self) -> PyFactorModel {
-        PyFactorModel {
-            inner: self.inner.build(),
-        }
+    ///
+    /// Raises ``ValueError`` if a multi-factor specification contains an
+    /// invalid volatility vector or correlation matrix.
+    fn build(&self) -> PyResult<PyFactorModel> {
+        self.inner
+            .build()
+            .map(|inner| PyFactorModel { inner })
+            .map_err(display_to_py)
     }
 
     fn __repr__(&self) -> String {

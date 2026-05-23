@@ -165,7 +165,9 @@ fn test_custom_config_quadrature_orders() {
 
 #[test]
 fn test_pricer_config_builder_methods_wire_copula_and_numerical_settings() {
-    let student_t = CDSTranchePricerConfig::default().with_student_t_copula(6.0);
+    let student_t = CDSTranchePricerConfig::default()
+        .with_student_t_copula(6.0)
+        .expect("valid Student-t df");
     assert!(matches!(
         student_t.copula_spec,
         CopulaSpec::StudentT {

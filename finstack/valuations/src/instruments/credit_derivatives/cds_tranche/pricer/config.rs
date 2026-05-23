@@ -1,6 +1,7 @@
 use crate::cashflow::primitives::CashFlow;
 use crate::correlation::copula::{Copula, CopulaSpec};
 use crate::correlation::recovery::RecoverySpec;
+use crate::correlation::Result as CorrelationResult;
 use finstack_core::dates::{Date, StubKind};
 use finstack_core::market_data::term_structures::CreditIndexData;
 use finstack_core::math::GaussHermiteQuadrature;
@@ -271,9 +272,9 @@ impl CDSTranchePricerConfig {
     ///
     /// # Arguments
     /// * `df` - Degrees of freedom (typical: 4-10 for CDX)
-    pub fn with_student_t_copula(mut self, df: f64) -> Self {
-        self.copula_spec = CopulaSpec::student_t(df);
-        self
+    pub fn with_student_t_copula(mut self, df: f64) -> CorrelationResult<Self> {
+        self.copula_spec = CopulaSpec::student_t(df)?;
+        Ok(self)
     }
 
     /// Create configuration with Random Factor Loading copula.
@@ -316,7 +317,11 @@ impl CDSTranchePricerConfig {
     /// * `vol` - Recovery volatility (typical: 0.20-0.30)
     /// * `corr` - Correlation with factor (typical: -0.30 to -0.50)
     pub fn with_custom_stochastic_recovery(mut self, mean: f64, vol: f64, corr: f64) -> Self {
-        self.recovery_spec = Some(RecoverySpec::market_correlated(mean, vol, corr));
+        self.recovery_spec = Some(RecoverySpec::MarketCorrelated {
+            mean_recovery: mean.clamp(0.0, 1.0),
+            recovery_volatility: vol.clamp(0.0, 0.5),
+            factor_correlation: corr.clamp(-1.0, 1.0),
+        });
         self
     }
 
@@ -327,23 +332,27 @@ impl CDSTranchePricerConfig {
         vol: Percentage,
         corr: f64,
     ) -> Self {
-        self.recovery_spec = Some(RecoverySpec::market_correlated(
-            mean.as_decimal(),
-            vol.as_decimal(),
-            corr,
-        ));
+        self.recovery_spec = Some(RecoverySpec::MarketCorrelated {
+            mean_recovery: mean.as_decimal().clamp(0.0, 1.0),
+            recovery_volatility: vol.as_decimal().clamp(0.0, 0.5),
+            factor_correlation: corr.clamp(-1.0, 1.0),
+        });
         self
     }
 
     /// Set constant recovery rate (overriding index recovery).
     pub fn with_constant_recovery(mut self, rate: f64) -> Self {
-        self.recovery_spec = Some(RecoverySpec::constant(rate));
+        self.recovery_spec = Some(RecoverySpec::Constant {
+            rate: rate.clamp(0.0, 1.0),
+        });
         self
     }
 
     /// Set constant recovery rate using a typed percentage.
     pub fn with_constant_recovery_pct(mut self, rate: Percentage) -> Self {
-        self.recovery_spec = Some(RecoverySpec::constant(rate.as_decimal()));
+        self.recovery_spec = Some(RecoverySpec::Constant {
+            rate: rate.as_decimal().clamp(0.0, 1.0),
+        });
         self
     }
 

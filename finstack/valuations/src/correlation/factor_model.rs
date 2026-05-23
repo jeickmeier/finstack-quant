@@ -43,13 +43,9 @@
 //! - Portfolio-risk and dependence context:
 //!   `docs/REFERENCES.md#mcneil-frey-embrechts-qrm`
 
-use crate::correlation::error::{Error, Result};
+use crate::correlation::{Error, Result};
 use finstack_analytics::correlation::validate_correlation_matrix;
 use finstack_core::math::linalg::{cholesky_correlation, CholeskyError, CorrelationFactor};
-
-/// Tolerance for correlation matrix validation.
-#[allow(dead_code)]
-const CORRELATION_TOLERANCE: f64 = 1e-10;
 
 /// Perform Cholesky decomposition of a correlation matrix using diagonal pivoting.
 /// Returns a [`CorrelationFactor`] that holds the lower triangular factor in the
@@ -302,9 +298,15 @@ impl FactorSpec {
     /// # Returns
     ///
     /// A [`FactorModelKind`] variant matching the specification.
-    #[must_use]
-    pub fn build(&self) -> FactorModelKind {
-        match self {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::correlation::Error`] if a multi-factor specification
+    /// contains an invalid volatility vector or correlation matrix. Call
+    /// [`MultiFactorModel::new_or_identity`] explicitly if repair/fallback
+    /// behavior is desired.
+    pub fn build(&self) -> Result<FactorModelKind> {
+        Ok(match self {
             FactorSpec::SingleFactor {
                 volatility,
                 mean_reversion,
@@ -318,12 +320,12 @@ impl FactorSpec {
                 num_factors,
                 volatilities,
                 correlations,
-            } => FactorModelKind::Multi(MultiFactorModel::new_or_identity(
+            } => FactorModelKind::Multi(MultiFactorModel::new(
                 *num_factors,
                 volatilities.clone(),
                 correlations.clone(),
-            )),
-        }
+            )?),
+        })
     }
 
     /// Get the number of factors.
@@ -629,10 +631,10 @@ impl MultiFactorModel {
         // structure away.
         let n = num_factors.max(1);
         if correlations.len() == n * n {
-            match crate::correlation::nearest_correlation::nearest_correlation_matrix(
+            match crate::correlation::nearest_correlation_matrix(
                 &correlations,
                 n,
-                crate::correlation::nearest_correlation::NearestCorrelationOpts::default(),
+                crate::correlation::NearestCorrelationOpts::default(),
             ) {
                 Ok(repaired) => {
                     if let Ok(model) = Self::new(num_factors, volatilities.clone(), repaired) {
@@ -954,12 +956,12 @@ mod tests {
     #[test]
     fn test_factor_spec_build() {
         let spec = FactorSpec::single_factor(0.25, 0.1);
-        let model = spec.build();
+        let model = spec.build().expect("single-factor spec should build");
         assert_eq!(model.num_factors(), 1);
         assert!(matches!(model, FactorModelKind::Single(_)));
 
         let spec = FactorSpec::two_factor(0.20, 0.30, -0.30);
-        let model = spec.build();
+        let model = spec.build().expect("two-factor spec should build");
         assert_eq!(model.num_factors(), 2);
         assert!(matches!(model, FactorModelKind::Two(_)));
     }

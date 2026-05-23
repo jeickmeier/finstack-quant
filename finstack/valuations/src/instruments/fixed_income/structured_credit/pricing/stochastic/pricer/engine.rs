@@ -1878,7 +1878,8 @@ mod per_name_copula_tests {
         let mut dispersed_cfg = copula_config(0.06, 0.20, 36, PoolGranularity::PerName, 4_000);
         // ρ_R = 0 ⇒ the systematic recovery is a flat 0.40, bit-identical to
         // the constant model; only the idiosyncratic σ_R = 0.30 channel differs.
-        dispersed_cfg.tree_config.recovery_spec = RecoverySpec::market_correlated(0.40, 0.30, 0.0);
+        dispersed_cfg.tree_config.recovery_spec = RecoverySpec::market_correlated(0.40, 0.30, 0.0)
+            .expect("valid dispersed recovery inputs");
 
         let constant = StochasticPricer::new(constant_cfg)
             .price(&deal, &market)

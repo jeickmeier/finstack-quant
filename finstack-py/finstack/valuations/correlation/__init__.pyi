@@ -65,6 +65,11 @@ class CopulaSpec:
         -------
         CopulaSpec
             Student-t copula specification.
+
+        Raises
+        ------
+        ValueError
+            If ``df`` is not finite or is ``<= 2``.
         """
         ...
 
@@ -107,6 +112,11 @@ class CopulaSpec:
         -------
         Copula
             Concrete copula model.
+
+        Raises
+        ------
+        ValueError
+            If a deserialized Student-t spec has invalid degrees of freedom.
         """
         ...
 
@@ -391,6 +401,12 @@ class FactorSpec:
         -------
         FactorModel
             Concrete factor model.
+
+        Raises
+        ------
+        ValueError
+            If a multi-factor specification contains an invalid volatility
+            vector or correlation matrix.
         """
         ...
 

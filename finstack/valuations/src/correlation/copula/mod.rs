@@ -31,6 +31,8 @@ pub use student_t::StudentTCopula;
 
 use finstack_core::math::GaussHermiteQuadrature;
 
+use crate::correlation::{Error, Result};
+
 /// Copula model for portfolio default correlation.
 ///
 /// Implementations provide the conditional default probability P(τᵢ ≤ t | M)
@@ -270,15 +272,8 @@ pub enum CopulaSpec {
     ///
     /// # Invariant
     ///
-    /// `degrees_of_freedom` **must** be finite and `> 2`. The programmatic
-    /// constructor [`CopulaSpec::student_t`] panics on invalid input, but
-    /// deserialized specs (from config files, JSON, etc.) cannot panic —
-    /// [`CopulaSpec::build`] silently clamps an out-of-range or non-finite
-    /// value to `2.01` and emits a `tracing::warn!`. This is deliberate: it
-    /// preserves forward
-    /// compatibility for serialized specs but means callers that round-trip
-    /// a spec may observe a changed `degrees_of_freedom`. Validate at the
-    /// config-loading boundary if strict rejection is required.
+    /// `degrees_of_freedom` **must** be finite and `> 2`. Programmatic
+    /// construction and [`CopulaSpec::build`] both reject invalid values.
     StudentT {
         /// Degrees of freedom (must be > 2 for finite variance)
         degrees_of_freedom: f64,
@@ -331,13 +326,13 @@ impl CopulaSpec {
     ///
     /// A [`CopulaSpec::StudentT`] configuration.
     ///
-    /// # Panics
-    /// Panics if df ≤ 2 (variance undefined)
-    pub fn student_t(df: f64) -> Self {
-        assert!(df > 2.0, "Student-t df must be > 2 for finite variance");
-        CopulaSpec::StudentT {
+    /// # Errors
+    /// Returns [`crate::correlation::Error`] if `df` is not finite or `<= 2`.
+    pub fn student_t(df: f64) -> Result<Self> {
+        validate_student_t_degrees_of_freedom(df)?;
+        Ok(CopulaSpec::StudentT {
             degrees_of_freedom: df,
-        }
+        })
     }
 
     /// Create a Random Factor Loading specification.
@@ -373,23 +368,16 @@ impl CopulaSpec {
     /// # Returns
     ///
     /// A boxed [`Copula`] implementation matching the spec variant.
-    #[must_use]
-    pub fn build(&self) -> Box<dyn Copula> {
-        match self {
+    ///
+    /// # Errors
+    /// Returns [`crate::correlation::Error`] if a Student-t spec has invalid
+    /// degrees of freedom.
+    pub fn build(&self) -> Result<Box<dyn Copula>> {
+        Ok(match self {
             CopulaSpec::Gaussian => Box::new(GaussianCopula::new()),
             CopulaSpec::StudentT { degrees_of_freedom } => {
-                if !degrees_of_freedom.is_finite() || *degrees_of_freedom <= 2.0 {
-                    tracing::warn!(
-                        df = degrees_of_freedom,
-                        "Student-t degrees_of_freedom must be finite and > 2; clamping to 2.01"
-                    );
-                }
-                let df = if degrees_of_freedom.is_finite() {
-                    degrees_of_freedom.max(2.01)
-                } else {
-                    2.01
-                };
-                Box::new(StudentTCopula::new(df))
+                validate_student_t_degrees_of_freedom(*degrees_of_freedom)?;
+                Box::new(StudentTCopula::new(*degrees_of_freedom))
             }
             CopulaSpec::RandomFactorLoading { loading_volatility } => {
                 Box::new(RandomFactorLoadingCopula::new(*loading_volatility))
@@ -397,7 +385,7 @@ impl CopulaSpec {
             CopulaSpec::MultiFactor { num_factors } => {
                 Box::new(MultiFactorCopula::new(*num_factors))
             }
-        }
+        })
     }
 
     /// Check if this is a Gaussian copula specification.
@@ -434,6 +422,14 @@ impl CopulaSpec {
     /// `true` if this value is [`CopulaSpec::MultiFactor`].
     pub fn is_multi_factor(&self) -> bool {
         matches!(self, CopulaSpec::MultiFactor { .. })
+    }
+}
+
+fn validate_student_t_degrees_of_freedom(df: f64) -> Result<()> {
+    if df.is_finite() && df > 2.0 {
+        Ok(())
+    } else {
+        Err(Error::InvalidStudentTDegreesOfFreedom { value: df })
     }
 }
 
@@ -484,7 +480,7 @@ mod tests {
         let gaussian = CopulaSpec::gaussian();
         assert!(matches!(gaussian, CopulaSpec::Gaussian));
 
-        let student_t = CopulaSpec::student_t(5.0);
+        let student_t = CopulaSpec::student_t(5.0).expect("valid Student-t df");
         assert!(matches!(
             student_t,
             CopulaSpec::StudentT {
@@ -502,9 +498,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Student-t df must be > 2")]
-    fn test_student_t_invalid_df() {
-        CopulaSpec::student_t(2.0);
+    fn test_student_t_invalid_df_is_rejected() {
+        assert!(matches!(
+            CopulaSpec::student_t(2.0),
+            Err(Error::InvalidStudentTDegreesOfFreedom { .. })
+        ));
     }
 
     #[test]
@@ -512,36 +510,37 @@ mod tests {
         // Test Gaussian
         let gaussian = CopulaSpec::gaussian();
         assert!(gaussian.is_gaussian());
-        let g_copula = gaussian.build();
+        let g_copula = gaussian.build().expect("Gaussian copula should build");
         assert_eq!(g_copula.num_factors(), 1);
 
         // Test Student-t
-        let student_t = CopulaSpec::student_t(5.0);
+        let student_t = CopulaSpec::student_t(5.0).expect("valid Student-t df");
         assert!(student_t.is_student_t());
-        let t_copula = student_t.build();
+        let t_copula = student_t.build().expect("Student-t copula should build");
         assert_eq!(t_copula.num_factors(), 1);
 
         // Test RFL
         let rfl = CopulaSpec::random_factor_loading(0.1);
         assert!(rfl.is_rfl());
-        let rfl_copula = rfl.build();
+        let rfl_copula = rfl.build().expect("RFL copula should build");
         assert_eq!(rfl_copula.num_factors(), 2);
 
         // Test Multi-factor
         let mf = CopulaSpec::multi_factor(2);
         assert!(mf.is_multi_factor());
-        let mf_copula = mf.build();
+        let mf_copula = mf.build().expect("multi-factor copula should build");
         assert_eq!(mf_copula.num_factors(), 2);
     }
 
     #[test]
-    fn test_deserialized_invalid_student_t_df_does_not_panic() {
+    fn test_deserialized_invalid_student_t_df_is_rejected_on_build() {
         // Simulate config file with invalid df <= 2
         let spec: CopulaSpec =
             serde_json::from_str(r#"{"type":"StudentT","degrees_of_freedom":1.5}"#)
                 .expect("should deserialize");
-        // build() must not panic — it clamps df to 2.01
-        let copula = spec.build();
-        assert_eq!(copula.num_factors(), 1);
+        assert!(matches!(
+            spec.build(),
+            Err(Error::InvalidStudentTDegreesOfFreedom { .. })
+        ));
     }
 }

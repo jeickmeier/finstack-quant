@@ -24,7 +24,9 @@
 
 use super::super::calibrations::{clo_standard, rmbs_standard};
 use super::traits::{MacroCreditFactors, StochasticDefault};
-use crate::instruments::common_impl::models::correlation::copula::{Copula, CopulaSpec};
+use crate::instruments::common_impl::models::correlation::copula::{
+    Copula, CopulaSpec, GaussianCopula,
+};
 use crate::instruments::fixed_income::structured_credit::utils::rates::cdr_to_mdr;
 use finstack_core::math::distributions::binomial_distribution;
 use finstack_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
@@ -184,7 +186,16 @@ impl CopulaBasedDefault {
     }
 
     fn build_copula(spec: &CopulaSpec) -> Box<dyn Copula> {
-        spec.build()
+        match spec.build() {
+            Ok(copula) => copula,
+            Err(err) => {
+                tracing::warn!(
+                    %err,
+                    "Invalid copula spec in stochastic default model; using Gaussian copula fallback"
+                );
+                Box::new(GaussianCopula::new())
+            }
+        }
     }
 
     /// Compute the default threshold appropriate for the copula type.

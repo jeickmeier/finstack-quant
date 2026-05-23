@@ -84,8 +84,9 @@ const MULTI_FACTOR_QUADRATURE_ORDER: u8 = 10;
 ///
 /// # Factor Limit
 ///
-/// Currently supports 1 or 2 factors (global + one sector).
-/// For >2 sector factors, Monte Carlo integration would be required.
+/// Supports 1 to 5 total factors: one global factor plus up to four sector
+/// factors. Beyond that cap, Monte Carlo integration is more appropriate than
+/// nested quadrature.
 ///
 /// # Default Parameters
 ///
@@ -99,7 +100,7 @@ const MULTI_FACTOR_QUADRATURE_ORDER: u8 = 10;
 /// - `docs/REFERENCES.md#andersen-sidenius-basu-2003`
 /// - `docs/REFERENCES.md#hull-white-2004-cdo`
 pub struct MultiFactorCopula {
-    /// Number of systematic factors (1 or 2, capped)
+    /// Number of systematic factors (1 to 5, capped)
     num_factors_count: usize,
     /// Global factor loading (default for all entities)
     default_global_loading: f64,
@@ -154,7 +155,7 @@ impl MultiFactorCopula {
     /// Uses default loadings: β_G=0.4, β_S=0.3, sector_fraction=0.4
     ///
     /// # Arguments
-    /// * `num_factors` - Number of factors (1 or 2; capped at 2)
+    /// * `num_factors` - Number of factors (1 to 5; capped at `MAX_FACTORS`)
     ///
     /// # Returns
     ///
@@ -186,7 +187,7 @@ impl MultiFactorCopula {
     /// Loadings are clamped to ensure β_G² + β_S² ≤ 1 (valid variance).
     ///
     /// # Arguments
-    /// * `num_factors` - Number of factors (1 or 2; capped at 2)
+    /// * `num_factors` - Number of factors (1 to 5; capped at `MAX_FACTORS`)
     /// * `global_loading` - Loading on global factor (β_G), clamped to [0, 0.99]
     /// * `sector_loading` - Loading on sector factor (β_S), clamped to maintain variance constraint
     ///
