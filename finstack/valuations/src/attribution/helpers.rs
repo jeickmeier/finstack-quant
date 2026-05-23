@@ -6,6 +6,9 @@
 
 use super::types::{AttributionMethod, CarryDetail, PnlAttribution, SourceLine};
 use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::common_impl::traits::PricingOptions;
+use crate::metrics::sensitivities::theta::collect_cashflows_in_period;
+use crate::metrics::MetricId;
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
@@ -30,7 +33,7 @@ use std::sync::Arc;
 /// # Errors
 ///
 /// Returns error if pricing fails (missing curves, invalid parameters, etc.).
-pub fn reprice_instrument(
+pub(crate) fn reprice_instrument(
     instrument: &Arc<dyn Instrument>,
     market: &MarketContext,
     as_of: Date,
@@ -179,6 +182,43 @@ pub(crate) fn apply_total_return_carry(
         theta: Some(theta),
     });
     Ok(())
+}
+
+pub(crate) struct TotalReturnCarryInputs {
+    pub coupon_income: Money,
+    pub roll_down: Option<Money>,
+}
+
+pub(crate) fn total_return_carry_inputs(
+    instrument: &dyn Instrument,
+    cashflow_market: &MarketContext,
+    roll_down_market: &MarketContext,
+    as_of_t0: Date,
+    as_of_t1: Date,
+    currency: Currency,
+) -> TotalReturnCarryInputs {
+    let coupon_income_value =
+        collect_cashflows_in_period(instrument, cashflow_market, as_of_t0, as_of_t1, currency)
+            .unwrap_or(0.0);
+    let coupon_income = Money::new(coupon_income_value, currency);
+
+    let roll_down_opt = if let Ok(val_res) = instrument.price_with_metrics(
+        roll_down_market,
+        as_of_t0,
+        &[MetricId::RollDown],
+        PricingOptions::default(),
+    ) {
+        val_res.measures.get(MetricId::RollDown.as_str()).copied()
+    } else {
+        None
+    };
+    let time_period_days = (as_of_t1 - as_of_t0).whole_days() as f64;
+    let roll_down = roll_down_opt.map(|rd| Money::new(rd * time_period_days, currency));
+
+    TotalReturnCarryInputs {
+        coupon_income,
+        roll_down,
+    }
 }
 
 pub(crate) fn stamp_fx_policy(

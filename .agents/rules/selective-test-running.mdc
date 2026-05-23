@@ -1,0 +1,11 @@
+---
+description: Run selective tests during task work and reserve full suites for final verification
+alwaysApply: true
+---
+
+# Selective Test Running
+
+- During a multi-step task list, run the smallest relevant checks for the task just completed.
+- Prefer targeted unit tests, crate-specific tests, package-specific tests, or focused lint/type checks while iterating.
+- Do not run the full test suite after each individual task unless the user explicitly asks or the change is broad enough that focused checks would be misleading.
+- Run the full test suite once at the end of the task list as final verification, after targeted checks are clean.

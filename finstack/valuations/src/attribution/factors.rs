@@ -180,32 +180,6 @@ impl std::ops::Not for CurveRestoreFlags {
     }
 }
 
-/// Snapshot of volatility surfaces from a market context.
-///
-/// Thin wrapper kept for backwards-compatible integration tests. New code should
-/// reach for [`MarketSnapshot`] with the `VOL` flag instead.
-#[derive(Clone)]
-pub struct VolatilitySnapshot {
-    /// Volatility surfaces indexed by surface ID
-    pub surfaces: HashMap<CurveId, Arc<VolSurface>>,
-}
-
-/// Snapshot of market scalars from a market context.
-///
-/// Thin wrapper kept for backwards-compatible integration tests. New code should
-/// reach for [`MarketSnapshot`] with the `SCALARS` flag instead.
-#[derive(Debug, Clone)]
-pub struct ScalarsSnapshot {
-    /// Market scalar prices indexed by ID
-    pub prices: HashMap<CurveId, MarketScalar>,
-    /// Time series data indexed by ID
-    pub series: HashMap<CurveId, ScalarTimeSeries>,
-    /// Inflation indices indexed by ID
-    pub inflation_indices: HashMap<CurveId, Arc<InflationIndex>>,
-    /// Dividend schedules indexed by equity ID
-    pub dividends: HashMap<CurveId, Arc<DividendSchedule>>,
-}
-
 /// Unified market snapshot that can hold any combination of factor families.
 ///
 /// Holds curves, FX, volatility surfaces, and market scalars. Extract only the
@@ -413,51 +387,6 @@ impl MarketSnapshot {
         }
 
         new_market
-    }
-}
-
-impl VolatilitySnapshot {
-    /// Extract all volatility surfaces from a market context.
-    pub fn extract(market: &MarketContext) -> Self {
-        VolatilitySnapshot {
-            surfaces: market.surfaces_snapshot(),
-        }
-    }
-}
-
-impl ScalarsSnapshot {
-    /// Extract all market scalars from a market context.
-    pub fn extract(market: &MarketContext) -> Self {
-        ScalarsSnapshot {
-            prices: market
-                .prices_iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect(),
-            series: market
-                .series_iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect(),
-            inflation_indices: market
-                .inflation_indices_iter()
-                .map(|(k, v)| (k.clone(), Arc::clone(v)))
-                .collect(),
-            dividends: market
-                .dividends_iter()
-                .map(|(k, v)| (k.clone(), Arc::clone(v)))
-                .collect(),
-        }
-    }
-
-    /// Materialize a [`MarketSnapshot`] carrying these scalars (with the `SCALARS`
-    /// semantics when passed to [`MarketSnapshot::restore_market`]).
-    pub fn into_market_snapshot(self) -> MarketSnapshot {
-        MarketSnapshot {
-            prices: self.prices,
-            series: self.series,
-            inflation_indices: self.inflation_indices,
-            dividends: self.dividends,
-            ..MarketSnapshot::default()
-        }
     }
 }
 

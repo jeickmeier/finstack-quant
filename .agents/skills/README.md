@@ -2,6 +2,15 @@
 
 This directory contains the active project skills for maintaining the finstack Rust/Python/WASM quant library.
 
+## Agent Compatibility
+
+These skills use the shared Agent Skills layout: one folder per skill, each with a `SKILL.md` file containing `name` and `description` frontmatter. Keep `.agents/skills` as the source of truth.
+
+- Cursor discovers `.agents/skills` and exposes skills by name.
+- Codex discovers `.agents/skills`; invoke explicitly via the skill selector or `$skill-name`.
+- GitHub Copilot discovers `.agents/skills` for Copilot agent mode, Copilot CLI, and cloud agents.
+- Claude Code discovers `.claude/skills`; this repo exposes that path as a symlink to `.agents/skills`.
+
 ## Active Skills
 
 | Skill | Use For | Prefer Another Skill When |

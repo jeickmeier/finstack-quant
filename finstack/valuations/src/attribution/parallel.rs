@@ -31,7 +31,6 @@ use super::helpers::*;
 use super::model_params;
 use super::types::*;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::metrics::sensitivities::theta::collect_cashflows_in_period;
 use finstack_core::config::FinstackConfig;
 use finstack_core::dates::Date;
 use finstack_core::factor_model::credit_hierarchy::CreditFactorModel;
@@ -431,38 +430,21 @@ pub fn attribute_pnl_parallel_with_credit_model(
 
     let theta = compute_pnl(val_t0, val_carry, val_t1.currency(), market_t1, as_of_t1)?;
 
-    // Realized cashflows (coupons paid) during [T0, T1]. On coupon dates the
-    // coupon drops out of PV but the holder receives it as cash — including it
-    // here aligns with GenericThetaAny (carry = PV roll + realized cashflows).
-    let coupon_income_value = collect_cashflows_in_period(
+    let carry_inputs = total_return_carry_inputs(
         instrument_t0.as_ref(),
         &market_frozen,
+        market_t0,
         as_of_t0,
         as_of_t1,
         val_t1.currency(),
-    )
-    .unwrap_or(0.0);
-    let coupon_income = Money::new(coupon_income_value, val_t1.currency());
+    );
 
-    // Include cashflows in total_pnl so that residual stays consistent:
-    // total_pnl now represents economic (total-return) P&L.
-    let roll_down_opt = if let Ok(val_res) = instrument_t0.price_with_metrics(
-        market_t0,
-        as_of_t0,
-        &[crate::metrics::MetricId::RollDown],
-        crate::instruments::common_impl::traits::PricingOptions::default(),
-    ) {
-        val_res
-            .measures
-            .get(crate::metrics::MetricId::RollDown.as_str())
-            .copied()
-    } else {
-        None
-    };
-    let time_period_days = (as_of_t1 - as_of_t0).whole_days() as f64;
-    let roll_down = roll_down_opt.map(|rd| Money::new(rd * time_period_days, val_t1.currency()));
-
-    apply_total_return_carry(&mut attribution, theta, coupon_income, roll_down)?;
+    apply_total_return_carry(
+        &mut attribution,
+        theta,
+        carry_inputs.coupon_income,
+        carry_inputs.roll_down,
+    )?;
 
     if full_cross_attribution {
         let discount_snap = MarketSnapshot::extract(market_t0, CurveRestoreFlags::DISCOUNT);

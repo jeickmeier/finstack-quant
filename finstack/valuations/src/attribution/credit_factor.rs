@@ -58,20 +58,6 @@ pub struct CreditFactorDetailOptions {
     /// When true, populate `LevelPnl.by_bucket` for every level. When false,
     /// only `LevelPnl.total` is populated. Defaults to `true`.
     pub include_per_bucket_breakdown: bool,
-    /// **Deprecated and ignored.** Formerly the minimum fraction of the
-    /// absolute (L1) hazard-curve move the signed move had to reach for the
-    /// synthetic back-solved-CS01 decomposition to be considered
-    /// well-conditioned.
-    ///
-    /// `compute_credit_factor_detail` no longer back-solves a synthetic CS01:
-    /// it measures a real CS01 and attributes the non-parallel (twist /
-    /// curve-shape) residual to `curve_shape_pnl`. There is no longer an
-    /// ill-conditioned `−credit_pnl / Δs̄` divide, so no threshold to tune —
-    /// a twisted curve simply lands in `curve_shape_pnl`.
-    ///
-    /// The field is retained (the struct is `#[serde(deny_unknown_fields)]`)
-    /// only so attribution JSON written before the refactor still deserializes.
-    pub parallel_fraction_floor: f64,
 }
 
 impl Default for CreditFactorDetailOptions {
@@ -79,7 +65,6 @@ impl Default for CreditFactorDetailOptions {
         Self {
             include_per_issuer_adder: false,
             include_per_bucket_breakdown: true,
-            parallel_fraction_floor: 1e-3,
         }
     }
 }
@@ -527,7 +512,6 @@ mod tests {
         let opts = CreditFactorDetailOptions {
             include_per_issuer_adder: false,
             include_per_bucket_breakdown: false,
-            parallel_fraction_floor: 1e-3,
         };
         let detail = compute_credit_factor_attribution(&model, &opts, &positions, &period).unwrap();
         for level in &detail.levels {

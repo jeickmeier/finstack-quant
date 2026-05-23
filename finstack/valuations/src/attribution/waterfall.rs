@@ -42,7 +42,6 @@ use super::helpers::*;
 use super::model_params;
 use super::types::*;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::metrics::sensitivities::theta::collect_cashflows_in_period;
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
@@ -311,34 +310,21 @@ pub fn attribute_pnl_waterfall_with_credit_model(
         match factor {
             AttributionFactor::Carry => {
                 let theta = factor_pnl;
-                let coupon_income_value = collect_cashflows_in_period(
+                let carry_inputs = total_return_carry_inputs(
                     ctx.current_instrument.as_ref(),
                     &ctx.current_market,
+                    market_t0,
                     ctx.as_of_t0,
                     ctx.as_of_t1,
                     factor_pnl.currency(),
-                )
-                .unwrap_or(0.0);
-                let coupon_income = Money::new(coupon_income_value, factor_pnl.currency());
+                );
 
-                let roll_down_opt = if let Ok(val_res) = ctx.current_instrument.price_with_metrics(
-                    market_t0,
-                    as_of_t0,
-                    &[crate::metrics::MetricId::RollDown],
-                    crate::instruments::common_impl::traits::PricingOptions::default(),
-                ) {
-                    val_res
-                        .measures
-                        .get(crate::metrics::MetricId::RollDown.as_str())
-                        .copied()
-                } else {
-                    None
-                };
-                let time_period_days = (as_of_t1 - as_of_t0).whole_days() as f64;
-                let roll_down = roll_down_opt
-                    .map(|rd| Money::new(rd * time_period_days, factor_pnl.currency()));
-
-                apply_total_return_carry(&mut attribution, theta, coupon_income, roll_down)?;
+                apply_total_return_carry(
+                    &mut attribution,
+                    theta,
+                    carry_inputs.coupon_income,
+                    carry_inputs.roll_down,
+                )?;
             }
             AttributionFactor::RatesCurves => attribution.rates_curves_pnl = factor_pnl,
             AttributionFactor::CreditCurves => attribution.credit_curves_pnl = factor_pnl,

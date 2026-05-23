@@ -834,16 +834,31 @@ class PnlAttribution:
         """Diagnostic notes and warnings."""
         ...
 
-    def residual_within_tolerance(self, pct_tolerance: float = 0.1, abs_tolerance: float = 1.0) -> bool:
+    @property
+    def result_invalid(self) -> bool:
+        """True when attribution was flagged invalid and residual checks should fail."""
+        ...
+
+    def residual_within_tolerance(
+        self,
+        pct_tolerance: float | None = None,
+        abs_tolerance: float | None = None,
+    ) -> bool:
         """Check if residual is within tolerance.
 
         Args:
             pct_tolerance: Percentage tolerance (e.g. 0.1 for 0.1%).
+                Defaults to the attribution's stored ``meta.tolerance_pct``.
             abs_tolerance: Absolute tolerance (e.g. 100.0 for $100).
+                Defaults to the attribution's stored ``meta.tolerance_abs``.
 
         Returns:
             ``True`` if residual is within tolerance.
         """
+        ...
+
+    def residual_within_meta_tolerance(self) -> bool:
+        """Check residual using the attribution's stored method-specific tolerances."""
         ...
 
     def explain(self) -> str:

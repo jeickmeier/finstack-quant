@@ -9,6 +9,7 @@ P&L attribution decomposes mark-to-market change between two dates into factor c
 | **Parallel** | `parallel.rs` | Isolate one factor at a time (T₀ level for that factor, T₁ elsewhere). Residual captures cross-effects. |
 | **Waterfall** | `waterfall.rs` | Apply factors in order; factor P&Ls sum to total P&L up to tolerance. Order matters. |
 | **Metrics-based** | `metrics_based.rs` | Linear (and optional second-order) approximation from precomputed metrics; no extra repricing. |
+| **Taylor** | `taylor.rs` | Sensitivity-based Taylor expansion from bump-and-reprice Greeks; optional second-order terms. |
 
 Default waterfall order: Carry → RatesCurves → CreditCurves → InflationCurves → Correlations → Fx → Volatility → ModelParameters → MarketScalars (`default_waterfall_order()`).
 
@@ -50,7 +51,7 @@ Metrics-based attribution needs metrics at both dates (for example `Theta`, `Dv0
 
 ## Extending
 
-A new factor requires updates to `types.rs`, `factors.rs`, all three methodology modules, `dataframe.rs`, and `default_waterfall_order()`. Follow an existing factor implementation.
+A new factor requires updates to `types.rs`, `factors.rs`, all four methodology modules, `dataframe.rs`, and `default_waterfall_order()`. Follow an existing factor implementation.
 
 ## Related
 

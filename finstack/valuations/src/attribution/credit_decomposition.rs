@@ -89,8 +89,7 @@ impl AttributionSpec {
         //    (par CDS spread bp), so `cs01_amt × delta_bp` is consistent and the
         //    decomposition reconciles to the par-spread `credit_curves_pnl`.
         //    This real CS01 replaces the former synthetic `−credit_pnl / ds_i`
-        //    back-solve, whose divide-by-near-zero forced the twist workaround
-        //    (`parallel_fraction_floor`).
+        //    back-solve, whose divide-by-near-zero forced a twist workaround.
         let cs01_bump_bp = 1.0_f64;
         let disc = cascade.discount_curve_id.as_ref();
         let pv_up = instrument.value(

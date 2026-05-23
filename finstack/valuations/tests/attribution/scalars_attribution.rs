@@ -13,7 +13,7 @@ use finstack_valuations::instruments::Instrument;
 
 #[test]
 fn test_scalars_snapshot_extraction() {
-    use finstack_valuations::attribution::{CurveRestoreFlags, MarketSnapshot, ScalarsSnapshot};
+    use finstack_valuations::attribution::{CurveRestoreFlags, MarketSnapshot};
 
     // Create market with various scalars
     let market = MarketContext::new()
@@ -26,8 +26,8 @@ fn test_scalars_snapshot_extraction() {
             MarketScalar::Price(Money::new(400.0, Currency::USD)),
         );
 
-    // Extract scalars snapshot (thin wrapper — still useful for bare-metal checks).
-    let snapshot = ScalarsSnapshot::extract(&market);
+    // Extract scalars through the unified market snapshot path.
+    let snapshot = MarketSnapshot::extract(&market, CurveRestoreFlags::SCALARS);
 
     // Verify extraction
     assert_eq!(snapshot.prices.len(), 2);
@@ -35,10 +35,9 @@ fn test_scalars_snapshot_extraction() {
     assert!(snapshot.prices.contains_key(&CurveId::from("MSFT")));
 
     // Restore to new market via the unified MarketSnapshot::restore_market path.
-    let unified = snapshot.into_market_snapshot();
     let empty_market = MarketContext::new();
     let restored =
-        MarketSnapshot::restore_market(&empty_market, &unified, CurveRestoreFlags::SCALARS);
+        MarketSnapshot::restore_market(&empty_market, &snapshot, CurveRestoreFlags::SCALARS);
 
     // Verify restoration
     let aapl_price = restored.get_price("AAPL").unwrap();

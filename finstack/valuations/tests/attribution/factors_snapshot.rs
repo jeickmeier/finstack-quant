@@ -6,9 +6,7 @@ use finstack_core::market_data::term_structures::{
 };
 use finstack_core::math::interp::InterpStyle;
 use finstack_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
-use finstack_valuations::attribution::{
-    CurveRestoreFlags, MarketSnapshot, ScalarsSnapshot, VolatilitySnapshot,
-};
+use finstack_valuations::attribution::{CurveRestoreFlags, MarketSnapshot};
 use std::sync::Arc;
 use time::macros::date;
 
@@ -411,14 +409,14 @@ fn test_restore_fx_with_none_snapshot_clears_current_fx() {
 #[test]
 fn test_volatility_snapshot_extract() {
     let market = MarketContext::new();
-    let snapshot = VolatilitySnapshot::extract(&market);
+    let snapshot = MarketSnapshot::extract(&market, CurveRestoreFlags::VOL);
     assert!(snapshot.surfaces.is_empty());
 }
 
 #[test]
 fn test_scalars_snapshot_extract() {
     let market = MarketContext::new();
-    let snapshot = ScalarsSnapshot::extract(&market);
+    let snapshot = MarketSnapshot::extract(&market, CurveRestoreFlags::SCALARS);
     assert_eq!(snapshot.prices.len(), 0);
     assert_eq!(snapshot.series.len(), 0);
     assert_eq!(snapshot.inflation_indices.len(), 0);

@@ -570,7 +570,6 @@ fn per_bucket_breakdown_can_be_disabled() {
     let opts = CreditFactorDetailOptions {
         include_per_issuer_adder: false,
         include_per_bucket_breakdown: false,
-        parallel_fraction_floor: 1e-3,
     };
     let detail =
         compute_credit_factor_attribution(&model, &opts, &positions(), &period).expect("ok");

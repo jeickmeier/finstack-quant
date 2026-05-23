@@ -325,9 +325,7 @@ pub use types::{
 pub use metrics_based::attribute_pnl_metrics_based;
 pub use model_params::{
     extract_model_params, measure_conversion_shift, measure_default_shift,
-    measure_prepayment_shift, measure_recovery_shift, try_measure_conversion_shift,
-    try_measure_default_shift, try_measure_prepayment_shift, try_measure_recovery_shift,
-    with_model_params, ModelParamsSnapshot,
+    measure_prepayment_shift, measure_recovery_shift, with_model_params, ModelParamsSnapshot,
 };
 pub use parallel::attribute_pnl_parallel;
 pub use spec::{
@@ -340,10 +338,8 @@ pub use taylor::{
 };
 pub use waterfall::{attribute_pnl_waterfall, default_waterfall_order};
 // Market snapshot helpers
-pub use factors::{
-    CurveRestoreFlags, MarketRestoreFlags, MarketSnapshot, ScalarsSnapshot, VolatilitySnapshot,
-};
-pub use helpers::{compute_pnl, compute_pnl_with_fx, reprice_instrument};
+pub use factors::{CurveRestoreFlags, MarketRestoreFlags, MarketSnapshot};
+pub use helpers::{compute_pnl, compute_pnl_with_fx};
 
 use crate::instruments::common_impl::traits::Instrument;
 use finstack_core::currency::Currency;
@@ -361,11 +357,11 @@ use std::sync::Arc;
 /// factors contributed. For a factor-level decomposition, reach for
 /// one of the `attribute_pnl_*` functions listed in the module docs.
 ///
-/// This is intentionally a thin wrapper over
-/// [`reprice_instrument`] + [`compute_pnl_with_fx`]: the function is
-/// cheap, it allocates no scratch buffers, and it contains no factor
-/// iteration. Benchmark the heavier methodologies against this
-/// baseline to quantify the cost of factor attribution.
+/// This is intentionally a thin wrapper over direct repricing plus
+/// [`compute_pnl_with_fx`]: the function is cheap, it allocates no scratch
+/// buffers, and it contains no factor iteration. Benchmark the heavier
+/// methodologies against this baseline to quantify the cost of factor
+/// attribution.
 ///
 /// # Arguments
 ///
@@ -419,8 +415,8 @@ pub fn simple_pnl_bridge(
     as_of_t1: Date,
     target_ccy: Currency,
 ) -> finstack_core::Result<Money> {
-    let v_t0 = reprice_instrument(instrument, market_t0, as_of_t0)?;
-    let v_t1 = reprice_instrument(instrument, market_t1, as_of_t1)?;
+    let v_t0 = helpers::reprice_instrument(instrument, market_t0, as_of_t0)?;
+    let v_t1 = helpers::reprice_instrument(instrument, market_t1, as_of_t1)?;
     compute_pnl_with_fx(
         v_t0, v_t1, target_ccy, market_t0, market_t1, as_of_t0, as_of_t1,
     )
