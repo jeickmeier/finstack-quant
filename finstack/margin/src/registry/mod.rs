@@ -865,7 +865,8 @@ fn parse_simm(value: Option<&Value>) -> Result<HashMap<String, SimmParams>> {
 // Public helper for overrides via FinstackConfig
 // -----------------------------------------------------------------------------//
 
-/// Extension key used by [`finstack_core::config::FinstackConfig`] for margin-registry JSON overlays.
+/// Legacy-compatible extension key used by [`finstack_core::config::FinstackConfig`]
+/// for margin-registry JSON overlays.
 pub const MARGIN_REGISTRY_EXTENSION_KEY: &str = "valuations.margin_registry.v1";
 
 /// Build a margin registry from a [`finstack_core::config::FinstackConfig`] extension overlay.

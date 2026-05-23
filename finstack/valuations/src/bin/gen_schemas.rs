@@ -416,13 +416,5 @@ fn main() {
         "market_quote"
     );
 
-    // Margin
-    gen_standalone_schema!(
-        "margin",
-        finstack_margin::types::OtcMarginSpec,
-        "margin/1",
-        "margin"
-    );
-
     println!("\nDone! Updated all schemas.");
 }

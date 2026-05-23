@@ -54,8 +54,8 @@ Repo margining is implemented following **GMRA 2011** (Global Master Repurchase 
 ### Adding Margin Specification
 
 ```rust
-use finstack_valuations::instruments::rates::repo::{Repo, RepoMarginSpec, RepoMarginType};
-use finstack_margin::{MarginFrequency, EligibleCollateralSchedule};
+use finstack_margin::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};
+use finstack_valuations::instruments::rates::repo::Repo;
 
 // Create a repo with mark-to-market margining
 let mut repo = Repo::example();
@@ -65,7 +65,7 @@ repo.margin_spec = Some(RepoMarginSpec {
     margin_type: RepoMarginType::MarkToMarket,
     margin_ratio: 1.02,              // 102% collateralization required
     margin_call_threshold: 0.01,     // 1% deviation triggers call
-    call_frequency: MarginFrequency::Daily,
+    call_frequency: MarginTenor::Daily,
     settlement_lag: 1,               // T+1 settlement
     pays_margin_interest: true,
     margin_interest_rate: Some(0.05), // 5% on cash margin

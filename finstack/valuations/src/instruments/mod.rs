@@ -142,6 +142,8 @@
 #[path = "common/mod.rs"]
 pub(crate) mod common_impl;
 
+mod marginable;
+
 /// Shared pricing infrastructure (schedules, generic pricers, TRS engine, etc.).
 pub mod pricing {
     pub use super::common_impl::pricing::*;

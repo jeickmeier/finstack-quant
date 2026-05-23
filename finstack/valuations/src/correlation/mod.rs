@@ -16,6 +16,12 @@
 //! [`crate::correlation::joint_probabilities`]) are re-exported from
 //! [`finstack_core::math::probability`].
 //!
+//! Matrix-validation helpers (`Error`, `Result`, `validate_correlation_matrix`,
+//! `nearest_correlation_matrix`, `NearestCorrelationOpts`) are re-exported from
+//! [`finstack_analytics::correlation`], which is the canonical home for those
+//! types so downstream crates (e.g. `finstack-factor-model`) can consume them
+//! without depending on `finstack-valuations`.
+//!
 //! # Utilities
 //!
 //! - [`crate::correlation::validate_correlation_matrix`]: Validate correlation matrices
@@ -39,9 +45,7 @@
 //!   `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
 
 pub mod copula;
-pub mod error;
 pub mod factor_model;
-pub mod nearest_correlation;
 pub mod recovery;
 
 // Re-export commonly used types
@@ -49,14 +53,14 @@ pub use copula::{
     Copula, CopulaSpec, GaussianCopula, MultiFactorCopula, RandomFactorLoadingCopula,
     StudentTCopula,
 };
-pub use error::{Error, Result};
 pub use factor_model::{
     cholesky_decompose, FactorModelKind, FactorSpec, MultiFactorModel, SingleFactorModel,
     TwoFactorModel,
 };
-pub use finstack_analytics::correlation::validate_correlation_matrix;
+pub use finstack_analytics::correlation::{
+    nearest_correlation_matrix, validate_correlation_matrix, Error, NearestCorrelationOpts, Result,
+};
 pub use finstack_core::math::probability::{
     correlation_bounds, joint_probabilities, CorrelatedBernoulli,
 };
-pub use nearest_correlation::{nearest_correlation_matrix, NearestCorrelationOpts};
 pub use recovery::{ConstantRecovery, CorrelatedRecovery, RecoveryModel, RecoverySpec};

@@ -27,7 +27,6 @@ schemas/
     exotics/               # Asian, barrier, lookback, basket options
   calibration/2/           # Calibration plan & result schemas (v2)
   cashflow/1/              # Cashflow component specs (v1)
-  margin/1/                # OTC margin & CSA specs (v1)
   results/1/               # Valuation result schema (v1)
   attribution/1/           # P&L attribution specs & results (v1)
 ```

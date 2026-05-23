@@ -6,11 +6,10 @@
 //! - Margin call scenarios
 
 use finstack_core::{currency::Currency, dates::Date, money::Money, types::CurveId};
-use finstack_margin::{CsaSpec, MarginTenor, VmCalculator, VmParameters};
-use finstack_valuations::instruments::{
-    rates::repo::{RepoMarginSpec, RepoMarginType},
-    CollateralSpec, Repo,
+use finstack_margin::{
+    CsaSpec, MarginTenor, RepoMarginSpec, RepoMarginType, VmCalculator, VmParameters,
 };
+use finstack_valuations::instruments::{CollateralSpec, Repo};
 use time::Month;
 
 fn test_date() -> Date {

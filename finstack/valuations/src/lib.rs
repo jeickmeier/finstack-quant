@@ -195,6 +195,7 @@
 //! - [`crate::results`]: Valuation result envelopes and metadata
 //! - [`crate::constants`]: Common numerical constants (basis points, etc.)
 //! - [`finstack_covenants`]: Covenant checking for structured products
+//! - [`finstack_margin`]: Margin, collateral, VM/IM, and regulatory capital helpers
 //! - [`crate::schema`]: JSON Schema generation for API contracts
 //!
 //! # Semantic Contracts
@@ -224,7 +225,7 @@
 //! - [`crate::prelude`]: Convenient re-exports of commonly used types
 //!
 //! ## Layer 2: Extended API (Less Common)
-//! - [`crate::margin`]: Margin calculations (VM/IM/CSA) for collateralized derivatives
+//! - [`finstack_margin`]: Margin calculations (VM/IM/CSA) for collateralized derivatives
 //! - `finstack-attribution`: P&L attribution analysis built on valuation results
 //! - [`finstack_covenants`]: Covenant checking for structured products
 //! - [`finstack_cashflows`]: Advanced cashflow schedule builders
@@ -365,11 +366,6 @@ pub(crate) mod contract_specs;
 pub mod correlation;
 /// Error types for pricing and valuation workflows.
 pub mod error;
-/// Margin calculation for collateralized derivatives.
-///
-/// Provides VM (Variation Margin) and IM (Initial Margin) calculations,
-/// CSA (Credit Support Annex) modeling, and netting set aggregation.
-pub mod margin;
 /// Market quotes and conventions
 pub mod market;
 /// Convenient re-exports for pricing and risk calculations.

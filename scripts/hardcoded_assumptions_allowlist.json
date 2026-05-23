@@ -2894,7 +2894,7 @@
       "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
     },
     {
-      "path": "finstack/valuations/src/margin/impls.rs",
+      "path": "finstack/valuations/src/instruments/marginable.rs",
       "category": "credit_assumption",
       "contains": "years_to_maturity * (1.0 - recovery_rate) * DURATION_APPROXIMATION_FACTOR;",
       "reason": "Financial formula or unit conversion, not an external default to configure."

@@ -30,9 +30,10 @@ pulling the full instrument stack.
 | `xva` | Public: `types` (config, profiles, results). Engines are crate-internal. |
 
 Registry JSON is embedded at build time. Overlays use the Finstack config
-extension key `valuations.margin_registry.v1` (parsed by the private `registry`
-module). Factory methods such as `CsaSpec::usd_regulatory()` and
-`OtcMarginSpec::usd_bilateral()` resolve defaults from that registry.
+extension key `valuations.margin_registry.v1`; the name is legacy-compatible,
+but the registry and embedded data are owned by `finstack-margin`. Factory
+methods such as `CsaSpec::usd_regulatory()` and `OtcMarginSpec::usd_bilateral()`
+resolve defaults from that registry.
 
 ## Quick examples
 
@@ -172,7 +173,7 @@ assert!(im.amount.amount() >= 0.0);
 | `data/margin/xva_defaults.v1.json` | XVA horizons and stochastic exposure defaults |
 | `schemas/margin/1/margin.schema.json` | External margin-spec JSON schema |
 
-Config overlay shape (extension key `valuations.margin_registry.v1`):
+Config overlay shape (legacy-compatible extension key `valuations.margin_registry.v1`):
 
 ```json
 {

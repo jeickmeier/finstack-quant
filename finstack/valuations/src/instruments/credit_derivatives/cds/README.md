@@ -47,7 +47,7 @@ Credit default swaps implement full margin support following **ISDA CSA** standa
 ```rust
 use finstack_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_margin::{
-    OtcMarginSpec, CsaSpec, ClearingStatus, ImMethodology, MarginFrequency,
+    OtcMarginSpec, CsaSpec, ClearingStatus, ImMethodology, MarginTenor,
 };
 
 let mut cds = CreditDefaultSwap::example();
@@ -57,7 +57,7 @@ cds.margin_spec = Some(OtcMarginSpec {
     csa: CsaSpec::usd_regulatory(),
     clearing_status: ClearingStatus::Bilateral,
     im_methodology: ImMethodology::Simm,
-    vm_frequency: MarginFrequency::Daily,
+    vm_frequency: MarginTenor::Daily,
     settlement_lag: 1,
 });
 ```
@@ -70,7 +70,7 @@ cds.margin_spec = Some(OtcMarginSpec {
     csa: CsaSpec::usd_regulatory(),
     clearing_status: ClearingStatus::Cleared { ccp: "ICE".to_string() },
     im_methodology: ImMethodology::ClearingHouse,
-    vm_frequency: MarginFrequency::Daily,
+    vm_frequency: MarginTenor::Daily,
     settlement_lag: 0,
 });
 ```

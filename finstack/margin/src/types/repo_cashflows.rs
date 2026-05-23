@@ -3,8 +3,8 @@
 use finstack_core::cashflow::{CFKind, CashFlow};
 use finstack_core::dates::Date;
 use finstack_core::money::Money;
-use finstack_margin::types::MarginCall;
-use finstack_margin::RepoMarginSpec;
+
+use super::{MarginCall, RepoMarginSpec};
 
 /// Generate margin-related cashflows for a repo.
 ///
@@ -138,22 +138,11 @@ pub fn margin_calls_to_cashflows(calls: &[MarginCall]) -> Vec<CashFlow> {
         .iter()
         .map(|call| {
             let kind = match call.call_type {
-                finstack_margin::MarginCallType::InitialMargin => CFKind::InitialMarginPost,
-                finstack_margin::MarginCallType::VariationMarginDelivery => {
-                    CFKind::VariationMarginPay
-                }
-                finstack_margin::MarginCallType::VariationMarginReturn => {
-                    CFKind::VariationMarginReceive
-                }
-                finstack_margin::MarginCallType::TopUp => CFKind::VariationMarginPay,
-                finstack_margin::MarginCallType::Substitution => CFKind::CollateralSubstitutionOut,
-                _ => {
-                    tracing::warn!(
-                        call_type = %call.call_type,
-                        "unrecognized margin call type in repo cashflow bridge; defaulting to variation margin pay"
-                    );
-                    CFKind::VariationMarginPay
-                }
+                super::MarginCallType::InitialMargin => CFKind::InitialMarginPost,
+                super::MarginCallType::VariationMarginDelivery => CFKind::VariationMarginPay,
+                super::MarginCallType::VariationMarginReturn => CFKind::VariationMarginReceive,
+                super::MarginCallType::TopUp => CFKind::VariationMarginPay,
+                super::MarginCallType::Substitution => CFKind::CollateralSubstitutionOut,
             };
 
             CashFlow {

@@ -48,6 +48,7 @@ pub use calculators::{
 };
 pub use traits::Marginable;
 pub use types::{
+    generate_margin_cashflows, generate_margin_interest_cashflows, margin_calls_to_cashflows,
     ClearingStatus, CollateralAssetClass, CollateralEligibility, ConcentrationBreach, CsaSpec,
     EligibleCollateralSchedule, ImMethodology, ImParameters, InstrumentMarginResult, MarginCall,
     MarginCallTiming, MarginCallType, MarginTenor, MaturityConstraints, NettingSetId,
