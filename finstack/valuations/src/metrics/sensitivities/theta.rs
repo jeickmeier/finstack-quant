@@ -445,28 +445,6 @@ fn store_theta_breakdown(context: &mut crate::metrics::MetricContext, breakdown:
         .insert(crate::metrics::MetricId::ThetaRollDown, breakdown.roll_down);
 }
 
-/// Lookup calculator for theta sub-components stored by [`GenericThetaAny`].
-///
-/// Returns a value previously inserted into [`MetricContext::computed`] by the
-/// decomposition calculator, avoiding redundant re-computation.
-pub(crate) struct ThetaComponentLookup(pub crate::metrics::MetricId);
-
-impl crate::metrics::MetricCalculator for ThetaComponentLookup {
-    fn calculate(&self, context: &mut crate::metrics::MetricContext) -> Result<f64> {
-        context.computed.get(&self.0).copied().ok_or_else(|| {
-            finstack_core::InputError::NotFound {
-                id: format!("metric:{}", self.0),
-            }
-            .into()
-        })
-    }
-
-    fn dependencies(&self) -> &[crate::metrics::MetricId] {
-        static DEPS: &[crate::metrics::MetricId] = &[crate::metrics::MetricId::Theta];
-        DEPS
-    }
-}
-
 /// Universal theta calculator that works with any instrument via the Instrument trait.
 ///
 /// Computes theta as the total carry from rolling the valuation date forward:

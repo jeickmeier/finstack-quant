@@ -12,4 +12,5 @@ pub(crate) mod finite_difference;
 pub(crate) mod ids;
 pub(crate) mod registration_macro;
 pub(crate) mod registry;
+pub(crate) mod standard_registry;
 pub(crate) mod traits;

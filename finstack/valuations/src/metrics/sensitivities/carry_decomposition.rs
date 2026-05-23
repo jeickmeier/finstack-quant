@@ -101,25 +101,6 @@ impl MetricCalculator for CarryDecompositionCalculator {
     }
 }
 
-/// Lookup calculator for carry sub-components stored by [`CarryDecompositionCalculator`].
-pub(crate) struct CarryComponentLookup(pub MetricId);
-
-impl MetricCalculator for CarryComponentLookup {
-    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        context.computed.get(&self.0).copied().ok_or_else(|| {
-            finstack_core::InputError::NotFound {
-                id: format!("metric:{}", self.0),
-            }
-            .into()
-        })
-    }
-
-    fn dependencies(&self) -> &[MetricId] {
-        static DEPS: &[MetricId] = &[MetricId::CarryTotal];
-        DEPS
-    }
-}
-
 fn build_flat_curve_market(context: &MetricContext, ytm: f64) -> Result<MarketContext> {
     let curve_id = discount_curve_id(context)?;
     let original_curve = context.curves.get_discount(curve_id.as_str())?;

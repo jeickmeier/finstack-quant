@@ -5,9 +5,40 @@
 //! risk metrics like DV01, Theta, etc.
 
 use crate::metrics::core::traits::{MetricCalculator, MetricContext};
-use crate::metrics::risk::{calculate_var_with_pricing, VarConfig};
+use crate::metrics::risk::{calculate_var_with_pricing, VarConfig, VarResult};
 use crate::metrics::MetricId;
 use finstack_core::Result;
+
+fn calculate_var_result(
+    context: &mut MetricContext,
+    default_config: &VarConfig,
+    missing_history_message: &str,
+) -> Result<VarResult> {
+    let history = context
+        .get_market_history()
+        .ok_or_else(|| finstack_core::Error::Validation(missing_history_message.to_string()))?;
+    let config = context
+        .get_metric_overrides()
+        .and_then(|overrides| overrides.var_config.clone())
+        .unwrap_or_else(|| default_config.clone());
+    let (pricing_model, pricer_registry) = context.clone_pricer_dispatch();
+    calculate_var_with_pricing(
+        &[context.instrument.as_ref()],
+        &context.curves,
+        history,
+        context.as_of,
+        &config,
+        pricing_model,
+        pricer_registry,
+    )
+}
+
+fn cache_num_scenarios(context: &mut MetricContext, result: &VarResult) {
+    context.computed.insert(
+        MetricId::custom("hvar_num_scenarios"),
+        result.num_scenarios as f64,
+    );
+}
 
 /// Generic Historical VaR calculator that works with any instrument.
 ///
@@ -47,35 +78,16 @@ impl MetricCalculator for GenericHVar {
             return Ok(var);
         }
 
-        let history = context.get_market_history().ok_or_else(|| {
-            finstack_core::Error::Validation(
-                "Market history required for VaR calculation. Provide it via Instrument::price_with_metrics(...) with PricingOptions::with_market_history(...)"
-                    .to_string(),
-            )
-        })?;
-
-        let config = context
-            .get_metric_overrides()
-            .and_then(|overrides| overrides.var_config.clone())
-            .unwrap_or_else(|| self.config.clone());
-        let (pricing_model, pricer_registry) = context.clone_pricer_dispatch();
-        let result = calculate_var_with_pricing(
-            &[context.instrument.as_ref()],
-            &context.curves,
-            history,
-            context.as_of,
-            &config,
-            pricing_model,
-            pricer_registry,
+        let result = calculate_var_result(
+            context,
+            &self.config,
+            "Market history required for VaR calculation. Provide it via Instrument::price_with_metrics(...) with PricingOptions::with_market_history(...)",
         )?;
 
         context
             .computed
             .insert(MetricId::ExpectedShortfall, result.expected_shortfall);
-        context.computed.insert(
-            MetricId::custom("hvar_num_scenarios"),
-            result.num_scenarios as f64,
-        );
+        cache_num_scenarios(context, &result);
 
         Ok(result.var)
     }
@@ -108,33 +120,14 @@ impl MetricCalculator for GenericExpectedShortfall {
             return Ok(es);
         }
 
-        let history = context.get_market_history().ok_or_else(|| {
-            finstack_core::Error::Validation(
-                "Market history required for VaR/ES calculation. Provide it via Instrument::price_with_metrics(...) with PricingOptions::with_market_history(...)"
-                    .to_string(),
-            )
-        })?;
-
-        let config = context
-            .get_metric_overrides()
-            .and_then(|overrides| overrides.var_config.clone())
-            .unwrap_or_else(|| self.config.clone());
-        let (pricing_model, pricer_registry) = context.clone_pricer_dispatch();
-        let result = calculate_var_with_pricing(
-            &[context.instrument.as_ref()],
-            &context.curves,
-            history,
-            context.as_of,
-            &config,
-            pricing_model,
-            pricer_registry,
+        let result = calculate_var_result(
+            context,
+            &self.config,
+            "Market history required for VaR/ES calculation. Provide it via Instrument::price_with_metrics(...) with PricingOptions::with_market_history(...)",
         )?;
 
         context.computed.insert(MetricId::HVar, result.var);
-        context.computed.insert(
-            MetricId::custom("hvar_num_scenarios"),
-            result.num_scenarios as f64,
-        );
+        cache_num_scenarios(context, &result);
 
         Ok(result.expected_shortfall)
     }

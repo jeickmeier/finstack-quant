@@ -410,6 +410,18 @@ fn missing_credit_curve_error<I: Instrument>(
     ))
 }
 
+fn resolve_optional_cs01_curves<I: Instrument + CurveDependencies>(
+    instrument: &I,
+    empty_credit_curve_zero: bool,
+    metric_name: &str,
+) -> finstack_core::Result<Option<(CurveId, Option<CurveId>)>> {
+    match resolve_cs01_curves(instrument)? {
+        Cs01Curves::Resolved(hazard_id, discount_id) => Ok(Some((hazard_id, discount_id))),
+        Cs01Curves::NoCreditCurve if empty_credit_curve_zero => Ok(None),
+        Cs01Curves::NoCreditCurve => Err(missing_credit_curve_error(instrument, metric_name)),
+    }
+}
+
 /// Generic BucketedCs01 calculator that works for any instrument implementing
 /// the required traits.
 pub(crate) struct GenericBucketedCs01<I> {
@@ -455,30 +467,17 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let (hazard_id, discount_id) = match resolve_cs01_curves(instrument)? {
-            Cs01Curves::Resolved(hazard_id, discount_id) => (hazard_id, discount_id),
-            Cs01Curves::NoCreditCurve if self.empty_credit_curve_zero => return Ok(0.0),
-            Cs01Curves::NoCreditCurve => {
-                return Err(missing_credit_curve_error(instrument, "CS01"))
-            }
+        let Some((hazard_id, discount_id)) =
+            resolve_optional_cs01_curves(instrument, self.empty_credit_curve_zero, "CS01")?
+        else {
+            return Ok(0.0);
         };
 
         let bump_bp =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?
                 .credit_spread_bump_bp;
 
-        let inst_arc = Arc::clone(&context.instrument);
-        let (model, registry) = context.clone_pricer_dispatch();
-        let as_of = context.as_of;
-
-        let reval = move |temp_ctx: &finstack_core::market_data::context::MarketContext| {
-            if let (Some(model), Some(registry)) = (model, registry.as_ref()) {
-                return registry
-                    .price_raw(inst_arc.as_ref(), model, temp_ctx, as_of)
-                    .map_err(Into::into);
-            }
-            inst_arc.value_raw(temp_ctx, as_of)
-        };
+        let reval = cs01_reval(context, true);
 
         let cs01 = compute_parallel_cs01_with_context_raw(
             context,
@@ -525,12 +524,10 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let (hazard_id, discount_id) = match resolve_cs01_curves(instrument)? {
-            Cs01Curves::Resolved(hazard_id, discount_id) => (hazard_id, discount_id),
-            Cs01Curves::NoCreditCurve if self.empty_credit_curve_zero => return Ok(0.0),
-            Cs01Curves::NoCreditCurve => {
-                return Err(missing_credit_curve_error(instrument, "CS01"))
-            }
+        let Some((hazard_id, discount_id)) =
+            resolve_optional_cs01_curves(instrument, self.empty_credit_curve_zero, "CS01")?
+        else {
+            return Ok(0.0);
         };
 
         let defaults =
@@ -538,18 +535,7 @@ where
         let buckets = defaults.cs01_buckets_years;
         let bump_bp = defaults.credit_spread_bump_bp;
 
-        let inst_arc = Arc::clone(&context.instrument);
-        let (model, registry) = context.clone_pricer_dispatch();
-        let as_of = context.as_of;
-
-        let reval = move |temp_ctx: &finstack_core::market_data::context::MarketContext| {
-            if let (Some(model), Some(registry)) = (model, registry.as_ref()) {
-                return registry
-                    .price_raw(inst_arc.as_ref(), model, temp_ctx, as_of)
-                    .map_err(Into::into);
-            }
-            inst_arc.value_raw(temp_ctx, as_of)
-        };
+        let reval = cs01_reval(context, true);
 
         let series_id = MetricId::custom(format!("bucketed_cs01::{}", hazard_id.as_str()));
 
@@ -610,12 +596,10 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let (hazard_id, _discount_id) = match resolve_cs01_curves(instrument)? {
-            Cs01Curves::Resolved(hazard_id, discount_id) => (hazard_id, discount_id),
-            Cs01Curves::NoCreditCurve if self.empty_credit_curve_zero => return Ok(0.0),
-            Cs01Curves::NoCreditCurve => {
-                return Err(missing_credit_curve_error(instrument, "CS01Hazard"))
-            }
+        let Some((hazard_id, _discount_id)) =
+            resolve_optional_cs01_curves(instrument, self.empty_credit_curve_zero, "CS01Hazard")?
+        else {
+            return Ok(0.0);
         };
 
         let bump_bp =
@@ -693,12 +677,13 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let (hazard_id, _discount_id) = match resolve_cs01_curves(instrument)? {
-            Cs01Curves::Resolved(hazard_id, discount_id) => (hazard_id, discount_id),
-            Cs01Curves::NoCreditCurve if self.empty_credit_curve_zero => return Ok(0.0),
-            Cs01Curves::NoCreditCurve => {
-                return Err(missing_credit_curve_error(instrument, "BucketedCs01Hazard"))
-            }
+        let Some((hazard_id, _discount_id)) = resolve_optional_cs01_curves(
+            instrument,
+            self.empty_credit_curve_zero,
+            "BucketedCs01Hazard",
+        )?
+        else {
+            return Ok(0.0);
         };
 
         let defaults =
@@ -811,9 +796,9 @@ pub(crate) trait CdsCs01Conventions {
     }
 }
 
-/// Build the reval closure used by the credit CS01 calculators, honouring the
+/// Build the reval closure used by CS01 calculators, honouring the
 /// instrument's [`CdsCs01Conventions::cs01_use_pricer_registry`] preference.
-fn credit_cs01_reval(
+fn cs01_reval(
     context: &MetricContext,
     use_registry: bool,
 ) -> impl FnMut(&MarketContext) -> finstack_core::Result<f64> {
@@ -897,7 +882,7 @@ where
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?
                 .credit_spread_bump_bp;
 
-        let reval = credit_cs01_reval(context, use_registry);
+        let reval = cs01_reval(context, use_registry);
 
         let cs01_result = compute_parallel_cs01_with_context_raw(
             context,
@@ -982,7 +967,7 @@ where
         let buckets = defaults.cs01_buckets_years;
         let bump_bp = defaults.credit_spread_bump_bp;
 
-        let reval = credit_cs01_reval(context, use_registry);
+        let reval = cs01_reval(context, use_registry);
 
         let series_id = MetricId::custom(format!("bucketed_cs01::{}", hazard_id.as_str()));
         let bucketed_result = compute_key_rate_cs01_series_with_context_raw(

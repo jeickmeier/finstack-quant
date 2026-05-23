@@ -283,43 +283,6 @@ pub(crate) fn bump_discount_curve_parallel(
     }])
 }
 
-/// Helper to bump a forward curve with parallel shift.
-///
-/// Creates a new MarketContext with a bumped forward curve using a parallel shift.
-/// Used for computing forward rate sensitivities via finite differences.
-///
-/// # Arguments
-///
-/// * `context` - Original market context containing the forward curve
-/// * `curve_id` - ID of the forward curve to bump
-/// * `bump_bp` - Bump size in basis points (e.g., 1.0 for 1bp)
-///
-/// # Returns
-///
-/// New MarketContext with the specified forward curve shifted in parallel by
-/// the given amount. All other market data remains unchanged.
-///
-/// # Errors
-///
-/// Returns an error if the curve ID is not found or the bump operation fails.
-///
-/// Currently unused: Taylor attribution moved to key-rate (triangular) forward
-/// bumps (audit item #3). Retained as the symmetric counterpart of
-/// [`bump_discount_curve_parallel`] for parallel-bump callers.
-#[allow(dead_code)]
-pub(crate) fn bump_forward_curve_parallel(
-    context: &finstack_core::market_data::context::MarketContext,
-    curve_id: &finstack_core::types::CurveId,
-    bump_bp: f64,
-) -> finstack_core::Result<finstack_core::market_data::context::MarketContext> {
-    use finstack_core::market_data::bumps::{BumpSpec, MarketBump};
-
-    context.bump([MarketBump::Curve {
-        id: curve_id.clone(),
-        spec: BumpSpec::parallel_bp(bump_bp),
-    }])
-}
-
 /// Helper to bump a volatility surface by an **absolute** volatility amount (vol points).
 ///
 /// This applies an additive parallel bump to the surface:
