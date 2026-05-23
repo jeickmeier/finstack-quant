@@ -248,7 +248,7 @@ mod hurdle01;
 mod nav01;
 
 /// Register all private markets fund metrics.
-pub fn register_private_markets_fund_metrics(registry: &mut MetricRegistry) {
+pub(crate) fn register_private_markets_fund_metrics(registry: &mut MetricRegistry) {
     use crate::metrics::MetricId;
     use crate::pricer::InstrumentType;
     use std::sync::Arc;

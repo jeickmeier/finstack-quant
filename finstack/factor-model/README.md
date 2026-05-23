@@ -136,11 +136,11 @@ All keyed maps are `BTreeMap`, all iteration orders are stable, and
 peer-proxy vol lists are sorted. Two calibrations with byte-identical inputs
 serialize to byte-identical JSON.
 
-### Supported / deferred features
+### Supported / reserved features
 
 - `VolModelChoice::Sample` is the only supported variant today. `Garch`,
-  `Egarch`, and `Ewma` are accepted at the type level but the calibrator
-  returns a clean `Error::Validation` if any of them is requested.
+  `Egarch`, and `Ewma` are reserved at the type level but the calibrator returns
+  a clean `Error::Validation` if any of them is requested.
 - The peer-proxy fallback chain treats `idiosyncratic_overrides` as the
   highest-precedence source for adder vols (caller → history → bucket-peer
   proxy → global mean → zero).

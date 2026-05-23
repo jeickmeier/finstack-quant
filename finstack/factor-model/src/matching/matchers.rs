@@ -84,21 +84,6 @@ pub trait FactorMatcher: Send + Sync {
         dependency: &MarketDependency,
         attributes: &Attributes,
     ) -> FactorMatchResult;
-
-    /// Convenience wrapper that returns only the deepest matched factor id.
-    ///
-    /// Equivalent to taking the last entry of [`Self::match_factor_with_betas`]
-    /// and discarding its beta. Errors and `Skip` are collapsed to `None`.
-    fn match_factor(
-        &self,
-        dependency: &MarketDependency,
-        attributes: &Attributes,
-    ) -> Option<FactorId> {
-        match self.match_factor_with_betas(dependency, attributes).ok()? {
-            Some(entries) if !entries.is_empty() => entries.last().map(|e| e.factor_id.clone()),
-            _ => None,
-        }
-    }
 }
 
 /// Helper: lift a single matched factor id into the canonical
@@ -109,6 +94,19 @@ fn one_entry(factor_id: FactorId) -> Vec<FactorMatchEntry> {
         factor_id,
         beta: 1.0,
     }]
+}
+
+#[cfg(test)]
+fn deepest_match(
+    matcher: &dyn FactorMatcher,
+    dependency: &MarketDependency,
+    attributes: &Attributes,
+) -> Option<FactorId> {
+    matcher
+        .match_factor_with_betas(dependency, attributes)
+        .ok()
+        .flatten()
+        .and_then(|entries| entries.last().map(|entry| entry.factor_id.clone()))
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +289,7 @@ mod tests_mapping_table {
         let matcher = MappingTableMatcher::new(vec![]);
         let dep = MarketDependency::Spot { id: "AAPL".into() };
         let attrs = Attributes::default();
-        assert_eq!(matcher.match_factor(&dep, &attrs), None);
+        assert_eq!(deepest_match(&matcher, &dep, &attrs), None);
     }
 
     #[test]
@@ -328,13 +326,13 @@ mod tests_mapping_table {
             .with_tag("energy")
             .with_meta("rating", "CCC");
         assert_eq!(
-            matcher.match_factor(&dep, &attrs1),
+            deepest_match(&matcher, &dep, &attrs1),
             Some(FactorId::new("NA-Energy-CCC"))
         );
 
         let attrs2 = Attributes::default().with_tag("financials");
         assert_eq!(
-            matcher.match_factor(&dep, &attrs2),
+            deepest_match(&matcher, &dep, &attrs2),
             Some(FactorId::new("Generic-Credit"))
         );
     }
@@ -356,7 +354,7 @@ mod tests_mapping_table {
             curve_type: CurveType::Discount,
         };
         let attrs = Attributes::default();
-        assert_eq!(matcher.match_factor(&dep, &attrs), None);
+        assert_eq!(deepest_match(&matcher, &dep, &attrs), None);
     }
 
     #[test]
@@ -453,7 +451,7 @@ mod tests_hierarchical {
             .with_meta("rating", "CCC");
 
         assert_eq!(
-            matcher.match_factor(&dep, &attrs),
+            deepest_match(&matcher, &dep, &attrs),
             Some(FactorId::new("NA-Energy-CCC"))
         );
     }
@@ -470,7 +468,7 @@ mod tests_hierarchical {
             .with_tag("financials");
 
         assert_eq!(
-            matcher.match_factor(&dep, &attrs),
+            deepest_match(&matcher, &dep, &attrs),
             Some(FactorId::new("NA-Credit"))
         );
     }
@@ -485,7 +483,7 @@ mod tests_hierarchical {
         let attrs = Attributes::default().with_meta("region", "APAC");
 
         assert_eq!(
-            matcher.match_factor(&dep, &attrs),
+            deepest_match(&matcher, &dep, &attrs),
             Some(FactorId::new("Generic-Credit"))
         );
     }
@@ -500,7 +498,7 @@ mod tests_hierarchical {
         let attrs = Attributes::default().with_meta("region", "EU");
 
         assert_eq!(
-            matcher.match_factor(&dep, &attrs),
+            deepest_match(&matcher, &dep, &attrs),
             Some(FactorId::new("EU-Credit"))
         );
     }
@@ -517,7 +515,7 @@ mod tests_hierarchical {
             .with_tag("energy");
 
         assert_eq!(
-            matcher.match_factor(&dep, &attrs),
+            deepest_match(&matcher, &dep, &attrs),
             Some(FactorId::new("NA-Credit"))
         );
     }
@@ -557,10 +555,10 @@ mod tests_hierarchical {
         let attrs = Attributes::default().with_meta("region", "EU");
 
         assert_eq!(
-            matcher.match_factor(&credit_dep, &attrs),
+            deepest_match(&matcher, &credit_dep, &attrs),
             Some(FactorId::new("EU-Credit"))
         );
-        assert_eq!(matcher.match_factor(&spot_dep, &attrs), None);
+        assert_eq!(deepest_match(&matcher, &spot_dep, &attrs), None);
     }
 }
 
@@ -599,7 +597,7 @@ mod tests_cascade {
             id: CurveId::new("ACME-HAZARD"),
         };
         assert_eq!(
-            cascade.match_factor(&dep1, &attrs),
+            deepest_match(&cascade, &dep1, &attrs),
             Some(FactorId::new("ACME-Specific"))
         );
 
@@ -607,18 +605,18 @@ mod tests_cascade {
             id: CurveId::new("OTHER-HAZARD"),
         };
         assert_eq!(
-            cascade.match_factor(&dep2, &attrs),
+            deepest_match(&cascade, &dep2, &attrs),
             Some(FactorId::new("Generic-Credit"))
         );
 
         let dep3 = MarketDependency::Spot { id: "AAPL".into() };
-        assert_eq!(cascade.match_factor(&dep3, &attrs), None);
+        assert_eq!(deepest_match(&cascade, &dep3, &attrs), None);
     }
 
     #[test]
     fn test_empty_cascade() {
         let cascade = CascadeMatcher::new(vec![]);
         let dep = MarketDependency::Spot { id: "AAPL".into() };
-        assert_eq!(cascade.match_factor(&dep, &Attributes::default()), None);
+        assert_eq!(deepest_match(&cascade, &dep, &Attributes::default()), None);
     }
 }

@@ -27,29 +27,17 @@ validate_correlation_matrix = _corr.validate_correlation_matrix
 nearest_correlation = _corr.nearest_correlation
 cholesky_decompose = _corr.cholesky_decompose
 
-# Deprecated aliases retained for one release cycle.
-FactorSpec = LatentFactorSpec
-FactorModel = LatentFactor
-SingleFactorModel = LatentSingleFactor
-TwoFactorModel = LatentTwoFactor
-MultiFactorModel = LatentMultiFactor
-
 __all__: list[str] = [
     "Copula",
     "CopulaSpec",
     "CorrelatedBernoulli",
-    "FactorModel",
-    "FactorSpec",
     "LatentFactor",
     "LatentFactorSpec",
     "LatentMultiFactor",
     "LatentSingleFactor",
     "LatentTwoFactor",
-    "MultiFactorModel",
     "RecoveryModel",
     "RecoverySpec",
-    "SingleFactorModel",
-    "TwoFactorModel",
     "cholesky_decompose",
     "correlation_bounds",
     "joint_probabilities",

@@ -150,7 +150,7 @@ pub(crate) fn quoted_workout_path(
 /// let mut registry = MetricRegistry::new();
 /// register_bond_metrics(&mut registry);
 /// ```
-pub fn register_bond_metrics(registry: &mut crate::metrics::MetricRegistry) {
+pub(crate) fn register_bond_metrics(registry: &mut crate::metrics::MetricRegistry) {
     use crate::metrics::{
         make_credit_bumper, make_rates_bumper, CrossFactorCalculator, CrossFactorPair, MetricId,
     };

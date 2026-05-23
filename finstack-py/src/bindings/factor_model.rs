@@ -1,8 +1,7 @@
 //! Python bindings for the `finstack-factor-model` crate.
 //!
 //! The module mirrors the Rust crate boundary. Credit hierarchy bindings are
-//! registered under `finstack.factor_model.credit`; legacy
-//! `finstack.valuations` aliases remain for compatibility.
+//! registered under `finstack.factor_model.credit`.
 
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -40,33 +39,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_submodule(&credit)?;
     m.setattr("credit", &credit)?;
 
-    // Root aliases mirror Rust crate-root re-exports while the `credit`
-    // namespace mirrors `finstack_factor_model::credit`.
-    for name in [
-        "CreditFactorModel",
-        "CreditCalibrator",
-        "LevelsAtDate",
-        "PeriodDecomposition",
-        "FactorCovarianceForecast",
-        "decompose_levels",
-        "decompose_period",
-    ] {
-        m.setattr(name, credit.getattr(name)?)?;
-    }
-
-    let all = PyList::new(
-        py,
-        [
-            "credit",
-            "CreditFactorModel",
-            "CreditCalibrator",
-            "LevelsAtDate",
-            "PeriodDecomposition",
-            "FactorCovarianceForecast",
-            "decompose_levels",
-            "decompose_period",
-        ],
-    )?;
+    let all = PyList::new(py, ["credit"])?;
     m.setattr("__all__", all)?;
     parent.add_submodule(&m)?;
 

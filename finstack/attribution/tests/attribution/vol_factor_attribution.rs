@@ -1,11 +1,7 @@
 //! Taylor vol-factor P&L attribution unit tests.
 //!
-//! Verifies that the Taylor vol attribution uses consistent units throughout:
-//! - `vega_per_point`: $ per vol point (1 vol point = 1 percentage point of vol = 0.01 absolute)
-//! - `vol_move`: vol points (as returned by `measure_vol_surface_shift`, which multiplies
-//!   the absolute move by 100)
-//! - `explained_pnl = vega_per_point × vol_move` must match full-revaluation P&L for a
-//!   1-vol-point move within the second-order residual.
+//! Verifies that Taylor maps volatility attribution into `PnlAttribution::vol_pnl`
+//! with consistent vol-point units and sensible first/second-order scaling.
 
 use finstack_attribution::{attribute_pnl_taylor, TaylorAttributionConfig};
 use finstack_core::currency::Currency;
@@ -143,28 +139,11 @@ fn taylor_vol_factor_matches_full_revaluation() {
     };
     let result = attribute_pnl_taylor(&inst, &market_t0, &market_t1, as_of_t0, as_of_t1, &config)
         .expect("Taylor attribution must succeed");
-
-    // Find the vol factor result.
-    let vol_factor = result
-        .factors
-        .iter()
-        .find(|f| f.factor_name.starts_with("Vol:"))
-        .expect("Vol factor must be present in Taylor attribution result");
-
-    let explained = vol_factor.explained_pnl;
+    let explained = result.vol_pnl.amount();
 
     eprintln!(
-        "full_reval_pnl = {:.4}, explained = {:.4}, vol_move_points = {:.4}, vega_per_point = {:.4}",
-        full_reval_pnl, explained, vol_factor.market_move, vol_factor.sensitivity
-    );
-
-    // vol_move must be 1.0 vol point (diff.rs multiplies absolute shift by 100).
-    let expected_vol_move = VOL_SHIFT_ABS * 100.0; // 1.0
-    assert!(
-        (vol_factor.market_move - expected_vol_move).abs() < 1e-6,
-        "market_move should be {:.4} vol points, got {:.4}",
-        expected_vol_move,
-        vol_factor.market_move
+        "full_reval_pnl = {:.4}, explained = {:.4}",
+        full_reval_pnl, explained
     );
 
     // full_reval_pnl must be non-trivial (sanity: ATM option gains value when vol rises).
@@ -242,83 +221,22 @@ fn taylor_vol_factor_gamma_matches_full_revaluation() {
     };
     let result = attribute_pnl_taylor(&inst, &market_t0, &market_t1, as_of_t0, as_of_t1, &config)
         .expect("Taylor attribution with gamma must succeed");
-
-    let vol_factor = result
-        .factors
-        .iter()
-        .find(|f| f.factor_name.starts_with("Vol:"))
-        .expect("Vol factor must be present");
-
-    let explained = vol_factor.explained_pnl;
-    let gamma_pnl = vol_factor.gamma_pnl;
-    let combined = explained + gamma_pnl.unwrap_or(0.0);
+    let combined = result.vol_pnl.amount();
 
     eprintln!(
-        "full_reval_pnl = {:.4}, explained = {:.4}, gamma_pnl = {:?}, \
-         combined = {:.4}, vol_move_points = {:.4}",
-        full_reval_pnl, explained, gamma_pnl, combined, vol_factor.market_move,
+        "full_reval_pnl = {:.4}, combined = {:.4}",
+        full_reval_pnl, combined,
     );
 
-    // 1. gamma_pnl must be present and non-zero.
-    let gamma = gamma_pnl.expect("gamma_pnl must be Some(..) when include_gamma = true");
+    // The gamma-inclusive Taylor vol bucket should stay close to full revaluation.
+    // The pre-fix 10,000x volga scaling bug would make this bucket explode.
+    let relative_error = (combined - full_reval_pnl).abs() / full_reval_pnl.abs();
     assert!(
-        gamma.abs() > 1e-6,
-        "gamma_pnl must be non-zero for a large vol move; got {:.6}",
-        gamma
-    );
-
-    // 2. gamma_pnl must be positive: ATM European call has positive volga
-    //    (vega increases with vol), so the second-order correction is a positive addition.
-    assert!(
-        gamma > 0.0,
-        "gamma_pnl should be positive for an ATM long call with rising vol; got {:.4}",
-        gamma
-    );
-
-    // 3. gamma_pnl must be a small but material fraction of full_reval_pnl.
-    //    Correct scaling: volga contributes ~0.01%–1% of the option P&L for a 5-pt move.
-    //    Pre-fix bug: 10,000× inflation would push this ratio to ~100%, failing this check.
-    let gamma_fraction = gamma.abs() / full_reval_pnl.abs();
-    eprintln!(
-        "gamma_pnl / full_reval_pnl = {:.4}% (expected 0.001%–1%)",
-        gamma_fraction * 100.0,
-    );
-    assert!(
-        gamma_fraction > 0.00001 && gamma_fraction < 0.01,
-        "gamma_pnl ({:.4}) is {:.4}% of full_reval_pnl ({:.4}); expected 0.001%–1%. \
-         If volga is 10,000× too large (pre-fix ÷100² unit bug), this ratio would be ~100%.",
-        gamma,
-        gamma_fraction * 100.0,
+        relative_error < 0.02,
+        "Taylor vol P&L ({:.4}) should be within 2% of full-reval ({:.4}); \
+         relative error: {:.2}%. This likely indicates a vol unit mismatch.",
+        combined,
         full_reval_pnl,
-    );
-
-    // 4. The first-order explained P&L alone must be within 2% of full-reval
-    //    (confirming vega units are correct), and the volga correction moves in the
-    //    direction of full-reval (i.e. positive, toward the true value which is above
-    //    the linear approximation for a positively-curved payoff).
-    let first_order_relative_error = (explained - full_reval_pnl).abs() / full_reval_pnl.abs();
-    assert!(
-        first_order_relative_error < 0.02,
-        "First-order explained P&L ({:.4}) should be within 2% of full-reval ({:.4}); \
-         first-order relative error: {:.2}%. This likely indicates a 100× vega unit mismatch.",
-        explained,
-        full_reval_pnl,
-        first_order_relative_error * 100.0,
-    );
-
-    // The full-reval is above the linear approximation (positive volga) so the
-    // residual (full_reval - explained) and gamma_pnl should have the same sign.
-    let first_order_residual = full_reval_pnl - explained;
-    eprintln!(
-        "first_order_residual = {:.4}, gamma_pnl = {:.4} — same sign: {}",
-        first_order_residual,
-        gamma,
-        (first_order_residual > 0.0) == (gamma > 0.0),
-    );
-    assert!(
-        (first_order_residual > 0.0) == (gamma > 0.0),
-        "gamma_pnl ({:.4}) should have the same sign as the first-order residual ({:.4})",
-        gamma,
-        first_order_residual,
+        relative_error * 100.0,
     );
 }

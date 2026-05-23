@@ -143,20 +143,7 @@ pub fn price_instrument_json(
     as_of: &str,
     model: &str,
 ) -> finstack_core::Result<ValuationResult> {
-    let instrument = parse_boxed_instrument_json(instrument_json, None)?;
-    let as_of = finstack_core::dates::parse_iso_date(as_of)?;
-    let model = resolve_model_key(instrument.as_ref(), model)?;
-    let registry = shared_standard_registry();
-    PricerRegistry::price_with_metrics_shared(
-        &registry,
-        instrument.as_ref(),
-        model,
-        market,
-        as_of,
-        &[],
-        Default::default(),
-    )
-    .map_err(Into::into)
+    price_instrument_json_request(instrument_json, market, as_of, model, &[], None, None)
 }
 
 /// Price a tagged instrument JSON payload with explicit metric requests.
@@ -182,6 +169,26 @@ pub fn price_instrument_json_with_metrics(
 /// Price a tagged instrument JSON payload with explicit metric requests and
 /// optional historical scenarios for VaR-style metrics.
 pub fn price_instrument_json_with_metrics_and_history(
+    instrument_json: &str,
+    market: &MarketContext,
+    as_of: &str,
+    model: &str,
+    metrics: &[String],
+    pricing_options: Option<&str>,
+    market_history_json: Option<&str>,
+) -> finstack_core::Result<ValuationResult> {
+    price_instrument_json_request(
+        instrument_json,
+        market,
+        as_of,
+        model,
+        metrics,
+        pricing_options,
+        market_history_json,
+    )
+}
+
+fn price_instrument_json_request(
     instrument_json: &str,
     market: &MarketContext,
     as_of: &str,

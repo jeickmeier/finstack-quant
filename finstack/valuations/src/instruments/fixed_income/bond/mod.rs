@@ -123,8 +123,7 @@ pub use metrics::price_yield_spread::asw::{
 };
 #[doc(hidden)]
 pub use metrics::{
-    register_bond_metrics, AssetSwapMarketCalculator, AssetSwapParCalculator,
-    DiscountMarginCalculator, ZSpreadCalculator,
+    AssetSwapMarketCalculator, AssetSwapParCalculator, DiscountMarginCalculator, ZSpreadCalculator,
 };
 pub use types::AmortizationSpec;
 pub use types::Bond;

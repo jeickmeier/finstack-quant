@@ -110,6 +110,18 @@ mod tests {
     use crate::primitives::factor_types::FactorId;
     use finstack_core::types::{Attributes, CurveId};
 
+    fn deepest_match(
+        matcher: &dyn FactorMatcher,
+        dependency: &MarketDependency,
+        attributes: &Attributes,
+    ) -> Option<FactorId> {
+        matcher
+            .match_factor_with_betas(dependency, attributes)
+            .ok()
+            .flatten()
+            .and_then(|entries| entries.last().map(|entry| entry.factor_id.clone()))
+    }
+
     #[test]
     fn test_matching_config_mapping_table() {
         let config = MatchingConfig::MappingTable(vec![MappingRule {
@@ -127,7 +139,7 @@ mod tests {
             id: CurveId::new("X"),
         };
         assert_eq!(
-            matcher.match_factor(&dep, &Attributes::default()),
+            deepest_match(matcher.as_ref(), &dep, &Attributes::default()),
             Some(FactorId::new("Credit"))
         );
     }
@@ -157,13 +169,13 @@ mod tests {
             id: "SPECIAL".into(),
         };
         assert_eq!(
-            matcher.match_factor(&dep1, &Attributes::default()),
+            deepest_match(matcher.as_ref(), &dep1, &Attributes::default()),
             Some(FactorId::new("Special"))
         );
 
         let dep2 = MarketDependency::Spot { id: "OTHER".into() };
         assert_eq!(
-            matcher.match_factor(&dep2, &Attributes::default()),
+            deepest_match(matcher.as_ref(), &dep2, &Attributes::default()),
             Some(FactorId::new("Fallback"))
         );
     }

@@ -7,7 +7,7 @@
 use crate::metrics::MetricRegistry;
 
 /// Register FX barrier option metrics with the registry.
-pub fn register_fx_barrier_option_metrics(registry: &mut MetricRegistry) {
+pub(crate) fn register_fx_barrier_option_metrics(registry: &mut MetricRegistry) {
     use crate::pricer::InstrumentType;
     crate::register_metrics! {
         registry: registry,

@@ -1441,7 +1441,7 @@ mod tests {
 
     #[test]
     fn credit_hierarchy_sensitivities_use_fixed_bp_membership_not_beta_scaled_mapping() {
-        use finstack_factor_model::credit_hierarchy::{
+        use finstack_factor_model::credit::hierarchy::{
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };
@@ -1543,7 +1543,7 @@ mod tests {
 
     #[test]
     fn credit_hierarchy_analysis_adds_idiosyncratic_residual_variance() {
-        use finstack_factor_model::credit_hierarchy::{
+        use finstack_factor_model::credit::hierarchy::{
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };

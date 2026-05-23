@@ -109,11 +109,11 @@ Classes that expose `free()` own WebAssembly heap memory and should be disposed
 when a long-lived handle is no longer needed:
 
 - `analytics.Performance`
-- `valuations.CreditFactorModel`
-- `valuations.CreditCalibrator`
-- `valuations.LevelsAtDate`
-- `valuations.PeriodDecomposition`
-- `valuations.FactorCovarianceForecast`
+- `factor_model.credit.CreditFactorModel`
+- `factor_model.credit.CreditCalibrator`
+- `factor_model.credit.LevelsAtDate`
+- `factor_model.credit.PeriodDecomposition`
+- `factor_model.credit.FactorCovarianceForecast`
 - `portfolio.Portfolio`
 
 Do not use an object after calling `free()`.

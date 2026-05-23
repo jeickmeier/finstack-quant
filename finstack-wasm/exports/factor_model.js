@@ -12,12 +12,4 @@ const credit = {
 
 export const factor_model = {
   credit,
-  // Root aliases mirror finstack_factor_model crate-root re-exports.
-  CreditFactorModel: credit.CreditFactorModel,
-  CreditCalibrator: credit.CreditCalibrator,
-  LevelsAtDate: credit.LevelsAtDate,
-  PeriodDecomposition: credit.PeriodDecomposition,
-  FactorCovarianceForecast: credit.FactorCovarianceForecast,
-  decomposeLevels: credit.decomposeLevels,
-  decomposePeriod: credit.decomposePeriod,
 };

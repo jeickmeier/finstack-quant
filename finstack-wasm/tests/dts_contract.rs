@@ -22,6 +22,17 @@ fn contains_ignoring_ws(haystack: &str, needle: &str) -> bool {
     compact_haystack.contains(&compact_needle)
 }
 
+fn interface_block<'a>(dts: &'a str, interface_name: &str) -> &'a str {
+    let start = dts
+        .find(&format!("export interface {interface_name}"))
+        .unwrap_or_else(|| panic!("{interface_name} interface declaration missing"));
+    let rest = &dts[start..];
+    let end = rest
+        .find("\n}\n")
+        .unwrap_or_else(|| panic!("{interface_name} interface declaration is unterminated"));
+    &rest[..end]
+}
+
 #[test]
 fn credit_factor_hierarchy_dts_exposes_public_surface() {
     let dts = index_dts();
@@ -72,7 +83,7 @@ fn credit_factor_hierarchy_dts_exposes_public_surface() {
         "export declare function decomposePeriod(",
     ));
 
-    // ValuationsNamespace entries
+    // FactorModelCreditNamespace entries
     assert!(dts.contains("CreditFactorModel: typeof CreditFactorModel;"));
     assert!(dts.contains("CreditCalibrator: typeof CreditCalibrator;"));
     assert!(dts.contains("FactorCovarianceForecast: typeof FactorCovarianceForecast;"));
@@ -330,6 +341,7 @@ fn statements_analytics_dts_matches_runtime_exports() {
 #[test]
 fn valuations_dts_exposes_credit_namespaces() {
     let dts = index_dts();
+    let valuations = interface_block(&dts, "ValuationsNamespace");
 
     assert!(dts.contains("export interface ValuationCreditNamespace"));
     assert!(dts.contains("mertonModelJson("));
@@ -340,16 +352,20 @@ fn valuations_dts_exposes_credit_namespaces() {
     assert!(dts.contains("cdsOptionExampleJson(): string;"));
     assert!(dts.contains("credit: ValuationCreditNamespace;"));
     assert!(dts.contains("creditDerivatives: CreditDerivativesNamespace;"));
+    assert!(!valuations.contains("CreditFactorModel"));
+    assert!(!valuations.contains("CreditCalibrator"));
+    assert!(!valuations.contains("decomposeLevels"));
 }
 
 #[test]
 fn factor_model_dts_exposes_credit_namespace() {
     let dts = index_dts();
+    let factor_model = interface_block(&dts, "FactorModelNamespace");
 
     assert!(dts.contains("export interface FactorModelNamespace"));
     assert!(dts.contains("export interface FactorModelCreditNamespace"));
     assert!(dts.contains("credit: FactorModelCreditNamespace;"));
-    assert!(dts.contains("CreditFactorModel: typeof CreditFactorModel;"));
-    assert!(dts.contains("decomposeLevels("));
+    assert!(!factor_model.contains("CreditFactorModel"));
+    assert!(!factor_model.contains("decomposeLevels"));
     assert!(dts.contains("export declare const factor_model: FactorModelNamespace;"));
 }

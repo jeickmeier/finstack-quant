@@ -1,8 +1,9 @@
 //! Credit-factor attribution detail and carry decomposition helpers.
 
 use super::credit_cascade::{
-    build_credit_factor_attribution, plan_credit_cascade, shift_credit_curves_par_spread,
-    CreditStepKind,
+    apply_curve_shape_residual, build_credit_factor_attribution, hierarchy_level_name,
+    optional_single_issuer_adder, plan_credit_cascade, shift_credit_curves_par_spread,
+    single_issuer_by_bucket, CreditStepKind,
 };
 use super::credit_factor::CreditFactorModelRef;
 use super::spec::AttributionSpec;
@@ -131,18 +132,11 @@ impl AttributionSpec {
                 }
             })
             .collect();
-        let parallel_sum: f64 = step_pnls
-            .iter()
-            .zip(cascade.steps.iter())
-            .filter(|(_, s)| !matches!(s.kind, CreditStepKind::CurveShape))
-            .map(|(pnl, _)| pnl.amount())
-            .sum();
-        let curve_shape_amt = attribution.credit_curves_pnl.amount() - parallel_sum;
-        for (pnl, step) in step_pnls.iter_mut().zip(cascade.steps.iter()) {
-            if matches!(step.kind, CreditStepKind::CurveShape) {
-                *pnl = Money::new(curve_shape_amt, ccy);
-            }
-        }
+        apply_curve_shape_residual(
+            &mut step_pnls,
+            &cascade.steps,
+            attribution.credit_curves_pnl,
+        );
 
         let detail = build_credit_factor_attribution(
             model,
@@ -192,8 +186,6 @@ impl AttributionSpec {
         use super::types::{CreditCarryByLevel, CreditCarryDecomposition, LevelCarry, SourceLine};
         use finstack_core::math::Compounding;
         use finstack_core::money::Money;
-        use finstack_factor_model::credit_hierarchy::{dimension_key, HierarchyDimension};
-        use std::collections::BTreeMap;
 
         // 0. Need a populated carry_detail to split.
         let carry_detail = match attribution.carry_detail.as_mut() {
@@ -338,19 +330,16 @@ impl AttributionSpec {
         let pc_share_of_s = beta_pc * g_anchor;
 
         let mut level_share_of_s: Vec<f64> = vec![0.0; num_levels];
-        let mut level_bucket: Vec<(String, f64)> = Vec::with_capacity(num_levels);
         for (k, share) in level_share_of_s.iter_mut().enumerate() {
             let bucket = model.hierarchy.bucket_path(&issuer_row.tags, k);
-            let (lk_value, bucket_label) = match (bucket, model.anchor_state.by_level.get(k)) {
+            let lk_value = match (bucket, model.anchor_state.by_level.get(k)) {
                 (Some(b), Some(level_anchor)) => {
-                    let v = level_anchor.values.get(&b).copied().unwrap_or(0.0);
-                    (v, b)
+                    level_anchor.values.get(&b).copied().unwrap_or(0.0)
                 }
-                _ => (0.0, String::new()),
+                _ => 0.0,
             };
             let beta_k = issuer_row.betas.levels.get(k).copied().unwrap_or(0.0);
             *share = beta_k * lk_value;
-            level_bucket.push((bucket_label, lk_value));
         }
         let adder_of_s = issuer_row.adder_at_anchor;
 
@@ -366,24 +355,19 @@ impl AttributionSpec {
         };
         // Build the LevelCarry vector.
         let mut levels_out: Vec<LevelCarry> = Vec::with_capacity(num_levels);
-        for k in 0..num_levels {
+        for (k, level_share) in level_share_of_s.iter().enumerate() {
             let dim = &model.hierarchy.levels[k];
-            let level_name = match dim {
-                HierarchyDimension::Custom(s) => s.clone(),
-                _ => dimension_key(dim),
-            };
-            let share = level_share_of_s[k] * scale_coupon;
+            let level_name = hierarchy_level_name(dim);
+            let share = *level_share * scale_coupon;
             let total_money = Money::new(share, ccy);
-            let mut by_bucket = BTreeMap::new();
-            if self
-                .credit_factor_detail_options
-                .include_per_bucket_breakdown
-            {
-                let (bucket_path, _l_value) = &level_bucket[k];
-                if !bucket_path.is_empty() {
-                    by_bucket.insert(bucket_path.clone(), total_money);
-                }
-            }
+            let by_bucket = single_issuer_by_bucket(
+                model,
+                issuer_row,
+                k,
+                total_money,
+                self.credit_factor_detail_options
+                    .include_per_bucket_breakdown,
+            );
             levels_out.push(LevelCarry {
                 level_name,
                 total: total_money,
@@ -400,13 +384,11 @@ impl AttributionSpec {
             credit_total
         };
 
-        let adder_by_issuer = if self.credit_factor_detail_options.include_per_issuer_adder {
-            let mut m = BTreeMap::new();
-            m.insert(issuer_id.clone(), adder_total_money);
-            Some(m)
-        } else {
-            None
-        };
+        let adder_by_issuer = optional_single_issuer_adder(
+            &issuer_id,
+            adder_total_money,
+            self.credit_factor_detail_options.include_per_issuer_adder,
+        );
 
         // Rates carry total: Σ rates_parts − funding_cost.
         let funding_cost = carry_detail.funding_cost.map(|m| m.amount()).unwrap_or(0.0);

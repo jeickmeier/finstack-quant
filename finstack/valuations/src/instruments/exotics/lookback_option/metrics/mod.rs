@@ -12,7 +12,7 @@ use crate::metrics::{MetricId, MetricRegistry};
 use std::sync::Arc;
 
 /// Register lookback option metrics with the registry.
-pub fn register_lookback_option_metrics(registry: &mut MetricRegistry) {
+pub(crate) fn register_lookback_option_metrics(registry: &mut MetricRegistry) {
     use crate::metrics::{GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVolga};
     use crate::pricer::InstrumentType;
 

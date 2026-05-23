@@ -448,25 +448,6 @@ mod tests {
     }
 
     // --------------------------------------------------------------
-    // Single-factor dispatch picks deepest level (legacy trait method)
-    // --------------------------------------------------------------
-    #[test]
-    fn match_factor_returns_deepest_factor_id_for_legacy_callers() {
-        let matcher = matcher_with_one_issuer();
-        let dep = MarketDependency::CreditCurve {
-            id: CurveId::new("X"),
-        };
-        let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-A");
-
-        assert_eq!(
-            matcher.match_factor(&dep, &attrs),
-            Some(FactorId::new(
-                "credit::level2::Rating.Region.Sector::IG.EU.FIN"
-            ))
-        );
-    }
-
-    // --------------------------------------------------------------
     // Non-credit dependency falls through to None
     // --------------------------------------------------------------
     #[test]
@@ -476,7 +457,6 @@ mod tests {
         let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-A");
         let result = matcher.match_factor_with_betas(&dep, &attrs).unwrap();
         assert!(result.is_none());
-        assert!(matcher.match_factor(&dep, &attrs).is_none());
     }
 
     // --------------------------------------------------------------

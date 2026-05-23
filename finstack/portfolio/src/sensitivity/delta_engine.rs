@@ -204,9 +204,6 @@ pub fn mapping_to_market_bumps(
                 })
                 .collect())
         }
-        MarketMapping::Custom(_) => Err(Error::Validation(
-            "Factor sensitivity engines do not support MarketMapping::Custom because the custom mapping does not identify target market objects".to_string(),
-        )),
     }
 }
 

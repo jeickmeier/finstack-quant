@@ -15,7 +15,7 @@
 //! # Usage
 //!
 //! ```rust
-//! use finstack_factor_model::credit_hierarchy::CreditFactorModel;
+//! use finstack_factor_model::credit::hierarchy::CreditFactorModel;
 //!
 //! // Deserialize from JSON — call `model.validate()` to check schema_version and consistency
 //! let json = r#"{
@@ -486,9 +486,8 @@ impl FactorCorrelationMatrix {
 /// Volatility model for a single factor.
 ///
 /// The `Sample` variant stores a single variance estimate.
-/// Future PRs will add `Garch` and `Ewma` variants here; the enum
-/// intentionally omits `#[serde(deny_unknown_fields)]` to allow additive
-/// extension without breaking readers of older writers.
+/// The enum intentionally omits `#[serde(deny_unknown_fields)]` to allow
+/// additive extension without breaking readers of older writers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FactorVolModel {

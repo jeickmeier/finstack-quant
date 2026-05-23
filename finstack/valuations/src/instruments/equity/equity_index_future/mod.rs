@@ -110,4 +110,3 @@ pub use types::{EquityFutureSpecs, EquityIndexFuture};
 pub(crate) mod pricer;
 
 pub(crate) mod metrics;
-pub use metrics::register_equity_index_future_metrics;

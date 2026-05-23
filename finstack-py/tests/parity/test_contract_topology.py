@@ -306,6 +306,31 @@ def test_wasm_valuations_exports_match_contract() -> None:
     )
 
 
+def test_wasm_attribution_exports_match_contract() -> None:
+    """`exports/attribution.js` root keys must match [wasm_attribution_subset]."""
+    block = CONTRACT["wasm_attribution_subset"]
+    js_path = (CONTRACT_PATH.parent / block["js_export_file"]).resolve()
+    expected = set(block["root_exports"])
+    actual = _parse_exported_const_object_keys(js_path, "attribution")
+    assert actual == expected, (
+        f"attribution.js exports diverged from contract.\n"
+        f"  missing from JS: {sorted(expected - actual)}\n"
+        f"  unlisted in contract: {sorted(actual - expected)}"
+    )
+
+
+def test_wasm_attribution_root_exports_are_triplet_accounted_for() -> None:
+    """Every attribution WASM root export is mapped from Python or listed wasm-only."""
+    block = CONTRACT["wasm_attribution_subset"]
+    root_exports = set(block["root_exports"])
+    wasm_only = set(block.get("wasm_only", {}).get("symbols", []))
+    mapped_js = set(block["python_js_map"].values())
+    unaccounted = root_exports - wasm_only - mapped_js
+    assert not unaccounted, f"attribution exports must be mapped or wasm-only: {sorted(unaccounted)}"
+    overlap = wasm_only & mapped_js
+    assert not overlap, f"attribution wasm_only overlaps python_js_map values: {sorted(overlap)}"
+
+
 def test_wasm_valuations_nested_exports_match_contract() -> None:
     """Nested `exports/valuations/*.js` facade keys must match the contract."""
     block = CONTRACT["wasm_valuations_subset"]

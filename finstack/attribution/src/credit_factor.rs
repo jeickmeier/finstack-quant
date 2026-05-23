@@ -36,11 +36,12 @@ use std::collections::BTreeMap;
 use finstack_core::money::Money;
 use finstack_core::types::IssuerId;
 use finstack_core::Error;
-use finstack_factor_model::credit_hierarchy::{
-    dimension_key, CreditFactorModel, HierarchyDimension, IssuerBetaRow,
-};
+use finstack_factor_model::credit::hierarchy::{CreditFactorModel, IssuerBetaRow};
 use serde::{Deserialize, Serialize};
 
+use super::credit_cascade::{
+    bucket_amounts_to_money, hierarchy_level_name, optional_adder_amounts_by_issuer,
+};
 use super::types::{CreditFactorAttribution, LevelPnl};
 use finstack_factor_model::PeriodDecomposition;
 
@@ -248,18 +249,12 @@ pub fn compute_credit_factor_attribution(
     let mut levels = Vec::with_capacity(num_levels);
     for (k, total) in level_totals.iter().enumerate() {
         let dim = &model.hierarchy.levels[k];
-        let level_name = match dim {
-            HierarchyDimension::Custom(s) => s.clone(),
-            _ => dimension_key(dim),
-        };
-        let by_bucket = if options.include_per_bucket_breakdown {
-            level_by_bucket[k]
-                .iter()
-                .map(|(k, v)| (k.clone(), Money::new(*v, ccy)))
-                .collect()
-        } else {
-            BTreeMap::new()
-        };
+        let level_name = hierarchy_level_name(dim);
+        let by_bucket = bucket_amounts_to_money(
+            &level_by_bucket[k],
+            ccy,
+            options.include_per_bucket_breakdown,
+        );
         levels.push(LevelPnl {
             level_name,
             total: Money::new(*total, ccy),
@@ -267,16 +262,11 @@ pub fn compute_credit_factor_attribution(
         });
     }
 
-    let adder_pnl_by_issuer = if options.include_per_issuer_adder {
-        Some(
-            adder_by_issuer_amt
-                .into_iter()
-                .map(|(k, v)| (k, Money::new(v, ccy)))
-                .collect(),
-        )
-    } else {
-        None
-    };
+    let adder_pnl_by_issuer = optional_adder_amounts_by_issuer(
+        adder_by_issuer_amt,
+        ccy,
+        options.include_per_issuer_adder,
+    );
 
     Ok(CreditFactorAttribution {
         model_id: credit_factor_model_id(model),
@@ -298,7 +288,7 @@ mod tests {
     use super::*;
     use finstack_core::currency::Currency;
     use finstack_core::dates::create_date;
-    use finstack_factor_model::credit_hierarchy::{
+    use finstack_factor_model::credit::hierarchy::{
         AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
         FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
         IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,

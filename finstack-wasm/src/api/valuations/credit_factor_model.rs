@@ -40,7 +40,7 @@ fn parse_vol_horizon(s: &str) -> Result<finstack_portfolio::factor_model::VolHor
 #[wasm_bindgen(js_name = CreditFactorModel)]
 pub struct WasmCreditFactorModel {
     #[wasm_bindgen(skip)]
-    pub inner: finstack_factor_model::credit_hierarchy::CreditFactorModel,
+    pub inner: finstack_factor_model::credit::hierarchy::CreditFactorModel,
 }
 
 #[wasm_bindgen(js_class = CreditFactorModel)]
@@ -53,7 +53,7 @@ impl WasmCreditFactorModel {
     /// Throws if the JSON is malformed or fails validation.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(s: &str) -> Result<WasmCreditFactorModel, JsValue> {
-        let inner: finstack_factor_model::credit_hierarchy::CreditFactorModel =
+        let inner: finstack_factor_model::credit::hierarchy::CreditFactorModel =
             serde_json::from_str(s).map_err(to_js_err)?;
         inner.validate().map_err(to_js_err)?;
         Ok(Self { inner })
@@ -119,9 +119,9 @@ impl WasmCreditCalibrator {
 /// - `Sector`          → `"sector"`
 /// - `Custom("Foo")`   → `{"custom": "Foo"}`
 fn dim_to_value(
-    dim: &finstack_factor_model::credit_hierarchy::HierarchyDimension,
+    dim: &finstack_factor_model::credit::hierarchy::HierarchyDimension,
 ) -> serde_json::Value {
-    use finstack_factor_model::credit_hierarchy::{dimension_key, HierarchyDimension};
+    use finstack_factor_model::credit::hierarchy::{dimension_key, HierarchyDimension};
     match dim {
         HierarchyDimension::Custom(n) => serde_json::json!({"custom": n}),
         _ => serde_json::Value::String(dimension_key(dim)),
@@ -277,7 +277,7 @@ pub fn decompose_levels(
     let runtime_tags: Option<
         std::collections::BTreeMap<
             finstack_core::types::IssuerId,
-            finstack_factor_model::credit_hierarchy::IssuerTags,
+            finstack_factor_model::credit::hierarchy::IssuerTags,
         >,
     > = match runtime_tags_json.as_deref() {
         Some(json) => Some(serde_json::from_str(json).map_err(to_js_err)?),
@@ -329,7 +329,7 @@ pub fn decompose_period(
 pub struct WasmFactorCovarianceForecast {
     /// Store the model by value so `FactorCovarianceForecast<'a>` lifetime
     /// requirements don't escape the WASM boundary.
-    model: finstack_factor_model::credit_hierarchy::CreditFactorModel,
+    model: finstack_factor_model::credit::hierarchy::CreditFactorModel,
 }
 
 #[wasm_bindgen(js_class = FactorCovarianceForecast)]
@@ -414,7 +414,7 @@ impl WasmFactorCovarianceForecast {
 mod tests {
     use finstack_core::dates::create_date;
     use finstack_core::types::IssuerId;
-    use finstack_factor_model::credit_hierarchy::{
+    use finstack_factor_model::credit::hierarchy::{
         CreditFactorModel, CreditHierarchySpec, GenericFactorSpec, HierarchyDimension, IssuerTags,
     };
     use finstack_factor_model::{
@@ -623,7 +623,7 @@ mod tests {
     /// - `Custom("Currency")` → `{"custom": "Currency"}`
     #[test]
     fn levels_at_date_dimension_matches_serde_convention() {
-        use finstack_factor_model::credit_hierarchy::HierarchyDimension;
+        use finstack_factor_model::credit::hierarchy::HierarchyDimension;
         use serde_json::json;
 
         // Unit-level checks against serde round-trip.

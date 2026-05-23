@@ -124,12 +124,18 @@
       "title": "VolModelChoice",
       "description": "Volatility model selector for the per-factor variance forecast.",
       "oneOf": [
-        { "const": "sample", "description": "Plain sample variance (PR-4)." },
-        { "const": "garch", "description": "GARCH(1,1) — deferred to PR-5a." },
-        { "const": "egarch", "description": "EGARCH — deferred to PR-5a." },
+        { "const": "sample", "description": "Plain sample variance." },
+        {
+          "const": "garch",
+          "description": "GARCH(1,1), reserved but not implemented."
+        },
+        {
+          "const": "egarch",
+          "description": "EGARCH, reserved but not implemented."
+        },
         {
           "type": "object",
-          "description": "EWMA with smoothing parameter lambda — deferred to PR-5a.",
+          "description": "EWMA with smoothing parameter lambda, reserved but not implemented.",
           "required": ["ewma"],
           "properties": {
             "ewma": {
@@ -147,7 +153,7 @@
       "title": "CovarianceStrategy",
       "description": "Strategy for assembling the factor covariance matrix.",
       "oneOf": [
-        { "const": "diagonal", "description": "Diagonal Σ = diag(σ²) under identity correlation (PR-4 default)." },
+        { "const": "diagonal", "description": "Diagonal Σ = diag(σ²) under identity correlation." },
         {
           "type": "object",
           "description": "Sample correlation plus diagonal ridge: Σ = D·ρ·D + α·I.",

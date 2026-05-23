@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://finstack.io/schemas/factor_model/1/credit_factor_model.schema.json",
   "title": "CreditFactorModel",
-  "description": "Fully self-contained credit factor hierarchy model artifact. Canonical Rust type: finstack_factor_model::credit_hierarchy::CreditFactorModel. Schema version constant: finstack.credit_factor_model/1.",
+  "description": "Fully self-contained credit factor hierarchy model artifact. Canonical Rust type: finstack_factor_model::credit::hierarchy::CreditFactorModel. Schema version constant: finstack.credit_factor_model/1.",
   "type": "object",
   "required": [
     "schema_version",

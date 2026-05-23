@@ -80,13 +80,6 @@ pub(crate) fn register_exotic_pricers(registry: &mut PricerRegistry) {
         ModelKey::Black76,
         crate::instruments::rates::cms_option::pricer::CmsOptionPricer::new(),
     );
-    registry.register(
-        InstrumentType::CmsOption,
-        ModelKey::Discounting,
-        crate::instruments::rates::cms_option::pricer::CmsOptionPricer::with_model(
-            ModelKey::Discounting,
-        ),
-    );
 
     // CMS Option - Static Replication (Andersen-Piterbarg)
     registry.register(

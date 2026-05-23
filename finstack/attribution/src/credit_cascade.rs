@@ -24,14 +24,16 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::diff::{measure_par_spread_shift, TenorSamplingMethod};
 use finstack_core::market_data::scalars::MarketScalar;
+use finstack_core::money::Money;
 use finstack_core::types::{CurveId, IssuerId};
 use finstack_core::Result;
-use finstack_factor_model::credit_hierarchy::{
-    dimension_key, CreditFactorModel, HierarchyDimension, IssuerTags,
+use finstack_factor_model::credit::hierarchy::{
+    dimension_key, CreditFactorModel, HierarchyDimension, IssuerBetaRow, IssuerTags,
 };
 use finstack_factor_model::matching::{
     bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
@@ -105,6 +107,104 @@ pub(crate) struct CreditCascade {
     /// Level names (one per hierarchy dimension), used to build
     /// `LevelPnl.level_name` and as parallel-factor labels.
     pub level_names: Vec<String>,
+}
+
+/// Human-readable name for a credit hierarchy dimension.
+pub(crate) fn hierarchy_level_name(dim: &HierarchyDimension) -> String {
+    match dim {
+        HierarchyDimension::Custom(s) => s.clone(),
+        _ => dimension_key(dim),
+    }
+}
+
+/// Human-readable names for every level in model order.
+pub(crate) fn hierarchy_level_names(model: &CreditFactorModel) -> Vec<String> {
+    model
+        .hierarchy
+        .levels
+        .iter()
+        .map(hierarchy_level_name)
+        .collect()
+}
+
+/// Convert accumulated bucket amounts into an optional `Money` bucket map.
+pub(crate) fn bucket_amounts_to_money(
+    bucket_amounts: &BTreeMap<String, f64>,
+    ccy: Currency,
+    include: bool,
+) -> BTreeMap<String, Money> {
+    if !include {
+        return BTreeMap::new();
+    }
+    bucket_amounts
+        .iter()
+        .map(|(bucket, amount)| (bucket.clone(), Money::new(*amount, ccy)))
+        .collect()
+}
+
+/// Single-instrument bucket map for one issuer/level.
+pub(crate) fn single_issuer_by_bucket(
+    model: &CreditFactorModel,
+    row: &IssuerBetaRow,
+    level_index: usize,
+    total: Money,
+    include: bool,
+) -> BTreeMap<String, Money> {
+    if !include {
+        return BTreeMap::new();
+    }
+    model
+        .hierarchy
+        .bucket_path(&row.tags, level_index)
+        .map(|bucket| BTreeMap::from([(bucket, total)]))
+        .unwrap_or_default()
+}
+
+/// Optional single-issuer adder map used by single-instrument detail paths.
+pub(crate) fn optional_single_issuer_adder(
+    issuer_id: &IssuerId,
+    adder: Money,
+    include: bool,
+) -> Option<BTreeMap<IssuerId, Money>> {
+    include.then(|| BTreeMap::from([(issuer_id.clone(), adder)]))
+}
+
+/// Optional multi-issuer adder map used by portfolio/linear detail paths.
+pub(crate) fn optional_adder_amounts_by_issuer(
+    amounts: BTreeMap<IssuerId, f64>,
+    ccy: Currency,
+    include: bool,
+) -> Option<BTreeMap<IssuerId, Money>> {
+    include.then(|| {
+        amounts
+            .into_iter()
+            .map(|(issuer_id, amount)| (issuer_id, Money::new(amount, ccy)))
+            .collect()
+    })
+}
+
+/// Fill the `CurveShape` step with the residual needed for exact reconciliation.
+pub(crate) fn apply_curve_shape_residual(
+    step_pnls: &mut [Money],
+    steps: &[CreditCascadeStep],
+    credit_total: Money,
+) {
+    debug_assert_eq!(step_pnls.len(), steps.len());
+    let parallel_sum: f64 = step_pnls
+        .iter()
+        .zip(steps.iter())
+        .filter(|(_, step)| !matches!(step.kind, CreditStepKind::CurveShape))
+        .map(|(pnl, _)| pnl.amount())
+        .sum();
+    let curve_shape = Money::new(
+        credit_total.amount() - parallel_sum,
+        credit_total.currency(),
+    );
+    for (pnl, step) in step_pnls.iter_mut().zip(steps.iter()) {
+        if matches!(step.kind, CreditStepKind::CurveShape) {
+            *pnl = curve_shape;
+        }
+    }
 }
 
 /// Plan a credit cascade for one instrument.
@@ -188,19 +288,14 @@ pub(crate) fn plan_credit_cascade(
     }
     let ds_i = total_shift_bp / count as f64;
 
-    let mut level_names: Vec<String> = Vec::with_capacity(model.hierarchy.levels.len());
+    let level_names = hierarchy_level_names(model);
     let mut scalar_level_moves: Vec<(String, Option<f64>)> =
         Vec::with_capacity(model.hierarchy.levels.len());
-    for (k, dim) in model.hierarchy.levels.iter().enumerate() {
-        let level_name = match dim {
-            HierarchyDimension::Custom(s) => s.clone(),
-            _ => dimension_key(dim),
-        };
+    for k in 0..model.hierarchy.levels.len() {
         let factor_id = bucket_factor_id(&model.hierarchy, &issuer_row.tags, k)
             .map(|factor_id| factor_id.to_string())
             .unwrap_or_default();
         let move_bp = factor_move_bp(&factor_id, market_t0, market_t1);
-        level_names.push(level_name);
         scalar_level_moves.push((factor_id, move_bp));
     }
 
@@ -301,11 +396,7 @@ pub(crate) fn plan_credit_cascade(
         delta_bp: generic_bp,
     });
 
-    for (k, dim) in model.hierarchy.levels.iter().enumerate() {
-        let level_name = match dim {
-            HierarchyDimension::Custom(s) => s.clone(),
-            _ => dimension_key(dim),
-        };
+    for (k, level_name) in level_names.iter().enumerate() {
         let bucket = model
             .hierarchy
             .bucket_path(&issuer_row.tags, k)
@@ -319,7 +410,7 @@ pub(crate) fn plan_credit_cascade(
         let level_bp = beta_k * d_level;
         steps.push(CreditCascadeStep {
             kind: CreditStepKind::Level(k),
-            label: format!("credit::{}", level_name),
+            label: format!("credit::{level_name}"),
             delta_bp: level_bp,
         });
     }
@@ -493,14 +584,11 @@ pub(crate) fn build_credit_factor_attribution(
             .get(&k)
             .copied()
             .unwrap_or_else(|| finstack_core::money::Money::new(0.0, ccy));
-        let mut by_bucket: BTreeMap<String, finstack_core::money::Money> = BTreeMap::new();
-        if options.include_per_bucket_breakdown {
-            if let Some(row) = issuer_row {
-                if let Some(bucket) = model.hierarchy.bucket_path(&row.tags, k) {
-                    by_bucket.insert(bucket, total);
-                }
-            }
-        }
+        let by_bucket = issuer_row
+            .map(|row| {
+                single_issuer_by_bucket(model, row, k, total, options.include_per_bucket_breakdown)
+            })
+            .unwrap_or_default();
         levels.push(LevelPnl {
             level_name: level_name.clone(),
             total,
@@ -508,13 +596,11 @@ pub(crate) fn build_credit_factor_attribution(
         });
     }
 
-    let adder_pnl_by_issuer = if options.include_per_issuer_adder {
-        let mut m = BTreeMap::new();
-        m.insert(cascade.issuer_id.clone(), adder_pnl);
-        Some(m)
-    } else {
-        None
-    };
+    let adder_pnl_by_issuer = optional_single_issuer_adder(
+        &cascade.issuer_id,
+        adder_pnl,
+        options.include_per_issuer_adder,
+    );
 
     // Diagnostic: surface the adder magnitude and warn when it dominates the
     // credit P&L. The adder is now the *parallel* issuer-idiosyncratic move
@@ -575,7 +661,7 @@ mod tests {
     use finstack_core::market_data::scalars::MarketScalar;
     use finstack_core::market_data::term_structures::HazardCurve;
     use finstack_core::money::Money;
-    use finstack_factor_model::credit_hierarchy::{
+    use finstack_factor_model::credit::hierarchy::{
         AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
         FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
         IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,

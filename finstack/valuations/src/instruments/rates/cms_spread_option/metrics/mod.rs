@@ -3,7 +3,7 @@
 use crate::metrics::MetricRegistry;
 
 /// Register CMS spread option metrics with the registry.
-pub fn register_cms_spread_option_metrics(registry: &mut MetricRegistry) {
+pub(crate) fn register_cms_spread_option_metrics(registry: &mut MetricRegistry) {
     use crate::metrics::{Dv01CalculatorConfig, MetricId, UnifiedDv01Calculator};
     use crate::pricer::InstrumentType;
     use std::sync::Arc;

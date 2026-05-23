@@ -6,7 +6,6 @@ Bindings for the ``finstack-valuations`` Rust crate.
 import json as _json
 from typing import TYPE_CHECKING as _TYPE_CHECKING, Any as _Any
 
-from finstack.factor_model import credit as _factor_model_credit
 from finstack.finstack import valuations as _valuations
 from finstack.valuations import (
     correlation as correlation,
@@ -142,14 +141,6 @@ SabrModel = _valuations.SabrModel
 SabrSmile = _valuations.SabrSmile
 SabrCalibrator = _valuations.SabrCalibrator
 instrument_cashflows_json = _valuations.instrument_cashflows_json
-CreditFactorModel = _factor_model_credit.CreditFactorModel
-CreditCalibrator = _factor_model_credit.CreditCalibrator
-LevelsAtDate = _factor_model_credit.LevelsAtDate
-PeriodDecomposition = _factor_model_credit.PeriodDecomposition
-FactorCovarianceForecast = _factor_model_credit.FactorCovarianceForecast
-decompose_levels = _factor_model_credit.decompose_levels
-decompose_period = _factor_model_credit.decompose_period
-
 # Canonical structural-credit exports live at `finstack.valuations.*`; the
 # `finstack.valuations.credit` module remains only as an import-compatibility
 # namespace.
@@ -231,8 +222,6 @@ __all__: list[str] = [
     "CdsUpfront",
     "CdsUpfrontDatum",
     "CollateralDatum",
-    "CreditCalibrator",
-    "CreditFactorModel",
     "CreditIndexDatum",
     "CreditState",
     "DatePillar",
@@ -241,7 +230,6 @@ __all__: list[str] = [
     "DividendScheduleDatum",
     "DynamicRecoverySpec",
     "EndogenousHazardSpec",
-    "FactorCovarianceForecast",
     "FixingSeriesDatum",
     "ForwardCurvePrior",
     "ForwardStep",
@@ -262,7 +250,6 @@ __all__: list[str] = [
     "InflationSwapDatum",
     "InflationSwapPayload",
     "InflationSwapQuote",
-    "LevelsAtDate",
     "MarketDatum",
     "MarketQuote",
     "MertonModel",
@@ -271,7 +258,6 @@ __all__: list[str] = [
     "OptionVolQuote",
     "ParametricCurvePrior",
     "ParametricStep",
-    "PeriodDecomposition",
     "Pillar",
     "PriceCurvePrior",
     "PriceDatum",
@@ -321,8 +307,6 @@ __all__: list[str] = [
     "correlation",
     "credit",
     "credit_derivatives",
-    "decompose_levels",
-    "decompose_period",
     "dependency_graph_json",
     "dry_run",
     "exotics",

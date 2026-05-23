@@ -191,8 +191,7 @@ pub fn setup_metric_context(base: Date) -> (Deposit, MarketContext, MetricContex
         MetricContext::default_config(),
     );
 
-    let mut registry = MetricRegistry::new();
-    finstack_valuations::instruments::rates::deposit::register_deposit_metrics(&mut registry);
+    let registry = finstack_valuations::metrics::standard_registry().clone();
 
     (dep, ctx, metric_ctx, registry)
 }

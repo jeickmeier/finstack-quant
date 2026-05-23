@@ -12,8 +12,8 @@
 //! to eliminate code duplication. All market factors — curves, FX, volatility surfaces
 //! and scalars — flow through a single pair of helpers:
 //!
-//! 1. **[`CurveRestoreFlags`]** (a.k.a. [`MarketRestoreFlags`]) - Bitflags specifying
-//!    which market factor families to snapshot and restore
+//! 1. **[`MarketRestoreFlags`]** - Bitflags specifying which market factor
+//!    families to snapshot and restore
 //! 2. **[`MarketSnapshot`]** - Unified container for curves, FX, surfaces, and scalars
 //! 3. **[`MarketSnapshot::extract`]** / **[`MarketSnapshot::restore_market`]** - The
 //!    canonical extract/restore entry points for every factor family
@@ -55,33 +55,27 @@ use std::sync::Arc;
 /// Flags indicating which market factor families to restore from snapshot vs. preserve
 /// from market.
 ///
-/// Despite the historical name `CurveRestoreFlags`, this struct now covers all market
-/// factor families: curves, FX, volatility surfaces and scalars. The alias
-/// [`MarketRestoreFlags`] is provided for call sites that prefer the broader name.
+/// Covers all market factor families: curves, FX, volatility surfaces and scalars.
 ///
 /// # Examples
 ///
 /// ```
-/// use finstack_attribution::CurveRestoreFlags;
+/// use finstack_attribution::MarketRestoreFlags;
 ///
 /// // Restore only discount curves
-/// let flags = CurveRestoreFlags::DISCOUNT;
+/// let flags = MarketRestoreFlags::DISCOUNT;
 ///
 /// // Restore both discount and forward curves (rates)
-/// let rates = CurveRestoreFlags::RATES;
-/// assert_eq!(rates, CurveRestoreFlags::DISCOUNT | CurveRestoreFlags::FORWARD);
+/// let rates = MarketRestoreFlags::RATES;
+/// assert_eq!(rates, MarketRestoreFlags::DISCOUNT | MarketRestoreFlags::FORWARD);
 ///
 /// // Restore FX and volatility surfaces together
-/// let fx_vol = CurveRestoreFlags::FX | CurveRestoreFlags::VOL;
+/// let fx_vol = MarketRestoreFlags::FX | MarketRestoreFlags::VOL;
 /// ```
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub struct CurveRestoreFlags(u16);
+pub struct MarketRestoreFlags(u16);
 
-/// Broader-name alias for [`CurveRestoreFlags`]. Prefer this name in new code where
-/// the flags mix curve and non-curve (FX/VOL/SCALARS) families.
-pub type MarketRestoreFlags = CurveRestoreFlags;
-
-impl CurveRestoreFlags {
+impl MarketRestoreFlags {
     const DISCOUNT_BIT: u16 = 1 << 0;
     const FORWARD_BIT: u16 = 1 << 1;
     const HAZARD_BIT: u16 = 1 << 2;
@@ -153,7 +147,7 @@ impl CurveRestoreFlags {
     }
 }
 
-impl std::ops::BitOr for CurveRestoreFlags {
+impl std::ops::BitOr for MarketRestoreFlags {
     type Output = Self;
 
     #[inline]
@@ -162,7 +156,7 @@ impl std::ops::BitOr for CurveRestoreFlags {
     }
 }
 
-impl std::ops::BitAnd for CurveRestoreFlags {
+impl std::ops::BitAnd for MarketRestoreFlags {
     type Output = Self;
 
     #[inline]
@@ -171,7 +165,7 @@ impl std::ops::BitAnd for CurveRestoreFlags {
     }
 }
 
-impl std::ops::Not for CurveRestoreFlags {
+impl std::ops::Not for MarketRestoreFlags {
     type Output = Self;
 
     #[inline]
@@ -219,31 +213,31 @@ impl MarketSnapshot {
     ///
     /// Only the families corresponding to set flags are populated into the snapshot;
     /// other fields remain empty (or `None` for FX).
-    pub fn extract(market: &MarketContext, flags: CurveRestoreFlags) -> Self {
+    pub fn extract(market: &MarketContext, flags: MarketRestoreFlags) -> Self {
         let mut snapshot = Self::default();
 
         for curve_id in market.curve_ids() {
-            if flags.contains(CurveRestoreFlags::DISCOUNT) {
+            if flags.contains(MarketRestoreFlags::DISCOUNT) {
                 if let Ok(curve) = market.get_discount(curve_id) {
                     snapshot.discount_curves.insert(curve_id.clone(), curve);
                 }
             }
-            if flags.contains(CurveRestoreFlags::FORWARD) {
+            if flags.contains(MarketRestoreFlags::FORWARD) {
                 if let Ok(curve) = market.get_forward(curve_id) {
                     snapshot.forward_curves.insert(curve_id.clone(), curve);
                 }
             }
-            if flags.contains(CurveRestoreFlags::HAZARD) {
+            if flags.contains(MarketRestoreFlags::HAZARD) {
                 if let Ok(curve) = market.get_hazard(curve_id) {
                     snapshot.hazard_curves.insert(curve_id.clone(), curve);
                 }
             }
-            if flags.contains(CurveRestoreFlags::INFLATION) {
+            if flags.contains(MarketRestoreFlags::INFLATION) {
                 if let Ok(curve) = market.get_inflation_curve(curve_id) {
                     snapshot.inflation_curves.insert(curve_id.clone(), curve);
                 }
             }
-            if flags.contains(CurveRestoreFlags::CORRELATION) {
+            if flags.contains(MarketRestoreFlags::CORRELATION) {
                 if let Ok(curve) = market.get_base_correlation(curve_id) {
                     snapshot
                         .base_correlation_curves
@@ -252,15 +246,15 @@ impl MarketSnapshot {
             }
         }
 
-        if flags.contains(CurveRestoreFlags::FX) {
+        if flags.contains(MarketRestoreFlags::FX) {
             snapshot.fx = market.fx().cloned();
         }
 
-        if flags.contains(CurveRestoreFlags::VOL) {
+        if flags.contains(MarketRestoreFlags::VOL) {
             snapshot.surfaces = market.surfaces_snapshot();
         }
 
-        if flags.contains(CurveRestoreFlags::SCALARS) {
+        if flags.contains(MarketRestoreFlags::SCALARS) {
             snapshot.prices = market
                 .prices_iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
@@ -297,16 +291,16 @@ impl MarketSnapshot {
     pub fn restore_market(
         current_market: &MarketContext,
         snapshot: &MarketSnapshot,
-        restore_flags: CurveRestoreFlags,
+        restore_flags: MarketRestoreFlags,
     ) -> MarketContext {
         let mut new_market = MarketContext::new();
 
         // --- Curves: preserve unflagged families, restore flagged ones ---
-        let curve_mask = CurveRestoreFlags::DISCOUNT
-            | CurveRestoreFlags::FORWARD
-            | CurveRestoreFlags::HAZARD
-            | CurveRestoreFlags::INFLATION
-            | CurveRestoreFlags::CORRELATION;
+        let curve_mask = MarketRestoreFlags::DISCOUNT
+            | MarketRestoreFlags::FORWARD
+            | MarketRestoreFlags::HAZARD
+            | MarketRestoreFlags::INFLATION
+            | MarketRestoreFlags::CORRELATION;
         let preserve_curve_flags = !restore_flags & curve_mask;
         let preserved = MarketSnapshot::extract(current_market, preserve_curve_flags);
 
@@ -344,7 +338,7 @@ impl MarketSnapshot {
         }
 
         // --- FX ---
-        if restore_flags.contains(CurveRestoreFlags::FX) {
+        if restore_flags.contains(MarketRestoreFlags::FX) {
             match &snapshot.fx {
                 Some(fx) => {
                     new_market = new_market.insert_fx(Arc::clone(fx));
@@ -358,7 +352,7 @@ impl MarketSnapshot {
         }
 
         // --- Volatility surfaces ---
-        if restore_flags.contains(CurveRestoreFlags::VOL) {
+        if restore_flags.contains(MarketRestoreFlags::VOL) {
             new_market.replace_surfaces_mut(snapshot.surfaces.clone());
         } else {
             new_market.replace_surfaces_mut(current_market.surfaces_snapshot());
@@ -369,7 +363,7 @@ impl MarketSnapshot {
         // Drop semantic is intentional: a scalar present in `current_market` but
         // absent from `snapshot` must NOT appear in the result. This keeps factor
         // isolation correct for the attribution call paths.
-        if restore_flags.contains(CurveRestoreFlags::SCALARS) {
+        if restore_flags.contains(MarketRestoreFlags::SCALARS) {
             for (id, price) in &snapshot.prices {
                 new_market = new_market.insert_price(id.as_str(), price.clone());
             }

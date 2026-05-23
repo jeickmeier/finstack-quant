@@ -1,4 +1,4 @@
-//! Integration tests for [`finstack_factor_model::credit_decomposition`].
+//! Integration tests for [`finstack_factor_model::credit::decomposition`].
 //!
 //! Covers the six PR-3 acceptance tests plus structural error handling.
 
@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use finstack_core::dates::create_date;
 use finstack_core::types::IssuerId;
-use finstack_factor_model::credit_hierarchy::{
+use finstack_factor_model::credit::hierarchy::{
     AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
     FactorCorrelationMatrix, FoldUpRecord, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,

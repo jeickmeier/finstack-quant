@@ -308,7 +308,7 @@ pub struct CreditFactorAttribution {
     /// P&L attributed to the generic (PC) credit factor:
     /// `-Σ_i CS01_i × β_i^PC × ΔF_PC`.
     pub generic_pnl: Money,
-    /// One entry per [`finstack_factor_model::credit_hierarchy::HierarchyDimension`]
+    /// One entry per [`finstack_factor_model::credit::hierarchy::HierarchyDimension`]
     /// in the spec order recorded by the model's hierarchy.
     pub levels: Vec<LevelPnl>,
     /// Total adder P&L: `-Σ_i CS01_i × Δadder_i`. This is the **parallel**
@@ -823,7 +823,7 @@ impl PnlAttribution {
     /// # Returns
     ///
     /// New `PnlAttribution` with all factor P&Ls initialized to zero.
-    pub fn new_with_rounding(
+    pub(crate) fn new_with_rounding(
         total_pnl: Money,
         instrument_id: impl Into<String>,
         t0: Date,

@@ -3,7 +3,7 @@
 use super::parallel::attribute_pnl_parallel_with_credit_model;
 use super::spec::{default_attribution_metrics, AttributionResult, AttributionSpec};
 use super::waterfall::attribute_pnl_waterfall_with_credit_model;
-use super::{attribute_pnl_metrics_based, attribute_pnl_taylor_standard, AttributionMethod};
+use super::{attribute_pnl_metrics_based, attribute_pnl_taylor, AttributionMethod};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::Result;
 use finstack_valuations::instruments::DynInstrument;
@@ -70,7 +70,7 @@ impl AttributionSpec {
                 &self.credit_factor_detail_options,
             )?,
 
-            AttributionMethod::Taylor(ref taylor_config) => attribute_pnl_taylor_standard(
+            AttributionMethod::Taylor(ref taylor_config) => attribute_pnl_taylor(
                 &instrument_arc,
                 &market_t0,
                 &market_t1,

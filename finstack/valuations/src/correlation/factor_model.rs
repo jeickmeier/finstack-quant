@@ -884,36 +884,6 @@ impl LatentMultiFactor {
     }
 }
 
-/// Deprecated alias for [`LatentFactorKind`].
-#[deprecated(
-    note = "Renamed to LatentFactorKind for disambiguation; finstack-factor-model is the canonical market-risk factor framework."
-)]
-pub type FactorModelKind = LatentFactorKind;
-
-/// Deprecated alias for [`LatentFactorSpec`].
-#[deprecated(
-    note = "Renamed to LatentFactorSpec for disambiguation; finstack-factor-model is the canonical market-risk factor framework."
-)]
-pub type FactorSpec = LatentFactorSpec;
-
-/// Deprecated alias for [`LatentSingleFactor`].
-#[deprecated(
-    note = "Renamed to LatentSingleFactor for disambiguation; finstack-factor-model is the canonical market-risk factor framework."
-)]
-pub type SingleFactorModel = LatentSingleFactor;
-
-/// Deprecated alias for [`LatentTwoFactor`].
-#[deprecated(
-    note = "Renamed to LatentTwoFactor for disambiguation; finstack-factor-model is the canonical market-risk factor framework."
-)]
-pub type TwoFactorModel = LatentTwoFactor;
-
-/// Deprecated alias for [`LatentMultiFactor`].
-#[deprecated(
-    note = "Renamed to LatentMultiFactor for disambiguation; finstack-factor-model is the canonical market-risk factor framework."
-)]
-pub type MultiFactorModel = LatentMultiFactor;
-
 #[cfg(test)]
 mod tests {
     use super::*;

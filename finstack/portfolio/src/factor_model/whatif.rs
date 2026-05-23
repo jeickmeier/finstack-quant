@@ -477,7 +477,7 @@ mod tests {
     #[test]
     fn factor_stress_applies_credit_hierarchy_fixed_bp_shocks_in_model_order() {
         use finstack_core::market_data::term_structures::{DiscountCurve, HazardCurve};
-        use finstack_factor_model::credit_hierarchy::{
+        use finstack_factor_model::credit::hierarchy::{
             AdderVolSource, CreditHierarchySpec, HierarchyDimension, IssuerBetaMode, IssuerBetaRow,
             IssuerBetas, IssuerTags,
         };

@@ -47,7 +47,7 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::{Error, Result};
-use finstack_factor_model::credit_hierarchy::CreditFactorModel;
+use finstack_factor_model::credit::hierarchy::CreditFactorModel;
 use finstack_valuations::instruments::Instrument;
 use std::sync::Arc;
 
@@ -556,62 +556,62 @@ impl<'a> WaterfallContext<'a> {
         match factor {
             AttributionFactor::Carry => Ok(self.current_market.clone()),
             AttributionFactor::RatesCurves => {
-                let rates_t1 = MarketSnapshot::extract(self.market_t1, CurveRestoreFlags::RATES);
+                let rates_t1 = MarketSnapshot::extract(self.market_t1, MarketRestoreFlags::RATES);
                 Ok(MarketSnapshot::restore_market(
                     &self.current_market,
                     &rates_t1,
-                    CurveRestoreFlags::RATES,
+                    MarketRestoreFlags::RATES,
                 ))
             }
             AttributionFactor::CreditCurves => {
-                let credit_t1 = MarketSnapshot::extract(self.market_t1, CurveRestoreFlags::CREDIT);
+                let credit_t1 = MarketSnapshot::extract(self.market_t1, MarketRestoreFlags::CREDIT);
                 Ok(MarketSnapshot::restore_market(
                     &self.current_market,
                     &credit_t1,
-                    CurveRestoreFlags::CREDIT,
+                    MarketRestoreFlags::CREDIT,
                 ))
             }
             AttributionFactor::InflationCurves => {
                 let inflation_t1 =
-                    MarketSnapshot::extract(self.market_t1, CurveRestoreFlags::INFLATION);
+                    MarketSnapshot::extract(self.market_t1, MarketRestoreFlags::INFLATION);
                 Ok(MarketSnapshot::restore_market(
                     &self.current_market,
                     &inflation_t1,
-                    CurveRestoreFlags::INFLATION,
+                    MarketRestoreFlags::INFLATION,
                 ))
             }
             AttributionFactor::Correlations => {
                 let corr_t1 =
-                    MarketSnapshot::extract(self.market_t1, CurveRestoreFlags::CORRELATION);
+                    MarketSnapshot::extract(self.market_t1, MarketRestoreFlags::CORRELATION);
                 Ok(MarketSnapshot::restore_market(
                     &self.current_market,
                     &corr_t1,
-                    CurveRestoreFlags::CORRELATION,
+                    MarketRestoreFlags::CORRELATION,
                 ))
             }
             AttributionFactor::Fx => {
-                let fx_t1 = MarketSnapshot::extract(self.market_t1, CurveRestoreFlags::FX);
+                let fx_t1 = MarketSnapshot::extract(self.market_t1, MarketRestoreFlags::FX);
                 Ok(MarketSnapshot::restore_market(
                     &self.current_market,
                     &fx_t1,
-                    CurveRestoreFlags::FX,
+                    MarketRestoreFlags::FX,
                 ))
             }
             AttributionFactor::Volatility => {
-                let vol_t1 = MarketSnapshot::extract(self.market_t1, CurveRestoreFlags::VOL);
+                let vol_t1 = MarketSnapshot::extract(self.market_t1, MarketRestoreFlags::VOL);
                 Ok(MarketSnapshot::restore_market(
                     &self.current_market,
                     &vol_t1,
-                    CurveRestoreFlags::VOL,
+                    MarketRestoreFlags::VOL,
                 ))
             }
             AttributionFactor::MarketScalars => {
                 let scalars_t1 =
-                    MarketSnapshot::extract(self.market_t1, CurveRestoreFlags::SCALARS);
+                    MarketSnapshot::extract(self.market_t1, MarketRestoreFlags::SCALARS);
                 Ok(MarketSnapshot::restore_market(
                     &self.current_market,
                     &scalars_t1,
-                    CurveRestoreFlags::SCALARS,
+                    MarketRestoreFlags::SCALARS,
                 ))
             }
             AttributionFactor::ModelParameters => Err(Error::internal(

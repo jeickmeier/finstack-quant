@@ -3,7 +3,7 @@
 use crate::metrics::MetricRegistry;
 
 /// Register callable range accrual metrics with the registry.
-pub fn register_callable_range_accrual_metrics(registry: &mut MetricRegistry) {
+pub(crate) fn register_callable_range_accrual_metrics(registry: &mut MetricRegistry) {
     use crate::metrics::{Dv01CalculatorConfig, MetricId, UnifiedDv01Calculator};
     use crate::pricer::InstrumentType;
     use std::sync::Arc;

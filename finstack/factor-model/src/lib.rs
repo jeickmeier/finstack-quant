@@ -25,31 +25,6 @@ mod parse;
 pub mod primitives;
 pub mod sensitivity_matrix;
 
-/// Compatibility module for factor definitions. Prefer [`primitives::definition`].
-pub mod definition {
-    pub use crate::primitives::definition::*;
-}
-/// Compatibility module for market dependency descriptors. Prefer [`primitives::dependency`].
-pub mod dependency {
-    pub use crate::primitives::dependency::*;
-}
-/// Compatibility module for factor identifiers and asset-class tags. Prefer [`primitives::factor_types`].
-pub mod factor_types {
-    pub use crate::primitives::factor_types::*;
-}
-/// Compatibility module for credit hierarchy artifacts. Prefer [`credit::hierarchy`].
-pub mod credit_hierarchy {
-    pub use crate::credit::hierarchy::*;
-}
-/// Compatibility module for credit calibration. Prefer [`credit::calibration`].
-pub mod credit_calibration {
-    pub use crate::credit::calibration::*;
-}
-/// Compatibility module for credit decomposition. Prefer [`credit::decomposition`].
-pub mod credit_decomposition {
-    pub use crate::credit::decomposition::*;
-}
-
 pub use calibration::FactorCalibrator;
 pub use config::{BumpSizeConfig, FactorBumpUnit, FactorModelConfig, PricingMode, RiskMeasure};
 pub use covariance::FactorCovarianceMatrix;

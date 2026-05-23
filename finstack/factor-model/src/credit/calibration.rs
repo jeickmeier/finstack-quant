@@ -1,5 +1,5 @@
 //! Deterministic calibrator that produces a [`CreditFactorModel`] artifact from
-//! sparse issuer-spread history (PR-4 MVP).
+//! sparse issuer-spread history.
 //!
 //! # Algorithm overview
 //!
@@ -91,19 +91,20 @@ pub enum PanelSpace {
 
 /// Volatility model selector for the per-factor variance forecast.
 ///
-/// PR-4 supports `Sample` only. The other variants are accepted at the type
-/// level so that downstream code does not break when those PRs land, but the
-/// calibrator returns a clean error if any non-`Sample` variant is supplied.
+/// `Sample` is the only executable choice today. The other variants are
+/// reserved at the type level so downstream config schemas do not churn when
+/// those estimators are implemented, but the calibrator returns a clean error
+/// if any non-`Sample` variant is supplied.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VolModelChoice {
-    /// Plain sample variance (PR-4).
+    /// Plain sample variance.
     Sample,
-    /// GARCH(1,1) — deferred to PR-5a.
+    /// GARCH(1,1), reserved but not implemented.
     Garch,
-    /// EGARCH — deferred to PR-5a.
+    /// EGARCH, reserved but not implemented.
     Egarch,
-    /// EWMA with smoothing parameter `lambda` — deferred to PR-5a.
+    /// EWMA with smoothing parameter `lambda`, reserved but not implemented.
     Ewma {
         /// Smoothing parameter.
         lambda: f64,
@@ -112,11 +113,10 @@ pub enum VolModelChoice {
 
 /// Strategy for assembling the factor covariance matrix.
 ///
-/// PR-4 supports `Diagonal` only.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CovarianceStrategy {
-    /// Diagonal Σ = diag(σ²) under identity correlation (PR-4 default).
+    /// Diagonal Σ = diag(σ²) under identity correlation.
     Diagonal,
     /// Sample correlation (PSD-repaired if needed) plus diagonal ridge:
     /// Σ = D·ρ·D + α·I. Requires `alpha >= 0`. See design spec §4.1.
@@ -174,9 +174,9 @@ pub struct CreditCalibrationConfig {
     pub hierarchy: CreditHierarchySpec,
     /// Per-level minimum-bucket-size thresholds.
     pub min_bucket_size_per_level: BucketSizeThresholds,
-    /// Vol-model choice for the per-factor variance forecast (PR-4: `Sample` only).
+    /// Vol-model choice for the per-factor variance forecast (`Sample` only today).
     pub vol_model: VolModelChoice,
-    /// Covariance assembly strategy (PR-4: `Diagonal` only).
+    /// Covariance assembly strategy.
     pub covariance_strategy: CovarianceStrategy,
     /// Optional shrinkage applied to OLS β estimates.
     pub beta_shrinkage: BetaShrinkage,
@@ -249,8 +249,8 @@ pub struct CreditCalibrationInputs {
     pub asof_spreads: BTreeMap<IssuerId, f64>,
     /// Optional caller-supplied idiosyncratic vol overrides.
     ///
-    /// Empty for PR-4 — the peer-proxy fallback chain is deferred to PR-5a.
-    /// PR-4 ignores any entries here so behaviour stays deterministic.
+    /// Caller-supplied values take precedence over history, peer-proxy, and
+    /// global-default adder-vol estimates.
     pub idiosyncratic_overrides: BTreeMap<IssuerId, f64>,
 }
 
@@ -278,22 +278,21 @@ impl CreditCalibrator {
     /// # Errors
     ///
     /// Returns [`finstack_core::Error::Validation`] when:
-    /// - any unsupported [`VolModelChoice`] or [`CovarianceStrategy`] is requested,
+    /// - an unsupported [`VolModelChoice`] is requested,
     /// - the inputs are structurally malformed (length mismatches, missing
     ///   `as_of` in the date grid, missing tags),
     /// - the assembled [`CreditFactorModel::validate`] check fails.
     pub fn calibrate(&self, inputs: CreditCalibrationInputs) -> Result<CreditFactorModel> {
-        // -- 0. Reject unsupported PR-5a/b features early. ------------------
+        // -- 0. Reject unsupported volatility estimators early. --------------
         match self.config.vol_model {
             VolModelChoice::Sample => {}
             VolModelChoice::Garch | VolModelChoice::Egarch | VolModelChoice::Ewma { .. } => {
                 return Err(validation_err(
-                    "PR-4 calibrator supports VolModelChoice::Sample only; \
-                     GARCH/EGARCH/EWMA are deferred to PR-5a",
+                    "CreditCalibrator supports VolModelChoice::Sample only; \
+                     GARCH/EGARCH/EWMA are reserved but not implemented",
                 ));
             }
         }
-        // All CovarianceStrategy variants are now supported (PR-5b).
 
         validate_calibration_config(&self.config)?;
         validate_calibration_inputs(&inputs)?;
@@ -1444,9 +1443,9 @@ fn assemble_factor_model_config(
     // Build factor definitions (every factor is Credit / CurveParallel placeholder).
     let mut factors = Vec::with_capacity(factor_id_order.len());
     for fid in factor_id_order {
-        // PR-4: empty curve_ids is an honest no-op. PR-8a (waterfall + parallel
-        // attribution) will replace this with real curve mappings via the credit
-        // hierarchical matcher.
+        // Empty curve_ids are an honest no-op for hierarchy-derived factors;
+        // downstream attribution uses the credit hierarchical matcher rather
+        // than these placeholder curve mappings.
         factors.push(FactorDefinition {
             id: fid.clone(),
             factor_type: FactorType::Credit,
@@ -1686,7 +1685,7 @@ fn build_factor_histories(
         PanelSpace::Returns => dates.iter().skip(1).copied().collect::<Vec<_>>(),
         PanelSpace::Levels => dates.to_vec(),
     };
-    // `FactorHistories.values` is `Vec<f64>` (locked at PR-1). Flatten sparse
+    // `FactorHistories.values` is `Vec<f64>`. Flatten sparse
     // series here: `None` (empty-bucket date) → `0.0`. Downstream consumers
     // should treat 0.0 entries in level-factor histories as "no observation"
     // when the panel is known to be sparse.

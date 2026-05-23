@@ -16,15 +16,14 @@ use finstack_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_core::money::Money;
 use finstack_valuations::instruments::exotics::basket::BasketCalculator;
 use finstack_valuations::instruments::exotics::basket::{
-    register_basket_metrics, AssetExposureCalculator, ConstituentCountCalculator,
-    ExpenseRatioCalculator,
+    AssetExposureCalculator, ConstituentCountCalculator, ExpenseRatioCalculator,
 };
 use finstack_valuations::instruments::exotics::basket::{
     AssetType, Basket, BasketConstituent, BasketPricingConfig, ConstituentReference,
 };
 use finstack_valuations::instruments::fixed_income::bond::Bond;
 use finstack_valuations::instruments::{Attributes, Instrument};
-use finstack_valuations::metrics::{MetricCalculator, MetricContext, MetricRegistry};
+use finstack_valuations::metrics::{MetricCalculator, MetricContext};
 use std::sync::Arc;
 use time::Month;
 
@@ -1037,19 +1036,6 @@ fn test_asset_exposure_metric_bond() {
     // Assert
     // Bond exposure: 0.5 + 0.3 = 0.8 = 80%
     assert!((result - 80.0).abs() < 0.01);
-}
-
-#[test]
-fn test_metrics_registry_registration() {
-    // Arrange
-    let mut registry = MetricRegistry::new();
-
-    // Act
-    register_basket_metrics(&mut registry);
-
-    // Assert - verification that registration doesn't panic
-    // The actual metric IDs would need to be checked via the registry's public API
-    // This tests that the registration process completes successfully
 }
 
 // ============================================================================

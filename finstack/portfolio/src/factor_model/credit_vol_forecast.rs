@@ -38,7 +38,7 @@
 use std::collections::BTreeMap;
 
 use finstack_core::types::IssuerId;
-use finstack_factor_model::credit_hierarchy::{
+use finstack_factor_model::credit::hierarchy::{
     CreditFactorModel, FactorVolModel, IdiosyncraticVolModel,
 };
 use finstack_factor_model::matching::CREDIT_GENERIC_FACTOR_ID;
@@ -367,7 +367,7 @@ pub fn build_credit_vol_report(
     model: &CreditFactorModel,
     by_position: bool,
 ) -> CreditVolReport {
-    use finstack_factor_model::credit_hierarchy::HierarchyDimension;
+    use finstack_factor_model::credit::hierarchy::HierarchyDimension;
 
     let n_levels = model.hierarchy.levels.len();
     let mut by_level: Vec<LevelVolContribution> = (0..n_levels)
@@ -521,7 +521,7 @@ mod tests {
     use finstack_core::dates::create_date;
     use finstack_core::market_data::bumps::BumpUnits;
     use finstack_core::types::{CurveId, IssuerId};
-    use finstack_factor_model::credit_hierarchy::{
+    use finstack_factor_model::credit::hierarchy::{
         CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
         FactorCorrelationMatrix, FactorVolModel, GenericFactorSpec, HierarchyDimension,
         IdiosyncraticVolModel, IssuerBetaPolicy, LevelsAtAnchor, VolState,

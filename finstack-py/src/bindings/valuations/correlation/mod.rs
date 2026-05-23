@@ -386,7 +386,7 @@ impl PyLatentFactorSpec {
 }
 
 // ---------------------------------------------------------------------------
-// FactorModel (trait object wrapper)
+// LatentFactor (concrete dispatch wrapper)
 // ---------------------------------------------------------------------------
 
 /// Concrete factor model for correlated behavior.
@@ -874,14 +874,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLatentTwoFactor>()?;
     m.add_class::<PyLatentMultiFactor>()?;
     m.add_class::<PyCorrelatedBernoulli>()?;
-    // Backwards-compatible aliases for the pre-rename Python classes. New code
-    // should use the Latent* names so "factor model" refers to market-risk
-    // factor modelling across finstack.
-    m.setattr("FactorSpec", m.getattr("LatentFactorSpec")?)?;
-    m.setattr("FactorModel", m.getattr("LatentFactor")?)?;
-    m.setattr("SingleFactorModel", m.getattr("LatentSingleFactor")?)?;
-    m.setattr("TwoFactorModel", m.getattr("LatentTwoFactor")?)?;
-    m.setattr("MultiFactorModel", m.getattr("LatentMultiFactor")?)?;
     m.add_function(wrap_pyfunction!(correlation_bounds, &m)?)?;
     m.add_function(wrap_pyfunction!(joint_probabilities, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_correlation_matrix, &m)?)?;
@@ -900,11 +892,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "LatentSingleFactor",
             "LatentTwoFactor",
             "LatentMultiFactor",
-            "FactorSpec",
-            "FactorModel",
-            "SingleFactorModel",
-            "TwoFactorModel",
-            "MultiFactorModel",
             "CorrelatedBernoulli",
             "correlation_bounds",
             "joint_probabilities",

@@ -78,7 +78,7 @@ fn register_equity_instrument_metrics(registry: &mut MetricRegistry) {
     crate::instruments::equity::equity_option::metrics::register_equity_option_metrics(registry);
     crate::instruments::equity::equity_trs::metrics::register_equity_trs_metrics(registry);
     crate::instruments::equity::variance_swap::metrics::register_variance_swap_metrics(registry);
-    crate::instruments::equity::pe_fund::register_private_markets_fund_metrics(registry);
+    crate::instruments::equity::pe_fund::metrics::register_private_markets_fund_metrics(registry);
     crate::instruments::equity::dcf_equity::metrics::register_dcf_metrics(registry);
     crate::instruments::equity::vol_index_future::metrics::register_vol_index_future_metrics(
         registry,

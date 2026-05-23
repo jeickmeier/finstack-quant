@@ -137,7 +137,6 @@ pub use metrics::{
     calculate_tranche_duration,
     calculate_tranche_wal,
     calculate_tranche_z_spread,
-    register_structured_credit_metrics,
     // Deal-specific metrics
     AbsChargeOffCalculator,
     AbsCreditEnhancementCalculator,

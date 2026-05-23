@@ -48,8 +48,8 @@ pub mod waterfall;
 
 #[doc(hidden)]
 pub use metrics::{
-    calculate_irr, register_private_markets_fund_metrics, CarryAccruedCalculator, DpiLpCalculator,
-    GpIrrCalculator, LpIrrCalculator, MoicLpCalculator, TvpiLpCalculator,
+    calculate_irr, CarryAccruedCalculator, DpiLpCalculator, GpIrrCalculator, LpIrrCalculator,
+    MoicLpCalculator, TvpiLpCalculator,
 };
 pub use types::PrivateMarketsFund;
 pub use waterfall::{

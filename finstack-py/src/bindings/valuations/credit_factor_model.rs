@@ -35,7 +35,7 @@ fn parse_date(s: &str) -> PyResult<finstack_core::dates::Date> {
 ///     json_out = model.to_json()
 ///
 /// Example:
-///     >>> from finstack.valuations import CreditFactorModel
+///     >>> from finstack.factor_model.credit import CreditFactorModel
 ///     >>> model = CreditFactorModel.from_json(json_str)  # doctest: +SKIP
 ///     >>> model.schema_version  # doctest: +SKIP
 ///     'finstack.credit_factor_model/1'
@@ -47,12 +47,12 @@ fn parse_date(s: &str) -> PyResult<finstack_core::dates::Date> {
 )]
 #[derive(Clone)]
 pub(crate) struct PyCreditFactorModel {
-    pub(crate) inner: finstack_factor_model::credit_hierarchy::CreditFactorModel,
+    pub(crate) inner: finstack_factor_model::credit::hierarchy::CreditFactorModel,
 }
 
 impl PyCreditFactorModel {
     pub(crate) fn from_inner(
-        inner: finstack_factor_model::credit_hierarchy::CreditFactorModel,
+        inner: finstack_factor_model::credit::hierarchy::CreditFactorModel,
     ) -> Self {
         Self { inner }
     }
@@ -74,7 +74,7 @@ impl PyCreditFactorModel {
     ///     ValueError: If the JSON is malformed or fails validation.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_factor_model::credit_hierarchy::CreditFactorModel =
+        let inner: finstack_factor_model::credit::hierarchy::CreditFactorModel =
             serde_json::from_str(json).map_err(display_to_py)?;
         inner.validate().map_err(display_to_py)?;
         Ok(Self { inner })
@@ -123,7 +123,7 @@ impl PyCreditFactorModel {
     /// Returns:
     ///     List of dimension names (e.g. ``["Rating", "Region", "Sector"]``).
     fn level_names(&self) -> Vec<String> {
-        use finstack_factor_model::credit_hierarchy::HierarchyDimension;
+        use finstack_factor_model::credit::hierarchy::HierarchyDimension;
         self.inner
             .hierarchy
             .levels
@@ -185,7 +185,7 @@ impl PyCreditFactorModel {
 ///
 /// Example:
 ///     >>> import json
-///     >>> from finstack.valuations import CreditCalibrator
+///     >>> from finstack.factor_model.credit import CreditCalibrator
 ///     >>> cal = CreditCalibrator(json.dumps(config))
 ///     >>> model = cal.calibrate(json.dumps(inputs))  # doctest: +SKIP
 #[pyclass(
@@ -250,7 +250,7 @@ impl PyCreditCalibrator {
 /// :func:`decompose_period` to compute period-over-period changes.
 ///
 /// Example:
-///     >>> from finstack.valuations import decompose_levels
+///     >>> from finstack.factor_model.credit import decompose_levels
 ///     >>> snap = decompose_levels(model, spreads, generic, "2024-03-29")  # doctest: +SKIP
 ///     >>> snap.generic  # doctest: +SKIP
 ///     100.5
@@ -361,7 +361,7 @@ impl PyLevelsAtDate {
 /// for every issuer present in both snapshots.
 ///
 /// Example:
-///     >>> from finstack.valuations import decompose_period
+///     >>> from finstack.factor_model.credit import decompose_period
 ///     >>> period = decompose_period(snap_t0, snap_t1)  # doctest: +SKIP
 ///     >>> period.d_generic  # doctest: +SKIP
 ///     0.3
@@ -484,7 +484,7 @@ impl PyPeriodDecomposition {
 ///         or if an issuer is missing a required hierarchy tag.
 ///
 /// Example:
-///     >>> from finstack.valuations import decompose_levels
+///     >>> from finstack.factor_model.credit import decompose_levels
 ///     >>> snap = decompose_levels(model, {"ISSUER-A": 120.5}, 100.0, "2024-03-29")  # doctest: +SKIP
 #[pyfunction]
 #[pyo3(signature = (model, observed_spreads_json, observed_generic, as_of, runtime_tags_json=None))]
@@ -503,7 +503,7 @@ fn decompose_levels(
     let runtime_tags: Option<
         std::collections::BTreeMap<
             finstack_core::types::IssuerId,
-            finstack_factor_model::credit_hierarchy::IssuerTags,
+            finstack_factor_model::credit::hierarchy::IssuerTags,
         >,
     > = match runtime_tags_json {
         Some(json) => Some(serde_json::from_str(json).map_err(display_to_py)?),
@@ -545,7 +545,7 @@ fn decompose_levels(
 ///         snapshots disagree on hierarchy depth.
 ///
 /// Example:
-///     >>> from finstack.valuations import decompose_period
+///     >>> from finstack.factor_model.credit import decompose_period
 ///     >>> period = decompose_period(snap_t0, snap_t1)  # doctest: +SKIP
 ///     >>> period.d_generic  # doctest: +SKIP
 ///     0.3
@@ -578,7 +578,7 @@ fn decompose_period(
 /// - ``{"n_steps": N}`` (JSON string) — variance scaled by ``N``.
 ///
 /// Example:
-///     >>> from finstack.valuations import FactorCovarianceForecast
+///     >>> from finstack.factor_model.credit import FactorCovarianceForecast
 ///     >>> fcf = FactorCovarianceForecast(model)
 ///     >>> cov_json = fcf.covariance_at("one_step")  # doctest: +SKIP
 #[pyclass(
@@ -590,7 +590,7 @@ fn decompose_period(
 pub(crate) struct PyFactorCovarianceForecast {
     /// We store the model by value (cloned from the Python wrapper) so that
     /// `FactorCovarianceForecast<'a>` lifetime requirements don't escape.
-    model: finstack_factor_model::credit_hierarchy::CreditFactorModel,
+    model: finstack_factor_model::credit::hierarchy::CreditFactorModel,
 }
 
 /// Parse a horizon descriptor from a Python string.

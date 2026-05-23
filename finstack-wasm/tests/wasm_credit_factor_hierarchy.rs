@@ -129,7 +129,7 @@ fn calibrate_then_decompose_round_trip() {
     let parsed: serde_json::Value = serde_json::from_str(&model_json).unwrap();
     assert_eq!(
         parsed["schema_version"].as_str().unwrap(),
-        finstack_factor_model::credit_hierarchy::CreditFactorModel::SCHEMA_VERSION,
+        finstack_factor_model::credit::hierarchy::CreditFactorModel::SCHEMA_VERSION,
         "schema_version must match the canonical constant"
     );
 }

@@ -31,7 +31,7 @@ pub use risk::{
 // Standalone tranche metric functions are included in the explicit lists above.
 
 /// Register all structured credit metrics
-pub fn register_structured_credit_metrics(registry: &mut crate::metrics::MetricRegistry) {
+pub(crate) fn register_structured_credit_metrics(registry: &mut crate::metrics::MetricRegistry) {
     use crate::metrics::MetricId;
     use crate::pricer::InstrumentType;
     use std::sync::Arc;

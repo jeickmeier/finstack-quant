@@ -14,7 +14,7 @@
 #![allow(clippy::unwrap_used)]
 
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
-use finstack_factor_model::credit_hierarchy::{
+use finstack_factor_model::credit::hierarchy::{
     CreditHierarchySpec, HierarchyDimension, IssuerBetaPolicy,
 };
 use finstack_factor_model::{

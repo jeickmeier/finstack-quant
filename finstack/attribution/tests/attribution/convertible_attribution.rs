@@ -17,8 +17,7 @@ use std::sync::Arc;
 use time::Month;
 
 use finstack_attribution::{
-    attribute_pnl_metrics_based, attribute_pnl_taylor, attribute_pnl_taylor_standard,
-    AttributionMethod, TaylorAttributionConfig,
+    attribute_pnl_metrics_based, attribute_pnl_taylor, AttributionMethod, TaylorAttributionConfig,
 };
 use finstack_cashflows::builder::specs::{CouponType, FixedCouponSpec};
 use finstack_valuations::instruments::fixed_income::convertible::{
@@ -123,32 +122,8 @@ fn taylor_explains_convertible_credit_spread_move() {
     let market_t1 = market(300.0); // +150bp credit widening
     let config = TaylorAttributionConfig::default();
 
-    let taylor = attribute_pnl_taylor(&conv, &market_t0, &market_t1, t0(), t1(), &config).unwrap();
-
-    // The credit factor must be produced (it was dropped before the fix).
-    let credit_factor = taylor
-        .factors
-        .iter()
-        .find(|f| f.factor_name.starts_with("Credit:"));
-    assert!(
-        credit_factor.is_some(),
-        "Taylor must produce a Credit factor for a convertible's risky discount \
-         curve; got factors {:?}",
-        taylor
-            .factors
-            .iter()
-            .map(|f| &f.factor_name)
-            .collect::<Vec<_>>()
-    );
-    let credit_factor = credit_factor.unwrap();
-    assert!(
-        credit_factor.explained_pnl < 0.0,
-        "credit widening must produce a loss on a long convertible, got {}",
-        credit_factor.explained_pnl
-    );
-
-    let attribution =
-        attribute_pnl_taylor_standard(&conv, &market_t0, &market_t1, t0(), t1(), &config).unwrap();
+    let attribution = attribute_pnl_taylor(&conv, &market_t0, &market_t1, t0(), t1(), &config)
+        .expect("Taylor attribution should succeed");
 
     assert!(
         attribution.credit_curves_pnl.amount() < 0.0,

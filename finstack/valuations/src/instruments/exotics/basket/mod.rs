@@ -133,10 +133,7 @@ pub(crate) mod types;
 // Re-export main types for convenience
 // Builder is generated via derive on `Basket`.
 #[doc(hidden)]
-pub use metrics::{
-    register_basket_metrics, AssetExposureCalculator, ConstituentCountCalculator,
-    ExpenseRatioCalculator,
-};
+pub use metrics::{AssetExposureCalculator, ConstituentCountCalculator, ExpenseRatioCalculator};
 pub use pricer::BasketCalculator;
 pub use types::{AssetType, Basket, BasketConstituent, BasketPricingConfig, ConstituentReference};
 

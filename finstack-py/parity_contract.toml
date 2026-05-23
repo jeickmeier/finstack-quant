@@ -54,7 +54,7 @@ rust_lib   = "finstack/factor-model/src/lib.rs"
 python_package = "finstack.factor_model"
 visibility = "pub"
 status = "exists"
-note = "Generic factor-model primitives are Rust-first today; credit hierarchy APIs are exposed under finstack.factor_model.credit with valuations aliases retained for compatibility."
+note = "Generic factor-model primitives are Rust-first today; credit hierarchy APIs are exposed under finstack.factor_model.credit."
 
 [crates.factor_model.modules]
 primitives = { python = "finstack.factor_model.primitives", status = "missing", note = "FactorId/FactorType/FactorDefinition typed host-language constructors deferred; JSON contracts remain Rust-owned." }
@@ -178,7 +178,6 @@ calibration  = { python = "finstack.valuations",              status = "flattene
 correlation  = { python = "finstack.valuations.correlation",  status = "exists", note = "Former standalone finstack-correlation crate; nested under valuations" }
 credit       = { python = "finstack.valuations.credit",       status = "exists", note = "Structural credit models and PIK toggle helpers" }
 credit_derivatives = { python = "finstack.valuations.credit_derivatives", status = "exists", note = "Typed wrappers for CDS, CDS index, tranche, and option JSON pricing" }
-credit_factor_model = { python = "finstack.factor_model.credit", status = "exists", note = "Canonical binding namespace moved with Rust crate to finstack.factor_model.credit; finstack.valuations root aliases remain for compatibility." }
 
 # Symbol-level pinning for the valuations domain. Names listed here MUST
 # resolve when imported from `finstack.valuations`. Adding a public name to
@@ -215,8 +214,6 @@ public = [
     "CdsUpfront",
     "CdsUpfrontDatum",
     "CollateralDatum",
-    "CreditCalibrator",
-    "CreditFactorModel",
     "CreditIndexDatum",
     "CreditState",
     "DatePillar",
@@ -225,7 +222,6 @@ public = [
     "DividendScheduleDatum",
     "DynamicRecoverySpec",
     "EndogenousHazardSpec",
-    "FactorCovarianceForecast",
     "FixingSeriesDatum",
     "ForwardCurvePrior",
     "ForwardStep",
@@ -246,7 +242,6 @@ public = [
     "InflationSwapDatum",
     "InflationSwapPayload",
     "InflationSwapQuote",
-    "LevelsAtDate",
     "MarketDatum",
     "MarketQuote",
     "MertonModel",
@@ -255,7 +250,6 @@ public = [
     "OptionVolQuote",
     "ParametricCurvePrior",
     "ParametricStep",
-    "PeriodDecomposition",
     "Pillar",
     "PriceCurvePrior",
     "PriceDatum",
@@ -302,8 +296,6 @@ public = [
     "calibrate",
     "callable_range_accrual_accrued",
     "cms_spread_option_intrinsic",
-    "decompose_levels",
-    "decompose_period",
     "dependency_graph_json",
     "dry_run",
     "instrument_cashflows",
@@ -342,6 +334,34 @@ public = [
     "default_waterfall_order",
     "validate_attribution_json",
 ]
+
+# WASM attribution subset
+#
+# Python exposes a richer `PnlAttribution` wrapper. WASM intentionally exposes
+# the JSON/spec attribution surface through `exports/attribution.js` with
+# camelCase facade names plus the wasm-bindgen params constructor.
+# ---------------------------------------------------------------------------
+[wasm_attribution_subset]
+rust_module_root = "../finstack-wasm/src/api/attribution/"
+js_export_file   = "../finstack-wasm/exports/attribution.js"
+root_exports = [
+    "AttributionParams",
+    "attributePnl",
+    "attributePnlFromSpec",
+    "defaultAttributionMetrics",
+    "defaultWaterfallOrder",
+    "validateAttributionJson",
+]
+
+[wasm_attribution_subset.python_js_map]
+attribute_pnl = "attributePnl"
+attribute_pnl_from_spec = "attributePnlFromSpec"
+default_attribution_metrics = "defaultAttributionMetrics"
+default_waterfall_order = "defaultWaterfallOrder"
+validate_attribution_json = "validateAttributionJson"
+
+[wasm_attribution_subset.wasm_only]
+symbols = ["AttributionParams"]
 
 # ---------------------------------------------------------------------------
 # finstack-statements  →  finstack.statements
@@ -561,11 +581,6 @@ nested = ["correlation", "credit", "creditDerivatives", "fx", "instruments"]
 # Root-level `valuations.<name>` exports (camelCase / PascalCase as in JS).
 # Duplicates under `instruments` / `creditDerivatives` are aliases, not extra entries.
 root_exports = [
-    "CreditCalibrator",
-    "CreditFactorModel",
-    "FactorCovarianceForecast",
-    "LevelsAtDate",
-    "PeriodDecomposition",
     "SabrCalibrator",
     "SabrModel",
     "SabrParameters",
@@ -581,8 +596,6 @@ root_exports = [
     "calibrate",
     "callableRangeAccrualAccrued",
     "cmsSpreadOptionIntrinsic",
-    "decomposeLevels",
-    "decomposePeriod",
     "dependencyGraphJson",
     "dryRun",
     "instrumentCashflowsJson",
@@ -657,14 +670,7 @@ cms_spread_option_intrinsic = "cmsSpreadOptionIntrinsic"
 callable_range_accrual_accrued = "callableRangeAccrualAccrued"
 validate_calibration_json = "validateCalibrationJson"
 validate_instrument_json = "validateInstrumentJson"
-decompose_levels = "decomposeLevels"
-decompose_period = "decomposePeriod"
 dependency_graph_json = "dependencyGraphJson"
-CreditFactorModel = "CreditFactorModel"
-CreditCalibrator = "CreditCalibrator"
-LevelsAtDate = "LevelsAtDate"
-PeriodDecomposition = "PeriodDecomposition"
-FactorCovarianceForecast = "FactorCovarianceForecast"
 SabrParameters = "SabrParameters"
 SabrModel = "SabrModel"
 SabrSmile = "SabrSmile"

@@ -26,7 +26,7 @@ use crate::metrics::MetricRegistry;
 ///
 /// Each metric is registered with the "Deposit" instrument type to ensure
 /// proper applicability filtering.
-pub fn register_deposit_metrics(registry: &mut MetricRegistry) {
+pub(crate) fn register_deposit_metrics(registry: &mut MetricRegistry) {
     use crate::pricer::InstrumentType;
     crate::register_metrics! {
         registry: registry,

@@ -1543,6 +1543,30 @@ mod tests {
         );
         assert!(
             registry
+                .get_pricer(PricerKey::new(InstrumentType::CmsOption, ModelKey::Black76))
+                .is_some(),
+            "CmsOption Black76 pricer should be registered"
+        );
+        assert!(
+            registry
+                .get_pricer(PricerKey::new(
+                    InstrumentType::CmsOption,
+                    ModelKey::StaticReplication
+                ))
+                .is_some(),
+            "CmsOption StaticReplication pricer should be registered"
+        );
+        assert!(
+            registry
+                .get_pricer(PricerKey::new(
+                    InstrumentType::CmsOption,
+                    ModelKey::Discounting
+                ))
+                .is_none(),
+            "CmsOption Discounting pricer must not be registered because it was only a Black76 alias"
+        );
+        assert!(
+            registry
                 .get_pricer(PricerKey::new(
                     InstrumentType::CommodityOption,
                     ModelKey::Black76

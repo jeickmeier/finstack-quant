@@ -23,7 +23,8 @@
 //! - Model parameters attribution requires instrument-specific support (see model_params.rs)
 
 use super::credit_cascade::{
-    build_credit_factor_attribution, plan_credit_cascade, shift_credit_curves_par_spread,
+    apply_curve_shape_residual, build_credit_factor_attribution, plan_credit_cascade,
+    shift_credit_curves_par_spread,
 };
 use super::credit_factor::CreditFactorDetailOptions;
 use super::factors::*;
@@ -35,7 +36,7 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::Result;
-use finstack_factor_model::credit_hierarchy::CreditFactorModel;
+use finstack_factor_model::credit::hierarchy::CreditFactorModel;
 use finstack_valuations::instruments::Instrument;
 use indexmap::IndexMap;
 use rayon::prelude::*;
@@ -85,17 +86,17 @@ enum ActiveFactorKind {
     ModelParameters,
 }
 
-fn get_restore_flags(kind: ActiveFactorKind) -> CurveRestoreFlags {
+fn get_restore_flags(kind: ActiveFactorKind) -> MarketRestoreFlags {
     match kind {
-        ActiveFactorKind::Discount => CurveRestoreFlags::DISCOUNT,
-        ActiveFactorKind::Forward => CurveRestoreFlags::FORWARD,
-        ActiveFactorKind::Credit => CurveRestoreFlags::HAZARD,
-        ActiveFactorKind::Inflation => CurveRestoreFlags::INFLATION,
-        ActiveFactorKind::Correlations => CurveRestoreFlags::CORRELATION,
-        ActiveFactorKind::FX => CurveRestoreFlags::FX,
-        ActiveFactorKind::Volatility => CurveRestoreFlags::VOL,
-        ActiveFactorKind::MarketScalars => CurveRestoreFlags::SCALARS,
-        ActiveFactorKind::ModelParameters => CurveRestoreFlags::empty(),
+        ActiveFactorKind::Discount => MarketRestoreFlags::DISCOUNT,
+        ActiveFactorKind::Forward => MarketRestoreFlags::FORWARD,
+        ActiveFactorKind::Credit => MarketRestoreFlags::HAZARD,
+        ActiveFactorKind::Inflation => MarketRestoreFlags::INFLATION,
+        ActiveFactorKind::Correlations => MarketRestoreFlags::CORRELATION,
+        ActiveFactorKind::FX => MarketRestoreFlags::FX,
+        ActiveFactorKind::Volatility => MarketRestoreFlags::VOL,
+        ActiveFactorKind::MarketScalars => MarketRestoreFlags::SCALARS,
+        ActiveFactorKind::ModelParameters => MarketRestoreFlags::empty(),
     }
 }
 
@@ -103,7 +104,7 @@ fn get_restore_flags(kind: ActiveFactorKind) -> CurveRestoreFlags {
 enum ParallelLatentFactorSpec {
     Market {
         factor: ParallelRestoredFactor,
-        flags: CurveRestoreFlags,
+        flags: MarketRestoreFlags,
         snapshot: Box<MarketSnapshot>,
     },
     ModelParams {
@@ -171,7 +172,7 @@ fn reprice_factor_restored_once(
     instrument: &Arc<dyn Instrument>,
     market_t1: &MarketContext,
     snapshot: &MarketSnapshot,
-    flags: CurveRestoreFlags,
+    flags: MarketRestoreFlags,
     has_data: bool,
     as_of_t1: Date,
     val_t1: Money,
@@ -205,7 +206,7 @@ fn reprice_cross_factor(
     market_t0: &MarketContext,
     market_t1: &MarketContext,
     as_of_t1: Date,
-    flags: CurveRestoreFlags,
+    flags: MarketRestoreFlags,
     val_t1: Money,
     val_with_t0_a: Money,
     val_with_t0_b: Money,
@@ -447,64 +448,64 @@ pub fn attribute_pnl_parallel_with_credit_model(
     )?;
 
     if full_cross_attribution {
-        let discount_snap = MarketSnapshot::extract(market_t0, CurveRestoreFlags::DISCOUNT);
-        let forward_snap = MarketSnapshot::extract(market_t0, CurveRestoreFlags::FORWARD);
-        let credit_snap_ext = MarketSnapshot::extract(market_t0, CurveRestoreFlags::CREDIT);
+        let discount_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::DISCOUNT);
+        let forward_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::FORWARD);
+        let credit_snap_ext = MarketSnapshot::extract(market_t0, MarketRestoreFlags::CREDIT);
         credit_snapshot = credit_snap_ext.clone();
-        let inflation_snap = MarketSnapshot::extract(market_t0, CurveRestoreFlags::INFLATION);
-        let correlation_snap = MarketSnapshot::extract(market_t0, CurveRestoreFlags::CORRELATION);
-        let fx_snap = MarketSnapshot::extract(market_t0, CurveRestoreFlags::FX);
-        let vol_snap = MarketSnapshot::extract(market_t0, CurveRestoreFlags::VOL);
-        let scalars_snap = MarketSnapshot::extract(market_t0, CurveRestoreFlags::SCALARS);
+        let inflation_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::INFLATION);
+        let correlation_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::CORRELATION);
+        let fx_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::FX);
+        let vol_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::VOL);
+        let scalars_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::SCALARS);
 
         let mut factor_specs = Vec::new();
 
         if !discount_snap.discount_curves.is_empty() {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Discount,
-                flags: CurveRestoreFlags::DISCOUNT,
+                flags: MarketRestoreFlags::DISCOUNT,
                 snapshot: Box::new(discount_snap),
             });
         }
         if !forward_snap.forward_curves.is_empty() {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Forward,
-                flags: CurveRestoreFlags::FORWARD,
+                flags: MarketRestoreFlags::FORWARD,
                 snapshot: Box::new(forward_snap),
             });
         }
         if !credit_snapshot.hazard_curves.is_empty() {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Credit,
-                flags: CurveRestoreFlags::CREDIT,
+                flags: MarketRestoreFlags::CREDIT,
                 snapshot: Box::new(credit_snapshot.clone()),
             });
         }
         if !inflation_snap.inflation_curves.is_empty() {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Inflation,
-                flags: CurveRestoreFlags::INFLATION,
+                flags: MarketRestoreFlags::INFLATION,
                 snapshot: Box::new(inflation_snap),
             });
         }
         if !correlation_snap.base_correlation_curves.is_empty() {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Correlations,
-                flags: CurveRestoreFlags::CORRELATION,
+                flags: MarketRestoreFlags::CORRELATION,
                 snapshot: Box::new(correlation_snap),
             });
         }
         if fx_snap.fx.is_some() {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::FX,
-                flags: CurveRestoreFlags::FX,
+                flags: MarketRestoreFlags::FX,
                 snapshot: Box::new(fx_snap),
             });
         }
         if !vol_snap.surfaces.is_empty() {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Volatility,
-                flags: CurveRestoreFlags::VOL,
+                flags: MarketRestoreFlags::VOL,
                 snapshot: Box::new(vol_snap),
             });
         }
@@ -515,7 +516,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
         if has_scalars {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::MarketScalars,
-                flags: CurveRestoreFlags::SCALARS,
+                flags: MarketRestoreFlags::SCALARS,
                 snapshot: Box::new(scalars_snap),
             });
         }
@@ -745,15 +746,15 @@ pub fn attribute_pnl_parallel_with_credit_model(
         // preserved exactly so repricing counts and first-error behavior stay
         // stable.
         let pre_fx_specs = [
-            (ParallelRestoredFactor::Rates, CurveRestoreFlags::RATES),
-            (ParallelRestoredFactor::Credit, CurveRestoreFlags::CREDIT),
+            (ParallelRestoredFactor::Rates, MarketRestoreFlags::RATES),
+            (ParallelRestoredFactor::Credit, MarketRestoreFlags::CREDIT),
             (
                 ParallelRestoredFactor::Inflation,
-                CurveRestoreFlags::INFLATION,
+                MarketRestoreFlags::INFLATION,
             ),
             (
                 ParallelRestoredFactor::Correlations,
-                CurveRestoreFlags::CORRELATION,
+                MarketRestoreFlags::CORRELATION,
             ),
         ];
         let pre_fx_evals = pre_fx_specs
@@ -799,10 +800,10 @@ pub fn attribute_pnl_parallel_with_credit_model(
         }
 
         // Step 7: FX attribution
-        let fx_snapshot = MarketSnapshot::extract(market_t0, CurveRestoreFlags::FX);
+        let fx_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::FX);
         if fx_snapshot.fx.is_some() {
             let market_with_t0_fx =
-                MarketSnapshot::restore_market(market_t1, &fx_snapshot, CurveRestoreFlags::FX);
+                MarketSnapshot::restore_market(market_t1, &fx_snapshot, MarketRestoreFlags::FX);
             let fx_reprice = reprice_instrument(instrument, &market_with_t0_fx, as_of_t1)?;
             num_repricings += 1;
             val_with_t0_fx = Some(fx_reprice);
@@ -828,7 +829,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
         }
 
         // Step 8: Volatility attribution.
-        let post_fx_specs = [(ParallelRestoredFactor::Volatility, CurveRestoreFlags::VOL)];
+        let post_fx_specs = [(ParallelRestoredFactor::Volatility, MarketRestoreFlags::VOL)];
         for (factor, flags) in post_fx_specs {
             let snapshot = MarketSnapshot::extract(market_t0, flags);
             if let Some((pnl, reprice)) = reprice_factor_restored_once(
@@ -892,7 +893,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
         // Step 10: Market scalars attribution.
         let post_model_specs = [(
             ParallelRestoredFactor::MarketScalars,
-            CurveRestoreFlags::SCALARS,
+            MarketRestoreFlags::SCALARS,
         )];
         for (factor, flags) in post_model_specs {
             let snapshot = MarketSnapshot::extract(market_t0, flags);
@@ -927,51 +928,51 @@ pub fn attribute_pnl_parallel_with_credit_model(
         // exactly as before for reduction-order stability.
         type CrossSpec<'a> = (
             &'a str,
-            CurveRestoreFlags,
-            CurveRestoreFlags,
+            MarketRestoreFlags,
+            MarketRestoreFlags,
             Option<Money>,
             Option<Money>,
         );
         let cross_specs: [CrossSpec<'_>; 6] = [
             (
                 "Rates×Credit",
-                CurveRestoreFlags::RATES,
-                CurveRestoreFlags::CREDIT,
+                MarketRestoreFlags::RATES,
+                MarketRestoreFlags::CREDIT,
                 val_with_t0_rates,
                 val_with_t0_credit,
             ),
             (
                 "Rates×Vol",
-                CurveRestoreFlags::RATES,
-                CurveRestoreFlags::VOL,
+                MarketRestoreFlags::RATES,
+                MarketRestoreFlags::VOL,
                 val_with_t0_rates,
                 val_with_t0_vol,
             ),
             (
                 "Spot×Vol",
-                CurveRestoreFlags::SCALARS,
-                CurveRestoreFlags::VOL,
+                MarketRestoreFlags::SCALARS,
+                MarketRestoreFlags::VOL,
                 val_with_t0_scalars,
                 val_with_t0_vol,
             ),
             (
                 "Spot×Credit",
-                CurveRestoreFlags::CREDIT,
-                CurveRestoreFlags::SCALARS,
+                MarketRestoreFlags::CREDIT,
+                MarketRestoreFlags::SCALARS,
                 val_with_t0_scalars,
                 val_with_t0_credit,
             ),
             (
                 "FX×Vol",
-                CurveRestoreFlags::FX,
-                CurveRestoreFlags::VOL,
+                MarketRestoreFlags::FX,
+                MarketRestoreFlags::VOL,
                 val_with_t0_fx,
                 val_with_t0_vol,
             ),
             (
                 "FX×Rates",
-                CurveRestoreFlags::RATES,
-                CurveRestoreFlags::FX,
+                MarketRestoreFlags::RATES,
+                MarketRestoreFlags::FX,
                 val_with_t0_fx,
                 val_with_t0_rates,
             ),
@@ -1027,7 +1028,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
                 let market_t0_credit = MarketSnapshot::restore_market(
                     market_t1,
                     &credit_snapshot,
-                    CurveRestoreFlags::CREDIT,
+                    MarketRestoreFlags::CREDIT,
                 );
 
                 // Base value for the cascade: the instrument priced at T1
@@ -1091,27 +1092,16 @@ pub fn attribute_pnl_parallel_with_credit_model(
                     })
                     .count();
 
-                // Sum of the parallel (bp-bump) steps only.
-                let parallel_step_sum: f64 = step_pnls
-                    .iter()
-                    .zip(cascade.steps.iter())
-                    .filter(|(_, s)| {
-                        !matches!(s.kind, super::credit_cascade::CreditStepKind::CurveShape)
-                    })
-                    .map(|(pnl, _)| pnl.amount())
-                    .sum();
-
                 // Audit item #1: the non-parallel hazard residual is attributed
                 // to the `CurveShape` step (a real curve-shape / term-structure
                 // component) rather than left in a generic cross-factor bucket.
                 // `curve_shape = credit_curves_pnl − Σ(parallel steps)` makes
                 // `Σ all steps ≡ credit_curves_pnl` hold exactly.
-                let curve_shape_amt = attribution.credit_curves_pnl.amount() - parallel_step_sum;
-                for (pnl, step) in step_pnls.iter_mut().zip(cascade.steps.iter()) {
-                    if matches!(step.kind, super::credit_cascade::CreditStepKind::CurveShape) {
-                        *pnl = Money::new(curve_shape_amt, val_t1.currency());
-                    }
-                }
+                apply_curve_shape_residual(
+                    &mut step_pnls,
+                    &cascade.steps,
+                    attribution.credit_curves_pnl,
+                );
 
                 let detail = build_credit_factor_attribution(
                     model,
@@ -1310,11 +1300,11 @@ mod tests {
         let market_t1 = MarketContext::new().insert(curve_t1);
 
         // Extract and verify snapshots work
-        let rates_snapshot = MarketSnapshot::extract(&market_t0, CurveRestoreFlags::RATES);
+        let rates_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::RATES);
         assert_eq!(rates_snapshot.discount_curves.len(), 1);
 
         let restored =
-            MarketSnapshot::restore_market(&market_t1, &rates_snapshot, CurveRestoreFlags::RATES);
+            MarketSnapshot::restore_market(&market_t1, &rates_snapshot, MarketRestoreFlags::RATES);
         assert!(restored.get_discount("USD-OIS").is_ok());
     }
 

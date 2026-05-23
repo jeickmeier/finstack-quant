@@ -1,4 +1,4 @@
-use finstack_attribution::{CurveRestoreFlags, MarketSnapshot};
+use finstack_attribution::{MarketRestoreFlags, MarketSnapshot};
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
@@ -87,68 +87,71 @@ fn test_extract_and_restore_rates_curves() {
         .insert(create_test_discount_curve("USD-OIS", base_date))
         .insert(create_test_discount_curve("EUR-OIS", base_date));
 
-    let snapshot = MarketSnapshot::extract(&market, CurveRestoreFlags::RATES);
+    let snapshot = MarketSnapshot::extract(&market, MarketRestoreFlags::RATES);
     assert_eq!(snapshot.discount_curves.len(), 2);
 
     let restored =
-        MarketSnapshot::restore_market(&MarketContext::new(), &snapshot, CurveRestoreFlags::RATES);
+        MarketSnapshot::restore_market(&MarketContext::new(), &snapshot, MarketRestoreFlags::RATES);
 
     assert!(restored.get_discount("USD-OIS").is_ok());
     assert!(restored.get_discount("EUR-OIS").is_ok());
 }
 
 #[test]
-fn test_curve_restore_flags_individual() {
-    assert_ne!(CurveRestoreFlags::DISCOUNT, CurveRestoreFlags::FORWARD);
-    assert_ne!(CurveRestoreFlags::DISCOUNT, CurveRestoreFlags::HAZARD);
-    assert_ne!(CurveRestoreFlags::HAZARD, CurveRestoreFlags::INFLATION);
-    assert_ne!(CurveRestoreFlags::INFLATION, CurveRestoreFlags::CORRELATION);
+fn test_market_restore_flags_individual() {
+    assert_ne!(MarketRestoreFlags::DISCOUNT, MarketRestoreFlags::FORWARD);
+    assert_ne!(MarketRestoreFlags::DISCOUNT, MarketRestoreFlags::HAZARD);
+    assert_ne!(MarketRestoreFlags::HAZARD, MarketRestoreFlags::INFLATION);
+    assert_ne!(
+        MarketRestoreFlags::INFLATION,
+        MarketRestoreFlags::CORRELATION
+    );
 }
 
 #[test]
-fn test_curve_restore_flags_union() {
-    let discount_forward = CurveRestoreFlags::DISCOUNT | CurveRestoreFlags::FORWARD;
-    assert!(discount_forward.contains(CurveRestoreFlags::DISCOUNT));
-    assert!(discount_forward.contains(CurveRestoreFlags::FORWARD));
-    assert!(!discount_forward.contains(CurveRestoreFlags::HAZARD));
-    assert_eq!(CurveRestoreFlags::RATES, discount_forward);
+fn test_market_restore_flags_union() {
+    let discount_forward = MarketRestoreFlags::DISCOUNT | MarketRestoreFlags::FORWARD;
+    assert!(discount_forward.contains(MarketRestoreFlags::DISCOUNT));
+    assert!(discount_forward.contains(MarketRestoreFlags::FORWARD));
+    assert!(!discount_forward.contains(MarketRestoreFlags::HAZARD));
+    assert_eq!(MarketRestoreFlags::RATES, discount_forward);
 }
 
 #[test]
-fn test_curve_restore_flags_intersection() {
-    let rates = CurveRestoreFlags::RATES;
-    let discount_hazard = CurveRestoreFlags::DISCOUNT | CurveRestoreFlags::HAZARD;
+fn test_market_restore_flags_intersection() {
+    let rates = MarketRestoreFlags::RATES;
+    let discount_hazard = MarketRestoreFlags::DISCOUNT | MarketRestoreFlags::HAZARD;
 
     let intersection = rates & discount_hazard;
-    assert!(intersection.contains(CurveRestoreFlags::DISCOUNT));
-    assert!(!intersection.contains(CurveRestoreFlags::FORWARD));
-    assert!(!intersection.contains(CurveRestoreFlags::HAZARD));
+    assert!(intersection.contains(MarketRestoreFlags::DISCOUNT));
+    assert!(!intersection.contains(MarketRestoreFlags::FORWARD));
+    assert!(!intersection.contains(MarketRestoreFlags::HAZARD));
 }
 
 #[test]
-fn test_curve_restore_flags_complement() {
-    let not_discount = CurveRestoreFlags::all() & !CurveRestoreFlags::DISCOUNT;
-    assert!(!not_discount.contains(CurveRestoreFlags::DISCOUNT));
-    assert!(not_discount.contains(CurveRestoreFlags::FORWARD));
-    assert!(not_discount.contains(CurveRestoreFlags::HAZARD));
-    assert!(not_discount.contains(CurveRestoreFlags::INFLATION));
-    assert!(not_discount.contains(CurveRestoreFlags::CORRELATION));
+fn test_market_restore_flags_complement() {
+    let not_discount = MarketRestoreFlags::all() & !MarketRestoreFlags::DISCOUNT;
+    assert!(!not_discount.contains(MarketRestoreFlags::DISCOUNT));
+    assert!(not_discount.contains(MarketRestoreFlags::FORWARD));
+    assert!(not_discount.contains(MarketRestoreFlags::HAZARD));
+    assert!(not_discount.contains(MarketRestoreFlags::INFLATION));
+    assert!(not_discount.contains(MarketRestoreFlags::CORRELATION));
 }
 
 #[test]
-fn test_curve_restore_flags_all_and_empty() {
-    let all = CurveRestoreFlags::all();
-    assert!(all.contains(CurveRestoreFlags::DISCOUNT));
-    assert!(all.contains(CurveRestoreFlags::FORWARD));
-    assert!(all.contains(CurveRestoreFlags::HAZARD));
-    assert!(all.contains(CurveRestoreFlags::INFLATION));
-    assert!(all.contains(CurveRestoreFlags::CORRELATION));
-    assert!(all.contains(CurveRestoreFlags::RATES));
-    assert!(all.contains(CurveRestoreFlags::CREDIT));
+fn test_market_restore_flags_all_and_empty() {
+    let all = MarketRestoreFlags::all();
+    assert!(all.contains(MarketRestoreFlags::DISCOUNT));
+    assert!(all.contains(MarketRestoreFlags::FORWARD));
+    assert!(all.contains(MarketRestoreFlags::HAZARD));
+    assert!(all.contains(MarketRestoreFlags::INFLATION));
+    assert!(all.contains(MarketRestoreFlags::CORRELATION));
+    assert!(all.contains(MarketRestoreFlags::RATES));
+    assert!(all.contains(MarketRestoreFlags::CREDIT));
 
-    let empty = CurveRestoreFlags::empty();
-    assert!(!empty.contains(CurveRestoreFlags::DISCOUNT));
-    assert!(!empty.contains(CurveRestoreFlags::FORWARD));
+    let empty = MarketRestoreFlags::empty();
+    assert!(!empty.contains(MarketRestoreFlags::DISCOUNT));
+    assert!(!empty.contains(MarketRestoreFlags::FORWARD));
 }
 
 #[test]
@@ -159,7 +162,7 @@ fn test_market_snapshot_extract_single_discount() {
         .insert(create_test_forward_curve("USD-SOFR", base_date))
         .insert(create_test_hazard_curve("CORP-A", base_date));
 
-    let snapshot = MarketSnapshot::extract(&market, CurveRestoreFlags::DISCOUNT);
+    let snapshot = MarketSnapshot::extract(&market, MarketRestoreFlags::DISCOUNT);
 
     assert_eq!(snapshot.discount_curves.len(), 1);
     assert!(snapshot.discount_curves.contains_key("USD-OIS"));
@@ -177,7 +180,7 @@ fn test_market_snapshot_extract_all_curve_types() {
         .insert(create_test_inflation_curve("US-CPI", base_date))
         .insert(create_test_base_correlation_curve("CDX-IG", base_date));
 
-    let snapshot = MarketSnapshot::extract(&market, CurveRestoreFlags::all());
+    let snapshot = MarketSnapshot::extract(&market, MarketRestoreFlags::all());
 
     assert_eq!(snapshot.discount_curves.len(), 1);
     assert_eq!(snapshot.forward_curves.len(), 1);
@@ -191,10 +194,10 @@ fn test_market_snapshot_extract_empty_flags_and_empty_market() {
     let base_date = date!(2025 - 01 - 15);
     let market = MarketContext::new().insert(create_test_discount_curve("USD-OIS", base_date));
 
-    let snapshot = MarketSnapshot::extract(&market, CurveRestoreFlags::empty());
+    let snapshot = MarketSnapshot::extract(&market, MarketRestoreFlags::empty());
     assert!(snapshot.discount_curves.is_empty());
 
-    let empty_snap = MarketSnapshot::extract(&MarketContext::new(), CurveRestoreFlags::all());
+    let empty_snap = MarketSnapshot::extract(&MarketContext::new(), MarketRestoreFlags::all());
     assert!(empty_snap.discount_curves.is_empty());
 }
 
@@ -217,7 +220,7 @@ fn test_restore_market_unified_discount_only() {
     };
 
     let restored =
-        MarketSnapshot::restore_market(&current_market, &snapshot, CurveRestoreFlags::DISCOUNT);
+        MarketSnapshot::restore_market(&current_market, &snapshot, MarketRestoreFlags::DISCOUNT);
 
     assert!(restored.get_discount("EUR-OIS").is_ok());
     assert!(restored.get_discount("USD-OIS").is_err());
@@ -250,7 +253,7 @@ fn test_restore_market_unified_rates() {
     };
 
     let restored =
-        MarketSnapshot::restore_market(&current_market, &snapshot, CurveRestoreFlags::RATES);
+        MarketSnapshot::restore_market(&current_market, &snapshot, MarketRestoreFlags::RATES);
 
     assert!(restored.get_discount("EUR-OIS").is_ok());
     assert!(restored.get_forward("EUR-ESTR").is_ok());
@@ -266,7 +269,7 @@ fn test_restore_market_empty_snapshot_and_empty_market() {
     let restored = MarketSnapshot::restore_market(
         &market,
         &MarketSnapshot::default(),
-        CurveRestoreFlags::RATES,
+        MarketRestoreFlags::RATES,
     );
     assert!(restored.get_discount("USD-OIS").is_err());
 
@@ -280,7 +283,7 @@ fn test_restore_market_empty_snapshot_and_empty_market() {
         ..Default::default()
     };
     let restored2 =
-        MarketSnapshot::restore_market(&MarketContext::new(), &snapshot, CurveRestoreFlags::RATES);
+        MarketSnapshot::restore_market(&MarketContext::new(), &snapshot, MarketRestoreFlags::RATES);
     assert!(restored2.get_discount("USD-OIS").is_ok());
 }
 
@@ -296,35 +299,35 @@ fn test_restore_equivalence_mixed_curve_types() {
         .insert(create_test_inflation_curve("US-CPI", base_date))
         .insert(create_test_base_correlation_curve("CDX-IG", base_date));
 
-    let rates_snap = MarketSnapshot::extract(&market, CurveRestoreFlags::RATES);
-    let credit_snap = MarketSnapshot::extract(&market, CurveRestoreFlags::CREDIT);
-    let inflation_snap = MarketSnapshot::extract(&market, CurveRestoreFlags::INFLATION);
-    let corr_snap = MarketSnapshot::extract(&market, CurveRestoreFlags::CORRELATION);
+    let rates_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::RATES);
+    let credit_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::CREDIT);
+    let inflation_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::INFLATION);
+    let corr_snap = MarketSnapshot::extract(&market, MarketRestoreFlags::CORRELATION);
 
     let target = MarketContext::new()
         .insert(create_test_discount_curve("GBP-OIS", base_date))
         .insert(create_test_hazard_curve("CORP-B", base_date));
 
     let after_rates =
-        MarketSnapshot::restore_market(&target, &rates_snap, CurveRestoreFlags::RATES);
+        MarketSnapshot::restore_market(&target, &rates_snap, MarketRestoreFlags::RATES);
     assert!(after_rates.get_hazard("CORP-B").is_ok());
 
     let after_credit =
-        MarketSnapshot::restore_market(&after_rates, &credit_snap, CurveRestoreFlags::CREDIT);
+        MarketSnapshot::restore_market(&after_rates, &credit_snap, MarketRestoreFlags::CREDIT);
     assert!(after_credit.get_discount("USD-OIS").is_ok());
     assert!(after_credit.get_hazard("CORP-A").is_ok());
 
     let after_inflation = MarketSnapshot::restore_market(
         &after_credit,
         &inflation_snap,
-        CurveRestoreFlags::INFLATION,
+        MarketRestoreFlags::INFLATION,
     );
     assert!(after_inflation.get_inflation_curve("US-CPI").is_ok());
 
     let final_market = MarketSnapshot::restore_market(
         &after_inflation,
         &corr_snap,
-        CurveRestoreFlags::CORRELATION,
+        MarketRestoreFlags::CORRELATION,
     );
     assert!(final_market.get_base_correlation("CDX-IG").is_ok());
     assert!(final_market.get_discount("GBP-OIS").is_err());
@@ -344,19 +347,22 @@ fn test_combined_restore_matches_stacked_restore_for_cross_factor_flags() {
         .insert(create_test_forward_curve("EUR-ESTR", base_date))
         .insert(create_test_hazard_curve("CORP-B", base_date));
 
-    let flags = CurveRestoreFlags::RATES | CurveRestoreFlags::CREDIT | CurveRestoreFlags::FX;
+    let flags = MarketRestoreFlags::RATES | MarketRestoreFlags::CREDIT | MarketRestoreFlags::FX;
     let combined_snapshot = MarketSnapshot::extract(&market_t0, flags);
     let combined = MarketSnapshot::restore_market(&market_t1, &combined_snapshot, flags);
 
-    let rates_snapshot = MarketSnapshot::extract(&market_t0, CurveRestoreFlags::RATES);
-    let credit_snapshot = MarketSnapshot::extract(&market_t0, CurveRestoreFlags::CREDIT);
-    let fx_snapshot = MarketSnapshot::extract(&market_t0, CurveRestoreFlags::FX);
+    let rates_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::RATES);
+    let credit_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::CREDIT);
+    let fx_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::FX);
     let stacked_rates =
-        MarketSnapshot::restore_market(&market_t1, &rates_snapshot, CurveRestoreFlags::RATES);
-    let stacked_credit =
-        MarketSnapshot::restore_market(&stacked_rates, &credit_snapshot, CurveRestoreFlags::CREDIT);
+        MarketSnapshot::restore_market(&market_t1, &rates_snapshot, MarketRestoreFlags::RATES);
+    let stacked_credit = MarketSnapshot::restore_market(
+        &stacked_rates,
+        &credit_snapshot,
+        MarketRestoreFlags::CREDIT,
+    );
     let stacked =
-        MarketSnapshot::restore_market(&stacked_credit, &fx_snapshot, CurveRestoreFlags::FX);
+        MarketSnapshot::restore_market(&stacked_credit, &fx_snapshot, MarketRestoreFlags::FX);
 
     assert_eq!(
         combined
@@ -400,7 +406,7 @@ fn test_restore_fx_with_none_snapshot_clears_current_fx() {
     let restored = MarketSnapshot::restore_market(
         &market_with_fx,
         &snapshot_without_fx,
-        CurveRestoreFlags::FX,
+        MarketRestoreFlags::FX,
     );
 
     assert!(restored.fx().is_none());
@@ -409,14 +415,14 @@ fn test_restore_fx_with_none_snapshot_clears_current_fx() {
 #[test]
 fn test_volatility_snapshot_extract() {
     let market = MarketContext::new();
-    let snapshot = MarketSnapshot::extract(&market, CurveRestoreFlags::VOL);
+    let snapshot = MarketSnapshot::extract(&market, MarketRestoreFlags::VOL);
     assert!(snapshot.surfaces.is_empty());
 }
 
 #[test]
 fn test_scalars_snapshot_extract() {
     let market = MarketContext::new();
-    let snapshot = MarketSnapshot::extract(&market, CurveRestoreFlags::SCALARS);
+    let snapshot = MarketSnapshot::extract(&market, MarketRestoreFlags::SCALARS);
     assert_eq!(snapshot.prices.len(), 0);
     assert_eq!(snapshot.series.len(), 0);
     assert_eq!(snapshot.inflation_indices.len(), 0);

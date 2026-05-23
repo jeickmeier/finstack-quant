@@ -194,10 +194,10 @@ the Python and WASM layers. Schemas live under `schemas/attribution/1/`.
 | `attribute_pnl_parallel`                                                          | `parallel`       | Factor isolation, residual reports cross-effects |
 | `attribute_pnl_waterfall`, `default_waterfall_order`                              | `waterfall`      | Sum-preserving ordered decomposition        |
 | `attribute_pnl_metrics_based`                                                     | `metrics_based`  | Linear approximation from precomputed metrics |
-| `attribute_pnl_taylor`, `attribute_pnl_taylor_standard`, `TaylorAttributionConfig`, `TaylorAttributionResult`, `TaylorFactorResult` | `taylor` | Sensitivity-based expansion |
+| `attribute_pnl_taylor`, `TaylorAttributionConfig`                                | `taylor`         | Sensitivity-based expansion mapped to `PnlAttribution` |
 | `PnlAttribution`, `AttributionFactor`, `AttributionMethod`, `AttributionMeta`     | `types`          | Result envelope and factor enums            |
 | `CarryDetail`, `RatesCurvesAttribution`, `CreditCurvesAttribution`, `CreditFactorAttribution`, `InflationCurvesAttribution`, `CorrelationsAttribution`, `FxAttribution`, `VolAttribution`, `ModelParamsAttribution`, `ScalarsAttribution`, `CrossFactorDetail`, `CreditCarryDecomposition`, `CreditCarryByLevel`, `LevelCarry`, `LevelPnl`, `SourceLine` | `types` | Per-factor detail structs                   |
-| `MarketSnapshot`, `MarketRestoreFlags`, `CurveRestoreFlags`                       | `factors`        | T₀/T₁ snapshot and per-factor restore primitives |
+| `MarketSnapshot`, `MarketRestoreFlags`                                             | `factors`        | T₀/T₁ snapshot and per-factor restore primitives |
 | `compute_pnl`, `compute_pnl_with_fx`                                              | `helpers`        | Money/FX arithmetic for P&L computation     |
 | `ModelParamsSnapshot`, `extract_model_params`, `with_model_params`, `measure_prepayment_shift`, `measure_default_shift`, `measure_recovery_shift`, `measure_conversion_shift` | `model_params` | Model-parameter snapshotting and shift attribution |
 | `compute_credit_factor_attribution`, `CreditAttributionInput`, `CreditFactorDetailOptions`, `CreditFactorModelRef`, `credit_factor_model_id` | `credit_factor` | Calibrated credit-factor decomposition of `credit_curves_pnl` |
@@ -232,7 +232,7 @@ the Python and WASM layers. Schemas live under `schemas/attribution/1/`.
   market snapshots.
 - Per-factor bump-and-reprice paths in `parallel`, `waterfall`, and `taylor`
   reuse a single `MarketSnapshot` and apply targeted restore flags
-  (`MarketRestoreFlags`, `CurveRestoreFlags`) to avoid full-context cloning.
+  (`MarketRestoreFlags`) to avoid full-context cloning.
 - Taylor attribution uses central differences by default; bump sizes are
   configurable via `TaylorAttributionConfig`.
 - Strict mode (`AttributionConfig::strict_validation = true`) propagates per-factor
@@ -260,8 +260,12 @@ Follow an existing factor (e.g. `Fx` or `Volatility`) end-to-end as a template.
 - **Python**: `AttributionSpec`-based JSON pipeline; result types serialize via
   serde and are exposed under `finstack.attribution`. See
   `finstack-py/parity_contract.toml`.
-- **WASM**: not currently part of the agreed `[wasm_core_subset]`; attribution
-  remains a Python-and-Rust surface.
+- **WASM**: attribution is exposed as a JSON-first surface under
+  `finstack-wasm/exports/attribution.js`. It intentionally mirrors the Python
+  JSON/spec entry points (`attribute_pnl`, `attribute_pnl_from_spec`,
+  `validate_attribution_json`, and the default-list helpers) rather than the
+  full Rust type surface. The agreed WASM facade is pinned in
+  `[wasm_attribution_subset]` in `finstack-py/parity_contract.toml`.
 
 ## Related
 

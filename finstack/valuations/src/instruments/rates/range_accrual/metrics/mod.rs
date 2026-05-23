@@ -13,7 +13,7 @@ use crate::metrics::{MetricId, MetricRegistry};
 use std::sync::Arc;
 
 /// Register range accrual metrics with the registry.
-pub fn register_range_accrual_metrics(registry: &mut MetricRegistry) {
+pub(crate) fn register_range_accrual_metrics(registry: &mut MetricRegistry) {
     use crate::metrics::{GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVolga};
     use crate::pricer::InstrumentType;
 

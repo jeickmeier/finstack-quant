@@ -17,11 +17,6 @@ __all__ = [
     "LatentSingleFactor",
     "LatentTwoFactor",
     "LatentMultiFactor",
-    "FactorModel",
-    "FactorSpec",
-    "MultiFactorModel",
-    "SingleFactorModel",
-    "TwoFactorModel",
     "CorrelatedBernoulli",
     "correlation_bounds",
     "joint_probabilities",
@@ -884,10 +879,3 @@ def cholesky_decompose(matrix: Sequence[float], n: int) -> list[float]:
         If the matrix is invalid.
     """
     ...
-
-# Deprecated aliases retained for one release cycle.
-FactorSpec = LatentFactorSpec
-FactorModel = LatentFactor
-SingleFactorModel = LatentSingleFactor
-TwoFactorModel = LatentTwoFactor
-MultiFactorModel = LatentMultiFactor

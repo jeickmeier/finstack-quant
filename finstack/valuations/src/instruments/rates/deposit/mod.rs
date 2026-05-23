@@ -46,5 +46,4 @@
 pub(crate) mod metrics;
 mod types;
 
-pub use metrics::register_deposit_metrics;
 pub use types::{ConventionDepositParams, Deposit};

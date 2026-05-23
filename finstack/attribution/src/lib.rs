@@ -350,13 +350,10 @@ pub use spec::{
     default_attribution_metrics, AttributionConfig, AttributionEnvelope, AttributionResult,
     AttributionResultEnvelope, AttributionSpec, ATTRIBUTION_SCHEMA_V1,
 };
-pub use taylor::{
-    attribute_pnl_taylor, attribute_pnl_taylor_standard, TaylorAttributionConfig,
-    TaylorAttributionResult, TaylorFactorResult,
-};
+pub use taylor::{attribute_pnl_taylor, TaylorAttributionConfig};
 pub use waterfall::{attribute_pnl_waterfall, default_waterfall_order};
 // Market snapshot helpers
-pub use factors::{CurveRestoreFlags, MarketRestoreFlags, MarketSnapshot};
+pub use factors::{MarketRestoreFlags, MarketSnapshot};
 pub use helpers::{compute_pnl, compute_pnl_with_fx};
 
 use finstack_core::currency::Currency;

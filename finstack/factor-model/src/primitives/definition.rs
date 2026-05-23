@@ -1,13 +1,11 @@
 use super::{FactorId, FactorType};
 use finstack_core::currency::Currency;
-use finstack_core::market_data::bumps::{BumpSpec, BumpUnits};
+use finstack_core::market_data::bumps::BumpUnits;
 use finstack_core::types::CurveId;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::sync::Arc;
 
 /// How a factor movement translates to market-data perturbations.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum MarketMapping {
     /// Parallel shift to one or more curves.
     CurveParallel {
@@ -44,40 +42,6 @@ pub enum MarketMapping {
         /// Units used for the bump magnitude.
         units: BumpUnits,
     },
-    /// Custom mapping available only through the builder path.
-    #[serde(skip)]
-    Custom(Arc<dyn Fn(f64) -> Vec<BumpSpec> + Send + Sync>),
-}
-
-impl fmt::Debug for MarketMapping {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::CurveParallel { curve_ids, units } => f
-                .debug_struct("CurveParallel")
-                .field("curve_ids", curve_ids)
-                .field("units", units)
-                .finish(),
-            Self::CurveBucketed {
-                curve_id,
-                tenor_weights,
-            } => f
-                .debug_struct("CurveBucketed")
-                .field("curve_id", curve_id)
-                .field("tenor_weights", tenor_weights)
-                .finish(),
-            Self::EquitySpot { tickers } => f
-                .debug_struct("EquitySpot")
-                .field("tickers", tickers)
-                .finish(),
-            Self::FxRate { pair } => f.debug_struct("FxRate").field("pair", pair).finish(),
-            Self::VolShift { surface_ids, units } => f
-                .debug_struct("VolShift")
-                .field("surface_ids", surface_ids)
-                .field("units", units)
-                .finish(),
-            Self::Custom(_) => f.write_str("Custom(<closure>)"),
-        }
-    }
 }
 
 /// Complete definition of a risk factor.
@@ -180,11 +144,5 @@ mod tests {
             return;
         };
         assert_eq!(json, back_json);
-    }
-
-    #[test]
-    fn test_market_mapping_custom_not_serializable() {
-        let mapping = MarketMapping::Custom(std::sync::Arc::new(|_| vec![]));
-        assert!(serde_json::to_string(&mapping).is_err());
     }
 }

@@ -1,4 +1,4 @@
-"""Smoke tests for the PR-10 credit factor hierarchy Python bindings.
+"""Smoke tests for the credit factor hierarchy Python bindings.
 
 Covers:
 - CreditFactorModel.from_json / to_json round-trip.
@@ -14,9 +14,7 @@ from datetime import date as dt_date
 import json
 import math
 
-import pytest
-
-from finstack.valuations import (
+from finstack.factor_model.credit import (
     CreditCalibrator,
     CreditFactorModel,
     FactorCovarianceForecast,
@@ -25,6 +23,7 @@ from finstack.valuations import (
     decompose_levels,
     decompose_period,
 )
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -248,6 +247,23 @@ def test_calibrated_model_round_trips_json() -> None:
 def test_calibrator_bad_config_raises() -> None:
     with pytest.raises(ValueError, match=r"missing field|unknown field|invalid"):
         CreditCalibrator('{"completely": "wrong"}')
+
+
+@pytest.mark.parametrize(
+    "vol_model",
+    [
+        "garch",
+        "egarch",
+        {"ewma": {"lambda": 0.94}},
+    ],
+)
+def test_calibrator_reserved_vol_models_raise_cleanly(vol_model: object) -> None:
+    config = _calibration_config()
+    config["vol_model"] = vol_model
+    cal = CreditCalibrator(json.dumps(config))
+
+    with pytest.raises(ValueError, match="Sample only"):
+        cal.calibrate(json.dumps(_fixture_inputs()))
 
 
 def test_calibrator_bad_inputs_raises() -> None:

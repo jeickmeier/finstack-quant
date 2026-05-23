@@ -692,8 +692,8 @@ fn test_price_batch_matches_serial_results() {
 }
 
 #[test]
-fn test_shared_price_batch_with_metrics_matches_serial_results() {
-    let registry = shared_standard_registry();
+fn test_standard_price_batch_with_metrics_matches_serial_results() {
+    let registry = standard_registry();
     let as_of = date!(2024 - 01 - 01);
     let market = test_market(as_of);
 

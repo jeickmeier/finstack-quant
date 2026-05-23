@@ -11,7 +11,7 @@ use crate::metrics::{MetricId, MetricRegistry};
 use std::sync::Arc;
 
 /// Register quanto option metrics with the registry.
-pub fn register_quanto_option_metrics(registry: &mut MetricRegistry) {
+pub(crate) fn register_quanto_option_metrics(registry: &mut MetricRegistry) {
     use crate::pricer::InstrumentType;
 
     // Theta is registered universally in `metrics::standard_registry`.

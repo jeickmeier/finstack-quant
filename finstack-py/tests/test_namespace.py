@@ -214,7 +214,7 @@ class TestCorrelationNamespace:
             Copula,
             CopulaSpec,
             CorrelatedBernoulli,
-            FactorModel,
+            LatentFactor,
             LatentFactorSpec,
             LatentMultiFactor,
             LatentSingleFactor,
@@ -249,12 +249,14 @@ class TestFactorModelNamespace:
             decompose_period,
         )
 
-    def test_valuations_credit_factor_aliases_remain(self) -> None:
-        """Historical valuations aliases should point at the canonical namespace."""
+    def test_valuations_credit_factor_aliases_are_removed(self) -> None:
+        """Credit factor APIs should live only under the factor_model namespace."""
         from finstack import factor_model, valuations
 
-        assert valuations.CreditFactorModel is factor_model.credit.CreditFactorModel
-        assert valuations.CreditCalibrator is factor_model.credit.CreditCalibrator
+        assert not hasattr(factor_model, "CreditFactorModel")
+        assert not hasattr(factor_model, "CreditCalibrator")
+        assert not hasattr(valuations, "CreditFactorModel")
+        assert not hasattr(valuations, "CreditCalibrator")
 
 
 class TestMonteCarloNamespace:

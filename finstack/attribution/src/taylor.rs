@@ -21,7 +21,7 @@
 //! factor-level explained/unexplained decomposition without sequential market
 //! state construction.
 
-use super::factors::{CurveRestoreFlags, MarketSnapshot};
+use super::factors::{MarketRestoreFlags, MarketSnapshot};
 use super::helpers::*;
 use super::metrics_based::extract_keyrate_cs01_per_curve;
 use super::types::*;
@@ -144,7 +144,7 @@ fn record_taylor_factor_result(
 /// vol points (percentage points of absolute vol), matching the convention of
 /// `measure_vol_surface_shift` which multiplies the absolute move by 100.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-pub struct TaylorFactorResult {
+pub(crate) struct TaylorFactorResult {
     /// Human-readable factor name (e.g. "Rates:USD-OIS").
     pub factor_name: String,
     /// First-order sensitivity (DV01, CS01, vega per vol point, etc.).
@@ -161,7 +161,7 @@ pub struct TaylorFactorResult {
 
 /// Complete result of Taylor-based attribution.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-pub struct TaylorAttributionResult {
+pub(crate) struct TaylorAttributionResult {
     /// Actual P&L (PV_T1 - PV_T0).
     pub actual_pnl: f64,
     /// Sum of all first-order (+ optional second-order) explained P&L.
@@ -180,7 +180,7 @@ pub struct TaylorAttributionResult {
     pub pv_t1: Money,
 }
 
-/// Compute Taylor-based P&L attribution.
+/// Compute the detailed Taylor factor decomposition.
 ///
 /// Uses bump-and-reprice at T0 to compute first-order sensitivities, then
 /// multiplies by the observed market move between T0 and T1 to obtain
@@ -198,7 +198,7 @@ pub struct TaylorAttributionResult {
 /// # Returns
 ///
 /// `TaylorAttributionResult` with per-factor decomposition and residual.
-pub fn attribute_pnl_taylor(
+fn compute_taylor_result(
     instrument: &Arc<dyn Instrument>,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
@@ -404,10 +404,10 @@ pub fn attribute_pnl_taylor(
     })
 }
 
-/// Also produce a `PnlAttribution` compatible with the existing attribution framework.
+/// Compute Taylor-based P&L attribution.
 ///
-/// This maps Taylor results into the standard `PnlAttribution` struct so that
-/// Taylor output can be used interchangeably with parallel/waterfall results.
+/// This maps Taylor factors into the standard `PnlAttribution` struct so Taylor
+/// output can be used interchangeably with parallel/waterfall results.
 ///
 /// # Factor coverage
 ///
@@ -425,7 +425,7 @@ pub fn attribute_pnl_taylor(
 /// `attribution/parallel.rs` when scalar attribution is required). FX
 /// *translation* into a non-native reporting currency is likewise out of scope
 /// for this standalone path, which reports in the instrument's pricing currency.
-pub fn attribute_pnl_taylor_standard(
+pub fn attribute_pnl_taylor(
     instrument: &Arc<dyn Instrument>,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
@@ -434,7 +434,7 @@ pub fn attribute_pnl_taylor_standard(
     config: &TaylorAttributionConfig,
 ) -> Result<PnlAttribution> {
     let taylor =
-        attribute_pnl_taylor(instrument, market_t0, market_t1, as_of_t0, as_of_t1, config)?;
+        compute_taylor_result(instrument, market_t0, market_t1, as_of_t0, as_of_t1, config)?;
 
     let total_pnl = compute_pnl_with_fx(
         taylor.pv_t0,
@@ -536,10 +536,10 @@ pub fn attribute_pnl_taylor_standard(
     );
     // Report the residual consistent with the `PnlAttribution` total-return
     // total (coupon income + FX translation included), computed by
-    // `finalize_attribution` above. The standalone `TaylorAttributionResult`
-    // exposes a price-only `unexplained_pct` (PV₁−PV₀ basis); quoting that here
-    // would disagree with `attribution.residual`, so we use the residual stats
-    // that `compute_residual` just populated instead.
+    // `finalize_attribution` above. The internal Taylor factor result keeps a
+    // price-only `unexplained_pct` (PV₁−PV₀ basis); quoting that here would
+    // disagree with `attribution.residual`, so we use the residual stats that
+    // `compute_residual` just populated instead.
     attribution.meta.notes.push(format!(
         "Taylor attribution: {:.2}% residual ({} factors, {} repricings)",
         attribution.meta.residual_pct,
@@ -609,8 +609,7 @@ fn key_rate_bump_spec(i: usize, bump_bp: f64) -> BumpSpec {
 ///   explained = Σ_bucket  DV01_bucket × Δr_bucket
 ///
 /// The reported `sensitivity` is the parallel-equivalent DV01 (Σ bucket DV01s)
-/// and `market_move` the average shift, preserved for backward compatibility of
-/// `TaylorFactorResult`'s scalar fields.
+/// and `market_move` the average shift used by the internal factor result.
 fn compute_rate_factor(
     instrument: &Arc<dyn Instrument>,
     market_t0: &MarketContext,
@@ -952,9 +951,9 @@ fn compute_fx_factor(
     as_of_t1: Date,
     pv_t1: Money,
 ) -> Result<TaylorFactorResult> {
-    let fx_snapshot = MarketSnapshot::extract(market_t0, CurveRestoreFlags::FX);
+    let fx_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::FX);
     let market_with_t0_fx =
-        MarketSnapshot::restore_market(market_t1, &fx_snapshot, CurveRestoreFlags::FX);
+        MarketSnapshot::restore_market(market_t1, &fx_snapshot, MarketRestoreFlags::FX);
     let pv_with_t0_fx = reprice_instrument(instrument, &market_with_t0_fx, as_of_t1)?;
 
     // FX-exposure P&L: value with the actual T1 FX minus value with T0 FX
@@ -1094,7 +1093,7 @@ mod tests {
         let market_t1 = MarketContext::new();
         let config = TaylorAttributionConfig::default();
 
-        let result = attribute_pnl_taylor(
+        let result = compute_taylor_result(
             &instrument,
             &market_t0,
             &market_t1,
@@ -1122,7 +1121,7 @@ mod tests {
         let market_t1 = MarketContext::new();
         let config = TaylorAttributionConfig::default();
 
-        let attribution = attribute_pnl_taylor_standard(
+        let attribution = attribute_pnl_taylor(
             &instrument,
             &market_t0,
             &market_t1,
@@ -1170,7 +1169,7 @@ mod tests {
         );
 
         let config = TaylorAttributionConfig::default();
-        let result = attribute_pnl_taylor(
+        let result = compute_taylor_result(
             &instrument,
             &market_t0,
             &market_t1,
@@ -1268,7 +1267,7 @@ mod tests {
     }
 
     #[test]
-    fn taylor_standard_buckets_fx_exposure_into_fx_pnl() {
+    fn taylor_buckets_fx_exposure_into_fx_pnl() {
         use finstack_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
         use finstack_core::Error;
 
@@ -1309,7 +1308,7 @@ mod tests {
         let market_t1 = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(FixedFx(1.20))));
 
         let config = TaylorAttributionConfig::default();
-        let attribution = attribute_pnl_taylor_standard(
+        let attribution = attribute_pnl_taylor(
             &instrument,
             &market_t0,
             &market_t1,
@@ -1340,8 +1339,8 @@ mod tests {
             attribution.residual
         );
 
-        // The standalone Taylor result should also expose an "Fx" factor.
-        let taylor = attribute_pnl_taylor(
+        // The internal Taylor factor decomposition should also expose an "Fx" factor.
+        let taylor = compute_taylor_result(
             &instrument,
             &market_t0,
             &market_t1,
@@ -1362,7 +1361,7 @@ mod tests {
     /// NaN/Inf). A zero `rate_bump_bp` makes the central-difference DV01 a
     /// 0/0 = NaN, exercising the guard end-to-end.
     #[test]
-    fn taylor_standard_flags_non_finite_factor_instead_of_panicking() {
+    fn taylor_flags_non_finite_factor_instead_of_panicking() {
         use finstack_core::market_data::term_structures::DiscountCurve;
         use finstack_core::math::interp::InterpStyle;
 
@@ -1391,7 +1390,7 @@ mod tests {
             ..TaylorAttributionConfig::default()
         };
 
-        let attribution = attribute_pnl_taylor_standard(
+        let attribution = attribute_pnl_taylor(
             &instrument,
             &market_t0,
             &market_t1,

@@ -66,14 +66,14 @@ fn explain_uses_stamped_rounding_context() {
     let as_of_t1 = date!(2025 - 01 - 02);
     let rounding = finstack_core::config::rounding_context_from(&FinstackConfig::default());
 
-    let mut attr = PnlAttribution::new_with_rounding(
+    let mut attr = PnlAttribution::new(
         Money::new(1000.0, Currency::USD),
         "EXPLAIN",
         as_of_t0,
         as_of_t1,
         AttributionMethod::Parallel,
-        rounding.clone(),
     );
+    attr.meta.rounding = rounding.clone();
 
     // Set non-zero components to exercise formatting paths
     attr.carry = Money::new(10.0, Currency::USD);

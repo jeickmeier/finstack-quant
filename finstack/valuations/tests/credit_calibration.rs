@@ -1,4 +1,4 @@
-//! Integration tests for [`finstack_factor_model::credit_calibration`].
+//! Integration tests for [`finstack_factor_model::credit::calibration`].
 //!
 //! Implements the seven required PR-4 tests from the design.
 
@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use finstack_core::dates::{create_date, Date};
 use finstack_core::types::IssuerId;
-use finstack_factor_model::credit_hierarchy::{
+use finstack_factor_model::credit::hierarchy::{
     AdderVolSource, CreditFactorModel, CreditHierarchySpec, FactorVolModel, GenericFactorSpec,
     HierarchyDimension, IssuerBetaMode, IssuerBetaOverride, IssuerBetaPolicy, IssuerTags,
 };

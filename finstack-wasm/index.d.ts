@@ -708,7 +708,7 @@ export interface FactorModelCreditNamespace {
   decomposePeriod(fromLevels: LevelsAtDate, toLevels: LevelsAtDate): PeriodDecomposition;
 }
 
-export interface FactorModelNamespace extends FactorModelCreditNamespace {
+export interface FactorModelNamespace {
   /** Credit factor hierarchy artifacts, calibration, and decomposition. */
   credit: FactorModelCreditNamespace;
 }
@@ -1355,27 +1355,6 @@ export interface ValuationsNamespace {
   fx: FxNamespace;
   /** Instrument JSON validation and pricing helpers. */
   instruments: ValuationInstrumentsNamespace;
-  // --- Credit factor hierarchy ---
-  /** Calibrated credit factor hierarchy artifact class. */
-  CreditFactorModel: typeof CreditFactorModel;
-  /** Deterministic credit factor calibrator class. */
-  CreditCalibrator: typeof CreditCalibrator;
-  /** Snapshot of hierarchy factor values at a date class (opaque handle). */
-  LevelsAtDate: typeof LevelsAtDate;
-  /** Period-over-period decomposition class (opaque handle). */
-  PeriodDecomposition: typeof PeriodDecomposition;
-  /** Vol-forecast view over a calibrated `CreditFactorModel` class. */
-  FactorCovarianceForecast: typeof FactorCovarianceForecast;
-  /** Decompose spreads at a point in time into per-level factor values. */
-  decomposeLevels(
-    model: CreditFactorModel,
-    observedSpreadsJson: string,
-    observedGeneric: number,
-    asOf: string,
-    runtimeTagsJson?: string
-  ): LevelsAtDate;
-  /** Difference two `LevelsAtDate` snapshots component-wise. */
-  decomposePeriod(fromLevels: LevelsAtDate, toLevels: LevelsAtDate): PeriodDecomposition;
   validateValuationResultJson(json: string): string;
   /**
    * Validate a `CalibrationEnvelope` and return the canonical pretty-printed JSON string.

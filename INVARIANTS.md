@@ -205,7 +205,7 @@ finstack.credit_factor_model/1
 ```
 
 It is stored as `CreditFactorModel::SCHEMA_VERSION` in
-`finstack_factor_model::credit_hierarchy`. Rules:
+`finstack_factor_model::credit::hierarchy`. Rules:
 
 * Consumers **must** check `schema_version == CreditFactorModel::SCHEMA_VERSION`
   before trusting any other field; `CreditFactorModel::validate()` enforces

@@ -25,16 +25,59 @@
 
 use super::market_handle::WasmMarket;
 use crate::utils::{to_js_err, to_js_error};
+use finstack_core::market_data::context::MarketContext;
+use finstack_valuations::results::ValuationResult;
 use wasm_bindgen::prelude::*;
+
+fn parse_market_json(market_json: &str) -> Result<MarketContext, JsValue> {
+    serde_json::from_str(market_json).map_err(to_js_err)
+}
+
+fn valuation_result_json(result: ValuationResult) -> Result<String, JsValue> {
+    serde_json::to_string(&result).map_err(to_js_err)
+}
+
+fn price_instrument_with_context(
+    instrument_json: &str,
+    market: &MarketContext,
+    as_of: &str,
+    model: &str,
+) -> Result<String, JsValue> {
+    let result =
+        finstack_valuations::pricer::price_instrument_json(instrument_json, market, as_of, model)
+            .map_err(|e| to_js_error(&e))?;
+    valuation_result_json(result)
+}
+
+fn price_instrument_with_metrics_context(
+    instrument_json: &str,
+    market: &MarketContext,
+    as_of: &str,
+    model: &str,
+    metrics: Vec<String>,
+    pricing_options: Option<String>,
+    market_history: Option<String>,
+) -> Result<String, JsValue> {
+    let result = finstack_valuations::pricer::price_instrument_json_with_metrics_and_history(
+        instrument_json,
+        market,
+        as_of,
+        model,
+        &metrics,
+        pricing_options.as_deref(),
+        market_history.as_deref(),
+    )
+    .map_err(|e| to_js_error(&e))?;
+    valuation_result_json(result)
+}
 
 /// Deserialize a `ValuationResult` from JSON and return the canonical JSON.
 ///
 /// Validates the input conforms to the `ValuationResult` schema.
 #[wasm_bindgen(js_name = validateValuationResultJson)]
 pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
-    let result: finstack_valuations::results::ValuationResult =
-        serde_json::from_str(json).map_err(to_js_err)?;
-    serde_json::to_string(&result).map_err(to_js_err)
+    let result: ValuationResult = serde_json::from_str(json).map_err(to_js_err)?;
+    valuation_result_json(result)
 }
 
 /// Validate a tagged instrument JSON string.
@@ -56,12 +99,8 @@ pub fn price_instrument(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    let result =
-        finstack_valuations::pricer::price_instrument_json(instrument_json, &market, as_of, model)
-            .map_err(|e| to_js_error(&e))?;
-    serde_json::to_string(&result).map_err(to_js_err)
+    let market = parse_market_json(market_json)?;
+    price_instrument_with_context(instrument_json, &market, as_of, model)
 }
 
 /// Price an instrument with explicit metric requests.
@@ -77,20 +116,17 @@ pub fn price_instrument_with_metrics(
     pricing_options: Option<String>,
     market_history: Option<String>,
 ) -> Result<String, JsValue> {
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
+    let market = parse_market_json(market_json)?;
     let metric_strs: Vec<String> = serde_wasm_bindgen::from_value(metrics).map_err(to_js_err)?;
-    let result = finstack_valuations::pricer::price_instrument_json_with_metrics_and_history(
+    price_instrument_with_metrics_context(
         instrument_json,
         &market,
         as_of,
         model,
-        &metric_strs,
-        pricing_options.as_deref(),
-        market_history.as_deref(),
+        metric_strs,
+        pricing_options,
+        market_history,
     )
-    .map_err(|e| to_js_error(&e))?;
-    serde_json::to_string(&result).map_err(to_js_err)
 }
 
 /// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
@@ -105,8 +141,7 @@ pub fn instrument_cashflows_json(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
+    let market = parse_market_json(market_json)?;
     finstack_valuations::pricer::instrument_cashflows_json(instrument_json, &market, as_of, model)
         .map_err(|e| to_js_error(&e))
 }
@@ -143,14 +178,7 @@ pub fn price_instrument_with_market(
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
-    let result = finstack_valuations::pricer::price_instrument_json(
-        instrument_json,
-        market.inner(),
-        as_of,
-        model,
-    )
-    .map_err(|e| to_js_error(&e))?;
-    serde_json::to_string(&result).map_err(to_js_err)
+    price_instrument_with_context(instrument_json, market.inner(), as_of, model)
 }
 
 /// Price an instrument with explicit metric requests using a pre-parsed [`WasmMarket`].
@@ -165,17 +193,15 @@ pub fn price_instrument_with_metrics_and_market(
     market_history: Option<String>,
 ) -> Result<String, JsValue> {
     let metric_strs: Vec<String> = serde_wasm_bindgen::from_value(metrics).map_err(to_js_err)?;
-    let result = finstack_valuations::pricer::price_instrument_json_with_metrics_and_history(
+    price_instrument_with_metrics_context(
         instrument_json,
         market.inner(),
         as_of,
         model,
-        &metric_strs,
-        pricing_options.as_deref(),
-        market_history.as_deref(),
+        metric_strs,
+        pricing_options,
+        market_history,
     )
-    .map_err(|e| to_js_error(&e))?;
-    serde_json::to_string(&result).map_err(to_js_err)
 }
 
 /// Per-flow cashflow envelope using a pre-parsed [`WasmMarket`].
