@@ -39,6 +39,12 @@ Release build (slower compile, faster runtime — large portfolios, batch notebo
 mise run python-build -- --release
 ```
 
+Python test tasks build the extension in release mode before invoking `pytest`:
+
+```bash
+mise run python-test
+```
+
 Direct maturin develop (from `finstack-py/`):
 
 ```bash
@@ -113,7 +119,7 @@ parity-tested surface, update `parity_contract.toml` in the same change.
 
 | Check | Command |
 |-------|---------|
-| Python tests | `mise run python-test` |
+| Python tests | `mise run python-test` (release build, then pytest) |
 | Parity only | `uv run pytest finstack-py/tests/parity` |
 | Type check | `mise run python-typecheck` |
 | Stub completeness | `mise run python-verifytypes` |

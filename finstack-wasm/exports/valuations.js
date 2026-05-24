@@ -1,45 +1,16 @@
 import * as wasm from '../pkg/finstack_wasm.js';
 import { correlation } from './valuations/correlation.js';
+import { credit } from './valuations/credit.js';
+import { creditDerivatives } from './valuations/creditDerivatives.js';
 import { fx } from './valuations/fx.js';
-
-const instrumentPricing = {
-  validateInstrumentJson: wasm.validateInstrumentJson,
-  priceInstrument: wasm.priceInstrument,
-  priceInstrumentWithMetrics: wasm.priceInstrumentWithMetrics,
-  priceInstrumentWithMarket: wasm.priceInstrumentWithMarket,
-  priceInstrumentWithMetricsAndMarket: wasm.priceInstrumentWithMetricsAndMarket,
-  instrumentCashflowsWithMarket: wasm.instrumentCashflowsWithMarket,
-};
+import { instruments } from './valuations/instruments.js';
 
 export const valuations = {
   correlation,
-  credit: {
-    mertonModelJson: wasm.mertonModelJson,
-    creditGradesModelJson: wasm.creditGradesModelJson,
-    mertonDefaultProbability: wasm.mertonDefaultProbability,
-    mertonDistanceToDefault: wasm.mertonDistanceToDefault,
-    mertonImpliedSpread: wasm.mertonImpliedSpread,
-    dynamicRecoveryAtNotional: wasm.dynamicRecoveryAtNotional,
-    endogenousHazardAtLeverage: wasm.endogenousHazardAtLeverage,
-    endogenousHazardAfterPikAccrual: wasm.endogenousHazardAfterPikAccrual,
-    dynamicRecoveryConstantJson: wasm.dynamicRecoveryConstantJson,
-    endogenousHazardPowerLawJson: wasm.endogenousHazardPowerLawJson,
-    creditStateJson: wasm.creditStateJson,
-    toggleExerciseThresholdJson: wasm.toggleExerciseThresholdJson,
-    toggleExerciseOptimalJson: wasm.toggleExerciseOptimalJson,
-  },
-  creditDerivatives: {
-    creditDefaultSwapExampleJson: wasm.creditDefaultSwapExampleJson,
-    cdsIndexExampleJson: wasm.cdsIndexExampleJson,
-    cdsTrancheExampleJson: wasm.cdsTrancheExampleJson,
-    cdsOptionExampleJson: wasm.cdsOptionExampleJson,
-  },
+  credit,
+  creditDerivatives,
   fx,
-  instruments: {
-    ...instrumentPricing,
-    listStandardMetrics: wasm.listStandardMetrics,
-    listStandardMetricsGrouped: wasm.listStandardMetricsGrouped,
-  },
+  instruments,
   validateValuationResultJson: wasm.validateValuationResultJson,
   // Calibration: build a MarketContext from raw quotes.
   // ⚠️ BLOCKING: calibration can be CPU-heavy; callers must run it behind an

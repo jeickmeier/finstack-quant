@@ -45,7 +45,7 @@ depends = ["rust-test", "python-test-all", "wasm-test"]
 description = "Run golden tests (Rust + Python layers)"
 run = """
 cargo test -p finstack-valuations --test golden -- --include-ignored &&
-mise run python-build &&
+mise run python-build -- --release &&
 uv run pytest finstack-py/tests/golden -v
 """
 
@@ -158,20 +158,32 @@ flag "--release" help="Build with release profile (slower compile, faster runtim
 run = 'uv run --project finstack-py maturin develop --manifest-path finstack-py/Cargo.toml{% if usage.release %} --release{% endif %}'
 
 [tasks.python-test]
-description = "Run fast Python tests (excludes slow goldens and Monte Carlo)"
-run = "uv run pytest -v -m 'not slow'"
+description = "Build release Python bindings, then run fast Python tests"
+run = """
+mise run python-build -- --release
+uv run pytest -v -m 'not slow'
+"""
 
 [tasks.python-test-slow]
-description = "Run slow Python tests (goldens and Monte Carlo)"
-run = "uv run pytest -v -m slow"
+description = "Build release Python bindings, then run slow Python tests"
+run = """
+mise run python-build -- --release
+uv run pytest -v -m slow
+"""
 
 [tasks.python-test-all]
-description = "Run the full Python test suite"
-run = "uv run pytest -v"
+description = "Build release Python bindings, then run the full Python test suite"
+run = """
+mise run python-build -- --release
+uv run pytest -v
+"""
 
 [tasks.python-test-cov]
-description = "Run Python tests with HTML coverage report"
-run = "uv run pytest -v --cov=finstack-py/finstack --cov-report=term-missing --cov-report=html:target/python-cov"
+description = "Build release Python bindings, then run Python tests with HTML coverage report"
+run = """
+mise run python-build -- --release
+uv run pytest -v --cov=finstack-py/finstack --cov-report=term-missing --cov-report=html:target/python-cov
+"""
 
 [tasks.python-fmt]
 description = "Format + auto-fix Python code (ruff format + ruff check --fix, mutating)"

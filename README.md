@@ -154,10 +154,10 @@ Run `mise tasks` to list every available task.
 | `mise run wasm-gen-bindings` | Export TypeScript types from Rust |
 | `mise run wasm-pkg` | Build the web and node WASM packages |
 | `mise run rust-test` | Run Rust tests with `cargo nextest` |
-| `mise run python-test` | Run Python tests |
+| `mise run python-test` | Build the release Python extension, then run Python tests |
 | `mise run wasm-test` | Run WASM package tests |
 | `mise run rust-test-cov` | Run Rust tests with HTML coverage report |
-| `mise run python-test-cov` | Run Python tests with HTML coverage report |
+| `mise run python-test-cov` | Build the release Python extension, then run Python tests with HTML coverage report |
 | `mise run wasm-test-cov` | Run WASM binding tests with HTML coverage report |
 | `mise run rust-check-schemas` | Verify JSON schemas match Rust types |
 | `mise run wheel-local` | Build a Python wheel for the current platform |

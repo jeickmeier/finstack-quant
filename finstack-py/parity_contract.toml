@@ -664,6 +664,49 @@ correlation = [
     "nearestCorrelation",
     "validateCorrelationMatrix",
 ]
+credit = [
+    "creditGradesModelJson",
+    "creditStateJson",
+    "dynamicRecoveryAtNotional",
+    "dynamicRecoveryConstantJson",
+    "endogenousHazardAfterPikAccrual",
+    "endogenousHazardAtLeverage",
+    "endogenousHazardPowerLawJson",
+    "mertonDefaultProbability",
+    "mertonDistanceToDefault",
+    "mertonImpliedSpread",
+    "mertonModelJson",
+    "toggleExerciseOptimalJson",
+    "toggleExerciseThresholdJson",
+]
+creditDerivatives = [
+    "cdsIndexExampleJson",
+    "cdsOptionExampleJson",
+    "cdsTrancheExampleJson",
+    "creditDefaultSwapExampleJson",
+]
+fx = [
+    "FxBarrierOption",
+    "FxDigitalOption",
+    "FxForward",
+    "FxOption",
+    "FxSpot",
+    "FxSwap",
+    "FxTouchOption",
+    "FxVarianceSwap",
+    "Ndf",
+    "QuantoOption",
+]
+instruments = [
+    "instrumentCashflowsWithMarket",
+    "listStandardMetrics",
+    "listStandardMetricsGrouped",
+    "priceInstrument",
+    "priceInstrumentWithMarket",
+    "priceInstrumentWithMetrics",
+    "priceInstrumentWithMetricsAndMarket",
+    "validateInstrumentJson",
+]
 
 # ---------------------------------------------------------------------------
 # Intentionally NOT covered by parity tests
