@@ -24,7 +24,6 @@
 
 use std::str::FromStr;
 
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
 
@@ -54,10 +53,10 @@ fn parse_attribute_value(text: Option<String>, number: Option<f64>) -> PyResult<
     match (text, number) {
         (Some(t), None) => Ok(AttributeValue::Text(t)),
         (None, Some(n)) => Ok(AttributeValue::Number(n)),
-        (Some(_), Some(_)) => Err(PyValueError::new_err(
+        (Some(_), Some(_)) => Err(crate::errors::value_error(
             "AttributeTest accepts either text= or number=, not both",
         )),
-        (None, None) => Err(PyValueError::new_err(
+        (None, None) => Err(crate::errors::value_error(
             "AttributeTest requires text= or number=",
         )),
     }
@@ -71,7 +70,7 @@ fn parse_comparison_op(op: &str) -> PyResult<ComparisonOp> {
         "le" | "<=" => Ok(ComparisonOp::Le),
         "gt" | ">" => Ok(ComparisonOp::Gt),
         "ge" | ">=" => Ok(ComparisonOp::Ge),
-        other => Err(PyValueError::new_err(format!(
+        other => Err(crate::errors::value_error(format!(
             "Unknown comparison operator {other:?}; expected one of eq/ne/lt/le/gt/ge"
         ))),
     }

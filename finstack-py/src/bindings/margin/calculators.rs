@@ -3,7 +3,6 @@
 use super::types::{PyCsaSpec, PyImMethodology};
 use crate::errors::{core_to_py, display_to_py};
 use finstack_margin as fm;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 // ---------------------------------------------------------------------------
@@ -101,9 +100,9 @@ impl PyVmCalculator {
         let exp = finstack_core::money::Money::new(exposure, ccy);
         let posted = finstack_core::money::Money::new(posted_collateral, ccy);
         let m = time::Month::try_from(month)
-            .map_err(|e| PyValueError::new_err(format!("invalid month: {e}")))?;
+            .map_err(|e| crate::errors::value_error(format!("invalid month: {e}")))?;
         let as_of = finstack_core::dates::Date::from_calendar_date(year, m, day)
-            .map_err(|e| PyValueError::new_err(format!("invalid date: {e}")))?;
+            .map_err(|e| crate::errors::value_error(format!("invalid date: {e}")))?;
 
         let result = self
             .inner

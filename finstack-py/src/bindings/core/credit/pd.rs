@@ -84,12 +84,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let all = PyList::new(py, ["pit_to_ttc", "ttc_to_pit", "central_tendency"])?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "pd",
         "finstack.core.credit",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

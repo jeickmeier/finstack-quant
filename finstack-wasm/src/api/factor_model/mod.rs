@@ -108,94 +108,6 @@ impl WasmCreditCalibrator {
 }
 
 // ---------------------------------------------------------------------------
-// Serialization helpers for types that don't implement serde::Serialize
-// ---------------------------------------------------------------------------
-
-/// Convert a [`HierarchyDimension`] to the `serde_json::Value` that serde
-/// would produce for it given `#[serde(rename_all = "snake_case")]`:
-///
-/// - `Rating`          → `"rating"`
-/// - `Region`          → `"region"`
-/// - `Sector`          → `"sector"`
-/// - `Custom("Foo")`   → `{"custom": "Foo"}`
-fn dim_to_value(
-    dim: &finstack_factor_model::credit::hierarchy::HierarchyDimension,
-) -> serde_json::Value {
-    use finstack_factor_model::credit::hierarchy::{dimension_key, HierarchyDimension};
-    match dim {
-        HierarchyDimension::Custom(n) => serde_json::json!({"custom": n}),
-        _ => serde_json::Value::String(dimension_key(dim)),
-    }
-}
-
-fn levels_at_date_to_value(snap: &finstack_factor_model::LevelsAtDate) -> serde_json::Value {
-    let by_level: Vec<serde_json::Value> = snap
-        .by_level
-        .iter()
-        .map(|lev| {
-            let values: serde_json::Map<String, serde_json::Value> = lev
-                .values
-                .iter()
-                .map(|(k, v)| (k.clone(), serde_json::Value::from(*v)))
-                .collect();
-            serde_json::json!({
-                "level_index": lev.level_index,
-                "dimension": dim_to_value(&lev.dimension),
-                "values": values,
-            })
-        })
-        .collect();
-
-    let adder: serde_json::Map<String, serde_json::Value> = snap
-        .adder
-        .iter()
-        .map(|(id, v)| (id.as_str().to_owned(), serde_json::Value::from(*v)))
-        .collect();
-
-    serde_json::json!({
-        "date": snap.date.to_string(),
-        "generic": snap.generic,
-        "by_level": by_level,
-        "adder": adder,
-    })
-}
-
-fn period_decomposition_to_value(
-    pd: &finstack_factor_model::PeriodDecomposition,
-) -> serde_json::Value {
-    let by_level: Vec<serde_json::Value> = pd
-        .by_level
-        .iter()
-        .map(|lev| {
-            let deltas: serde_json::Map<String, serde_json::Value> = lev
-                .deltas
-                .iter()
-                .map(|(k, v)| (k.clone(), serde_json::Value::from(*v)))
-                .collect();
-            serde_json::json!({
-                "level_index": lev.level_index,
-                "dimension": dim_to_value(&lev.dimension),
-                "deltas": deltas,
-            })
-        })
-        .collect();
-
-    let d_adder: serde_json::Map<String, serde_json::Value> = pd
-        .d_adder
-        .iter()
-        .map(|(id, v)| (id.as_str().to_owned(), serde_json::Value::from(*v)))
-        .collect();
-
-    serde_json::json!({
-        "from": pd.from.to_string(),
-        "to": pd.to.to_string(),
-        "d_generic": pd.d_generic,
-        "by_level": by_level,
-        "d_adder": d_adder,
-    })
-}
-
-// ---------------------------------------------------------------------------
 // LevelsAtDate  (opaque handle — not exposed as a JS class, just passed through)
 // ---------------------------------------------------------------------------
 
@@ -214,8 +126,7 @@ impl WasmLevelsAtDate {
     /// Serialize the snapshot to JSON.
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
-        let v = levels_at_date_to_value(&self.inner);
-        serde_json::to_string_pretty(&v).map_err(to_js_err)
+        serde_json::to_string_pretty(&self.inner).map_err(to_js_err)
     }
 }
 
@@ -237,8 +148,7 @@ impl WasmPeriodDecomposition {
     /// Serialize the decomposition to JSON.
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
-        let v = period_decomposition_to_value(&self.inner);
-        serde_json::to_string_pretty(&v).map_err(to_js_err)
+        serde_json::to_string_pretty(&self.inner).map_err(to_js_err)
     }
 }
 
@@ -392,12 +302,9 @@ impl WasmFactorCovarianceForecast {
         let measure: finstack_factor_model::RiskMeasure =
             serde_json::from_str(risk_measure_json).map_err(to_js_err)?;
         let forecast = finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
-        let _fm = forecast.factor_model_at(h, measure).map_err(to_js_err)?;
-        // Build config with horizon-scaled covariance and selected risk measure.
-        let covariance = forecast.covariance_at(h).map_err(to_js_err)?;
-        let mut config = self.model.config.clone();
-        config.covariance = covariance;
-        config.risk_measure = measure;
+        let config = forecast
+            .factor_model_config_at(h, measure)
+            .map_err(to_js_err)?;
         serde_json::to_string_pretty(&config).map_err(to_js_err)
     }
 }
@@ -586,15 +493,15 @@ mod tests {
         )
         .expect("decompose_levels t1");
 
-        // Serialization helper must produce valid JSON.
-        let l0_val = super::levels_at_date_to_value(&levels_t0);
+        // Serde serialization must produce valid JSON.
+        let l0_val = serde_json::to_value(&levels_t0).expect("LevelsAtDate serializes");
         assert!(l0_val.is_object());
         assert_eq!(l0_val["date"].as_str().unwrap(), "2024-03-28");
 
         // decompose_period.
         let period = finstack_factor_model::decompose_period(&levels_t0, &levels_t1)
             .expect("decompose_period");
-        let p_val = super::period_decomposition_to_value(&period);
+        let p_val = serde_json::to_value(&period).expect("PeriodDecomposition serializes");
         assert!(p_val.is_object());
         assert!(p_val["d_generic"].as_f64().is_some());
     }
@@ -613,14 +520,8 @@ mod tests {
         assert!(cov_val.is_object());
     }
 
-    /// `dim_to_value` must produce output identical to what serde would emit
-    /// for `HierarchyDimension` with `#[serde(rename_all = "snake_case")]`.
-    ///
-    /// Reference values:
-    /// - `Rating`           → `"rating"`
-    /// - `Region`           → `"region"`
-    /// - `Sector`           → `"sector"`
-    /// - `Custom("Currency")` → `{"custom": "Currency"}`
+    /// `HierarchyDimension` serde must emit the binding's public snake-case
+    /// JSON convention.
     #[test]
     fn levels_at_date_dimension_matches_serde_convention() {
         use finstack_factor_model::credit::hierarchy::HierarchyDimension;
@@ -638,14 +539,6 @@ mod tests {
         ];
 
         for (dim, expected) in cases {
-            // Check our helper.
-            let got = super::dim_to_value(dim);
-            assert_eq!(
-                got, *expected,
-                "dim_to_value({dim:?}) mismatch: got {got}, want {expected}"
-            );
-
-            // Cross-check: serde must also produce the same value.
             let serde_got = serde_json::to_value(dim).expect("serde serializes HierarchyDimension");
             assert_eq!(
                 serde_got, *expected,
@@ -654,7 +547,7 @@ mod tests {
         }
     }
 
-    /// Full integration: `decompose_levels` → `levels_at_date_to_value` emits
+    /// Full integration: `decompose_levels` serde emits
     /// dimension keys that match serde convention in a real calibrated model.
     #[test]
     fn decompose_levels_dimension_keys_match_serde() {
@@ -677,7 +570,7 @@ mod tests {
         )
         .expect("decompose_levels");
 
-        let val = super::levels_at_date_to_value(&levels);
+        let val = serde_json::to_value(&levels).expect("LevelsAtDate serializes");
         let by_level = val["by_level"].as_array().expect("by_level is array");
         for entry in by_level {
             let dim = &entry["dimension"];

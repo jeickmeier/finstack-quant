@@ -42,7 +42,7 @@ use finstack_factor_model::credit::hierarchy::{
     CreditFactorModel, FactorVolModel, IdiosyncraticVolModel,
 };
 use finstack_factor_model::matching::CREDIT_GENERIC_FACTOR_ID;
-use finstack_factor_model::{FactorCovarianceMatrix, RiskMeasure};
+use finstack_factor_model::{FactorCovarianceMatrix, FactorModelConfig, RiskMeasure};
 
 use crate::factor_model::model::{FactorModel, FactorModelBuilder};
 use crate::factor_model::types::RiskDecomposition;
@@ -265,10 +265,7 @@ impl<'a> FactorCovarianceForecast<'a> {
         horizon: VolHorizon,
         risk_measure: RiskMeasure,
     ) -> Result<FactorModel, ValuationsError> {
-        let covariance = self.covariance_at(horizon)?;
-        let mut config = self.model.config.clone();
-        config.covariance = covariance;
-        config.risk_measure = risk_measure;
+        let config = self.factor_model_config_at(horizon, risk_measure)?;
         FactorModelBuilder::new()
             .config(config)
             .build()
@@ -278,6 +275,24 @@ impl<'a> FactorCovarianceForecast<'a> {
                 // a single error type.
                 ValuationsError::Core(finstack_core::Error::Validation(e.to_string()))
             })
+    }
+
+    /// Build the canonical factor-model config using `Σ(t, h)` at the given
+    /// horizon and requested risk measure.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValuationsError::Core`] when [`Self::covariance_at`] fails.
+    pub fn factor_model_config_at(
+        &self,
+        horizon: VolHorizon,
+        risk_measure: RiskMeasure,
+    ) -> Result<FactorModelConfig, ValuationsError> {
+        let covariance = self.covariance_at(horizon)?;
+        let mut config = self.model.config.clone();
+        config.covariance = covariance;
+        config.risk_measure = risk_measure;
+        Ok(config)
     }
 }
 

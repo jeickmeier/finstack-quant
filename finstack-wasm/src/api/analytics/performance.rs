@@ -11,7 +11,7 @@ use finstack_core::dates::{CalendarRegistry, FiscalConfig, HolidayCalendar, Peri
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
 
-use super::support::{parse_f64_matrix, parse_f64_vec, parse_iso_date};
+use super::support::{parse_f64_matrix, parse_f64_vec, parse_iso_date, parse_iso_dates};
 
 const DEFAULT_FISCAL_START_MONTH: u8 = 1;
 const DEFAULT_FISCAL_START_DAY: u8 = 1;
@@ -52,7 +52,7 @@ fn resolve_fiscal_calendar() -> Result<&'static dyn HolidayCalendar, JsValue> {
 
 fn parse_dates(dates: JsValue) -> Result<Vec<time::Date>, JsValue> {
     let strs: Vec<String> = serde_wasm_bindgen::from_value(dates).map_err(to_js_err)?;
-    strs.iter().map(|s| parse_iso_date(s)).collect()
+    parse_iso_dates(&strs)
 }
 
 fn parse_panel_inputs(

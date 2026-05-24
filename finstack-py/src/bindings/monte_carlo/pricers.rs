@@ -297,7 +297,7 @@ struct PyLsmcRun {
 
 impl PyLsmcPricer {
     fn build_basis(&self, strike: f64) -> PyResult<LsmcBasis> {
-        let to_py = |e: String| pyo3::exceptions::PyValueError::new_err(e);
+        let to_py = |e: String| crate::errors::value_error(e);
         build_lsmc_basis(self.basis, self.basis_degree, strike).map_err(to_py)
     }
 
@@ -353,10 +353,10 @@ impl PyLsmcPricer {
     ) -> PyResult<Self> {
         let defaults = &py_mc_defaults()?.lsmc;
         let basis = BasisKind::parse(basis.unwrap_or(defaults.basis.as_str()))
-            .map_err(pyo3::exceptions::PyValueError::new_err)?;
+            .map_err(crate::errors::value_error)?;
         let basis_degree = basis_degree.unwrap_or(defaults.basis_degree);
         if basis_degree == 0 {
-            return Err(pyo3::exceptions::PyValueError::new_err(
+            return Err(crate::errors::value_error(
                 "basis_degree must be a positive integer",
             ));
         }

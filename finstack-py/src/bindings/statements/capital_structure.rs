@@ -8,7 +8,6 @@ use crate::errors::display_to_py;
 use finstack_statements::capital_structure::{
     EcfSweepSpec, PaymentPriority, PikToggleSpec, WaterfallSpec,
 };
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 fn parse_priority(s: &str) -> PyResult<PaymentPriority> {
@@ -20,7 +19,7 @@ fn parse_priority(s: &str) -> PyResult<PaymentPriority> {
         "voluntary_prepayment" => Ok(PaymentPriority::VoluntaryPrepayment),
         "sweep" => Ok(PaymentPriority::Sweep),
         "equity" => Ok(PaymentPriority::Equity),
-        other => Err(PyValueError::new_err(format!(
+        other => Err(crate::errors::value_error(format!(
             "unknown payment priority {other:?}; expected one of: fees, interest, amortization, mandatory_prepayment, voluntary_prepayment, sweep, equity"
         ))),
     }

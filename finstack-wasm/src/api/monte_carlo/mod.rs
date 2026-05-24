@@ -81,50 +81,6 @@ impl McResultJs {
         }
     }
 
-    #[cfg(target_arch = "wasm32")]
-    fn to_js_value(&self) -> Result<JsValue, JsValue> {
-        use js_sys::{Object, Reflect};
-
-        fn set(obj: &Object, key: &str, value: &JsValue) -> Result<(), JsValue> {
-            Reflect::set(obj, &JsValue::from_str(key), value).map(|_| ())
-        }
-
-        fn optional_f64(value: Option<f64>) -> JsValue {
-            value.map_or(JsValue::NULL, JsValue::from_f64)
-        }
-
-        let obj = Object::new();
-        set(&obj, "mean", &JsValue::from_f64(self.mean))?;
-        set(&obj, "currency", &JsValue::from_str(&self.currency))?;
-        set(&obj, "stderr", &JsValue::from_f64(self.stderr))?;
-        set(&obj, "std_dev", &optional_f64(self.std_dev))?;
-        set(&obj, "ci_lower", &JsValue::from_f64(self.ci_lower))?;
-        set(&obj, "ci_upper", &JsValue::from_f64(self.ci_upper))?;
-        set(&obj, "num_paths", &JsValue::from_f64(self.num_paths as f64))?;
-        set(
-            &obj,
-            "num_simulated_paths",
-            &JsValue::from_f64(self.num_simulated_paths as f64),
-        )?;
-        set(
-            &obj,
-            "num_skipped",
-            &JsValue::from_f64(self.num_skipped as f64),
-        )?;
-        set(&obj, "median", &optional_f64(self.median))?;
-        set(&obj, "percentile_25", &optional_f64(self.percentile_25))?;
-        set(&obj, "percentile_75", &optional_f64(self.percentile_75))?;
-        set(&obj, "min", &optional_f64(self.min))?;
-        set(&obj, "max", &optional_f64(self.max))?;
-        set(
-            &obj,
-            "relative_stderr",
-            &JsValue::from_f64(self.relative_stderr),
-        )?;
-        Ok(obj.into())
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
     fn to_js_value(&self) -> Result<JsValue, JsValue> {
         serde_wasm_bindgen::to_value(self).map_err(to_js_err)
     }
@@ -154,12 +110,9 @@ pub fn price_european_call(
     num_steps: Option<usize>,
     currency: Option<String>,
 ) -> Result<JsValue, JsValue> {
-    let ccy = resolve_currency(currency.as_deref())?;
-    let steps = num_steps.unwrap_or(252);
-    let est = build_pricer(num_paths, seed)
-        .price_gbm_call(spot, strike, rate, div_yield, vol, expiry, steps, ccy)
-        .map_err(to_js_err)?;
-    estimate_to_js(&est)
+    price_european(
+        true, spot, strike, rate, div_yield, vol, expiry, num_paths, seed, num_steps, currency,
+    )
 }
 
 /// Price a European put option via Monte Carlo under GBM dynamics.
@@ -182,11 +135,34 @@ pub fn price_european_put(
     num_steps: Option<usize>,
     currency: Option<String>,
 ) -> Result<JsValue, JsValue> {
+    price_european(
+        false, spot, strike, rate, div_yield, vol, expiry, num_paths, seed, num_steps, currency,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn price_european(
+    is_call: bool,
+    spot: f64,
+    strike: f64,
+    rate: f64,
+    div_yield: f64,
+    vol: f64,
+    expiry: f64,
+    num_paths: usize,
+    seed: u64,
+    num_steps: Option<usize>,
+    currency: Option<String>,
+) -> Result<JsValue, JsValue> {
     let ccy = resolve_currency(currency.as_deref())?;
     let steps = num_steps.unwrap_or(252);
-    let est = build_pricer(num_paths, seed)
-        .price_gbm_put(spot, strike, rate, div_yield, vol, expiry, steps, ccy)
-        .map_err(to_js_err)?;
+    let pricer = build_pricer(num_paths, seed);
+    let est = if is_call {
+        pricer.price_gbm_call(spot, strike, rate, div_yield, vol, expiry, steps, ccy)
+    } else {
+        pricer.price_gbm_put(spot, strike, rate, div_yield, vol, expiry, steps, ccy)
+    }
+    .map_err(to_js_err)?;
     estimate_to_js(&est)
 }
 
@@ -293,23 +269,9 @@ pub fn price_asian_call(
     num_steps: Option<usize>,
     currency: Option<String>,
 ) -> Result<JsValue, JsValue> {
-    use finstack_monte_carlo::payoff::asian::{default_fixing_steps, AsianCall, AveragingMethod};
-    use finstack_monte_carlo::pricer::path_dependent::{
-        PathDependentPricer, PathDependentPricerConfig,
-    };
-
-    let ccy = resolve_currency(currency.as_deref())?;
-    let steps = num_steps.unwrap_or(252);
-    let fixing_steps = default_fixing_steps(steps);
-    let payoff = AsianCall::new(strike, 1.0, AveragingMethod::Arithmetic, fixing_steps);
-    let df = (-rate * expiry).exp();
-    let config = PathDependentPricerConfig::new(num_paths).with_seed(seed);
-    let pricer = PathDependentPricer::new(config);
-    let process = GbmProcess::with_params(rate, div_yield, vol).map_err(to_js_err)?;
-    let est = pricer
-        .price(&process, spot, expiry, steps, &payoff, ccy, df)
-        .map_err(to_js_err)?;
-    estimate_to_js(&est)
+    price_asian(
+        true, spot, strike, rate, div_yield, vol, expiry, num_paths, seed, num_steps, currency,
+    )
 }
 
 /// Price an Asian put via Monte Carlo under GBM dynamics.
@@ -327,7 +289,28 @@ pub fn price_asian_put(
     num_steps: Option<usize>,
     currency: Option<String>,
 ) -> Result<JsValue, JsValue> {
-    use finstack_monte_carlo::payoff::asian::{default_fixing_steps, AsianPut, AveragingMethod};
+    price_asian(
+        false, spot, strike, rate, div_yield, vol, expiry, num_paths, seed, num_steps, currency,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn price_asian(
+    is_call: bool,
+    spot: f64,
+    strike: f64,
+    rate: f64,
+    div_yield: f64,
+    vol: f64,
+    expiry: f64,
+    num_paths: usize,
+    seed: u64,
+    num_steps: Option<usize>,
+    currency: Option<String>,
+) -> Result<JsValue, JsValue> {
+    use finstack_monte_carlo::payoff::asian::{
+        default_fixing_steps, AsianCall, AsianPut, AveragingMethod,
+    };
     use finstack_monte_carlo::pricer::path_dependent::{
         PathDependentPricer, PathDependentPricerConfig,
     };
@@ -335,14 +318,18 @@ pub fn price_asian_put(
     let ccy = resolve_currency(currency.as_deref())?;
     let steps = num_steps.unwrap_or(252);
     let fixing_steps = default_fixing_steps(steps);
-    let payoff = AsianPut::new(strike, 1.0, AveragingMethod::Arithmetic, fixing_steps);
     let df = (-rate * expiry).exp();
     let config = PathDependentPricerConfig::new(num_paths).with_seed(seed);
     let pricer = PathDependentPricer::new(config);
     let process = GbmProcess::with_params(rate, div_yield, vol).map_err(to_js_err)?;
-    let est = pricer
-        .price(&process, spot, expiry, steps, &payoff, ccy, df)
-        .map_err(to_js_err)?;
+    let est = if is_call {
+        let payoff = AsianCall::new(strike, 1.0, AveragingMethod::Arithmetic, fixing_steps);
+        pricer.price(&process, spot, expiry, steps, &payoff, ccy, df)
+    } else {
+        let payoff = AsianPut::new(strike, 1.0, AveragingMethod::Arithmetic, fixing_steps);
+        pricer.price(&process, spot, expiry, steps, &payoff, ccy, df)
+    }
+    .map_err(to_js_err)?;
     estimate_to_js(&est)
 }
 

@@ -3,11 +3,10 @@
 //! Exposes the JSON-spec attribution pipeline and a `PnlAttribution` wrapper
 //! for interactive exploration from Python.
 
-use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe;
 use crate::errors::{display_to_py, serde_json_to_py};
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::PyList;
 
 // ---------------------------------------------------------------------------
 // Ergonomic entry point
@@ -188,7 +187,7 @@ fn py_to_json_string<'py>(
     json_mod
         .call_method1("dumps", (obj,))
         .and_then(|value| value.extract())
-        .map_err(|e| PyValueError::new_err(format!("invalid {label}: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("invalid {label}: {e}")))
 }
 
 // ---------------------------------------------------------------------------
@@ -432,51 +431,28 @@ impl PyPnlAttribution {
     /// ``cross_factor_pnl``, ``model_params_pnl``, ``market_scalars_pnl``,
     /// ``residual``, ``residual_pct``, ``num_repricings``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("instrument_id", vec![&self.inner.meta.instrument_id])?;
-        data.set_item("method", vec![self.inner.meta.method.to_string()])?;
-        data.set_item("t0", vec![self.inner.meta.t0.to_string()])?;
-        data.set_item("t1", vec![self.inner.meta.t1.to_string()])?;
-        data.set_item(
-            "currency",
-            vec![self.inner.total_pnl.currency().to_string()],
-        )?;
-        data.set_item("total_pnl", vec![self.inner.total_pnl.amount()])?;
-        data.set_item("carry", vec![self.inner.carry.amount()])?;
-        data.set_item(
-            "rates_curves_pnl",
-            vec![self.inner.rates_curves_pnl.amount()],
-        )?;
-        data.set_item(
-            "credit_curves_pnl",
-            vec![self.inner.credit_curves_pnl.amount()],
-        )?;
-        data.set_item(
-            "inflation_curves_pnl",
-            vec![self.inner.inflation_curves_pnl.amount()],
-        )?;
-        data.set_item(
-            "correlations_pnl",
-            vec![self.inner.correlations_pnl.amount()],
-        )?;
-        data.set_item("fx_pnl", vec![self.inner.fx_pnl.amount()])?;
-        data.set_item("vol_pnl", vec![self.inner.vol_pnl.amount()])?;
-        data.set_item(
-            "cross_factor_pnl",
-            vec![self.inner.cross_factor_pnl.amount()],
-        )?;
-        data.set_item(
-            "model_params_pnl",
-            vec![self.inner.model_params_pnl.amount()],
-        )?;
-        data.set_item(
-            "market_scalars_pnl",
-            vec![self.inner.market_scalars_pnl.amount()],
-        )?;
-        data.set_item("residual", vec![self.inner.residual.amount()])?;
-        data.set_item("residual_pct", vec![self.inner.meta.residual_pct])?;
-        data.set_item("num_repricings", vec![self.inner.meta.num_repricings])?;
-        dict_to_dataframe(py, &data, None)
+        let row = serde_json::json!({
+            "instrument_id": self.inner.meta.instrument_id,
+            "method": self.inner.meta.method.to_string(),
+            "t0": self.inner.meta.t0.to_string(),
+            "t1": self.inner.meta.t1.to_string(),
+            "currency": self.inner.total_pnl.currency().to_string(),
+            "total_pnl": self.inner.total_pnl.amount(),
+            "carry": self.inner.carry.amount(),
+            "rates_curves_pnl": self.inner.rates_curves_pnl.amount(),
+            "credit_curves_pnl": self.inner.credit_curves_pnl.amount(),
+            "inflation_curves_pnl": self.inner.inflation_curves_pnl.amount(),
+            "correlations_pnl": self.inner.correlations_pnl.amount(),
+            "fx_pnl": self.inner.fx_pnl.amount(),
+            "vol_pnl": self.inner.vol_pnl.amount(),
+            "cross_factor_pnl": self.inner.cross_factor_pnl.amount(),
+            "model_params_pnl": self.inner.model_params_pnl.amount(),
+            "market_scalars_pnl": self.inner.market_scalars_pnl.amount(),
+            "residual": self.inner.residual.amount(),
+            "residual_pct": self.inner.meta.residual_pct,
+            "num_repricings": self.inner.meta.num_repricings,
+        });
+        serde_object_to_single_row_dataframe(py, &row)
     }
 
     fn __repr__(&self) -> String {

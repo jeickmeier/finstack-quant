@@ -8,7 +8,6 @@ use crate::errors::core_to_py;
 use finstack_monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_monte_carlo::pricer::european::EuropeanPricer;
 use finstack_monte_carlo::registry;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::str::FromStr;
 
@@ -124,7 +123,7 @@ pub(super) fn resolve_currency(
                 .python_bindings
                 .default_currency;
             finstack_core::currency::Currency::from_str(default_currency).map_err(|e| {
-                PyValueError::new_err(format!("Failed to resolve default currency: {e}"))
+                crate::errors::value_error(format!("Failed to resolve default currency: {e}"))
             })
         }
     }

@@ -13,7 +13,6 @@ use finstack_core::dates::PeriodId;
 use finstack_core::money::fx::FxConversionPolicy;
 use finstack_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_statements::types::AmountOrScalar;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 /// Builder for financial models (type-state collapsed for Python).
@@ -163,7 +162,7 @@ impl PyMixedNodeBuilder {
     fn take(&mut self) -> PyResult<MixedNodeBuilder> {
         self.inner
             .take()
-            .ok_or_else(|| PyValueError::new_err("MixedNodeBuilder has already been consumed"))
+            .ok_or_else(|| crate::errors::value_error("MixedNodeBuilder has already been consumed"))
     }
 }
 
@@ -197,7 +196,7 @@ impl PyModelBuilder {
             }
             BuilderState::Ready(b) => {
                 self.inner = Some(BuilderState::Ready(b));
-                Err(PyValueError::new_err("Periods already set"))
+                Err(crate::errors::value_error("Periods already set"))
             }
         }
     }
@@ -512,7 +511,7 @@ impl PyModelBuilder {
         let policy_value = serde_json::Value::String(policy.to_string());
         let parsed: FxConversionPolicy =
             serde_json::from_value(policy_value).map_err(|e| {
-                PyValueError::new_err(format!(
+                crate::errors::value_error(format!(
                     "invalid fx_policy {policy:?}: {e}; expected one of cashflow_date, period_end, period_average, custom"
                 ))
             })?;
@@ -554,9 +553,9 @@ impl PyModelBuilder {
 
 impl PyModelBuilder {
     fn take_any(&mut self) -> PyResult<BuilderState> {
-        self.inner
-            .take()
-            .ok_or_else(|| PyValueError::new_err("Builder has already been consumed by build()"))
+        self.inner.take().ok_or_else(|| {
+            crate::errors::value_error("Builder has already been consumed by build()")
+        })
     }
 
     fn take_ready(&mut self) -> PyResult<ModelBuilder<finstack_statements::builder::Ready>> {
@@ -565,7 +564,7 @@ impl PyModelBuilder {
             BuilderState::Ready(b) => Ok(b),
             BuilderState::NeedPeriods(b) => {
                 self.inner = Some(BuilderState::NeedPeriods(b));
-                Err(PyValueError::new_err(
+                Err(crate::errors::value_error(
                     "Must call periods() before adding nodes",
                 ))
             }

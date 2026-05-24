@@ -8,7 +8,7 @@ use finstack_analytics as fa;
 use finstack_core::dates::{CalendarRegistry, FiscalConfig, HolidayCalendar, PeriodKind};
 use numpy::PyArray1;
 use pyo3::buffer::PyBuffer;
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -57,7 +57,7 @@ fn resolve_fiscal_calendar() -> PyResult<&'static dyn HolidayCalendar> {
 /// Parse a frequency string into a [`PeriodKind`].
 fn parse_freq(freq: &str) -> PyResult<PeriodKind> {
     freq.parse::<PeriodKind>().map_err(|_| {
-        PyValueError::new_err(format!(
+        crate::errors::value_error(format!(
             "Unknown frequency {freq:?}; expected one of: \
              daily, weekly, monthly, quarterly, semiannual, annual"
         ))
@@ -139,12 +139,12 @@ fn extract_float64_column(series: &Bound<'_, PyAny>, col_label: &str) -> PyResul
         })?;
 
     let buffer = PyBuffer::<f64>::get(&array).map_err(|err| {
-        PyValueError::new_err(format!(
+        crate::errors::value_error(format!(
             "Column {col_label:?} did not expose a contiguous float64 buffer: {err}"
         ))
     })?;
     buffer.to_vec(py).map_err(|err| {
-        PyValueError::new_err(format!(
+        crate::errors::value_error(format!(
             "Column {col_label:?} could not be read as float64 buffer: {err}"
         ))
     })

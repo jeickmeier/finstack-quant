@@ -72,6 +72,59 @@ pub use whatif::{
     FactorContributionDelta, PositionChange, StressResult, WhatIfEngine, WhatIfResult,
 };
 
+/// JS/Python-friendly ES contribution row derived from
+/// [`PositionEsContribution`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct PositionEsContributionView {
+    /// Position identifier.
+    pub position_id: String,
+    /// Component Expected Shortfall allocated to the position.
+    pub component_es: f64,
+    /// Marginal Expected Shortfall, when available.
+    pub marginal_es: Option<f64>,
+    /// Fraction of total ES contributed by this position.
+    pub pct_contribution: f64,
+}
+
+/// JS/Python-friendly ES decomposition view.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct ParametricEsDecompositionView {
+    /// Total portfolio VaR.
+    pub portfolio_var: f64,
+    /// Total portfolio Expected Shortfall.
+    pub portfolio_es: f64,
+    /// Confidence level used for ES.
+    pub confidence: f64,
+    /// Number of positions in the decomposition.
+    pub n_positions: usize,
+    /// Per-position ES contributions.
+    pub contributions: Vec<PositionEsContributionView>,
+}
+
+/// Convert a full position risk decomposition into the legacy ES-only view.
+#[must_use]
+pub fn parametric_es_decomposition_view(
+    decomposition: &PositionRiskDecomposition,
+) -> ParametricEsDecompositionView {
+    let contributions = decomposition
+        .es_contributions
+        .iter()
+        .map(|c| PositionEsContributionView {
+            position_id: c.position_id.as_str().to_owned(),
+            component_es: c.component_es,
+            marginal_es: c.marginal_es,
+            pct_contribution: c.relative_es,
+        })
+        .collect();
+    ParametricEsDecompositionView {
+        portfolio_var: decomposition.portfolio_var,
+        portfolio_es: decomposition.portfolio_es,
+        confidence: decomposition.confidence,
+        n_positions: decomposition.n_positions,
+        contributions,
+    }
+}
+
 /// Flatten a row-major nested `Vec<Vec<f64>>` into a contiguous `Vec<f64>` after
 /// validating squareness against `n`.
 ///
@@ -113,6 +166,44 @@ pub fn flatten_square_matrix(
         flat.extend(row);
     }
     Ok(flat)
+}
+
+/// Flatten per-position scenario P&Ls from `[n_positions][n_scenarios]` into
+/// the scenario-major buffer expected by [`HistoricalPositionDecomposer`].
+///
+/// # Errors
+///
+/// Returns [`finstack_core::Error::Validation`] when the number of rows does
+/// not equal `n_positions` or when rows have inconsistent scenario counts.
+pub fn flatten_position_pnls(
+    position_pnls: Vec<Vec<f64>>,
+    n_positions: usize,
+) -> finstack_core::Result<(Vec<f64>, usize)> {
+    if position_pnls.len() != n_positions {
+        return Err(finstack_core::Error::Validation(format!(
+            "position_pnls must have {n_positions} rows, got {}",
+            position_pnls.len()
+        )));
+    }
+    if n_positions == 0 {
+        return Ok((Vec::new(), 0));
+    }
+    let n_scenarios = position_pnls[0].len();
+    for (i, row) in position_pnls.iter().enumerate() {
+        if row.len() != n_scenarios {
+            return Err(finstack_core::Error::Validation(format!(
+                "position_pnls row {i} has {} scenarios, expected {n_scenarios}",
+                row.len()
+            )));
+        }
+    }
+    let mut flat = Vec::with_capacity(n_scenarios * n_positions);
+    for s in 0..n_scenarios {
+        for row in &position_pnls {
+            flat.push(row[s]);
+        }
+    }
+    Ok((flat, n_scenarios))
 }
 
 #[cfg(test)]

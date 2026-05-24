@@ -5,7 +5,6 @@ use std::sync::Arc;
 use finstack_core::money::fx::{
     FxConversionPolicy, FxMatrix, FxQuery, FxRateResult, SimpleFxProvider,
 };
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
@@ -20,7 +19,7 @@ use crate::errors::core_to_py;
 /// Parse an [`FxConversionPolicy`] from a string.
 fn parse_fx_policy(s: &str) -> PyResult<FxConversionPolicy> {
     s.parse::<FxConversionPolicy>()
-        .map_err(|e| PyValueError::new_err(format!("Invalid FxConversionPolicy {s:?}: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("Invalid FxConversionPolicy {s:?}: {e}")))
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +219,7 @@ impl PyFxMatrix {
                 } else if let Ok(s) = p.extract::<String>() {
                     parse_fx_policy(&s)?
                 } else {
-                    return Err(PyValueError::new_err(
+                    return Err(crate::errors::value_error(
                         "policy must be FxConversionPolicy or str",
                     ));
                 }
@@ -260,12 +259,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, EXPORTS)?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "fx",
         "finstack.core.market_data",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

@@ -1,7 +1,6 @@
 //! Date conversion helpers between Python `datetime.date` and `time::Date`.
 
 use crate::errors::display_to_py;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
@@ -11,7 +10,7 @@ pub fn py_to_date(obj: &Bound<'_, PyAny>) -> PyResult<time::Date> {
     let month: u8 = obj.getattr("month")?.extract()?;
     let day: u8 = obj.getattr("day")?.extract()?;
     let m = time::Month::try_from(month)
-        .map_err(|_| PyValueError::new_err(format!("invalid month: {month}")))?;
+        .map_err(|_| crate::errors::value_error(format!("invalid month: {month}")))?;
     time::Date::from_calendar_date(year, m, day).map_err(display_to_py)
 }
 

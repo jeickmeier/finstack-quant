@@ -237,33 +237,15 @@ pub fn value_portfolio(
     market_json: &str,
     strict_risk: bool,
 ) -> Result<String, JsValue> {
-    let spec: finstack_portfolio::portfolio::PortfolioSpec =
-        serde_json::from_str(spec_json).map_err(to_js_err)?;
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    let portfolio = finstack_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
-    let config = finstack_core::config::FinstackConfig::default();
-    let options = finstack_portfolio::valuation::PortfolioValuationOptions {
-        strict_risk,
-        ..Default::default()
-    };
-    let valuation =
-        finstack_portfolio::valuation::value_portfolio(&portfolio, &market, &config, &options)
-            .map_err(to_js_err)?;
-    serde_json::to_string(&valuation).map_err(to_js_err)
+    let portfolio = WasmPortfolio::from_spec(spec_json)?;
+    value_portfolio_built(&portfolio, market_json, strict_risk)
 }
 
 /// Aggregate the full classified cashflow ladder for a portfolio.
 #[wasm_bindgen(js_name = aggregateFullCashflows)]
 pub fn aggregate_full_cashflows(spec_json: &str, market_json: &str) -> Result<String, JsValue> {
-    let spec: finstack_portfolio::portfolio::PortfolioSpec =
-        serde_json::from_str(spec_json).map_err(to_js_err)?;
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    let portfolio = finstack_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
-    let cashflows = finstack_portfolio::cashflows::aggregate_full_cashflows(&portfolio, &market)
-        .map_err(to_js_err)?;
-    serde_json::to_string(&cashflows).map_err(to_js_err)
+    let portfolio = WasmPortfolio::from_spec(spec_json)?;
+    aggregate_full_cashflows_built(&portfolio, market_json)
 }
 
 /// Aggregate the full classified cashflow ladder for an already-built
@@ -325,17 +307,13 @@ pub fn apply_scenario_and_revalue_built(
     let market: finstack_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let config = finstack_core::config::FinstackConfig::default();
-    let (valuation, report) = finstack_portfolio::scenarios::apply_and_revalue(
+    let out = finstack_portfolio::scenarios::apply_and_revalue_envelope(
         &portfolio.inner,
         &scenario,
         &market,
         &config,
     )
     .map_err(to_js_err)?;
-    let out = serde_json::json!({
-        "valuation": valuation,
-        "report": report,
-    });
     serde_wasm_bindgen::to_value(&out).map_err(to_js_err)
 }
 
@@ -373,22 +351,8 @@ pub fn apply_scenario_and_revalue(
     scenario_json: &str,
     market_json: &str,
 ) -> Result<JsValue, JsValue> {
-    let spec: finstack_portfolio::portfolio::PortfolioSpec =
-        serde_json::from_str(spec_json).map_err(to_js_err)?;
-    let scenario: finstack_scenarios::ScenarioSpec =
-        serde_json::from_str(scenario_json).map_err(to_js_err)?;
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    let portfolio = finstack_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
-    let config = finstack_core::config::FinstackConfig::default();
-    let (valuation, report) =
-        finstack_portfolio::scenarios::apply_and_revalue(&portfolio, &scenario, &market, &config)
-            .map_err(to_js_err)?;
-    let out = serde_json::json!({
-        "valuation": valuation,
-        "report": report,
-    });
-    serde_wasm_bindgen::to_value(&out).map_err(to_js_err)
+    let portfolio = WasmPortfolio::from_spec(spec_json)?;
+    apply_scenario_and_revalue_built(&portfolio, scenario_json, market_json)
 }
 
 /// Optimize portfolio weights using the LP-based optimizer.
@@ -485,7 +449,9 @@ pub fn parametric_es_decomposition(
     covariance_json: &str,
     confidence: f64,
 ) -> Result<String, JsValue> {
-    use finstack_portfolio::factor_model::{DecompositionConfig, ParametricPositionDecomposer};
+    use finstack_portfolio::factor_model::{
+        parametric_es_decomposition_view, DecompositionConfig, ParametricPositionDecomposer,
+    };
     use finstack_portfolio::types::PositionId;
 
     let ids: Vec<String> = serde_json::from_str(position_ids_json).map_err(to_js_err)?;
@@ -502,39 +468,7 @@ pub fn parametric_es_decomposition(
         .decompose_positions(&weights, &cov_flat, &ids, &config)
         .map_err(to_js_err)?;
 
-    #[derive(serde::Serialize)]
-    struct EsContribution<'a> {
-        position_id: &'a str,
-        component_es: f64,
-        marginal_es: Option<f64>,
-        pct_contribution: f64,
-    }
-    #[derive(serde::Serialize)]
-    struct EsDecomposition<'a> {
-        portfolio_var: f64,
-        portfolio_es: f64,
-        confidence: f64,
-        n_positions: usize,
-        contributions: Vec<EsContribution<'a>>,
-    }
-
-    let contributions = decomposition
-        .es_contributions
-        .iter()
-        .map(|c| EsContribution {
-            position_id: c.position_id.as_str(),
-            component_es: c.component_es,
-            marginal_es: c.marginal_es,
-            pct_contribution: c.relative_es,
-        })
-        .collect();
-    let out = EsDecomposition {
-        portfolio_var: decomposition.portfolio_var,
-        portfolio_es: decomposition.portfolio_es,
-        confidence: decomposition.confidence,
-        n_positions: decomposition.n_positions,
-        contributions,
-    };
+    let out = parametric_es_decomposition_view(&decomposition);
     serde_json::to_string(&out).map_err(to_js_err)
 }
 
@@ -548,46 +482,22 @@ pub fn historical_var_decomposition(
     position_pnls_json: &str,
     confidence: f64,
 ) -> Result<String, JsValue> {
-    use finstack_portfolio::factor_model::{DecompositionConfig, HistoricalPositionDecomposer};
+    use finstack_portfolio::factor_model::{
+        flatten_position_pnls, DecompositionConfig, HistoricalPositionDecomposer,
+    };
     use finstack_portfolio::types::PositionId;
 
     let ids: Vec<String> = serde_json::from_str(position_ids_json).map_err(to_js_err)?;
     let position_pnls: Vec<Vec<f64>> =
         serde_json::from_str(position_pnls_json).map_err(to_js_err)?;
     let n = ids.len();
-    if position_pnls.len() != n {
-        return Err(to_js_err(format!(
-            "position_pnls must have {n} rows, got {}",
-            position_pnls.len()
-        )));
-    }
     let ids: Vec<PositionId> = ids.into_iter().map(PositionId::new).collect();
     let config = DecompositionConfig::historical(confidence);
 
-    let result = if n == 0 {
-        HistoricalPositionDecomposer
-            .decompose_from_pnls(&[], &ids, 0, &config)
-            .map_err(to_js_err)?
-    } else {
-        let n_scenarios = position_pnls[0].len();
-        for (i, row) in position_pnls.iter().enumerate() {
-            if row.len() != n_scenarios {
-                return Err(to_js_err(format!(
-                    "position_pnls row {i} has {} scenarios, expected {n_scenarios}",
-                    row.len()
-                )));
-            }
-        }
-        let mut flat = Vec::with_capacity(n_scenarios * n);
-        for s in 0..n_scenarios {
-            for row in &position_pnls {
-                flat.push(row[s]);
-            }
-        }
-        HistoricalPositionDecomposer
-            .decompose_from_pnls(&flat, &ids, n_scenarios, &config)
-            .map_err(to_js_err)?
-    };
+    let (flat, n_scenarios) = flatten_position_pnls(position_pnls, n).map_err(to_js_err)?;
+    let result = HistoricalPositionDecomposer
+        .decompose_from_pnls(&flat, &ids, n_scenarios, &config)
+        .map_err(to_js_err)?;
     serde_json::to_string(&result).map_err(to_js_err)
 }
 
@@ -726,50 +636,16 @@ pub fn almgren_chriss_impact(
     temporary_impact_coef: f64,
     reference_price: Option<f64>,
 ) -> Result<String, JsValue> {
-    use finstack_portfolio::liquidity::{
-        AlmgrenChrissModel, LiquidityProfile, MarketImpactModel, TradeParams,
-    };
-
-    if !avg_daily_volume.is_finite() || avg_daily_volume <= 0.0 {
-        return Err(to_js_err("avg_daily_volume must be finite and positive"));
-    }
-    if !volatility.is_finite() || volatility <= 0.0 {
-        return Err(to_js_err("volatility must be finite and positive"));
-    }
-    if let Some(price) = reference_price {
-        if !price.is_finite() || price <= 0.0 {
-            return Err(to_js_err("reference_price must be finite and positive"));
-        }
-    }
-
-    let model = AlmgrenChrissModel::new(permanent_impact_coef, temporary_impact_coef, 0.5)
-        .map_err(to_js_err)?;
-    let mid = reference_price.unwrap_or(1.0);
-    let profile = LiquidityProfile::new(
-        "AC_CALIBRATION",
-        mid,
-        mid * 0.999,
-        mid * 1.001,
+    let out = finstack_portfolio::liquidity::almgren_chriss_uniform_impact(
+        position_size,
         avg_daily_volume,
-        1.0,
-        0.0,
+        volatility,
+        execution_horizon_days,
+        permanent_impact_coef,
+        temporary_impact_coef,
+        reference_price,
     )
     .map_err(to_js_err)?;
-    let params = TradeParams {
-        quantity: position_size,
-        horizon_days: execution_horizon_days,
-        daily_volatility: volatility,
-        profile,
-        risk_aversion: None,
-        reference_price,
-    };
-    let est = model.estimate_cost(&params).map_err(to_js_err)?;
-    let out = serde_json::json!({
-        "permanent_impact": est.permanent_impact,
-        "temporary_impact": est.temporary_impact,
-        "total_impact": est.total_cost,
-        "expected_cost_bps": est.cost_bps,
-    });
     serde_json::to_string(&out).map_err(to_js_err)
 }
 

@@ -12,7 +12,6 @@ use crate::errors::display_to_py;
 use finstack_portfolio::liquidity::{
     self, AlmgrenChrissModel, KyleLambdaModel, LiquidityProfile, MarketImpactModel, TradeParams,
 };
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -231,18 +230,18 @@ fn almgren_chriss_impact<'py>(
     reference_price: Option<f64>,
 ) -> PyResult<Bound<'py, PyDict>> {
     if !avg_daily_volume.is_finite() || avg_daily_volume <= 0.0 {
-        return Err(PyValueError::new_err(
+        return Err(crate::errors::value_error(
             "avg_daily_volume must be finite and positive",
         ));
     }
     if !volatility.is_finite() || volatility <= 0.0 {
-        return Err(PyValueError::new_err(
+        return Err(crate::errors::value_error(
             "volatility must be finite and positive",
         ));
     }
     if let Some(price) = reference_price {
         if !price.is_finite() || price <= 0.0 {
-            return Err(PyValueError::new_err(
+            return Err(crate::errors::value_error(
                 "reference_price must be finite and positive",
             ));
         }

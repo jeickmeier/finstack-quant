@@ -32,7 +32,7 @@ fn flatten_matrix(rows: Vec<Vec<f64>>) -> PyResult<(Vec<f64>, usize)> {
     let n = rows.len();
     for (i, row) in rows.iter().enumerate() {
         if row.len() != n {
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "Row {i} has length {} but expected {n} for a square matrix",
                 row.len()
             )));
@@ -78,7 +78,7 @@ fn cholesky_decomposition(matrix: Vec<Vec<f64>>) -> PyResult<Vec<Vec<f64>>> {
 fn cholesky_solve(chol: Vec<Vec<f64>>, b: Vec<f64>) -> PyResult<Vec<f64>> {
     let (flat, n) = flatten_matrix(chol)?;
     if b.len() != n {
-        return Err(PyValueError::new_err(format!(
+        return Err(crate::errors::value_error(format!(
             "Right-hand side has length {} but Cholesky factor is {n}x{n}",
             b.len()
         )));
@@ -136,12 +136,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "linalg",
         "finstack.core.math",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

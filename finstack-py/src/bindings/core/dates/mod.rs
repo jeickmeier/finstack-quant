@@ -39,12 +39,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, &all_names)?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "dates",
         "finstack.core",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())
@@ -60,7 +61,7 @@ fn py_create_date<'py>(
     day: u8,
 ) -> PyResult<Bound<'py, PyAny>> {
     let m = time::Month::try_from(month)
-        .map_err(|_| pyo3::exceptions::PyValueError::new_err(format!("invalid month: {month}")))?;
+        .map_err(|_| crate::errors::value_error(format!("invalid month: {month}")))?;
     let date =
         finstack_core::dates::create_date(year, m, day).map_err(crate::errors::core_to_py)?;
     utils::date_to_py(py, date)
@@ -79,9 +80,7 @@ fn py_days_since_epoch(date: &Bound<'_, PyAny>) -> PyResult<i32> {
 #[pyo3(name = "date_from_epoch_days", text_signature = "(days)")]
 fn py_date_from_epoch_days<'py>(py: Python<'py>, days: i32) -> PyResult<Bound<'py, PyAny>> {
     let date = finstack_core::dates::date_from_epoch_days(days).ok_or_else(|| {
-        pyo3::exceptions::PyValueError::new_err(format!(
-            "epoch days {days} out of valid date range"
-        ))
+        crate::errors::value_error(format!("epoch days {days} out of valid date range"))
     })?;
     utils::date_to_py(py, date)
 }

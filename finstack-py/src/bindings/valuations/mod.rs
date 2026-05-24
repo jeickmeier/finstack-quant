@@ -8,7 +8,6 @@ mod calibration;
 pub mod correlation;
 mod credit;
 mod credit_derivatives;
-pub(crate) mod credit_factor_model;
 mod direct_wrapper;
 mod exotic_rates;
 mod exotics;
@@ -17,15 +16,11 @@ mod fx;
 mod pricing;
 mod sabr;
 
+use crate::bindings::date_utils::parse_iso_date_py as parse_date;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-
-/// Parse an ISO 8601 date string into a `time::Date`.
-fn parse_date(s: &str) -> PyResult<time::Date> {
-    finstack_core::dates::parse_iso_date(s).map_err(display_to_py)
-}
 
 // ---------------------------------------------------------------------------
 // ValuationResult
@@ -197,13 +192,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.setattr("__all__", all)?;
     parent.add_submodule(&m)?;
 
-    let parent_name: String = match parent.getattr("__name__") {
-        Ok(attr) => match attr.extract::<String>() {
-            Ok(s) => s,
-            Err(_) => "finstack.finstack".to_string(),
-        },
-        Err(_) => "finstack.finstack".to_string(),
-    };
+    let parent_name = crate::bindings::module_utils::parent_qualified_name(
+        parent,
+        crate::bindings::module_utils::ROOT_PACKAGE,
+        crate::bindings::module_utils::ParentNameSource::Name,
+    );
     let qual = format!("{parent_name}.valuations");
     m.setattr("__package__", &qual)?;
     let sys = PyModule::import(py, "sys")?;

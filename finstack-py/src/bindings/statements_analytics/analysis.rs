@@ -11,7 +11,6 @@
 
 use crate::bindings::extract::{extract_market_opt, extract_model_ref, extract_results_ref};
 use crate::errors::display_to_py;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -457,7 +456,7 @@ fn run_corporate_analysis<'py>(
 
     if let Some(w) = wacc {
         let tv_json = terminal_value_json.ok_or_else(|| {
-            PyValueError::new_err("terminal_value_json required when wacc is set")
+            crate::errors::value_error("terminal_value_json required when wacc is set")
         })?;
         let tv: TerminalValueSpec = serde_json::from_str(tv_json).map_err(display_to_py)?;
         builder = builder.dcf(w, tv);

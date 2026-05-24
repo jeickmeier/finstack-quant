@@ -2,7 +2,6 @@
 
 use crate::errors::core_to_py;
 use finstack_core::dates::{Tenor, TenorUnit};
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
 
@@ -228,7 +227,7 @@ pub(crate) fn extract_tenor(obj: &Bound<'_, PyAny>) -> PyResult<Tenor> {
     if let Ok(s) = obj.extract::<String>() {
         return Tenor::parse(&s).map_err(core_to_py);
     }
-    Err(PyValueError::new_err("expected Tenor or str"))
+    Err(crate::errors::value_error("expected Tenor or str"))
 }
 
 /// Register tenor types on the `finstack.core.dates` module.

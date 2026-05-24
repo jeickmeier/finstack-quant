@@ -122,11 +122,9 @@ where
     PyValueError::new_err(e.to_string())
 }
 
-/// Convert any `std::error::Error` into a Python exception, preserving the
-/// full source chain in the message.
-#[allow(dead_code)] // Opt-in escape hatch for bindings that want full source chains.
-pub fn error_to_py(e: &dyn std::error::Error) -> PyErr {
-    PyValueError::new_err(format_chain(e))
+/// Construct a Python `ValueError` through the centralized binding error path.
+pub fn value_error(message: impl Into<String>) -> PyErr {
+    PyValueError::new_err(message.into())
 }
 
 /// Convert a `serde_json::Error` into a Python `ValueError`, with a caller-

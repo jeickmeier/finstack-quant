@@ -12,7 +12,6 @@ use finstack_core::market_data::term_structures::{
 };
 use finstack_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_core::math::volatility::sabr::SabrParams;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
 
@@ -27,19 +26,19 @@ use crate::errors::core_to_py;
 /// Parse a DayCount from a Python string like `"act_365f"`, `"act_360"`, etc.
 fn parse_day_count(s: &str) -> PyResult<DayCount> {
     s.parse::<DayCount>()
-        .map_err(|e| PyValueError::new_err(format!("Invalid day_count {s:?}: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("Invalid day_count {s:?}: {e}")))
 }
 
 /// Parse an [`InterpStyle`] from a Python string.
 fn parse_interp_style(s: &str) -> PyResult<InterpStyle> {
     s.parse::<InterpStyle>()
-        .map_err(|e| PyValueError::new_err(format!("Invalid interp style {s:?}: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("Invalid interp style {s:?}: {e}")))
 }
 
 /// Parse an [`ExtrapolationPolicy`] from a Python string.
 fn parse_extrapolation(s: &str) -> PyResult<ExtrapolationPolicy> {
     s.parse::<ExtrapolationPolicy>()
-        .map_err(|e| PyValueError::new_err(format!("Invalid extrapolation {s:?}: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("Invalid extrapolation {s:?}: {e}")))
 }
 
 /// Parse a [`VolSurfaceAxis`] from a Python string.
@@ -47,7 +46,7 @@ fn parse_vol_surface_axis(s: &str) -> PyResult<VolSurfaceAxis> {
     match s {
         "strike" => Ok(VolSurfaceAxis::Strike),
         "tenor" => Ok(VolSurfaceAxis::Tenor),
-        _ => Err(PyValueError::new_err(format!(
+        _ => Err(crate::errors::value_error(format!(
             "Invalid vol surface axis {s:?}: expected 'strike' or 'tenor'",
         ))),
     }
@@ -58,7 +57,7 @@ fn parse_vol_interpolation_mode(s: &str) -> PyResult<VolInterpolationMode> {
     match s {
         "vol" => Ok(VolInterpolationMode::Vol),
         "total_variance" => Ok(VolInterpolationMode::TotalVariance),
-        _ => Err(PyValueError::new_err(format!(
+        _ => Err(crate::errors::value_error(format!(
             "Invalid vol interpolation mode {s:?}: expected 'vol' or 'total_variance'",
         ))),
     }
@@ -741,7 +740,7 @@ fn parse_sabr_dict(dict: &Bound<'_, PyDict>, idx: usize) -> PyResult<SabrParams>
     let get = |key: &str| -> PyResult<f64> {
         dict.get_item(key)?
             .ok_or_else(|| {
-                PyValueError::new_err(format!(
+                crate::errors::value_error(format!(
                     "params_row_major[{idx}]: missing required key {key:?}"
                 ))
             })?
@@ -1113,12 +1112,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, EXPORTS)?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "curves",
         "finstack.core.market_data",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

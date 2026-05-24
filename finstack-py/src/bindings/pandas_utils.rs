@@ -3,10 +3,10 @@
 use crate::bindings::core::dates::utils::date_to_py;
 use finstack_core::table::{TableColumn, TableColumnData, TableEnvelope};
 use numpy::PyArray1;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyList};
+use serde::Serialize;
 
 static PANDAS_DATAFRAME: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
@@ -32,6 +32,20 @@ pub fn dict_to_dataframe<'py>(
         kwargs.set_item("index", idx)?;
     }
     pandas_dataframe(py)?.call((columns,), Some(&kwargs))
+}
+
+/// Build a single-row pandas DataFrame from any serializable object.
+pub fn serde_object_to_single_row_dataframe<'py, T>(
+    py: Python<'py>,
+    value: &T,
+) -> PyResult<Bound<'py, PyAny>>
+where
+    T: Serialize,
+{
+    let json = serde_json::to_string(value).map_err(crate::errors::display_to_py)?;
+    let row = py.import("json")?.call_method1("loads", (json,))?;
+    let rows = PyList::new(py, [row])?;
+    pandas_dataframe(py)?.call1((rows,))
 }
 
 /// Convert a slice of `time::Date` into a Python list suitable for a DataFrame index.
@@ -91,7 +105,7 @@ pub fn selected_table_to_dataframe<'py>(
     let columns = PyDict::new(py);
     for (source, target) in selected_columns {
         let column = table.column(source).ok_or_else(|| {
-            PyValueError::new_err(format!("missing required table column '{source}'"))
+            crate::errors::value_error(format!("missing required table column '{source}'"))
         })?;
         columns.set_item(*target, table_column_to_pylist(py, column)?)?;
     }

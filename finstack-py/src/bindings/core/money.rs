@@ -5,7 +5,7 @@ use std::str::FromStr;
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyFloat, PyInt, PyList, PyTuple, PyType};
@@ -50,7 +50,7 @@ fn decimal_from_py(obj: &Bound<'_, PyAny>) -> PyResult<rust_decimal::Decimal> {
     }
     let s: String = obj.str()?.extract()?;
     rust_decimal::Decimal::from_str(&s)
-        .map_err(|e| PyValueError::new_err(format!("Invalid Decimal value {s:?}: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("Invalid Decimal value {s:?}: {e}")))
 }
 
 /// Return true if `obj` is an instance of `decimal.Decimal` (or any subclass).
@@ -184,7 +184,7 @@ impl PyMoney {
             CompareOp::Ne => Ok((self.inner != rhs.inner).into_py_any(py)?),
             CompareOp::Lt | CompareOp::Le | CompareOp::Gt | CompareOp::Ge => {
                 if self.inner.currency() != rhs.inner.currency() {
-                    return Err(PyValueError::new_err(
+                    return Err(crate::errors::value_error(
                         "cannot order Money values with different currencies",
                     ));
                 }
@@ -192,7 +192,7 @@ impl PyMoney {
                     .inner
                     .amount()
                     .partial_cmp(&rhs.inner.amount())
-                    .ok_or_else(|| PyValueError::new_err("non-comparable Money amounts"))?;
+                    .ok_or_else(|| crate::errors::value_error("non-comparable Money amounts"))?;
                 Ok(op.matches(ord).into_py_any(py)?)
             }
         }
@@ -223,8 +223,9 @@ impl PyMoney {
     #[pyo3(text_signature = "(cls, tup)")]
     fn from_tuple(_cls: &Bound<'_, PyType>, tup: &Bound<'_, PyTuple>) -> PyResult<Self> {
         let (amount, code): (f64, String) = tup.extract()?;
-        let ccy = Currency::from_str(&code)
-            .map_err(|e| PyValueError::new_err(format!("Invalid currency code {code:?}: {e}")))?;
+        let ccy = Currency::from_str(&code).map_err(|e| {
+            crate::errors::value_error(format!("Invalid currency code {code:?}: {e}"))
+        })?;
         Money::try_new(amount, ccy)
             .map(Self::from_inner)
             .map_err(core_to_py)
@@ -325,12 +326,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, ["Money"])?;
     module.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &module,
         "money",
         "finstack.core",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

@@ -5,9 +5,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_wasm::api::valuations::credit_factor_model::{
-    WasmCreditCalibrator, WasmCreditFactorModel,
-};
+use finstack_wasm::api::factor_model::{WasmCreditCalibrator, WasmCreditFactorModel};
 use wasm_bindgen_test::*;
 
 // ---- helpers ----------------------------------------------------------------

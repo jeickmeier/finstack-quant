@@ -22,7 +22,6 @@ use crate::errors::display_to_py;
 use finstack_valuations::models::volatility::sabr::{
     SABRCalibrator, SABRModel, SABRParameters, SABRSmile,
 };
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -398,7 +397,7 @@ impl PySabrCalibrator {
         beta: f64,
     ) -> PyResult<PySabrParameters> {
         if strikes.len() != market_vols.len() {
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "strikes length ({}) must match market_vols length ({})",
                 strikes.len(),
                 market_vols.len()

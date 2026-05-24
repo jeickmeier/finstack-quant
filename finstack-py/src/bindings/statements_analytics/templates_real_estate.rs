@@ -362,7 +362,7 @@ impl PyLeaseGrowthConvention {
         match value.trim().to_ascii_lowercase().as_str() {
             "per_period" | "perperiod" => Ok(PyLeaseGrowthConvention::PerPeriod),
             "annual_escalator" | "annualescalator" => Ok(PyLeaseGrowthConvention::AnnualEscalator),
-            other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            other => Err(crate::errors::value_error(format!(
                 "unknown lease growth convention '{}' (expected per_period / annual_escalator)",
                 other
             ))),
@@ -623,7 +623,7 @@ impl PyManagementFeeBase {
         match value.trim().to_ascii_lowercase().as_str() {
             "egi" => Ok(PyManagementFeeBase::Egi),
             "effective_rent" | "effectiverent" => Ok(PyManagementFeeBase::EffectiveRent),
-            other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            other => Err(crate::errors::value_error(format!(
                 "unknown management fee base '{}' (expected egi / effective_rent)",
                 other
             ))),

@@ -5,7 +5,7 @@ use std::str::FromStr;
 use crate::errors::display_to_py;
 use finstack_core::currency::Currency;
 use pyo3::basic::CompareOp;
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 use pyo3::IntoPyObjectExt;
@@ -39,7 +39,7 @@ impl PyCurrency {
     fn ctor(code: &str) -> PyResult<Self> {
         Currency::from_str(code)
             .map(Self::from_inner)
-            .map_err(|e| PyValueError::new_err(format!("Invalid currency code {code:?}: {e}")))
+            .map_err(|e| crate::errors::value_error(format!("Invalid currency code {code:?}: {e}")))
     }
 
     /// Construct from an ISO-4217 numeric code (e.g. ``840`` for USD).
@@ -131,7 +131,7 @@ pub(crate) fn extract_currency(obj: &Bound<'_, PyAny>) -> PyResult<Currency> {
     }
     if let Ok(s) = obj.extract::<String>() {
         return Currency::from_str(&s)
-            .map_err(|e| PyValueError::new_err(format!("Invalid currency code {s:?}: {e}")));
+            .map_err(|e| crate::errors::value_error(format!("Invalid currency code {s:?}: {e}")));
     }
     Err(PyTypeError::new_err(
         "expected Currency or str currency code",
@@ -157,12 +157,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, &name_refs)?;
     module.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &module,
         "currency",
         "finstack.core",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

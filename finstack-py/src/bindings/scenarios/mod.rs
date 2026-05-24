@@ -8,30 +8,23 @@ mod engine;
 mod horizon;
 mod operation_spec;
 
-use pyo3::exceptions::PyValueError;
+use crate::bindings::date_utils::parse_iso_date_py as parse_date;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-/// Parse an ISO 8601 date string into a `time::Date`.
-fn parse_date(s: &str) -> PyResult<time::Date> {
-    let format = time::format_description::well_known::Iso8601::DEFAULT;
-    time::Date::parse(s, &format)
-        .map_err(|e| PyValueError::new_err(format!("Invalid date '{s}': {e}")))
-}
-
 fn parse_json<T: DeserializeOwned>(json: &str, context: &str) -> PyResult<T> {
-    serde_json::from_str(json).map_err(|e| PyValueError::new_err(format!("{context}: {e}")))
+    serde_json::from_str(json).map_err(|e| crate::errors::value_error(format!("{context}: {e}")))
 }
 
 fn to_json<T: Serialize>(value: &T, context: &str) -> PyResult<String> {
-    serde_json::to_string(value).map_err(|e| PyValueError::new_err(format!("{context}: {e}")))
+    serde_json::to_string(value).map_err(|e| crate::errors::value_error(format!("{context}: {e}")))
 }
 
 fn validate_spec(spec: &finstack_scenarios::ScenarioSpec) -> PyResult<()> {
     spec.validate()
-        .map_err(|e| PyValueError::new_err(format!("ScenarioSpec validation failed: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("ScenarioSpec validation failed: {e}")))
 }
 
 fn parse_spec(json_str: &str) -> PyResult<finstack_scenarios::ScenarioSpec> {
@@ -40,7 +33,7 @@ fn parse_spec(json_str: &str) -> PyResult<finstack_scenarios::ScenarioSpec> {
 
 fn builtin_registry() -> PyResult<finstack_scenarios::TemplateRegistry> {
     finstack_scenarios::TemplateRegistry::with_embedded_builtins()
-        .map_err(|e| PyValueError::new_err(format!("Failed to load embedded templates: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("Failed to load embedded templates: {e}")))
 }
 
 fn template_entry<'a>(
@@ -49,7 +42,7 @@ fn template_entry<'a>(
 ) -> PyResult<&'a finstack_scenarios::RegisteredTemplate> {
     registry
         .get(template_id)
-        .ok_or_else(|| PyValueError::new_err(format!("Unknown template: '{template_id}'")))
+        .ok_or_else(|| crate::errors::value_error(format!("Unknown template: '{template_id}'")))
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +86,7 @@ fn compose_scenarios(specs_json: &str) -> PyResult<String> {
     let engine = finstack_scenarios::ScenarioEngine::new();
     let composed = engine
         .try_compose(specs)
-        .map_err(|e| PyValueError::new_err(format!("Scenario composition failed: {e}")))?;
+        .map_err(|e| crate::errors::value_error(format!("Scenario composition failed: {e}")))?;
     to_json(&composed, "Failed to serialize composed spec")
 }
 
@@ -128,7 +121,7 @@ fn build_from_template(template_id: &str) -> PyResult<String> {
     let spec = entry
         .builder()
         .build()
-        .map_err(|e| PyValueError::new_err(format!("Failed to build template spec: {e}")))?;
+        .map_err(|e| crate::errors::value_error(format!("Failed to build template spec: {e}")))?;
     to_json(&spec, "Failed to serialize spec")
 }
 
@@ -148,13 +141,13 @@ fn build_template_component(template_id: &str, component_id: &str) -> PyResult<S
     let registry = builtin_registry()?;
     let entry = template_entry(&registry, template_id)?;
     let builder = entry.component(component_id).ok_or_else(|| {
-        PyValueError::new_err(format!(
+        crate::errors::value_error(format!(
             "Unknown component '{component_id}' in template '{template_id}'"
         ))
     })?;
     let spec = builder
         .build()
-        .map_err(|e| PyValueError::new_err(format!("Failed to build component spec: {e}")))?;
+        .map_err(|e| crate::errors::value_error(format!("Failed to build component spec: {e}")))?;
     to_json(&spec, "Failed to serialize component spec")
 }
 
@@ -208,12 +201,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_by_parent_name(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "scenarios",
-        "finstack.finstack",
+        crate::bindings::module_utils::ROOT_PACKAGE,
+        crate::bindings::module_utils::ParentNameSource::Name,
     )?;
 
     Ok(())

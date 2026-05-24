@@ -5,7 +5,6 @@
 use crate::bindings::attribution::PyPnlAttribution;
 use crate::bindings::extract::extract_market_ref;
 use crate::errors::display_to_py;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 /// Compute horizon total return under a scenario.
@@ -73,7 +72,7 @@ pub(crate) fn compute_horizon_return<'py>(
             AttributionMethod::Taylor(finstack_attribution::TaylorAttributionConfig::default())
         }
         other => {
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "Unknown attribution method '{other}'. Expected: parallel, waterfall, metrics_based, taylor"
             )));
         }
@@ -203,7 +202,9 @@ impl PyHorizonResult {
             "model_parameters" | "model_params" => AttributionFactor::ModelParameters,
             "market_scalars" | "scalars" => AttributionFactor::MarketScalars,
             other => {
-                return Err(PyValueError::new_err(format!("Unknown factor '{other}'")));
+                return Err(crate::errors::value_error(format!(
+                    "Unknown factor '{other}'"
+                )));
             }
         };
         Ok(self.inner.factor_contribution(&f))
