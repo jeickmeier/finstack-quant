@@ -49,7 +49,6 @@ impl std::ops::Deref for ModelAccess<'_> {
 impl ModelAccess<'_> {
     /// Consume this access and produce an owned value, cloning only if
     /// the data was borrowed from a Python object.
-    #[allow(dead_code)]
     pub fn into_owned(self) -> finstack_statements::FinancialModelSpec {
         match self {
             Self::Borrowed(r) => r.inner.clone(),
@@ -75,7 +74,6 @@ impl std::ops::Deref for ResultAccess<'_> {
 }
 
 impl ResultAccess<'_> {
-    #[allow(dead_code)]
     pub fn into_owned(self) -> finstack_statements::evaluator::StatementResult {
         match self {
             Self::Borrowed(r) => r.inner.clone(),
@@ -87,7 +85,6 @@ impl ResultAccess<'_> {
 /// Extract a [`FinancialModelSpec`] without cloning when a typed Python
 /// object is passed.  Returns [`ModelAccess`] which dereferences to
 /// `&FinancialModelSpec`.
-#[allow(dead_code)]
 pub fn extract_model_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ModelAccess<'py>> {
     if let Ok(spec) = obj.cast::<PyFinancialModelSpec>() {
         return Ok(ModelAccess::Borrowed(spec.borrow()));
@@ -100,7 +97,6 @@ pub fn extract_model_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ModelAccess<'
 
 /// Extract a [`StatementResult`] without cloning when a typed Python
 /// object is passed.
-#[allow(dead_code)]
 pub fn extract_results_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ResultAccess<'py>> {
     if let Ok(result) = obj.cast::<PyStatementResult>() {
         return Ok(ResultAccess::Borrowed(result.borrow()));
@@ -174,18 +170,6 @@ impl std::ops::Deref for MarketAccess<'_> {
         match self {
             Self::Borrowed(r) => &r.inner,
             Self::Owned(m) => m.as_ref(),
-        }
-    }
-}
-
-impl MarketAccess<'_> {
-    /// Consume this access and produce an owned value, cloning only if
-    /// the data was borrowed from a Python object.
-    #[allow(dead_code)]
-    pub fn into_owned(self) -> finstack_core::market_data::context::MarketContext {
-        match self {
-            Self::Borrowed(r) => r.inner.clone(),
-            Self::Owned(m) => *m,
         }
     }
 }

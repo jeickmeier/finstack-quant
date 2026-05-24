@@ -14,7 +14,7 @@ use finstack_valuations::calibration::api::schema::CalibrationResultEnvelope;
 use finstack_valuations::calibration::api::validate as validate_api;
 use numpy::PyArray1;
 use pyo3::create_exception;
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
@@ -234,7 +234,7 @@ impl PyCalibrationResult {
             .get()
             .and_then(|reports| reports.get(step_id))
             .cloned()
-            .ok_or_else(|| PyValueError::new_err(format!("No step report for '{step_id}'")))
+            .ok_or_else(|| crate::errors::value_error(format!("No step report for '{step_id}'")))
     }
 
     /// Per-step summary as a pandas ``DataFrame``.

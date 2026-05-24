@@ -66,7 +66,7 @@ fn parse_option(name: &str) -> PyResult<OptionType> {
     match name.to_ascii_lowercase().as_str() {
         "call" | "c" => Ok(OptionType::Call),
         "put" | "p" => Ok(OptionType::Put),
-        other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+        other => Err(crate::errors::value_error(format!(
             "unknown option_type '{other}'; expected 'call' or 'put'"
         ))),
     }

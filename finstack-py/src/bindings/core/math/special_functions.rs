@@ -102,12 +102,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "special_functions",
         "finstack.core.math",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

@@ -20,7 +20,6 @@ use finstack_statements_analytics::analysis::{
     score_relative_value as core_score, z_score as core_z_score, CompanyMetrics, MetricExtractor,
     Multiple, PeerSet, PeriodBasis, ScoringDimension,
 };
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
@@ -253,13 +252,13 @@ fn parse_scoring_dimension(obj: &Bound<'_, PyAny>) -> PyResult<ScoringDimension>
     }
 
     let dict = obj.cast::<PyDict>().map_err(|_| {
-        PyValueError::new_err(
+        crate::errors::value_error(
             "dimension must be a (metric_name, weight) tuple or a dict with label/y/x/weight",
         )
     })?;
 
     let y_name = dict_get_string_any(dict, &["y", "y_extractor", "metric"])?
-        .ok_or_else(|| PyValueError::new_err("dimension dict missing required key 'y'"))?;
+        .ok_or_else(|| crate::errors::value_error("dimension dict missing required key 'y'"))?;
     let label = dict_get_string_any(dict, &["label", "name"])?.unwrap_or_else(|| y_name.clone());
     let weight = match dict.get_item("weight")? {
         Some(value) => value.extract::<f64>()?,

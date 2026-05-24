@@ -44,8 +44,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_by_package(
-        py, parent, &m, "core", "finstack",
+    crate::bindings::module_utils::register_submodule(
+        py,
+        parent,
+        &m,
+        "core",
+        "finstack",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
     Ok(())
 }

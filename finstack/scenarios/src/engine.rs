@@ -140,6 +140,48 @@ pub struct ApplicationReport {
     pub rounding_context: Option<String>,
 }
 
+/// JSON envelope returned after applying a scenario to market data and,
+/// optionally, a financial model.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ApplicationEnvelope {
+    /// Serialized mutated market context.
+    pub market_json: String,
+    /// Serialized mutated financial model, when a model was supplied.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_json: Option<String>,
+    /// Number of effects successfully applied.
+    pub operations_applied: usize,
+    /// Number of user-provided operations before expansion.
+    pub user_operations: usize,
+    /// Number of expanded operations the engine attempted.
+    pub expanded_operations: usize,
+    /// Structured warnings produced while applying the scenario.
+    pub warnings: Vec<Warning>,
+}
+
+impl ApplicationEnvelope {
+    /// Build an envelope from a report and mutated contexts.
+    ///
+    /// # Errors
+    ///
+    /// Returns a serialization error if the market or model cannot be encoded
+    /// as JSON.
+    pub fn from_contexts(
+        report: ApplicationReport,
+        market: &finstack_core::market_data::context::MarketContext,
+        model: Option<&finstack_statements::FinancialModelSpec>,
+    ) -> serde_json::Result<Self> {
+        Ok(Self {
+            market_json: serde_json::to_string(market)?,
+            model_json: model.map(serde_json::to_string).transpose()?,
+            operations_applied: report.operations_applied,
+            user_operations: report.user_operations,
+            expanded_operations: report.expanded_operations,
+            warnings: report.warnings,
+        })
+    }
+}
+
 /// Tracks a hierarchy-expanded operation with metadata needed for deduplication.
 struct HierarchyExpansion {
     /// Depth of the matched hierarchy node (deeper = more specific).

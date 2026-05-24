@@ -18,16 +18,9 @@ mod sensitivity;
 mod spec;
 pub(crate) mod types;
 
-use pyo3::exceptions::PyValueError;
+use crate::bindings::date_utils::parse_iso_date_py as parse_date;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
-
-/// Parse an ISO 8601 date string into a `time::Date`.
-fn parse_date(s: &str) -> PyResult<time::Date> {
-    let format = time::format_description::well_known::Iso8601::DEFAULT;
-    time::Date::parse(s, &format)
-        .map_err(|e| PyValueError::new_err(format!("Invalid date '{s}': {e}")))
-}
 
 /// Register the `portfolio` submodule on the parent module.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -152,12 +145,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_by_parent_name(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "portfolio",
-        "finstack.finstack",
+        crate::bindings::module_utils::ROOT_PACKAGE,
+        crate::bindings::module_utils::ParentNameSource::Name,
     )?;
 
     Ok(())

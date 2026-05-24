@@ -7,7 +7,7 @@ use finstack_core::currency::Currency;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::scalars::MarketScalar;
 use finstack_core::money::Money;
-use pyo3::exceptions::{PyTypeError, PyValueError};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
@@ -116,7 +116,7 @@ impl PyMarketContext {
     fn insert_price(&mut self, id: &str, value: f64, currency: Option<&str>) -> PyResult<()> {
         let scalar = if let Some(raw_currency) = currency {
             let currency = Currency::from_str(raw_currency).map_err(|err| {
-                PyValueError::new_err(format!("invalid currency '{raw_currency}': {err}"))
+                crate::errors::value_error(format!("invalid currency '{raw_currency}': {err}"))
             })?;
             MarketScalar::Price(Money::new(value, currency))
         } else {
@@ -219,15 +219,16 @@ impl PyMarketContext {
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         let ctx: MarketContext = serde_json::from_str(json)
-            .map_err(|e| PyValueError::new_err(format!("invalid MarketContext JSON: {e}")))?;
+            .map_err(|e| crate::errors::value_error(format!("invalid MarketContext JSON: {e}")))?;
         Ok(Self { inner: ctx })
     }
 
     /// Serialize this market context to pretty-printed JSON (round-trips with pricers).
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string_pretty(&self.inner)
-            .map_err(|e| PyValueError::new_err(format!("failed to serialize MarketContext: {e}")))
+        serde_json::to_string_pretty(&self.inner).map_err(|e| {
+            crate::errors::value_error(format!("failed to serialize MarketContext: {e}"))
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -254,12 +255,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, EXPORTS)?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "context",
         "finstack.core.market_data",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

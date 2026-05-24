@@ -37,7 +37,7 @@
 // allowance — keep the binding layer consistent.
 #![allow(clippy::result_large_err)]
 
-use crate::utils::to_js_err;
+use crate::utils::{structured_js_error, to_js_err};
 use finstack_valuations::calibration::api::engine::{self, ExecuteError};
 use finstack_valuations::calibration::api::errors::EnvelopeError;
 #[cfg(test)]
@@ -124,31 +124,14 @@ pub fn dependency_graph_json(envelope_json: &str) -> Result<String, JsValue> {
 /// lossy boundary conversion. This function is reached natively only at the
 /// thin `#[wasm_bindgen]` edge, which native tests do not assert through.
 fn envelope_error_to_js(err: &EnvelopeError) -> JsValue {
-    #[cfg(target_arch = "wasm32")]
-    {
-        use js_sys::{Error as JsError, Reflect, JSON};
-
-        let display = err.to_string();
-        let cause_json = err.to_json();
-
-        let js_err = JsError::new(&display);
-        js_err.set_name("CalibrationEnvelopeError");
-
-        // Attach structured cause as a JS object (parsed from JSON) when
-        // possible; fall back to the raw string if parsing fails.
-        let cause_value: JsValue = match JSON::parse(&cause_json) {
-            Ok(v) => v,
-            Err(_) => JsValue::from_str(&cause_json),
-        };
-        let _ = Reflect::set(&js_err, &JsValue::from_str("cause"), &cause_value);
-
-        js_err.into()
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        let _ = err;
-        JsValue::NULL
-    }
+    let display = err.to_string();
+    let cause_json = err.to_json();
+    structured_js_error(
+        "CalibrationEnvelopeError",
+        &display,
+        None,
+        Some(&cause_json),
+    )
 }
 
 /// Map an [`ExecuteError`] (returned by `engine::execute_with_diagnostics`)

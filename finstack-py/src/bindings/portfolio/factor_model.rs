@@ -19,7 +19,7 @@
 use std::collections::HashMap;
 
 use indexmap::IndexMap;
-use pyo3::exceptions::{PyKeyError, PyValueError};
+use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
 
@@ -50,7 +50,8 @@ fn to_position_ids(ids: Vec<String>) -> Vec<PositionId> {
 /// `core::Error::Validation` shape into a `PyValueError` so the same matrix
 /// validation diagnostics surface from both the Python and WASM bindings.
 fn flatten_square_matrix(matrix: Vec<Vec<f64>>, n: usize, label: &str) -> PyResult<Vec<f64>> {
-    fm::flatten_square_matrix(matrix, n, label).map_err(|e| PyValueError::new_err(e.to_string()))
+    fm::flatten_square_matrix(matrix, n, label)
+        .map_err(|e| crate::errors::value_error(e.to_string()))
 }
 
 /// Convert a Rust `DecompositionMethod` to a stable Python string.
@@ -1550,7 +1551,7 @@ impl PyVolHorizon {
     fn parse(_cls: &Bound<'_, PyType>, s: &str) -> PyResult<Self> {
         VolHorizon::parse(s)
             .map(Self::from_inner)
-            .map_err(PyValueError::new_err)
+            .map_err(crate::errors::value_error)
     }
 
     /// Variant label: ``"one_step"`` / ``"unconditional"`` / ``"n_steps"``.
@@ -1715,7 +1716,7 @@ fn historical_var_decomposition_typed(
 ) -> PyResult<PyPositionRiskDecomposition> {
     let n = position_ids.len();
     if position_pnls.len() != n {
-        return Err(PyValueError::new_err(format!(
+        return Err(crate::errors::value_error(format!(
             "position_pnls must have {n} rows (one per position), got {}",
             position_pnls.len()
         )));
@@ -1732,7 +1733,7 @@ fn historical_var_decomposition_typed(
     let n_scenarios = position_pnls[0].len();
     for (i, row) in position_pnls.iter().enumerate() {
         if row.len() != n_scenarios {
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "position_pnls row {i} has {} scenarios, expected {n_scenarios}",
                 row.len()
             )));
@@ -1770,13 +1771,13 @@ fn evaluate_risk_budget_typed(
 ) -> PyResult<PyRiskBudgetResult> {
     let n = position_ids.len();
     if actual_var.len() != n {
-        return Err(PyValueError::new_err(format!(
+        return Err(crate::errors::value_error(format!(
             "actual_var length ({}) must match position_ids length ({n})",
             actual_var.len()
         )));
     }
     if target_var_pct.len() != n {
-        return Err(PyValueError::new_err(format!(
+        return Err(crate::errors::value_error(format!(
             "target_var_pct length ({}) must match position_ids length ({n})",
             target_var_pct.len()
         )));

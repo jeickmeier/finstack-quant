@@ -5,7 +5,6 @@ use crate::bindings::core::dates::tenor::extract_tenor;
 use crate::bindings::core::dates::utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 use finstack_core::dates::{Schedule, ScheduleErrorPolicy, ScheduleSpec, StubKind};
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
 
@@ -64,7 +63,7 @@ impl PyStubKind {
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
         name.parse::<StubKind>()
             .map(Self::from_inner)
-            .map_err(PyValueError::new_err)
+            .map_err(crate::errors::value_error)
     }
 
     /// Hash based on discriminant.
@@ -252,7 +251,7 @@ impl PyScheduleBuilder {
         let s = py_to_date(start)?;
         let e = py_to_date(end)?;
         if s >= e {
-            return Err(PyValueError::new_err("start must be before end"));
+            return Err(crate::errors::value_error("start must be before end"));
         }
         Ok(Self {
             spec: ScheduleSpec {
@@ -329,7 +328,7 @@ impl PyScheduleBuilder {
                 .map(|w| w.to_string())
                 .collect::<Vec<_>>()
                 .join("; ");
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "schedule build produced warnings; Python bindings fail closed: {warnings}"
             )));
         }

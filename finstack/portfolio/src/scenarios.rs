@@ -11,6 +11,15 @@ use finstack_scenarios::spec::ScenarioSpec;
 use finstack_valuations::instruments::Instrument;
 use std::sync::Arc;
 
+/// JSON envelope returned by scenario-and-revalue binding surfaces.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ScenarioRevalueEnvelope {
+    /// Stressed portfolio valuation.
+    pub valuation: crate::valuation::PortfolioValuation,
+    /// Scenario application report.
+    pub report: ApplicationReport,
+}
+
 /// Apply a scenario to a portfolio.
 ///
 /// This function:
@@ -164,6 +173,22 @@ pub fn apply_and_revalue(
     )?;
 
     Ok((valuation, report))
+}
+
+/// Apply a scenario and return the canonical JSON envelope shape.
+///
+/// # Errors
+///
+/// Returns any scenario-application or valuation error raised by
+/// [`apply_and_revalue`].
+pub fn apply_and_revalue_envelope(
+    portfolio: &Portfolio,
+    scenario: &ScenarioSpec,
+    market: &MarketContext,
+    config: &finstack_core::config::FinstackConfig,
+) -> Result<ScenarioRevalueEnvelope> {
+    let (valuation, report) = apply_and_revalue(portfolio, scenario, market, config)?;
+    Ok(ScenarioRevalueEnvelope { valuation, report })
 }
 
 #[cfg(test)]

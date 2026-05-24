@@ -28,7 +28,6 @@ use finstack_scenarios::spec::{
 use finstack_statements::types::NodeId;
 use finstack_valuations::pricer::InstrumentType;
 use indexmap::IndexMap;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
@@ -38,12 +37,12 @@ use pyo3::types::PyType;
 
 fn parse_currency(code: &str) -> PyResult<Currency> {
     Currency::from_str(code)
-        .map_err(|e| PyValueError::new_err(format!("Invalid currency code {code:?}: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("Invalid currency code {code:?}: {e}")))
 }
 
 fn parse_instrument_type(name: &str) -> PyResult<InstrumentType> {
     InstrumentType::from_str(name)
-        .map_err(|e| PyValueError::new_err(format!("Invalid instrument type {name:?}: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("Invalid instrument type {name:?}: {e}")))
 }
 
 fn parse_instrument_types(names: Vec<String>) -> PyResult<Vec<InstrumentType>> {
@@ -60,7 +59,7 @@ fn parse_attrs(pairs: Vec<(String, String)>) -> IndexMap<String, String> {
 
 fn parse_hierarchy_target(json: &str) -> PyResult<HierarchyTarget> {
     serde_json::from_str(json)
-        .map_err(|e| PyValueError::new_err(format!("Invalid HierarchyTarget JSON: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("Invalid HierarchyTarget JSON: {e}")))
 }
 
 // ---------------------------------------------------------------------------
@@ -496,8 +495,9 @@ impl PyRateBindingSpec {
     /// Deserialize a `RateBindingSpec` from JSON.
     #[classmethod]
     fn from_json(_cls: &Bound<'_, PyType>, json: &str) -> PyResult<Self> {
-        let inner: RateBindingSpec = serde_json::from_str(json)
-            .map_err(|e| PyValueError::new_err(format!("Invalid RateBindingSpec JSON: {e}")))?;
+        let inner: RateBindingSpec = serde_json::from_str(json).map_err(|e| {
+            crate::errors::value_error(format!("Invalid RateBindingSpec JSON: {e}"))
+        })?;
         Ok(Self { inner })
     }
 
@@ -934,7 +934,7 @@ impl PyOperationSpec {
     #[classmethod]
     fn from_json(_cls: &Bound<'_, PyType>, json: &str) -> PyResult<Self> {
         let inner: OperationSpec = serde_json::from_str(json)
-            .map_err(|e| PyValueError::new_err(format!("Invalid OperationSpec JSON: {e}")))?;
+            .map_err(|e| crate::errors::value_error(format!("Invalid OperationSpec JSON: {e}")))?;
         Ok(Self { inner })
     }
 
@@ -946,7 +946,7 @@ impl PyOperationSpec {
             .get("kind")
             .and_then(|v| v.as_str())
             .map(str::to_string)
-            .ok_or_else(|| PyValueError::new_err("OperationSpec JSON missing 'kind' tag"))
+            .ok_or_else(|| crate::errors::value_error("OperationSpec JSON missing 'kind' tag"))
     }
 
     fn __repr__(&self) -> String {

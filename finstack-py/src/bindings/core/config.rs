@@ -301,12 +301,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, ["RoundingMode", "ToleranceConfig", "FinstackConfig"])?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "config",
         "finstack.core",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

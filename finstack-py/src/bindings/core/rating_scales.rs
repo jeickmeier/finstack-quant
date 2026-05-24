@@ -62,7 +62,7 @@ impl PyUnknownScalePolicy {
             "error" => Ok(Self::from_inner(UnknownScalePolicy::Error)),
             "fallback_to_default" => Ok(Self::from_inner(UnknownScalePolicy::FallbackToDefault)),
             "warn_and_fallback" => Ok(Self::from_inner(UnknownScalePolicy::WarnAndFallback)),
-            other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            other => Err(crate::errors::value_error(format!(
                 "unknown UnknownScalePolicy variant {other:?}"
             ))),
         }
@@ -413,12 +413,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "rating_scales",
         "finstack.core",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

@@ -12,7 +12,7 @@
 //! is therefore not wired in here; if a future getter exposes a raw `usize`
 //! across the boundary, route it through that guard first.
 
-use crate::utils::to_js_err;
+use crate::utils::{structured_js_error, to_js_err};
 use wasm_bindgen::prelude::*;
 
 /// Parameters for P&L attribution via [`attribute_pnl`].
@@ -32,7 +32,6 @@ pub struct AttributionParams {
 #[wasm_bindgen]
 impl AttributionParams {
     #[wasm_bindgen(constructor)]
-    #[wasm_bindgen(js_name = new)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         instrument_json: String,
@@ -71,33 +70,13 @@ impl AttributionParams {
 fn attribution_error_to_js(err: finstack_core::Error) -> JsValue {
     let message = err.to_string();
     let kind = error_variant_name(&err);
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        let js_err = js_sys::Error::new(&message);
-        js_err.set_name("AttributionError");
-
-        // Attach `kind` as an own property so JS clients can switch on it.
-        let _ = js_sys::Reflect::set(
-            &js_err,
-            &JsValue::from_str("kind"),
-            &JsValue::from_str(kind),
-        );
-
-        // Serialize the full structured error as `cause` (variant fields,
-        // including `category`, are preserved by the core Error derive).
-        if let Ok(json_str) = serde_json::to_string(&err) {
-            if let Ok(parsed) = js_sys::JSON::parse(&json_str) {
-                let _ = js_sys::Reflect::set(&js_err, &JsValue::from_str("cause"), &parsed);
-            }
-        }
-        js_err.into()
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        let _ = (message, kind);
-        JsValue::NULL
-    }
+    let cause_json = serde_json::to_string(&err).ok();
+    structured_js_error(
+        "AttributionError",
+        &message,
+        Some(kind),
+        cause_json.as_deref(),
+    )
 }
 
 /// Return the externally-tagged variant name for a `finstack_core::Error`.

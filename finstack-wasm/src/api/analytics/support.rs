@@ -1,7 +1,7 @@
 //! Shared helpers for the WASM `Performance`-centric analytics binding.
 
-pub(super) use crate::utils::parse_iso_date;
 use crate::utils::to_js_err;
+pub(super) use crate::utils::{parse_iso_date, parse_iso_dates};
 use js_sys::{Array, Float64Array};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;

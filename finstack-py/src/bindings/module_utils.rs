@@ -8,30 +8,38 @@
 //!    finstack.x.y` resolves correctly (matters for re-export shims, the
 //!    importlib machinery, and tools like `inspect.getmodule`).
 //!
-//! Two flavors are provided. They differ only in how the parent's qualified
-//! name is obtained — kept separate to preserve the historical behavior at
-//! each call site without changing observable semantics.
+//! Callers choose whether the parent's qualified path comes from `__package__`
+//! or `__name__`. That keeps historical behavior explicit while avoiding two
+//! near-identical registration helpers.
 
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use serde_json::Value;
 
+/// Canonical qualified name of the public Python package root.
+pub(crate) const ROOT_PACKAGE: &str = "finstack";
+
+/// Which parent attribute should be used to derive a child module's qualified
+/// dotted path.
+pub(crate) enum ParentNameSource {
+    /// Derive from `parent.__package__`.
+    Package,
+    /// Derive from `parent.__name__`.
+    Name,
+}
+
 /// Register `submodule` under `parent`, deriving the qualified path from the
-/// parent's `__package__` attribute and falling back to
-/// `parent_default_pkg` when the attribute is missing or unreadable.
-///
-/// Used by submodules nested several layers deep (e.g. `finstack.core.math`,
-/// `finstack.core.market_data`) where the parent already has a stable
-/// `__package__` set by its own `register`.
-pub(crate) fn register_submodule_by_package(
+/// selected parent attribute and falling back to `parent_default` when the
+/// attribute is missing or unreadable.
+pub(crate) fn register_submodule(
     py: Python<'_>,
     parent: &Bound<'_, PyModule>,
     submodule: &Bound<'_, PyModule>,
     submod_name: &str,
-    parent_default_pkg: &str,
+    parent_default: &str,
+    source: ParentNameSource,
 ) -> PyResult<()> {
-    let qual =
-        set_submodule_package_by_package(parent, submodule, submod_name, parent_default_pkg)?;
+    let qual = submodule_name(parent, submod_name, parent_default, source);
+    submodule.setattr("__package__", &qual)?;
     register_submodule_at(py, parent, submodule, &qual)
 }
 
@@ -47,31 +55,14 @@ pub(crate) fn set_submodule_package_by_package(
     submod_name: &str,
     parent_default_pkg: &str,
 ) -> PyResult<String> {
-    let qual = submodule_name_by_package(parent, submod_name, parent_default_pkg);
+    let qual = submodule_name(
+        parent,
+        submod_name,
+        parent_default_pkg,
+        ParentNameSource::Package,
+    );
     submodule.setattr("__package__", &qual)?;
     Ok(qual)
-}
-
-/// Register `submodule` under `parent`, deriving the qualified path from the
-/// parent's `__name__` attribute and falling back to `parent_default_name`
-/// when the attribute is missing or unreadable.
-///
-/// Used by top-level domain modules (e.g. `finstack.analytics`,
-/// `finstack.portfolio`) where parent is the root `finstack` module.
-pub(crate) fn register_submodule_by_parent_name(
-    py: Python<'_>,
-    parent: &Bound<'_, PyModule>,
-    submodule: &Bound<'_, PyModule>,
-    submod_name: &str,
-    parent_default_name: &str,
-) -> PyResult<()> {
-    let parent_name: String = parent
-        .getattr("__name__")
-        .ok()
-        .and_then(|v| v.extract::<String>().ok())
-        .unwrap_or_else(|| parent_default_name.to_string());
-    let qual = format!("{parent_name}.{submod_name}");
-    register_submodule_at(py, parent, submodule, &qual)
 }
 
 /// Attach `submodule` to `parent` and register it in `sys.modules` at `qual`.
@@ -88,17 +79,31 @@ pub(crate) fn register_submodule_at(
     Ok(())
 }
 
-fn submodule_name_by_package(
+fn submodule_name(
     parent: &Bound<'_, PyModule>,
     submod_name: &str,
-    parent_default_pkg: &str,
+    parent_default: &str,
+    source: ParentNameSource,
 ) -> String {
-    let pkg: String = parent
-        .getattr("__package__")
+    let parent_name = parent_qualified_name(parent, parent_default, source);
+    format!("{parent_name}.{submod_name}")
+}
+
+/// Derive a module's qualified parent path from the selected Python attribute.
+pub(crate) fn parent_qualified_name(
+    parent: &Bound<'_, PyModule>,
+    parent_default: &str,
+    source: ParentNameSource,
+) -> String {
+    let attr_name = match source {
+        ParentNameSource::Package => "__package__",
+        ParentNameSource::Name => "__name__",
+    };
+    parent
+        .getattr(attr_name)
         .ok()
         .and_then(|v| v.extract::<String>().ok())
-        .unwrap_or_else(|| parent_default_pkg.to_string());
-    format!("{pkg}.{submod_name}")
+        .unwrap_or_else(|| parent_default.to_string())
 }
 
 /// Convert a Python object (e.g. dict or string) to a `serde_json::Value`.
@@ -109,14 +114,14 @@ pub(crate) fn py_to_json_value<'py>(
 ) -> PyResult<Value> {
     if let Ok(json) = obj.extract::<String>() {
         return serde_json::from_str(&json)
-            .map_err(|e| PyValueError::new_err(format!("invalid {label} JSON: {e}")));
+            .map_err(|e| crate::errors::value_error(format!("invalid {label} JSON: {e}")));
     }
 
     let json_mod = py.import("json")?;
     let json: String = json_mod
         .call_method1("dumps", (obj,))
         .and_then(|value| value.extract())
-        .map_err(|e| PyValueError::new_err(format!("invalid {label}: {e}")))?;
+        .map_err(|e| crate::errors::value_error(format!("invalid {label}: {e}")))?;
     serde_json::from_str(&json)
-        .map_err(|e| PyValueError::new_err(format!("invalid {label} JSON: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("invalid {label} JSON: {e}")))
 }

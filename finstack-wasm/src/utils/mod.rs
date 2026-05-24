@@ -16,12 +16,42 @@ use wasm_bindgen::JsValue;
 /// errors let JS clients pattern-match on `err.name` and reliably read
 /// `err.message` rather than parsing ad-hoc strings.
 pub fn to_js_err(e: impl std::fmt::Display) -> JsValue {
-    js_value_from_message(display_error_message(e))
+    js_value_from_message(e.to_string())
 }
 
 /// Convert an error with a `source()` chain into a structured `JsValue` error.
 pub fn to_js_error(e: &dyn std::error::Error) -> JsValue {
-    js_value_from_message(js_error_message(e))
+    js_value_from_message(format_error_chain(e))
+}
+
+/// Build a named JS `Error` with optional structured `kind` and `cause`
+/// properties.
+pub fn structured_js_error(
+    name: &str,
+    message: &str,
+    kind: Option<&str>,
+    cause_json: Option<&str>,
+) -> JsValue {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let err = js_sys::Error::new(message);
+        err.set_name(name);
+        if let Some(kind) = kind {
+            let _ =
+                js_sys::Reflect::set(&err, &JsValue::from_str("kind"), &JsValue::from_str(kind));
+        }
+        if let Some(cause_json) = cause_json {
+            let cause_value =
+                js_sys::JSON::parse(cause_json).unwrap_or_else(|_| JsValue::from_str(cause_json));
+            let _ = js_sys::Reflect::set(&err, &JsValue::from_str("cause"), &cause_value);
+        }
+        err.into()
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let _ = (name, message, kind, cause_json);
+        JsValue::NULL
+    }
 }
 
 fn js_value_from_message(msg: String) -> JsValue {
@@ -36,10 +66,6 @@ fn js_value_from_message(msg: String) -> JsValue {
         let _ = msg;
         JsValue::NULL
     }
-}
-
-fn display_error_message(e: impl std::fmt::Display) -> String {
-    e.to_string()
 }
 
 /// Largest integer a JavaScript `number` (IEEE-754 double) can represent
@@ -72,10 +98,6 @@ pub fn check_js_safe_count(count: usize, label: &str) -> Result<(), JsValue> {
         )));
     }
     Ok(())
-}
-
-fn js_error_message(e: &dyn std::error::Error) -> String {
-    format_error_chain(e)
 }
 
 fn format_error_chain(err: &dyn std::error::Error) -> String {
@@ -129,24 +151,12 @@ mod tests {
     impl Error for Leaf {}
 
     #[test]
-    fn js_error_message_flattens_error_sources() {
+    fn format_error_chain_flattens_error_sources() {
         let err = Wrapper(Box::new(Leaf));
 
         assert_eq!(
-            js_error_message(&err),
+            format_error_chain(&err),
             "calibration failed: solver diverged after 1000 iterations"
-        );
-    }
-
-    #[test]
-    fn js_error_message_keeps_plain_string_callers_compatible() {
-        assert_eq!(
-            display_error_message("plain validation error"),
-            "plain validation error"
-        );
-        assert_eq!(
-            display_error_message(String::from("owned validation error")),
-            "owned validation error"
         );
     }
 

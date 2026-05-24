@@ -13,7 +13,6 @@ use finstack_margin::regulatory::{
     sa_ccr::{SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig, SaCcrTrade},
 };
 use finstack_margin::NettingSetId;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -30,7 +29,7 @@ fn parse_correlation_scenario(s: &str) -> PyResult<CorrelationScenario> {
         "low" => Ok(CorrelationScenario::Low),
         "medium" | "med" | "base" => Ok(CorrelationScenario::Medium),
         "high" => Ok(CorrelationScenario::High),
-        other => Err(PyValueError::new_err(format!(
+        other => Err(crate::errors::value_error(format!(
             "unknown FRTB correlation scenario '{other}' (expected 'low', 'medium', or 'high')"
         ))),
     }
@@ -67,7 +66,7 @@ fn parse_asset_class(s: &str) -> PyResult<SaCcrAssetClass> {
         "credit" | "cr" => Ok(SaCcrAssetClass::Credit),
         "equity" | "eq" => Ok(SaCcrAssetClass::Equity),
         "commodity" | "comm" | "co" => Ok(SaCcrAssetClass::Commodity),
-        other => Err(PyValueError::new_err(format!(
+        other => Err(crate::errors::value_error(format!(
             "unknown SA-CCR asset class '{other}' (expected ir/fx/credit/equity/commodity)"
         ))),
     }
@@ -75,9 +74,9 @@ fn parse_asset_class(s: &str) -> PyResult<SaCcrAssetClass> {
 
 fn parse_date(year: i32, month: u8, day: u8) -> PyResult<finstack_core::dates::Date> {
     let m = time::Month::try_from(month)
-        .map_err(|e| PyValueError::new_err(format!("invalid month: {e}")))?;
+        .map_err(|e| crate::errors::value_error(format!("invalid month: {e}")))?;
     finstack_core::dates::Date::from_calendar_date(year, m, day)
-        .map_err(|e| PyValueError::new_err(format!("invalid date: {e}")))
+        .map_err(|e| crate::errors::value_error(format!("invalid date: {e}")))
 }
 
 // ---------------------------------------------------------------------------

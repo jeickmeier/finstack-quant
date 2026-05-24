@@ -29,7 +29,7 @@ fn parse_stage(s: &str) -> PyResult<rust_ecl::Stage> {
         "stage1" | "1" | "s1" => Ok(rust_ecl::Stage::Stage1),
         "stage2" | "2" | "s2" => Ok(rust_ecl::Stage::Stage2),
         "stage3" | "3" | "s3" => Ok(rust_ecl::Stage::Stage3),
-        other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+        other => Err(crate::errors::value_error(format!(
             "unknown stage '{}' (expected one of: stage1/stage2/stage3 or 1/2/3)",
             other
         ))),

@@ -6,7 +6,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-use crate::bindings::valuations::credit_factor_model;
+mod credit;
 
 /// Register the `factor_model` Python domain.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -21,7 +21,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "__doc__",
         "Credit factor hierarchy artifacts, calibration, and decomposition.",
     )?;
-    credit_factor_model::register(py, &credit)?;
+    credit::register(py, &credit)?;
 
     let credit_all = PyList::new(
         py,
@@ -43,13 +43,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.setattr("__all__", all)?;
     parent.add_submodule(&m)?;
 
-    let parent_name: String = match parent.getattr("__name__") {
-        Ok(attr) => match attr.extract::<String>() {
-            Ok(s) => s,
-            Err(_) => "finstack.finstack".to_string(),
-        },
-        Err(_) => "finstack.finstack".to_string(),
-    };
+    let parent_name = crate::bindings::module_utils::parent_qualified_name(
+        parent,
+        crate::bindings::module_utils::ROOT_PACKAGE,
+        crate::bindings::module_utils::ParentNameSource::Name,
+    );
     let qual = format!("{parent_name}.factor_model");
     let credit_qual = format!("{qual}.credit");
     m.setattr("__package__", &qual)?;

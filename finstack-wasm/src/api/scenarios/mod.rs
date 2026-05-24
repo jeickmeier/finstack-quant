@@ -3,7 +3,7 @@
 //! Exposes scenario specification parsing, validation, composition,
 //! and built-in template access via JSON round-trip functions.
 
-use crate::utils::to_js_err;
+use crate::utils::{parse_iso_date, to_js_err};
 use std::sync::OnceLock;
 use wasm_bindgen::prelude::*;
 
@@ -16,11 +16,6 @@ fn builtin_registry() -> Result<&'static finstack_scenarios::TemplateRegistry, J
         finstack_scenarios::TemplateRegistry::with_embedded_builtins().map_err(|e| e.to_string())
     });
     stored.as_ref().map_err(to_js_err)
-}
-
-fn parse_date(as_of: &str) -> Result<time::Date, JsValue> {
-    let format = time::format_description::well_known::Iso8601::DEFAULT;
-    time::Date::parse(as_of, &format).map_err(to_js_err)
 }
 
 fn to_json_string<T: serde::Serialize>(value: &T) -> Result<String, JsValue> {
@@ -194,17 +189,10 @@ pub fn apply_scenario(
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let mut model: finstack_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
-    let date = parse_date(as_of)?;
+    let date = parse_iso_date(as_of)?;
     let report = apply_with_context(&spec, &mut market, Some(&mut model), date)?;
-
-    let out = serde_json::json!({
-        "market_json": to_json_string(&market)?,
-        "model_json": to_json_string(&model)?,
-        "operations_applied": report.operations_applied,
-        "user_operations": report.user_operations,
-        "expanded_operations": report.expanded_operations,
-        "warnings": report.warnings,
-    });
+    let out = finstack_scenarios::ApplicationEnvelope::from_contexts(report, &market, Some(&model))
+        .map_err(to_js_err)?;
     serde_wasm_bindgen::to_value(&out).map_err(to_js_err)
 }
 
@@ -219,16 +207,10 @@ pub fn apply_scenario_to_market(
         serde_json::from_str(scenario_json).map_err(to_js_err)?;
     let mut market: finstack_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
-    let date = parse_date(as_of)?;
+    let date = parse_iso_date(as_of)?;
     let report = apply_with_context(&spec, &mut market, None, date)?;
-
-    let out = serde_json::json!({
-        "market_json": to_json_string(&market)?,
-        "operations_applied": report.operations_applied,
-        "user_operations": report.user_operations,
-        "expanded_operations": report.expanded_operations,
-        "warnings": report.warnings,
-    });
+    let out = finstack_scenarios::ApplicationEnvelope::from_contexts(report, &market, None)
+        .map_err(to_js_err)?;
     serde_wasm_bindgen::to_value(&out).map_err(to_js_err)
 }
 
@@ -271,7 +253,7 @@ pub fn compute_horizon_return(
         serde_json::from_str(market_json).map_err(to_js_err)?;
 
     // Parse date
-    let date = parse_date(as_of)?;
+    let date = parse_iso_date(as_of)?;
 
     // Parse scenario
     let scenario: finstack_scenarios::ScenarioSpec =

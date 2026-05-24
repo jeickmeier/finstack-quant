@@ -9,7 +9,6 @@ use finstack_valuations::pricer::{
     pretty_instrument_json, price_instrument_json, price_instrument_json_with_metrics,
     validate_instrument_json,
 };
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
@@ -22,7 +21,7 @@ pub(super) fn build_from_py(
     constructor_error: &str,
 ) -> PyResult<String> {
     if spec.is_some() && kwargs.is_some_and(|d| !d.is_empty()) {
-        return Err(PyValueError::new_err(
+        return Err(crate::errors::value_error(
             "pass either a spec object/JSON or keyword fields, not both",
         ));
     }
@@ -32,7 +31,7 @@ pub(super) fn build_from_py(
     } else if let Some(kwargs) = kwargs {
         py_to_json_value(py, kwargs.as_any(), spec_label)?
     } else {
-        return Err(PyValueError::new_err(constructor_error.to_string()));
+        return Err(crate::errors::value_error(constructor_error.to_string()));
     };
     canonical_instrument_json(type_tag, value).map_err(display_to_py)
 }

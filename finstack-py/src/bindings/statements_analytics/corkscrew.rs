@@ -42,7 +42,7 @@ impl PyAccountType {
             "asset" => Ok(PyAccountType::Asset),
             "liability" => Ok(PyAccountType::Liability),
             "equity" => Ok(PyAccountType::Equity),
-            other => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            other => Err(crate::errors::value_error(format!(
                 "unknown account type '{}' (expected asset / liability / equity)",
                 other
             ))),

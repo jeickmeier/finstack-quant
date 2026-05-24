@@ -22,7 +22,6 @@ use finstack_valuations::models::closed_form::{
     floating_strike_lookback_call, floating_strike_lookback_put, geometric_asian_call,
     geometric_asian_put, quanto_call, quanto_put, up_in_call, up_out_call, BsGreeks,
 };
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -46,7 +45,7 @@ fn finite_price(value: f64, what: &str) -> PyResult<f64> {
     if value.is_finite() {
         Ok(value)
     } else {
-        Err(PyValueError::new_err(format!(
+        Err(crate::errors::value_error(format!(
             "{what} is not finite ({value}); check inputs (volatility, time \
              to expiry, spot, strike) are in the model's valid domain"
         )))
@@ -277,7 +276,7 @@ fn barrier_call_wrapper(
         ("down", "in") => down_in_call(spot, strike, barrier, t, r, q, sigma),
         ("down", "out") => down_out_call(spot, strike, barrier, t, r, q, sigma),
         _ => {
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "unknown barrier spec: direction='{direction}' knock='{knock}'; \
                  expected direction in {{'up','down'}} and knock in {{'in','out'}}"
             )))
@@ -318,7 +317,7 @@ fn asian_option_wrapper(
         ("geometric", true) => geometric_asian_call(spot, strike, t, r, q, sigma, num_fixings),
         ("geometric", false) => geometric_asian_put(spot, strike, t, r, q, sigma, num_fixings),
         _ => {
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "unknown averaging '{averaging}'; expected 'arithmetic' or 'geometric'"
             )))
         }
@@ -359,7 +358,7 @@ fn lookback_option_wrapper(
         ("floating", true) => floating_strike_lookback_call(spot, t, r, q, sigma, extremum),
         ("floating", false) => floating_strike_lookback_put(spot, t, r, q, sigma, extremum),
         _ => {
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "unknown strike_type '{strike_type}'; expected 'fixed' or 'floating'"
             )))
         }

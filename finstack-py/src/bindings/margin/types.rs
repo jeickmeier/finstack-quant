@@ -2,7 +2,6 @@
 
 use crate::errors::{core_to_py, display_to_py};
 use finstack_margin as fm;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 // ---------------------------------------------------------------------------
@@ -66,7 +65,9 @@ impl PyImMethodology {
     /// Parse from a string (e.g. ``"simm"``, ``"schedule"``).
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::ImMethodology = s.parse().map_err(|e: String| PyValueError::new_err(e))?;
+        let inner: fm::ImMethodology = s
+            .parse()
+            .map_err(|e: String| crate::errors::value_error(e))?;
         Ok(Self { inner })
     }
 
@@ -132,7 +133,9 @@ impl PyMarginTenor {
     /// Parse from string.
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::MarginTenor = s.parse().map_err(|e: String| PyValueError::new_err(e))?;
+        let inner: fm::MarginTenor = s
+            .parse()
+            .map_err(|e: String| crate::errors::value_error(e))?;
         Ok(Self { inner })
     }
 
@@ -343,7 +346,7 @@ impl PyCollateralAssetClass {
     /// Parse from string.
     #[staticmethod]
     fn from_str(s: &str) -> PyResult<Self> {
-        let inner: fm::CollateralAssetClass = s.parse().map_err(PyValueError::new_err)?;
+        let inner: fm::CollateralAssetClass = s.parse().map_err(crate::errors::value_error)?;
         Ok(Self { inner })
     }
 

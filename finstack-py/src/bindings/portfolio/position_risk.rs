@@ -14,7 +14,6 @@ use finstack_portfolio::factor_model::{
 };
 use finstack_portfolio::types::PositionId;
 use indexmap::IndexMap;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -26,7 +25,8 @@ use pyo3::types::{PyDict, PyList};
 /// `core::Error::Validation` shape into a `PyValueError` so the same matrix
 /// validation diagnostics surface from both the Python and WASM bindings.
 fn flatten_square_matrix(matrix: Vec<Vec<f64>>, n: usize, label: &str) -> PyResult<Vec<f64>> {
-    core_flatten_square_matrix(matrix, n, label).map_err(|e| PyValueError::new_err(e.to_string()))
+    core_flatten_square_matrix(matrix, n, label)
+        .map_err(|e| crate::errors::value_error(e.to_string()))
 }
 
 /// Convert `Vec<String>` position ids to the Rust newtype.
@@ -212,7 +212,7 @@ fn historical_var_decomposition<'py>(
 ) -> PyResult<Bound<'py, PyDict>> {
     let n = position_ids.len();
     if position_pnls.len() != n {
-        return Err(PyValueError::new_err(format!(
+        return Err(crate::errors::value_error(format!(
             "position_pnls must have {n} rows (one per position), got {}",
             position_pnls.len()
         )));
@@ -229,7 +229,7 @@ fn historical_var_decomposition<'py>(
     let n_scenarios = position_pnls[0].len();
     for (i, row) in position_pnls.iter().enumerate() {
         if row.len() != n_scenarios {
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "position_pnls row {i} has {} scenarios, expected {n_scenarios}",
                 row.len()
             )));
@@ -297,13 +297,13 @@ fn evaluate_risk_budget<'py>(
 ) -> PyResult<Bound<'py, PyDict>> {
     let n = position_ids.len();
     if actual_var.len() != n {
-        return Err(PyValueError::new_err(format!(
+        return Err(crate::errors::value_error(format!(
             "actual_var length ({}) must match position_ids length ({n})",
             actual_var.len()
         )));
     }
     if target_var_pct.len() != n {
-        return Err(PyValueError::new_err(format!(
+        return Err(crate::errors::value_error(format!(
             "target_var_pct length ({}) must match position_ids length ({n})",
             target_var_pct.len()
         )));

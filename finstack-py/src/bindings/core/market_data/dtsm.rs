@@ -8,7 +8,6 @@
 //! - PCA-based scenario generation (N-sigma shocks along principal components).
 
 use finstack_core::market_data::dtsm::{DieboldLi, YieldPanel, YieldPca};
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
 
@@ -54,7 +53,7 @@ fn diebold_li_fit_factors<'py>(
 
     let fts = model
         .factors()
-        .ok_or_else(|| PyValueError::new_err("factor extraction produced no factors"))?;
+        .ok_or_else(|| crate::errors::value_error("factor extraction produced no factors"))?;
     let t = fts.factors.nrows();
 
     let mut beta1 = Vec::with_capacity(t);
@@ -172,7 +171,7 @@ fn yield_pca_fit<'py>(
     let pca = YieldPca::fit_yield_changes(yield_changes).map_err(core_to_py)?;
     let n = pca.tenors().len();
     if n_components == 0 || n_components > pca.num_components() {
-        return Err(PyValueError::new_err(format!(
+        return Err(crate::errors::value_error(format!(
             "n_components must be in [1, {}], got {n_components}",
             pca.num_components()
         )));
@@ -291,12 +290,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_by_package(
+    crate::bindings::module_utils::register_submodule(
         py,
         parent,
         &m,
         "dtsm",
         "finstack.core.market_data",
+        crate::bindings::module_utils::ParentNameSource::Package,
     )?;
 
     Ok(())

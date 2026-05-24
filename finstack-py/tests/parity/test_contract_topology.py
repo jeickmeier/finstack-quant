@@ -180,8 +180,17 @@ def test_contract_symbols_match_live_surface(crate_name: str, crate: dict[str, A
     a contract entry that no longer exists in Python.
     """
     expected = set(crate["symbols"]["public"])
+    expected_all = expected | {
+        spec["python"].rsplit(".", 1)[-1] for spec in crate.get("modules", {}).values() if spec["status"] == "exists"
+    }
     module = importlib.import_module(crate["python_package"])
+    module_all = set(getattr(module, "__all__", []))
     actual = {n for n in dir(module) if not n.startswith("_") and not inspect.ismodule(getattr(module, n))}
+    assert module_all == expected_all, (
+        f"finstack.{crate_name} __all__ diverged from contract.\n"
+        f"  missing from __all__: {sorted(expected_all - module_all)}\n"
+        f"  unlisted in contract: {sorted(module_all - expected_all)}"
+    )
     assert actual == expected, (
         f"finstack.{crate_name} public surface diverged from contract.\n"
         f"  missing from Python: {sorted(expected - actual)}\n"

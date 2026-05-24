@@ -6,7 +6,6 @@ use crate::errors::core_to_py;
 use finstack_core::dates::{
     CalendarRegistry, DayCount, DayCountContext, DayCountContextState, Tenor, Thirty360Convention,
 };
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
 
@@ -80,7 +79,7 @@ impl PyDayCount {
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
         name.parse::<DayCount>()
             .map(Self::from_inner)
-            .map_err(PyValueError::new_err)
+            .map_err(crate::errors::value_error)
     }
 
     /// Compute the year fraction between two dates under this convention.

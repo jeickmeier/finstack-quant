@@ -6,7 +6,6 @@
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{display_to_py, serde_json_to_py};
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -108,7 +107,7 @@ impl PySensitivityMatrix {
     /// float
     fn delta(&self, position_idx: usize, factor_idx: usize) -> PyResult<f64> {
         if position_idx >= self.position_ids.len() || factor_idx >= self.n_factors {
-            return Err(PyValueError::new_err("index out of bounds"));
+            return Err(crate::errors::value_error("index out of bounds"));
         }
         Ok(self.data[position_idx * self.n_factors + factor_idx])
     }
@@ -116,7 +115,7 @@ impl PySensitivityMatrix {
     /// Sensitivity row for a single position across all factors.
     fn position_deltas(&self, position_idx: usize) -> PyResult<Vec<f64>> {
         if position_idx >= self.position_ids.len() {
-            return Err(PyValueError::new_err("position index out of bounds"));
+            return Err(crate::errors::value_error("position index out of bounds"));
         }
         let start = position_idx * self.n_factors;
         Ok(self.data[start..start + self.n_factors].to_vec())
@@ -125,7 +124,7 @@ impl PySensitivityMatrix {
     /// Sensitivity column for a single factor across all positions.
     fn factor_deltas(&self, factor_idx: usize) -> PyResult<Vec<f64>> {
         if factor_idx >= self.n_factors {
-            return Err(PyValueError::new_err("factor index out of bounds"));
+            return Err(crate::errors::value_error("factor index out of bounds"));
         }
         Ok((0..self.position_ids.len())
             .map(|pos| self.data[pos * self.n_factors + factor_idx])
@@ -226,7 +225,7 @@ impl PyFactorPnlProfile {
     ) -> PyResult<Bound<'py, PyAny>> {
         let expected_width = self.position_pnls.first().map_or(0, Vec::len);
         if position_ids.len() != expected_width {
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "position_ids length ({}) does not match profile width ({})",
                 position_ids.len(),
                 expected_width,
@@ -592,7 +591,7 @@ fn decompose_factor_risk(
         .collect();
 
     if sensitivities.n_factors == 0 {
-        return Err(PyValueError::new_err(
+        return Err(crate::errors::value_error(
             "sensitivity matrix has no factors; decomposition requires at least one factor",
         ));
     }

@@ -5,19 +5,10 @@
 //! [`PyFactorCovarianceForecast`] which wraps the vol-forecast engine from
 //! `finstack-portfolio`.
 
+use crate::bindings::date_utils::parse_iso_date_py as parse_date;
 use crate::errors::display_to_py;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/// Parse an ISO 8601 date string.
-fn parse_date(s: &str) -> PyResult<finstack_core::dates::Date> {
-    finstack_core::dates::parse_iso_date(s).map_err(display_to_py)
-}
 
 // ---------------------------------------------------------------------------
 // PyCreditFactorModel
@@ -307,7 +298,7 @@ impl PyLevelsAtDate {
         level_index: usize,
     ) -> PyResult<Bound<'py, PyDict>> {
         let lev = self.inner.by_level.get(level_index).ok_or_else(|| {
-            PyValueError::new_err(format!(
+            crate::errors::value_error(format!(
                 "level_index {} out of range (n_levels={})",
                 level_index,
                 self.inner.by_level.len()
@@ -424,7 +415,7 @@ impl PyPeriodDecomposition {
         level_index: usize,
     ) -> PyResult<Bound<'py, PyDict>> {
         let lev = self.inner.by_level.get(level_index).ok_or_else(|| {
-            PyValueError::new_err(format!(
+            crate::errors::value_error(format!(
                 "level_index {} out of range (n_levels={})",
                 level_index,
                 self.inner.by_level.len()
@@ -603,7 +594,7 @@ pub(crate) struct PyFactorCovarianceForecast {
 /// Delegates to the canonical [`VolHorizon::parse`] implementation in
 /// `finstack-portfolio`; this wrapper only maps the error to `PyValueError`.
 fn parse_vol_horizon(s: &str) -> PyResult<finstack_portfolio::factor_model::VolHorizon> {
-    finstack_portfolio::factor_model::VolHorizon::parse(s).map_err(PyValueError::new_err)
+    finstack_portfolio::factor_model::VolHorizon::parse(s).map_err(crate::errors::value_error)
 }
 
 #[pymethods]

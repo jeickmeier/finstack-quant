@@ -5,7 +5,6 @@ use crate::errors::core_to_py;
 use finstack_core::dates::{
     adjust, BusinessDayConvention, CalendarMetadata, CalendarRegistry, HolidayCalendar, WeekendRule,
 };
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
 
@@ -74,7 +73,7 @@ impl PyBusinessDayConvention {
     fn from_name(_cls: &Bound<'_, PyType>, name: &str) -> PyResult<Self> {
         name.parse::<BusinessDayConvention>()
             .map(Self::from_inner)
-            .map_err(PyValueError::new_err)
+            .map_err(crate::errors::value_error)
     }
 
     /// Hash based on discriminant.
@@ -107,9 +106,9 @@ pub(crate) fn extract_bdc(obj: &Bound<'_, PyAny>) -> PyResult<BusinessDayConvent
     if let Ok(s) = obj.extract::<String>() {
         return s
             .parse::<BusinessDayConvention>()
-            .map_err(PyValueError::new_err);
+            .map_err(crate::errors::value_error);
     }
-    Err(PyValueError::new_err(
+    Err(crate::errors::value_error(
         "expected BusinessDayConvention or str",
     ))
 }
@@ -198,7 +197,7 @@ impl PyHolidayCalendar {
     fn new(code: &str) -> PyResult<Self> {
         let registry = CalendarRegistry::global();
         if registry.resolve_str(code).is_none() {
-            return Err(PyValueError::new_err(format!(
+            return Err(crate::errors::value_error(format!(
                 "unknown calendar code: {code:?}"
             )));
         }
@@ -250,7 +249,9 @@ impl PyHolidayCalendar {
     fn resolve(&self) -> PyResult<&'static dyn HolidayCalendar> {
         CalendarRegistry::global()
             .resolve_str(&self.code)
-            .ok_or_else(|| PyValueError::new_err(format!("calendar not found: {:?}", self.code)))
+            .ok_or_else(|| {
+                crate::errors::value_error(format!("calendar not found: {:?}", self.code))
+            })
     }
 }
 
@@ -277,9 +278,9 @@ fn py_adjust<'py>(
         } else if let Ok(code) = calendar.extract::<String>() {
             CalendarRegistry::global()
                 .resolve_str(&code)
-                .ok_or_else(|| PyValueError::new_err(format!("unknown calendar: {code:?}")))?
+                .ok_or_else(|| crate::errors::value_error(format!("unknown calendar: {code:?}")))?
         } else {
-            return Err(PyValueError::new_err(
+            return Err(crate::errors::value_error(
                 "expected HolidayCalendar or str calendar code",
             ));
         };
