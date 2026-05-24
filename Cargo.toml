@@ -4,7 +4,7 @@ edition = "2021"
 rust-version = "1.90"
 authors = ["Jon Eickmeier (me@jeickmeier.com)"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/rustfin/rfin"
+repository = "https://github.com/jeickmeier/finstack"
 
 [workspace]
 members = [

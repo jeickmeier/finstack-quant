@@ -128,8 +128,8 @@ mise install
 ### Quick Start
 
 ```bash
-git clone https://github.com/rustfin/rfin.git
-cd rfin
+git clone https://github.com/jeickmeier/finstack.git
+cd finstack
 mise install
 
 mise run rust-build

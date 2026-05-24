@@ -46,11 +46,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/rustfin/rfin"
+    "url": "https://github.com/jeickmeier/finstack"
   },
-  "homepage": "https://github.com/rustfin/rfin#readme",
+  "homepage": "https://github.com/jeickmeier/finstack#readme",
   "bugs": {
-    "url": "https://github.com/rustfin/rfin/issues"
+    "url": "https://github.com/jeickmeier/finstack/issues"
   },
   "keywords": [
     "wasm",
