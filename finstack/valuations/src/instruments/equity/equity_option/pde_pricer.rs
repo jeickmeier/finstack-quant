@@ -8,7 +8,7 @@ use crate::instruments::equity::equity_option::pricer::collect_inputs_extended;
 use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::instruments::ExerciseStyle;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::Date;
@@ -45,7 +45,7 @@ impl EquityOptionPdePricer {
         inst: &EquityOption,
         market: &MarketContext,
         as_of: Date,
-    ) -> Result<Money, PricingError> {
+    ) -> std::result::Result<Money, PricingError> {
         let inputs = collect_inputs_extended(inst, market, as_of).map_err(|e| {
             PricingError::model_failure_with_context(
                 e.to_string(),
@@ -160,7 +160,7 @@ impl Pricer for EquityOptionPdePricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let equity_option = instrument
             .as_any()
             .downcast_ref::<EquityOption>()

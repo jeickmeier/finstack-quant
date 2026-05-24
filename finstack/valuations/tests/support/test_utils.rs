@@ -14,7 +14,7 @@ use finstack_core::{
 use rust_decimal::Decimal;
 use time::Month;
 
-use finstack_valuations::instruments::CurveIdVec;
+use smallvec::SmallVec;
 use finstack_valuations::instruments::{EquityUnderlyingParams, FixedLegSpec, FloatLegSpec, FxUnderlyingParams};
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::instruments::credit_derivatives::cds::{
@@ -102,7 +102,7 @@ pub fn usd_irs_swap(
 pub struct TestInstrument {
     id: String,
     value: Money,
-    discount_curves: CurveIdVec,
+    discount_curves: SmallVec<[CurveId; 2]>,
 }
 
 impl TestInstrument {
@@ -110,7 +110,7 @@ impl TestInstrument {
         Self {
             id: id.to_string(),
             value,
-            discount_curves: CurveIdVec::new(),
+            discount_curves: SmallVec::<[CurveId; 2]>::new(),
         }
     }
 

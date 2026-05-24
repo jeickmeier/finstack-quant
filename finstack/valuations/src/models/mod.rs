@@ -44,8 +44,8 @@ pub use pde::{
 pub use trees::{
     short_rate_keys, single_factor_equity_state, state_keys, two_factor_equity_rates_state,
     BarrierSpec, BarrierStyle, BinomialTree, EvolutionParams, HullWhiteTree, HullWhiteTreeConfig,
-    NodeState, ShortRateModel, ShortRateTree, ShortRateTreeConfig, StateVariables, TreeBranching,
-    TreeCompounding, TreeGreeks, TreeModel, TreeParameters, TreeType, TreeValuator,
+    NodeState, ShortRateModel, ShortRateTree, ShortRateTreeConfig, TreeBranching, TreeCompounding,
+    TreeGreeks, TreeModel, TreeParameters, TreeType, TreeValuator,
 };
 pub(crate) use volatility::vega_weight;
 #[allow(unused_imports)]

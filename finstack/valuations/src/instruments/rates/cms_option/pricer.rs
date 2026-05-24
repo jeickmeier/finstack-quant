@@ -36,7 +36,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_option::types::CmsOption;
 use crate::models::d1_d2_black76;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DateExt, DayCountContext};
@@ -266,7 +266,7 @@ impl Pricer for CmsOptionPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let cms = instrument
             .as_any()
             .downcast_ref::<CmsOption>()

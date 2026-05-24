@@ -38,8 +38,8 @@ pub use error::{FactorModelError, UnmatchedPolicy};
 pub use finstack_core::{Error, InputError, Result};
 pub use matching::{
     bucket_factor_id, AttributeFilter, CascadeMatcher, CreditHierarchicalConfig, DependencyFilter,
-    FactorMatchEntry, FactorMatchError, FactorMatchResult, FactorMatcher, FactorNode,
-    HierarchicalConfig, HierarchicalMatcher, MappingRule, MappingTableMatcher, MatchingConfig,
+    FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode, HierarchicalConfig,
+    HierarchicalMatcher, MappingRule, MappingTableMatcher, MatchingConfig,
     CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
 };
 pub use primitives::{

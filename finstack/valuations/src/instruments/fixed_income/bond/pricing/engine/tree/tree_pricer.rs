@@ -5,12 +5,11 @@ use crate::instruments::pricing_overrides::OasPriceBasis;
 use crate::models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
 use crate::models::trees::short_rate_tree::CalibrationResult;
 use crate::models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
-use crate::models::{
-    short_rate_keys, ShortRateTree, ShortRateTreeConfig, StateVariables, TreeModel,
-};
+use crate::models::{short_rate_keys, ShortRateTree, ShortRateTreeConfig, TreeModel};
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::solver::{BrentSolver, Solver};
+use finstack_core::HashMap;
 use finstack_core::{Error, Result};
 
 /// Tree-based pricer for bonds with embedded options and OAS calculations.
@@ -229,7 +228,7 @@ impl TreePricer {
             };
             let mut tree = RatesCreditTree::new(cfg);
             tree.calibrate(discount_curve.as_ref(), hc.as_ref(), time_to_maturity)?;
-            let mut vars = StateVariables::default();
+            let mut vars = HashMap::<&'static str, f64>::default();
             vars.insert("oas", continuous_oas_bp);
             return tree.price(vars, time_to_maturity, market_context, &valuator);
         }
@@ -288,7 +287,7 @@ impl TreePricer {
                     time_to_maturity,
                 )?;
                 validate_bdt_calibration_quality(tree.calibration_result())?;
-                let mut vars = StateVariables::default();
+                let mut vars = HashMap::<&'static str, f64>::default();
                 vars.insert(short_rate_keys::SHORT_RATE, tree.rate_at_node(0, 0)?);
                 vars.insert(short_rate_keys::OAS, continuous_oas_bp);
                 tree.price(vars, time_to_maturity, market_context, &valuator)
@@ -306,7 +305,7 @@ impl TreePricer {
                     discount_curve.as_ref(),
                     time_to_maturity,
                 )?;
-                let mut vars = StateVariables::default();
+                let mut vars = HashMap::<&'static str, f64>::default();
                 vars.insert(short_rate_keys::SHORT_RATE, tree.rate_at_node(0, 0)?);
                 vars.insert(short_rate_keys::OAS, continuous_oas_bp);
                 tree.price(vars, time_to_maturity, market_context, &valuator)
@@ -542,7 +541,7 @@ impl TreePricer {
 
         let objective_fn = |oas: f64| -> f64 {
             if use_rates_credit {
-                let mut vars = StateVariables::default();
+                let mut vars = HashMap::<&'static str, f64>::default();
                 vars.insert("oas", oas);
                 if let Some(tree) = rc_tree.as_ref() {
                     match tree.price(vars, time_to_maturity, market_context, &valuator) {
@@ -557,7 +556,7 @@ impl TreePricer {
                 let model_price = valuator.price_with_hw_tree(tree, oas);
                 model_price - dirty_target
             } else {
-                let mut vars = StateVariables::default();
+                let mut vars = HashMap::<&'static str, f64>::default();
                 vars.insert(short_rate_keys::SHORT_RATE, initial_rate);
                 vars.insert(short_rate_keys::OAS, oas);
                 if let Some(tree) = sr_tree.as_ref() {

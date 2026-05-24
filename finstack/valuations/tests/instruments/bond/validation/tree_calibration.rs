@@ -9,10 +9,11 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
+use finstack_core::HashMap;
 use finstack_valuations::instruments::fixed_income::bond::Bond;
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::models::{
-    NodeState, ShortRateTree, ShortRateTreeConfig, StateVariables, TreeModel, TreeValuator,
+    NodeState, ShortRateTree, ShortRateTreeConfig, TreeModel, TreeValuator,
 };
 use time::macros::date;
 
@@ -77,7 +78,12 @@ fn test_tree_calibrates_to_curve() {
     for &t in &test_times {
         let expected_df = (-rate * t).exp();
         let tree_df = tree
-            .price(StateVariables::default(), t, &market, &valuator)
+            .price(
+                HashMap::<&'static str, f64>::default(),
+                t,
+                &market,
+                &valuator,
+            )
             .unwrap();
 
         assert!(
@@ -334,10 +340,20 @@ fn test_mean_reversion_none_matches_ho_lee() {
 
     for &t in &[1.0, 3.0, 5.0] {
         let pv_hl = tree_hl
-            .price(StateVariables::default(), t, &market, &valuator)
+            .price(
+                HashMap::<&'static str, f64>::default(),
+                t,
+                &market,
+                &valuator,
+            )
             .unwrap();
         let pv_hw = tree_hw
-            .price(StateVariables::default(), t, &market, &valuator)
+            .price(
+                HashMap::<&'static str, f64>::default(),
+                t,
+                &market,
+                &valuator,
+            )
             .unwrap();
 
         assert!(

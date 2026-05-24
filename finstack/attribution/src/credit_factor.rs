@@ -70,12 +70,6 @@ impl Default for CreditFactorDetailOptions {
     }
 }
 
-/// Reference to a [`CreditFactorModel`] inside an [`crate::AttributionSpec`].
-///
-/// The model artifact is embedded inline; boxing keeps `AttributionSpec` small
-/// on the stack — `CreditFactorModel` is large.
-pub type CreditFactorModelRef = Box<CreditFactorModel>;
-
 /// Per-position input to [`compute_credit_factor_attribution`].
 ///
 /// `cs01` is signed money (typical convention: long credit risk → negative

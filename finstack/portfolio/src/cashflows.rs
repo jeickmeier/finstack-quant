@@ -25,7 +25,7 @@ use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
-use finstack_valuations::instruments::DynInstrument;
+use finstack_valuations::instruments::Instrument;
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
@@ -185,7 +185,7 @@ pub struct PortfolioCashflows {
 
 /// Build the canonical signed schedule for a single instrument.
 fn instrument_cashflow_schedule(
-    instrument: &DynInstrument,
+    instrument: &dyn Instrument,
     market: &MarketContext,
     as_of: Date,
 ) -> std::result::Result<CashFlowSchedule, finstack_core::Error> {

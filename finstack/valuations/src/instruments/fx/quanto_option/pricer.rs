@@ -7,7 +7,7 @@
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::quanto_option::types::QuantoOption;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
@@ -119,7 +119,7 @@ impl Pricer for QuantoOptionAnalyticalPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let quanto = instrument
             .as_any()
             .downcast_ref::<QuantoOption>()

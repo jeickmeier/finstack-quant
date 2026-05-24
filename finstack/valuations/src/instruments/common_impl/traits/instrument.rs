@@ -10,7 +10,7 @@ use finstack_core::types::Attributes;
 use finstack_core::{currency::Currency, dates::Date, money::Money, types::CurveId};
 use std::any::Any;
 
-use super::pricing_options::{DynInstrument, PricingOptions};
+use super::pricing_options::PricingOptions;
 
 /// Unified instrument trait combining identity, attributes, and pricing.
 ///
@@ -412,7 +412,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// # Ok(())
     /// # }
     /// ```
-    fn clone_box(&self) -> Box<DynInstrument>;
+    fn clone_box(&self) -> Box<dyn Instrument>;
 
     /// Returns a normalized instrument for computing spread/yield metrics.
     ///
@@ -430,7 +430,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// This method affects spread- and yield-style metrics only. It should not be
     /// used to change the economic basis of PV itself or unrelated risk measures.
-    fn metrics_equivalent(&self) -> Box<DynInstrument> {
+    fn metrics_equivalent(&self) -> Box<dyn Instrument> {
         self.clone_box()
     }
 

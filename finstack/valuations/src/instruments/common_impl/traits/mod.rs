@@ -76,7 +76,7 @@ pub use equity_dependencies::{
 };
 pub use instrument::Instrument;
 pub use option_greeks::{OptionGreekKind, OptionGreeks, OptionGreeksProvider, OptionGreeksRequest};
-pub use pricing_options::{CurveIdVec, DynInstrument, PricingOptions};
+pub use pricing_options::PricingOptions;
 
 /// Metadata for instrument categorization, tagging, and scenario selection.
 ///

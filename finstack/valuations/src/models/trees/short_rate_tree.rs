@@ -52,11 +52,12 @@
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::traits::Discounting;
 use finstack_core::types::CurveId;
+use finstack_core::HashMap;
 use finstack_core::{Error, Result};
 
 use super::tree_framework::{
-    price_recombining_tree, state_keys, RecombiningInputs, StateGenerator, StateVariables,
-    TreeBranching, TreeGreeks, TreeModel, TreeValuator,
+    price_recombining_tree, state_keys, RecombiningInputs, TreeBranching, TreeGreeks, TreeModel,
+    TreeValuator,
 };
 
 /// Default normal (absolute) volatility for Ho-Lee model.
@@ -1194,7 +1195,7 @@ impl ShortRateTree {
 impl TreeModel for ShortRateTree {
     fn price<V: TreeValuator>(
         &self,
-        mut initial_vars: StateVariables,
+        mut initial_vars: HashMap<&'static str, f64>,
         time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,
@@ -1222,25 +1223,27 @@ impl TreeModel for ShortRateTree {
         // Create custom state generator that uses pre-calibrated rates
         // Clone rates (cheap Arc clone) to avoid lifetime issues with closures
         let rates_clone = self.rates.clone();
-        let state_gen: StateGenerator = Box::new(move |step: usize, node: usize| -> f64 {
-            if step < rates_clone.len() && node < rates_clone[step].len() {
-                rates_clone[step][node]
-            } else {
-                0.0 // Fallback
-            }
-        });
+        let state_gen: Box<dyn Fn(usize, usize) -> f64> =
+            Box::new(move |step: usize, node: usize| -> f64 {
+                if step < rates_clone.len() && node < rates_clone[step].len() {
+                    rates_clone[step][node]
+                } else {
+                    0.0 // Fallback
+                }
+            });
 
         let rates_clone2 = self.rates.clone();
         let compounding = self.config.compounding;
         let dt_pricing = time_to_maturity / self.config.steps as f64;
-        let rate_gen: StateGenerator = Box::new(move |step: usize, node: usize| -> f64 {
-            let r = if step < rates_clone2.len() && node < rates_clone2[step].len() {
-                rates_clone2[step][node] + oas / 10000.0
-            } else {
-                return 0.0;
-            };
-            compounding.to_continuous(r, dt_pricing)
-        });
+        let rate_gen: Box<dyn Fn(usize, usize) -> f64> =
+            Box::new(move |step: usize, node: usize| -> f64 {
+                let r = if step < rates_clone2.len() && node < rates_clone2[step].len() {
+                    rates_clone2[step][node] + oas / 10000.0
+                } else {
+                    return 0.0;
+                };
+                compounding.to_continuous(r, dt_pricing)
+            });
 
         // Set up branching probabilities based on tree type
         let (p_up, p_down, p_middle) = match self.config.branching {
@@ -1275,14 +1278,14 @@ impl TreeModel for ShortRateTree {
             prob_middle: Some(p_middle),
             interest_rate: 0.0, // Not used with custom_rate_generator
             barrier: None,
-            custom_state_generator: Some(&state_gen),
-            custom_rate_generator: Some(&rate_gen),
+            custom_state_generator: Some(&*state_gen),
+            custom_rate_generator: Some(&*rate_gen),
         })
     }
 
     fn calculate_greeks<V: TreeValuator>(
         &self,
-        initial_vars: StateVariables,
+        initial_vars: HashMap<&'static str, f64>,
         time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,
@@ -1522,7 +1525,7 @@ mod tests {
         let market = MarketContext::new();
         let actual = tree
             .price(
-                StateVariables::default(),
+                HashMap::<&'static str, f64>::default(),
                 maturity,
                 &market,
                 &ConstantValuator,
@@ -1629,7 +1632,7 @@ mod tests {
         tree.calibrate(&test_curve_id(), &curve, maturity)
             .expect("BDT calibration");
 
-        let mut vars = StateVariables::default();
+        let mut vars = HashMap::<&'static str, f64>::default();
         vars.insert(
             short_rate_keys::SHORT_RATE,
             tree.rate_at_node(0, 0).expect("root rate"),
@@ -1672,7 +1675,7 @@ mod tests {
         tree.calibrate(&test_curve_id(), &curve, 2.0)
             .expect("BDT calibration");
 
-        let mut vars = StateVariables::default();
+        let mut vars = HashMap::<&'static str, f64>::default();
         vars.insert(
             short_rate_keys::SHORT_RATE,
             tree.rate_at_node(0, 0).expect("root rate"),
@@ -1715,7 +1718,7 @@ mod tests {
         );
 
         let market = MarketContext::new();
-        let mut vars = StateVariables::default();
+        let mut vars = HashMap::<&'static str, f64>::default();
         vars.insert(
             short_rate_keys::SHORT_RATE,
             tree_mr.rate_at_node(0, 0).expect("root"),
@@ -1739,7 +1742,7 @@ mod tests {
         let curve_id = test_curve_id();
         let market = MarketContext::new().insert(curve.clone());
         let valuator = RateCallValuator { strike: 0.03 };
-        let initial_vars = StateVariables::default();
+        let initial_vars = HashMap::<&'static str, f64>::default();
 
         let config = ShortRateTreeConfig::bdt(steps, 0.20, 0.0);
         let mut tree = ShortRateTree::new(config.clone());
@@ -2172,7 +2175,7 @@ mod tests {
         let tree = ShortRateTree::ho_lee(5, 0.01);
         let err = tree
             .price(
-                StateVariables::default(),
+                HashMap::<&'static str, f64>::default(),
                 1.0,
                 &MarketContext::new(),
                 &ConstantValuator,

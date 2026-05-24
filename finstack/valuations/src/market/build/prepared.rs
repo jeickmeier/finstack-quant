@@ -1,6 +1,6 @@
 //! Prepared quote envelopes for calibration pipelines.
 
-use crate::instruments::DynInstrument;
+use crate::instruments::Instrument;
 use crate::market::build::cds::{build_cds_instrument, resolve_cds_quote_dates};
 use crate::market::build::rates::{build_rate_instrument, resolve_rate_quote_dates};
 use crate::market::build::xccy::build_xccy_instrument;
@@ -39,7 +39,7 @@ use std::sync::Arc;
 /// # use finstack_valuations::market::quotes::ids::QuoteId;
 /// # use finstack_core::dates::Date;
 /// # use std::sync::Arc;
-/// # use finstack_valuations::instruments::DynInstrument;
+/// # use finstack_valuations::instruments::Instrument;
 /// #
 /// # fn example() -> finstack_core::Result<()> {
 /// // In practice, this would be created by a builder function
@@ -57,7 +57,7 @@ pub(crate) struct PreparedQuote<Q> {
     ///
     /// The instrument is ready to be priced and includes all necessary curve references,
     /// dates, and market conventions resolved from the quote.
-    pub(crate) instrument: Arc<DynInstrument>,
+    pub(crate) instrument: Arc<dyn Instrument>,
     /// The maturity date of the pillar (used for sorting / time axis).
     ///
     /// This is the resolved maturity date from the quote's pillar (either from a tenor
@@ -101,9 +101,9 @@ impl<Q> PreparedQuote<Q> {
     /// # use finstack_valuations::market::build::prepared::PreparedQuote;
     /// # use finstack_core::dates::Date;
     /// # use std::sync::Arc;
-    /// # use finstack_valuations::instruments::DynInstrument;
+    /// # use finstack_valuations::instruments::Instrument;
     /// #
-    /// # fn example(quote: Arc<String>, instrument: Arc<DynInstrument>) -> finstack_core::Result<()> {
+    /// # fn example(quote: Arc<String>, instrument: Arc<dyn Instrument>) -> finstack_core::Result<()> {
     /// let pillar_date = Date::from_calendar_date(2025, time::Month::January, 2).unwrap();
     /// let as_of = Date::from_calendar_date(2024, time::Month::January, 2).unwrap();
     /// let pillar_time = (pillar_date - as_of).whole_days() as f64 / 365.25;
@@ -114,7 +114,7 @@ impl<Q> PreparedQuote<Q> {
     /// ```
     pub(crate) fn new(
         quote: Arc<Q>,
-        instrument: Arc<DynInstrument>,
+        instrument: Arc<dyn Instrument>,
         pillar_date: Date,
         pillar_time: f64,
     ) -> Self {
@@ -138,7 +138,7 @@ pub(crate) fn prepare_rate_quote(
     let maturity_date =
         resolve_rate_quote_dates(&quote, build_ctx, swap_use_payment_delay)?.pillar_date();
     let instrument = build_rate_instrument(&quote, build_ctx)?;
-    let instrument: Arc<DynInstrument> = instrument.into();
+    let instrument: Arc<dyn Instrument> = instrument.into();
 
     let pillar_time =
         curve_day_count.year_fraction(base_date, maturity_date, DayCountContext::default())?;
@@ -164,8 +164,8 @@ pub(crate) fn prepare_xccy_quote(
     curve_day_count: DayCount,
     base_date: Date,
 ) -> Result<PreparedQuote<XccyQuote>> {
-    let instrument: Box<DynInstrument> = build_xccy_instrument(&quote, build_ctx)?;
-    let instrument_arc: Arc<DynInstrument> = instrument.into();
+    let instrument: Box<dyn Instrument> = build_xccy_instrument(&quote, build_ctx)?;
+    let instrument_arc: Arc<dyn Instrument> = instrument.into();
     let maturity_date = xccy_quote_pillar_date(&quote, instrument_arc.as_ref())?;
     let pillar_time =
         curve_day_count.year_fraction(base_date, maturity_date, DayCountContext::default())?;
@@ -182,7 +182,7 @@ pub(crate) fn prepare_xccy_quote(
 /// to call `build_xccy_instrument` (which already does all the date math + convention
 /// resolution) and read `leg1.end` off the constructed swap — both legs share the same
 /// end date by builder construction.
-fn xccy_quote_pillar_date(quote: &XccyQuote, instrument: &DynInstrument) -> Result<Date> {
+fn xccy_quote_pillar_date(quote: &XccyQuote, instrument: &dyn Instrument) -> Result<Date> {
     use crate::instruments::rates::xccy_swap::XccySwap;
     let swap = instrument
         .as_any()
@@ -205,7 +205,7 @@ pub(crate) fn prepare_cds_quote(
 ) -> Result<PreparedQuote<CdsQuote>> {
     let maturity_date = resolve_cds_quote_dates(&quote, build_ctx)?.maturity;
     let instrument = build_cds_instrument(&quote, build_ctx)?;
-    let instrument: Arc<DynInstrument> = instrument.into();
+    let instrument: Arc<dyn Instrument> = instrument.into();
 
     let pillar_time =
         day_count.year_fraction(base_date, maturity_date, DayCountContext::default())?;

@@ -329,7 +329,7 @@ pub(crate) mod waterfall;
 // Re-export core types
 pub use credit_factor::{
     compute_credit_factor_attribution, credit_factor_model_id, CreditAttributionInput,
-    CreditFactorDetailOptions, CreditFactorModelRef,
+    CreditFactorDetailOptions,
 };
 pub use types::{
     AttributionFactor, AttributionMeta, AttributionMethod, CarryDetail, CorrelationsAttribution,

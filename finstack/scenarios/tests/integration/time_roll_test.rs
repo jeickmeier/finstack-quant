@@ -9,7 +9,7 @@ use finstack_scenarios::{
 };
 use finstack_statements::FinancialModelSpec;
 use finstack_valuations::instruments::pricing_overrides::PricingOverrides;
-use finstack_valuations::instruments::{Attributes, Bond, DynInstrument};
+use finstack_valuations::instruments::{Attributes, Bond, Instrument};
 use time::Month;
 
 #[test]
@@ -188,7 +188,7 @@ fn test_time_roll_with_bond_carry() {
 
     use finstack_valuations::instruments::fixed_income::bond::CashflowSpec;
     // Create a bond instrument
-    let mut instruments: Vec<Box<DynInstrument>> = vec![Box::new(
+    let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
         Bond::builder()
             .id("BOND1".into())
             .notional(finstack_core::money::Money::new(100.0, Currency::USD))

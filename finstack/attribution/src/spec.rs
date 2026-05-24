@@ -3,10 +3,7 @@
 //! Provides serializable specs for defining complete attribution runs in JSON,
 //! with stable schemas and deterministic round-trip serialization.
 
-use super::{
-    AttributionMethod, CreditFactorDetailOptions, CreditFactorModelRef, ModelParamsSnapshot,
-    PnlAttribution,
-};
+use super::{AttributionMethod, CreditFactorDetailOptions, ModelParamsSnapshot, PnlAttribution};
 use finstack_core::{
     config::{FinstackConfig, ResultsMeta},
     currency::Currency,
@@ -14,6 +11,7 @@ use finstack_core::{
     market_data::context::MarketContextState,
     Result,
 };
+use finstack_factor_model::credit::hierarchy::CreditFactorModel;
 use finstack_valuations::instruments::InstrumentJson;
 use finstack_valuations::metrics::MetricId;
 use serde::de::DeserializeOwned;
@@ -94,7 +92,7 @@ pub struct AttributionSpec {
     /// `credit_curves_pnl`. PR-7 wires metrics-based and Taylor methods.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(skip)]
-    pub credit_factor_model: Option<CreditFactorModelRef>,
+    pub credit_factor_model: Option<Box<CreditFactorModel>>,
     /// Detail/payload options for `credit_factor_detail`. Inert when
     /// `credit_factor_model` is `None`.
     #[serde(default)]

@@ -1,4 +1,5 @@
-use crate::instruments::common_impl::traits::{Attributes, CurveIdVec, Instrument};
+use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use smallvec::SmallVec;
 use crate::metrics::MetricId;
 use crate::results::ValuationResult;
 use finstack_core::dates::Date;
@@ -12,8 +13,8 @@ use std::sync::OnceLock;
 pub struct TestInstrument {
     id: String,
     value: Money,
-    discount_curves: CurveIdVec,
-    forward_curves: CurveIdVec,
+    discount_curves: SmallVec<[CurveId; 2]>,
+    forward_curves: SmallVec<[CurveId; 2]>,
 }
 
 impl TestInstrument {
@@ -21,8 +22,8 @@ impl TestInstrument {
         Self {
             id: id.to_string(),
             value,
-            discount_curves: CurveIdVec::new(),
-            forward_curves: CurveIdVec::new(),
+            discount_curves: SmallVec::<[CurveId; 2]>::new(),
+            forward_curves: SmallVec::<[CurveId; 2]>::new(),
         }
     }
 

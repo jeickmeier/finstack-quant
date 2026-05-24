@@ -4,7 +4,7 @@ use super::levered::LeveredRealEstateEquity;
 use crate::cashflow::traits::CashflowProvider;
 use crate::instruments::{Instrument, InstrumentJson};
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::currency::Currency;
@@ -221,7 +221,7 @@ impl Pricer for LeveredRealEstateDiscountingPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let inst = instrument
             .as_any()
             .downcast_ref::<LeveredRealEstateEquity>()

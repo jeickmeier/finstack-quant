@@ -73,7 +73,7 @@ impl CalibratedHullWhiteModel {
         steps: usize,
         disc: &dyn Discounting,
         ttm: f64,
-    ) -> Result<Self, PricingError> {
+    ) -> std::result::Result<Self, PricingError> {
         if steps == 0 {
             return Err(PricingError::model_failure_with_context(
                 "Tree steps must be positive".to_string(),
@@ -259,7 +259,7 @@ impl BermudanSwaptionPricer {
         swaption: &BermudanSwaption,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         if swaption.forward_curve_id != swaption.discount_curve_id {
             return Err(PricingError::model_failure_with_context(
                 "Bermudan tree pricing is currently single-curve only. \
@@ -380,7 +380,7 @@ impl BermudanSwaptionPricer {
         swaption: &BermudanSwaption,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         // Refuse uncalibrated defaults when enforcement is enabled (as
         // the pricer registry does). LSMC has no cached model path, so
         // this guard runs before any curve loading.
@@ -691,7 +691,7 @@ impl Pricer for BermudanSwaptionPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         // Type-safe downcasting
         let swaption = instrument
             .as_any()

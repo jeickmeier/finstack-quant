@@ -5,12 +5,11 @@ use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::math::interp::InterpStyle;
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
+use finstack_core::HashMap;
 use finstack_valuations::instruments::fixed_income::bond::pricing::engine::tree::BondValuator;
 use finstack_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
 use finstack_valuations::instruments::pricing_overrides::PricingOverrides;
-use finstack_valuations::models::{
-    short_rate_keys, ShortRateTree, ShortRateTreeConfig, StateVariables, TreeModel,
-};
+use finstack_valuations::models::{short_rate_keys, ShortRateTree, ShortRateTreeConfig, TreeModel};
 use time::macros::date;
 
 fn market(as_of: Date) -> MarketContext {
@@ -71,7 +70,7 @@ fn call_friction_raises_callable_price_toward_straight() {
     )
     .unwrap();
 
-    let mut vars = StateVariables::default();
+    let mut vars = HashMap::<&'static str, f64>::default();
     vars.insert(short_rate_keys::OAS, 0.0);
 
     // Straight bond (no callability), priced on the same tree.

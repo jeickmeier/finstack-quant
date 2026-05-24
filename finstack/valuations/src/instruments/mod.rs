@@ -234,10 +234,10 @@ pub use common_impl::dependencies::{FxPair, MarketDependencies};
 pub use common_impl::discountable::Discountable;
 pub use common_impl::pricing::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
 pub use common_impl::traits::{
-    Attributes, CurveDependencies, CurveIdVec, DynInstrument, EquityDependencies,
-    EquityInstrumentDeps, EquityInstrumentDepsBuilder, Instrument, InstrumentCurves,
-    InstrumentCurvesBuilder, OptionGreekKind, OptionGreeks, OptionGreeksProvider,
-    OptionGreeksRequest, PricingOptions, RatesCurveKind,
+    Attributes, CurveDependencies, EquityDependencies, EquityInstrumentDeps,
+    EquityInstrumentDepsBuilder, Instrument, InstrumentCurves, InstrumentCurvesBuilder,
+    OptionGreekKind, OptionGreeks, OptionGreeksProvider, OptionGreeksRequest, PricingOptions,
+    RatesCurveKind,
 };
 
 // === Parameter Types ===

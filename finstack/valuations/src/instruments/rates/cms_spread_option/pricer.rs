@@ -14,7 +14,7 @@ use crate::instruments::rates::exotics_shared::forward_swap_rate::{
 };
 use crate::metrics::MetricId;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DateExt, DayCountContext, Tenor};
@@ -276,7 +276,7 @@ impl Pricer for CmsSpreadOptionPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let option = instrument
             .as_any()
             .downcast_ref::<CmsSpreadOption>()
@@ -334,7 +334,7 @@ impl Pricer for CmsSpreadOptionPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<f64> {
+    ) -> std::result::Result<f64, PricingError> {
         let option = instrument
             .as_any()
             .downcast_ref::<CmsSpreadOption>()

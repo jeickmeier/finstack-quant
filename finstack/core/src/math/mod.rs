@@ -123,7 +123,8 @@ pub use integration::{
     GaussLaguerreQuadrature,
 };
 pub use interp::{
-    CubicHermite, ExtrapolationPolicy, InterpFn, LinearDf, LogLinearDf, MonotoneConvex,
+    CubicHermiteStrategy, ExtrapolationPolicy, InterpFn, Interpolator, LinearStrategy,
+    LogLinearStrategy, MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy,
 };
 pub use linalg::{
     apply_correlation, build_correlation_matrix, cholesky_correlation, cholesky_decomposition,

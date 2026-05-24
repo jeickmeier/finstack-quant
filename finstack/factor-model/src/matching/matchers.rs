@@ -58,16 +58,6 @@ impl std::fmt::Display for FactorMatchError {
 
 impl std::error::Error for FactorMatchError {}
 
-/// Outcome of [`FactorMatcher::match_factor_with_betas`].
-///
-/// - `Skip` — the matcher does not handle this dependency (caller should
-///   fall through to the next matcher).
-/// - `Ok(entries)` — zero or more `(factor_id, beta)` matches in canonical
-///   order. `entries.is_empty()` is allowed and treated as no match.
-/// - `Err(FactorMatchError)` — the matcher recognised the dependency but
-///   the input was malformed for the matcher's contract.
-pub type FactorMatchResult = Result<Option<Vec<FactorMatchEntry>>, FactorMatchError>;
-
 /// Matches a market dependency and instrument attributes to factor identifiers.
 pub trait FactorMatcher: Send + Sync {
     /// Returns the matched `(factor_id, beta)` entries for a dependency.
@@ -83,7 +73,7 @@ pub trait FactorMatcher: Send + Sync {
         &self,
         dependency: &MarketDependency,
         attributes: &Attributes,
-    ) -> FactorMatchResult;
+    ) -> Result<Option<Vec<FactorMatchEntry>>, FactorMatchError>;
 }
 
 /// Helper: lift a single matched factor id into the canonical
@@ -144,7 +134,7 @@ impl FactorMatcher for MappingTableMatcher {
         &self,
         dependency: &MarketDependency,
         attributes: &Attributes,
-    ) -> FactorMatchResult {
+    ) -> Result<Option<Vec<FactorMatchEntry>>, FactorMatchError> {
         Ok(self
             .rules
             .iter()
@@ -232,7 +222,7 @@ impl FactorMatcher for HierarchicalMatcher {
         &self,
         dependency: &MarketDependency,
         attributes: &Attributes,
-    ) -> FactorMatchResult {
+    ) -> Result<Option<Vec<FactorMatchEntry>>, FactorMatchError> {
         if !self.dependency_filter.matches(dependency) {
             return Ok(None);
         }
@@ -263,7 +253,7 @@ impl FactorMatcher for CascadeMatcher {
         &self,
         dependency: &MarketDependency,
         attributes: &Attributes,
-    ) -> FactorMatchResult {
+    ) -> Result<Option<Vec<FactorMatchEntry>>, FactorMatchError> {
         for matcher in &self.matchers {
             match matcher.match_factor_with_betas(dependency, attributes)? {
                 Some(entries) if !entries.is_empty() => return Ok(Some(entries)),

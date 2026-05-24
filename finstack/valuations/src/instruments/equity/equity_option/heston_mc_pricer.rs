@@ -9,7 +9,7 @@ use crate::instruments::equity::equity_option::pricer::collect_inputs_extended;
 use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::models::closed_form::heston::HestonParams as ClosedFormHestonParams;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::Date;
@@ -191,7 +191,7 @@ impl Pricer for EquityOptionHestonMcPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let equity_option = instrument
             .as_any()
             .downcast_ref::<EquityOption>()

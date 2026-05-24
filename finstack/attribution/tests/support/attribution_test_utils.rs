@@ -4,8 +4,9 @@ use finstack_core::money::Money;
 use finstack_core::types::CurveId;
 use finstack_core::Result;
 use finstack_valuations::instruments::{
-    Attributes, CurveIdVec, Instrument, InstrumentCurves, MarketDependencies,
+    Attributes, Instrument, InstrumentCurves, MarketDependencies,
 };
+use smallvec::SmallVec;
 use finstack_valuations::metrics::MetricId;
 use finstack_valuations::results::ValuationResult;
 use std::sync::OnceLock;
@@ -14,8 +15,8 @@ use std::sync::OnceLock;
 pub struct TestInstrument {
     id: String,
     value: Money,
-    discount_curves: CurveIdVec,
-    forward_curves: CurveIdVec,
+    discount_curves: SmallVec<[CurveId; 2]>,
+    forward_curves: SmallVec<[CurveId; 2]>,
 }
 
 impl TestInstrument {
@@ -23,8 +24,8 @@ impl TestInstrument {
         Self {
             id: id.to_string(),
             value,
-            discount_curves: CurveIdVec::new(),
-            forward_curves: CurveIdVec::new(),
+            discount_curves: SmallVec::<[CurveId; 2]>::new(),
+            forward_curves: SmallVec::<[CurveId; 2]>::new(),
         }
     }
 

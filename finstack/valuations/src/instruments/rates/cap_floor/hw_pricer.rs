@@ -70,7 +70,7 @@ impl Pricer for CapFloorHullWhitePricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let cap_floor = instrument
             .as_any()
             .downcast_ref::<CapFloor>()
@@ -89,7 +89,7 @@ impl CapFloorHullWhitePricer {
         cap_floor: &CapFloor,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let ctx = DayCountContext::default();
 
         // Get discount and projection curves. Bloomberg's HW1F cap/floor setup is

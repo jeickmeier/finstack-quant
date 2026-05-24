@@ -5,6 +5,7 @@
 //! - Model futures price calculation
 //! - NPV calculation
 
+use crate::pricer::PricingError;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
@@ -447,7 +448,7 @@ impl crate::pricer::Pricer for BondFuturePricer {
         instrument: &dyn crate::instruments::common_impl::traits::Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> crate::pricer::PricingResult<crate::results::ValuationResult> {
+    ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
         // Type-safe downcast to BondFuture
         let future = instrument
             .as_any()

@@ -10,14 +10,15 @@ use crate::instruments::{ExerciseStyle, OptionType};
 use crate::models::trees::NodeState;
 use crate::models::volatility::black::d1_d2;
 use finstack_core::market_data::context::MarketContext;
+use finstack_core::HashMap;
 use finstack_core::HashSet;
 use finstack_core::{Error, Result};
 
 // Import the generic tree framework
 use super::tree_framework::{
     map_exercise_dates_to_steps, price_recombining_tree, single_factor_equity_state, state_keys,
-    BarrierSpec, BarrierStyle, RecombiningInputs, StateVariables, TreeBranching, TreeGreeks,
-    TreeModel, TreeValuator,
+    BarrierSpec, BarrierStyle, RecombiningInputs, TreeBranching, TreeGreeks, TreeModel,
+    TreeValuator,
 };
 
 /// Binomial tree types
@@ -718,7 +719,7 @@ impl BinomialTree {
     #[inline(never)] // Prevent inlining to reduce coverage metadata conflicts
     pub fn price_generic<V: TreeValuator>(
         &self,
-        initial_vars: StateVariables,
+        initial_vars: HashMap<&'static str, f64>,
         time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,
@@ -808,7 +809,7 @@ impl BinomialGreeks {
 impl TreeModel for BinomialTree {
     fn price<V: TreeValuator>(
         &self,
-        initial_vars: StateVariables,
+        initial_vars: HashMap<&'static str, f64>,
         time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,
@@ -818,7 +819,7 @@ impl TreeModel for BinomialTree {
 
     fn calculate_greeks<V: TreeValuator>(
         &self,
-        initial_vars: StateVariables,
+        initial_vars: HashMap<&'static str, f64>,
         time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,

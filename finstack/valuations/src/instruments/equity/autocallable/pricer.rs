@@ -6,7 +6,7 @@ use crate::instruments::equity::autocallable::monte_carlo::{
 };
 use crate::instruments::equity::autocallable::types::{Autocallable, FinalPayoffType};
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
@@ -207,7 +207,7 @@ impl Pricer for AutocallableMcPricer {
         instrument: &dyn crate::instruments::common_impl::traits::Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let autocallable = instrument
             .as_any()
             .downcast_ref::<Autocallable>()

@@ -17,7 +17,7 @@ use finstack_core::Result;
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_monte_carlo::estimate::Estimate;
@@ -646,7 +646,7 @@ impl Pricer for RevolvingCreditPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         use crate::pricer::expect_inst;
 
         let facility: &RevolvingCredit = expect_inst(instrument, InstrumentType::RevolvingCredit)?;

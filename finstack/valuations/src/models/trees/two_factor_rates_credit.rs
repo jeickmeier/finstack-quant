@@ -70,10 +70,11 @@
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::HazardCurve;
 use finstack_core::market_data::traits::Discounting;
+use finstack_core::HashMap;
 use finstack_core::{Error, Result};
 
 use super::state_keys;
-use super::tree_framework::{NodeState, StateVariables, TreeModel, TreeValuator};
+use super::tree_framework::{NodeState, TreeModel, TreeValuator};
 
 /// Maximum allowed mean-reversion speed (κ) for either factor.
 ///
@@ -493,7 +494,7 @@ impl RatesCreditTree {
 impl TreeModel for RatesCreditTree {
     fn price<V: TreeValuator>(
         &self,
-        initial_vars: StateVariables,
+        initial_vars: HashMap<&'static str, f64>,
         time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,
@@ -704,7 +705,7 @@ mod tests {
         tree.calibrate(&disc, &haz, 5.0).expect("calibration");
 
         let ctx = MarketContext::new();
-        let vars = StateVariables::default();
+        let vars = HashMap::<&'static str, f64>::default();
         let val = DummyValuator;
         let price = tree.price(vars, 5.0, &ctx, &val).expect("should succeed");
         assert!(price.is_finite() && price > 0.0);
@@ -714,7 +715,7 @@ mod tests {
     fn uncalibrated_tree_returns_error() {
         let tree = RatesCreditTree::new(RatesCreditConfig::default());
         let ctx = MarketContext::new();
-        let vars = StateVariables::default();
+        let vars = HashMap::<&'static str, f64>::default();
         let val = DummyValuator;
         let result = tree.price(vars, 1.0, &ctx, &val);
         assert!(result.is_err(), "price() without calibrate() must fail");
@@ -740,7 +741,7 @@ mod tests {
         tree.calibrate(&disc, &haz, ttm).expect("calibrate");
 
         let ctx = MarketContext::new();
-        let vars = StateVariables::default();
+        let vars = HashMap::<&'static str, f64>::default();
         let val = DummyValuator;
         let tree_price = tree.price(vars, ttm, &ctx, &val).expect("price");
         let market_df = disc.df(ttm);
@@ -828,7 +829,7 @@ mod tests {
 
         let price = tree
             .price(
-                StateVariables::default(),
+                HashMap::<&'static str, f64>::default(),
                 2.0,
                 &MarketContext::new(),
                 &DummyValuator,
@@ -869,7 +870,12 @@ mod tests {
 
             let ctx = MarketContext::new();
             let price = tree
-                .price(StateVariables::default(), ttm, &ctx, &DummyValuator)
+                .price(
+                    HashMap::<&'static str, f64>::default(),
+                    ttm,
+                    &ctx,
+                    &DummyValuator,
+                )
                 .expect("price");
             let market_df = disc.df(ttm);
             let error_bps = (price - market_df).abs() * 10_000.0;

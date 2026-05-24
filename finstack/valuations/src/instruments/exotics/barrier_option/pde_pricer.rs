@@ -23,7 +23,7 @@
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::barrier_option::types::{BarrierOption, BarrierType};
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::Date;
@@ -163,7 +163,7 @@ impl BarrierOptionPdePricer {
         inst: &BarrierOption,
         market: &MarketContext,
         as_of: Date,
-    ) -> Result<Money, PricingError> {
+    ) -> std::result::Result<Money, PricingError> {
         let bs_inputs = crate::instruments::common_impl::helpers::collect_black_scholes_inputs_df(
             &inst.spot_id,
             &inst.discount_curve_id,
@@ -284,7 +284,10 @@ impl BarrierOptionPdePricer {
     ///
     /// The grid is built once and shared by the knock-out and vanilla solves
     /// so that the knock-in parity difference is consistent (W-08).
-    fn build_barrier_grid(&self, inputs: &KnockOutPdeInputs) -> Result<Grid1D, PricingError> {
+    fn build_barrier_grid(
+        &self,
+        inputs: &KnockOutPdeInputs,
+    ) -> std::result::Result<Grid1D, PricingError> {
         let ln_barrier = inputs.barrier.ln();
         let ln_spot = inputs.spot.ln();
         let spread = 5.0 * inputs.sigma * inputs.maturity.sqrt();
@@ -321,7 +324,7 @@ impl BarrierOptionPdePricer {
         &self,
         ko_grid: &Grid1D,
         inputs: &KnockOutPdeInputs,
-    ) -> Result<Grid1D, PricingError> {
+    ) -> std::result::Result<Grid1D, PricingError> {
         let ln_barrier = inputs.barrier.ln();
         let ln_spot = inputs.spot.ln();
         let ln_strike = inputs.strike.ln();
@@ -369,7 +372,7 @@ impl BarrierOptionPdePricer {
         &self,
         grid: &Grid1D,
         inputs: &KnockOutPdeInputs,
-    ) -> Result<f64, PricingError> {
+    ) -> std::result::Result<f64, PricingError> {
         let ln_spot = inputs.spot.ln();
 
         let pde = BarrierPde {
@@ -405,7 +408,11 @@ impl BarrierOptionPdePricer {
     ///
     /// Uses the same grid and Rannacher stepper as [`Self::price_knock_out`] so
     /// that `KI = Vanilla - KO` is a consistent finite-difference difference.
-    fn price_vanilla(&self, grid: &Grid1D, inputs: VanillaPdeInputs) -> Result<f64, PricingError> {
+    fn price_vanilla(
+        &self,
+        grid: &Grid1D,
+        inputs: VanillaPdeInputs,
+    ) -> std::result::Result<f64, PricingError> {
         use crate::models::pde::BlackScholesPde;
 
         let pde = BlackScholesPde {
@@ -446,7 +453,7 @@ impl Pricer for BarrierOptionPdePricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let barrier_opt = instrument
             .as_any()
             .downcast_ref::<BarrierOption>()

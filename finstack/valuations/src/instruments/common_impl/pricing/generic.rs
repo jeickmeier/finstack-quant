@@ -67,7 +67,7 @@ where
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         // Type-safe downcasting
         let typed_instrument = instrument
             .as_any()

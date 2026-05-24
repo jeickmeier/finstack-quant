@@ -4,7 +4,7 @@ use crate::instruments::rates::deposit::Deposit;
 use crate::instruments::rates::fra::ForwardRateAgreement;
 use crate::instruments::rates::ir_future::{FutureContractSpecs, InterestRateFuture, Position};
 use crate::instruments::rates::irs::{InterestRateSwap, IrsLegConventions};
-use crate::instruments::DynInstrument;
+use crate::instruments::Instrument;
 use crate::market::build::helpers::{resolve_calendar, resolve_spot_date};
 use crate::market::conventions::defs::{RateIndexConventions, RateIndexKind};
 use crate::market::conventions::registry::ConventionRegistry;
@@ -30,7 +30,7 @@ use rust_decimal::Decimal;
 ///
 /// # Returns
 ///
-/// `Ok(Box<DynInstrument>)` with the constructed instrument, or `Err` if:
+/// `Ok(Box<dyn Instrument>)` with the constructed instrument, or `Err` if:
 /// - Convention lookup fails (missing index or future contract)
 /// - Calendar resolution fails
 /// - Date calculations fail (invalid tenor, business day adjustment)
@@ -101,7 +101,7 @@ use rust_decimal::Decimal;
 ///
 /// - [`RateQuote`](crate::market::quotes::rates::RateQuote) for supported quote types
 /// - [`BuildCtx`](crate::market::BuildCtx) for build context configuration
-pub fn build_rate_instrument(quote: &RateQuote, ctx: &BuildCtx) -> Result<Box<DynInstrument>> {
+pub fn build_rate_instrument(quote: &RateQuote, ctx: &BuildCtx) -> Result<Box<dyn Instrument>> {
     tracing::debug!(quote_id = %quote.id(), "building rate instrument");
     let registry = ConventionRegistry::try_global()?;
 
@@ -279,7 +279,7 @@ fn build_deposit(
     quote: &RateQuote,
     ctx: &BuildCtx,
     registry: &ConventionRegistry,
-) -> Result<Box<DynInstrument>> {
+) -> Result<Box<dyn Instrument>> {
     let RateQuote::Deposit {
         id, index, rate, ..
     } = quote
@@ -319,7 +319,7 @@ fn build_fra(
     quote: &RateQuote,
     ctx: &BuildCtx,
     registry: &ConventionRegistry,
-) -> Result<Box<DynInstrument>> {
+) -> Result<Box<dyn Instrument>> {
     let RateQuote::Fra {
         id, index, rate, ..
     } = quote
@@ -365,7 +365,7 @@ fn build_future(
     quote: &RateQuote,
     ctx: &BuildCtx,
     registry: &ConventionRegistry,
-) -> Result<Box<DynInstrument>> {
+) -> Result<Box<dyn Instrument>> {
     let RateQuote::Futures {
         id,
         contract,
@@ -426,7 +426,7 @@ fn build_swap(
     quote: &RateQuote,
     ctx: &BuildCtx,
     registry: &ConventionRegistry,
-) -> Result<Box<DynInstrument>> {
+) -> Result<Box<dyn Instrument>> {
     let RateQuote::Swap {
         id,
         index,

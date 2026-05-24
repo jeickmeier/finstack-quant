@@ -1,10 +1,11 @@
 //! Unified market data dependency representation for instruments.
 
 use crate::instruments::common_impl::traits::{
-    CurveDependencies, CurveIdVec, EquityDependencies, EquityInstrumentDeps, InstrumentCurves,
+    CurveDependencies, EquityDependencies, EquityInstrumentDeps, InstrumentCurves,
 };
 use finstack_core::currency::Currency;
 use finstack_core::types::CurveId;
+use smallvec::SmallVec;
 
 use crate::instruments::json_loader::InstrumentJson;
 
@@ -150,7 +151,7 @@ impl MarketDependencies {
 
 // Deduplicate while preserving insertion order for deterministic risk reports.
 
-fn push_unique_curve(target: &mut CurveIdVec, id: CurveId) {
+fn push_unique_curve(target: &mut SmallVec<[CurveId; 2]>, id: CurveId) {
     if target.contains(&id) {
         return;
     }

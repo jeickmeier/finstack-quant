@@ -24,6 +24,7 @@ tracing = { version = "0.1", default-features = false, features = ["attributes"]
 criterion = { workspace = true }
 proptest = "1.11.0"
 rust_decimal = { workspace = true }
+smallvec = { version = "1.15", default-features = false }
 time = { workspace = true, features = ["macros"] }
 
 [[bench]]

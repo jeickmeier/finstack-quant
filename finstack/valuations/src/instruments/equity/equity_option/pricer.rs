@@ -12,6 +12,7 @@ use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::instruments::ExerciseStyle;
 use crate::models::trees::binomial_tree::BinomialTree;
 use crate::models::{bs_greeks, bs_price, BsGreeks};
+use crate::pricer::PricingError;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, DayCount};
 use finstack_core::market_data::context::MarketContext;
@@ -839,7 +840,7 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
         instrument: &dyn crate::instruments::common_impl::traits::Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> crate::pricer::PricingResult<crate::results::ValuationResult> {
+    ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
         let equity_option = instrument
             .as_any()
             .downcast_ref::<EquityOption>()

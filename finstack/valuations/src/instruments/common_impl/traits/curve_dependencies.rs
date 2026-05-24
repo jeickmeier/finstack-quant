@@ -2,8 +2,8 @@
 // Curve Dependencies
 // -----------------------------------------------------------------------------
 
-use super::pricing_options::CurveIdVec;
 use finstack_core::types::CurveId;
+use smallvec::SmallVec;
 
 /// Trait for instruments to declare all their curve dependencies.
 ///
@@ -42,11 +42,11 @@ pub trait CurveDependencies {
 #[derive(Default, Clone, Debug)]
 pub struct InstrumentCurves {
     /// Discount curves used by the instrument (including primary and foreign).
-    pub discount_curves: CurveIdVec,
+    pub discount_curves: SmallVec<[CurveId; 2]>,
     /// Forward/projection curves used by the instrument.
-    pub forward_curves: CurveIdVec,
+    pub forward_curves: SmallVec<[CurveId; 2]>,
     /// Credit/hazard curves used by the instrument.
-    pub credit_curves: CurveIdVec,
+    pub credit_curves: SmallVec<[CurveId; 2]>,
 }
 
 impl InstrumentCurves {

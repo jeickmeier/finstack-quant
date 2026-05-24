@@ -25,11 +25,13 @@ pub const DERIVATIVE_EPSILON: f64 = 1e-6;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_core::math::interp::{ValidationPolicy, LinearDf, ExtrapolationPolicy};
+/// use finstack_core::math::interp::{
+///     ExtrapolationPolicy, Interpolator, LinearStrategy, ValidationPolicy,
+/// };
 ///
 /// # fn main() -> finstack_core::Result<()> {
 /// // Strict validation (default) - requires positive values
-/// let strict = LinearDf::new(
+/// let strict = Interpolator::<LinearStrategy>::new(
 ///     vec![0.0, 1.0, 2.0].into_boxed_slice(),
 ///     vec![1.0, 0.95, 0.90].into_boxed_slice(),
 ///     ExtrapolationPolicy::FlatZero,
@@ -37,7 +39,7 @@ pub const DERIVATIVE_EPSILON: f64 = 1e-6;
 /// )?;
 ///
 /// // AllowNegative - permits negative values (e.g., for forward curves)
-/// let relaxed = LinearDf::new(
+/// let relaxed = Interpolator::<LinearStrategy>::new(
 ///     vec![0.0, 1.0, 2.0].into_boxed_slice(),
 ///     vec![-0.01, 0.0, 0.01].into_boxed_slice(),
 ///     ExtrapolationPolicy::FlatZero,
@@ -237,11 +239,11 @@ impl std::str::FromStr for InterpStyle {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Interp {
-    Linear(LinearDf),
-    LogLinear(LogLinearDf),
-    MonotoneConvex(MonotoneConvex),
-    CubicHermite(CubicHermite),
-    PiecewiseQuadraticForward(PiecewiseQuadraticForward),
+    Linear(Interpolator<LinearStrategy>),
+    LogLinear(Interpolator<LogLinearStrategy>),
+    MonotoneConvex(Interpolator<MonotoneConvexStrategy>),
+    CubicHermite(Interpolator<CubicHermiteStrategy>),
+    PiecewiseQuadraticForward(Interpolator<PiecewiseQuadraticForwardStrategy>),
 }
 
 impl Interp {
@@ -305,7 +307,7 @@ impl InterpStyle {
     ///
     /// # fn main() -> finstack_core::Result<()> {
     /// // Preferred: direct construction (no heap allocation, static dispatch)
-    /// let interp = MonotoneConvex::new(
+    /// let interp = Interpolator::<MonotoneConvexStrategy>::new(
     ///     vec![0.0, 1.0, 2.0].into_boxed_slice(),
     ///     vec![1.0, 0.95, 0.90].into_boxed_slice(),
     ///     ExtrapolationPolicy::FlatZero,
@@ -329,31 +331,35 @@ impl InterpStyle {
     ) -> crate::Result<Box<dyn InterpFn>> {
         let effective_validation = self.effective_validation(validation);
         match self {
-            InterpStyle::Linear => Ok(Box::new(LinearDf::new(
+            InterpStyle::Linear => Ok(Box::new(Interpolator::<LinearStrategy>::new(
                 knots,
                 values,
                 extrapolation,
                 effective_validation,
             )?)),
-            InterpStyle::LogLinear => Ok(Box::new(LogLinearDf::new(
+            InterpStyle::LogLinear => Ok(Box::new(Interpolator::<LogLinearStrategy>::new(
                 knots,
                 values,
                 extrapolation,
                 effective_validation,
             )?)),
-            InterpStyle::MonotoneConvex => Ok(Box::new(MonotoneConvex::new(
+            InterpStyle::MonotoneConvex => {
+                Ok(Box::new(Interpolator::<MonotoneConvexStrategy>::new(
+                    knots,
+                    values,
+                    extrapolation,
+                    effective_validation,
+                )?))
+            }
+            InterpStyle::CubicHermite => Ok(Box::new(Interpolator::<CubicHermiteStrategy>::new(
                 knots,
                 values,
                 extrapolation,
                 effective_validation,
             )?)),
-            InterpStyle::CubicHermite => Ok(Box::new(CubicHermite::new(
-                knots,
-                values,
-                extrapolation,
-                effective_validation,
-            )?)),
-            InterpStyle::PiecewiseQuadraticForward => Ok(Box::new(PiecewiseQuadraticForward::new(
+            InterpStyle::PiecewiseQuadraticForward => Ok(Box::new(Interpolator::<
+                PiecewiseQuadraticForwardStrategy,
+            >::new(
                 knots,
                 values,
                 extrapolation,
@@ -383,162 +389,46 @@ impl InterpStyle {
     ) -> crate::Result<Interp> {
         let effective_validation = self.effective_validation(validation);
         let interp = match self {
-            InterpStyle::Linear => Interp::Linear(LinearDf::new(
+            InterpStyle::Linear => Interp::Linear(Interpolator::<LinearStrategy>::new(
                 knots,
                 values,
                 extrapolation,
                 effective_validation,
             )?),
-            InterpStyle::LogLinear => Interp::LogLinear(LogLinearDf::new(
+            InterpStyle::LogLinear => Interp::LogLinear(Interpolator::<LogLinearStrategy>::new(
                 knots,
                 values,
                 extrapolation,
                 effective_validation,
             )?),
-            InterpStyle::MonotoneConvex => Interp::MonotoneConvex(MonotoneConvex::new(
-                knots,
-                values,
-                extrapolation,
-                effective_validation,
-            )?),
-            InterpStyle::CubicHermite => Interp::CubicHermite(CubicHermite::new(
-                knots,
-                values,
-                extrapolation,
-                effective_validation,
-            )?),
+            InterpStyle::MonotoneConvex => {
+                Interp::MonotoneConvex(Interpolator::<MonotoneConvexStrategy>::new(
+                    knots,
+                    values,
+                    extrapolation,
+                    effective_validation,
+                )?)
+            }
+            InterpStyle::CubicHermite => {
+                Interp::CubicHermite(Interpolator::<CubicHermiteStrategy>::new(
+                    knots,
+                    values,
+                    extrapolation,
+                    effective_validation,
+                )?)
+            }
             InterpStyle::PiecewiseQuadraticForward => Interp::PiecewiseQuadraticForward(
-                PiecewiseQuadraticForward::new(knots, values, extrapolation, effective_validation)?,
+                Interpolator::<PiecewiseQuadraticForwardStrategy>::new(
+                    knots,
+                    values,
+                    extrapolation,
+                    effective_validation,
+                )?,
             ),
         };
         Ok(interp)
     }
 }
-
-// ---------------------------------------------------------------------------
-// Public type aliases over Interpolator<S>
-// ---------------------------------------------------------------------------
-
-/// Piecewise linear interpolation on discount factors.
-///
-/// Simple linear interpolation between knot points. Fast and straightforward
-/// but may produce negative forward rates (arbitrage) if discount factors
-/// aren't carefully spaced. Prefer [`LogLinearDf`] or [`MonotoneConvex`] for yield curves.
-///
-/// # Example
-///
-/// ```rust
-/// use finstack_core::math::interp::{LinearDf, ExtrapolationPolicy, ValidationPolicy};
-///
-/// # fn main() -> finstack_core::Result<()> {
-/// let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();
-/// let dfs = vec![1.0, 0.95, 0.90].into_boxed_slice();
-/// let _interp = LinearDf::new(knots, dfs, ExtrapolationPolicy::FlatZero, ValidationPolicy::Strict)?;
-/// # Ok(())
-/// # }
-/// ```
-pub type LinearDf = Interpolator<LinearStrategy>;
-
-/// Log-linear interpolation for discount factors.
-///
-/// Performs linear interpolation on ln(DF), equivalent to piecewise-constant
-/// zero rates. Guarantees positive forward rates and is commonly used for
-/// government bond curves and simple yield curve construction.
-///
-/// # Example
-///
-/// ```rust
-/// use finstack_core::math::interp::{LogLinearDf, ExtrapolationPolicy, ValidationPolicy};
-///
-/// # fn main() -> finstack_core::Result<()> {
-/// let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();
-/// let dfs = vec![1.0, 0.95, 0.90].into_boxed_slice();
-/// let _interp = LogLinearDf::new(knots, dfs, ExtrapolationPolicy::FlatZero, ValidationPolicy::Strict)?;
-/// # Ok(())
-/// # }
-/// ```
-pub type LogLinearDf = Interpolator<LogLinearStrategy>;
-
-/// Monotone cubic Hermite interpolation (PCHIP).
-///
-/// Implements the Piecewise Cubic Hermite Interpolating Polynomial with
-/// Fritsch-Carlson slope selection. Preserves monotonicity of input data,
-/// ensuring no spurious oscillations. Requires monotone input discount factors.
-///
-/// # Algorithm
-///
-/// Uses weighted harmonic mean for slope selection:
-/// - Ensures C¹ continuity (smooth first derivatives)
-/// - Preserves monotonicity (no overshoots)
-/// - Efficient O(log n) evaluation via binary search
-///
-/// # References
-///
-/// - Fritsch, F. N., & Carlson, R. E. (1980). "Monotone Piecewise Cubic Interpolation."
-///   *SIAM Journal on Numerical Analysis*, 17(2), 238-246.
-///
-/// # Example
-///
-/// ```rust
-/// use finstack_core::math::interp::{CubicHermite, ExtrapolationPolicy, ValidationPolicy};
-///
-/// # fn main() -> finstack_core::Result<()> {
-/// let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();
-/// let dfs = vec![1.0, 0.95, 0.90].into_boxed_slice();
-/// let _interp = CubicHermite::new(knots, dfs, ExtrapolationPolicy::FlatZero, ValidationPolicy::Strict)?;
-/// # Ok(())
-/// # }
-/// ```
-pub type CubicHermite = Interpolator<CubicHermiteStrategy>;
-
-/// Monotone-convex discount-factor interpolator (Hagan & West, 2006).
-///
-/// Implements the full Hagan–West slope-selecting, monotone-convex cubic
-/// interpolation in natural-log discount-factor space. This is the industry
-/// standard for yield curve construction as it guarantees positive and
-/// continuous forward rates.
-///
-/// ## Algorithm Overview
-/// 1. Convert discount factors to continuously compounded yields: y = -ln(P)
-/// 2. Compute initial derivatives using weighted harmonic means for smoothness
-/// 3. Apply convexity constraint g(α,β) = α² + β² ≤ 9 to ensure positive forwards
-/// 4. Build cubic coefficients for each segment: y(s) = a + bs + cs² + ds³
-///
-/// ## Numerical Stability
-/// - Uses epsilon protection (100 × machine epsilon) for near-zero slopes
-/// - Harmonic mean calculation protected against division by very small values
-/// - Supports configurable extrapolation policy beyond input domain
-///
-/// The constructor computes and stores per-segment cubic coefficients guaranteeing
-/// positivity, monotonicity and convexity when the input curve is arbitrage-free
-/// (non-increasing). Evaluation is O(log N) due to binary search on the knot vector.
-///
-/// # References
-///
-/// - Hagan, P. S., & West, G. (2006). "Interpolation Methods for Curve Construction."
-///   *Applied Mathematical Finance*, 13(2), 89-129.
-/// - Hagan, P. S., & West, G. (2008). "Methods for Constructing a Yield Curve."
-///   *Wilmott Magazine*, May 2008.
-///
-/// # Example
-///
-/// ```rust
-/// use finstack_core::math::interp::{MonotoneConvex, ExtrapolationPolicy, ValidationPolicy};
-///
-/// # fn main() -> finstack_core::Result<()> {
-/// let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();
-/// let dfs = vec![1.0, 0.95, 0.90].into_boxed_slice();
-/// let _interp = MonotoneConvex::new(knots, dfs, ExtrapolationPolicy::FlatZero, ValidationPolicy::Strict)?;
-/// # Ok(())
-/// # }
-/// ```
-pub type MonotoneConvex = Interpolator<MonotoneConvexStrategy>;
-
-/// Piecewise quadratic forward interpolation (smooth forward curve).
-///
-/// Builds a natural cubic spline in log-discount space, producing C² continuous
-/// forward rates with flat-forward extrapolation behavior.
-pub type PiecewiseQuadraticForward = Interpolator<PiecewiseQuadraticForwardStrategy>;
 
 #[cfg(test)]
 mod tests {

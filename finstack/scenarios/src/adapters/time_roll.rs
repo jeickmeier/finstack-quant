@@ -11,7 +11,7 @@ use crate::TimeRollMode;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{BusinessDayConvention, Tenor};
 use finstack_core::money::Money;
-use finstack_valuations::instruments::DynInstrument;
+use finstack_valuations::instruments::Instrument;
 use indexmap::IndexMap;
 
 /// Report from time roll-forward operation.
@@ -215,7 +215,7 @@ type InstrumentPnlResult = (
 /// paid on the roll-forward target date counts toward carry; a coupon paid on
 /// the starting valuation date does not.
 fn calculate_instrument_pnl(
-    instruments: &[Box<DynInstrument>],
+    instruments: &[Box<dyn Instrument>],
     market: &finstack_core::market_data::context::MarketContext,
     old_date: finstack_core::dates::Date,
     new_date: finstack_core::dates::Date,
@@ -290,7 +290,7 @@ fn calculate_instrument_pnl(
 /// concatenation and avoids double-counting coupons landing on roll
 /// boundaries.
 fn collect_instrument_cashflows(
-    instrument: &DynInstrument,
+    instrument: &dyn Instrument,
     market: &finstack_core::market_data::context::MarketContext,
     start_date: finstack_core::dates::Date,
     end_date: finstack_core::dates::Date,
@@ -324,7 +324,7 @@ mod tests {
     use finstack_statements::FinancialModelSpec;
     use finstack_valuations::instruments::fixed_income::bond::CashflowSpec;
     use finstack_valuations::instruments::pricing_overrides::PricingOverrides;
-    use finstack_valuations::instruments::{Attributes, Bond, DynInstrument, PricingOptions};
+    use finstack_valuations::instruments::{Attributes, Bond, Instrument, PricingOptions};
     use finstack_valuations::metrics::MetricId;
     use time::macros::date;
     use time::Month;
@@ -354,7 +354,7 @@ mod tests {
 
         let mut market = MarketContext::new().insert(curve);
         let mut model = FinancialModelSpec::new("test", vec![]);
-        let mut instruments: Vec<Box<DynInstrument>> = vec![Box::new(
+        let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
             Bond::builder()
                 .id("BOND1".into())
                 .notional(Money::new(100.0, Currency::USD))

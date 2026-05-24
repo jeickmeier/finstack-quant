@@ -3,9 +3,7 @@
 //! Defines the [`Pricer`] trait, [`PricerRegistry`], and the [`expect_inst`]
 //! downcast helper used by all pricer implementations.
 
-use super::{
-    InstrumentType, ModelKey, PricerKey, PricingError, PricingErrorContext, PricingResult,
-};
+use super::{InstrumentType, ModelKey, PricerKey, PricingError, PricingErrorContext};
 use crate::instruments::common_impl::traits::Instrument as Priceable;
 use finstack_core::config::{results_meta_now, FinstackConfig};
 use finstack_core::market_data::context::MarketContext as Market;
@@ -20,7 +18,7 @@ use std::sync::Arc;
 pub fn expect_inst<T: Priceable + 'static>(
     inst: &dyn Priceable,
     expected: InstrumentType,
-) -> PricingResult<&T> {
+) -> std::result::Result<&T, PricingError> {
     if inst.key() != expected {
         return Err(PricingError::type_mismatch(expected, inst.key()));
     }
@@ -44,7 +42,7 @@ pub trait Pricer: Send + Sync {
         instrument: &dyn Priceable,
         market: &Market,
         as_of: finstack_core::dates::Date,
-    ) -> PricingResult<crate::results::ValuationResult>;
+    ) -> std::result::Result<crate::results::ValuationResult, PricingError>;
 
     /// Price an instrument as an unrounded scalar when the pricer can provide one.
     ///
@@ -56,7 +54,7 @@ pub trait Pricer: Send + Sync {
         instrument: &dyn Priceable,
         market: &Market,
         as_of: finstack_core::dates::Date,
-    ) -> PricingResult<f64> {
+    ) -> std::result::Result<f64, PricingError> {
         Ok(self.price_dyn(instrument, market, as_of)?.value.amount())
     }
 }
@@ -251,7 +249,7 @@ impl PricerRegistry {
         as_of: finstack_core::dates::Date,
         metrics: &[crate::metrics::MetricId],
         options: crate::instruments::PricingOptions,
-    ) -> PricingResult<crate::results::ValuationResult> {
+    ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
         let shared = if metrics.is_empty() {
             SharedPricingInputs::default()
         } else {
@@ -285,7 +283,7 @@ impl PricerRegistry {
         as_of: finstack_core::dates::Date,
         metrics: &[crate::metrics::MetricId],
         options: crate::instruments::PricingOptions,
-    ) -> PricingResult<crate::results::ValuationResult> {
+    ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
         let shared_market = (!metrics.is_empty()).then(|| Arc::new(market.clone()));
         registry.as_ref().price_with_metrics_impl(
             PricingRequest {
@@ -307,7 +305,7 @@ impl PricerRegistry {
         &self,
         request: PricingRequest<'_>,
         shared: SharedPricingInputs,
-    ) -> PricingResult<crate::results::ValuationResult> {
+    ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
         use crate::metrics::MetricId;
         let PricingRequest {
             instrument,
@@ -472,7 +470,7 @@ impl PricerRegistry {
         model: ModelKey,
         market: &Market,
         as_of: finstack_core::dates::Date,
-    ) -> PricingResult<f64> {
+    ) -> std::result::Result<f64, PricingError> {
         let key = PricerKey::new(instrument.key(), model);
         let Some(pricer) = self.get_pricer(key) else {
             return Err(PricingError::UnknownPricer {
@@ -496,7 +494,7 @@ impl PricerRegistry {
         as_of: finstack_core::dates::Date,
         metrics: &[crate::metrics::MetricId],
         options: crate::instruments::PricingOptions,
-    ) -> Vec<PricingResult<crate::results::ValuationResult>> {
+    ) -> Vec<std::result::Result<crate::results::ValuationResult, PricingError>> {
         let shared = if metrics.is_empty() {
             SharedPricingInputs::default()
         } else {
@@ -530,7 +528,7 @@ impl PricerRegistry {
         as_of: finstack_core::dates::Date,
         metrics: &[crate::metrics::MetricId],
         options: crate::instruments::PricingOptions,
-    ) -> Vec<PricingResult<crate::results::ValuationResult>> {
+    ) -> Vec<std::result::Result<crate::results::ValuationResult, PricingError>> {
         let shared_market = (!metrics.is_empty()).then(|| Arc::new(market.clone()));
         registry.as_ref().price_batch_impl(
             BatchPricingRequest {
@@ -552,7 +550,7 @@ impl PricerRegistry {
         &self,
         request: BatchPricingRequest<'_>,
         shared: SharedPricingInputs,
-    ) -> Vec<PricingResult<crate::results::ValuationResult>> {
+    ) -> Vec<std::result::Result<crate::results::ValuationResult, PricingError>> {
         use rayon::prelude::*;
         let BatchPricingRequest {
             instruments,
@@ -705,7 +703,7 @@ mod tests {
             instrument: &dyn Priceable,
             _market: &Market,
             as_of: finstack_core::dates::Date,
-        ) -> PricingResult<crate::results::ValuationResult> {
+        ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
             Ok(crate::results::ValuationResult::stamped(
                 instrument.id(),
                 as_of,

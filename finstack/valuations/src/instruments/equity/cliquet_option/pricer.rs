@@ -6,7 +6,7 @@ use crate::instruments::equity::cliquet_option::monte_carlo::{
 };
 use crate::instruments::equity::cliquet_option::types::{CliquetOption, CliquetPayoffType};
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
@@ -448,7 +448,7 @@ impl Pricer for CliquetOptionMcPricer {
         instrument: &dyn crate::instruments::common_impl::traits::Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let cliquet = instrument
             .as_any()
             .downcast_ref::<CliquetOption>()

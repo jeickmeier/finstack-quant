@@ -5,7 +5,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::common_impl::two_clock::TwoClockParams;
 use crate::instruments::exotics::barrier_option::types::BarrierOption;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::Date;
@@ -288,7 +288,7 @@ impl Pricer for BarrierOptionMcPricer {
         instrument: &dyn crate::instruments::common_impl::traits::Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let barrier = instrument
             .as_any()
             .downcast_ref::<BarrierOption>()
@@ -441,7 +441,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let barrier_opt = instrument
             .as_any()
             .downcast_ref::<BarrierOption>()

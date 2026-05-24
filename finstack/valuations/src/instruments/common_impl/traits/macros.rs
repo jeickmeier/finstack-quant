@@ -51,7 +51,7 @@ macro_rules! impl_instrument_base {
             &mut self.attributes
         }
 
-        fn clone_box(&self) -> Box<$crate::instruments::DynInstrument> {
+        fn clone_box(&self) -> Box<dyn $crate::instruments::Instrument> {
             Box::new(self.clone())
         }
     };

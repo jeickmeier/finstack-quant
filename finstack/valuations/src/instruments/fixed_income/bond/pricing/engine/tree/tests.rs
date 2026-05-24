@@ -230,8 +230,8 @@ fn test_bond_valuator_street_call_redemption_includes_accrued_interest() {
 #[test]
 fn test_rates_credit_default_lowers_price() {
     use crate::models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
-    use crate::models::StateVariables;
     use finstack_core::market_data::term_structures::HazardCurve;
+    use finstack_core::HashMap;
 
     let bond = create_test_bond();
     let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -324,7 +324,7 @@ fn test_rates_credit_default_lowers_price() {
         .calibrate(disc_high.as_ref(), high_hc_ref.as_ref(), time_to_maturity)
         .expect("calibration high");
 
-    let vars = StateVariables::default();
+    let vars = HashMap::<&'static str, f64>::default();
 
     let pv_low = tree_low
         .price(vars.clone(), time_to_maturity, &ctx_low, &valuator_low)

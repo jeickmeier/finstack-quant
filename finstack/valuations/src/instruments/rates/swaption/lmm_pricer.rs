@@ -71,7 +71,7 @@ impl BermudanSwaptionLmmPricer {
         disc: &dyn Discounting,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<LmmParams, PricingError> {
+    ) -> std::result::Result<LmmParams, PricingError> {
         let swap_start_yf =
             year_fraction(swaption.day_count, as_of, swaption.swap_start).map_err(|e| {
                 PricingError::model_failure_with_context(
@@ -304,7 +304,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         // Downcast to BermudanSwaption
         let swaption = instrument
             .as_any()

@@ -3,9 +3,6 @@ use finstack_core::HashMap;
 
 use super::state_keys;
 
-/// Map of state variables for a tree node
-pub type StateVariables = HashMap<&'static str, f64>;
-
 /// Complete state information for a node in the pricing tree
 #[derive(Clone)]
 pub struct NodeState<'a> {
@@ -14,7 +11,7 @@ pub struct NodeState<'a> {
     /// Time in years from valuation date
     pub time: f64,
     /// Map of all state variables at this node (reference to avoid cloning)
-    pub vars: &'a StateVariables,
+    pub vars: &'a HashMap<&'static str, f64>,
     /// Access to market context for additional data
     pub market_context: &'a MarketContext,
     /// Barrier state tracking (if applicable)
@@ -72,7 +69,7 @@ impl<'a> NodeState<'a> {
     pub fn new(
         step: usize,
         time: f64,
-        vars: &'a StateVariables,
+        vars: &'a HashMap<&'static str, f64>,
         market_context: &'a MarketContext,
     ) -> Self {
         let cached = CachedValues {
@@ -103,7 +100,7 @@ impl<'a> NodeState<'a> {
     pub(crate) fn with_cached(
         step: usize,
         time: f64,
-        vars: &'a StateVariables,
+        vars: &'a HashMap<&'static str, f64>,
         market_context: &'a MarketContext,
         cached: CachedValues,
     ) -> Self {
@@ -125,7 +122,7 @@ impl<'a> NodeState<'a> {
     pub(crate) fn with_cached_barrier(
         step: usize,
         time: f64,
-        vars: &'a StateVariables,
+        vars: &'a HashMap<&'static str, f64>,
         market_context: &'a MarketContext,
         barrier_state: BarrierState,
         cached: CachedValues,
@@ -147,7 +144,7 @@ impl<'a> NodeState<'a> {
     pub fn new_with_barrier(
         step: usize,
         time: f64,
-        vars: &'a StateVariables,
+        vars: &'a HashMap<&'static str, f64>,
         market_context: &'a MarketContext,
         barrier_state: BarrierState,
     ) -> Self {

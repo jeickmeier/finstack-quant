@@ -9,7 +9,7 @@
 
 use super::{
     expect_inst, register_generic, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry,
-    PricingError, PricingErrorContext, PricingResult,
+    PricingError, PricingErrorContext,
 };
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::structured_credit::{
@@ -75,7 +75,7 @@ impl Pricer for CDSHazardPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let cds =
             expect_inst::<crate::instruments::CreditDefaultSwap>(instrument, InstrumentType::CDS)?;
         let value = cds.base_value(market, as_of).map_err(|e| {
@@ -118,7 +118,7 @@ impl Pricer for StructuredCreditStochasticPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let structured_credit =
             expect_inst::<StructuredCredit>(instrument, InstrumentType::StructuredCredit)?;
         let stochastic = structured_credit

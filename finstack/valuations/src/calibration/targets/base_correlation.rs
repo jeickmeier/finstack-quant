@@ -276,7 +276,7 @@ impl BaseCorrelationTarget {
 
         let prepared_quote = PreparedQuote::new(
             Arc::new(quote.clone()),
-            Arc::<crate::instruments::DynInstrument>::from(instrument),
+            Arc::<dyn crate::instruments::Instrument>::from(instrument),
             fields.maturity,
             pillar_time,
         );

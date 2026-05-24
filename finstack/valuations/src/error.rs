@@ -10,7 +10,7 @@
 //! valuations::Error
 //! ├── Core(finstack_core::Error)         ← propagated core errors
 //! ├── Pricing(PricingError)              ← pricer registry, model failures
-//! ├── Correlation(CorrelationError)      ← factor model validation
+//! ├── Correlation(correlation::Error)    ← factor model validation
 //! └── WaterfallValidation(ValidationError) ← structured credit waterfall
 //! ```
 //!
@@ -24,7 +24,7 @@
 //! # Naming Convention
 //!
 //! Sub-errors use `{Domain}Error` prefixes (`PricingError`,
-//! `CorrelationError`, `ValidationError`) so they can be imported
+//! `ValidationError`) so they can be imported
 //! alongside `finstack_core::Error` without ambiguity. The unified wrapper
 //! is re-exported at crate root as `Error` (matching the standard convention).
 //! See `docs/CONVENTIONS_ERROR_NAMING.md` for the cross-crate naming rationale.
@@ -38,12 +38,12 @@
 //!   (e.g., `finstack_core::error` has `Error`, `InputError`, suggestions).
 //! - **`error.rs`** (flat file): Use for re-export facades that aggregate errors
 //!   defined elsewhere in the crate (this module re-exports `PricingError`,
-//!   `CorrelationError`, `ValidationError` from their source modules).
+//!   `ValidationError` from their source modules).
 //!
 //! # Examples
 //!
 //! ```ignore
-//! use finstack_valuations::error::{CorrelationError, Error, PricingError, ValidationError};
+//! use finstack_valuations::error::{Error, PricingError, ValidationError};
 //! use finstack_valuations::pricer::InstrumentType;
 //!
 //! // Domain errors automatically wrap into the unified type
@@ -56,9 +56,8 @@
 //! let core_err: finstack_core::Error = pricing_err.into();
 //! ```
 
-pub use crate::correlation::Error as CorrelationError;
 pub use crate::instruments::fixed_income::structured_credit::utils::validation::ValidationError;
-pub use crate::pricer::{PricingError, PricingErrorContext, PricingResult};
+pub use crate::pricer::{PricingError, PricingErrorContext};
 pub use finstack_factor_model::DecompositionError;
 
 /// Unified error type for the valuations crate.
@@ -85,7 +84,7 @@ pub enum Error {
 
     /// Correlation matrix validation error (factor model).
     #[error(transparent)]
-    Correlation(#[from] CorrelationError),
+    Correlation(#[from] crate::correlation::Error),
 
     /// Structured credit waterfall validation error.
     #[error(transparent)]
@@ -170,14 +169,14 @@ mod tests {
 
     #[test]
     fn correlation_error_wraps_into_unified() {
-        let corr = CorrelationError::InvalidSize {
+        let corr = crate::correlation::Error::InvalidSize {
             expected: 3,
             actual: 5,
         };
         let unified: Error = corr.into();
         assert!(matches!(
             unified,
-            Error::Correlation(CorrelationError::InvalidSize { .. })
+            Error::Correlation(crate::correlation::Error::InvalidSize { .. })
         ));
     }
 
@@ -204,7 +203,7 @@ mod tests {
         assert!(matches!(core_err, finstack_core::Error::Calibration { .. }));
 
         // Correlation -> core
-        let corr = CorrelationError::NotSymmetric {
+        let corr = crate::correlation::Error::NotSymmetric {
             i: 0,
             j: 1,
             diff: 0.01,

@@ -209,17 +209,3 @@ pub struct BarrierSpec {
     /// Barrier style (engine only enforces KnockOut directly)
     pub style: BarrierStyle,
 }
-
-/// Custom state generator function type for flexible tree evolution.
-///
-/// Given a step index and node index, returns the state variable value at that node.
-/// This allows for pre-calibrated trees (e.g., short-rate trees) to inject
-/// custom state values instead of using multiplicative factors.
-///
-/// # Arguments
-/// * `step` - Time step index (0 to N)
-/// * `node` - Node index at this step
-///
-/// # Returns
-/// * State variable value (e.g., interest rate, spot price)
-pub type StateGenerator = Box<dyn Fn(usize, usize) -> f64>;

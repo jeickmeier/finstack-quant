@@ -1,12 +1,9 @@
 //! Pricing error types and context utilities.
 //!
-//! Defines [`PricingError`], [`PricingErrorContext`], and [`PricingResult`].
+//! Defines [`PricingError`] and [`PricingErrorContext`].
 
 use super::{InstrumentType, ModelKey, PricerKey};
 use crate::instruments::common_impl::traits::Instrument as Priceable;
-
-/// Standardized result type for pricing operations
-pub type PricingResult<T> = std::result::Result<T, PricingError>;
 
 /// Context for pricing operations, providing actionable debugging information.
 ///

@@ -9,6 +9,7 @@ use super::pricer::{collect_inputs_extended, option_currency};
 use super::types::EquityOption;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Instrument;
+use crate::pricer::PricingError;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
@@ -73,7 +74,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
         instrument: &dyn crate::instruments::common_impl::traits::Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> crate::pricer::PricingResult<crate::results::ValuationResult> {
+    ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
         let equity_option = instrument
             .as_any()
             .downcast_ref::<EquityOption>()

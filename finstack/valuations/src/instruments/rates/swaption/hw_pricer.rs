@@ -71,7 +71,7 @@ impl Pricer for SwaptionHullWhitePricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let swaption = instrument
             .as_any()
             .downcast_ref::<Swaption>()
@@ -90,7 +90,7 @@ impl SwaptionHullWhitePricer {
         swaption: &Swaption,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         // Single-curve requirement (same as Bermudan pricer)
         if swaption.forward_curve_id != swaption.discount_curve_id {
             return Err(PricingError::model_failure_with_context(

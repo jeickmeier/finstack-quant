@@ -1,7 +1,8 @@
 use finstack_core::market_data::context::MarketContext;
+use finstack_core::HashMap;
 use finstack_core::Result;
 
-use super::node_state::{NodeState, StateVariables};
+use super::node_state::NodeState;
 use super::state_keys;
 
 /// Trait for instrument-specific valuation logic on a tree
@@ -34,7 +35,7 @@ pub trait TreeModel {
     #[must_use = "pricing result should not be discarded"]
     fn price<V: TreeValuator>(
         &self,
-        initial_vars: StateVariables,
+        initial_vars: HashMap<&'static str, f64>,
         time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,
@@ -50,7 +51,7 @@ pub trait TreeModel {
     /// * `bump_size` - Size of finite difference bumps (default: 1% of base value)
     fn calculate_greeks<V: TreeValuator>(
         &self,
-        initial_vars: StateVariables,
+        initial_vars: HashMap<&'static str, f64>,
         time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,

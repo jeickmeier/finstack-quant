@@ -23,7 +23,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::asian_option::AveragingMethod;
 use crate::instruments::OptionType;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
@@ -406,7 +406,7 @@ impl Pricer for CommodityAsianOptionAnalyticalPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let asian = instrument
             .as_any()
             .downcast_ref::<CommodityAsianOption>()

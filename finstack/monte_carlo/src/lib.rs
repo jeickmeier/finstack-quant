@@ -139,7 +139,7 @@ mod mc_process_params_serialization;
 
 pub use traits::{
     state_keys, Discretization, PathState, Payoff, ProportionalDiffusion, RandomStream, StateKey,
-    StateVariables, StochasticProcess,
+    StochasticProcess,
 };
 
 /// Prelude for convenient imports of the main Monte Carlo entry points.

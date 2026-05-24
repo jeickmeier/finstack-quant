@@ -314,8 +314,8 @@ macro_rules! instrument_json_into_boxed_match {
         $(boxed: $boxed_variant:ident($boxed_ty:ty) => $boxed_tag:literal @ $boxed_schema_path:literal $(, $boxed_alias:literal)*;)*
     ) => {
         match $instrument_json {
-            $(InstrumentJson::$variant(instrument) => Ok::<Box<DynInstrument>, finstack_core::Error>(Box::new(instrument) as Box<DynInstrument>),)*
-            $(InstrumentJson::$boxed_variant(instrument) => Ok::<Box<DynInstrument>, finstack_core::Error>(Box::new(*instrument) as Box<DynInstrument>),)*
+            $(InstrumentJson::$variant(instrument) => Ok::<Box<dyn Instrument>, finstack_core::Error>(Box::new(instrument) as Box<dyn Instrument>),)*
+            $(InstrumentJson::$boxed_variant(instrument) => Ok::<Box<dyn Instrument>, finstack_core::Error>(Box::new(*instrument) as Box<dyn Instrument>),)*
         }
     };
 }
@@ -346,7 +346,7 @@ macro_rules! instrument_json_parse_tagged_match {
     };
 }
 
-fn validate_loaded_instrument(instrument: &DynInstrument) -> Result<()> {
+fn validate_loaded_instrument(instrument: &dyn Instrument) -> Result<()> {
     if let Some(overrides) = instrument.pricing_overrides() {
         overrides.validate()?;
     } else if let Some(overrides) = instrument.scenario_overrides() {
@@ -379,8 +379,8 @@ impl InstrumentJson {
     /// # Errors
     ///
     /// Returns an error if spec validation fails during conversion.
-    pub fn into_boxed(self) -> Result<Box<DynInstrument>> {
-        let instrument: Box<DynInstrument> =
+    pub fn into_boxed(self) -> Result<Box<dyn Instrument>> {
+        let instrument: Box<dyn Instrument> =
             with_instrument_json_registry!(instrument_json_into_boxed_match, self)?;
         validate_loaded_instrument(instrument.as_ref())?;
         Ok(instrument)
@@ -444,7 +444,7 @@ impl InstrumentEnvelope {
         Ok(())
     }
 
-    fn finalize_loaded_instrument(instrument: Box<DynInstrument>) -> Result<Box<DynInstrument>> {
+    fn finalize_loaded_instrument(instrument: Box<dyn Instrument>) -> Result<Box<dyn Instrument>> {
         validate_loaded_instrument(instrument.as_ref())?;
         Ok(instrument)
     }
@@ -465,7 +465,7 @@ impl InstrumentEnvelope {
     ///
     /// The `"schema"` key is used to route to the envelope path without
     /// cloning the entire `Value` tree.
-    pub fn from_value(value: serde_json::Value) -> Result<Box<DynInstrument>> {
+    pub fn from_value(value: serde_json::Value) -> Result<Box<dyn Instrument>> {
         // Detect envelope form by presence of the "schema" key — avoids
         // cloning the entire Value tree when trying both paths.
         let is_envelope = value
@@ -512,7 +512,7 @@ impl InstrumentEnvelope {
     /// - Required fields are missing
     /// - Unknown fields are present (strict mode)
     /// - Spec validation fails
-    pub fn from_reader<R: Read>(reader: R) -> Result<Box<DynInstrument>> {
+    pub fn from_reader<R: Read>(reader: R) -> Result<Box<dyn Instrument>> {
         // Read up to MAX_JSON_BYTES + 1 bytes so we can distinguish "exactly
         // at limit" from "over limit" without reading the whole stream first.
         let mut buf = Vec::with_capacity(4096.min(MAX_JSON_BYTES));
@@ -539,7 +539,7 @@ impl InstrumentEnvelope {
     /// Convenience wrapper around `from_reader`.  The same [`MAX_JSON_BYTES`]
     /// cap applies.
     #[allow(clippy::should_implement_trait)]
-    pub fn from_str(s: &str) -> Result<Box<DynInstrument>> {
+    pub fn from_str(s: &str) -> Result<Box<dyn Instrument>> {
         Self::from_reader(s.as_bytes())
     }
 
@@ -556,7 +556,7 @@ impl InstrumentEnvelope {
     /// # Returns
     ///
     /// A boxed instrument trait object ready for pricing.
-    pub fn from_path(path: impl AsRef<std::path::Path>) -> Result<Box<DynInstrument>> {
+    pub fn from_path(path: impl AsRef<std::path::Path>) -> Result<Box<dyn Instrument>> {
         let path = path.as_ref();
         let file = std::fs::File::open(path).map_err(|e| {
             finstack_core::Error::Validation(format!(
@@ -597,7 +597,7 @@ impl InstrumentEnvelope {
 pub fn cashflow_provider_from_value(
     value: serde_json::Value,
 ) -> Result<Arc<dyn finstack_cashflows::CashflowProvider + Send + Sync>> {
-    let instrument: Box<DynInstrument> = InstrumentEnvelope::from_value(value)?;
+    let instrument: Box<dyn Instrument> = InstrumentEnvelope::from_value(value)?;
     let provider: Box<dyn finstack_cashflows::CashflowProvider + Send + Sync> = instrument;
     Ok(Arc::from(provider))
 }

@@ -13,6 +13,7 @@ use super::pricer::{collect_inputs_extended, option_currency};
 use super::types::EquityOption;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Instrument;
+use crate::pricer::PricingError;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
@@ -79,7 +80,7 @@ fn simulate_rbergomi<F: finstack_monte_carlo::traits::Payoff>(
     fbm_gen: &finstack_monte_carlo::rng::volterra::RiemannLiouvilleVolterra,
     num_steps: usize,
     err_ctx: crate::pricer::PricingErrorContext,
-) -> crate::pricer::PricingResult<f64> {
+) -> std::result::Result<f64, PricingError> {
     use finstack_monte_carlo::rng::fbm::FractionalNoiseGenerator;
     use finstack_monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
 
@@ -159,7 +160,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
         instrument: &dyn crate::instruments::common_impl::traits::Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> crate::pricer::PricingResult<crate::results::ValuationResult> {
+    ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
         let equity_option = instrument
             .as_any()
             .downcast_ref::<EquityOption>()

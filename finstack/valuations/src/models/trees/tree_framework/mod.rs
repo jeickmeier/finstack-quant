@@ -64,10 +64,8 @@ mod traits;
 #[cfg(test)]
 mod tests;
 
-pub use evolution::{
-    BarrierSpec, BarrierStyle, EvolutionParams, StateGenerator, TreeBranching, TreeParameters,
-};
-pub use node_state::{BarrierState, BarrierType, NodeState, StateVariables};
+pub use evolution::{BarrierSpec, BarrierStyle, EvolutionParams, TreeBranching, TreeParameters};
+pub use node_state::{BarrierState, BarrierType, NodeState};
 pub use recombining::{
     price_recombining_tree, single_factor_equity_state, two_factor_equity_rates_state,
     RecombiningInputs,

@@ -28,7 +28,7 @@ use crate::instruments::fixed_income::convertible::{
 };
 use crate::metrics::bump_discount_curve_parallel;
 use crate::models::trees::tree_framework::map_date_to_step;
-use crate::models::{single_factor_equity_state, EvolutionParams, StateVariables, TreeGreeks};
+use crate::models::{single_factor_equity_state, EvolutionParams, TreeGreeks};
 
 /// Compute the conversion value for any conversion policy given the spot price.
 ///
@@ -548,7 +548,7 @@ struct TsiveriotisZhangEngine<'a> {
 impl<'a> TsiveriotisZhangEngine<'a> {
     fn price(
         &self,
-        initial_vars: StateVariables,
+        initial_vars: HashMap<&'static str, f64>,
         tree_type: ConvertibleTreeType,
     ) -> Result<(f64, f64)> {
         // Extract parameters

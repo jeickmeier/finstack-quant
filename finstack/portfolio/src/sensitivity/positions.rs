@@ -1,6 +1,6 @@
 //! JSON position parsing helpers for factor-model bindings.
 
-use finstack_valuations::instruments::{DynInstrument, Instrument};
+use finstack_valuations::instruments::Instrument;
 use serde::Deserialize;
 
 /// A parsed factor-model position ready for repricing or sensitivity analysis.
@@ -8,7 +8,7 @@ pub struct ParsedPosition {
     /// Position identifier.
     pub id: String,
     /// Boxed instrument parsed from tagged JSON.
-    pub instrument: Box<DynInstrument>,
+    pub instrument: Box<dyn Instrument>,
     /// Position weight or notional multiplier.
     pub weight: f64,
 }

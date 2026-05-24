@@ -8,7 +8,7 @@ use crate::portfolio::Portfolio;
 use finstack_core::market_data::context::MarketContext;
 use finstack_scenarios::engine::{ApplicationReport, ExecutionContext, ScenarioEngine};
 use finstack_scenarios::spec::ScenarioSpec;
-use finstack_valuations::instruments::DynInstrument;
+use finstack_valuations::instruments::Instrument;
 use std::sync::Arc;
 
 /// Apply a scenario to a portfolio.
@@ -70,7 +70,7 @@ pub(crate) fn apply_scenario(
     let mut portfolio_copy = portfolio.clone();
 
     // Extract instruments into a mutable vector
-    let mut instruments: Vec<Box<DynInstrument>> = portfolio_copy
+    let mut instruments: Vec<Box<dyn Instrument>> = portfolio_copy
         .positions
         .iter()
         .map(|pos| {

@@ -14,17 +14,17 @@ use crate::instruments::fixed_income::term_loan::cashflows::generate_cashflows;
 use crate::instruments::fixed_income::term_loan::TermLoan;
 use crate::models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
 use crate::models::{
-    short_rate_keys, NodeState, ShortRateTree, ShortRateTreeConfig, StateVariables, TreeModel,
-    TreeValuator,
+    short_rate_keys, NodeState, ShortRateTree, ShortRateTreeConfig, TreeModel, TreeValuator,
 };
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::solver::{BrentSolver, Solver};
 use finstack_core::money::Money;
+use finstack_core::HashMap;
 use finstack_core::Result;
 
 /// Configuration for tree-based term loan pricing (callable PV, OAS).
@@ -494,7 +494,7 @@ impl TermLoanTreePricer {
             });
             tree.calibrate(disc.as_ref(), hc.as_ref(), time_to_maturity)?;
 
-            let vars = StateVariables::default();
+            let vars = HashMap::<&'static str, f64>::default();
             tree.price(vars, time_to_maturity, market, &valuator)?
         } else {
             // Short-rate tree calibrated to the discount curve.
@@ -506,7 +506,7 @@ impl TermLoanTreePricer {
             tree.calibrate(&loan.discount_curve_id, disc.as_ref(), time_to_maturity)?;
 
             let initial_rate = tree.rate_at_node(0, 0).unwrap_or_else(|_| disc.zero(0.0));
-            let mut vars = StateVariables::default();
+            let mut vars = HashMap::<&'static str, f64>::default();
             vars.insert(short_rate_keys::SHORT_RATE, initial_rate);
             vars.insert(short_rate_keys::OAS, 0.0);
             tree.price(vars, time_to_maturity, market, &valuator)?
@@ -635,7 +635,7 @@ impl TermLoanTreePricer {
         let objective_fn = |oas_bp: f64| -> f64 {
             if let Some(tree) = rc_tree.as_ref() {
                 // Calibrated credit tree: OAS as a parallel shift to calibrated rates.
-                let mut vars = StateVariables::default();
+                let mut vars = HashMap::<&'static str, f64>::default();
                 vars.insert("oas", oas_bp);
                 match tree.price(vars, time_to_maturity, market, &valuator) {
                     Ok(model_price) => model_price - dirty_target,
@@ -643,7 +643,7 @@ impl TermLoanTreePricer {
                 }
             } else if let Some((tree, initial_rate)) = sr_tree_and_initial.as_ref() {
                 // Short-rate tree: pre-calibrated; OAS is a parallel shift via state.
-                let mut vars = StateVariables::default();
+                let mut vars = HashMap::<&'static str, f64>::default();
                 vars.insert(short_rate_keys::SHORT_RATE, *initial_rate);
                 vars.insert(short_rate_keys::OAS, oas_bp);
                 match tree.price(vars, time_to_maturity, market, &valuator) {
@@ -682,7 +682,7 @@ impl Pricer for TermLoanTreePricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let loan = instrument
             .as_any()
             .downcast_ref::<TermLoan>()

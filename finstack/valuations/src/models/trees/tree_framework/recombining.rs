@@ -2,8 +2,8 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::HashMap;
 use finstack_core::Result;
 
-use super::evolution::{BarrierSpec, BarrierStyle, StateGenerator, TreeBranching};
-use super::node_state::{BarrierState, BarrierType, CachedValues, NodeState, StateVariables};
+use super::evolution::{BarrierSpec, BarrierStyle, TreeBranching};
+use super::node_state::{BarrierState, BarrierType, CachedValues, NodeState};
 use super::state_keys;
 use super::traits::TreeValuator;
 
@@ -16,7 +16,7 @@ pub struct RecombiningInputs<'a, V: TreeValuator> {
     /// Number of time steps in the tree
     pub steps: usize,
     /// Initial state variable values at root node
-    pub initial_vars: StateVariables,
+    pub initial_vars: HashMap<&'static str, f64>,
     /// Time to maturity in years
     pub time_to_maturity: f64,
     /// Market data context for curve lookups
@@ -40,9 +40,9 @@ pub struct RecombiningInputs<'a, V: TreeValuator> {
     /// Optional barrier configuration (discrete monitoring per step)
     pub barrier: Option<BarrierSpec>,
     /// Optional custom state generator for primary state variable (overrides up/down factors)
-    pub custom_state_generator: Option<&'a StateGenerator>,
+    pub custom_state_generator: Option<&'a dyn Fn(usize, usize) -> f64>,
     /// Optional custom rate generator for discounting (overrides interest_rate)
-    pub custom_rate_generator: Option<&'a StateGenerator>,
+    pub custom_rate_generator: Option<&'a dyn Fn(usize, usize) -> f64>,
 }
 
 /// Price an option using a recombining tree with backward induction.
@@ -676,7 +676,7 @@ pub fn single_factor_equity_state(
     risk_free_rate: f64,
     dividend_yield: f64,
     volatility: f64,
-) -> StateVariables {
+) -> HashMap<&'static str, f64> {
     let mut vars = HashMap::default();
     vars.insert(state_keys::SPOT, spot);
     vars.insert(state_keys::INTEREST_RATE, risk_free_rate);
@@ -692,7 +692,7 @@ pub fn two_factor_equity_rates_state(
     dividend_yield: f64,
     equity_volatility: f64,
     rate_volatility: f64,
-) -> StateVariables {
+) -> HashMap<&'static str, f64> {
     let mut vars = HashMap::default();
     vars.insert(state_keys::SPOT, spot);
     vars.insert(state_keys::INTEREST_RATE, risk_free_rate);

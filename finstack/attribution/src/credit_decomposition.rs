@@ -5,12 +5,12 @@ use super::credit_cascade::{
     optional_single_issuer_adder, plan_credit_cascade, shift_credit_curves_par_spread,
     single_issuer_by_bucket, CreditStepKind,
 };
-use super::credit_factor::CreditFactorModelRef;
 use super::spec::AttributionSpec;
 use super::types::PnlAttribution;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::Result;
-use finstack_valuations::instruments::DynInstrument;
+use finstack_factor_model::credit::hierarchy::CreditFactorModel;
+use finstack_valuations::instruments::Instrument;
 
 impl AttributionSpec {
     /// Compute the optional `credit_factor_detail` field for a finished
@@ -29,8 +29,8 @@ impl AttributionSpec {
     /// — there is no divide-by-near-zero and no twist guard.
     pub(crate) fn compute_credit_factor_detail(
         &self,
-        model_ref: &CreditFactorModelRef,
-        instrument: &std::sync::Arc<DynInstrument>,
+        model: &CreditFactorModel,
+        instrument: &std::sync::Arc<dyn Instrument>,
         market_t0: &MarketContext,
         market_t1: &MarketContext,
         attribution: &PnlAttribution,
@@ -38,8 +38,6 @@ impl AttributionSpec {
     ) -> Result<Option<super::CreditFactorAttribution>> {
         use finstack_core::money::Money;
         use finstack_core::types::IssuerId;
-
-        let model = model_ref.as_ref();
 
         // 1. Resolve issuer id from instrument attributes.
         let issuer_id_str = match instrument
@@ -177,8 +175,8 @@ impl AttributionSpec {
     /// no resolvable hazard curve). Hard-errors if validation fails.
     pub(crate) fn compute_carry_credit_split_and_decomposition(
         &self,
-        model_ref: &super::CreditFactorModelRef,
-        instrument: &std::sync::Arc<DynInstrument>,
+        model: &CreditFactorModel,
+        instrument: &std::sync::Arc<dyn Instrument>,
         market_t0: &MarketContext,
         attribution: &mut PnlAttribution,
     ) -> Result<()> {
@@ -203,7 +201,6 @@ impl AttributionSpec {
             None => return Ok(()),
         };
         let issuer_id = finstack_core::types::IssuerId::new(issuer_id_str);
-        let model = model_ref.as_ref();
         let issuer_row = match model.issuer_betas.iter().find(|r| r.issuer_id == issuer_id) {
             Some(r) => r,
             None => return Ok(()),

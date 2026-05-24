@@ -7,7 +7,7 @@ use crate::instruments::fx::shared::{
     FxSpotSource,
 };
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
@@ -148,7 +148,7 @@ impl Pricer for FxBarrierOptionMcPricer {
         instrument: &dyn crate::instruments::common_impl::traits::Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let fx_barrier = instrument
             .as_any()
             .downcast_ref::<FxBarrierOption>()
@@ -426,7 +426,7 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let fx_barrier = instrument
             .as_any()
             .downcast_ref::<FxBarrierOption>()
@@ -557,7 +557,10 @@ impl FxBarrierOptionVannaVolgaPricer {
     ///    caller explicitly requested via `ModelKey::FxBarrierVannaVolga`.
     ///    Production callers must construct the pricer with real 25Δ
     ///    market quotes via `with_quotes(...)`.
-    fn resolve_quotes(&self, fx_barrier: &FxBarrierOption) -> PricingResult<VannaVolgaQuotes> {
+    fn resolve_quotes(
+        &self,
+        fx_barrier: &FxBarrierOption,
+    ) -> std::result::Result<VannaVolgaQuotes, PricingError> {
         if let Some(q) = self.quotes {
             return Ok(q);
         }
@@ -580,7 +583,7 @@ impl FxBarrierOptionVannaVolgaPricer {
         fx_barrier: &FxBarrierOption,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<Money> {
+    ) -> std::result::Result<Money, PricingError> {
         if fx_barrier.use_gobet_miri {
             return Err(PricingError::model_failure_with_context(
                 "Discrete barrier monitoring (use_gobet_miri = true) requires the Monte Carlo \
@@ -682,7 +685,7 @@ impl Pricer for FxBarrierOptionVannaVolgaPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let fx_barrier = instrument
             .as_any()
             .downcast_ref::<FxBarrierOption>()

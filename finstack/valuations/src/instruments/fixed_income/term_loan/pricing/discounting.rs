@@ -322,7 +322,7 @@ impl Pricer for TermLoanDiscountingPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let loan = instrument
             .as_any()
             .downcast_ref::<TermLoan>()

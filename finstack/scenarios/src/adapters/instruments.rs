@@ -6,7 +6,7 @@
 
 use crate::adapters::traits::ScenarioEffect;
 use crate::warning::Warning;
-use finstack_valuations::instruments::{Attributes, DynInstrument};
+use finstack_valuations::instruments::{Attributes, Instrument};
 use finstack_valuations::pricer::InstrumentType;
 
 fn accumulate_optional_shock(current: Option<f64>, delta: f64) -> f64 {
@@ -115,13 +115,13 @@ impl ShockKind {
 
 /// Apply a shock to every instrument matching `matcher`.
 fn apply_shock<M>(
-    instruments: &mut [Box<DynInstrument>],
+    instruments: &mut [Box<dyn Instrument>],
     matcher: M,
     kind: ShockKind,
     raw_value: f64,
 ) -> (usize, Vec<Warning>)
 where
-    M: Fn(&Box<DynInstrument>) -> bool,
+    M: Fn(&Box<dyn Instrument>) -> bool,
 {
     let delta = kind.internal_value(raw_value);
     let mut count = 0;
@@ -169,7 +169,7 @@ where
 
 /// Apply a percentage price shock to instruments matching the provided types.
 pub fn apply_instrument_type_price_shock(
-    instruments: &mut [Box<DynInstrument>],
+    instruments: &mut [Box<dyn Instrument>],
     instrument_types: &[InstrumentType],
     pct: f64,
 ) -> (usize, Vec<Warning>) {
@@ -183,7 +183,7 @@ pub fn apply_instrument_type_price_shock(
 
 /// Apply a spread shock to instruments matching the provided types.
 pub fn apply_instrument_type_spread_shock(
-    instruments: &mut [Box<DynInstrument>],
+    instruments: &mut [Box<dyn Instrument>],
     instrument_types: &[InstrumentType],
     bp: f64,
 ) -> (usize, Vec<Warning>) {
@@ -197,7 +197,7 @@ pub fn apply_instrument_type_spread_shock(
 
 /// Apply a percentage price shock to instruments matching the provided attributes.
 pub fn apply_instrument_attr_price_shock(
-    instruments: &mut [Box<DynInstrument>],
+    instruments: &mut [Box<dyn Instrument>],
     attrs: &indexmap::IndexMap<String, String>,
     pct: f64,
 ) -> (usize, Vec<Warning>) {
@@ -218,7 +218,7 @@ pub fn apply_instrument_attr_price_shock(
 
 /// Apply a spread shock to instruments matching the provided attributes.
 pub fn apply_instrument_attr_spread_shock(
-    instruments: &mut [Box<DynInstrument>],
+    instruments: &mut [Box<dyn Instrument>],
     attrs: &indexmap::IndexMap<String, String>,
     bp: f64,
 ) -> (usize, Vec<Warning>) {

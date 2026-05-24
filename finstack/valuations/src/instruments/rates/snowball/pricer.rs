@@ -14,7 +14,7 @@ use crate::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig;
 use crate::instruments::rates::snowball::{Snowball, SnowballVariant};
 use crate::metrics::MetricId;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
@@ -212,7 +212,7 @@ impl Pricer for SnowballDiscountingPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let snowball = instrument
             .as_any()
             .downcast_ref::<Snowball>()
@@ -238,7 +238,7 @@ impl Pricer for SnowballDiscountingPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<f64> {
+    ) -> std::result::Result<f64, PricingError> {
         let snowball = instrument
             .as_any()
             .downcast_ref::<Snowball>()
@@ -437,7 +437,7 @@ impl Pricer for SnowballHw1fMcPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let snowball = instrument
             .as_any()
             .downcast_ref::<Snowball>()
@@ -479,7 +479,7 @@ impl Pricer for SnowballHw1fMcPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<f64> {
+    ) -> std::result::Result<f64, PricingError> {
         let snowball = instrument
             .as_any()
             .downcast_ref::<Snowball>()

@@ -5,11 +5,7 @@
 use crate::metrics::risk::MarketHistory;
 use crate::pricer::{ModelKey, PricerRegistry};
 use finstack_core::config::FinstackConfig;
-use finstack_core::types::CurveId;
-use smallvec::SmallVec;
 use std::sync::Arc;
-
-use super::instrument::Instrument;
 
 /// Optional overrides for a pricing-and-metrics request.
 ///
@@ -96,11 +92,3 @@ impl PricingOptions {
         self
     }
 }
-/// Type alias for curve ID collections that are typically small (0-2 items).
-///
-/// Most instruments depend on 1-2 curves. Using SmallVec avoids heap allocation
-/// for the common case while still supporting instruments with more curve dependencies.
-pub type CurveIdVec = SmallVec<[CurveId; 2]>;
-
-/// Trait-object alias for instrument values used by portfolio/scenario plumbing.
-pub type DynInstrument = dyn Instrument;

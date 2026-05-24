@@ -4,7 +4,7 @@
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::asian_option::types::AsianOption;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
@@ -916,7 +916,7 @@ impl Pricer for AsianOptionMcPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let asian = instrument
             .as_any()
             .downcast_ref::<AsianOption>()
@@ -986,7 +986,7 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let asian = instrument
             .as_any()
             .downcast_ref::<AsianOption>()
@@ -1098,7 +1098,7 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         use crate::instruments::common_impl::helpers::collect_black_scholes_inputs_df;
 
         let asian = instrument

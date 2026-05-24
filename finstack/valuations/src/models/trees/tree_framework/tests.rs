@@ -23,7 +23,7 @@ struct MockTreeModel;
 impl TreeModel for MockTreeModel {
     fn price<V: TreeValuator>(
         &self,
-        initial_vars: StateVariables,
+        initial_vars: HashMap<&'static str, f64>,
         time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,
@@ -33,7 +33,7 @@ impl TreeModel for MockTreeModel {
     }
 }
 
-fn sample_state_variables() -> StateVariables {
+fn sample_state_variables() -> HashMap<&'static str, f64> {
     let mut vars = HashMap::default();
     vars.insert(state_keys::SPOT, 100.0);
     vars.insert(state_keys::INTEREST_RATE, 0.03);

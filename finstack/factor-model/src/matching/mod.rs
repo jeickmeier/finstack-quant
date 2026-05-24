@@ -13,6 +13,6 @@ pub use credit::{
 };
 pub use filter::{AttributeFilter, DependencyFilter};
 pub use matchers::{
-    CascadeMatcher, FactorMatchEntry, FactorMatchError, FactorMatchResult, FactorMatcher,
-    FactorNode, HierarchicalMatcher, MappingRule, MappingTableMatcher,
+    CascadeMatcher, FactorMatchEntry, FactorMatchError, FactorMatcher, FactorNode,
+    HierarchicalMatcher, MappingRule, MappingTableMatcher,
 };

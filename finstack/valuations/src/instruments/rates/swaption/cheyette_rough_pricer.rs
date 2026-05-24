@@ -244,7 +244,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
         swaption: &BermudanSwaption,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<(Money, f64), PricingError> {
+    ) -> std::result::Result<(Money, f64), PricingError> {
         let disc = market
             .get_discount(swaption.discount_curve_id.as_str())
             .map_err(|e| {
@@ -640,7 +640,7 @@ impl Pricer for BermudanSwaptionCheyetteRoughPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let swaption = instrument
             .as_any()
             .downcast_ref::<BermudanSwaption>()

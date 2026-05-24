@@ -20,7 +20,7 @@
 //! tags rather than enumerated as nodes in a tree.
 
 use super::filter::DependencyFilter;
-use super::matchers::{FactorMatchEntry, FactorMatchError, FactorMatchResult, FactorMatcher};
+use super::matchers::{FactorMatchEntry, FactorMatchError, FactorMatcher};
 use crate::credit::hierarchy::{
     dimension_key, CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerTags,
 };
@@ -128,7 +128,7 @@ impl FactorMatcher for CreditHierarchicalMatcher {
         &self,
         dependency: &MarketDependency,
         attributes: &Attributes,
-    ) -> FactorMatchResult {
+    ) -> Result<Option<Vec<FactorMatchEntry>>, FactorMatchError> {
         if !self.config.dependency_filter.matches(dependency) {
             return Ok(None);
         }

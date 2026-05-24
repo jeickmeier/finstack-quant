@@ -11,7 +11,7 @@
 //! - `keys`: [`crate::pricer::InstrumentType`], [`crate::pricer::ModelKey`],
 //!   [`crate::pricer::PricerKey`]
 //! - `errors`: [`crate::pricer::PricingError`],
-//!   [`crate::pricer::PricingErrorContext`], [`crate::pricer::PricingResult`]
+//!   [`crate::pricer::PricingErrorContext`]
 //! - `registry`: [`crate::pricer::Pricer`], [`crate::pricer::PricerRegistry`],
 //!   `expect_inst`
 //!
@@ -33,7 +33,7 @@ mod registry;
 
 pub use crate::instruments::cashflow_export::instrument_cashflows_json;
 pub(crate) use errors::actionable_unknown_pricer_message;
-pub use errors::{PricingError, PricingErrorContext, PricingResult};
+pub use errors::{PricingError, PricingErrorContext};
 pub use json::{
     canonical_instrument_json, canonical_instrument_json_from_str, list_standard_metrics,
     list_standard_metrics_grouped, metric_value_from_instrument_json, parse_boxed_instrument_json,
@@ -188,7 +188,7 @@ mod tests {
             _instrument: &dyn crate::instruments::Instrument,
             _market: &finstack_core::market_data::MarketContext,
             as_of: finstack_core::dates::Date,
-        ) -> PricingResult<ValuationResult> {
+        ) -> std::result::Result<ValuationResult, PricingError> {
             Ok(ValuationResult::stamped(
                 "dummy",
                 as_of,

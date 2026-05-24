@@ -124,9 +124,6 @@ pub trait RandomStream: Clone + Send + Sync {
     }
 }
 
-/// Map of state variables for a path node (used only for dynamic/non-standard keys).
-pub type StateVariables = HashMap<&'static str, f64>;
-
 /// Standard named keys for values stored in [`PathState`].
 pub mod state_keys {
     use std::sync::Mutex;
@@ -250,7 +247,7 @@ fn parse_indexed_spot_key(key: &str) -> Option<usize> {
 #[derive(Debug, Clone, Default)]
 struct PathStateExtras {
     indexed_spots: SmallVec<[Option<f64>; 4]>,
-    dynamic: StateVariables,
+    dynamic: HashMap<&'static str, f64>,
     cashflows: Vec<(f64, f64, CashflowType)>,
 }
 
@@ -303,7 +300,7 @@ impl PathState {
     }
 
     /// Create a path state with initial variables.
-    pub fn with_vars(step: usize, time: f64, vars: StateVariables) -> Self {
+    pub fn with_vars(step: usize, time: f64, vars: HashMap<&'static str, f64>) -> Self {
         let mut ps = Self::new(step, time);
         for (key, value) in vars {
             ps.set(key, value);
@@ -395,7 +392,7 @@ impl PathState {
     /// Prefer this over [`Self::vars`] on hot paths to reuse a single `HashMap`
     /// allocation instead of cloning the dynamic map and allocating a fresh map
     /// on every call.
-    pub fn collect_vars(&self, out: &mut StateVariables) {
+    pub fn collect_vars(&self, out: &mut HashMap<&'static str, f64>) {
         out.clear();
 
         let dyn_len = self.extras().map(|e| e.dynamic.len()).unwrap_or(0);
@@ -443,8 +440,8 @@ impl PathState {
     /// Collect all state variables into a HashMap.
     /// Merges fixed-slot values with dynamic values. This allocates --
     /// prefer `get`/`get_key` or [`Self::collect_vars`] on hot paths.
-    pub fn vars(&self) -> StateVariables {
-        let mut map = StateVariables::default();
+    pub fn vars(&self) -> HashMap<&'static str, f64> {
+        let mut map = HashMap::<&'static str, f64>::default();
         self.collect_vars(&mut map);
         map
     }
@@ -823,7 +820,7 @@ mod tests {
         assert_eq!(state.get("spot_1"), Some(120.0));
         assert_eq!(state.vars().get("spot_1"), Some(&120.0));
 
-        let mut buf = StateVariables::default();
+        let mut buf = HashMap::<&'static str, f64>::default();
         state.collect_vars(&mut buf);
         assert_eq!(buf.get("spot_1"), Some(&120.0));
         buf.clear();

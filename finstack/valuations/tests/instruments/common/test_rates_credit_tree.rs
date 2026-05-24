@@ -16,9 +16,8 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::{DiscountCurve, HazardCurve, ParInterp};
 use finstack_core::math::interp::InterpStyle;
-use finstack_valuations::models::trees::tree_framework::{
-    NodeState, StateVariables, TreeModel, TreeValuator,
-};
+use finstack_core::HashMap;
+use finstack_valuations::models::trees::tree_framework::{NodeState, TreeModel, TreeValuator};
 use finstack_valuations::models::trees::two_factor_rates_credit::{
     RatesCreditConfig, RatesCreditTree,
 };
@@ -92,7 +91,7 @@ fn rates_credit_tree_reproduces_disc_curve_when_hazard_is_silent() {
     tree.calibrate(&disc, &haz, ttm).expect("calibrate");
 
     let ctx = MarketContext::new();
-    let vars = StateVariables::default();
+    let vars = HashMap::<&'static str, f64>::default();
     let val = DefaultableZcbValuator;
     let price = tree.price(vars, ttm, &ctx, &val).expect("price");
 
@@ -123,7 +122,7 @@ fn rates_credit_tree_correlation_extremes_are_well_defined() {
             ..Default::default()
         });
         tree.calibrate(&disc, &haz, ttm).expect("calibrate");
-        let vars = StateVariables::default();
+        let vars = HashMap::<&'static str, f64>::default();
         tree.price(vars, ttm, &ctx, &val).expect("price")
     };
 
@@ -152,7 +151,7 @@ fn rates_credit_tree_correlation_extremes_are_well_defined() {
 fn rates_credit_tree_uncalibrated_returns_error() {
     let tree = RatesCreditTree::new(RatesCreditConfig::default());
     let ctx = MarketContext::new();
-    let vars = StateVariables::default();
+    let vars = HashMap::<&'static str, f64>::default();
     let val = DefaultableZcbValuator;
     let result = tree.price(vars, 1.0, &ctx, &val);
     assert!(

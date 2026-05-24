@@ -11,6 +11,7 @@
 //!   European Options Based on Fourier-Cosine Series Expansions."
 //!   *SIAM J. Sci. Comput.*, 31(2), 826-848.
 
+use super::PricingError;
 use finstack_core::math::characteristic_function::{
     BlackScholesCf, CharacteristicFunction, MertonJumpCf, VarianceGammaCf,
 };
@@ -112,7 +113,7 @@ pub struct MertonJumpCosParams {
 }
 
 /// Price a European option under Black-Scholes using the COS method.
-pub fn bs_cos_price(params: BlackScholesCosParams) -> crate::pricer::PricingResult<f64> {
+pub fn bs_cos_price(params: BlackScholesCosParams) -> std::result::Result<f64, PricingError> {
     let cf = BlackScholesCf {
         r: params.rate,
         q: params.dividend,
@@ -130,7 +131,7 @@ pub fn bs_cos_price(params: BlackScholesCosParams) -> crate::pricer::PricingResu
 }
 
 /// Price a European option under Variance Gamma using the COS method.
-pub fn vg_cos_price(params: VarianceGammaCosParams) -> crate::pricer::PricingResult<f64> {
+pub fn vg_cos_price(params: VarianceGammaCosParams) -> std::result::Result<f64, PricingError> {
     let cf = VarianceGammaCf {
         r: params.rate,
         q: params.dividend,
@@ -150,7 +151,9 @@ pub fn vg_cos_price(params: VarianceGammaCosParams) -> crate::pricer::PricingRes
 }
 
 /// Price a European option under Merton jump-diffusion using the COS method.
-pub fn merton_jump_cos_price(params: MertonJumpCosParams) -> crate::pricer::PricingResult<f64> {
+pub fn merton_jump_cos_price(
+    params: MertonJumpCosParams,
+) -> std::result::Result<f64, PricingError> {
     let cf = MertonJumpCf {
         r: params.rate,
         q: params.dividend,
@@ -186,7 +189,7 @@ fn price_from_cf(
     maturity: f64,
     is_call: bool,
     n_terms: Option<usize>,
-) -> crate::pricer::PricingResult<f64> {
+) -> std::result::Result<f64, PricingError> {
     let pricer = CosPricer::new(cf, cos_config(n_terms));
     if is_call {
         pricer.price_call(spot, strike, rate, maturity)
@@ -239,7 +242,7 @@ impl<'a> CosPricer<'a> {
         strike: f64,
         r: f64,
         t: f64,
-    ) -> crate::pricer::PricingResult<f64> {
+    ) -> std::result::Result<f64, PricingError> {
         self.price(spot, strike, r, t, true)
     }
 
@@ -251,7 +254,7 @@ impl<'a> CosPricer<'a> {
         strike: f64,
         r: f64,
         t: f64,
-    ) -> crate::pricer::PricingResult<f64> {
+    ) -> std::result::Result<f64, PricingError> {
         self.price(spot, strike, r, t, false)
     }
 
@@ -262,7 +265,7 @@ impl<'a> CosPricer<'a> {
         strikes: &[f64],
         r: f64,
         t: f64,
-    ) -> crate::pricer::PricingResult<Vec<f64>> {
+    ) -> Result<Vec<f64>, PricingError> {
         self.price_strip(spot, strikes, r, t, true)
     }
 
@@ -273,7 +276,7 @@ impl<'a> CosPricer<'a> {
         strikes: &[f64],
         r: f64,
         t: f64,
-    ) -> crate::pricer::PricingResult<Vec<f64>> {
+    ) -> Result<Vec<f64>, PricingError> {
         self.price_strip(spot, strikes, r, t, false)
     }
 
@@ -284,7 +287,7 @@ impl<'a> CosPricer<'a> {
         r: f64,
         t: f64,
         is_call: bool,
-    ) -> crate::pricer::PricingResult<f64> {
+    ) -> std::result::Result<f64, PricingError> {
         // `price_strip` returns one price per input strike; with a single
         // strike the result is a one-element vector. Use a non-panicking
         // accessor — a panicking index has no place in library code.
@@ -306,7 +309,7 @@ impl<'a> CosPricer<'a> {
         r: f64,
         t: f64,
         is_call: bool,
-    ) -> crate::pricer::PricingResult<Vec<f64>> {
+    ) -> Result<Vec<f64>, PricingError> {
         if strikes.is_empty() {
             return Ok(Vec::new());
         }
@@ -429,7 +432,7 @@ impl<'a> CosPricer<'a> {
         bma: f64,
         df: f64,
         cf_vals: &[Complex64],
-    ) -> crate::pricer::PricingResult<f64> {
+    ) -> std::result::Result<f64, PricingError> {
         // x0 = ln(S/K): shift from Y to X = Y + x0.
         // Integration window in X-space, following the moneyness shift.
         let x0 = (spot / strike).ln();
@@ -493,7 +496,7 @@ impl<'a> CosPricer<'a> {
 /// function diverged; returning `raw.max(0.0)` would turn that into a silent
 /// `$0`, since `f64::max(NaN, 0.0) == 0.0` and the negativity check
 /// `raw < -tol` is `false` for `NaN`. Surface it as an explicit error instead.
-fn cos_finite_price(raw: f64, side: &str) -> crate::pricer::PricingResult<f64> {
+fn cos_finite_price(raw: f64, side: &str) -> std::result::Result<f64, PricingError> {
     if !raw.is_finite() {
         return Err(crate::pricer::PricingError::model_failure_with_context(
             format!(
@@ -541,7 +544,7 @@ const DEGENERATE_CUMULANT_RADICAND: f64 = 1e-12;
 fn truncation_range(
     c: &finstack_core::math::characteristic_function::Cumulants,
     l: f64,
-) -> crate::pricer::PricingResult<(f64, f64)> {
+) -> std::result::Result<(f64, f64), PricingError> {
     let radicand = c.c2 + c.c4.abs().sqrt();
     if !radicand.is_finite() || radicand <= DEGENERATE_CUMULANT_RADICAND {
         return Err(crate::pricer::PricingError::model_failure_with_context(

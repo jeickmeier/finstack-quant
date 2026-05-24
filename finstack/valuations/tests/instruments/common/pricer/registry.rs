@@ -31,8 +31,8 @@ fn test_market(as_of: Date) -> MarketContext {
 }
 
 fn assert_pricing_result_eq(
-    left: &PricingResult<ValuationResult>,
-    right: &PricingResult<ValuationResult>,
+    left: &std::result::Result<ValuationResult, PricingError>,
+    right: &std::result::Result<ValuationResult, PricingError>,
 ) {
     match (left, right) {
         (Ok(left_val), Ok(right_val)) => {

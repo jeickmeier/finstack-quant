@@ -12,7 +12,7 @@ use crate::instruments::rates::exotics_shared::{
 use crate::instruments::rates::range_accrual::BoundsType;
 use crate::metrics::MetricId;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
@@ -342,7 +342,7 @@ impl Pricer for CallableRangeAccrualPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let callable = instrument
             .as_any()
             .downcast_ref::<CallableRangeAccrual>()
@@ -385,7 +385,7 @@ impl Pricer for CallableRangeAccrualPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<f64> {
+    ) -> std::result::Result<f64, PricingError> {
         let callable = instrument
             .as_any()
             .downcast_ref::<CallableRangeAccrual>()

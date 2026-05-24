@@ -18,7 +18,7 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::range_accrual::monte_carlo::RangeAccrualPayoff;
 use crate::instruments::rates::range_accrual::types::RangeAccrual;
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
@@ -257,7 +257,7 @@ impl Pricer for RangeAccrualMcPricer {
         instrument: &dyn crate::instruments::common_impl::traits::Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let range_accrual = instrument
             .as_any()
             .downcast_ref::<RangeAccrual>()
@@ -291,7 +291,7 @@ impl Pricer for RangeAccrualStaticReplicationPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let range_accrual = instrument
             .as_any()
             .downcast_ref::<RangeAccrual>()

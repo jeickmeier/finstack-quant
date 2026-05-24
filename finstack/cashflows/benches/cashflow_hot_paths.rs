@@ -31,7 +31,7 @@ use finstack_cashflows::builder::{
     PeriodDataFrameOptions,
 };
 use finstack_cashflows::primitives::{CFKind, CashFlow};
-use finstack_cashflows::DatedFlow;
+use finstack_cashflows::DatedFlows;
 use finstack_core::cashflow::Discountable;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{
@@ -132,7 +132,7 @@ fn make_quarterly_periods(base: Date, n_quarters: u32) -> Vec<Period> {
 }
 
 /// Dated flows spanning `years` years with quarterly payments.
-fn make_dated_flows(n: usize, base: Date) -> Vec<DatedFlow> {
+fn make_dated_flows(n: usize, base: Date) -> DatedFlows {
     (0..n)
         .map(|i| {
             let days = (i as i64) * 90 + 90;

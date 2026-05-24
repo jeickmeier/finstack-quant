@@ -30,6 +30,7 @@ criterion = { workspace = true }
 rust_decimal = { workspace = true }
 rust_decimal_macros = { workspace = true }
 finstack-test-utils = { path = "../test-utils" }
+smallvec = { version = "1.15", default-features = false }
 
 [[bench]]
 name = "portfolio_valuation"

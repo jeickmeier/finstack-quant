@@ -6,7 +6,7 @@ use super::waterfall::attribute_pnl_waterfall_with_credit_model;
 use super::{attribute_pnl_metrics_based, attribute_pnl_taylor, AttributionMethod};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::Result;
-use finstack_valuations::instruments::DynInstrument;
+use finstack_valuations::instruments::Instrument;
 use finstack_valuations::metrics::MetricId;
 
 impl AttributionSpec {
@@ -16,7 +16,7 @@ impl AttributionSpec {
     pub fn execute(&self) -> Result<AttributionResult> {
         // Reconstruct instrument from JSON
         let instrument = self.instrument.clone().into_boxed()?;
-        let instrument_arc: std::sync::Arc<DynInstrument> = std::sync::Arc::from(instrument);
+        let instrument_arc: std::sync::Arc<dyn Instrument> = std::sync::Arc::from(instrument);
 
         // Reconstruct market contexts
         let market_t0 = MarketContext::try_from(self.market_t0.clone())?;

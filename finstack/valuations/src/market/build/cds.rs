@@ -5,7 +5,7 @@ use crate::instruments::common_impl::parameters::legs::{
 };
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::credit_derivatives::cds::{CDSConvention, CreditDefaultSwap};
-use crate::instruments::DynInstrument;
+use crate::instruments::Instrument;
 use crate::instruments::PricingOverrides;
 use crate::market::build::helpers::{resolve_calendar, resolve_spot_date};
 use crate::market::conventions::ids::CdsConventionKey;
@@ -105,7 +105,7 @@ fn resolve_cds_dates(
 ///
 /// # Returns
 ///
-/// `Ok(Box<DynInstrument>)` with the constructed CDS instrument, or `Err` if:
+/// `Ok(Box<dyn Instrument>)` with the constructed CDS instrument, or `Err` if:
 /// - Convention lookup fails (missing CDS convention key)
 /// - Calendar resolution fails
 /// - Date calculations fail (invalid pillar, IMM roll date resolution)
@@ -194,7 +194,7 @@ fn resolve_cds_dates(
 ///
 /// - [`CdsQuote`](crate::market::quotes::cds::CdsQuote) for supported quote types
 /// - [`BuildCtx`](crate::market::BuildCtx) for build context configuration
-pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<DynInstrument>> {
+pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn Instrument>> {
     tracing::debug!(quote_id = %quote.id(), "building CDS instrument");
     quote.validate_market_conventions()?;
     let registry = ConventionRegistry::try_global()?;

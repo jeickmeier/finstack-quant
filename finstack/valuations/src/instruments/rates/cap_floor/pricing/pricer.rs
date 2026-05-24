@@ -240,7 +240,7 @@ impl Pricer for SimpleCapFloorBlackPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
-    ) -> Result<ValuationResult, PricingError> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         // Type-safe downcasting
         let cap_floor = instrument
             .as_any()

@@ -4,7 +4,7 @@
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::exotics::lookback_option::types::{LookbackOption, LookbackType};
 use crate::pricer::{
-    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext, PricingResult,
+    InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
 use finstack_core::dates::{Date, DayCountContext};
@@ -271,7 +271,7 @@ impl Pricer for LookbackOptionMcPricer {
         instrument: &dyn crate::instruments::common_impl::traits::Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let lookback = instrument
             .as_any()
             .downcast_ref::<LookbackOption>()
@@ -435,7 +435,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
         instrument: &dyn Instrument,
         market: &MarketContext,
         as_of: Date,
-    ) -> PricingResult<ValuationResult> {
+    ) -> std::result::Result<ValuationResult, PricingError> {
         let lookback = instrument
             .as_any()
             .downcast_ref::<LookbackOption>()
