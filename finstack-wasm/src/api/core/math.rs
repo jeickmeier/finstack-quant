@@ -44,18 +44,6 @@ pub fn cholesky_solve(chol: JsValue, b: JsValue) -> Result<JsValue, JsValue> {
     serde_wasm_bindgen::to_value(&x).map_err(to_js_err)
 }
 
-/// Validate that a matrix is a valid correlation matrix.
-///
-/// Checks diagonal = 1, off-diagonal in [-1, 1], symmetry, and
-/// positive semi-definiteness.
-#[wasm_bindgen(js_name = validateCorrelationMatrix)]
-pub fn validate_correlation_matrix(matrix: JsValue) -> Result<(), JsValue> {
-    let rows: Vec<Vec<f64>> = serde_wasm_bindgen::from_value(matrix).map_err(to_js_err)?;
-    let n = rows.len();
-    let flat = flatten_matrix(&rows, n)?;
-    linalg::validate_correlation_matrix(&flat, n).map_err(to_js_err)
-}
-
 /// Cholesky decomposition for a flat row-major matrix.
 ///
 /// Accepts a `Float64Array`/`number[]` containing `n * n` row-major entries
@@ -84,6 +72,9 @@ pub fn cholesky_solve_flat(chol: &[f64], b: &[f64], n: usize) -> Result<Box<[f64
 }
 
 /// Validate a flat row-major correlation matrix.
+///
+/// This is the only correlation-matrix validator on the `core` namespace.
+/// Callers pass `n * n` row-major entries plus the matrix dimension `n`.
 #[wasm_bindgen(js_name = validateCorrelationMatrixFlat)]
 pub fn validate_correlation_matrix_flat(matrix: &[f64], n: usize) -> Result<(), JsValue> {
     validate_flat_matrix_len(matrix, n)?;

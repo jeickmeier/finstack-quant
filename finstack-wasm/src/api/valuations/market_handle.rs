@@ -16,35 +16,29 @@ use wasm_bindgen::prelude::*;
 ///
 /// @example
 /// ```javascript
-/// const market = valuations.WasmMarket.fromJson(marketJson);
+/// const market = new valuations.Market(marketJson);
 /// for (const instr of instruments) {
 ///   const result = valuations.instruments.priceInstrumentWithMarket(instr, market, "2025-06-15", "default");
 /// }
 /// ```
-#[wasm_bindgen(js_name = WasmMarket)]
-pub struct WasmMarket {
+#[wasm_bindgen(js_name = Market)]
+pub struct Market {
     inner: Arc<MarketContext>,
 }
 
-#[wasm_bindgen(js_class = WasmMarket)]
-impl WasmMarket {
+#[wasm_bindgen(js_class = Market)]
+impl Market {
     /// Parse a MarketContext from its JSON representation.
     ///
     /// @param json - MarketContext JSON string.
-    /// @returns A `WasmMarket` handle that can be reused across pricing calls.
+    /// @returns A `Market` handle that can be reused across pricing calls.
     /// @throws If the JSON is invalid.
     #[wasm_bindgen(constructor)]
-    pub fn new(json: &str) -> Result<WasmMarket, JsValue> {
+    pub fn new(json: &str) -> Result<Market, JsValue> {
         let inner: MarketContext = serde_json::from_str(json).map_err(to_js_err)?;
-        Ok(WasmMarket {
+        Ok(Market {
             inner: Arc::new(inner),
         })
-    }
-
-    /// Parse a MarketContext from its JSON representation (static factory).
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<WasmMarket, JsValue> {
-        WasmMarket::new(json)
     }
 
     /// Serialize the wrapped MarketContext back to JSON.

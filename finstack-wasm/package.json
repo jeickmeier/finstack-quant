@@ -1,6 +1,6 @@
 {
   "name": "finstack-wasm",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "type": "module",
   "description": "WebAssembly bindings for Finstack - high-performance financial computation library for bonds, derivatives, and portfolio analytics",
   "main": "./index.js",

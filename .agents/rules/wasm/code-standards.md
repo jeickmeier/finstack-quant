@@ -143,7 +143,7 @@ export const core = {
   Money: raw.Money,
   DayCount: raw.DayCount,
   createDate: raw.createDate,
-  adjustBusinessDay: raw.adjustBusinessDay,
+  adjust: raw.adjust,
   DiscountCurve: raw.DiscountCurve,
 };
 ```

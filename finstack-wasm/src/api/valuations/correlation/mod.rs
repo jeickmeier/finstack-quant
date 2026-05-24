@@ -245,12 +245,7 @@ pub fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> Vec<f64> {
 /// checks unit diagonal, off-diagonal in `[-1, 1]`, symmetry, and positive
 /// semi-definiteness. Returns nothing on success; raises a descriptive error
 /// (including the failing dimension or constraint) otherwise.
-///
-/// Unique wasm export name (`validateValuationsCorrelationMatrix`) so it does
-/// not collide with `core/math`'s nested-array `validateCorrelationMatrix`;
-/// the `valuations.correlation` JS facade re-exports it as
-/// `validateCorrelationMatrix`.
-#[wasm_bindgen(js_name = validateValuationsCorrelationMatrix)]
+#[wasm_bindgen(js_name = validateCorrelationMatrix)]
 pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<(), JsValue> {
     corr::validate_correlation_matrix(matrix, n).map_err(to_js_err)
 }

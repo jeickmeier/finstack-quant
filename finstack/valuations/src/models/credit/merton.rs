@@ -515,7 +515,7 @@ impl MertonModel {
     /// `PD = N(-DD)`, with the distance-to-default drift
     /// `mu = r - q - sigma^2/2` (consistent with
     /// [`distance_to_default`](Self::distance_to_default) and
-    /// [`implied_equity`](Self::implied_equity)). The resulting model has
+    /// [`try_implied_equity`](Self::try_implied_equity)). The resulting model has
     /// `BarrierType::Terminal` with `AssetDynamics::GeometricBrownian` and
     /// the supplied `payout_rate`.
     ///

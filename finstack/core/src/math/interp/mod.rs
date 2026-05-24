@@ -6,11 +6,11 @@
 //!
 //! # Interpolation Methods
 //!
-//! - [`LinearDf`]: Linear in discount factors (simple but may create arbitrage)
-//! - [`LogLinearDf`]: Linear in log(DF), constant zero rates
-//! - [`MonotoneConvex`]: Hagan-West smooth, monotone, no-arbitrage
-//! - [`CubicHermite`]: PCHIP shape-preserving cubic
-//! - [`PiecewiseQuadraticForward`]: Natural cubic in log DF (C² forwards)
+//! - [`LinearStrategy`]: Linear in discount factors (simple but may create arbitrage)
+//! - [`LogLinearStrategy`]: Linear in log(DF), constant zero rates
+//! - [`MonotoneConvexStrategy`]: Hagan-West smooth, monotone, no-arbitrage
+//! - [`CubicHermiteStrategy`]: PCHIP shape-preserving cubic
+//! - [`PiecewiseQuadraticForwardStrategy`]: Natural cubic in log DF (C² forwards)
 //!
 //! # Arbitrage Considerations
 //!

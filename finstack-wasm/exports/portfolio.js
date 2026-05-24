@@ -26,7 +26,7 @@ export const portfolio = {
   historicalVarDecomposition: wasm.historicalVarDecomposition,
   evaluateRiskBudget: wasm.evaluateRiskBudget,
   // ⚠️ BLOCKING: prefer computeFactorSensitivitiesWithMarket for repeated calls
-  // so large MarketContext JSON is parsed once into WasmMarket.
+  // so large MarketContext JSON is parsed once into Market.
   computeFactorSensitivities: wasm.computeFactorSensitivities,
   computeFactorSensitivitiesWithMarket: wasm.computeFactorSensitivitiesWithMarket,
   computePnlProfiles: wasm.computePnlProfiles,

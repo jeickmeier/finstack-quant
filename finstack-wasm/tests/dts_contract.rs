@@ -198,18 +198,18 @@ fn valuations_dts_exposes_direct_fx_instruments() {
 fn valuations_dts_exposes_reusable_market_handle_pricing() {
     let dts = index_dts();
 
-    assert!(dts.contains("export declare class WasmMarket {"));
+    assert!(dts.contains("export declare class Market {"));
     assert!(contains_ignoring_ws(
         &dts,
-        "priceInstrumentWithMarket(instrumentJson: string, market: WasmMarket, asOf: string, model: string): string;",
+        "priceInstrumentWithMarket(instrumentJson: string, market: Market, asOf: string, model: string): string;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "priceInstrumentWithMetricsAndMarket(instrumentJson: string, market: WasmMarket, asOf: string, model: string, metrics: string[], pricingOptions?: string | null, marketHistory?: string | null): string;",
+        "priceInstrumentWithMetricsAndMarket(instrumentJson: string, market: Market, asOf: string, model: string, metrics: string[], pricingOptions?: string | null, marketHistory?: string | null): string;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "instrumentCashflowsWithMarket(instrumentJson: string, market: WasmMarket, asOf: string, model: string): string;",
+        "instrumentCashflowsWithMarket(instrumentJson: string, market: Market, asOf: string, model: string): string;",
     ));
 }
 

@@ -60,7 +60,7 @@ export const valuations = {
     const json = typeof envelope === 'string' ? envelope : JSON.stringify(envelope);
     return wasm.dependencyGraphJson(json);
   },
-  WasmMarket: wasm.WasmMarket,
+  Market: wasm.Market,
   instrumentCashflowsJson: wasm.instrumentCashflowsJson,
   bsPrice: wasm.bsPrice,
   bsGreeks: wasm.bsGreeks,

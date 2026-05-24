@@ -18,7 +18,7 @@
 //!
 //! # Determinism
 //!
-//! All keyed maps are [`BTreeMap`] so the output is byte-stable for byte-stable
+//! All keyed maps are [`std::collections::BTreeMap`] so the output is byte-stable for byte-stable
 //! input. The function performs no I/O and reads no global state.
 
 use std::collections::{BTreeMap, BTreeSet};

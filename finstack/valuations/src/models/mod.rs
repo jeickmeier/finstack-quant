@@ -6,11 +6,11 @@
 //!
 //! # Module Organization
 //!
-//! - [`closed_form`]: Closed-form and semi-analytical pricing formulas (Black-Scholes Greeks,
+//! - `closed_form`: Closed-form and semi-analytical pricing formulas (Black-Scholes Greeks,
 //!   Asian, Barrier, Lookback, Quanto, Heston)
-//! - [`volatility`]: Volatility models (SABR) and Black-Scholes helper functions
-//! - [`trees`]: Tree-based methods (Binomial, Trinomial, Multi-factor, Short-rate)
-//! - [`pde`]: Finite difference PDE methods (1D Crank-Nicolson, 2D Craig-Sneyd ADI, Heston, American penalty)
+//! - `volatility`: Volatility models (SABR) and Black-Scholes helper functions
+//! - `trees`: Tree-based methods (Binomial, Trinomial, Multi-factor, Short-rate)
+//! - `pde`: Finite difference PDE methods (1D Crank-Nicolson, 2D Craig-Sneyd ADI, Heston, American penalty)
 //!
 //! Credit copulas, recovery models, and factor models live in [`crate::correlation`].
 

@@ -7,7 +7,7 @@
 //!
 //! # Monte-Carlo determinism
 //!
-//! `priceInstrument` / `priceInstrumentWithMetrics` (and their `WasmMarket`
+//! `priceInstrument` / `priceInstrumentWithMetrics` (and their `Market`
 //! variants) accept Monte-Carlo models (e.g. `monte_carlo_gbm`,
 //! `monte_carlo_hull_white_1f`). These bindings deliberately expose **no**
 //! explicit RNG-seed parameter: the seed is part of the *instrument*
@@ -23,7 +23,7 @@
 //! `mc_seed_scenario` inside the instrument JSON. This contract is verified by
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
-use super::market_handle::WasmMarket;
+use super::market_handle::Market;
 use crate::utils::{to_js_err, to_js_error};
 use finstack_core::market_data::context::MarketContext;
 use finstack_valuations::results::ValuationResult;
@@ -165,27 +165,27 @@ pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
 }
 
 // ---------------------------------------------------------------------------
-// WasmMarket overloads — parse market once, reuse across pricing calls
+// Market overloads — parse market once, reuse across pricing calls
 // ---------------------------------------------------------------------------
 
-/// Price an instrument using a pre-parsed [`WasmMarket`].
+/// Price an instrument using a pre-parsed [`Market`].
 ///
 /// Avoids the per-call market-parse overhead of [`priceInstrument`].
 #[wasm_bindgen(js_name = priceInstrumentWithMarket)]
 pub fn price_instrument_with_market(
     instrument_json: &str,
-    market: &WasmMarket,
+    market: &Market,
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
     price_instrument_with_context(instrument_json, market.inner(), as_of, model)
 }
 
-/// Price an instrument with explicit metric requests using a pre-parsed [`WasmMarket`].
+/// Price an instrument with explicit metric requests using a pre-parsed [`Market`].
 #[wasm_bindgen(js_name = priceInstrumentWithMetricsAndMarket)]
 pub fn price_instrument_with_metrics_and_market(
     instrument_json: &str,
-    market: &WasmMarket,
+    market: &Market,
     as_of: &str,
     model: &str,
     metrics: JsValue,
@@ -204,11 +204,11 @@ pub fn price_instrument_with_metrics_and_market(
     )
 }
 
-/// Per-flow cashflow envelope using a pre-parsed [`WasmMarket`].
+/// Per-flow cashflow envelope using a pre-parsed [`Market`].
 #[wasm_bindgen(js_name = instrumentCashflowsWithMarket)]
 pub fn instrument_cashflows_with_market(
     instrument_json: &str,
-    market: &WasmMarket,
+    market: &Market,
     as_of: &str,
     model: &str,
 ) -> Result<String, JsValue> {
@@ -607,7 +607,7 @@ mod tests {
     #[test]
     fn wasm_market_reuses_parsed_market_for_pricing_and_cashflows() {
         let inst = bond_instrument_json();
-        let market = WasmMarket::from_json(&market_context_json()).expect("market handle");
+        let market = Market::new(&market_context_json()).expect("market handle");
 
         let priced = price_instrument_with_market(&inst, &market, "2024-01-01", "discounting")
             .expect("price");

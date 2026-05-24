@@ -216,7 +216,6 @@ export interface VolCubeConstructor {
 }
 
 export interface FxConversionPolicy {
-  getName(): string;
   toString(): string;
 }
 
@@ -286,7 +285,7 @@ export interface CoreNamespace {
   Tenor: TenorConstructor;
   createDate(year: number, month: number, day: number): number;
   dateFromEpochDays(days: number): number[];
-  adjustBusinessDay(epochDays: number, convention: string, calendarCode: string): number;
+  adjust(epochDays: number, convention: string, calendarCode: string): number;
   availableCalendars(): string[];
   DiscountCurve: DiscountCurveConstructor;
   ForwardCurve: ForwardCurveConstructor;
@@ -295,8 +294,6 @@ export interface CoreNamespace {
   FxMatrix: FxMatrixConstructor;
   choleskyDecomposition(matrix: number[][]): number[][];
   choleskySolve(chol: number[][], b: number[]): number[];
-  /** Validates a square correlation matrix passed as nested rows (core/math). */
-  validateCorrelationMatrix(matrix: number[][]): void;
   /** Fast flat row-major Cholesky decomposition for typed numeric arrays. */
   choleskyDecompositionFlat(matrix: NumericArray, n: number): Float64Array;
   /** Fast flat row-major Cholesky solve for typed numeric arrays. */
@@ -766,8 +763,7 @@ export interface CorrelationNamespace {
    * Validate a flat row-major correlation matrix with explicit dimension `n`
    * (finstack_valuations::correlation). Checks unit diagonal, off-diagonal in
    * [-1, 1], symmetry, and positive semi-definiteness; throws a descriptive
-   * error otherwise. Backed by the wasm export `validateValuationsCorrelationMatrix`,
-   * distinct from core/math's nested-array `validateCorrelationMatrix`.
+   * error otherwise.
    */
   validateCorrelationMatrix(matrix: number[], n: number): void;
   /**
@@ -1063,16 +1059,16 @@ export interface CovenantsNamespace {
   validateCovenantSpec(specJson: string): string;
   validateCovenantReport(reportJson: string): string;
   validateCovenantEngine(engineJson: string): string;
-  evaluateCovenantEngine(engineJson: string, metricsJson: string, asOf: string): string;
-  lboStandardCovenants(
+  evaluateEngine(engineJson: string, metricsJson: string, asOf: string): string;
+  lboStandard(
     initialLeverage: number,
     interestCoverage: number,
     fixedChargeCoverage: number,
     maxCapex: number
   ): string;
-  covLiteCovenants(maxLeverage: number, maxSeniorLeverage: number): string;
-  realEstateCovenants(minDscr: number, minDebtYield: number, maxLtv: number): string;
-  projectFinanceCovenants(
+  covLite(maxLeverage: number, maxSeniorLeverage: number): string;
+  realEstate(minDscr: number, minDebtYield: number, maxLtv: number): string;
+  projectFinance(
     minDscr: number,
     distributionLockupDscr: number,
     minLiquidity: number,
@@ -1084,9 +1080,8 @@ export declare const covenants: CovenantsNamespace;
 
 // --- valuations ------------------------------------------------------------
 
-export declare class WasmMarket {
+export declare class Market {
   constructor(json: string);
-  static fromJson(json: string): WasmMarket;
   toJson(): string;
 }
 
@@ -1104,13 +1099,13 @@ export interface ValuationInstrumentsNamespace {
   ): string;
   priceInstrumentWithMarket(
     instrumentJson: string,
-    market: WasmMarket,
+    market: Market,
     asOf: string,
     model: string
   ): string;
   priceInstrumentWithMetricsAndMarket(
     instrumentJson: string,
-    market: WasmMarket,
+    market: Market,
     asOf: string,
     model: string,
     metrics: string[],
@@ -1119,7 +1114,7 @@ export interface ValuationInstrumentsNamespace {
   ): string;
   instrumentCashflowsWithMarket(
     instrumentJson: string,
-    market: WasmMarket,
+    market: Market,
     asOf: string,
     model: string
   ): string;
@@ -1130,7 +1125,7 @@ export interface ValuationInstrumentsNamespace {
 export type FxInstrumentSpec = Record<string, unknown> | string;
 
 export interface FxInstrument {
-  toJSON(): string;
+  toJson(): string;
   price(marketJson: string, asOf: string, model?: string | null): string;
   priceWithMetrics(
     marketJson: string,
@@ -1156,7 +1151,7 @@ export interface FxOptionInstrument extends FxInstrument {
 
 export interface FxInstrumentConstructor<T extends FxInstrument> {
   new (spec: FxInstrumentSpec): T;
-  fromJSON(json: string): T;
+  fromJson(json: string): T;
 }
 
 export interface FxNamespace {
@@ -1344,7 +1339,7 @@ export interface ValuationsNamespace {
    * @throws Error with `name = "CalibrationEnvelopeError"` if the envelope JSON is malformed.
    */
   dependencyGraphJson(envelope: CalibrationEnvelope | string): string;
-  WasmMarket: typeof WasmMarket;
+  Market: typeof Market;
   /**
    * Per-flow cashflow envelope (DF / survival / PV) for a discountable
    * instrument. `model` must be `"discounting"` or `"hazard_rate"`; the
@@ -1768,7 +1763,7 @@ export interface PortfolioNamespace {
   /** Compute first-order factor sensitivities.
    *
    * ⚠️ BLOCKING: prefer `computeFactorSensitivitiesWithMarket` for repeated
-   * calls so market JSON is parsed once into `WasmMarket`.
+   * calls so market JSON is parsed once into `Market`.
    */
   computeFactorSensitivities(
     positionsJson: string,
@@ -1781,7 +1776,7 @@ export interface PortfolioNamespace {
   computeFactorSensitivitiesWithMarket(
     positionsJson: string,
     factorsJson: string,
-    market: WasmMarket,
+    market: Market,
     asOf: string,
     bumpConfigJson?: string
   ): string;
@@ -1798,7 +1793,7 @@ export interface PortfolioNamespace {
   computePnlProfilesWithMarket(
     positionsJson: string,
     factorsJson: string,
-    market: WasmMarket,
+    market: Market,
     asOf: string,
     bumpConfigJson?: string,
     nScenarioPoints?: number

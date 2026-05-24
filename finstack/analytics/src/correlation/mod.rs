@@ -22,7 +22,7 @@ pub use nearest_correlation::{nearest_correlation_matrix, NearestCorrelationOpts
 
 /// Tolerance used by [`validate_correlation_matrix`] to classify diagonal /
 /// symmetry / boundedness violations.
-const CORRELATION_TOLERANCE: f64 = 1e-10;
+pub(crate) const CORRELATION_TOLERANCE: f64 = 1e-10;
 
 /// Validate a flattened row-major correlation matrix.
 ///
@@ -32,9 +32,9 @@ const CORRELATION_TOLERANCE: f64 = 1e-10;
 ///
 /// Checks performed:
 /// - Correct size (`matrix.len() == n * n`)
-/// - Unit diagonal (within [`CORRELATION_TOLERANCE`])
-/// - Symmetry (within [`CORRELATION_TOLERANCE`])
-/// - All values within `[-1, 1]` (within [`CORRELATION_TOLERANCE`])
+/// - Unit diagonal (within `1e-10`)
+/// - Symmetry (within `1e-10`)
+/// - All values within `[-1, 1]` (within `1e-10`)
 /// - Positive semi-definiteness (via Cholesky)
 ///
 /// # Errors

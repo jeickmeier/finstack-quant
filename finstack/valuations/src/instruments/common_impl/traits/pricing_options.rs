@@ -46,8 +46,8 @@ pub struct PricingOptions {
     pub market_history: Option<Arc<MarketHistory>>,
     /// Optional explicit pricing model override.
     ///
-    /// When `None`, [`Instrument::price_with_metrics`] uses
-    /// [`Instrument::default_model`]. Set this to select a different registered
+    /// When `None`, [`super::Instrument::price_with_metrics`] uses
+    /// [`super::Instrument::default_model`]. Set this to select a different registered
     /// pricing path, such as hazard-rate or tree/OAS pricing, without dropping
     /// down to [`crate::pricer::PricerRegistry`] directly.
     pub model: Option<ModelKey>,
@@ -79,7 +79,7 @@ impl PricingOptions {
 
     /// Set the pricing model for this pricing request.
     ///
-    /// Most callers can stay on [`Instrument::price_with_metrics`] and use this
+    /// Most callers can stay on [`super::Instrument::price_with_metrics`] and use this
     /// override only when they need a non-default registered model.
     pub fn with_model(mut self, model: ModelKey) -> Self {
         self.model = Some(model);

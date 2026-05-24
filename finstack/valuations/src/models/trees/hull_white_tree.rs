@@ -182,7 +182,7 @@ impl HullWhiteTree {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`](finstack_core::Error::Validation) if the
+    /// Returns [`finstack_core::Error::Validation`] if the
     /// configuration is invalid or `time_to_maturity` is not a finite,
     /// strictly positive number of years.
     ///

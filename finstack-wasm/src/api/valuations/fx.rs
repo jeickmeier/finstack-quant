@@ -113,14 +113,14 @@ macro_rules! fx_class {
                 })
             }
 
-            #[wasm_bindgen(js_name = fromJSON)]
+            #[wasm_bindgen(js_name = fromJson)]
             pub fn from_json(json: &str) -> Result<$rust_name, JsValue> {
                 Ok(Self {
                     json: from_json_payload($type_tag, json)?,
                 })
             }
 
-            #[wasm_bindgen(js_name = toJSON)]
+            #[wasm_bindgen(js_name = toJson)]
             pub fn to_json(&self) -> Result<String, JsValue> {
                 pretty_json(&self.json)
             }

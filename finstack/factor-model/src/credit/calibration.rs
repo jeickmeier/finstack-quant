@@ -22,14 +22,14 @@
 //!    `Diagonal` → identity ρ, Σ = diag(σ²); `Ridge` → sample ρ (PSD-repaired
 //!    if needed), Σ = D·ρ·D + α·I; `FullSampleRepaired` → sample ρ repaired
 //!    to PSD, Σ = D·ρ_repaired·D.
-//! 10. Assemble [`FactorModelConfig`] with `MatchingConfig::CreditHierarchical`.
+//! 10. Assemble [`crate::FactorModelConfig`] with `MatchingConfig::CreditHierarchical`.
 //! 11. Build [`CalibrationDiagnostics`] from the bookkeeping above.
 //! 12. Return the assembled [`CreditFactorModel`] after a final
 //!     [`CreditFactorModel::validate`] check.
 //!
 //! # Determinism
 //!
-//! Every keyed map is a [`BTreeMap`] and every iteration order is stable. Two
+//! Every keyed map is a [`std::collections::BTreeMap`] and every iteration order is stable. Two
 //! calibrations with the same inputs serialize to byte-identical JSON.
 //!
 //! # Reuse with PR-3

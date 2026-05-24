@@ -10,12 +10,14 @@
 
 use crate::utils::to_js_err;
 use finstack_valuations::instruments::OptionType;
-use finstack_valuations::models::closed_form::implied_vol::{black76_implied_vol, bs_implied_vol};
+use finstack_valuations::models::closed_form::implied_vol::{
+    black76_implied_vol as black76_implied_vol_core, bs_implied_vol as bs_implied_vol_core,
+};
 use finstack_valuations::models::closed_form::{
-    arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks, bs_price, down_in_call,
-    down_out_call, fixed_strike_lookback_call, fixed_strike_lookback_put,
-    floating_strike_lookback_call, floating_strike_lookback_put, geometric_asian_call,
-    geometric_asian_put, quanto_call, quanto_put, up_in_call, up_out_call,
+    arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks as bs_greeks_core,
+    bs_price as bs_price_core, down_in_call, down_out_call, fixed_strike_lookback_call,
+    fixed_strike_lookback_put, floating_strike_lookback_call, floating_strike_lookback_put,
+    geometric_asian_call, geometric_asian_put, quanto_call, quanto_put, up_in_call, up_out_call,
 };
 use wasm_bindgen::prelude::*;
 
@@ -77,7 +79,7 @@ fn finite_price(value: f64, what: &str) -> Result<f64, JsValue> {
 ///
 /// @throws If the inputs produce a non-finite price (e.g. negative volatility).
 #[wasm_bindgen(js_name = bsPrice)]
-pub fn bs_price_js(
+pub fn bs_price(
     spot: f64,
     strike: f64,
     r: f64,
@@ -87,7 +89,7 @@ pub fn bs_price_js(
     is_call: bool,
 ) -> Result<f64, JsValue> {
     finite_price(
-        bs_price(spot, strike, r, q, sigma, t, option_type(is_call)),
+        bs_price_core(spot, strike, r, q, sigma, t, option_type(is_call)),
         "Black-Scholes price",
     )
 }
@@ -116,7 +118,7 @@ pub fn bs_price_js(
 /// ```
 #[wasm_bindgen(js_name = bsGreeks)]
 #[allow(clippy::too_many_arguments)]
-pub fn bs_greeks_js(
+pub fn bs_greeks(
     spot: f64,
     strike: f64,
     r: f64,
@@ -126,7 +128,7 @@ pub fn bs_greeks_js(
     is_call: bool,
     theta_days: Option<f64>,
 ) -> Result<JsValue, JsValue> {
-    let g = bs_greeks(
+    let g = bs_greeks_core(
         spot,
         strike,
         r,
@@ -165,7 +167,7 @@ pub fn bs_greeks_js(
 /// // iv ≈ 0.20
 /// ```
 #[wasm_bindgen(js_name = bsImpliedVol)]
-pub fn bs_implied_vol_js(
+pub fn bs_implied_vol(
     spot: f64,
     strike: f64,
     r: f64,
@@ -174,12 +176,12 @@ pub fn bs_implied_vol_js(
     price: f64,
     is_call: bool,
 ) -> Result<f64, JsValue> {
-    bs_implied_vol(spot, strike, r, q, t, option_type(is_call), price).map_err(to_js_err)
+    bs_implied_vol_core(spot, strike, r, q, t, option_type(is_call), price).map_err(to_js_err)
 }
 
 /// Solve for Black-76 (forward-based) implied volatility.
 #[wasm_bindgen(js_name = black76ImpliedVol)]
-pub fn black76_implied_vol_js(
+pub fn black76_implied_vol(
     forward: f64,
     strike: f64,
     df: f64,
@@ -187,7 +189,7 @@ pub fn black76_implied_vol_js(
     price: f64,
     is_call: bool,
 ) -> Result<f64, JsValue> {
-    black76_implied_vol(forward, strike, df, t, option_type(is_call), price).map_err(to_js_err)
+    black76_implied_vol_core(forward, strike, df, t, option_type(is_call), price).map_err(to_js_err)
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +201,7 @@ pub fn black76_implied_vol_js(
 /// `direction` is `"up"` or `"down"`, `knock` is `"in"` or `"out"`.
 #[wasm_bindgen(js_name = barrierCall)]
 #[allow(clippy::too_many_arguments)]
-pub fn barrier_call_js(
+pub fn barrier_call(
     spot: f64,
     strike: f64,
     barrier: f64,
@@ -226,7 +228,7 @@ pub fn barrier_call_js(
 /// Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option.
 #[wasm_bindgen(js_name = asianOptionPrice)]
 #[allow(clippy::too_many_arguments)]
-pub fn asian_option_price_js(
+pub fn asian_option_price(
     spot: f64,
     strike: f64,
     r: f64,
@@ -258,7 +260,7 @@ pub fn asian_option_price_js(
 /// `strike` is ignored and `extremum` is the observed min/max to date.
 #[wasm_bindgen(js_name = lookbackOptionPrice)]
 #[allow(clippy::too_many_arguments)]
-pub fn lookback_option_price_js(
+pub fn lookback_option_price(
     spot: f64,
     strike: f64,
     r: f64,
@@ -289,7 +291,7 @@ pub fn lookback_option_price_js(
 /// @throws If the inputs produce a non-finite price.
 #[wasm_bindgen(js_name = quantoOptionPrice)]
 #[allow(clippy::too_many_arguments)]
-pub fn quanto_option_price_js(
+pub fn quanto_option_price(
     spot: f64,
     strike: f64,
     t: f64,
@@ -335,15 +337,15 @@ mod tests {
 
     #[test]
     fn bs_price_call_atm_is_positive() {
-        let p = bs_price_js(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true).expect("finite price");
+        let p = bs_price(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true).expect("finite price");
         assert!(p > 0.0);
     }
 
     #[test]
     fn bs_implied_vol_recovers_sigma() {
         let sigma = 0.25;
-        let price = bs_price_js(100.0, 110.0, 0.03, 0.01, sigma, 0.75, true).expect("finite price");
-        let iv = bs_implied_vol_js(100.0, 110.0, 0.03, 0.01, 0.75, price, true)
+        let price = bs_price(100.0, 110.0, 0.03, 0.01, sigma, 0.75, true).expect("finite price");
+        let iv = bs_implied_vol(100.0, 110.0, 0.03, 0.01, 0.75, price, true)
             .expect("solver should converge");
         assert!((iv - sigma).abs() < 1e-6, "iv={iv} sigma={sigma}");
     }
@@ -354,19 +356,19 @@ mod tests {
         // `exp(-r*t)` to `+inf`, which escapes the core's `.max(0.0)` clamp.
         // The binding guard must surface that as a thrown error rather than a
         // silent non-finite value crossing the wasm boundary.
-        let result = bs_price_js(100.0, 100.0, -1.0, 0.0, 0.2, 1.0e6, false);
+        let result = bs_price(100.0, 100.0, -1.0, 0.0, 0.2, 1.0e6, false);
         assert!(
             result.is_err(),
             "a non-finite Black-Scholes price must produce an error"
         );
         // A well-posed input still returns a finite price unchanged.
-        assert!(bs_price_js(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true).is_ok());
+        assert!(bs_price(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true).is_ok());
     }
 
     #[test]
     fn quanto_option_price_rejects_non_finite_result() {
         // Same degenerate-maturity path: a non-finite quanto price must throw.
-        let result = quanto_option_price_js(
+        let result = quanto_option_price(
             100.0,
             100.0,
             1.0e6,
@@ -383,7 +385,7 @@ mod tests {
             "a non-finite quanto option price must produce an error"
         );
         // A well-posed input still returns a finite price.
-        assert!(quanto_option_price_js(
+        assert!(quanto_option_price(
             100.0,
             100.0,
             1.0,

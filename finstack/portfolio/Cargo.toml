@@ -15,7 +15,6 @@ finstack-margin = { path = "../margin" }
 finstack-valuations = { path = "../valuations" }
 finstack-factor-model = { path = "../factor-model" }
 finstack-scenarios = { path = "../scenarios" }
-finstack-statements = { path = "../statements" }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

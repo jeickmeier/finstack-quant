@@ -11,6 +11,38 @@ stability contract and schema-version policy.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-23
+
+### `finstack-wasm` — JS facade simplification (breaking)
+
+Several wasm-bindgen JS names were trimmed/aligned for clarity. The Rust internals
+keep the same behaviour; only the JS-facing names change.
+
+- **`core.adjustBusinessDay` → `core.adjust`** — the function lives in the
+  `core` namespace under date helpers; the `BusinessDay` suffix was redundant.
+- **`covenants.*Covenants` suffixes dropped** — `evaluateCovenantEngine` →
+  `evaluateEngine`, `lboStandardCovenants` → `lboStandard`,
+  `covLiteCovenants` → `covLite`, `realEstateCovenants` → `realEstate`,
+  `projectFinanceCovenants` → `projectFinance`. The namespace already conveys
+  "covenants".
+- **FX instruments: `toJSON` / `fromJSON` → `toJson` / `fromJson`** —
+  camelCase JSON aligns with the rest of the JS facade (`fromJson` /
+  `toJson` everywhere else).
+- **`valuations.WasmMarket` → `valuations.Market`** and the
+  `WasmMarket.fromJson(json)` static factory was removed. Use
+  `new valuations.Market(json)` instead — the constructor already accepts the
+  same JSON payload.
+- **`FxConversionPolicy.getName()` removed.** Use `toString()` (which already
+  returned the same canonical label).
+- **`core.validateCorrelationMatrix(nested)` removed.** Use
+  `core.validateCorrelationMatrixFlat(flat, n)` — pass a `Float64Array` /
+  `number[]` of `n * n` row-major entries plus the dimension `n`. The
+  nested-array overload incurred a JS-side copy for every call.
+
+JavaScript/TypeScript consumers must update call sites accordingly. The
+`finstack-wasm/index.d.ts` declarations and `finstack-py/parity_contract.toml`
+WASM-only export list were updated to match.
+
 ### Added — Credit factor hierarchy decomposition (opt-in, non-breaking)
 
 A hierarchical credit factor model that decomposes every issuer's spread into a sequence of common factors (user-designated generic + configurable bucket levels) plus an issuer-specific adder residual. All consumers take `Option<&CreditFactorModel>` and fall back to today's behavior when absent.

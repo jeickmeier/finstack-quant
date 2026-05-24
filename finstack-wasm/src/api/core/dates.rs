@@ -2,7 +2,7 @@
 
 use crate::utils::to_js_err;
 use finstack_core::dates::{
-    adjust, BusinessDayConvention, CalendarRegistry, DayCount as RustDayCount,
+    adjust as core_adjust, BusinessDayConvention, CalendarRegistry, DayCount as RustDayCount,
     DayCountContext as RustDayCountContext, Tenor as RustTenor,
 };
 use wasm_bindgen::prelude::*;
@@ -375,12 +375,8 @@ pub fn date_from_epoch_days(days: i32) -> Result<Vec<i32>, JsValue> {
 /// Adjust a date (epoch days) according to a business-day convention and calendar.
 ///
 /// Returns the adjusted date as epoch days.
-#[wasm_bindgen(js_name = adjustBusinessDay)]
-pub fn adjust_business_day(
-    epoch_days: i32,
-    convention: &str,
-    calendar_code: &str,
-) -> Result<i32, JsValue> {
+#[wasm_bindgen(js_name = adjust)]
+pub fn adjust(epoch_days: i32, convention: &str, calendar_code: &str) -> Result<i32, JsValue> {
     let date = epoch_to_date(epoch_days)?;
     let bdc: BusinessDayConvention = convention
         .parse()
@@ -389,7 +385,7 @@ pub fn adjust_business_day(
     let cal = registry
         .resolve_str(calendar_code)
         .ok_or_else(|| JsValue::from_str(&format!("unknown calendar: {calendar_code}")))?;
-    let adjusted = adjust(date, bdc, cal).map_err(to_js_err)?;
+    let adjusted = core_adjust(date, bdc, cal).map_err(to_js_err)?;
     Ok(finstack_core::dates::days_since_epoch(adjusted))
 }
 

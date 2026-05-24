@@ -132,7 +132,7 @@ const date = core.createDate(2024, 9, 30);
 
 console.log(date); // "2024-09-30"
 
-const nextBD = core.adjustBusinessDay(date, "modified_following", "nyse");
+const nextBD = core.adjust(date, "modified_following", "nyse");
 ```
 
 Dates are represented as ISO strings at the JavaScript facade boundary.

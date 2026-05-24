@@ -579,8 +579,8 @@ async function main() {
     w.availableCalendars();
   });
 
-  bench('core', 'adjustBusinessDay', 4000, () => {
-    w.adjustBusinessDay(t0d, 'modified_following', calCode);
+  bench('core', 'adjust', 4000, () => {
+    w.adjust(t0d, 'modified_following', calCode);
   });
 
   const benchRf = returns.map(() => 0.0001);

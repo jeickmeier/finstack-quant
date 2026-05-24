@@ -38,12 +38,6 @@ fn cholesky_solve_identity_system() {
 }
 
 #[wasm_bindgen_test]
-fn validate_correlation_matrix_valid() {
-    let matrix = serde_wasm_bindgen::to_value(&vec![vec![1.0, 0.5], vec![0.5, 1.0]]).unwrap();
-    validate_correlation_matrix(matrix).unwrap();
-}
-
-#[wasm_bindgen_test]
 fn cholesky_decomposition_flat_returns_row_major_factor() {
     let matrix = [4.0, 2.0, 2.0, 3.0];
     let result = cholesky_decomposition_flat(&matrix, 2).unwrap();
@@ -66,8 +60,7 @@ fn validate_correlation_matrix_flat_valid() {
 
 #[wasm_bindgen_test]
 fn validate_correlation_matrix_invalid_diagonal() {
-    let matrix = serde_wasm_bindgen::to_value(&vec![vec![0.9, 0.5], vec![0.5, 1.0]]).unwrap();
-    assert!(validate_correlation_matrix(matrix).is_err());
+    assert!(validate_correlation_matrix_flat(&[0.9, 0.5, 0.5, 1.0], 2).is_err());
 }
 
 // ---- Statistics ----

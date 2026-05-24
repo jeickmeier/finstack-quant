@@ -22,7 +22,7 @@ fn fx_matrix_rate_returns_structured_result() {
 
     assert!((result.get_rate() - 1.10).abs() < 1e-12);
     assert!(!result.get_triangulated());
-    assert_eq!(result.get_policy().get_name(), "cashflow_date");
+    assert_eq!(result.get_policy().to_string(), "cashflow_date");
 }
 
 #[wasm_bindgen_test]
@@ -33,7 +33,7 @@ fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
     let result = matrix.rate("GBP", "USD", "2024-01-02", None).unwrap();
 
     assert!((result.get_rate() - 1.25).abs() < 1e-12);
-    assert_eq!(result.get_policy().get_name(), "cashflow_date");
+    assert_eq!(result.get_policy().to_string(), "cashflow_date");
 }
 
 #[wasm_bindgen_test]

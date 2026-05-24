@@ -297,15 +297,9 @@ impl FxConversionPolicy {
         })
     }
 
-    /// Return the canonical string label for this policy.
-    #[wasm_bindgen(js_name = getName)]
-    pub fn get_name(&self) -> String {
-        self.inner.to_string()
-    }
-
     /// String form of the conversion policy.
     #[wasm_bindgen(js_name = toString)]
-    pub fn to_string_js(&self) -> String {
+    pub fn to_string(&self) -> String {
         self.inner.to_string()
     }
 }
@@ -600,7 +594,7 @@ mod tests {
         let r = m.rate("USD", "EUR", "2024-01-15", None).expect("fx rate");
         assert!((r.get_rate() - 0.92).abs() < 1e-9);
         assert!(!r.get_triangulated());
-        assert_eq!(r.get_policy().get_name(), "cashflow_date");
+        assert_eq!(r.get_policy().to_string(), "cashflow_date");
     }
 
     // VolCube tests require a WASM runtime (JsValue) — run via wasm-pack test.

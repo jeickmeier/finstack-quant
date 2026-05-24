@@ -7,6 +7,6 @@ export const correlation = {
   RecoveryModel: wasm.RecoveryModel,
   correlationBounds: wasm.correlationBounds,
   jointProbabilities: wasm.jointProbabilities,
-  validateCorrelationMatrix: wasm.validateValuationsCorrelationMatrix,
+  validateCorrelationMatrix: wasm.validateCorrelationMatrix,
   nearestCorrelation: wasm.nearestCorrelation,
 };

@@ -294,7 +294,7 @@ pub(crate) fn bump_discount_curve_parallel(
 ///
 /// # Non-Negativity Guarantee
 ///
-/// The underlying [`VolSurface::bump`] implementation ensures that bumped volatilities
+/// The underlying `VolSurface` bump implementation ensures that bumped volatilities
 /// are floored at zero. This means:
 /// - For negative bumps (e.g., `bump_abs = -0.15` on a 10% vol surface), vols are clamped to 0.0
 /// - This prevents mathematically invalid negative volatilities

@@ -519,7 +519,7 @@ pub enum IdiosyncraticVolModel {
 pub struct VolState {
     /// GARCH/EWMA/sample vol model for each systematic factor.
     ///
-    /// Keys are factor IDs from [`FactorModelConfig`].
+    /// Keys are factor IDs from [`crate::FactorModelConfig`].
     /// `BTreeMap` for deterministic serialization order.
     pub factors: BTreeMap<FactorId, FactorVolModel>,
     /// Idiosyncratic vol model for each issuer.
@@ -640,7 +640,7 @@ pub struct GenericFactorSpec {
 /// to byte-identical JSON. This relies on:
 /// - [`issuer_betas`][Self::issuer_betas] sorted by `issuer_id`.
 /// - All maps using `BTreeMap`.
-/// - [`FactorModelConfig`] respecting its own factor ordering.
+/// - [`crate::FactorModelConfig`] respecting its own factor ordering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CreditFactorModel {
