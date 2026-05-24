@@ -107,7 +107,8 @@ enum PositionLiquidityOutcome {
 ///
 /// # Parallelism
 ///
-/// For portfolios with at least [`PARALLEL_SCORING_THRESHOLD`] positions,
+/// For portfolios with at least 512 positions (the internal
+/// `PARALLEL_SCORING_THRESHOLD`),
 /// per-position scoring runs via Rayon's parallel iterator. For smaller
 /// portfolios the work per position is too small to amortize the thread-pool
 /// overhead, so a serial iterator is used. Results are sorted deterministically

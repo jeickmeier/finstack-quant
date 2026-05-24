@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+description = "Financial-statements modeling for Finstack with deterministic Value > Forecast > Formula precedence and corkscrew schedules"
 
 [dependencies]
 finstack-core = { path = "../core" }

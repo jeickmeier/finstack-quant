@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+description = "Deterministic scenario DSL for Finstack with preview, composition, and phase-ordered apply across market/statements/valuations"
 
 [dependencies]
 finstack-attribution = { path = "../attribution" }

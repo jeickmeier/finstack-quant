@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+description = "P&L attribution for Finstack portfolios: Brinson, Taylor, parallel, waterfall, and credit-factor decomposition"
 
 [dependencies]
 finstack-core = { path = "../core" }

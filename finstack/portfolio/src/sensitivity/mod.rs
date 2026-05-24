@@ -3,17 +3,17 @@
 //! Hosts the engines that consume `&dyn Instrument` and bump-and-reprice
 //! against a `MarketContext`:
 //!
-//! - [`DeltaBasedEngine`]: linear sensitivity via finite-difference bumps.
-//! - [`FullRepricingEngine`] + [`ScenarioGrid`]: P&L profile across a
+//! - `DeltaBasedEngine`: linear sensitivity via finite-difference bumps.
+//! - `FullRepricingEngine` + `ScenarioGrid`: P&L profile across a
 //!   scenario grid.
-//! - [`FactorSensitivityEngine`]: shared trait.
+//! - `FactorSensitivityEngine`: shared trait.
 //!
-//! [`SensitivityMatrix`] is re-exported from
+//! `SensitivityMatrix` is re-exported from
 //! [`finstack_factor_model::sensitivity_matrix`] for binding stability.
 //!
-//! [`json`] holds the JSON-facing helpers used by Python and WASM bindings;
-//! [`positions`] parses tagged position JSON into boxed `Instrument` trait
-//! objects via the shared instrument JSON pipeline.
+//! The `json` submodule holds the JSON-facing helpers used by Python and WASM
+//! bindings; the `positions` submodule parses tagged position JSON into boxed
+//! `Instrument` trait objects via the shared instrument JSON pipeline.
 
 mod delta_engine;
 pub mod json;

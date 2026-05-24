@@ -7,8 +7,8 @@
 //! The aggregation is **currency-preserving**: no implicit FX conversion is
 //! applied. Consumers can apply explicit FX policies on top if a base-currency
 //! ladder is required. Use
-//! [`PortfolioCashflows::collapse_to_base_by_date_kind`] for a
-//! base-currency projection that preserves [`CFKind`] classification.
+//! `PortfolioCashflows::collapse_to_base_by_date_kind` for a
+//! base-currency projection that preserves `CFKind` classification.
 //!
 //! Spot-equivalent FX is used for every cashflow date in base-currency
 //! projections, which is **not** the same as discounting future
@@ -194,7 +194,7 @@ fn instrument_cashflow_schedule(
 
 impl PortfolioCashflows {
     /// Collapse classified multi-currency flows into base currency bucketed by
-    /// (date, [`CFKind`]).
+    /// (date, `CFKind`).
     ///
     /// ### FX convention
     ///

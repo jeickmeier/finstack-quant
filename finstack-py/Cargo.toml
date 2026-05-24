@@ -6,6 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "PyO3 Python bindings for the Finstack financial computation library"
 
 [lib]
 name = "finstack"

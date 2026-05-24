@@ -24,12 +24,16 @@ use super::types::{ExtrapolationPolicy, DERIVATIVE_EPSILON};
 /// # Examples
 ///
 /// ```rust
-/// use finstack_core::math::interp::{InterpFn, LinearDf, ExtrapolationPolicy, ValidationPolicy};
+/// use finstack_core::math::interp::{
+///     ExtrapolationPolicy, InterpFn, Interpolator, LinearStrategy, ValidationPolicy,
+/// };
 ///
 /// # fn main() -> finstack_core::Result<()> {
 /// let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();
 /// let values = vec![1.0, 0.95, 0.90].into_boxed_slice();
-/// let interp = LinearDf::new(knots, values, ExtrapolationPolicy::FlatZero, ValidationPolicy::Strict)?;
+/// let interp = Interpolator::<LinearStrategy>::new(
+///     knots, values, ExtrapolationPolicy::FlatZero, ValidationPolicy::Strict,
+/// )?;
 ///
 /// // Use as concrete type
 /// let val = interp.interp(0.5);

@@ -10,7 +10,7 @@
 //! For example, a EUR position's DV01 (reported in EUR) and a USD position's DV01
 //! (reported in USD) cannot be meaningfully summed without FX conversion.
 //!
-//! [`aggregate_metrics`] performs this conversion automatically using the FX rate
+//! `aggregate_metrics` performs this conversion automatically using the FX rate
 //! implied by each position's native and base-currency valuations. Positions with
 //! zero native PV fall back to the FX matrix in the
 //! [`finstack_core::market_data::context::MarketContext`].
@@ -45,7 +45,7 @@ pub struct AggregatedMetric {
 /// Complete portfolio metrics results.
 ///
 /// Holds both aggregated metrics and per-position values returned
-/// by [`aggregate_metrics`].
+/// by `aggregate_metrics`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PortfolioMetrics {
     /// Aggregated metrics (summable only)

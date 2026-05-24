@@ -303,7 +303,9 @@ impl InterpStyle {
     /// loops), prefer using the concrete interpolator types directly:
     ///
     /// ```rust
-    /// use finstack_core::math::interp::{MonotoneConvex, ExtrapolationPolicy, ValidationPolicy};
+    /// use finstack_core::math::interp::{
+    ///     ExtrapolationPolicy, Interpolator, MonotoneConvexStrategy, ValidationPolicy,
+    /// };
     ///
     /// # fn main() -> finstack_core::Result<()> {
     /// // Preferred: direct construction (no heap allocation, static dispatch)

@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+description = "Loan covenant specifications and evaluation engine for Finstack: LBO, cov-lite, real estate, project-finance packages"
 
 [dependencies]
 finstack-core = { path = "../core" }

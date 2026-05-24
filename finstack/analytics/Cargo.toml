@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+description = "Risk metrics and portfolio analytics for Finstack: Sharpe, drawdown, correlation matrices, and nearest-correlation repair"
 
 [dependencies]
 finstack-core = { path = "../core" }

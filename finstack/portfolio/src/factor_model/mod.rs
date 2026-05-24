@@ -3,13 +3,13 @@
 //! This module lifts instrument-level market dependencies and sensitivities into
 //! portfolio-level factor analytics. Typical usage is:
 //!
-//! 1. Build a [`FactorModel`] from a declarative
+//! 1. Build a [`crate::factor_model::FactorModel`] from a declarative
 //!    [`finstack_factor_model::FactorModelConfig`].
-//! 2. Use [`FactorModel::assign_factors`] to inspect how portfolio positions map
-//!    to configured factors.
-//! 3. Use [`FactorModel::compute_sensitivities`] to produce a weighted
-//!    sensitivity matrix.
-//! 4. Use [`FactorModel::analyze`] to decompose portfolio risk.
+//! 2. Use [`crate::factor_model::FactorModel::assign_factors`] to inspect how
+//!    portfolio positions map to configured factors.
+//! 3. Use [`crate::factor_model::FactorModel::compute_sensitivities`] to produce
+//!    a weighted sensitivity matrix.
+//! 4. Use [`crate::factor_model::FactorModel::analyze`] to decompose portfolio risk.
 //!
 //! The module exposes both closed-form covariance-based decomposition
 //! ([`crate::factor_model::ParametricDecomposer`]) and simulation-based

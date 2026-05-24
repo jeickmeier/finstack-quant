@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+description = "Credit covenant forecasting, alignment analysis, and reporting analytics over Finstack statements"
 
 [dependencies]
 finstack-core = { path = "../core" }

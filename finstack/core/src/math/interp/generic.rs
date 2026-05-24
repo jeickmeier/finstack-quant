@@ -27,10 +27,12 @@ use crate::error::InputError;
 /// # Example
 ///
 /// ```rust
-/// use finstack_core::math::interp::{ExtrapolationPolicy, InterpFn, LinearDf, ValidationPolicy};
+/// use finstack_core::math::interp::{
+///     ExtrapolationPolicy, InterpFn, Interpolator, LinearStrategy, ValidationPolicy,
+/// };
 ///
 /// # fn main() -> finstack_core::Result<()> {
-/// let interp = LinearDf::new(
+/// let interp = Interpolator::<LinearStrategy>::new(
 ///     vec![0.0, 1.0, 2.0].into_boxed_slice(),
 ///     vec![1.0, 0.95, 0.90].into_boxed_slice(),
 ///     ExtrapolationPolicy::FlatZero,
@@ -73,11 +75,13 @@ impl<S: InterpolationStrategy> Interpolator<S> {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_core::math::interp::{ExtrapolationPolicy, LinearDf, ValidationPolicy};
+    /// use finstack_core::math::interp::{
+    ///     ExtrapolationPolicy, Interpolator, LinearStrategy, ValidationPolicy,
+    /// };
     ///
     /// # fn main() -> finstack_core::Result<()> {
     /// // Strict validation (default) - requires positive values for discount factors
-    /// let df_interp = LinearDf::new(
+    /// let df_interp = Interpolator::<LinearStrategy>::new(
     ///     vec![0.0, 1.0, 2.0].into_boxed_slice(),
     ///     vec![1.0, 0.95, 0.90].into_boxed_slice(),
     ///     ExtrapolationPolicy::FlatZero,
@@ -85,7 +89,7 @@ impl<S: InterpolationStrategy> Interpolator<S> {
     /// )?;
     ///
     /// // AllowNegative - permits negative values for forward rate curves
-    /// let fwd_interp = LinearDf::new(
+    /// let fwd_interp = Interpolator::<LinearStrategy>::new(
     ///     vec![0.0, 1.0, 2.0].into_boxed_slice(),
     ///     vec![-0.01, 0.0, 0.01].into_boxed_slice(),
     ///     ExtrapolationPolicy::FlatZero,

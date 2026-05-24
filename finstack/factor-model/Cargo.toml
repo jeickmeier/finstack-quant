@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+description = "Factor model framework for Finstack with hierarchical credit factor decomposition and offline calibration"
 
 [dependencies]
 finstack-core = { path = "../core" }

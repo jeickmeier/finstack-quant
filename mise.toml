@@ -98,9 +98,9 @@ description = "Run Rust tests via cargo-nextest"
 run = "cargo nextest run --workspace --exclude finstack-py --lib --test '*' --no-fail-fast"
 
 [tasks.rust-doc]
-description = "Build core docs with strict rustdoc and run core doctests"
+description = "Build workspace docs with strict rustdoc and run core doctests"
 run = [
-  "RUSTDOCFLAGS='-D warnings' cargo doc -p finstack-core --no-deps",
+  "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --exclude finstack-py --exclude finstack-wasm --no-deps",
   "cargo test -p finstack-core --doc",
 ]
 

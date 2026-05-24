@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+description = "Instrument pricing, cashflows, and risk for Finstack: fixed income, derivatives, structured credit, Monte Carlo, and PDE/tree methods"
 
 [dependencies]
 finstack-core = { path = "../core" }

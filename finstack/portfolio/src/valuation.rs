@@ -272,7 +272,8 @@ fn assemble_valuation(
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(tag = "mode", content = "metrics", rename_all = "snake_case")]
 pub enum RequestedMetrics {
-    /// Standard portfolio metric set only (see [`standard_portfolio_metrics`]).
+    /// Standard portfolio metric set only (see the internal
+    /// `standard_portfolio_metrics` helper).
     #[default]
     Standard,
     /// Standard set plus the listed extra metrics (de-duplicated).

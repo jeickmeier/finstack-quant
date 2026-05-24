@@ -6,6 +6,7 @@ rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Internal test fixtures and helpers shared across Finstack crates (not intended for public consumption)"
 
 [dependencies]
 finstack-core = { path = "../core" }

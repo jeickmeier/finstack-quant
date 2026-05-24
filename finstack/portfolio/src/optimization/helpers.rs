@@ -122,8 +122,8 @@ pub(crate) fn optimize_from_parts(
 }
 
 /// Run portfolio optimization against a built `Portfolio` plus pre-parsed
-/// [`OptimizationParameters`]. Convenience wrapper over
-/// [`optimize_from_parts`] for binding code that already has a parameters
+/// [`OptimizationParameters`]. Convenience wrapper over the internal
+/// `optimize_from_parts` helper for binding code that already has a parameters
 /// struct on hand.
 pub fn optimize_with_parameters(
     portfolio: &Portfolio,

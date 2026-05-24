@@ -127,7 +127,7 @@ pub(crate) fn apply_scenario(
 ///
 /// # Errors
 ///
-/// Propagates errors from [`apply_scenario`] and [`value_portfolio`](crate::valuation::value_portfolio).
+/// Propagates errors from the internal `apply_scenario` helper and [`value_portfolio`](crate::valuation::value_portfolio).
 ///
 /// # Examples
 ///

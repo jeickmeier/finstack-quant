@@ -175,11 +175,12 @@ impl Portfolio {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] if a position with the same
+    /// Returns [`finstack_core::Error::Validation`] if a position with the same
     /// `position_id` is already present. Silently appending would leave a
-    /// duplicate row in [`Self::positions`] that all iteration-based
-    /// aggregators would double-count, while [`Self::position_index`] and
-    /// [`Self::get_position`] would only see the new row.
+    /// duplicate row in the internal `positions` vector that all
+    /// iteration-based aggregators would double-count, while the
+    /// `position_index` map and [`Self::get_position`] would only see the
+    /// new row.
     pub fn add_position(&mut self, position: Position) -> Result<()> {
         if self.position_index.contains_key(&position.position_id) {
             return Err(Error::validation(format!(
@@ -213,7 +214,7 @@ impl Portfolio {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] if the replacement vector contains
+    /// Returns [`finstack_core::Error::Validation`] if the replacement vector contains
     /// duplicate position IDs. The portfolio is left unchanged on error.
     pub fn set_positions(&mut self, positions: Vec<Position>) -> Result<()> {
         use finstack_core::HashSet;

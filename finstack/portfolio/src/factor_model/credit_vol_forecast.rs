@@ -3,13 +3,13 @@
 //! This module is the PR-6 wiring layer between a calibrated credit factor
 //! model artifact ([`CreditFactorModel`] from `finstack-core`) and the
 //! existing portfolio-level risk decomposition pipeline (
-//! [`FactorModel`], [`RiskDecomposition`]).
+//! [`crate::factor_model::FactorModel`], `RiskDecomposition`).
 //!
 //! # Layering note
 //!
 //! The original PR-6 design placed this file under
 //! `finstack/valuations/src/factor_model/credit_vol_forecast.rs`. The
-//! `factor_model_at` helper, however, returns a [`FactorModel`], which lives
+//! `factor_model_at` helper, however, returns a [`crate::factor_model::FactorModel`], which lives
 //! in `finstack-portfolio` (and `finstack-portfolio` already depends on
 //! `finstack-valuations`, so the reverse dependency is not available). To
 //! keep the API surface intact without inverting the dependency graph the
@@ -145,7 +145,7 @@ impl<'a> FactorCovarianceForecast<'a> {
     ///
     /// `D = diag(σ_factor)` where `σ_factor` is the square root of the
     /// horizon-scaled variance for each factor, in the same order as
-    /// [`CreditFactorModel::config.factors`].
+    /// `CreditFactorModel::config::factors`.
     ///
     /// # Errors
     ///
@@ -219,7 +219,7 @@ impl<'a> FactorCovarianceForecast<'a> {
     /// # Errors
     ///
     /// Returns [`ValuationsError::Core`] when the issuer is not present in
-    /// [`VolState::idiosyncratic`] or the calibrated variance is negative.
+    /// `VolState::idiosyncratic` or the calibrated variance is negative.
     pub fn idiosyncratic_vol(
         &self,
         issuer_id: &IssuerId,
@@ -251,7 +251,7 @@ impl<'a> FactorCovarianceForecast<'a> {
         Ok(variance.sqrt())
     }
 
-    /// Build a portfolio-level [`FactorModel`] using `Σ(t, h)` at the given
+    /// Build a portfolio-level [`crate::factor_model::FactorModel`] using `Σ(t, h)` at the given
     /// horizon and the requested risk measure, reusing the artifact's
     /// declarative matching / pricing-mode configuration.
     ///
