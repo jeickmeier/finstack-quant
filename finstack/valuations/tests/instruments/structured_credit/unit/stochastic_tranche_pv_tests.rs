@@ -10,9 +10,9 @@ use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    CorrelationStructure, DealType, Pool, PoolAsset, PricingMode, Seniority, StochasticDefaultSpec,
+    AssetPool, CorrelationStructure, DealType, PoolAsset, PricingMode, StochasticDefaultSpec,
     StochasticPrepaySpec, StochasticPricingResult, StructuredCredit, Tranche, TrancheCoupon,
-    TrancheStructure,
+    TrancheSeniority, TrancheStructure,
 };
 use finstack_valuations::instruments::{InstrumentJson, PricingOverrides};
 use finstack_valuations::metrics::MetricId;
@@ -44,8 +44,8 @@ fn fixed_market() -> MarketContext {
     MarketContext::new().insert(discount_curve(as_of()))
 }
 
-fn pool(balance: f64) -> Pool {
-    let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+fn pool(balance: f64) -> AssetPool {
+    let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
         Money::new(balance, Currency::USD),
@@ -88,7 +88,7 @@ fn two_tranches(floating_senior: bool) -> TrancheStructure {
             "SR",
             0.0,
             80.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(800_000.0, Currency::USD),
             senior_coupon,
             legal_maturity(),
@@ -98,7 +98,7 @@ fn two_tranches(floating_senior: bool) -> TrancheStructure {
             "EQ",
             80.0,
             100.0,
-            Seniority::Equity,
+            TrancheSeniority::Equity,
             Money::new(200_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.0 },
             legal_maturity(),

@@ -403,22 +403,14 @@ export interface PeriodStats {
   kelly_criterion: number;
 }
 
-/** Dated rolling Sharpe result returned by `rollingSharpe`. */
-export interface RollingSharpe {
-  sharpe: Float64Array;
+/** Dated rolling result returned by per-ticker rolling analytics. */
+export interface DatedSeries {
   dates: string[];
-}
-
-/** Dated rolling Sortino result returned by `rollingSortino`. */
-export interface RollingSortino {
-  sortino: Float64Array;
-  dates: string[];
-}
-
-/** Dated rolling volatility result returned by `rollingVolatility`. */
-export interface RollingVolatility {
-  volatility: Float64Array;
-  dates: string[];
+  values?: Float64Array;
+  sharpe?: Float64Array;
+  sortino?: Float64Array;
+  volatility?: Float64Array;
+  return?: Float64Array;
 }
 
 /** OLS beta result with standard error and 95% confidence interval. */
@@ -453,12 +445,6 @@ export interface MultiFactorResult {
   residual_vol: number;
 }
 
-/** Dated rolling N-period compounded return result returned by `rollingReturns`. */
-export interface RollingReturns {
-  return: Float64Array;
-  dates: string[];
-}
-
 /** Period-to-date lookback returns (per ticker) returned by `lookbackReturns`. */
 export interface LookbackReturns {
   mtd: number[];
@@ -477,7 +463,7 @@ export interface LookbackReturns {
  *
  * All multi-ticker scalar outputs come back as `number[]` indexed by the
  * panel's ticker order; vector / per-ticker / structured outputs are
- * serialized to plain JS objects (e.g. `RollingSharpe`, `BetaResult[]`).
+ * serialized to plain JS objects (e.g. `DatedSeries`, `BetaResult[]`).
  */
 export declare class Performance {
   constructor(
@@ -549,10 +535,10 @@ export declare class Performance {
   beta(): BetaResult[];
   greeks(): GreeksResult[];
   rollingGreeks(tickerIdx: number, window?: number): RollingGreeksResult;
-  rollingVolatility(tickerIdx: number, window?: number): RollingVolatility;
-  rollingSortino(tickerIdx: number, window?: number, mar?: number): RollingSortino;
-  rollingSharpe(tickerIdx: number, window?: number, riskFreeRate?: number): RollingSharpe;
-  rollingReturns(tickerIdx: number, window: number): RollingReturns;
+  rollingVolatility(tickerIdx: number, window?: number): DatedSeries;
+  rollingSortino(tickerIdx: number, window?: number, mar?: number): DatedSeries;
+  rollingSharpe(tickerIdx: number, window?: number, riskFreeRate?: number): DatedSeries;
+  rollingReturns(tickerIdx: number, window: number): DatedSeries;
   drawdownDetails(tickerIdx: number, n?: number): DrawdownEpisode[];
   multiFactorGreeks(tickerIdx: number, factorReturns: NumericMatrix): MultiFactorResult;
   lookbackReturns(refDate: string, fiscalYearStartMonth?: number): LookbackReturns;

@@ -79,7 +79,7 @@ fn test_irs_cashflow_schedule_generation() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -98,7 +98,7 @@ fn test_irs_fixed_leg_quarterly_schedule() {
     let swap = InterestRateSwap::builder()
         .id("IRS-FIX-Q".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -152,7 +152,7 @@ fn test_irs_fixed_leg_semiannual_schedule() {
     let swap = InterestRateSwap::builder()
         .id("IRS-FIX-SA".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -208,7 +208,7 @@ fn test_irs_floating_leg_schedule() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2025 - 01 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -229,7 +229,7 @@ fn test_irs_value_matches_combined_signed_schedule() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -278,7 +278,7 @@ fn test_irs_stub_front() {
     let swap = InterestRateSwap::builder()
         .id("IRS-STUB-FRONT".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -328,7 +328,7 @@ fn test_irs_stub_back() {
     let swap = InterestRateSwap::builder()
         .id("IRS-STUB-BACK".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -380,7 +380,7 @@ fn test_irs_cashflow_dates_ordered() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2027 - 01 - 01),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -405,7 +405,7 @@ fn test_irs_cashflow_amounts_nonzero() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2027 - 01 - 01),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -432,7 +432,7 @@ fn test_irs_full_schedule_with_cfkind() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2026 - 01 - 01),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -459,7 +459,7 @@ fn test_regular_short_front_schedule_does_not_tag_first_coupon_as_stub() {
     let swap = InterestRateSwap::builder()
         .id("IRS-REGULAR-SHORT-FRONT-NO-STUB-KIND".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -517,7 +517,7 @@ fn test_genuine_front_stub_fixed_coupon_is_tagged_as_stub() {
     let swap = InterestRateSwap::builder()
         .id("IRS-GENUINE-FRONT-STUB-KIND".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -572,7 +572,7 @@ fn test_regular_holiday_end_coupon_under_stub_rule_is_not_tagged_stub() {
     let swap = InterestRateSwap::builder()
         .id("IRS-HOLIDAY-END-NO-STUB-KIND".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -630,7 +630,7 @@ fn test_regular_eom_schedule_under_stub_rule_is_not_tagged_stub() {
     let swap = InterestRateSwap::builder()
         .id("IRS-EOM-NO-STUB-KIND".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -689,7 +689,7 @@ fn test_irs_different_frequencies() {
     let swap = InterestRateSwap::builder()
         .id("IRS-DIFF-FREQ".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -740,7 +740,7 @@ fn test_irs_calendar_adjustments() {
     let swap = InterestRateSwap::builder()
         .id("IRS-CAL-ADJ".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -793,7 +793,7 @@ fn test_irs_explicit_zero_payment_delay_preserved() {
     let swap = InterestRateSwap::builder()
         .id("IRS-OIS-ZERO-DELAY".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -873,7 +873,7 @@ fn test_irs_explicit_zero_reset_lag_preserved() {
     let swap = InterestRateSwap::builder()
         .id("IRS-TERM-ZERO-LAG".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -932,7 +932,7 @@ fn test_irs_receive_fixed_cashflow_signs() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2025 - 01 - 01),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -950,14 +950,14 @@ fn test_irs_receive_fixed_cashflow_signs() {
                 // Receive fixed: should be positive
                 assert!(
                     cf.amount.amount() > 0.0,
-                    "Fixed leg should be positive for ReceiveFixed"
+                    "Fixed leg should be positive for Receive"
                 );
             }
             CFKind::FloatReset => {
                 // Pay floating: should be negative
                 assert!(
                     cf.amount.amount() < 0.0,
-                    "Floating leg should be negative for ReceiveFixed"
+                    "Floating leg should be negative for Receive"
                 );
             }
             _ => {}
@@ -974,7 +974,7 @@ fn test_irs_pay_fixed_cashflow_signs() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2025 - 01 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -992,14 +992,14 @@ fn test_irs_pay_fixed_cashflow_signs() {
                 // Pay fixed: should be negative
                 assert!(
                     cf.amount.amount() < 0.0,
-                    "Fixed leg should be negative for PayFixed"
+                    "Fixed leg should be negative for Pay"
                 );
             }
             CFKind::FloatReset => {
                 // Receive floating: should be positive
                 assert!(
                     cf.amount.amount() > 0.0,
-                    "Floating leg should be positive for PayFixed"
+                    "Floating leg should be positive for Pay"
                 );
             }
             _ => {}
@@ -1025,7 +1025,7 @@ fn test_irs_npv_parity_at_par_rate() {
     let swap = InterestRateSwap::builder()
         .id("IRS-PAR-PARITY".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"), // matches flat forward

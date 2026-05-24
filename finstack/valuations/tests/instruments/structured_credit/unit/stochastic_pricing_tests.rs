@@ -7,8 +7,9 @@ use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::PricingMode;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    CorrelationStructure, DealType, Pool, PoolAsset, Seniority, StochasticDefaultSpec,
-    StochasticPrepaySpec, StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
+    AssetPool, CorrelationStructure, DealType, PoolAsset, StochasticDefaultSpec,
+    StochasticPrepaySpec, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
+    TrancheStructure,
 };
 use time::Month;
 
@@ -20,8 +21,8 @@ fn legal_maturity() -> Date {
     Date::from_calendar_date(2030, Month::January, 1).unwrap()
 }
 
-fn simple_pool(balance: f64) -> Pool {
-    let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+fn simple_pool(balance: f64) -> AssetPool {
+    let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
     if balance > 0.0 {
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
@@ -39,7 +40,7 @@ fn single_tranche_structure(balance: f64) -> TrancheStructure {
         "SENIOR",
         0.0,
         100.0,
-        finstack_valuations::instruments::fixed_income::structured_credit::Seniority::Senior,
+        finstack_valuations::instruments::fixed_income::structured_credit::TrancheSeniority::Senior,
         Money::new(balance, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         legal_maturity(),
@@ -216,7 +217,7 @@ fn enable_stochastic_defaults_populates_specs_for_each_deal_family() {
     assert!(abs.is_stochastic());
 
     let make = |deal_type| {
-        let pool = Pool::new("POOL", deal_type, Currency::USD);
+        let pool = AssetPool::new("POOL", deal_type, Currency::USD);
         let tranches = single_tranche_structure(1_000_000.0);
         StructuredCredit::apply_deal_defaults(
             format!("TEST-{deal_type:?}"),
@@ -309,7 +310,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
     let close = Date::from_calendar_date(2024, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
-    let mut pool = Pool::new("POOL-LARGE", DealType::ABS, Currency::USD);
+    let mut pool = AssetPool::new("POOL-LARGE", DealType::ABS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
         Money::new(50_000_000.0, Currency::USD),
@@ -322,7 +323,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
         "SR",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(50_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity,
@@ -436,7 +437,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
 
     // Build a deal with factor-correlated defaults so `has_stochastic_rates()`
     // returns true and the RNG is actually exercised on every path.
-    let mut pool = Pool::new("POOL-PHILOX", DealType::ABS, Currency::USD);
+    let mut pool = AssetPool::new("POOL-PHILOX", DealType::ABS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
         Money::new(1_000_000.0, Currency::USD),
@@ -448,7 +449,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         "SR",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(1_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity,

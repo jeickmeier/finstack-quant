@@ -273,16 +273,16 @@ let trigger = CoverageTrigger::new(1.20, TriggerConsequence::DivertCashFlow)
     .with_cure_level(1.25);
 ```
 
-### Waterfall-Level Triggers (`WaterfallCoverageTrigger`)
+### Waterfall-Level Triggers (`CoverageTrigger`)
 
 Used when building waterfalls with coverage test diversion:
 
 ```rust
-use finstack_valuations::instruments::fixed_income::structured_credit::WaterfallCoverageTrigger;
+use finstack_valuations::instruments::fixed_income::structured_credit::waterfall::CoverageTrigger;
 
 let waterfall = WaterfallBuilder::new(Currency::USD)
     // ... add tiers ...
-    .add_coverage_trigger(WaterfallCoverageTrigger {
+    .add_coverage_trigger(CoverageTrigger {
         tranche_id: "CLASS_A".into(),
         oc_trigger: Some(1.25),
         ic_trigger: Some(1.20),

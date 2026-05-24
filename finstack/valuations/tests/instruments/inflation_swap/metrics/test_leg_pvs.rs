@@ -25,7 +25,7 @@ fn test_fixed_leg_pv_metric() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -65,7 +65,7 @@ fn test_inflation_leg_pv_metric() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -108,7 +108,7 @@ fn test_leg_pvs_sum_to_npv() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -129,7 +129,7 @@ fn test_leg_pvs_sum_to_npv() {
     let inflation_leg_pv = *result.measures.get("inflation_leg_pv").unwrap();
     let npv = result.value.amount();
 
-    // PayFixed: NPV = inflation_leg - fixed_leg
+    // Pay: NPV = inflation_leg - fixed_leg
     let expected_npv = inflation_leg_pv - fixed_leg_pv;
 
     assert!(
@@ -156,7 +156,7 @@ fn test_leg_pvs_scale_with_notional() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -170,7 +170,7 @@ fn test_leg_pvs_scale_with_notional() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();

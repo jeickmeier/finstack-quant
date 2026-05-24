@@ -90,7 +90,7 @@ already simple returns instead of prices.
 | `DrawdownEpisode` | `drawdown` | Returned by `Performance::drawdown_details` |
 | `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult` | `benchmark` | Returned by benchmark methods on `Performance` |
 | `CagrBasis`, `AnnualizationConvention` | `risk_metrics` | Configuration types |
-| `DatedSeries`, `RollingSharpe`, `RollingSortino`, `RollingVolatility` | `risk_metrics` | Returned by `Performance::rolling_*` |
+| `DatedSeries`, `DatedSeries`, `DatedSeries`, `DatedSeries` | `risk_metrics` | Returned by `Performance::rolling_*` |
 | `beta` | `benchmark` | Freestanding OLS beta; also used by `finstack-valuations` |
 | `correlation` | `correlation` | Shared row-major correlation validation / repair infrastructure used by valuations and factor-model crates |
 
@@ -117,7 +117,7 @@ All other analytics building-block functions are crate-internal (`pub(crate)`).
 
 ## Serialization
 
-`Performance`, `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`, `GreeksResult`, `MultiFactorResult`, `RollingGreeks`, `RollingSharpe`, `RollingSortino`, and `RollingVolatility` derive `Serialize`/`Deserialize`.
+`Performance`, `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`, `GreeksResult`, `MultiFactorResult`, `RollingGreeks`, `DatedSeries`, `DatedSeries`, and `DatedSeries` derive `Serialize`/`Deserialize`.
 
 ## Bindings
 

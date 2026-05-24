@@ -15,7 +15,7 @@ mod tests {
         types::{moodys_warf_factor, CreditRating},
     };
     use finstack_valuations::instruments::fixed_income::structured_credit::{
-        DealConfig, DealDates, DealType, DefaultAssumptions, Pool, PoolAsset,
+        AssetPool, DealConfig, DealDates, DealType, DefaultAssumptions, PoolAsset,
     };
     use time::Month;
 
@@ -116,7 +116,7 @@ mod tests {
         .with_industry("Energy");
 
         // Build pool
-        let mut pool = Pool::new("CLO_2024_1", DealType::CLO, Currency::USD);
+        let mut pool = AssetPool::new("CLO_2024_1", DealType::CLO, Currency::USD);
         pool.assets.push(loan1);
         pool.assets.push(loan2);
         pool.assets.push(bond1);
@@ -144,7 +144,7 @@ mod tests {
 
         let maturity = Date::from_calendar_date(2030, Month::December, 31).unwrap();
 
-        let mut pool = Pool::new("CLO_WARF_DEMO", DealType::CLO, Currency::USD);
+        let mut pool = AssetPool::new("CLO_WARF_DEMO", DealType::CLO, Currency::USD);
 
         // Add assets with various ratings
         pool.assets.push(
@@ -256,7 +256,7 @@ mod tests {
             ), // 4 years
         ];
 
-        let pool = Pool::new("DEMO_POOL", DealType::CLO, Currency::USD);
+        let pool = AssetPool::new("DEMO_POOL", DealType::CLO, Currency::USD);
 
         // Calculate WAL using market-standard cashflow-based method
         let wal = pool.weighted_avg_life_from_cashflows(&cashflows, as_of);
@@ -304,7 +304,7 @@ mod tests {
         let maturity = Date::from_calendar_date(2031, Month::December, 15).unwrap();
 
         // 1. Create pool with proper spread tracking
-        let mut pool = Pool::new("CLO_2024_1A", DealType::CLO, Currency::USD);
+        let mut pool = AssetPool::new("CLO_2024_1A", DealType::CLO, Currency::USD);
 
         // Add diversified loan portfolio
         pool.assets.push(
@@ -429,7 +429,7 @@ mod tests {
 
         let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-        let pool = Pool::new("DEMO", DealType::RMBS, Currency::USD);
+        let pool = AssetPool::new("DEMO", DealType::RMBS, Currency::USD);
 
         // Asset with 5-year maturity but principal amortizes over time
         let amortizing_cashflows = vec![

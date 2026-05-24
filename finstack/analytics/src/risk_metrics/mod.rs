@@ -3,8 +3,7 @@
 //! The metric functions in this module are crate-internal building blocks for
 //! [`crate::performance::Performance`]. Library consumers should drive every
 //! analytic through `Performance`; the result/config types ([`CagrBasis`],
-//! [`AnnualizationConvention`], [`RollingSharpe`], [`RollingSortino`],
-//! [`RollingVolatility`], [`DatedSeries`]) are re-exported because
+//! [`AnnualizationConvention`], [`DatedSeries`]) are re-exported because
 //! `Performance` returns them.
 
 mod return_based;
@@ -17,8 +16,8 @@ pub(crate) use return_based::{
     modified_sharpe, omega_ratio, sharpe, sortino, volatility,
 };
 pub use return_based::{AnnualizationConvention, CagrBasis};
+pub use rolling::DatedSeries;
 pub(crate) use rolling::{rolling_sharpe, rolling_sortino, rolling_volatility};
-pub use rolling::{DatedSeries, RollingSharpe, RollingSortino, RollingVolatility};
 pub(crate) use tail_risk::{
     cornish_fisher_var, expected_shortfall, kurtosis, parametric_var, skew_kurt, skewness,
     tail_ratio, value_at_risk, value_at_risk_and_es,

@@ -12,12 +12,6 @@ use finstack_core::HashMap;
 use finstack_core::Result;
 use std::sync::Arc;
 
-/// Legacy alias for the unified [`super::ExternalImSource`] trait.
-///
-/// Kept so downstream callers that imported `InternalModelInputSource`
-/// continue to compile.
-pub use super::ExternalImSource as InternalModelInputSource;
-
 /// Internal model IM calculator.
 ///
 /// Fields are private; use the builder methods ([`Self::new`],

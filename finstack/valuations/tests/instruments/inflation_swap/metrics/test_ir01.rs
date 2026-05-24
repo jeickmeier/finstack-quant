@@ -27,7 +27,7 @@ fn test_ir01_finite_difference_validation() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -95,7 +95,7 @@ fn test_ir01_scales_with_maturity() {
             .inflation_index_id("US-CPI-U".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .attributes(Default::default())
             .build()
             .unwrap();
@@ -138,7 +138,7 @@ fn test_ir01_sign_pay_fixed() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -174,7 +174,7 @@ fn test_ir01_sign_receive_fixed() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -210,7 +210,7 @@ fn test_ir01_zero_for_matured_swap() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();

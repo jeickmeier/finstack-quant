@@ -1,7 +1,7 @@
 //! DV01 metric tests.
 //!
 //! Tests dollar value of a basis point: DV01 = Annuity × Notional × 0.0001
-//! Sign depends on swap side (ReceiveFixed vs PayFixed).
+//! Sign depends on swap side (Receive vs Pay).
 
 use finstack_core::currency::Currency;
 use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -98,7 +98,7 @@ fn test_dv01_formula_consistency() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
 
-    let swap = create_standard_swap(as_of, end, PayReceive::ReceiveFixed);
+    let swap = create_standard_swap(as_of, end, PayReceive::Receive);
     let market = build_market(0.05, as_of);
 
     let result = swap
@@ -131,7 +131,7 @@ fn test_dv01_five_year_swap() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
 
-    let swap = create_standard_swap(as_of, end, PayReceive::ReceiveFixed);
+    let swap = create_standard_swap(as_of, end, PayReceive::Receive);
     let market = build_market(0.05, as_of);
 
     let result = swap
@@ -159,9 +159,9 @@ fn test_dv01_scales_with_notional() {
 
     let market = build_market(0.05, as_of);
 
-    let swap_1m = create_standard_swap(as_of, end, PayReceive::ReceiveFixed);
+    let swap_1m = create_standard_swap(as_of, end, PayReceive::Receive);
 
-    let mut swap_10m = create_standard_swap(as_of, end, PayReceive::ReceiveFixed);
+    let mut swap_10m = create_standard_swap(as_of, end, PayReceive::Receive);
     swap_10m.notional = Money::new(10_000_000.0, Currency::USD);
 
     let dv01_1m = *swap_1m
@@ -204,8 +204,8 @@ fn test_dv01_receive_vs_pay_opposite_signs() {
 
     let market = build_market(0.05, as_of);
 
-    let swap_receive = create_standard_swap(as_of, end, PayReceive::ReceiveFixed);
-    let swap_pay = create_standard_swap(as_of, end, PayReceive::PayFixed);
+    let swap_receive = create_standard_swap(as_of, end, PayReceive::Receive);
+    let swap_pay = create_standard_swap(as_of, end, PayReceive::Pay);
 
     let dv01_receive = *swap_receive
         .price_with_metrics(
@@ -253,9 +253,9 @@ fn test_dv01_longer_maturity_higher_dv01() {
 
     let market = build_market(0.05, as_of);
 
-    let swap_2y = create_standard_swap(as_of, date!(2026 - 01 - 01), PayReceive::ReceiveFixed);
-    let swap_5y = create_standard_swap(as_of, date!(2029 - 01 - 01), PayReceive::ReceiveFixed);
-    let swap_10y = create_standard_swap(as_of, date!(2034 - 01 - 01), PayReceive::ReceiveFixed);
+    let swap_2y = create_standard_swap(as_of, date!(2026 - 01 - 01), PayReceive::Receive);
+    let swap_5y = create_standard_swap(as_of, date!(2029 - 01 - 01), PayReceive::Receive);
+    let swap_10y = create_standard_swap(as_of, date!(2034 - 01 - 01), PayReceive::Receive);
 
     let dv01_2y = *swap_2y
         .price_with_metrics(
@@ -303,7 +303,7 @@ fn test_dv01_short_swap() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2025 - 01 - 01);
 
-    let swap = create_standard_swap(as_of, end, PayReceive::ReceiveFixed);
+    let swap = create_standard_swap(as_of, end, PayReceive::Receive);
     let market = build_market(0.05, as_of);
 
     let result = swap
@@ -330,7 +330,7 @@ fn test_dv01_higher_rates_lower_dv01() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
 
-    let swap = create_standard_swap(as_of, end, PayReceive::ReceiveFixed);
+    let swap = create_standard_swap(as_of, end, PayReceive::Receive);
     let market_3pct = build_market(0.03, as_of);
     let market_7pct = build_market(0.07, as_of);
 
@@ -374,7 +374,7 @@ fn test_dv01_receive_fixed_negative() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
 
-    let swap = create_standard_swap(as_of, end, PayReceive::ReceiveFixed);
+    let swap = create_standard_swap(as_of, end, PayReceive::Receive);
     let market = build_market(0.05, as_of);
 
     let result = swap
@@ -403,7 +403,7 @@ fn test_dv01_pay_fixed_positive() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
 
-    let swap = create_standard_swap(as_of, end, PayReceive::PayFixed);
+    let swap = create_standard_swap(as_of, end, PayReceive::Pay);
     let market = build_market(0.05, as_of);
 
     let result = swap
@@ -430,7 +430,7 @@ fn test_dv01_typical_range() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
 
-    let swap = create_standard_swap(as_of, end, PayReceive::ReceiveFixed);
+    let swap = create_standard_swap(as_of, end, PayReceive::Receive);
     let market = build_market(0.05, as_of);
 
     let result = swap

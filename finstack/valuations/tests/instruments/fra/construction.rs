@@ -24,7 +24,7 @@ fn test_standard_fra_construction() {
     assert_eq!(fra.day_count, DayCount::Act360);
     assert_eq!(
         fra.side,
-        finstack_valuations::instruments::rates::irs::PayReceive::ReceiveFixed
+        finstack_valuations::instruments::rates::irs::PayReceive::Receive
     ); // receive fixed rate
 }
 
@@ -70,8 +70,8 @@ fn test_builder_receive_vs_pay_fixed() {
     let receive_fixed = TestFraBuilder::new().receive_fixed(true).build();
     let pay_fixed = TestFraBuilder::new().receive_fixed(false).build();
 
-    assert_eq!(receive_fixed.side, PayReceive::ReceiveFixed); // receive fixed rate
-    assert_eq!(pay_fixed.side, PayReceive::PayFixed); // pay fixed rate
+    assert_eq!(receive_fixed.side, PayReceive::Receive); // receive fixed rate
+    assert_eq!(pay_fixed.side, PayReceive::Pay); // pay fixed rate
 }
 
 #[test]

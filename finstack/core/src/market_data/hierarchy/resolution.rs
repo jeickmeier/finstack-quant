@@ -3,7 +3,7 @@
 //! Resolves hierarchy paths + tag filters to sets of `CurveId`s, with
 //! configurable inheritance modes (most-specific-wins vs. cumulative).
 
-use super::{HierarchyNode, MarketDataHierarchy, NodePath};
+use super::{HierarchyNode, MarketDataHierarchy};
 use crate::collections::{HashMap, HashSet};
 use crate::types::CurveId;
 use serde::{Deserialize, Serialize};
@@ -87,7 +87,7 @@ impl TagFilter {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HierarchyTarget {
     /// Path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
-    pub path: NodePath,
+    pub path: Vec<String>,
     /// Optional tag filter applied to nodes in the subtree.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tag_filter: Option<TagFilter>,

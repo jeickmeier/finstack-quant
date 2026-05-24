@@ -28,7 +28,7 @@ fn create_test_swap() -> InterestRateSwap {
         0.035,                                    // 3.5% fixed rate
         start,
         end,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .expect("swap creation succeeds")
 }

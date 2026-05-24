@@ -7,19 +7,19 @@ use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::RoundingConvention;
 use finstack_valuations::instruments::fixed_income::structured_credit::WaterfallContext;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    DealType, PaymentCalculation, PaymentType, Pool, Recipient, RecipientType, TrancheStructure,
-    WaterfallBuilder, WaterfallTier,
+    AssetPool, DealType, PaymentCalculation, PaymentType, Recipient, RecipientType,
+    TrancheStructure, WaterfallBuilder, WaterfallTier,
 };
 
 fn run_rounding_test(amount: f64, rounding: RoundingConvention) -> f64 {
     let currency = Currency::USD;
-    let pool = Pool::new("TEST", DealType::CLO, currency);
+    let pool = AssetPool::new("TEST", DealType::CLO, currency);
     let tranches = TrancheStructure::new(vec![
         finstack_valuations::instruments::fixed_income::structured_credit::Tranche::new(
             "A",
             0.0,
             100.0,
-            finstack_valuations::instruments::fixed_income::structured_credit::Seniority::Senior,
+            finstack_valuations::instruments::fixed_income::structured_credit::TrancheSeniority::Senior,
             Money::new(100.0, currency),
             finstack_valuations::instruments::fixed_income::structured_credit::TrancheCoupon::Fixed {
                 rate: 0.05,

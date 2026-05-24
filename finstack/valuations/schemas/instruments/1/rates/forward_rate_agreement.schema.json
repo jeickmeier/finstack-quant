@@ -1091,7 +1091,7 @@
               ]
             },
             "PoolGranularity": {
-              "description": "Pool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
+              "description": "AssetPool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
               "oneOf": [
                 {
                   "const": "PerName",
@@ -1782,7 +1782,7 @@
             },
             "side": {
               "$ref": "#/$defs/PayReceive",
-              "description": "Direction of the FRA: PayFixed means paying the fixed rate (receiving floating),\nReceiveFixed means receiving the fixed rate (paying floating)."
+              "description": "Direction of the FRA: Pay means paying the fixed rate (receiving floating),\nReceive means receiving the fixed rate (paying floating)."
             },
             "start_date": {
               "description": "Interest period start date",

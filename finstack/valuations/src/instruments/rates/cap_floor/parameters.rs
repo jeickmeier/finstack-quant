@@ -15,7 +15,7 @@ use rust_decimal::Decimal;
 ///
 /// Groups parameters specific to interest rate options (caps/floors).
 #[derive(Debug, Clone)]
-pub struct InterestRateOptionParams {
+pub struct CapFloorParams {
     /// Type of rate option (Cap/Floor)
     pub rate_option_type: RateOptionType,
     /// Notional amount
@@ -34,7 +34,7 @@ pub struct InterestRateOptionParams {
     pub calendar_id: Option<&'static str>,
 }
 
-impl InterestRateOptionParams {
+impl CapFloorParams {
     fn to_decimal(value: f64) -> finstack_core::Result<Decimal> {
         Decimal::try_from(value).map_err(|_| {
             finstack_core::Error::Validation(format!(

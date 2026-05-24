@@ -19,7 +19,7 @@
 //!
 //! where τ is the year fraction from start to maturity using the instrument's day count.
 //!
-//! Net payment = Inflation leg - Fixed leg (for PayFixed side)
+//! Net payment = Inflation leg - Fixed leg (for Pay side)
 //!
 //! # Breakeven Inflation Rate (Par Rate)
 //!

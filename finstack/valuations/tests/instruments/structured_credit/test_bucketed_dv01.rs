@@ -6,7 +6,7 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    DealType, Pool, PoolAsset, Seniority, StructuredCredit, Tranche, TrancheCoupon,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
     TrancheStructure,
 };
 use finstack_valuations::instruments::Instrument;
@@ -28,8 +28,8 @@ fn flat_discount_curve(rate: f64, base: Date) -> DiscountCurve {
         .unwrap()
 }
 
-fn create_simple_pool() -> Pool {
-    let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+fn create_simple_pool() -> AssetPool {
+    let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
         Money::new(5_000_000.0, Currency::USD),
@@ -45,7 +45,7 @@ fn create_simple_tranches() -> TrancheStructure {
         "SENIOR",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(5_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.035 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),

@@ -1,8 +1,6 @@
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
-use finstack_core::money::fx::{
-    FxConfig, FxConversionPolicy, FxMatrix, FxProvider, FxQuery, FxRate,
-};
+use finstack_core::money::fx::{FxConfig, FxConversionPolicy, FxMatrix, FxProvider, FxQuery};
 use finstack_core::money::Money;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -18,7 +16,7 @@ impl FxProvider for StaticFx {
         _to: Currency,
         _on: Date,
         _policy: FxConversionPolicy,
-    ) -> finstack_core::Result<FxRate> {
+    ) -> finstack_core::Result<f64> {
         Ok(self.rate)
     }
 }
@@ -60,7 +58,7 @@ fn closure_check_matrix() {
             to: Currency,
             _on: Date,
             _policy: FxConversionPolicy,
-        ) -> finstack_core::Result<FxRate> {
+        ) -> finstack_core::Result<f64> {
             match (from, to) {
                 (Currency::USD, Currency::EUR) => Ok(0.9),
                 (Currency::USD, Currency::GBP) => Ok(0.75),
@@ -114,7 +112,7 @@ fn fx_matrix_cache_distinguishes_query_date_and_policy() {
             to: Currency,
             on: Date,
             policy: FxConversionPolicy,
-        ) -> finstack_core::Result<FxRate> {
+        ) -> finstack_core::Result<f64> {
             assert_eq!(from, Currency::EUR);
             assert_eq!(to, Currency::USD);
 
@@ -190,7 +188,7 @@ fn fx_matrix_set_quote_rejects_invalid_rates_without_mutating_state() {
             to: Currency,
             _on: Date,
             _policy: FxConversionPolicy,
-        ) -> finstack_core::Result<FxRate> {
+        ) -> finstack_core::Result<f64> {
             Err(finstack_core::InputError::NotFound {
                 id: format!("FX:{from}->{to}"),
             }
@@ -223,7 +221,7 @@ fn with_bumped_rate_invalidates_cached_crosses() {
             to: Currency,
             _on: Date,
             _policy: FxConversionPolicy,
-        ) -> finstack_core::Result<FxRate> {
+        ) -> finstack_core::Result<f64> {
             match (from, to) {
                 (Currency::GBP, Currency::USD) => Ok(1.25),
                 (Currency::USD, Currency::EUR) => Ok(0.90),
@@ -271,7 +269,7 @@ fn validate_triangular_flags_inconsistent_crosses() {
             to: Currency,
             _on: Date,
             _policy: FxConversionPolicy,
-        ) -> finstack_core::Result<FxRate> {
+        ) -> finstack_core::Result<f64> {
             Err(finstack_core::InputError::NotFound {
                 id: format!("FX:{from}->{to}"),
             }
@@ -307,7 +305,7 @@ fn triangulation_missing_leg_only_queries_provider_once_per_leg() {
             to: Currency,
             _on: Date,
             _policy: FxConversionPolicy,
-        ) -> finstack_core::Result<FxRate> {
+        ) -> finstack_core::Result<f64> {
             self.calls.fetch_add(1, Ordering::Relaxed);
             Err(finstack_core::InputError::NotFound {
                 id: format!("FX:{from}->{to}"),

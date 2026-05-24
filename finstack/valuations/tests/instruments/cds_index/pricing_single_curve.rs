@@ -12,9 +12,8 @@
 use super::test_utils::*;
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
-use finstack_valuations::instruments::credit_derivatives::cds::{
-    PayReceive, RECOVERY_SENIOR_UNSECURED,
-};
+use finstack_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
+use finstack_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_valuations::instruments::credit_derivatives::cds_index::{CDSIndex, IndexPricing};
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::metrics::MetricId;
@@ -126,7 +125,7 @@ fn test_single_curve_par_spread() {
 
     assert_positive(par_spread, "Par spread");
     // Flat hazard approximation: spread ≈ hazard × (1 - recovery) × 10,000
-    let expected = flat_hazard_par_spread_bps(STANDARD_HAZARD_RATE, RECOVERY_SENIOR_UNSECURED);
+    let expected = flat_hazard_par_spread_bps(STANDARD_HAZARD_RATE, STANDARD_RECOVERY_SENIOR);
     assert_in_range(
         par_spread,
         expected * 0.85,
@@ -184,10 +183,10 @@ fn test_single_curve_buy_vs_sell_protection() {
         &standard_cdx_params(),
         "CDX-SELL",
         Money::new(10_000_000.0, Currency::USD),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
         start,
         end,
-        RECOVERY_SENIOR_UNSECURED,
+        STANDARD_RECOVERY_SENIOR,
         "USD-OIS",
         "HZ-INDEX",
     )

@@ -29,7 +29,7 @@ fn test_irs_at_par_npv_zero() {
     let swap = InterestRateSwap {
         id: "SWAP_PAR".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -88,7 +88,7 @@ fn test_irs_receive_fixed_below_market() {
     let swap = InterestRateSwap {
         id: "SWAP_OFF_MARKET".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.03).expect("valid"), // Below market
@@ -146,7 +146,7 @@ fn test_irs_receive_fixed_above_market() {
     let swap = InterestRateSwap {
         id: "SWAP_ABOVE_MARKET".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.07).expect("valid"), // Above market
@@ -239,7 +239,7 @@ fn test_irs_pay_vs_receive_opposite_signs() {
     let swap_receive = InterestRateSwap {
         id: "SWAP_RECEIVE".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: fixed_leg.clone(),
         float: float_leg.clone(),
         margin_spec: None,
@@ -250,7 +250,7 @@ fn test_irs_pay_vs_receive_opposite_signs() {
     let swap_pay = InterestRateSwap {
         id: "SWAP_PAY".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::PayFixed,
+        side: PayReceive::Pay,
         fixed: fixed_leg,
         float: float_leg,
         margin_spec: None,
@@ -291,7 +291,7 @@ fn test_irs_npv_scales_with_notional() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -301,7 +301,7 @@ fn test_irs_npv_scales_with_notional() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -329,7 +329,7 @@ fn test_irs_rate_sensitivity_inverse() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -370,7 +370,7 @@ fn test_irs_with_spread() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
     swap.float.spread_bp = dec!(50.0);
@@ -399,7 +399,7 @@ fn test_irs_short_maturity() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -427,7 +427,7 @@ fn test_irs_long_maturity() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -455,7 +455,7 @@ fn test_irs_zero_rate() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -479,7 +479,7 @@ fn test_irs_theta_calculation() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -517,7 +517,7 @@ fn test_irs_forward_starting() {
         0.05,
         start,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -539,7 +539,7 @@ fn test_irs_npv_currency_matches() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 

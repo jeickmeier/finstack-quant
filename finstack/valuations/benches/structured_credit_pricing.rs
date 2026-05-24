@@ -4,7 +4,7 @@
 //! - NPV calculation (ABS, CLO, CMBS, RMBS)
 //! - Cashflow generation with waterfall
 //! - Risk metrics (WAL, duration, spread duration)
-//! - Pool metrics (WAC, WAS, WARF, diversity)
+//! - AssetPool metrics (WAC, WAS, WARF, diversity)
 //! - Deal-specific metrics
 //! - Scaling with pool size
 //!
@@ -19,7 +19,7 @@ use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::money::Money;
 use finstack_core::types::CreditRating;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    DealType, Pool, PoolAsset, Seniority, StructuredCredit, Tranche, TrancheCoupon,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
     TrancheStructure,
 };
 use finstack_valuations::instruments::Instrument;
@@ -40,8 +40,8 @@ fn closing_date() -> Date {
 }
 
 // Helper to create a pool with a specified number of assets
-fn create_pool(deal_type: DealType, num_assets: usize) -> Pool {
-    let mut pool = Pool::new("POOL", deal_type, Currency::USD);
+fn create_pool(deal_type: DealType, num_assets: usize) -> AssetPool {
+    let mut pool = AssetPool::new("POOL", deal_type, Currency::USD);
     let asset_balance = 10_000_000.0 / (num_assets as f64);
 
     for i in 0..num_assets {
@@ -65,7 +65,7 @@ fn create_tranches(total_balance: f64) -> TrancheStructure {
         "SENIOR",
         0.0,
         70.0, // 70% senior
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(total_balance * 0.70, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.035 },
         maturity_date(),
@@ -76,7 +76,7 @@ fn create_tranches(total_balance: f64) -> TrancheStructure {
         "MEZZ",
         70.0,
         90.0, // 20% mezzanine
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(total_balance * 0.20, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.06 },
         maturity_date(),
@@ -87,7 +87,7 @@ fn create_tranches(total_balance: f64) -> TrancheStructure {
         "EQUITY",
         90.0,
         100.0, // 10% equity
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(total_balance * 0.10, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -251,7 +251,7 @@ fn bench_cs01(c: &mut Criterion) {
 }
 
 // ============================================================================
-// Pool Metrics Benchmarks
+// AssetPool Metrics Benchmarks
 // ============================================================================
 
 fn bench_pool_metrics(c: &mut Criterion) {

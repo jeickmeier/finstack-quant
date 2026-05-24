@@ -898,7 +898,7 @@
                 },
                 "collection_account": {
                   "$ref": "#/$defs/Money",
-                  "description": "Pool-level accounts\nCollection account balance (collected but not yet distributed)"
+                  "description": "AssetPool-level accounts\nCollection account balance (collected but not yet distributed)"
                 },
                 "cumulative_defaults": {
                   "$ref": "#/$defs/Money",
@@ -934,7 +934,7 @@
                 },
                 "id": {
                   "$ref": "#/$defs/Id",
-                  "description": "Pool identifier"
+                  "description": "AssetPool identifier"
                 },
                 "reinvestment_period": {
                   "anyOf": [
@@ -5771,7 +5771,7 @@
               "type": "object"
             },
             "CommoditySwap": {
-              "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_valuations::instruments::commodity::commodity_swap::CommoditySwap;\nuse finstack_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_valuations::instruments::PayReceive;\nuse finstack_core::currency::Currency;\nuse finstack_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(rust_decimal::Decimal::try_from(3.50).expect(\"valid decimal\"))\n    .floating_index_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::PayFixed)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```",
+              "description": "Commodity swap (fixed-for-floating commodity price exchange).\n\nOne party pays a fixed price per unit, the other pays a floating price\ndetermined by an index or average of spot prices over the period.\n\n# Pricing\n\nFixed leg: ∑ Q × P_fixed × DF(t_i)\nFloating leg: ∑ Q × E[P_float(t_i)] × DF(t_i)\n\nFor a payer of fixed:\nNPV = Floating leg PV - Fixed leg PV\n\n# Examples\n\n```rust\nuse finstack_valuations::instruments::commodity::commodity_swap::CommoditySwap;\nuse finstack_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_valuations::instruments::PayReceive;\nuse finstack_core::currency::Currency;\nuse finstack_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};\nuse finstack_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swap = CommoditySwap::builder()\n    .id(InstrumentId::new(\"NG-SWAP-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .quantity(10000.0)\n    .fixed_price(rust_decimal::Decimal::try_from(3.50).expect(\"valid decimal\"))\n    .floating_index_id(CurveId::new(\"NG-SPOT-AVG\"))\n    .side(PayReceive::Pay)\n    .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())\n    .frequency(Tenor::new(1, TenorUnit::Months))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid swap\");\n```",
               "properties": {
                 "attributes": {
                   "$ref": "#/$defs/Attributes",
@@ -5870,7 +5870,7 @@
                 },
                 "side": {
                   "$ref": "#/$defs/PayReceive",
-                  "description": "Direction of the swap: PayFixed means paying the fixed price leg,\nReceiveFixed means receiving the fixed price leg."
+                  "description": "Direction of the swap: Pay means paying the fixed price leg,\nReceive means receiving the fixed price leg."
                 },
                 "start_date": {
                   "description": "Start date of the swap.",
@@ -10271,7 +10271,7 @@
             },
             "ForwardRateAgreement": {
               "additionalProperties": false,
-              "description": "Forward Rate Agreement instrument.\n\nA FRA is a forward contract on an interest rate. The holder receives\nthe difference between the realized rate and the fixed rate, paid at\nthe start of the interest period (FRA convention).\n\n# Direction Convention\n\n- `side = PayReceive::ReceiveFixed`: Receive fixed rate, pay floating rate.\n  When forward rate > fixed rate, PV is negative (you're paying more than receiving).\n- `side = PayReceive::PayFixed`: Pay fixed rate, receive floating rate.\n  When forward rate > fixed rate, PV is positive (you're receiving more than paying).\n\n# Side field\n\nUse `side` to indicate the fixed leg direction. If omitted in JSON,\ndeserialization defaults to `PayFixed`.",
+              "description": "Forward Rate Agreement instrument.\n\nA FRA is a forward contract on an interest rate. The holder receives\nthe difference between the realized rate and the fixed rate, paid at\nthe start of the interest period (FRA convention).\n\n# Direction Convention\n\n- `side = PayReceive::Receive`: Receive fixed rate, pay floating rate.\n  When forward rate > fixed rate, PV is negative (you're paying more than receiving).\n- `side = PayReceive::Pay`: Pay fixed rate, receive floating rate.\n  When forward rate > fixed rate, PV is positive (you're receiving more than paying).\n\n# Side field\n\nUse `side` to indicate the fixed leg direction. If omitted in JSON,\ndeserialization defaults to `Pay`.",
               "properties": {
                 "attributes": {
                   "$ref": "#/$defs/Attributes",
@@ -10378,7 +10378,7 @@
                 },
                 "side": {
                   "$ref": "#/$defs/PayReceive",
-                  "description": "Direction of the FRA: PayFixed means paying the fixed rate (receiving floating),\nReceiveFixed means receiving the fixed rate (paying floating)."
+                  "description": "Direction of the FRA: Pay means paying the fixed rate (receiving floating),\nReceive means receiving the fixed rate (paying floating)."
                 },
                 "start_date": {
                   "description": "Interest period start date",
@@ -13710,7 +13710,7 @@
                 },
                 "side": {
                   "$ref": "#/$defs/PayReceive",
-                  "description": "Direction of the swap (PayFixed or ReceiveFixed)."
+                  "description": "Direction of the swap (Pay or Receive)."
                 }
               },
               "required": [
@@ -15170,7 +15170,7 @@
               "type": "object"
             },
             "PoolGranularity": {
-              "description": "Pool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
+              "description": "AssetPool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
               "oneOf": [
                 {
                   "const": "PerName",
@@ -17775,7 +17775,7 @@
                       "type": "string"
                     },
                     "pool_coupon": {
-                      "description": "Pool weighted average coupon",
+                      "description": "AssetPool weighted average coupon",
                       "format": "double",
                       "type": "number"
                     },

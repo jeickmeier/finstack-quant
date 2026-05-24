@@ -1,4 +1,4 @@
-use super::pool::AssetPool as Pool;
+use super::pool::AssetPool;
 use finstack_core::dates::{Date, DayCount};
 
 /// Structure of Arrays (SoA) layout for pool assets to improve cache locality
@@ -47,8 +47,8 @@ pub(crate) struct PoolState {
 }
 
 impl PoolState {
-    /// Create a new PoolState from a Pool (AoS to SoA conversion).
-    pub(crate) fn from_pool(pool: &Pool) -> Self {
+    /// Create a new PoolState from a AssetPool (AoS to SoA conversion).
+    pub(crate) fn from_pool(pool: &AssetPool) -> Self {
         let n = pool.assets.len();
         let mut ids = Vec::with_capacity(n);
         let mut balances = Vec::with_capacity(n);

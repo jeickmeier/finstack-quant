@@ -23,7 +23,7 @@ pub struct CliquetOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Underlying asset ticker symbol
-    pub underlying_ticker: crate::instruments::equity::spot::Ticker,
+    pub underlying_ticker: String,
     /// Reset dates for periodic return locking
     #[schemars(with = "Vec<String>")]
     pub reset_dates: Vec<Date>,
@@ -92,7 +92,7 @@ pub enum CliquetPayoffType {
 #[serde(deny_unknown_fields)]
 struct CliquetOptionUnchecked {
     id: InstrumentId,
-    underlying_ticker: crate::instruments::equity::spot::Ticker,
+    underlying_ticker: String,
     #[schemars(with = "Vec<String>")]
     reset_dates: Vec<Date>,
     #[schemars(with = "String")]

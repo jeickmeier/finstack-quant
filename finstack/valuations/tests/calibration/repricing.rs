@@ -11,6 +11,7 @@ use finstack_core::market_data::term_structures::Seniority;
 use finstack_core::math::interp::ExtrapolationPolicy;
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
+use finstack_core::types::IndexId;
 use finstack_core::HashMap;
 use finstack_valuations::calibration::api::engine;
 use finstack_valuations::calibration::api::schema::{
@@ -25,7 +26,7 @@ use finstack_valuations::instruments::PayReceive;
 use finstack_valuations::market::build_cds_instrument;
 use finstack_valuations::market::build_rate_instrument;
 use finstack_valuations::market::conventions::ids::{
-    CdsConventionKey, CdsDocClause, IndexId, InflationSwapConventionId,
+    CdsConventionKey, CdsDocClause, InflationSwapConventionId,
 };
 use finstack_valuations::market::conventions::ConventionRegistry;
 use finstack_valuations::market::quotes::cds::CdsQuote;
@@ -424,7 +425,7 @@ fn forward_curve_fra_repricing() {
             .reset_lag(2)
             .discount_curve_id("USD-OIS".into())
             .forward_curve_id("USD-SOFR-3M".into())
-            .side(finstack_valuations::instruments::rates::irs::PayReceive::PayFixed)
+            .side(finstack_valuations::instruments::rates::irs::PayReceive::Pay)
             .build()
             .unwrap();
 
@@ -989,7 +990,7 @@ fn inflation_curve_swap_repricing() {
             .inflation_index_id("USD-CPI".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(conventions.day_count)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .lag_override_opt(Some(lag))
             .base_cpi_opt(Some(base_cpi))
             .bdc(conventions.business_day_convention)

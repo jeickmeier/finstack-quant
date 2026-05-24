@@ -4,7 +4,7 @@
 
 - Supports caps, floors, caplets, and floorlets via `RateOptionType` with configurable schedule (freq/day-count/BDC/stub).
 - Uses explicit discount, forward, and volatility curve IDs for market data alignment; settlement and exercise style fields follow standard conventions.
-- Helper constructors (`new_cap`, `new_floor`, and `InterestRateOptionParams`) simplify building standard structures.
+- Helper constructors (`new_cap`, `new_floor`, and `CapFloorParams`) simplify building standard structures.
 
 ## Methodology & References
 

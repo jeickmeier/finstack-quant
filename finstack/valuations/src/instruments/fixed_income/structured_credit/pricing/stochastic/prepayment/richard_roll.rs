@@ -52,7 +52,7 @@ pub(crate) struct RichardRollPrepay {
     refi_sensitivity: f64,
     /// Refinancing slope parameter (lambda)
     refi_slope: f64,
-    /// Pool coupon rate (WAC)
+    /// AssetPool coupon rate (WAC)
     pool_coupon: f64,
     /// Burnout decay rate per prepayment
     burnout_rate: f64,
@@ -72,7 +72,7 @@ impl RichardRollPrepay {
     /// # Arguments
     /// * `base_cpr` - Base CPR at full seasoning
     /// * `refi_sensitivity` - Sensitivity to refinancing incentive (gamma)
-    /// * `pool_coupon` - Pool weighted average coupon
+    /// * `pool_coupon` - AssetPool weighted average coupon
     /// * `burnout_rate` - Burnout decay rate
     pub(crate) fn new(
         base_cpr: f64,

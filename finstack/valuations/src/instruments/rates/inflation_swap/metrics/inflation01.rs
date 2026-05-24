@@ -36,8 +36,8 @@
 //!
 //! # Sign Convention
 //!
-//! - **PayFixed**: positive Inflation01 (benefits from higher inflation).
-//! - **ReceiveFixed**: negative Inflation01 (loses from higher inflation).
+//! - **Pay**: positive Inflation01 (benefits from higher inflation).
+//! - **Receive**: negative Inflation01 (loses from higher inflation).
 //!
 //! The bumped-curve `value()` already carries the leg signs, so the finite
 //! difference reproduces the correct sign without an explicit branch.
@@ -143,7 +143,7 @@ mod tests {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(finstack_core::dates::DayCount::Act365F)
-            .side(crate::instruments::common_impl::parameters::legs::PayReceive::PayFixed)
+            .side(crate::instruments::common_impl::parameters::legs::PayReceive::Pay)
             .lag_override(InflationLag::None)
             .attributes(crate::instruments::common_impl::traits::Attributes::new())
             .build()

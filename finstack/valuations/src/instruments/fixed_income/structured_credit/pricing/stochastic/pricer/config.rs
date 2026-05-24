@@ -92,7 +92,7 @@ pub(crate) struct StochasticPricerConfig {
     /// Maximum terminal paths allowed for explicit path-preserving tree mode.
     pub max_tree_paths: usize,
 
-    /// Pool-granularity policy for copula-based default models.
+    /// AssetPool-granularity policy for copula-based default models.
     ///
     /// [`PoolGranularity::PerName`] (the default) realizes each pool asset's
     /// default individually — the correct treatment for concentrated CLOs

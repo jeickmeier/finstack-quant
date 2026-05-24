@@ -165,7 +165,7 @@ impl InflationCurveTarget {
                     .inflation_index_id(self.params.curve_id.clone())
                     .discount_curve_id(self.params.discount_curve_id.clone())
                     .day_count(conventions.day_count)
-                    .side(PayReceive::PayFixed)
+                    .side(PayReceive::Pay)
                     .lag_override_opt(if has_index_fixings { None } else { Some(lag) })
                     .bdc(conventions.business_day_convention)
                     .calendar_id_opt(Some(conventions.calendar_id.clone().into()))
@@ -184,7 +184,7 @@ impl InflationCurveTarget {
                     .inflation_index_id(self.params.curve_id.clone())
                     .discount_curve_id(self.params.discount_curve_id.clone())
                     .day_count(conventions.day_count)
-                    .side(PayReceive::PayFixed)
+                    .side(PayReceive::Pay)
                     .lag_override_opt(if has_index_fixings { None } else { Some(lag) })
                     .base_cpi_opt(if has_index_fixings {
                         None

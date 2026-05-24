@@ -114,7 +114,7 @@ mod tests {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
-            .side(crate::instruments::common_impl::parameters::legs::PayReceive::PayFixed)
+            .side(crate::instruments::common_impl::parameters::legs::PayReceive::Pay)
             .lag_override(InflationLag::None)
             .attributes(crate::instruments::common_impl::traits::Attributes::new())
             .build()

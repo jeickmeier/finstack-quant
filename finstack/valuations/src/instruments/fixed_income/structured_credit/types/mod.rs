@@ -2,7 +2,7 @@
 //!
 //! This module contains all data structures for structured credit instruments:
 //! - `StructuredCredit` - The main instrument type
-//! - Pool and asset types
+//! - AssetPool and asset types
 //! - Tranche structure and coupon types
 //! - Waterfall distribution types
 //! - Behavioral model specifications
@@ -34,15 +34,12 @@ mod stochastic;
 // RE-EXPORTS FROM TYPE MODULES
 // ============================================================================
 
-// Enums - use the new Seniority name
+// Enums
+pub use enums::TrancheSeniority;
 pub use enums::{AssetType, DealType, PaymentMode, TriggerConsequence};
-// Re-export TrancheSeniority as Seniority for cleaner naming
-pub use enums::TrancheSeniority as Seniority;
-pub(crate) use enums::TrancheSeniority;
 
-// Pool types - use Pool as the primary name
-pub use pool::AssetPool as Pool;
-pub(crate) use pool::AssetPool;
+// AssetPool types
+pub use pool::AssetPool;
 pub use pool::{
     calculate_pool_stats, ConcentrationCheckResult, ConcentrationViolation, PoolAsset, PoolStats,
     ReinvestmentCriteria, ReinvestmentPeriod, RepLine,
@@ -301,7 +298,7 @@ pub struct StructuredCredit {
     pub deal_type: DealType,
 
     /// Asset pool definition.
-    pub pool: Pool,
+    pub pool: AssetPool,
 
     /// Tranche structure.
     pub tranches: TrancheStructure,
@@ -1131,7 +1128,7 @@ impl core::fmt::Display for StructuredCredit {
 
         write!(
             f,
-            "{} {:?} | Pool: {} {} | {} tranches | {} -> {}",
+            "{} {:?} | AssetPool: {} {} | {} tranches | {} -> {}",
             self.id.as_str(),
             self.deal_type,
             pool_balance.amount(),

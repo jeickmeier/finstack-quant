@@ -4,7 +4,7 @@
 //!
 //! ## Unit Tests (`unit/`)
 //! - **components/**: Tests for structural building blocks
-//!   - pool: Pool, PoolAsset, pool statistics
+//!   - pool: AssetPool, PoolAsset, pool statistics
 //!   - tranches: Tranche, TrancheStructure, attachment points
 //!   - waterfall: Waterfall, payment rules, diversion
 //!   - coverage: OC/IC test calculations

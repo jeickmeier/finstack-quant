@@ -5,8 +5,8 @@ use finstack_core::dates::{Date, Tenor};
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
     abs_auto_standard_cdr, clo_standard_cdr, cmbs_standard_cdr, psa_ramp_months, psa_terminal_cpr,
-    rmbs_standard_cdr, sda_peak_cdr, sda_peak_month, sda_terminal_cdr, DealType, Pool, PoolAsset,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
+    rmbs_standard_cdr, sda_peak_cdr, sda_peak_month, sda_terminal_cdr, AssetPool, DealType,
+    PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
 };
 use finstack_valuations::instruments::fixed_income::structured_credit::{cdr_to_mdr, cpr_to_smm};
 use time::Month;
@@ -21,8 +21,8 @@ fn maturity_date() -> Date {
     Date::from_calendar_date(2030, Month::December, 31).unwrap()
 }
 
-fn create_pool_with_balance(balance: f64) -> Pool {
-    let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+fn create_pool_with_balance(balance: f64) -> AssetPool {
+    let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
     if balance > 0.0 {
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
@@ -40,7 +40,7 @@ fn create_single_tranche() -> TrancheStructure {
         "SENIOR",
         0.0,
         100.0,
-        finstack_valuations::instruments::fixed_income::structured_credit::Seniority::Senior,
+        finstack_valuations::instruments::fixed_income::structured_credit::TrancheSeniority::Senior,
         Money::new(1_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),

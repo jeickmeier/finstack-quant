@@ -16,8 +16,8 @@ use finstack_core::math::interp::InterpStyle;
 use finstack_core::money::Money;
 use finstack_core::types::{CreditRating, InstrumentId};
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    run_simulation, AssetType, DealType, Pool, PoolAsset, Seniority, StructuredCredit, Tranche,
-    TrancheCoupon, TrancheStructure,
+    run_simulation, AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche,
+    TrancheCoupon, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -60,8 +60,8 @@ fn flat_market() -> MarketContext {
 }
 
 /// Create a single-asset pool (bullet loan, no amortization).
-fn single_asset_pool(balance: f64, rate: f64, maturity: Date) -> Pool {
-    let mut pool = Pool::new("E2E_POOL", DealType::CLO, Currency::USD);
+fn single_asset_pool(balance: f64, rate: f64, maturity: Date) -> AssetPool {
+    let mut pool = AssetPool::new("E2E_POOL", DealType::CLO, Currency::USD);
     pool.assets.push(PoolAsset {
         day_count: finstack_core::dates::DayCount::Act360,
         id: InstrumentId::new("LOAN_1"),
@@ -93,7 +93,7 @@ fn simple_tranches(senior: f64, mezz: f64, equity: f64, maturity: Date) -> Tranc
             "SR",
             0.0,
             senior / (senior + mezz + equity) * 100.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(senior, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
@@ -103,7 +103,7 @@ fn simple_tranches(senior: f64, mezz: f64, equity: f64, maturity: Date) -> Tranc
             "MZ",
             senior / (senior + mezz + equity) * 100.0,
             (senior + mezz) / (senior + mezz + equity) * 100.0,
-            Seniority::Mezzanine,
+            TrancheSeniority::Mezzanine,
             Money::new(mezz, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.07 },
             maturity,
@@ -113,7 +113,7 @@ fn simple_tranches(senior: f64, mezz: f64, equity: f64, maturity: Date) -> Tranc
             "EQ",
             (senior + mezz) / (senior + mezz + equity) * 100.0,
             100.0,
-            Seniority::Equity,
+            TrancheSeniority::Equity,
             Money::new(equity, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity,
@@ -153,13 +153,13 @@ fn build_simple_clo(
 }
 
 // ============================================================================
-// E2E: Bullet Pool, No Defaults, No Prepayments
+// E2E: Bullet AssetPool, No Defaults, No Prepayments
 // ============================================================================
 
 #[test]
 fn e2e_bullet_no_defaults_all_principal_returns() {
     // Setup:
-    //   Pool: $100M at 8%, bullet maturity in 2 years
+    //   AssetPool: $100M at 8%, bullet maturity in 2 years
     //   Tranches: Senior $70M @5%, Mezz $20M @7%, Equity $10M @0%
     //   CDR=0%, CPR=0%, Recovery irrelevant
     //
@@ -191,7 +191,7 @@ fn e2e_bullet_no_defaults_all_principal_returns() {
     let eq = results.get("EQ").unwrap();
 
     // Total distribution check: all pool cash flows to tranches.
-    // Pool: ~$100M at 8% for ~2yr → ~$16M interest + $100M principal = ~$116M
+    // AssetPool: ~$100M at 8% for ~2yr → ~$16M interest + $100M principal = ~$116M
     // Total tranche distributions should ≈ $116M (small variance from day count)
     let sr_total = sr.total_interest.amount() + sr.total_principal.amount();
     let mz_total = mz.total_interest.amount() + mz.total_principal.amount();
@@ -449,10 +449,10 @@ fn e2e_defaults_erode_pool_reducing_interest_over_time() {
 #[test]
 fn e2e_pik_accretes_when_cash_insufficient() {
     // Setup a scenario where pool cash is insufficient to pay all tranche interest.
-    // Pool: small asset, low rate → limited cash
+    // AssetPool: small asset, low rate → limited cash
     // Tranches: total coupon obligations exceed pool cash
     //
-    // Pool: $100M at 4% = $4M interest/year
+    // AssetPool: $100M at 4% = $4M interest/year
     // Senior $70M at 5% = $3.5M/year, Mezz $20M at 7% = $1.4M/year
     // Total due: $4.9M > $4M available → shortfall → PIK on mezz
     let market = flat_market();
@@ -499,7 +499,7 @@ fn e2e_pik_accretes_when_cash_insufficient() {
 
     // If there IS PIK on mezz, equity should get less interest than in a well-funded deal
     if mz.total_pik.amount() > 1000.0 {
-        // Pool generates ~$4M/yr, senior needs ~$3.5M, mezz needs ~$1.4M
+        // AssetPool generates ~$4M/yr, senior needs ~$3.5M, mezz needs ~$1.4M
         // Equity should get at most the residual after senior interest
         assert!(
             eq.total_interest.amount() < 3_000_000.0,
@@ -595,7 +595,7 @@ fn e2e_recovery_cash_reaches_tranches() {
 }
 
 // ============================================================================
-// E2E: Seniority Protection Under Stress
+// E2E: TrancheSeniority Protection Under Stress
 // ============================================================================
 
 #[test]
@@ -919,16 +919,16 @@ fn e2e_no_loss_full_recovery_all_tranches() {
 }
 
 // ============================================================================
-// E2E: Multi-Asset Pool Aggregation
+// E2E: Multi-Asset AssetPool Aggregation
 // ============================================================================
 
 #[test]
 fn e2e_multi_asset_pool_aggregates_correctly() {
-    // Pool with 5 assets at different rates should produce
+    // AssetPool with 5 assets at different rates should produce
     // interest ≈ sum of individual asset interests.
     let market = flat_market();
 
-    let mut pool = Pool::new("MULTI_POOL", DealType::CLO, Currency::USD);
+    let mut pool = AssetPool::new("MULTI_POOL", DealType::CLO, Currency::USD);
     let rates = [0.06, 0.07, 0.08, 0.09, 0.10];
 
     for (i, rate) in rates.iter().enumerate() {

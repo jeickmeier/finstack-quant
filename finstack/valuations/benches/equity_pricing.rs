@@ -206,7 +206,7 @@ fn variance_swap(months: i64) -> VarianceSwap {
         .maturity(maturity)
         .observation_freq(Tenor::daily())
         .realized_var_method(RealizedVarMethod::CloseToClose)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .day_count(DayCount::Act365F)
         .attributes(Attributes::new())

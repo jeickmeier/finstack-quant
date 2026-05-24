@@ -280,7 +280,7 @@ mod irs_contract {
             0.04,
             start,
             end,
-            PayReceive::PayFixed,
+            PayReceive::Pay,
         )
         .expect("valid swap");
 
@@ -299,7 +299,7 @@ mod irs_contract {
             0.04,
             start,
             end,
-            PayReceive::ReceiveFixed,
+            PayReceive::Receive,
         )
         .expect("valid swap");
 

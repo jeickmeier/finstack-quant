@@ -22,15 +22,6 @@ MultiFactorResult = _analytics.MultiFactorResult
 DrawdownEpisode = _analytics.DrawdownEpisode
 DatedSeries = _analytics.DatedSeries
 
-# Backwards-compatible aliases. The four rolling result types collapsed into a
-# single ``DatedSeries`` class because the underlying Rust type is identical;
-# the historical names continue to import for callers that did
-# ``isinstance(x, RollingSharpe)``.
-RollingSharpe = DatedSeries
-RollingSortino = DatedSeries
-RollingVolatility = DatedSeries
-RollingReturns = DatedSeries
-
 __all__: list[str] = [
     "AnalyticsError",
     "BetaResult",
@@ -42,8 +33,4 @@ __all__: list[str] = [
     "Performance",
     "PeriodStats",
     "RollingGreeks",
-    "RollingReturns",
-    "RollingSharpe",
-    "RollingSortino",
-    "RollingVolatility",
 ]

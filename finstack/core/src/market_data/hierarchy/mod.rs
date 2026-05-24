@@ -36,17 +36,14 @@ use crate::types::CurveId;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-/// A path through the hierarchy tree, e.g., `["Credit", "US", "IG", "Financials"]`.
-pub type NodePath = Vec<String>;
-
-pub(crate) fn parse_path(path: &str) -> crate::Result<NodePath> {
+pub(crate) fn parse_path(path: &str) -> crate::Result<Vec<String>> {
     if path.is_empty() {
         return Err(crate::Error::Validation(
             "Hierarchy paths must not be empty".to_string(),
         ));
     }
 
-    let segments: NodePath = path.split('/').map(String::from).collect();
+    let segments: Vec<String> = path.split('/').map(String::from).collect();
     if segments.iter().any(|segment| segment.is_empty()) {
         return Err(crate::Error::Validation(format!(
             "Hierarchy path '{path}' must not contain empty segments"
@@ -285,7 +282,7 @@ impl MarketDataHierarchy {
     }
 
     /// Find the path from root to a specific curve. Returns `None` if not found.
-    pub fn path_for_curve(&self, curve_id: &CurveId) -> Option<NodePath> {
+    pub fn path_for_curve(&self, curve_id: &CurveId) -> Option<Vec<String>> {
         fn find_in_node(node: &HierarchyNode, target: &CurveId, path: &mut Vec<String>) -> bool {
             path.push(node.name().to_string());
             if node.curve_ids.iter().any(|id| id == target) {

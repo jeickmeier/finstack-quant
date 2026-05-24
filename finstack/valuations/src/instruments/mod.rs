@@ -194,9 +194,9 @@ pub use fixed_income::{
 pub use rates::{
     BasisSwap, BermudanSwaption, CallableRangeAccrual, CapFloor, CmsOption, CmsSpreadOption,
     CmsSpreadOptionType, CmsSwap, CollateralSpec, CollateralType, Deposit, ForwardRateAgreement,
-    InflationCapFloor, InflationCapFloorType, InflationSwap, InterestRateFuture,
-    InterestRateOption, InterestRateSwap, IrFutureOption, RangeAccrual, RateOptionType, Repo,
-    RepoType, Snowball, SnowballVariant, Swaption, Tarn, XccySwap, YoYInflationSwap,
+    InflationCapFloor, InflationCapFloorType, InflationSwap, InterestRateFuture, InterestRateSwap,
+    IrFutureOption, RangeAccrual, RateOptionType, Repo, RepoType, Snowball, SnowballVariant,
+    Swaption, Tarn, XccySwap, YoYInflationSwap,
 };
 
 // Credit Derivatives
@@ -242,11 +242,11 @@ pub use common_impl::traits::{
 
 // === Parameter Types ===
 pub use common_impl::parameters::{
-    BasisSwapLeg, BondConvention, CommodityUnderlyingParams, ContractSpec, CreditParams,
-    EquityOptionParams, EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec,
+    BasisSwapLeg, BondConvention, CapFloorParams, CommodityUnderlyingParams, ContractSpec,
+    CreditParams, EquityOptionParams, EquityUnderlyingParams, ExerciseStyle, FinancingLegSpec,
     FinancingRateCompounding, FixedLegSpec, FloatLegSpec, FxOptionParams, FxUnderlyingParams,
-    IRSConvention, IndexUnderlyingParams, InterestRateOptionParams, OptionMarketParams, OptionType,
-    ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec, ScheduleSpec, SettlementType,
+    IRSConvention, IndexUnderlyingParams, OptionMarketParams, OptionType, ParRateMethod,
+    PayReceive, PremiumLegSpec, ProtectionLegSpec, ScheduleSpec, SettlementType,
     TotalReturnLegSpec, UnderlyingParams,
 };
 

@@ -14,7 +14,7 @@ use finstack_core::money::Money;
 use finstack_core::types::CreditRating;
 use finstack_core::types::CurveId;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    CoverageTrigger, Seniority, Tranche, TrancheCoupon, TrancheStructure, TriggerConsequence,
+    CoverageTrigger, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, TriggerConsequence,
 };
 use rust_decimal_macros::dec;
 use time::Month;
@@ -34,7 +34,7 @@ fn test_tranche_creation_basic() {
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(10_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -45,7 +45,7 @@ fn test_tranche_creation_basic() {
     assert_eq!(tranche.id.as_str(), "EQUITY");
     assert_eq!(tranche.attachment_point, 0.0);
     assert_eq!(tranche.detachment_point, 10.0);
-    assert_eq!(tranche.seniority, Seniority::Equity);
+    assert_eq!(tranche.seniority, TrancheSeniority::Equity);
     assert_eq!(tranche.original_balance.amount(), 10_000_000.0);
     assert_eq!(tranche.current_balance.amount(), 10_000_000.0);
 }
@@ -57,7 +57,7 @@ fn test_tranche_creation_validates_attachment_points() {
         "INVALID",
         10.0,
         5.0, // detachment < attachment
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(10_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
@@ -74,7 +74,7 @@ fn test_tranche_creation_validates_negative_attachment() {
         "INVALID",
         -5.0, // Negative attachment
         10.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(10_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -91,7 +91,7 @@ fn test_tranche_creation_validates_detachment_over_100() {
         "INVALID",
         90.0,
         105.0, // Over 100%
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.04 },
         maturity_date(),
@@ -108,7 +108,7 @@ fn test_tranche_fixed_coupon() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(90_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -129,7 +129,7 @@ fn test_tranche_floating_coupon() {
         "FLOATING",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(90_000_000.0, Currency::USD),
         TrancheCoupon::Floating(finstack_cashflows::builder::FloatingRateSpec {
             index_id: CurveId::new("SOFR-3M".to_string()),
@@ -177,7 +177,7 @@ fn test_tranche_builder_complete() {
     let tranche = Tranche::builder()
         .id("MEZZANINE")
         .attachment_detachment(10.0, 15.0)
-        .seniority(Seniority::Mezzanine)
+        .seniority(TrancheSeniority::Mezzanine)
         .balance(Money::new(5_000_000.0, Currency::USD))
         .coupon(TrancheCoupon::Fixed { rate: 0.08 })
         .maturity(maturity_date())
@@ -199,7 +199,7 @@ fn test_tranche_builder_missing_required_field() {
     let result = Tranche::builder()
         .id("INCOMPLETE")
         .attachment_detachment(0.0, 10.0)
-        .seniority(Seniority::Equity)
+        .seniority(TrancheSeniority::Equity)
         // Missing: .balance()
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
         .maturity(maturity_date())
@@ -220,7 +220,7 @@ fn test_tranche_thickness() {
         "MEZZ",
         10.0,
         15.0,
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(5_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
@@ -241,7 +241,7 @@ fn test_tranche_is_first_loss() {
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(10_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.15 },
         maturity_date(),
@@ -252,7 +252,7 @@ fn test_tranche_is_first_loss() {
         "MEZZ",
         10.0,
         15.0,
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(5_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
@@ -271,7 +271,7 @@ fn test_tranche_is_impaired() {
         "MEZZ",
         10.0,
         15.0,
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(5_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
@@ -295,7 +295,7 @@ fn test_tranche_loss_allocation_no_loss() {
         "MEZZ",
         10.0,
         15.0,
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(50_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
@@ -318,7 +318,7 @@ fn test_tranche_loss_allocation_partial_loss() {
         "MEZZ",
         10.0, // 10% attachment
         15.0, // 15% detachment (5% thick)
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(50_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
@@ -341,7 +341,7 @@ fn test_tranche_loss_allocation_full_loss() {
         "MEZZ",
         10.0,
         15.0,
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(50_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
@@ -364,7 +364,7 @@ fn test_tranche_current_balance_after_losses() {
         "MEZZ",
         10.0,
         15.0,
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(50_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.08 },
         maturity_date(),
@@ -390,7 +390,7 @@ fn test_tranche_structure_creation() {
     let equity = Tranche::builder()
         .id("EQUITY")
         .attachment_detachment(0.0, 10.0)
-        .seniority(Seniority::Equity)
+        .seniority(TrancheSeniority::Equity)
         .balance(Money::new(10_000_000.0, Currency::USD))
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
         .maturity(maturity_date())
@@ -400,7 +400,7 @@ fn test_tranche_structure_creation() {
     let senior = Tranche::builder()
         .id("SENIOR")
         .attachment_detachment(10.0, 100.0)
-        .seniority(Seniority::Senior)
+        .seniority(TrancheSeniority::Senior)
         .balance(Money::new(90_000_000.0, Currency::USD))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
         .maturity(maturity_date())
@@ -421,7 +421,7 @@ fn test_tranche_structure_validates_gaps() {
     let equity = Tranche::builder()
         .id("EQUITY")
         .attachment_detachment(0.0, 10.0)
-        .seniority(Seniority::Equity)
+        .seniority(TrancheSeniority::Equity)
         .balance(Money::new(10_000_000.0, Currency::USD))
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
         .maturity(maturity_date())
@@ -431,7 +431,7 @@ fn test_tranche_structure_validates_gaps() {
     let senior = Tranche::builder()
         .id("SENIOR")
         .attachment_detachment(20.0, 100.0) // Gap!
-        .seniority(Seniority::Senior)
+        .seniority(TrancheSeniority::Senior)
         .balance(Money::new(80_000_000.0, Currency::USD))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
         .maturity(maturity_date())
@@ -451,7 +451,7 @@ fn test_tranche_structure_validates_overlap() {
     let tranche1 = Tranche::builder()
         .id("T1")
         .attachment_detachment(0.0, 15.0)
-        .seniority(Seniority::Equity)
+        .seniority(TrancheSeniority::Equity)
         .balance(Money::new(15_000_000.0, Currency::USD))
         .coupon(TrancheCoupon::Fixed { rate: 0.12 })
         .maturity(maturity_date())
@@ -461,7 +461,7 @@ fn test_tranche_structure_validates_overlap() {
     let tranche2 = Tranche::builder()
         .id("T2")
         .attachment_detachment(10.0, 100.0) // Overlaps with T1!
-        .seniority(Seniority::Senior)
+        .seniority(TrancheSeniority::Senior)
         .balance(Money::new(85_000_000.0, Currency::USD))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
         .maturity(maturity_date())
@@ -481,7 +481,7 @@ fn test_tranche_structure_validates_reaches_100() {
     let tranche = Tranche::builder()
         .id("INCOMPLETE")
         .attachment_detachment(0.0, 90.0)
-        .seniority(Seniority::Senior)
+        .seniority(TrancheSeniority::Senior)
         .balance(Money::new(90_000_000.0, Currency::USD))
         .coupon(TrancheCoupon::Fixed { rate: 0.05 })
         .maturity(maturity_date())
@@ -498,14 +498,14 @@ fn test_tranche_structure_validates_reaches_100() {
 #[test]
 fn test_tranche_structure_by_seniority() {
     // Arrange
-    let equity = create_tranche("EQUITY", 0.0, 10.0, Seniority::Equity);
-    let mezz = create_tranche("MEZZ", 10.0, 15.0, Seniority::Mezzanine);
-    let senior = create_tranche("SENIOR", 15.0, 100.0, Seniority::Senior);
+    let equity = create_tranche("EQUITY", 0.0, 10.0, TrancheSeniority::Equity);
+    let mezz = create_tranche("MEZZ", 10.0, 15.0, TrancheSeniority::Mezzanine);
+    let senior = create_tranche("SENIOR", 15.0, 100.0, TrancheSeniority::Senior);
 
     let structure = TrancheStructure::new(vec![equity, mezz, senior]).unwrap();
 
     // Act
-    let senior_tranches = structure.by_seniority(Seniority::Senior);
+    let senior_tranches = structure.by_seniority(TrancheSeniority::Senior);
 
     // Assert
     assert_eq!(senior_tranches.len(), 1);
@@ -515,9 +515,9 @@ fn test_tranche_structure_by_seniority() {
 #[test]
 fn test_tranche_structure_senior_to() {
     // Arrange
-    let equity = create_tranche("EQUITY", 0.0, 10.0, Seniority::Equity);
-    let mezz = create_tranche("MEZZ", 10.0, 15.0, Seniority::Mezzanine);
-    let senior = create_tranche("SENIOR", 15.0, 100.0, Seniority::Senior);
+    let equity = create_tranche("EQUITY", 0.0, 10.0, TrancheSeniority::Equity);
+    let mezz = create_tranche("MEZZ", 10.0, 15.0, TrancheSeniority::Mezzanine);
+    let senior = create_tranche("SENIOR", 15.0, 100.0, TrancheSeniority::Senior);
 
     let structure = TrancheStructure::new(vec![equity, mezz, senior]).unwrap();
 
@@ -532,10 +532,16 @@ fn test_tranche_structure_senior_to() {
 #[test]
 fn test_tranche_structure_senior_balance() {
     // Arrange
-    let equity = create_tranche("EQUITY", 0.0, 10.0, Seniority::Equity);
-    let mezz = create_tranche_with_balance("MEZZ", 10.0, 15.0, Seniority::Mezzanine, 5_000_000.0);
-    let senior =
-        create_tranche_with_balance("SENIOR", 15.0, 100.0, Seniority::Senior, 85_000_000.0);
+    let equity = create_tranche("EQUITY", 0.0, 10.0, TrancheSeniority::Equity);
+    let mezz =
+        create_tranche_with_balance("MEZZ", 10.0, 15.0, TrancheSeniority::Mezzanine, 5_000_000.0);
+    let senior = create_tranche_with_balance(
+        "SENIOR",
+        15.0,
+        100.0,
+        TrancheSeniority::Senior,
+        85_000_000.0,
+    );
 
     let structure = TrancheStructure::new(vec![equity, mezz, senior]).unwrap();
 
@@ -549,10 +555,17 @@ fn test_tranche_structure_senior_balance() {
 #[test]
 fn test_tranche_structure_subordination_amount() {
     // Arrange
-    let equity = create_tranche_with_balance("EQUITY", 0.0, 10.0, Seniority::Equity, 10_000_000.0);
-    let mezz = create_tranche_with_balance("MEZZ", 10.0, 15.0, Seniority::Mezzanine, 5_000_000.0);
-    let senior =
-        create_tranche_with_balance("SENIOR", 15.0, 100.0, Seniority::Senior, 85_000_000.0);
+    let equity =
+        create_tranche_with_balance("EQUITY", 0.0, 10.0, TrancheSeniority::Equity, 10_000_000.0);
+    let mezz =
+        create_tranche_with_balance("MEZZ", 10.0, 15.0, TrancheSeniority::Mezzanine, 5_000_000.0);
+    let senior = create_tranche_with_balance(
+        "SENIOR",
+        15.0,
+        100.0,
+        TrancheSeniority::Senior,
+        85_000_000.0,
+    );
 
     let structure = TrancheStructure::new(vec![equity, mezz, senior]).unwrap();
 
@@ -605,7 +618,7 @@ fn test_coverage_trigger_is_cured() {
 // Helper Functions
 // ============================================================================
 
-fn create_tranche(id: &str, attach: f64, detach: f64, seniority: Seniority) -> Tranche {
+fn create_tranche(id: &str, attach: f64, detach: f64, seniority: TrancheSeniority) -> Tranche {
     Tranche::new(
         id,
         attach,
@@ -622,7 +635,7 @@ fn create_tranche_with_balance(
     id: &str,
     attach: f64,
     detach: f64,
-    seniority: Seniority,
+    seniority: TrancheSeniority,
     balance: f64,
 ) -> Tranche {
     Tranche::new(

@@ -119,7 +119,7 @@ pub fn create_standard_fra() -> ForwardRateAgreement {
         observed_fixing: None,
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
-        side: PayReceive::ReceiveFixed, // receive fixed rate, pay floating
+        side: PayReceive::Receive, // receive fixed rate, pay floating
         pricing_overrides: finstack_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     }
@@ -155,7 +155,7 @@ impl Default for TestFraBuilder {
             reset_lag: 2,
             discount_curve_id: "USD_OIS".to_string(),
             forward_curve_id: "USD_LIBOR_3M".to_string(),
-            side: PayReceive::ReceiveFixed, // receive fixed rate
+            side: PayReceive::Receive, // receive fixed rate
         }
     }
 }
@@ -201,9 +201,9 @@ impl TestFraBuilder {
     /// Set the FRA direction: true = receive fixed rate, false = pay fixed rate.
     pub fn receive_fixed(mut self, receive: bool) -> Self {
         self.side = if receive {
-            PayReceive::ReceiveFixed
+            PayReceive::Receive
         } else {
-            PayReceive::PayFixed
+            PayReceive::Pay
         };
         self
     }

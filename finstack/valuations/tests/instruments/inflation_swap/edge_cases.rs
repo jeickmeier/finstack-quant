@@ -26,7 +26,7 @@ fn test_matured_swap_has_zero_pv() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -55,7 +55,7 @@ fn test_very_short_maturity() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -83,7 +83,7 @@ fn test_very_long_maturity() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -110,7 +110,7 @@ fn test_very_high_fixed_rate() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -119,7 +119,7 @@ fn test_very_high_fixed_rate() {
 
     // Should handle extreme rates without overflow
     assert!(pv.amount().is_finite());
-    // ReceiveFixed with high rate should be positive
+    // Receive with high rate should be positive
     assert!(pv.amount() > 0.0);
 }
 
@@ -139,7 +139,7 @@ fn test_very_low_negative_fixed_rate() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -166,7 +166,7 @@ fn test_very_small_notional() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -197,7 +197,7 @@ fn test_very_large_notional() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -226,7 +226,7 @@ fn test_start_equals_maturity() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build();
 
@@ -265,7 +265,7 @@ fn test_pricing_on_maturity_date() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -294,7 +294,7 @@ fn test_pricing_after_start_before_maturity() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -322,15 +322,15 @@ fn test_zero_inflation_rate() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
 
     let pv = swap.value(&ctx, as_of).unwrap();
 
-    // With 0% inflation and positive fixed rate, ReceiveFixed equivalent would be positive
-    // PayFixed should be negative (paying more than receiving)
+    // With 0% inflation and positive fixed rate, Receive equivalent would be positive
+    // Pay should be negative (paying more than receiving)
     assert!(pv.amount() < 0.0);
 }
 
@@ -351,7 +351,7 @@ fn test_very_high_inflation_rate() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -360,7 +360,7 @@ fn test_very_high_inflation_rate() {
 
     // Should handle high inflation without overflow
     assert!(pv.amount().is_finite());
-    // PayFixed with low fixed rate in high inflation should be very positive
+    // Pay with low fixed rate in high inflation should be very positive
     assert!(pv.amount() > 0.0);
 }
 
@@ -381,7 +381,7 @@ fn test_deflation_scenario() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -409,7 +409,7 @@ fn test_flat_discount_curve_zero_rate() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -437,7 +437,7 @@ fn test_swap_with_multiple_currencies() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();

@@ -41,10 +41,10 @@ use crate::cashflow::builder::specs::{
     CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec, StepUpCouponSpec,
 };
 use crate::cashflow::builder::AmortizationSpec;
-use crate::market::conventions::ids::IndexId;
 use crate::market::conventions::ConventionRegistry;
 use crate::market::conventions::RateIndexConventions;
 use finstack_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+use finstack_core::types::IndexId;
 use finstack_core::types::{Bps, CurveId, Rate};
 use rust_decimal::Decimal;
 

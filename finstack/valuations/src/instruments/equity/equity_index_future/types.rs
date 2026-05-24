@@ -210,7 +210,7 @@ pub struct EquityIndexFuture {
     /// Unique instrument identifier.
     pub id: InstrumentId,
     /// Index ticker symbol (e.g., "SPX", "NDX", "SX5E").
-    pub underlying_ticker: crate::instruments::equity::spot::Ticker,
+    pub underlying_ticker: String,
     /// Notional exposure in settlement currency.
     pub notional: Money,
     /// Future expiry/settlement date.

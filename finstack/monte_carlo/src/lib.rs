@@ -169,7 +169,7 @@ pub mod prelude {
     pub use super::process::heston::{HestonParams, HestonProcess};
     pub use super::process::jump_diffusion::{MertonJumpParams, MertonJumpProcess};
     pub use super::process::multi_ou::MultiOuParams;
-    pub use super::process::ou::{HullWhite1FParams, HullWhite1FProcess, VasicekProcess};
+    pub use super::process::ou::{HullWhite1FParams, HullWhite1FProcess};
     pub use super::process::schwartz_smith::{SchwartzSmithParams, SchwartzSmithProcess};
 
     // --- Discretization schemes ---

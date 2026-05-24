@@ -1,4 +1,4 @@
-//! Pool characteristic metrics for structured credit.
+//! AssetPool characteristic metrics for structured credit.
 
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry;
 use crate::instruments::fixed_income::structured_credit::utils::rates::psa_to_cpr;

@@ -1,9 +1,9 @@
 //! Interest rate market quote schema.
 
 use super::ids::{Pillar, QuoteId};
-use crate::market::conventions::ids::{IndexId, IrFutureContractId};
+use crate::market::conventions::ids::IrFutureContractId;
 use finstack_core::dates::Date;
-use finstack_core::types::CurveId;
+use finstack_core::types::{CurveId, IndexId};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "ts_export")]
 use ts_rs::TS;
@@ -20,7 +20,7 @@ use ts_rs::TS;
 /// ```rust
 /// use finstack_valuations::market::quotes::rates::RateQuote;
 /// use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
-/// use finstack_valuations::market::conventions::ids::IndexId;
+/// use finstack_core::types::IndexId;
 ///
 /// # fn example() -> finstack_core::Result<()> {
 /// let quote = RateQuote::Deposit {
@@ -37,7 +37,7 @@ use ts_rs::TS;
 /// ```rust
 /// use finstack_valuations::market::quotes::rates::RateQuote;
 /// use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
-/// use finstack_valuations::market::conventions::ids::IndexId;
+/// use finstack_core::types::IndexId;
 ///
 /// # fn example() -> finstack_core::Result<()> {
 /// let quote = RateQuote::Swap {
@@ -151,7 +151,7 @@ impl RateQuote {
     /// ```rust
     /// use finstack_valuations::market::quotes::rates::RateQuote;
     /// use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
-    /// use finstack_valuations::market::conventions::ids::IndexId;
+    /// use finstack_core::types::IndexId;
     ///
     /// # fn example() -> finstack_core::Result<()> {
     /// let quote = RateQuote::Deposit {
@@ -186,7 +186,7 @@ impl RateQuote {
     /// ```rust
     /// use finstack_valuations::market::quotes::rates::RateQuote;
     /// use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
-    /// use finstack_valuations::market::conventions::ids::IndexId;
+    /// use finstack_core::types::IndexId;
     ///
     /// # fn example() -> finstack_core::Result<()> {
     /// let quote = RateQuote::Deposit {
@@ -228,7 +228,7 @@ impl RateQuote {
     /// ```rust
     /// use finstack_valuations::market::quotes::rates::RateQuote;
     /// use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
-    /// use finstack_valuations::market::conventions::ids::IndexId;
+    /// use finstack_core::types::IndexId;
     ///
     /// # fn example() -> finstack_core::Result<()> {
     /// let quote = RateQuote::Deposit {

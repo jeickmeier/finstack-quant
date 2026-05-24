@@ -42,7 +42,7 @@ fn test_lag_override_vs_index_lag() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -57,7 +57,7 @@ fn test_lag_override_vs_index_lag() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .lag_override(InflationLag::None)
         .attributes(Default::default())
         .build()
@@ -67,10 +67,10 @@ fn test_lag_override_vs_index_lag() {
     let pv_no_lag = swap_no_lag.value(&ctx, as_of).unwrap().amount();
 
     // With positive inflation, longer lag reduces projected CPI at maturity
-    // For PayFixed (receiving inflation), lower CPI means lower PV
+    // For Pay (receiving inflation), lower CPI means lower PV
     assert!(
         pv_no_lag >= pv_idx_lag,
-        "No lag should give higher/equal PV than 3M lag for PayFixed: {} vs {}",
+        "No lag should give higher/equal PV than 3M lag for Pay: {} vs {}",
         pv_no_lag,
         pv_idx_lag
     );
@@ -101,7 +101,7 @@ fn test_different_lag_durations() {
             .inflation_index_id("US-CPI-U".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .lag_override(if *lag_months == 0 {
                 InflationLag::None
             } else {
@@ -148,7 +148,7 @@ fn test_lag_in_days_vs_months() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .lag_override(InflationLag::Months(3))
         .attributes(Default::default())
         .build()
@@ -163,7 +163,7 @@ fn test_lag_in_days_vs_months() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .lag_override(InflationLag::Days(90))
         .attributes(Default::default())
         .build()
@@ -203,7 +203,7 @@ fn test_no_index_fallback_to_curve() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();

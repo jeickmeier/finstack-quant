@@ -16,13 +16,13 @@ use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, DateExt};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
+use finstack_valuations::instruments::fixed_income::structured_credit::waterfall::CoverageTrigger;
 use finstack_valuations::instruments::fixed_income::structured_credit::WaterfallContext;
-use finstack_valuations::instruments::fixed_income::structured_credit::WaterfallCoverageTrigger as CoverageTrigger;
 use finstack_valuations::instruments::fixed_income::structured_credit::WaterfallDistribution;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    AllocationMode, DealType, ManagementFeeType, PaymentCalculation, PaymentType, Pool, Recipient,
-    RecipientType, Seniority, Tranche, TrancheCoupon, TrancheStructure, Waterfall,
-    WaterfallBuilder, WaterfallTier,
+    AllocationMode, AssetPool, DealType, ManagementFeeType, PaymentCalculation, PaymentType,
+    Recipient, RecipientType, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    Waterfall, WaterfallBuilder, WaterfallTier,
 };
 use time::Duration;
 
@@ -40,12 +40,12 @@ fn create_test_market() -> MarketContext {
 }
 
 /// Helper to create a test asset pool
-fn create_test_pool(balance: f64, currency: Currency) -> Pool {
+fn create_test_pool(balance: f64, currency: Currency) -> AssetPool {
     use finstack_core::types::CreditRating;
     use finstack_core::types::InstrumentId;
     use finstack_valuations::instruments::fixed_income::structured_credit::{AssetType, PoolAsset};
 
-    let mut pool = Pool::new("TEST_POOL", DealType::CLO, currency);
+    let mut pool = AssetPool::new("TEST_POOL", DealType::CLO, currency);
 
     // Add assets to match the specified balance
     let num_assets = 10;
@@ -85,7 +85,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         "CLASS_A",
         0.0,
         70.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(175_000_000.0, currency),
         TrancheCoupon::Fixed { rate: 0.05 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
@@ -96,7 +96,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         "CLASS_B",
         70.0,
         85.0,
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(37_500_000.0, currency),
         TrancheCoupon::Fixed { rate: 0.065 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
@@ -107,7 +107,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         "CLASS_C",
         85.0,
         95.0,
-        Seniority::Subordinated,
+        TrancheSeniority::Subordinated,
         Money::new(25_000_000.0, currency),
         TrancheCoupon::Fixed { rate: 0.08 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
@@ -118,7 +118,7 @@ fn create_test_tranches(currency: Currency) -> TrancheStructure {
         "EQUITY",
         95.0,
         100.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(12_500_000.0, currency),
         TrancheCoupon::Fixed { rate: 0.0 },
         Date::from_calendar_date(2031, time::Month::January, 1).unwrap(),
@@ -137,7 +137,7 @@ fn run_waterfall(
     tranches: &TrancheStructure,
     pool_balance: Money,
     period_start_override: Option<Date>,
-    pool: &Pool,
+    pool: &AssetPool,
     market: &MarketContext,
 ) -> WaterfallDistribution {
     let period_start = period_start_override.unwrap_or_else(|| payment_date.add_months(-3));
@@ -434,7 +434,7 @@ fn test_golden_cmbs_sequential_pay() {
         "CLASS_A",
         0.0,
         70.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(300_000_000.0, currency),
         TrancheCoupon::Fixed { rate: 0.04 },
         Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
@@ -445,7 +445,7 @@ fn test_golden_cmbs_sequential_pay() {
         "CLASS_B",
         70.0,
         85.0,
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(75_000_000.0, currency),
         TrancheCoupon::Fixed { rate: 0.045 },
         Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
@@ -456,7 +456,7 @@ fn test_golden_cmbs_sequential_pay() {
         "CLASS_C",
         85.0,
         100.0,
-        Seniority::Subordinated,
+        TrancheSeniority::Subordinated,
         Money::new(50_000_000.0, currency),
         TrancheCoupon::Fixed { rate: 0.05 },
         Date::from_calendar_date(2034, time::Month::January, 1).unwrap(),
@@ -556,7 +556,7 @@ fn test_golden_cre_pro_rata_distribution() {
         "LP",
         0.0,
         95.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(47_500_000.0, currency),
         TrancheCoupon::Fixed { rate: 0.08 },
         Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),
@@ -567,7 +567,7 @@ fn test_golden_cre_pro_rata_distribution() {
         "GP",
         95.0,
         100.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(2_500_000.0, currency),
         TrancheCoupon::Fixed { rate: 0.08 },
         Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),

@@ -8,7 +8,7 @@
 //! - Metric context and registry integration
 
 use super::test_utils::*;
-use finstack_valuations::instruments::credit_derivatives::cds::RECOVERY_SENIOR_UNSECURED;
+use finstack_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::metrics::MetricId;
 use time::macros::date;
@@ -58,7 +58,7 @@ fn test_metric_par_spread() {
     let par_spread = *result.measures.get("par_spread").unwrap();
 
     assert_positive(par_spread, "Par spread metric");
-    let expected = flat_hazard_par_spread_bps(STANDARD_HAZARD_RATE, RECOVERY_SENIOR_UNSECURED);
+    let expected = flat_hazard_par_spread_bps(STANDARD_HAZARD_RATE, STANDARD_RECOVERY_SENIOR);
     assert_in_range(
         par_spread,
         expected * 0.85,
@@ -363,7 +363,7 @@ fn test_par_spread_reasonable_range() {
         .unwrap();
     let par_spread = *result.measures.get("par_spread").unwrap();
 
-    let expected = flat_hazard_par_spread_bps(STANDARD_HAZARD_RATE, RECOVERY_SENIOR_UNSECURED);
+    let expected = flat_hazard_par_spread_bps(STANDARD_HAZARD_RATE, STANDARD_RECOVERY_SENIOR);
     assert_in_range(
         par_spread,
         expected * 0.85,

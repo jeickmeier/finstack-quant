@@ -2,7 +2,7 @@
 //!
 //! This module provides OC and IC test calculations for waterfall diversion.
 
-use crate::instruments::fixed_income::structured_credit::types::{Pool, TrancheStructure};
+use crate::instruments::fixed_income::structured_credit::types::{AssetPool, TrancheStructure};
 use crate::instruments::fixed_income::structured_credit::utils::frequency_periods_per_year;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
@@ -356,8 +356,8 @@ impl CoverageTest {
 
 /// Context needed to calculate coverage tests.
 pub struct TestContext<'a> {
-    /// Pool reference.
-    pub pool: &'a Pool,
+    /// AssetPool reference.
+    pub pool: &'a AssetPool,
     /// Tranche structure reference.
     pub tranches: &'a TrancheStructure,
     /// Target tranche ID.
@@ -401,7 +401,7 @@ pub struct TestResult {
 }
 
 fn collateral_balance_with_haircuts(
-    pool: &Pool,
+    pool: &AssetPool,
     performing_only: bool,
     haircuts: Option<&HashMap<CreditRating, f64>>,
 ) -> Result<Money> {
@@ -440,7 +440,7 @@ fn collateral_balance_with_haircuts(
 mod tests {
     use super::*;
     use crate::instruments::fixed_income::structured_credit::types::{
-        DealType, Pool, Seniority, Tranche, TrancheCoupon, TrancheStructure,
+        AssetPool, DealType, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use finstack_core::currency::Currency;
     use finstack_core::dates::Date;
@@ -454,14 +454,14 @@ mod tests {
 
     #[test]
     fn test_oc_test_calculation() {
-        let pool = Pool::new("TEST", DealType::CLO, Currency::USD);
+        let pool = AssetPool::new("TEST", DealType::CLO, Currency::USD);
         let test = CoverageTest::new_oc(1.25);
 
         let tranche = Tranche::new(
             "TEST_TRANCHE",
             0.0,
             100.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(100_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
@@ -495,14 +495,14 @@ mod tests {
 
     #[test]
     fn test_ic_test_calculation() {
-        let pool = Pool::new("TEST", DealType::CLO, Currency::USD);
+        let pool = AssetPool::new("TEST", DealType::CLO, Currency::USD);
         let test = CoverageTest::new_ic(1.20);
 
         let tranche = Tranche::new(
             "TEST_TRANCHE",
             0.0,
             100.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(100_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
@@ -541,7 +541,7 @@ mod tests {
     fn test_oc_cure_with_cash_in_numerator_restores_exact_ratio() {
         // Numerator = collateral (90k, stays) + cash (30k, leaves on diversion).
         // Denominator = 100k. Ratio = 120k / 100k = 1.20, breaches a 1.25 trigger.
-        let pool = Pool::new("TEST", DealType::CLO, Currency::USD);
+        let pool = AssetPool::new("TEST", DealType::CLO, Currency::USD);
         let required_ratio = 1.25_f64;
         let test = CoverageTest::new_oc(required_ratio);
 
@@ -549,7 +549,7 @@ mod tests {
             "SENIOR",
             0.0,
             100.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(100_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
@@ -610,7 +610,7 @@ mod tests {
     /// balances) — the most a coverage diversion could ever pay down.
     #[test]
     fn test_oc_cure_is_capped_at_denominator_for_near_one_trigger() {
-        let pool = Pool::new("TEST", DealType::CLO, Currency::USD);
+        let pool = AssetPool::new("TEST", DealType::CLO, Currency::USD);
         // Trigger just above 1.0 — the pathological regime for the cure.
         let required_ratio = 1.001_f64;
         let test = CoverageTest::new_oc(required_ratio);
@@ -619,7 +619,7 @@ mod tests {
             "SENIOR",
             0.0,
             100.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(100_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),
@@ -686,7 +686,7 @@ mod tests {
             "A-1",
             0.0,
             25.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(25_000.0, Currency::USD),
             cpn(),
             mat,
@@ -696,7 +696,7 @@ mod tests {
             "A-2",
             25.0,
             50.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(25_000.0, Currency::USD),
             cpn(),
             mat,
@@ -706,7 +706,7 @@ mod tests {
             "A-3",
             50.0,
             75.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(25_000.0, Currency::USD),
             cpn(),
             mat,
@@ -716,7 +716,7 @@ mod tests {
             "EQUITY",
             75.0,
             100.0,
-            Seniority::Equity,
+            TrancheSeniority::Equity,
             Money::new(25_000.0, Currency::USD),
             cpn(),
             mat,
@@ -770,7 +770,7 @@ mod tests {
     /// the senior interest shortfall, so IC-only breaches actually divert cash.
     #[test]
     fn test_ic_breach_yields_senior_interest_shortfall_cure() {
-        let pool = Pool::new("TEST", DealType::CLO, Currency::USD);
+        let pool = AssetPool::new("TEST", DealType::CLO, Currency::USD);
         let required_ratio = 1.20_f64;
         let test = CoverageTest::new_ic(required_ratio);
 
@@ -778,7 +778,7 @@ mod tests {
             "TEST_TRANCHE",
             0.0,
             100.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(100_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2030, Month::January, 1).expect("Valid date"),

@@ -20,11 +20,11 @@ use finstack_core::dates::{
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_core::money::Money;
+use finstack_core::types::IndexId;
 use finstack_valuations::instruments::rates::irs::{
     FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, ParRateMethod, PayReceive,
 };
 use finstack_valuations::instruments::Instrument;
-use finstack_valuations::market::conventions::ids::IndexId;
 use finstack_valuations::market::conventions::ConventionRegistry;
 use finstack_valuations::metrics::MetricId;
 use time::macros::date;
@@ -82,7 +82,7 @@ fn test_irs_par_rate_market_standard() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
     // Compute par rate under current curves
@@ -102,7 +102,7 @@ fn test_irs_par_rate_market_standard() {
         par,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
     let npv = par_swap.value(&market, as_of).unwrap();
@@ -132,7 +132,7 @@ fn test_par_rate_discount_ratio_matches_forward_for_new_swap() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
     let mut swap_discount = swap_forward.clone();
@@ -200,7 +200,7 @@ fn test_par_rate_discount_ratio_rejects_seasoned_swap() {
         0.05,
         start,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
     swap.fixed.par_method = Some(ParRateMethod::DiscountRatio);
@@ -257,7 +257,7 @@ fn test_irs_annuity_calculation() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -308,7 +308,7 @@ fn test_irs_dv01_market_standard() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -325,7 +325,7 @@ fn test_irs_dv01_market_standard() {
     let dv01 = *result.measures.get("dv01").unwrap();
 
     // DV01 is computed via parallel bump-and-reprice (GenericParallelDv01)
-    // For a ReceiveFixed swap, DV01 should be negative (loses value when rates rise)
+    // For a Receive swap, DV01 should be negative (loses value when rates rise)
     // For $1MM notional, 5-year swap at 5% rates, expect DV01 magnitude around $430-$450
     assert!(
         dv01.abs() > 400.0 && dv01.abs() < 500.0,
@@ -333,10 +333,10 @@ fn test_irs_dv01_market_standard() {
         dv01
     );
 
-    // ReceiveFixed swap should have negative DV01 (loses value when rates increase)
+    // Receive swap should have negative DV01 (loses value when rates increase)
     assert!(
         dv01 < 0.0,
-        "ReceiveFixed swap should have negative DV01, got {:.2}",
+        "Receive swap should have negative DV01, got {:.2}",
         dv01
     );
 
@@ -405,7 +405,7 @@ fn test_irs_receive_vs_pay_fixed() {
     let swap_receive = InterestRateSwap {
         id: "SWAP_RECEIVE".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: fixed_leg.clone(),
         float: float_leg.clone(),
         margin_spec: None,
@@ -416,7 +416,7 @@ fn test_irs_receive_vs_pay_fixed() {
     let swap_pay = InterestRateSwap {
         id: "SWAP_PAY".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::PayFixed,
+        side: PayReceive::Pay,
         fixed: fixed_leg,
         float: float_leg,
         margin_spec: None,
@@ -494,7 +494,7 @@ fn test_irs_rate_sensitivity() {
     let swap = InterestRateSwap {
         id: "SWAP_RATE_SENS".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: fixed_leg,
         float: float_leg,
         margin_spec: None,
@@ -554,7 +554,7 @@ fn test_irs_leg_pvs_consistency() {
     let swap = InterestRateSwap {
         id: "SWAP_LEG_PVS".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -630,7 +630,7 @@ fn test_daycount_convention_impact_on_annuity() {
     let swap_act360 = InterestRateSwap::builder()
         .id("IRS-ACT360".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -670,7 +670,7 @@ fn test_daycount_convention_impact_on_annuity() {
     let swap_30360 = InterestRateSwap::builder()
         .id("IRS-30360".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -811,7 +811,7 @@ fn test_irs_t_minus_2_fixing_calendar_isda_standard() {
     let swap = InterestRateSwap::builder()
         .id("IRS-5Y-USD-T2-FIXING".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"), // 5% fixed rate
@@ -901,7 +901,7 @@ fn test_irs_t_minus_2_fixing_calendar_isda_standard() {
         pv_float
     );
 
-    // 3. For PayFixed: NPV = PV_Float - PV_Fixed
+    // 3. For Pay: NPV = PV_Float - PV_Fixed
     let calculated_npv = pv_float - pv_fixed;
     assert!(
         (calculated_npv - pv).abs() < 1.0,
@@ -990,7 +990,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
     let swap_365 = InterestRateSwap::builder()
         .id("IRS-FWD-365".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.04).expect("valid"), // Below average forward to create positive NPV
@@ -1029,7 +1029,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
     let swap_360 = InterestRateSwap::builder()
         .id("IRS-FWD-360".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.04).expect("valid"), // Below average forward to create positive NPV
@@ -1127,7 +1127,7 @@ fn test_sofr_ois_par_rate_matches_quantlib_identity() {
     let swap = InterestRateSwap::builder()
         .id("SOFR-OIS-QL-PARITY".into())
         .notional(Money::new(100_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: curve_id.into(),
             rate: rust_decimal::Decimal::ZERO,
@@ -1276,7 +1276,7 @@ fn test_eom_pricer_cashflow_consistency() {
     let swap_eom = InterestRateSwap::builder()
         .id("IRS-EOM-TRUE".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
             rate: Decimal::try_from(0.04).unwrap(),
@@ -1316,7 +1316,7 @@ fn test_eom_pricer_cashflow_consistency() {
     let swap_no_eom = InterestRateSwap::builder()
         .id("IRS-EOM-FALSE".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
             rate: Decimal::try_from(0.04).unwrap(),
@@ -1441,7 +1441,7 @@ fn test_ois_identity_with_eom() {
     let swap = InterestRateSwap::builder()
         .id("OIS-EOM-IDENTITY".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: disc_id.clone(),
             rate: Decimal::ZERO,
@@ -1480,7 +1480,7 @@ fn test_ois_identity_with_eom() {
         .build()
         .expect("swap");
 
-    // Compute the NPV (with zero fixed rate, NPV = PV_float for PayFixed)
+    // Compute the NPV (with zero fixed rate, NPV = PV_float for Pay)
     let pv = swap.value(&market, as_of).expect("OIS EOM PV");
 
     // Analytical identity: PV_float = N × (DF(start) − DF(end))

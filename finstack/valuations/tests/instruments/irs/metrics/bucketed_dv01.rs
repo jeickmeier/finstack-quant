@@ -67,7 +67,7 @@ fn create_swap(as_of: Date, end: Date) -> InterestRateSwap {
     InterestRateSwap {
         id: "IRS_BUCKETED_DV01_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),

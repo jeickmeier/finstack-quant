@@ -212,11 +212,7 @@ pub struct MarketContextState {
 /// internal `SnapshotFxProvider` plumbing.
 pub fn build_snapshot_fx_matrix(
     config: crate::money::fx::FxConfig,
-    quotes: Vec<(
-        crate::currency::Currency,
-        crate::currency::Currency,
-        crate::money::fx::FxRate,
-    )>,
+    quotes: Vec<(crate::currency::Currency, crate::currency::Currency, f64)>,
 ) -> crate::Result<Arc<FxMatrix>> {
     let state = FxMatrixState { config, quotes };
     let provider: Arc<dyn FxProvider> = Arc::new(SnapshotFxProvider::from_state(&state));

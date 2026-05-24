@@ -251,7 +251,7 @@ pub fn bump_discount_curve_synthetic(
         };
         quotes.push(RateQuote::Deposit {
             id: QuoteId::new(format!("SYNTH-DEP-{}", t)),
-            index: crate::market::conventions::ids::IndexId::new(deposit_index_id),
+            index: finstack_core::types::IndexId::new(deposit_index_id),
             pillar: Pillar::Date(maturity),
             rate,
         });

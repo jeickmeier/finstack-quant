@@ -1,4 +1,4 @@
-//! Pool characteristic metrics for structured credit.
+//! AssetPool characteristic metrics for structured credit.
 
 pub(crate) mod characteristics;
 pub(crate) mod warf;

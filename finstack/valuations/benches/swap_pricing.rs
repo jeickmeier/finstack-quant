@@ -51,7 +51,7 @@ fn create_swap(tenor_years: i32) -> InterestRateSwap {
         0.04, // 4% fixed rate
         start,
         end,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .expect("Failed to create swap for benchmark")
 }
@@ -70,7 +70,7 @@ fn create_monthly_swap(tenor_years: i32) -> InterestRateSwap {
     InterestRateSwap::builder()
         .id(format!("IRS-{}Y-Monthly", tenor_years).into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: disc_id.clone(),
             rate: dec!(0.04),
@@ -118,7 +118,7 @@ fn create_ois_swap(tenor_years: i32) -> InterestRateSwap {
     InterestRateSwap::builder()
         .id(format!("OIS-{}Y", tenor_years).into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: disc_id.clone(),
             rate: dec!(0.04),

@@ -44,7 +44,7 @@
 //! # See Also
 //!
 //! - [`Equity`] for instrument struct
-//! - [`crate::instruments::equity::spot::Ticker`] for symbol type
+//! - [`String`] for symbol type
 //! - [`crate::instruments::equity::equity_option`] for options on equities
 
 pub(crate) mod metrics;
@@ -53,4 +53,3 @@ mod types;
 
 pub use pricer::EquityPricer;
 pub use types::Equity;
-pub use types::Ticker;

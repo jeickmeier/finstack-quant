@@ -132,6 +132,7 @@ class TestAnalyticsNamespace:
         from finstack.analytics import (  # noqa: F401
             AnalyticsError,
             BetaResult,
+            DatedSeries,
             DrawdownEpisode,
             GreeksResult,
             LookbackReturns,
@@ -139,10 +140,6 @@ class TestAnalyticsNamespace:
             Performance,
             PeriodStats,
             RollingGreeks,
-            RollingReturns,
-            RollingSharpe,
-            RollingSortino,
-            RollingVolatility,
         )
 
     def test_analytics_drops_freestanding_helpers(self) -> None:

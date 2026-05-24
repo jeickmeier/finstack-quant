@@ -15,12 +15,12 @@ use crate::market::quotes::market_quote::MarketQuote;
 use crate::market::quotes::rates::RateQuote;
 use crate::market::quotes::vol::VolQuote;
 use crate::market::quotes::xccy::XccyQuote;
+use f64;
 use finstack_core::currency::Currency;
 use finstack_core::market_data::context::{CreditIndexState, CurveState, MarketContextState};
 use finstack_core::market_data::dividends::DividendSchedule;
 use finstack_core::market_data::scalars::{InflationIndex, MarketScalar, ScalarTimeSeries};
 use finstack_core::market_data::surfaces::{FxDeltaVolSurface, VolCube};
-use finstack_core::money::fx::FxRate;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "ts_export")]
@@ -106,7 +106,7 @@ pub struct FxSpotDatum {
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub to: Currency,
     /// Rate such that `1 from = rate to`.
-    pub rate: FxRate,
+    pub rate: f64,
 }
 
 /// Single-name spot-price payload for [`MarketDatum::Price`].
@@ -366,10 +366,10 @@ mod tests {
 
     #[test]
     fn rate_quote_id_kind_and_as_quote() {
-        use crate::market::conventions::ids::IndexId;
         use crate::market::quotes::ids::{Pillar, QuoteId};
         use crate::market::quotes::rates::RateQuote;
         use finstack_core::dates::{Tenor, TenorUnit};
+        use finstack_core::types::IndexId;
 
         let rq = RateQuote::Deposit {
             id: QuoteId::new("USD-DEP-1M"),

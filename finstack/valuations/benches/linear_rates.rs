@@ -13,7 +13,7 @@ use finstack_core::math::interp::InterpStyle;
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, InstrumentId};
 use finstack_valuations::instruments::rates::basis_swap::{BasisSwap, BasisSwapLeg};
-use finstack_valuations::instruments::rates::cap_floor::{InterestRateOption, RateOptionType};
+use finstack_valuations::instruments::rates::cap_floor::{CapFloor, RateOptionType};
 use finstack_valuations::instruments::rates::deposit::Deposit;
 use finstack_valuations::instruments::rates::fra::ForwardRateAgreement;
 use finstack_valuations::instruments::rates::ir_future::{
@@ -140,7 +140,7 @@ fn fra(id: &str, start: Date, end: Date) -> ForwardRateAgreement {
         observed_fixing: None,
         discount_curve_id: CurveId::new("USD-OIS"),
         forward_curve_id: CurveId::new("USD-SOFR-3M"),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
@@ -184,8 +184,8 @@ fn basis_swap(id: &str, end: Date) -> BasisSwap {
     .unwrap()
 }
 
-fn interest_rate_cap(id: &str, maturity: Date) -> InterestRateOption {
-    InterestRateOption {
+fn interest_rate_cap(id: &str, maturity: Date) -> CapFloor {
+    CapFloor {
         id: InstrumentId::new(id),
         rate_option_type: RateOptionType::Cap,
         notional: Money::new(1_000_000.0, Currency::USD),

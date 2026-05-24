@@ -38,7 +38,7 @@
 //! let swap = InterestRateSwap::builder()
 //!     .id(InstrumentId::new("IRS-5Y-USD"))
 //!     .notional(Money::new(10_000_000.0, Currency::USD))
-//!     .side(PayReceive::PayFixed)
+//!     .side(PayReceive::Pay)
 //!     .fixed(FixedLegSpec {
 //!         discount_curve_id: "USD-OIS".into(),
 //!         rate: dec!(0.04),  // 4% fixed rate
@@ -141,7 +141,7 @@ pub mod xccy_swap;
 // Re-export primary types
 pub use basis_swap::BasisSwap;
 pub use callable_range_accrual::CallableRangeAccrual;
-pub use cap_floor::{CapFloor, InterestRateOption, RateOptionType};
+pub use cap_floor::{CapFloor, RateOptionType};
 pub use cms_option::CmsOption;
 pub use cms_spread_option::{CmsSpreadOption, CmsSpreadOptionType};
 pub use cms_swap::CmsSwap;

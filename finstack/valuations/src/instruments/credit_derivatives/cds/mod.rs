@@ -134,11 +134,6 @@ pub(crate) mod pricer;
 mod types;
 
 pub use crate::market::conventions::ids::CdsDocClause;
-
-/// ISDA standard recovery rate for senior unsecured (40%).
-///
-/// Re-exported from [`crate::constants::isda::STANDARD_RECOVERY_SENIOR`].
-pub use crate::constants::isda::STANDARD_RECOVERY_SENIOR as RECOVERY_SENIOR_UNSECURED;
 pub use types::CDSConvention;
 pub use types::CdsValuationConvention;
 pub use types::CreditDefaultSwap;

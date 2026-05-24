@@ -35,7 +35,7 @@ fn create_cds_index_single_curve(tenor_years: i32) -> CDSIndex {
         &preset,
         format!("CDX-{}Y", tenor_years),
         Money::new(10_000_000.0, Currency::USD),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
         start,
         end,
         0.40,

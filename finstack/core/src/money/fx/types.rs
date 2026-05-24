@@ -2,8 +2,6 @@ use crate::currency::Currency;
 use crate::dates::Date;
 use serde::{Deserialize, Serialize};
 
-use super::provider::FxRate;
-
 /// Standard FX conversion strategies used to hint FX providers.
 ///
 /// The policy tells a provider *how* the rate will be applied so it can decide
@@ -167,7 +165,7 @@ impl Default for FxConfig {
 #[serde(deny_unknown_fields)]
 pub struct FxRateResult {
     /// The final FX rate
-    pub rate: FxRate,
+    pub rate: f64,
     /// Whether this rate was obtained via triangulation
     pub triangulated: bool,
 }
@@ -179,5 +177,5 @@ pub struct FxMatrixState {
     /// FX configuration
     pub config: FxConfig,
     /// Cached FX quotes as (from, to, rate) tuples
-    pub quotes: Vec<(Currency, Currency, FxRate)>,
+    pub quotes: Vec<(Currency, Currency, f64)>,
 }

@@ -8,9 +8,9 @@
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::instruments::{BondConvention, ExerciseStyle, SettlementType};
 use crate::market::conventions::ids::FxConventionId;
-use crate::market::conventions::ids::IndexId;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{BusinessDayConvention, DayCount, Tenor};
+use finstack_core::types::IndexId;
 use serde::{Deserialize, Serialize};
 
 /// Type of rate index for convention determination.

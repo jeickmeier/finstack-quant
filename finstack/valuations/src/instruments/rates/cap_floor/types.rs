@@ -3,15 +3,15 @@
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::{ExerciseStyle, SettlementType};
 use crate::market::conventions::defs::RateIndexKind;
-use crate::market::conventions::ids::IndexId;
 use crate::market::conventions::ConventionRegistry;
 use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_core::money::Money;
+use finstack_core::types::IndexId;
 use finstack_core::types::{CalendarId, CurveId, InstrumentId};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
-use super::parameters::InterestRateOptionParams;
+use super::parameters::CapFloorParams;
 use crate::impl_instrument_base;
 
 /// Volatility convention for cap/floor pricing.
@@ -249,9 +249,6 @@ pub struct CapFloor {
     pub attributes: Attributes,
 }
 
-/// Backward-compatible alias for the canonical cap/floor instrument name.
-pub type InterestRateOption = CapFloor;
-
 impl CapFloor {
     /// Create a canonical example USD 5Y 3% interest rate cap ($10M notional, quarterly SOFR).
     ///
@@ -290,7 +287,7 @@ impl CapFloor {
 
     fn from_params(
         id: impl Into<InstrumentId>,
-        option_params: &InterestRateOptionParams,
+        option_params: &CapFloorParams,
         start_date: Date,
         maturity: Date,
         discount_curve_id: impl Into<CurveId>,
@@ -337,7 +334,7 @@ impl CapFloor {
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
     ) -> finstack_core::Result<Self> {
-        let option_params = InterestRateOptionParams::cap(notional, strike, frequency, day_count)?;
+        let option_params = CapFloorParams::cap(notional, strike, frequency, day_count)?;
         Ok(Self::from_params(
             id,
             &option_params,
@@ -365,8 +362,7 @@ impl CapFloor {
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
     ) -> finstack_core::Result<Self> {
-        let option_params =
-            InterestRateOptionParams::floor(notional, strike, frequency, day_count)?;
+        let option_params = CapFloorParams::floor(notional, strike, frequency, day_count)?;
         Ok(Self::from_params(
             id,
             &option_params,
@@ -393,7 +389,7 @@ impl CapFloor {
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
     ) -> finstack_core::Result<Self> {
-        let option_params = InterestRateOptionParams {
+        let option_params = CapFloorParams {
             rate_option_type: RateOptionType::Caplet,
             notional,
             strike: finstack_core::decimal::f64_to_decimal(strike)?,
@@ -429,7 +425,7 @@ impl CapFloor {
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
     ) -> finstack_core::Result<Self> {
-        let option_params = InterestRateOptionParams {
+        let option_params = CapFloorParams {
             rate_option_type: RateOptionType::Floorlet,
             notional,
             strike: finstack_core::decimal::f64_to_decimal(strike)?,

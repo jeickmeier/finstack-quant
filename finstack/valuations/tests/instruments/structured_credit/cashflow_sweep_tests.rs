@@ -27,8 +27,8 @@ use finstack_core::math::interp::InterpStyle;
 use finstack_core::money::Money;
 use finstack_core::types::{CreditRating, InstrumentId};
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    run_simulation, AssetType, DealType, Pool, PoolAsset, Seniority, StructuredCredit, Tranche,
-    TrancheCoupon, TrancheStructure,
+    run_simulation, AssetPool, AssetType, DealType, PoolAsset, StructuredCredit, Tranche,
+    TrancheCoupon, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -48,8 +48,8 @@ fn maturity() -> Date {
     Date::from_calendar_date(2030, Month::December, 31).unwrap()
 }
 
-fn create_pool() -> Pool {
-    let mut pool = Pool::new("SWEEP_POOL", DealType::CLO, Currency::USD);
+fn create_pool() -> AssetPool {
+    let mut pool = AssetPool::new("SWEEP_POOL", DealType::CLO, Currency::USD);
 
     for i in 0..10 {
         pool.assets.push(PoolAsset {
@@ -83,7 +83,7 @@ fn create_tranches() -> TrancheStructure {
         "CLASS_A",
         0.0,
         70.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(175_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity(),
@@ -94,7 +94,7 @@ fn create_tranches() -> TrancheStructure {
         "CLASS_B",
         70.0,
         90.0,
-        Seniority::Mezzanine,
+        TrancheSeniority::Mezzanine,
         Money::new(50_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.07 },
         maturity(),
@@ -105,7 +105,7 @@ fn create_tranches() -> TrancheStructure {
         "EQUITY",
         90.0,
         100.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(25_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.0 },
         maturity(),

@@ -69,7 +69,7 @@ fn test_validation_rejects_end_before_start() {
         0.05,
         date!(2029 - 01 - 01), // Start after end
         date!(2024 - 01 - 01), // End before start
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     );
 
     assert!(result.is_err(), "Should reject end <= start");
@@ -89,7 +89,7 @@ fn test_validation_rejects_zero_notional() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     );
 
     assert!(result.is_err(), "Should reject zero notional");
@@ -109,7 +109,7 @@ fn test_validation_rejects_negative_notional() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     );
 
     assert!(result.is_err(), "Should reject negative notional");
@@ -124,7 +124,7 @@ fn test_validation_rejects_extreme_rate() {
         150.0, // 15000% rate - well above MAX_RATE_MAGNITUDE (100.0)
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     );
 
     assert!(result.is_err(), "Should reject extreme rate");
@@ -145,7 +145,7 @@ fn test_validation_accepts_negative_rate() {
         -0.005, // -0.5% rate
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     );
 
     assert!(result.is_ok(), "Should accept small negative rate");
@@ -159,7 +159,7 @@ fn test_validation_accepts_valid_swap() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .expect("Valid swap should construct");
 
@@ -189,7 +189,7 @@ fn test_30y_swap_numerical_stability() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -246,7 +246,7 @@ fn test_annuity_deterministic_across_runs() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -295,7 +295,7 @@ fn test_expired_swap_handling() {
     let swap = InterestRateSwap {
         id: InstrumentId::new("EXPIRED_SWAP"),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -374,7 +374,7 @@ fn test_very_short_swap_1_month() {
     let swap = InterestRateSwap {
         id: InstrumentId::new("SHORT_SWAP"),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -435,7 +435,7 @@ fn test_extreme_rate_environment_stress() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -493,7 +493,7 @@ fn test_golden_5y_usd_swap_par_npv() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -514,7 +514,7 @@ fn test_golden_5y_usd_swap_par_npv() {
         par_rate, // Use computed par rate
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -550,7 +550,7 @@ fn test_golden_annuity_5y_at_5pct() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -592,7 +592,7 @@ fn test_golden_dv01_approximation() {
         0.05,
         as_of,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -638,7 +638,7 @@ fn test_missing_curve_produces_clear_error() {
         0.05,
         as_of,
         end,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 

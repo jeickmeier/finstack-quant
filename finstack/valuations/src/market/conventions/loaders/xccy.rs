@@ -1,9 +1,10 @@
 //! Loader for cross-currency swap conventions embedded in JSON registries.
 
 use crate::market::conventions::defs::XccyConventions;
-use crate::market::conventions::ids::{IndexId, XccyConventionId};
+use crate::market::conventions::ids::XccyConventionId;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{BusinessDayConvention, DayCount, Tenor};
+use finstack_core::types::IndexId;
 use finstack_core::Error;
 use finstack_core::HashMap;
 

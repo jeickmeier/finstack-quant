@@ -8,7 +8,6 @@ use crate::calibration::api::schema::{
 };
 use crate::calibration::{CalibrationConfig, CalibrationMethod};
 use crate::instruments::rates::fra::ForwardRateAgreement;
-use crate::market::conventions::ids::IndexId;
 use crate::market::quotes::ids::{Pillar, QuoteId};
 use crate::market::quotes::market_quote::MarketQuote;
 use crate::market::quotes::rates::RateQuote;
@@ -22,6 +21,7 @@ use finstack_core::market_data::term_structures::{
     DiscountCurveRateCalibration, DiscountCurveRateQuote, DiscountCurveRateQuoteType,
     ForwardCurveRateCalibration, ForwardCurveRateQuote,
 };
+use finstack_core::types::IndexId;
 use finstack_core::HashMap;
 use time::Duration;
 

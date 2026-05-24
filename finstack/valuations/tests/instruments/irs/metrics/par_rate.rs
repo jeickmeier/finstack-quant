@@ -44,7 +44,7 @@ fn create_standard_swap(
     InterestRateSwap {
         id: "IRS_PAR_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: fixed_rate,
@@ -220,10 +220,10 @@ fn test_par_rate_independent_of_side() {
     let market = build_flat_curves(0.05, as_of);
 
     let mut swap_receive = create_standard_swap(as_of, end, dec!(0.05));
-    swap_receive.side = PayReceive::ReceiveFixed;
+    swap_receive.side = PayReceive::Receive;
 
     let mut swap_pay = create_standard_swap(as_of, end, dec!(0.05));
-    swap_pay.side = PayReceive::PayFixed;
+    swap_pay.side = PayReceive::Pay;
 
     let par_rate_receive = *swap_receive
         .price_with_metrics(

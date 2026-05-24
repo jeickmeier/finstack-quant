@@ -155,7 +155,7 @@ pub fn rmbs_trustee_fee_annual() -> f64 {
     rmbs_fees().trustee_fee_annual.amount()
 }
 
-/// Pool balance threshold (in base currency units) below which cashflow generation stops.
+/// AssetPool balance threshold (in base currency units) below which cashflow generation stops.
 ///
 /// For example, for a USD-denominated pool, this means stop when balance < $100.
 /// This prevents unnecessary computation for immaterial remaining balances.

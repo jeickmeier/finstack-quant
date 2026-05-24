@@ -47,15 +47,15 @@ fn structured_credit_instrument_json() -> String {
     use finstack_core::dates::{Date, DayCount};
     use finstack_core::money::Money;
     use finstack_valuations::instruments::fixed_income::structured_credit::{
-        DealType, Pool, PoolAsset, Seniority, StochasticDefaultSpec, StochasticPrepaySpec,
-        StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
+        AssetPool, DealType, PoolAsset, StochasticDefaultSpec, StochasticPrepaySpec,
+        StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use finstack_valuations::instruments::{InstrumentJson, PricingOverrides};
     use time::Month;
 
     let closing = Date::from_calendar_date(2024, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2026, Month::January, 1).unwrap();
-    let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+    let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
         Money::new(1_000_000.0, Currency::USD),
@@ -68,7 +68,7 @@ fn structured_credit_instrument_json() -> String {
             "SR",
             0.0,
             80.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(800_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
@@ -78,7 +78,7 @@ fn structured_credit_instrument_json() -> String {
             "EQ",
             80.0,
             100.0,
-            Seniority::Equity,
+            TrancheSeniority::Equity,
             Money::new(200_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity,

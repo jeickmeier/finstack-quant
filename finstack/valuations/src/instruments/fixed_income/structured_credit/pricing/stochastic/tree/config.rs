@@ -155,7 +155,7 @@ pub(crate) struct ScenarioTreeConfig {
     /// Initial pool seasoning (months)
     pub initial_seasoning: u32,
 
-    /// Pool coupon rate
+    /// AssetPool coupon rate
     pub pool_coupon: f64,
 }
 

@@ -62,7 +62,7 @@ fn create_swap(tenor_years: i32) -> InterestRateSwap {
         0.04, // 4% fixed rate
         start,
         end,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap()
 }

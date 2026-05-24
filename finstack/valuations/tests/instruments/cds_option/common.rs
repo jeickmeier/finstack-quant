@@ -14,7 +14,7 @@ use finstack_core::market_data::term_structures::{
     DiscountCurveRateQuoteType, HazardCurve,
 };
 use finstack_core::money::Money;
-use finstack_valuations::instruments::credit_derivatives::cds::RECOVERY_SENIOR_UNSECURED;
+use finstack_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_valuations::instruments::credit_derivatives::cds_option::{
     CDSOption, CDSOptionParams, ProtectionStartConvention,
 };
@@ -71,7 +71,7 @@ pub fn flat_hazard(id: &str, base: Date, recovery: f64, hazard_rate: f64) -> Haz
 /// Standard market context with typical curves
 pub fn standard_market(as_of: Date) -> MarketContext {
     let disc = flat_discount("USD-OIS", as_of, 0.03);
-    let credit = flat_hazard("HZ-SN", as_of, RECOVERY_SENIOR_UNSECURED, 0.02);
+    let credit = flat_hazard("HZ-SN", as_of, STANDARD_RECOVERY_SENIOR, 0.02);
 
     MarketContext::new().insert(disc).insert(credit)
 }

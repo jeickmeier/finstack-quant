@@ -111,7 +111,7 @@ impl InflationSwap {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .lag_override(InflationLag::Months(3))
             .bdc(BusinessDayConvention::Following)
             .attributes(Attributes::new())
@@ -434,8 +434,8 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
         let pv_fixed = self.pv_fixed_leg(curves, as_of)?;
         let pv_inflation = self.pv_inflation_leg(curves, as_of)?;
         match self.side {
-            PayReceive::ReceiveFixed => pv_fixed.checked_sub(pv_inflation),
-            PayReceive::PayFixed => pv_inflation.checked_sub(pv_fixed),
+            PayReceive::Receive => pv_fixed.checked_sub(pv_inflation),
+            PayReceive::Pay => pv_inflation.checked_sub(pv_fixed),
         }
     }
 
@@ -479,8 +479,8 @@ impl CashflowProvider for InflationSwap {
         let fixed_amount = self.fixed_leg_amount()?;
         let inflation_amount = self.inflation_leg_amount(curves, as_of)?;
         let (fixed_signed, inflation_signed) = match self.side {
-            PayReceive::PayFixed => (-fixed_amount.amount(), inflation_amount.amount()),
-            PayReceive::ReceiveFixed => (fixed_amount.amount(), -inflation_amount.amount()),
+            PayReceive::Pay => (-fixed_amount.amount(), inflation_amount.amount()),
+            PayReceive::Receive => (fixed_amount.amount(), -inflation_amount.amount()),
         };
         let ccy = self.notional.currency();
         let mut builder = CashFlowSchedule::builder();
@@ -596,7 +596,7 @@ impl YoYInflationSwap {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .lag_override(InflationLag::Months(3))
             .bdc(BusinessDayConvention::ModifiedFollowing)
             .attributes(Attributes::new())
@@ -722,8 +722,8 @@ impl YoYInflationSwap {
             let fixed_leg = self.notional.amount() * fixed_rate * accrual;
 
             let net = match self.side {
-                PayReceive::PayFixed => inflation_leg - fixed_leg,
-                PayReceive::ReceiveFixed => fixed_leg - inflation_leg,
+                PayReceive::Pay => inflation_leg - fixed_leg,
+                PayReceive::Receive => fixed_leg - inflation_leg,
             };
 
             let t_discount =
@@ -810,8 +810,8 @@ impl YoYInflationSwap {
             let fixed_leg = self.notional.amount() * fixed_rate * accrual;
             let inflation_leg = self.notional.amount() * (cpi_end / cpi_start - 1.0);
             let (fixed_signed, inflation_signed) = match self.side {
-                PayReceive::PayFixed => (-fixed_leg, inflation_leg),
-                PayReceive::ReceiveFixed => (fixed_leg, -inflation_leg),
+                PayReceive::Pay => (-fixed_leg, inflation_leg),
+                PayReceive::Receive => (fixed_leg, -inflation_leg),
             };
             flows.push((pay, Money::new(fixed_signed, self.notional.currency())));
             flows.push((pay, Money::new(inflation_signed, self.notional.currency())));
@@ -956,7 +956,7 @@ mod tests {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .lag_override(InflationLag::None)
             .attributes(Attributes::new())
             .build()
@@ -1023,7 +1023,7 @@ mod tests {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .lag_override(InflationLag::None)
             .attributes(Attributes::new())
             .build()
@@ -1061,7 +1061,7 @@ mod tests {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .lag_override(InflationLag::None)
             .attributes(Attributes::new())
             .build()

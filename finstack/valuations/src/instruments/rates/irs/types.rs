@@ -19,8 +19,8 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
-use crate::market::conventions::ids::IndexId;
 use crate::market::conventions::{ConventionRegistry, RateIndexConventions, RateIndexKind};
+use finstack_core::types::IndexId;
 use finstack_margin::types::OtcMarginSpec;
 
 use super::compounding::FloatingLegCompounding;
@@ -144,7 +144,7 @@ pub struct InterestRateSwap {
     pub id: InstrumentId,
     /// Notional amount for both legs.
     pub notional: Money,
-    /// Direction of the swap (PayFixed or ReceiveFixed).
+    /// Direction of the swap (Pay or Receive).
     pub side: PayReceive,
     /// Fixed leg specification.
     pub fixed: FixedLegSpec,
@@ -565,7 +565,7 @@ impl InterestRateSwap {
         let swap = Self::builder()
             .id(InstrumentId::new("IRS-5Y-USD-STD"))
             .notional(Money::new(10_000_000.0, Currency::USD))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .fixed(crate::instruments::common_impl::parameters::FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 rate: Decimal::try_from(0.04_f64).expect("valid literal"),
@@ -752,7 +752,7 @@ mod tests {
         let swap = InterestRateSwap::from_conventions(ConventionSwapParams {
             id: InstrumentId::new("USD-SOFR-OIS-SWAP-5Y"),
             notional: Money::new(1_000_000.0, Currency::USD),
-            side: PayReceive::PayFixed,
+            side: PayReceive::Pay,
             fixed_rate: 0.04,
             start: Date::from_calendar_date(2025, time::Month::January, 13).expect("start"),
             end: Date::from_calendar_date(2030, time::Month::January, 13).expect("end"),

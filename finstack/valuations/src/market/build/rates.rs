@@ -44,7 +44,7 @@ use rust_decimal::Decimal;
 /// use finstack_valuations::market::build_rate_instrument;
 /// use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
 /// use finstack_valuations::market::quotes::rates::RateQuote;
-/// use finstack_valuations::market::conventions::ids::IndexId;
+/// use finstack_core::types::IndexId;
 /// use finstack_core::dates::Date;
 /// use finstack_core::HashMap;
 ///
@@ -73,7 +73,7 @@ use rust_decimal::Decimal;
 /// use finstack_valuations::market::build_rate_instrument;
 /// use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
 /// use finstack_valuations::market::quotes::rates::RateQuote;
-/// use finstack_valuations::market::conventions::ids::IndexId;
+/// use finstack_core::types::IndexId;
 /// use finstack_core::dates::Date;
 /// use finstack_core::HashMap;
 ///
@@ -352,7 +352,7 @@ fn build_fra(
         .reset_lag(conv.default_reset_lag_days)
         .discount_curve_id(CurveId::new(ctx.require_curve_id("discount")?.to_string()))
         .forward_curve_id(CurveId::new(ctx.require_curve_id("forward")?.to_string()))
-        .side(crate::instruments::common_impl::parameters::legs::PayReceive::ReceiveFixed)
+        .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
         .fixing_calendar_id_opt(Some(conv.market_calendar_id.clone().into()))
         .fixing_bdc_opt(Some(conv.market_business_day_convention))
         .attributes(Default::default())
@@ -534,7 +534,7 @@ fn build_swap(
     let mut swap = InterestRateSwap::builder()
         .id(InstrumentId::new(id.as_str()))
         .notional(Money::new(ctx.notional(), conv.currency))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(fixed)
         .float(float)
         .build()?;
@@ -575,8 +575,8 @@ fn resolve_fixing_date(start: Date, conv: &RateIndexConventions) -> Result<Date>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::market::conventions::ids::IndexId;
     use crate::market::quotes::ids::{Pillar, QuoteId};
+    use finstack_core::types::IndexId;
     use finstack_core::HashMap;
 
     fn usd_build_ctx() -> BuildCtx {

@@ -26,7 +26,7 @@ fn create_test_cds(
     CreditDefaultSwap::new_isda(
         finstack_core::types::InstrumentId::new(id),
         Money::new(10_000_000.0, Currency::USD),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
         crate::instruments::credit_derivatives::cds::CDSConvention::IsdaNa,
         Decimal::try_from(spread_bp).expect("valid spread_bp"),
         start_date,
@@ -310,7 +310,7 @@ fn test_doc_clause_default_when_omitted() {
     let cds_built = CreditDefaultSwap::builder()
         .id(finstack_core::types::InstrumentId::new("CDS-BUILDER"))
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .convention(crate::instruments::credit_derivatives::cds::CDSConvention::IsdaNa)
         .premium(
             crate::instruments::common_impl::parameters::legs::PremiumLegSpec {

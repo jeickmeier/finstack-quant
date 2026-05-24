@@ -11,7 +11,7 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::types::{moodys_warf_factor, CreditRating, RatingFactorTable};
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    AssetType, DealType, Pool, PoolAsset, ReinvestmentManager,
+    AssetPool, AssetType, DealType, PoolAsset, ReinvestmentManager,
 };
 use time::Month;
 
@@ -169,7 +169,7 @@ fn test_reinvestment_manager_selects_cheapest_first() {
     // Arrange
     let manager =
         ReinvestmentManager::new(Date::from_calendar_date(2027, Month::January, 1).unwrap());
-    let pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    let pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
 
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
     let base_asset = PoolAsset {
@@ -233,7 +233,7 @@ fn test_reinvestment_manager_respects_budget() {
     // Arrange
     let manager =
         ReinvestmentManager::new(Date::from_calendar_date(2027, Month::January, 1).unwrap());
-    let pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    let pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
 
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
     let asset = PoolAsset::floating_rate_loan(

@@ -1,9 +1,7 @@
 //! Rolling risk metrics: Sharpe, Sortino, and volatility over a sliding window.
 //!
-//! Crate-internal except for the result types [`DatedSeries`],
-//! [`RollingSharpe`], [`RollingSortino`], [`RollingVolatility`] (re-exported
-//! at the crate root). `///` doc examples target crate developers and are
-//! marked `ignore`.
+//! Crate-internal except for [`DatedSeries`] (re-exported at the crate root).
+//! `///` doc examples target crate developers and are marked `ignore`.
 //!
 //! All rolling functions share O(n) sliding-window kernels and produce either
 //! a dated struct (aligned to window-end dates) or a NaN-padded `Vec<f64>`.
@@ -52,7 +50,7 @@ fn recompute_sum_sum_ds(window: &[f64], mar: f64) -> (f64, f64) {
 ///
 /// Shared carrier type for rolling analytics outputs. Concrete metrics
 /// (rolling Sharpe, Sortino, volatility, etc.) re-use this struct via
-/// type aliases so they share field names, serde shape, and helper methods.
+/// this struct so they share field names, serde shape, and helper methods.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct DatedSeries {
     /// Computed metric values, one per completed rolling window.
@@ -80,9 +78,6 @@ fn nan_series(dates: &[Date], start: usize, len: usize) -> DatedSeries {
     }
 }
 
-/// Output of a rolling Sharpe ratio computation (see [`DatedSeries`]).
-pub type RollingSharpe = DatedSeries;
-
 /// Rolling Sharpe ratio over a sliding window.
 ///
 /// Computes the Sharpe ratio independently for each `window`-length sub-slice
@@ -100,7 +95,7 @@ pub type RollingSharpe = DatedSeries;
 ///
 /// # Returns
 ///
-/// A [`RollingSharpe`] with `values` and `dates` of equal length. Returns
+/// A [`DatedSeries`] with `values` and `dates` of equal length. Returns
 /// empty vectors if `window` is zero or larger than the series length.
 ///
 /// # Examples
@@ -123,7 +118,7 @@ pub(crate) fn rolling_sharpe(
     window: usize,
     ann_factor: f64,
     risk_free_rate: f64,
-) -> RollingSharpe {
+) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
         return DatedSeries::default();
@@ -149,9 +144,6 @@ pub(crate) fn rolling_sharpe(
     out
 }
 
-/// Output of a rolling volatility computation (see [`DatedSeries`]).
-pub type RollingVolatility = DatedSeries;
-
 /// Rolling annualized volatility over a sliding window.
 ///
 /// Computes annualized volatility independently for each `window`-length
@@ -166,7 +158,7 @@ pub type RollingVolatility = DatedSeries;
 ///
 /// # Returns
 ///
-/// A [`RollingVolatility`] with `n - window + 1` values. Returns empty
+/// A [`DatedSeries`] with `n - window + 1` values. Returns empty
 /// vectors if `window` is zero or larger than the series length.
 ///
 /// # Examples
@@ -188,7 +180,7 @@ pub(crate) fn rolling_volatility(
     dates: &[Date],
     window: usize,
     ann_factor: f64,
-) -> RollingVolatility {
+) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
         return DatedSeries::default();
@@ -212,9 +204,6 @@ pub(crate) fn rolling_volatility(
     out
 }
 
-/// Output of a rolling Sortino ratio computation (see [`DatedSeries`]).
-pub type RollingSortino = DatedSeries;
-
 /// Rolling Sortino ratio over a sliding window.
 ///
 /// Computes the Sortino ratio independently for each `window`-length
@@ -231,7 +220,7 @@ pub type RollingSortino = DatedSeries;
 ///
 /// # Returns
 ///
-/// A [`RollingSortino`] with `n - window + 1` values. Returns empty
+/// A [`DatedSeries`] with `n - window + 1` values. Returns empty
 /// vectors if `window` is zero or larger than the series length.
 ///
 /// # Examples
@@ -254,7 +243,7 @@ pub(crate) fn rolling_sortino(
     window: usize,
     ann_factor: f64,
     mar: f64,
-) -> RollingSortino {
+) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
         return DatedSeries::default();

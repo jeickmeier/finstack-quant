@@ -30,10 +30,6 @@ __all__ = [
     "MultiFactorResult",
     "DrawdownEpisode",
     "DatedSeries",
-    "RollingSharpe",
-    "RollingSortino",
-    "RollingVolatility",
-    "RollingReturns",
 ]
 
 # ---------------------------------------------------------------------------
@@ -248,10 +244,8 @@ class LookbackReturns:
 class DatedSeries:
     """Date-indexed numeric series returned by the rolling-window analytics.
 
-    Replaces the previous ``RollingSharpe``, ``RollingSortino``,
-    ``RollingVolatility``, and ``RollingReturns`` classes (which were
-    textually identical except for the DataFrame column name). Those names
-    still import as aliases of this class for backwards compatibility.
+    Rolling-window methods return this shared carrier with a metric-specific
+    DataFrame column name.
     """
 
     @property
@@ -274,13 +268,6 @@ class DatedSeries:
         ...
 
     def __repr__(self) -> str: ...
-
-# Backwards-compatible aliases. Each historical name resolves to ``DatedSeries``
-# at runtime because the underlying Rust types are identical.
-RollingSharpe = DatedSeries
-RollingSortino = DatedSeries
-RollingVolatility = DatedSeries
-RollingReturns = DatedSeries
 
 # ---------------------------------------------------------------------------
 # Performance engine

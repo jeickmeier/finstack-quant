@@ -337,7 +337,7 @@ impl Default for ReinvestmentCriteria {
     }
 }
 
-/// Pool-level performance statistics
+/// AssetPool-level performance statistics
 #[derive(Debug, Clone, Default, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PoolStats {
     /// Weighted average coupon
@@ -370,7 +370,7 @@ pub struct PoolStats {
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AssetPool {
-    /// Pool identifier
+    /// AssetPool identifier
     pub id: InstrumentId,
 
     /// Deal type classification
@@ -398,7 +398,7 @@ pub struct AssetPool {
     /// Reinvestment period configuration (if applicable)
     pub reinvestment_period: Option<ReinvestmentPeriod>,
 
-    /// Pool-level accounts
+    /// AssetPool-level accounts
     /// Collection account balance (collected but not yet distributed)
     pub collection_account: Money,
     /// Reserve account balance (for credit enhancement)

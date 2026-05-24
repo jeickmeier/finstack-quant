@@ -285,8 +285,8 @@ impl Marginable for InterestRateSwap {
             * ONE_BP;
 
         let sign = match self.side {
-            crate::instruments::rates::irs::PayReceive::PayFixed => -1.0,
-            crate::instruments::rates::irs::PayReceive::ReceiveFixed => 1.0,
+            crate::instruments::rates::irs::PayReceive::Pay => -1.0,
+            crate::instruments::rates::irs::PayReceive::Receive => 1.0,
         };
 
         let buckets: &[(&str, f64, f64)] = &[
@@ -387,8 +387,8 @@ impl Marginable for CreditDefaultSwap {
             * DURATION_APPROXIMATION_FACTOR;
         let cs01 = self.notional.amount().abs() * risky_duration * ONE_BP;
         let signed_cs01 = match self.side {
-            crate::instruments::common_impl::parameters::legs::PayReceive::PayFixed => cs01,
-            crate::instruments::common_impl::parameters::legs::PayReceive::ReceiveFixed => -cs01,
+            crate::instruments::common_impl::parameters::legs::PayReceive::Pay => cs01,
+            crate::instruments::common_impl::parameters::legs::PayReceive::Receive => -cs01,
         };
         sens.add_credit_delta(ref_entity, qualifying, tenor, signed_cs01);
 
@@ -406,12 +406,12 @@ impl Marginable for CreditDefaultSwap {
         let pv_prot = pricer.pv_protection_leg(self, disc.as_ref(), surv.as_ref(), as_of)?;
         let pv_prem = pricer.pv_premium_leg(self, disc.as_ref(), surv.as_ref(), as_of)?;
 
-        // NPV from protection buyer perspective (PayFixed)
+        // NPV from protection buyer perspective (Pay)
         let npv = match self.side {
-            crate::instruments::common_impl::parameters::legs::PayReceive::PayFixed => {
+            crate::instruments::common_impl::parameters::legs::PayReceive::Pay => {
                 pv_prot.checked_sub(pv_prem)?
             }
-            crate::instruments::common_impl::parameters::legs::PayReceive::ReceiveFixed => {
+            crate::instruments::common_impl::parameters::legs::PayReceive::Receive => {
                 pv_prem.checked_sub(pv_prot)?
             }
         };
@@ -470,8 +470,8 @@ impl Marginable for CDSIndex {
             years_to_maturity * (1.0 - recovery_rate) * DURATION_APPROXIMATION_FACTOR;
         let cs01 = self.notional.amount().abs() * risky_duration * ONE_BP;
         let signed_cs01 = match self.side {
-            crate::instruments::common_impl::parameters::legs::PayReceive::PayFixed => cs01,
-            crate::instruments::common_impl::parameters::legs::PayReceive::ReceiveFixed => -cs01,
+            crate::instruments::common_impl::parameters::legs::PayReceive::Pay => cs01,
+            crate::instruments::common_impl::parameters::legs::PayReceive::Receive => -cs01,
         };
         sens.add_credit_delta(&self.index_name, qualifying, tenor, signed_cs01);
 
@@ -677,7 +677,7 @@ mod tests {
             0.035,
             start,
             end,
-            crate::instruments::rates::irs::PayReceive::PayFixed,
+            crate::instruments::rates::irs::PayReceive::Pay,
         )
         .expect("swap creation");
 
@@ -707,7 +707,7 @@ mod tests {
             0.035,
             start,
             end,
-            crate::instruments::rates::irs::PayReceive::PayFixed,
+            crate::instruments::rates::irs::PayReceive::Pay,
         )
         .expect("swap creation");
 
@@ -742,7 +742,7 @@ mod tests {
             0.035,
             start,
             end,
-            crate::instruments::rates::irs::PayReceive::PayFixed,
+            crate::instruments::rates::irs::PayReceive::Pay,
         )
         .expect("swap creation");
 
@@ -805,7 +805,7 @@ mod tests {
             0.035,
             start,
             end,
-            crate::instruments::rates::irs::PayReceive::PayFixed,
+            crate::instruments::rates::irs::PayReceive::Pay,
         )
         .expect("swap creation");
 

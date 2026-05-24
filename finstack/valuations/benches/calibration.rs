@@ -5,6 +5,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
+use finstack_core::types::IndexId;
 use finstack_core::HashMap;
 use finstack_valuations::calibration::api::market_datum::MarketDatum;
 use finstack_valuations::calibration::api::{
@@ -16,7 +17,6 @@ use finstack_valuations::calibration::api::{
 };
 use finstack_valuations::calibration::CalibrationConfig;
 use finstack_valuations::calibration::CalibrationMethod;
-use finstack_valuations::market::conventions::ids::IndexId;
 use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
 use finstack_valuations::market::quotes::market_quote::MarketQuote;
 use finstack_valuations::market::quotes::rates::RateQuote;

@@ -87,7 +87,7 @@ fn test_irs_pricing_negative_discount_rate() {
         0.01, // 1% fixed rate
         as_of,
         maturity,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .expect("swap creation should succeed");
 
@@ -118,7 +118,7 @@ fn test_irs_dv01_negative_discount_rate() {
         0.01,
         as_of,
         maturity,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -170,7 +170,7 @@ fn test_irs_pricing_negative_forward_rate() {
         0.01, // Pay 1% fixed
         as_of,
         maturity,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -201,7 +201,7 @@ fn test_irs_par_rate_with_negative_rates() {
         0.01, // Initial rate doesn't matter for par rate calc
         as_of,
         maturity,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -245,7 +245,7 @@ fn test_irs_deep_negative_rates() {
         -0.005, // Pay -50bp fixed (receive negative)
         as_of,
         maturity,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -296,7 +296,7 @@ fn test_payer_receiver_symmetry_negative_rates() {
         fixed_rate,
         as_of,
         maturity,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -306,7 +306,7 @@ fn test_payer_receiver_symmetry_negative_rates() {
         fixed_rate,
         as_of,
         maturity,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -342,7 +342,7 @@ fn test_annuity_positive_with_negative_rates() {
         0.01,
         as_of,
         maturity,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 

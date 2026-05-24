@@ -42,7 +42,7 @@ pub enum StochasticPrepaySpec {
         base_cpr: f64,
         /// Refinancing sensitivity (gamma)
         refi_sensitivity: f64,
-        /// Pool weighted average coupon
+        /// AssetPool weighted average coupon
         pool_coupon: f64,
         /// Burnout decay rate
         burnout_rate: f64,

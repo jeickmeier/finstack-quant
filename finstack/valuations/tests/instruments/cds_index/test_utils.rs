@@ -7,9 +7,8 @@ use finstack_core::dates::{Date, DayCount};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_core::money::Money;
-use finstack_valuations::instruments::credit_derivatives::cds::{
-    PayReceive, RECOVERY_SENIOR_UNSECURED,
-};
+use finstack_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
+use finstack_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_valuations::instruments::credit_derivatives::cds_index::{
     CDSIndex, CDSIndexConstituent, CDSIndexParams,
 };
@@ -46,7 +45,7 @@ pub fn standard_market_context(base: Date) -> MarketContext {
     let hz = flat_hazard_curve(
         "HZ-INDEX",
         base,
-        RECOVERY_SENIOR_UNSECURED,
+        STANDARD_RECOVERY_SENIOR,
         STANDARD_HAZARD_RATE,
     );
 
@@ -60,12 +59,7 @@ pub fn multi_constituent_market_context(base: Date, num_constituents: usize) -> 
 
     for i in 0..num_constituents {
         let hz_id = format!("HZ{}", i + 1);
-        let hz = flat_hazard_curve(
-            &hz_id,
-            base,
-            RECOVERY_SENIOR_UNSECURED,
-            STANDARD_HAZARD_RATE,
-        );
+        let hz = flat_hazard_curve(&hz_id, base, STANDARD_RECOVERY_SENIOR, STANDARD_HAZARD_RATE);
         ctx = ctx.insert(hz);
     }
 
@@ -73,7 +67,7 @@ pub fn multi_constituent_market_context(base: Date, num_constituents: usize) -> 
     let hz_index = flat_hazard_curve(
         "HZ-INDEX",
         base,
-        RECOVERY_SENIOR_UNSECURED,
+        STANDARD_RECOVERY_SENIOR,
         STANDARD_HAZARD_RATE,
     );
     ctx = ctx.insert(hz_index);
@@ -104,10 +98,10 @@ pub fn standard_single_curve_index(id: &str, start: Date, end: Date, notional: f
         &standard_cdx_params(),
         id,
         Money::new(notional, Currency::USD),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
         start,
         end,
-        RECOVERY_SENIOR_UNSECURED,
+        STANDARD_RECOVERY_SENIOR,
         "USD-OIS",
         "HZ-INDEX",
     )
@@ -126,10 +120,10 @@ pub fn standard_constituents_index(
         &standard_cdx_params(),
         id,
         Money::new(notional, Currency::USD),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
         start,
         end,
-        RECOVERY_SENIOR_UNSECURED,
+        STANDARD_RECOVERY_SENIOR,
         "USD-OIS",
         "HZ-INDEX",
     )

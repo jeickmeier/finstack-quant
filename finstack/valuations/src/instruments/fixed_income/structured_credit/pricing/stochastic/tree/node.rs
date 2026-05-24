@@ -77,7 +77,7 @@ pub(crate) struct ScenarioNode {
     /// Recovery rate for defaults at this node
     pub recovery_rate: f64,
 
-    // === Pool state ===
+    // === AssetPool state ===
     /// Remaining pool balance at this node
     pub pool_balance: f64,
 
@@ -170,7 +170,7 @@ impl ScenarioNode {
             smm,
             mdr,
             recovery_rate,
-            // Pool state updated later
+            // AssetPool state updated later
             pool_balance: self.pool_balance,
             burnout_factor: self.burnout_factor,
             seasoning: self.seasoning + 1,

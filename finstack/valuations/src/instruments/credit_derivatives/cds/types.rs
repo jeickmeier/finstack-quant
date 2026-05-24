@@ -39,6 +39,7 @@
 //!     .build()?;
 //! ```
 
+use crate::constants::isda::STANDARD_RECOVERY_SENIOR;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::instruments::PricingOverrides;
@@ -637,7 +638,7 @@ impl CreditDefaultSwap {
         let cds = CreditDefaultSwap::builder()
             .id(InstrumentId::new("CDS-CORP-5Y"))
             .notional(Money::new(10_000_000.0, Currency::USD))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .convention(convention)
             .premium(PremiumLegSpec {
                 start: date!(2024 - 03 - 20),
@@ -652,8 +653,7 @@ impl CreditDefaultSwap {
             })
             .protection(ProtectionLegSpec {
                 credit_curve_id: finstack_core::types::CurveId::new("CORP-HAZARD"),
-                recovery_rate:
-                    crate::instruments::credit_derivatives::cds::RECOVERY_SENIOR_UNSECURED,
+                recovery_rate: STANDARD_RECOVERY_SENIOR,
                 settlement_delay: convention.settlement_delay(),
             })
             .pricing_overrides(PricingOverrides::default())
@@ -694,7 +694,7 @@ impl CreditDefaultSwap {
         let cds = CreditDefaultSwap::builder()
             .id(InstrumentId::new("CDS-FWD-EU-5Y"))
             .notional(notional)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .convention(convention)
             .premium(PremiumLegSpec {
                 start: premium_start,
@@ -709,8 +709,7 @@ impl CreditDefaultSwap {
             })
             .protection(ProtectionLegSpec {
                 credit_curve_id: finstack_core::types::CurveId::new("EU-CORP-HAZARD"),
-                recovery_rate:
-                    crate::instruments::credit_derivatives::cds::RECOVERY_SENIOR_UNSECURED,
+                recovery_rate: STANDARD_RECOVERY_SENIOR,
                 settlement_delay: convention.settlement_delay(),
             })
             .pricing_overrides(PricingOverrides::default())
@@ -810,7 +809,7 @@ impl CreditDefaultSwap {
     /// let cds = CreditDefaultSwap::builder()
     ///     .id("CDS-EXAMPLE".into())
     ///     .notional(Money::new(10_000_000.0, Currency::USD))
-    ///     .side(PayReceive::PayFixed)
+    ///     .side(PayReceive::Pay)
     ///     .convention(CDSConvention::IsdaNa)
     ///     .premium(PremiumLegSpec {
     ///         start: date!(2024 - 03 - 20),
@@ -825,7 +824,7 @@ impl CreditDefaultSwap {
     ///     })
     ///     .protection(ProtectionLegSpec {
     ///         credit_curve_id: CurveId::new("CORP-HAZARD"),
-    ///         recovery_rate: RECOVERY_SENIOR_UNSECURED,
+    ///         recovery_rate: STANDARD_RECOVERY_SENIOR,
     ///         settlement_delay: CDSConvention::IsdaNa.settlement_delay(),
     ///     })
     ///     .pricing_overrides(PricingOverrides::default())
@@ -1091,11 +1090,11 @@ impl crate::cashflow::traits::CashflowProvider for CreditDefaultSwap {
             schedule.flows.sort_by_key(|cf| cf.date);
         }
 
-        // Apply holder-view sign: protection buyer (PayFixed) pays premium,
-        // protection seller (ReceiveFixed) receives premium.
+        // Apply holder-view sign: protection buyer (Pay) pays premium,
+        // protection seller (Receive) receives premium.
         let sign = match self.side {
-            PayReceive::PayFixed => -1.0,
-            PayReceive::ReceiveFixed => 1.0,
+            PayReceive::Pay => -1.0,
+            PayReceive::Receive => 1.0,
         };
         for cf in &mut schedule.flows {
             cf.amount = Money::new(cf.amount.amount() * sign, cf.amount.currency());
@@ -1119,7 +1118,7 @@ mod tests {
         let cds = CreditDefaultSwap::new_isda(
             InstrumentId::new("CDS-CORP-5Y"),
             Money::new(10_000_000.0, Currency::USD),
-            PayReceive::PayFixed,
+            PayReceive::Pay,
             CDSConvention::IsdaNa,
             Decimal::try_from(100.0).expect("valid spread_bp"),
             date!(2025 - 03 - 20),
@@ -1132,7 +1131,7 @@ mod tests {
 
         assert_eq!(cds.id, InstrumentId::new("CDS-CORP-5Y"));
         assert_eq!(cds.notional, Money::new(10_000_000.0, Currency::USD));
-        assert_eq!(cds.side, PayReceive::PayFixed);
+        assert_eq!(cds.side, PayReceive::Pay);
         assert_eq!(cds.convention, CDSConvention::IsdaNa);
         assert_eq!(cds.premium.start, date!(2025 - 03 - 20));
         assert_eq!(cds.premium.end, date!(2030 - 03 - 20));

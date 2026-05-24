@@ -94,7 +94,7 @@ proptest! {
         let irs_low = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-LOW"))
             .notional(Money::new(notional, Currency::USD))
-            .side(PayReceive::ReceiveFixed)
+            .side(PayReceive::Receive)
             .fixed(FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 rate: rust_decimal::Decimal::from_f64_retain(rate_low).unwrap_or_default(),
@@ -130,7 +130,7 @@ proptest! {
         let irs_high = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-HIGH"))
             .notional(Money::new(notional, Currency::USD))
-            .side(PayReceive::ReceiveFixed)
+            .side(PayReceive::Receive)
             .fixed(FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 rate: rust_decimal::Decimal::from_f64_retain(rate_high).unwrap_or_default(),
@@ -196,7 +196,7 @@ proptest! {
         let payer = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-PAYER"))
             .notional(Money::new(notional, Currency::USD))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .fixed(FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 rate: rust_decimal::Decimal::from_f64_retain(fixed_rate).unwrap_or_default(),
@@ -232,7 +232,7 @@ proptest! {
         let receiver = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-RECEIVER"))
             .notional(Money::new(notional, Currency::USD))
-            .side(PayReceive::ReceiveFixed)
+            .side(PayReceive::Receive)
             .fixed(FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 rate: rust_decimal::Decimal::from_f64_retain(fixed_rate).unwrap_or_default(),
@@ -325,7 +325,7 @@ proptest! {
         let irs = InterestRateSwap::builder()
             .id(InstrumentId::new("IRS-EXTREME"))
             .notional(Money::new(notional, Currency::USD))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .fixed(FixedLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
                 rate: rust_decimal::Decimal::from_f64_retain(fixed_rate).unwrap_or_default(),

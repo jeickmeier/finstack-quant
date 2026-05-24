@@ -27,7 +27,7 @@ fn test_builder_creates_valid_swap() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -40,7 +40,7 @@ fn test_builder_creates_valid_swap() {
         swap.fixed_rate,
         Decimal::try_from(0.02).expect("valid decimal")
     );
-    assert_eq!(swap.side, PayReceive::PayFixed);
+    assert_eq!(swap.side, PayReceive::Pay);
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn test_builder_with_lag_override() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .lag_override(InflationLag::Months(2))
         .attributes(Attributes::new())
         .build()
@@ -68,31 +68,25 @@ fn test_builder_with_lag_override() {
 
 #[test]
 fn test_pay_receive_inflation_display() {
-    assert_eq!(PayReceive::PayFixed.to_string(), "pay");
-    assert_eq!(PayReceive::ReceiveFixed.to_string(), "receive");
+    assert_eq!(PayReceive::Pay.to_string(), "pay");
+    assert_eq!(PayReceive::Receive.to_string(), "receive");
 }
 
 #[test]
 fn test_pay_receive_inflation_from_str() {
     use std::str::FromStr;
 
-    assert_eq!(
-        PayReceive::from_str("pay_fixed").unwrap(),
-        PayReceive::PayFixed
-    );
-    assert_eq!(PayReceive::from_str("pay").unwrap(), PayReceive::PayFixed);
+    assert_eq!(PayReceive::from_str("pay_fixed").unwrap(), PayReceive::Pay);
+    assert_eq!(PayReceive::from_str("pay").unwrap(), PayReceive::Pay);
     assert_eq!(
         PayReceive::from_str("receive_fixed").unwrap(),
-        PayReceive::ReceiveFixed
+        PayReceive::Receive
     );
     assert_eq!(
         PayReceive::from_str("receive").unwrap(),
-        PayReceive::ReceiveFixed
+        PayReceive::Receive
     );
-    assert_eq!(
-        PayReceive::from_str("PAY-FIXED").unwrap(),
-        PayReceive::PayFixed
-    );
+    assert_eq!(PayReceive::from_str("PAY-FIXED").unwrap(), PayReceive::Pay);
     assert!(PayReceive::from_str("invalid").is_err());
 }
 
@@ -116,7 +110,7 @@ fn test_swap_with_different_day_counts() {
             .inflation_index_id("US-CPI-U".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(*dc)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .attributes(Attributes::new())
             .build()
             .unwrap();
@@ -140,7 +134,7 @@ fn test_swap_with_different_notionals() {
             .inflation_index_id("US-CPI-U".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .attributes(Attributes::new())
             .build()
             .unwrap();
@@ -164,7 +158,7 @@ fn test_swap_with_various_maturities() {
             .inflation_index_id("US-CPI-U".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .attributes(Attributes::new())
             .build()
             .unwrap();
@@ -188,7 +182,7 @@ fn test_swap_with_negative_fixed_rate() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -217,7 +211,7 @@ fn test_swap_with_attributes() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(attrs)
         .build()
         .unwrap();
@@ -242,7 +236,7 @@ fn test_instrument_trait_implementations() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -269,7 +263,7 @@ fn test_clone_and_equality() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();

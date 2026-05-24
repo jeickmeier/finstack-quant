@@ -42,9 +42,9 @@ pub mod regulatory;
 pub use calculators::im::schedule::{ScheduleAssetClass, BCBS_IOSCO_SCHEDULE_ID};
 pub use calculators::im::simm::SimmVersion;
 pub use calculators::{
-    CcpMarginInputSource, CcpMethodology, ClearingHouseImCalculator, ExternalImSource,
-    HaircutImCalculator, ImCalculator, ImResult, InternalModelImCalculator,
-    InternalModelInputSource, ScheduleImCalculator, SimmCalculator, VmCalculator, VmResult,
+    CcpMethodology, ClearingHouseImCalculator, ExternalImSource, HaircutImCalculator, ImCalculator,
+    ImResult, InternalModelImCalculator, ScheduleImCalculator, SimmCalculator, VmCalculator,
+    VmResult,
 };
 pub use traits::Marginable;
 pub use types::{

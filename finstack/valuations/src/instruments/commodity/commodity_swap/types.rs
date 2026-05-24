@@ -50,7 +50,7 @@ use rust_decimal::Decimal;
 ///     .quantity(10000.0)
 ///     .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("valid decimal"))
 ///     .floating_index_id(CurveId::new("NG-SPOT-AVG"))
-///     .side(PayReceive::PayFixed)
+///     .side(PayReceive::Pay)
 ///     .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
 ///     .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())
 ///     .frequency(Tenor::new(1, TenorUnit::Months))
@@ -77,8 +77,8 @@ pub struct CommoditySwap {
     pub fixed_price: Decimal,
     /// Floating index ID for price lookups.
     pub floating_index_id: CurveId,
-    /// Direction of the swap: PayFixed means paying the fixed price leg,
-    /// ReceiveFixed means receiving the fixed price leg.
+    /// Direction of the swap: Pay means paying the fixed price leg,
+    /// Receive means receiving the fixed price leg.
     pub side: PayReceive,
     /// Start date of the swap.
     #[schemars(with = "String")]
@@ -113,7 +113,7 @@ pub struct CommoditySwap {
 }
 
 /// Custom deserializer for CommoditySwap that reads the `side` field
-/// (PayReceive enum), defaulting to `PayFixed` when omitted.
+/// (PayReceive enum), defaulting to `Pay` when omitted.
 impl<'de> serde::Deserialize<'de> for CommoditySwap {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -146,7 +146,7 @@ impl<'de> serde::Deserialize<'de> for CommoditySwap {
 
         let helper = Helper::deserialize(deserializer)?;
 
-        let side = helper.side.unwrap_or(PayReceive::PayFixed);
+        let side = helper.side.unwrap_or(PayReceive::Pay);
 
         Ok(CommoditySwap {
             id: helper.id,
@@ -185,7 +185,7 @@ impl CommoditySwap {
             .quantity(10000.0)
             .fixed_price(Decimal::try_from(3.50).expect("valid decimal"))
             .floating_index_id(CurveId::new("NG-SPOT-AVG"))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .start_date(
                 Date::from_calendar_date(2025, time::Month::January, 1)
                     .expect("Valid example date"),
@@ -426,8 +426,8 @@ impl CommoditySwap {
             .to_f64()
             .ok_or(finstack_core::InputError::ConversionOverflow)?;
         let signed_amount = match self.side {
-            PayReceive::PayFixed => -self.quantity * fixed_price,
-            PayReceive::ReceiveFixed => self.quantity * fixed_price,
+            PayReceive::Pay => -self.quantity * fixed_price,
+            PayReceive::Receive => self.quantity * fixed_price,
         };
         Ok(self
             .payment_schedule(self.start_date)?
@@ -455,8 +455,8 @@ impl CommoditySwap {
             let forward_price =
                 self.expected_period_price(&price_curve, as_of, period_start, period_end)?;
             let signed_amount = match self.side {
-                PayReceive::PayFixed => self.quantity * forward_price,
-                PayReceive::ReceiveFixed => -self.quantity * forward_price,
+                PayReceive::Pay => self.quantity * forward_price,
+                PayReceive::Receive => -self.quantity * forward_price,
             };
             flows.push((
                 payment_date,
@@ -491,11 +491,11 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
         let floating_leg_pv = self.floating_leg_pv(market, as_of)?;
 
         let npv = match self.side {
-            PayReceive::PayFixed => {
+            PayReceive::Pay => {
                 // Pay fixed, receive floating
                 floating_leg_pv - fixed_leg_pv
             }
-            PayReceive::ReceiveFixed => {
+            PayReceive::Receive => {
                 // Receive fixed, pay floating
                 fixed_leg_pv - floating_leg_pv
             }
@@ -596,7 +596,7 @@ mod tests {
             .quantity(1000.0)
             .fixed_price(rust_decimal::Decimal::try_from(70.0).expect("valid decimal"))
             .floating_index_id(CurveId::new("CL-AVG"))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .start_date(Date::from_calendar_date(2025, Month::January, 1).expect("valid date"))
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
             .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))
@@ -609,7 +609,7 @@ mod tests {
         assert_eq!(swap.underlying.ticker, "CL");
         assert_eq!(swap.quantity, 1000.0);
         assert_eq!(swap.fixed_price.to_f64().expect("decimal to f64"), 70.0);
-        assert_eq!(swap.side, PayReceive::PayFixed);
+        assert_eq!(swap.side, PayReceive::Pay);
     }
 
     #[test]
@@ -638,7 +638,7 @@ mod tests {
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("valid decimal")) // Same as spot
             .floating_index_id(CurveId::new("NG-SPOT-AVG"))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
             .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))
@@ -673,7 +673,7 @@ mod tests {
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.55).expect("valid decimal"))
             .floating_index_id(CurveId::new("NG-SPOT-AVG"))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
             .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))
@@ -692,7 +692,7 @@ mod tests {
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.55).expect("valid decimal"))
             .floating_index_id(CurveId::new("NG-SPOT-AVG"))
-            .side(PayReceive::ReceiveFixed) // Receiving fixed
+            .side(PayReceive::Receive) // Receiving fixed
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("valid date"))
             .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))
@@ -728,7 +728,7 @@ mod tests {
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("valid decimal"))
             .floating_index_id(CurveId::new("NG-SPOT-AVG"))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::March, 31).expect("valid date"))
             .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))
@@ -833,7 +833,7 @@ mod tests {
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("decimal"))
             .floating_index_id(CurveId::new("NG-SPOT-AVG"))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("date"))
             .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))
@@ -883,7 +883,7 @@ mod tests {
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("decimal"))
             .floating_index_id(CurveId::new("NG-SPOT-AVG"))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::December, 31).expect("date"))
             .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))
@@ -916,7 +916,7 @@ mod tests {
             .quantity(10000.0)
             .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("valid decimal"))
             .floating_index_id(CurveId::new("NG-SPOT-AVG"))
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .start_date(as_of)
             .maturity(Date::from_calendar_date(2025, Month::March, 31).expect("valid date"))
             .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))

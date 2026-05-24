@@ -268,7 +268,7 @@ mod tests {
 
         let quote = RateQuote::Swap {
             id: QuoteId::new("USD-SOFR-OIS-SWAP-5Y"),
-            index: crate::market::conventions::ids::IndexId::new("USD-SOFR-OIS"),
+            index: finstack_core::types::IndexId::new("USD-SOFR-OIS"),
             pillar: crate::market::quotes::ids::Pillar::Tenor(finstack_core::dates::Tenor::new(
                 5,
                 finstack_core::dates::TenorUnit::Years,

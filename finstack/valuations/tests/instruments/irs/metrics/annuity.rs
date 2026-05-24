@@ -54,7 +54,7 @@ fn create_standard_swap(as_of: Date, end: Date) -> InterestRateSwap {
     InterestRateSwap {
         id: "IRS_ANNUITY_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -353,10 +353,10 @@ fn test_annuity_independent_of_side() {
     let market = build_market(0.05, as_of);
 
     let mut swap_receive = create_standard_swap(as_of, end);
-    swap_receive.side = PayReceive::ReceiveFixed;
+    swap_receive.side = PayReceive::Receive;
 
     let mut swap_pay = create_standard_swap(as_of, end);
-    swap_pay.side = PayReceive::PayFixed;
+    swap_pay.side = PayReceive::Pay;
 
     let annuity_receive = *swap_receive
         .price_with_metrics(

@@ -96,7 +96,7 @@ pub fn build_initial_context(
     let mut fx_quotes: Vec<(
         finstack_core::currency::Currency,
         finstack_core::currency::Currency,
-        finstack_core::money::fx::FxRate,
+        f64,
     )> = Vec::new();
     let mut credit_states: Vec<&finstack_core::market_data::context::CreditIndexState> = Vec::new();
 

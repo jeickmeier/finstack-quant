@@ -87,7 +87,7 @@ pub struct RangeAccrual {
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Underlying asset ticker symbol
-    pub underlying_ticker: crate::instruments::equity::spot::Ticker,
+    pub underlying_ticker: String,
     /// Observation dates for range checking (must be sorted ascending)
     #[schemars(with = "Vec<String>")]
     pub observation_dates: Vec<Date>,

@@ -87,7 +87,7 @@ fn test_forward_swap_rate_includes_first_multicurve_float_period() {
                 1_000_000.0,
                 finstack_core::currency::Currency::USD,
             ))
-            .side(PayReceive::ReceiveFixed)
+            .side(PayReceive::Receive)
             .fixed(fixed(rate))
             .float(float.clone())
             .build()

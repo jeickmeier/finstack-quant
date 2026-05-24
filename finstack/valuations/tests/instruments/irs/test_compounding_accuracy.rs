@@ -68,7 +68,7 @@ fn test_compounding_lookback_sensitivity() {
     let mut irs = InterestRateSwap::builder()
         .id("TEST-COMP".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -149,7 +149,7 @@ fn test_rate_cutoff_uses_business_day_lockout_over_weekend() {
     let mut irs = InterestRateSwap::builder()
         .id("TEST-RATE-CUTOFF-BUSINESS-DAY".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -297,7 +297,7 @@ fn test_seasoned_compounded_swap_requires_fixings() {
     let irs = InterestRateSwap::builder()
         .id("TEST-SEASONED-COMP".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -386,7 +386,7 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
     let irs = InterestRateSwap::builder()
         .id("TEST-SEASONED-COMP-WITH-FIX".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -470,7 +470,7 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
     let irs = InterestRateSwap::builder()
         .id("TEST-SPREAD-ZERO".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.005).expect("valid"), // 0.5% fixed
@@ -517,11 +517,11 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
 
     // Float leg has ~0.1% index + 0.5% spread = ~0.6% all-in rate
     // Fixed leg pays 0.5%
-    // PayFixed NPV = Float - Fixed should be slightly positive
+    // Pay NPV = Float - Fixed should be slightly positive
     // (receiving 0.6%, paying 0.5% on ~10MM for 1Y = ~10k profit)
     assert!(
         pv_val > 0.0,
-        "PayFixed with higher float all-in rate should have positive NPV, got {}",
+        "Pay with higher float all-in rate should have positive NPV, got {}",
         pv_val
     );
 }
@@ -568,7 +568,7 @@ fn test_compounded_swap_with_spread_negative_rates() {
     let irs = InterestRateSwap::builder()
         .id("TEST-SPREAD-NEG".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.005).expect("valid"), // 0.5% fixed
@@ -619,10 +619,10 @@ fn test_compounded_swap_with_spread_negative_rates() {
 
     // Float leg has -0.5% index + 1% spread = 0.5% all-in rate
     // Fixed leg pays 0.5%
-    // PayFixed NPV = Float - Fixed should be approximately zero
+    // Pay NPV = Float - Fixed should be approximately zero
     assert!(
         pv_val.abs() < 1000.0, // Within ~1bp on 10MM notional
-        "PayFixed with matching float all-in rate should have near-zero NPV, got {}",
+        "Pay with matching float all-in rate should have near-zero NPV, got {}",
         pv_val
     );
 }
@@ -674,7 +674,7 @@ fn test_observation_shift_before_curve_base_date() {
     let irs = InterestRateSwap::builder()
         .id("TEST-OBS-SHIFT".into())
         .notional(Money::new(10_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(FixedLegSpec {
             discount_curve_id: "DISC".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),

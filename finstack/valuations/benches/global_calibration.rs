@@ -18,6 +18,7 @@ use finstack_core::dates::{Date, Tenor};
 use finstack_core::market_data::term_structures::Seniority;
 use finstack_core::math::interp::ExtrapolationPolicy;
 use finstack_core::types::CurveId;
+use finstack_core::types::IndexId;
 use finstack_core::HashMap;
 use finstack_valuations::calibration::api::market_datum::MarketDatum;
 use finstack_valuations::calibration::api::{
@@ -28,7 +29,7 @@ use finstack_valuations::calibration::api::{
     },
 };
 use finstack_valuations::calibration::{CalibrationConfig, CalibrationMethod};
-use finstack_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause, IndexId};
+use finstack_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_valuations::market::quotes::cds::CdsQuote;
 use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
 use finstack_valuations::market::quotes::market_quote::MarketQuote;

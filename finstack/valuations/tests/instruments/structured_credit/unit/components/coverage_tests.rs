@@ -11,8 +11,8 @@ use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    CoverageTest, DealType, Pool, PoolAsset, Seniority, TestContext, Tranche, TrancheCoupon,
-    TrancheStructure,
+    AssetPool, CoverageTest, DealType, PoolAsset, TestContext, Tranche, TrancheCoupon,
+    TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -25,7 +25,7 @@ fn maturity_date() -> Date {
 }
 
 fn context_for_tranche<'a>(
-    pool: &'a Pool,
+    pool: &'a AssetPool,
     tranches: &'a TrancheStructure,
     tranche_id: &'a str,
     cash_balance: Money,
@@ -66,8 +66,8 @@ fn test_oc_test_creation() {
 
 #[test]
 fn test_oc_test_passing_scenario() {
-    // Arrange: Pool value > required multiple of tranche
-    let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    // Arrange: AssetPool value > required multiple of tranche
+    let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
         Money::new(125_000_000.0, Currency::USD),
@@ -81,7 +81,7 @@ fn test_oc_test_passing_scenario() {
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -92,7 +92,7 @@ fn test_oc_test_passing_scenario() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -122,7 +122,7 @@ fn test_oc_test_passing_scenario() {
 
 #[test]
 fn test_coverage_test_result_preserves_tranche_id_with_underscore() {
-    let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
         Money::new(100_000_000.0, Currency::USD),
@@ -136,7 +136,7 @@ fn test_coverage_test_result_preserves_tranche_id_with_underscore() {
         "CLASS_A_1",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -162,8 +162,8 @@ fn test_coverage_test_result_preserves_tranche_id_with_underscore() {
 
 #[test]
 fn test_oc_test_failing_scenario() {
-    // Arrange: Pool value < required multiple
-    let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    // Arrange: AssetPool value < required multiple
+    let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
         Money::new(120_000_000.0, Currency::USD),
@@ -177,7 +177,7 @@ fn test_oc_test_failing_scenario() {
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -188,7 +188,7 @@ fn test_oc_test_failing_scenario() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -217,8 +217,8 @@ fn test_oc_test_failing_scenario() {
 
 #[test]
 fn test_oc_test_with_cash_balance() {
-    // Arrange: Pool + cash should pass
-    let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    // Arrange: AssetPool + cash should pass
+    let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
         Money::new(120_000_000.0, Currency::USD),
@@ -232,7 +232,7 @@ fn test_oc_test_with_cash_balance() {
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -243,7 +243,7 @@ fn test_oc_test_with_cash_balance() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -272,7 +272,7 @@ fn test_oc_test_with_cash_balance() {
 #[test]
 fn test_oc_test_cure_amount_calculation() {
     // Arrange
-    let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
         Money::new(115_000_000.0, Currency::USD),
@@ -286,7 +286,7 @@ fn test_oc_test_cure_amount_calculation() {
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -297,7 +297,7 @@ fn test_oc_test_cure_amount_calculation() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -347,13 +347,13 @@ fn test_ic_test_creation() {
 #[test]
 fn test_ic_test_passing_scenario() {
     // Arrange: Interest collections > required multiple of interest due
-    let pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    let pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
 
     let equity = Tranche::new(
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -364,7 +364,7 @@ fn test_ic_test_passing_scenario() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 }, // 5% = 1.25M quarterly
         maturity_date(),
@@ -394,13 +394,13 @@ fn test_ic_test_passing_scenario() {
 #[test]
 fn test_ic_test_failing_scenario() {
     // Arrange: Interest collections < required
-    let pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    let pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
 
     let equity = Tranche::new(
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -411,7 +411,7 @@ fn test_ic_test_failing_scenario() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -440,13 +440,13 @@ fn test_ic_test_failing_scenario() {
 #[test]
 fn test_ic_test_no_cure_amount() {
     // Arrange
-    let pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    let pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
 
     let equity = Tranche::new(
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -457,7 +457,7 @@ fn test_ic_test_no_cure_amount() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -494,13 +494,13 @@ fn test_ic_test_no_cure_amount() {
 #[test]
 fn test_oc_test_empty_pool() {
     // Arrange: Empty pool
-    let pool = Pool::new("EMPTY", DealType::CLO, Currency::USD);
+    let pool = AssetPool::new("EMPTY", DealType::CLO, Currency::USD);
 
     let equity = Tranche::new(
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -511,7 +511,7 @@ fn test_oc_test_empty_pool() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -541,13 +541,13 @@ fn test_oc_test_empty_pool() {
 #[test]
 fn test_ic_test_no_interest_collections() {
     // Arrange
-    let pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    let pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
 
     let equity = Tranche::new(
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -558,7 +558,7 @@ fn test_ic_test_no_interest_collections() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -587,7 +587,7 @@ fn test_ic_test_no_interest_collections() {
 #[test]
 fn test_oc_test_infinity_ratio_zero_debt() {
     // Arrange: Edge case with zero tranche balance
-    let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+    let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L1",
         Money::new(100_000_000.0, Currency::USD),
@@ -601,7 +601,7 @@ fn test_oc_test_infinity_ratio_zero_debt() {
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(11_111_111.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         maturity_date(),
@@ -612,7 +612,7 @@ fn test_oc_test_infinity_ratio_zero_debt() {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(0.0, Currency::USD), // Zero balance
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),

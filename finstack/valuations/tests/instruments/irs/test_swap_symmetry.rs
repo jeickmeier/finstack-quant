@@ -1,8 +1,8 @@
 //! Property-based tests for interest rate swap symmetry.
 //!
 //! Key Property: For any swap at inception with notional N and fixed rate F:
-//! - DV01(PayFixed) = -DV01(ReceiveFixed)
-//! - PV(PayFixed) + PV(ReceiveFixed) ≈ 0 (at par rate)
+//! - DV01(Pay) = -DV01(Receive)
+//! - PV(Pay) + PV(Receive) ≈ 0 (at par rate)
 
 use crate::finstack_test_utils as test_utils;
 use finstack_core::currency::Currency;
@@ -64,7 +64,7 @@ proptest! {
             fixed_rate,
             start,
             end,
-            PayReceive::PayFixed,
+            PayReceive::Pay,
         )
         .expect("Valid swap construction");
 
@@ -74,7 +74,7 @@ proptest! {
             fixed_rate,
             start,
             end,
-            PayReceive::ReceiveFixed,
+            PayReceive::Receive,
         )
         .expect("Valid swap construction");
 
@@ -92,7 +92,7 @@ proptest! {
 
         prop_assert!(
             dv01_sum.abs() < 1e-6,
-            "DV01 symmetry violated: PayFixed DV01 = {:.6}, ReceiveFixed DV01 = {:.6}, Sum = {:.6}",
+            "DV01 symmetry violated: Pay DV01 = {:.6}, Receive DV01 = {:.6}, Sum = {:.6}",
             dv01_pay, dv01_rec, dv01_sum
         );
     }
@@ -115,7 +115,7 @@ proptest! {
             0.04, // temporary rate
             start,
             end,
-            PayReceive::PayFixed,
+            PayReceive::Pay,
         )
         .expect("Valid swap construction");
 
@@ -134,7 +134,7 @@ proptest! {
             par_rate,
             start,
             end,
-            PayReceive::PayFixed,
+            PayReceive::Pay,
         )
         .expect("Valid swap construction");
 
@@ -144,7 +144,7 @@ proptest! {
             par_rate,
             start,
             end,
-            PayReceive::ReceiveFixed,
+            PayReceive::Receive,
         )
         .expect("Valid swap construction");
 
@@ -156,7 +156,7 @@ proptest! {
 
         prop_assert!(
             pv_sum.abs() < 1.0, // Within $1 for million+ notionals
-            "PV symmetry at par violated: PayFixed PV = {:.2}, ReceiveFixed PV = {:.2}, Sum = {:.2}",
+            "PV symmetry at par violated: Pay PV = {:.2}, Receive PV = {:.2}, Sum = {:.2}",
             pv_pay, pv_rec, pv_sum
         );
     }
@@ -177,7 +177,7 @@ proptest! {
             fixed_rate,
             start,
             end,
-            PayReceive::PayFixed,
+            PayReceive::Pay,
         )
         .expect("Valid swap construction");
 

@@ -20,13 +20,7 @@ pub enum PayReceive {
     Receive,
 }
 
-#[allow(non_upper_case_globals)]
 impl PayReceive {
-    /// Alias for `Pay` used in fixed-rate instrument contexts.
-    pub const PayFixed: Self = Self::Pay;
-    /// Alias for `Receive` used in fixed-rate instrument contexts.
-    pub const ReceiveFixed: Self = Self::Receive;
-
     /// Check if this is the payer side
     pub fn is_payer(&self) -> bool {
         matches!(self, Self::Pay)

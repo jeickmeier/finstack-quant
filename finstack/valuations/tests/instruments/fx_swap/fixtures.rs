@@ -8,7 +8,7 @@ use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::math::interp::InterpStyle;
-use finstack_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider, FxRate};
+use finstack_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_core::money::Money;
 use finstack_core::HashMap;
 use finstack_valuations::instruments::fx::fx_swap::FxSwap;
@@ -51,7 +51,7 @@ impl FxProvider for MockFxProvider {
         to: Currency,
         _on: Date,
         _policy: FxConversionPolicy,
-    ) -> finstack_core::Result<FxRate> {
+    ) -> finstack_core::Result<f64> {
         if let Some(&rate) = self.rates.get(&(from, to)) {
             return Ok(rate);
         }

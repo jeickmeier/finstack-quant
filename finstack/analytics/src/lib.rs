@@ -28,7 +28,7 @@
 //! Result and config types ([`PeriodStats`], [`DrawdownEpisode`],
 //! [`BetaResult`], [`GreeksResult`], [`RollingGreeks`], [`MultiFactorResult`],
 //! [`CagrBasis`], [`AnnualizationConvention`], [`DatedSeries`],
-//! [`RollingSharpe`], [`RollingSortino`], [`RollingVolatility`],
+//! [`DatedSeries`], [`DatedSeries`], [`DatedSeries`],
 //! [`LookbackReturns`]) are re-exported here because `Performance` returns
 //! them.
 //!
@@ -68,7 +68,4 @@ pub use aggregation::PeriodStats;
 pub use benchmark::{beta, BetaResult, GreeksResult, MultiFactorResult, RollingGreeks};
 pub use drawdown::DrawdownEpisode;
 pub use performance::{LookbackReturns, Performance};
-pub use risk_metrics::{
-    AnnualizationConvention, CagrBasis, DatedSeries, RollingSharpe, RollingSortino,
-    RollingVolatility,
-};
+pub use risk_metrics::{AnnualizationConvention, CagrBasis, DatedSeries};

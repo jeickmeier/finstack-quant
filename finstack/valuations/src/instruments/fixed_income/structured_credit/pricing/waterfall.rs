@@ -5,7 +5,7 @@
 
 use super::coverage_tests::{CoverageTest, TestContext};
 use crate::instruments::fixed_income::structured_credit::types::{
-    AllocationMode, DiversionRecord, PaymentCalculation, PaymentRecord, PaymentType, Pool,
+    AllocationMode, AssetPool, DiversionRecord, PaymentCalculation, PaymentRecord, PaymentType,
     Recipient, RecipientType, RoundingConvention, TrancheStructure, Waterfall,
     WaterfallDistribution, WaterfallTier, WaterfallWorkspace,
 };
@@ -92,7 +92,7 @@ pub struct WaterfallContext<'a> {
 pub fn execute_waterfall(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,
-    pool: &Pool,
+    pool: &AssetPool,
     context: WaterfallContext,
 ) -> Result<WaterfallDistribution> {
     execute_waterfall_with_explanation(waterfall, tranches, pool, context, ExplainOpts::disabled())
@@ -106,7 +106,7 @@ pub fn execute_waterfall(
 fn execute_waterfall_core(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,
-    pool: &Pool,
+    pool: &AssetPool,
     context: WaterfallContext,
     explain: ExplainOpts,
     mut workspace: Option<&mut WaterfallWorkspace>,
@@ -359,7 +359,7 @@ fn execute_waterfall_core(
 pub fn execute_waterfall_with_explanation(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,
-    pool: &Pool,
+    pool: &AssetPool,
     context: WaterfallContext,
     explain: ExplainOpts,
 ) -> Result<WaterfallDistribution> {
@@ -370,7 +370,7 @@ pub fn execute_waterfall_with_explanation(
 pub fn execute_waterfall_with_workspace(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,
-    pool: &Pool,
+    pool: &AssetPool,
     context: WaterfallContext,
     explain: ExplainOpts,
     workspace: &mut WaterfallWorkspace,
@@ -762,7 +762,7 @@ fn allocate_pro_rata(
 fn evaluate_coverage_tests(
     waterfall: &Waterfall,
     tranches: &TrancheStructure,
-    pool: &Pool,
+    pool: &AssetPool,
     as_of: Date,
     period_start: Date,
     available_cash: Money,
@@ -1029,8 +1029,9 @@ mod ic_diversion_tests {
     use super::WaterfallContext;
     use crate::instruments::fixed_income::structured_credit::types::waterfall::CoverageTrigger;
     use crate::instruments::fixed_income::structured_credit::types::{
-        AllocationMode, DealType, PaymentCalculation, PaymentType, Pool, Recipient, RecipientType,
-        Seniority, Tranche, TrancheCoupon, TrancheStructure, WaterfallBuilder, WaterfallTier,
+        AllocationMode, AssetPool, DealType, PaymentCalculation, PaymentType, Recipient,
+        RecipientType, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        WaterfallBuilder, WaterfallTier,
     };
     use finstack_core::currency::Currency;
     use finstack_core::dates::Date;
@@ -1045,9 +1046,9 @@ mod ic_diversion_tests {
     fn ic_only_breach_diverts_cash() {
         let currency = Currency::USD;
 
-        // Pool with a single large performing asset: OC numerator is huge so
+        // AssetPool with a single large performing asset: OC numerator is huge so
         // the OC test comfortably passes.
-        let mut pool = Pool::new("POOL", DealType::CLO, currency);
+        let mut pool = AssetPool::new("POOL", DealType::CLO, currency);
         {
             use crate::instruments::fixed_income::structured_credit::types::{
                 AssetType, PoolAsset,
@@ -1081,7 +1082,7 @@ mod ic_diversion_tests {
             "CLASS_A",
             0.0,
             70.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(100_000_000.0, currency),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2031, Month::January, 1).unwrap(),
@@ -1091,7 +1092,7 @@ mod ic_diversion_tests {
             "CLASS_B",
             70.0,
             100.0,
-            Seniority::Subordinated,
+            TrancheSeniority::Subordinated,
             Money::new(30_000_000.0, currency),
             TrancheCoupon::Fixed { rate: 0.08 },
             Date::from_calendar_date(2031, Month::January, 1).unwrap(),
@@ -1245,10 +1246,10 @@ mod ic_diversion_tests {
     fn coverage_cures_are_not_summed_across_tranches() {
         let currency = Currency::USD;
 
-        // Pool: one performing asset sized so BOTH OC tests breach but by
+        // AssetPool: one performing asset sized so BOTH OC tests breach but by
         // different amounts (the junior test, with a smaller denominator,
         // needs a larger cure than the senior test).
-        let mut pool = Pool::new("POOL", DealType::CLO, currency);
+        let mut pool = AssetPool::new("POOL", DealType::CLO, currency);
         {
             use crate::instruments::fixed_income::structured_credit::types::{
                 AssetType, PoolAsset,
@@ -1284,7 +1285,7 @@ mod ic_diversion_tests {
             "CLASS_A",
             0.0,
             77.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(100_000_000.0, currency),
             TrancheCoupon::Fixed { rate: 0.05 },
             Date::from_calendar_date(2031, Month::January, 1).unwrap(),
@@ -1294,7 +1295,7 @@ mod ic_diversion_tests {
             "CLASS_B",
             77.0,
             100.0,
-            Seniority::Subordinated,
+            TrancheSeniority::Subordinated,
             Money::new(30_000_000.0, currency),
             TrancheCoupon::Fixed { rate: 0.08 },
             Date::from_calendar_date(2031, Month::January, 1).unwrap(),

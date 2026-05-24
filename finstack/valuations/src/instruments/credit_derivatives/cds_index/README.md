@@ -34,7 +34,7 @@ let idx = CDSIndex::from_preset(
     &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
     "CDX-IG-42",
     Money::new(10_000_000.0, Currency::USD),
-    PayReceive::PayFixed,
+    PayReceive::Pay,
     start,
     end,
     0.40,

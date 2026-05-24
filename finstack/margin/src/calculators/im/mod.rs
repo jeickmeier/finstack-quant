@@ -16,9 +16,9 @@ pub mod schedule;
 /// ISDA SIMM calculator and supporting types.
 pub mod simm;
 
-pub use clearing::{CcpMarginInputSource, CcpMethodology, ClearingHouseImCalculator};
+pub use clearing::{CcpMethodology, ClearingHouseImCalculator};
 pub use haircut::HaircutImCalculator;
-pub use internal::{InternalModelImCalculator, InternalModelInputSource};
+pub use internal::InternalModelImCalculator;
 pub use schedule::ScheduleImCalculator;
 pub use simm::SimmCalculator;
 

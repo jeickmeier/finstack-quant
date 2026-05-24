@@ -17,7 +17,7 @@ use finstack_core::dates::Date;
 use finstack_core::money::Money;
 use finstack_core::types::{moodys_warf_factor, CreditRating};
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    cdr_to_mdr, cpr_to_smm, mdr_to_cdr, psa_to_cpr, DealType, Pool, PoolAsset,
+    cdr_to_mdr, cpr_to_smm, mdr_to_cdr, psa_to_cpr, AssetPool, DealType, PoolAsset,
 };
 use time::Month;
 
@@ -246,7 +246,7 @@ fn test_warf_golden_pool_calculation() {
     // WARF calculation for a sample CLO pool
     // Reference: Moody's WARF methodology
     //
-    // Pool composition:
+    // AssetPool composition:
     // - 20% BB rated (factor 1350)
     // - 60% B rated (factor 2720)
     // - 20% CCC rated (factor 6500)
@@ -292,7 +292,7 @@ fn test_wal_golden_uniform_amortization() {
     // WAL = (1 + 2 + 3 + 4) / 4 = 2.5 years
 
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let pool = Pool::new("UNIFORM_POOL", DealType::ABS, Currency::USD);
+    let pool = AssetPool::new("UNIFORM_POOL", DealType::ABS, Currency::USD);
 
     let cashflows = vec![
         (
@@ -335,7 +335,7 @@ fn test_wal_golden_front_loaded() {
     // WAL = 0.70 × 1 + 0.20 × 2 + 0.10 × 3 = 0.70 + 0.40 + 0.30 = 1.4 years
 
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let pool = Pool::new("FRONT_LOADED", DealType::ABS, Currency::USD);
+    let pool = AssetPool::new("FRONT_LOADED", DealType::ABS, Currency::USD);
 
     let total_principal = 100_000.0;
     let cashflows = vec![
@@ -375,7 +375,7 @@ fn test_wal_golden_back_loaded() {
     // WAL = 0.10 × 1 + 0.20 × 2 + 0.70 × 3 = 0.10 + 0.40 + 2.10 = 2.6 years
 
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let pool = Pool::new("BACK_LOADED", DealType::ABS, Currency::USD);
+    let pool = AssetPool::new("BACK_LOADED", DealType::ABS, Currency::USD);
 
     let total_principal = 100_000.0;
     let cashflows = vec![
@@ -416,7 +416,7 @@ fn test_was_golden_calculation() {
     // WAS calculation for a sample CLO pool
     // Reference: Industry standard weighted average
     //
-    // Pool composition:
+    // AssetPool composition:
     // - $50M at SOFR + 400 bps
     // - $30M at SOFR + 450 bps
     // - $20M at SOFR + 500 bps
@@ -425,7 +425,7 @@ fn test_was_golden_calculation() {
 
     let maturity = Date::from_calendar_date(2030, Month::December, 31).unwrap();
 
-    let mut pool = Pool::new("WAS_TEST", DealType::CLO, Currency::USD);
+    let mut pool = AssetPool::new("WAS_TEST", DealType::CLO, Currency::USD);
 
     pool.assets.push(
         PoolAsset::floating_rate_loan(

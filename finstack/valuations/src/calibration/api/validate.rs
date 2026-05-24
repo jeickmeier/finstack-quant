@@ -592,9 +592,10 @@ mod tests {
     use crate::calibration::api::schema::{
         CalibrationPlan, CalibrationStep, DiscountCurveParams, StepParams, CALIBRATION_SCHEMA,
     };
-    use crate::market::conventions::ids::{CdsConventionKey, CdsDocClause, IndexId};
+    use crate::market::conventions::ids::{CdsConventionKey, CdsDocClause};
     use crate::market::quotes::ids::{Pillar, QuoteId};
     use finstack_core::currency::Currency;
+    use finstack_core::types::IndexId;
     use finstack_core::HashMap;
 
     fn empty_envelope(id: &str) -> CalibrationEnvelope {

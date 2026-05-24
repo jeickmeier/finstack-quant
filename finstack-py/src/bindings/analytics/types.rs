@@ -386,15 +386,13 @@ impl PyLookbackReturns {
 }
 
 // ---------------------------------------------------------------------------
-// DatedSeries (unified Rolling* wrapper)
+// DatedSeries
 // ---------------------------------------------------------------------------
 
 /// Date-indexed numeric series returned by the rolling-window analytics.
 ///
-/// Replaces the previous `RollingSharpe`, `RollingSortino`, `RollingVolatility`,
-/// and `RollingReturns` classes, which were textually identical except for the
-/// DataFrame column name. The Python facade re-exports each historical name
-/// as an alias of this class.
+/// Rolling-window analytics share this carrier and attach a metric-specific
+/// DataFrame column name.
 #[pyclass(name = "DatedSeries", module = "finstack.analytics", frozen)]
 pub struct PyDatedSeries {
     pub(super) inner: fa::DatedSeries,

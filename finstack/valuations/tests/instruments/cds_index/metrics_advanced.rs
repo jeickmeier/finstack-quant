@@ -9,9 +9,8 @@
 use super::test_utils::*;
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
-use finstack_valuations::instruments::credit_derivatives::cds::{
-    PayReceive, RECOVERY_SENIOR_UNSECURED,
-};
+use finstack_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
+use finstack_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_valuations::instruments::credit_derivatives::cds_index::CDSIndex;
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::metrics::MetricId;
@@ -51,10 +50,10 @@ fn test_jump_to_default_negative_for_protection_seller() {
         &standard_cdx_params(),
         "CDX-JTD-SELL",
         Money::new(10_000_000.0, Currency::USD),
-        PayReceive::ReceiveFixed, // Sell protection
+        PayReceive::Receive, // Sell protection
         start,
         end,
-        RECOVERY_SENIOR_UNSECURED,
+        STANDARD_RECOVERY_SENIOR,
         "USD-OIS",
         "HZ-INDEX",
     )
@@ -489,7 +488,7 @@ fn test_jtd_per_name_basis() {
     //
     // The implementation uses:
     //   - num_constituents = 125 (CDX IG standard)
-    //   - recovery_rate = RECOVERY_SENIOR_UNSECURED = 0.40
+    //   - recovery_rate = STANDARD_RECOVERY_SENIOR = 0.40
     //   - LGD = 1 - 0.40 = 0.60
     //   - JTD = (1/125) × $10MM × 0.60 = $48,000
     let start = date!(2025 - 01 - 01);
@@ -545,11 +544,11 @@ fn test_jtd_uses_explicit_constituent_count_over_name_inference() {
     let jtd = *result.measures.get("jump_to_default").unwrap();
 
     // Expected with the supplied count of 97.
-    let expected_97 = 10_000_000.0 * (1.0 - RECOVERY_SENIOR_UNSECURED) / 97.0;
+    let expected_97 = 10_000_000.0 * (1.0 - STANDARD_RECOVERY_SENIOR) / 97.0;
     assert_relative_eq(jtd, expected_97, 1e-10, "JTD uses explicit count of 97");
 
     // And it must NOT equal the count the name (or preset default) would imply.
-    let with_default_125 = 10_000_000.0 * (1.0 - RECOVERY_SENIOR_UNSECURED) / 125.0;
+    let with_default_125 = 10_000_000.0 * (1.0 - STANDARD_RECOVERY_SENIOR) / 125.0;
     assert!(
         (jtd - with_default_125).abs() > 1.0,
         "JTD must not fall back to the preset/inferred pool size: jtd={jtd}, \

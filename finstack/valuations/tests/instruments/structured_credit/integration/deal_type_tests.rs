@@ -6,8 +6,8 @@ use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, Tenor};
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    DealType, Pool, PoolAsset, PrepaymentCurve, Seniority, StructuredCredit, Tranche,
-    TrancheCoupon, TrancheStructure,
+    AssetPool, DealType, PoolAsset, PrepaymentCurve, StructuredCredit, Tranche, TrancheCoupon,
+    TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -15,8 +15,8 @@ fn maturity_date() -> Date {
     Date::from_calendar_date(2030, Month::December, 31).unwrap()
 }
 
-fn create_minimal_pool(deal_type: DealType) -> Pool {
-    let mut pool = Pool::new("POOL", deal_type, Currency::USD);
+fn create_minimal_pool(deal_type: DealType) -> AssetPool {
+    let mut pool = AssetPool::new("POOL", deal_type, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
         Money::new(10_000_000.0, Currency::USD),
@@ -32,7 +32,7 @@ fn create_minimal_tranches() -> TrancheStructure {
         "SENIOR",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(10_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.04 },
         maturity_date(),

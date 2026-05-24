@@ -54,7 +54,7 @@ use finstack_valuations::instruments::fixed_income::convertible::{
 use finstack_valuations::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
 use finstack_valuations::instruments::fixed_income::inflation_linked_bond::InflationLinkedBondParams;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    DealType, Pool, PoolAsset, Seniority, StructuredCredit, Tranche, TrancheCoupon,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
     TrancheStructure,
 };
 use finstack_valuations::instruments::fx::fx_option::FxOption;
@@ -439,9 +439,9 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_portfolio::P
             base,
             maturity_5y(),
             if i % 2 == 0 {
-                PayReceive::PayFixed
+                PayReceive::Pay
             } else {
-                PayReceive::ReceiveFixed
+                PayReceive::Receive
             },
         )
         .expect("Failed to create swap for benchmark");
@@ -544,9 +544,9 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_portfolio::P
             id: cds_id.clone().into(),
             notional: Money::new(10_000_000.0, Currency::USD),
             side: if i % 2 == 0 {
-                PayReceive::PayFixed
+                PayReceive::Pay
             } else {
-                PayReceive::ReceiveFixed
+                PayReceive::Receive
             },
             convention,
             premium,
@@ -884,7 +884,7 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_portfolio::P
             .inflation_index_id("USD-CPI".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .attributes(Attributes::default())
             .build()
             .unwrap();
@@ -909,7 +909,7 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_portfolio::P
         let sc_id = format!("CLO_{}", i);
 
         // Create simple pool
-        let mut pool = Pool::new(sc_id.clone(), DealType::CLO, Currency::USD);
+        let mut pool = AssetPool::new(sc_id.clone(), DealType::CLO, Currency::USD);
         for j in 0..10 {
             pool.assets.push(PoolAsset::fixed_rate_bond(
                 format!("{}_ASSET_{}", sc_id, j),
@@ -925,7 +925,7 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_portfolio::P
             format!("{}_SENIOR", sc_id),
             0.0,
             100.0, // Must reach 100% for valid structure
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(10_000_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.04 },
             maturity_5y(),

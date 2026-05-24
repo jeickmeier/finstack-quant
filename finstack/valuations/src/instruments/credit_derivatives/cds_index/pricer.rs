@@ -147,8 +147,8 @@ impl CDSIndexPricer {
         )?;
         if let Some(upfront) = index.pricing_overrides.market_quotes.upfront_payment {
             result.total = match index.side {
-                PayReceive::PayFixed => result.total.checked_sub(upfront)?,
-                PayReceive::ReceiveFixed => result.total.checked_add(upfront)?,
+                PayReceive::Pay => result.total.checked_sub(upfront)?,
+                PayReceive::Receive => result.total.checked_add(upfront)?,
             };
         }
         // Ensure consistent currency handling even when constituents list is empty.
@@ -780,8 +780,8 @@ impl CDSIndexPricer {
     ) -> Result<Vec<CashFlow>> {
         let mut schedule = CashflowProvider::cashflow_schedule(cds, &MarketContext::new(), as_of)?;
         let premium_sign = match cds.side {
-            PayReceive::PayFixed => -1.0,
-            PayReceive::ReceiveFixed => 1.0,
+            PayReceive::Pay => -1.0,
+            PayReceive::Receive => 1.0,
         };
         let protection_sign = -premium_sign;
         let loss_given_default = 1.0 - cds.protection.recovery_rate;
@@ -1052,7 +1052,7 @@ mod tests {
             .expect("pay npv with upfront");
 
         let mut receive = CDSIndex::example();
-        receive.side = crate::instruments::credit_derivatives::cds::PayReceive::ReceiveFixed;
+        receive.side = crate::instruments::credit_derivatives::cds::PayReceive::Receive;
         let mut receive_with_upfront = receive.clone();
         receive_with_upfront
             .pricing_overrides
@@ -1135,7 +1135,7 @@ mod tests {
         let as_of = date(2024, 1, 1);
         let market = sample_market(as_of);
         let pricer = CDSIndexPricer::new();
-        let index = CDSIndex::example(); // PayFixed by default
+        let index = CDSIndex::example(); // Pay by default
 
         let npv = pricer.npv(&index, &market, as_of).expect("npv");
         let pv_prot = pricer
@@ -1145,11 +1145,11 @@ mod tests {
             .pv_premium_leg(&index, &market, as_of)
             .expect("pv premium");
 
-        // PayFixed: NPV = protection - premium
+        // Pay: NPV = protection - premium
         let recomposed = pv_prot.amount() - pv_prem.amount();
         assert!(
             (npv.amount() - recomposed).abs() < 1e-6,
-            "PayFixed leg decomposition: npv={:.6}, prot={:.6}, prem={:.6}, recomposed={:.6}",
+            "Pay leg decomposition: npv={:.6}, prot={:.6}, prem={:.6}, recomposed={:.6}",
             npv.amount(),
             pv_prot.amount(),
             pv_prem.amount(),

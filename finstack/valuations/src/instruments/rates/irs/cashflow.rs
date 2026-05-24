@@ -750,8 +750,8 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
     for cf in fixed_sched.flows {
         if cf.kind == CFKind::Fixed || cf.kind == CFKind::Stub {
             let amt = match irs.side {
-                PayReceive::ReceiveFixed => cf.amount,
-                PayReceive::PayFixed => cf.amount * -1.0,
+                PayReceive::Receive => cf.amount,
+                PayReceive::Pay => cf.amount * -1.0,
             };
             all_flows.push(CashFlow {
                 date: cf.date,
@@ -768,8 +768,8 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
     for cf in float_sched.flows {
         if cf.kind == CFKind::FloatReset {
             let amt = match irs.side {
-                PayReceive::ReceiveFixed => cf.amount * -1.0,
-                PayReceive::PayFixed => cf.amount,
+                PayReceive::Receive => cf.amount * -1.0,
+                PayReceive::Pay => cf.amount,
             };
             all_flows.push(CashFlow {
                 date: cf.date,
@@ -1089,7 +1089,7 @@ mod tests {
             InterestRateSwap::builder()
                 .id(InstrumentId::new(id))
                 .notional(Money::new(10_000_000.0, Currency::USD))
-                .side(PayReceive::PayFixed)
+                .side(PayReceive::Pay)
                 .fixed(FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
                     rate: Decimal::ZERO,

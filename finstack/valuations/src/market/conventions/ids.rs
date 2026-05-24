@@ -8,9 +8,6 @@ use finstack_core::currency::Currency;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Canonical rate index identifier (shared with finstack-core).
-pub type IndexId = finstack_core::types::IndexId;
-
 macro_rules! define_convention_id {
     ($(#[$meta:meta])* $name:ident) => {
         $(#[$meta])*

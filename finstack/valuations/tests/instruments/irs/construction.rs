@@ -22,7 +22,7 @@ fn test_irs_standard_construction() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -32,7 +32,7 @@ fn test_irs_standard_construction() {
         swap.fixed.rate,
         rust_decimal::Decimal::try_from(0.05).expect("valid")
     );
-    assert_eq!(swap.side, PayReceive::PayFixed);
+    assert_eq!(swap.side, PayReceive::Pay);
     assert_eq!(swap.fixed.discount_curve_id.as_ref(), "USD-OIS");
     assert_eq!(swap.float.forward_curve_id.as_ref(), "USD-SOFR-3M");
 }
@@ -43,7 +43,7 @@ fn test_irs_builder_pattern() {
     let swap = InterestRateSwap::builder()
         .id("IRS-CUSTOM".into())
         .notional(Money::new(5_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.0325).expect("valid"),
@@ -107,16 +107,15 @@ fn test_irs_receive_vs_pay() {
         rate,
         start,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
     let swap_pay =
-        test_utils::usd_irs_swap("IRS-PAY", notional, rate, start, end, PayReceive::PayFixed)
-            .unwrap();
+        test_utils::usd_irs_swap("IRS-PAY", notional, rate, start, end, PayReceive::Pay).unwrap();
 
-    assert_eq!(swap_receive.side, PayReceive::ReceiveFixed);
-    assert_eq!(swap_pay.side, PayReceive::PayFixed);
+    assert_eq!(swap_receive.side, PayReceive::Receive);
+    assert_eq!(swap_pay.side, PayReceive::Pay);
 
     // Same parameters except direction
     assert_eq!(swap_receive.fixed.rate, swap_pay.fixed.rate);
@@ -132,7 +131,7 @@ fn test_irs_short_maturity() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2024 - 07 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -149,7 +148,7 @@ fn test_irs_long_maturity() {
         0.04,
         date!(2024 - 01 - 01),
         date!(2054 - 01 - 01),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -165,7 +164,7 @@ fn test_irs_zero_spread() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -180,7 +179,7 @@ fn test_irs_with_spread() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -201,7 +200,7 @@ fn test_irs_large_notional() {
         0.045,
         date!(2024 - 01 - 01),
         date!(2034 - 01 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -217,7 +216,7 @@ fn test_irs_small_notional() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .unwrap();
 
@@ -230,7 +229,7 @@ fn test_irs_different_leg_frequencies() {
     let swap = InterestRateSwap::builder()
         .id("IRS-DIFF-FREQ".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -278,7 +277,7 @@ fn test_irs_attribute_management() {
         0.05,
         date!(2024 - 01 - 01),
         date!(2029 - 01 - 01),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 
@@ -302,7 +301,7 @@ fn test_irs_calendar_specification() {
     let swap = InterestRateSwap::builder()
         .id("IRS-CAL".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -347,7 +346,7 @@ fn test_irs_stub_specification() {
     let swap = InterestRateSwap::builder()
         .id("IRS-STUB".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .fixed(finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),

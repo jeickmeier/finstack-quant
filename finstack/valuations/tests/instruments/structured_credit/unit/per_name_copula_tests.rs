@@ -24,9 +24,9 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    CorrelationStructure, DealType, Pool, PoolAsset, PoolGranularity, PricingMode, Seniority,
+    AssetPool, CorrelationStructure, DealType, PoolAsset, PoolGranularity, PricingMode,
     StochasticDefaultSpec, StochasticPrepaySpec, StochasticPricingResult, StructuredCredit,
-    Tranche, TrancheCoupon, TrancheStructure,
+    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -55,7 +55,7 @@ fn market() -> MarketContext {
 fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredit {
     let total = 100_000_000.0;
     let per_asset = total / n_assets as f64;
-    let mut pool = Pool::new("CLO-POOL", DealType::CLO, Currency::USD);
+    let mut pool = AssetPool::new("CLO-POOL", DealType::CLO, Currency::USD);
     for i in 0..n_assets {
         pool.assets.push(PoolAsset::fixed_rate_bond(
             format!("L{i}"),
@@ -70,7 +70,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
             "SR",
             0.0,
             80.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(total * 0.80, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity(),
@@ -80,7 +80,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
             "MEZZ",
             80.0,
             92.0,
-            Seniority::Mezzanine,
+            TrancheSeniority::Mezzanine,
             Money::new(total * 0.12, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.08 },
             maturity(),
@@ -90,7 +90,7 @@ fn clo_deal(n_assets: usize, base_cdr: f64, correlation: f64) -> StructuredCredi
             "EQ",
             92.0,
             100.0,
-            Seniority::Equity,
+            TrancheSeniority::Equity,
             Money::new(total * 0.08, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity(),

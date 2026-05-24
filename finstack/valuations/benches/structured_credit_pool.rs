@@ -4,7 +4,7 @@ use finstack_core::dates::{Date, DayCount};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    DealType, Pool, PoolAsset, Seniority, StructuredCredit, Tranche, TrancheCoupon,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
     TrancheStructure,
 };
 use time::Month;
@@ -14,7 +14,7 @@ fn benchmark_pool_flows(c: &mut Criterion) {
     let as_of = Date::from_calendar_date(2023, Month::January, 1).unwrap();
 
     // Create a large pool with 10,000 assets
-    let mut pool = Pool::new("LARGE_POOL", DealType::RMBS, Currency::USD);
+    let mut pool = AssetPool::new("LARGE_POOL", DealType::RMBS, Currency::USD);
     for i in 0..10_000 {
         pool.assets.push(PoolAsset::floating_rate_loan(
             format!("LOAN_{}", i),
@@ -30,7 +30,7 @@ fn benchmark_pool_flows(c: &mut Criterion) {
         "A1",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(1_000_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity,

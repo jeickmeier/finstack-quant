@@ -147,18 +147,10 @@ impl CcpMethodology {
     }
 }
 
-/// Legacy alias for the unified [`super::ExternalImSource`] trait.
-///
-/// Kept so downstream callers that imported `CcpMarginInputSource`
-/// continue to compile. The methodology argument previously threaded
-/// through the trait is redundant (the implementer already knows which
-/// CCP it represents) and has been dropped.
-pub use super::ExternalImSource as CcpMarginInputSource;
-
 /// Clearing house IM calculator.
 ///
 /// Provides CCP-specific initial-margin approximations for cleared derivatives.
-/// When a [`CcpMarginInputSource`] is attached, the calculator uses the
+/// When an [`ExternalImSource`](super::ExternalImSource) is attached, the calculator uses the
 /// externally supplied IM amount and optional MPOR override. Otherwise it
 /// requires [`Marginable::im_exposure_base`] and scales that explicit CCP
 /// exposure base by a conservative rate. It refuses to use current MtM as a

@@ -3,10 +3,7 @@
 //! Pure layout split from `performance.rs`; no behavior changes.
 
 use super::Performance;
-use crate::risk_metrics::{
-    rolling_sharpe, rolling_sortino, rolling_volatility, DatedSeries, RollingSharpe,
-    RollingSortino, RollingVolatility,
-};
+use crate::risk_metrics::{rolling_sharpe, rolling_sortino, rolling_volatility, DatedSeries};
 
 /// Smallest growth factor allowed before taking the log.
 ///
@@ -131,7 +128,7 @@ impl Performance {
         &self,
         ticker_idx: usize,
         window: usize,
-    ) -> crate::Result<RollingVolatility> {
+    ) -> crate::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Ok(rolling_volatility(
             self.active_returns(ticker_idx),
@@ -160,7 +157,7 @@ impl Performance {
         ticker_idx: usize,
         window: usize,
         mar: f64,
-    ) -> crate::Result<RollingSortino> {
+    ) -> crate::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Ok(rolling_sortino(
             self.active_returns(ticker_idx),
@@ -181,7 +178,7 @@ impl Performance {
     ///
     /// # Returns
     ///
-    /// A [`RollingSharpe`] with parallel date and Sharpe value vectors.
+    /// A [`DatedSeries`] with parallel date and Sharpe value vectors.
     ///
     /// # Errors
     ///
@@ -192,7 +189,7 @@ impl Performance {
         ticker_idx: usize,
         window: usize,
         risk_free_rate: f64,
-    ) -> crate::Result<RollingSharpe> {
+    ) -> crate::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         Ok(rolling_sharpe(
             self.active_returns(ticker_idx),

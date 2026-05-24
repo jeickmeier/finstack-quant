@@ -25,7 +25,7 @@ fn test_theta_finite_difference_validation() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -76,7 +76,7 @@ fn test_theta_reasonable_magnitude() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -117,7 +117,7 @@ fn test_theta_zero_for_matured_swap() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();

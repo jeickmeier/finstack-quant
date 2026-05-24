@@ -557,8 +557,8 @@ impl CDSPricer {
     ///
     /// Layered components (raw `f64`):
     ///
-    /// 1. **Leg PV with sign:** Protection PV − Premium PV (for `PayFixed`),
-    ///    Premium PV − Protection PV (for `ReceiveFixed`).
+    /// 1. **Leg PV with sign:** Protection PV − Premium PV (for `Pay`),
+    ///    Premium PV − Protection PV (for `Receive`).
     /// 2. **Dated upfront** (`cds.upfront: Option<(Date, Money)>`): a specific
     ///    payment on a specific date, discounted from `as_of`. Positive
     ///    amount = paid by Buyer (reduces Buyer NPV).
@@ -599,10 +599,8 @@ impl CDSPricer {
             .unwrap_or(0.0);
 
         let mut npv_amount = match cds.side {
-            PayReceive::PayFixed => protection_pv - premium_pv - upfront_pv - upfront_adjustment,
-            PayReceive::ReceiveFixed => {
-                premium_pv - protection_pv + upfront_pv + upfront_adjustment
-            }
+            PayReceive::Pay => protection_pv - premium_pv - upfront_pv - upfront_adjustment,
+            PayReceive::Receive => premium_pv - protection_pv + upfront_pv + upfront_adjustment,
         };
 
         if cds.uses_clean_price() {
@@ -613,8 +611,8 @@ impl CDSPricer {
             })? / BASIS_POINTS_PER_UNIT;
             let accrued = cds.notional.amount() * spread * accrual_fraction;
             npv_amount = match cds.side {
-                PayReceive::PayFixed => npv_amount + accrued,
-                PayReceive::ReceiveFixed => npv_amount - accrued,
+                PayReceive::Pay => npv_amount + accrued,
+                PayReceive::Receive => npv_amount - accrued,
             };
         }
 

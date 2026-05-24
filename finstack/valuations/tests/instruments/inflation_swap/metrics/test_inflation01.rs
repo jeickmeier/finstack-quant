@@ -27,7 +27,7 @@ fn test_inflation01_finite_difference_validation() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -68,7 +68,7 @@ fn test_inflation01_finite_difference_validation() {
 
 #[test]
 fn test_inflation01_sign_pay_fixed() {
-    // PayFixed: receive inflation, pay fixed
+    // Pay: receive inflation, pay fixed
     // Higher inflation => more positive PV => positive inflation01
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
@@ -84,7 +84,7 @@ fn test_inflation01_sign_pay_fixed() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -100,17 +100,17 @@ fn test_inflation01_sign_pay_fixed() {
 
     let infl01 = *result.measures.get("inflation01").unwrap();
 
-    // PayFixed should benefit from higher inflation
+    // Pay should benefit from higher inflation
     assert!(
         infl01 > 0.0,
-        "PayFixed inflation01 should be positive: {}",
+        "Pay inflation01 should be positive: {}",
         infl01
     );
 }
 
 #[test]
 fn test_inflation01_sign_receive_fixed() {
-    // ReceiveFixed: pay inflation, receive fixed
+    // Receive: pay inflation, receive fixed
     // Higher inflation => more negative PV => negative inflation01
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
@@ -126,7 +126,7 @@ fn test_inflation01_sign_receive_fixed() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -142,10 +142,10 @@ fn test_inflation01_sign_receive_fixed() {
 
     let infl01 = *result.measures.get("inflation01").unwrap();
 
-    // ReceiveFixed should lose from higher inflation
+    // Receive should lose from higher inflation
     assert!(
         infl01 < 0.0,
-        "ReceiveFixed inflation01 should be negative: {}",
+        "Receive inflation01 should be negative: {}",
         infl01
     );
 }
@@ -167,7 +167,7 @@ fn test_inflation01_scales_with_maturity() {
             .inflation_index_id("US-CPI-U".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .attributes(Default::default())
             .build()
             .unwrap();
@@ -210,7 +210,7 @@ fn test_inflation01_scales_with_notional() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -224,7 +224,7 @@ fn test_inflation01_scales_with_notional() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();

@@ -25,16 +25,13 @@ import pytest
 from finstack.analytics import (
     AnalyticsError,
     BetaResult,
+    DatedSeries,
     GreeksResult,
     LookbackReturns,
     MultiFactorResult,
     Performance,
     PeriodStats,
     RollingGreeks,
-    RollingReturns,
-    RollingSharpe,
-    RollingSortino,
-    RollingVolatility,
 )
 
 # ---------------------------------------------------------------------------
@@ -214,7 +211,7 @@ class TestPeriodicReturns:
 
     def test_rolling_returns_matches_dated_series_shape(self, perf_prices: Performance) -> None:
         rr = perf_prices.rolling_returns(0, 5)
-        assert isinstance(rr, RollingReturns)
+        assert isinstance(rr, DatedSeries)
         assert len(rr.values) == len(rr.dates())
         assert len(rr.values) > 0
 
@@ -245,9 +242,9 @@ class TestBenchmark:
         rs = perf_prices.rolling_sharpe(0, window=10)
         rso = perf_prices.rolling_sortino(0, window=10)
         rv = perf_prices.rolling_volatility(0, window=10)
-        assert isinstance(rs, RollingSharpe)
-        assert isinstance(rso, RollingSortino)
-        assert isinstance(rv, RollingVolatility)
+        assert isinstance(rs, DatedSeries)
+        assert isinstance(rso, DatedSeries)
+        assert isinstance(rv, DatedSeries)
         assert len(rs.values) == len(rs.dates())
 
     def test_information_and_tracking(self, perf_prices: Performance) -> None:

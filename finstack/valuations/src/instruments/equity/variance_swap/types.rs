@@ -76,7 +76,7 @@ pub struct VarianceSwap {
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Underlying identifier (equity/index)
-    pub underlying_ticker: crate::instruments::equity::spot::Ticker,
+    pub underlying_ticker: String,
     /// Variance notional (in variance units)
     pub notional: Money,
     /// Strike variance (annualized)

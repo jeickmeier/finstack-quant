@@ -25,7 +25,7 @@ fn test_complete_pricing_workflow() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -94,7 +94,7 @@ fn test_pricing_over_time() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -127,9 +127,9 @@ fn test_portfolio_of_swaps() {
     let mut swaps = Vec::new();
 
     for (years, side) in &[
-        (2, PayReceive::PayFixed),
-        (5, PayReceive::ReceiveFixed),
-        (10, PayReceive::PayFixed),
+        (2, PayReceive::Pay),
+        (5, PayReceive::Receive),
+        (10, PayReceive::Pay),
     ] {
         let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
         let swap = InflationSwapBuilder::new()
@@ -185,7 +185,7 @@ fn test_stress_scenarios() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -231,7 +231,7 @@ fn test_side_symmetry() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -245,7 +245,7 @@ fn test_side_symmetry() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -279,7 +279,7 @@ fn test_realistic_market_workflow() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -305,7 +305,7 @@ fn test_realistic_market_workflow() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -347,5 +347,5 @@ fn test_realistic_market_workflow() {
         theta < large_notional().amount() * 0.01,
         "Theta should be reasonable"
     );
-    assert!(infl01 > 0.0, "Inflation01 should be positive for PayFixed");
+    assert!(infl01 > 0.0, "Inflation01 should be positive for Pay");
 }

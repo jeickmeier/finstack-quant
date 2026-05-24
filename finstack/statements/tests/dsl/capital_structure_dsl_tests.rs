@@ -493,7 +493,7 @@ fn test_build_any_instrument_from_spec_swap_variant() {
         0.045,
         start,
         maturity,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .unwrap();
 

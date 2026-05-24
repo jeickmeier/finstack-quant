@@ -27,8 +27,8 @@ pub use legs::{
     ParRateMethod, PayReceive, PremiumLegSpec, ProtectionLegSpec, TotalReturnLegSpec,
 };
 pub use market::{
-    CreditParams, EquityOptionParams, ExerciseStyle, FxOptionParams, InterestRateOptionParams,
-    OptionType, Position, SettlementType,
+    CapFloorParams, CreditParams, EquityOptionParams, ExerciseStyle, FxOptionParams, OptionType,
+    Position, SettlementType,
 };
 pub use option_market::OptionMarketParams;
 pub use quanto::QuantoSpec;

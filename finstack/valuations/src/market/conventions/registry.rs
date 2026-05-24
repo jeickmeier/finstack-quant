@@ -6,10 +6,11 @@ use super::defs::{
     XccyConventions,
 };
 use super::ids::{
-    BondConventionId, CdsConventionKey, FxConventionId, FxOptionConventionId, IndexId,
+    BondConventionId, CdsConventionKey, FxConventionId, FxOptionConventionId,
     InflationSwapConventionId, IrFutureContractId, OptionConventionId, SwaptionConventionId,
     XccyConventionId,
 };
+use finstack_core::types::IndexId;
 use finstack_core::HashMap;
 use finstack_core::{Error, Result};
 use std::sync::OnceLock;
@@ -29,7 +30,7 @@ use std::sync::OnceLock;
 ///
 /// ```rust
 /// use finstack_valuations::market::conventions::ConventionRegistry;
-/// use finstack_valuations::market::conventions::ids::IndexId;
+/// use finstack_core::types::IndexId;
 ///
 /// let registry = ConventionRegistry::try_global()?;
 /// let conv = registry.require_rate_index(&IndexId::new("USD-SOFR-OIS"))?;
@@ -131,7 +132,7 @@ impl ConventionRegistry {
     ///
     /// ```rust
     /// use finstack_valuations::market::conventions::ConventionRegistry;
-    /// use finstack_valuations::market::conventions::ids::IndexId;
+    /// use finstack_core::types::IndexId;
     ///
     /// let registry = ConventionRegistry::try_global()?;
     /// let conv = registry.require_rate_index(&IndexId::new("USD-SOFR-OIS"))?;

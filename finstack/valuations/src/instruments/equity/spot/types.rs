@@ -15,9 +15,6 @@ use finstack_core::market_data::scalars::MarketScalar;
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, InstrumentId};
 
-/// Type alias for ticker symbols
-pub type Ticker = String;
-
 /// Simple equity (spot) instrument.
 ///
 /// Represents a spot equity position that can be priced using market data.
@@ -40,7 +37,7 @@ pub struct Equity {
     /// Unique identifier for the equity
     pub id: InstrumentId,
     /// Ticker symbol (e.g., "AAPL", "MSFT")
-    pub ticker: Ticker,
+    pub ticker: String,
     /// Currency in which the equity is quoted
     pub currency: Currency,
     /// Optional number of shares (defaults to 1 if not specified)
@@ -212,7 +209,7 @@ impl Equity {
                 to: finstack_core::currency::Currency,
                 on: finstack_core::dates::Date,
                 policy: finstack_core::money::fx::FxConversionPolicy,
-            ) -> finstack_core::Result<finstack_core::money::fx::FxRate> {
+            ) -> finstack_core::Result<f64> {
                 let r = self.m.rate(finstack_core::money::fx::FxQuery::with_policy(
                     from, to, on, policy,
                 ))?;

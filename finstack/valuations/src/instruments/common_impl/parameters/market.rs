@@ -409,7 +409,7 @@ impl CreditParams {
 
 /// Interest rate option parameters (caps/floors)
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-pub struct InterestRateOptionParams {
+pub struct CapFloorParams {
     /// Strike rate for the option
     pub strike: f64,
     /// Option expiry date
@@ -425,11 +425,11 @@ pub struct InterestRateOptionParams {
     pub notional: Money,
 }
 
-impl InterestRateOptionParams {
+impl CapFloorParams {
     /// Create new IR option parameters.
     ///
     /// Validation is provided separately by
-    /// [`InterestRateOptionParams::validate`] so this constructor's signature
+    /// [`CapFloorParams::validate`] so this constructor's signature
     /// stays infallible.
     pub fn new(
         strike: f64,
@@ -487,7 +487,7 @@ impl InterestRateOptionParams {
     pub fn validate(&self) -> finstack_core::Result<()> {
         crate::instruments::common_impl::validation::validate_f64_finite(
             self.strike,
-            "InterestRateOptionParams.strike",
+            "CapFloorParams.strike",
         )
     }
 }
@@ -562,7 +562,7 @@ mod tests {
         assert!((corp.recovery_rate - 0.40).abs() < 1e-12);
         assert!((sov.recovery_rate - 0.30).abs() < 1e-12);
 
-        let ir = InterestRateOptionParams::new_rate(
+        let ir = CapFloorParams::new_rate(
             Rate::from_bps(325),
             date!(2027 - 01 - 01),
             OptionType::Put,
@@ -695,28 +695,24 @@ mod tests {
         let expiry = date!(2026 - 06 - 15);
         let notional = Money::new(1_000_000.0, Currency::USD);
         assert!(
-            InterestRateOptionParams::new(-0.005, expiry, OptionType::Put, "3M", notional)
+            CapFloorParams::new(-0.005, expiry, OptionType::Put, "3M", notional)
                 .validate()
                 .is_ok(),
             "negative cap/floor strike must be accepted"
         );
         // A non-finite f64 strike (possible via deserialization) is rejected.
         assert!(
-            InterestRateOptionParams::new(f64::NAN, expiry, OptionType::Put, "3M", notional)
+            CapFloorParams::new(f64::NAN, expiry, OptionType::Put, "3M", notional)
                 .validate()
                 .is_err()
         );
-        assert!(InterestRateOptionParams::new(
-            f64::INFINITY,
-            expiry,
-            OptionType::Put,
-            "3M",
-            notional
-        )
-        .validate()
-        .is_err());
+        assert!(
+            CapFloorParams::new(f64::INFINITY, expiry, OptionType::Put, "3M", notional)
+                .validate()
+                .is_err()
+        );
         // A struct-literal spec that bypassed `new` is still checkable.
-        let bad = InterestRateOptionParams {
+        let bad = CapFloorParams {
             strike: f64::NAN,
             expiry,
             option_type: OptionType::Put,
@@ -735,7 +731,7 @@ mod tests {
         let equity = EquityOptionParams::new(95.0, expiry, OptionType::Put, notional);
         let fx = FxOptionParams::new(1.05, expiry, OptionType::Call, notional);
         let credit = CreditParams::new("Issuer", 0.4, "ISSUER-CDS");
-        let ir = InterestRateOptionParams::new(0.03, expiry, OptionType::Call, "3M", notional);
+        let ir = CapFloorParams::new(0.03, expiry, OptionType::Call, "3M", notional);
 
         assert_eq!(equity.exercise_style, ExerciseStyle::European);
         assert_eq!(equity.settlement, SettlementType::Physical);
@@ -778,7 +774,7 @@ mod tests {
             }
         }
         if let Ok(json) = ir_json {
-            let roundtrip = serde_json::from_str::<InterestRateOptionParams>(&json);
+            let roundtrip = serde_json::from_str::<CapFloorParams>(&json);
             assert!(roundtrip.is_ok());
             if let Ok(back) = roundtrip {
                 assert_eq!(back.tenor, "3M");

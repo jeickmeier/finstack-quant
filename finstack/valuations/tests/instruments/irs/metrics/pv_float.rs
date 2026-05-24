@@ -54,7 +54,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: rust_decimal::Decimal) -> Int
     InterestRateSwap {
         id: "IRS_PV_FLOAT_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: fixed_rate,
@@ -253,8 +253,8 @@ fn test_swap_npv_matches_leg_pvs() {
     let pv_float = *result.measures.get("pv_float").unwrap();
 
     let recomposed = match swap.side {
-        PayReceive::ReceiveFixed => pv_fixed - pv_float,
-        PayReceive::PayFixed => pv_float - pv_fixed,
+        PayReceive::Receive => pv_fixed - pv_float,
+        PayReceive::Pay => pv_float - pv_fixed,
     };
 
     assert!(
@@ -275,10 +275,10 @@ fn test_pv_float_independent_of_side() {
     let market = build_curves(0.05, 0.05, as_of);
 
     let mut swap_receive = create_swap(as_of, end, dec!(0.05));
-    swap_receive.side = PayReceive::ReceiveFixed;
+    swap_receive.side = PayReceive::Receive;
 
     let mut swap_pay = create_swap(as_of, end, dec!(0.05));
-    swap_pay.side = PayReceive::PayFixed;
+    swap_pay.side = PayReceive::Pay;
 
     let pv_float_receive = *swap_receive
         .price_with_metrics(

@@ -117,8 +117,8 @@ impl MetricCalculator for JumpToDefaultCalculator {
 
             // Apply sign based on position
             let signed_jtd = match index.side {
-                PayReceive::PayFixed => avg_jtd,
-                PayReceive::ReceiveFixed => -avg_jtd,
+                PayReceive::Pay => avg_jtd,
+                PayReceive::Receive => -avg_jtd,
             };
 
             Ok(signed_jtd)
@@ -136,8 +136,8 @@ impl MetricCalculator for JumpToDefaultCalculator {
 
             // Apply sign based on position
             let signed_jtd = match index.side {
-                PayReceive::PayFixed => single_name_jtd,
-                PayReceive::ReceiveFixed => -single_name_jtd,
+                PayReceive::Pay => single_name_jtd,
+                PayReceive::Receive => -single_name_jtd,
             };
 
             Ok(signed_jtd)

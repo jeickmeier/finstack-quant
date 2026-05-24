@@ -58,8 +58,7 @@ pub mod reports;
 pub use backtesting::{backtest_forecast, ForecastMetrics};
 pub use credit::{
     compute_credit_context, forecast_breaches, forecast_covenant, forecast_covenants, to_table,
-    AdjustedNetDebtSpec, AdjustedNetDebtSpecBuilder, CovenantForecast, CreditContextMetrics,
-    StatementsAdapter,
+    AdjustedNetDebtSpec, AdjustedNetDebtSpecBuilder, CreditContextMetrics, StatementsAdapter,
 };
 pub use goal_seek::goal_seek;
 pub use introspection::{

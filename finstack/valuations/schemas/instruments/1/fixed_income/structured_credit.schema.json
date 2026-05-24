@@ -223,7 +223,7 @@
                 },
                 "collection_account": {
                   "$ref": "#/$defs/Money",
-                  "description": "Pool-level accounts\nCollection account balance (collected but not yet distributed)"
+                  "description": "AssetPool-level accounts\nCollection account balance (collected but not yet distributed)"
                 },
                 "cumulative_defaults": {
                   "$ref": "#/$defs/Money",
@@ -259,7 +259,7 @@
                 },
                 "id": {
                   "$ref": "#/$defs/Id",
-                  "description": "Pool identifier"
+                  "description": "AssetPool identifier"
                 },
                 "reinvestment_period": {
                   "anyOf": [
@@ -3215,7 +3215,7 @@
                 },
                 "side": {
                   "$ref": "#/$defs/PayReceive",
-                  "description": "Direction of the swap (PayFixed or ReceiveFixed)."
+                  "description": "Direction of the swap (Pay or Receive)."
                 }
               },
               "required": [
@@ -3817,7 +3817,7 @@
               "type": "object"
             },
             "PoolGranularity": {
-              "description": "Pool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
+              "description": "AssetPool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
               "oneOf": [
                 {
                   "const": "PerName",
@@ -4696,7 +4696,7 @@
                       "type": "string"
                     },
                     "pool_coupon": {
-                      "description": "Pool weighted average coupon",
+                      "description": "AssetPool weighted average coupon",
                       "format": "double",
                       "type": "number"
                     },

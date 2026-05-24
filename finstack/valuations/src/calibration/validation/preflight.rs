@@ -553,7 +553,7 @@ mod tests {
         DiscountCurveParams, StepParams, StudentTParams, SviSurfaceParams,
     };
     use crate::calibration::config::CalibrationMethod;
-    use crate::market::conventions::ids::{CdsConventionKey, CdsDocClause, IndexId};
+    use crate::market::conventions::ids::{CdsConventionKey, CdsDocClause};
     use crate::market::quotes::cds_tranche::CDSTrancheQuote;
     use crate::market::quotes::ids::{Pillar, QuoteId};
     use finstack_core::currency::Currency;
@@ -563,6 +563,7 @@ mod tests {
     };
     use finstack_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     use finstack_core::types::CurveId;
+    use finstack_core::types::IndexId;
     use std::sync::Arc;
     use time::Month;
 

@@ -82,7 +82,7 @@ fn test_irs_par_rate_self_consistent() {
     let market = test_market(as_of, market_rate);
 
     // Price with a fixed rate equal to the flat market rate
-    let swap = create_5y_swap(as_of, market_rate, PayReceive::PayFixed)
+    let swap = create_5y_swap(as_of, market_rate, PayReceive::Pay)
         .expect("swap construction should succeed");
 
     let pv = swap.value(&market, as_of).expect("pricing should succeed");
@@ -112,7 +112,7 @@ fn test_irs_dv01_magnitude() {
     let market_rate = 0.04;
     let market = test_market(as_of, market_rate);
 
-    let swap = create_5y_swap(as_of, market_rate, PayReceive::PayFixed)
+    let swap = create_5y_swap(as_of, market_rate, PayReceive::Pay)
         .expect("swap construction should succeed");
 
     let metrics = vec![MetricId::Dv01];
@@ -146,7 +146,7 @@ fn test_irs_par_rate_flat_curve() {
     let market_rate = 0.04;
     let market = test_market(as_of, market_rate);
 
-    let swap = create_5y_swap(as_of, market_rate, PayReceive::PayFixed)
+    let swap = create_5y_swap(as_of, market_rate, PayReceive::Pay)
         .expect("swap construction should succeed");
 
     let metrics = vec![MetricId::ParRate];
@@ -178,9 +178,9 @@ fn test_irs_pay_receive_symmetry() {
     let market = test_market(as_of, market_rate);
 
     let pay_fixed =
-        create_5y_swap(as_of, 0.035, PayReceive::PayFixed).expect("pay-fixed swap should build");
-    let recv_fixed = create_5y_swap(as_of, 0.035, PayReceive::ReceiveFixed)
-        .expect("recv-fixed swap should build");
+        create_5y_swap(as_of, 0.035, PayReceive::Pay).expect("pay-fixed swap should build");
+    let recv_fixed =
+        create_5y_swap(as_of, 0.035, PayReceive::Receive).expect("recv-fixed swap should build");
 
     let pv_pay = pay_fixed.value(&market, as_of).expect("pricing").amount();
     let pv_recv = recv_fixed.value(&market, as_of).expect("pricing").amount();

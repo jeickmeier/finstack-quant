@@ -234,7 +234,7 @@ fn yoy_inflation_swap_exposes_cashflow_provider_bridge() {
         .inflation_index_id("US-CPI".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(finstack_core::dates::DayCount::Act365F)
-        .side(finstack_valuations::instruments::PayReceive::PayFixed)
+        .side(finstack_valuations::instruments::PayReceive::Pay)
         .attributes(Default::default())
         .build()
         .expect("yoy fixture");

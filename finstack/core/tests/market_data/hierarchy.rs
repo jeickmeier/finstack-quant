@@ -1,6 +1,5 @@
 use finstack_core::market_data::hierarchy::{
-    HierarchyNode, HierarchyTarget, MarketDataHierarchy, NodePath, ResolutionMode, TagFilter,
-    TagPredicate,
+    HierarchyNode, HierarchyTarget, MarketDataHierarchy, ResolutionMode, TagFilter, TagPredicate,
 };
 use finstack_core::types::CurveId;
 
@@ -21,7 +20,7 @@ fn hierarchy_node_stores_name_and_curves() {
 
 #[test]
 fn node_path_is_vec_of_strings() {
-    let path: NodePath = vec!["Rates".into(), "USD".into()];
+    let path: Vec<String> = vec!["Rates".into(), "USD".into()];
     assert_eq!(path.len(), 2);
     assert_eq!(path[0], "Rates");
 }
@@ -46,13 +45,13 @@ fn builder_creates_hierarchy_with_slash_paths() {
     assert!(h.roots().contains_key("Credit"));
 
     // Check deep path
-    let path: NodePath = vec!["Rates".into(), "USD".into(), "OIS".into()];
+    let path: Vec<String> = vec!["Rates".into(), "USD".into(), "OIS".into()];
     let node = h.get_node(&path).unwrap();
     assert_eq!(node.curve_ids().len(), 1);
     assert_eq!(node.curve_ids()[0], CurveId::from("USD-OIS"));
 
     // Check tags
-    let credit_path: NodePath = vec![
+    let credit_path: Vec<String> = vec![
         "Credit".into(),
         "US".into(),
         "IG".into(),
@@ -150,7 +149,7 @@ fn serde_round_trip() {
     assert_eq!(deserialized.roots().len(), h.roots().len());
     assert_eq!(deserialized.all_curve_ids().len(), h.all_curve_ids().len());
 
-    let path: NodePath = vec![
+    let path: Vec<String> = vec![
         "Credit".into(),
         "US".into(),
         "IG".into(),
@@ -170,7 +169,7 @@ fn insert_and_remove_curve() {
         .unwrap();
 
     h.insert_curve("Rates/USD", "USD-SOFR-3M").unwrap();
-    let path: NodePath = vec!["Rates".into(), "USD".into()];
+    let path: Vec<String> = vec!["Rates".into(), "USD".into()];
     assert_eq!(h.get_node(&path).unwrap().curve_ids().len(), 2);
 
     assert!(h.remove_curve(&CurveId::from("USD-OIS")));

@@ -8,10 +8,11 @@ use finstack_core::dates::Date;
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::RepLine;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    CorrelationStructure, CoverageTrigger, DealType, DefaultAssumptions, DefaultModelSpec,
-    Overrides, Pool, PoolAsset, PrepaymentModelSpec, RecoveryModelSpec, ReinvestmentCriteria,
-    ReinvestmentPeriod, Seniority, StochasticDefaultSpec, StochasticPrepaySpec, StructuredCredit,
-    Tranche, TrancheCoupon, TrancheStructure, TriggerConsequence,
+    AssetPool, CorrelationStructure, CoverageTrigger, DealType, DefaultAssumptions,
+    DefaultModelSpec, Overrides, PoolAsset, PrepaymentModelSpec, RecoveryModelSpec,
+    ReinvestmentCriteria, ReinvestmentPeriod, StochasticDefaultSpec, StochasticPrepaySpec,
+    StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    TriggerConsequence,
 };
 use finstack_valuations::instruments::json_loader::InstrumentJson;
 use finstack_valuations::instruments::Attributes;
@@ -90,13 +91,13 @@ fn test_recovery_spec_all_variants_serialize() {
 #[test]
 fn test_clo_json_roundtrip() {
     // Arrange
-    let pool = Pool::new("TEST_POOL", DealType::CLO, Currency::USD);
+    let pool = AssetPool::new("TEST_POOL", DealType::CLO, Currency::USD);
 
     let tranche = Tranche::new(
         "AAA",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(10_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -134,13 +135,13 @@ fn test_clo_json_roundtrip() {
 #[test]
 fn test_rmbs_with_overrides_serialization() {
     // Arrange
-    let pool = Pool::new("TEST_POOL", DealType::RMBS, Currency::USD);
+    let pool = AssetPool::new("TEST_POOL", DealType::RMBS, Currency::USD);
 
     let tranche = Tranche::new(
         "AAA",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(10_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),
@@ -233,7 +234,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     let reinvestment_end = Date::from_calendar_date(2026, Month::January, 1).unwrap();
     let legal = Date::from_calendar_date(2034, Month::January, 1).unwrap();
 
-    let mut pool = Pool::new("POOL-FULL", DealType::CLO, Currency::USD);
+    let mut pool = AssetPool::new("POOL-FULL", DealType::CLO, Currency::USD);
 
     let mut loan = PoolAsset::floating_rate_loan(
         "LOAN1",
@@ -298,7 +299,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         "EQUITY",
         0.0,
         10.0,
-        Seniority::Equity,
+        TrancheSeniority::Equity,
         Money::new(5_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.12 },
         legal,
@@ -345,7 +346,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         "SENIOR",
         10.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(45_000_000.0, Currency::USD),
         TrancheCoupon::Floating(floating_coupon),
         legal,
@@ -441,7 +442,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         0.015,
         closing,
         Date::from_calendar_date(2028, Month::January, 1).unwrap(),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .expect("valid swap");
     deal.hedge_swaps.push(swap);
@@ -462,7 +463,7 @@ fn test_structured_credit_full_feature_json_roundtrip() {
     assert_eq!(original.first_payment_date, parsed.first_payment_date);
     assert_eq!(original.reinvestment_end_date, parsed.reinvestment_end_date);
 
-    // Pool with overrides, reinvestment, rep lines, and accounts
+    // AssetPool with overrides, reinvestment, rep lines, and accounts
     assert_eq!(original.pool.assets.len(), parsed.pool.assets.len());
     assert_eq!(
         original.pool.assets[0].smm_override,

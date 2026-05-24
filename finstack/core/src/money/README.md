@@ -18,7 +18,7 @@ The module enforces currency safety, keeps internal arithmetic in
 - **`types.rs`**: `Money` construction, checked arithmetic, formatting, `money!` macro
 - **`rounding.rs`**: internal rounding helpers (`AmountRepr = rust_decimal::Decimal`)
 - **`fx/`**: FX traits and matrix
-  - `provider.rs` — `FxProvider`, `FxRate`
+  - `provider.rs` — `FxProvider`
   - `matrix.rs` — `FxMatrix` with LRU cache and triangulation
   - `types.rs` — `FxConfig`, `FxQuery`, `FxConversionPolicy`, `FxRateResult`, `FxPolicyMeta`
   - `providers.rs` — `SimpleFxProvider`, `BumpedFxProvider`

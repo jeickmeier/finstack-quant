@@ -34,7 +34,7 @@ fn test_par_rate_gives_zero_pv() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -55,7 +55,7 @@ fn test_par_rate_gives_zero_pv() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -84,7 +84,7 @@ fn test_fixed_leg_pv_scales_with_notional() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -98,7 +98,7 @@ fn test_fixed_leg_pv_scales_with_notional() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -130,7 +130,7 @@ fn test_inflation_leg_pv_scales_with_notional() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -144,7 +144,7 @@ fn test_inflation_leg_pv_scales_with_notional() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -162,7 +162,7 @@ fn test_inflation_leg_pv_scales_with_notional() {
 
 #[test]
 fn test_pv_sign_convention_pay_fixed() {
-    // PayFixed: receive inflation leg, pay fixed leg
+    // Pay: receive inflation leg, pay fixed leg
     // If inflation > fixed: PV should be positive
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
@@ -178,21 +178,18 @@ fn test_pv_sign_convention_pay_fixed() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
 
     let pv = swap.value(&ctx, as_of).unwrap().amount();
-    assert!(
-        pv > 0.0,
-        "PayFixed with low fixed rate should have positive PV"
-    );
+    assert!(pv > 0.0, "Pay with low fixed rate should have positive PV");
 }
 
 #[test]
 fn test_pv_sign_convention_receive_fixed() {
-    // ReceiveFixed: pay inflation leg, receive fixed leg
+    // Receive: pay inflation leg, receive fixed leg
     // If fixed > inflation: PV should be positive
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
@@ -208,7 +205,7 @@ fn test_pv_sign_convention_receive_fixed() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -216,7 +213,7 @@ fn test_pv_sign_convention_receive_fixed() {
     let pv = swap.value(&ctx, as_of).unwrap().amount();
     assert!(
         pv > 0.0,
-        "ReceiveFixed with high fixed rate should have positive PV"
+        "Receive with high fixed rate should have positive PV"
     );
 }
 
@@ -237,7 +234,7 @@ fn test_par_rate_increases_with_inflation_expectations() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -270,7 +267,7 @@ fn test_fixed_leg_increases_with_maturity() {
             .inflation_index_id("US-CPI-U".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .attributes(Attributes::new())
             .build()
             .unwrap();
@@ -305,7 +302,7 @@ fn test_inflation_leg_increases_with_maturity() {
             .inflation_index_id("US-CPI-U".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .attributes(Attributes::new())
             .build()
             .unwrap();
@@ -340,7 +337,7 @@ fn test_par_rate_formula_consistency() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -372,7 +369,7 @@ fn test_npv_equals_leg_difference() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -381,7 +378,7 @@ fn test_npv_equals_leg_difference() {
     let pv_fixed = swap.pv_fixed_leg(&ctx, as_of).unwrap().amount();
     let pv_infl = swap.pv_inflation_leg(&ctx, as_of).unwrap().amount();
 
-    // PayFixed: NPV = PV(infl) - PV(fixed)
+    // Pay: NPV = PV(infl) - PV(fixed)
     let expected_npv = pv_infl - pv_fixed;
     assert!(
         (npv - expected_npv).abs() < 1e-6,
@@ -407,7 +404,7 @@ fn test_realistic_market_pricing() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -437,7 +434,7 @@ fn test_day_count_impact_on_fixed_leg() {
             .inflation_index_id("US-CPI-U".into())
             .discount_curve_id("USD-OIS".into())
             .day_count(*dc)
-            .side(PayReceive::PayFixed)
+            .side(PayReceive::Pay)
             .attributes(Attributes::new())
             .build()
             .unwrap();
@@ -471,7 +468,7 @@ fn test_zero_fixed_rate() {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .unwrap();

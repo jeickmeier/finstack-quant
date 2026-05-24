@@ -36,7 +36,7 @@ fn test_buy_protection_constructor() {
     assert_eq!(cds.id.as_str(), "CDS_BUY_TEST");
     assert_eq!(cds.notional.amount(), 10_000_000.0);
     assert_eq!(cds.notional.currency(), Currency::USD);
-    assert_eq!(cds.side, PayReceive::PayFixed);
+    assert_eq!(cds.side, PayReceive::Pay);
     assert_eq!(cds.premium.spread_bp, Decimal::from(100));
     assert_eq!(cds.convention, CDSConvention::IsdaNa);
 }
@@ -58,7 +58,7 @@ fn test_sell_protection_constructor() {
     )
     .expect("CDS construction should succeed");
 
-    assert_eq!(cds.side, PayReceive::ReceiveFixed);
+    assert_eq!(cds.side, PayReceive::Receive);
     assert_eq!(cds.premium.spread_bp, Decimal::from(150));
     assert_eq!(cds.notional.currency(), Currency::EUR);
 }
@@ -112,7 +112,7 @@ fn test_builder_pattern() {
     let cds = CreditDefaultSwap::builder()
         .id("BUILDER_TEST".into())
         .notional(Money::new(1_000_000.0, Currency::USD))
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .convention(convention)
         .premium(PremiumLegSpec {
             start,

@@ -125,7 +125,7 @@ fn build_spot_cds(_as_of: Date) -> CreditDefaultSwap {
     .expect("spot CDS");
     cds.protection.recovery_rate = 0.4;
     cds.valuation_convention = CdsValuationConvention::BloombergCdswClean;
-    let _ = (PayReceive::PayFixed, CDSConvention::IsdaNa, Decimal::ZERO);
+    let _ = (PayReceive::Pay, CDSConvention::IsdaNa, Decimal::ZERO);
     cds
 }
 

@@ -14,7 +14,7 @@ use finstack_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_core::math::interp::InterpStyle;
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    DealType, Pool, PoolAsset, Seniority, StructuredCredit, Tranche, TrancheCoupon,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
     TrancheStructure,
 };
 use time::Month;
@@ -35,8 +35,8 @@ fn test_date() -> Date {
     Date::from_calendar_date(2025, Month::January, 1).unwrap()
 }
 
-fn create_test_pool() -> Pool {
-    let mut pool = Pool::new("TEST_POOL", DealType::CLO, Currency::USD);
+fn create_test_pool() -> AssetPool {
+    let mut pool = AssetPool::new("TEST_POOL", DealType::CLO, Currency::USD);
     pool.assets.push(PoolAsset::floating_rate_loan(
         "LOAN_1",
         Money::new(50_000_000.0, Currency::USD),
@@ -53,7 +53,7 @@ fn create_test_tranches() -> TrancheStructure {
         "SENIOR_A",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(50_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.05 },
         maturity_date(),

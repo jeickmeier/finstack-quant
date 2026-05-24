@@ -6,22 +6,15 @@
 use finstack_core::dates::{Date, PeriodId, PeriodKind};
 use finstack_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use finstack_core::Result;
-use finstack_covenants::GenericCovenantForecast as ValuationCovenantForecast;
 use finstack_covenants::{
-    forecast_breaches_generic, forecast_covenant_generic, CovenantEngine, CovenantForecastConfig,
-    CovenantSpec, FutureBreach, ModelTimeSeries,
+    forecast_breaches_generic, forecast_covenant_generic, CovenantEngine, CovenantForecast,
+    CovenantForecastConfig, CovenantSpec, FutureBreach, ModelTimeSeries,
 };
 use finstack_statements::evaluator::StatementResult;
 use finstack_statements::types::{FinancialModelSpec, ForecastMethod};
 use indexmap::IndexMap;
 use serde_json::json;
 use time::Month;
-
-/// Forecast output envelope for covenant compliance projections.
-///
-/// This is a re-exported type alias from `finstack-covenants` so statements
-/// users can stay within the `finstack-statements::analysis` namespace.
-pub type CovenantForecast = ValuationCovenantForecast;
 
 /// Adapter to use Statements StatementResult as a ModelTimeSeries.
 ///

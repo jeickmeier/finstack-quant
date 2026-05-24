@@ -700,7 +700,7 @@ impl Swaption {
         use crate::instruments::common_impl::pricing::time::relative_df_discounting;
         use finstack_core::math::NeumaierAccumulator;
 
-        let underlier = self.underlying_irs(1.0, PayReceive::ReceiveFixed)?;
+        let underlier = self.underlying_irs(1.0, PayReceive::Receive)?;
         let sched = crate::instruments::rates::irs::cashflow::fixed_leg_schedule(&underlier)?;
         let mut annuity = NeumaierAccumulator::new();
         for flow in sched.flows {
@@ -826,7 +826,7 @@ impl Swaption {
             return Ok(0.0);
         }
 
-        let underlier = self.underlying_irs_for_market(0.0, PayReceive::ReceiveFixed, curves)?;
+        let underlier = self.underlying_irs_for_market(0.0, PayReceive::Receive, curves)?;
         let pv_float = underlier.pv_float_leg(curves, as_of)?;
 
         Ok(pv_float / (self.notional.amount() * annuity))

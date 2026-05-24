@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use crate::currency::Currency;
 use crate::dates::Date;
 
-use super::provider::{reciprocal_rate_or_err, validate_fx_rate, FxProvider, FxRate};
+use super::provider::{reciprocal_rate_or_err, validate_fx_rate, FxProvider};
 use super::types::{FxConfig, FxConversionPolicy, FxMatrixState, FxQuery, FxRateResult};
 
 /// Pair key for the explicit-quote cache.
@@ -40,9 +40,9 @@ struct QueryKey {
 pub struct FxMatrix {
     provider: Arc<dyn FxProvider>,
     /// Explicit quotes inserted by callers or restored from serialized state.
-    quotes: Mutex<LruCache<Pair, FxRate>>,
+    quotes: Mutex<LruCache<Pair, f64>>,
     /// Query-sensitive quotes observed from providers or triangulation.
-    observed_quotes: Mutex<LruCache<QueryKey, FxRate>>,
+    observed_quotes: Mutex<LruCache<QueryKey, f64>>,
     config: FxConfig,
 }
 
@@ -263,7 +263,7 @@ impl FxMatrix {
     /// )).expect("FX rate lookup should succeed");
     /// assert_eq!(res.rate, 1.3);
     /// ```
-    pub fn set_quote(&self, from: Currency, to: Currency, rate: FxRate) -> crate::Result<()> {
+    pub fn set_quote(&self, from: Currency, to: Currency, rate: f64) -> crate::Result<()> {
         let rate = validate_fx_rate(from, to, rate)?;
         self.insert_quote(from, to, rate);
         Ok(())
@@ -273,7 +273,7 @@ impl FxMatrix {
     ///
     /// # Parameters
     /// - `quotes`: slice of `(from, to, rate)` tuples
-    pub fn set_quotes(&self, quotes: &[(Currency, Currency, FxRate)]) -> crate::Result<()> {
+    pub fn set_quotes(&self, quotes: &[(Currency, Currency, f64)]) -> crate::Result<()> {
         let mut map = self.quotes.lock();
         for &(from, to, rate) in quotes {
             validate_fx_rate(from, to, rate)?;
@@ -349,7 +349,7 @@ impl FxMatrix {
     /// ```
     pub fn get_serializable_state(&self) -> FxMatrixState {
         let mut seen = std::collections::HashSet::new();
-        let mut quote_vec: Vec<(Currency, Currency, FxRate)> = Vec::new();
+        let mut quote_vec: Vec<(Currency, Currency, f64)> = Vec::new();
 
         // Explicit LRU quotes take precedence.
         {
@@ -470,7 +470,7 @@ impl FxMatrix {
             )));
         }
 
-        let mut rates: HashMap<(Currency, Currency), FxRate> = HashMap::new();
+        let mut rates: HashMap<(Currency, Currency), f64> = HashMap::new();
         let mut currencies: HashSet<Currency> = HashSet::new();
 
         {
@@ -539,7 +539,7 @@ impl FxMatrix {
         to: Currency,
         on: Date,
         policy: FxConversionPolicy,
-    ) -> crate::Result<FxRate> {
+    ) -> crate::Result<f64> {
         use crate::error::InputError;
 
         let pivot = self.config.pivot_currency;
@@ -579,7 +579,7 @@ impl FxMatrix {
     }
 
     /// Insert an explicit provider quote
-    fn insert_quote(&self, from: Currency, to: Currency, rate: FxRate) {
+    fn insert_quote(&self, from: Currency, to: Currency, rate: f64) {
         // Internal insertion should never persist invalid rates.
         let checked = validate_fx_rate(from, to, rate);
         assert!(
@@ -597,7 +597,7 @@ impl FxMatrix {
         to: Currency,
         on: Date,
         policy: FxConversionPolicy,
-        rate: FxRate,
+        rate: f64,
     ) {
         let checked = validate_fx_rate(from, to, rate);
         assert!(
@@ -623,7 +623,7 @@ impl FxMatrix {
         to: Currency,
         on: Date,
         policy: FxConversionPolicy,
-    ) -> crate::Result<FxRate> {
+    ) -> crate::Result<f64> {
         if from == to {
             return Ok(1.0);
         }
@@ -658,11 +658,7 @@ impl FxMatrix {
 
     /// Read direct and reciprocal cached quotes for a pair under a single lock.
     #[inline]
-    fn read_cached_pair_bidir(
-        &self,
-        from: Currency,
-        to: Currency,
-    ) -> (Option<FxRate>, Option<FxRate>) {
+    fn read_cached_pair_bidir(&self, from: Currency, to: Currency) -> (Option<f64>, Option<f64>) {
         let mut quotes = self.quotes.lock();
         let direct_key = Pair(from, to);
         let rev_key = Pair(to, from);
@@ -695,7 +691,7 @@ impl FxMatrix {
         to: Currency,
         on: Date,
         policy: FxConversionPolicy,
-    ) -> (Option<FxRate>, Option<FxRate>) {
+    ) -> (Option<f64>, Option<f64>) {
         let mut quotes = self.observed_quotes.lock();
         let direct_key = QueryKey {
             from,

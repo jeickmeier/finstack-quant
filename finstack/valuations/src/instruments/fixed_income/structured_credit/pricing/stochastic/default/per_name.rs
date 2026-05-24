@@ -33,7 +33,7 @@ use finstack_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
 use finstack_monte_carlo::rng::philox::PhiloxRng;
 use finstack_monte_carlo::traits::RandomStream;
 
-/// Pool-granularity policy for the structured-credit default engine.
+/// AssetPool-granularity policy for the structured-credit default engine.
 ///
 /// Selects whether each scenario realizes defaults name-by-name (finite-pool
 /// copula simulation) or applies the closed-form LHP conditional default

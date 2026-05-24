@@ -18,7 +18,7 @@
 //!
 //! - `StructuredCredit` for main instrument struct
 //! - `DealType` for ABS/RMBS/CMBS/CLO specification
-//! - `Pool` for collateral pool modeling
+//! - `AssetPool` for collateral pool modeling
 //! - `Tranche` for tranche structure
 //! - waterfall engine for cashflow distribution
 
@@ -30,15 +30,21 @@ pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
 
+/// Waterfall-specific public types.
+pub mod waterfall {
+    pub use super::types::waterfall::CoverageTrigger;
+}
+
 // ============================================================================
 // MAIN TYPES
 // ============================================================================
 
 pub use types::{
-    // Pool types
+    // AssetPool types
     calculate_pool_stats,
     // Waterfall types
     AllocationMode,
+    AssetPool,
     // Enums
     AssetType,
     // Metadata
@@ -65,7 +71,6 @@ pub use types::{
     PaymentMode,
     PaymentRecord,
     PaymentType,
-    Pool,
     PoolAsset,
     PoolStats,
     Recipient,
@@ -76,7 +81,6 @@ pub use types::{
     ReinvestmentPeriod,
     RepLine,
     RoundingConvention,
-    Seniority,
     StochasticDefaultSpec,
     StochasticPrepaySpec,
     // Main instrument
@@ -87,6 +91,7 @@ pub use types::{
     // Result types
     TrancheCashflows,
     TrancheCoupon,
+    TrancheSeniority,
     TrancheStructure,
     TrancheValuation,
     TriggerConsequence,
@@ -163,7 +168,7 @@ pub use metrics::{
     RmbsWalCalculator,
     SpreadDurationCalculator,
     WalCalculator,
-    // Pool metrics
+    // AssetPool metrics
     WamCalculator,
     YtmCalculator,
     ZSpreadCalculator,
@@ -190,8 +195,3 @@ pub use types::constants::{
     standard_severity_rates, AVERAGE_DAYS_PER_YEAR, BASIS_POINTS_DIVISOR, MIN_PREPAYMENT_RATE,
     MONTHS_PER_YEAR, PERCENTAGE_MULTIPLIER, QUARTERLY_PERIODS_PER_YEAR,
 };
-
-// Re-export waterfall coverage trigger with clear name
-/// Waterfall-level coverage trigger (for waterfall diversion).
-/// Use this when building waterfall engines with coverage test diversion.
-pub use types::waterfall::CoverageTrigger as WaterfallCoverageTrigger;

@@ -3,9 +3,6 @@ use crate::dates::Date;
 
 use super::types::FxConversionPolicy;
 
-/// Provider FX rate type alias - always f64.
-pub type FxRate = f64;
-
 /// Helper to compute reciprocal rate safely, checking for zero division.
 ///
 /// Returns `1.0 / rate` if `rate != 0.0`, otherwise returns an error.
@@ -147,7 +144,7 @@ pub trait FxProvider: Send + Sync {
         to: Currency,
         on: Date,
         policy: FxConversionPolicy,
-    ) -> crate::Result<FxRate>;
+    ) -> crate::Result<f64>;
 
     /// Return all stored quotes for serialization.
     ///

@@ -94,7 +94,7 @@ pub struct EquityOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Underlying equity ticker symbol
-    pub underlying_ticker: crate::instruments::equity::spot::Ticker,
+    pub underlying_ticker: String,
     /// Strike price
     pub strike: f64,
     /// Option type (call or put)

@@ -5,10 +5,9 @@
 use finstack_core::dates::{Date, Tenor};
 use finstack_covenants::{
     BoundKind, ConsequenceApplication, Covenant, CovenantBreach, CovenantConsequence,
-    CovenantEngine, CovenantForecastConfig, CovenantMetricId, CovenantReport, CovenantScope,
-    CovenantSpec, CovenantTestSpec, CovenantType, CovenantWindow, FutureBreach,
-    GenericCovenantForecast as CovenantForecast, SpringingCondition, ThresholdSchedule,
-    ThresholdTest,
+    CovenantEngine, CovenantForecast, CovenantForecastConfig, CovenantMetricId, CovenantReport,
+    CovenantScope, CovenantSpec, CovenantTestSpec, CovenantType, CovenantWindow, FutureBreach,
+    SpringingCondition, ThresholdSchedule, ThresholdTest,
 };
 use time::Month;
 

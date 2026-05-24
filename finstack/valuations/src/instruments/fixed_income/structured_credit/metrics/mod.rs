@@ -88,7 +88,7 @@ pub(crate) fn register_structured_credit_metrics(registry: &mut crate::metrics::
             // so "key-rate" here is a time-bucketing of that scalar's effect.)
             (BucketedCs01, risk::BucketedCs01Calculator),
             (SpreadDuration, risk::SpreadDurationCalculator),
-            // Pool metrics
+            // AssetPool metrics
             (WAM, pool::WamCalculator),
             (CPR, pool::CprCalculator),
             (CDR, pool::CdrCalculator),

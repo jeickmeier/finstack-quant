@@ -1068,8 +1068,8 @@ mod tests {
         BranchingSpec, ScenarioTreeConfig,
     };
     use crate::instruments::fixed_income::structured_credit::{
-        DealType, DefaultModelSpec, Pool, PoolAsset, RecoveryModelSpec, Seniority, Tranche,
-        TrancheCoupon, TrancheStructure,
+        AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
+        TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use finstack_core::currency::Currency;
     use finstack_core::dates::Date;
@@ -1094,7 +1094,7 @@ mod tests {
 
     fn test_instrument() -> StructuredCredit {
         let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
-        let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
             Money::new(1_000_000.0, Currency::USD),
@@ -1106,7 +1106,7 @@ mod tests {
             "A",
             0.0,
             100.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(1_000_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
@@ -1349,8 +1349,8 @@ mod per_name_copula_tests {
         BranchingSpec, ScenarioTreeConfig,
     };
     use crate::instruments::fixed_income::structured_credit::{
-        CorrelationStructure, DealType, DefaultModelSpec, Pool, PoolAsset, RecoveryModelSpec,
-        Seniority, Tranche, TrancheCoupon, TrancheStructure,
+        AssetPool, CorrelationStructure, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec,
+        Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use finstack_core::currency::Currency;
     use finstack_core::dates::{Date, DayCount};
@@ -1383,7 +1383,7 @@ mod per_name_copula_tests {
     fn clo_deal(n_assets: usize) -> StructuredCredit {
         let total = 100_000_000.0;
         let per_asset = total / n_assets as f64;
-        let mut pool = Pool::new("CLO-POOL", DealType::CLO, Currency::USD);
+        let mut pool = AssetPool::new("CLO-POOL", DealType::CLO, Currency::USD);
         for i in 0..n_assets {
             pool.assets.push(PoolAsset::fixed_rate_bond(
                 format!("L{i}"),
@@ -1398,7 +1398,7 @@ mod per_name_copula_tests {
                 "SR",
                 0.0,
                 80.0,
-                Seniority::Senior,
+                TrancheSeniority::Senior,
                 Money::new(total * 0.80, Currency::USD),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity(),
@@ -1408,7 +1408,7 @@ mod per_name_copula_tests {
                 "MEZZ",
                 80.0,
                 92.0,
-                Seniority::Mezzanine,
+                TrancheSeniority::Mezzanine,
                 Money::new(total * 0.12, Currency::USD),
                 TrancheCoupon::Fixed { rate: 0.08 },
                 maturity(),
@@ -1418,7 +1418,7 @@ mod per_name_copula_tests {
                 "EQ",
                 92.0,
                 100.0,
-                Seniority::Equity,
+                TrancheSeniority::Equity,
                 Money::new(total * 0.08, Currency::USD),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity(),

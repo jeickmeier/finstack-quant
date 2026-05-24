@@ -26,8 +26,8 @@ impl MetricCalculator for DeltaCalculator {
             .get_discount(swap.discount_curve_id.as_str())?;
         let schedule = swap.payment_schedule(context.as_of)?;
         let sign = match swap.side {
-            PayReceive::PayFixed => 1.0,
-            PayReceive::ReceiveFixed => -1.0,
+            PayReceive::Pay => 1.0,
+            PayReceive::Receive => -1.0,
         };
 
         let mut delta = 0.0;

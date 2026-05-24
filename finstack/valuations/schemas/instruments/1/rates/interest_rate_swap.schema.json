@@ -1833,7 +1833,7 @@
               ]
             },
             "PoolGranularity": {
-              "description": "Pool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
+              "description": "AssetPool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
               "oneOf": [
                 {
                   "const": "PerName",
@@ -2592,7 +2592,7 @@
             },
             "side": {
               "$ref": "#/$defs/PayReceive",
-              "description": "Direction of the swap (PayFixed or ReceiveFixed)."
+              "description": "Direction of the swap (Pay or Receive)."
             }
           },
           "required": [

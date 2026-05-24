@@ -11,7 +11,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::de
     PerNameCopulaDefault, PoolGranularity,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
-    Pool, PoolState, RecipientType, StructuredCredit, TrancheCashflows, TrancheSeniority,
+    AssetPool, PoolState, RecipientType, StructuredCredit, TrancheCashflows, TrancheSeniority,
     TrancheStructure, Waterfall, WaterfallDistribution,
 };
 use crate::instruments::fixed_income::structured_credit::utils::simulation::RecoveryQueue;
@@ -643,8 +643,8 @@ pub(crate) fn take_tranche_cashflows(
 mod tests {
     use super::*;
     use crate::instruments::fixed_income::structured_credit::{
-        DealType, DefaultModelSpec, Pool, PoolAsset, PrepaymentModelSpec, RecoveryModelSpec,
-        Seniority, Tranche, TrancheCoupon, TrancheStructure,
+        AssetPool, DealType, DefaultModelSpec, PoolAsset, PrepaymentModelSpec, RecoveryModelSpec,
+        Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use finstack_core::currency::Currency;
     use time::Month;
@@ -706,7 +706,7 @@ mod tests {
     /// cleanup-call redemption mid-period.
     fn cleanup_call_deal() -> StructuredCredit {
         let maturity = Date::from_calendar_date(2029, Month::January, 1).expect("valid date");
-        let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
             Money::new(10_000_000.0, Currency::USD),
@@ -718,7 +718,7 @@ mod tests {
             "A",
             0.0,
             100.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(10_000_000.0, Currency::USD),
             // Non-zero coupon so the stub-period accrued interest is non-zero.
             TrancheCoupon::Fixed { rate: 0.05 },
@@ -862,7 +862,7 @@ mod tests {
         // Build a CLO whose pool prepays fast (high CPR). During the 6y
         // reinvestment period, that prepaid principal must be recycled.
         let build_deal = |with_reinvestment: bool| {
-            let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+            let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
             pool.assets.push(PoolAsset::fixed_rate_bond(
                 "L1",
                 Money::new(100_000_000.0, Currency::USD),
@@ -881,7 +881,7 @@ mod tests {
                 "A",
                 0.0,
                 100.0,
-                Seniority::Senior,
+                TrancheSeniority::Senior,
                 Money::new(100_000_000.0, Currency::USD),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity,
@@ -968,7 +968,7 @@ mod tests {
     fn loss_allocation_caps_writedown_by_face_net_of_principal_repaid() {
         let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
 
-        let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+        let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
         // High CPR pays the structure down fast; concurrent high CDR writes
         // losses against the (already-amortizing) subordinated tranche.
         pool.assets.push(PoolAsset::fixed_rate_bond(
@@ -985,7 +985,7 @@ mod tests {
                 "A",
                 0.0,
                 70.0,
-                Seniority::Senior,
+                TrancheSeniority::Senior,
                 Money::new(70_000_000.0, Currency::USD),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity,
@@ -995,7 +995,7 @@ mod tests {
                 "B",
                 70.0,
                 92.0,
-                Seniority::Subordinated,
+                TrancheSeniority::Subordinated,
                 Money::new(22_000_000.0, Currency::USD),
                 TrancheCoupon::Fixed { rate: 0.07 },
                 maturity,
@@ -1005,7 +1005,7 @@ mod tests {
                 "EQ",
                 92.0,
                 100.0,
-                Seniority::Equity,
+                TrancheSeniority::Equity,
                 Money::new(8_000_000.0, Currency::USD),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity,
@@ -1068,7 +1068,7 @@ mod tests {
     fn per_period_cash_conservation_holds_over_full_simulation() {
         let maturity = Date::from_calendar_date(2031, Month::January, 1).expect("valid date");
 
-        let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+        let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "L1",
             Money::new(80_000_000.0, Currency::USD),
@@ -1088,7 +1088,7 @@ mod tests {
                 "A",
                 0.0,
                 80.0,
-                Seniority::Senior,
+                TrancheSeniority::Senior,
                 Money::new(80_000_000.0, Currency::USD),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity,
@@ -1098,7 +1098,7 @@ mod tests {
                 "B",
                 80.0,
                 100.0,
-                Seniority::Equity,
+                TrancheSeniority::Equity,
                 Money::new(20_000_000.0, Currency::USD),
                 TrancheCoupon::Fixed { rate: 0.0 },
                 maturity,
@@ -1167,7 +1167,7 @@ mod tests {
         let rate = 0.06_f64;
         let original_balance = 1_000_000.0_f64;
 
-        let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
         pool.assets.push(PoolAsset {
             day_count: DayCount::Thirty360,
             id: InstrumentId::new("MTG1"),
@@ -1191,7 +1191,7 @@ mod tests {
             "A",
             0.0,
             100.0,
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(original_balance, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
@@ -1295,7 +1295,7 @@ mod tests {
         let start = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
         // Long maturity so the deal runs to cleanup before expiring.
         let maturity = Date::from_calendar_date(2035, Month::January, 1).expect("valid date");
-        let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
             "A1",
             Money::new(10_000_000.0, Currency::USD),
@@ -1308,7 +1308,7 @@ mod tests {
             "A",
             0.0,
             80.0, // 80% of original balance = 8 M face
-            Seniority::Senior,
+            TrancheSeniority::Senior,
             Money::new(8_000_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.05 },
             maturity,
@@ -1318,7 +1318,7 @@ mod tests {
             "E",
             80.0,
             100.0, // junior 20% = 2 M face
-            Seniority::Equity,
+            TrancheSeniority::Equity,
             Money::new(2_000_000.0, Currency::USD),
             TrancheCoupon::Fixed { rate: 0.0 },
             maturity,
@@ -1461,7 +1461,7 @@ mod tests {
 
         // Build a single non-amortizing bond pool with an optional MDR override.
         let build_pool = |mdr_override: Option<f64>| {
-            let mut pool = Pool::new("POOL", DealType::CLO, Currency::USD);
+            let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
             pool.assets.push(PoolAsset {
                 day_count: DayCount::Thirty360,
                 id: InstrumentId::new("BND1"),
@@ -1488,7 +1488,7 @@ mod tests {
                 "A",
                 0.0,
                 100.0,
-                Seniority::Senior,
+                TrancheSeniority::Senior,
                 Money::new(balance, Currency::USD),
                 TrancheCoupon::Fixed { rate: 0.05 },
                 maturity,
@@ -1497,7 +1497,7 @@ mod tests {
             TrancheStructure::new(vec![tranche]).expect("structure")
         };
 
-        let one_period_interest = |pool: &Pool, tranches: &TrancheStructure| -> f64 {
+        let one_period_interest = |pool: &AssetPool, tranches: &TrancheStructure| -> f64 {
             let mut state = SimulationState::new(pool, tranches, closing, 0).expect("state");
             let flows = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
                 state: &mut state,
@@ -1572,7 +1572,7 @@ fn cleanup_call_premium(_instrument: &StructuredCredit, _tranche_balance: f64) -
 
 /// Internal state for period-by-period simulation.
 pub(crate) struct SimulationState<'a> {
-    /// Pool state (SoA layout)
+    /// AssetPool state (SoA layout)
     pool_state: PoolState,
     /// Total pool outstanding (sum of balances)
     pool_outstanding: Money,
@@ -1584,7 +1584,7 @@ pub(crate) struct SimulationState<'a> {
     prev_date: Option<Date>,
     base_ccy: Currency,
     recovery_lag_months: u32,
-    pool: &'a Pool,
+    pool: &'a AssetPool,
     tranches: &'a TrancheStructure,
     closing_date: Date,
     pool_balance_cleanup_threshold: f64,
@@ -1621,7 +1621,7 @@ pub(crate) struct SimulationState<'a> {
 
 impl<'a> SimulationState<'a> {
     fn new(
-        pool: &'a Pool,
+        pool: &'a AssetPool,
         tranches: &'a TrancheStructure,
         closing_date: Date,
         recovery_lag_months: u32,
@@ -1700,7 +1700,7 @@ impl<'a> SimulationState<'a> {
         let performing_pool_balance = pool.performing_balance().unwrap_or(total_pool_balance);
 
         // Pre-compute loss allocation order once: equity first → senior last.
-        // Seniority enum: Senior=0, Mezzanine=1, Subordinated=2, Equity=3.
+        // TrancheSeniority enum: Senior=0, Mezzanine=1, Subordinated=2, Equity=3.
         // Sort descending so Equity (3) comes first.
         let mut loss_alloc_order: Vec<usize> = (0..tranches.tranches.len()).collect();
         loss_alloc_order.sort_by(|&a, &b| {
@@ -2195,7 +2195,7 @@ fn simulate_period(
     // ── Step 6: Update pool balance ──────────────────────────────────
     if is_reinvestment_active {
         // During reinvestment, principal is recycled into new assets.
-        // Pool balance drops only by defaults (gross).
+        // AssetPool balance drops only by defaults (gross).
         state.pool_outstanding = state.pool_outstanding.checked_sub(pool_flows.default)?;
     } else {
         // After reinvestment, all principal reductions hit pool balance.
@@ -2353,7 +2353,7 @@ fn recycle_reinvestment_principal(state: &mut SimulationState, recyclable: f64) 
 // CALCULATION HELPERS
 // ============================================================================
 
-/// Pool flow results for a single period.
+/// AssetPool flow results for a single period.
 pub(crate) struct PoolFlows {
     interest: Money,
     scheduled_principal: Money,

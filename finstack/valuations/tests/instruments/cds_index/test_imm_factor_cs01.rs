@@ -48,7 +48,7 @@ fn imm_20th_schedule_for_index_synthetic() {
         &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
         "CDX-IMM",
         Money::new(1_000_000.0, Currency::USD),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
         start,
         end,
         0.40,
@@ -79,7 +79,7 @@ fn index_factor_scales_pv() {
     let end = Date::from_calendar_date(2028, Month::January, 1).unwrap();
 
     let disc = flat_discount("USD-OIS", as_of);
-    let rec = finstack_valuations::instruments::credit_derivatives::cds::RECOVERY_SENIOR_UNSECURED;
+    let rec = finstack_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
     let hz = 0.02;
     let names = [
         ("N1", "HZ1"),
@@ -106,7 +106,7 @@ fn index_factor_scales_pv() {
         &preset,
         "CDX-BASE",
         Money::new(10_000_000.0, Currency::USD),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
         start,
         end,
         rec,
@@ -120,7 +120,7 @@ fn index_factor_scales_pv() {
         &preset,
         "CDX-SCALED",
         Money::new(10_000_000.0, Currency::USD),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
         start,
         end,
         rec,

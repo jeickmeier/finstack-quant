@@ -34,8 +34,8 @@ mod providers;
 mod types;
 
 pub use matrix::FxMatrix;
+pub use provider::FxProvider;
 pub(crate) use provider::{reciprocal_rate_or_err, validate_fx_rate};
-pub use provider::{FxProvider, FxRate};
 pub use providers::{BumpedFxProvider, SimpleFxProvider};
 pub use types::{FxConfig, FxConversionPolicy, FxMatrixState, FxPolicyMeta, FxQuery, FxRateResult};
 

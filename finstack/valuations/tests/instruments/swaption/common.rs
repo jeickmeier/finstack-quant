@@ -184,7 +184,7 @@ pub fn equivalent_vanilla_irs_par_rate(
         InterestRateSwap::builder()
             .id(format!("IRS-{rate:.0}").into())
             .notional(swaption.notional)
-            .side(PayReceive::ReceiveFixed)
+            .side(PayReceive::Receive)
             .fixed(fixed(rate))
             .float(float.clone())
             .build()

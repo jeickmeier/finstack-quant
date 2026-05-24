@@ -232,7 +232,7 @@ impl CDSIndex {
             version: 1,
             notional: Money::new(10_000_000.0, Currency::USD),
             index_factor: 1.0,
-            side: PayReceive::PayFixed,
+            side: PayReceive::Pay,
             convention,
             premium: PremiumLegSpec {
                 start: date!(2024 - 03 - 20),
@@ -272,7 +272,7 @@ impl CDSIndex {
     ///     &CDSIndexParams::cdx_na_ig(42, 1, 100.0),
     ///     "CDX-IG-42",
     ///     Money::new(10_000_000.0, Currency::USD),
-    ///     PayReceive::PayFixed,
+    ///     PayReceive::Pay,
     ///     start, end,
     ///     0.40,
     ///     "USD-OIS",

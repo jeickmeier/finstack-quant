@@ -117,7 +117,7 @@ pub struct LookbackOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Underlying asset ticker symbol
-    pub underlying_ticker: crate::instruments::equity::spot::Ticker,
+    pub underlying_ticker: String,
     /// Strike price (None for floating strike lookbacks)
     pub strike: Option<f64>, // None for floating strike
     /// Option type (call or put)

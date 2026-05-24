@@ -10,8 +10,8 @@ use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::WaterfallContext;
 use finstack_valuations::instruments::fixed_income::structured_credit::WaterfallDistribution;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    AllocationMode, DealType, PaymentCalculation, PaymentType, Pool, Recipient, RecipientType,
-    Seniority, Tranche, TrancheCoupon, TrancheStructure, Waterfall, WaterfallBuilder,
+    AllocationMode, AssetPool, DealType, PaymentCalculation, PaymentType, Recipient, RecipientType,
+    Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, Waterfall, WaterfallBuilder,
     WaterfallTier,
 };
 
@@ -21,8 +21,8 @@ fn create_market() -> MarketContext {
 }
 
 /// Helper to create a minimal pool
-fn create_pool(currency: Currency) -> Pool {
-    Pool::new("TEST", DealType::CLO, currency)
+fn create_pool(currency: Currency) -> AssetPool {
+    AssetPool::new("TEST", DealType::CLO, currency)
 }
 
 /// Helper to create a simple single-tranche structure
@@ -31,7 +31,7 @@ fn create_single_tranche(currency: Currency) -> TrancheStructure {
         "TEST_TRANCHE",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(100_000_000.0, currency),
         TrancheCoupon::Fixed { rate: 0.05 },
         Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),
@@ -50,7 +50,7 @@ fn run_waterfall(
     tranches: &TrancheStructure,
     pool_balance: Money,
     period_start_override: Option<Date>,
-    pool: &Pool,
+    pool: &AssetPool,
     market: &MarketContext,
 ) -> WaterfallDistribution {
     let period_start = period_start_override.unwrap_or_else(|| payment_date.add_months(-3));
@@ -635,7 +635,7 @@ fn property_coverage_test_result_format() {
             )),
         )
         .add_coverage_trigger(
-            finstack_valuations::instruments::fixed_income::structured_credit::WaterfallCoverageTrigger {
+            finstack_valuations::instruments::fixed_income::structured_credit::waterfall::CoverageTrigger {
                 tranche_id: "TEST_TRANCHE".into(),
                 oc_trigger: Some(1.25),
                 ic_trigger: Some(1.20),

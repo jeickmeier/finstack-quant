@@ -108,7 +108,7 @@ impl SwaptionVolTarget {
                 };
                 let registry = ConventionRegistry::try_global()?;
                 let swaption_conv = registry.require_swaption(convention)?;
-                idx_from_quotes = Some(crate::market::conventions::ids::IndexId::new(
+                idx_from_quotes = Some(finstack_core::types::IndexId::new(
                     &swaption_conv.float_leg_index,
                 ));
                 break;
@@ -116,7 +116,7 @@ impl SwaptionVolTarget {
             let idx_key = params
                 .swap_index
                 .as_ref()
-                .map(|core_idx| crate::market::conventions::ids::IndexId::new(core_idx.as_str()))
+                .map(|core_idx| finstack_core::types::IndexId::new(core_idx.as_str()))
                 .or(idx_from_quotes)
                 .ok_or_else(|| {
                     finstack_core::Error::Validation(
@@ -524,7 +524,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         };
         let swaption_conv = ConventionRegistry::try_global()?.require_swaption(swaption_conv_id)?;
 
-        let idx_key = crate::market::conventions::ids::IndexId::new(&swaption_conv.float_leg_index);
+        let idx_key = finstack_core::types::IndexId::new(&swaption_conv.float_leg_index);
         let idx_conv = ConventionRegistry::try_global()?.require_rate_index(&idx_key)?;
 
         // Strict conventions: We use exactly what's in the registry.
@@ -567,7 +567,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
             )
         })?;
         let idx_str = idx.as_str();
-        let index_id = crate::market::conventions::ids::IndexId::new(idx_str);
+        let index_id = finstack_core::types::IndexId::new(idx_str);
         let idx_conv = ConventionRegistry::try_global()?.require_rate_index(&index_id)?;
 
         Ok(SwaptionLegConventions {

@@ -68,7 +68,7 @@ fn test_fra_forward_dependencies_complete() {
         .reset_lag(2)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .forward_curve_id(CurveId::new("USD-SOFR-3M"))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .build()
         .expect("FRA construction should succeed");
 
@@ -102,7 +102,7 @@ fn test_missing_forward_curve_fails() {
         .reset_lag(2)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .forward_curve_id(CurveId::new("USD-SOFR-3M"))
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .build()
         .expect("FRA construction should succeed");
 

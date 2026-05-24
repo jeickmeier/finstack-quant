@@ -27,7 +27,7 @@ fn create_test_swap() -> InterestRateSwap {
         0.04, // 4% fixed rate
         start,
         end,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .expect("Valid swap construction")
 }
@@ -262,7 +262,7 @@ fn test_swap_pay_vs_receive_determinism() {
         0.04,
         start,
         end,
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .expect("Valid swap construction");
 
@@ -272,7 +272,7 @@ fn test_swap_pay_vs_receive_determinism() {
         0.04,
         start,
         end,
-        PayReceive::ReceiveFixed,
+        PayReceive::Receive,
     )
     .expect("Valid swap construction");
 

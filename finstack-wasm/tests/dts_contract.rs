@@ -113,7 +113,7 @@ fn analytics_dts_matches_runtime_hotspots() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "rollingReturns(tickerIdx: number, window: number): RollingReturns;",
+        "rollingReturns(tickerIdx: number, window: number): DatedSeries;",
     ));
     assert!(contains_ignoring_ws(
         &dts,

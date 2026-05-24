@@ -77,9 +77,8 @@ pub use engine::{
     ThresholdTest,
 };
 pub use forward::{
-    forecast_breaches_generic, forecast_covenant_generic,
-    CovenantForecast as GenericCovenantForecast, CovenantForecastConfig, FutureBreach,
-    ModelTimeSeries,
+    forecast_breaches_generic, forecast_covenant_generic, CovenantForecast, CovenantForecastConfig,
+    FutureBreach, ModelTimeSeries,
 };
 pub use json::{
     cov_lite_json, evaluate_engine_json, lbo_standard_json, project_finance_json, real_estate_json,

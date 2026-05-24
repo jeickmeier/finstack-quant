@@ -108,7 +108,7 @@ pub struct BarrierOption {
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Underlying asset ticker symbol
-    pub underlying_ticker: crate::instruments::equity::spot::Ticker,
+    pub underlying_ticker: String,
     /// Strike price
     pub strike: f64,
     /// Barrier level (price that triggers knock-in/out)

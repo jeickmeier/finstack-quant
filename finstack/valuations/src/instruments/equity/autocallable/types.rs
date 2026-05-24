@@ -78,7 +78,7 @@ pub struct Autocallable {
     /// Unique instrument identifier
     pub id: InstrumentId,
     /// Underlying asset ticker symbol
-    pub underlying_ticker: crate::instruments::equity::spot::Ticker,
+    pub underlying_ticker: String,
     /// Observation dates for autocall and coupon checks.
     ///
     /// Barriers are monitored **discretely** at these exact dates only.
@@ -146,7 +146,7 @@ pub struct Autocallable {
 #[serde(deny_unknown_fields)]
 struct AutocallableUnchecked {
     id: InstrumentId,
-    underlying_ticker: crate::instruments::equity::spot::Ticker,
+    underlying_ticker: String,
     #[schemars(with = "Vec<String>")]
     observation_dates: Vec<Date>,
     #[schemars(with = "String")]

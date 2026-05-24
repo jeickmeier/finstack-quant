@@ -13,12 +13,12 @@
 //! - **Accrued Premium** = Premium accrued from last coupon date to default
 //!
 //! ## Interpretation
-//! - For protection **buyer** (PayFixed):
+//! - For protection **buyer** (Pay):
 //!   - Receives: LGD × Notional (protection payout)
 //!   - Pays: Accrued premium (payable on default per ISDA)
 //!   - Net JTD = LGD × Notional - Accrued Premium (positive = gain)
 //!
-//! - For protection **seller** (ReceiveFixed):
+//! - For protection **seller** (Receive):
 //!   - Pays: LGD × Notional (protection payout)
 //!   - Receives: Accrued premium
 //!   - Net JTD = Accrued Premium - LGD × Notional (negative = loss)
@@ -55,8 +55,8 @@ impl MetricCalculator for JumpToDefaultCalculator {
         // - Protection buyer: receives protection, pays accrued → JTD = protection - accrued
         // - Protection seller: pays protection, receives accrued → JTD = accrued - protection
         let signed_jtd = match cds.side {
-            PayReceive::PayFixed => protection_payout - accrued_premium,
-            PayReceive::ReceiveFixed => accrued_premium - protection_payout,
+            PayReceive::Pay => protection_payout - accrued_premium,
+            PayReceive::Receive => accrued_premium - protection_payout,
         };
 
         Ok(signed_jtd)
@@ -95,8 +95,8 @@ fn signed_lgd_payout(cds: &CreditDefaultSwap) -> f64 {
     let lgd = 1.0 - cds.protection.recovery_rate;
     let payout = cds.notional.amount() * lgd;
     match cds.side {
-        PayReceive::PayFixed => payout,
-        PayReceive::ReceiveFixed => -payout,
+        PayReceive::Pay => payout,
+        PayReceive::Receive => -payout,
     }
 }
 

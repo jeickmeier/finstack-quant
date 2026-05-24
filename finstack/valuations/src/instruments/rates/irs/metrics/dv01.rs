@@ -39,8 +39,8 @@ impl MetricCalculator for IrsDv01Calculator {
             * ((fixed_rate - par_rate) * d_annuity_dbp - annuity * ONE_BP_DECIMAL);
 
         Ok(match irs.side {
-            PayReceive::ReceiveFixed => receive_fixed_dv01,
-            PayReceive::PayFixed => -receive_fixed_dv01,
+            PayReceive::Receive => receive_fixed_dv01,
+            PayReceive::Pay => -receive_fixed_dv01,
         })
     }
 }

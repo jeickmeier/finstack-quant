@@ -1,3 +1,4 @@
+use finstack_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 // Shared helpers for unit tests to reduce boilerplate market setup.
 use finstack_core::{
     currency::Currency,
@@ -18,7 +19,7 @@ use finstack_valuations::instruments::{EquityUnderlyingParams, FixedLegSpec, Flo
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::instruments::credit_derivatives::cds::{
     CDSConvention, CreditDefaultSwap, CreditDefaultSwapBuilder, PayReceive, PremiumLegSpec,
-    ProtectionLegSpec, RECOVERY_SENIOR_UNSECURED,
+    ProtectionLegSpec,
 };
 use finstack_valuations::instruments::rates::irs::{FloatingLegCompounding, InterestRateSwap};
 use finstack_valuations::instruments::{
@@ -378,7 +379,7 @@ pub fn cds_buy_protection(
     let cds = CreditDefaultSwap::builder()
         .id(id.into())
         .notional(notional)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .convention(convention)
         .premium(PremiumLegSpec {
             start,
@@ -393,7 +394,7 @@ pub fn cds_buy_protection(
         })
         .protection(ProtectionLegSpec {
             credit_curve_id: credit_id.into(),
-            recovery_rate: RECOVERY_SENIOR_UNSECURED,
+            recovery_rate: STANDARD_RECOVERY_SENIOR,
             settlement_delay: convention.settlement_delay(),
         })
         .pricing_overrides(PricingOverrides::default())
@@ -431,7 +432,7 @@ pub fn cds_sell_protection(
     let cds = CreditDefaultSwap::builder()
         .id(id.into())
         .notional(notional)
-        .side(PayReceive::ReceiveFixed)
+        .side(PayReceive::Receive)
         .convention(convention)
         .premium(PremiumLegSpec {
             start,
@@ -446,7 +447,7 @@ pub fn cds_sell_protection(
         })
         .protection(ProtectionLegSpec {
             credit_curve_id: credit_id.into(),
-            recovery_rate: RECOVERY_SENIOR_UNSECURED,
+            recovery_rate: STANDARD_RECOVERY_SENIOR,
             settlement_delay: convention.settlement_delay(),
         })
         .pricing_overrides(PricingOverrides::default())

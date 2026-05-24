@@ -328,8 +328,8 @@ pub(crate) fn compute_pv_raw(
     };
 
     Ok(match irs.side {
-        PayReceive::PayFixed => pv_float - pv_fixed,
-        PayReceive::ReceiveFixed => pv_fixed - pv_float,
+        PayReceive::Pay => pv_float - pv_fixed,
+        PayReceive::Receive => pv_fixed - pv_float,
     })
 }
 
@@ -443,7 +443,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-SEASONED"))
             .notional(Money::new(1_000_000.0, Currency::USD))
-            .side(crate::instruments::rates::irs::PayReceive::PayFixed)
+            .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -531,7 +531,7 @@ mod tests {
         let swap_no_lookback = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-NO-LOOKBACK"))
             .notional(Money::new(10_000_000.0, Currency::USD))
-            .side(crate::instruments::rates::irs::PayReceive::PayFixed)
+            .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -613,7 +613,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-MISSING-CAL"))
             .notional(Money::new(10_000_000.0, Currency::USD))
-            .side(crate::instruments::rates::irs::PayReceive::PayFixed)
+            .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -694,7 +694,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-NO-CALENDAR"))
             .notional(Money::new(10_000_000.0, Currency::USD))
-            .side(crate::instruments::rates::irs::PayReceive::PayFixed)
+            .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -780,7 +780,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-VALUE-RAW-NO-FWD"))
             .notional(Money::new(10_000_000.0, Currency::USD))
-            .side(crate::instruments::rates::irs::PayReceive::PayFixed)
+            .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -853,7 +853,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-SCHEDULE-NO-FWD"))
             .notional(Money::new(10_000_000.0, Currency::USD))
-            .side(crate::instruments::rates::irs::PayReceive::PayFixed)
+            .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -946,7 +946,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-SCHEDULE-SEASONED"))
             .notional(Money::new(1_000_000.0, Currency::USD))
-            .side(crate::instruments::rates::irs::PayReceive::PayFixed)
+            .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),
@@ -1035,7 +1035,7 @@ mod tests {
         let swap = InterestRateSwap::builder()
             .id(InstrumentId::new("OIS-IDENTITY-TEST"))
             .notional(Money::new(10_000_000.0, Currency::USD))
-            .side(crate::instruments::rates::irs::PayReceive::PayFixed)
+            .side(crate::instruments::rates::irs::PayReceive::Pay)
             .fixed(
                 crate::instruments::common_impl::parameters::legs::FixedLegSpec {
                     discount_curve_id: disc_id.clone(),

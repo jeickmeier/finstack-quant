@@ -110,7 +110,7 @@ fn test_build_any_instrument_from_swap_spec() {
         0.04,
         Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
         Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
     )
     .expect("swap should build");
 

@@ -132,7 +132,7 @@ fn inflation_swap(as_of: Date, maturity: Date, id: &str) -> InflationSwap {
         .inflation_index_id("US-CPI-U".into())
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .attributes(Attributes::new())
         .build()
         .expect("inflation swap")

@@ -1,7 +1,6 @@
 use finstack_analytics::{
-    AnnualizationConvention, BetaResult, DrawdownEpisode, GreeksResult, LookbackReturns,
-    MultiFactorResult, Performance, PeriodStats, RollingGreeks, RollingSharpe, RollingSortino,
-    RollingVolatility,
+    AnnualizationConvention, BetaResult, DatedSeries, DrawdownEpisode, GreeksResult,
+    LookbackReturns, MultiFactorResult, Performance, PeriodStats, RollingGreeks,
 };
 use finstack_core::dates::{Date, Month, PeriodKind};
 
@@ -116,17 +115,17 @@ fn test_analytics_results_and_configs_roundtrip() {
         residual_vol: 0.11,
     });
 
-    assert_roundtrip_value(&RollingSharpe {
+    assert_roundtrip_value(&DatedSeries {
         values: vec![1.1, 1.2, 1.3],
         dates: dates.clone(),
     });
 
-    assert_roundtrip_value(&RollingVolatility {
+    assert_roundtrip_value(&DatedSeries {
         values: vec![0.15, 0.14, 0.13],
         dates: dates.clone(),
     });
 
-    assert_roundtrip_value(&RollingSortino {
+    assert_roundtrip_value(&DatedSeries {
         values: vec![1.5, 1.6, 1.7],
         dates,
     });

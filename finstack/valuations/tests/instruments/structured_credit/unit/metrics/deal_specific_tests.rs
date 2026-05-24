@@ -15,16 +15,17 @@ use finstack_core::money::Money;
 use finstack_core::types::{Percentage, Rate};
 use finstack_valuations::instruments::fixed_income::structured_credit::{
     standard_psa_speeds, AbsChargeOffCalculator, AbsCreditEnhancementCalculator,
-    AbsDelinquencyCalculator, AbsExcessSpreadCalculator, AbsSpeedCalculator, CmbsDscrCalculator,
-    DealType, Pool, PoolAsset, RmbsFicoCalculator, RmbsLtvCalculator, RmbsWalCalculator, Seniority,
-    StructuredCredit, Tranche, TrancheCoupon, TrancheStructure,
+    AbsDelinquencyCalculator, AbsExcessSpreadCalculator, AbsSpeedCalculator, AssetPool,
+    CmbsDscrCalculator, DealType, PoolAsset, RmbsFicoCalculator, RmbsLtvCalculator,
+    RmbsWalCalculator, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
+    TrancheStructure,
 };
 use finstack_valuations::metrics::{MetricCalculator, MetricContext};
 use std::sync::Arc;
 use time::Month;
 
 fn rmbs_instrument() -> StructuredCredit {
-    let mut pool = Pool::new("POOL", DealType::RMBS, Currency::USD);
+    let mut pool = AssetPool::new("POOL", DealType::RMBS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "MORTGAGE-1",
         Money::new(5_000_000.0, Currency::USD),
@@ -37,7 +38,7 @@ fn rmbs_instrument() -> StructuredCredit {
         "A",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(5_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
@@ -57,7 +58,7 @@ fn rmbs_instrument() -> StructuredCredit {
 }
 
 fn cmbs_instrument() -> StructuredCredit {
-    let mut pool = Pool::new("POOL", DealType::CMBS, Currency::USD);
+    let mut pool = AssetPool::new("POOL", DealType::CMBS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "MORTGAGE-1",
         Money::new(10_000_000.0, Currency::USD),
@@ -70,7 +71,7 @@ fn cmbs_instrument() -> StructuredCredit {
         "A",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(10_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
@@ -89,7 +90,7 @@ fn cmbs_instrument() -> StructuredCredit {
 }
 
 fn abs_instrument() -> StructuredCredit {
-    let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+    let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "AUTO-1",
         Money::new(80_000_000.0, Currency::USD),
@@ -109,7 +110,7 @@ fn abs_instrument() -> StructuredCredit {
         "A",
         0.0,
         80.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(80_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
@@ -119,7 +120,7 @@ fn abs_instrument() -> StructuredCredit {
         "B",
         80.0,
         100.0,
-        Seniority::Subordinated,
+        TrancheSeniority::Subordinated,
         Money::new(20_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.08 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
@@ -203,13 +204,13 @@ fn test_abs_deal_specific_calculators_return_expected_values() {
 #[test]
 fn test_abs_charge_off_and_credit_enhancement_handle_zero_balances() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let mut empty_pool = Pool::new("EMPTY", DealType::ABS, Currency::USD);
+    let mut empty_pool = AssetPool::new("EMPTY", DealType::ABS, Currency::USD);
     empty_pool.cumulative_defaults = Money::new(10_000.0, Currency::USD);
     let zero_tranche = Tranche::new(
         "A",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(0.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.04 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),

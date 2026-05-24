@@ -55,7 +55,7 @@ impl SwaptionParams {
             expiry,
             swap_start,
             swap_end,
-            side: PayReceive::PayFixed,
+            side: PayReceive::Pay,
             fixed_freq: None,
             float_freq: None,
             day_count: None,
@@ -82,7 +82,7 @@ impl SwaptionParams {
             expiry,
             swap_start,
             swap_end,
-            side: PayReceive::PayFixed,
+            side: PayReceive::Pay,
             fixed_freq: None,
             float_freq: None,
             day_count: None,
@@ -109,7 +109,7 @@ impl SwaptionParams {
             expiry,
             swap_start,
             swap_end,
-            side: PayReceive::ReceiveFixed,
+            side: PayReceive::Receive,
             fixed_freq: None,
             float_freq: None,
             day_count: None,
@@ -136,7 +136,7 @@ impl SwaptionParams {
             expiry,
             swap_start,
             swap_end,
-            side: PayReceive::ReceiveFixed,
+            side: PayReceive::Receive,
             fixed_freq: None,
             float_freq: None,
             day_count: None,
@@ -213,7 +213,7 @@ mod tests {
 
         assert_eq!(payer.notional, notional);
         assert_eq!(payer.strike, Decimal::new(325, 4));
-        assert_eq!(payer.side, PayReceive::PayFixed);
+        assert_eq!(payer.side, PayReceive::Pay);
         assert_eq!(payer.expiry, expiry);
         assert_eq!(payer.swap_start, swap_start);
         assert_eq!(payer.swap_end, swap_end);
@@ -223,7 +223,7 @@ mod tests {
         assert_eq!(payer.vol_model, None);
 
         assert_eq!(receiver.strike, Decimal::new(31, 3));
-        assert_eq!(receiver.side, PayReceive::ReceiveFixed);
+        assert_eq!(receiver.side, PayReceive::Receive);
     }
 
     #[test]
@@ -240,9 +240,9 @@ mod tests {
 
         let expected = Decimal::new(275, 4);
         assert_eq!(payer.strike, expected);
-        assert_eq!(payer.side, PayReceive::PayFixed);
+        assert_eq!(payer.side, PayReceive::Pay);
         assert_eq!(receiver.strike, expected);
-        assert_eq!(receiver.side, PayReceive::ReceiveFixed);
+        assert_eq!(receiver.side, PayReceive::Receive);
     }
 
     #[test]

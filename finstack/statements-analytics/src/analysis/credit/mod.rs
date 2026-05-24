@@ -10,7 +10,6 @@ pub(crate) mod credit_context;
 
 pub use adjusted_net_debt::{AdjustedNetDebtSpec, AdjustedNetDebtSpecBuilder};
 pub use covenants::{
-    forecast_breaches, forecast_covenant, forecast_covenants, to_table, CovenantForecast,
-    StatementsAdapter,
+    forecast_breaches, forecast_covenant, forecast_covenants, to_table, StatementsAdapter,
 };
 pub use credit_context::{compute_credit_context, CreditContextMetrics};

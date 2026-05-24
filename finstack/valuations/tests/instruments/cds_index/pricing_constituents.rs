@@ -12,10 +12,9 @@
 use super::test_utils::*;
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
+use finstack_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
 use finstack_valuations::constants::BASIS_POINTS_PER_UNIT;
-use finstack_valuations::instruments::credit_derivatives::cds::{
-    PayReceive, RECOVERY_SENIOR_UNSECURED,
-};
+use finstack_valuations::instruments::credit_derivatives::cds::PayReceive;
 use finstack_valuations::instruments::credit_derivatives::cds_index::{
     CDSIndex, CDSIndexConstituent, IndexPricing, ParSpreadMethod,
 };
@@ -114,7 +113,7 @@ fn test_constituents_par_spread() {
     let par_spread = metric_value(&idx, &ctx, as_of, MetricId::ParSpread);
 
     assert_positive(par_spread, "Par spread");
-    let expected = flat_hazard_par_spread_bps(STANDARD_HAZARD_RATE, RECOVERY_SENIOR_UNSECURED);
+    let expected = flat_hazard_par_spread_bps(STANDARD_HAZARD_RATE, STANDARD_RECOVERY_SENIOR);
     assert_in_range(
         par_spread,
         expected * 0.85,
@@ -191,10 +190,10 @@ fn test_constituents_unequal_weights() {
         &standard_cdx_params(),
         "CDX-UNEQUAL",
         Money::new(TEST_NOTIONAL, Currency::USD),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
         start,
         end,
-        RECOVERY_SENIOR_UNSECURED,
+        STANDARD_RECOVERY_SENIOR,
         "USD-OIS",
         "HZ-INDEX",
     )
@@ -221,10 +220,10 @@ fn test_constituents_index_factor_application() {
         &standard_cdx_params(),
         "CDX-FACTOR",
         Money::new(TEST_NOTIONAL, Currency::USD),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
         start,
         end,
-        RECOVERY_SENIOR_UNSECURED,
+        STANDARD_RECOVERY_SENIOR,
         "USD-OIS",
         "HZ-INDEX",
     )

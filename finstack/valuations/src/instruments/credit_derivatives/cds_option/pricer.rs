@@ -209,7 +209,7 @@ pub fn synthetic_underlying_cds(
             option.notional.amount() * notional_scale,
             option.notional.currency(),
         ),
-        PayReceive::PayFixed,
+        PayReceive::Pay,
         option.underlying_convention,
         spread_bp,
         option.effective_underlying_effective_date(as_of),

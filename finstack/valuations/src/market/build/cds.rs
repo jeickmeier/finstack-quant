@@ -254,7 +254,7 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<DynI
     let cds = CreditDefaultSwap {
         id: InstrumentId::new(id.as_str()),
         notional: Money::new(ctx.notional(), convention_key.currency),
-        side: PayReceive::PayFixed, // Standard: Quote implies we buy protection (pay premium/spread) ? Or we are pricing the contract?
+        side: PayReceive::Pay, // Standard: Quote implies we buy protection (pay premium/spread) ? Or we are pricing the contract?
         // Usually "Par Spread" implies the spread we pay.
         // Default to Buy Protection (Pay Premium).
         convention: convention_enum,

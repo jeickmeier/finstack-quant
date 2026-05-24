@@ -9,7 +9,7 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::money::Money;
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    DealType, Pool, PoolAsset, Seniority, StructuredCredit, Tranche, TrancheCoupon,
+    AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
     TrancheStructure,
 };
 use finstack_valuations::instruments::Instrument;
@@ -24,8 +24,8 @@ fn maturity_date() -> Date {
     Date::from_calendar_date(2030, Month::December, 31).unwrap()
 }
 
-fn create_simple_pool() -> Pool {
-    let mut pool = Pool::new("POOL", DealType::ABS, Currency::USD);
+fn create_simple_pool() -> AssetPool {
+    let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
         Money::new(5_000_000.0, Currency::USD),
@@ -43,8 +43,8 @@ fn create_simple_pool() -> Pool {
     pool
 }
 
-fn create_simple_clo_pool() -> Pool {
-    let mut pool = Pool::new("CLO_POOL", DealType::CLO, Currency::USD);
+fn create_simple_clo_pool() -> AssetPool {
+    let mut pool = AssetPool::new("CLO_POOL", DealType::CLO, Currency::USD);
     pool.assets.push(
         PoolAsset::fixed_rate_bond(
             "L1",
@@ -68,8 +68,8 @@ fn create_simple_clo_pool() -> Pool {
     pool
 }
 
-fn create_simple_cmbs_pool() -> Pool {
-    let mut pool = Pool::new("CMBS_POOL", DealType::CMBS, Currency::USD);
+fn create_simple_cmbs_pool() -> AssetPool {
+    let mut pool = AssetPool::new("CMBS_POOL", DealType::CMBS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "CMBS-LOAN-1",
         Money::new(10_000_000.0, Currency::USD),
@@ -85,7 +85,7 @@ fn create_simple_tranches() -> TrancheStructure {
         "SENIOR",
         0.0,
         100.0,
-        Seniority::Senior,
+        TrancheSeniority::Senior,
         Money::new(8_000_000.0, Currency::USD),
         TrancheCoupon::Fixed { rate: 0.035 },
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
@@ -478,8 +478,8 @@ fn test_structured_credit_metric_dependency_resolution() {
 
 #[test]
 fn test_structured_credit_pool_balance_cleanup() {
-    // Arrange: Pool with very small remaining balance
-    let mut pool = Pool::new("SMALL_POOL", DealType::ABS, Currency::USD);
+    // Arrange: AssetPool with very small remaining balance
+    let mut pool = AssetPool::new("SMALL_POOL", DealType::ABS, Currency::USD);
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "A1",
         Money::new(50.0, Currency::USD), // Below cleanup threshold

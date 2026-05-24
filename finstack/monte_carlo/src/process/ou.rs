@@ -181,12 +181,6 @@ impl StochasticProcess for HullWhite1FProcess {
     }
 }
 
-/// Ornstein-Uhlenbeck process (constant mean reversion level).
-///
-/// This is a special case of Hull-White with constant θ, also known as
-/// the Vasicek short rate model.
-pub type VasicekProcess = HullWhite1FProcess;
-
 // ============================================================================
 // Curve-Derived θ(t) Calibration
 // ============================================================================
@@ -442,7 +436,7 @@ mod tests {
 
     #[test]
     fn test_vasicek_alias() {
-        let process = VasicekProcess::vasicek(0.1, 0.03, 0.01);
+        let process = HullWhite1FProcess::vasicek(0.1, 0.03, 0.01);
 
         assert_eq!(process.params().kappa, 0.1);
         assert_eq!(process.params().sigma, 0.01);

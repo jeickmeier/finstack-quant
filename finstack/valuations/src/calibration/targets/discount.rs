@@ -1216,7 +1216,7 @@ mod tests {
         // Native Quote
         let quote = crate::market::quotes::rates::RateQuote::Swap {
             id: crate::market::quotes::ids::QuoteId::new("SWP-1Y"),
-            index: crate::market::conventions::ids::IndexId::new("USD-SOFR-OIS"),
+            index: finstack_core::types::IndexId::new("USD-SOFR-OIS"),
             pillar: crate::market::quotes::ids::Pillar::Date(maturity), // 1Y
             rate: 0.02,
             spread_decimal: None,
@@ -1312,7 +1312,7 @@ mod tests {
         // RateQuote::Deposit
         let quote = crate::market::quotes::rates::RateQuote::Deposit {
             id: crate::market::quotes::ids::QuoteId::new("DEP-1Y"),
-            index: crate::market::conventions::ids::IndexId::new("USD-SOFR"),
+            index: finstack_core::types::IndexId::new("USD-SOFR"),
             pillar: crate::market::quotes::ids::Pillar::Date(maturity),
             rate,
         };
@@ -1380,7 +1380,7 @@ mod tests {
 
                 let quote = crate::market::quotes::rates::RateQuote::Deposit {
                     id: crate::market::quotes::ids::QuoteId::new(format!("DEP-{}D", days)),
-                    index: crate::market::conventions::ids::IndexId::new("USD-SOFR"),
+                    index: finstack_core::types::IndexId::new("USD-SOFR"),
                     pillar: crate::market::quotes::ids::Pillar::Date(maturity),
                     rate,
                 };

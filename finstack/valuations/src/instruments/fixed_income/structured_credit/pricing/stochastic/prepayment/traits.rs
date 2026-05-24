@@ -9,7 +9,7 @@
 /// - Loan seasoning (months since origination)
 /// - Systematic factor realizations
 /// - Market conditions (interest rates)
-/// - Pool burnout state
+/// - AssetPool burnout state
 ///
 /// # Mathematical Framework
 ///

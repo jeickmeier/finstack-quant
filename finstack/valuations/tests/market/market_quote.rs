@@ -4,7 +4,8 @@
 
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
-use finstack_valuations::market::conventions::ids::{BondConventionId, IndexId};
+use finstack_core::types::IndexId;
+use finstack_valuations::market::conventions::ids::BondConventionId;
 use finstack_valuations::market::quotes::bond::BondQuote;
 use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
 use finstack_valuations::market::quotes::market_quote::MarketQuote;

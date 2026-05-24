@@ -109,7 +109,7 @@ fn test_off_market_swap_all_metrics() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
 
-    let swap = create_swap(as_of, end, 0.03, PayReceive::ReceiveFixed);
+    let swap = create_swap(as_of, end, 0.03, PayReceive::Receive);
     let market = build_flat_curves(0.05, 0.05, as_of);
 
     let metrics = vec![
@@ -169,7 +169,7 @@ fn test_multi_curve_environment() {
 
     let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
-    let swap = create_swap(as_of, end, 0.045, PayReceive::ReceiveFixed);
+    let swap = create_swap(as_of, end, 0.045, PayReceive::Receive);
 
     let npv = swap.value(&market, as_of).unwrap();
 
@@ -208,7 +208,7 @@ fn test_forward_starting_swap() {
     let swap = InterestRateSwap {
         id: "FORWARD_START".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
@@ -264,9 +264,9 @@ fn test_swap_portfolio_aggregation() {
     let market = build_flat_curves(0.05, 0.05, as_of);
 
     let swaps = vec![
-        create_swap(as_of, date!(2026 - 01 - 01), 0.04, PayReceive::ReceiveFixed),
-        create_swap(as_of, date!(2027 - 01 - 01), 0.045, PayReceive::PayFixed),
-        create_swap(as_of, date!(2029 - 01 - 01), 0.05, PayReceive::ReceiveFixed),
+        create_swap(as_of, date!(2026 - 01 - 01), 0.04, PayReceive::Receive),
+        create_swap(as_of, date!(2027 - 01 - 01), 0.045, PayReceive::Pay),
+        create_swap(as_of, date!(2029 - 01 - 01), 0.05, PayReceive::Receive),
     ];
 
     let mut total_npv = 0.0;
@@ -297,7 +297,7 @@ fn test_swap_with_large_spread() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
 
-    let mut swap = create_swap(as_of, end, 0.05, PayReceive::ReceiveFixed);
+    let mut swap = create_swap(as_of, end, 0.05, PayReceive::Receive);
     swap.float.spread_bp = rust_decimal::Decimal::try_from(200.0).expect("valid"); // 200bp spread
 
     let market = build_flat_curves(0.05, 0.05, as_of);
@@ -362,7 +362,7 @@ fn test_swap_seasoned() {
     let swap = InterestRateSwap {
         id: "SEASONED_SWAP".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD-OIS".into(),
             rate: rust_decimal::Decimal::try_from(0.04).expect("valid"), // Old rate from 2023
@@ -413,7 +413,7 @@ fn test_swap_risk_attribution() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
 
-    let swap = create_swap(as_of, end, 0.05, PayReceive::ReceiveFixed);
+    let swap = create_swap(as_of, end, 0.05, PayReceive::Receive);
     let market = build_flat_curves(0.05, 0.06, as_of);
 
     let result = swap

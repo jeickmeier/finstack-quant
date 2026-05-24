@@ -2,9 +2,9 @@
 
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::market::conventions::defs::{RateIndexConventions, RateIndexKind};
-use crate::market::conventions::ids::IndexId;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{BusinessDayConvention, DayCount, Tenor};
+use finstack_core::types::IndexId;
 use finstack_core::Error;
 use finstack_core::HashMap;
 

@@ -10,12 +10,12 @@ use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::PayReceive;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
-use crate::market::conventions::ids::IndexId;
 use crate::market::conventions::ConventionRegistry;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{adjust, BusinessDayConvention, CalendarRegistry, Date, DayCount};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
+use finstack_core::types::IndexId;
 use finstack_core::types::{CalendarId, CurveId, InstrumentId, Rate};
 use rust_decimal::Decimal;
 use time::macros::date;
@@ -45,15 +45,15 @@ const MAX_REASONABLE_RATE: f64 = 0.50;
 ///
 /// # Direction Convention
 ///
-/// - `side = PayReceive::ReceiveFixed`: Receive fixed rate, pay floating rate.
+/// - `side = PayReceive::Receive`: Receive fixed rate, pay floating rate.
 ///   When forward rate > fixed rate, PV is negative (you're paying more than receiving).
-/// - `side = PayReceive::PayFixed`: Pay fixed rate, receive floating rate.
+/// - `side = PayReceive::Pay`: Pay fixed rate, receive floating rate.
 ///   When forward rate > fixed rate, PV is positive (you're receiving more than paying).
 ///
 /// # Side field
 ///
 /// Use `side` to indicate the fixed leg direction. If omitted in JSON,
-/// deserialization defaults to `PayFixed`.
+/// deserialization defaults to `Pay`.
 #[derive(
     Debug,
     Clone,
@@ -100,8 +100,8 @@ pub struct ForwardRateAgreement {
     pub discount_curve_id: CurveId,
     /// Forward curve identifier
     pub forward_curve_id: CurveId,
-    /// Direction of the FRA: PayFixed means paying the fixed rate (receiving floating),
-    /// ReceiveFixed means receiving the fixed rate (paying floating).
+    /// Direction of the FRA: Pay means paying the fixed rate (receiving floating),
+    /// Receive means receiving the fixed rate (paying floating).
     pub side: PayReceive,
     /// Attributes for scenario selection
     #[serde(default)]
@@ -137,7 +137,7 @@ pub struct ConventionFraParams<'a> {
 }
 
 /// Custom deserializer for ForwardRateAgreement that accepts `side`
-/// (PayReceive enum), defaulting to `PayFixed` when omitted.
+/// (PayReceive enum), defaulting to `Pay` when omitted.
 impl<'de> serde::Deserialize<'de> for ForwardRateAgreement {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -173,7 +173,7 @@ impl<'de> serde::Deserialize<'de> for ForwardRateAgreement {
 
         let helper = FraHelper::deserialize(deserializer)?;
 
-        let side = helper.side.unwrap_or(PayReceive::PayFixed);
+        let side = helper.side.unwrap_or(PayReceive::Pay);
 
         Ok(ForwardRateAgreement {
             id: helper.id,
@@ -262,7 +262,7 @@ impl ForwardRateAgreement {
             .reset_lag(2)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-SOFR-3M"))
-            .side(PayReceive::ReceiveFixed)
+            .side(PayReceive::Receive)
             .attributes(Attributes::new())
             .build()
     }
@@ -460,12 +460,12 @@ impl ForwardRateAgreement {
 
         let settlement = self.notional.amount() * rate_diff * tau / denom;
 
-        // Apply direction: ReceiveFixed means we receive K and pay F
+        // Apply direction: Receive means we receive K and pay F
         // When F > K: rate_diff > 0, settlement > 0 (we owe money)
-        // So negate when ReceiveFixed
+        // So negate when Receive
         Ok(match self.side {
-            PayReceive::ReceiveFixed => -settlement,
-            PayReceive::PayFixed => settlement,
+            PayReceive::Receive => -settlement,
+            PayReceive::Pay => settlement,
         })
     }
 
@@ -664,7 +664,7 @@ mod tests {
             .reset_lag(2)
             .discount_curve_id("DISC".into())
             .forward_curve_id("FWD-3M".into())
-            .side(PayReceive::PayFixed) // Pay fixed, receive floating
+            .side(PayReceive::Pay) // Pay fixed, receive floating
             .build()
             .expect("FRA builder should succeed in test");
 
@@ -718,7 +718,7 @@ mod tests {
             .reset_lag(2)
             .discount_curve_id("DISC".into())
             .forward_curve_id("FWD-3M".into())
-            .side(PayReceive::ReceiveFixed)
+            .side(PayReceive::Receive)
             .build()
             .expect("Builder failed");
 
@@ -780,7 +780,7 @@ mod serde_tests {
             "attributes": {"tags": [], "meta": {}}
         });
         let fra: ForwardRateAgreement = serde_json::from_value(json).expect("deserialize FRA");
-        assert_eq!(fra.side, PayReceive::PayFixed);
+        assert_eq!(fra.side, PayReceive::Pay);
         assert_eq!(fra.notional.currency(), Currency::USD);
     }
 
@@ -797,7 +797,7 @@ mod serde_tests {
             index_id: "USD-SOFR-3M",
             discount_curve_id: "USD-OIS",
             forward_curve_id: "USD-SOFR-3M",
-            side: PayReceive::ReceiveFixed,
+            side: PayReceive::Receive,
             attributes: Attributes::new(),
         })
         .expect("FRA conventions constructor should succeed");
@@ -809,7 +809,7 @@ mod serde_tests {
         assert_eq!(fra.discount_curve_id, CurveId::new("USD-OIS"));
         assert_eq!(fra.forward_curve_id, CurveId::new("USD-SOFR-3M"));
         assert_eq!(fra.fixed_rate.to_f64(), Some(0.045));
-        assert_eq!(fra.side, PayReceive::ReceiveFixed);
+        assert_eq!(fra.side, PayReceive::Receive);
         assert_eq!(fra.fixing_calendar_id.as_deref(), Some("usny"));
         assert_eq!(
             fra.fixing_bdc,

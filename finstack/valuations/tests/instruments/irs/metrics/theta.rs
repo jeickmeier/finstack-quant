@@ -51,7 +51,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: rust_decimal::Decimal) -> Int
     InterestRateSwap {
         id: "IRS_THETA_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD),
-        side: PayReceive::ReceiveFixed,
+        side: PayReceive::Receive,
         fixed: finstack_valuations::instruments::FixedLegSpec {
             discount_curve_id: "USD_OIS".into(),
             rate: fixed_rate,
@@ -248,10 +248,10 @@ fn test_theta_opposite_sides() {
     let market = build_curves(0.06, as_of);
 
     let mut swap_receive = create_swap(as_of, end, dec!(0.05));
-    swap_receive.side = PayReceive::ReceiveFixed;
+    swap_receive.side = PayReceive::Receive;
 
     let mut swap_pay = create_swap(as_of, end, dec!(0.05));
-    swap_pay.side = PayReceive::PayFixed;
+    swap_pay.side = PayReceive::Pay;
 
     let theta_receive = *swap_receive
         .price_with_metrics(

@@ -83,10 +83,7 @@ def test_example_modules_export_symbols_used_by_scripts(
         "LookbackReturns",
         "PeriodStats",
         "RollingGreeks",
-        "RollingReturns",
-        "RollingSharpe",
-        "RollingSortino",
-        "RollingVolatility",
+        "DatedSeries",
     }
     statements_analytics_exports = {
         "compute_multiple",

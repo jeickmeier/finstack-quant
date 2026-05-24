@@ -37,7 +37,7 @@
 //! use finstack_valuations::market::{BuildCtx, build_rate_instrument};
 //! use finstack_valuations::market::quotes::ids::{Pillar, QuoteId};
 //! use finstack_valuations::market::quotes::rates::RateQuote;
-//! use finstack_valuations::market::conventions::ids::IndexId;
+//! use finstack_core::types::IndexId;
 //! use finstack_valuations::market::conventions::ConventionRegistry;
 //! use finstack_core::dates::Date;
 //! use finstack_core::HashMap;

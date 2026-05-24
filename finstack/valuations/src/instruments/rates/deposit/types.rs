@@ -29,8 +29,8 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
-use crate::market::conventions::ids::IndexId;
 use crate::market::conventions::ConventionRegistry;
+use finstack_core::types::IndexId;
 
 /// Simple deposit instrument with optional quoted rate.
 ///

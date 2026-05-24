@@ -136,7 +136,7 @@ fn build_swap_internal(
     Ok(InterestRateSwap::builder()
         .id(InstrumentId::new(id_str))
         .notional(notional)
-        .side(PayReceive::PayFixed)
+        .side(PayReceive::Pay)
         .fixed(fixed)
         .float(float)
         .build()?)
