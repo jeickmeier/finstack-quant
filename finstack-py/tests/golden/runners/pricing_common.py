@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 
 from finstack.core.market_data import MarketContext
+from finstack.valuations.instruments import price_instrument_with_metrics
 
 from finstack.valuations import (
     CalibrationEnvelopeError,
     ValuationResult,
     calibrate,
-    price_instrument_with_metrics,
 )
 from tests.golden.pricing_validation import validated_instrument_json
 from tests.golden.runners import validate_source_validation_fixture

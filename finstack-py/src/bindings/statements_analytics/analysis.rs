@@ -673,69 +673,6 @@ impl PyDependencyTracer {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Introspection — free functions (kept for backward compatibility)
-// ---------------------------------------------------------------------------
-
-/// Trace dependencies for a node and return ASCII tree.
-///
-/// Parameters
-/// ----------
-/// model_json : str
-///     JSON-serialized ``FinancialModelSpec``.
-/// node_id : str
-///     Node to trace dependencies for.
-///
-/// Returns
-/// -------
-/// str
-///     ASCII-formatted dependency tree.
-#[pyfunction]
-fn trace_dependencies(model: &Bound<'_, PyAny>, node_id: &str) -> PyResult<String> {
-    let model = extract_model_ref(model)?;
-    let graph = finstack_statements::evaluator::DependencyGraph::from_model(&model)
-        .map_err(display_to_py)?;
-    let tracer = finstack_statements_analytics::analysis::DependencyTracer::new(&model, &graph);
-    let tree = tracer.dependency_tree(node_id).map_err(display_to_py)?;
-    Ok(finstack_statements_analytics::analysis::render_tree_ascii(
-        &tree,
-    ))
-}
-
-/// Trace dependencies for a node and return detailed tree with values.
-///
-/// Parameters
-/// ----------
-/// model_json : str
-///     JSON-serialized ``FinancialModelSpec``.
-/// results_json : str
-///     JSON-serialized ``StatementResult``.
-/// node_id : str
-///     Node to trace dependencies for.
-/// period : str
-///     Period string (e.g. ``"2025Q1"``).
-///
-/// Returns
-/// -------
-/// str
-///     ASCII tree with node values for the given period.
-#[pyfunction]
-fn trace_dependencies_detailed(
-    model: &Bound<'_, PyAny>,
-    results: &Bound<'_, PyAny>,
-    node_id: &str,
-    period: &str,
-) -> PyResult<String> {
-    let model = extract_model_ref(model)?;
-    let results = extract_results_ref(results)?;
-    let pid: finstack_core::dates::PeriodId = period.parse().map_err(display_to_py)?;
-    let graph = finstack_statements::evaluator::DependencyGraph::from_model(&model)
-        .map_err(display_to_py)?;
-    let tracer = finstack_statements_analytics::analysis::DependencyTracer::new(&model, &graph);
-    let tree = tracer.dependency_tree(node_id).map_err(display_to_py)?;
-    Ok(finstack_statements_analytics::analysis::render_tree_detailed(&tree, &results, &pid))
-}
-
 /// Get direct dependencies for a node.
 ///
 /// Parameters
@@ -1110,8 +1047,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(run_corporate_analysis, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(pl_summary_report, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(credit_assessment_report, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(trace_dependencies, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(trace_dependencies_detailed, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(direct_dependencies, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(all_dependencies, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(dependents, m)?)?;

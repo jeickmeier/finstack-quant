@@ -84,7 +84,7 @@ A hierarchical credit factor model that decomposes every issuer's spread into a 
   accept any finite `pct`** (including `<= -100`) — these are legitimate
   tail-risk stresses. FX shocks retain the strict `<= -100%` rejection because
   driving a spot rate to zero would propagate NaNs through triangulation.
-- **`ScenarioEngine::compose` is `#[deprecated]`** in favor of `try_compose`.
+- **`ScenarioEngine::compose` has been removed** in favor of `try_compose`.
   The permissive variant could produce specs with multiple `TimeRollForward`
   ops that the apply phase rejects; `try_compose` catches that statically.
 

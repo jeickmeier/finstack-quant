@@ -422,7 +422,6 @@ class TestValuationsNamespace:
             ValuationResult,
             bs_cos_price,
             merton_jump_cos_price,
-            validate_instrument_json,
             vg_cos_price,
         )
 

@@ -279,6 +279,12 @@ const COMPOSE_SCENARIOS_JSON = JSON.stringify([
 
 const returns = Array.from({ length: 252 }, (_, i) => ((i % 17) - 8) * 0.001);
 const prices = Array.from({ length: 128 }, (_, i) => 100 * (1 + 0.001 * Math.sin(i)));
+const priceDates = prices.map((_, i) =>
+  new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10)
+);
+const returnDates = returns.map((_, i) =>
+  new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10)
+);
 const statsArr = Array.from({ length: 512 }, (_, i) => i * 0.01 + Math.sin(i));
 const cholMat = [
   [4, 2, 0],
@@ -367,6 +373,14 @@ async function main() {
   const t0d = w.createDate(2024, 1, 2);
   const t1d = w.createDate(2025, 1, 2);
   const curve = new w.DiscountCurve('USD-OIS', '2024-01-02', [0.0, 1.0, 1.0, 0.98, 5.0, 0.88]);
+  const pricePerf = new w.Performance(priceDates, [prices], ['bench'], null, 'daily');
+  const returnPerf = w.Performance.fromReturns(
+    returnDates,
+    [returns, returns.map((x) => x * 0.95)],
+    ['bench', 'benchmark'],
+    'benchmark',
+    'daily'
+  );
 
   for (let i = 0; i < 20; i++) {
     w.mean(statsArr);
@@ -400,23 +414,23 @@ async function main() {
   });
 
   bench('analytics', 'sharpe', 20000, () => {
-    w.sharpe(0.08, 0.15, 0.02);
+    pricePerf.sharpe(0.02);
   });
 
   bench('analytics', 'volatility', 8000, () => {
-    w.volatility(returns, 252);
+    pricePerf.volatility(true);
   });
 
-  bench('analytics', 'simpleReturns', 6000, () => {
-    w.simpleReturns(prices);
+  bench('analytics', 'cumulativeReturns', 6000, () => {
+    pricePerf.cumulativeReturns();
   });
 
-  bench('analytics', 'toDrawdownSeries', 6000, () => {
-    w.toDrawdownSeries(returns);
+  bench('analytics', 'drawdownSeries', 6000, () => {
+    returnPerf.drawdownSeries();
   });
 
   bench('analytics', 'maxDrawdown', 8000, () => {
-    w.maxDrawdown(w.toDrawdownSeries(returns));
+    returnPerf.maxDrawdown();
   });
 
   bench('correlation', 'correlationBounds', 20000, () => {
@@ -569,93 +583,82 @@ async function main() {
     w.adjustBusinessDay(t0d, 'modified_following', calCode);
   });
 
-  const benchReturns = returns;
   const benchRf = returns.map(() => 0.0001);
-  const benchBm = returns.map((x) => x * 0.95);
-  const benchDates = benchReturns.map((_, i) =>
-    new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10)
-  );
-  let ddSeries = benchReturns;
-  try {
-    ddSeries = w.toDrawdownSeries(benchReturns);
-  } catch {
-    /* keep raw */
-  }
 
   bench('analytics', 'sortino', 6000, () => {
-    w.sortino(benchReturns, true, 252, 0);
+    returnPerf.sortino(0);
   });
 
   bench('analytics', 'meanReturn', 6000, () => {
-    w.meanReturn(benchReturns, true, 252);
+    returnPerf.meanReturn(true);
   });
 
   bench('analytics', 'downsideDeviation', 6000, () => {
-    w.downsideDeviation(benchReturns, 0.0, true, 252);
+    returnPerf.downsideDeviation(0.0);
   });
 
   bench('analytics', 'valueAtRisk', 6000, () => {
-    w.valueAtRisk(benchReturns, 0.95);
+    returnPerf.valueAtRisk(0.95);
   });
 
   bench('analytics', 'expectedShortfall', 6000, () => {
-    w.expectedShortfall(benchReturns, 0.95);
+    returnPerf.expectedShortfall(0.95);
   });
 
   bench('analytics', 'parametricVar', 6000, () => {
-    w.parametricVar(benchReturns, 0.95);
+    returnPerf.parametricVar(0.95);
   });
 
   bench('analytics', 'skewness', 8000, () => {
-    w.skewness(benchReturns);
+    returnPerf.skewness();
   });
 
   bench('analytics', 'kurtosis', 8000, () => {
-    w.kurtosis(benchReturns);
+    returnPerf.kurtosis();
   });
 
-  bench('analytics', 'compSum', 5000, () => {
-    w.compSum(benchReturns);
+  bench('analytics', 'geometricMean', 5000, () => {
+    returnPerf.geometricMean();
   });
 
-  bench('analytics', 'compTotal', 8000, () => {
-    w.compTotal(benchReturns);
+  bench('analytics', 'cumulativeReturns', 8000, () => {
+    returnPerf.cumulativeReturns();
   });
 
-  bench('analytics', 'cleanReturns', 5000, () => {
-    w.cleanReturns(benchReturns);
+  bench('analytics', 'excessReturns', 5000, () => {
+    returnPerf.excessReturns(benchRf, 252);
   });
 
-  bench('analytics', 'excessReturns', 4000, () => {
-    w.excessReturns(benchReturns, benchRf);
+  bench('analytics', 'drawdownSeries', 4000, () => {
+    returnPerf.drawdownSeries();
   });
 
   bench('analytics', 'rollingSharpe', 2000, () => {
-    w.rollingSharpe(benchReturns, benchDates, 60, 252, 0.02);
+    returnPerf.rollingSharpe(0, 60, 0.02);
   });
 
   bench('analytics', 'rollingVolatility', 2000, () => {
-    w.rollingVolatility(benchReturns, benchDates, 60, 252);
+    returnPerf.rollingVolatility(0, 60);
   });
 
   bench('analytics', 'trackingError', 4000, () => {
-    w.trackingError(benchReturns, benchBm, true, 252);
+    returnPerf.trackingError();
   });
 
   bench('analytics', 'informationRatio', 4000, () => {
-    w.informationRatio(benchReturns, benchBm, true, 252);
+    returnPerf.informationRatio();
   });
 
   bench('analytics', 'rSquared', 5000, () => {
-    w.rSquared(benchReturns, benchBm);
+    returnPerf.rSquared();
   });
 
-  bench('analytics', 'meanEpisodeDrawdown', 4000, () => {
-    w.meanEpisodeDrawdown(ddSeries, 3);
+  bench('analytics', 'drawdownDetails', 4000, () => {
+    returnPerf.drawdownDetails(0, 3);
   });
 
   bench('analytics', 'calmar', 20000, () => {
-    w.calmar(0.08, 0.12);
+    returnPerf.calmar();
   });
 
   bench('core', 'countConsecutive', 8000, () => {

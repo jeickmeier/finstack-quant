@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import json
 
+from finstack.valuations.instruments import price_instrument, validate_instrument_json
 import pytest
-
-from finstack.valuations import price_instrument, validate_instrument_json
 
 
 def _money(amount: str) -> dict[str, str]:

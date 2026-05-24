@@ -35,11 +35,6 @@ const DEFAULT_CORR_BUMP_ABS: f64 = 0.01;
 /// Boundary width for smooth correlation clamping transitions
 const DEFAULT_CORR_BOUNDARY_WIDTH: f64 = 0.005;
 
-/// Default value for the deprecated `aod_allocation_fraction` field. The
-/// engine no longer reads this field (AoD timing is survival-weighted); the
-/// constant is retained only so `Default` populates the legacy field.
-const DEFAULT_AOD_ALLOCATION_FRACTION: f64 = 0.5;
-
 /// Grid step for exact convolution method (fraction of portfolio notional)
 const DEFAULT_GRID_STEP: f64 = 0.001;
 
@@ -186,21 +181,6 @@ pub struct CDSTranchePricerConfig {
     pub mid_period_protection: bool,
     /// Whether to include accrual-on-default in the premium leg
     pub accrual_on_default_enabled: bool,
-    /// Deprecated: fraction of incremental loss allocated to accrual-on-default.
-    ///
-    /// This field is no longer read by the pricer. It previously held a fixed
-    /// `0.5` mid-period fraction; the engine now integrates the within-period
-    /// default timing against the index credit curve (via
-    /// `within_period_default_fraction`) — a survival-weighted fraction that
-    /// is `< 0.5` for a positive hazard and is consistent with the single-name
-    /// CDS analytic accrual-on-default.
-    /// The field is retained for struct-construction compatibility and will
-    /// be removed in a future release.
-    #[deprecated(
-        note = "AoD timing is now survival-weighted (see within_period_default_fraction); \
-                this field is ignored"
-    )]
-    pub aod_allocation_fraction: f64,
     /// Stub convention for schedule generation
     pub schedule_stub: StubKind,
     /// If true, generate ISDA coupon dates (IMM-20 schedule)
@@ -226,10 +206,6 @@ pub struct CDSTranchePricerConfig {
 }
 
 impl Default for CDSTranchePricerConfig {
-    // `aod_allocation_fraction` is deprecated but still a (now-ignored) struct
-    // field; populating it in the constructor is intentional for
-    // struct-construction compatibility.
-    #[allow(deprecated)]
     fn default() -> Self {
         Self {
             // Model selection
@@ -251,7 +227,6 @@ impl Default for CDSTranchePricerConfig {
             // ISDA conventions
             mid_period_protection: true, // ISDA standard
             accrual_on_default_enabled: true,
-            aod_allocation_fraction: DEFAULT_AOD_ALLOCATION_FRACTION,
             schedule_stub: StubKind::ShortFront,
             use_isda_coupon_dates: false,
             index_settlement_lag: DEFAULT_INDEX_SETTLEMENT_LAG,

@@ -20,8 +20,6 @@ run_corporate_analysis = _sa.run_corporate_analysis
 pl_summary_report = _sa.pl_summary_report
 credit_assessment_report = _sa.credit_assessment_report
 DependencyTracer = _sa.DependencyTracer
-trace_dependencies = _sa.trace_dependencies
-trace_dependencies_detailed = _sa.trace_dependencies_detailed
 direct_dependencies = _sa.direct_dependencies
 all_dependencies = _sa.all_dependencies
 dependents = _sa.dependents
@@ -142,8 +140,6 @@ __all__: list[str] = [
     "run_three_statement_checks",
     "run_variance",
     "score_relative_value",
-    "trace_dependencies",
-    "trace_dependencies_detailed",
     "validate_scorecard_config",
     "z_score",
 ]

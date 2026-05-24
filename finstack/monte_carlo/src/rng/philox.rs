@@ -118,49 +118,6 @@ impl PhiloxRng {
         rng
     }
 
-    /// Create a deterministic RNG from a string seed.
-    ///
-    /// Useful for reproducible simulations with human-readable seed identifiers
-    /// (e.g., `"scenario-1"`, `"risk-run-2024-01-15"`). Uses FNV-1a hashing.
-    ///
-    /// # Deprecation
-    ///
-    /// This helper is unused outside its own doctest. Prefer
-    /// [`crate::seed::derive_seed`] for instrument/scenario-keyed seeds, or
-    /// hash the string at the call site and pass to [`Self::new`]. Kept as
-    /// `#[deprecated]` rather than removed so external callers (if any)
-    /// receive a clear migration message instead of a silent breakage.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # #![allow(deprecated)]
-    /// use finstack_monte_carlo::rng::philox::PhiloxRng;
-    ///
-    /// let rng1 = PhiloxRng::deterministic_from_str("my-simulation");
-    /// let rng2 = PhiloxRng::deterministic_from_str("my-simulation");
-    ///
-    /// assert_eq!(format!("{:?}", rng1), format!("{:?}", rng2));
-    /// ```
-    #[deprecated(
-        since = "0.5.0",
-        note = "Use `crate::seed::derive_seed` for instrument-keyed seeds, or hash the string and pass to `PhiloxRng::new`."
-    )]
-    #[inline]
-    pub fn deterministic_from_str(seed_str: &str) -> Self {
-        // FNV-1a hash for good distribution
-        const FNV_OFFSET: u64 = 0xcbf29ce484222325;
-        const FNV_PRIME: u64 = 0x00000100000001B3;
-
-        let mut hash = FNV_OFFSET;
-        for byte in seed_str.bytes() {
-            hash ^= byte as u64;
-            hash = hash.wrapping_mul(FNV_PRIME);
-        }
-
-        Self::new(hash)
-    }
-
     /// Generate a new block of random values.
     ///
     /// This is a hot path method called frequently during simulation.

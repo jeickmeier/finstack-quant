@@ -350,8 +350,6 @@ class Thirty360Convention:
 
     US_SIA: Thirty360Convention
     """US 30/360 SIA / Bond Basis convention."""
-    US: Thirty360Convention
-    """Backward-compatible alias for ``US_SIA``."""
     ISDA: Thirty360Convention
     """30/360 ISDA convention."""
     EUROPEAN: Thirty360Convention

@@ -30,7 +30,7 @@ the asset value falls below the debt barrier.
 | `distance_to_default()` | DD = (ln(V/B) + (r - q - σ²/2)·T) / (σ√T)                      |
 | `default_probability()` | Terminal: PD = N(-DD). First-passage: Black-Cox closed-form      |
 | `implied_spread()`      | s = -ln(1 - PD·(1-R)) / T                                       |
-| `implied_equity()`      | Black-Scholes call formula with continuous payout rate            |
+| `try_implied_equity()`  | Black-Scholes call formula with continuous payout rate            |
 | `to_hazard_curve()`     | Converts structural PD to piecewise-constant hazard curve        |
 
 **Asset dynamics**

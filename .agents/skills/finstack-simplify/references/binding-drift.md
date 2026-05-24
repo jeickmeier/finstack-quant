@@ -2,7 +2,7 @@
 
 The triplet is **load-bearing**. Rust is canonical; Python and WASM must match in names and semantics, per `AGENTS.md`:
 
-> Rust is the canonical API design. Type and function names in Python/WASM must match Rust exactly (exceptions only for host-language collisions, e.g. WASM `FsDate` for JS `Date`).
+> Rust is the canonical API design. Type and function names in Python/WASM must match Rust exactly (exceptions only for documented host-language collisions).
 > All logic stays in Rust crates; bindings do only type conversion, wrapper construction, error mapping.
 
 Drift has two flavors:
@@ -57,12 +57,11 @@ Per `AGENTS.md`, metric keys are fully qualified: `bucketed_dv01::USD-OIS::10y`,
 
 ## Name collision exceptions
 
-Python and WASM have host-language name collisions we tolerate:
+Python and WASM host-language name collisions must be documented explicitly:
 
-- WASM uses `FsDate` instead of `Date` to avoid colliding with JS's builtin `Date`.
 - Python must avoid builtins like `type`, `id`, `hash` (these are fine to shadow in Rust, not in Python).
 
-These are **the only exceptions.** If you see another deviation ("we renamed `register` to `add` because it's cleaner"), treat it as drift to fix.
+Undocumented deviations ("we renamed `register` to `add` because it's cleaner") are drift to fix.
 
 ---
 
@@ -91,7 +90,7 @@ When you find these, the refactor is:
 
 1. Move the logic into a new (or existing) Rust function.
 2. Reduce the binding back to the three-job shape.
-3. Add a matching binding in the *other* host language if one was missing.
+3. Add a matching binding in the _other_ host language if one was missing.
 
 **Do not** just clean up the Python binding and leave the WASM binding still holding logic. Triplets move together.
 
@@ -108,6 +107,7 @@ During a refactor:
 - If the parity test suite fails after your changes, stop. Either your refactor broke an invariant or the parity entry is stale — figure out which before "fixing" the test.
 
 Run the parity tests with:
+
 ```bash
 uv run pytest finstack-py/tests/parity -x
 ```
@@ -166,7 +166,7 @@ The worst case. Rust has `compute_cs01(&bond, &curve)`, Python has `compute_cs01
 ## Sanity check before you call a binding slice "done"
 
 - [ ] Rust public surface matches Python binding symbol-for-symbol (modulo Python naming like `get_*` and snake_case).
-- [ ] Rust public surface matches WASM binding symbol-for-symbol (modulo `FsDate` and JS naming conventions).
+- [ ] Rust public surface matches WASM binding symbol-for-symbol (modulo documented JS naming conventions).
 - [ ] No binding function exceeds ~20 lines unless it's doing a legitimate type-conversion batch.
 - [ ] No binding function contains arithmetic or non-trivial control flow.
 - [ ] `parity_contract.toml` is in sync; `mise run python-test` passes; parity tests pass.

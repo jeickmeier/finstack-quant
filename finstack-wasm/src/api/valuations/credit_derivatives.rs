@@ -1,13 +1,13 @@
 //! WASM bindings for CDS-family instrument example payloads.
 //!
-//! Mirrors `finstack-py/src/bindings/valuations/credit_derivatives.rs`. The
-//! exported JS surface (under `valuations.creditDerivatives.*`) is unchanged;
-//! this file exists so the Rust source tree matches the Python wrapper layout.
+//! Mirrors `finstack-py/src/bindings/valuations/credit_derivatives.rs`. This
+//! file exists so the Rust source tree matches the Python wrapper layout.
 //!
 //! Pricing / validation / serialization for CDS instruments is provided by the
 //! generic `priceInstrument`, `priceInstrumentWithMetrics`, and
-//! `validateInstrumentJson` entry points already exposed from
-//! [`super::pricing`]; this module only owns the example-payload factories.
+//! `validateInstrumentJson` entry points exposed from the JS facade at
+//! `valuations.instruments`; this module only owns the example-payload
+//! factories.
 
 use crate::utils::to_js_err;
 use finstack_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;

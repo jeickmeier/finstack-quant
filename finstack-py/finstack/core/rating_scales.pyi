@@ -123,9 +123,6 @@ def registry_from_config(config: FinstackConfig) -> RatingScaleRegistry:
     :data:`RATING_SCALES_EXTENSION_KEY`.
     """
 
-def extension_key() -> str:
-    """Return :data:`RATING_SCALES_EXTENSION_KEY`."""
-
 RATING_SCALES_EXTENSION_KEY: str
 """Configuration-extension key used to override the embedded registry."""
 
@@ -136,6 +133,5 @@ __all__ = [
     "ScorecardScale",
     "UnknownScalePolicy",
     "embedded_registry",
-    "extension_key",
     "registry_from_config",
 ]

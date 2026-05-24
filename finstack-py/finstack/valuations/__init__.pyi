@@ -49,10 +49,10 @@ Reference envelope JSON examples covering both Track-A (bootstrap from quotes)
 and Track-B (snapshot-only) live under
 ``finstack/valuations/examples/market_bootstrap/`` in the repository.
 
-This module also exposes pricing (:func:`price_instrument`,
-:func:`price_instrument_with_metrics`), SABR / Black-Scholes primitives,
-and credit-factor hierarchy tooling. Portfolio factor sensitivities and
-risk decomposition live under :mod:`finstack.portfolio`.
+Instrument pricing helpers live under :mod:`finstack.valuations.instruments`.
+This module exposes calibration, SABR / Black-Scholes primitives, and
+credit-factor hierarchy tooling. Portfolio factor sensitivities and risk
+decomposition live under :mod:`finstack.portfolio`.
 """
 
 from __future__ import annotations
@@ -66,13 +66,6 @@ from finstack.valuations import credit_derivatives as credit_derivatives
 from finstack.valuations import exotics as exotics
 from finstack.valuations import fx as fx
 from finstack.valuations import instruments as instruments
-from finstack.valuations.credit import (
-    CreditState as CreditState,
-    DynamicRecoverySpec as DynamicRecoverySpec,
-    EndogenousHazardSpec as EndogenousHazardSpec,
-    MertonModel as MertonModel,
-    ToggleExerciseModel as ToggleExerciseModel,
-)
 from finstack.valuations.envelope import (
     BaseCorrelationCurvePrior as BaseCorrelationCurvePrior,
     BaseCorrelationStep as BaseCorrelationStep,
@@ -171,16 +164,7 @@ __all__ = [
     "exotics",
     "fx",
     "instruments",
-    "CreditState",
-    "DynamicRecoverySpec",
-    "EndogenousHazardSpec",
-    "MertonModel",
     "ValuationResult",
-    "validate_instrument_json",
-    "price_instrument",
-    "price_instrument_with_metrics",
-    "list_standard_metrics",
-    "list_standard_metrics_grouped",
     "BaseCorrelationCurvePrior",
     "BaseCorrelationStep",
     "BasisSpreadCurvePrior",
@@ -296,7 +280,6 @@ __all__ = [
     "SabrCalibrator",
     "instrument_cashflows",
     "instrument_cashflows_json",
-    "ToggleExerciseModel",
 ]
 
 class ValuationResult:
@@ -511,83 +494,6 @@ class ValuationResult:
         """
         ...
 
-def validate_instrument_json(json: str) -> str:
-    """Parse tagged instrument JSON and return canonical pretty JSON.
-
-    Args:
-        json: Tagged instrument JSON (e.g. ``{"type": "bond", ...}``).
-
-    Returns:
-        Canonical pretty-printed JSON accepted by the instrument loader.
-
-    Example:
-        >>> from finstack.valuations import validate_instrument_json
-        >>> validate_instrument_json(inst_json)  # doctest: +SKIP
-        ''
-    """
-    ...
-
-def price_instrument(
-    instrument_json: str,
-    market: MarketContext | str,
-    as_of: str,
-    model: str = "default",
-) -> str:
-    """Price an instrument using the standard registry and a model key.
-
-    Args:
-        instrument_json: Tagged instrument JSON.
-        market: ``MarketContext`` instance or JSON string.
-        as_of: Valuation date in ISO 8601 format.
-        model: Model key: ``default`` (instrument-native default), ``discounting``, ``black76``, ``hazard_rate``,
-            ``hull_white_1f``, ``tree``, ``normal``, ``monte_carlo_gbm``, etc.
-
-    Returns:
-        Pretty-printed JSON ``ValuationResult``.
-
-    Example:
-        >>> from finstack.valuations import price_instrument
-        >>> price_instrument(inst_json, mkt_json, "2025-01-15")  # doctest: +SKIP
-        ''
-    """
-    ...
-
-def price_instrument_with_metrics(
-    instrument_json: str,
-    market: MarketContext | str,
-    as_of: str,
-    model: str = "default",
-    metrics: list[str] = [],
-    pricing_options: str | None = None,
-    market_history: str | None = None,
-) -> str:
-    """Price an instrument and request explicit risk metrics.
-
-    Args:
-        instrument_json: Tagged instrument JSON.
-        market: ``MarketContext`` instance or JSON string.
-        as_of: Valuation date in ISO 8601 format.
-        model: Model key string (same vocabulary as ``price_instrument``).
-        metrics: Metric names to compute (default empty list).
-        pricing_options: Optional JSON string of ``MetricPricingOverrides``
-            merged into the instrument's ``pricing_overrides``. Supports
-            ``"theta_period"`` (e.g. ``"6M"``) and ``"breakeven_config"``
-            (e.g. ``{"target": "z_spread", "mode": "linear"}``), plus
-            ``"var_config"`` for ``hvar`` / ``expected_shortfall`` settings
-            (e.g. ``{"confidence_level": 0.99, "method": "full_revaluation"}``).
-        market_history: Optional JSON string of ``MarketHistory`` scenarios
-            required by ``hvar`` and ``expected_shortfall`` metrics.
-
-    Returns:
-        Pretty-printed JSON ``ValuationResult`` including requested metrics.
-
-    Example:
-        >>> from finstack.valuations import price_instrument_with_metrics
-        >>> price_instrument_with_metrics(inst_json, mkt_json, "2025-01-15", metrics=["dv01"])  # doctest: +SKIP
-        ''
-    """
-    ...
-
 def instrument_cashflows_json(
     instrument_json: str,
     market: MarketContext | str,
@@ -639,42 +545,6 @@ def instrument_cashflows(
         ``conditional_default_prob``, ``inflation_index_ratio``,
         ``prepayment_smm``, ``beginning_balance``, ``ending_balance``, and
         ``pv``.
-    """
-    ...
-
-def list_standard_metrics() -> list[str]:
-    """Return every metric ID exposed by the standard metric registry.
-
-    Args:
-        (none)
-
-    Returns:
-        Sorted metric identifier strings.
-
-    Example:
-        >>> from finstack.valuations import list_standard_metrics
-        >>> isinstance(list_standard_metrics(), list)
-        True
-    """
-    ...
-
-def list_standard_metrics_grouped() -> dict[str, list[str]]:
-    """Return standard metrics organized by group.
-
-    Each key is a human-readable group name (e.g. ``"Pricing"``,
-    ``"Greeks"``, ``"Sensitivity"``).  Values are sorted lists of
-    metric identifier strings belonging to that group.
-
-    Returns:
-        Mapping from group name to metric identifiers.
-
-    Example:
-        >>> from finstack.valuations import list_standard_metrics_grouped
-        >>> grouped = list_standard_metrics_grouped()
-        >>> "Greeks" in grouped
-        True
-        >>> "delta" in grouped["Greeks"]
-        True
     """
     ...
 
@@ -918,6 +788,7 @@ def calibrate(json: str) -> CalibrationResult:
         >>> result = calibrate(_json.dumps(envelope))  # doctest: +SKIP
         >>> assert result.success and result.rmse < 1e-6  # doctest: +SKIP
         >>> curve = result.market.get_discount("USD-OIS")  # doctest: +SKIP
+        >>> from finstack.valuations.instruments import price_instrument
         >>> price_json = price_instrument(inst_json, result.market_json, "2026-05-08")  # doctest: +SKIP
 
     See Also:

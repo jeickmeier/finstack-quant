@@ -3,6 +3,7 @@ trigger: glob
 description:
 globs: *.tsx,*.ts,*.js
 ---
+
 # JavaScript/TypeScript Usage Standards for finstack-wasm
 
 ## Overview
@@ -17,11 +18,11 @@ Standards for JavaScript and TypeScript code that uses the finstack-wasm module.
 import init, { core, analytics, valuations, margin } from "finstack-wasm";
 
 async function initialize() {
-    await init();
+  await init();
 
-    const usd = new core.Currency("USD");
-    const amount = new core.Money(100.0, usd);
-    const date = new core.dates.FsDate(2024, 1, 15);
+  const usd = new core.Currency("USD");
+  const amount = new core.Money(100.0, usd);
+  const date = core.createDate(2024, 1, 15);
 }
 
 initialize().catch(console.error);
@@ -31,14 +32,22 @@ initialize().catch(console.error);
 
 ```typescript
 import init, {
-  core, analytics, correlation, margin, monte_carlo,
-  portfolio, scenarios, statements, statements_analytics, valuations
+  core,
+  analytics,
+  correlation,
+  margin,
+  monte_carlo,
+  portfolio,
+  scenarios,
+  statements,
+  statements_analytics,
+  valuations,
 } from "finstack-wasm";
 
 async function example(): Promise<void> {
-    await init();
-    const usd = new core.Currency("USD");
-    const money = new core.Money(100.0, usd);
+  await init();
+  const usd = new core.Currency("USD");
+  const money = new core.Money(100.0, usd);
 }
 ```
 
@@ -70,16 +79,21 @@ await init();
 
 // Core types
 const usd = new core.Currency("USD");
-const money = new core.Money(1000.50, usd);
-const date = new core.dates.FsDate(2024, 9, 30);
+const money = new core.Money(1000.5, usd);
+const date = core.createDate(2024, 9, 30);
 
 // Analytics
-const s = analytics.sharpe([0.01, 0.02, -0.01], 0.0);
+const perf = analytics.Performance.fromReturns(
+  ["2024-01-01", "2024-01-02", "2024-01-03"],
+  [[0.01, 0.02, -0.01]],
+  ["asset"],
+  null,
+  "daily",
+);
+const s = perf.sharpe(0.0);
 
 // Valuations
-const bond = valuations.instruments.Bond.builder()
-    .notional(1000000)
-    .build();
+const bond = valuations.instruments.Bond.builder().notional(1000000).build();
 
 // Monte Carlo
 const grid = new monte_carlo.TimeGrid([0.0, 0.5, 1.0]);
@@ -104,41 +118,38 @@ const usd = new core.Currency("USD");
 const usd = new core.Currency("USD");
 const eur = new core.Currency("EUR");
 
-console.log(usd.code);         // "USD"
-console.log(usd.numericCode);  // 840
+console.log(usd.code); // "USD"
+console.log(usd.numericCode); // 840
 
-const amount = new core.Money(1000.50, usd);
-console.log(amount.amount);    // 1000.5
+const amount = new core.Money(1000.5, usd);
+console.log(amount.amount); // 1000.5
 ```
 
 ### Dates
 
 ```javascript
-const date = new core.dates.FsDate(2024, 9, 30);
+const date = core.createDate(2024, 9, 30);
 
-console.log(date.year);    // 2024
-console.log(date.month);   // 9
-console.log(date.day);     // 30
+console.log(date); // "2024-09-30"
 
-const isWeekend = date.isWeekend();
-const nextBD = date.addBusinessDays(1);
+const nextBD = core.adjustBusinessDay(date, "modified_following", "nyse");
 ```
 
-Note: WASM uses `FsDate` (not `Date`) to avoid collision with JavaScript's built-in `Date`.
+Dates are represented as ISO strings at the JavaScript facade boundary.
 
 ## Error Handling
 
 ```javascript
 try {
-    const invalid = new core.Currency("XXX");
+  const invalid = new core.Currency("XXX");
 } catch (error) {
-    console.error("Invalid currency:", error);
+  console.error("Invalid currency:", error);
 }
 
 try {
-    const result = money1.add(money2);
+  const result = money1.add(money2);
 } catch (error) {
-    console.error("Operation failed:", error);
+  console.error("Operation failed:", error);
 }
 ```
 
@@ -154,13 +165,20 @@ import init, { core, analytics } from "finstack-wasm";
 await init();
 
 test("core.Currency creation", () => {
-    const usd = new core.Currency("USD");
-    assert.equal(usd.code, "USD");
+  const usd = new core.Currency("USD");
+  assert.equal(usd.code, "USD");
 });
 
-test("analytics.sharpe returns float", () => {
-    const value = analytics.sharpe([0.01, 0.02], 0.0);
-    assert.equal(typeof value, "number");
+test("analytics.Performance.sharpe returns a typed array", () => {
+  const perf = analytics.Performance.fromReturns(
+    ["2024-01-01", "2024-01-02"],
+    [[0.01, 0.02]],
+    ["asset"],
+    null,
+    "daily",
+  );
+  const value = perf.sharpe(0.0);
+  assert.equal(value instanceof Float64Array, true);
 });
 ```
 
@@ -181,6 +199,6 @@ Use JSDoc with namespace paths:
  * @returns {core.Money}
  */
 function createMoney(currency, amount) {
-    return new core.Money(amount, currency);
+  return new core.Money(amount, currency);
 }
 ```

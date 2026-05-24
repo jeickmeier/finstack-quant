@@ -167,26 +167,6 @@ class MonteCarloResult:
         ...
 
     @property
-    def num_skipped(self) -> int:
-        """Legacy skipped-path count.
-
-        Current engine loops reject non-finite discounted payoffs rather than
-        censoring paths, so new results should report zero here.
-
-        Args:
-            None
-
-        Returns:
-            Count of skipped paths (0 when no values were filtered).
-
-        Example:
-            >>> from finstack.monte_carlo import price_european_call
-            >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=1000).num_skipped
-            0
-        """
-        ...
-
-    @property
     def median(self) -> float | None:
         """Median of captured discounted path values, if captured.
 
@@ -391,21 +371,6 @@ class Estimate:
 
         Returns:
             Count of simulated sample paths.
-        """
-        ...
-
-    @property
-    def num_skipped(self) -> int:
-        """Legacy skipped-path count.
-
-        Current engine loops reject non-finite discounted payoffs rather than
-        censoring paths, so new estimates should report zero here.
-
-        Args:
-            None
-
-        Returns:
-            Count of skipped paths (0 when no values were filtered).
         """
         ...
 

@@ -1063,16 +1063,16 @@ export interface CovenantsNamespace {
   validateCovenantSpec(specJson: string): string;
   validateCovenantReport(reportJson: string): string;
   validateCovenantEngine(engineJson: string): string;
-  evaluateEngine(engineJson: string, metricsJson: string, asOf: string): string;
-  lboStandard(
+  evaluateCovenantEngine(engineJson: string, metricsJson: string, asOf: string): string;
+  lboStandardCovenants(
     initialLeverage: number,
     interestCoverage: number,
     fixedChargeCoverage: number,
     maxCapex: number
   ): string;
-  covLite(maxLeverage: number, maxSeniorLeverage: number): string;
-  realEstate(minDscr: number, minDebtYield: number, maxLtv: number): string;
-  projectFinance(
+  covLiteCovenants(maxLeverage: number, maxSeniorLeverage: number): string;
+  realEstateCovenants(minDscr: number, minDebtYield: number, maxLtv: number): string;
+  projectFinanceCovenants(
     minDscr: number,
     distributionLockupDscr: number,
     minLiquidity: number,
@@ -1296,38 +1296,6 @@ export interface CreditDerivativesNamespace {
   cdsIndexExampleJson(): string;
   cdsTrancheExampleJson(): string;
   cdsOptionExampleJson(): string;
-  validate(instrumentJson: string): string;
-  priceInstrument(instrumentJson: string, marketJson: string, asOf: string, model: string): string;
-  priceInstrumentWithMetrics(
-    instrumentJson: string,
-    marketJson: string,
-    asOf: string,
-    model: string,
-    metrics: string[],
-    pricingOptions?: string | null,
-    marketHistory?: string | null
-  ): string;
-  priceInstrumentWithMarket(
-    instrumentJson: string,
-    market: WasmMarket,
-    asOf: string,
-    model: string
-  ): string;
-  priceInstrumentWithMetricsAndMarket(
-    instrumentJson: string,
-    market: WasmMarket,
-    asOf: string,
-    model: string,
-    metrics: string[],
-    pricingOptions?: string | null,
-    marketHistory?: string | null
-  ): string;
-  instrumentCashflowsWithMarket(
-    instrumentJson: string,
-    market: WasmMarket,
-    asOf: string,
-    model: string
-  ): string;
 }
 
 export interface ValuationsNamespace {
@@ -1376,33 +1344,7 @@ export interface ValuationsNamespace {
    * @throws Error with `name = "CalibrationEnvelopeError"` if the envelope JSON is malformed.
    */
   dependencyGraphJson(envelope: CalibrationEnvelope | string): string;
-  validateInstrumentJson(json: string): string;
   WasmMarket: typeof WasmMarket;
-  priceInstrument(instrumentJson: string, marketJson: string, asOf: string, model: string): string;
-  priceInstrumentWithMetrics(
-    instrumentJson: string,
-    marketJson: string,
-    asOf: string,
-    model: string,
-    metrics: string[],
-    pricingOptions?: string | null,
-    marketHistory?: string | null
-  ): string;
-  priceInstrumentWithMarket(
-    instrumentJson: string,
-    market: WasmMarket,
-    asOf: string,
-    model: string
-  ): string;
-  priceInstrumentWithMetricsAndMarket(
-    instrumentJson: string,
-    market: WasmMarket,
-    asOf: string,
-    model: string,
-    metrics: string[],
-    pricingOptions?: string | null,
-    marketHistory?: string | null
-  ): string;
   /**
    * Per-flow cashflow envelope (DF / survival / PV) for a discountable
    * instrument. `model` must be `"discounting"` or `"hazard_rate"`; the
@@ -1414,16 +1356,6 @@ export interface ValuationsNamespace {
     asOf: string,
     model: string
   ): string;
-  instrumentCashflowsWithMarket(
-    instrumentJson: string,
-    market: WasmMarket,
-    asOf: string,
-    model: string
-  ): string;
-  listStandardMetrics(): string[];
-  /** List all standard metrics organized by group.
-   *  Returns an object mapping group name to sorted metric ID arrays. */
-  listStandardMetricsGrouped(): Record<string, string[]>;
   /** Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
    *  All rates are continuously compounded decimals; `sigma` is annualized vol;
    *  `t` is years to expiry. */

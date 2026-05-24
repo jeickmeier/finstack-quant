@@ -47,7 +47,7 @@ pub use finstack_statements::types::NodeId;
 /// - `name`: Optional display name for UI or logs.
 /// - `description`: Optional text describing the intent of the scenario.
 /// - `operations`: Ordered list of [`OperationSpec`] values to execute.
-/// - `priority`: Used by [`ScenarioEngine::compose`](crate::engine::ScenarioEngine::compose)
+/// - `priority`: Used by [`ScenarioEngine::try_compose`](crate::engine::ScenarioEngine::try_compose)
 ///   to determine merge ordering (lower numbers run first).
 /// - `resolution_mode`: Controls how hierarchy-targeted shocks at multiple tree
 ///   levels combine for a single curve. Defaults to [`ResolutionMode::MostSpecificWins`].

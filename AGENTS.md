@@ -29,7 +29,7 @@
 
 ## Architecture: Binding Layer
 
-- Rust is the canonical API design. Type and function names in Python/WASM must match Rust exactly (exceptions only for host-language collisions, e.g. WASM `FsDate` for JS `Date`)
+- Rust is the canonical API design. Type and function names in Python/WASM must match Rust exactly (exceptions only for documented host-language collisions)
 - All logic stays in Rust crates; bindings do only type conversion, wrapper construction, error mapping
 - Python binding tree: `finstack-py/src/bindings/{core,analytics,margin,...}/`; `lib.rs` delegates to `bindings::register_root`
 - WASM binding tree: `finstack-wasm/src/api/{core_ns,analytics,margin,...}/`; public API via `index.js` facade, not raw pkg/

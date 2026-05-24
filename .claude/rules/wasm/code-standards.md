@@ -3,6 +3,7 @@ trigger: model_decision
 description: Rust-Wasm Bindings
 globs:
 ---
+
 # WASM Bindings Code Standards for finstack-wasm
 
 ## Core Principles
@@ -61,7 +62,7 @@ finstack-wasm/
 - Types: `PascalCase` (matching Rust)
 - Functions: `camelCase` (wasm-bindgen auto-converts snake_case)
 - Namespace keys in facade: `snake_case` (matching Rust crate names)
-- Name exceptions allowed only for host-language collisions (e.g. `FsDate` instead of `Date` to avoid JS built-in collision); documented in `parity_contract.toml`
+- Name exceptions are allowed only for documented host-language collisions.
 
 ## Type Wrapping Patterns
 
@@ -140,15 +141,10 @@ import * as raw from "../pkg/finstack_wasm.js";
 export const core = {
   Currency: raw.Currency,
   Money: raw.Money,
-  dates: {
-    FsDate: raw.FsDate,
-    DayCount: raw.DayCount,
-    buildPeriods: raw.buildPeriods,
-  },
-  market_data: {
-    MarketContext: raw.MarketContext,
-    DiscountCurve: raw.DiscountCurve,
-  },
+  DayCount: raw.DayCount,
+  createDate: raw.createDate,
+  adjustBusinessDay: raw.adjustBusinessDay,
+  DiscountCurve: raw.DiscountCurve,
 };
 ```
 
@@ -207,7 +203,7 @@ test("core namespace exposes Currency", () => {
 
 - [ ] Wrapper types use named struct with `pub(crate) inner`.
 - [ ] No `pub use *` glob re-exports in `api/mod.rs`.
-- [ ] Type names match Rust; only documented exceptions (e.g. `FsDate`).
+- [ ] Type names match Rust; any exception is explicitly documented.
 - [ ] Errors converted to `JsValue`; no `.unwrap()` on user inputs.
 - [ ] Facade JS file updated with new exports.
 - [ ] Tests pass: `node --test tests/*.mjs` and `cargo test -p finstack-wasm`.

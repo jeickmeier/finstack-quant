@@ -50,8 +50,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "pl_summary_report",
             "credit_assessment_report",
             "DependencyTracer",
-            "trace_dependencies",
-            "trace_dependencies_detailed",
             "direct_dependencies",
             "all_dependencies",
             "dependents",

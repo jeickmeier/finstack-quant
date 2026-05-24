@@ -637,25 +637,7 @@ impl ScenarioEngine {
         Self::default()
     }
 
-    /// Compose multiple scenarios into a single deterministic spec.
-    ///
-    /// **Prefer [`ScenarioEngine::try_compose`].** This permissive variant does
-    /// not validate the composed result; in particular it can produce a spec
-    /// with multiple `TimeRollForward` operations which the apply phase will
-    /// reject. It is retained for backwards-compatible library use only.
-    ///
-    /// Operations are sorted by priority (lower = first); operations targeting
-    /// the same curve stack additively (two +25bp shocks produce +50bp).
-    #[deprecated(
-        since = "0.4.2",
-        note = "use try_compose, which rejects compositions that would fail at apply time"
-    )]
-    #[must_use]
-    pub fn compose(&self, scenarios: Vec<ScenarioSpec>) -> ScenarioSpec {
-        self.compose_inner(scenarios)
-    }
-
-    fn compose_inner(&self, mut scenarios: Vec<ScenarioSpec>) -> ScenarioSpec {
+    pub(crate) fn compose_inner(&self, mut scenarios: Vec<ScenarioSpec>) -> ScenarioSpec {
         // Stable sort by priority (lower = higher priority)
         scenarios.sort_by_key(|s| s.priority);
 
@@ -1258,41 +1240,6 @@ mod tests {
     use crate::spec::OperationSpec;
 
     #[test]
-    #[allow(deprecated)]
-    fn compose_preserves_source_ids_and_names() {
-        let engine = ScenarioEngine::new();
-        let composed = engine.compose(vec![
-            ScenarioSpec {
-                id: "rates_up".into(),
-                name: Some("Rates Up".into()),
-                description: None,
-                operations: vec![OperationSpec::StmtForecastPercent {
-                    node_id: "Revenue".into(),
-                    pct: 1.0,
-                }],
-                priority: 2,
-                resolution_mode: ResolutionMode::MostSpecificWins,
-            },
-            ScenarioSpec {
-                id: "credit_down".into(),
-                name: None,
-                description: None,
-                operations: vec![OperationSpec::StmtForecastPercent {
-                    node_id: "Expenses".into(),
-                    pct: -1.0,
-                }],
-                priority: 1,
-                resolution_mode: ResolutionMode::Cumulative,
-            },
-        ]);
-
-        assert_eq!(composed.id.as_str(), "credit_down+rates_up");
-        assert_eq!(composed.name.as_deref(), Some("credit_down + Rates Up"));
-        assert_eq!(composed.operations.len(), 2);
-        assert_eq!(composed.resolution_mode, ResolutionMode::Cumulative);
-    }
-
-    #[test]
     fn try_compose_rejects_two_time_rolls() {
         use crate::spec::TimeRollMode;
 
@@ -1330,8 +1277,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
-    fn try_compose_agrees_with_compose_on_valid_inputs() {
+    fn try_compose_preserves_source_ids_and_names() {
         let engine = ScenarioEngine::new();
         let scenarios = vec![
             ScenarioSpec {
@@ -1358,12 +1304,12 @@ mod tests {
             },
         ];
 
-        let permissive = engine.compose(scenarios.clone());
         let strict = engine.try_compose(scenarios).expect("valid compose");
 
-        assert_eq!(permissive.id, strict.id);
-        assert_eq!(permissive.operations.len(), strict.operations.len());
-        assert_eq!(permissive.resolution_mode, strict.resolution_mode);
+        assert_eq!(strict.id.as_str(), "credit_down+rates_up");
+        assert_eq!(strict.name.as_deref(), Some("credit_down + Rates Up"));
+        assert_eq!(strict.operations.len(), 2);
+        assert_eq!(strict.resolution_mode, ResolutionMode::Cumulative);
     }
 
     #[test]

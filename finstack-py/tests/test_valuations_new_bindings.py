@@ -17,6 +17,7 @@ import json
 
 from finstack.core.market_data import DiscountCurve, MarketContext
 from finstack.valuations.correlation import nearest_correlation
+from finstack.valuations.instruments import price_instrument
 import pytest
 
 from finstack.valuations import (
@@ -33,7 +34,6 @@ from finstack.valuations import (
     instrument_cashflows,
     instrument_cashflows_json,
     lookback_option_price,
-    price_instrument,
     quanto_option_price,
 )
 

@@ -6,9 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from finstack.valuations.instruments import list_standard_metrics, validate_instrument_json
 from jsonschema import validators
-
-from finstack.valuations import list_standard_metrics, validate_instrument_json
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 INSTRUMENT_ENVELOPE_SCHEMA_PATH = WORKSPACE_ROOT / "finstack/valuations/schemas/instruments/1/instrument.schema.json"

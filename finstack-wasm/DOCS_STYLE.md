@@ -49,14 +49,12 @@ For every exported function/class/constructor/static factory/method:
 ///
 /// @example
 /// ```javascript
-/// import init, { standardRegistry, MarketContext, FsDate, Money, Bond } from "finstack-wasm";
+/// import init, { core, valuations } from "finstack-wasm";
 ///
 /// await init();
-/// const market = new MarketContext();
-/// const asOf = new FsDate(2024, 1, 2);
-/// const bond = Bond.fixedSemiannual("bond1", Money.fromCode(1e6, "USD"), 0.05, issue, maturity, "USD-OIS");
-/// const registry = standardRegistry();
-/// const result = registry.priceInstrument(bond, "discounting", market, asOf);
+/// const asOf = core.createDate(2024, 1, 2);
+/// const isValid = valuations.instruments.validateInstrumentJson(instrumentJson);
+/// const result = valuations.instruments.priceInstrument(instrumentJson, marketJson, asOf, "discounting");
 /// ```
 /// ```
 ````

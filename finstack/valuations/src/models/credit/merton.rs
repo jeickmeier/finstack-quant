@@ -394,67 +394,6 @@ impl MertonModel {
         Ok((equity, equity_vol))
     }
 
-    /// Compute implied equity value and equity volatility from the structural
-    /// model (infallible variant).
-    ///
-    /// # Deprecated
-    ///
-    /// This infallible variant divided the equity volatility by the implied
-    /// equity value, so for a deeply distressed firm whose call-option equity
-    /// collapses to `~0` it returned a non-finite `equity_vol` (`+inf`/`NaN`)
-    /// that silently poisoned downstream calculations. Use
-    /// [`try_implied_equity`](Self::try_implied_equity) instead, which rejects
-    /// the degenerate near-default configuration with a descriptive error.
-    ///
-    /// For backward compatibility this method still returns a value, now
-    /// delegating to [`try_implied_equity`](Self::try_implied_equity): on the
-    /// degenerate branch it returns the (finite, possibly tiny or negative)
-    /// implied `equity` paired with an `equity_vol` of `0.0` rather than a
-    /// non-finite number, so existing callers cannot be poisoned by `inf`.
-    ///
-    /// # Arguments
-    ///
-    /// * `horizon` - Time horizon T in years (must be > 0)
-    ///
-    /// # Returns
-    ///
-    /// A tuple `(equity_value, equity_vol)`. Both components are always finite.
-    #[deprecated(
-        since = "0.4.1",
-        note = "divides by implied equity and can return a non-finite equity vol for a \
-                distressed firm; use `try_implied_equity`, which returns a `Result`"
-    )]
-    pub fn implied_equity(&self, horizon: f64) -> (f64, f64) {
-        match self.try_implied_equity(horizon) {
-            Ok(result) => result,
-            Err(_) => {
-                // Degenerate near-default configuration: recompute the implied
-                // equity value (which is finite) and report a zero equity vol
-                // instead of the `inf`/`NaN` the raw division would produce.
-                let v = self.asset_value;
-                let sigma = self.asset_vol;
-                let b = self.debt_barrier;
-                let r = self.risk_free_rate;
-                let q = self.payout_rate;
-                let sqrt_t = horizon.sqrt();
-
-                let d1 =
-                    ((v / b).ln() + (r - q + 0.5 * sigma * sigma) * horizon) / (sigma * sqrt_t);
-                let d2 = d1 - sigma * sqrt_t;
-
-                let exp_neg_qt = (-q * horizon).exp();
-                let equity =
-                    v * exp_neg_qt * norm_cdf(d1) - b * (-r * horizon).exp() * norm_cdf(d2);
-
-                // `equity` may be a tiny positive, zero, or (numerically)
-                // slightly negative value; all are finite. Pair it with a
-                // finite `0.0` vol so no caller can be poisoned by `inf`.
-                let equity = if equity.is_finite() { equity } else { 0.0 };
-                (equity, 0.0)
-            }
-        }
-    }
-
     /// KMV calibration: recover asset value and asset volatility from observed
     /// equity value and equity volatility.
     ///
@@ -1451,37 +1390,6 @@ mod tests {
         let (equity, equity_vol) = m.try_implied_equity(1.0).expect("healthy firm");
         assert!(equity.is_finite() && equity > 0.0);
         assert!(equity_vol.is_finite() && equity_vol > 0.0);
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn implied_equity_infallible_never_returns_non_finite() {
-        // P0-2: the deprecated infallible `implied_equity` previously divided
-        // by `equity`, returning `+inf` for a deeply distressed firm whose
-        // implied call-option equity collapses to ~0. The returned equity vol
-        // must always be finite so it cannot silently poison downstream math.
-        let m = MertonModel::new(1.0, 0.05, 1.0e9, 0.05).expect("valid");
-        let (equity, equity_vol) = m.implied_equity(1.0);
-        assert!(
-            equity.is_finite(),
-            "distressed-firm equity must be finite, got {equity}"
-        );
-        assert!(
-            equity_vol.is_finite(),
-            "distressed-firm equity vol must be finite, not inf/NaN, got {equity_vol}"
-        );
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn implied_equity_infallible_agrees_with_try_for_healthy_firm() {
-        // For a solvent firm the deprecated infallible variant must return
-        // exactly what `try_implied_equity` returns.
-        let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        let (eq_inf, vol_inf) = m.implied_equity(1.0);
-        let (eq_try, vol_try) = m.try_implied_equity(1.0).expect("healthy firm");
-        assert!((eq_inf - eq_try).abs() < 1e-12, "{eq_inf} vs {eq_try}");
-        assert!((vol_inf - vol_try).abs() < 1e-12, "{vol_inf} vs {vol_try}");
     }
 
     #[test]

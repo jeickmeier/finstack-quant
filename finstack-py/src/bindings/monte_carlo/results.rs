@@ -66,15 +66,6 @@ impl PyMonteCarloResult {
         self.inner.num_simulated_paths
     }
 
-    /// Legacy skipped-path count from older survivor-pricing results.
-    ///
-    /// Current engines reject non-finite discounted payoffs instead of
-    /// censoring paths, so new results should report zero here.
-    #[getter]
-    fn num_skipped(&self) -> usize {
-        self.inner.num_skipped
-    }
-
     /// Median of captured discounted path values (if captured).
     #[getter]
     fn median(&self) -> Option<f64> {
@@ -172,15 +163,6 @@ impl PyEstimate {
     #[getter]
     fn num_simulated_paths(&self) -> usize {
         self.inner.num_simulated_paths
-    }
-
-    /// Legacy skipped-path count from older survivor-pricing results.
-    ///
-    /// Current engines reject non-finite discounted payoffs instead of
-    /// censoring paths, so new estimates should report zero here.
-    #[getter]
-    fn num_skipped(&self) -> usize {
-        self.inner.num_skipped
     }
 
     /// Median of captured path values (if captured).

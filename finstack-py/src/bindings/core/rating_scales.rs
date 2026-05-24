@@ -380,13 +380,6 @@ fn py_registry_from_config(config: PyRef<'_, PyFinstackConfig>) -> PyResult<PyRa
         .map_err(core_to_py)
 }
 
-/// Configuration-extension key used to override the embedded registry.
-#[pyfunction]
-#[pyo3(name = "extension_key", text_signature = "()")]
-fn py_extension_key() -> &'static str {
-    RATING_SCALES_EXTENSION_KEY
-}
-
 /// Build the `finstack.core.rating_scales` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = PyModule::new(py, "rating_scales")?;
@@ -402,10 +395,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     m.add_function(wrap_pyfunction!(py_embedded_registry, &m)?)?;
     m.add_function(wrap_pyfunction!(py_registry_from_config, &m)?)?;
-    m.add_function(wrap_pyfunction!(py_extension_key, &m)?)?;
 
-    // Surface the extension key as a module-level constant for callers that
-    // prefer the constant over calling ``extension_key()``.
+    // Surface the extension key as the single Python entry point.
     m.add("RATING_SCALES_EXTENSION_KEY", RATING_SCALES_EXTENSION_KEY)?;
 
     let all = PyList::new(
@@ -417,7 +408,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "RatingScaleRegistry",
             "embedded_registry",
             "registry_from_config",
-            "extension_key",
             "RATING_SCALES_EXTENSION_KEY",
         ],
     )?;

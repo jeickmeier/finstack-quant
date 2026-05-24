@@ -110,11 +110,6 @@ if _TYPE_CHECKING:
     import pandas as pd
 
 ValuationResult = _valuations.ValuationResult
-validate_instrument_json = _valuations.validate_instrument_json
-price_instrument = _valuations.price_instrument
-price_instrument_with_metrics = _valuations.price_instrument_with_metrics
-list_standard_metrics = _valuations.list_standard_metrics
-list_standard_metrics_grouped = _valuations.list_standard_metrics_grouped
 CalibrationResult = _valuations.CalibrationResult
 CalibrationEnvelopeError = _valuations.CalibrationEnvelopeError
 validate_calibration_json = _valuations.validate_calibration_json
@@ -141,14 +136,6 @@ SabrModel = _valuations.SabrModel
 SabrSmile = _valuations.SabrSmile
 SabrCalibrator = _valuations.SabrCalibrator
 instrument_cashflows_json = _valuations.instrument_cashflows_json
-# Canonical structural-credit exports live at `finstack.valuations.*`; the
-# `finstack.valuations.credit` module remains only as an import-compatibility
-# namespace.
-MertonModel = _valuations.credit.MertonModel
-DynamicRecoverySpec = _valuations.credit.DynamicRecoverySpec
-EndogenousHazardSpec = _valuations.credit.EndogenousHazardSpec
-CreditState = _valuations.credit.CreditState
-ToggleExerciseModel = _valuations.credit.ToggleExerciseModel
 
 
 def instrument_cashflows(
@@ -223,13 +210,10 @@ __all__: list[str] = [
     "CdsUpfrontDatum",
     "CollateralDatum",
     "CreditIndexDatum",
-    "CreditState",
     "DatePillar",
     "DiscountCurvePrior",
     "DiscountStep",
     "DividendScheduleDatum",
-    "DynamicRecoverySpec",
-    "EndogenousHazardSpec",
     "FixingSeriesDatum",
     "ForwardCurvePrior",
     "ForwardStep",
@@ -252,7 +236,6 @@ __all__: list[str] = [
     "InflationSwapQuote",
     "MarketDatum",
     "MarketQuote",
-    "MertonModel",
     "OptionVolDatum",
     "OptionVolPayload",
     "OptionVolQuote",
@@ -282,7 +265,6 @@ __all__: list[str] = [
     "SwaptionVolStep",
     "Tenor",
     "TenorPillar",
-    "ToggleExerciseModel",
     "ValuationResult",
     "VolCubeDatum",
     "VolSurfacePrior",
@@ -314,16 +296,11 @@ __all__: list[str] = [
     "instrument_cashflows",
     "instrument_cashflows_json",
     "instruments",
-    "list_standard_metrics",
-    "list_standard_metrics_grouped",
     "lookback_option_price",
     "merton_jump_cos_price",
-    "price_instrument",
-    "price_instrument_with_metrics",
     "quanto_option_price",
     "snowball_coupon_profile",
     "tarn_coupon_profile",
     "validate_calibration_json",
-    "validate_instrument_json",
     "vg_cos_price",
 ]

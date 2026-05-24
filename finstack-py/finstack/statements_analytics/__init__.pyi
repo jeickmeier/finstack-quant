@@ -16,8 +16,6 @@ __all__ = [
     "run_corporate_analysis",
     "pl_summary_report",
     "credit_assessment_report",
-    "trace_dependencies",
-    "trace_dependencies_detailed",
     "direct_dependencies",
     "all_dependencies",
     "dependents",
@@ -310,44 +308,29 @@ def credit_assessment_report(results_json: str, as_of: str) -> str:
     """
     ...
 
-def trace_dependencies(model_json: str, node_id: str) -> str:
-    """Return an ASCII dependency tree for a node.
+class DependencyTracer:
+    """Reusable dependency tracer for a financial model.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
-        node_id: Node to trace.
-
-    Returns:
-        ASCII-formatted dependency tree.
+        model: ``FinancialModelSpec`` object or JSON string.
 
     Example:
-        >>> from finstack.statements_analytics import trace_dependencies
-        >>> tree = trace_dependencies(model_json, "ebitda")
+        >>> from finstack.statements_analytics import DependencyTracer
+        >>> tree = DependencyTracer(model_json).dependency_tree("ebitda")
     """
-    ...
 
-def trace_dependencies_detailed(
-    model_json: str,
-    results_json: str,
-    node_id: str,
-    period: str,
-) -> str:
-    """Return a detailed ASCII dependency tree with values for one period.
+    def __init__(self, model: Any) -> None: ...
+    def dependency_tree(self, node_id: str) -> str:
+        """Return an ASCII dependency tree for ``node_id``."""
+        ...
 
-    Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
-        results_json: JSON-serialized ``StatementResult``.
-        node_id: Node to trace.
-        period: Period string (e.g. ``"2025Q1"``).
+    def dependency_tree_detailed(self, results: Any, node_id: str, period: str) -> str:
+        """Return an ASCII dependency tree annotated with values for one period."""
+        ...
 
-    Returns:
-        ASCII tree including values for the period.
-
-    Example:
-        >>> from finstack.statements_analytics import trace_dependencies_detailed
-        >>> text = trace_dependencies_detailed(mj, rj, "ebitda", "2025Q1")
-    """
-    ...
+    def direct_dependencies(self, node_id: str) -> list[str]: ...
+    def all_dependencies(self, node_id: str) -> list[str]: ...
+    def dependents(self, node_id: str) -> list[str]: ...
 
 def direct_dependencies(model_json: str, node_id: str) -> list[str]:
     """List immediate dependencies of a node.

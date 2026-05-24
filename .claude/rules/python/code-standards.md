@@ -3,6 +3,7 @@ trigger: model_decision
 description: When python code standards are needed
 globs:
 ---
+
 # Finstack Python Bindings — Code Standards
 
 Standards for the `finstack-py` Python bindings (PyO3-based).
@@ -19,7 +20,7 @@ Standards for the `finstack-py` Python bindings (PyO3-based).
 Rust is the single source of truth for all API topology and naming:
 
 - The binding module tree under `src/bindings/` mirrors the Rust umbrella crate structure exactly.
-- Type and function names in Python match their Rust names exactly (e.g. Rust `sharpe` stays `sharpe`, not `sharpe_ratio`; Rust `Date` stays `Date`, not `FsDate`).
+- Type and function names in Python match their Rust names exactly (e.g. Rust `sharpe` stays `sharpe`, not `sharpe_ratio`; Rust `Date` stays `Date`, not a host-specific alias).
 - No convenience re‑exports at `finstack.*` unless the Rust umbrella root exports them.
 - No legacy aliases or compatibility paths.
 
@@ -70,6 +71,7 @@ pub(crate) fn register<'py>(py: Python<'py>, parent: &Bound<'py, PyModule>) -> P
 ```
 
 Rules:
+
 - Set `__all__` via `PyList` directly in registration; do not return export lists.
 - Keep `__all__` exhaustive and sorted; expose only public APIs.
 - Every module sets `__doc__`.
@@ -113,6 +115,7 @@ impl PyCurrency {
 ## Error Mapping
 
 Convert core errors via `errors.rs`:
+
 - Missing id → `KeyError`
 - Validation/argument errors → `ValueError`
 - Calibration/operational failures → `RuntimeError`

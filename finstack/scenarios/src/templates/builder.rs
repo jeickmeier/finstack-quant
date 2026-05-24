@@ -99,7 +99,7 @@ impl ScenarioSpecBuilder {
     ///
     /// # Arguments
     ///
-    /// - `priority`: Ordering key used by [`crate::ScenarioEngine::compose`].
+    /// - `priority`: Ordering key used by [`crate::ScenarioEngine::try_compose`].
     ///
     /// # Returns
     ///
@@ -209,7 +209,7 @@ impl ScenarioSpecBuilder {
         self
     }
 
-    /// Compose multiple builders into a single builder via [`ScenarioEngine::compose`].
+    /// Compose multiple builders into a single builder.
     ///
     /// The composed builder inherits the engine defaults, including the default `"composed"`
     /// identifier, so callers can override it with [`id`](Self::id) when needed.
@@ -227,11 +227,9 @@ impl ScenarioSpecBuilder {
             .into_iter()
             .map(ScenarioSpecBuilder::into_spec_without_validation)
             .collect();
-        // The builder-level compose mirrors the deprecated permissive API on
-        // the engine: it does not validate. Callers can validate by calling
-        // [`ScenarioSpecBuilder::build`] on the result.
-        #[allow(deprecated)]
-        let composed = ScenarioEngine::new().compose(specs);
+        // Builder composition remains unchecked so callers can keep using the
+        // fluent builder and validate at the final `build()` boundary.
+        let composed = ScenarioEngine::new().compose_inner(specs);
 
         Self {
             id: composed.id,

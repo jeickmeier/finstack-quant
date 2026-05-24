@@ -357,11 +357,6 @@ impl PyThirty360Convention {
     const US_SIA: PyThirty360Convention = PyThirty360Convention {
         inner: Thirty360Convention::UsSia,
     };
-    /// Backward-compatible alias for US SIA / Bond Basis.
-    #[classattr]
-    const US: PyThirty360Convention = PyThirty360Convention {
-        inner: Thirty360Convention::UsSia,
-    };
     /// 30/360 ISDA convention.
     #[classattr]
     const ISDA: PyThirty360Convention = PyThirty360Convention {

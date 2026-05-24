@@ -27,6 +27,7 @@ from finstack.core.math import count_consecutive, linalg, stats
 from finstack.core.money import Money
 from finstack.core.types import Rate
 from finstack.statements_analytics import (
+    DependencyTracer,
     backtest_forecast,
     direct_dependencies,
     evaluate_scenario_set,
@@ -34,7 +35,6 @@ from finstack.statements_analytics import (
     goal_seek,
     run_sensitivity,
     run_variance,
-    trace_dependencies,
 )
 from finstack.valuations.correlation import (
     CopulaSpec,
@@ -45,6 +45,7 @@ from finstack.valuations.correlation import (
     correlation_bounds,
     validate_correlation_matrix,
 )
+from finstack.valuations.instruments import list_standard_metrics, validate_instrument_json
 import pytest
 
 from finstack.analytics import (
@@ -117,7 +118,6 @@ from finstack.statements import (
     parse_formula,
     validate_formula,
 )
-from finstack.valuations import list_standard_metrics, validate_instrument_json
 
 # ---------------------------------------------------------------------------
 # Shared data
@@ -795,17 +795,17 @@ class TestStatementsAnalyticsBenchmarks:
 
         benchmark.pedantic(_seek, rounds=10, warmup_rounds=1)
 
-    def test_trace_dependencies_json(self, benchmark) -> None:
+    def test_dependency_tracer_json(self, benchmark) -> None:
         def _trace():
-            tree = trace_dependencies(_MODEL_JSON, "gross_profit")
+            tree = DependencyTracer(_MODEL_JSON).dependency_tree("gross_profit")
             deps = direct_dependencies(_MODEL_JSON, "gross_profit")
             return tree, deps
 
         benchmark(_trace)
 
-    def test_trace_dependencies_typed(self, benchmark) -> None:
+    def test_dependency_tracer_typed(self, benchmark) -> None:
         def _trace():
-            tree = trace_dependencies(_MODEL_SPEC, "gross_profit")
+            tree = DependencyTracer(_MODEL_SPEC).dependency_tree("gross_profit")
             deps = direct_dependencies(_MODEL_SPEC, "gross_profit")
             return tree, deps
 

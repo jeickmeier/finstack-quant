@@ -33,8 +33,6 @@ export const valuations = {
     cdsIndexExampleJson: wasm.cdsIndexExampleJson,
     cdsTrancheExampleJson: wasm.cdsTrancheExampleJson,
     cdsOptionExampleJson: wasm.cdsOptionExampleJson,
-    validate: wasm.validateInstrumentJson,
-    ...instrumentPricing,
   },
   fx,
   instruments: {
@@ -62,16 +60,8 @@ export const valuations = {
     const json = typeof envelope === 'string' ? envelope : JSON.stringify(envelope);
     return wasm.dependencyGraphJson(json);
   },
-  validateInstrumentJson: instrumentPricing.validateInstrumentJson,
   WasmMarket: wasm.WasmMarket,
-  priceInstrument: instrumentPricing.priceInstrument,
-  priceInstrumentWithMetrics: instrumentPricing.priceInstrumentWithMetrics,
-  priceInstrumentWithMarket: instrumentPricing.priceInstrumentWithMarket,
-  priceInstrumentWithMetricsAndMarket: instrumentPricing.priceInstrumentWithMetricsAndMarket,
   instrumentCashflowsJson: wasm.instrumentCashflowsJson,
-  instrumentCashflowsWithMarket: instrumentPricing.instrumentCashflowsWithMarket,
-  listStandardMetrics: wasm.listStandardMetrics,
-  listStandardMetricsGrouped: wasm.listStandardMetricsGrouped,
   bsPrice: wasm.bsPrice,
   bsGreeks: wasm.bsGreeks,
   bsImpliedVol: wasm.bsImpliedVol,

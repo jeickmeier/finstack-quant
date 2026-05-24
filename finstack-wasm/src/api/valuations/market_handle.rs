@@ -18,7 +18,7 @@ use wasm_bindgen::prelude::*;
 /// ```javascript
 /// const market = valuations.WasmMarket.fromJson(marketJson);
 /// for (const instr of instruments) {
-///   const result = valuations.priceInstrumentWithMarket(instr, market, "2025-06-15", "default");
+///   const result = valuations.instruments.priceInstrumentWithMarket(instr, market, "2025-06-15", "default");
 /// }
 /// ```
 #[wasm_bindgen(js_name = WasmMarket)]

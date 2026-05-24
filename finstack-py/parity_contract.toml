@@ -165,13 +165,12 @@ rust_lib   = "finstack/valuations/src/lib.rs"
 python_package = "finstack.valuations"
 visibility = "pub"
 status = "exists"
-# NOTE: valuations still exposes compatibility aliases at the package root, but
-# instrument helpers now also live under the dedicated `instruments` submodule.
+# Instrument helpers live under the dedicated `instruments` submodule.
 
 [crates.valuations.modules]
 # Top-level public modules. Symbol-level pinning for non-submodule public names
 # lives in [crates.valuations.symbols] below.
-instruments  = { python = "finstack.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack.valuations.instruments; root aliases remain for compatibility" }
+instruments  = { python = "finstack.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack.valuations.instruments" }
 fx           = { python = "finstack.valuations.fx",           status = "exists", note = "Direct FX instrument wrappers for Rust/WASM-supported FX instruments; no JSON-only workflow required" }
 exotics      = { python = "finstack.valuations.exotics",      status = "exists", note = "Python-only direct exotics wrappers; WASM exposes closed-form exotics helpers on the valuations facade instead of class wrappers" }
 calibration  = { python = "finstack.valuations",              status = "flattened", note = "calibrate, dry_run, validate_calibration_json, dependency_graph_json exported from finstack.valuations root" }
@@ -215,13 +214,10 @@ public = [
     "CdsUpfrontDatum",
     "CollateralDatum",
     "CreditIndexDatum",
-    "CreditState",
     "DatePillar",
     "DiscountCurvePrior",
     "DiscountStep",
     "DividendScheduleDatum",
-    "DynamicRecoverySpec",
-    "EndogenousHazardSpec",
     "FixingSeriesDatum",
     "ForwardCurvePrior",
     "ForwardStep",
@@ -244,7 +240,6 @@ public = [
     "InflationSwapQuote",
     "MarketDatum",
     "MarketQuote",
-    "MertonModel",
     "OptionVolDatum",
     "OptionVolPayload",
     "OptionVolQuote",
@@ -274,7 +269,6 @@ public = [
     "SwaptionVolStep",
     "Tenor",
     "TenorPillar",
-    "ToggleExerciseModel",
     "ValuationResult",
     "VolCubeDatum",
     "VolSurfacePrior",
@@ -300,17 +294,12 @@ public = [
     "dry_run",
     "instrument_cashflows",
     "instrument_cashflows_json",
-    "list_standard_metrics",
-    "list_standard_metrics_grouped",
     "lookback_option_price",
     "merton_jump_cos_price",
-    "price_instrument",
-    "price_instrument_with_metrics",
     "quanto_option_price",
     "snowball_coupon_profile",
     "tarn_coupon_profile",
     "validate_calibration_json",
-    "validate_instrument_json",
     "vg_cos_price",
 ]
 
@@ -579,7 +568,7 @@ js_export_file   = "../finstack-wasm/exports/valuations.js"
 nested = ["correlation", "credit", "creditDerivatives", "fx", "instruments"]
 
 # Root-level `valuations.<name>` exports (camelCase / PascalCase as in JS).
-# Duplicates under `instruments` / `creditDerivatives` are aliases, not extra entries.
+# Instrument pricing helpers live under `valuations.instruments`.
 root_exports = [
     "SabrCalibrator",
     "SabrModel",
@@ -599,20 +588,12 @@ root_exports = [
     "dependencyGraphJson",
     "dryRun",
     "instrumentCashflowsJson",
-    "instrumentCashflowsWithMarket",
-    "listStandardMetrics",
-    "listStandardMetricsGrouped",
     "lookbackOptionPrice",
     "mertonJumpCosPrice",
-    "priceInstrument",
-    "priceInstrumentWithMarket",
-    "priceInstrumentWithMetrics",
-    "priceInstrumentWithMetricsAndMarket",
     "quantoOptionPrice",
     "snowballCouponProfile",
     "tarnCouponProfile",
     "validateCalibrationJson",
-    "validateInstrumentJson",
     "validateValuationResultJson",
     "vgCosPrice",
 ]
@@ -645,14 +626,7 @@ wasm_only = [
 # Explicit python_snake_case -> js_name for root exports (triplet pinning).
 # Omitted entries follow default camelCase from snake_case.
 [wasm_valuations_subset.python_js_map]
-price_instrument = "priceInstrument"
-price_instrument_with_metrics = "priceInstrumentWithMetrics"
-price_instrument_with_market = "priceInstrumentWithMarket"
-price_instrument_with_metrics_and_market = "priceInstrumentWithMetricsAndMarket"
 instrument_cashflows_json = "instrumentCashflowsJson"
-instrument_cashflows = "instrumentCashflowsWithMarket"
-list_standard_metrics = "listStandardMetrics"
-list_standard_metrics_grouped = "listStandardMetricsGrouped"
 bs_price = "bsPrice"
 bs_greeks = "bsGreeks"
 bs_implied_vol = "bsImpliedVol"
@@ -669,7 +643,6 @@ snowball_coupon_profile = "snowballCouponProfile"
 cms_spread_option_intrinsic = "cmsSpreadOptionIntrinsic"
 callable_range_accrual_accrued = "callableRangeAccrualAccrued"
 validate_calibration_json = "validateCalibrationJson"
-validate_instrument_json = "validateInstrumentJson"
 dependency_graph_json = "dependencyGraphJson"
 SabrParameters = "SabrParameters"
 SabrModel = "SabrModel"

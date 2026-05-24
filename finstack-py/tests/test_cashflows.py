@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from finstack.valuations.instruments import price_instrument
 import pytest
 
 from finstack.cashflows import (
@@ -13,7 +14,6 @@ from finstack.cashflows import (
     dated_flows,
     validate_cashflow_schedule,
 )
-from finstack.valuations import price_instrument
 
 
 def _cashflow_spec() -> str:
