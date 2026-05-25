@@ -322,8 +322,7 @@ pub fn get_unitless_scalar(market: &MarketContext, key: &str, default: f64) -> f
 /// missing or carries a non-unitless type.
 ///
 /// Production model-parameter resolvers should prefer this over the lenient
-/// fallback form so a misnamed `HESTON_KAPPA` / `RBERGOMI_HURST` / `…` scalar
-/// fails loudly rather than silently pricing with a representative default.
+/// fallback form so missing or mistyped model scalars are surfaced.
 /// The `model` argument is purely diagnostic and appears in the error
 /// message (e.g. `"Heston"`, `"rough Bergomi"`).
 pub fn get_unitless_scalar_strict(

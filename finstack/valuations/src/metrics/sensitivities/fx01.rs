@@ -1,10 +1,7 @@
 //! Generic FX01 calculator.
 //!
 //! Computes the sensitivity of any instrument's PV to a **1% relative** move
-//! in its FX exposure via central finite difference. Works for every
-//! instrument that publishes one or more FX pairs through
-//! `MarketDependencies::fx_pairs` — currently `FxSpot`, `FxForward`,
-//! `FxSwap`, and `Ndf`.
+//! in its FX exposure via central finite difference.
 //!
 //! # Convention
 //!
@@ -20,12 +17,9 @@
 //!
 //! # Multi-pair instruments
 //!
-//! When an instrument depends on more than one FX pair (rare today — none
-//! of the current FX instruments do this), every pair is bumped together by
-//! `+1%` (then `−1%`) in the same reprice. The result is the **joint**
-//! sensitivity to a simultaneous 1% move across all pairs, not a sum of
-//! per-pair sensitivities. Callers that need per-pair detail should request
-//! per-pair sensitivities individually rather than read this metric.
+//! When an instrument depends on more than one FX pair, every pair is bumped
+//! together by `+1%` (then `−1%`) in the same reprice. The result is the
+//! joint sensitivity to a simultaneous 1% move across all pairs.
 
 use std::sync::Arc;
 
@@ -36,10 +30,6 @@ use crate::metrics::{MetricCalculator, MetricContext};
 
 /// Generic, instrument-agnostic FX01 calculator.
 ///
-/// Replaces the per-instrument `Fx01Calculator` structs that previously lived
-/// in `instruments::fx::{fx_spot, fx_forward, fx_swap, ndf}::metrics::fx01`.
-/// The per-instrument variants are kept only as private helpers (or removed)
-/// once every FX instrument's metrics registry points at this generic one.
 pub struct GenericFx01Calculator;
 
 impl GenericFx01Calculator {

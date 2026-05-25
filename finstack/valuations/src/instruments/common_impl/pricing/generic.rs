@@ -92,10 +92,6 @@ where
                 )
             })?;
 
-        // Attach optional typed details (e.g., FX policy stamp for
-        // FX-bearing instruments) if the instrument provides them. The
-        // default `valuation_details` returns `None`, so non-FX
-        // instruments stay zero-cost.
         let mut result = ValuationResult::stamped(typed_instrument.id(), effective_as_of, pv);
         if let Some(details) = typed_instrument.valuation_details(market, effective_as_of) {
             result = result.with_details(details);

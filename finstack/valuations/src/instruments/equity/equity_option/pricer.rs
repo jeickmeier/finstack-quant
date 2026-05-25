@@ -875,12 +875,8 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
             ));
         }
 
-        // Heston parameters: source from market scalars (HESTON_KAPPA, etc.).
-        // **Audit P3b**: use the *strict* resolver so a missing or mistyped
-        // HESTON_* scalar surfaces as an `InputError::NotFound` here rather
-        // than silently selecting the representative SPX-style defaults in
-        // `heston_defaults`. Validation (positive κ/θ/σᵥ/v₀, ρ ∈ (−1, 1)) is
-        // still enforced inside `HestonParams::new`.
+        // Source production Heston parameters from explicit market scalars.
+        // Validation is still enforced inside `HestonParams::new`.
         let err_ctx = crate::pricer::PricingErrorContext::from_instrument(equity_option)
             .model(crate::pricer::ModelKey::HestonFourier);
         let params = HestonParams::from_market_strict(market, r, q)

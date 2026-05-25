@@ -606,11 +606,9 @@ fn stamp_results_meta(
 /// Walk an instrument's declared curve dependencies and join any `fx_policy`
 /// stamps the curves carry into a single result envelope value.
 ///
-/// Returns `None` when the instrument has no curve dependencies, when no
-/// dependent curve carries a stamp, or when the dependencies fail to
-/// resolve (we surface the FX provenance as best-effort metadata, never as
-/// a pricing error). Stamps are de-duplicated in source order — the same
-/// policy applied to multiple curves shows up once.
+/// Returns `None` when the instrument has no curve dependencies, no dependent
+/// curve carries a stamp, or dependency lookup fails. Stamps are de-duplicated
+/// in source order.
 fn collect_fx_policy_from_curves(
     instrument: &dyn Priceable,
     market: &finstack_core::market_data::context::MarketContext,

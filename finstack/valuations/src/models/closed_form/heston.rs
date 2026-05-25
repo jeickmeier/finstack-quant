@@ -187,12 +187,9 @@ impl HestonParams {
     ///
     /// # Deprecation note
     ///
-    /// Production pricers (Fourier, PDE, Monte Carlo equity option) now
-    /// invoke [`Self::from_market_strict`] so that a missing or mistyped
-    /// `HESTON_*` scalar fails loudly instead of silently selecting the
-    /// representative SPX defaults. This lenient form is retained for
-    /// examples / notebooks / smoke tests where the default-fallback
-    /// behaviour is convenient. New code should prefer the strict form.
+    /// Production pricers should use [`Self::from_market_strict`] so missing
+    /// or mistyped `HESTON_*` scalars are surfaced instead of defaulted.
+    /// This lenient form is retained for examples, notebooks, and smoke tests.
     #[deprecated(
         note = "Use HestonParams::from_market_strict in production code paths so missing \
                 HESTON_* scalars fail loudly instead of silently falling back to representative \
@@ -213,12 +210,8 @@ impl HestonParams {
     /// `HESTON_SIGMA_V`, `HESTON_RHO`, `HESTON_V0`) is missing or carries a
     /// non-unitless type.
     ///
-    /// Production pricers — Fourier inversion, ADI PDE, and Monte Carlo
-    /// equity option — use this form so a misnamed market scalar produces
-    /// an `InputError::NotFound` instead of silently pricing with the
-    /// representative SPX-style defaults in [`heston_defaults`]. The
-    /// lenient [`Self::from_market`] is retained for examples and smoke
-    /// tests where the default-fallback behaviour is convenient.
+    /// Production pricers use this form so a missing or mistyped market
+    /// scalar produces an error instead of falling back to [`heston_defaults`].
     ///
     /// # Errors
     ///
@@ -1308,10 +1301,8 @@ mod tests {
     use finstack_core::market_data::context::MarketContext;
     use finstack_core::market_data::scalars::MarketScalar;
 
-    // The lenient `HestonParams::from_market` is intentionally retained
-    // alongside `from_market_strict` (see audit P3b). These tests pin its
-    // default-fallback behaviour; suppress the expected deprecation
-    // warning at the (test-only) call sites.
+    // These tests pin the retained lenient resolver; suppress the expected
+    // deprecation warning at the test-only call sites.
     #[allow(deprecated)]
     #[test]
     fn from_market_uses_defaults_when_market_is_empty() {
@@ -1360,15 +1351,8 @@ mod tests {
         assert!(err.to_string().contains("kappa"));
     }
 
-    // Audit P3b: strict resolver coverage. These tests pin the new
-    // production-path behaviour (missing scalar => loud error) so a
-    // regression that silently re-introduces a default-fallback would
-    // surface here.
-
     #[test]
     fn from_market_strict_errors_when_any_scalar_is_missing() {
-        // Empty market: no HESTON_* scalars present at all. Each strict
-        // call must error rather than fall back to the SPX defaults.
         let market = MarketContext::new();
         let err = HestonParams::from_market_strict(&market, 0.05, 0.02)
             .expect_err("strict resolver must reject missing HESTON_KAPPA");
@@ -1381,9 +1365,6 @@ mod tests {
 
     #[test]
     fn from_market_strict_errors_when_only_some_scalars_present() {
-        // Partial config — missing HESTON_V0 alone should be enough to
-        // refuse to construct (the lenient resolver would silently fill
-        // it with `heston_defaults::V0 = 0.04`).
         let market = MarketContext::new()
             .insert_price("HESTON_KAPPA", MarketScalar::Unitless(1.5))
             .insert_price("HESTON_THETA", MarketScalar::Unitless(0.06))

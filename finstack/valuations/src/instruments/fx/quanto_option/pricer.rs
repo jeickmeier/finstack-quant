@@ -62,40 +62,14 @@ fn collect_quanto_inputs(
         inst.equity_strike.amount(),
     )?;
 
-    // Get FX volatility at the **ATM forward FX rate**.
-    //
-    // The quanto drift correction is `-ρ σ_S σ_FX`; the relevant `σ_FX` is the
-    // ATM lognormal vol of the FX rate that converts the asset (foreign)
-    // currency into the payoff (domestic) currency over the option's life.
-    // The ATM forward by CIRP is:
-    //
-    //   F_fx = S_fx · exp((r_dom − r_for) · t)
-    //
-    // Looking the surface up at the absolute forward strike is correct for
-    // surfaces stored on an absolute-strike axis (the finstack convention —
-    // see `VolSurfaceAxis::Strike` in `finstack-core`) and remains close to
-    // ATM for moneyness-keyed surfaces only when the forward happens to sit
-    // near 1.0. The previous `value_clamped(t, 1.0)` silently extrapolated
-    // to the leftmost wing for typical absolute-strike FX surfaces (e.g.
-    // EUR/USD around 1.05–1.35), pulling deep-OTM smile vol into the
-    // quanto adjustment.
-    //
-    // Falls back to the previous moneyness-1.0 lookup with a tracing warning
-    // when the FX spot cannot be resolved, which preserves runnability of
-    // legacy fixtures that lack an FX matrix or `fx_rate_id`.
+    // The quanto drift adjustment uses ATM-forward FX vol, so absolute-strike
+    // surfaces must be queried at the CIRP forward rather than moneyness 1.0.
     let sigma_fx = if let Some(fx_vol_id) = &inst.fx_vol_id {
         let fx_vol_surface = curves.get_surface(fx_vol_id.as_str())?;
         let fx_spot = resolve_quanto_fx_spot(inst, curves, as_of);
         match fx_spot {
             Some(s_fx) if s_fx.is_finite() && s_fx > 0.0 => {
                 let atm_fwd_fx = s_fx * ((r_dom - r_for) * t).exp();
-                // `value_clamped` keeps us safe at the axis boundaries; the
-                // strike-aware FD vega clamp diagnostic (Task #9) does the
-                // same. For *absolute-strike* surfaces this returns the ATM
-                // forward vol; for misconfigured moneyness-keyed surfaces
-                // where `atm_fwd_fx ≫ 1`, the result will pin to the
-                // rightmost wing, which is a loud failure mode rather than
-                // the silent `value_clamped(t, 1.0)` extrapolation.
                 debug_assert!(
                     atm_fwd_fx.is_finite() && atm_fwd_fx > 0.0,
                     "ATM forward FX must be positive finite, got {atm_fwd_fx} \

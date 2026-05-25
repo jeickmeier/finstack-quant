@@ -51,12 +51,8 @@ impl EquityOptionHestonMcPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_core::Result<(Money, f64)> {
-        // W-31: `collect_inputs_extended` applies the escrowed-dividend model
-        // (spot shift + `q = 0`) when `discrete_dividends` is non-empty. The
-        // escrowed-dividend identity holds only under Black-Scholes; under
-        // Heston stochastic vol it is invalid, so feeding the escrowed spot
-        // into the QE MC silently mis-prices a single-stock option with
-        // discrete dividends. Reject it explicitly rather than price it wrong.
+        // The escrowed-dividend identity used by `collect_inputs_extended`
+        // is Black-Scholes-specific; reject it for Heston stochastic vol.
         if inst
             .discrete_dividends
             .iter()

@@ -5,13 +5,11 @@
 /// - **Interior bucket** (`prev = Some(p)`, `next = Some(n)`): a full
 ///   triangle — 0 at `prev`, linear rise to 1 at `target`, linear fall to
 ///   0 at `next`.
-/// - **First (left-wing) bucket** (`prev = None`, `next = Some(n)`): a
-///   half-triangle — **flat 1.0 for `t ≤ target`**, then linear fall to 0
-///   at `next`. This preserves unity partition at the short end of the
-///   curve where there is no preceding bucket to share weight with.
-/// - **Last (right-wing) bucket** (`prev = Some(p)`, `next = None`): a
-///   half-triangle — linear rise from 0 at `prev` to 1 at `target`, then
-///   **flat 1.0 for `t > target`**. Mirrors the first-bucket convention.
+/// - **First (left-wing) bucket** (`prev = None`, `next = Some(n)`): flat
+///   1.0 for `t ≤ target`, then linear fall to 0 at `next`.
+/// - **Last (right-wing) bucket** (`prev = Some(p)`, `next = None`):
+///   linear rise from 0 at `prev` to 1 at `target`, then flat 1.0 for
+///   `t > target`.
 /// - **Sole bucket** (`prev = None`, `next = None`): a constant 1.0
 ///   everywhere. Equivalent to a flat parallel shift.
 ///
@@ -30,30 +28,18 @@
 /// Weight in [0, 1] representing the contribution of this bucket to the rate at time t.
 #[inline]
 pub(crate) fn triangular_weight(t: f64, prev: Option<f64>, target: f64, next: Option<f64>) -> f64 {
-    // Rising / left side of the triangle.
-    let rising = match prev {
-        // No left neighbour: flat 1.0 for everything up to the target.
-        None => {
-            if t <= target {
-                return 1.0;
-            }
-            1.0
+    match prev {
+        None if t <= target => return 1.0,
+        Some(p) if t <= p => return 0.0,
+        Some(p) if t <= target => {
+            let denom = (target - p).max(1e-10);
+            return (t - p) / denom;
         }
-        Some(p) => {
-            if t <= p {
-                return 0.0;
-            }
-            if t <= target {
-                let denom = (target - p).max(1e-10);
-                return (t - p) / denom;
-            }
-            1.0
-        }
-    };
-    // Falling / right side of the triangle (t > target).
+        _ => {}
+    }
+
     match next {
-        // No right neighbour: flat 1.0 to infinity.
-        None => rising,
+        None => 1.0,
         Some(n) => {
             if t < n {
                 let denom = (n - target).max(1e-10);
@@ -183,8 +169,6 @@ mod tests {
 
     #[test]
     fn first_bucket_half_triangle_is_flat_to_the_left() {
-        // First bucket (prev = None) must have weight = 1 for every t <= target,
-        // restoring the unity-partition invariant at the short end of the curve.
         let target = 0.25;
         let next = Some(0.5);
         for &t in &[0.0_f64, 1e-12, 1e-6, 0.01, 0.10, 0.25] {
@@ -194,20 +178,16 @@ mod tests {
                 "first-bucket weight at t={t} must be 1.0, got {w}"
             );
         }
-        // Falling edge between target and next still tapers as before.
         let w_mid = triangular_weight(0.375, None, target, next);
         assert!(
             (w_mid - 0.5).abs() < 1e-12,
             "first-bucket falling-edge weight at midpoint should be 0.5, got {w_mid}"
         );
-        // Beyond next, weight is zero.
         assert_eq!(triangular_weight(0.6, None, target, next), 0.0);
     }
 
     #[test]
     fn last_bucket_half_triangle_is_flat_to_the_right() {
-        // Last bucket (next = None) must have weight = 1 for every t > target,
-        // mirroring the first-bucket convention.
         let prev = Some(20.0);
         let target = 30.0;
         for &t in &[30.0_f64, 31.0, 45.0, 100.0, 1e6] {
@@ -217,20 +197,16 @@ mod tests {
                 "last-bucket weight at t={t} must be 1.0, got {w}"
             );
         }
-        // Rising edge from prev to target is unchanged.
         let w_mid = triangular_weight(25.0, prev, target, None);
         assert!(
             (w_mid - 0.5).abs() < 1e-12,
             "last-bucket rising-edge weight at midpoint should be 0.5, got {w_mid}"
         );
-        // Before prev, weight is zero.
         assert_eq!(triangular_weight(15.0, prev, target, None), 0.0);
     }
 
     #[test]
     fn interior_bucket_full_triangle_is_unchanged() {
-        // Some(prev) / Some(next) keeps the legacy full-triangle behaviour, so
-        // existing key-rate plumbing for interior buckets continues to work.
         let prev = Some(3.0);
         let target = 5.0;
         let next = Some(7.0);
@@ -243,12 +219,6 @@ mod tests {
 
     #[test]
     fn full_bucket_set_partitions_unity_across_curve() {
-        // Three buckets (0.25, 1.0, 5.0). With half-triangle wings the
-        // weights must sum to 1.0 at every t covered by any bucket -- the
-        // invariant that makes `Σ bucketed_dv01 = parallel_dv01`. A rising
-        // triangle at the first bucket (prev = Some(0.0)) would leave the
-        // [0, 0.25] interval with sub-unity total weight; this test pins
-        // the fix.
         let bucket_times = [0.25_f64, 1.0, 5.0];
         let last = bucket_times.len() - 1;
         for &t in &[

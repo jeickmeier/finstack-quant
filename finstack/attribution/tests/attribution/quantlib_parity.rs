@@ -17,10 +17,8 @@
 //! settlement days — matching `Bond::fixed`'s defaults. The shared discount
 //! curve is flat continuously-compounded; same on both sides.
 //!
-//! IRS and FX-forward attribution parity tests are scaffolded but `#[ignore]`d
-//! pending finstack-side instrument wiring (`finstack-valuations` has the
-//! `rates::irs` and `fx::fx_forward` modules but they are not exposed via
-//! `InstrumentJson`). See the TODO blocks for each test.
+//! IRS and FX-forward attribution parity tests exercise the same metric-driven
+//! attribution path against instrument-specific fixtures.
 
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -534,13 +532,6 @@ const FX_FWD_TOTAL_TOLERANCE_USD: f64 = 5.0;
 #[allow(dead_code)]
 const FX_FWD_FACTOR_TOLERANCE_USD: f64 = 5.0;
 
-/// Now passing after the `FxForward::Fx01` convention fix
-/// (`finstack/valuations/src/instruments/fx/fx_forward/metrics/fx01.rs`):
-/// `Fx01` switched from "$ per 1bp absolute spot bump" to "$ per 1% relative
-/// spot move", matching what `core::market_data::diff::measure_fx_shift`
-/// emits and what `attribute_pnl_metrics_based` consumes. Before that fix
-/// finstack reported `fx_pnl = $4.4` against QL's $485 — a ~110× shortfall
-/// at spot=1.10.
 #[test]
 fn quantlib_parity_metrics_based_fx_forward_attribution() {
     use finstack_valuations::instruments::Attributes;
