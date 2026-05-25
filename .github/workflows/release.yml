@@ -91,7 +91,7 @@ jobs:
         if: matrix.target != 'aarch64' || runner.os != 'Linux'
         run: |
           python -c "from pathlib import Path; import subprocess, sys; wheels = sorted(Path('dist').glob('finstack-*.whl')); assert len(wheels) == 1, f'Expected exactly one wheel in dist/, found: {wheels}'; subprocess.run([sys.executable, '-m', 'pip', 'install', str(wheels[0])], check=True)"
-          python -c "from finstack import Money, Currency; m = Money(100.0, Currency('USD')); print(f'OK: {m}')"
+          python -c "from finstack.core.money import Money; from finstack.core.currency import Currency; m = Money(100.0, Currency('USD')); print(f'OK: {m}')"
 
       - uses: actions/upload-artifact@v6
         with:
