@@ -45,6 +45,33 @@ types         = { python = "finstack.core.types",         status = "exists" }
 validation    = { python = "finstack.core.validation",    status = "missing" }
 # golden is feature-gated test-only — excluded (see [exclusions])
 
+# Symbol-level pinning for finstack.core.market_data — every name in
+# `finstack.core.market_data.__all__` must appear here.
+[crates.core.market_data]
+python_package = "finstack.core.market_data"
+public = [
+    "curves",
+    "fx",
+    "context",
+    "dtsm",
+    "arbitrage",
+    "BaseCorrelationCurve",
+    "CreditIndexData",
+    "DiscountCurve",
+    "ForwardCurve",
+    "FxDeltaVolSurface",
+    "HazardCurve",
+    "InflationCurve",
+    "PriceCurve",
+    "VolSurface",
+    "VolCube",
+    "VolatilityIndexCurve",
+    "FxConversionPolicy",
+    "FxRateResult",
+    "FxMatrix",
+    "MarketContext",
+]
+
 # ---------------------------------------------------------------------------
 # finstack-factor-model  →  finstack.factor_model
 # ---------------------------------------------------------------------------
@@ -534,7 +561,7 @@ namespaces = [
 # ---------------------------------------------------------------------------
 [wasm_core_subset]
 rust_module_root = "finstack-wasm/src/api/core/"
-js_export_file   = "finstack-wasm/exports/core.js"
+js_export_file   = "../finstack-wasm/exports/core.js"
 modules = [
     "currency",
     "dates",
@@ -552,6 +579,82 @@ excluded = [
     "prelude",       # Re-export bag; no host-language meaning
     "validation",    # Internal validation helpers
 ]
+
+# Root-level `core.<name>` exports on `finstack-wasm/exports/core.js`.
+root_exports = [
+    "Currency",
+    "Money",
+    "Rate",
+    "Bps",
+    "Percentage",
+    "DayCount",
+    "DayCountContext",
+    "Tenor",
+    "createDate",
+    "dateFromEpochDays",
+    "adjust",
+    "availableCalendars",
+    "DiscountCurve",
+    "ForwardCurve",
+    "VolCube",
+    "FxDeltaVolSurface",
+    "FxConversionPolicy",
+    "FxMatrix",
+    "choleskyDecomposition",
+    "choleskySolve",
+    "choleskyDecompositionFlat",
+    "choleskySolveFlat",
+    "validateCorrelationMatrixFlat",
+    "mean",
+    "meanArray",
+    "variance",
+    "varianceArray",
+    "populationVariance",
+    "populationVarianceArray",
+    "correlation",
+    "correlationArray",
+    "covariance",
+    "covarianceArray",
+    "quantile",
+    "quantileArray",
+    "normCdf",
+    "normPdf",
+    "standardNormalInvCdf",
+    "erf",
+    "lnGamma",
+    "kahanSum",
+    "kahanSumArray",
+    "neumaierSum",
+    "neumaierSumArray",
+    "countConsecutive",
+    "countConsecutiveArray",
+]
+
+# finstack.core.market_data symbols intentionally absent from the WASM core
+# facade. Browser callers build market data via `valuations.calibrate` JSON
+# (`MarketContextState`) rather than the Python `MarketContext` builder API.
+python_only_market_data = [
+    "curves",
+    "fx",
+    "context",
+    "dtsm",
+    "arbitrage",
+    "BaseCorrelationCurve",
+    "CreditIndexData",
+    "HazardCurve",
+    "InflationCurve",
+    "PriceCurve",
+    "VolSurface",
+    "VolatilityIndexCurve",
+    "FxRateResult",
+    "MarketContext",
+]
+
+# Method-level gaps on types that *are* partially exposed in WASM.
+[wasm_core_subset.method_gaps]
+"FxDeltaVolSurface.to_vol_surface" = "VolSurface is not on the WASM core facade; use impliedVol or calibrate JSON."
+"MarketContext.get_fx_delta_vol_surface" = "MarketContext is Python-only; read fx_delta_vol_surfaces from MarketContextState JSON."
+"MarketContext.insert" = "MarketContext is Python-only; use calibrate JSON to materialize market state."
 
 # ---------------------------------------------------------------------------
 # WASM valuations subset

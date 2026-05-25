@@ -16,6 +16,7 @@ export const core = {
   DiscountCurve: wasm.DiscountCurve,
   ForwardCurve: wasm.ForwardCurve,
   VolCube: wasm.VolCube,
+  FxDeltaVolSurface: wasm.FxDeltaVolSurface,
   FxConversionPolicy: wasm.FxConversionPolicy,
   FxMatrix: wasm.FxMatrix,
   choleskyDecomposition: wasm.choleskyDecomposition,

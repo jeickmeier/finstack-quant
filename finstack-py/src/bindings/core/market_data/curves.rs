@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use finstack_core::dates::DayCount;
 use finstack_core::market_data::surfaces::{
-    VolCube, VolGridOpts, VolInterpolationMode, VolSurface, VolSurfaceAxis,
+    FxDeltaVolSurface, VolCube, VolGridOpts, VolInterpolationMode, VolSurface, VolSurfaceAxis,
 };
 use finstack_core::market_data::term_structures::{
     BaseCorrelationCurve, CreditIndexData, DiscountCurve, ForwardCurve, HazardCurve,
@@ -707,6 +707,171 @@ impl PyVolSurface {
 }
 
 // ---------------------------------------------------------------------------
+// PyFxDeltaVolSurface
+// ---------------------------------------------------------------------------
+
+/// Delta-quoted FX volatility surface (ATM, 25-delta RR/BF, optional 10-delta wings).
+///
+/// Uses forward delta (premium-unadjusted). Converts to strikes via Garman-Kohlhagen
+/// for strike-axis pricing. See Wystup (2006) and Clark (2011).
+#[pyclass(
+    name = "FxDeltaVolSurface",
+    module = "finstack.core.market_data.curves",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone)]
+pub struct PyFxDeltaVolSurface {
+    /// Shared Rust surface.
+    pub(crate) inner: Arc<FxDeltaVolSurface>,
+}
+
+impl PyFxDeltaVolSurface {
+    /// Build from an existing `Arc<FxDeltaVolSurface>`.
+    pub(crate) fn from_inner(inner: Arc<FxDeltaVolSurface>) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyFxDeltaVolSurface {
+    /// Construct an FX delta-quoted vol surface with 25-delta wings.
+    ///
+    /// Optional `rr_10d` and `bf_10d` add 10-delta wings for richer smile
+    /// interpolation in the wings.
+    ///
+    /// Parameters
+    /// ----------
+    /// id : str
+    ///     Unique surface identifier.
+    /// expiries : list[float]
+    ///     Strictly increasing positive expiry times in years.
+    /// atm_vols : list[float]
+    ///     ATM delta-neutral straddle vols per expiry (must be positive).
+    /// rr_25d : list[float]
+    ///     25-delta risk reversal per expiry (call vol - put vol).
+    /// bf_25d : list[float]
+    ///     25-delta butterfly per expiry (wing average - ATM).
+    /// rr_10d : list[float], optional
+    ///     10-delta risk reversal per expiry. If provided, `bf_10d` is required.
+    /// bf_10d : list[float], optional
+    ///     10-delta butterfly per expiry. If provided, `rr_10d` is required.
+    #[new]
+    #[pyo3(signature = (id, expiries, atm_vols, rr_25d, bf_25d, rr_10d=None, bf_10d=None))]
+    fn new(
+        id: &str,
+        expiries: Vec<f64>,
+        atm_vols: Vec<f64>,
+        rr_25d: Vec<f64>,
+        bf_25d: Vec<f64>,
+        rr_10d: Option<Vec<f64>>,
+        bf_10d: Option<Vec<f64>>,
+    ) -> PyResult<Self> {
+        let surface = match (rr_10d, bf_10d) {
+            (Some(rr), Some(bf)) => {
+                FxDeltaVolSurface::with_10d(id, expiries, atm_vols, rr_25d, bf_25d, rr, bf)
+                    .map_err(core_to_py)?
+            }
+            (None, None) => FxDeltaVolSurface::new(id, expiries, atm_vols, rr_25d, bf_25d)
+                .map_err(core_to_py)?,
+            _ => {
+                return Err(crate::errors::value_error(
+                    "rr_10d and bf_10d must both be provided or both omitted",
+                ));
+            }
+        };
+        Ok(Self {
+            inner: Arc::new(surface),
+        })
+    }
+
+    /// Surface identifier string.
+    #[getter]
+    fn id(&self) -> &str {
+        self.inner.id().as_str()
+    }
+
+    /// Expiry axis in years.
+    #[getter]
+    fn expiries(&self) -> Vec<f64> {
+        self.inner.expiries().to_vec()
+    }
+
+    /// Number of expiry pillars.
+    #[getter]
+    fn num_expiries(&self) -> usize {
+        self.inner.num_expiries()
+    }
+
+    /// Pillar vols at the given expiry index as ``(atm, put_25d_vol, call_25d_vol)``.
+    ///
+    /// Raises ``IndexError`` if ``expiry_idx`` is out of range.
+    #[pyo3(text_signature = "(self, expiry_idx)")]
+    fn pillar_vols(&self, expiry_idx: usize) -> PyResult<(f64, f64, f64)> {
+        if expiry_idx >= self.inner.num_expiries() {
+            return Err(pyo3::exceptions::PyIndexError::new_err(format!(
+                "expiry_idx {} out of range (num_expiries={})",
+                expiry_idx,
+                self.inner.num_expiries()
+            )));
+        }
+        Ok(self.inner.pillar_vols(expiry_idx))
+    }
+
+    /// Interpolated implied vol at the given ``(expiry, strike)`` for the
+    /// supplied forward and rates.
+    #[pyo3(text_signature = "(self, expiry, strike, forward, r_d, r_f)")]
+    fn implied_vol(
+        &self,
+        expiry: f64,
+        strike: f64,
+        forward: f64,
+        r_d: f64,
+        r_f: f64,
+    ) -> PyResult<f64> {
+        self.inner
+            .implied_vol(expiry, strike, forward, r_d, r_f)
+            .map_err(core_to_py)
+    }
+
+    /// Materialize this delta-quoted surface as a strike-axis ``VolSurface``.
+    ///
+    /// The conversion uses Garman-Kohlhagen with the supplied ``spot``, ``r_d``
+    /// (domestic continuously-compounded rate), and ``r_f`` (foreign rate).
+    #[pyo3(text_signature = "(self, spot, r_d, r_f)")]
+    fn to_vol_surface(&self, spot: f64, r_d: f64, r_f: f64) -> PyResult<PyVolSurface> {
+        let surface = self
+            .inner
+            .to_vol_surface(spot, r_d, r_f)
+            .map_err(core_to_py)?;
+        Ok(PyVolSurface::from_inner(Arc::new(surface)))
+    }
+
+    /// Convert a forward delta to a strike using Garman-Kohlhagen
+    /// (premium-unadjusted forward delta).
+    #[staticmethod]
+    #[pyo3(text_signature = "(delta, forward, vol, expiry, r_f)")]
+    fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64, r_f: f64) -> f64 {
+        FxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry, r_f)
+    }
+
+    /// Convert a strike to forward delta (premium-unadjusted call delta).
+    #[staticmethod]
+    #[pyo3(text_signature = "(strike, forward, vol, expiry, r_f)")]
+    fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64, r_f: f64) -> f64 {
+        FxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry, r_f)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "FxDeltaVolSurface(id={:?}, num_expiries={})",
+            self.inner.id().as_str(),
+            self.inner.num_expiries()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // PyVolCube
 // ---------------------------------------------------------------------------
 
@@ -1082,6 +1247,7 @@ pub(super) const EXPORTS: &[&str] = &[
     "CreditIndexData",
     "DiscountCurve",
     "ForwardCurve",
+    "FxDeltaVolSurface",
     "HazardCurve",
     "InflationCurve",
     "PriceCurve",
@@ -1106,6 +1272,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyInflationCurve>()?;
     m.add_class::<PyPriceCurve>()?;
     m.add_class::<PyVolSurface>()?;
+    m.add_class::<PyFxDeltaVolSurface>()?;
     m.add_class::<PyVolCube>()?;
     m.add_class::<PyVolatilityIndexCurve>()?;
 

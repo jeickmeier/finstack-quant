@@ -202,6 +202,10 @@ pub struct DiscountCurve {
     /// *both* the intermediate solver curves and the final curve so that the
     /// bootstrap-internal swap repricing and downstream pricing agree.
     pub(crate) calibration_ois_cutoff_days: Option<i32>,
+    /// Opaque FX policy stamp when bootstrap used cross-currency assumptions
+    /// (XCCY basis, FX triangulation). Propagated to `ResultsMeta.fx_policy_applied`
+    /// for instruments that depend on this curve.
+    pub(crate) fx_policy: Option<String>,
 }
 
 /// Raw serializable state of DiscountCurve
@@ -234,6 +238,11 @@ struct RawDiscountCurve {
     /// OIS cut-off (business days) the curve was calibrated under, if any.
     #[serde(default)]
     pub calibration_ois_cutoff_days: Option<i32>,
+    /// Opaque FX policy stamp; see [`DiscountCurve::fx_policy`]. Defaults to
+    /// `None` so curve JSON written before this field existed deserializes
+    /// cleanly.
+    #[serde(default)]
+    pub fx_policy: Option<String>,
 }
 
 fn default_min_forward_tenor() -> f64 {
@@ -265,6 +274,7 @@ impl From<DiscountCurve> for RawDiscountCurve {
             min_forward_tenor: curve.min_forward_tenor,
             rate_calibration: curve.rate_calibration,
             calibration_ois_cutoff_days: curve.calibration_ois_cutoff_days,
+            fx_policy: curve.fx_policy,
         }
     }
 }
@@ -282,6 +292,7 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
             .min_forward_tenor(state.min_forward_tenor)
             .rate_calibration_opt(state.rate_calibration)
             .calibration_ois_cutoff_days_opt(state.calibration_ois_cutoff_days)
+            .fx_policy_opt(state.fx_policy)
             .validation(ValidationMode::Raw {
                 allow_non_monotonic: state.allow_non_monotonic,
                 forward_floor: state.min_forward_rate,
@@ -339,6 +350,14 @@ impl DiscountCurve {
     #[inline]
     pub fn calibration_ois_cutoff_days(&self) -> Option<i32> {
         self.calibration_ois_cutoff_days
+    }
+
+    /// Opaque FX policy stamp from curve construction, if any.
+    ///
+    /// Propagated onto `ResultsMeta.fx_policy_applied` for dependent instruments.
+    #[inline]
+    pub fn fx_policy(&self) -> Option<&str> {
+        self.fx_policy.as_deref()
     }
 
     /// Number of knot points in the curve.
@@ -1093,6 +1112,7 @@ impl DiscountCurve {
             min_forward_tenor: DEFAULT_MIN_FORWARD_TENOR, // Default ~30 seconds
             rate_calibration: None,
             calibration_ois_cutoff_days: None,
+            fx_policy: None,
         }
     }
 
@@ -1106,6 +1126,7 @@ impl DiscountCurve {
             .min_forward_tenor(self.min_forward_tenor)
             .rate_calibration_opt(self.rate_calibration.clone())
             .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
+            .fx_policy_opt(self.fx_policy.clone())
             .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
             .knots(self.knots.iter().copied().zip(self.dfs.iter().copied()))
     }
@@ -1305,6 +1326,7 @@ pub struct DiscountCurveBuilder {
     pub(crate) min_forward_tenor: f64,
     pub(crate) rate_calibration: Option<DiscountCurveRateCalibration>,
     pub(crate) calibration_ois_cutoff_days: Option<i32>,
+    pub(crate) fx_policy: Option<String>,
 }
 
 impl DiscountCurveBuilder {
@@ -1419,6 +1441,23 @@ impl DiscountCurveBuilder {
         self
     }
 
+    /// Stamp an opaque FX policy on the curve.
+    ///
+    /// Use when the bootstrap involved an FX-sensitive assumption (XCCY basis
+    /// adjustment, FX matrix triangulation, etc.) and the policy must be
+    /// surfaced on downstream valuation result envelopes.
+    pub fn fx_policy(mut self, policy: impl Into<String>) -> Self {
+        self.fx_policy = Some(policy.into());
+        self
+    }
+
+    /// Optionally stamp an FX policy. `None` is a no-op (the field stays
+    /// unset). Used by the serde round-trip path.
+    pub fn fx_policy_opt(mut self, policy: Option<String>) -> Self {
+        self.fx_policy = policy;
+        self
+    }
+
     pub(crate) fn apply_non_monotonic_settings(
         mut self,
         allow_non_monotonic: bool,
@@ -1481,6 +1520,7 @@ impl DiscountCurveBuilder {
             min_forward_tenor: self.min_forward_tenor,
             rate_calibration: self.rate_calibration,
             calibration_ois_cutoff_days: self.calibration_ois_cutoff_days,
+            fx_policy: self.fx_policy,
         })
     }
 
@@ -1543,6 +1583,7 @@ impl DiscountCurveBuilder {
             min_forward_tenor: self.min_forward_tenor,
             rate_calibration: self.rate_calibration,
             calibration_ois_cutoff_days: self.calibration_ois_cutoff_days,
+            fx_policy: self.fx_policy,
         })
     }
 }

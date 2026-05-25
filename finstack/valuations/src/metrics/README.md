@@ -37,7 +37,7 @@ The registry topologically sorts calculators so dependencies (for example YTM be
 - **1D**: `store_bucketed_series` — key-rate DV01, bucketed CS01, etc.
 - **2D**: `store_matrix` — vega by expiry × strike
 
-Parallel bucket totals should reconcile to the scalar metric where the implementation defines that invariant.
+Parallel bucket totals should reconcile to the scalar metric where the implementation defines that invariant. Bucketed CS01 and DV01 require strictly increasing key-rate grids; duplicate or unsorted tenors return `Validation` errors. CS01 bucket totals use Neumaier compensated summation, matching DV01.
 
 ## Adding a metric
 

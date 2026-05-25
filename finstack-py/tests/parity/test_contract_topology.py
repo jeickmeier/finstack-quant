@@ -393,3 +393,49 @@ def test_wasm_valuations_python_js_names_use_camel_or_pascal_case() -> None:
     block = CONTRACT["wasm_valuations_subset"]
     for js_name in block["python_js_map"].values():
         assert "_" not in js_name, f"WASM name must not be snake_case: {js_name!r}"
+
+
+def test_wasm_core_exports_match_contract() -> None:
+    """``exports/core.js`` root keys must match [wasm_core_subset]."""
+    block = CONTRACT["wasm_core_subset"]
+    js_path = (CONTRACT_PATH.parent / block["js_export_file"]).resolve()
+    expected = set(block["root_exports"])
+    actual = _parse_exported_const_object_keys(js_path, "core")
+    assert actual == expected, (
+        f"core.js exports diverged from contract.\n"
+        f"  missing from JS: {sorted(expected - actual)}\n"
+        f"  unlisted in contract: {sorted(actual - expected)}"
+    )
+
+
+def test_wasm_core_python_only_market_data_not_on_facade() -> None:
+    """Python-only market_data symbols must not appear on the WASM core facade."""
+    block = CONTRACT["wasm_core_subset"]
+    js_path = (CONTRACT_PATH.parent / block["js_export_file"]).resolve()
+    actual = _parse_exported_const_object_keys(js_path, "core")
+    overlap = set(block["python_only_market_data"]) & actual
+    assert not overlap, f"python_only_market_data must not be on core.js: {sorted(overlap)}"
+
+
+def test_wasm_core_market_data_types_on_facade() -> None:
+    """WASM core exposes the agreed market_data type subset from the contract."""
+    block = CONTRACT["wasm_core_subset"]
+    js_path = (CONTRACT_PATH.parent / block["js_export_file"]).resolve()
+    actual = _parse_exported_const_object_keys(js_path, "core")
+    public = set(CONTRACT["crates"]["core"]["market_data"]["public"])
+    python_only = set(block["python_only_market_data"])
+    expected_on_wasm = public - python_only
+    missing = expected_on_wasm - actual
+    assert not missing, f"market_data WASM subset missing from core.js: {sorted(missing)}"
+
+
+def test_core_market_data_public_matches_contract() -> None:
+    """``finstack.core.market_data.__all__`` must match [crates.core.market_data]."""
+    block = CONTRACT["crates"]["core"]["market_data"]
+    expected = block["public"]
+    module = importlib.import_module(block["python_package"])
+    assert module.__all__ == expected, (
+        f"{block['python_package']}.__all__ diverged from contract.\n"
+        f"  missing: {sorted(set(expected) - set(module.__all__))}\n"
+        f"  unlisted: {sorted(set(module.__all__) - set(expected))}"
+    )

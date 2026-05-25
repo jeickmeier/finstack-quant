@@ -5,7 +5,9 @@ use std::sync::Arc;
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err};
 use finstack_core::currency::Currency as RustCurrency;
 use finstack_core::dates::DayCount;
-use finstack_core::market_data::surfaces::VolCube as RustVolCube;
+use finstack_core::market_data::surfaces::{
+    FxDeltaVolSurface as RustFxDeltaVolSurface, VolCube as RustVolCube,
+};
 use finstack_core::market_data::term_structures::{
     DiscountCurve as RustDiscountCurve, ForwardCurve as RustForwardCurve,
 };
@@ -489,6 +491,138 @@ impl VolCube {
     #[wasm_bindgen(getter, js_name = id)]
     pub fn id(&self) -> String {
         self.inner.id().as_str().to_string()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FxDeltaVolSurface
+// ---------------------------------------------------------------------------
+
+/// FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional
+/// 10-delta wings).
+///
+/// Stores market-standard FX delta quotes (Wystup 2006, Clark 2011) and
+/// converts to a strike-axis [`VolSurface`] on demand via Garman-Kohlhagen.
+/// The delta convention is **forward delta (premium-unadjusted)**.
+#[wasm_bindgen(js_name = FxDeltaVolSurface)]
+pub struct FxDeltaVolSurface {
+    #[wasm_bindgen(skip)]
+    pub(crate) inner: Arc<RustFxDeltaVolSurface>,
+}
+
+#[wasm_bindgen(js_class = FxDeltaVolSurface)]
+impl FxDeltaVolSurface {
+    /// Construct an FX delta-quoted vol surface with 25-delta wings.
+    ///
+    /// Optional `rr10d` / `bf10d` add 10-delta wings for richer wing
+    /// interpolation. Pass an empty array for both to omit; if one is
+    /// provided, the other must be too.
+    ///
+    /// # Arguments
+    /// * `id`        - Stable surface identifier.
+    /// * `expiries`  - Strictly increasing positive expiry times (years).
+    /// * `atm_vols`  - ATM delta-neutral straddle vols per expiry.
+    /// * `rr25d`     - 25-delta risk reversal per expiry (call vol − put vol).
+    /// * `bf25d`     - 25-delta butterfly per expiry (wing avg − ATM).
+    /// * `rr10d`     - Optional 10-delta risk reversal per expiry.
+    /// * `bf10d`     - Optional 10-delta butterfly per expiry.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        id: &str,
+        expiries: &[f64],
+        atm_vols: &[f64],
+        rr25d: &[f64],
+        bf25d: &[f64],
+        rr10d: Option<Vec<f64>>,
+        bf10d: Option<Vec<f64>>,
+    ) -> Result<FxDeltaVolSurface, JsValue> {
+        let surface = match (rr10d, bf10d) {
+            (Some(rr), Some(bf)) => RustFxDeltaVolSurface::with_10d(
+                id,
+                expiries.to_vec(),
+                atm_vols.to_vec(),
+                rr25d.to_vec(),
+                bf25d.to_vec(),
+                rr,
+                bf,
+            )
+            .map_err(to_js_err)?,
+            (None, None) => RustFxDeltaVolSurface::new(
+                id,
+                expiries.to_vec(),
+                atm_vols.to_vec(),
+                rr25d.to_vec(),
+                bf25d.to_vec(),
+            )
+            .map_err(to_js_err)?,
+            _ => {
+                return Err(JsValue::from_str(
+                    "rr10d and bf10d must both be provided or both omitted",
+                ));
+            }
+        };
+        Ok(Self {
+            inner: Arc::new(surface),
+        })
+    }
+
+    /// Surface identifier.
+    #[wasm_bindgen(getter, js_name = id)]
+    pub fn id(&self) -> String {
+        self.inner.id().as_str().to_string()
+    }
+
+    /// Expiry axis in years.
+    #[wasm_bindgen(getter, js_name = expiries)]
+    pub fn expiries(&self) -> Vec<f64> {
+        self.inner.expiries().to_vec()
+    }
+
+    /// Number of expiry pillars.
+    #[wasm_bindgen(getter, js_name = numExpiries)]
+    pub fn num_expiries(&self) -> usize {
+        self.inner.num_expiries()
+    }
+
+    /// Pillar vols at the given expiry index as `[atm, put25d_vol, call25d_vol]`.
+    #[wasm_bindgen(js_name = pillarVols)]
+    pub fn pillar_vols(&self, expiry_idx: usize) -> Result<Vec<f64>, JsValue> {
+        if expiry_idx >= self.inner.num_expiries() {
+            return Err(JsValue::from_str(&format!(
+                "expiry_idx {} out of range (num_expiries={})",
+                expiry_idx,
+                self.inner.num_expiries()
+            )));
+        }
+        let (atm, p, c) = self.inner.pillar_vols(expiry_idx);
+        Ok(vec![atm, p, c])
+    }
+
+    /// Implied vol at `(expiry, strike)` for the supplied forward + rates.
+    #[wasm_bindgen(js_name = impliedVol)]
+    pub fn implied_vol(
+        &self,
+        expiry: f64,
+        strike: f64,
+        forward: f64,
+        r_d: f64,
+        r_f: f64,
+    ) -> Result<f64, JsValue> {
+        self.inner
+            .implied_vol(expiry, strike, forward, r_d, r_f)
+            .map_err(to_js_err)
+    }
+
+    /// Convert a forward delta to a strike (Garman-Kohlhagen, premium-unadjusted).
+    #[wasm_bindgen(js_name = deltaToStrike)]
+    pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64, r_f: f64) -> f64 {
+        RustFxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry, r_f)
+    }
+
+    /// Convert a strike to forward delta (Garman-Kohlhagen call delta).
+    #[wasm_bindgen(js_name = strikeToDelta)]
+    pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64, r_f: f64) -> f64 {
+        RustFxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry, r_f)
     }
 }
 

@@ -47,9 +47,7 @@
 //! - General volatility-surface conventions:
 //!   `docs/REFERENCES.md#gatheral-volatility-surface`
 //! - FX volatility quoting:
-//!   `docs/REFERENCES.md#clark-fx-options`
-//! - FX volatility quoting:
-//!   `docs/REFERENCES.md#wystup-fx-options`
+//!   `docs/REFERENCES.md#clark-fx-options`, `docs/REFERENCES.md#wystup-fx-options`
 
 mod delta_vol_surface;
 pub mod fx_delta_vol_surface;

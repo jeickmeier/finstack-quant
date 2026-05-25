@@ -170,6 +170,8 @@ pub struct ForwardCurve {
     interp: Interp,
     /// Optional market quotes used to bootstrap this curve.
     rate_calibration: Option<ForwardCurveRateCalibration>,
+    /// Opaque FX policy stamp; see [`DiscountCurve::fx_policy`].
+    fx_policy: Option<String>,
 }
 
 /// Raw serializable state of ForwardCurve
@@ -193,6 +195,9 @@ struct RawForwardCurve {
     /// Optional market quotes used to bootstrap this curve.
     #[serde(default)]
     pub rate_calibration: Option<ForwardCurveRateCalibration>,
+    /// Opaque FX policy stamp; see [`super::DiscountCurve::fx_policy`].
+    #[serde(default)]
+    pub fx_policy: Option<String>,
 }
 
 impl From<ForwardCurve> for RawForwardCurve {
@@ -218,6 +223,7 @@ impl From<ForwardCurve> for RawForwardCurve {
                 extrapolation: curve.interp.extrapolation(),
             },
             rate_calibration: curve.rate_calibration,
+            fx_policy: curve.fx_policy,
         }
     }
 }
@@ -234,6 +240,7 @@ impl TryFrom<RawForwardCurve> for ForwardCurve {
             .interp(state.interp.interp_style)
             .extrapolation(state.interp.extrapolation)
             .rate_calibration_opt(state.rate_calibration)
+            .fx_policy_opt(state.fx_policy)
             .build()
     }
 }
@@ -263,6 +270,7 @@ impl ForwardCurve {
             min_forward_rate: None,
             extrapolation: ExtrapolationPolicy::FlatForward,
             rate_calibration: None,
+            fx_policy: None,
         }
     }
 
@@ -330,6 +338,13 @@ impl ForwardCurve {
     #[inline]
     pub fn rate_calibration(&self) -> Option<&ForwardCurveRateCalibration> {
         self.rate_calibration.as_ref()
+    }
+
+    /// Opaque FX policy stamp set by the curve constructor; see
+    /// [`super::DiscountCurve::fx_policy`] for the contract.
+    #[inline]
+    pub fn fx_policy(&self) -> Option<&str> {
+        self.fx_policy.as_deref()
     }
 
     /// Number of knot points in the curve.
@@ -490,6 +505,8 @@ impl ForwardCurve {
             .day_count(self.day_count)
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
+            .rate_calibration_opt(self.rate_calibration.clone())
+            .fx_policy_opt(self.fx_policy.clone())
             .knots(
                 self.knots
                     .iter()
@@ -778,6 +795,7 @@ pub struct ForwardCurveBuilder {
     min_forward_rate: Option<f64>,
     extrapolation: ExtrapolationPolicy,
     rate_calibration: Option<ForwardCurveRateCalibration>,
+    fx_policy: Option<String>,
 }
 
 impl ForwardCurveBuilder {
@@ -839,6 +857,19 @@ impl ForwardCurveBuilder {
         self
     }
 
+    /// Stamp an opaque FX policy on the curve. See [`ForwardCurve::fx_policy`].
+    pub fn fx_policy(mut self, policy: impl Into<String>) -> Self {
+        self.fx_policy = Some(policy.into());
+        self
+    }
+
+    /// Optionally stamp an FX policy; `None` is a no-op. Used by serde
+    /// round-trip and curve builders that propagate metadata.
+    pub fn fx_policy_opt(mut self, policy: Option<String>) -> Self {
+        self.fx_policy = policy;
+        self
+    }
+
     /// Validate input and build the [`ForwardCurve`].
     pub fn build(self) -> crate::Result<ForwardCurve> {
         if !self.base_is_set {
@@ -888,6 +919,7 @@ impl ForwardCurveBuilder {
             forwards,
             interp,
             rate_calibration: self.rate_calibration,
+            fx_policy: self.fx_policy,
         })
     }
 }

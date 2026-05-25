@@ -57,8 +57,9 @@ Convention notes:
   - `discount_curve.rs`: discount factor curves (`DiscountCurve`) implementing:
     - `TermStructure` + `Discounting` traits.
     - Builder pattern with `base_date`, `day_count`, `knots`, `interp`, and extrapolation controls.
-  - `forward_curve.rs`: forward-rate curves (`ForwardCurve`) with tenor-aware builders (e.g., 3M forward) and knot-based interpolation.
-  - `hazard_curve.rs`: credit hazard/survival curves (`HazardCurve`) with survival/probability helpers; used for credit pricing.
+    - Optional `fx_policy` stamp when bootstrap used cross-currency assumptions.
+  - `forward_curve.rs`: forward-rate curves (`ForwardCurve`) with tenor-aware builders (e.g., 3M forward) and knot-based interpolation; optional `fx_policy` stamp.
+  - `hazard_curve.rs`: credit hazard/survival curves (`HazardCurve`) with survival/probability helpers; optional `fx_policy` stamp.
   - `inflation.rs`: real/breakeven inflation term structures (`InflationCurve`) built from CPI levels.
   - `credit_index.rs`: credit index aggregates (`CreditIndexData`) referencing component hazard and base correlation curves.
   - `base_correlation.rs`: base correlation curves for tranche pricing (`BaseCorrelationCurve`).
@@ -68,10 +69,11 @@ Convention notes:
     - Support serde via `*State` DTOs when runtime types need explicit wire shapes.
 
 - **`surfaces/`**
-  - `mod.rs`: documentation and re-export of `VolSurface`.
-  - `vol_surface.rs`: bilinear volatility surface implementation:
-    - `VolSurface::builder` with `expiries`, `strikes`, and per-row volatility grids.
-    - Evaluation helpers (e.g., `value(expiry, strike)`) and bucket bumping (`apply_bucket_bump`) for scenario work.
+  - `mod.rs`: documentation and re-exports for surface types.
+  - `vol_surface.rs`: bilinear volatility surface on a strike grid (`VolSurface`).
+  - `fx_delta_vol_surface.rs`: FX smiles quoted in delta space (`FxDeltaVolSurface`);
+    ATM / 25-delta RR/BF (optional 10-delta wings), forward-delta convention,
+    Garman-Kohlhagen delta-to-strike conversion, and materialization to `VolSurface`.
 
 - **`scalars/`**
   - `mod.rs`: documentation and re-exports.
@@ -136,6 +138,10 @@ Convention notes:
 - **Volatility surfaces (`VolSurface`)**
   - Two-dimensional matrices of implied vols by expiry and strike.
   - Builder validates grid dimensions and supports bilinear interpolation and bucket-level bumps.
+- **FX delta vol surfaces (`FxDeltaVolSurface`)**
+  - FX option vols quoted as ATM DNS, 25-delta risk reversal, and 25-delta butterfly per expiry.
+  - Optional 10-delta wings; forward delta (premium-unadjusted) convention.
+  - Converts to strike-axis `VolSurface` via Garman-Kohlhagen for existing pricing engines.
 
 All curve and surface types:
 
@@ -165,7 +171,7 @@ These types are stored inside `MarketContext` under `prices`, `series`, and `inf
 
 - **Builder-style inserts**
   - Curves: `insert_discount`, `insert_forward`, `insert_hazard`, `insert_inflation`, `insert_base_correlation`.
-  - Surfaces: `insert_surface`.
+  - Surfaces: `insert_surface`, `insert_fx_delta_vol_surface`.
   - Scalars & time series: `insert_price`, `insert_series`.
   - Inflation indices: `insert_inflation_index`.
   - Credit indices: `insert_credit_index`.
@@ -174,7 +180,7 @@ These types are stored inside `MarketContext` under `prices`, `series`, and `inf
   - Dividends and market history: `insert_dividends`, `insert_market_history`.
 - **Type-safe getters**
   - Curves: `get_discount`, `get_forward`, `get_hazard`, `get_inflation_curve`, `get_base_correlation` (and `_ref` borrowing variants).
-  - Surfaces and indices: `surface`, `get_price`, `get_series`, `get_inflation_index`, `dividend_schedule`, `credit_index`, `collateral`.
+  - Surfaces and indices: `get_surface`, `get_fx_delta_vol_surface`, `get_price`, `get_series`, `get_inflation_index`, `dividend_schedule`, `credit_index`, `collateral`.
   - Introspection: `curve_ids`, `curves_of_type`, `count_by_type`, `stats`, `is_empty`, `total_objects`.
 - **Scenario support**
   - `bump` for curve/surface/price/time-series bumps keyed by `CurveId`.
@@ -183,7 +189,8 @@ These types are stored inside `MarketContext` under `prices`, `series`, and `inf
   - `bump_fx_spot` for FX-specific percentage bumps (via `FxMatrix`).
 - **Serialization**
   - `MarketContext` serializes via `MarketContextState` with stable field names:
-    - `curves`, `surfaces`, `prices`, `series`, `inflation_indices`, `credit_indices`, `collateral`.
+    `curves`, `surfaces`, `fx_delta_vol_surfaces`, `prices`, `series`,
+    `inflation_indices`, `credit_indices`, and `collateral`.
   - `MarketContextState` is the wire shape for Python/WASM bindings and long-lived storage.
 
 ---

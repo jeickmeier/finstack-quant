@@ -2,11 +2,15 @@
 
 import json
 from pathlib import Path
+import tomllib
 
 from finstack.core.market_data import MarketContext
 import pytest
 
 from finstack.portfolio import aggregate_full_cashflows
+
+CONTRACT_PATH = Path(__file__).parents[1] / "parity_contract.toml"
+CONTRACT = tomllib.loads(CONTRACT_PATH.read_text())
 
 
 class TestCoreNamespace:
@@ -59,31 +63,10 @@ class TestCoreNamespace:
         )
 
     def test_core_market_data_all_matches_static_parent_exports(self) -> None:
-        """Market data parent exports should stay explicit and non-dynamic."""
+        """Market data parent exports should match the parity contract."""
         from finstack.core import market_data
 
-        expected = [
-            "curves",
-            "fx",
-            "context",
-            "dtsm",
-            "arbitrage",
-            "BaseCorrelationCurve",
-            "CreditIndexData",
-            "DiscountCurve",
-            "ForwardCurve",
-            "HazardCurve",
-            "InflationCurve",
-            "PriceCurve",
-            "VolSurface",
-            "VolCube",
-            "VolatilityIndexCurve",
-            "FxConversionPolicy",
-            "FxRateResult",
-            "FxMatrix",
-            "MarketContext",
-        ]
-
+        expected = CONTRACT["crates"]["core"]["market_data"]["public"]
         assert market_data.__all__ == expected
         for name in expected:
             assert hasattr(market_data, name)

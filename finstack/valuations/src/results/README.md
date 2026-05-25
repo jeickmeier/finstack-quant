@@ -36,6 +36,23 @@ let result = result.with_measures(measures);
 
 For batch pricing, build `ResultsMeta` once via `results_meta(&config)` and use `stamped_with_meta` to avoid repeated config allocation.
 
+## FX policy metadata
+
+`ResultsMeta.fx_policy_applied` records which FX conversion or cross-currency
+assumption fed into a valuation. Precedence when `PricerRegistry::price_with_metrics`
+stamps metadata:
+
+1. A policy already set by the instrument pricer (for example FX options that
+   stamp their conversion direction).
+2. The `fx_policy` field on any discount, forward, or hazard curve the
+   instrument depends on (`DiscountCurve::fx_policy`, etc.). Multiple stamps
+   are joined with ` | ` in dependency order.
+3. `None`.
+
+Curve stamps are opaque strings set at calibration or via the curve builder
+(`fx_policy(...)`). They propagate to single-currency instruments discounted
+off cross-currency curves without requiring the pricer to restate the policy.
+
 ## Covenants
 
 ```rust

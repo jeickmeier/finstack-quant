@@ -387,9 +387,9 @@ impl MetricRegistry {
         }
 
         if temp_mark.contains(&id) {
-            // Circular dependency detected - build the cycle path
+            // Cycle: `id` is already on `path`; push again and slice from its first occurrence.
             path.push(id.clone());
-            let cycle_start = path.iter().position(|m| m == &id).unwrap_or(0);
+            let cycle_start = path.iter().position(|m| m == &id).unwrap_or(path.len() - 1);
             let cycle_path: Vec<String> = path[cycle_start..]
                 .iter()
                 .map(|m| m.as_str().to_string())

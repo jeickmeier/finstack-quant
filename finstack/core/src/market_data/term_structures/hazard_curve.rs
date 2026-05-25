@@ -133,6 +133,8 @@ pub struct HazardCurve {
     par_interp: ParInterp,
     /// Interpolator for survival probabilities
     interp: Interp,
+    /// Opaque FX policy stamp; see [`super::DiscountCurve::fx_policy`].
+    fx_policy: Option<String>,
 }
 
 /// Raw serializable state of a HazardCurve
@@ -160,6 +162,9 @@ struct RawHazardCurve {
     /// Par interpolation method
     #[serde(default = "default_par_interp")]
     pub par_interp: ParInterp,
+    /// Opaque FX policy stamp; see [`super::DiscountCurve::fx_policy`].
+    #[serde(default)]
+    pub fx_policy: Option<String>,
 }
 
 fn default_par_interp() -> ParInterp {
@@ -194,6 +199,7 @@ impl From<HazardCurve> for RawHazardCurve {
             day_count: curve.day_count,
             par_points,
             par_interp: curve.par_interp,
+            fx_policy: curve.fx_policy,
         }
     }
 }
@@ -212,6 +218,7 @@ impl TryFrom<RawHazardCurve> for HazardCurve {
             .issuer_opt(state.issuer)
             .seniority_opt(state.seniority)
             .currency_opt(state.currency)
+            .fx_policy_opt(state.fx_policy)
             .build()
     }
 }
@@ -235,6 +242,7 @@ impl HazardCurve {
             par_points: Vec::new(),
             par_interp: ParInterp::Linear,
             max_hazard_rate: 10.0,
+            fx_policy: None,
         }
     }
 
@@ -383,6 +391,13 @@ impl HazardCurve {
         self.issuer.as_deref()
     }
 
+    /// Opaque FX policy stamp set by the curve constructor; see
+    /// [`super::DiscountCurve::fx_policy`] for the contract.
+    #[inline]
+    pub fn fx_policy(&self) -> Option<&str> {
+        self.fx_policy.as_deref()
+    }
+
     /// Access the knot points (time, lambda) for inspection or modification.
     pub fn knot_points(&self) -> impl Iterator<Item = (f64, f64)> + '_ {
         self.knots
@@ -448,6 +463,7 @@ impl HazardCurve {
             par_spreads_bp: self.par_spreads_bp.clone(),
             par_interp: self.par_interp,
             interp: self.interp.clone(),
+            fx_policy: self.fx_policy.clone(),
         })
     }
 
@@ -462,6 +478,7 @@ impl HazardCurve {
             .issuer_opt(self.issuer.clone())
             .seniority_opt(self.seniority)
             .currency_opt(self.currency)
+            .fx_policy_opt(self.fx_policy.clone())
             .knots(self.knot_points())
             .par_spreads(self.par_spread_points())
     }
@@ -744,6 +761,7 @@ pub struct HazardCurveBuilder {
     /// Maximum allowed hazard rate (default 10.0).
     /// Rates above this trigger an error in `build()`.
     max_hazard_rate: f64,
+    fx_policy: Option<String>,
 }
 
 impl HazardCurveBuilder {
@@ -823,6 +841,19 @@ impl HazardCurveBuilder {
     /// Optionally set currency metadata (no-op if `None`).
     pub fn currency_opt(mut self, ccy: Option<Currency>) -> Self {
         self.currency = ccy;
+        self
+    }
+
+    /// Stamp an opaque FX policy on the curve. See [`HazardCurve::fx_policy`].
+    pub fn fx_policy(mut self, policy: impl Into<String>) -> Self {
+        self.fx_policy = Some(policy.into());
+        self
+    }
+
+    /// Optionally stamp an FX policy; `None` is a no-op. Used by the serde
+    /// round-trip path and by curve builders propagating metadata.
+    pub fn fx_policy_opt(mut self, policy: Option<String>) -> Self {
+        self.fx_policy = policy;
         self
     }
 
@@ -960,6 +991,7 @@ impl HazardCurveBuilder {
             par_spreads_bp: p_spd.into_boxed_slice(),
             par_interp: self.par_interp,
             interp,
+            fx_policy: self.fx_policy,
         })
     }
 }

@@ -3,7 +3,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use finstack_wasm::api::core::dates::{create_date, DayCount, DayCountContext, Tenor};
-use finstack_wasm::api::core::market_data::{FxConversionPolicy, FxMatrix};
+use finstack_wasm::api::core::market_data::{FxConversionPolicy, FxDeltaVolSurface, FxMatrix};
 use wasm_bindgen_test::*;
 
 #[wasm_bindgen_test]
@@ -34,6 +34,55 @@ fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
 
     assert!((result.get_rate() - 1.25).abs() < 1e-12);
     assert_eq!(result.get_policy().to_string(), "cashflow_date");
+}
+
+#[wasm_bindgen_test]
+fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
+    let surface = FxDeltaVolSurface::new(
+        "EURUSD-DELTA-VOL",
+        &[0.25, 0.5, 1.0],
+        &[0.08, 0.085, 0.09],
+        &[0.01, 0.012, 0.015],
+        &[0.005, 0.006, 0.007],
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(surface.id(), "EURUSD-DELTA-VOL");
+    assert_eq!(surface.num_expiries(), 3);
+    assert_eq!(surface.expiries(), vec![0.25, 0.5, 1.0]);
+
+    let pillar = surface.pillar_vols(0).unwrap();
+    assert!((pillar[0] - 0.08).abs() < 1e-12);
+
+    // ATM-DNS strike at expiry 1.0 should recover the 0.09 ATM vol.
+    let forward: f64 = 1.20;
+    let atm_vol: f64 = 0.09;
+    let k_atm = forward * (0.5 * atm_vol * atm_vol * 1.0_f64).exp();
+    let vol = surface
+        .implied_vol(1.0, k_atm, forward, 0.05, 0.03)
+        .unwrap();
+    assert!((vol - atm_vol).abs() < 1e-9);
+}
+
+#[wasm_bindgen_test]
+fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
+    match FxDeltaVolSurface::new(
+        "BAD",
+        &[0.25, 0.5],
+        &[0.08, 0.085],
+        &[0.01, 0.012],
+        &[0.005, 0.006],
+        Some(vec![0.018, 0.020]),
+        None,
+    ) {
+        Ok(_) => panic!("mixed rr10d/bf10d must error"),
+        Err(err) => {
+            let msg = err.as_string().unwrap_or_default();
+            assert!(msg.contains("rr10d"), "unexpected error message: {msg}");
+        }
+    }
 }
 
 #[wasm_bindgen_test]

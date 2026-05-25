@@ -56,6 +56,7 @@ use crate::market::conventions::ids::CdsDocClause;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricContext, MetricId};
 use finstack_core::market_data::context::MarketContext;
+use finstack_core::math::NeumaierAccumulator;
 use finstack_core::types::CurveId;
 use std::sync::Arc;
 
@@ -72,6 +73,26 @@ pub(crate) fn sensitivity_central_diff(pv_up: f64, pv_down: f64, bump_bp: f64) -
         return 0.0;
     }
     (pv_up - pv_down) / (2.0 * bump_bp)
+}
+
+/// Validate that a bucket grid is strictly increasing.
+///
+/// Mirrors the DV01 invariant at
+/// `metrics::sensitivities::dv01::UnifiedDv01Calculator::compute_triangular_for_curve`:
+/// unsorted or duplicate tenors silently produce wrong per-bucket sensitivities
+/// (each duplicate tenor would be shocked twice and double-counted in the
+/// series), so reject them up front with a clear error.
+fn validate_buckets_strictly_increasing(buckets: &[f64]) -> finstack_core::Result<()> {
+    for win in buckets.windows(2) {
+        if win[1].partial_cmp(&win[0]) != Some(std::cmp::Ordering::Greater) {
+            return Err(finstack_core::Error::Validation(format!(
+                "CS01 key-rate buckets must be strictly increasing, got {:?} \
+                 (offending pair: {} -> {})",
+                buckets, win[0], win[1]
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Compute parallel CS01 by bumping par spreads and re-calibrating.
@@ -269,6 +290,8 @@ where
     if has_zero_anchor && !buckets.iter().any(|t| t.abs() <= 1e-9) {
         buckets.insert(0, 0.0);
     }
+    // Validate after optional zero-anchor insertion.
+    validate_buckets_strictly_increasing(&buckets)?;
 
     // Central differencing does not need the base PV, but we still probe whether
     // par-spread re-bootstrapping is available so all buckets use the same methodology.
@@ -296,7 +319,7 @@ where
 
     let (series, total) = context.with_market_scratch(|_, scratch| {
         let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> = Vec::new();
-        let mut total = 0.0;
+        let mut total_acc = NeumaierAccumulator::new();
 
         for t in buckets {
             let label = super::config::format_bucket_label_cow(t);
@@ -354,10 +377,10 @@ where
 
             let cs01 = sensitivity_central_diff(pv_bumped_up, pv_bumped_down, bump_bp);
             series.push((label, cs01));
-            total += cs01;
+            total_acc.add(cs01);
         }
 
-        Ok((series, total))
+        Ok((series, total_acc.total()))
     })?;
 
     context.store_bucketed_series(series_id, series);
@@ -690,6 +713,7 @@ where
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
         let buckets = defaults.cs01_buckets_years;
         let bump_bp = defaults.credit_spread_bump_bp;
+        validate_buckets_strictly_increasing(&buckets)?;
 
         let curves = Arc::clone(&context.curves);
         let base_ctx = curves.as_ref();
@@ -700,7 +724,7 @@ where
 
         let (series, total) = context.with_market_scratch(|ctx, scratch| {
             let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> = Vec::new();
-            let mut total = 0.0;
+            let mut total_acc = NeumaierAccumulator::new();
 
             for t in buckets {
                 let label = super::config::format_bucket_label_cow(t);
@@ -720,10 +744,10 @@ where
 
                 let cs01 = sensitivity_central_diff(pv_up, pv_down, bump_bp);
                 series.push((label, cs01));
-                total += cs01;
+                total_acc.add(cs01);
             }
 
-            Ok((series, total))
+            Ok((series, total_acc.total()))
         })?;
 
         let series_id = MetricId::custom(format!("bucketed_cs01_hazard::{}", hazard_id.as_str()));
@@ -990,6 +1014,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::validate_buckets_strictly_increasing;
+    use finstack_core::math::NeumaierAccumulator;
+
     #[test]
     fn test_central_vs_forward_difference() {
         // Central difference: (f(x+h) - f(x-h)) / (2h) = f'(x) + O(h^2)
@@ -1009,6 +1036,55 @@ mod tests {
         assert!(
             (forward - 2.0).abs() > 0.09,
             "Forward difference should have O(h) error"
+        );
+    }
+
+    #[test]
+    fn cs01_bucket_total_uses_compensated_summation() {
+        let n = 1_000_000usize;
+        let mut values = vec![1.0e16];
+        values.extend(std::iter::repeat_n(1.0, n));
+        values.push(-1.0e16);
+
+        let naive: f64 = values.iter().fold(0.0_f64, |acc, v| acc + v);
+
+        let mut acc = NeumaierAccumulator::new();
+        for v in &values {
+            acc.add(*v);
+        }
+        let compensated = acc.total();
+
+        assert!(
+            (compensated - n as f64).abs() < 1e-6,
+            "compensated summation must recover the exact total {n}, got {compensated}"
+        );
+        assert!(
+            (naive - n as f64).abs() > 1.0,
+            "naive summation is expected to lose precision here (got {naive}, \
+             exact {n}); the CS01 bucket totals must therefore use \
+             NeumaierAccumulator"
+        );
+    }
+
+    #[test]
+    fn validate_buckets_rejects_unsorted_and_duplicate_grids() {
+        validate_buckets_strictly_increasing(&[0.25, 0.5, 1.0, 5.0])
+            .expect("sorted grid must validate");
+        validate_buckets_strictly_increasing(&[]).expect("empty grid is vacuously valid");
+        validate_buckets_strictly_increasing(&[1.0]).expect("single-element grid is valid");
+
+        let dup = validate_buckets_strictly_increasing(&[0.25, 1.0, 1.0, 5.0])
+            .expect_err("duplicate tenor must error");
+        assert!(
+            matches!(dup, finstack_core::Error::Validation(_)),
+            "duplicate tenor must surface as Validation, got {dup:?}"
+        );
+
+        let unsorted = validate_buckets_strictly_increasing(&[0.25, 5.0, 1.0])
+            .expect_err("unsorted grid must error");
+        assert!(
+            matches!(unsorted, finstack_core::Error::Validation(_)),
+            "unsorted grid must surface as Validation, got {unsorted:?}"
         );
     }
 }

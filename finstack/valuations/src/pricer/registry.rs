@@ -341,7 +341,7 @@ impl PricerRegistry {
         let effective_cfg = cfg
             .as_deref()
             .map_or_else(FinstackConfig::default, |c| c.clone());
-        stamp_results_meta(&effective_cfg, &mut base_result);
+        stamp_results_meta(&effective_cfg, instrument, market, &mut base_result);
 
         if metrics.is_empty() {
             // No extra metrics requested: apply scenario overrides and return.
@@ -579,12 +579,71 @@ impl PricerRegistry {
     }
 }
 
-/// Stamp result metadata from a config, preserving FX policy stamps if present.
-fn stamp_results_meta(cfg: &FinstackConfig, result: &mut crate::results::ValuationResult) {
+/// Stamp result metadata from a config.
+///
+/// FX policy precedence (highest to lowest):
+/// 1. A policy already set on `result.meta.fx_policy_applied` by the pricer.
+/// 2. The `fx_policy` field on any curve the instrument depends on.
+/// 3. `None`.
+///
+/// Multi-curve aggregation: when more than one dependent curve carries a
+/// policy stamp, they are joined with ` | ` so the audit trail records every
+/// policy that fed into the valuation. Single-stamp results return the
+/// policy verbatim.
+fn stamp_results_meta(
+    cfg: &FinstackConfig,
+    instrument: &dyn Priceable,
+    market: &finstack_core::market_data::context::MarketContext,
+    result: &mut crate::results::ValuationResult,
+) {
     let prev_fx_policy = result.meta.fx_policy_applied.clone();
     let mut meta = results_meta_now(cfg);
-    meta.fx_policy_applied = prev_fx_policy;
+    meta.fx_policy_applied =
+        prev_fx_policy.or_else(|| collect_fx_policy_from_curves(instrument, market));
     result.meta = meta;
+}
+
+/// Walk an instrument's declared curve dependencies and join any `fx_policy`
+/// stamps the curves carry into a single result envelope value.
+///
+/// Returns `None` when the instrument has no curve dependencies, when no
+/// dependent curve carries a stamp, or when the dependencies fail to
+/// resolve (we surface the FX provenance as best-effort metadata, never as
+/// a pricing error). Stamps are de-duplicated in source order — the same
+/// policy applied to multiple curves shows up once.
+fn collect_fx_policy_from_curves(
+    instrument: &dyn Priceable,
+    market: &finstack_core::market_data::context::MarketContext,
+) -> Option<String> {
+    let deps = instrument.market_dependencies().ok()?;
+    let mut policies: Vec<String> = Vec::new();
+    let mut push = |policy: Option<&str>| {
+        if let Some(p) = policy {
+            if !p.is_empty() && !policies.iter().any(|existing| existing == p) {
+                policies.push(p.to_string());
+            }
+        }
+    };
+    for id in &deps.curves.discount_curves {
+        if let Ok(curve) = market.get_discount(id.as_str()) {
+            push(curve.fx_policy());
+        }
+    }
+    for id in &deps.curves.forward_curves {
+        if let Ok(curve) = market.get_forward(id.as_str()) {
+            push(curve.fx_policy());
+        }
+    }
+    for id in &deps.curves.credit_curves {
+        if let Ok(curve) = market.get_hazard(id.as_str()) {
+            push(curve.fx_policy());
+        }
+    }
+    if policies.is_empty() {
+        None
+    } else {
+        Some(policies.join(" | "))
+    }
 }
 
 #[cfg(test)]
@@ -602,6 +661,21 @@ mod tests {
             .base_date(base_date)
             .knots([(0.0, 1.0), (10.0, 0.9)])
             .interp(finstack_core::math::interp::InterpStyle::Linear)
+            .build()
+            .expect("DiscountCurve should build with valid test data")
+    }
+
+    /// Variant of [`flat_discount_curve`] with an opaque FX policy stamp.
+    fn flat_discount_curve_with_fx_policy(
+        id: &str,
+        base_date: finstack_core::dates::Date,
+        policy: &str,
+    ) -> finstack_core::market_data::term_structures::DiscountCurve {
+        finstack_core::market_data::term_structures::DiscountCurve::builder(id)
+            .base_date(base_date)
+            .knots([(0.0, 1.0), (10.0, 0.9)])
+            .interp(finstack_core::math::interp::InterpStyle::Linear)
+            .fx_policy(policy)
             .build()
             .expect("DiscountCurve should build with valid test data")
     }
@@ -759,6 +833,62 @@ mod tests {
         assert!(
             (trait_pv - registry_pv).abs() < 1.0,
             "Bond PV parity: trait={trait_pv:.4} registry={registry_pv:.4} diff > $1"
+        );
+    }
+
+    #[test]
+    fn fx_policy_propagates_from_curve_to_non_fx_instrument_result() {
+        use finstack_core::dates::Date;
+        use finstack_core::market_data::context::MarketContext;
+        use time::macros::date;
+
+        let as_of: Date = date!(2025 - 01 - 15);
+        let bond = fixed_test_bond();
+        let disc = flat_discount_curve_with_fx_policy("USD-TREASURY", as_of, "xccy_basis::USD/EUR");
+        let market = MarketContext::new().insert(disc);
+        let registry = super::super::standard_registry();
+
+        let result = registry
+            .price_with_metrics(
+                &bond,
+                ModelKey::Discounting,
+                &market,
+                as_of,
+                &[],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("registry price should succeed");
+
+        assert_eq!(
+            result.meta.fx_policy_applied.as_deref(),
+            Some("xccy_basis::USD/EUR"),
+            "discount-curve fx_policy must propagate onto ResultsMeta"
+        );
+    }
+
+    #[test]
+    fn fx_policy_pricer_stamp_takes_precedence_over_curve_stamp() {
+        use finstack_core::dates::Date;
+        use finstack_core::market_data::context::MarketContext;
+        use time::macros::date;
+
+        let as_of: Date = date!(2025 - 01 - 15);
+        let bond = fixed_test_bond();
+        let disc = flat_discount_curve_with_fx_policy("USD-TREASURY", as_of, "curve::xccy_basis");
+        let market = MarketContext::new().insert(disc);
+
+        let pricer = FixedBondPricer { amount: 1_000.0 };
+        let mut result = pricer
+            .price_dyn(&bond, &market, as_of)
+            .expect("synthetic pricer should price");
+        result.meta.fx_policy_applied = Some("pricer::explicit_policy".to_string());
+
+        stamp_results_meta(&FinstackConfig::default(), &bond, &market, &mut result);
+
+        assert_eq!(
+            result.meta.fx_policy_applied.as_deref(),
+            Some("pricer::explicit_policy"),
+            "explicit pricer stamp must outrank curve-walking fallback"
         );
     }
 

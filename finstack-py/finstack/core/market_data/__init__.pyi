@@ -38,6 +38,7 @@ __all__ = [
     "CreditIndexData",
     "DiscountCurve",
     "ForwardCurve",
+    "FxDeltaVolSurface",
     "HazardCurve",
     "InflationCurve",
     "PriceCurve",
@@ -676,6 +677,89 @@ class VolSurface:
     def grid_shape(self) -> tuple[int, int]: ...
     def __repr__(self) -> str: ...
 
+class FxDeltaVolSurface:
+    """FX vol surface in delta space (ATM, 25-d RR/BF, optional 10-d wings).
+
+    Forward delta (premium-unadjusted). Strike conversion uses Garman-Kohlhagen.
+    See ``docs/REFERENCES.md#clark-fx-options`` and ``#wystup-fx-options``.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        expiries: list[float],
+        atm_vols: list[float],
+        rr_25d: list[float],
+        bf_25d: list[float],
+        rr_10d: list[float] | None = None,
+        bf_10d: list[float] | None = None,
+    ) -> None:
+        """Build a delta-quoted FX vol surface.
+
+        Parameters
+        ----------
+        id
+            Unique surface identifier.
+        expiries
+            Strictly increasing positive expiry times (years).
+        atm_vols
+            ATM delta-neutral straddle vols per expiry (positive).
+        rr_25d
+            25-delta risk reversal per expiry (call vol − put vol).
+        bf_25d
+            25-delta butterfly per expiry (wing average − ATM).
+        rr_10d, bf_10d
+            Optional 10-delta wings; both required when either is set.
+
+        Raises
+        ------
+        ValueError
+            Invalid inputs or mismatched ``rr_10d`` / ``bf_10d``.
+        """
+        ...
+    @property
+    def id(self) -> str: ...
+    @property
+    def expiries(self) -> list[float]: ...
+    @property
+    def num_expiries(self) -> int: ...
+    def pillar_vols(self, expiry_idx: int) -> tuple[float, float, float]:
+        """Pillar vols at ``expiry_idx`` as ``(atm, put_25d_vol, call_25d_vol)``.
+
+        Raises
+        ------
+        IndexError
+            If ``expiry_idx`` is out of range.
+        """
+        ...
+
+    def implied_vol(
+        self,
+        expiry: float,
+        strike: float,
+        forward: float,
+        r_d: float,
+        r_f: float,
+    ) -> float:
+        """Interpolated implied vol at the given ``(expiry, strike)``."""
+        ...
+
+    def to_vol_surface(self, spot: float, r_d: float, r_f: float) -> VolSurface:
+        """Materialize this delta-quoted surface as a strike-axis :class:`VolSurface`."""
+        ...
+
+    @staticmethod
+    def delta_to_strike(delta: float, forward: float, vol: float, expiry: float, r_f: float) -> float:
+        """Convert a forward delta to a strike (Garman-Kohlhagen, premium-unadjusted)."""
+        ...
+
+    @staticmethod
+    def strike_to_delta(strike: float, forward: float, vol: float, expiry: float, r_f: float) -> float:
+        """Convert a strike to forward call delta."""
+        ...
+
+    def __repr__(self) -> str: ...
+
 class VolCube:
     """SABR volatility cube on an expiry x tenor grid.
 
@@ -1046,6 +1130,7 @@ class MarketContext:
             InflationCurve,
             PriceCurve,
             VolSurface,
+            FxDeltaVolSurface,
             VolCube,
             VolatilityIndexCurve,
         ],
@@ -1054,11 +1139,12 @@ class MarketContext:
 
         Accepts any curve type: :class:`DiscountCurve`, :class:`ForwardCurve`,
         :class:`HazardCurve`, :class:`InflationCurve`, :class:`PriceCurve`,
-        :class:`VolSurface`, :class:`VolCube`, or :class:`VolatilityIndexCurve`.
+        :class:`VolSurface`, :class:`FxDeltaVolSurface`, :class:`VolCube`,
+        or :class:`VolatilityIndexCurve`.
 
         Parameters
         ----------
-        curve : DiscountCurve | ForwardCurve | HazardCurve | InflationCurve | PriceCurve | VolSurface | VolCube | VolatilityIndexCurve
+        curve : DiscountCurve | ForwardCurve | HazardCurve | InflationCurve | PriceCurve | VolSurface | FxDeltaVolSurface | VolCube | VolatilityIndexCurve
             The curve to insert.
 
         Returns
@@ -1225,6 +1311,25 @@ class MarketContext:
         ------
         ValueError
             If no surface with this *id* exists.
+        """
+        ...
+
+    def get_fx_delta_vol_surface(self, id: str) -> FxDeltaVolSurface:
+        """Retrieve a delta-quoted FX vol surface by identifier.
+
+        Parameters
+        ----------
+        id : str
+            Surface identifier.
+
+        Returns
+        -------
+        FxDeltaVolSurface
+
+        Raises
+        ------
+        ValueError
+            If no delta-quoted FX surface with this *id* exists.
         """
         ...
 

@@ -17,6 +17,8 @@
 //! ## Surfaces (2D)
 //!
 //! - **Volatility surfaces** (`VolSurface`): Implied volatility by strike/maturity
+//! - **FX delta vol surfaces** (`FxDeltaVolSurface`): FX smiles quoted in ATM /
+//!   risk-reversal / butterfly form, converted to strikes for pricing
 //!
 //! ## Scalars and Time Series
 //!
