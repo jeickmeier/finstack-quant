@@ -15,18 +15,18 @@ These skills use the shared Agent Skills layout: one folder per skill, each with
 
 | Skill | Use For | Prefer Another Skill When |
 | --- | --- | --- |
-| `quant-finance-review` | Pricing, risk, calibration, market conventions, numerical regression | Pure architecture or binding-shape review |
-| `rust-architecture-review` | Crate/module boundaries, ownership, errors, async/concurrency, public API shape | Writing architecture docs |
-| `rust-library-architecture-docs` | Source-backed Rust architecture documentation | Critiquing architecture quality |
-| `binding-parity-reviewer` | Rust/PyO3/WASM/stub/export/parity-contract drift | The main issue is quant correctness |
+| `finstack-quant-finance-review` | Pricing, risk, calibration, market conventions, numerical regression | Pure architecture or binding-shape review |
+| `finstack-rust-architecture-review` | Crate/module boundaries, ownership, errors, async/concurrency, public API shape | Writing architecture docs |
+| `finstack-rust-library-architecture-docs` | Source-backed Rust architecture documentation | Critiquing architecture quality |
+| `finstack-binding-parity-reviewer` | Rust/PyO3/WASM/stub/export/parity-contract drift | The main issue is quant correctness |
 | `finstack-simplify` | Finstack-specific slop, dedupe, wrapper bloat, public API consolidation | Small mechanical refactor with known scope |
-| `refactor` | Behavior-preserving structural edits after scope is clear | Broad finstack simplification audit |
-| `performance-reviewer` | Hot paths, allocations, concurrency, benchmark regression | Formula/convention correctness |
-| `documentation-maintainer` | API docs, stale docs, README/spec/changelog cleanup, examples | Release-wide readiness |
-| `production-release-prep` | Release orchestration, semver, docs, audit, final gates | One failing check or narrow cleanup |
-| `quality-gate-triage` | Pasted lint/test/pre-commit/CI failures, bug-fix loops | Read-only review |
-| `senior-code-review` | Broad fallback review when no specialist applies | Any specialist skill fits |
-| `consistency-reviewer` | Naming, convention inventory, pattern drift | Dedupe/API-surface consolidation |
+| `finstack-refactor` | Behavior-preserving structural edits after scope is clear | Broad finstack simplification audit |
+| `finstack-performance-reviewer` | Hot paths, allocations, concurrency, benchmark regression | Formula/convention correctness |
+| `finstack-documentation-maintainer` | API docs, stale docs, README/spec/changelog cleanup, examples | Release-wide readiness |
+| `finstack-production-release-prep` | Release orchestration, semver, docs, audit, final gates | One failing check or narrow cleanup |
+| `finstack-quality-gate-triage` | Pasted lint/test/pre-commit/CI failures, bug-fix loops | Read-only review |
+| `finstack-senior-code-review` | Broad fallback review when no specialist applies | Any specialist skill fits |
+| `finstack-consistency-reviewer` | Naming, convention inventory, pattern drift | Dedupe/API-surface consolidation |
 
 ## Catalog Rule
 

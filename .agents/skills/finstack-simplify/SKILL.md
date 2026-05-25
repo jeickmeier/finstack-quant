@@ -13,7 +13,7 @@ A phased simplification workflow for the **finstack** workspace (Rust core + Pyt
 
 Trigger when the user is asking to simplify, audit, refactor, or dedupe _any_ part of finstack. Even weak signals count: "this feels over-engineered", "why are there two ways to build a curve", "the checks module is a mess", "find dead code in margin". If the user is clearly working on something finstack-adjacent (Rust workspace, PyO3 bindings, wasm-bindgen bindings, parity, builders, registries), default to using this skill over a generic simplify skill.
 
-**Do NOT use** for: generic non-finstack code, pure bug hunting with no simplicity angle (use `quality-gate-triage`), performance tuning without a simplicity angle (use `performance-reviewer`), or new feature work.
+**Do NOT use** for: generic non-finstack code, pure bug hunting with no simplicity angle (use `finstack-quality-gate-triage`), performance tuning without a simplicity angle (use `finstack-performance-reviewer`), or new feature work.
 
 ## The core loop
 
@@ -122,7 +122,7 @@ After Verify passes, offer the user three options: (a) continue to the next slic
 ## What this skill is NOT
 
 - Not a code generator. Outputs are audits, plans, and targeted diffs.
-- Not a performance optimizer — use `performance-reviewer` for that.
-- Not a bug finder — use `quality-gate-triage` for that.
-- Not a generic simplifier — use `refactor` for behavior-preserving implementation or `senior-code-review` for broad fallback review.
+- Not a performance optimizer — use `finstack-performance-reviewer` for that.
+- Not a bug finder — use `finstack-quality-gate-triage` for that.
+- Not a generic simplifier — use `finstack-refactor` for behavior-preserving implementation or `finstack-senior-code-review` for broad fallback review.
 - Not a rewrite-the-world tool. If the answer is "rewrite this crate from scratch", this skill has failed; surface that as a finding and stop.

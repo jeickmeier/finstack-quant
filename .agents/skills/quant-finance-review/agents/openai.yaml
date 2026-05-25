@@ -1,4 +1,0 @@
-interface:
-  display_name: "Quant Finance Review"
-  short_description: "Audit pricing, risk, and market conventions"
-  default_prompt: "Use $quant-finance-review to audit this pricing or risk change for production correctness."

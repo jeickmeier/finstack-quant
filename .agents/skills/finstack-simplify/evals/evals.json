@@ -12,7 +12,7 @@
       "id": 2,
       "name": "margin-csa-otc-simplify",
       "prompt": "look at finstack/margin/src/types/ — csa.rs and otc.rs look like they might have overlapping structure. also the enums.rs might be bloated. run your simplify workflow on the whole margin types module, audit then plan, don't execute anything without me looking",
-      "expected_output": "Phase 1 Audit Report followed by Phase 2 Consolidation Plan (only if the user's 'audit then plan' is interpreted as wanting both phases). Should properly check PyO3 bindings in finstack-py/src/bindings/margin/ and WASM in finstack-wasm/src/api/margin/. Should flag any ISDA-SIMM or CSA serde fields under financial-invariants. Must stop before Phase 3 (refactor).",
+      "expected_output": "Phase 1 Audit Report followed by Phase 2 Consolidation Plan (only if the user's 'audit then plan' is interpreted as wanting both phases). Should properly check PyO3 bindings in finstack-py/src/bindings/margin/ and WASM in finstack-wasm/src/api/margin/. Should flag any ISDA-SIMM or CSA serde fields under financial-invariants. Must stop before Phase 3 (finstack-refactor).",
       "files": []
     },
     {

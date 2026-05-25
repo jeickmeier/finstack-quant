@@ -152,9 +152,9 @@ Slice 4 (drawdown merge, needs user sign-off) ◄──────────�
 
 Findings explicitly excluded:
 
-- **F8 (documentation gaps):** out of scope; suggest running `documentation-maintainer` skill separately.
-- **F9 (performance concern in surface interp):** out of scope; suggest running `performance-reviewer` separately.
-- **H1 (`.unwrap()` in binding):** this is a bug, not slop. Suggest running `quality-gate-triage` skill separately.
+- **F8 (documentation gaps):** out of scope; suggest running `finstack-documentation-maintainer` skill separately.
+- **F9 (performance concern in surface interp):** out of scope; suggest running `finstack-performance-reviewer` separately.
+- **H1 (`.unwrap()` in binding):** this is a bug, not slop. Suggest running `finstack-quality-gate-triage` skill separately.
 
 ## What we expect at the end
 
