@@ -8,9 +8,9 @@ use crate::portfolio::Portfolio;
 use crate::types::PositionId;
 use finstack_attribution::{
     attribute_pnl_metrics_based, attribute_pnl_parallel, default_attribution_metrics,
-    AttributionMethod, CorrelationsAttribution, CreditCurvesAttribution, FxAttribution,
-    InflationCurvesAttribution, PnlAttribution, RatesCurvesAttribution, ScalarsAttribution,
-    VolAttribution,
+    AttributionMethod, CorrelationsAttribution, CreditCurvesAttribution, ExecutionPolicy,
+    FxAttribution, InflationCurvesAttribution, PnlAttribution, RatesCurvesAttribution,
+    ScalarsAttribution, VolAttribution,
 };
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
@@ -358,7 +358,7 @@ fn attribute_single_position(
                 as_of_t0,
                 as_of_t1,
                 config,
-                None,
+                ExecutionPolicy::Serial,
             )
             .map_err(|e| Error::ValuationError {
                 position_id: position.position_id.clone(),
@@ -442,6 +442,7 @@ fn attribute_single_position(
                 as_of_t0,
                 as_of_t1,
                 taylor_config,
+                ExecutionPolicy::Serial,
             )
             .map_err(|e| Error::ValuationError {
                 position_id: position.position_id.clone(),

@@ -10,7 +10,7 @@
 //!
 //! Uses proptest for property-based testing to discover edge cases.
 
-use finstack_attribution::attribute_pnl_parallel;
+use finstack_attribution::{attribute_pnl_parallel, ExecutionPolicy};
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{create_date, Date};
@@ -225,7 +225,7 @@ fn test_zero_market_change_identity() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -296,7 +296,7 @@ fn test_rates_pnl_sign_convention() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -344,7 +344,7 @@ fn test_rates_pnl_positive_when_rates_decrease() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -390,12 +390,24 @@ fn test_long_short_net_zero_invariant() {
         Arc::new(ScaledInstrument::new("SHORT-BOND", long.clone(), -1.0));
 
     let long_attr = attribute_pnl_parallel(
-        &long, &market_t0, &market_t1, as_of_t0, as_of_t1, &config, None,
+        &long,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &config,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
     let short_attr = attribute_pnl_parallel(
-        &short, &market_t0, &market_t1, as_of_t0, as_of_t1, &config, None,
+        &short,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &config,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -464,17 +476,35 @@ fn test_portfolio_additivity_invariant() {
     ));
 
     let attr_a = attribute_pnl_parallel(
-        &inst_a, &market_t0, &market_t1, as_of_t0, as_of_t1, &config, None,
+        &inst_a,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &config,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
     let attr_b = attribute_pnl_parallel(
-        &inst_b, &market_t0, &market_t1, as_of_t0, as_of_t1, &config, None,
+        &inst_b,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &config,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
     let attr_portfolio = attribute_pnl_parallel(
-        &portfolio, &market_t0, &market_t1, as_of_t0, as_of_t1, &config, None,
+        &portfolio,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &config,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -541,7 +571,7 @@ proptest! {
             as_of_t0,
             as_of_t1,
             &config,
-            None,
+            ExecutionPolicy::Parallel,
         )
         .unwrap();
 
@@ -602,7 +632,7 @@ proptest! {
                 as_of_t0,
                 as_of_t1,
                 &config,
-                None,
+                ExecutionPolicy::Parallel,
             )
             .unwrap();
 
@@ -661,7 +691,7 @@ proptest! {
             as_of_t0,
             as_of_t1,
             &config,
-            None,
+            ExecutionPolicy::Parallel,
         )
         .unwrap();
 
@@ -672,7 +702,7 @@ proptest! {
             as_of_t0,
             as_of_t1,
             &config,
-            None,
+            ExecutionPolicy::Parallel,
         )
         .unwrap();
 
@@ -730,7 +760,7 @@ fn test_small_notional_edge_case() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -781,7 +811,7 @@ fn test_large_notional_edge_case() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -835,7 +865,7 @@ fn test_extreme_rate_levels() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -858,7 +888,7 @@ fn test_extreme_rate_levels() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -909,7 +939,7 @@ fn test_near_maturity_edge_case() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 

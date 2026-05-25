@@ -1,6 +1,8 @@
 //! End-to-end integration tests for cross-factor P&L attribution.
 
-use finstack_attribution::{attribute_pnl_metrics_based, attribute_pnl_parallel};
+use finstack_attribution::{
+    attribute_pnl_metrics_based, attribute_pnl_parallel, ExecutionPolicy, PnlAttribution,
+};
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{DateExt, DayCount};
@@ -137,7 +139,7 @@ fn single_factor_instrument_has_zero_cross_factor() {
         as_of_t0,
         as_of_t1,
         &FinstackConfig::default(),
-        None,
+        ExecutionPolicy::Parallel,
     )
     .expect("parallel attribution should succeed");
 
@@ -170,7 +172,7 @@ fn synthetic_parallel_instrument_surfaces_rates_credit_cross_factor() {
         as_of_t0,
         as_of_t1,
         &FinstackConfig::default(),
-        None,
+        ExecutionPolicy::Parallel,
     )
     .expect("parallel attribution should succeed");
 
@@ -184,6 +186,63 @@ fn synthetic_parallel_instrument_surfaces_rates_credit_cross_factor() {
         parallel_detail.total.amount(),
         parallel.cross_factor_pnl.amount()
     );
+}
+
+fn assert_policy_equivalent(left: &PnlAttribution, right: &PnlAttribution) {
+    assert_eq!(left.total_pnl, right.total_pnl);
+    assert_eq!(left.rates_curves_pnl, right.rates_curves_pnl);
+    assert_eq!(left.credit_curves_pnl, right.credit_curves_pnl);
+    assert_eq!(left.cross_factor_pnl, right.cross_factor_pnl);
+    assert_eq!(left.residual, right.residual);
+    assert_eq!(left.meta.num_repricings, right.meta.num_repricings);
+    assert_eq!(
+        left.cross_factor_detail
+            .as_ref()
+            .map(|detail| &detail.by_pair),
+        right
+            .cross_factor_detail
+            .as_ref()
+            .map(|detail| &detail.by_pair)
+    );
+}
+
+#[test]
+fn serial_execution_policy_matches_parallel_cross_factor_attribution() {
+    let as_of_t0 = date!(2025 - 01 - 15);
+    let as_of_t1 = date!(2025 - 01 - 16);
+    let market_t0 = MarketContext::new()
+        .insert(build_discount_curve("USD-OIS", as_of_t0, 0.01))
+        .insert(build_hazard_curve("ACME-HAZ", as_of_t0, 0.01));
+    let market_t1 = MarketContext::new()
+        .insert(build_discount_curve("USD-OIS", as_of_t1, 0.02))
+        .insert(build_hazard_curve("ACME-HAZ", as_of_t1, 0.02));
+
+    let instrument =
+        Arc::new(RatesCreditInteractionInstrument::new("POLICY-XFACTOR")) as Arc<dyn Instrument>;
+
+    let parallel = attribute_pnl_parallel(
+        &instrument,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &FinstackConfig::default(),
+        ExecutionPolicy::Parallel,
+    )
+    .expect("parallel policy attribution should succeed");
+
+    let serial = attribute_pnl_parallel(
+        &instrument,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &FinstackConfig::default(),
+        ExecutionPolicy::Serial,
+    )
+    .expect("serial policy attribution should succeed");
+
+    assert_policy_equivalent(&parallel, &serial);
 }
 
 #[test]

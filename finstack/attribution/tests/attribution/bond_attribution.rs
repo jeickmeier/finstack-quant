@@ -4,7 +4,7 @@
 //! simple fixed-rate bond.
 
 use finstack_attribution::{
-    attribute_pnl_metrics_based, attribute_pnl_parallel, AttributionMethod,
+    attribute_pnl_metrics_based, attribute_pnl_parallel, AttributionMethod, ExecutionPolicy,
 };
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
@@ -84,7 +84,7 @@ fn test_bond_attribution_parallel() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -164,7 +164,7 @@ fn test_bond_attribution_structure() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 

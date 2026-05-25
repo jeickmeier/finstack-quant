@@ -17,7 +17,8 @@ use std::sync::Arc;
 use time::Month;
 
 use finstack_attribution::{
-    attribute_pnl_metrics_based, attribute_pnl_taylor, AttributionMethod, TaylorAttributionConfig,
+    attribute_pnl_metrics_based, attribute_pnl_taylor, AttributionMethod, ExecutionPolicy,
+    TaylorAttributionConfig,
 };
 use finstack_cashflows::builder::specs::{CouponType, FixedCouponSpec};
 use finstack_valuations::instruments::fixed_income::convertible::{
@@ -122,8 +123,16 @@ fn taylor_explains_convertible_credit_spread_move() {
     let market_t1 = market(300.0); // +150bp credit widening
     let config = TaylorAttributionConfig::default();
 
-    let attribution = attribute_pnl_taylor(&conv, &market_t0, &market_t1, t0(), t1(), &config)
-        .expect("Taylor attribution should succeed");
+    let attribution = attribute_pnl_taylor(
+        &conv,
+        &market_t0,
+        &market_t1,
+        t0(),
+        t1(),
+        &config,
+        ExecutionPolicy::Parallel,
+    )
+    .expect("Taylor attribution should succeed");
 
     assert!(
         attribution.credit_curves_pnl.amount() < 0.0,
@@ -138,6 +147,43 @@ fn taylor_explains_convertible_credit_spread_move() {
         attribution.credit_curves_pnl,
         attribution.residual,
     );
+}
+
+#[test]
+fn taylor_serial_execution_policy_matches_parallel_for_convertible_credit() {
+    let conv = convertible_with_credit();
+    let market_t0 = market(150.0);
+    let market_t1 = market(300.0);
+    let config = TaylorAttributionConfig::default();
+
+    let parallel = attribute_pnl_taylor(
+        &conv,
+        &market_t0,
+        &market_t1,
+        t0(),
+        t1(),
+        &config,
+        ExecutionPolicy::Parallel,
+    )
+    .expect("parallel Taylor attribution should succeed");
+    let serial = attribute_pnl_taylor(
+        &conv,
+        &market_t0,
+        &market_t1,
+        t0(),
+        t1(),
+        &config,
+        ExecutionPolicy::Serial,
+    )
+    .expect("serial Taylor attribution should succeed");
+
+    assert_eq!(parallel.total_pnl, serial.total_pnl);
+    assert_eq!(parallel.rates_curves_pnl, serial.rates_curves_pnl);
+    assert_eq!(parallel.credit_curves_pnl, serial.credit_curves_pnl);
+    assert_eq!(parallel.vol_pnl, serial.vol_pnl);
+    assert_eq!(parallel.fx_pnl, serial.fx_pnl);
+    assert_eq!(parallel.residual, serial.residual);
+    assert_eq!(parallel.meta.num_repricings, serial.meta.num_repricings);
 }
 
 /// Metrics-based attribution must likewise explain the convertible credit move

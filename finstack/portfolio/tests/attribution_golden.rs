@@ -260,3 +260,79 @@ fn test_attribution_carry_theta() {
         carry_amount
     );
 }
+
+#[test]
+fn test_parallel_portfolio_attribution_closes_with_serial_inner_policy() {
+    let as_of_t0 = base_date();
+    let as_of_t1 = as_of_t0 + Duration::days(1);
+    let issue = as_of_t0;
+    let maturity = as_of_t0 + Duration::days(1825);
+
+    let positions = (0..80)
+        .map(|i| {
+            let instrument_id = format!("BOND_{i:03}");
+            let bond = Bond::fixed(
+                instrument_id.as_str(),
+                Money::new(100_000.0 + f64::from(i) * 1_000.0, Currency::USD),
+                0.04,
+                issue,
+                maturity,
+                "USD",
+            )
+            .expect("Bond::fixed should succeed with valid parameters");
+            Position::new(
+                format!("POS_{i:03}"),
+                "ENTITY_A",
+                instrument_id,
+                Arc::new(bond),
+                1.0,
+                PositionUnit::FaceValue,
+            )
+            .expect("Position::new should succeed with valid parameters")
+        })
+        .collect::<Vec<_>>();
+
+    let portfolio = PortfolioBuilder::new("TEST_PARALLEL_ATTR")
+        .base_ccy(Currency::USD)
+        .as_of(as_of_t0)
+        .entity(Entity::new("ENTITY_A"))
+        .positions(positions)
+        .build()
+        .unwrap();
+
+    let market_t0 = market_with_usd_at_rate(100.0);
+    let market_t1 = market_with_usd_at_rate(125.0);
+    let config = FinstackConfig::default();
+
+    let attribution = attribute_portfolio_pnl(
+        &portfolio,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &config,
+        AttributionMethod::Parallel,
+    )
+    .expect("portfolio attribution should succeed");
+
+    assert_eq!(attribution.by_position.len(), 80);
+
+    let explained_total = attribution.carry.amount()
+        + attribution.rates_curves_pnl.amount()
+        + attribution.credit_curves_pnl.amount()
+        + attribution.inflation_curves_pnl.amount()
+        + attribution.correlations_pnl.amount()
+        + attribution.fx_pnl.amount()
+        + attribution.fx_translation_pnl.amount()
+        + attribution.vol_pnl.amount()
+        + attribution.model_params_pnl.amount()
+        + attribution.market_scalars_pnl.amount()
+        + attribution.residual.amount();
+
+    assert!(
+        (attribution.total_pnl.amount() - explained_total).abs() < 1.0e-8,
+        "portfolio attribution should close with serial inner attribution: total={}, explained={}",
+        attribution.total_pnl.amount(),
+        explained_total
+    );
+}

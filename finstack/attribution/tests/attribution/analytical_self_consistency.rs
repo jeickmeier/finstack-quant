@@ -34,7 +34,7 @@
 //! - First-order approximation: < 5% relative error for small shifts (<50bp)
 //! - With convexity: < 1% relative error for larger shifts
 
-use finstack_attribution::{attribute_pnl_parallel, AttributionMethod};
+use finstack_attribution::{attribute_pnl_parallel, AttributionMethod, ExecutionPolicy};
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
 use finstack_core::dates::create_date;
@@ -185,7 +185,7 @@ fn run_analytical_parity_test(tc: &AnalyticalParityTestCase) {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -293,7 +293,7 @@ fn test_attribution_method_metadata() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -351,7 +351,7 @@ fn test_convexity_benefit_symmetric_moves() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -363,7 +363,7 @@ fn test_convexity_benefit_symmetric_moves() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 

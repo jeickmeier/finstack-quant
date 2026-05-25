@@ -5,6 +5,7 @@
 
 use finstack_attribution::{
     attribute_pnl_parallel, attribute_pnl_waterfall, default_waterfall_order, AttributionFactor,
+    ExecutionPolicy,
 };
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
@@ -187,7 +188,7 @@ fn test_fx_attribution_parallel_internal_exposure() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -346,7 +347,7 @@ fn test_fx_attribution_cross_currency_exposure() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -394,7 +395,7 @@ fn test_fx_attribution_cross_currency_fx_pnl_sign_and_magnitude() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -444,7 +445,7 @@ fn test_fx_attribution_cross_currency_fx_pnl_weakening() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 
@@ -508,7 +509,7 @@ fn test_fx_attribution_eur_weakening() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .unwrap();
 

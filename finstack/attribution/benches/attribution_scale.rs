@@ -22,7 +22,7 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use finstack_attribution::{
     attribute_pnl_metrics_based, attribute_pnl_parallel, attribute_pnl_taylor,
     attribute_pnl_waterfall, default_waterfall_order, simple_pnl_bridge, AttributionMethod,
-    TaylorAttributionConfig,
+    ExecutionPolicy, TaylorAttributionConfig,
 };
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
@@ -188,7 +188,7 @@ fn run_parallel(fx: &Fixture) {
             black_box(fx.as_of_t0),
             black_box(fx.as_of_t1),
             &fx.config,
-            None,
+            ExecutionPolicy::Parallel,
         )
         .unwrap();
         black_box(attr);
@@ -222,6 +222,7 @@ fn run_taylor(fx: &Fixture, taylor_cfg: &TaylorAttributionConfig) {
             black_box(fx.as_of_t0),
             black_box(fx.as_of_t1),
             taylor_cfg,
+            ExecutionPolicy::Parallel,
         )
         .unwrap();
         black_box(attr);

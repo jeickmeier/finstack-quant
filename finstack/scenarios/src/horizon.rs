@@ -64,7 +64,7 @@ use std::sync::Arc;
 use finstack_attribution::{
     attribute_pnl_metrics_based, attribute_pnl_parallel, attribute_pnl_taylor,
     attribute_pnl_waterfall, default_attribution_metrics, AttributionFactor, AttributionMethod,
-    PnlAttribution,
+    ExecutionPolicy, PnlAttribution,
 };
 use finstack_core::config::FinstackConfig;
 use finstack_core::dates::Date;
@@ -240,7 +240,7 @@ impl HorizonAnalysis {
                 as_of_t0,
                 as_of_t1,
                 &self.config,
-                None,
+                ExecutionPolicy::Parallel,
             ),
             AttributionMethod::Waterfall(order) => attribute_pnl_waterfall(
                 instrument,
@@ -271,9 +271,15 @@ impl HorizonAnalysis {
                     instrument, market_t0, market_t1, &val_t0, &val_t1, as_of_t0, as_of_t1,
                 )
             }
-            AttributionMethod::Taylor(config) => {
-                attribute_pnl_taylor(instrument, market_t0, market_t1, as_of_t0, as_of_t1, config)
-            }
+            AttributionMethod::Taylor(config) => attribute_pnl_taylor(
+                instrument,
+                market_t0,
+                market_t1,
+                as_of_t0,
+                as_of_t1,
+                config,
+                ExecutionPolicy::Parallel,
+            ),
         };
         Ok(result?)
     }

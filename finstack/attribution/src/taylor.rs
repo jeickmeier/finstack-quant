@@ -223,6 +223,7 @@ fn compute_taylor_result(
     as_of_t0: Date,
     as_of_t1: Date,
     config: &TaylorAttributionConfig,
+    execution_policy: ExecutionPolicy,
 ) -> Result<TaylorAttributionResult> {
     config.validate()?;
     validate_attribution_period(as_of_t0, as_of_t1)?;
@@ -239,19 +240,28 @@ fn compute_taylor_result(
 
     // Rate sensitivities (parallel DV01 per discount curve)
     let market_deps = instrument.market_dependencies()?;
-    let rate_results = market_deps
-        .curve_dependencies()
-        .discount_curves
-        .par_iter()
-        .map(|curve_id| {
-            (
-                curve_id.clone(),
-                compute_rate_factor(
-                    instrument, market_t0, market_t1, as_of_t0, pv_t0, curve_id, config,
-                ),
-            )
-        })
-        .collect::<Vec<_>>();
+    let compute_rate = |curve_id: &CurveId| {
+        (
+            curve_id.clone(),
+            compute_rate_factor(
+                instrument, market_t0, market_t1, as_of_t0, pv_t0, curve_id, config,
+            ),
+        )
+    };
+    let rate_results = match execution_policy {
+        ExecutionPolicy::Parallel => market_deps
+            .curve_dependencies()
+            .discount_curves
+            .par_iter()
+            .map(compute_rate)
+            .collect::<Vec<_>>(),
+        ExecutionPolicy::Serial => market_deps
+            .curve_dependencies()
+            .discount_curves
+            .iter()
+            .map(compute_rate)
+            .collect::<Vec<_>>(),
+    };
     for (curve_id, result) in rate_results {
         record_taylor_factor_result(
             "rate",
@@ -265,19 +275,28 @@ fn compute_taylor_result(
     }
 
     // Forward curve sensitivities (parallel bump per forward curve)
-    let forward_results = market_deps
-        .curve_dependencies()
-        .forward_curves
-        .par_iter()
-        .map(|curve_id| {
-            (
-                curve_id.clone(),
-                compute_forward_factor(
-                    instrument, market_t0, market_t1, as_of_t0, pv_t0, curve_id, config,
-                ),
-            )
-        })
-        .collect::<Vec<_>>();
+    let compute_forward = |curve_id: &CurveId| {
+        (
+            curve_id.clone(),
+            compute_forward_factor(
+                instrument, market_t0, market_t1, as_of_t0, pv_t0, curve_id, config,
+            ),
+        )
+    };
+    let forward_results = match execution_policy {
+        ExecutionPolicy::Parallel => market_deps
+            .curve_dependencies()
+            .forward_curves
+            .par_iter()
+            .map(compute_forward)
+            .collect::<Vec<_>>(),
+        ExecutionPolicy::Serial => market_deps
+            .curve_dependencies()
+            .forward_curves
+            .iter()
+            .map(compute_forward)
+            .collect::<Vec<_>>(),
+    };
     for (curve_id, result) in forward_results {
         record_taylor_factor_result(
             "forward",
@@ -311,28 +330,32 @@ fn compute_taylor_result(
             .ok()
             .map(|vr| extract_keyrate_cs01_per_curve(&vr.measures, credit_curves))
     };
-    let credit_results = credit_curves
-        .par_iter()
-        .map(|curve_id| {
-            let keyrate = credit_keyrate
-                .as_ref()
-                .and_then(|m| m.get(curve_id))
-                .map(|v| v.as_slice());
-            (
-                curve_id.clone(),
-                compute_credit_factor(CreditFactorInputs {
-                    instrument,
-                    market_t0,
-                    market_t1,
-                    as_of_t0,
-                    pv_t0,
-                    curve_id,
-                    config,
-                    keyrate,
-                }),
-            )
-        })
-        .collect::<Vec<_>>();
+    let compute_credit = |curve_id: &CurveId| {
+        let keyrate = credit_keyrate
+            .as_ref()
+            .and_then(|m| m.get(curve_id))
+            .map(|v| v.as_slice());
+        (
+            curve_id.clone(),
+            compute_credit_factor(CreditFactorInputs {
+                instrument,
+                market_t0,
+                market_t1,
+                as_of_t0,
+                pv_t0,
+                curve_id,
+                config,
+                keyrate,
+            }),
+        )
+    };
+    let credit_results = match execution_policy {
+        ExecutionPolicy::Parallel => credit_curves
+            .par_iter()
+            .map(compute_credit)
+            .collect::<Vec<_>>(),
+        ExecutionPolicy::Serial => credit_curves.iter().map(compute_credit).collect::<Vec<_>>(),
+    };
     for (curve_id, result) in credit_results {
         record_taylor_factor_result(
             "credit",
@@ -459,9 +482,17 @@ pub fn attribute_pnl_taylor(
     as_of_t0: Date,
     as_of_t1: Date,
     config: &TaylorAttributionConfig,
+    execution_policy: ExecutionPolicy,
 ) -> Result<PnlAttribution> {
-    let taylor =
-        compute_taylor_result(instrument, market_t0, market_t1, as_of_t0, as_of_t1, config)?;
+    let taylor = compute_taylor_result(
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        as_of_t1,
+        config,
+        execution_policy,
+    )?;
 
     let total_pnl = compute_pnl_with_fx(
         taylor.pv_t0,
@@ -1132,6 +1163,7 @@ mod tests {
             as_of_t0,
             as_of_t1,
             &config,
+            ExecutionPolicy::Parallel,
         )
         .expect("taylor attribution should succeed for simple instrument");
 
@@ -1160,6 +1192,7 @@ mod tests {
             as_of_t0,
             as_of_t1,
             &config,
+            ExecutionPolicy::Parallel,
         )
         .expect("taylor compat attribution should succeed");
 
@@ -1208,6 +1241,7 @@ mod tests {
             as_of_t0,
             as_of_t1,
             &config,
+            ExecutionPolicy::Parallel,
         )
         .expect("taylor attribution should succeed");
 
@@ -1347,6 +1381,7 @@ mod tests {
             as_of_t0,
             as_of_t1,
             &config,
+            ExecutionPolicy::Parallel,
         )
         .expect("taylor standard attribution should succeed");
 
@@ -1379,6 +1414,7 @@ mod tests {
             as_of_t0,
             as_of_t1,
             &config,
+            ExecutionPolicy::Parallel,
         )
         .expect("taylor attribution should succeed");
         assert!(
@@ -1442,6 +1478,7 @@ mod tests {
                 as_of_t0,
                 as_of_t1,
                 &bad,
+                ExecutionPolicy::Parallel,
             )
             .expect_err("malformed bump config must error at validation");
             let msg = format!("{err}");

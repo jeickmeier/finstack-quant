@@ -83,7 +83,7 @@ Import path uses underscores:
 ```rust
 use finstack_attribution::{
     attribute_pnl_parallel, attribute_pnl_waterfall, default_waterfall_order,
-    AttributionFactor, PnlAttribution,
+    AttributionFactor, ExecutionPolicy, PnlAttribution,
 };
 ```
 
@@ -92,7 +92,7 @@ use finstack_attribution::{
 ### Parallel attribution
 
 ```rust,ignore
-use finstack_attribution::attribute_pnl_parallel;
+use finstack_attribution::{attribute_pnl_parallel, ExecutionPolicy};
 use finstack_core::config::FinstackConfig;
 
 let attribution = attribute_pnl_parallel(
@@ -102,7 +102,7 @@ let attribution = attribute_pnl_parallel(
     as_of_t0,
     as_of_t1,
     &FinstackConfig::default(),
-    None, // optional ModelParamsSnapshot at T₀
+    ExecutionPolicy::Parallel,
 )?;
 
 println!("Total P&L:  {}", attribution.total_pnl);
@@ -235,6 +235,10 @@ the Python and WASM layers. Schemas live under `schemas/attribution/1/`.
 - Per-factor bump-and-reprice paths in `parallel`, `waterfall`, and `taylor`
   reuse a single `MarketSnapshot` and apply targeted restore flags
   (`MarketRestoreFlags`) to avoid full-context cloning.
+- `ExecutionPolicy::Parallel` is the standalone default for parallel and Taylor
+  attribution. Portfolio-level callers use `ExecutionPolicy::Serial` for those
+  inner per-factor repricings so the outer position loop owns Rayon and avoids
+  nested thread-pool contention.
 - Taylor attribution uses central differences by default; bump sizes are
   configurable via `TaylorAttributionConfig`.
 - Strict mode (`AttributionConfig::strict_validation = true`) propagates per-factor

@@ -32,7 +32,7 @@ and method. Call `AttributionSpec::execute()` or use the envelope helpers.
 ## Usage
 
 ```rust,ignore
-use finstack_attribution::attribute_pnl_parallel;
+use finstack_attribution::{attribute_pnl_parallel, ExecutionPolicy};
 use finstack_core::config::FinstackConfig;
 
 let attribution = attribute_pnl_parallel(
@@ -42,7 +42,7 @@ let attribution = attribute_pnl_parallel(
     as_of_t0,
     as_of_t1,
     &FinstackConfig::default(),
-    None, // optional ModelParamsSnapshot at T₀
+    ExecutionPolicy::Parallel,
 )?;
 
 assert!(attribution.residual_within_meta_tolerance());

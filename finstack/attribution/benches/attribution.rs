@@ -4,7 +4,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use finstack_attribution::{
-    attribute_pnl_parallel, attribute_pnl_waterfall, default_waterfall_order,
+    attribute_pnl_parallel, attribute_pnl_waterfall, default_waterfall_order, ExecutionPolicy,
 };
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
@@ -83,7 +83,7 @@ fn bench_attribution_parallel_1_bond(c: &mut Criterion) {
                 black_box(as_of_t0),
                 black_box(as_of_t1),
                 &config,
-                None,
+                ExecutionPolicy::Parallel,
             )
             .unwrap();
             black_box(attr);
@@ -140,7 +140,7 @@ fn bench_attribution_parallel_5_bonds(c: &mut Criterion) {
                     black_box(as_of_t0),
                     black_box(as_of_t1),
                     &config,
-                    None,
+                    ExecutionPolicy::Parallel,
                 )
                 .unwrap();
                 black_box(attr);

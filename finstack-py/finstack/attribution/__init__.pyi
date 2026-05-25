@@ -344,7 +344,9 @@ def attribute_pnl(
         method: Attribution method — one of ``"Parallel"``,
             ``{"Waterfall": ["Carry", "RatesCurves", ...]}``,
             ``"MetricsBased"``, or ``{"Taylor": {"include_gamma": True, ...}}``.
-        config: Optional config overrides (tolerance, metrics, bump sizes).
+        config: Optional config overrides (tolerance, metrics, bump sizes,
+            target currency, or ``{"execution_policy": "serial"}`` for
+            callers that already parallelize at the portfolio/batch level).
         full_cross_attribution: Option to compute all 36 cross-factor pairs when enabled.
 
     Returns:

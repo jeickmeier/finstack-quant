@@ -5,6 +5,7 @@
 
 use finstack_attribution::{
     AttributionConfig, AttributionEnvelope, AttributionFactor, AttributionMethod, AttributionSpec,
+    ExecutionPolicy,
 };
 use finstack_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_core::currency::Currency;
@@ -244,6 +245,7 @@ fn test_attribution_config_roundtrip() {
         rounding_scale: None,
         rate_bump_bp: None,
         target_ccy: None,
+        execution_policy: Some(ExecutionPolicy::Serial),
     };
 
     let json = serde_json::to_string(&config).unwrap();
@@ -252,6 +254,7 @@ fn test_attribution_config_roundtrip() {
     assert_eq!(parsed.tolerance_abs, Some(0.01));
     assert_eq!(parsed.tolerance_pct, Some(0.001));
     assert_eq!(parsed.metrics.as_ref().unwrap().len(), 2);
+    assert_eq!(parsed.execution_policy, Some(ExecutionPolicy::Serial));
 }
 
 #[test]
@@ -412,6 +415,17 @@ fn test_attribution_method_metrics_based_roundtrip() {
     let deserialized: AttributionMethod = serde_json::from_str(&json).unwrap();
 
     assert!(matches!(deserialized, AttributionMethod::MetricsBased));
+}
+
+#[test]
+fn test_execution_policy_roundtrip() {
+    let policy = ExecutionPolicy::Serial;
+    let json = serde_json::to_string(&policy).unwrap();
+    assert_eq!(json, "\"serial\"");
+
+    let deserialized: ExecutionPolicy = serde_json::from_str(&json).unwrap();
+    assert_eq!(deserialized, ExecutionPolicy::Serial);
+    assert_eq!(ExecutionPolicy::default(), ExecutionPolicy::Parallel);
 }
 
 #[test]

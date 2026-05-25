@@ -119,7 +119,7 @@
 //! ## Basic Parallel Attribution
 //!
 //! ```ignore
-//! use finstack_attribution::attribute_pnl_parallel;
+//! use finstack_attribution::{attribute_pnl_parallel, ExecutionPolicy};
 //! use finstack_valuations::instruments::Instrument;
 //! use finstack_valuations::instruments::rates::deposit::Deposit;
 //! use finstack_core::config::FinstackConfig;
@@ -155,7 +155,7 @@
 //!     as_of_t0,
 //!     as_of_t1,
 //!     &config,
-//!     None,
+//!     ExecutionPolicy::Parallel,
 //! )?;
 //!
 //! println!("Total P&L: {}", attribution.total_pnl);
@@ -281,7 +281,7 @@
 //! # Per-Tenor Curve Attribution
 //!
 //! ```ignore
-//! use finstack_attribution::attribute_pnl_parallel;
+//! use finstack_attribution::{attribute_pnl_parallel, ExecutionPolicy};
 //! use finstack_valuations::instruments::Instrument;
 //! use finstack_valuations::instruments::rates::deposit::Deposit;
 //! use finstack_core::config::FinstackConfig;
@@ -317,7 +317,7 @@
 //!     as_of_t0,
 //!     as_of_t1,
 //!     &config,
-//!     None,
+//!     ExecutionPolicy::Parallel,
 //! )?;
 //!
 //! if let Some(rates_detail) = &attribution.rates_detail {
@@ -357,9 +357,9 @@ pub use credit_factor::{
 pub use types::{
     AttributionFactor, AttributionMeta, AttributionMethod, CarryDetail, CorrelationsAttribution,
     CreditCarryByLevel, CreditCarryDecomposition, CreditCurvesAttribution, CreditFactorAttribution,
-    CrossFactorDetail, FxAttribution, InflationCurvesAttribution, LevelCarry, LevelPnl,
-    ModelParamsAttribution, PnlAttribution, RatesCurvesAttribution, ScalarsAttribution, SourceLine,
-    VolAttribution,
+    CrossFactorDetail, ExecutionPolicy, FxAttribution, InflationCurvesAttribution, LevelCarry,
+    LevelPnl, ModelParamsAttribution, PnlAttribution, RatesCurvesAttribution, ScalarsAttribution,
+    SourceLine, VolAttribution,
 };
 
 // Re-export attribution functions

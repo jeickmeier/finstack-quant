@@ -137,7 +137,8 @@ fn catch_attribution_panic<T>(
 ///
 /// Accepts an [`AttributionParams`] struct with the instrument JSON, two market
 /// snapshots, dates, and a method descriptor. Returns the `PnlAttribution`
-/// result as JSON.
+/// result as JSON. `config_json` may include `"execution_policy": "serial"`
+/// for hosts that already parallelize attribution at a higher level.
 #[wasm_bindgen(js_name = attributePnl)]
 pub fn attribute_pnl(params: &AttributionParams) -> Result<String, JsValue> {
     // MI3 defense in depth: wrap input-parsing as well. `from_json_inputs`

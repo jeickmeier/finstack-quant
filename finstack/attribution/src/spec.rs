@@ -3,7 +3,7 @@
 //! Provides serializable specs for defining complete attribution runs in JSON,
 //! with stable schemas and deterministic round-trip serialization.
 
-use super::{AttributionMethod, CreditFactorDetailOptions, PnlAttribution};
+use super::{AttributionMethod, CreditFactorDetailOptions, ExecutionPolicy, PnlAttribution};
 use finstack_core::{
     config::{FinstackConfig, ResultsMeta},
     currency::Currency,
@@ -145,6 +145,13 @@ pub struct AttributionConfig {
     /// `val_t1.currency()`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_ccy: Option<Currency>,
+    /// Controls whether attribution's per-factor repricings run in parallel.
+    ///
+    /// Defaults to [`ExecutionPolicy::Parallel`] when omitted. Portfolio-level
+    /// callers should use [`ExecutionPolicy::Serial`] for inner attribution
+    /// work so the outer position loop owns Rayon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_policy: Option<ExecutionPolicy>,
 }
 
 impl AttributionSpec {
@@ -335,6 +342,7 @@ mod tests {
             rounding_scale: None,
             rate_bump_bp: None,
             target_ccy: None,
+            execution_policy: None,
         };
 
         let json =
@@ -383,6 +391,7 @@ mod tests {
             rounding_scale: Some(6),
             rate_bump_bp: None,
             target_ccy: None,
+            execution_policy: None,
         };
 
         let spec = AttributionSpec::from_json_inputs(

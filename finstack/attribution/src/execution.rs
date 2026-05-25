@@ -37,6 +37,11 @@ impl AttributionSpec {
             .as_ref()
             .and_then(|c| c.strict_validation)
             .unwrap_or(false);
+        let execution_policy = self
+            .config
+            .as_ref()
+            .and_then(|c| c.execution_policy)
+            .unwrap_or_default();
 
         // Resolve optional credit-factor model for waterfall/parallel cascade.
         let resolved_credit_model = self.credit_factor_model.as_ref().map(|m| (**m).clone());
@@ -54,6 +59,7 @@ impl AttributionSpec {
                 resolved_credit_model.as_ref(),
                 &self.credit_factor_detail_options,
                 self.full_cross_attribution,
+                execution_policy,
             )?,
 
             AttributionMethod::Waterfall(order) => attribute_pnl_waterfall_with_credit_model(
@@ -77,6 +83,7 @@ impl AttributionSpec {
                 self.as_of_t0,
                 self.as_of_t1,
                 taylor_config,
+                execution_policy,
             )?,
 
             AttributionMethod::MetricsBased => {

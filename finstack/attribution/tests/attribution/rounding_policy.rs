@@ -1,7 +1,9 @@
 //! Tests for rounding policy stamping and display in attribution.
 
 use crate::common::test_utils::TestInstrument;
-use finstack_attribution::{attribute_pnl_parallel, AttributionMethod, PnlAttribution};
+use finstack_attribution::{
+    attribute_pnl_parallel, AttributionMethod, ExecutionPolicy, PnlAttribution,
+};
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
 use finstack_core::market_data::context::MarketContext;
@@ -41,7 +43,7 @@ fn parallel_stamps_configured_rounding_context() {
         as_of_t0,
         as_of_t1,
         &config,
-        None,
+        ExecutionPolicy::Parallel,
     )
     .expect("Attribution should succeed");
 

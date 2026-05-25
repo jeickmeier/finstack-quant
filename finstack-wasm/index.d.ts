@@ -1544,7 +1544,11 @@ export declare const valuations: ValuationsNamespace;
 // --- attribution -----------------------------------------------------------
 
 export interface AttributionNamespace {
-  /** Parameters constructor emitted by wasm-bindgen for attribution calls. */
+  /** Parameters constructor emitted by wasm-bindgen for attribution calls.
+   *
+   * `configJson` may include `{ "execution_policy": "serial" }` when the host
+   * already parallelizes attribution at the portfolio or batch level.
+   */
   AttributionParams: new (
     instrumentJson: string,
     marketT0Json: string,

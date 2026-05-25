@@ -133,6 +133,28 @@
               "type": "array",
               "items": { "type": "string" },
               "description": "Metrics to compute for metrics-based attribution"
+            },
+            "strict_validation": {
+              "type": "boolean",
+              "description": "Whether attribution errors should propagate instead of being logged"
+            },
+            "rounding_scale": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Optional rounding scale override"
+            },
+            "rate_bump_bp": {
+              "type": "number",
+              "description": "Rate bump size in basis points for sensitivities"
+            },
+            "target_ccy": {
+              "type": "string",
+              "description": "Optional reporting currency for attribution output"
+            },
+            "execution_policy": {
+              "type": "string",
+              "enum": ["parallel", "serial"],
+              "description": "Controls whether per-factor attribution repricings use internal Rayon parallelism"
             }
           }
         }

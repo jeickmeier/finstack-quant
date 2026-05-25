@@ -24,7 +24,7 @@
 
 use super::credit_cascade::{
     build_credit_factor_attribution, plan_credit_cascade, shift_credit_curves_par_spread,
-    snap_hazard_to_t1,
+    snap_hazard_to_t1, CreditCascadeStep,
 };
 use super::credit_factor::CreditFactorDetailOptions;
 use super::factors::*;
@@ -253,7 +253,7 @@ fn reprice_cross_factor(
 /// # Examples
 ///
 /// ```ignore
-/// use finstack_attribution::attribute_pnl_parallel;
+/// use finstack_attribution::{attribute_pnl_parallel, ExecutionPolicy};
 /// use finstack_valuations::instruments::Instrument;
 /// use finstack_valuations::instruments::rates::deposit::Deposit;
 /// use finstack_core::config::FinstackConfig;
@@ -289,7 +289,7 @@ fn reprice_cross_factor(
 ///     as_of_t0,
 ///     as_of_t1,
 ///     &config,
-///     None,
+///     ExecutionPolicy::Parallel,
 /// )?;
 ///
 /// println!("Total P&L: {}", attribution.total_pnl);
@@ -310,7 +310,7 @@ pub fn attribute_pnl_parallel(
     as_of_t0: Date,
     as_of_t1: Date,
     config: &FinstackConfig,
-    model_params_t0: Option<&ModelParamsSnapshot>,
+    execution_policy: ExecutionPolicy,
 ) -> Result<PnlAttribution> {
     attribute_pnl_parallel_with_credit_model(
         instrument,
@@ -319,10 +319,11 @@ pub fn attribute_pnl_parallel(
         as_of_t0,
         as_of_t1,
         config,
-        model_params_t0,
+        None,
         None,
         &CreditFactorDetailOptions::default(),
         false,
+        execution_policy,
     )
 }
 
@@ -372,6 +373,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
     credit_factor_model: Option<&CreditFactorModel>,
     credit_factor_detail_options: &CreditFactorDetailOptions,
     full_cross_attribution: bool,
+    execution_policy: ExecutionPolicy,
 ) -> Result<PnlAttribution> {
     validate_attribution_period(as_of_t0, as_of_t1)?;
 
@@ -541,9 +543,8 @@ pub fn attribute_pnl_parallel_with_credit_model(
             });
         }
 
-        let first_order_results = factor_specs
-            .par_iter()
-            .map(|spec| -> Result<FirstOrderRepriceResult> {
+        let reprice_first_order =
+            |spec: &ParallelLatentFactorSpec| -> Result<FirstOrderRepriceResult> {
                 match spec {
                     ParallelLatentFactorSpec::Market {
                         factor,
@@ -586,8 +587,17 @@ pub fn attribute_pnl_parallel_with_credit_model(
                         })
                     }
                 }
-            })
-            .collect::<Result<Vec<_>>>()?;
+            };
+        let first_order_results = match execution_policy {
+            ExecutionPolicy::Parallel => factor_specs
+                .par_iter()
+                .map(reprice_first_order)
+                .collect::<Result<Vec<_>>>()?,
+            ExecutionPolicy::Serial => factor_specs
+                .iter()
+                .map(reprice_first_order)
+                .collect::<Result<Vec<_>>>()?,
+        };
 
         let mut val_with_t0_discount: Option<Money> = None;
         let mut val_with_t0_forward: Option<Money> = None;
@@ -689,54 +699,64 @@ pub fn attribute_pnl_parallel_with_credit_model(
             }
         }
 
-        let cross_results = cross_specs
-            .par_iter()
-            .map(
-                |(label, kind_a, kind_b, val_a, val_b)| -> Result<(String, Money)> {
-                    let pnl = if matches!(kind_a, ActiveFactorKind::ModelParameters)
-                        || matches!(kind_b, ActiveFactorKind::ModelParameters)
-                    {
-                        let market_factor = if matches!(kind_a, ActiveFactorKind::ModelParameters) {
-                            *kind_b
-                        } else {
-                            *kind_a
-                        };
-                        let val_market = if matches!(kind_a, ActiveFactorKind::ModelParameters) {
-                            *val_b
-                        } else {
-                            *val_a
-                        };
-                        let val_params = if matches!(kind_a, ActiveFactorKind::ModelParameters) {
-                            *val_a
-                        } else {
-                            *val_b
-                        };
+        let reprice_cross_spec = |(label, kind_a, kind_b, val_a, val_b): &(
+            String,
+            ActiveFactorKind,
+            ActiveFactorKind,
+            Money,
+            Money,
+        )|
+         -> Result<(String, Money)> {
+            let pnl = if matches!(kind_a, ActiveFactorKind::ModelParameters)
+                || matches!(kind_b, ActiveFactorKind::ModelParameters)
+            {
+                let market_factor = if matches!(kind_a, ActiveFactorKind::ModelParameters) {
+                    *kind_b
+                } else {
+                    *kind_a
+                };
+                let val_market = if matches!(kind_a, ActiveFactorKind::ModelParameters) {
+                    *val_b
+                } else {
+                    *val_a
+                };
+                let val_params = if matches!(kind_a, ActiveFactorKind::ModelParameters) {
+                    *val_a
+                } else {
+                    *val_b
+                };
 
-                        let m_flags = get_restore_flags(market_factor);
-                        let combined_snap = MarketSnapshot::extract(market_t0, m_flags);
-                        let market_combined =
-                            MarketSnapshot::restore_market(market_t1, &combined_snap, m_flags);
-                        let reprice_both =
-                            reprice_instrument(&instrument_t0, &market_combined, as_of_t1)?;
-                        cross_interaction_pnl(val_t1, val_market, val_params, reprice_both)?
-                    } else {
-                        let combined_flags =
-                            get_restore_flags(*kind_a) | get_restore_flags(*kind_b);
-                        reprice_cross_factor(
-                            instrument,
-                            market_t0,
-                            market_t1,
-                            as_of_t1,
-                            combined_flags,
-                            val_t1,
-                            *val_a,
-                            *val_b,
-                        )?
-                    };
-                    Ok((label.clone(), pnl))
-                },
-            )
-            .collect::<Result<Vec<(String, Money)>>>()?;
+                let m_flags = get_restore_flags(market_factor);
+                let combined_snap = MarketSnapshot::extract(market_t0, m_flags);
+                let market_combined =
+                    MarketSnapshot::restore_market(market_t1, &combined_snap, m_flags);
+                let reprice_both = reprice_instrument(&instrument_t0, &market_combined, as_of_t1)?;
+                cross_interaction_pnl(val_t1, val_market, val_params, reprice_both)?
+            } else {
+                let combined_flags = get_restore_flags(*kind_a) | get_restore_flags(*kind_b);
+                reprice_cross_factor(
+                    instrument,
+                    market_t0,
+                    market_t1,
+                    as_of_t1,
+                    combined_flags,
+                    val_t1,
+                    *val_a,
+                    *val_b,
+                )?
+            };
+            Ok((label.clone(), pnl))
+        };
+        let cross_results = match execution_policy {
+            ExecutionPolicy::Parallel => cross_specs
+                .par_iter()
+                .map(reprice_cross_spec)
+                .collect::<Result<Vec<(String, Money)>>>()?,
+            ExecutionPolicy::Serial => cross_specs
+                .iter()
+                .map(reprice_cross_spec)
+                .collect::<Result<Vec<(String, Money)>>>()?,
+        };
 
         let mut cross_total = 0.0;
         let mut cross_by_pair: IndexMap<String, Money> = IndexMap::new();
@@ -768,21 +788,28 @@ pub fn attribute_pnl_parallel_with_credit_model(
                 MarketRestoreFlags::CORRELATION,
             ),
         ];
-        let pre_fx_evals = pre_fx_specs
-            .par_iter()
-            .map(|(factor, flags)| {
-                let snapshot = MarketSnapshot::extract(market_t0, *flags);
-                let has_data = restored_factor_has_data(*factor, &snapshot);
-                reprice_factor_restored_once(
-                    instrument, market_t1, &snapshot, *flags, has_data, as_of_t1, val_t1,
-                )
-                .map(|output| RestoredFactorEval {
-                    factor: *factor,
-                    snapshot,
-                    output,
-                })
+        let eval_pre_fx = |(factor, flags): &(ParallelRestoredFactor, MarketRestoreFlags)| {
+            let snapshot = MarketSnapshot::extract(market_t0, *flags);
+            let has_data = restored_factor_has_data(*factor, &snapshot);
+            reprice_factor_restored_once(
+                instrument, market_t1, &snapshot, *flags, has_data, as_of_t1, val_t1,
+            )
+            .map(|output| RestoredFactorEval {
+                factor: *factor,
+                snapshot,
+                output,
             })
-            .collect::<Result<Vec<_>>>()?;
+        };
+        let pre_fx_evals = match execution_policy {
+            ExecutionPolicy::Parallel => pre_fx_specs
+                .par_iter()
+                .map(eval_pre_fx)
+                .collect::<Result<Vec<_>>>()?,
+            ExecutionPolicy::Serial => pre_fx_specs
+                .iter()
+                .map(eval_pre_fx)
+                .collect::<Result<Vec<_>>>()?,
+        };
         for eval in pre_fx_evals {
             let RestoredFactorEval {
                 factor,
@@ -992,9 +1019,8 @@ pub fn attribute_pnl_parallel_with_credit_model(
         // Each cross-factor block is an independent full revaluation. Reprice them
         // in parallel, then reduce in the fixed `cross_specs` order so the result
         // is bit-identical to the previous sequential loop.
-        let cross_results = cross_specs
-            .par_iter()
-            .map(|(pair, flag_a, flag_b, reprice_a, reprice_b)| {
+        let reprice_default_cross =
+            |(pair, flag_a, flag_b, reprice_a, reprice_b): &CrossSpec<'_>| {
                 let (Some(val_a), Some(val_b)) = (*reprice_a, *reprice_b) else {
                     return Ok(None);
                 };
@@ -1008,13 +1034,22 @@ pub fn attribute_pnl_parallel_with_credit_model(
                     val_a,
                     val_b,
                 )?;
-                Ok(Some((*pair, pnl)))
-            })
-            .collect::<Result<Vec<Option<(&str, Money)>>>>()?;
+                Ok(Some(((*pair).to_string(), pnl)))
+            };
+        let cross_results = match execution_policy {
+            ExecutionPolicy::Parallel => cross_specs
+                .par_iter()
+                .map(reprice_default_cross)
+                .collect::<Result<Vec<Option<(String, Money)>>>>()?,
+            ExecutionPolicy::Serial => cross_specs
+                .iter()
+                .map(reprice_default_cross)
+                .collect::<Result<Vec<Option<(String, Money)>>>>()?,
+        };
         for result in cross_results.into_iter().flatten() {
             let (pair, pnl) = result;
             num_repricings += 1;
-            record_cross_pair(pair, pnl, &mut cross_total, &mut cross_by_pair);
+            record_cross_pair(&pair, pnl, &mut cross_total, &mut cross_by_pair);
         }
 
         if !cross_by_pair.is_empty() {
@@ -1092,12 +1127,11 @@ pub fn attribute_pnl_parallel_with_credit_model(
                         .collect()
                 };
 
-                // Reprice each step's end-state market in parallel.
-                let step_values: Vec<Money> = cascade
-                    .steps
-                    .par_iter()
-                    .zip(cumulative_bps.par_iter())
-                    .map(|(step, cumulative_bp)| -> Result<Money> {
+                // Reprice each step's end-state market. Standalone attribution
+                // can fan these out; portfolio callers pass `Serial` so the
+                // outer position loop owns Rayon.
+                let reprice_cascade_step =
+                    |(step, cumulative_bp): (&CreditCascadeStep, &Option<f64>)| -> Result<Money> {
                         let market_step = match step.kind {
                             super::credit_cascade::CreditStepKind::CurveShape => snap_hazard_to_t1(
                                 &market_t0_credit,
@@ -1112,8 +1146,21 @@ pub fn attribute_pnl_parallel_with_credit_model(
                             )?,
                         };
                         reprice_instrument(instrument, &market_step, as_of_t1)
-                    })
-                    .collect::<Result<Vec<Money>>>()?;
+                    };
+                let step_values: Vec<Money> = match execution_policy {
+                    ExecutionPolicy::Parallel => cascade
+                        .steps
+                        .par_iter()
+                        .zip(cumulative_bps.par_iter())
+                        .map(reprice_cascade_step)
+                        .collect::<Result<Vec<Money>>>()?,
+                    ExecutionPolicy::Serial => cascade
+                        .steps
+                        .iter()
+                        .zip(cumulative_bps.iter())
+                        .map(reprice_cascade_step)
+                        .collect::<Result<Vec<Money>>>()?,
+                };
                 num_repricings += step_values.len();
 
                 // Telescope to per-step P&Ls: V_k − V_{k−1}, V_0 = base_credit_val.
@@ -1382,7 +1429,7 @@ mod tests {
             as_of_t0,
             as_of_t1,
             &config,
-            None,
+            ExecutionPolicy::Parallel,
         )
         .expect("parallel attribution should succeed");
 
