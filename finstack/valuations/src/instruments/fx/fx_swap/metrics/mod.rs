@@ -6,12 +6,12 @@
 //!
 //! Exposed metrics:
 //! - Forward points (far rate - near rate)
-//! - FX01 (sensitivity to 1bp spot bump)
+//! - FX01 (sensitivity to a 1% relative spot move) — shared
+//!   `GenericFx01Calculator`
 //! - DV01 (domestic) and DV01 (foreign)
 
 mod carry_pv;
 mod forward_points;
-mod fx01;
 mod fx_delta;
 mod ir01_domestic;
 mod ir01_foreign;
@@ -36,9 +36,14 @@ pub(crate) fn register_fx_swap_metrics(registry: &mut MetricRegistry) {
             Arc::new(forward_points::ForwardPoints),
             &[InstrumentType::FxSwap],
         )
+        // Fx01 = "PV change per 1% relative spot move" via the shared
+        // generic calculator (was a custom `fx01::FX01` doing 1bp absolute
+        // central difference). `FxDelta` below keeps the same convention; the
+        // two metrics are now numerically identical for `FxSwap`, kept
+        // separate only for API surface stability.
         .register_metric(
             MetricId::Fx01,
-            Arc::new(fx01::FX01),
+            crate::metrics::sensitivities::fx01::arc_generic_fx01(),
             &[InstrumentType::FxSwap],
         )
         .register_metric(

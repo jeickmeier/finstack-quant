@@ -13,7 +13,6 @@
 //! Note: Quote amount (PV in quote currency) is available in `ValuationResult.value`.
 
 pub(crate) mod base_amount;
-pub(crate) mod fx01;
 pub(crate) mod fx_delta;
 pub(crate) mod inverse_rate;
 pub(crate) mod spot_rate;
@@ -32,9 +31,12 @@ pub(crate) fn register_fx_spot_metrics(registry: &mut MetricRegistry) {
         Arc::new(fx_delta::FxDeltaCalculator),
         &[InstrumentType::FxSpot],
     );
+    // FX01 now uses the shared `GenericFx01Calculator` (1% relative spot
+    // move) instead of the per-instrument trivial `notional * 0.0001` shim.
+    // This aligns the unit convention with every attribution consumer.
     registry.register_metric(
         MetricId::Fx01,
-        Arc::new(fx01::Fx01Calculator),
+        crate::metrics::sensitivities::fx01::arc_generic_fx01(),
         &[InstrumentType::FxSpot],
     );
 

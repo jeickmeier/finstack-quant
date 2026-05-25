@@ -6,9 +6,11 @@
 //!
 //! Exposed metrics:
 //! - DV01 (interest rate sensitivity for domestic and foreign curves)
-//! - Theta (time decay)
-
-mod fx01;
+//! - FX01 (sensitivity to a 1% relative spot move) — uses the shared
+//!   `metrics::sensitivities::fx01::GenericFx01Calculator`. The custom
+//!   per-instrument calculator that used to live here was removed in favor of
+//!   the generic one (which works for every instrument that publishes its FX
+//!   pair via `MarketDependencies::fx_pairs`).
 
 use crate::metrics::MetricRegistry;
 
@@ -16,11 +18,10 @@ use crate::metrics::MetricRegistry;
 pub(crate) fn register_fx_forward_metrics(registry: &mut MetricRegistry) {
     use crate::metrics::MetricId;
     use crate::pricer::InstrumentType;
-    use std::sync::Arc;
 
     registry.register_metric(
         MetricId::Fx01,
-        Arc::new(fx01::Fx01Calculator),
+        crate::metrics::sensitivities::fx01::arc_generic_fx01(),
         &[InstrumentType::FxForward],
     );
     crate::register_metrics! {

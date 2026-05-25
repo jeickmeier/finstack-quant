@@ -182,7 +182,7 @@ fn test_ir01_sensitivity_scales_with_tenor() {
 
 #[test]
 fn test_fx01_calculation() {
-    // FX01: sensitivity to 1bp bump in spot FX rate
+    // FX01: sensitivity to a 1% relative spot move (shared GenericFx01Calculator).
     let dates = TestDates::standard();
     let market = setup_standard_market(dates.as_of);
 

@@ -4,13 +4,18 @@
 //!
 //! # FX Delta vs FX01
 //!
-//! - **FX Delta**: Sensitivity to a **1% relative** move in spot rate.
-//!   Uses central difference: (PV(S+1%) - PV(S-1%)) / (2 × 1%)
-//!   Useful for normalized risk comparison across different spot levels.
+//! Both `FxDelta` and `Fx01` now report PV change per **1% relative** spot
+//! move. The two metrics are numerically equivalent for `FxSwap`; they are
+//! kept separate only for API surface stability. `Fx01` is registered via
+//! the shared `metrics::sensitivities::fx01::GenericFx01Calculator`, which
+//! uses `MarketBump::FxPct` on the FX matrix and reprices through the
+//! canonical pricer. `FxDelta` uses the in-line `FxSwapPricingContext`
+//! shortcut — slightly faster but functionally identical.
 //!
-//! - **FX01**: Sensitivity to a **1bp absolute** move in spot rate.
-//!   See [`fx01::FX01`] for details.
-//!   Useful for small perturbation analysis and hedge ratio calculation.
+//! Historical note: `Fx01` previously meant "1bp absolute" (Δspot = 0.0001)
+//! across all FX instruments. The convention was changed to "1% relative"
+//! so attribution consumers — which multiply Fx01 by a percentage-points
+//! shift — produce correct P&L magnitudes.
 
 use crate::instruments::fx::fx_swap::pricing_helper::FxSwapPricingContext;
 use crate::instruments::fx::fx_swap::FxSwap;
