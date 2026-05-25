@@ -65,6 +65,20 @@ pub struct EquityInstrumentDeps {
     /// This is used to look up implied volatilities for option pricing
     /// and volatility greeks (vega, volga, vanna).
     pub vol_surface_id: Option<String>,
+
+    /// Optional reference strike used to localise vol-surface diagnostics
+    /// (currently the vega-clamp detection in finite-difference Greeks).
+    ///
+    /// When set, the vega calculator checks for the additive
+    /// down-bump clamp at the strikes *adjacent* to this value rather than
+    /// across the entire surface grid. This avoids forcing a one-sided
+    /// (O(h)) difference in the common case where a far-OTM corner of the
+    /// surface has σ < bump but the option's actual vega draw is from a
+    /// high-σ region of the smile. Instruments with multiple or path-
+    /// dependent strikes (basket payoffs, autocallables on non-trivial
+    /// triggers) may legitimately leave this unset, in which case the
+    /// calculator falls back to the conservative global-min check.
+    pub reference_strike: Option<f64>,
 }
 
 impl EquityInstrumentDeps {
@@ -138,6 +152,20 @@ impl EquityInstrumentDepsBuilder {
     /// ```
     pub fn vol_surface(mut self, id: impl Into<String>) -> Self {
         self.deps.vol_surface_id = Some(id.into());
+        self
+    }
+
+    /// Declare a reference strike for vol-surface diagnostics.
+    ///
+    /// See [`EquityInstrumentDeps::reference_strike`] for the rationale.
+    /// Instruments with a single contractual strike (vanilla European,
+    /// vanilla barrier, vanilla autocallable) should set this so the
+    /// vega clamp detection only inspects the relevant region of the
+    /// surface. Multi-strike payoffs that cannot identify a single
+    /// reference may omit this; the calculator then falls back to a
+    /// global-min check.
+    pub fn reference_strike(mut self, strike: f64) -> Self {
+        self.deps.reference_strike = Some(strike);
         self
     }
 

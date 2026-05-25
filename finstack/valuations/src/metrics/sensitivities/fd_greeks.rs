@@ -113,6 +113,58 @@ fn min_surface_vol(surface: &finstack_core::market_data::surfaces::VolSurface) -
     min_vol
 }
 
+/// Smallest implied vol on a surface that is *relevant* to a single-strike
+/// option, used to decide whether a `±h` vol bump would clamp at zero on
+/// any cell the option's pricing actually touches.
+///
+/// When the instrument supplies a `reference_strike`, only the stored vols
+/// at the two strike-grid columns bracketing the reference (or just the
+/// adjacent column when the reference sits outside the strike axis) are
+/// inspected, across every expiry. Bilinear interpolation cannot draw vol
+/// from outside that footprint, so a low-σ corner of the surface that the
+/// option never samples no longer forces the vega calculator into a
+/// one-sided (O(h)) difference.
+///
+/// Without a reference strike (e.g. basket payoffs, autocallables where
+/// pricing samples the surface along a path), this conservatively falls
+/// back to [`min_surface_vol`] — the previous global-min behaviour.
+///
+/// Returns `None` when the surface has no usable strike grid.
+fn min_relevant_surface_vol(
+    surface: &finstack_core::market_data::surfaces::VolSurface,
+    reference_strike: Option<f64>,
+) -> Option<f64> {
+    let Some(strike) = reference_strike else {
+        return min_surface_vol(surface);
+    };
+    let strikes = surface.strikes();
+    if strikes.is_empty() {
+        return None;
+    }
+    // Find the bracketing strike columns. Bilinear interpolation only
+    // mixes the two columns immediately adjacent to the query strike.
+    let lo_idx = strikes.iter().rposition(|&s| s <= strike).unwrap_or(0);
+    let hi_idx = strikes
+        .iter()
+        .position(|&s| s >= strike)
+        .unwrap_or(strikes.len() - 1);
+    let relevant_strikes: &[f64] = if lo_idx == hi_idx {
+        &strikes[lo_idx..=lo_idx]
+    } else {
+        &strikes[lo_idx..=hi_idx]
+    };
+
+    let mut min_vol: Option<f64> = None;
+    for &expiry in surface.expiries() {
+        for &col_strike in relevant_strikes {
+            if let Ok(vol) = surface.value_checked(expiry, col_strike) {
+                min_vol = Some(min_vol.map_or(vol, |m: f64| m.min(vol)));
+            }
+        }
+    }
+    min_vol
+}
+
 /// Guard against NaN / ±Inf leaking out of finite-difference calculations.
 fn ensure_finite(value: f64, metric_name: &str) -> finstack_core::Result<f64> {
     if value.is_finite() {
@@ -608,10 +660,15 @@ where
         // The additive down-bump `σ - h` is clamped at zero wherever `σ < h`
         // (VolSurface `Bumpable`). When that clamp triggers, the down-bumped
         // surface does NOT represent a uniform `-h` move, so a central
-        // difference divided by the full `2h` is asymmetric and biased. Detect
-        // the clamp and fall back to a one-sided (forward) difference with the
-        // correct `h` divisor near zero vol.
-        let min_vol = min_surface_vol(&surface);
+        // difference divided by the full `2h` is asymmetric and biased.
+        //
+        // Restrict the clamp check to the strike columns the option's pricing
+        // can actually sample (via `eq_deps.reference_strike`); a far-OTM
+        // wing with σ < h then no longer forces a one-sided difference for
+        // an ATM-vega option. Multi-strike instruments that leave
+        // `reference_strike = None` fall back to the conservative global
+        // minimum.
+        let min_vol = min_relevant_surface_vol(&surface, eq_deps.reference_strike);
         let clamp_active = min_vol.map(|m| m < bump_abs).unwrap_or(false);
 
         let vega = if clamp_active {
@@ -1577,6 +1634,74 @@ mod tests {
         assert!(
             (vega - slope * 0.0075).abs() > 1.0,
             "vega must not equal the contaminated central-difference value"
+        );
+    }
+
+    #[test]
+    fn min_relevant_surface_vol_falls_back_to_global_without_strike() {
+        // Surface: ATM (strike=100) has σ=0.20; wings (90, 110) have σ=0.005.
+        let surface = finstack_core::market_data::surfaces::VolSurface::builder("SMILE")
+            .expiries(&[0.5, 1.0])
+            .strikes(&[90.0, 100.0, 110.0])
+            .row(&[0.005, 0.20, 0.005])
+            .row(&[0.005, 0.20, 0.005])
+            .build()
+            .expect("smile surface");
+        // No reference strike: must keep the legacy global-min behaviour so
+        // instruments that genuinely sample wing strikes (basket payoffs,
+        // path-dependent autocallables) still get the conservative clamp
+        // detection.
+        let min = super::min_relevant_surface_vol(&surface, None).expect("non-empty");
+        assert!(
+            (min - 0.005).abs() < 1e-12,
+            "global min should be 0.005, got {min}"
+        );
+    }
+
+    #[test]
+    fn min_relevant_surface_vol_uses_only_bracketing_columns_when_strike_present() {
+        // Same smile surface: ATM high-vol, wings low-vol.
+        let surface = finstack_core::market_data::surfaces::VolSurface::builder("SMILE2")
+            .expiries(&[0.5, 1.0])
+            .strikes(&[90.0, 100.0, 110.0])
+            .row(&[0.005, 0.20, 0.005])
+            .row(&[0.005, 0.20, 0.005])
+            .build()
+            .expect("smile surface");
+
+        // Reference strike exactly on the ATM column: only column [100] is
+        // relevant ⇒ min is the ATM vol, NOT the wing vol. This is the fix
+        // for audit P2a — a single low-vol corner that the option's pricing
+        // never samples must not force a one-sided vega.
+        let atm = super::min_relevant_surface_vol(&surface, Some(100.0)).expect("non-empty");
+        assert!(
+            (atm - 0.20).abs() < 1e-12,
+            "strike=100 (ATM) should bracket to {{[100]}} only, expected min=0.20, got {atm}"
+        );
+
+        // Reference strike between two columns: bracketing is {[100, 110]}.
+        // 110 column is low-vol, so the min reflects that. Strikes between
+        // grid columns mix both via bilinear interpolation, so both must be
+        // considered.
+        let mid = super::min_relevant_surface_vol(&surface, Some(105.0)).expect("non-empty");
+        assert!(
+            (mid - 0.005).abs() < 1e-12,
+            "strike=105 should bracket to {{[100, 110]}}, expected min=0.005, got {mid}"
+        );
+
+        // Strike outside the right axis: clamps to the rightmost column.
+        let beyond_right =
+            super::min_relevant_surface_vol(&surface, Some(150.0)).expect("non-empty");
+        assert!(
+            (beyond_right - 0.005).abs() < 1e-12,
+            "strike beyond right axis should use the rightmost column"
+        );
+
+        // Strike outside the left axis: clamps to the leftmost column.
+        let beyond_left = super::min_relevant_surface_vol(&surface, Some(50.0)).expect("non-empty");
+        assert!(
+            (beyond_left - 0.005).abs() < 1e-12,
+            "strike beyond left axis should use the leftmost column"
         );
     }
 

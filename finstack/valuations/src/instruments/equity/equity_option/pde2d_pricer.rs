@@ -73,10 +73,13 @@ impl EquityOptionHestonPdePricer {
             return Ok(Money::new(intrinsic * inst.notional.amount(), ccy));
         }
 
-        // Heston parameters: source from market scalars and fall back to
-        // centralized defaults; validation (positive κ/θ/σᵥ/v₀, ρ ∈ (−1, 1))
-        // is enforced by `HestonParams::from_market`.
-        let cf_params = ClosedFormHestonParams::from_market(market, r, q).map_err(|e| {
+        // Heston parameters: **Audit P3b** — use the strict resolver so a
+        // missing or mistyped HESTON_* scalar surfaces as an
+        // `InputError::NotFound` here rather than silently selecting the
+        // representative SPX defaults in `heston_defaults`. Validation
+        // (positive κ/θ/σᵥ/v₀, ρ ∈ (−1, 1)) is still enforced inside
+        // `HestonParams::new`.
+        let cf_params = ClosedFormHestonParams::from_market_strict(market, r, q).map_err(|e| {
             PricingError::model_failure_with_context(
                 e.to_string(),
                 PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),

@@ -88,11 +88,13 @@ impl EquityOptionHestonMcPricer {
             return Ok((Money::new(intrinsic * inst.notional.amount(), ccy), 0.0));
         }
 
-        // Heston parameters: source from market scalars and fall back to
-        // centralized defaults; validation (positive κ/θ/σᵥ/v₀, ρ ∈ (−1, 1))
-        // is enforced by `from_market`. We then convert to the MC engine's
-        // own `HestonParams` struct.
-        let cf_params = ClosedFormHestonParams::from_market(market, r, q)?;
+        // Heston parameters: **Audit P3b** — use the strict resolver so a
+        // missing or mistyped HESTON_* scalar fails loudly here rather than
+        // silently selecting the representative SPX defaults. Validation
+        // (positive κ/θ/σᵥ/v₀, ρ ∈ (−1, 1)) is still enforced inside
+        // `HestonParams::new`. We then convert to the MC engine's own
+        // `HestonParams` struct.
+        let cf_params = ClosedFormHestonParams::from_market_strict(market, r, q)?;
         let heston_params = HestonParams::new(
             cf_params.r,
             cf_params.q,

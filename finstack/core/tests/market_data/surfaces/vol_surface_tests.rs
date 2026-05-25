@@ -290,9 +290,9 @@ fn test_vol_surface_rejects_key_rate_bumps() {
             units: BumpUnits::Percent,
             value: 1.0,
             bump_type: BumpType::TriangularKeyRate {
-                prev_bucket: 1.0,
+                prev_bucket: Some(1.0),
                 target_bucket: 2.0,
-                next_bucket: 3.0,
+                next_bucket: Some(3.0),
             },
         })
         .expect_err("VolSurface should reject key-rate bumps");

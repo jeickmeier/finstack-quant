@@ -115,10 +115,10 @@ mod scalar_curve_invariants {
         let vc = vol_curve();
 
         let bumped_pc = pc
-            .with_triangular_key_rate_bump_neighbors(0.25, 0.5, 1.0, 3.0)
+            .with_triangular_key_rate_bump_neighbors(Some(0.25), 0.5, Some(1.0), 3.0)
             .unwrap();
         let bumped_vc = vc
-            .with_triangular_key_rate_bump_neighbors(0.25, 0.5, 1.0, 3.0)
+            .with_triangular_key_rate_bump_neighbors(Some(0.25), 0.5, Some(1.0), 3.0)
             .unwrap();
 
         assert!((bumped_pc.spot_price() - pc.spot_price()).abs() < TOL);
@@ -131,10 +131,10 @@ mod scalar_curve_invariants {
         let vc = vol_curve();
 
         let bumped_pc = pc
-            .with_triangular_key_rate_bump_neighbors(0.25, 0.5, 1.0, 3.0)
+            .with_triangular_key_rate_bump_neighbors(Some(0.25), 0.5, Some(1.0), 3.0)
             .unwrap();
         let bumped_vc = vc
-            .with_triangular_key_rate_bump_neighbors(0.25, 0.5, 1.0, 3.0)
+            .with_triangular_key_rate_bump_neighbors(Some(0.25), 0.5, Some(1.0), 3.0)
             .unwrap();
 
         let idx_pc = pc

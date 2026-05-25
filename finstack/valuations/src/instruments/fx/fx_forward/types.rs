@@ -685,6 +685,32 @@ impl crate::instruments::common_impl::traits::Instrument for FxForward {
         None
     }
 
+    fn valuation_details(
+        &self,
+        market: &finstack_core::market_data::context::MarketContext,
+        as_of: finstack_core::dates::Date,
+    ) -> Option<crate::results::ValuationDetails> {
+        // Project invariant: FX-policy visibility per layer. Record whether
+        // the spot was a direct quote or triangulated through the matrix
+        // pivot. `spot_rate_override` short-circuits the matrix lookup, so
+        // there is no triangulation to report in that case.
+        use finstack_core::money::fx::FxQuery;
+        let fx_triangulated = if self.spot_rate_override.is_some() {
+            None
+        } else {
+            market
+                .fx()
+                .and_then(|fx| {
+                    fx.rate(FxQuery::new(self.base_currency, self.quote_currency, as_of))
+                        .ok()
+                })
+                .map(|q| q.triangulated)
+        };
+        Some(crate::results::ValuationDetails::Fx(
+            crate::results::FxValuationDetails { fx_triangulated },
+        ))
+    }
+
     fn pricing_overrides_mut(
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {

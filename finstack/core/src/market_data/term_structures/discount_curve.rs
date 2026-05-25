@@ -858,23 +858,31 @@ impl DiscountCurve {
     /// DF_bumped(t) = DF(t) × exp(-w(t) × δr × t)
     /// ```
     ///
-    /// The triangular weight function for bucket at `target` with neighbors `prev` and `next`:
-    /// - w(t) = 0                                    if t ≤ prev
-    /// - w(t) = (t - prev) / (target - prev)        if prev < t ≤ target
-    /// - w(t) = (next - t) / (next - target)        if target < t < next
-    /// - w(t) = 0                                    if t ≥ next
+    /// The triangular weight function for an **interior** bucket at `target`
+    /// with neighbours `prev = Some(p)` and `next = Some(n)`:
+    /// - w(t) = 0                                    if t ≤ p
+    /// - w(t) = (t − p) / (target − p)               if p < t ≤ target
+    /// - w(t) = (n − t) / (n − target)               if target < t < n
+    /// - w(t) = 0                                    if t ≥ n
+    ///
+    /// For the **first bucket** (`prev = None`) the rising edge is replaced
+    /// by a flat 1.0 for `t ≤ target`; for the **last bucket**
+    /// (`next = None`) the falling edge is replaced by a flat 1.0 for
+    /// `t > target`.
     ///
     /// # Key Property: Unity Partition
     ///
-    /// For any time t, the sum of all bucket weights equals 1.0:
+    /// When `prev = None` is used for the first bucket and `next = None`
+    /// for the last bucket, the weights of the full bucket set sum to 1.0
+    /// at any time t covered by any bucket:
     /// `Σᵢ wᵢ(t) = 1.0`
     ///
-    /// This ensures: **sum of bucketed DV01 = parallel DV01**
+    /// This ensures: **sum of bucketed DV01 = parallel DV01**.
     ///
     /// # Arguments
-    /// * `prev_bucket` - Previous bucket time in years (use 0.0 for first bucket)
+    /// * `prev_bucket` - Previous bucket time in years; `None` for the first bucket
     /// * `target_bucket` - Target bucket time in years (peak of the triangle)
-    /// * `next_bucket` - Next bucket time in years (use f64::INFINITY for last bucket)
+    /// * `next_bucket` - Next bucket time in years; `None` for the last bucket
     /// * `bp` - Bump size in basis points (100bp = 1%)
     ///
     /// # Returns
@@ -896,32 +904,39 @@ impl DiscountCurve {
     ///     .build()
     ///     ?;
     ///
-    /// // Apply 10bp bump at 5Y bucket with neighbors at 3Y and 7Y
-    /// let bumped = curve.with_triangular_key_rate_bump_neighbors(3.0, 5.0, 7.0, 10.0)?;
+    /// // Apply 10bp bump at 5Y interior bucket with neighbours at 3Y and 7Y
+    /// let bumped = curve.with_triangular_key_rate_bump_neighbors(
+    ///     Some(3.0), 5.0, Some(7.0), 10.0,
+    /// )?;
     /// # let _ = bumped;
     /// # Ok(())
     /// # }
     /// ```
     pub fn with_triangular_key_rate_bump_neighbors(
         &self,
-        prev_bucket: f64,
+        prev_bucket: Option<f64>,
         target_bucket: f64,
-        next_bucket: f64,
+        next_bucket: Option<f64>,
         bp: f64,
     ) -> crate::Result<Self> {
         if self.knots.len() < 2 {
             return self.with_parallel_bump(bp);
         }
 
-        // Validate bucket grid ordering.
-        // next_bucket may be +∞ for the last bucket.
-        if !prev_bucket.is_finite()
-            || !target_bucket.is_finite()
-            || !(next_bucket.is_finite() || next_bucket.is_infinite())
-            || prev_bucket >= target_bucket
-            || (!next_bucket.is_infinite() && target_bucket >= next_bucket)
-        {
+        // Validate bucket grid ordering. Each finite bound must satisfy
+        // prev < target < next.
+        if !target_bucket.is_finite() {
             return Err(crate::error::InputError::Invalid.into());
+        }
+        if let Some(p) = prev_bucket {
+            if !p.is_finite() || p >= target_bucket {
+                return Err(crate::error::InputError::Invalid.into());
+            }
+        }
+        if let Some(n) = next_bucket {
+            if !n.is_finite() || target_bucket >= n {
+                return Err(crate::error::InputError::Invalid.into());
+            }
         }
 
         let bump_rate = bp / 10_000.0;

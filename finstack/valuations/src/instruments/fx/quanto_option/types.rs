@@ -620,6 +620,30 @@ impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
         None
     }
 
+    fn valuation_details(
+        &self,
+        market: &finstack_core::market_data::context::MarketContext,
+        as_of: finstack_core::dates::Date,
+    ) -> Option<crate::results::ValuationDetails> {
+        // Quanto FX policy stamp. `fx_rate_id` short-circuits the matrix,
+        // so triangulation is unknown / not applicable in that case.
+        let fx_triangulated = if self.fx_rate_id.is_some() {
+            None
+        } else {
+            use finstack_core::money::fx::FxQuery;
+            market
+                .fx()
+                .and_then(|fx| {
+                    fx.rate(FxQuery::new(self.base_currency, self.quote_currency, as_of))
+                        .ok()
+                })
+                .map(|q| q.triangulated)
+        };
+        Some(crate::results::ValuationDetails::Fx(
+            crate::results::FxValuationDetails { fx_triangulated },
+        ))
+    }
+
     fn pricing_overrides_mut(
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {

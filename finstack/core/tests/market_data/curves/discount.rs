@@ -483,7 +483,7 @@ fn triangular_key_rate_bump_targets_bucket() {
 
     // Triangular bump centered at 1.0, with neighbors at 0.0 and 2.0
     let bumped = curve
-        .with_triangular_key_rate_bump_neighbors(0.0, 1.0, 2.0, 25.0)
+        .with_triangular_key_rate_bump_neighbors(Some(0.0), 1.0, Some(2.0), 25.0)
         .unwrap();
 
     // DF at t=0 is unchanged (weight = 0 at t=0)
@@ -528,7 +528,7 @@ fn triangular_key_rate_bump_error_handling() {
         .unwrap();
 
     // Normal triangular key-rate bump should succeed
-    let bumped_ok = curve.with_triangular_key_rate_bump_neighbors(0.5, 1.5, 2.5, 15.0);
+    let bumped_ok = curve.with_triangular_key_rate_bump_neighbors(Some(0.5), 1.5, Some(2.5), 15.0);
     assert!(
         bumped_ok.is_ok(),
         "Valid triangular key-rate bump should succeed: {:?}",
@@ -536,7 +536,8 @@ fn triangular_key_rate_bump_error_handling() {
     );
 
     // Extreme bump should either succeed or return typed error - no panic
-    let bumped_extreme = curve.with_triangular_key_rate_bump_neighbors(0.0, 1.0, 2.0, 1000.0);
+    let bumped_extreme =
+        curve.with_triangular_key_rate_bump_neighbors(Some(0.0), 1.0, Some(2.0), 1000.0);
     match bumped_extreme {
         Ok(_) => {}
         Err(e) => {
@@ -598,7 +599,7 @@ fn triangular_key_rate_bump_weight_verification() {
 
     let bp = 25.0;
     let bumped = curve
-        .with_triangular_key_rate_bump_neighbors(0.0, 1.0, 2.0, bp)
+        .with_triangular_key_rate_bump_neighbors(Some(0.0), 1.0, Some(2.0), bp)
         .unwrap();
 
     // At target (t=1.0): weight=1.0

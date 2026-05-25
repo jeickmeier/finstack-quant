@@ -184,6 +184,20 @@ impl HestonParams {
     ///
     /// Returns the same validation errors as [`Self::new`] (positive κ, θ,
     /// σᵥ, v₀; ρ ∈ (−1, 1); finite r, q).
+    ///
+    /// # Deprecation note
+    ///
+    /// Production pricers (Fourier, PDE, Monte Carlo equity option) now
+    /// invoke [`Self::from_market_strict`] so that a missing or mistyped
+    /// `HESTON_*` scalar fails loudly instead of silently selecting the
+    /// representative SPX defaults. This lenient form is retained for
+    /// examples / notebooks / smoke tests where the default-fallback
+    /// behaviour is convenient. New code should prefer the strict form.
+    #[deprecated(
+        note = "Use HestonParams::from_market_strict in production code paths so missing \
+                HESTON_* scalars fail loudly instead of silently falling back to representative \
+                SPX defaults. The lenient `from_market` form is preserved for examples and tests."
+    )]
     pub fn from_market(market: &MarketContext, r: f64, q: f64) -> finstack_core::Result<Self> {
         use crate::instruments::common_impl::helpers::get_unitless_scalar;
         let kappa = get_unitless_scalar(market, "HESTON_KAPPA", heston_defaults::KAPPA);
@@ -191,6 +205,39 @@ impl HestonParams {
         let sigma_v = get_unitless_scalar(market, "HESTON_SIGMA_V", heston_defaults::SIGMA_V);
         let rho = get_unitless_scalar(market, "HESTON_RHO", heston_defaults::RHO);
         let v0 = get_unitless_scalar(market, "HESTON_V0", heston_defaults::V0);
+        Self::new(r, q, kappa, theta, sigma_v, rho, v0)
+    }
+
+    /// Strict variant of [`Self::from_market`] that errors when any of the
+    /// five `HESTON_*` scalars (`HESTON_KAPPA`, `HESTON_THETA`,
+    /// `HESTON_SIGMA_V`, `HESTON_RHO`, `HESTON_V0`) is missing or carries a
+    /// non-unitless type.
+    ///
+    /// Production pricers — Fourier inversion, ADI PDE, and Monte Carlo
+    /// equity option — use this form so a misnamed market scalar produces
+    /// an `InputError::NotFound` instead of silently pricing with the
+    /// representative SPX-style defaults in [`heston_defaults`]. The
+    /// lenient [`Self::from_market`] is retained for examples and smoke
+    /// tests where the default-fallback behaviour is convenient.
+    ///
+    /// # Errors
+    ///
+    /// Returns:
+    /// - [`InputError::NotFound`](finstack_core::InputError::NotFound) when a scalar is missing.
+    /// - [`finstack_core::Error::Validation`] when a scalar exists but is the wrong type.
+    /// - The same validation errors as [`Self::new`] (positive κ/θ/σᵥ/v₀, ρ ∈ (−1, 1),
+    ///   finite r, q) when the scalars are present but produce an invalid parameter set.
+    pub fn from_market_strict(
+        market: &MarketContext,
+        r: f64,
+        q: f64,
+    ) -> finstack_core::Result<Self> {
+        use crate::instruments::common_impl::helpers::get_unitless_scalar_strict;
+        let kappa = get_unitless_scalar_strict(market, "HESTON_KAPPA", "Heston")?;
+        let theta = get_unitless_scalar_strict(market, "HESTON_THETA", "Heston")?;
+        let sigma_v = get_unitless_scalar_strict(market, "HESTON_SIGMA_V", "Heston")?;
+        let rho = get_unitless_scalar_strict(market, "HESTON_RHO", "Heston")?;
+        let v0 = get_unitless_scalar_strict(market, "HESTON_V0", "Heston")?;
         Self::new(r, q, kappa, theta, sigma_v, rho, v0)
     }
 }
@@ -1261,6 +1308,11 @@ mod tests {
     use finstack_core::market_data::context::MarketContext;
     use finstack_core::market_data::scalars::MarketScalar;
 
+    // The lenient `HestonParams::from_market` is intentionally retained
+    // alongside `from_market_strict` (see audit P3b). These tests pin its
+    // default-fallback behaviour; suppress the expected deprecation
+    // warning at the (test-only) call sites.
+    #[allow(deprecated)]
     #[test]
     fn from_market_uses_defaults_when_market_is_empty() {
         let market = MarketContext::new();
@@ -1274,6 +1326,7 @@ mod tests {
         assert_eq!(params.v0, heston_defaults::V0);
     }
 
+    #[allow(deprecated)]
     #[test]
     fn from_market_overrides_defaults_with_market_scalars() {
         let market = MarketContext::new()
@@ -1290,6 +1343,7 @@ mod tests {
         assert_eq!(params.v0, 0.05);
     }
 
+    #[allow(deprecated)]
     #[test]
     fn from_market_rejects_rho_at_boundary() {
         let market = MarketContext::new().insert_price("HESTON_RHO", MarketScalar::Unitless(1.0));
@@ -1297,12 +1351,68 @@ mod tests {
         assert!(err.to_string().contains("rho"));
     }
 
+    #[allow(deprecated)]
     #[test]
     fn from_market_rejects_negative_kappa() {
         let market =
             MarketContext::new().insert_price("HESTON_KAPPA", MarketScalar::Unitless(-0.1));
         let err = HestonParams::from_market(&market, 0.0, 0.0).expect_err("negative kappa");
         assert!(err.to_string().contains("kappa"));
+    }
+
+    // Audit P3b: strict resolver coverage. These tests pin the new
+    // production-path behaviour (missing scalar => loud error) so a
+    // regression that silently re-introduces a default-fallback would
+    // surface here.
+
+    #[test]
+    fn from_market_strict_errors_when_any_scalar_is_missing() {
+        // Empty market: no HESTON_* scalars present at all. Each strict
+        // call must error rather than fall back to the SPX defaults.
+        let market = MarketContext::new();
+        let err = HestonParams::from_market_strict(&market, 0.05, 0.02)
+            .expect_err("strict resolver must reject missing HESTON_KAPPA");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("HESTON_KAPPA"),
+            "error must name the missing scalar, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn from_market_strict_errors_when_only_some_scalars_present() {
+        // Partial config — missing HESTON_V0 alone should be enough to
+        // refuse to construct (the lenient resolver would silently fill
+        // it with `heston_defaults::V0 = 0.04`).
+        let market = MarketContext::new()
+            .insert_price("HESTON_KAPPA", MarketScalar::Unitless(1.5))
+            .insert_price("HESTON_THETA", MarketScalar::Unitless(0.06))
+            .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(0.4))
+            .insert_price("HESTON_RHO", MarketScalar::Unitless(-0.5));
+        let err = HestonParams::from_market_strict(&market, 0.0, 0.0)
+            .expect_err("strict resolver must reject missing HESTON_V0");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("HESTON_V0"),
+            "error must name the missing scalar, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn from_market_strict_succeeds_when_full_config_present() {
+        let market = MarketContext::new()
+            .insert_price("HESTON_KAPPA", MarketScalar::Unitless(1.5))
+            .insert_price("HESTON_THETA", MarketScalar::Unitless(0.06))
+            .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(0.4))
+            .insert_price("HESTON_RHO", MarketScalar::Unitless(-0.5))
+            .insert_price("HESTON_V0", MarketScalar::Unitless(0.05));
+        let params =
+            HestonParams::from_market_strict(&market, 0.03, 0.01).expect("strict ok with full set");
+        assert_eq!(params.kappa, 1.5);
+        assert_eq!(params.theta, 0.06);
+        assert_eq!(params.sigma_v, 0.4);
+        assert_eq!(params.rho, -0.5);
+        assert_eq!(params.v0, 0.05);
     }
 
     /// Test that ψ_j(0) ≈ 1 for both probability characteristic functions.

@@ -35,6 +35,13 @@ pub enum ValuationDetails {
     StructuredCreditStochastic(
         crate::instruments::fixed_income::structured_credit::StochasticPricingResult,
     ),
+    /// FX-bearing instrument pricing metadata (forwards, options, quanto, …).
+    ///
+    /// Surfaces the [`FxMatrix`](finstack_core::money::fx::FxMatrix) lookup
+    /// chain that backed the spot rate used at pricing time, satisfying the
+    /// project-wide FX-policy-visibility invariant for instruments that
+    /// resolve their spot through the matrix.
+    Fx(FxValuationDetails),
 }
 
 /// Metadata for CDS-family valuation paths.
@@ -44,6 +51,26 @@ pub struct CreditDerivativeValuationDetails {
     pub model_key: String,
     /// CDS integration method actually used, when applicable.
     pub integration_method: Option<String>,
+}
+
+/// Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).
+///
+/// Captures the FX policy applied at pricing time so downstream audit /
+/// reconciliation can trace whether a quoted rate came from a direct
+/// market quote or via triangulation through the matrix pivot currency.
+/// Mirrors the cross-cutting invariant documented in
+/// `.claude/rules/project-description.md` ("FX policy visibility: Applied
+/// conversion strategy recorded per layer (e.g., valuations, statements,
+/// portfolio)").
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct FxValuationDetails {
+    /// `true` when the FX spot was obtained via triangulation through the
+    /// [`FxMatrix`](finstack_core::money::fx::FxMatrix) pivot currency
+    /// rather than a direct quote. Mirrors
+    /// [`FxRateResult.triangulated`](finstack_core::money::fx::FxRateResult).
+    /// `None` when the instrument resolved spot from an explicit market
+    /// scalar (`fx_rate_id`) rather than the matrix.
+    pub fx_triangulated: Option<bool>,
 }
 
 /// Complete valuation result envelope with NPV, risk metrics, and metadata.

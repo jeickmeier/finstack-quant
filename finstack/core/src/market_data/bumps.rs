@@ -58,25 +58,40 @@ pub enum BumpType {
     ///
     /// # Weight Function
     ///
-    /// For a bump at `target_bucket` with neighbors `prev_bucket` and `next_bucket`:
-    /// - w(t) = 0                                    if t ≤ prev_bucket
-    /// - w(t) = (t - prev_bucket) / (target - prev) if prev_bucket < t ≤ target_bucket
-    /// - w(t) = (next_bucket - t) / (next - target) if target_bucket < t < next_bucket
-    /// - w(t) = 0                                    if t ≥ next_bucket
+    /// For an **interior** bucket at `target_bucket` with neighbours
+    /// `prev_bucket = Some(p)` and `next_bucket = Some(n)`:
+    ///
+    /// - w(t) = 0                              if t ≤ p
+    /// - w(t) = (t − p) / (target − p)         if p < t ≤ target
+    /// - w(t) = (n − t) / (n − target)         if target < t < n
+    /// - w(t) = 0                              if t ≥ n
+    ///
+    /// For the **first bucket** (no left neighbour, `prev_bucket = None`)
+    /// the rising edge is replaced by a flat 1.0 for `t ≤ target`. For
+    /// the **last bucket** (no right neighbour, `next_bucket = None`)
+    /// the falling edge is replaced by a flat 1.0 for `t > target`.
     ///
     /// # Key Property
     ///
-    /// For any time t, the sum of all bucket weights equals 1.0:
+    /// When the wings are encoded as `None` for the first/last bucket,
+    /// the weights of the full bucket set sum to 1.0 at any time `t`
+    /// covered by any bucket:
     /// `Σᵢ wᵢ(t) = 1.0`
     ///
-    /// This ensures that sum of bucketed DV01 = parallel DV01.
+    /// This ensures that the sum of bucketed DV01 equals parallel DV01.
+    /// Using `Some(0.0)` for the first bucket (instead of `None`) gives a
+    /// rising triangle from `t = 0` and **understates** short-end DV01
+    /// because it leaves the [0, target_first] interval with sub-unity
+    /// total weight.
     TriangularKeyRate {
-        /// Previous bucket time in years (use 0.0 for first bucket)
-        prev_bucket: f64,
-        /// Target bucket time in years (peak of the triangle)
+        /// Previous bucket time in years. `None` for the first bucket
+        /// (half-triangle flat to the left of `target_bucket`).
+        prev_bucket: Option<f64>,
+        /// Target bucket time in years (peak of the triangle).
         target_bucket: f64,
-        /// Next bucket time in years (use f64::INFINITY for last bucket)
-        next_bucket: f64,
+        /// Next bucket time in years. `None` for the last bucket
+        /// (half-triangle flat to the right of `target_bucket`).
+        next_bucket: Option<f64>,
     },
 }
 
@@ -162,30 +177,31 @@ impl BumpSpec {
         }
     }
 
-    /// Create a triangular key-rate bump with explicit bucket neighbors.
+    /// Create a triangular key-rate bump for an **interior** bucket.
     ///
-    /// This is the market-standard implementation (per Tuckman/Fabozzi) where the
-    /// triangular weight is defined by the bucket grid, ensuring that the sum of
-    /// all bucketed DV01s equals the parallel DV01.
+    /// This is the market-standard implementation (per Tuckman / Fabozzi)
+    /// where the triangular weight is defined by the bucket grid. For
+    /// interior buckets a full triangle peaks at `target_bucket` and
+    /// falls to zero at `prev_bucket` and `next_bucket`.
+    ///
+    /// Use [`Self::triangular_key_rate_first_bp`] for the first bucket
+    /// (no left neighbour) and [`Self::triangular_key_rate_last_bp`]
+    /// for the last bucket (no right neighbour) — those constructors
+    /// produce half-triangles that preserve the unity-partition
+    /// invariant at the wings.
     ///
     /// # Arguments
-    /// * `prev_bucket` - Previous bucket time in years (use 0.0 for first bucket)
+    /// * `prev_bucket` - Previous bucket time in years
     /// * `target_bucket` - Target bucket time in years (peak of the triangle)
-    /// * `next_bucket` - Next bucket time in years (use f64::INFINITY for last bucket)
+    /// * `next_bucket` - Next bucket time in years
     /// * `bump_bp` - Bump size in basis points (e.g., 1.0 = 1bp)
     ///
     /// # Example
     /// ```rust
     /// use finstack_core::market_data::bumps::BumpSpec;
     ///
-    /// // For the 5Y bucket with neighbors at 3Y and 7Y
+    /// // 5Y bucket with neighbours at 3Y and 7Y.
     /// let spec = BumpSpec::triangular_key_rate_bp(3.0, 5.0, 7.0, 1.0);
-    ///
-    /// // For the first bucket (3M) with no previous neighbor
-    /// let first = BumpSpec::triangular_key_rate_bp(0.0, 0.25, 0.5, 1.0);
-    ///
-    /// // For the last bucket (30Y) with no next neighbor
-    /// let last = BumpSpec::triangular_key_rate_bp(20.0, 30.0, f64::INFINITY, 1.0);
     /// ```
     pub fn triangular_key_rate_bp(
         prev_bucket: f64,
@@ -198,9 +214,70 @@ impl BumpSpec {
             units: BumpUnits::RateBp,
             value: bump_bp,
             bump_type: BumpType::TriangularKeyRate {
-                prev_bucket,
+                prev_bucket: Some(prev_bucket),
                 target_bucket,
-                next_bucket,
+                next_bucket: Some(next_bucket),
+            },
+        }
+    }
+
+    /// Create a triangular key-rate bump for the **first bucket** (no left
+    /// neighbour). The weight is flat at 1.0 for `t ≤ target_bucket`,
+    /// then linearly tapers to 0 at `next_bucket`.
+    ///
+    /// Using this constructor (rather than passing `0.0` as `prev_bucket`
+    /// to [`Self::triangular_key_rate_bp`]) preserves the
+    /// `Σ wᵢ(t) = 1.0` invariant at the short end of the curve. The
+    /// rising-triangle convention with `prev = 0.0` understates DV01 for
+    /// any knot in `(0, target_first)` because the weight there is
+    /// `t / target_first < 1`, leaving the interval with sub-unity total
+    /// weight.
+    ///
+    /// # Example
+    /// ```rust
+    /// use finstack_core::market_data::bumps::BumpSpec;
+    ///
+    /// // First bucket at 3M, next bucket at 6M, 1bp shock.
+    /// let first = BumpSpec::triangular_key_rate_first_bp(0.25, 0.5, 1.0);
+    /// ```
+    pub fn triangular_key_rate_first_bp(
+        target_bucket: f64,
+        next_bucket: f64,
+        bump_bp: f64,
+    ) -> Self {
+        Self {
+            mode: BumpMode::Additive,
+            units: BumpUnits::RateBp,
+            value: bump_bp,
+            bump_type: BumpType::TriangularKeyRate {
+                prev_bucket: None,
+                target_bucket,
+                next_bucket: Some(next_bucket),
+            },
+        }
+    }
+
+    /// Create a triangular key-rate bump for the **last bucket** (no
+    /// right neighbour). The weight rises linearly from 0 at
+    /// `prev_bucket` to 1 at `target_bucket`, then stays flat at 1.0
+    /// for `t > target_bucket`.
+    ///
+    /// # Example
+    /// ```rust
+    /// use finstack_core::market_data::bumps::BumpSpec;
+    ///
+    /// // Last bucket at 30Y with previous neighbour at 20Y.
+    /// let last = BumpSpec::triangular_key_rate_last_bp(20.0, 30.0, 1.0);
+    /// ```
+    pub fn triangular_key_rate_last_bp(prev_bucket: f64, target_bucket: f64, bump_bp: f64) -> Self {
+        Self {
+            mode: BumpMode::Additive,
+            units: BumpUnits::RateBp,
+            value: bump_bp,
+            bump_type: BumpType::TriangularKeyRate {
+                prev_bucket: Some(prev_bucket),
+                target_bucket,
+                next_bucket: None,
             },
         }
     }

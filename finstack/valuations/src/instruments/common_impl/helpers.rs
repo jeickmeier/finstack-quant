@@ -318,6 +318,32 @@ pub fn get_unitless_scalar(market: &MarketContext, key: &str, default: f64) -> f
         .unwrap_or(default)
 }
 
+/// Strict variant of [`get_unitless_scalar`] that errors when the scalar is
+/// missing or carries a non-unitless type.
+///
+/// Production model-parameter resolvers should prefer this over the lenient
+/// fallback form so a misnamed `HESTON_KAPPA` / `RBERGOMI_HURST` / `…` scalar
+/// fails loudly rather than silently pricing with a representative default.
+/// The `model` argument is purely diagnostic and appears in the error
+/// message (e.g. `"Heston"`, `"rough Bergomi"`).
+pub fn get_unitless_scalar_strict(
+    market: &MarketContext,
+    key: &str,
+    model: &str,
+) -> finstack_core::Result<f64> {
+    match market.get_price(key) {
+        Ok(MarketScalar::Unitless(v)) => Ok(*v),
+        Ok(other) => Err(finstack_core::Error::Validation(format!(
+            "{model} parameter '{key}' must be a unitless market scalar, got {other:?}"
+        ))),
+        Err(_) => Err(finstack_core::Error::from(
+            finstack_core::InputError::NotFound {
+                id: format!("{key} (required by {model} strict from_market resolver)"),
+            },
+        )),
+    }
+}
+
 /// Shared helper to build a ValuationResult with a set of metrics.
 ///
 /// Centralizes the repeated pattern across instruments to compute base value,

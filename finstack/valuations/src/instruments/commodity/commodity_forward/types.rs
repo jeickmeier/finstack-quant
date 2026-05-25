@@ -417,6 +417,9 @@ impl crate::instruments::common_impl::traits::EquityDependencies for CommodityFo
             crate::instruments::common_impl::traits::EquityInstrumentDeps {
                 spot_id: self.spot_id.clone(),
                 vol_surface_id: None,
+                // Forward (linear in spot, no vol surface) — strike-aware
+                // vega clamp detection is irrelevant.
+                reference_strike: None,
             },
         )
     }

@@ -1028,6 +1028,7 @@ pub fn calibrate_hull_white_to_cap_floors(
                 model_price - market_prices[idx],
             );
         }
+        let moneyness = cap_floor_moneyness_summary(quotes, forward_df, frequency);
         let report = enrich_cap_floor_report(
             CalibrationReport::for_type_with_tolerance(
                 "hull_white_1f_cap_floor",
@@ -1041,6 +1042,7 @@ pub fn calibrate_hull_white_to_cap_floors(
             true,
             frequency,
             &vega_floor_hits,
+            moneyness,
         );
         return Ok((HullWhiteParams::new(fixed, sigma)?, report));
     }
@@ -1089,6 +1091,7 @@ pub fn calibrate_hull_white_to_cap_floors(
         )));
     }
 
+    let moneyness = cap_floor_moneyness_summary(quotes, forward_df, frequency);
     let report = enrich_cap_floor_report(
         report.with_metadata("type", "hull_white_1f_cap_floor".to_string()),
         params.kappa,
@@ -1097,12 +1100,14 @@ pub fn calibrate_hull_white_to_cap_floors(
         false,
         frequency,
         &vega_floor_hits,
+        moneyness,
     );
 
     Ok((HullWhiteParams::new(params.kappa, params.sigma)?, report))
 }
 
 /// Apply cap/floor metadata shared by the fixed-kappa and two-parameter paths.
+#[allow(clippy::too_many_arguments)]
 fn enrich_cap_floor_report(
     report: CalibrationReport,
     kappa: f64,
@@ -1111,6 +1116,7 @@ fn enrich_cap_floor_report(
     fixed_kappa: bool,
     frequency: SwapFrequency,
     vega_floor_hits: &[String],
+    moneyness: MoneynessSummary,
 ) -> CalibrationReport {
     let mut r = report
         .with_model_version(finstack_core::versions::HULL_WHITE_1F)
@@ -1124,11 +1130,62 @@ fn enrich_cap_floor_report(
         )
         .with_metadata("calibration_family", "cap_floor_hw1f".to_string())
         .with_metadata("frequency", format!("{frequency:?}"))
-        .with_metadata("vega_floor_hits", vega_floor_hits.len().to_string());
+        .with_metadata("vega_floor_hits", vega_floor_hits.len().to_string())
+        // Audit P3a: off-ATM diagnostic. Vega-weighted residuals linearise
+        // around the *ATM* vega, so quotes whose strikes are far from the
+        // per-caplet forward rate sit outside the regime where the
+        // linearisation is accurate. Report both the max and mean
+        // |strike − fwd| / fwd across all caplets so an analyst can spot
+        // when the calibration was driven by deep-OTM/ITM quotes (the LM
+        // objective is still descent-compatible but its scaling is
+        // distorted; see the HW1F module-level docstring).
+        .with_metadata("max_moneyness_distance", format!("{:.6}", moneyness.max))
+        .with_metadata("mean_moneyness_distance", format!("{:.6}", moneyness.mean));
     if !vega_floor_hits.is_empty() {
         r = r.with_metadata("vega_floor_hits_detail", vega_floor_hits.join("; "));
     }
     r
+}
+
+/// Aggregate off-ATM diagnostic: `|strike − caplet_forward| / caplet_forward`
+/// summarised across every caplet of every cap/floor quote in the basket.
+/// Returned zero for an empty basket or when forwards are non-positive.
+#[derive(Clone, Copy, Debug, Default)]
+struct MoneynessSummary {
+    max: f64,
+    mean: f64,
+}
+
+fn cap_floor_moneyness_summary(
+    quotes: &[CapFloorQuote],
+    forward_df: &dyn Fn(f64) -> f64,
+    frequency: SwapFrequency,
+) -> MoneynessSummary {
+    let mut max_dist = 0.0_f64;
+    let mut sum_dist = 0.0_f64;
+    let mut count = 0_usize;
+    for quote in quotes {
+        for (t_start, t_end, _accrual) in cap_floor_periods(quote.maturity, frequency) {
+            let fwd = forward_rate_from_df(forward_df, t_start, t_end);
+            if !fwd.is_finite() || fwd.abs() < 1e-12 {
+                continue;
+            }
+            let dist = ((quote.strike - fwd) / fwd).abs();
+            if dist.is_finite() {
+                max_dist = max_dist.max(dist);
+                sum_dist += dist;
+                count += 1;
+            }
+        }
+    }
+    if count == 0 {
+        MoneynessSummary::default()
+    } else {
+        MoneynessSummary {
+            max: max_dist,
+            mean: sum_dist / count as f64,
+        }
+    }
 }
 
 /// ATM vega for a swaption expressed in the same volatility units as the
@@ -1212,32 +1269,74 @@ fn solve_cap_floor_sigma_for_fixed_kappa(
         acc
     };
 
-    // Plausible normal-vol search range for cap/floor sigma.
-    let lo = 1e-8_f64;
-    let hi = 1.0_f64;
+    // Plausible normal-vol search range for cap/floor sigma. The full
+    // interval `[1e-8, 1.0]` is split into three sub-brackets and each is
+    // minimised independently. **Audit P2d**: a single golden-section sweep
+    // assumes the SSE is unimodal in σ, which holds for a single quote
+    // (each cap's price is monotone in σ) but **not** for multi-quote
+    // baskets at different strikes where individual squared residuals can
+    // bottom out at different σ values, creating local minima between
+    // them. Multi-start with one bracket per decade catches that case at
+    // negligible cost (the pricer runs ~200×3 = 600 times vs ~200×1).
+    let brackets: [(f64, f64); 3] = [(1e-8, 5e-3), (5e-3, 5e-2), (5e-2, 1.0)];
 
     // Reject the case where the objective is non-finite across the whole range — the
     // pricer cannot produce a usable fit and a silent bogus sigma must not be returned.
-    if !sse(lo).is_finite() && !sse(hi).is_finite() && !sse(0.5 * (lo + hi)).is_finite() {
+    let any_finite = brackets.iter().any(|&(lo, hi)| {
+        sse(lo).is_finite() || sse(hi).is_finite() || sse(0.5 * (lo + hi)).is_finite()
+    });
+    if !any_finite {
         return Err(finstack_core::Error::Validation(
             "Cap/floor HW1F sigma calibration objective is non-finite across the search range"
                 .to_string(),
         ));
     }
 
-    // Golden-section minimisation of the (unimodal) SSE. Bracketing the *minimum* of a
-    // unimodal function only requires the enclosing interval — no sign change needed.
+    let mut best_sigma: Option<f64> = None;
+    let mut best_sse = f64::INFINITY;
+    for &(lo, hi) in &brackets {
+        if let Some((sigma, sse_val)) = golden_section_min(&sse, lo, hi, 1e-12, 200) {
+            if sse_val < best_sse {
+                best_sse = sse_val;
+                best_sigma = Some(sigma);
+            }
+        }
+    }
+
+    let sigma = best_sigma.ok_or_else(|| {
+        finstack_core::Error::Validation(
+            "Cap/floor HW1F sigma calibration could not locate a finite minimum across any \
+             search bracket"
+                .to_string(),
+        )
+    })?;
+    if !sigma.is_finite() || sigma <= 0.0 {
+        return Err(finstack_core::Error::Validation(format!(
+            "Cap/floor HW1F sigma calibration produced an invalid sigma: {sigma}"
+        )));
+    }
+    Ok(sigma)
+}
+
+/// Golden-section minimisation of `f` on `[lo, hi]`. Returns the minimiser
+/// `x` and `f(x)` after contracting the bracket below `x_tol`, capped at
+/// `max_iters`. Returns `None` when the objective is non-finite at every
+/// probe point in the bracket (the caller can then skip the bracket).
+fn golden_section_min(
+    f: &impl Fn(f64) -> f64,
+    lo: f64,
+    hi: f64,
+    x_tol: f64,
+    max_iters: usize,
+) -> Option<(f64, f64)> {
     const INV_PHI: f64 = 0.618_033_988_749_894_8; // 1/φ
     let mut a = lo;
     let mut b = hi;
     let mut c = b - INV_PHI * (b - a);
     let mut d = a + INV_PHI * (b - a);
-    let mut fc = sse(c);
-    let mut fd = sse(d);
-    // ~100 iterations contracts the interval by φ^-100 ≪ machine epsilon; stop early
-    // once the bracket is tighter than the historical Brent tolerance.
-    let x_tol = 1e-12_f64;
-    for _ in 0..200 {
+    let mut fc = f(c);
+    let mut fd = f(d);
+    for _ in 0..max_iters {
         if (b - a).abs() <= x_tol {
             break;
         }
@@ -1246,22 +1345,21 @@ fn solve_cap_floor_sigma_for_fixed_kappa(
             d = c;
             fd = fc;
             c = b - INV_PHI * (b - a);
-            fc = sse(c);
+            fc = f(c);
         } else {
             a = c;
             c = d;
             fc = fd;
             d = a + INV_PHI * (b - a);
-            fd = sse(d);
+            fd = f(d);
         }
     }
-    let sigma = 0.5 * (a + b);
-    if !sigma.is_finite() || sigma <= 0.0 {
-        return Err(finstack_core::Error::Validation(format!(
-            "Cap/floor HW1F sigma calibration produced an invalid sigma: {sigma}"
-        )));
+    let x = 0.5 * (a + b);
+    let fx = f(x);
+    if !x.is_finite() || x <= 0.0 || !fx.is_finite() {
+        return None;
     }
-    Ok(sigma)
+    Some((x, fx))
 }
 
 /// Price a full cap/floor with a flat normal volatility quote.

@@ -140,26 +140,44 @@ pub fn mapping_to_market_bumps(
                     "MarketMapping::CurveBucketed requires BasisPoint bump_unit, got {bump_unit:?}"
                 )));
             }
+            let last_idx = tenor_weights.len().saturating_sub(1);
             Ok(tenor_weights
                 .iter()
                 .enumerate()
                 .map(|(idx, &(target_bucket, weight))| {
-                    let prev_bucket = if idx == 0 {
-                        0.0
-                    } else {
-                        tenor_weights[idx - 1].0
+                    // Use half-triangle wings (prev = None / next = None) at
+                    // the first and last buckets so the bump-set partitions
+                    // unity across the full curve and `Σ bucketed_dv01`
+                    // matches the parallel bump. A finite `prev = 0.0` at
+                    // the first bucket would produce a rising triangle from
+                    // t=0 and understate short-end sensitivity.
+                    let scaled_bp = bump_size * weight;
+                    let spec = match (idx == 0, idx == last_idx) {
+                        (true, true) => {
+                            // Sole bucket: both wings flat ⇒ weight is 1 at every
+                            // knot, equivalent to a parallel bump.
+                            BumpSpec::parallel_bp(scaled_bp)
+                        }
+                        (true, false) => BumpSpec::triangular_key_rate_first_bp(
+                            target_bucket,
+                            tenor_weights[idx + 1].0,
+                            scaled_bp,
+                        ),
+                        (false, true) => BumpSpec::triangular_key_rate_last_bp(
+                            tenor_weights[idx - 1].0,
+                            target_bucket,
+                            scaled_bp,
+                        ),
+                        (false, false) => BumpSpec::triangular_key_rate_bp(
+                            tenor_weights[idx - 1].0,
+                            target_bucket,
+                            tenor_weights[idx + 1].0,
+                            scaled_bp,
+                        ),
                     };
-                    let next_bucket = tenor_weights
-                        .get(idx + 1)
-                        .map_or(f64::INFINITY, |(bucket, _)| *bucket);
                     MarketBump::Curve {
                         id: curve_id.clone(),
-                        spec: BumpSpec::triangular_key_rate_bp(
-                            prev_bucket,
-                            target_bucket,
-                            next_bucket,
-                            bump_size * weight,
-                        ),
+                        spec,
                     }
                 })
                 .collect())
@@ -404,9 +422,9 @@ mod tests {
             assert_eq!(
                 spec.bump_type,
                 BumpType::TriangularKeyRate {
-                    prev_bucket: 2.0,
+                    prev_bucket: Some(2.0),
                     target_bucket: 5.0,
-                    next_bucket: 10.0,
+                    next_bucket: Some(10.0),
                 }
             );
         }

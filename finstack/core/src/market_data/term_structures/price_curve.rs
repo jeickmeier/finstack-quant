@@ -337,18 +337,18 @@ impl PriceCurve {
     /// Create a new curve with a triangular key-rate bump at a specific tenor.
     ///
     /// # Arguments
-    /// * `prev_bucket` - Previous bucket time in years (use 0.0 for first bucket)
+    /// * `prev_bucket` - Previous bucket time in years; `None` for the first bucket
     /// * `target_bucket` - Target bucket time in years (peak of the triangle)
-    /// * `next_bucket` - Next bucket time in years (use f64::INFINITY for last bucket)
+    /// * `next_bucket` - Next bucket time in years; `None` for the last bucket
     /// * `bump` - Bump size in price units
     ///
     /// # Returns
     /// A new price curve with the triangular key-rate bump applied.
     pub fn with_triangular_key_rate_bump_neighbors(
         &self,
-        prev_bucket: f64,
+        prev_bucket: Option<f64>,
         target_bucket: f64,
-        next_bucket: f64,
+        next_bucket: Option<f64>,
         bump: f64,
     ) -> crate::Result<Self> {
         if self.knots.len() < 2 {

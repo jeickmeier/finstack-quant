@@ -548,17 +548,24 @@ impl ForwardCurve {
     ///     .build()
     ///     ?;
     ///
-    /// // Apply 10bp bump at 5Y bucket with neighbors at 3Y and 7Y
-    /// let bumped = curve.with_triangular_key_rate_bump_neighbors(3.0, 5.0, 7.0, 10.0)?;
+    /// // Apply 10bp bump at 5Y interior bucket with neighbours at 3Y and 7Y
+    /// let bumped = curve.with_triangular_key_rate_bump_neighbors(
+    ///     Some(3.0), 5.0, Some(7.0), 10.0,
+    /// )?;
     /// # let _ = bumped;
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// `prev_bucket = None` makes this the first bucket (flat-left half
+    /// triangle); `next_bucket = None` makes this the last bucket
+    /// (flat-right half triangle). These preserve the unity-partition
+    /// invariant at the wings.
     pub fn with_triangular_key_rate_bump_neighbors(
         &self,
-        prev_bucket: f64,
+        prev_bucket: Option<f64>,
         target_bucket: f64,
-        next_bucket: f64,
+        next_bucket: Option<f64>,
         bp: f64,
     ) -> crate::Result<Self> {
         if self.knots.len() < 2 {

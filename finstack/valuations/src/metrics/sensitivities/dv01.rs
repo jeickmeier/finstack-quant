@@ -493,33 +493,41 @@ where
         let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> =
             Vec::with_capacity(buckets.len());
 
+        let last_idx = buckets.len() - 1;
         context.with_market_scratch(|context, scratch| {
             for (i, &target_time) in buckets.iter().enumerate() {
                 let label = super::config::format_bucket_label_cow(target_time);
 
-                let prev_bucket = if i == 0 { 0.0 } else { buckets[i - 1] };
-                let next_bucket = if i == buckets.len() - 1 {
-                    f64::INFINITY
-                } else {
-                    buckets[i + 1]
+                // Build bucket-shaped bumps with half-triangle wings at the
+                // first and last buckets so the bump-set partitions unity
+                // across the full curve. Using a finite `prev = 0.0` at the
+                // first bucket would produce a rising triangle from t=0 and
+                // understate short-end DV01 — see
+                // `BumpSpec::triangular_key_rate_first_bp` for the rationale.
+                let build = |bp: f64| -> BumpSpec {
+                    match (i == 0, i == last_idx) {
+                        (true, true) => BumpSpec::parallel_bp(bp),
+                        (true, false) => {
+                            BumpSpec::triangular_key_rate_first_bp(target_time, buckets[i + 1], bp)
+                        }
+                        (false, true) => {
+                            BumpSpec::triangular_key_rate_last_bp(buckets[i - 1], target_time, bp)
+                        }
+                        (false, false) => BumpSpec::triangular_key_rate_bp(
+                            buckets[i - 1],
+                            target_time,
+                            buckets[i + 1],
+                            bp,
+                        ),
+                    }
                 };
 
-                let spec_up = BumpSpec::triangular_key_rate_bp(
-                    prev_bucket,
-                    target_time,
-                    next_bucket,
-                    bump_bp,
-                );
+                let spec_up = build(bump_bp);
                 let token_up = scratch.apply_curve_bump_in_place(curve_id, spec_up)?;
                 let pv_up = context.reprice_raw(scratch, as_of)?;
                 scratch.revert_scratch_bump(token_up)?;
 
-                let spec_down = BumpSpec::triangular_key_rate_bp(
-                    prev_bucket,
-                    target_time,
-                    next_bucket,
-                    -bump_bp,
-                );
+                let spec_down = build(-bump_bp);
                 let token_down = scratch.apply_curve_bump_in_place(curve_id, spec_down)?;
                 let pv_down = context.reprice_raw(scratch, as_of)?;
                 scratch.revert_scratch_bump(token_down)?;

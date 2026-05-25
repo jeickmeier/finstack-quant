@@ -199,9 +199,14 @@ impl crate::instruments::common_impl::traits::EquityDependencies for EquityOptio
     fn equity_dependencies(
         &self,
     ) -> finstack_core::Result<crate::instruments::common_impl::traits::EquityInstrumentDeps> {
+        // Vanilla European with a single contractual strike — declare it so
+        // the FD vega clamp detection only inspects the strikes adjacent to
+        // `self.strike` rather than the entire surface grid (avoids a
+        // forward-difference fallback when only a far-OTM wing has σ < bump).
         crate::instruments::common_impl::traits::EquityInstrumentDeps::builder()
             .spot(self.spot_id.as_str())
             .vol_surface(self.vol_surface_id.as_str())
+            .reference_strike(self.strike)
             .build()
     }
 }

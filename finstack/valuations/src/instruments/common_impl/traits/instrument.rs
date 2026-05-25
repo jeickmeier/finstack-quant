@@ -540,6 +540,27 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         requested
     }
 
+    /// Optional typed [`ValuationDetails`](crate::results::ValuationDetails)
+    /// to attach to this instrument's [`ValuationResult`].
+    ///
+    /// The generic instrument pricer
+    /// ([`GenericInstrumentPricer`](crate::instruments::common_impl::GenericInstrumentPricer))
+    /// calls this after computing PV and, when `Some`, attaches the returned
+    /// details via [`ValuationResult::with_details`](crate::results::ValuationResult::with_details).
+    /// FX-bearing instruments (`FxForward`, `FxOption`, `QuantoOption`) use
+    /// this to surface the FX matrix triangulation flag — satisfying the
+    /// project-wide FX-policy-visibility invariant — without requiring a
+    /// per-instrument bespoke pricer.
+    ///
+    /// Default implementation returns `None`.
+    fn valuation_details(
+        &self,
+        _market: &MarketContext,
+        _as_of: Date,
+    ) -> Option<crate::results::ValuationDetails> {
+        None
+    }
+
     /// Compute the scenario-adjusted present value.
     ///
     /// Default implementation invokes [`Instrument::base_value`] and applies any

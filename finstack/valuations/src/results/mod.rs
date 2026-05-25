@@ -68,4 +68,6 @@ mod valuation_result;
 
 pub use dataframe::{results_to_rows, ValuationRow};
 pub use finstack_core::config::ResultsMeta;
-pub use valuation_result::{CreditDerivativeValuationDetails, ValuationDetails, ValuationResult};
+pub use valuation_result::{
+    CreditDerivativeValuationDetails, FxValuationDetails, ValuationDetails, ValuationResult,
+};

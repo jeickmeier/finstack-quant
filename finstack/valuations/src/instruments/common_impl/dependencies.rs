@@ -58,6 +58,10 @@ impl MarketDependencies {
         EquityInstrumentDeps {
             spot_id: self.spot_ids.first().cloned(),
             vol_surface_id: self.vol_surface_ids.first().cloned(),
+            // Basket / multi-strike aggregations don't carry a single
+            // reference strike; the FD vega clamp detection falls back to
+            // the conservative global-min check for these.
+            reference_strike: None,
         }
     }
 

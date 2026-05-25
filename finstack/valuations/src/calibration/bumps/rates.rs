@@ -2,7 +2,7 @@
 
 use super::currency::infer_currency_from_id;
 use super::BumpRequest;
-use crate::calibration::api::schema::{DiscountCurveParams, StepParams};
+use crate::calibration::api::schema::{DiscountCurveParams, ForwardCurveParams, StepParams};
 use crate::calibration::config::CalibrationMethod;
 use crate::calibration::config::RatesStepConventions;
 use crate::calibration::step_runtime;
@@ -15,10 +15,11 @@ use finstack_core::dates::{Date, DayCount, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::scalars::ScalarTimeSeries;
 use finstack_core::market_data::term_structures::{
-    DiscountCurve, DiscountCurveRateCalibration, DiscountCurveRateQuoteType,
+    DiscountCurve, DiscountCurveRateCalibration, DiscountCurveRateQuoteType, ForwardCurve,
+    ForwardCurveRateCalibration, ForwardCurveRateQuote,
 };
 use finstack_core::math::interp::ExtrapolationPolicy;
-use finstack_core::types::IndexId;
+use finstack_core::types::{CurveId, IndexId};
 use time::Duration;
 
 /// Infer currency from a discount curve ID using token-by-token heuristics.
@@ -39,27 +40,7 @@ pub fn bump_discount_curve(
     base_context: &MarketContext,
     bump: &BumpRequest,
 ) -> finstack_core::Result<DiscountCurve> {
-    let as_of = params.base_date;
-
-    // Clone quotes to apply bumps.
-    let mut bumped_quotes: Vec<RateQuote> = quotes.to_vec();
-
-    match bump {
-        BumpRequest::Parallel(bp) => {
-            bumped_quotes = bumped_quotes
-                .into_iter()
-                .map(|q| q.bump_rate_bp(*bp))
-                .collect();
-        }
-        BumpRequest::Tenors(targets) => {
-            for (target_t, bp) in targets {
-                if let Some(idx) = find_closest_quote(&bumped_quotes, *target_t, as_of) {
-                    bumped_quotes[idx] = bumped_quotes[idx].bump_rate_bp(*bp);
-                }
-            }
-        }
-    }
-
+    let bumped_quotes = apply_bump_to_rate_quotes(quotes.to_vec(), bump, params.base_date);
     let market_quotes: Vec<MarketQuote> =
         bumped_quotes.into_iter().map(MarketQuote::Rates).collect();
     let step = StepParams::Discount(params.clone());
@@ -135,6 +116,211 @@ pub(crate) fn bump_discount_curve_from_rate_calibration(
     };
 
     bump_discount_curve(&quotes, &params, &base_context, bump)
+}
+
+/// Bump a forward curve by shocking its stored market-rate calibration quotes
+/// and re-bootstrapping against the supplied market context.
+///
+/// The provided `context` must already contain the discount curve referenced by
+/// `calibration.discount_curve_id` (in its bumped form, when bumping both curves
+/// together). The helper does not support [`ForwardCurveRateQuote::Basis`]
+/// quotes; callers handling basis-tenor calibrations must rebuild the forward
+/// curve explicitly.
+pub(crate) fn bump_forward_curve_from_rate_calibration(
+    curve: &ForwardCurve,
+    calibration: &ForwardCurveRateCalibration,
+    context: &MarketContext,
+    bump: &BumpRequest,
+) -> finstack_core::Result<ForwardCurve> {
+    let index = IndexId::new(calibration.index_id.as_str());
+    let mut quotes = Vec::with_capacity(calibration.quotes.len());
+    for (idx, quote) in calibration.quotes.iter().enumerate() {
+        let id = QuoteId::new(format!("{}-{}", curve.id(), idx));
+        let rate_quote = match quote {
+            ForwardCurveRateQuote::Deposit { tenor, rate } => RateQuote::Deposit {
+                id,
+                index: index.clone(),
+                pillar: Pillar::Tenor(tenor.parse()?),
+                rate: *rate,
+            },
+            ForwardCurveRateQuote::Fra { start, end, rate } => RateQuote::Fra {
+                id,
+                index: index.clone(),
+                start: Pillar::Date(*start),
+                end: Pillar::Date(*end),
+                rate: *rate,
+            },
+            ForwardCurveRateQuote::Swap {
+                tenor,
+                rate,
+                spread_decimal,
+            } => RateQuote::Swap {
+                id,
+                index: index.clone(),
+                pillar: Pillar::Tenor(tenor.parse()?),
+                rate: *rate,
+                spread_decimal: *spread_decimal,
+            },
+            ForwardCurveRateQuote::Basis { .. } => {
+                return Err(finstack_core::Error::Validation(format!(
+                    "forward curve {} calibration uses basis quotes; \
+                     bump_forward_curve_from_rate_calibration cannot re-bootstrap them — \
+                     callers must rebuild the basis curve explicitly",
+                    curve.id()
+                )));
+            }
+        };
+        quotes.push(rate_quote);
+    }
+
+    let bumped_quotes = apply_bump_to_rate_quotes(quotes, bump, curve.base_date());
+    let market_quotes: Vec<MarketQuote> =
+        bumped_quotes.into_iter().map(MarketQuote::Rates).collect();
+
+    let params = ForwardCurveParams {
+        curve_id: curve.id().clone(),
+        currency: calibration.currency,
+        base_date: curve.base_date(),
+        tenor_years: curve.tenor(),
+        discount_curve_id: calibration.discount_curve_id.clone(),
+        method: CalibrationMethod::Bootstrap,
+        interpolation: curve.interp_style(),
+        conventions: RatesStepConventions {
+            ois_compounding: None,
+            curve_day_count: Some(curve.day_count()),
+        },
+    };
+    let step = StepParams::Forward(params);
+    let cfg = CalibrationConfig::default();
+    let (ctx, _report) =
+        step_runtime::execute_params_and_apply(&step, &market_quotes, context, &cfg)?;
+
+    Ok(ctx.get_forward(curve.id().as_str())?.as_ref().clone())
+}
+
+/// Re-bootstrap both a discount curve and its dependent forward curve from
+/// stored rate-calibration metadata under a parallel quote shock.
+///
+/// Both curves must carry [`DiscountCurve::rate_calibration`] / [`ForwardCurve::rate_calibration`]
+/// metadata. Index fixings are seeded from the first quote of each calibration
+/// (keyed by both index_id and curve_id) so the calibration engine has the
+/// reference fixings it needs when re-bootstrapping. Returns an error if the
+/// forward curve uses basis quotes; callers needing basis support must combine
+/// [`bump_discount_curve_from_rate_calibration`] with a bespoke forward rebuild.
+pub(crate) fn bump_market_via_rate_quote_shock(
+    market: &MarketContext,
+    discount_curve_id: &CurveId,
+    forward_curve_id: &CurveId,
+    bump_bp: f64,
+) -> finstack_core::Result<MarketContext> {
+    let discount = market.get_discount(discount_curve_id.as_str())?;
+    let forward = market.get_forward(forward_curve_id.as_str())?;
+    let discount_cal = discount.rate_calibration().ok_or_else(|| {
+        finstack_core::Error::Validation(format!(
+            "discount curve {} has no rate_calibration metadata; cannot quote-shock DV01",
+            discount_curve_id
+        ))
+    })?;
+    let forward_cal = forward.rate_calibration().ok_or_else(|| {
+        finstack_core::Error::Validation(format!(
+            "forward curve {} has no rate_calibration metadata; cannot quote-shock DV01",
+            forward_curve_id
+        ))
+    })?;
+
+    let seeded = seed_calibration_fixings(
+        market,
+        discount.base_date(),
+        discount_curve_id,
+        discount_cal,
+        forward_curve_id,
+        forward_cal,
+    )?;
+
+    let bump = BumpRequest::Parallel(bump_bp);
+
+    let bumped_discount =
+        bump_discount_curve_from_rate_calibration(discount.as_ref(), discount_cal, &seeded, &bump)?;
+    let seeded_with_discount = seeded.insert(bumped_discount);
+
+    let bumped_forward = bump_forward_curve_from_rate_calibration(
+        forward.as_ref(),
+        forward_cal,
+        &seeded_with_discount,
+        &bump,
+    )?;
+    Ok(seeded_with_discount.insert(bumped_forward))
+}
+
+/// Seed bootstrap-time fixings for both curve and index identifiers so the
+/// calibration engine has the reference rates it needs when re-bootstrapping
+/// after a quote shock. Uses the first quote of each calibration set as the
+/// historical fixing — sufficient for risk re-bootstrapping where only the
+/// shape of the curve matters, not the historical realized path.
+fn seed_calibration_fixings(
+    market: &MarketContext,
+    base_date: Date,
+    discount_curve_id: &CurveId,
+    discount_cal: &DiscountCurveRateCalibration,
+    forward_curve_id: &CurveId,
+    forward_cal: &ForwardCurveRateCalibration,
+) -> finstack_core::Result<MarketContext> {
+    let mut seeded = market.clone();
+    if let Some(rate) = discount_cal.quotes.first().map(|q| q.rate) {
+        seeded = seeded.insert_series(fixing_seed(&discount_cal.index_id, base_date, rate)?);
+        seeded = seeded.insert_series(fixing_seed(discount_curve_id.as_str(), base_date, rate)?);
+    }
+    if let Some(rate) = first_forward_calibration_rate(forward_cal) {
+        seeded = seeded.insert_series(fixing_seed(&forward_cal.index_id, base_date, rate)?);
+        seeded = seeded.insert_series(fixing_seed(forward_curve_id.as_str(), base_date, rate)?);
+    }
+    Ok(seeded)
+}
+
+fn first_forward_calibration_rate(calibration: &ForwardCurveRateCalibration) -> Option<f64> {
+    calibration.quotes.first().map(|q| match q {
+        ForwardCurveRateQuote::Deposit { rate, .. }
+        | ForwardCurveRateQuote::Fra { rate, .. }
+        | ForwardCurveRateQuote::Swap { rate, .. } => *rate,
+        ForwardCurveRateQuote::Basis { spread_decimal, .. } => *spread_decimal,
+    })
+}
+
+fn fixing_seed(id: &str, base_date: Date, rate: f64) -> finstack_core::Result<ScalarTimeSeries> {
+    ScalarTimeSeries::new(
+        format!("FIXING:{id}"),
+        vec![
+            (base_date - Duration::days(3), rate),
+            (base_date - Duration::days(2), rate),
+            (base_date - Duration::days(1), rate),
+            (base_date, rate),
+        ],
+        None,
+    )
+}
+
+/// Apply a [`BumpRequest`] to a vector of [`RateQuote`]s.
+///
+/// Parallel bumps shift every quote; tenor bumps locate the closest quote to
+/// each target year fraction and shift only that quote. Pure data transform —
+/// no calibration engine involvement.
+fn apply_bump_to_rate_quotes(
+    quotes: Vec<RateQuote>,
+    bump: &BumpRequest,
+    as_of: Date,
+) -> Vec<RateQuote> {
+    match bump {
+        BumpRequest::Parallel(bp) => quotes.into_iter().map(|q| q.bump_rate_bp(*bp)).collect(),
+        BumpRequest::Tenors(targets) => {
+            let mut q = quotes;
+            for (target_t, bp) in targets {
+                if let Some(idx) = find_closest_quote(&q, *target_t, as_of) {
+                    q[idx] = q[idx].bump_rate_bp(*bp);
+                }
+            }
+            q
+        }
+    }
 }
 
 /// Helper to resolve maturity date of a quote.

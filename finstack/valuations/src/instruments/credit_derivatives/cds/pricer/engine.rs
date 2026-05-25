@@ -123,6 +123,16 @@ impl CDSPricer {
         // For forward-starting CDS, protection begins at protection_effective_date
         // (which may be later than the premium leg start).
         // We only value protection from as_of onwards (can't protect against past defaults).
+        //
+        // **Audit P3c**: standard CDS (single-name, CDX, iTraxx) terminate
+        // protection and premium on the same date, which is why we read
+        // `cds.premium.end` here. `ProtectionLegSpec`
+        // (see `common_impl::parameters::legs`) carries no
+        // `end_date` field today. Bespoke contracts that need a separate
+        // protection termination (contingent CDS, amortising structures
+        // with shrinking notional schedules) would have to extend
+        // `ProtectionLegSpec` with an explicit `end_date: Option<Date>`
+        // and prefer it here when present.
         let protection_start = as_of.max(cds.protection_start());
         let protection_end = cds.premium.end;
 
