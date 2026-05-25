@@ -185,7 +185,14 @@ pub fn compute_credit_factor_attribution(
 
     for input in positions {
         let cs01 = input.cs01.amount();
-        if cs01 == 0.0 {
+        // Bit-exact zero check: positions with zero CS01 contribute nothing to
+        // any factor's P&L, so we short-circuit. The comparison is intentional
+        // — `input.cs01` is constructed by callers as `Money::new(0.0, ccy)`
+        // when the position has no CS01 exposure, so bit-equality is the right
+        // test (NOT epsilon-based).
+        #[allow(clippy::float_cmp)]
+        let is_zero = cs01 == 0.0;
+        if is_zero {
             continue;
         }
         let Some(row) = beta_idx.get(&input.issuer_id) else {

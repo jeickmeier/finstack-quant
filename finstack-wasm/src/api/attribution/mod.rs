@@ -140,16 +140,22 @@ fn catch_attribution_panic<T>(
 /// result as JSON.
 #[wasm_bindgen(js_name = attributePnl)]
 pub fn attribute_pnl(params: &AttributionParams) -> Result<String, JsValue> {
-    let mut spec = finstack_attribution::AttributionSpec::from_json_inputs(
-        &params.instrument_json,
-        &params.market_t0_json,
-        &params.market_t1_json,
-        &params.as_of_t0,
-        &params.as_of_t1,
-        &params.method_json,
-        params.config_json.as_deref(),
-    )
-    .map_err(attribution_error_to_js)?;
+    // MI3 defense in depth: wrap input-parsing as well. `from_json_inputs`
+    // funnels through serde + downstream constructors that should not panic,
+    // but a deeply malformed payload could in principle. An uncaught unwind
+    // at the wasm boundary aborts the whole module instance, killing every
+    // subsequent call from the JS host.
+    let mut spec = catch_attribution_panic("attributePnl/from_json_inputs", || {
+        finstack_attribution::AttributionSpec::from_json_inputs(
+            &params.instrument_json,
+            &params.market_t0_json,
+            &params.market_t1_json,
+            &params.as_of_t0,
+            &params.as_of_t1,
+            &params.method_json,
+            params.config_json.as_deref(),
+        )
+    })?;
     if let Some(val) = params.full_cross_attribution {
         spec.full_cross_attribution = val;
     }
@@ -162,8 +168,22 @@ pub fn attribute_pnl(params: &AttributionParams) -> Result<String, JsValue> {
 /// Power-user variant for full envelope round-trip workflows.
 #[wasm_bindgen(js_name = attributePnlFromSpec)]
 pub fn attribute_pnl_from_spec(spec_json: &str) -> Result<String, JsValue> {
-    let envelope: finstack_attribution::AttributionEnvelope =
-        serde_json::from_str(spec_json).map_err(to_js_err)?;
+    // MI3: wrap serde_json parse too. A JSON-parse panic would otherwise abort
+    // the wasm module instance.
+    let envelope = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        serde_json::from_str::<finstack_attribution::AttributionEnvelope>(spec_json)
+    })) {
+        Ok(Ok(envelope)) => envelope,
+        Ok(Err(err)) => return Err(to_js_err(err)),
+        Err(panic) => {
+            return Err(attribution_error_to_js(finstack_core::Error::Validation(
+                format!(
+                    "attributePnlFromSpec panicked while parsing envelope JSON: {}",
+                    panic_message(panic.as_ref())
+                ),
+            )));
+        }
+    };
     let result_envelope = catch_attribution_panic("attributePnlFromSpec", || envelope.execute())?;
     serde_json::to_string(&result_envelope).map_err(to_js_err)
 }

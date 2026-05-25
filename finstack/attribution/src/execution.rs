@@ -214,6 +214,41 @@ impl AttributionSpec {
             }
         }
 
+        // Item 2: optional target-currency translation. Runs as a final
+        // post-processing step so direct callers of the per-method functions
+        // keep their existing native-currency behavior; only the JSON-spec
+        // pipeline (used by the bindings) picks up `target_ccy`.
+        if let Some(target_ccy) = self.config.as_ref().and_then(|c| c.target_ccy) {
+            if let Some(instr_ccy) = instrument_ccy {
+                if target_ccy != instr_ccy {
+                    // Re-price T0 in native currency to obtain val_t0 for the
+                    // translation formula. We can't reuse the per-method
+                    // val_t0 because it's not surfaced; the extra reprice is
+                    // cheap relative to a full attribution run.
+                    match instrument_arc.value(&market_t0, self.as_of_t0) {
+                        Ok(val_t0_native) => match crate::translate_to_target_ccy(
+                            &mut attribution,
+                            val_t0_native,
+                            target_ccy,
+                            &market_t0,
+                            &market_t1,
+                            self.as_of_t0,
+                            self.as_of_t1,
+                        ) {
+                            Ok(()) => {}
+                            Err(e) => attribution
+                                .meta
+                                .notes
+                                .push(format!("target_ccy translation failed: {e}")),
+                        },
+                        Err(e) => attribution.meta.notes.push(format!(
+                            "target_ccy translation skipped: T0 reprice failed - {e}"
+                        )),
+                    }
+                }
+            }
+        }
+
         // Create results metadata
         let results_meta = finstack_core::config::results_meta(&config);
 

@@ -47,20 +47,28 @@
 //!
 //! This module expects metrics to follow these unit conventions:
 //!
-//! | Metric | Unit | Definition |
-//! |--------|------|------------|
-//! | DV01 | $ / bp | Dollar change per 1bp parallel rate shift |
-//! | Convexity | dimensionless | Percentage second derivative: (∂²P/∂r²) / P |
-//! | IrConvexity | dimensionless | Same as Convexity (alias for swaps) |
-//! | CS01 | $ / bp | Dollar change per 1bp spread shift |
-//! | CsGamma | $ / decimal² | Dollar second derivative ∂²V/∂s² (spread in decimal) |
-//! | Vega | $ / vol point | Dollar change per 1% absolute vol shift |
-//! | Volga | $ / vol point² | Dollar second derivative per vol point² |
-//! | Theta | $ / day | Dollar time decay per calendar day |
+//! | Metric              | Unit            | Definition                                                |
+//! |---------------------|-----------------|-----------------------------------------------------------|
+//! | DV01                | $ / bp          | Dollar change per 1bp parallel rate shift                 |
+//! | Convexity           | dimensionless   | Percentage second derivative: (∂²P/∂r²) / P               |
+//! | IrConvexity         | dimensionless   | Same as Convexity (alias for swaps)                       |
+//! | CS01                | $ / bp          | Dollar change per 1bp spread shift                        |
+//! | CsGamma             | $ / decimal²    | Dollar second derivative ∂²V/∂s² (spread in decimal)      |
+//! | Vega                | $ / vol point   | Dollar change per 1% absolute vol shift                   |
+//! | Volga               | $ / vol point²  | Dollar second derivative per vol point²                   |
+//! | Theta               | $ / day         | Dollar time decay per calendar day                        |
+//! | Inflation01         | $ / bp          | Dollar change per 1bp inflation-curve shift               |
+//! | InflationConvexity  | $ / decimal²    | Dollar second derivative ∂²V/∂i² (inflation in decimal)   |
 //!
 //! **Important**: `Convexity` and `IrConvexity` are dimensionless percentage metrics,
 //! NOT "modified convexity" in years² as quoted by some data vendors. The formula
 //! used is: `ΔP_convexity = ½ × P₀ × Convexity × (Δr_decimal)²`
+//!
+//! `InflationConvexity` uses the `CsGamma`-style $/decimal² convention (no P₀
+//! multiplier): `ΔP_inflation_convexity = ½ × InflationConvexity × (Δi_decimal)²`.
+//! A pricer emitting `InflationConvexity` in the dimensionless-percentage
+//! convention used by `Convexity` would mis-attribute by a factor of P₀
+//! (e.g. 1,000,000× for a $1M bond).
 //!
 //! If your convexity metric uses different units, apply the appropriate scaling
 //! factor before passing to attribution.
@@ -306,6 +314,107 @@ fn discount_curve_abs_shift_bp(
 /// understates the true quadratic contribution, so downstream consumers should
 /// fall back to per-tenor convexity.
 const TWIST_FRACTION_THRESHOLD: f64 = 1e-2;
+
+/// Mean of the per-tenor *absolute* credit-curve shift (bp) on the standard
+/// tenor grid. Counterpart of [`discount_curve_abs_shift_bp`] for credit.
+///
+/// For a hazard curve this is the L1 mean of the par CDS spread move; for a
+/// discount-style credit curve (e.g. a convertible's risky discount curve) it
+/// is the L1 mean of the zero-rate move. Either way it pairs with the signed
+/// mean that the per-method credit attribution consumes.
+///
+/// Returns `0.0` if either side's curve is missing.
+fn credit_curve_abs_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> f64 {
+    use finstack_core::market_data::diff::STANDARD_TENORS;
+    let tenors: Vec<f64> = STANDARD_TENORS
+        .iter()
+        .copied()
+        .filter(|t| *t > 0.0)
+        .collect();
+    let Ok(shifts) = finstack_core::market_data::diff::measure_per_tenor_credit_curve_shift(
+        curve_id, market_t0, market_t1, &tenors,
+    ) else {
+        return 0.0;
+    };
+    let (total_abs, count) = shifts
+        .iter()
+        .filter(|v| v.is_finite())
+        .fold((0.0, 0usize), |(acc, n), v| (acc + v.abs(), n + 1));
+    if count == 0 {
+        0.0
+    } else {
+        total_abs / count as f64
+    }
+}
+
+/// Mean of the per-tenor *absolute* inflation-curve shift (bp) on the standard
+/// tenor grid. Counterpart of [`discount_curve_abs_shift_bp`] for inflation.
+///
+/// Returns `0.0` if either side's curve is missing.
+fn inflation_curve_abs_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> f64 {
+    use finstack_core::market_data::diff::STANDARD_TENORS;
+    let (Ok(c0), Ok(c1)) = (
+        market_t0.get_inflation_curve(curve_id),
+        market_t1.get_inflation_curve(curve_id),
+    ) else {
+        return 0.0;
+    };
+    let mut total_abs = 0.0;
+    let mut count = 0usize;
+    for &t in STANDARD_TENORS {
+        if t <= 0.0 {
+            continue;
+        }
+        // Inflation rate at tenor t from the cpi ratio (mirrors the
+        // measure_inflation_curve_shift formula in core::market_data::diff).
+        let rate = |c: &finstack_core::market_data::term_structures::InflationCurve| -> f64 {
+            let ratio = c.cpi(t) / c.base_cpi();
+            ratio.powf(1.0 / t) - 1.0
+        };
+        let r0 = rate(&c0);
+        let r1 = rate(&c1);
+        if r0.is_finite() && r1.is_finite() {
+            total_abs += (r1 - r0).abs() * 10_000.0;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        0.0
+    } else {
+        total_abs / count as f64
+    }
+}
+
+/// Format a diagnostic note when a signed average shift is twist-dominated
+/// — i.e. `|signed_avg| < TWIST_FRACTION_THRESHOLD × l1_avg`. In that regime,
+/// scalar second-order terms `½·γ·avg²` collapse toward 0 even though the
+/// true `½·Δxᵀ·H·Δx` contribution is non-trivial.
+///
+/// Returns `None` when not twist-dominated (signed average is the dominant
+/// component) or when there is no L1 magnitude to compare against.
+fn twist_diagnostic_note(factor_label: &str, signed_avg: f64, l1_avg: f64) -> Option<String> {
+    if l1_avg <= 0.0 {
+        return None;
+    }
+    if signed_avg.abs() >= TWIST_FRACTION_THRESHOLD * l1_avg {
+        return None;
+    }
+    Some(format!(
+        "{factor_label} second-order may be understated: curves twisted \
+         (signed mean shift {signed_avg:.3}bp vs L1 mean shift {l1_avg:.3}bp); \
+         the scalar `½·γ·avg²` term collapses for twist-dominated moves. \
+         Consider per-tenor second-order or parallel/waterfall attribution \
+         for an accurate second-order contribution."
+    ))
+}
 
 fn add_cross_factor_term(
     by_pair: &mut IndexMap<String, Money>,
@@ -867,15 +976,8 @@ pub fn attribute_pnl_metrics_based(
 
         // Twist-domination warning (audit rec #6).
         if let Some(abs_shift) = avg_rate_abs_shift_bp {
-            if abs_shift > 0.0 && avg_shift.abs() < TWIST_FRACTION_THRESHOLD * abs_shift {
-                attribution.meta.notes.push(format!(
-                    "Rates convexity may be understated: discount curves twisted \
-                     (signed mean shift {:.3}bp vs L1 mean shift {:.3}bp); the \
-                     scalar `½·γ·avg²` term collapses for twist-dominated moves. \
-                     Consider per-tenor (key-rate) convexity or parallel/waterfall \
-                     attribution for an accurate second-order contribution.",
-                    avg_shift, abs_shift
-                ));
+            if let Some(note) = twist_diagnostic_note("Rates convexity", avg_shift, abs_shift) {
+                attribution.meta.notes.push(note);
                 attribution
                     .meta
                     .notes
@@ -990,6 +1092,27 @@ pub fn attribute_pnl_metrics_based(
     //
     // UNIT CONTRACT: CsGamma is ∂²V/∂s² in $ per decimal² of *par spread*.
     //   ΔP_gamma = ½ × CsGamma × (Δs_decimal)², Δs = mean par-spread move.
+    //
+    // TWIST GUARD: like rates convexity, the scalar `½·γ·avg²` term collapses
+    // when the credit curve is twisted (signed mean ≈ 0). Emit a note so the
+    // consumer knows the gamma number is not a real upper bound. Average over
+    // the same credit curves the metrics-based attribution consumed.
+    let avg_credit_abs_shift_bp: Option<f64> = {
+        let mut total = 0.0;
+        let mut count = 0usize;
+        for curve_id in &market_deps.curve_dependencies().credit_curves {
+            let v = credit_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
+            if v > 0.0 {
+                total += v;
+                count += 1;
+            }
+        }
+        if count > 0 {
+            Some(total / count as f64)
+        } else {
+            None
+        }
+    };
     if credit_has_data {
         if let Some(avg_shift) = credit_convexity_avg_shift_bp {
             if let Some(cs_gamma) = val_t0.measures.get(MetricId::CsGamma.as_str()) {
@@ -1011,6 +1134,16 @@ pub fn attribute_pnl_metrics_based(
                     avg_shift.abs(),
                     LARGE_SPREAD_MOVE_THRESHOLD_BP
                 ));
+            }
+
+            if let Some(abs_shift) = avg_credit_abs_shift_bp {
+                if let Some(note) = twist_diagnostic_note("Credit gamma", avg_shift, abs_shift) {
+                    attribution.meta.notes.push(note);
+                    attribution
+                        .meta
+                        .notes
+                        .push("Credit gamma: unreliable / bounds-exceeded".to_string());
+                }
             }
         }
     }
@@ -1386,10 +1519,20 @@ pub fn attribute_pnl_metrics_based(
             &mut non_finite_detected,
         );
 
-        // Second-order: Inflation convexity (if available)
+        // Second-order: Inflation convexity (if available).
+        //
+        // UNIT CONTRACT: `InflationConvexity` is ∂²V/∂i² in $ per decimal² of
+        // inflation rate (the `CsGamma`-style convention, NOT the dimensionless
+        // `Convexity` convention). The debug assertion guards against a
+        // non-finite metric silently corrupting the attributed P&L (it cannot
+        // enforce units — see the unit-contract table at the top of this file).
         if let Some(inflation_convexity) =
             val_t0.measures.get(MetricId::InflationConvexity.as_str())
         {
+            debug_assert!(
+                inflation_convexity.is_finite(),
+                "InflationConvexity metric must be finite for P&L attribution, got {inflation_convexity}"
+            );
             let shift_decimal = avg_shift / 10_000.0;
             let convexity_pnl = 0.5 * inflation_convexity * shift_decimal * shift_decimal;
             attribution.inflation_curves_pnl = factor_money_or_invalid(
@@ -1399,6 +1542,33 @@ pub fn attribute_pnl_metrics_based(
                 &mut attribution.meta.notes,
                 &mut non_finite_detected,
             );
+
+            // TWIST GUARD: emit a diagnostic note when the inflation curve is
+            // twisted (signed mean shift collapses toward 0 but L1 mean is
+            // non-trivial). Same shape as the rates / credit twist guards.
+            let mut total_abs = 0.0;
+            let mut abs_count = 0usize;
+            for curve_id in market_t1.curve_ids() {
+                if market_t1.get_inflation_curve(curve_id).is_err() {
+                    continue;
+                }
+                let v = inflation_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
+                if v > 0.0 {
+                    total_abs += v;
+                    abs_count += 1;
+                }
+            }
+            if abs_count > 0 {
+                let abs_avg = total_abs / abs_count as f64;
+                if let Some(note) = twist_diagnostic_note("Inflation convexity", avg_shift, abs_avg)
+                {
+                    attribution.meta.notes.push(note);
+                    attribution
+                        .meta
+                        .notes
+                        .push("Inflation convexity: unreliable / bounds-exceeded".to_string());
+                }
+            }
         }
     }
 

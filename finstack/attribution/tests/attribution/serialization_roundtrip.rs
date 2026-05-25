@@ -243,6 +243,7 @@ fn test_attribution_config_roundtrip() {
         strict_validation: Some(false),
         rounding_scale: None,
         rate_bump_bp: None,
+        target_ccy: None,
     };
 
     let json = serde_json::to_string(&config).unwrap();

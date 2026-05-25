@@ -242,6 +242,7 @@ fn run_metrics_based_with_model(model: Option<CreditFactorModel>) -> PnlAttribut
             strict_validation: None,
             rounding_scale: None,
             rate_bump_bp: None,
+            target_ccy: None,
         }),
         full_cross_attribution: false,
     };

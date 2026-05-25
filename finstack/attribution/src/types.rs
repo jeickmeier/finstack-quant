@@ -198,8 +198,31 @@ pub struct PnlAttribution {
     /// Base correlation curves P&L.
     pub correlations_pnl: Money,
 
-    /// FX rate changes P&L.
+    /// FX rate changes P&L — the **pricing-impact** component of FX moves on
+    /// cross-currency instruments (the FX matrix feeding into the instrument's
+    /// own pricer). For pure single-currency instruments this is zero.
     pub fx_pnl: Money,
+
+    /// FX translation P&L — the **reporting-currency** component of FX moves.
+    ///
+    /// Populated only when the attribution call passed an explicit
+    /// `target_ccy` that differs from the instrument's native pricing currency
+    /// (`val_t1.currency()`). In that case the native-currency P&L is
+    /// translated into `target_ccy` using `market_t0`'s FX at T₀ and
+    /// `market_t1`'s FX at T₁; the difference between those two translated
+    /// totals lands here.
+    ///
+    /// For attribution calls that report in native currency (the default —
+    /// `target_ccy = None`), this is always zero in the `total_pnl` currency.
+    ///
+    /// Additive serde extension: pre-existing JSON without this field
+    /// deserializes with `Money::new(0.0, Currency::USD)`. Downstream consumers
+    /// that need to compare against `total_pnl.currency()` should fall back to
+    /// zero when the currencies do not match (which they will not for any
+    /// attribution produced after this field was added — the field is always
+    /// constructed in the same currency as `total_pnl`).
+    #[serde(default = "zero_money_usd")]
+    pub fx_translation_pnl: Money,
 
     /// Implied volatility changes P&L.
     pub vol_pnl: Money,
@@ -779,6 +802,10 @@ impl PnlAttribution {
             cross_factor_pnl: zero,
             model_params_pnl: zero,
             market_scalars_pnl: zero,
+            // `fx_translation_pnl` is constructed in the same currency as
+            // `total_pnl`; it stays zero unless a `target_ccy` translation is
+            // explicitly applied by the per-method attribution code.
+            fx_translation_pnl: zero,
             residual: total_pnl, // Initially all P&L is residual
             carry_detail: None,
             rates_detail: None,
@@ -854,6 +881,7 @@ impl PnlAttribution {
         self.cross_factor_pnl *= factor;
         self.model_params_pnl *= factor;
         self.market_scalars_pnl *= factor;
+        self.fx_translation_pnl *= factor;
         self.residual *= factor;
 
         if let Some(d) = &mut self.carry_detail {
@@ -966,6 +994,7 @@ impl PnlAttribution {
             ("cross_factor", self.cross_factor_pnl.currency()),
             ("model_params", self.model_params_pnl.currency()),
             ("market_scalars", self.market_scalars_pnl.currency()),
+            ("fx_translation", self.fx_translation_pnl.currency()),
         ];
 
         for (name, ccy) in &factors {
@@ -1058,6 +1087,29 @@ impl PnlAttribution {
             "market scalars P&L",
             &mut self.meta.notes,
         )?;
+        attributed_sum = add_factor(
+            attributed_sum,
+            self.fx_translation_pnl,
+            "FX translation P&L",
+            &mut self.meta.notes,
+        )?;
+
+        // MI5: guard against a non-finite accumulator before calling
+        // `checked_sub` — `Money::new` panics on NaN/Inf inside `checked_sub`,
+        // so if attributed_sum has hit ±∞ from a runaway factor we flag the
+        // attribution invalid instead of unwinding the caller's stack.
+        if !attributed_sum.amount().is_finite() {
+            let note = format!(
+                "Non-finite attributed sum ({:?}) during residual computation; \
+                 attribution flagged invalid",
+                attributed_sum.amount()
+            );
+            self.meta.notes.push(note);
+            self.residual = Money::new(0.0, self.total_pnl.currency());
+            self.meta.residual_pct = 0.0;
+            self.result_invalid = true;
+            return Ok(());
+        }
 
         self.residual = match self.total_pnl.checked_sub(attributed_sum) {
             Ok(r) => r,
@@ -1108,11 +1160,18 @@ impl PnlAttribution {
         let abs_residual = self.residual.amount().abs();
         let abs_total = self.total_pnl.amount().abs();
 
-        // Tolerance is the larger of percentage-based or absolute
-        let tolerance = if abs_total > 1e-10 {
-            (abs_total * pct_tolerance / 100.0).max(abs_tolerance)
-        } else {
+        // Tolerance is the larger of percentage-based or absolute. The
+        // "is total_pnl effectively zero?" gate uses the attribution's stored
+        // RoundingContext (MI4) rather than a hardcoded 1e-10 — keeps the
+        // semantic consistent with the rest of `PnlAttribution`'s zero checks.
+        let total_is_zero = self
+            .meta
+            .rounding
+            .is_effectively_zero_money(abs_total, self.total_pnl.currency());
+        let tolerance = if total_is_zero {
             abs_tolerance
+        } else {
+            (abs_total * pct_tolerance / 100.0).max(abs_tolerance)
         };
 
         abs_residual <= tolerance

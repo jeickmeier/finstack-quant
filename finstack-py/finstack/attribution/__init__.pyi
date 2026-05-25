@@ -56,7 +56,24 @@ class PnlAttribution:
 
     @property
     def total_pnl(self) -> float:
-        """Total P&L amount (val_t1 − val_t0)."""
+        """Total P&L amount (val_t1 − val_t0 + intra-period coupon income).
+
+        For methods that follow the total-return convention (parallel,
+        waterfall, Taylor), ``total_pnl`` includes coupon income received in
+        the period. Use :attr:`mark_to_market_pnl` for the raw price change.
+        """
+        ...
+
+    @property
+    def mark_to_market_pnl(self) -> float | None:
+        """Raw mark-to-market P&L: ``val_t1 − val_t0`` with no cashflow adjustment.
+
+        When the attribution method added coupon income to ``total_pnl`` (the
+        standard total-return convention), this field still reports the raw
+        mark-to-market change so a downstream consumer can reconcile against
+        their own computation. ``None`` for attributions deserialized from a
+        pre-audit JSON payload that did not carry the field.
+        """
         ...
 
     @property
@@ -86,7 +103,21 @@ class PnlAttribution:
 
     @property
     def fx_pnl(self) -> float:
-        """FX rate changes P&L amount."""
+        """FX rate changes P&L amount.
+
+        Pricing-impact FX P&L for cross-currency instruments. For pure
+        single-currency instruments this is zero.
+        """
+        ...
+
+    @property
+    def fx_translation_pnl(self) -> float:
+        """FX translation P&L amount.
+
+        Reporting-currency FX P&L when ``AttributionConfig.target_ccy`` was
+        supplied and differs from native. Equals
+        ``val_t0_native × (T1_fx − T0_fx)``. Zero by default.
+        """
         ...
 
     @property
@@ -181,6 +212,16 @@ class PnlAttribution:
         """Check residual using the attribution's stored method-specific tolerances."""
         ...
 
+    def validate_currencies(self) -> None:
+        """Validate that every factor's currency matches ``total_pnl.currency``.
+
+        Useful before building a DataFrame or summing across instruments.
+
+        Raises:
+            ValueError: When any factor's currency differs from ``total_pnl.currency``.
+        """
+        ...
+
     def explain(self) -> str:
         """Human-readable tree explanation (non-zero factors only).
 
@@ -201,11 +242,77 @@ class PnlAttribution:
         """Export attribution as a single-row pandas DataFrame.
 
         Columns include ``instrument_id``, ``method``, ``t0``, ``t1``,
-        ``currency``, ``total_pnl``, all factor P&L amounts, ``residual``,
-        ``residual_pct``, and ``num_repricings``.
+        ``currency``, ``total_pnl``, ``mark_to_market_pnl`` (nullable), all
+        factor P&L amounts, ``residual``, ``residual_pct``,
+        ``num_repricings``, and ``result_invalid``.
 
         Returns:
             Single-row DataFrame.
+        """
+        ...
+
+    def to_long_dataframe(self) -> pd.DataFrame:
+        """Export every populated detail breakdown as one long-format DataFrame.
+
+        Columns:
+            kind: dotted-path identifier (e.g. ``"rates.by_curve"``,
+                ``"rates.by_tenor"``, ``"credit.by_curve"``, ``"fx.by_pair"``,
+                ``"vol.by_surface"``, ``"cross_factor.by_pair"``,
+                ``"scalars.dividends"``, ``"credit_factor.generic"``,
+                ``"credit_factor.level"``, ``"credit_factor.adder"``,
+                ``"credit_factor.curve_shape"``, ``"carry.theta"``,
+                ``"carry.coupon_income"``, ...).
+            factor: parent factor family (``"rates"``, ``"credit"``, ``"fx"``,
+                ``"vol"``, ``"cross_factor"``, ``"scalars"``,
+                ``"credit_factor"``, ``"carry"``, ``"inflation"``,
+                ``"correlations"``, ``"model_params"``).
+            key_a: primary identifier (curve_id, pair label, surface_id,
+                equity_id, level_name, sub-component name).
+            key_b: secondary key when present (tenor, ``to``-currency, bucket
+                path); ``None`` otherwise.
+            amount: float P&L amount.
+            currency: 3-letter currency code.
+
+        The DataFrame is empty (zero rows, schema columns present) when no
+        detail breakdown was populated. Use
+        ``df.query("kind.str.startswith('rates')")`` or
+        ``df.pivot_table(index="key_a", columns="key_b", values="amount")``
+        to slice the desired view.
+
+        Returns:
+            Long-format DataFrame.
+        """
+        ...
+
+    def to_carry_detail_dataframe(self) -> pd.DataFrame:
+        """Export the carry decomposition as a typed long DataFrame.
+
+        Columns are the same as :meth:`to_long_dataframe` but the kind values
+        are limited to the ``"carry.*"`` family — useful when you only want the
+        carry split (coupon income, pull-to-par, roll-down, funding cost,
+        theta), including the optional rates/credit splits when a credit
+        factor model was supplied.
+
+        Returns an empty DataFrame when ``carry_detail`` is not populated.
+
+        Returns:
+            Carry-decomposition DataFrame.
+        """
+        ...
+
+    def to_credit_factor_dataframe(self) -> pd.DataFrame:
+        """Export the credit-factor hierarchy decomposition as a typed long DataFrame.
+
+        Columns are the same as :meth:`to_long_dataframe`; rows are limited to
+        the ``"credit_factor.*"`` family. Includes generic, per-level, adder,
+        curve_shape, plus per-bucket and per-issuer rows when present.
+
+        Returns an empty DataFrame when ``credit_factor_detail`` is not
+        populated (no ``credit_factor_model`` was supplied, or the instrument
+        has no resolvable issuer).
+
+        Returns:
+            Credit-factor DataFrame.
         """
         ...
 

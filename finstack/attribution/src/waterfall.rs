@@ -53,6 +53,16 @@ use std::sync::Arc;
 
 /// Default waterfall order for factor attribution.
 ///
+/// # Doctrine
+///
+/// The first factor is **always** [`AttributionFactor::Carry`]. The waterfall
+/// path enforces this at the entry point (see
+/// [`attribute_pnl_waterfall`]) so the date-roll P&L — "price today's
+/// position with yesterday's market" — is the foundational first step of every
+/// attribution, before any factor-level market move is layered in. Any
+/// user-supplied factor order that does not start with `Carry` will be rejected
+/// with an `Error::Validation`.
+///
 /// # Returns
 ///
 /// Vector of attribution factors in recommended sequential order.
@@ -224,6 +234,17 @@ pub fn attribute_pnl_waterfall_with_credit_model(
         return Err(Error::Validation(
             "Waterfall attribution requires non-empty factor_order".to_string(),
         ));
+    }
+    // Doctrine: the date-roll Carry — pricing today's position with yesterday's
+    // market — is the foundational first step of every attribution. Reject any
+    // ordering that does not start with `Carry` so the doctrine is enforced
+    // rather than convention-only. (See `default_waterfall_order` doc.)
+    if factor_order[0] != AttributionFactor::Carry {
+        return Err(Error::Validation(format!(
+            "Waterfall attribution requires factor_order[0] == AttributionFactor::Carry \
+             (yesterday's market rolled forward is always the first step); got {:?}",
+            factor_order[0]
+        )));
     }
     validate_attribution_period(as_of_t0, as_of_t1)?;
 

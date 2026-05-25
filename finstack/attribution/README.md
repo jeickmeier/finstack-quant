@@ -207,8 +207,9 @@ the Python and WASM layers. Schemas live under `schemas/attribution/1/`.
 
 - **Sign convention**: positive `PnlAttribution.total_pnl` is a gain to the
   long-position holder. Each factor P&L follows the same sign.
-- **Currency**: every P&L term is `Money` in a single reporting currency. FX
-  conversion is resolved through `market_t1` (see `compute_pnl_with_fx`).
+- **Currency**: every P&L term is `Money` in a single reporting currency.
+  Date-specific FX conversion uses `market_t0` for the T₀ value and `market_t1`
+  for the T₁ value when `compute_pnl_with_fx` is used.
 - **Carry definition**: `carry = value(T₁ market, T₁ date) − value(T₁ market, T₀ date)`
   in parallel/waterfall runs; metrics-based carry uses theta × Δt.
 - **Curve moves** are applied as full-snapshot replacements, not parametric
@@ -271,7 +272,7 @@ Follow an existing factor (e.g. `Fx` or `Volatility`) end-to-end as a template.
 
 - [`finstack-valuations`](../valuations/README.md) — instrument repricing used at T₀ and T₁.
 - [`finstack-cashflows`](../cashflows/README.md) — accrual and carry inputs.
-- [`finstack-factor-model`](../factor-model/) — calibrated credit-factor models consumed via `CreditFactorModelRef`.
+- [`finstack-factor-model`](../factor-model/README.md) — calibrated credit-factor models consumed via `CreditFactorModelRef`.
 - [`finstack-portfolio`](../portfolio/README.md) — aggregates per-instrument `PnlAttribution`s into book-level views.
 
 ## References

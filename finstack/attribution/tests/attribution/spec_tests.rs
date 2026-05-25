@@ -66,6 +66,7 @@ fn spec_rejects_unknown_metrics() {
             strict_validation: None,
             rounding_scale: None,
             rate_bump_bp: None,
+            target_ccy: None,
         }),
         full_cross_attribution: false,
     };

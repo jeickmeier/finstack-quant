@@ -1,0 +1,52 @@
+{
+  "conventions": {
+    "day_count": "Actual365Fixed",
+    "model": "no-arbitrage forward, simple flat continuously-compounded rates",
+    "settlement": "USD (cash-settled)"
+  },
+  "currency": "USD",
+  "expected_attribution": {
+    "actual_pnl": 533.2294526727566,
+    "carry_pnl": -58.4990180088063,
+    "eur_rate_pnl_first_order": 0.0,
+    "fx_pnl_first_order": 485.22276677393154,
+    "residual_first_order": 213.254712775828,
+    "usd_rate_pnl_first_order": -106.74900886819671
+  },
+  "instrument": "FxForward",
+  "name": "EURUSD-1Y-FORWARD",
+  "quantlib": {
+    "t0": {
+      "eur_dv01": -106.74900886820105,
+      "npv_usd": 0.0,
+      "spot_delta_per_unit": 970445.53354797,
+      "theta_one_day": -58.4990180088063,
+      "usd_dv01": 106.74900886820105
+    },
+    "t1": {
+      "npv_usd": 533.2294526727566
+    },
+    "version": "1.42.1"
+  },
+  "scenario": {
+    "r_eur_t0": 0.03,
+    "r_eur_t1": 0.03,
+    "r_usd_t0": 0.05,
+    "r_usd_t1": 0.0501,
+    "spot_t0": 1.1,
+    "spot_t1": 1.1005,
+    "t0": "2025-01-15",
+    "t1": "2025-01-16",
+    "tau_t0": 1.0,
+    "tau_t1": 0.9972602739726028
+  },
+  "spec": {
+    "base_ccy": "EUR",
+    "maturity_date": "2026-01-15",
+    "notional_base_ccy": 1000000.0,
+    "quote_ccy": "USD",
+    "strike": 1.1222214740294314,
+    "strike_at_forward": true,
+    "trade_date": "2025-01-15"
+  }
+}

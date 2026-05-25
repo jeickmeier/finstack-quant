@@ -1,0 +1,52 @@
+{
+  "conventions": {
+    "business_day_convention": "Following",
+    "calendar": "UnitedStates::GovernmentBond",
+    "date_generation": "Backward",
+    "day_count": "Thirty360::BondBasis",
+    "end_of_month": false,
+    "frequency": "Semiannual",
+    "settlement_days": 2
+  },
+  "currency": "USD",
+  "expected_attribution": {
+    "actual_pnl": -0.06558717115331092,
+    "carry_pnl": 0.013821783836064583,
+    "rates_pnl_first_order": -0.07946202885759522,
+    "residual_first_order": 5.3073868219719045e-05
+  },
+  "instrument": "FixedRateBond",
+  "name": "USD-BOND-5PCT-10Y-SEMI",
+  "quantlib": {
+    "t0": {
+      "accrued": 0.02777777777778212,
+      "clean_price": 99.50980059738178,
+      "convexity_cash": 7296.5069364272495,
+      "dirty_price": 99.53757837515957,
+      "dv01": -0.07946202885759845,
+      "npv": 99.50993288766193,
+      "theta_one_day": 0.013821783836064583
+    },
+    "t1": {
+      "accrued": 0.08333333333332416,
+      "clean_price": 99.43023315400325,
+      "dirty_price": 99.51356648733658,
+      "npv": 99.44434571650862
+    },
+    "version": "1.42.1"
+  },
+  "scenario": {
+    "rate_shift_bp": 0.9999999999999593,
+    "rate_t0": 0.05,
+    "rate_t1": 0.0501,
+    "t0": "2025-01-15",
+    "t1": "2025-01-16",
+    "yield_curve": "flat_continuous"
+  },
+  "spec": {
+    "coupon_rate": 0.05,
+    "face_amount": 100.0,
+    "issue_date": "2025-01-15",
+    "maturity_date": "2035-01-15"
+  }
+}

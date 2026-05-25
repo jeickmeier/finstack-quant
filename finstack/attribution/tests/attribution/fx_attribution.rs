@@ -519,8 +519,11 @@ fn test_fx_attribution_eur_weakening() {
 
 #[test]
 fn test_waterfall_factor_ordering_sensitivity() {
-    // Test that different factor orders produce different attributions
-    // but same total P&L and minimal residual
+    // Doctrine: Carry must always be the first waterfall factor (date-roll
+    // first). Two valid orders that BOTH start with Carry but differ later
+    // produce different factor attributions yet the same total P&L and
+    // minimal residual. Any order whose first factor is not `Carry` is
+    // rejected at the entry point — exercised separately below.
     let as_of_t0 = create_date(2025, Month::January, 15).unwrap();
     let as_of_t1 = create_date(2025, Month::January, 16).unwrap();
 
@@ -573,8 +576,14 @@ fn test_waterfall_factor_ordering_sensitivity() {
     )
     .unwrap();
 
-    // Order 2: Rates then Carry
-    let order2 = vec![AttributionFactor::RatesCurves, AttributionFactor::Carry];
+    // Order 2: Carry then Fx then Rates — Carry still first; subsequent
+    // factors differ. (The original test ran Order2 = [Rates, Carry] which is
+    // now a doctrine violation and is asserted to error below.)
+    let order2 = vec![
+        AttributionFactor::Carry,
+        AttributionFactor::Fx,
+        AttributionFactor::RatesCurves,
+    ];
 
     let attr2 = attribute_pnl_waterfall(
         &bond_instrument,
@@ -596,8 +605,50 @@ fn test_waterfall_factor_ordering_sensitivity() {
     assert!(attr1.residual_within_meta_tolerance());
     assert!(attr2.residual_within_meta_tolerance());
 
-    // Factor attributions may differ due to ordering
-    // (This is expected and correct for waterfall methodology)
+    // Factor attributions may differ due to ordering of post-Carry factors
+    // (this is expected and correct for waterfall methodology).
+}
+
+#[test]
+fn test_waterfall_rejects_non_carry_first_order() {
+    // Doctrine guard: a factor_order that does not start with `Carry` is
+    // a hard validation error at the waterfall entry point. The error message
+    // must mention `Carry` so callers can diagnose quickly.
+    let as_of_t0 = create_date(2025, Month::January, 15).unwrap();
+    let as_of_t1 = create_date(2025, Month::January, 16).unwrap();
+
+    let bond = Bond::fixed(
+        "US-BOND-DOCTRINE",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        create_date(2025, Month::January, 1).unwrap(),
+        create_date(2030, Month::January, 1).unwrap(),
+        "USD-OIS",
+    )
+    .unwrap();
+    let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);
+    let market_t0 = MarketContext::new();
+    let market_t1 = MarketContext::new();
+    let config = FinstackConfig::default();
+
+    let bad_order = vec![AttributionFactor::RatesCurves, AttributionFactor::Carry];
+    let result = attribute_pnl_waterfall(
+        &bond_instrument,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &config,
+        bad_order,
+        false,
+        None,
+    );
+    let err = result.expect_err("non-Carry-first order must be rejected");
+    let msg = format!("{err}");
+    assert!(
+        msg.contains("Carry"),
+        "error message must reference Carry, got: {msg}"
+    );
 }
 
 finstack_valuations::impl_empty_cashflow_provider!(

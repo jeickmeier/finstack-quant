@@ -5,6 +5,7 @@ use super::credit_cascade::{
     optional_single_issuer_adder, plan_credit_cascade, shift_credit_curves_par_spread,
     single_issuer_by_bucket, CreditStepKind,
 };
+use super::factors::{MarketRestoreFlags, MarketSnapshot};
 use super::spec::AttributionSpec;
 use super::types::PnlAttribution;
 use finstack_core::market_data::context::MarketContext;
@@ -19,7 +20,17 @@ impl AttributionSpec {
     /// `model.issuer_betas`; the credit-factor cascade supplies the per-factor
     /// par-spread moves (`β·ΔF` / `Δadder`), and a **real** aggregate par-spread
     /// CS01 — measured by a parallel par-spread bump — gives each factor's P&L
-    /// as `−CS01 × Δs_factor`.
+    /// as `CS01 × Δs_factor`.
+    ///
+    /// # CS01 baseline
+    ///
+    /// CS01 is measured at the **same market state** the `credit_curves_pnl`
+    /// baseline was computed against: `market_t1` with the issuer's hazard
+    /// curves restored to T0, priced at `as_of_t1`. Measuring CS01 against
+    /// `market_t0` at `as_of_t0` instead would silently absorb the T0→T1 drift
+    /// of forwards, discounting, and recovery rates into `curve_shape_pnl`,
+    /// distorting the meaning of the `generic` / level / adder components for
+    /// any portfolio whose non-hazard markets drift between dates.
     ///
     /// The non-parallel (twist / curve-shape) part is the closing residual
     /// `curve_shape_pnl = credit_curves_pnl − Σ(parallel factor steps)`, so the
@@ -80,34 +91,40 @@ impl AttributionSpec {
             return Ok(None);
         };
 
-        // 5. Real aggregate **par-spread** CS01: bump every hazard curve the
-        //    instrument depends on with the *same* `shift_credit_curves_par_spread`
-        //    bump the cascade applies to its steps, central-differenced.
-        //    Measuring CS01 with the identical par-spread bump guarantees
-        //    `cs01_amt` and the cascade's per-step `delta_bp` share units exactly
-        //    (par CDS spread bp), so `cs01_amt × delta_bp` is consistent and the
-        //    decomposition reconciles to the par-spread `credit_curves_pnl`.
-        //    This real CS01 replaces the former synthetic `−credit_pnl / ds_i`
-        //    back-solve, whose divide-by-near-zero forced a twist workaround.
+        // 5. Real aggregate **par-spread** CS01 measured against the same
+        //    baseline as `credit_curves_pnl`: `market_t1` with the issuer's
+        //    hazard curves restored to T0, priced at `as_of_t1`. The same
+        //    `shift_credit_curves_par_spread` bump the cascade applies is used
+        //    here so `cs01_amt` and the cascade's per-step `delta_bp` share
+        //    units exactly (par CDS spread bp).
+        //
+        //    Audit (M2 fix): the prior implementation measured CS01 at
+        //    (market_t0, as_of_t0). That baseline drifts from the credit_pnl
+        //    baseline whenever forwards / discounting / recovery move between
+        //    T0 and T1, distorting generic / level / adder attributions for
+        //    multi-day periods.
+        let credit_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::CREDIT);
+        let cs01_base_market =
+            MarketSnapshot::restore_market(market_t1, &credit_snapshot, MarketRestoreFlags::CREDIT);
         let cs01_bump_bp = 1.0_f64;
         let disc = cascade.discount_curve_id.as_ref();
         let pv_up = instrument.value(
             &shift_credit_curves_par_spread(
-                market_t0,
+                &cs01_base_market,
                 &cascade.hazard_curve_ids,
                 disc,
                 cs01_bump_bp,
             )?,
-            self.as_of_t0,
+            self.as_of_t1,
         )?;
         let pv_down = instrument.value(
             &shift_credit_curves_par_spread(
-                market_t0,
+                &cs01_base_market,
                 &cascade.hazard_curve_ids,
                 disc,
                 -cs01_bump_bp,
             )?,
-            self.as_of_t0,
+            self.as_of_t1,
         )?;
         let cs01_amt = (pv_up.amount() - pv_down.amount()) / (2.0 * cs01_bump_bp);
 

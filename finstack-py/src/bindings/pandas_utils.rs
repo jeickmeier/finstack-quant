@@ -48,6 +48,21 @@ where
     pandas_dataframe(py)?.call1((rows,))
 }
 
+/// Build a many-row pandas DataFrame from a slice of serializable rows.
+///
+/// Each row is independently serialized to JSON; pandas infers the column
+/// schema from the union of keys. An empty input yields an empty DataFrame.
+/// Use this for long-format detail exports where each row is a `(kind, key,
+/// amount, ...)` record.
+pub fn serde_rows_to_dataframe<'py, T>(py: Python<'py>, rows: &[T]) -> PyResult<Bound<'py, PyAny>>
+where
+    T: Serialize,
+{
+    let json = serde_json::to_string(rows).map_err(crate::errors::display_to_py)?;
+    let py_rows = py.import("json")?.call_method1("loads", (json,))?;
+    pandas_dataframe(py)?.call1((py_rows,))
+}
+
 /// Convert a slice of `time::Date` into a Python list suitable for a DataFrame index.
 pub fn dates_to_pylist<'py>(
     py: Python<'py>,

@@ -127,6 +127,23 @@ pub struct AttributionConfig {
     /// Rate bump size in basis points for sensitivities
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_bump_bp: Option<f64>,
+    /// Optional reporting currency for the attribution output.
+    ///
+    /// When supplied and different from the instrument's native pricing
+    /// currency, the per-instrument attribution is computed in native
+    /// currency and then translated to `target_ccy` via
+    /// [`crate::translate_to_target_ccy`]. The translation:
+    ///
+    /// - converts every aggregate factor amount at `market_t1`'s FX,
+    /// - emits a new `fx_translation_pnl` field that captures the FX move
+    ///   applied to the opening position (`val_t0 × ΔFX`),
+    /// - stamps `meta.fx_policy.target_ccy` so downstream consumers know the
+    ///   report is in a non-native currency.
+    ///
+    /// When `None` (the default), the attribution stays in
+    /// `val_t1.currency()`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_ccy: Option<Currency>,
 }
 
 impl AttributionSpec {
@@ -316,6 +333,7 @@ mod tests {
             strict_validation: Some(true),
             rounding_scale: None,
             rate_bump_bp: None,
+            target_ccy: None,
         };
 
         let json =
@@ -363,6 +381,7 @@ mod tests {
             strict_validation: Some(true),
             rounding_scale: Some(6),
             rate_bump_bp: None,
+            target_ccy: None,
         };
 
         let spec = AttributionSpec::from_json_inputs(

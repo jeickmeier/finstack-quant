@@ -10,3 +10,4 @@ mod test_cross_impl_parity;
 mod test_equity_option_parity;
 mod test_fx_option_parity;
 mod test_irs_parity;
+mod test_quantlib_external_parity;

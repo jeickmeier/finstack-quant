@@ -540,12 +540,21 @@ fn same_credit_total_different_hierarchy_different_detail() {
     }
 }
 
-/// Regression (audit C1): the parallel credit cascade must attribute each
-/// step's *own* contribution — `val(T0 hazard + step bp) − val(T0 hazard)` —
-/// not the complement `val_t1 − val(T0 hazard + step bp)`. The complement
-/// formula drove every moved factor's P&L toward zero and dumped a large
-/// spurious offset (≈ −2 × credit P&L) into `curve_shape_pnl`; only the
-/// back-solved sum reconciled, so a sum-only test could not catch it.
+/// Regression (audit C1 → cumulative cascade): the parallel credit cascade
+/// uses **cumulative bumps** that telescope to `credit_curves_pnl`, mirroring
+/// the waterfall cascade. The step P&L is the marginal `V_k − V_{k−1}` along
+/// the chain `base → +bp_1 → +bp_1+bp_2 → … → snap(T1)`. For a perfectly
+/// parallel hazard move, only the generic step does meaningful work — the
+/// subsequent levels / adder add 0 bp, and the curve-shape snap lands on the
+/// same hazard state the cumulative bumps already produced — so
+/// `curve_shape_pnl ≈ 0` and `parallel.generic_pnl ≡ waterfall.generic_pnl`.
+///
+/// A buggy non-telescoping formulation (`val_t1 − V_step` or
+/// `V_step − base` summed without cumulative chaining) would either drive
+/// every moved factor's P&L toward zero, dump a spurious offset into
+/// `curve_shape_pnl`, or — in the CS-gamma case — silently route cross-bp
+/// convexity into `curve_shape_pnl` and trip the curve-shape tracing warn
+/// on a perfectly parallel hazard move.
 #[test]
 fn parallel_credit_cascade_attributes_each_step_to_its_own_contribution() {
     let (as_of_t0, as_of_t1) = standard_period();
@@ -628,5 +637,104 @@ fn parallel_credit_cascade_attributes_each_step_to_its_own_contribution() {
     assert!(
         (parallel_part + p.curve_shape_pnl.amount() - credit_pnl).abs() < 1e-6,
         "credit_factor_detail must reconcile to credit_curves_pnl"
+    );
+}
+
+/// M2 regression: with the discount curve drifting between T0 and T1, the
+/// linear-path CS01 (used by metrics-based / Taylor) must be measured at the
+/// SAME baseline as `credit_curves_pnl` — `market_t1` with the issuer's
+/// hazard curves restored to T0, priced at `as_of_t1`. Before the M2 fix the
+/// linear path measured CS01 at (market_t0, as_of_t0), and any rate drift
+/// silently distorted the generic / level / adder split.
+///
+/// This test exercises a 100bp parallel rate move alongside a 100bp parallel
+/// hazard move. With the fix in place, the metrics-based decomposition must
+/// reconcile to `credit_curves_pnl` AND its `generic_pnl` must agree closely
+/// with the parallel cascade's `generic_pnl` (which uses the correct baseline
+/// natively via cumulative bumps).
+#[test]
+fn metrics_based_credit_factor_detail_uses_t1_cs01_baseline() {
+    let (as_of_t0, as_of_t1) = standard_period();
+    let bond = make_bond();
+    let model = make_model(vec![HierarchyDimension::Rating, HierarchyDimension::Region]);
+
+    // Rate drift: 5% → 6% (100 bp parallel).
+    let drift_discount = |base: time::Date, r: f64| {
+        DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([
+                (0.0_f64, 1.0_f64),
+                (1.0_f64, (-r).exp()),
+                (5.0_f64, (-r * 5.0).exp()),
+                (10.0_f64, (-r * 10.0).exp()),
+                (30.0_f64, (-r * 30.0).exp()),
+            ])
+            .build()
+            .expect("discount curve")
+    };
+    let market_t0 = make_market_state(drift_discount(as_of_t0, 0.05), flat_hazard(as_of_t0, 0.01));
+    let market_t1 = make_market_state(drift_discount(as_of_t1, 0.06), flat_hazard(as_of_t1, 0.02));
+
+    let run = |method: AttributionMethod| {
+        let spec = AttributionSpec {
+            instrument: InstrumentJson::Bond(bond.clone()),
+            market_t0: market_t0.clone(),
+            market_t1: market_t1.clone(),
+            as_of_t0,
+            as_of_t1,
+            method,
+            model_params_t0: None,
+            credit_factor_model: Some(Box::new(model.clone())),
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            config: None,
+            full_cross_attribution: false,
+        };
+        AttributionEnvelope::new(spec)
+            .execute()
+            .expect("attribution should succeed")
+            .result
+            .attribution
+    };
+
+    let metrics = run(AttributionMethod::MetricsBased);
+    let parallel = run(AttributionMethod::Parallel);
+
+    let m = metrics
+        .credit_factor_detail
+        .as_ref()
+        .expect("metrics-based credit detail");
+    let p = parallel
+        .credit_factor_detail
+        .as_ref()
+        .expect("parallel credit detail");
+
+    // Reconciliation: generic + Σlevels + adder + curve_shape ≡ credit_curves_pnl
+    // — must hold even with the rate drift (M2 fix preserved this exactly).
+    let m_attributed = m.generic_pnl.amount()
+        + m.levels.iter().map(|l| l.total.amount()).sum::<f64>()
+        + m.adder_pnl_total.amount()
+        + m.curve_shape_pnl.amount();
+    let m_total = metrics.credit_curves_pnl.amount();
+    assert!(
+        (m_attributed - m_total).abs() < 1e-8,
+        "metrics-based reconciliation: attributed={m_attributed}, credit={m_total}"
+    );
+
+    // M2 substantive check: the metrics-based CS01 (now measured against T1
+    // markets with T0 hazard) and the parallel cascade's CS01 (measured at
+    // T1 markets natively) should agree on the per-factor split to a tight
+    // tolerance. Before M2, the rate drift would have pushed an O(ΔDV01 ×
+    // Δs) wedge between them and shifted that wedge into curve_shape.
+    let m_generic = m.generic_pnl.amount();
+    let p_generic = p.generic_pnl.amount();
+    let agree = |a: f64, b: f64| {
+        let scale = m_total.abs().max(1.0);
+        (a - b).abs() <= 5e-3 * scale
+    };
+    assert!(
+        agree(m_generic, p_generic),
+        "metrics-based generic_pnl {m_generic} must agree with parallel generic_pnl {p_generic} \
+         to within 0.5% of credit_pnl {m_total} (M2: same CS01 baseline)"
     );
 }

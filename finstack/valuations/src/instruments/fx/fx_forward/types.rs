@@ -603,6 +603,21 @@ impl crate::instruments::common_impl::traits::Instrument for FxForward {
         Ok(deps)
     }
 
+    /// Surface the FX pair so attribution can route the `Fx01 × Δspot` P&L
+    /// to `fx_pnl` instead of leaving it in residual. Without this override
+    /// `attribute_pnl_metrics_based`'s `instrument.fx_exposure()` lookup
+    /// returns `None`, the FX01 metric this instrument *does* publish is
+    /// ignored, and the entire spot-driven move falls into the residual
+    /// bucket — a real attribution gap found by the QuantLib parity test.
+    fn fx_exposure(
+        &self,
+    ) -> Option<(
+        finstack_core::currency::Currency,
+        finstack_core::currency::Currency,
+    )> {
+        Some((self.base_currency, self.quote_currency))
+    }
+
     fn base_value(
         &self,
         market: &finstack_core::market_data::context::MarketContext,

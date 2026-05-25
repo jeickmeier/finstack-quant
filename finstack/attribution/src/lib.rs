@@ -18,9 +18,9 @@
 
 //! Multi-period P&L attribution for financial instruments.
 //!
-//! This module provides comprehensive P&L attribution capabilities to decompose
-//! daily MTM changes into constituent factors: carry, curve shifts, credit spreads,
-//! FX, volatility, model parameters, and market scalars.
+//! This crate decomposes mark-to-market changes between two dates into
+//! constituent factors: carry, rates curves, credit curves, inflation,
+//! correlations, FX, volatility, model parameters, and market scalars.
 //!
 //! # Overview
 //!
@@ -49,14 +49,36 @@
 //! decision; they all involve non-trivial per-factor repricing and should be
 //! benchmarked before being wired into hot paths.
 //!
-//! # Documentation Rules For Attribution APIs
+//! # Interpretation conventions
 //!
-//! Attribution docs should state:
+//! Positive P&L is a gain to the long-position holder. Every factor contribution
+//! is reported in the same currency as `total_pnl`; date-specific FX conversion
+//! uses the T₀ market for T₀ values and the T₁ market for T₁ values. Residuals
+//! have method-specific meanings: waterfall residuals should be small, parallel
+//! residuals capture cross-effects, and metrics-based residuals scale with move
+//! size and convexity.
 //!
-//! - whether a contribution is exact, path-dependent, or an approximation
-//! - what units and sign conventions are used for input metrics and output P&L terms
-//! - whether curve, spread, vol, or scalar moves are parallel, bucketed, or model-specific
-//! - how residual should be interpreted and when it is expected to be large
+//! # Reporting currency
+//!
+//! Every attribution method reports in the instrument's **native pricing
+//! currency** (`val_t1.currency()`). Cross-currency translation into a
+//! non-native portfolio reporting currency (e.g. an EUR bond reported in USD)
+//! is out of scope for the per-instrument attribution surface — it is the
+//! responsibility of the portfolio layer (`finstack-portfolio`) to handle
+//! base-currency rollups with explicit FX policy stamping. The `fx_pnl`
+//! component captures pricing-impact FX P&L for cross-currency instruments
+//! (FX options, cross-currency swaps, foreign-currency bonds) where the FX
+//! matrix feeds into the instrument's own pricing.
+//!
+//! # Doctrine: date roll first
+//!
+//! Every methodology treats the **date roll** — pricing today's position with
+//! yesterday's market — as the foundational first step before any factor-level
+//! market move is layered in. Parallel and Taylor implement this implicitly;
+//! Waterfall enforces it at the entry point by rejecting any `factor_order`
+//! that does not start with [`AttributionFactor::Carry`]. MetricsBased reports
+//! carry as the first attribution line via the `Theta × days` (or
+//! `CarryTotal × days`) sensitivity-based approximation.
 //!
 //! # Methodologies
 //!
@@ -322,6 +344,7 @@ pub(crate) mod metrics_based;
 pub(crate) mod model_params;
 pub(crate) mod parallel;
 pub(crate) mod spec;
+pub(crate) mod target_ccy;
 pub mod taylor;
 pub(crate) mod types;
 pub(crate) mod waterfall;
@@ -350,6 +373,7 @@ pub use spec::{
     default_attribution_metrics, AttributionConfig, AttributionEnvelope, AttributionResult,
     AttributionResultEnvelope, AttributionSpec, ATTRIBUTION_SCHEMA_V1,
 };
+pub use target_ccy::translate_to_target_ccy;
 pub use taylor::{attribute_pnl_taylor, TaylorAttributionConfig};
 pub use waterfall::{attribute_pnl_waterfall, default_waterfall_order};
 // Market snapshot helpers
@@ -367,8 +391,9 @@ use std::sync::Arc;
 ///
 /// This is the **cheapest** attribution entry point — it prices the
 /// instrument once at each date in each market state and returns the
-/// scalar total P&L in `target_ccy` (FX-converted on the way out). Use
-/// it when you just need the headline number and don't care which
+/// scalar total P&L in `target_ccy`. FX conversion uses `market_t0` for
+/// the T₀ value and `market_t1` for the T₁ value. Use it when you just
+/// need the headline number and don't care which
 /// factors contributed. For a factor-level decomposition, reach for
 /// one of the `attribute_pnl_*` functions listed in the module docs.
 ///
@@ -383,8 +408,8 @@ use std::sync::Arc;
 /// * `instrument` - Instrument to price at both dates.
 /// * `market_t0`, `market_t1` - Market states at T₀ and T₁.
 /// * `as_of_t0`, `as_of_t1` - Valuation dates.
-/// * `target_ccy` - Currency to report P&L in; FX is resolved through
-///   `market_t1`.
+/// * `target_ccy` - Currency to report P&L in; FX is resolved from the
+///   date-specific market contexts.
 ///
 /// # Returns
 ///
@@ -393,7 +418,7 @@ use std::sync::Arc;
 /// # Errors
 ///
 /// Returns an error if either repricing call fails or if the FX
-/// conversion cannot be resolved from `market_t1`.
+/// conversion cannot be resolved from the provided market contexts.
 ///
 /// # Examples
 ///

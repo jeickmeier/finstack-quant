@@ -1,0 +1,47 @@
+{
+  "conventions": {
+    "calendar": "UnitedStates::SOFR",
+    "day_count_fixed": "Thirty360::BondBasis",
+    "day_count_float": "Actual360",
+    "fixed_frequency": "Semiannual",
+    "float_frequency": "Quarterly",
+    "settlement_days": 2,
+    "swap_type": "Payer"
+  },
+  "currency": "USD",
+  "expected_attribution": {
+    "actual_pnl": 5011.084421800682,
+    "carry_pnl": 566.2349721449427,
+    "rates_pnl_first_order": 4198.310814164874,
+    "residual_first_order": 246.538635490866
+  },
+  "instrument": "VanillaSwap",
+  "name": "USD-IRS-5Y-PAYER",
+  "quantlib": {
+    "t0": {
+      "dv01": 4198.310814165045,
+      "fair_rate": 0.05127212254710113,
+      "npv": 492168.8428086594,
+      "theta_one_day": 566.2349721449427
+    },
+    "t1": {
+      "npv": 497179.9272304601
+    },
+    "version": "1.42.1"
+  },
+  "scenario": {
+    "rate_shift_bp": 0.9999999999999593,
+    "rate_t0": 0.05,
+    "rate_t1": 0.0501,
+    "t0": "2025-01-15",
+    "t1": "2025-01-16",
+    "yield_curve": "flat_continuous"
+  },
+  "spec": {
+    "fixed_rate": 0.04,
+    "maturity_date": "2030-01-17",
+    "notional": 10000000.0,
+    "settlement_date": "2025-01-17",
+    "trade_date": "2025-01-15"
+  }
+}

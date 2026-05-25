@@ -1,0 +1,86 @@
+{
+  "total_pnl": {
+    "amount": "1000",
+    "currency": "USD"
+  },
+  "mark_to_market_pnl": {
+    "amount": "1000",
+    "currency": "USD"
+  },
+  "carry": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "rates_curves_pnl": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "credit_curves_pnl": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "inflation_curves_pnl": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "correlations_pnl": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "fx_pnl": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "vol_pnl": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "cross_factor_pnl": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "model_params_pnl": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "market_scalars_pnl": {
+    "amount": "0",
+    "currency": "USD"
+  },
+  "residual": {
+    "amount": "1000",
+    "currency": "USD"
+  },
+  "carry_detail": null,
+  "rates_detail": null,
+  "credit_detail": null,
+  "inflation_detail": null,
+  "correlations_detail": null,
+  "fx_detail": null,
+  "vol_detail": null,
+  "cross_factor_detail": null,
+  "model_params_detail": null,
+  "scalars_detail": null,
+  "meta": {
+    "method": "Parallel",
+    "t0": "2025-01-15",
+    "t1": "2025-01-16",
+    "instrument_id": "FIXTURE-BOND",
+    "num_repricings": 0,
+    "tolerance_abs": 1.0,
+    "tolerance_pct": 0.01,
+    "residual_pct": 100.0,
+    "rounding": {
+      "mode": "Bankers",
+      "ingest_scale_by_ccy": {},
+      "output_scale_by_ccy": {},
+      "tolerances": {
+        "rate_epsilon": 1e-12,
+        "generic_epsilon": 1e-10
+      },
+      "version": 1
+    },
+    "notes": []
+  },
+  "result_invalid": false
+}

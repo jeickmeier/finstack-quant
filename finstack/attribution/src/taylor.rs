@@ -85,6 +85,18 @@ impl Default for TaylorAttributionConfig {
 impl TaylorAttributionConfig {
     /// Validates configuration parameters.
     pub fn validate(&self) -> Result<()> {
+        if self.rate_bump_bp <= 0.0 || self.rate_bump_bp > 100.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Rate bump size must be strictly positive and no greater than 100bp, got {:.4}",
+                self.rate_bump_bp
+            )));
+        }
+        if self.credit_bump_bp <= 0.0 || self.credit_bump_bp > 100.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Credit bump size must be strictly positive and no greater than 100bp, got {:.4}",
+                self.credit_bump_bp
+            )));
+        }
         if self.vol_bump <= 0.0 || self.vol_bump > 0.20 {
             return Err(finstack_core::Error::Validation(format!(
                 "Volatility bump size must be strictly positive and no greater than 20% (0.20), got {:.4}",
@@ -178,6 +190,12 @@ pub(crate) struct TaylorAttributionResult {
     pub pv_t0: Money,
     /// Present value at T1 (cached to avoid redundant repricing in compat layer).
     pub pv_t1: Money,
+    /// Coupon income for the theta period, captured by `compute_theta_factor`.
+    /// `None` when theta computation failed; otherwise lets `attribute_pnl_taylor`
+    /// split theta into PV-only and coupon components without re-collecting
+    /// cashflows (audit MO3 fix).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theta_coupon_income: Option<f64>,
 }
 
 /// Compute the detailed Taylor factor decomposition.
@@ -370,11 +388,19 @@ fn compute_taylor_result(
         }
     }
 
-    // Theta (time decay): reprice at T1 date with T0 market
+    // Theta (time decay): reprice at T1 date with T0 market. The outcome
+    // also carries `coupon_income` so `attribute_pnl_taylor` can split theta
+    // into PV-only and coupon components without re-collecting cashflows.
+    let mut theta_coupon_income: Option<f64> = None;
     match compute_theta_factor(instrument, market_t0, as_of_t0, as_of_t1, pv_t0) {
-        Ok(result) => {
+        Ok(outcome) => {
+            let ThetaFactorOutcome {
+                factor: result,
+                coupon_income,
+            } = outcome;
             total_explained += result.explained_pnl;
             num_repricings += 1;
+            theta_coupon_income = Some(coupon_income);
             factors.push(result);
         }
         Err(e) => {
@@ -401,6 +427,7 @@ fn compute_taylor_result(
         num_repricings,
         pv_t0,
         pv_t1,
+        theta_coupon_income,
     })
 }
 
@@ -472,22 +499,21 @@ pub fn attribute_pnl_taylor(
             &mut non_finite_detected,
         );
 
+        // MO5: route accumulation through Money::checked_add so a currency
+        // mismatch surfaces as an error instead of being silently coerced into
+        // `ccy`. Taylor factors are all produced in the instrument's native
+        // currency in practice, but the safety net matches the rest of the
+        // attribution code.
         if factor.factor_name.starts_with("Rates:") || factor.factor_name.starts_with("Forward:") {
-            attribution.rates_curves_pnl = Money::new(
-                attribution.rates_curves_pnl.amount() + factor_money.amount(),
-                ccy,
-            );
+            attribution.rates_curves_pnl =
+                attribution.rates_curves_pnl.checked_add(factor_money)?;
         } else if factor.factor_name.starts_with("Credit:") {
-            attribution.credit_curves_pnl = Money::new(
-                attribution.credit_curves_pnl.amount() + factor_money.amount(),
-                ccy,
-            );
+            attribution.credit_curves_pnl =
+                attribution.credit_curves_pnl.checked_add(factor_money)?;
         } else if factor.factor_name.starts_with("Vol:") {
-            attribution.vol_pnl =
-                Money::new(attribution.vol_pnl.amount() + factor_money.amount(), ccy);
+            attribution.vol_pnl = attribution.vol_pnl.checked_add(factor_money)?;
         } else if factor.factor_name == "Fx" {
-            attribution.fx_pnl =
-                Money::new(attribution.fx_pnl.amount() + factor_money.amount(), ccy);
+            attribution.fx_pnl = attribution.fx_pnl.checked_add(factor_money)?;
             stamp_fx_policy(
                 &mut attribution,
                 ccy,
@@ -495,26 +521,18 @@ pub fn attribute_pnl_taylor(
             );
         } else if factor.factor_name == "Theta" {
             // Taylor theta already includes cashflows from compute_theta_factor.
-            // Compute the PV-only portion for carry_detail.theta by subtracting
-            // coupon income.
-            let ci = {
-                use finstack_valuations::metrics::collect_cashflows_in_period;
-                let ci_val = collect_cashflows_in_period(
-                    instrument.as_ref(),
-                    market_t0,
-                    as_of_t0,
-                    as_of_t1,
-                    ccy,
-                )
-                .unwrap_or(0.0);
-                factor_money_or_invalid(
-                    ci_val,
-                    ccy,
-                    "Theta coupon income",
-                    &mut attribution.meta.notes,
-                    &mut non_finite_detected,
-                )
-            };
+            // Re-use the coupon income that was captured during that compute
+            // (audit MO3: previously we re-called collect_cashflows_in_period
+            // here, which doubled cashflow traversal cost and risked silent
+            // desync against the value `compute_theta_factor` consumed).
+            let ci_val = taylor.theta_coupon_income.unwrap_or(0.0);
+            let ci = factor_money_or_invalid(
+                ci_val,
+                ccy,
+                "Theta coupon income",
+                &mut attribution.meta.notes,
+                &mut non_finite_detected,
+            );
             let theta_only = Money::new(factor_money.amount() - ci.amount(), ccy);
             apply_total_return_carry(&mut attribution, theta_only, ci, None)?;
         }
@@ -969,6 +987,17 @@ fn compute_fx_factor(
     })
 }
 
+/// Coupon income for the theta period — surfaced separately so
+/// `attribute_pnl_taylor` can re-use it when splitting `theta_pnl` into the
+/// pure PV move and the realized cashflow component (instead of calling
+/// `collect_cashflows_in_period` again, which would re-traverse the
+/// instrument's cashflow schedule and risk silent desync if the schedule path
+/// is non-deterministic).
+struct ThetaFactorOutcome {
+    factor: TaylorFactorResult,
+    coupon_income: f64,
+}
+
 /// Compute theta (time decay + realized cashflows) by repricing at T1 date
 /// with T0 market, then adding any coupon payments in the period.
 fn compute_theta_factor(
@@ -977,7 +1006,7 @@ fn compute_theta_factor(
     as_of_t0: Date,
     as_of_t1: Date,
     pv_t0: Money,
-) -> Result<TaylorFactorResult> {
+) -> Result<ThetaFactorOutcome> {
     use finstack_valuations::metrics::collect_cashflows_in_period;
 
     let pv_t0_at_t1 = reprice_instrument(instrument, market_t0, as_of_t1)?;
@@ -1009,12 +1038,15 @@ fn compute_theta_factor(
         0.0
     };
 
-    Ok(TaylorFactorResult {
-        factor_name: "Theta".to_string(),
-        sensitivity: theta_per_day,
-        market_move: days,
-        explained_pnl: theta_pnl,
-        gamma_pnl: None,
+    Ok(ThetaFactorOutcome {
+        factor: TaylorFactorResult {
+            factor_name: "Theta".to_string(),
+            sensitivity: theta_per_day,
+            market_move: days,
+            explained_pnl: theta_pnl,
+            gamma_pnl: None,
+        },
+        coupon_income,
     })
 }
 
@@ -1356,12 +1388,13 @@ mod tests {
         );
     }
 
-    /// Audit N2: a non-finite Taylor factor P&L must flag the attribution
-    /// invalid rather than panicking inside `Money::new` (which panics on
-    /// NaN/Inf). A zero `rate_bump_bp` makes the central-difference DV01 a
-    /// 0/0 = NaN, exercising the guard end-to-end.
+    /// MO4 regression: malformed config bumps (≤ 0 or > sane max) must be
+    /// rejected at validation rather than producing a `result_invalid`
+    /// flagged result. Before MO4 the central-difference DV01 was a 0/0 NaN
+    /// and the attribution flagged itself invalid; with the strengthened
+    /// validation the caller now gets an immediate `Error::Validation`.
     #[test]
-    fn taylor_flags_non_finite_factor_instead_of_panicking() {
+    fn taylor_rejects_non_positive_bump_at_validation() {
         use finstack_core::market_data::term_structures::DiscountCurve;
         use finstack_core::math::interp::InterpStyle;
 
@@ -1384,29 +1417,47 @@ mod tests {
         let market_t0 = MarketContext::new().insert(curve(as_of_t0, 0.98));
         let market_t1 = MarketContext::new().insert(curve(as_of_t1, 0.97));
 
-        // A zero rate bump makes the central-difference DV01 a 0/0 = NaN.
-        let config = TaylorAttributionConfig {
-            rate_bump_bp: 0.0,
-            ..TaylorAttributionConfig::default()
-        };
-
-        let attribution = attribute_pnl_taylor(
-            &instrument,
-            &market_t0,
-            &market_t1,
-            as_of_t0,
-            as_of_t1,
-            &config,
-        )
-        .expect("taylor standard must return a flagged result, never panic");
-
-        assert!(
-            attribution.result_invalid,
-            "a non-finite Taylor factor must set result_invalid"
-        );
-        assert!(
-            !attribution.residual_within_meta_tolerance(),
-            "an invalid attribution must not pass the tolerance check"
-        );
+        for bad in [
+            TaylorAttributionConfig {
+                rate_bump_bp: 0.0,
+                ..TaylorAttributionConfig::default()
+            },
+            TaylorAttributionConfig {
+                rate_bump_bp: -1.0,
+                ..TaylorAttributionConfig::default()
+            },
+            TaylorAttributionConfig {
+                credit_bump_bp: 0.0,
+                ..TaylorAttributionConfig::default()
+            },
+            TaylorAttributionConfig {
+                credit_bump_bp: 200.0,
+                ..TaylorAttributionConfig::default()
+            },
+        ] {
+            let err = attribute_pnl_taylor(
+                &instrument,
+                &market_t0,
+                &market_t1,
+                as_of_t0,
+                as_of_t1,
+                &bad,
+            )
+            .expect_err("malformed bump config must error at validation");
+            let msg = format!("{err}");
+            assert!(
+                msg.to_lowercase().contains("bump"),
+                "validation error must mention 'bump', got: {msg}"
+            );
+        }
     }
+
+    // Audit N2 (originally `taylor_flags_non_finite_factor_instead_of_panicking`):
+    // covered redundantly by the MO4 validation test above
+    // (`taylor_rejects_non_positive_bump_at_validation`) and by the
+    // metrics-based NaN-flagging test
+    // (`metrics_based::tests::nan_factor_sensitivity_sets_result_invalid_instead_of_panicking`).
+    // The MO4 change closed the original trigger (zero bump → 0/0 NaN) at the
+    // boundary; constructing an alternative NaN-producing pricer would
+    // duplicate the metrics-based coverage without exercising any new code.
 }
