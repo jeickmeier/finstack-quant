@@ -1,47 +1,18 @@
 //! Model parameters extraction and modification for P&L attribution.
 //!
-//! Provides functionality to extract model-specific parameters from instruments,
-//! create modified versions with different parameters, and measure parameter shifts.
+//! Provides functionality to delegate model-specific parameter extraction to
+//! instruments, create modified versions with different parameters, and measure
+//! parameter shifts.
 
-use finstack_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
-use finstack_core::Error;
 use finstack_core::Result;
-use finstack_valuations::instruments::fixed_income::convertible::{
-    ConversionSpec, ConvertibleBond,
-};
-use finstack_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+use finstack_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_valuations::instruments::Instrument;
 use std::sync::Arc;
 
-/// Snapshot of extractable model parameters from an instrument.
-///
-/// Different instrument types have different model parameters that affect
-/// pricing. This enum captures the relevant parameters for each type.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub enum ModelParamsSnapshot {
-    /// Structured credit parameters (prepayment, default, recovery).
-    StructuredCredit {
-        /// Prepayment model specification
-        prepayment_spec: PrepaymentModelSpec,
-        /// Default model specification
-        default_spec: DefaultModelSpec,
-        /// Recovery model specification
-        recovery_spec: RecoveryModelSpec,
-    },
-
-    /// Convertible bond parameters (conversion ratio, policies).
-    Convertible {
-        /// Conversion specification for convertible bonds
-        conversion_spec: ConversionSpec,
-    },
-
-    /// No extractable model parameters.
-    None,
-}
-
 /// Extract model parameters from an instrument.
 ///
-/// Uses downcasting to identify instrument type and extract relevant parameters.
+/// Delegates through the [`Instrument`] trait so each instrument owns its
+/// model-parameter extraction behavior.
 ///
 /// # Arguments
 ///
@@ -56,8 +27,8 @@ pub enum ModelParamsSnapshot {
 ///
 /// ```ignore
 /// use finstack_attribution::extract_model_params;
-/// use finstack_attribution::ModelParamsSnapshot;
 /// use finstack_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+/// use finstack_valuations::instruments::model_params::ModelParamsSnapshot;
 /// use finstack_valuations::instruments::Instrument;
 /// use std::sync::Arc;
 ///
@@ -76,24 +47,7 @@ pub enum ModelParamsSnapshot {
 /// # }
 /// ```
 pub fn extract_model_params(instrument: &Arc<dyn Instrument>) -> ModelParamsSnapshot {
-    // Try downcasting to StructuredCredit
-    if let Some(structured) = instrument.as_any().downcast_ref::<StructuredCredit>() {
-        return ModelParamsSnapshot::StructuredCredit {
-            prepayment_spec: structured.credit_model.prepayment_spec.clone(),
-            default_spec: structured.credit_model.default_spec.clone(),
-            recovery_spec: structured.credit_model.recovery_spec.clone(),
-        };
-    }
-
-    // Try downcasting to ConvertibleBond
-    if let Some(convertible) = instrument.as_any().downcast_ref::<ConvertibleBond>() {
-        return ModelParamsSnapshot::Convertible {
-            conversion_spec: convertible.conversion.clone(),
-        };
-    }
-
-    // Other instrument types don't have model parameters
-    ModelParamsSnapshot::None
+    instrument.model_params_snapshot()
 }
 
 /// Create a modified instrument with different model parameters.
@@ -139,42 +93,11 @@ pub fn with_model_params(
     instrument: &Arc<dyn Instrument>,
     params: &ModelParamsSnapshot,
 ) -> Result<Arc<dyn Instrument>> {
-    match params {
-        ModelParamsSnapshot::StructuredCredit {
-            prepayment_spec,
-            default_spec,
-            recovery_spec,
-        } => {
-            if let Some(structured) = instrument.as_any().downcast_ref::<StructuredCredit>() {
-                let mut modified = structured.clone();
-                modified.credit_model.prepayment_spec = prepayment_spec.clone();
-                modified.credit_model.default_spec = default_spec.clone();
-                modified.credit_model.recovery_spec = recovery_spec.clone();
-                Ok(Arc::new(modified) as Arc<dyn Instrument>)
-            } else {
-                Err(Error::Validation(
-                    "Instrument type mismatch: expected StructuredCredit".to_string(),
-                ))
-            }
-        }
-
-        ModelParamsSnapshot::Convertible { conversion_spec } => {
-            if let Some(convertible) = instrument.as_any().downcast_ref::<ConvertibleBond>() {
-                let mut modified = convertible.clone();
-                modified.conversion = conversion_spec.clone();
-                Ok(Arc::new(modified) as Arc<dyn Instrument>)
-            } else {
-                Err(Error::Validation(
-                    "Instrument type mismatch: expected ConvertibleBond".to_string(),
-                ))
-            }
-        }
-
-        ModelParamsSnapshot::None => {
-            // No model params to modify, return original
-            Ok(Arc::clone(instrument))
-        }
+    if matches!(params, ModelParamsSnapshot::None) {
+        return Ok(Arc::clone(instrument));
     }
+
+    instrument.with_model_params(params).map(Arc::from)
 }
 
 /// Compute a prepayment parameter shift between two snapshots.
@@ -491,8 +414,9 @@ pub fn measure_conversion_shift(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
     use finstack_valuations::instruments::fixed_income::convertible::{
-        AntiDilutionPolicy, ConversionPolicy, DividendAdjustment,
+        AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
     };
 
     #[test]

@@ -45,7 +45,8 @@ finer breakdowns:
 - **Fx** — spot FX revaluation in the target reporting currency.
 - **Volatility** — implied-vol surface moves (`VolAttribution`).
 - **ModelParameters** — prepayment, default, recovery, conversion-policy and
-  other model inputs snapshotted via [`ModelParamsSnapshot`](src/model_params.rs).
+  other model inputs snapshotted via
+  `finstack_valuations::instruments::model_params::ModelParamsSnapshot`.
 - **MarketScalars** — dividends, equity/commodity spots, inflation index fixings.
 
 ## Layout
@@ -60,7 +61,7 @@ attribution/
 ├── waterfall.rs            # attribute_pnl_waterfall, default_waterfall_order
 ├── metrics_based.rs        # attribute_pnl_metrics_based (linear from metrics)
 ├── taylor.rs               # attribute_pnl_taylor, TaylorAttributionConfig
-├── model_params.rs         # ModelParamsSnapshot, with_model_params, measure_*_shift
+├── model_params.rs         # extract/replace model params, measure_*_shift
 ├── credit_factor.rs        # compute_credit_factor_attribution, model wiring
 ├── credit_cascade.rs       # Waterfall credit-factor cascade
 ├── credit_decomposition.rs # Generic / per-level / adder decomposition
@@ -199,7 +200,7 @@ the Python and WASM layers. Schemas live under `schemas/attribution/1/`.
 | `CarryDetail`, `RatesCurvesAttribution`, `CreditCurvesAttribution`, `CreditFactorAttribution`, `InflationCurvesAttribution`, `CorrelationsAttribution`, `FxAttribution`, `VolAttribution`, `ModelParamsAttribution`, `ScalarsAttribution`, `CrossFactorDetail`, `CreditCarryDecomposition`, `CreditCarryByLevel`, `LevelCarry`, `LevelPnl`, `SourceLine` | `types` | Per-factor detail structs                   |
 | `MarketSnapshot`, `MarketRestoreFlags`                                             | `factors`        | T₀/T₁ snapshot and per-factor restore primitives |
 | `compute_pnl`, `compute_pnl_with_fx`                                              | `helpers`        | Money/FX arithmetic for P&L computation     |
-| `ModelParamsSnapshot`, `extract_model_params`, `with_model_params`, `measure_prepayment_shift`, `measure_default_shift`, `measure_recovery_shift`, `measure_conversion_shift` | `model_params` | Model-parameter snapshotting and shift attribution |
+| `extract_model_params`, `with_model_params`, `measure_prepayment_shift`, `measure_default_shift`, `measure_recovery_shift`, `measure_conversion_shift` | `model_params` | Model-parameter snapshotting and shift attribution; use `finstack_valuations::instruments::model_params::ModelParamsSnapshot` for the snapshot type |
 | `compute_credit_factor_attribution`, `CreditAttributionInput`, `CreditFactorDetailOptions`, `CreditFactorModelRef`, `credit_factor_model_id` | `credit_factor` | Calibrated credit-factor decomposition of `credit_curves_pnl` |
 | `AttributionEnvelope`, `AttributionSpec`, `AttributionConfig`, `AttributionResult`, `AttributionResultEnvelope`, `ATTRIBUTION_SCHEMA_V1`, `default_attribution_metrics` | `spec` | JSON contract |
 

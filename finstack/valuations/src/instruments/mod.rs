@@ -165,6 +165,9 @@ pub use finstack_core::dates::fx::resolve_calendar;
 /// `MarketDependency` entries. Used by portfolio factor-model orchestration.
 pub mod dependencies_flatten;
 
+/// Model parameter snapshots used by attribution.
+pub mod model_params;
+
 // === Category Modules ===
 /// Commodity derivatives.
 pub mod commodity;

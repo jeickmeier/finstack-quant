@@ -894,6 +894,19 @@
       ],
       "type": "object"
     },
+    "FxValuationDetails": {
+      "description": "Metadata for FX-bearing valuation paths (FX forwards, FX options, quanto).\n\nCaptures the FX policy applied at pricing time so downstream audit /\nreconciliation can trace whether a quoted rate came from a direct\nmarket quote or via triangulation through the matrix pivot currency.\nMirrors the cross-cutting invariant documented in\n`.claude/rules/project-description.md` (\"FX policy visibility: Applied\nconversion strategy recorded per layer (e.g., valuations, statements,\nportfolio)\").",
+      "properties": {
+        "fx_triangulated": {
+          "description": "`true` when the FX spot was obtained via triangulation through the\n[`FxMatrix`](finstack_core::money::fx::FxMatrix) pivot currency\nrather than a direct quote. Mirrors\n[`FxRateResult.triangulated`](finstack_core::money::fx::FxRateResult).\n`None` when the instrument resolved spot from an explicit market\nscalar (`fx_rate_id`) rather than the matrix.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "Money": {
       "additionalProperties": false,
       "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues are stored using a fixed-point representation derived from ISO 4217\ndecimal places.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_core::money::Money;\nuse finstack_core::currency::Currency;\n\nlet notional = Money::new(1_000_000.0, Currency::EUR);\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
@@ -1429,6 +1442,23 @@
             },
             "type": {
               "const": "structured_credit_stochastic",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "FX-bearing instrument pricing metadata (forwards, options, quanto, …).\n\nSurfaces the [`FxMatrix`](finstack_core::money::fx::FxMatrix) lookup\nchain that backed the spot rate used at pricing time, satisfying the\nproject-wide FX-policy-visibility invariant for instruments that\nresolve their spot through the matrix.",
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/FxValuationDetails"
+            },
+            "type": {
+              "const": "fx",
               "type": "string"
             }
           },

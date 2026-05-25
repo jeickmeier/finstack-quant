@@ -7,12 +7,14 @@ use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, InstrumentId};
+use finstack_core::Error;
 
 use crate::cashflow::builder::specs::{FixedCouponSpec, FloatingCouponSpec};
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::CashflowProvider;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::bond::CallPutSchedule;
+use crate::instruments::model_params::ModelParamsSnapshot;
 
 use super::pricer;
 use crate::impl_instrument_base;
@@ -710,6 +712,29 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
 
     fn effective_start_date(&self) -> Option<Date> {
         Some(self.issue_date)
+    }
+
+    fn model_params_snapshot(&self) -> ModelParamsSnapshot {
+        ModelParamsSnapshot::Convertible {
+            conversion_spec: self.conversion.clone(),
+        }
+    }
+
+    fn with_model_params(
+        &self,
+        params: &ModelParamsSnapshot,
+    ) -> finstack_core::Result<Box<dyn crate::instruments::common_impl::traits::Instrument>> {
+        match params {
+            ModelParamsSnapshot::Convertible { conversion_spec } => {
+                let mut modified = self.clone();
+                modified.conversion = conversion_spec.clone();
+                Ok(Box::new(modified))
+            }
+            ModelParamsSnapshot::None => Ok(self.clone_box()),
+            ModelParamsSnapshot::StructuredCredit { .. } => Err(Error::Validation(
+                "Instrument type mismatch: expected ConvertibleBond model parameters".to_string(),
+            )),
+        }
     }
 
     fn pricing_overrides_mut(

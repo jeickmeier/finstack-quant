@@ -3,7 +3,7 @@
 //! Provides serializable specs for defining complete attribution runs in JSON,
 //! with stable schemas and deterministic round-trip serialization.
 
-use super::{AttributionMethod, CreditFactorDetailOptions, ModelParamsSnapshot, PnlAttribution};
+use super::{AttributionMethod, CreditFactorDetailOptions, PnlAttribution};
 use finstack_core::{
     config::{FinstackConfig, ResultsMeta},
     currency::Currency,
@@ -12,6 +12,7 @@ use finstack_core::{
     Result,
 };
 use finstack_factor_model::credit::hierarchy::CreditFactorModel;
+use finstack_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_valuations::instruments::InstrumentJson;
 use finstack_valuations::metrics::MetricId;
 use serde::de::DeserializeOwned;

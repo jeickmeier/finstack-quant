@@ -1,5 +1,6 @@
 use crate::cashflow::traits::CashflowProvider;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
+use crate::instruments::model_params::ModelParamsSnapshot;
 use crate::metrics::MetricId;
 use crate::pricer::{
     actionable_unknown_pricer_message, shared_standard_registry, InstrumentType, ModelKey,
@@ -7,7 +8,7 @@ use crate::pricer::{
 };
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::types::Attributes;
-use finstack_core::{currency::Currency, dates::Date, money::Money, types::CurveId};
+use finstack_core::{currency::Currency, dates::Date, money::Money, types::CurveId, Error};
 use std::any::Any;
 
 use super::pricing_options::PricingOptions;
@@ -299,6 +300,35 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// `None`, indicating that the instrument does not support margin calculations.
     fn as_marginable(&self) -> Option<&dyn finstack_margin::Marginable> {
         None
+    }
+
+    /// Snapshot model parameters that can be isolated during attribution.
+    ///
+    /// The default implementation returns [`ModelParamsSnapshot::None`].
+    /// Instruments with model inputs that attribution can revalue independently
+    /// should override this method and return their concrete snapshot variant.
+    fn model_params_snapshot(&self) -> ModelParamsSnapshot {
+        ModelParamsSnapshot::None
+    }
+
+    /// Clone this instrument with replacement model parameters.
+    ///
+    /// The default implementation accepts [`ModelParamsSnapshot::None`] and
+    /// returns a normal clone. Concrete snapshots are rejected unless the
+    /// instrument overrides this hook, keeping model-parameter attribution
+    /// dispatch behind the instrument contract.
+    fn with_model_params(
+        &self,
+        params: &ModelParamsSnapshot,
+    ) -> finstack_core::Result<Box<dyn Instrument>> {
+        match params {
+            ModelParamsSnapshot::None => Ok(self.clone_box()),
+            _ => Err(Error::Validation(format!(
+                "Instrument '{}' ({:?}) does not support model parameter replacement",
+                self.id(),
+                self.key()
+            ))),
+        }
     }
 
     /// Get immutable reference to instrument attributes.

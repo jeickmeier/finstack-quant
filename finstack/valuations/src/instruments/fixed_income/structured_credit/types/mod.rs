@@ -98,6 +98,7 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tr
     BranchingSpec, ScenarioTreeConfig,
 };
 use crate::instruments::fixed_income::structured_credit::utils::rates::{cdr_to_mdr, cpr_to_smm};
+use crate::instruments::model_params::ModelParamsSnapshot;
 use crate::instruments::rates::irs::InterestRateSwap;
 use crate::metrics::{MetricContext, MetricId};
 use finstack_core::dates::{
@@ -106,6 +107,7 @@ use finstack_core::dates::{
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, InstrumentId};
+use finstack_core::Error;
 
 use finstack_core::HashMap;
 use std::collections::BTreeMap;
@@ -926,6 +928,37 @@ impl Instrument for StructuredCredit {
 
     fn effective_start_date(&self) -> Option<Date> {
         None
+    }
+
+    fn model_params_snapshot(&self) -> ModelParamsSnapshot {
+        ModelParamsSnapshot::StructuredCredit {
+            prepayment_spec: self.credit_model.prepayment_spec.clone(),
+            default_spec: self.credit_model.default_spec.clone(),
+            recovery_spec: self.credit_model.recovery_spec.clone(),
+        }
+    }
+
+    fn with_model_params(
+        &self,
+        params: &ModelParamsSnapshot,
+    ) -> finstack_core::Result<Box<dyn Instrument>> {
+        match params {
+            ModelParamsSnapshot::StructuredCredit {
+                prepayment_spec,
+                default_spec,
+                recovery_spec,
+            } => {
+                let mut modified = self.clone();
+                modified.credit_model.prepayment_spec = prepayment_spec.clone();
+                modified.credit_model.default_spec = default_spec.clone();
+                modified.credit_model.recovery_spec = recovery_spec.clone();
+                Ok(Box::new(modified))
+            }
+            ModelParamsSnapshot::None => Ok(self.clone_box()),
+            ModelParamsSnapshot::Convertible { .. } => Err(Error::Validation(
+                "Instrument type mismatch: expected StructuredCredit model parameters".to_string(),
+            )),
+        }
     }
 
     fn pricing_overrides_mut(

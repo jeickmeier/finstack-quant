@@ -5,7 +5,6 @@
 
 use finstack_attribution::{
     AttributionConfig, AttributionEnvelope, AttributionFactor, AttributionMethod, AttributionSpec,
-    ModelParamsSnapshot,
 };
 use finstack_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_core::currency::Currency;
@@ -16,6 +15,7 @@ use finstack_valuations::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
 use finstack_valuations::instruments::json_loader::InstrumentJson;
+use finstack_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_valuations::instruments::Bond;
 use time::Month;
 

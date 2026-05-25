@@ -37,6 +37,7 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::Result;
 use finstack_factor_model::credit::hierarchy::CreditFactorModel;
+use finstack_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_valuations::instruments::Instrument;
 use indexmap::IndexMap;
 use rayon::prelude::*;
@@ -108,7 +109,7 @@ enum ParallelLatentFactorSpec {
         snapshot: Box<MarketSnapshot>,
     },
     ModelParams {
-        snapshot: model_params::ModelParamsSnapshot,
+        snapshot: ModelParamsSnapshot,
     },
 }
 
@@ -309,7 +310,7 @@ pub fn attribute_pnl_parallel(
     as_of_t0: Date,
     as_of_t1: Date,
     config: &FinstackConfig,
-    model_params_t0: Option<&model_params::ModelParamsSnapshot>,
+    model_params_t0: Option<&ModelParamsSnapshot>,
 ) -> Result<PnlAttribution> {
     attribute_pnl_parallel_with_credit_model(
         instrument,
@@ -367,7 +368,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
     as_of_t0: Date,
     as_of_t1: Date,
     _config: &FinstackConfig,
-    model_params_t0: Option<&model_params::ModelParamsSnapshot>,
+    model_params_t0: Option<&ModelParamsSnapshot>,
     credit_factor_model: Option<&CreditFactorModel>,
     credit_factor_detail_options: &CreditFactorDetailOptions,
     full_cross_attribution: bool,
@@ -534,7 +535,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
         let params_t0 = model_params_t0
             .cloned()
             .unwrap_or_else(|| model_params::extract_model_params(instrument));
-        if !matches!(params_t0, model_params::ModelParamsSnapshot::None) {
+        if !matches!(params_t0, ModelParamsSnapshot::None) {
             factor_specs.push(ParallelLatentFactorSpec::ModelParams {
                 snapshot: params_t0,
             });
@@ -866,7 +867,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
         let params_t0 = model_params_t0
             .cloned()
             .unwrap_or_else(|| model_params::extract_model_params(instrument));
-        if !matches!(params_t0, model_params::ModelParamsSnapshot::None) {
+        if !matches!(params_t0, ModelParamsSnapshot::None) {
             // Create instrument with T₀ parameters
             match model_params::with_model_params(instrument, &params_t0) {
                 Ok(instrument_with_t0_params) => {

@@ -366,7 +366,7 @@ pub use types::{
 pub use metrics_based::attribute_pnl_metrics_based;
 pub use model_params::{
     extract_model_params, measure_conversion_shift, measure_default_shift,
-    measure_prepayment_shift, measure_recovery_shift, with_model_params, ModelParamsSnapshot,
+    measure_prepayment_shift, measure_recovery_shift, with_model_params,
 };
 pub use parallel::attribute_pnl_parallel;
 pub use spec::{

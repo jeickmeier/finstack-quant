@@ -40,12 +40,13 @@
 
 use finstack_attribution::{
     measure_conversion_shift, measure_default_shift, measure_prepayment_shift,
-    measure_recovery_shift, ModelParamsSnapshot,
+    measure_recovery_shift,
 };
 use finstack_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_valuations::instruments::fixed_income::convertible::{
     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
 };
+use finstack_valuations::instruments::model_params::ModelParamsSnapshot;
 
 /// Test PSA prepayment shift measurement.
 ///
@@ -197,5 +198,64 @@ fn test_model_params_none_for_plain_instruments() {
         matches!(params, ModelParamsSnapshot::None),
         "Plain bond should have ModelParamsSnapshot::None, got {:?}",
         params
+    );
+}
+
+#[test]
+fn test_with_model_params_none_reuses_original_arc() {
+    use finstack_attribution::with_model_params;
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::create_date;
+    use finstack_core::money::Money;
+    use finstack_valuations::instruments::fixed_income::bond::Bond;
+    use finstack_valuations::instruments::Instrument;
+    use std::sync::Arc;
+    use time::Month;
+
+    let bond = Bond::fixed(
+        "PLAIN-BOND-002",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        create_date(2024, Month::January, 1).unwrap(),
+        create_date(2029, Month::January, 1).unwrap(),
+        "USD-OIS",
+    )
+    .unwrap();
+
+    let instrument: Arc<dyn Instrument> = Arc::new(bond);
+    let unchanged = with_model_params(&instrument, &ModelParamsSnapshot::None)
+        .expect("None model params should be a no-op");
+
+    assert!(Arc::ptr_eq(&instrument, &unchanged));
+}
+
+#[test]
+fn test_model_params_mismatch_errors_through_instrument_hook() {
+    use finstack_attribution::with_model_params;
+    use finstack_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
+    use finstack_valuations::instruments::Instrument;
+    use std::sync::Arc;
+
+    let structured_credit: Arc<dyn Instrument> = Arc::new(StructuredCredit::example());
+    let convertible_params = ModelParamsSnapshot::Convertible {
+        conversion_spec: ConversionSpec {
+            ratio: Some(10.0),
+            price: None,
+            policy: ConversionPolicy::Voluntary,
+            anti_dilution: AntiDilutionPolicy::None,
+            dividend_adjustment: DividendAdjustment::None,
+            dilution_events: Vec::new(),
+        },
+    };
+
+    let err = match with_model_params(&structured_credit, &convertible_params) {
+        Ok(_) => panic!("mismatched model parameter snapshot should fail"),
+        Err(err) => err,
+    };
+    let message = err.to_string();
+
+    assert!(
+        message.contains("StructuredCredit"),
+        "mismatch error should identify the expected instrument type, got {message}"
     );
 }

@@ -48,6 +48,7 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::{Error, Result};
 use finstack_factor_model::credit::hierarchy::CreditFactorModel;
+use finstack_valuations::instruments::model_params::ModelParamsSnapshot;
 use finstack_valuations::instruments::Instrument;
 use std::sync::Arc;
 
@@ -170,7 +171,7 @@ pub fn attribute_pnl_waterfall(
     config: &FinstackConfig,
     factor_order: Vec<AttributionFactor>,
     strict_validation: bool,
-    model_params_t0: Option<&model_params::ModelParamsSnapshot>,
+    model_params_t0: Option<&ModelParamsSnapshot>,
 ) -> Result<PnlAttribution> {
     attribute_pnl_waterfall_with_credit_model(
         instrument,
@@ -226,7 +227,7 @@ pub fn attribute_pnl_waterfall_with_credit_model(
     _config: &FinstackConfig,
     factor_order: Vec<AttributionFactor>,
     strict_validation: bool,
-    model_params_t0: Option<&model_params::ModelParamsSnapshot>,
+    model_params_t0: Option<&ModelParamsSnapshot>,
     credit_factor_model: Option<&CreditFactorModel>,
     credit_factor_detail_options: &CreditFactorDetailOptions,
 ) -> Result<PnlAttribution> {
