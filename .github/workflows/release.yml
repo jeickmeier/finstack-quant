@@ -60,6 +60,11 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
 
+      - name: Set HOME for mise on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: '"HOME=$env:USERPROFILE" | Out-File -FilePath $env:GITHUB_ENV -Append'
+
       - name: Provision toolchain (mise)
         uses: jdx/mise-action@v2
         with:
@@ -142,7 +147,20 @@ jobs:
         run: echo "registry=https://registry.npmjs.org/" > ~/.npmrc
 
       - name: Sync package.json version from Cargo.toml
-        run: ./scripts/sync-versions
+        run: |
+          python3 - <<'PY'
+          import json
+          import tomllib
+          from pathlib import Path
+
+          workspace = tomllib.loads(Path("Cargo.toml").read_text())
+          version = workspace["workspace"]["package"]["version"]
+          package_path = Path("finstack-wasm/package.json")
+          package = json.loads(package_path.read_text())
+          package["version"] = version
+          package_path.write_text(json.dumps(package, indent=2) + "\n")
+          print(f"finstack-wasm package version set to {version}")
+          PY
 
       - name: Build WASM targets
         working-directory: finstack-wasm

@@ -122,8 +122,10 @@ jobs:
         with:
           cache: true
 
-      - name: Run Rust tests
-        run: cargo nextest run --workspace --exclude finstack-py --lib --test '*' --no-fail-fast
+      - name: Run Rust lib and integration tests
+        # Do not run Rust doctests in CI; they are long-running and not
+        # supported by nextest. Keep target selection explicit here.
+        run: cargo nextest run --workspace --exclude finstack-py --lib --tests --no-fail-fast
 
       - name: Run workspace rustdoc
         run: |
