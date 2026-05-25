@@ -114,12 +114,12 @@ pub fn translate_to_target_ccy(
             .unwrap_or(attribution.total_pnl),
     )?;
     let val_t1_at_t1 = market_t1.convert_money(val_t1_native, target_ccy, as_of_t1)?;
-    let new_total_pnl = val_t1_at_t1.checked_sub(val_t0_at_t0)?;
-    attribution.total_pnl = new_total_pnl;
+    let translated_mtm = val_t1_at_t1.checked_sub(val_t0_at_t0)?;
+    attribution.total_pnl = translated_mtm;
 
     // mark_to_market_pnl in target_ccy retains the raw price change interpretation.
     if let Some(_mtm) = attribution.mark_to_market_pnl {
-        attribution.mark_to_market_pnl = Some(new_total_pnl);
+        attribution.mark_to_market_pnl = Some(translated_mtm);
     }
 
     // Residual is recomputed against the translated sum.

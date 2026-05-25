@@ -70,8 +70,6 @@ enum ParallelRestoredFactor {
     Discount,
     Forward,
     FX,
-    #[allow(dead_code)]
-    ModelParameters,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -161,7 +159,6 @@ fn restored_factor_has_data(factor: ParallelRestoredFactor, snapshot: &MarketSna
         ParallelRestoredFactor::Discount => !snapshot.discount_curves.is_empty(),
         ParallelRestoredFactor::Forward => !snapshot.forward_curves.is_empty(),
         ParallelRestoredFactor::FX => snapshot.fx.is_some(),
-        ParallelRestoredFactor::ModelParameters => true,
     }
 }
 
