@@ -5,7 +5,7 @@
 //! fractional kernel internally using standard normal increments — no fBM generator
 //! is required.
 
-use super::pricer::{collect_inputs_extended, option_currency};
+use super::pricer::{collect_inputs_extended, has_future_discrete_dividends, option_currency};
 use super::types::EquityOption;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Instrument;
@@ -92,11 +92,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
         // escrowed spot into the MC silently mis-prices a single-stock option
         // with discrete dividends. Reject it explicitly rather than price it
         // wrong.
-        if equity_option
-            .discrete_dividends
-            .iter()
-            .any(|(ex_date, _)| *ex_date > as_of && *ex_date <= equity_option.expiry)
-        {
+        if has_future_discrete_dividends(equity_option, as_of) {
             return Err(crate::pricer::PricingError::model_failure_with_context(
                 "rough Heston Monte Carlo pricing does not support discrete \
                  dividends: the escrowed-dividend spot adjustment is a \
@@ -133,11 +129,12 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
             ));
         }
 
-        // Source rough-Heston scalars from a single shared lookup.
-        let s = crate::instruments::equity::equity_option::rough_heston_market::RoughHestonScalars::from_market(market);
-
         let err_ctx = crate::pricer::PricingErrorContext::from_instrument(equity_option)
             .model(crate::pricer::ModelKey::MonteCarloRoughHeston);
+
+        // Source production rough-Heston parameters from explicit market scalars.
+        let s = crate::instruments::equity::equity_option::rough_heston_market::RoughHestonScalars::from_market_strict(market)
+            .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
 
         // Build process
         let hurst_exp = finstack_core::math::fractional::HurstExponent::new(s.hurst)

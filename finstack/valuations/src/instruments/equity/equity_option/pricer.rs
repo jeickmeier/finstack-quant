@@ -12,7 +12,7 @@ use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::instruments::ExerciseStyle;
 use crate::models::trees::binomial_tree::BinomialTree;
 use crate::models::{bs_greeks, bs_price, BsGreeks};
-use crate::pricer::PricingError;
+use crate::pricer::{ModelKey, PricingError, PricingErrorContext};
 use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, DayCount};
 use finstack_core::market_data::context::MarketContext;
@@ -170,6 +170,33 @@ pub(crate) fn collect_inputs(
 /// `inst.expiry` are returned (past and post-expiry dividends do not affect the
 /// option). Times use ACT/365F (the equity-vol market standard). The returned
 /// slice drives the escrowed-dividend spot adjustment and its rho correction.
+pub(crate) fn has_future_discrete_dividends(inst: &EquityOption, as_of: Date) -> bool {
+    inst.discrete_dividends
+        .iter()
+        .any(|(ex_date, _)| *ex_date > as_of && *ex_date <= inst.expiry)
+}
+
+pub(crate) fn reject_future_discrete_dividends_for_stochastic_vol(
+    inst: &EquityOption,
+    as_of: Date,
+    model: ModelKey,
+    model_name: &str,
+) -> std::result::Result<(), PricingError> {
+    if has_future_discrete_dividends(inst, as_of) {
+        return Err(PricingError::model_failure_with_context(
+            format!(
+                "{model_name} pricing does not support discrete dividends: the \
+                 escrowed-dividend spot adjustment is a Black-Scholes-only construct \
+                 and is invalid under stochastic volatility. Use the Black-Scholes \
+                 pricer for discrete dividends, or supply a continuous dividend yield \
+                 instead."
+            ),
+            PricingErrorContext::from_instrument(inst).model(model),
+        ));
+    }
+    Ok(())
+}
+
 fn future_dividends(inst: &EquityOption, as_of: Date) -> Result<Vec<(f64, f64)>> {
     if inst.discrete_dividends.is_empty() {
         return Ok(Vec::new());
@@ -851,6 +878,13 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
                 )
             })?;
 
+        reject_future_discrete_dividends_for_stochastic_vol(
+            equity_option,
+            as_of,
+            crate::pricer::ModelKey::HestonFourier,
+            "Heston Fourier",
+        )?;
+
         let inputs = collect_inputs_extended(equity_option, market, as_of).map_err(|e| {
             crate::pricer::PricingError::model_failure_with_context(
                 e.to_string(),
@@ -904,6 +938,7 @@ mod tests {
     use super::*;
     use crate::instruments::equity::equity_option::types::EquityOption;
     use crate::instruments::{Attributes, PricingOverrides, SettlementType};
+    use crate::pricer::Pricer;
     use finstack_core::market_data::context::MarketContext;
     use finstack_core::market_data::scalars::MarketScalar;
     use finstack_core::market_data::surfaces::VolSurface;
@@ -1060,6 +1095,23 @@ mod tests {
             (analytic - naive).abs() / denom > 1e-3,
             "the ∂S*/∂r correction must move rho away from the S*-fixed value: \
              analytic={analytic} naive={naive}"
+        );
+    }
+
+    #[test]
+    fn heston_fourier_rejects_future_discrete_dividend() {
+        let as_of = date(2025, 1, 1);
+        let expiry = date(2026, 1, 1);
+        let mut opt = option(expiry, OptionType::Call, ExerciseStyle::European);
+        opt.discrete_dividends = vec![(date(2025, 7, 1), 2.0)];
+
+        let err = EquityOptionHestonFourierPricer::new()
+            .price_dyn(&opt, &market(as_of, 100.0, 0.20, 0.03, 0.0), as_of)
+            .expect_err("Heston Fourier must reject discrete dividends");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("discrete dividends"),
+            "unexpected error message: {msg}"
         );
     }
 

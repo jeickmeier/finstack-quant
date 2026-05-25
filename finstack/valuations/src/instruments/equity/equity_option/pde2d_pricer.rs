@@ -3,10 +3,12 @@
 //!
 //! Solves the Heston PDE in (log-spot, variance) coordinates on a tensor-product
 //! grid using the Modified Craig-Sneyd (MCS) ADI splitting scheme. Heston model
-//! parameters are sourced from market scalars with sensible defaults.
+//! parameters are sourced from required market scalars.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::equity::equity_option::pricer::collect_inputs_extended;
+use crate::instruments::equity::equity_option::pricer::{
+    collect_inputs_extended, reject_future_discrete_dividends_for_stochastic_vol,
+};
 use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
@@ -53,6 +55,13 @@ impl EquityOptionHestonPdePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<Money, PricingError> {
+        reject_future_discrete_dividends_for_stochastic_vol(
+            inst,
+            as_of,
+            ModelKey::PdeAdi2D,
+            "Heston PDE",
+        )?;
+
         let inputs = collect_inputs_extended(inst, market, as_of).map_err(|e| {
             PricingError::model_failure_with_context(
                 e.to_string(),
@@ -172,5 +181,79 @@ impl Pricer for EquityOptionHestonPdePricer {
         let pv = self.price_internal(equity_option, market, as_of)?;
 
         Ok(ValuationResult::stamped(equity_option.id(), as_of, pv))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::common_impl::parameters::{ExerciseStyle, OptionType};
+    use crate::instruments::{Attributes, PricingOverrides, SettlementType};
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::DayCount;
+    use finstack_core::market_data::scalars::MarketScalar;
+    use finstack_core::market_data::surfaces::VolSurface;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_core::types::{CurveId, InstrumentId};
+    use time::Month;
+
+    fn date(year: i32, month: u8, day: u8) -> Date {
+        Date::from_calendar_date(year, Month::try_from(month).expect("month"), day)
+            .expect("valid date")
+    }
+
+    fn market(as_of: Date) -> MarketContext {
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+            .build()
+            .expect("curve");
+        let surface = VolSurface::builder("SPX-VOL")
+            .expiries(&[1.0])
+            .strikes(&[100.0])
+            .row(&[0.20])
+            .build()
+            .expect("surface");
+        MarketContext::new()
+            .insert(curve)
+            .insert_surface(surface)
+            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
+    }
+
+    fn option(expiry: Date) -> EquityOption {
+        EquityOption::builder()
+            .id(InstrumentId::new("EQ-OPT-PDE-TEST"))
+            .underlying_ticker("SPX".to_string())
+            .strike(100.0)
+            .option_type(OptionType::Call)
+            .exercise_style(ExerciseStyle::European)
+            .expiry(expiry)
+            .notional(Money::new(100.0, Currency::USD))
+            .day_count(DayCount::Act365F)
+            .settlement(SettlementType::Cash)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .spot_id("SPX-SPOT".into())
+            .vol_surface_id(CurveId::new("SPX-VOL"))
+            .pricing_overrides(PricingOverrides::default())
+            .attributes(Attributes::new())
+            .build()
+            .expect("equity option")
+    }
+
+    #[test]
+    fn heston_pde_rejects_future_discrete_dividend() {
+        let as_of = date(2025, 1, 1);
+        let mut inst = option(date(2026, 1, 1));
+        inst.discrete_dividends = vec![(date(2025, 7, 1), 2.0)];
+
+        let err = EquityOptionHestonPdePricer::default()
+            .price_internal(&inst, &market(as_of), as_of)
+            .expect_err("Heston PDE must reject discrete dividends");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("discrete dividends"),
+            "unexpected error message: {msg}"
+        );
     }
 }

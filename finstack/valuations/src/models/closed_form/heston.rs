@@ -176,9 +176,9 @@ impl HestonParams {
     /// `HESTON_V0`) and falling back to [`heston_defaults`] when a scalar is
     /// missing or has the wrong type.
     ///
-    /// This is the single entry point used by the Fourier, PDE, and Monte
-    /// Carlo equity-option pricers, ensuring all three see identical
-    /// parameters when invoked on the same market.
+    /// This lenient entry point is retained for examples, notebooks, and smoke
+    /// tests. Production pricers use [`Self::from_market_strict`] so all three
+    /// Heston equity-option implementations see identical explicit parameters.
     ///
     /// # Errors
     ///

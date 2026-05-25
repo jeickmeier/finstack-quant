@@ -27,8 +27,8 @@ use finstack_monte_carlo::time_grid::TimeGrid;
 /// Equity option Heston Monte Carlo pricer.
 ///
 /// Prices European equity options under the Heston stochastic volatility model
-/// using QE discretization. Heston parameters are sourced from market scalars
-/// (HESTON_KAPPA, HESTON_THETA, etc.) with sensible defaults.
+/// using QE discretization. Heston parameters are sourced from required market
+/// scalars (`HESTON_KAPPA`, `HESTON_THETA`, etc.).
 pub(crate) struct EquityOptionHestonMcPricer {
     num_paths: usize,
     steps_per_year: f64,

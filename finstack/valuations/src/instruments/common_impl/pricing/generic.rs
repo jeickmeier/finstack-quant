@@ -88,7 +88,7 @@ where
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
-                    PricingErrorContext::default(),
+                    PricingErrorContext::from_instrument(typed_instrument).model(self.model_key),
                 )
             })?;
 
@@ -98,11 +98,37 @@ where
         }
         Ok(result)
     }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let typed_instrument = instrument
+            .as_any()
+            .downcast_ref::<I>()
+            .ok_or_else(|| PricingError::type_mismatch(self.instrument_type, instrument.key()))?;
+        let effective_as_of = typed_instrument.resolve_pricing_as_of(market, as_of);
+
+        typed_instrument
+            .value_raw(market, effective_as_of)
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::from_instrument(typed_instrument).model(self.model_key),
+                )
+            })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_core::currency::Currency;
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::money::Money;
+    use time::macros::date;
 
     #[test]
     fn test_generic_pricer_keys() {
@@ -134,5 +160,61 @@ mod tests {
             pricer.key(),
             PricerKey::new(InstrumentType::Bond, ModelKey::HazardRate)
         );
+    }
+
+    #[test]
+    fn generic_pricer_attaches_instrument_and_model_context_to_failures() {
+        let bond = crate::instruments::Bond::fixed(
+            "GENERIC-CTX",
+            Money::new(100.0, Currency::USD),
+            0.05,
+            date!(2025 - 01 - 01),
+            date!(2030 - 01 - 01),
+            "USD-OIS",
+        )
+        .expect("bond");
+        let pricer =
+            GenericInstrumentPricer::<crate::instruments::Bond>::discounting(InstrumentType::Bond);
+
+        let err = pricer
+            .price_dyn(&bond, &MarketContext::new(), date!(2025 - 01 - 01))
+            .expect_err("missing discount curve must fail");
+
+        match err {
+            PricingError::ModelFailure { context, .. } => {
+                assert_eq!(context.instrument_id.as_deref(), Some("GENERIC-CTX"));
+                assert_eq!(context.instrument_type, Some(InstrumentType::Bond));
+                assert_eq!(context.model, Some(ModelKey::Discounting));
+            }
+            other => panic!("expected model failure, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn generic_pricer_raw_path_attaches_context_to_failures() {
+        let bond = crate::instruments::Bond::fixed(
+            "GENERIC-RAW-CTX",
+            Money::new(100.0, Currency::USD),
+            0.05,
+            date!(2025 - 01 - 01),
+            date!(2030 - 01 - 01),
+            "USD-OIS",
+        )
+        .expect("bond");
+        let pricer =
+            GenericInstrumentPricer::<crate::instruments::Bond>::discounting(InstrumentType::Bond);
+
+        let err = pricer
+            .price_raw_dyn(&bond, &MarketContext::new(), date!(2025 - 01 - 01))
+            .expect_err("missing discount curve must fail");
+
+        match err {
+            PricingError::ModelFailure { context, .. } => {
+                assert_eq!(context.instrument_id.as_deref(), Some("GENERIC-RAW-CTX"));
+                assert_eq!(context.instrument_type, Some(InstrumentType::Bond));
+                assert_eq!(context.model, Some(ModelKey::Discounting));
+            }
+            other => panic!("expected model failure, got {other:?}"),
+        }
     }
 }
