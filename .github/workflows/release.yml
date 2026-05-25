@@ -85,7 +85,9 @@ jobs:
             --manifest-path finstack-py/Cargo.toml
             --interpreter python${{ matrix.python }}
           manylinux: "2_28"
-          sccache: true
+          # Windows wheel builds have hit rustc-version skew from cached artifacts
+          # (E0514). Keep sccache for Unix wheels, but force clean Windows compiles.
+          sccache: ${{ runner.os != 'Windows' }}
 
       - name: Smoke test wheel
         if: matrix.target != 'aarch64' || runner.os != 'Linux'
