@@ -11,8 +11,8 @@ use finstack_core::{Error, Result};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-use crate::taylor::TaylorAttributionConfig;
 use super::detail::*;
+use crate::taylor::TaylorAttributionConfig;
 
 /// Controls where attribution repricing work spends parallelism.
 ///
@@ -103,11 +103,10 @@ pub enum AttributionFactor {
     Volatility,
 
     /// Market scalars (dividends, equity/commodity prices, inflation indices).
-    MarketScalars,    
+    MarketScalars,
 
     /// Model-specific parameters (prepayment, default, recovery, conversion).
     ModelParameters,
-
 }
 
 /// Complete P&L attribution result for a single instrument.
