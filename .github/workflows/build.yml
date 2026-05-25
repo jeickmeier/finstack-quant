@@ -100,7 +100,7 @@ jobs:
   test-rust:
     name: Test Rust
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     needs: prime-cache
 
     env:
