@@ -160,7 +160,12 @@ pub(in crate::builder) fn emit_fees_on(
     ccy: Currency,
     new_flows: &mut Vec<CashFlow>,
 ) -> finstack_core::Result<()> {
-    let mut twa_buf: Vec<(Date, Decimal)> = Vec::with_capacity(outstanding_history.len());
+    // Lazily allocated: only `TimeWeightedAverage` fees touch this buffer (via
+    // `compute_time_weighted_average`, which clears + extends it itself). For
+    // the common cases — no periodic fees, point-in-time fees, or a date with
+    // no matching fee period — `Vec::new()` never allocates, avoiding an
+    // O(history) allocation on every build date.
+    let mut twa_buf: Vec<(Date, Decimal)> = Vec::new();
 
     for pf in periodic_fees {
         if let Some(period) = pf.prev.get(&d) {

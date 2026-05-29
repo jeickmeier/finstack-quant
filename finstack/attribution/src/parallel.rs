@@ -431,19 +431,22 @@ pub fn attribute_pnl_parallel_with_credit_model(
     // (via `compute_pnl`). This isolates the pricing effect of time passage
     // from FX translation effects. The FX factor (Step 7) captures all
     // translation P&L, ensuring consistent summation.
-    let market_frozen = market_t0.clone();
+    // Carry freezes the market at T₀: it reprices at the T₁ date against the
+    // unchanged T₀ market context, so the T₀ context is used directly rather
+    // than deep-cloned (the reprice and carry-input helpers only borrow it).
+    //
     // Carry must isolate *pure time passage*: it reprices the T₀-parameter
     // instrument (`instrument_t0`), not `instrument`. Using `instrument` here
     // would fold any T₀→T₁ model-parameter drift into theta, since `val_t0`
     // was itself priced with `instrument_t0`.
-    let val_carry = reprice_instrument(&instrument_t0, &market_frozen, as_of_t1)?;
+    let val_carry = reprice_instrument(&instrument_t0, market_t0, as_of_t1)?;
     num_repricings += 1;
 
     let theta = compute_pnl(val_t0, val_carry, val_t1.currency(), market_t1, as_of_t1)?;
 
     let carry_inputs = total_return_carry_inputs(
         instrument_t0.as_ref(),
-        &market_frozen,
+        market_t0,
         market_t0,
         as_of_t0,
         as_of_t1,
@@ -461,7 +464,6 @@ pub fn attribute_pnl_parallel_with_credit_model(
         let discount_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::DISCOUNT);
         let forward_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::FORWARD);
         let credit_snap_ext = MarketSnapshot::extract(market_t0, MarketRestoreFlags::CREDIT);
-        credit_snapshot = credit_snap_ext.clone();
         let inflation_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::INFLATION);
         let correlation_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::CORRELATION);
         let fx_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::FX);
@@ -484,13 +486,15 @@ pub fn attribute_pnl_parallel_with_credit_model(
                 snapshot: Box::new(forward_snap),
             });
         }
-        if !credit_snapshot.hazard_curves.is_empty() {
+        if !credit_snap_ext.hazard_curves.is_empty() {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Credit,
                 flags: MarketRestoreFlags::CREDIT,
-                snapshot: Box::new(credit_snapshot.clone()),
+                snapshot: Box::new(credit_snap_ext.clone()),
             });
         }
+        // Retain the credit snapshot for the cascade reprice later (Step 4).
+        credit_snapshot = credit_snap_ext;
         if !inflation_snap.inflation_curves.is_empty() {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Inflation,

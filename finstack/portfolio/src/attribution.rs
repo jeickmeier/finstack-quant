@@ -553,7 +553,8 @@ pub fn attribute_portfolio_pnl(
         .collect::<Result<Vec<_>>>()?;
 
     let mut acc = FactorAccumulator::new();
-    let mut by_position: IndexMap<PositionId, PnlAttribution> = IndexMap::new();
+    let mut by_position: IndexMap<PositionId, PnlAttribution> =
+        IndexMap::with_capacity(position_data.len());
 
     // Hoisted out of the per-position loop: the closure captures `market_t1`,
     // `base_ccy`, and `as_of_t1` by reference and is reused for every field of

@@ -22,9 +22,9 @@ use finstack_core::currency::Currency;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::summation::neumaier_sum;
 use finstack_core::money::fx::FxQuery;
+use finstack_core::{HashMap, HashSet};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
 /// Aggregated metric across the portfolio.
@@ -363,7 +363,7 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
     // eliminating per-position String clones during accumulation. The
     // intern table's iteration order doesn't affect output, so HashMap
     // is fine here.
-    let mut intern: HashMap<String, Arc<str>> = HashMap::new();
+    let mut intern: HashMap<String, Arc<str>> = HashMap::default();
 
     // These two maps drive the serialization order of
     // `PortfolioMetrics.aggregated` and `AggregatedMetric.by_entity`.

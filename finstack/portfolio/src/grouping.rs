@@ -9,8 +9,8 @@ use crate::position::Position;
 use crate::valuation::PortfolioValuation;
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
+use finstack_core::{HashMap, HashSet};
 use indexmap::IndexMap;
-use std::collections::{HashMap, HashSet};
 
 const MAX_BOOK_GROUPING_RECURSION_DEPTH: usize = 512;
 const UNTAGGED_GROUP: &str = "_untagged";
@@ -264,9 +264,9 @@ pub fn aggregate_by_book(
     }
 
     // Compute totals for all books
-    let mut memo: HashMap<BookId, Money> = HashMap::new();
+    let mut memo: HashMap<BookId, Money> = HashMap::default();
     for book_id in books.keys() {
-        let mut visiting = HashSet::new();
+        let mut visiting = HashSet::default();
         let total = compute_book_total(
             book_id,
             books,
