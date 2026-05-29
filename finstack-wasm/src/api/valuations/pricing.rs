@@ -295,8 +295,8 @@ mod tests {
 
         let mut pricing_overrides = PricingOverrides::default();
         pricing_overrides.model_config.mc_paths = Some(32);
-        pricing_overrides.model_config.mean_reversion = Some(0.05);
-        pricing_overrides.market_quotes.implied_volatility = Some(1e-12);
+        pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
+        pricing_overrides.model_config.hw1f_sigma = Some(1e-12);
 
         let tarn = Tarn {
             id: InstrumentId::new("TARN-WASM-E2E"),
@@ -313,6 +313,7 @@ mod tests {
             floating_tenor: Tenor::semi_annual(),
             floating_index_id: CurveId::new("USD-SOFR-6M"),
             discount_curve_id: CurveId::new("USD-OIS"),
+            vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             day_count: DayCount::Act365F,
             pricing_overrides,
             attributes: Default::default(),
@@ -330,8 +331,8 @@ mod tests {
 
         let mut pricing_overrides = PricingOverrides::default();
         pricing_overrides.model_config.mc_paths = Some(32);
-        pricing_overrides.model_config.mean_reversion = Some(0.05);
-        pricing_overrides.market_quotes.implied_volatility = Some(1e-12);
+        pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
+        pricing_overrides.model_config.hw1f_sigma = Some(1e-12);
 
         let snowball = Snowball {
             id: InstrumentId::new("SNOWBALL-WASM-E2E"),
@@ -351,6 +352,7 @@ mod tests {
             floating_index_id: CurveId::new("USD-SOFR-6M"),
             floating_tenor: Tenor::semi_annual(),
             discount_curve_id: CurveId::new("USD-OIS"),
+            vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             callable: None,
             day_count: DayCount::Act365F,
             pricing_overrides,
@@ -385,6 +387,7 @@ mod tests {
             floating_index_id: CurveId::new("USD-SOFR-6M"),
             floating_tenor: Tenor::semi_annual(),
             discount_curve_id: CurveId::new("USD-OIS"),
+            vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             callable: None,
             day_count: DayCount::Act365F,
             pricing_overrides: PricingOverrides::default(),
@@ -405,8 +408,8 @@ mod tests {
 
         let mut pricing_overrides = PricingOverrides::default();
         pricing_overrides.model_config.mc_paths = Some(8);
-        pricing_overrides.model_config.mean_reversion = Some(0.05);
-        pricing_overrides.market_quotes.implied_volatility = Some(1e-12);
+        pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
+        pricing_overrides.model_config.hw1f_sigma = Some(1e-12);
 
         let range_accrual = RangeAccrual::builder()
             .id(InstrumentId::new("RA-WASM-E2E"))

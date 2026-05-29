@@ -15,7 +15,10 @@ pub use mc_config::RateExoticMcConfig;
 
 /// HW1F parameter resolution with overrides/market-scalar/default precedence.
 pub mod hw1f_calibration;
-pub use hw1f_calibration::{resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fResolveRequest};
+pub use hw1f_calibration::{
+    resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fCapletSurfacePoint, Hw1fResolveRequest,
+    Hw1fSurfaceCalibration,
+};
 
 /// HW1F θ(t) curve calibration and term-forward bond reconstruction.
 pub mod hw1f_curve;

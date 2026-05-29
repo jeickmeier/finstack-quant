@@ -81,6 +81,9 @@ pub struct Snowball {
     pub floating_tenor: Tenor,
     /// Discount curve ID.
     pub discount_curve_id: CurveId,
+    /// Optional normal-vol surface used to infer HW1F short-rate σ for stress scenarios.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vol_surface_id: Option<CurveId>,
     /// Optional Bermudan call provision.
     pub callable: Option<BermudanCallProvision>,
     /// Day count convention.
@@ -185,6 +188,7 @@ impl Snowball {
             floating_index_id: CurveId::new("USD-SOFR-6M"),
             floating_tenor: Tenor::semi_annual(),
             discount_curve_id: CurveId::new("USD-OIS"),
+            vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             callable: None,
             day_count: DayCount::Act360,
             pricing_overrides: PricingOverrides::default(),
@@ -218,6 +222,7 @@ impl Snowball {
             floating_index_id: CurveId::new("USD-SOFR-3M"),
             floating_tenor: Tenor::quarterly(),
             discount_curve_id: CurveId::new("USD-OIS"),
+            vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             callable: None,
             day_count: DayCount::Act360,
             pricing_overrides: PricingOverrides::default(),
@@ -269,9 +274,14 @@ impl crate::instruments::common_impl::traits::Instrument for Snowball {
         &self,
     ) -> finstack_core::Result<crate::instruments::common_impl::dependencies::MarketDependencies>
     {
-        crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-            self,
-        )
+        let mut deps =
+            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
+                self,
+            )?;
+        if let Some(surface_id) = &self.vol_surface_id {
+            deps.add_vol_surface_id(surface_id.as_str());
+        }
+        Ok(deps)
     }
 
     fn base_value(

@@ -5,9 +5,10 @@ use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::callable_range_accrual::CallableRangeAccrual;
 use crate::instruments::rates::exotics_shared::{
-    calibrate_hw1f_params, initial_short_rate_from_curve, standard_basis, ExerciseBoundaryPayoff,
-    Hw1fTermForward, PeriodForwardCoeffs, RateExoticHw1fLsmcPricer, RateExoticHw1fMcPricer,
-    RateExoticMcConfig,
+    calibrate_hw1f_params, initial_short_rate_from_curve, resolve_hw1f_params, standard_basis,
+    ExerciseBoundaryPayoff, Hw1fCalibrationFlavor, Hw1fCapletSurfacePoint, Hw1fResolveRequest,
+    Hw1fSurfaceCalibration, Hw1fTermForward, PeriodForwardCoeffs, RateExoticHw1fLsmcPricer,
+    RateExoticHw1fMcPricer, RateExoticMcConfig,
 };
 use crate::instruments::rates::range_accrual::BoundsType;
 use crate::metrics::MetricId;
@@ -209,18 +210,27 @@ impl CallableRangeAccrualPricer {
         self
     }
 
-    fn effective_hw_params(&self, inst: &CallableRangeAccrual) -> Result<HullWhiteParams> {
-        let kappa = inst
-            .pricing_overrides
-            .model_config
-            .mean_reversion
-            .unwrap_or(self.hw_params.kappa);
-        let sigma = inst
-            .pricing_overrides
-            .market_quotes
-            .implied_volatility
-            .unwrap_or(self.hw_params.sigma);
-        HullWhiteParams::new(kappa, sigma)
+    fn effective_hw_params(
+        &self,
+        inst: &CallableRangeAccrual,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<HullWhiteParams> {
+        let overrides = hw1f_overrides_json(inst);
+        let surface_points = callable_range_surface_points(inst, as_of)?;
+        let context_label = format!("CallableRangeAccrual {}", inst.id);
+        let req = Hw1fResolveRequest {
+            curve_id: inst.range_accrual.discount_curve_id.as_str(),
+            flavor: Hw1fCalibrationFlavor::CapFloor,
+            overrides: overrides.as_ref(),
+            surface: Some(Hw1fSurfaceCalibration::CapFloor {
+                surface_id: inst.range_accrual.vol_surface_id.as_str(),
+                points: surface_points.as_slice(),
+            }),
+            fallback: Some(self.hw_params),
+            context: context_label.as_str(),
+        };
+        resolve_hw1f_params(&req, market)
     }
 
     fn effective_config(&self, inst: &CallableRangeAccrual) -> RateExoticMcConfig {
@@ -249,7 +259,7 @@ impl CallableRangeAccrualPricer {
         inst.validate()?;
 
         let discount_curve = market.get_discount(inst.range_accrual.discount_curve_id.as_ref())?;
-        let hw_params = self.effective_hw_params(inst)?;
+        let hw_params = self.effective_hw_params(inst, market, as_of)?;
         // HW1F bond-reconstruction built from the discount curve; turns the
         // simulated short rate at each observation into the term reference rate.
         let term_forward = Hw1fTermForward::new(hw_params, discount_curve.as_ref(), as_of)?;
@@ -327,6 +337,37 @@ impl Default for CallableRangeAccrualPricer {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn hw1f_overrides_json(inst: &CallableRangeAccrual) -> Option<serde_json::Value> {
+    let kappa = inst.pricing_overrides.model_config.hw1f_mean_reversion?;
+    let sigma = inst.pricing_overrides.model_config.hw1f_sigma?;
+    Some(serde_json::json!({ "hw1f_kappa": kappa, "hw1f_sigma": sigma }))
+}
+
+fn callable_range_surface_points(
+    inst: &CallableRangeAccrual,
+    as_of: Date,
+) -> Result<Vec<Hw1fCapletSurfacePoint>> {
+    let ctx = DayCountContext::default();
+    let range = &inst.range_accrual;
+    let strike = 0.5 * (range.lower_bound + range.upper_bound);
+    let mut points = Vec::new();
+    for &date in &range.observation_dates {
+        if date <= as_of {
+            continue;
+        }
+        let t_fix = range.day_count.year_fraction(as_of, date, ctx)?;
+        if t_fix > 0.0 {
+            points.push(Hw1fCapletSurfacePoint {
+                t_fix,
+                accrual: (range.day_count.year_fraction(as_of, date, ctx)?).max(1.0 / 365.0),
+                strike,
+                weight: range.notional.amount().abs(),
+            });
+        }
+    }
+    Ok(points)
 }
 
 impl Pricer for CallableRangeAccrualPricer {
@@ -645,6 +686,31 @@ mod tests {
             min_steps_between_events: 1,
             ..Default::default()
         })
+    }
+
+    #[test]
+    fn implied_volatility_is_not_used_as_hw1f_sigma() {
+        let as_of = date(2025, Month::January, 1);
+        let curves = market(as_of, 0.02, 0.03);
+        let no_iv = test_callable(vec![date(2025, Month::July, 1)], 10, 0.06);
+        let mut with_iv = no_iv.clone();
+        with_iv.pricing_overrides.market_quotes.implied_volatility = Some(0.20);
+
+        let pv_no_iv = deterministic_pricer(8)
+            .price_estimate(&no_iv, &curves, as_of)
+            .expect("no iv")
+            .mean
+            .amount();
+        let pv_with_iv = deterministic_pricer(8)
+            .price_estimate(&with_iv, &curves, as_of)
+            .expect("with iv")
+            .mean
+            .amount();
+
+        assert!(
+            (pv_with_iv - pv_no_iv).abs() < 1e-9,
+            "implied_volatility must not alter callable range accrual HW1F sigma: no_iv={pv_no_iv}, with_iv={pv_with_iv}"
+        );
     }
 
     #[test]

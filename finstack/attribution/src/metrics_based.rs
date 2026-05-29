@@ -2055,6 +2055,100 @@ mod tests {
         );
     }
 
+    #[test]
+    fn hw1f_cap_surface_shock_produces_metrics_based_vol_pnl() {
+        use finstack_core::dates::{DayCount, Tenor};
+        use finstack_core::market_data::bumps::{
+            BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
+        };
+        use finstack_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+        use finstack_core::types::CurveId;
+        use finstack_valuations::instruments::rates::cap_floor::{CapFloor, CapFloorVolType};
+        use finstack_valuations::instruments::PricingOptions;
+        use finstack_valuations::pricer::ModelKey;
+
+        let as_of_t0 = date!(2024 - 01 - 01);
+        let as_of_t1 = date!(2024 - 01 - 02);
+        let mut cap = CapFloor::new_cap(
+            "HW-SURFACE-CAP",
+            Money::new(1_000_000.0, Currency::USD),
+            0.05,
+            date!(2024 - 04 - 01),
+            date!(2029 - 04 - 01),
+            Tenor::quarterly(),
+            DayCount::Act365F,
+            "USD-OIS",
+            "USD-LIBOR-3M",
+            "USD-CAP-VOL",
+        )
+        .expect("cap");
+        cap.vol_type = CapFloorVolType::Normal;
+
+        let discount = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of_t0)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (10.0, (-0.05_f64 * 10.0).exp())])
+            .build()
+            .expect("discount");
+        let forward = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
+            .base_date(as_of_t0)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 0.05), (10.0, 0.05)])
+            .build()
+            .expect("forward");
+        let surface = VolSurface::builder("USD-CAP-VOL")
+            .expiries(&[0.25, 1.0, 5.0, 10.0])
+            .strikes(&[0.05])
+            .row(&[0.010])
+            .row(&[0.010])
+            .row(&[0.010])
+            .row(&[0.010])
+            .build()
+            .expect("surface");
+        let market_t0 = MarketContext::new()
+            .insert(discount)
+            .insert(forward)
+            .insert_surface(surface);
+        let market_t1 = market_t0
+            .bump([MarketBump::Curve {
+                id: CurveId::from("USD-CAP-VOL"),
+                spec: BumpSpec {
+                    mode: BumpMode::Multiplicative,
+                    units: BumpUnits::Factor,
+                    value: 1.10,
+                    bump_type: BumpType::Parallel,
+                },
+            }])
+            .expect("vol shock");
+        let options = PricingOptions::default().with_model(ModelKey::HullWhite1F);
+        let metrics = [MetricId::Vega];
+
+        let val_t0 = cap
+            .price_with_metrics(&market_t0, as_of_t0, &metrics, options.clone())
+            .expect("t0 price");
+        let val_t1 = cap
+            .price_with_metrics(&market_t1, as_of_t1, &metrics, options)
+            .expect("t1 price");
+        let instrument: Arc<dyn Instrument> = Arc::new(cap);
+
+        let attribution = attribute_pnl_metrics_based(
+            &instrument,
+            &market_t0,
+            &market_t1,
+            &val_t0,
+            &val_t1,
+            as_of_t0,
+            as_of_t1,
+        )
+        .expect("attribution");
+
+        assert!(val_t0.measures.get("vega").copied().unwrap_or(0.0) > 0.0);
+        assert!(
+            attribution.vol_pnl.amount().abs() > 1e-6,
+            "surface-driven HW cap must produce non-zero vol P&L"
+        );
+    }
+
     /// Regression test: `CrossGammaSpotVol` (in pct-spot × vol-point units,
     /// produced by `CrossFactorCalculator`) multiplied by `avg_spot_shift_pct`
     /// and `avg_vol_shift_abs` must give the correct cross P&L.

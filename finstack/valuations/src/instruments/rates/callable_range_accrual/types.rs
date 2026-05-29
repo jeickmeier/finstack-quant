@@ -121,9 +121,12 @@ impl crate::instruments::common_impl::traits::Instrument for CallableRangeAccrua
         &self,
     ) -> finstack_core::Result<crate::instruments::common_impl::dependencies::MarketDependencies>
     {
-        crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-            self,
-        )
+        let mut deps =
+            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
+                self,
+            )?;
+        deps.add_vol_surface_id(self.range_accrual.vol_surface_id.as_str());
+        Ok(deps)
     }
 
     fn base_value(

@@ -2,7 +2,8 @@
 //!
 //! Precedence:
 //! 1. Explicit overrides in `PricingOverrides.model_config` (keys `hw1f_kappa`, `hw1f_sigma`).
-//! 2. Pre-calibrated parameters read from the `MarketContext` scalar store.
+//! 2. Pricing-time calibration from a volatility surface, when supplied.
+//! 3. Pre-calibrated parameters read from the `MarketContext` scalar store.
 //!    A prior Hull-White calibration step (`StepParams::HullWhite` /
 //!    `StepParams::CapFloorHullWhite`) writes solved κ/σ as named scalars under
 //!    the keys produced by
@@ -10,11 +11,13 @@
 //!    [`capfloor_hw1f_scalar_keys`](crate::calibration::hull_white::capfloor_hw1f_scalar_keys).
 //!    When both scalars are present and valid for the request's `curve_id`,
 //!    the resolver returns those market-consistent parameters.
-//! 3. `HullWhiteParams::default()` when neither overrides nor calibrated market
+//! 4. `HullWhiteParams::default()` when neither overrides nor calibrated market
 //!    scalars are available, with a `tracing::warn!` log.
 
 use crate::calibration::hull_white::{
-    capfloor_hw1f_scalar_keys, hw1f_scalar_keys, HullWhiteParams,
+    calibrate_hull_white_to_swaptions, capfloor_hw1f_scalar_keys,
+    hw1f_caplet_forward_rate_normal_vol, hw1f_scalar_keys, HullWhiteParams, SwapFrequency,
+    SwaptionQuote,
 };
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::scalars::MarketScalar;
@@ -31,6 +34,39 @@ pub enum Hw1fCalibrationFlavor {
     Swaption,
     /// Parameters calibrated to a cap/floor vol strip (`{curve}_CAPFLOOR_HW1F_*`).
     CapFloor,
+}
+
+/// One caplet/floorlet observation used to infer a short-rate σ from a normal-vol surface.
+#[derive(Debug, Clone, Copy)]
+pub struct Hw1fCapletSurfacePoint {
+    /// Time from valuation date to option fixing, in years.
+    pub t_fix: f64,
+    /// Accrual year fraction for the underlying rate period.
+    pub accrual: f64,
+    /// Surface strike coordinate to read.
+    pub strike: f64,
+    /// Non-negative aggregation weight, typically annuity × normal vega.
+    pub weight: f64,
+}
+
+/// Optional pricing-time vol-surface calibration input for HW1F products.
+pub enum Hw1fSurfaceCalibration<'a> {
+    /// Infer σ from caplet normal vols on a cap/floor surface.
+    CapFloor {
+        /// Vol surface identifier.
+        surface_id: &'a str,
+        /// Caplet observations to sample from the surface.
+        points: &'a [Hw1fCapletSurfacePoint],
+    },
+    /// Calibrate κ/σ from an ATM swaption surface.
+    Swaption {
+        /// Swaption vol surface identifier.
+        surface_id: &'a str,
+        /// Ignore surface expiries beyond this horizon, when supplied.
+        max_expiry: Option<f64>,
+        /// Underlying swap fixed-leg frequency for calibration.
+        frequency: SwapFrequency,
+    },
 }
 
 impl Hw1fCalibrationFlavor {
@@ -54,6 +90,10 @@ pub struct Hw1fResolveRequest<'a> {
     pub flavor: Hw1fCalibrationFlavor,
     /// Optional pricing-override JSON blob (from `PricingOverrides.model_config`).
     pub overrides: Option<&'a serde_json::Value>,
+    /// Optional pricing-time surface input used to infer market-consistent HW1F params.
+    pub surface: Option<Hw1fSurfaceCalibration<'a>>,
+    /// Optional fallback used by pricers with explicit constructor-level defaults.
+    pub fallback: Option<HullWhiteParams>,
     /// Context label for logs/warns (e.g., "TARN TARN-USD-5Y").
     pub context: &'a str,
 }
@@ -65,6 +105,120 @@ fn scalar_as_positive_f64(scalar: &MarketScalar) -> Option<f64> {
         MarketScalar::Price(m) => m.amount(),
     };
     (value.is_finite() && value > 0.0).then_some(value)
+}
+
+fn override_positive_f64(
+    obj: Option<&serde_json::Map<String, serde_json::Value>>,
+    key: &str,
+) -> Result<Option<f64>> {
+    let Some(value) = obj.and_then(|o| o.get(key)).and_then(|x| x.as_f64()) else {
+        return Ok(None);
+    };
+    if value.is_finite() && value > 0.0 {
+        Ok(Some(value))
+    } else {
+        Err(finstack_core::Error::Validation(format!(
+            "{key} override must be positive and finite, got {value}"
+        )))
+    }
+}
+
+fn resolve_from_surface(
+    req: &Hw1fResolveRequest<'_>,
+    market: &MarketContext,
+    kappa_hint: f64,
+) -> Result<Option<HullWhiteParams>> {
+    let Some(surface_calibration) = req.surface.as_ref() else {
+        return Ok(None);
+    };
+    match surface_calibration {
+        Hw1fSurfaceCalibration::CapFloor { surface_id, points } => {
+            resolve_capfloor_surface_params(market, surface_id, points, kappa_hint)
+        }
+        Hw1fSurfaceCalibration::Swaption {
+            surface_id,
+            max_expiry,
+            frequency,
+        } => resolve_swaption_surface_params(
+            market,
+            req.curve_id,
+            surface_id,
+            *max_expiry,
+            *frequency,
+        ),
+    }
+}
+
+fn resolve_capfloor_surface_params(
+    market: &MarketContext,
+    surface_id: &str,
+    points: &[Hw1fCapletSurfacePoint],
+    kappa: f64,
+) -> Result<Option<HullWhiteParams>> {
+    let surface = match market.get_surface(surface_id) {
+        Ok(surface) => surface,
+        Err(_) => return Ok(None),
+    };
+    let mut weighted_sigma = 0.0;
+    let mut total_weight = 0.0;
+    for point in points {
+        let factor = hw1f_caplet_forward_rate_normal_vol(kappa, 1.0, point.t_fix, point.accrual);
+        let normal_vol = surface.value_clamped(point.t_fix, point.strike);
+        if factor > 0.0 && normal_vol.is_finite() && normal_vol > 0.0 {
+            let weight = point.weight.max(0.0);
+            if weight > 0.0 {
+                weighted_sigma += (normal_vol / factor) * weight;
+                total_weight += weight;
+            }
+        }
+    }
+    if total_weight <= 0.0 {
+        return Ok(None);
+    }
+    HullWhiteParams::new(kappa, weighted_sigma / total_weight).map(Some)
+}
+
+fn resolve_swaption_surface_params(
+    market: &MarketContext,
+    curve_id: &str,
+    surface_id: &str,
+    max_expiry: Option<f64>,
+    frequency: SwapFrequency,
+) -> Result<Option<HullWhiteParams>> {
+    let surface = match market.get_surface(surface_id) {
+        Ok(surface) => surface,
+        Err(_) => return Ok(None),
+    };
+    let discount = match market.get_discount(curve_id) {
+        Ok(discount) => discount,
+        Err(_) => return Ok(None),
+    };
+    let mut quotes = Vec::new();
+    for &expiry in surface.expiries() {
+        if expiry <= 0.0 || max_expiry.is_some_and(|limit| expiry > limit) {
+            continue;
+        }
+        for &tenor in surface.strikes() {
+            if tenor <= 0.0 {
+                continue;
+            }
+            let vol = surface.value_clamped(expiry, tenor);
+            if vol.is_finite() && vol > 0.0 {
+                quotes.push(SwaptionQuote {
+                    expiry,
+                    tenor,
+                    volatility: vol,
+                    is_normal_vol: true,
+                });
+            }
+        }
+    }
+    if quotes.len() < 2 {
+        return Ok(None);
+    }
+    let df = |t: f64| discount.df(t);
+    let (params, _report) = calibrate_hull_white_to_swaptions(&df, &quotes, frequency, None)?;
+    Ok(Some(params))
 }
 
 /// Resolve HW1F parameters following the documented precedence.
@@ -79,26 +233,14 @@ pub fn resolve_hw1f_params(
     req: &Hw1fResolveRequest<'_>,
     market: &MarketContext,
 ) -> Result<HullWhiteParams> {
-    // (1) Explicit pricing overrides.
-    if let Some(obj) = req.overrides.and_then(|v| v.as_object()) {
-        let kappa = obj.get("hw1f_kappa").and_then(|x| x.as_f64());
-        let sigma = obj.get("hw1f_sigma").and_then(|x| x.as_f64());
-        if let (Some(k), Some(s)) = (kappa, sigma) {
-            if !k.is_finite() || k <= 0.0 {
-                return Err(finstack_core::Error::Validation(format!(
-                    "hw1f_kappa override must be positive and finite, got {k}"
-                )));
-            }
-            if !s.is_finite() || s <= 0.0 {
-                return Err(finstack_core::Error::Validation(format!(
-                    "hw1f_sigma override must be positive and finite, got {s}"
-                )));
-            }
-            return HullWhiteParams::new(k, s);
-        }
+    let override_obj = req.overrides.and_then(|v| v.as_object());
+    let override_kappa = override_positive_f64(override_obj, "hw1f_kappa")?;
+    let override_sigma = override_positive_f64(override_obj, "hw1f_sigma")?;
+    if let (Some(k), Some(s)) = (override_kappa, override_sigma) {
+        return HullWhiteParams::new(k, s);
     }
 
-    // (2) Pre-calibrated parameters from the MarketContext scalar store.
+    // Pre-calibrated parameters from the MarketContext scalar store.
     let (kappa_key, sigma_key) = req.flavor.scalar_keys(req.curve_id);
     let kappa = market
         .get_price(&kappa_key)
@@ -108,6 +250,24 @@ pub fn resolve_hw1f_params(
         .get_price(&sigma_key)
         .ok()
         .and_then(scalar_as_positive_f64);
+
+    // (2) Pricing-time vol-surface calibration. This keeps scenario/attribution
+    // vol shocks flowing through the same `VolSurface` channel as vanilla options.
+    let defaults = req.fallback.unwrap_or_default();
+    let kappa_hint = override_kappa.or(kappa).unwrap_or(defaults.kappa);
+    if let Some(surface_params) = resolve_from_surface(req, market, kappa_hint)? {
+        tracing::debug!(
+            target = "finstack.exotic_rates",
+            context = req.context,
+            curve_id = req.curve_id,
+            kappa = surface_params.kappa,
+            sigma = surface_params.sigma,
+            "resolved HW1F parameters from volatility surface"
+        );
+        return Ok(surface_params);
+    }
+
+    // (3) Pre-calibrated parameters from the MarketContext scalar store.
     if let (Some(k), Some(s)) = (kappa, sigma) {
         tracing::debug!(
             target = "finstack.exotic_rates",
@@ -120,14 +280,13 @@ pub fn resolve_hw1f_params(
         return HullWhiteParams::new(k, s);
     }
 
-    // (3) Genuine fallback: no overrides, no calibrated scalars.
-    let defaults = HullWhiteParams::default();
+    // (4) Genuine fallback: no overrides, no surface, no calibrated scalars.
     tracing::warn!(
         target = "finstack.exotic_rates",
         context = req.context,
         kappa = defaults.kappa,
         sigma = defaults.sigma,
-        "no HW1F overrides or calibrated market scalars found; using HullWhiteParams::default()"
+        "no HW1F overrides, volatility surface, or calibrated market scalars found; using fallback parameters"
     );
     Ok(defaults)
 }
@@ -137,6 +296,7 @@ mod tests {
     use super::*;
     use finstack_core::market_data::context::MarketContext;
     use finstack_core::market_data::scalars::MarketScalar;
+    use finstack_core::market_data::surfaces::VolSurface;
     use serde_json::json;
 
     fn empty_market() -> MarketContext {
@@ -152,6 +312,8 @@ mod tests {
             curve_id,
             flavor,
             overrides,
+            surface: None,
+            fallback: None,
             context: "test",
         }
     }
@@ -246,6 +408,88 @@ mod tests {
         .expect("ok");
         assert!((params.kappa - 0.06).abs() < 1e-12);
         assert!((params.sigma - 0.009).abs() < 1e-12);
+    }
+
+    #[test]
+    fn capfloor_surface_calibration_wins_over_calibrated_scalars() {
+        let kappa = 0.05;
+        let target_sigma = 0.02;
+        let t_fix = 1.0;
+        let accrual = 0.25;
+        let strike = 0.04;
+        let normal_vol = hw1f_caplet_forward_rate_normal_vol(kappa, target_sigma, t_fix, accrual);
+        let surface = VolSurface::builder("USD-CAP-VOL")
+            .expiries(&[t_fix])
+            .strikes(&[strike])
+            .row(&[normal_vol])
+            .build()
+            .expect("surface");
+        let (kappa_key, sigma_key) = capfloor_hw1f_scalar_keys("USD-OIS");
+        let market = empty_market()
+            .insert_surface(surface)
+            .insert_price(&kappa_key, MarketScalar::Unitless(kappa))
+            .insert_price(&sigma_key, MarketScalar::Unitless(0.009));
+        let points = [Hw1fCapletSurfacePoint {
+            t_fix,
+            accrual,
+            strike,
+            weight: 1.0,
+        }];
+        let request = Hw1fResolveRequest {
+            curve_id: "USD-OIS",
+            flavor: Hw1fCalibrationFlavor::CapFloor,
+            overrides: None,
+            surface: Some(Hw1fSurfaceCalibration::CapFloor {
+                surface_id: "USD-CAP-VOL",
+                points: &points,
+            }),
+            fallback: None,
+            context: "surface-test",
+        };
+
+        let params = resolve_hw1f_params(&request, &market).expect("params");
+
+        assert!((params.kappa - kappa).abs() < 1e-12);
+        assert!((params.sigma - target_sigma).abs() < 1e-12);
+    }
+
+    #[test]
+    fn capfloor_surface_shock_scales_resolved_sigma() {
+        let kappa = 0.03;
+        let base_sigma = 0.01;
+        let t_fix = 2.0;
+        let accrual = 0.5;
+        let strike = 0.035;
+        let base_normal_vol =
+            hw1f_caplet_forward_rate_normal_vol(kappa, base_sigma, t_fix, accrual);
+        let bumped_surface = VolSurface::builder("USD-CAP-VOL")
+            .expiries(&[t_fix])
+            .strikes(&[strike])
+            .row(&[base_normal_vol * 1.25])
+            .build()
+            .expect("surface");
+        let market = empty_market().insert_surface(bumped_surface);
+        let points = [Hw1fCapletSurfacePoint {
+            t_fix,
+            accrual,
+            strike,
+            weight: 1.0,
+        }];
+        let request = Hw1fResolveRequest {
+            curve_id: "USD-OIS",
+            flavor: Hw1fCalibrationFlavor::CapFloor,
+            overrides: None,
+            surface: Some(Hw1fSurfaceCalibration::CapFloor {
+                surface_id: "USD-CAP-VOL",
+                points: &points,
+            }),
+            fallback: Some(HullWhiteParams::new(kappa, base_sigma).expect("fallback")),
+            context: "surface-test",
+        };
+
+        let params = resolve_hw1f_params(&request, &market).expect("params");
+
+        assert!((params.sigma - base_sigma * 1.25).abs() < 1e-12);
     }
 
     #[test]

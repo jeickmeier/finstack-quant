@@ -327,6 +327,57 @@ fn test_hull_white_1f_vega_is_nonzero_and_sigma_sensitive() {
 }
 
 #[test]
+fn test_hull_white_1f_surface_shock_moves_pv_and_vega() {
+    use finstack_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump};
+    use finstack_core::types::CurveId;
+    use finstack_valuations::pricer::ModelKey;
+
+    let as_of = date!(2024 - 01 - 01);
+    let end = date!(2029 - 01 - 01);
+    let cap = create_standard_cap(as_of, end, 0.05);
+
+    let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
+    let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
+    let vol_surface = build_flat_vol_surface(0.01, as_of, "USD_CAP_VOL");
+    let market = MarketContext::new()
+        .insert(disc_curve)
+        .insert(fwd_curve)
+        .insert_surface(vol_surface);
+    let shocked_market = market
+        .bump([MarketBump::Curve {
+            id: CurveId::from("USD_CAP_VOL"),
+            spec: BumpSpec {
+                mode: BumpMode::Multiplicative,
+                units: BumpUnits::Factor,
+                value: 1.25,
+                bump_type: BumpType::Parallel,
+            },
+        }])
+        .expect("surface shock");
+    let opts = finstack_valuations::instruments::PricingOptions::default()
+        .with_model(ModelKey::HullWhite1F);
+
+    let base = cap
+        .price_with_metrics(&market, as_of, &[MetricId::Vega], opts.clone())
+        .unwrap();
+    let shocked = cap
+        .price_with_metrics(&shocked_market, as_of, &[MetricId::Vega], opts)
+        .unwrap();
+
+    let base_pv = base.value.amount();
+    let shocked_pv = shocked.value.amount();
+    let vega = *base.measures.get("vega").unwrap();
+    assert!(
+        vega > 0.0,
+        "surface-driven HW vega should be positive: {vega}"
+    );
+    assert!(
+        (shocked_pv - base_pv).abs() > 1e-6,
+        "HW cap PV must move under a vol surface shock: base={base_pv}, shocked={shocked_pv}"
+    );
+}
+
+#[test]
 fn test_vega_reasonable_magnitude() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);

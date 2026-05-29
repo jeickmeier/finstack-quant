@@ -2,6 +2,7 @@
 
 use crate::instruments::rates::cap_floor::hw_pricer::resolve_capfloor_hw1f_params;
 use crate::instruments::rates::cap_floor::{CapFloor, CapFloorVolType};
+use crate::metrics::bump_surface_vol_absolute;
 use crate::metrics::{MetricCalculator, MetricContext};
 use crate::pricer::ModelKey;
 use finstack_core::Result;
@@ -71,13 +72,34 @@ fn caplet_vega(vol_type: CapFloorVolType, strike: f64, vol_shift: f64, c: Caplet
 }
 
 fn hull_white_tree_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
-    // Bump the *short-rate* σ the HW tree pricer actually consumes
-    // (`model_config.hw1f_sigma`), not `market_quotes.implied_volatility`, which
-    // the cap/floor HW pricer ignores. Resolving the base κ/σ through the same
-    // precedence as the pricer keeps the central-difference vega consistent with
-    // the reported PV; bumping the unread implied-vol field would always yield 0.
+    if option.pricing_overrides.model_config.hw1f_sigma.is_none()
+        || option
+            .pricing_overrides
+            .model_config
+            .hw1f_mean_reversion
+            .is_none()
+    {
+        return hull_white_surface_vega_per_pct(option, context);
+    }
+    hull_white_sigma_vega_per_pct(option, context)
+}
+
+fn hull_white_surface_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
+    let bump = DEFAULT_HW_VEGA_BUMP;
     let market = context.curves.as_ref();
-    let base = resolve_capfloor_hw1f_params(option, market)?;
+    if market.get_surface(option.vol_surface_id.as_str()).is_err() {
+        return hull_white_sigma_vega_per_pct(option, context);
+    }
+    let up_market = bump_surface_vol_absolute(market, option.vol_surface_id.as_str(), bump)?;
+    let pv_up = context.reprice_instrument_raw(option, &up_market, context.as_of)?;
+    let down_market = bump_surface_vol_absolute(market, option.vol_surface_id.as_str(), -bump)?;
+    let pv_down = context.reprice_instrument_raw(option, &down_market, context.as_of)?;
+    Ok((pv_up - pv_down) / (2.0 * bump) * 0.01)
+}
+
+fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
+    let market = context.curves.as_ref();
+    let base = resolve_capfloor_hw1f_params(option, market, context.as_of)?;
     let base_sigma = base.sigma;
     if base_sigma <= DEFAULT_HW_VEGA_BUMP {
         return Ok(0.0);

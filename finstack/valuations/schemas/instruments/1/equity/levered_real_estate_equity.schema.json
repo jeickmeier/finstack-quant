@@ -10496,7 +10496,7 @@
                   "type": "object"
                 },
                 {
-                  "description": "Floating rate funding leg.",
+                  "description": "Floating rate funding leg.\n\n# Convention: no payment lag\n\nThis leg models each period by its `payment_dates` only and assumes the\n**accrual end equals the payment date** (no payment lag, no\naccrual-vs-pay adjustment). The pricer projects the floating forward over\n`[previous payment date, payment date]` and discounts to the payment\ndate. For funding with a genuine payment lag or accrual end ≠ payment\ndate, model the floating side as a full IRS float leg (which carries\nexplicit accrual start/end and payment dates) instead of this simplified\nfunding leg.",
                   "properties": {
                     "accrual_fractions": {
                       "description": "Accrual fractions for each period.",
@@ -10515,7 +10515,7 @@
                       "description": "Forward curve for floating rate projection."
                     },
                     "payment_dates": {
-                      "description": "Payment dates for each period.",
+                      "description": "Payment dates for each period. Each is also treated as the period's\naccrual-end date (no payment lag — see the variant docs).",
                       "items": {
                         "type": "string"
                       },
@@ -17429,6 +17429,17 @@
                 "variant": {
                   "$ref": "#/$defs/SnowballVariant",
                   "description": "Snowball or inverse floater variant."
+                },
+                "vol_surface_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Optional normal-vol surface used to infer HW1F short-rate σ for stress scenarios."
                 }
               },
               "required": [
@@ -18481,6 +18492,17 @@
                   "description": "Target cumulative coupon level (triggers early redemption).\n\nA zero target is allowed and represents redemption at the first\nfuture coupon date without coupon accrual.",
                   "format": "double",
                   "type": "number"
+                },
+                "vol_surface_id": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Id"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Optional normal-vol surface used to infer HW1F short-rate σ for stress scenarios."
                 }
               },
               "required": [

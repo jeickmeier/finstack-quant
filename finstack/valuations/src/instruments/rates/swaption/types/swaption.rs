@@ -1029,6 +1029,18 @@ impl crate::instruments::common_impl::traits::Instrument for Swaption {
         }
     }
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_core::Result<crate::instruments::common_impl::dependencies::MarketDependencies>
+    {
+        let mut deps =
+            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
+                self,
+            )?;
+        deps.add_vol_surface_id(self.vol_surface_id.as_str());
+        Ok(deps)
+    }
+
     fn expiry(&self) -> Option<finstack_core::dates::Date> {
         Some(self.expiry)
     }

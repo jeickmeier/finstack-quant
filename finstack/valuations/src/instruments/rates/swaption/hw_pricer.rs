@@ -29,7 +29,7 @@ use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::exotics_shared::{
-    resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fResolveRequest,
+    resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fResolveRequest, Hw1fSurfaceCalibration,
 };
 use crate::instruments::rates::swaption::types::Swaption;
 use crate::models::trees::{HullWhiteTree, HullWhiteTreeConfig};
@@ -157,6 +157,12 @@ impl SwaptionHullWhitePricer {
             curve_id: swaption.discount_curve_id.as_str(),
             flavor: Hw1fCalibrationFlavor::Swaption,
             overrides: overrides.as_ref(),
+            surface: Some(Hw1fSurfaceCalibration::Swaption {
+                surface_id: swaption.vol_surface_id.as_str(),
+                max_expiry: Some(swap_end_time),
+                frequency: crate::calibration::hull_white::SwapFrequency::SemiAnnual,
+            }),
+            fallback: None,
             context: context_label.as_str(),
         };
         let hw_params = resolve_hw1f_params(&req, market).map_err(|e| {
@@ -409,6 +415,55 @@ mod tests {
         assert!(
             (calibrated_pv - default_pv).abs() > 1e-9,
             "calibrated PV ({calibrated_pv}) must differ from default PV ({default_pv})"
+        );
+    }
+
+    #[test]
+    fn hw_swaption_surface_shock_moves_pv() {
+        use finstack_core::market_data::bumps::{
+            BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
+        };
+        use finstack_core::market_data::surfaces::VolSurface;
+        use finstack_core::types::CurveId;
+
+        let (as_of, swaption, market) = example_single_curve();
+        let surface = VolSurface::builder(swaption.vol_surface_id.clone())
+            .expiries(&[0.5, 1.0, 2.0])
+            .strikes(&[1.0, 2.0, 5.0])
+            .row(&[0.020, 0.022, 0.024])
+            .row(&[0.022, 0.024, 0.026])
+            .row(&[0.024, 0.026, 0.028])
+            .build()
+            .expect("swaption surface");
+        let market = market.insert_surface(surface);
+        let shocked_market = market
+            .bump([MarketBump::Curve {
+                id: CurveId::from(swaption.vol_surface_id.as_str()),
+                spec: BumpSpec {
+                    mode: BumpMode::Multiplicative,
+                    units: BumpUnits::Factor,
+                    value: 1.25,
+                    bump_type: BumpType::Parallel,
+                },
+            }])
+            .expect("surface shock");
+
+        let base_pv = SwaptionHullWhitePricer::default()
+            .price_internal(&swaption, &market, as_of)
+            .expect("surface pricing should succeed")
+            .value
+            .amount();
+        let shocked_pv = SwaptionHullWhitePricer::default()
+            .price_internal(&swaption, &shocked_market, as_of)
+            .expect("shocked pricing should succeed")
+            .value
+            .amount();
+
+        assert!(base_pv.is_finite());
+        assert!(shocked_pv.is_finite());
+        assert!(
+            (shocked_pv - base_pv).abs() > 1e-6,
+            "HW swaption PV must move under a vol surface shock: base={base_pv}, shocked={shocked_pv}"
         );
     }
 

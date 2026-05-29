@@ -34,7 +34,8 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
 use crate::instruments::rates::cap_floor::types::{CapFloor, RateOptionType};
 use crate::instruments::rates::exotics_shared::{
-    resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fResolveRequest,
+    resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fCapletSurfacePoint, Hw1fResolveRequest,
+    Hw1fSurfaceCalibration,
 };
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
@@ -158,7 +159,7 @@ impl CapFloorHullWhitePricer {
         // Resolve HW1F parameters following the documented precedence:
         // explicit `pricing_overrides` κ/σ → calibrated MarketContext scalars
         // → warned `HullWhiteParams::default()`.
-        let hw_params = resolve_capfloor_hw1f_params(cap_floor, market).map_err(|e| {
+        let hw_params = resolve_capfloor_hw1f_params(cap_floor, market, as_of).map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
@@ -286,16 +287,58 @@ fn hw1f_overrides_json(cap_floor: &CapFloor) -> Option<serde_json::Value> {
 pub(crate) fn resolve_capfloor_hw1f_params(
     cap_floor: &CapFloor,
     market: &MarketContext,
+    as_of: finstack_core::dates::Date,
 ) -> finstack_core::Result<crate::calibration::hull_white::HullWhiteParams> {
     let context_label = format!("CapFloor {}", cap_floor.id);
     let overrides = hw1f_overrides_json(cap_floor);
+    let surface_points = capfloor_surface_points(cap_floor, market, as_of)?;
     let req = Hw1fResolveRequest {
         curve_id: cap_floor.discount_curve_id.as_str(),
         flavor: Hw1fCalibrationFlavor::CapFloor,
         overrides: overrides.as_ref(),
+        surface: Some(Hw1fSurfaceCalibration::CapFloor {
+            surface_id: cap_floor.vol_surface_id.as_str(),
+            points: &surface_points,
+        }),
+        fallback: None,
         context: context_label.as_str(),
     };
     resolve_hw1f_params(&req, market)
+}
+
+fn capfloor_surface_points(
+    cap_floor: &CapFloor,
+    market: &MarketContext,
+    as_of: finstack_core::dates::Date,
+) -> finstack_core::Result<Vec<Hw1fCapletSurfacePoint>> {
+    let disc = market.get_discount(cap_floor.discount_curve_id.as_str())?;
+    let periods = cap_floor.pricing_periods()?;
+    let strike = cap_floor.strike_f64()?;
+    let ctx = DayCountContext::default();
+    let mut points = Vec::with_capacity(periods.len());
+    for period in &periods {
+        let fixing_date = cap_floor.option_fixing_date(period);
+        let t_fix = cap_floor.day_count.year_fraction(as_of, fixing_date, ctx)?;
+        if t_fix <= 0.0 {
+            continue;
+        }
+        let tau = year_fraction(
+            cap_floor.day_count,
+            period.accrual_start,
+            period.accrual_end,
+        )?;
+        if tau <= 0.0 {
+            continue;
+        }
+        let df = relative_df_discount_curve(disc.as_ref(), as_of, period.payment_date)?;
+        points.push(Hw1fCapletSurfacePoint {
+            t_fix,
+            accrual: tau,
+            strike,
+            weight: (cap_floor.notional.amount() * tau * df).abs(),
+        });
+    }
+    Ok(points)
 }
 
 #[cfg(test)]

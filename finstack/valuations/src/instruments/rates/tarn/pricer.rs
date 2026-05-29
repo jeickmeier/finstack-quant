@@ -11,6 +11,10 @@ use crate::instruments::rates::exotics_shared::hw1f_curve::{
 };
 use crate::instruments::rates::exotics_shared::hw1f_mc::RateExoticHw1fMcPricer;
 use crate::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig;
+use crate::instruments::rates::exotics_shared::{
+    resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fCapletSurfacePoint, Hw1fResolveRequest,
+    Hw1fSurfaceCalibration,
+};
 use crate::instruments::rates::tarn::Tarn;
 use crate::metrics::MetricId;
 use crate::pricer::{
@@ -178,18 +182,31 @@ impl TarnPricer {
         self
     }
 
-    fn effective_hw_params(&self, inst: &Tarn) -> Result<HullWhiteParams> {
-        let kappa = inst
-            .pricing_overrides
-            .model_config
-            .mean_reversion
-            .unwrap_or(self.hw_params.kappa);
-        let sigma = inst
-            .pricing_overrides
-            .market_quotes
-            .implied_volatility
-            .unwrap_or(self.hw_params.sigma);
-        HullWhiteParams::new(kappa, sigma)
+    fn effective_hw_params(
+        &self,
+        inst: &Tarn,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<HullWhiteParams> {
+        let overrides = hw1f_overrides_json(inst);
+        let surface_points = tarn_surface_points(inst, as_of)?;
+        let surface =
+            inst.vol_surface_id
+                .as_ref()
+                .map(|surface_id| Hw1fSurfaceCalibration::CapFloor {
+                    surface_id: surface_id.as_str(),
+                    points: surface_points.as_slice(),
+                });
+        let context_label = format!("TARN {}", inst.id);
+        let req = Hw1fResolveRequest {
+            curve_id: inst.discount_curve_id.as_str(),
+            flavor: Hw1fCalibrationFlavor::CapFloor,
+            overrides: overrides.as_ref(),
+            surface,
+            fallback: Some(self.hw_params),
+            context: context_label.as_str(),
+        };
+        resolve_hw1f_params(&req, market)
     }
 
     fn effective_config(&self, inst: &Tarn) -> RateExoticMcConfig {
@@ -224,7 +241,7 @@ impl TarnPricer {
         // as an instrument-contract precondition, but is not otherwise read.
         let _forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
 
-        let hw_params = self.effective_hw_params(inst)?;
+        let hw_params = self.effective_hw_params(inst, market, as_of)?;
         // HW1F bond-reconstruction built from the discount curve; turns the
         // short rate sampled at each coupon's in-advance fixing date into that
         // coupon's term forward.
@@ -368,6 +385,35 @@ impl Default for TarnPricer {
     }
 }
 
+fn hw1f_overrides_json(inst: &Tarn) -> Option<serde_json::Value> {
+    let kappa = inst.pricing_overrides.model_config.hw1f_mean_reversion?;
+    let sigma = inst.pricing_overrides.model_config.hw1f_sigma?;
+    Some(serde_json::json!({ "hw1f_kappa": kappa, "hw1f_sigma": sigma }))
+}
+
+fn tarn_surface_points(inst: &Tarn, as_of: Date) -> Result<Vec<Hw1fCapletSurfacePoint>> {
+    let ctx = DayCountContext::default();
+    let mut points = Vec::new();
+    for period in inst.coupon_dates.windows(2) {
+        let start = period[0];
+        let end = period[1];
+        if start <= as_of || end <= start {
+            continue;
+        }
+        let t_fix = inst.day_count.year_fraction(as_of, start, ctx)?;
+        let accrual = inst.day_count.year_fraction(start, end, ctx)?;
+        if t_fix > 0.0 && accrual > 0.0 {
+            points.push(Hw1fCapletSurfacePoint {
+                t_fix,
+                accrual,
+                strike: inst.fixed_rate,
+                weight: accrual * inst.notional.amount().abs(),
+            });
+        }
+    }
+    Ok(points)
+}
+
 /// PV of a fully-seasoned TARN schedule whose every coupon fixes off the
 /// deterministic `r(0) = f(0,0)`, so there is no Monte-Carlo component.
 ///
@@ -499,6 +545,7 @@ mod tests {
             floating_tenor: Tenor::semi_annual(),
             floating_index_id: CurveId::new("USD-SOFR-6M"),
             discount_curve_id: CurveId::new("USD-OIS"),
+            vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             day_count: DayCount::Act365F,
             pricing_overrides: PricingOverrides::default(),
             attributes: Default::default(),
@@ -545,6 +592,31 @@ mod tests {
                 min_steps_between_events: 1,
                 ..Default::default()
             })
+    }
+
+    #[test]
+    fn implied_volatility_is_not_used_as_hw1f_sigma() {
+        let as_of = date(2025, Month::January, 1);
+        let market = market(as_of, 0.02, 0.03);
+        let no_iv = test_tarn(1.0);
+        let mut with_iv = no_iv.clone();
+        with_iv.pricing_overrides.market_quotes.implied_volatility = Some(0.20);
+
+        let pv_no_iv = deterministic_pricer(32)
+            .price_estimate(&no_iv, &market, as_of)
+            .expect("no iv")
+            .mean
+            .amount();
+        let pv_with_iv = deterministic_pricer(32)
+            .price_estimate(&with_iv, &market, as_of)
+            .expect("with iv")
+            .mean
+            .amount();
+
+        assert!(
+            (pv_with_iv - pv_no_iv).abs() < 1e-9,
+            "implied_volatility must not alter TARN HW1F sigma: no_iv={pv_no_iv}, with_iv={pv_with_iv}"
+        );
     }
 
     /// Independent in-advance ground-truth PV for the deterministic-σ limit.

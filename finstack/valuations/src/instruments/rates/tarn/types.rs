@@ -59,6 +59,9 @@ pub struct Tarn {
     pub floating_index_id: CurveId,
     /// Discount curve ID for PV calculations.
     pub discount_curve_id: CurveId,
+    /// Optional normal-vol surface used to infer HW1F short-rate σ for stress scenarios.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vol_surface_id: Option<CurveId>,
     /// Day count convention for coupon accrual.
     pub day_count: DayCount,
     /// Pricing overrides.
@@ -140,6 +143,7 @@ impl Tarn {
             floating_tenor: Tenor::semi_annual(),
             floating_index_id: CurveId::new("USD-SOFR-6M"),
             discount_curve_id: CurveId::new("USD-OIS"),
+            vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             day_count: DayCount::Act360,
             pricing_overrides: PricingOverrides::default(),
             attributes: Attributes::new(),
@@ -158,9 +162,14 @@ impl crate::instruments::common_impl::traits::Instrument for Tarn {
         &self,
     ) -> finstack_core::Result<crate::instruments::common_impl::dependencies::MarketDependencies>
     {
-        crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-            self,
-        )
+        let mut deps =
+            crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
+                self,
+            )?;
+        if let Some(surface_id) = &self.vol_surface_id {
+            deps.add_vol_surface_id(surface_id.as_str());
+        }
+        Ok(deps)
     }
 
     fn base_value(
@@ -234,6 +243,7 @@ mod tests {
             floating_tenor: Tenor::semi_annual(),
             floating_index_id: CurveId::new("USD-SOFR-6M"),
             discount_curve_id: CurveId::new("USD-OIS"),
+            vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             day_count: DayCount::Act360,
             pricing_overrides: PricingOverrides::default(),
             attributes: Attributes::new(),
