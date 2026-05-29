@@ -1,6 +1,6 @@
 //! Vega calculator for interest rate options (caps/floors/caplets/floorlets).
 
-use crate::calibration::hull_white::HullWhiteParams;
+use crate::instruments::rates::cap_floor::hw_pricer::resolve_capfloor_hw1f_params;
 use crate::instruments::rates::cap_floor::{CapFloor, CapFloorVolType};
 use crate::metrics::{MetricCalculator, MetricContext};
 use crate::pricer::ModelKey;
@@ -71,23 +71,31 @@ fn caplet_vega(vol_type: CapFloorVolType, strike: f64, vol_shift: f64, c: Caplet
 }
 
 fn hull_white_tree_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
-    let base_vol = option
-        .pricing_overrides
-        .market_quotes
-        .implied_volatility
-        .unwrap_or_else(|| HullWhiteParams::default().sigma);
-    if base_vol <= DEFAULT_HW_VEGA_BUMP {
+    // Bump the *short-rate* σ the HW tree pricer actually consumes
+    // (`model_config.hw1f_sigma`), not `market_quotes.implied_volatility`, which
+    // the cap/floor HW pricer ignores. Resolving the base κ/σ through the same
+    // precedence as the pricer keeps the central-difference vega consistent with
+    // the reported PV; bumping the unread implied-vol field would always yield 0.
+    let market = context.curves.as_ref();
+    let base = resolve_capfloor_hw1f_params(option, market)?;
+    let base_sigma = base.sigma;
+    if base_sigma <= DEFAULT_HW_VEGA_BUMP {
         return Ok(0.0);
     }
 
     let bump = DEFAULT_HW_VEGA_BUMP;
-    let mut up = option.clone();
-    up.pricing_overrides.market_quotes.implied_volatility = Some(base_vol + bump);
-    let pv_up = context.reprice_instrument_raw(&up, context.curves.as_ref(), context.as_of)?;
+    let with_sigma = |sigma: f64| -> CapFloor {
+        let mut bumped = option.clone();
+        bumped.pricing_overrides.model_config.hw1f_sigma = Some(sigma);
+        bumped.pricing_overrides.model_config.hw1f_mean_reversion = Some(base.kappa);
+        bumped
+    };
 
-    let mut down = option.clone();
-    down.pricing_overrides.market_quotes.implied_volatility = Some(base_vol - bump);
-    let pv_down = context.reprice_instrument_raw(&down, context.curves.as_ref(), context.as_of)?;
+    let up = with_sigma(base_sigma + bump);
+    let pv_up = context.reprice_instrument_raw(&up, market, context.as_of)?;
+
+    let down = with_sigma(base_sigma - bump);
+    let pv_down = context.reprice_instrument_raw(&down, market, context.as_of)?;
 
     Ok((pv_up - pv_down) / (2.0 * bump) * 0.01)
 }

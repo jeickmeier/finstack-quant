@@ -544,8 +544,8 @@
       "vol_type": "normal",
       "pricing_overrides": {
         "tree_steps": 300,
-        "implied_volatility": 0.0094182,
-        "mean_reversion": 0.0342
+        "hw1f_sigma": 0.0094182,
+        "hw1f_mean_reversion": 0.0342
       },
       "attributes": {
         "tags": [
@@ -565,8 +565,9 @@
           "hw1f_fixed_kappa": "0.0342",
           "hw1f_source_quote": "VCUB USD RFR BVOL Cube visible 5Y tenor caplet normal-vol strip transcribed in inputs.market.surfaces[USD-RFR-BVOL-CUBE-5Y].vols_row_major",
           "hw1f_source_quote_normal_vol": "caplet strip, 20 quarterly expiries",
-          "hw1f_calibrated_implied_volatility": "0.0094182",
-          "hw1f_calibration_note": "Bloomberg screenshot shows HW1F and normal-vol VCUB inputs but does not show mean reversion. Kappa is an explicit fixed calibration assumption; sigma is derived from the visible caplet normal-vol strip rather than tuned to expected_outputs.",
+          "hw1f_short_rate_sigma": "0.0094182",
+          "hw1f_param_routing": "kappa and sigma are supplied to the cap/floor HW1F tree via the dedicated spec.pricing_overrides.hw1f_mean_reversion and hw1f_sigma fields (the short-rate channel the pricer consumes), not market_quotes.implied_volatility.",
+          "hw1f_calibration_note": "Bloomberg screenshot shows HW1F and normal-vol VCUB inputs but does not show mean reversion. Kappa is an explicit fixed calibration assumption; sigma is the HW1F short-rate absolute volatility derived from the visible caplet normal-vol strip rather than tuned to expected_outputs.",
           "legacy_fixture_name": "usd_cap_5y_atm_black"
         }
       }

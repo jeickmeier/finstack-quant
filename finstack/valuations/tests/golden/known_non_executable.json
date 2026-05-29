@@ -1,9 +1,4 @@
 {
   "description": "Golden fixtures whose externally sourced expected values are retained as the source of truth but cannot yet be reproduced by the executable runner. Failures are reported but not fatal (Rust: pricing.rs; Python: pytest.mark.xfail strict=False). Paths are relative to tests/golden/data/.",
-  "fixtures": [
-    {
-      "path": "pricing/cap_floor/usd_cap_5y_atm_black.json",
-      "reason": "Bloomberg cap/floor fixture is not yet reproducible by the executable runner; preserve screen expected values until quote-basis cap/floor risk support lands."
-    }
-  ]
+  "fixtures": []
 }

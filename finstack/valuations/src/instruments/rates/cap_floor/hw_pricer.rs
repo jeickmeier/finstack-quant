@@ -158,15 +158,7 @@ impl CapFloorHullWhitePricer {
         // Resolve HW1F parameters following the documented precedence:
         // explicit `pricing_overrides` κ/σ → calibrated MarketContext scalars
         // → warned `HullWhiteParams::default()`.
-        let context_label = format!("CapFloor {}", cap_floor.id);
-        let overrides = hw1f_overrides_json(cap_floor);
-        let req = Hw1fResolveRequest {
-            curve_id: cap_floor.discount_curve_id.as_str(),
-            flavor: Hw1fCalibrationFlavor::CapFloor,
-            overrides: overrides.as_ref(),
-            context: context_label.as_str(),
-        };
-        let hw_params = resolve_hw1f_params(&req, market).map_err(|e| {
+        let hw_params = resolve_capfloor_hw1f_params(cap_floor, market).map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
@@ -283,6 +275,27 @@ fn hw1f_overrides_json(cap_floor: &CapFloor) -> Option<serde_json::Value> {
         .hw1f_mean_reversion?;
     let sigma = cap_floor.pricing_overrides.model_config.hw1f_sigma?;
     Some(serde_json::json!({ "hw1f_kappa": kappa, "hw1f_sigma": sigma }))
+}
+
+/// Resolve the effective Hull-White 1F (κ, σ) the tree pricer uses for `cap_floor`.
+///
+/// Applies the documented precedence (explicit `pricing_overrides` κ/σ →
+/// calibrated `MarketContext` scalars → defaults). Sharing this with the vega
+/// calculator keeps the model-consistent vega bump aligned with the σ the
+/// pricer actually consumes, rather than an unrelated `implied_volatility`.
+pub(crate) fn resolve_capfloor_hw1f_params(
+    cap_floor: &CapFloor,
+    market: &MarketContext,
+) -> finstack_core::Result<crate::calibration::hull_white::HullWhiteParams> {
+    let context_label = format!("CapFloor {}", cap_floor.id);
+    let overrides = hw1f_overrides_json(cap_floor);
+    let req = Hw1fResolveRequest {
+        curve_id: cap_floor.discount_curve_id.as_str(),
+        flavor: Hw1fCalibrationFlavor::CapFloor,
+        overrides: overrides.as_ref(),
+        context: context_label.as_str(),
+    };
+    resolve_hw1f_params(&req, market)
 }
 
 #[cfg(test)]
