@@ -659,9 +659,12 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
         let pv_up = self.value(&curves_vol_up, as_of)?.amount();
         let pv_dn = self.value(&curves_vol_dn, as_of)?.amount();
 
-        Ok(Some(
-            (pv_up - 2.0 * base_pv + pv_dn) / (vol_bump_abs * vol_bump_abs),
-        ))
+        // Report volga per **vol point squared** to match the library-wide
+        // per-vol-point vega convention (and `MetricId::Volga`). The second
+        // difference is taken in absolute-vol units, so normalize by the bump
+        // expressed in vol points, squared.
+        let width = vol_bump_abs * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
+        Ok(Some((pv_up - 2.0 * base_pv + pv_dn) / (width * width)))
     }
 }
 

@@ -35,6 +35,17 @@
 //! without a cross-crate type relocation. Callers that require exact bump
 //! consistency should calibrate with the default config, or recompute risk
 //! through a path that re-runs the original calibration plan.
+//!
+//! ## Induced-error bound
+//!
+//! Both the base curve and the bumped curve reprice every input quote to within
+//! their respective calibration tolerances, so the residual leakage into a
+//! sensitivity is bounded by roughly the **sum of the two repricing tolerances
+//! divided by the bump size**. With the default `1e-10` tolerance and a 1bp
+//! bump this is on the order of `2e-10 / 1e-4 ≈ 2e-6` of the PV unit —
+//! negligible versus the bump itself. The leakage only becomes material if the
+//! original curve was calibrated with a *much looser* tolerance than the
+//! default; in that regime, prefer re-running the original calibration plan.
 
 mod currency;
 pub(crate) mod hazard;

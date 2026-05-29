@@ -13,7 +13,7 @@
 //! - Forward rate projection with floor/cap/gearing
 
 use crate::cashflow::builder::rate_helpers::FloatingRateParams;
-use finstack_core::dates::CalendarRegistry;
+use finstack_core::dates::{CalendarRegistry, HolidayCalendar};
 use finstack_core::dates::{Date, DateExt, DayCount, DayCountContext, Schedule};
 use finstack_core::market_data::scalars::ScalarTimeSeries;
 use finstack_core::market_data::term_structures::DiscountCurve;
@@ -257,33 +257,53 @@ pub fn add_payment_delay(date: Date, delay_days: i32, calendar_id: Option<&str>)
     }
 }
 
-/// Step a date forward/backward by `n` business days, using a holiday calendar
-/// when one is supplied and weekday-only stepping otherwise.
+/// Resolve an optional overnight-compounding calendar id **once**, enforcing the
+/// strict policy of [`add_payment_delay`]: a `Some` id must resolve (a missing
+/// calendar is a hard error, not a silent weekday-only fallback) so that
+/// overnight compounding cannot silently drift onto a different observation grid
+/// than the rest of the swap. `None` signals intentional weekday-only stepping.
 ///
-/// This mirrors the calendar policy of [`add_payment_delay`]: a `Some` calendar
-/// id must resolve (a missing calendar is a hard error, not a silent
-/// weekday-only fallback) so that overnight compounding cannot silently drift
-/// onto a different observation grid than the rest of the swap.
+/// Resolving up front (rather than on every business-day step) avoids repeated
+/// global-registry lookups inside the daily compounding loops — each lookup
+/// allocates via `to_lowercase()` — turning ~O(days) allocations per coupon into
+/// a single resolution per leg.
 #[inline]
-fn shift_business_days(date: Date, n: i32, calendar_id: Option<&str>) -> Result<Date> {
+fn resolve_overnight_calendar(
+    calendar_id: Option<&str>,
+) -> Result<Option<&'static dyn HolidayCalendar>> {
+    match calendar_id {
+        Some(id) => match CalendarRegistry::global().resolve_str(id) {
+            Some(cal) => Ok(Some(cal)),
+            None => Err(finstack_core::Error::Validation(format!(
+                "Overnight-compounding calendar '{}' not found in registry; \
+                 cannot apply daily business-day stepping. \
+                 Either register the calendar or use None for weekday-only stepping.",
+                id
+            ))),
+        },
+        None => Ok(None),
+    }
+}
+
+/// Step a date forward/backward by `n` business days using a **pre-resolved**
+/// holiday calendar (or weekday-only stepping when `cal` is `None`).
+///
+/// Hot-loop variant of the calendar stepping used by the daily overnight-
+/// compounding projection: the caller resolves the calendar once via
+/// [`resolve_overnight_calendar`] and reuses it for every sub-period, so no
+/// per-step registry lookup (and its `to_lowercase` allocation) is incurred.
+#[inline]
+fn shift_business_days_with(date: Date, n: i32, cal: Option<&dyn HolidayCalendar>) -> Result<Date> {
     if n == 0 {
         return Ok(date);
     }
-    match calendar_id {
-        Some(id) => match CalendarRegistry::global().resolve_str(id) {
-            Some(cal) => date.add_business_days(n, cal).map_err(|e| {
-                finstack_core::Error::Validation(format!(
-                    "Failed to step {} business days from {} using calendar '{}': {}",
-                    n, date, id, e
-                ))
-            }),
-            None => Err(finstack_core::Error::Validation(format!(
-                "Overnight-compounding calendar '{}' not found in registry; \
-                 cannot step {} business days from {}. \
-                 Either register the calendar or use None for weekday-only stepping.",
-                id, n, date
-            ))),
-        },
+    match cal {
+        Some(c) => date.add_business_days(n, c).map_err(|e| {
+            finstack_core::Error::Validation(format!(
+                "Failed to step {} business days from {}: {}",
+                n, date, e
+            ))
+        }),
         None => Ok(date.add_weekdays(n)),
     }
 }
@@ -389,12 +409,16 @@ pub(crate) fn compounded_forward_projection(
         }
     };
 
+    // Resolve the daily/observation calendar once for the whole period instead
+    // of on every business-day step (see `resolve_overnight_calendar`).
+    let cal = resolve_overnight_calendar(calendar_id)?;
+
     // ∏(1 + rᵢ·dᵢ) over the daily sub-periods.
     let mut compound_factor = 1.0_f64;
 
     let mut d = accrual_start;
     while d < accrual_end {
-        let next_d = shift_business_days(d, 1, calendar_id)?.min(accrual_end);
+        let next_d = shift_business_days_with(d, 1, cal)?.min(accrual_end);
 
         // Day-count weight dᵢ is anchored to the accrual sub-period (lookback
         // semantics: observation dates shift, weights do not).
@@ -413,8 +437,8 @@ pub(crate) fn compounded_forward_projection(
             (d, next_d)
         } else {
             (
-                shift_business_days(d, -observation_shift_days, calendar_id)?,
-                shift_business_days(next_d, -observation_shift_days, calendar_id)?,
+                shift_business_days_with(d, -observation_shift_days, cal)?,
+                shift_business_days_with(next_d, -observation_shift_days, cal)?,
             )
         };
 
@@ -561,12 +585,16 @@ pub(crate) fn compounded_spliced_projection(
         }
     };
 
+    // Resolve the daily/observation calendar once for the whole period instead
+    // of on every business-day step (see `resolve_overnight_calendar`).
+    let cal = resolve_overnight_calendar(calendar_id)?;
+
     // ∏(1 + rᵢ·dᵢ) over the daily sub-periods, splicing realized and projected.
     let mut compound_factor = 1.0_f64;
 
     let mut d = accrual_start;
     while d < accrual_end {
-        let next_d = shift_business_days(d, 1, calendar_id)?.min(accrual_end);
+        let next_d = shift_business_days_with(d, 1, cal)?.min(accrual_end);
 
         // Day-count weight dᵢ is anchored to the accrual sub-period.
         let dcf = fwd_dc.year_fraction(d, next_d, DayCountContext::default())?;
@@ -583,8 +611,8 @@ pub(crate) fn compounded_spliced_projection(
             (d, next_d)
         } else {
             (
-                shift_business_days(d, -observation_shift_days, calendar_id)?,
-                shift_business_days(next_d, -observation_shift_days, calendar_id)?,
+                shift_business_days_with(d, -observation_shift_days, cal)?,
+                shift_business_days_with(next_d, -observation_shift_days, cal)?,
             )
         };
 

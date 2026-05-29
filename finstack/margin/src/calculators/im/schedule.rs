@@ -404,12 +404,21 @@ impl ScheduleImCalculator {
     /// * `positions` — `[(signed_mtm, gross_notional)]` per instrument.
     ///   MtM signs matter (used for NGR numerator); gross notionals are
     ///   summed as absolute values for the pre-factor IM base.
-    /// * `asset_class` — schedule asset class (applied uniformly across
-    ///   the set; mixed-asset-class netting sets should use a different
-    ///   calculator per the methodology).
+    /// * `asset_class` — schedule asset class, **applied uniformly to every
+    ///   position**. The BCBS-IOSCO Schedule applies a class-specific gross
+    ///   initial-margin rate, so this method assumes the entire netting set
+    ///   belongs to a single asset class.
     /// * `maturity_years` — representative remaining maturity for the
     ///   rate lookup. Typical convention: longest or weighted-average
     ///   remaining maturity across the netting set.
+    ///
+    /// # Precondition
+    ///
+    /// All positions **must** be of `asset_class`. The `(mtm, notional)` inputs
+    /// carry no per-position class, so this method cannot detect a mixed set; a
+    /// heterogeneous netting set would be charged at a single (wrong) rate. The
+    /// caller must partition the book by asset class, call this once per class,
+    /// and sum the results.
     ///
     /// # Returns
     ///

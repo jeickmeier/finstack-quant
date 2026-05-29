@@ -124,8 +124,11 @@ impl Default for ZSpreadSolverConfig {
 ///
 /// Calculates the zero-volatility spread (Z-spread) as the constant additive spread
 /// to the base discount curve that makes the discounted value of future cashflows
-/// equal to the bond's dirty market price. The spread is applied as an exponential
-/// shift: `df_z(t) = df_base(t) * exp(-z * t)`.
+/// equal to the bond's dirty market price. The spread is applied on the
+/// **periodically-compounded zero rate**: the base discount factor is converted
+/// to its zero rate at the quote frequency `m`, the spread `z` is added, and the
+/// flow is re-discounted at frequency `m` (see `z_spread_discount_factor`). It is
+/// not a continuous `exp(-z·t)` shift.
 ///
 /// Uses Brent's method with a maturity-aware initial bracket and a configurable
 /// tolerance. The default configuration is tuned for production use:

@@ -566,6 +566,15 @@ const MIN_BUMP_BP_THRESHOLD: f64 = 1e-10;
 
 #[inline]
 fn calculate_dv01_central(pv_up: f64, pv_down: f64, bump_bp: f64) -> f64 {
+    // `bump_bp` originates from config validated with `ensure_finite_positive`,
+    // so a degenerate width is a misconfiguration, not normal input. Assert
+    // loudly in debug/test builds so a silent 0.0 (indistinguishable from a true
+    // zero Greek) cannot mask a bad bump; in release, fall back to 0.0 rather
+    // than divide by ~0 and emit inf/NaN.
+    debug_assert!(
+        bump_bp.abs() > MIN_BUMP_BP_THRESHOLD,
+        "DV01 bump_bp must exceed {MIN_BUMP_BP_THRESHOLD} (got {bump_bp}); validate upstream"
+    );
     if bump_bp.abs() <= MIN_BUMP_BP_THRESHOLD {
         return 0.0;
     }

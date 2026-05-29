@@ -546,14 +546,15 @@ impl Money {
             to,
             provider.rate(self.currency, to, on, policy)?,
         )?;
+        // Retain full Decimal precision, consistent with `Money::new`. Rounding
+        // to the destination minor units here would truncate sub-unit precision
+        // mid-calculation, so the result of a chained computation would depend
+        // on *where* a `convert` was inserted and could break serial≡parallel
+        // determinism. Apply minor-unit rounding only at the reporting boundary
+        // (e.g. `format`/`round_to_currency`), not on every conversion.
         let new_amount = super::rounding::try_repr_mul_f64(self.amount, rate)?;
-        let rounded = super::rounding::round_decimal(
-            new_amount,
-            to.decimals() as i32,
-            crate::config::RoundingMode::Bankers,
-        );
         Ok(Self {
-            amount: rounded,
+            amount: new_amount,
             currency: to,
         })
     }

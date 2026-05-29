@@ -164,6 +164,63 @@ fn fx_matrix_cache_distinguishes_query_date_and_policy() {
 }
 
 #[test]
+fn fx_matrix_set_quote_on_overrides_only_the_seeded_date() {
+    // Date-aware provider: rate ramps by one cent per day from 2025-01-01.
+    struct RampFx;
+    impl FxProvider for RampFx {
+        fn rate(
+            &self,
+            _from: Currency,
+            _to: Currency,
+            on: Date,
+            _policy: FxConversionPolicy,
+        ) -> finstack_core::Result<f64> {
+            let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+            Ok(1.10 + (on - base).whole_days() as f64 * 0.01)
+        }
+    }
+
+    let matrix = FxMatrix::try_with_config(
+        Arc::new(RampFx),
+        FxConfig {
+            enable_triangulation: false,
+            ..Default::default()
+        },
+    )
+    .expect("valid FxConfig");
+    let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    let jan_2 = Date::from_calendar_date(2025, time::Month::January, 2).unwrap();
+
+    // Seed only Jan 1; unlike set_quote this must NOT shadow the provider for
+    // other dates.
+    matrix
+        .set_quote_on(
+            Currency::EUR,
+            Currency::USD,
+            jan_1,
+            FxConversionPolicy::CashflowDate,
+            9.99,
+        )
+        .expect("date-scoped seed");
+
+    let r1 = matrix
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, jan_1))
+        .unwrap();
+    let r2 = matrix
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, jan_2))
+        .unwrap();
+
+    assert!(
+        (r1.rate - 9.99).abs() < 1e-12,
+        "seeded date uses the override"
+    );
+    assert!(
+        (r2.rate - 1.11).abs() < 1e-12,
+        "other dates still use the date-aware provider, not the override"
+    );
+}
+
+#[test]
 fn fx_matrix_try_with_config_rejects_zero_capacity() {
     let err = FxMatrix::try_with_config(
         Arc::new(StaticFx { rate: 1.0 }),

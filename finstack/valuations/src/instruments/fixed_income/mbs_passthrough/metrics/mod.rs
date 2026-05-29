@@ -19,7 +19,7 @@ pub(crate) use duration::{effective_convexity, effective_duration};
 pub(crate) use mc_oas::McOasResult;
 pub(crate) use mc_oas::{calculate_mc_oas, McOasConfig};
 #[allow(unused_imports)] // static Z-spread retained as a public-API helper
-pub(crate) use oas::calculate_oas;
+pub(crate) use oas::calculate_static_zspread;
 
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
@@ -163,9 +163,9 @@ mod tests {
         mbs.pricing_overrides.market_quotes.quoted_clean_price = Some(quote);
 
         // Reference values computed directly.
-        let static_zspread = calculate_oas(&mbs, quote, &market, as_of)
+        let static_zspread = calculate_static_zspread(&mbs, quote, &market, as_of)
             .expect("static z-spread")
-            .oas;
+            .spread;
         let mc_oas = calculate_mc_oas(&mbs, quote, &market, as_of, &McOasConfig::default())
             .expect("mc oas")
             .oas;

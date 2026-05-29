@@ -176,27 +176,69 @@ pub fn adjust_joint_calendar(
 pub fn add_joint_business_days(
     start: Date,
     n_days: u32,
-    _bdc: BusinessDayConvention,
+    bdc: BusinessDayConvention,
     base_cal_id: Option<&str>,
     quote_cal_id: Option<&str>,
 ) -> Result<Date> {
+    add_joint_business_days_with_settlement(start, n_days, bdc, base_cal_id, quote_cal_id, None)
+}
+
+/// Add N business days on a joint calendar that also includes an optional
+/// **third settlement calendar** (typically USD).
+///
+/// For FX cross pairs that do not involve USD (e.g. EUR/JPY), the market T+2
+/// rule requires every counted day — including the intermediate day(s) — to be
+/// a good business day in USD as well as in the two named currencies, and the
+/// final value date to be good in all three. Passing `settlement_cal_id =
+/// Some("usny")` enforces that; `None` reproduces the two-calendar rule of
+/// [`add_joint_business_days`].
+///
+/// # Arguments
+///
+/// * `start` - Starting date
+/// * `n_days` - Number of joint business days to add
+/// * `_bdc` - Business day convention (unused in counting, kept for API parity)
+/// * `base_cal_id` - Optional calendar ID for the base currency
+/// * `quote_cal_id` - Optional calendar ID for the quote currency
+/// * `settlement_cal_id` - Optional third settlement calendar (e.g. USD)
+///
+/// # Errors
+///
+/// Returns an error if any calendar ID is unrecognized, or if the iteration
+/// limit is exceeded (suggesting a calendar configuration issue).
+pub fn add_joint_business_days_with_settlement(
+    start: Date,
+    n_days: u32,
+    _bdc: BusinessDayConvention,
+    base_cal_id: Option<&str>,
+    quote_cal_id: Option<&str>,
+    settlement_cal_id: Option<&str>,
+) -> Result<Date> {
     let base_cal = resolve_calendar(base_cal_id)?;
     let quote_cal = resolve_calendar(quote_cal_id)?;
+    let settlement_cal = match settlement_cal_id {
+        Some(id) => Some(resolve_calendar(Some(id))?),
+        None => None,
+    };
 
     let mut date = start;
     let mut count = 0u32;
 
-    // Iterate until we've found n_days that are business days on BOTH calendars
+    // Iterate until we've found n_days that are business days on every calendar.
     let max_iters: u32 = (n_days.saturating_mul(10).saturating_add(25)).max(1000);
     let mut iters: u32 = 0;
 
     while count < n_days && iters < max_iters {
         date += Duration::days(1);
 
-        // Check if business day on both calendars
-        if base_cal.as_holiday_calendar().is_business_day(date)
+        // Check if business day on the two currency calendars and, when
+        // supplied, the settlement (USD) calendar.
+        let good = base_cal.as_holiday_calendar().is_business_day(date)
             && quote_cal.as_holiday_calendar().is_business_day(date)
-        {
+            && settlement_cal
+                .as_ref()
+                .is_none_or(|c| c.as_holiday_calendar().is_business_day(date));
+        if good {
             count += 1;
         }
 
@@ -264,6 +306,45 @@ pub fn roll_spot_date(
 ) -> Result<Date> {
     // Use joint business day counting instead of calendar days
     add_joint_business_days(trade_date, spot_lag_days, bdc, base_cal_id, quote_cal_id)
+}
+
+/// Roll a trade date to spot, including a third **settlement calendar** (USD).
+///
+/// Applies the cross-pair T+2 convention where intermediate and final value
+/// dates must be good business days in the two currency calendars **and** the
+/// settlement (USD) calendar — see
+/// [`add_joint_business_days_with_settlement`]. Use this for non-USD crosses
+/// (e.g. EUR/JPY) so that USD holidays correctly shift the spot date; pass
+/// `settlement_cal_id = None` for the plain two-calendar behaviour.
+///
+/// # Arguments
+///
+/// * `trade_date` - The trade execution date
+/// * `spot_lag_days` - Business days to spot (typically 2)
+/// * `bdc` - Business day convention (kept for API parity)
+/// * `base_cal_id` - Optional calendar ID for the base currency
+/// * `quote_cal_id` - Optional calendar ID for the quote currency
+/// * `settlement_cal_id` - Optional third settlement calendar (e.g. USD)
+///
+/// # Errors
+///
+/// Returns an error if calendar resolution or date arithmetic fails.
+pub fn roll_spot_date_with_settlement(
+    trade_date: Date,
+    spot_lag_days: u32,
+    bdc: BusinessDayConvention,
+    base_cal_id: Option<&str>,
+    quote_cal_id: Option<&str>,
+    settlement_cal_id: Option<&str>,
+) -> Result<Date> {
+    add_joint_business_days_with_settlement(
+        trade_date,
+        spot_lag_days,
+        bdc,
+        base_cal_id,
+        quote_cal_id,
+        settlement_cal_id,
+    )
 }
 
 // ============================================================================
@@ -636,6 +717,43 @@ mod tests {
         assert_eq!(
             adjusted, expected,
             "ModifiedFollowing must be evaluated on the joint calendar, not sequentially"
+        );
+    }
+
+    #[test]
+    fn roll_spot_date_with_settlement_honours_usd_holiday_on_cross() {
+        // EUR/JPY traded Wed 2025-07-02. The two-currency T+2 lands on Fri
+        // 2025-07-04 (good in EUR and JPY). US Independence Day closes USD on
+        // that date, so the cross's spot value date must roll to Mon 2025-07-07.
+        let trade = create_date(2025, Month::July, 2).unwrap();
+
+        let spot_two_cal = roll_spot_date(
+            trade,
+            2,
+            BusinessDayConvention::Following,
+            Some("target2"),
+            Some("jpto"),
+        )
+        .expect("two-calendar roll");
+        assert_eq!(
+            spot_two_cal,
+            create_date(2025, Month::July, 4).unwrap(),
+            "without USD settlement, spot lands on the US holiday"
+        );
+
+        let spot_with_usd = roll_spot_date_with_settlement(
+            trade,
+            2,
+            BusinessDayConvention::Following,
+            Some("target2"),
+            Some("jpto"),
+            Some("usny"),
+        )
+        .expect("three-calendar roll");
+        assert_eq!(
+            spot_with_usd,
+            create_date(2025, Month::July, 7).unwrap(),
+            "USD holiday must shift the cross spot date to the next all-good day"
         );
     }
 }

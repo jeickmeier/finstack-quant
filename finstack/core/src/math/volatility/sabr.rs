@@ -184,6 +184,12 @@ impl SabrParams {
     ///
     /// Black-76 implied volatility (lognormal). Returns `alpha` for the ATM case.
     ///
+    /// Returns `f64::NAN` for degenerate inputs (non-positive forward/strike,
+    /// non-positive expiry, or a χ(z) breakdown). Callers on pricing/risk paths
+    /// must guard the result with `is_finite()`, or use the fallible
+    /// [`try_implied_vol_lognormal`](Self::try_implied_vol_lognormal), since a
+    /// silent NaN poisons Black-76 pricing and compensated summations downstream.
+    ///
     /// # Special Cases
     ///
     /// - ATM (`f ≈ k`): Uses the simplified ATM formula for numerical stability
@@ -272,6 +278,12 @@ impl SabrParams {
     /// * `f` - Forward rate (may be negative)
     /// * `k` - Strike rate (may be negative)
     /// * `t` - Time to expiry in years
+    ///
+    /// # Returns
+    ///
+    /// Normal/Bachelier implied volatility, or `f64::NAN` for non-positive
+    /// expiry or a χ(z) breakdown. Guard with `is_finite()` or use the fallible
+    /// [`try_implied_vol_normal`](Self::try_implied_vol_normal) on pricing paths.
     pub fn implied_vol_normal(&self, f: f64, k: f64, t: f64) -> f64 {
         let alpha = self.alpha;
         let beta = self.beta;
@@ -340,6 +352,41 @@ impl SabrParams {
                 * t;
 
         alpha * fk_beta_half / ratio * z_over_chi * correction
+    }
+
+    /// Fallible [`implied_vol_lognormal`](Self::implied_vol_lognormal): returns
+    /// an error instead of a silent `f64::NAN` for degenerate inputs.
+    ///
+    /// Prefer this on any pricing/risk path where a NaN vol could silently
+    /// propagate into Black-76 valuation or a compensated aggregation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InputError::Invalid`](crate::error::InputError::Invalid) when
+    /// the underlying expansion yields a non-finite volatility.
+    pub fn try_implied_vol_lognormal(&self, f: f64, k: f64, t: f64) -> crate::Result<f64> {
+        let v = self.implied_vol_lognormal(f, k, t);
+        if v.is_finite() {
+            Ok(v)
+        } else {
+            Err(crate::error::InputError::Invalid.into())
+        }
+    }
+
+    /// Fallible [`implied_vol_normal`](Self::implied_vol_normal): returns an
+    /// error instead of a silent `f64::NAN` for degenerate inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InputError::Invalid`](crate::error::InputError::Invalid) when
+    /// the underlying expansion yields a non-finite volatility.
+    pub fn try_implied_vol_normal(&self, f: f64, k: f64, t: f64) -> crate::Result<f64> {
+        let v = self.implied_vol_normal(f, k, t);
+        if v.is_finite() {
+            Ok(v)
+        } else {
+            Err(crate::error::InputError::Invalid.into())
+        }
     }
 
     /// Check for negative implied probability density across a strike grid.
@@ -850,6 +897,24 @@ mod tests {
         let fwd = 0.05;
         let vol = params.implied_vol_lognormal(fwd, fwd, 1.0);
         assert!(vol > 0.0, "ATM vol should be positive: {vol}");
+    }
+
+    #[test]
+    fn sabr_try_implied_vol_errors_on_degenerate_inputs() {
+        let params = SabrParams::new(0.035, 0.5, -0.2, 0.4).expect("valid params");
+        // Valid inputs return Ok and match the infallible path.
+        let ok = params
+            .try_implied_vol_lognormal(0.05, 0.06, 1.0)
+            .expect("finite vol");
+        assert!((ok - params.implied_vol_lognormal(0.05, 0.06, 1.0)).abs() < 1e-12);
+
+        // Degenerate inputs (non-positive forward/strike/expiry) yield NaN in the
+        // infallible path and an error in the fallible one.
+        assert!(params.implied_vol_lognormal(-0.05, 0.06, 1.0).is_nan());
+        assert!(params.try_implied_vol_lognormal(-0.05, 0.06, 1.0).is_err());
+        assert!(params.try_implied_vol_lognormal(0.05, 0.06, 0.0).is_err());
+        assert!(params.try_implied_vol_normal(0.05, 0.06, 0.0).is_err());
+        assert!(params.try_implied_vol_normal(0.01, -0.01, 1.0).is_ok());
     }
 
     #[test]

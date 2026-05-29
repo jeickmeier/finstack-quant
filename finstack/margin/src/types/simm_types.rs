@@ -385,6 +385,62 @@ impl SimmSensitivities {
         );
     }
 
+    /// Return a copy of these sensitivities re-expressed in `target_currency`.
+    ///
+    /// Every entry is a signed **currency amount** denominated in
+    /// [`base_currency`](Self::base_currency), so converting the set to another
+    /// currency is a uniform multiply by the spot factor `fx_rate` (the value of
+    /// one unit of `base_currency` expressed in `target_currency`). Keys — which
+    /// merely *name* the risk factor (the FX/IR currency, the equity underlier,
+    /// the commodity bucket) — are unchanged; only the amounts are rescaled.
+    ///
+    /// This must be applied before [`merge`](Self::merge) when combining
+    /// sensitivity sets produced in different base currencies: `merge` sums raw
+    /// amounts, so mixing currencies without first collapsing them violates
+    /// currency safety and produces a wrong IM.
+    #[must_use]
+    pub fn scaled_to_currency(&self, target_currency: Currency, fx_rate: f64) -> Self {
+        let mut out = self.clone();
+        out.base_currency = target_currency;
+        if target_currency == self.base_currency {
+            return out;
+        }
+        for v in out.ir_delta.values_mut() {
+            *v *= fx_rate;
+        }
+        for v in out.ir_vega.values_mut() {
+            *v *= fx_rate;
+        }
+        for v in out.credit_qualifying_delta.values_mut() {
+            *v *= fx_rate;
+        }
+        for v in out.credit_non_qualifying_delta.values_mut() {
+            *v *= fx_rate;
+        }
+        for v in out.equity_delta.values_mut() {
+            *v *= fx_rate;
+        }
+        for v in out.equity_vega.values_mut() {
+            *v *= fx_rate;
+        }
+        for v in out.fx_delta.values_mut() {
+            *v *= fx_rate;
+        }
+        for v in out.fx_vega.values_mut() {
+            *v *= fx_rate;
+        }
+        for v in out.commodity_delta.values_mut() {
+            *v *= fx_rate;
+        }
+        for v in out.curvature.values_mut() {
+            *v *= fx_rate;
+        }
+        for v in out.credit_qualifying_delta_bucketed.values_mut() {
+            *v *= fx_rate;
+        }
+        out
+    }
+
     /// Get total IR delta across all currencies and tenors.
     #[must_use]
     pub fn total_ir_delta(&self) -> f64 {
@@ -465,6 +521,25 @@ mod tests {
         assert!(!sens.is_empty());
         assert_eq!(sens.total_ir_delta(), 150_000.0);
         assert_eq!(sens.total_credit_delta(), 25_000.0);
+    }
+
+    #[test]
+    fn scaled_to_currency_rescales_all_amount_maps_uniformly() {
+        let mut s = SimmSensitivities::new(Currency::EUR);
+        s.add_ir_delta(Currency::EUR, "5Y", 100.0);
+        s.equity_delta.insert("AAPL".to_string(), 50.0);
+        s.fx_delta.insert(Currency::EUR, 25.0);
+
+        // EUR -> USD at 1.10: every amount scales, base_currency re-tagged.
+        let usd = s.scaled_to_currency(Currency::USD, 1.10);
+        assert_eq!(usd.base_currency, Currency::USD);
+        assert!((usd.ir_delta[&(Currency::EUR, "5Y".to_string())] - 110.0).abs() < 1e-9);
+        assert!((usd.equity_delta["AAPL"] - 55.0).abs() < 1e-9);
+        assert!((usd.fx_delta[&Currency::EUR] - 27.5).abs() < 1e-9);
+
+        // Same-currency conversion is a no-op on amounts.
+        let same = s.scaled_to_currency(Currency::EUR, 999.0);
+        assert!((same.ir_delta[&(Currency::EUR, "5Y".to_string())] - 100.0).abs() < 1e-9);
     }
 
     #[test]

@@ -222,7 +222,20 @@ impl FxMatrix {
         }
     }
 
-    /// Seed or update a single quote directly inside the matrix.
+    /// Seed or update a single **date- and policy-independent constant** quote.
+    ///
+    /// # ⚠️ Shadows the provider for every query
+    ///
+    /// An explicit quote set here is checked *before* the underlying
+    /// [`FxProvider`] in [`rate`](Self::rate) and is **not** keyed by `on` or
+    /// [`FxConversionPolicy`]. Once set, the pair is pinned to this single rate
+    /// for **all** valuation dates and policies — a date-aware provider is
+    /// silently bypassed. Use this only for genuinely constant rates (e.g.
+    /// pegged currencies or deterministic tests).
+    ///
+    /// For a rate that should vary across a time series, do **not** call this:
+    /// either rely on the date-aware provider, or seed a specific date with
+    /// [`set_quote_on`](Self::set_quote_on), which is scoped by `(on, policy)`.
     ///
     /// Note: This does not automatically insert a reciprocal. Lookups will use
     /// the reciprocal on demand if the opposite direction is requested.
@@ -266,6 +279,37 @@ impl FxMatrix {
     pub fn set_quote(&self, from: Currency, to: Currency, rate: f64) -> crate::Result<()> {
         let rate = validate_fx_rate(from, to, rate)?;
         self.insert_quote(from, to, rate);
+        Ok(())
+    }
+
+    /// Seed a quote scoped to a specific date and policy.
+    ///
+    /// Unlike [`set_quote`](Self::set_quote), this keys the quote by
+    /// `(from, to, on, policy)`, so it only answers queries for that date and
+    /// policy and does **not** shadow the provider across an entire time
+    /// series. Use it to pin individual fixings while letting the provider
+    /// supply every other date.
+    ///
+    /// The quote is stored in the same date/policy-scoped cache the provider
+    /// populates on a miss; if it is evicted under cache pressure the provider
+    /// is consulted again for that date.
+    ///
+    /// # Parameters
+    /// - `from`: base currency for the quote
+    /// - `to`: quote currency
+    /// - `on`: the date the quote applies to
+    /// - `policy`: the conversion policy the quote applies to
+    /// - `rate`: raw FX rate (`from → to`)
+    pub fn set_quote_on(
+        &self,
+        from: Currency,
+        to: Currency,
+        on: Date,
+        policy: FxConversionPolicy,
+        rate: f64,
+    ) -> crate::Result<()> {
+        let rate = validate_fx_rate(from, to, rate)?;
+        self.insert_observed_quote(from, to, on, policy, rate);
         Ok(())
     }
 

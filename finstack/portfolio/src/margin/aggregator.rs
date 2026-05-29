@@ -211,13 +211,38 @@ impl PortfolioMarginAggregator {
         as_of: Date,
     ) -> Result<SimmSensitivities> {
         if let Some(marginable) = position.instrument.as_marginable() {
-            marginable
+            let sens = marginable
                 .simm_sensitivities(market, as_of)
-                .map_err(|e| Error::valuation(position.position_id.clone(), e.to_string()))
+                .map_err(|e| Error::valuation(position.position_id.clone(), e.to_string()))?;
+            // FX-collapse to the aggregator base currency before the netting-set
+            // merge sums raw amounts. Without this, sensitivities produced in a
+            // position's own base currency are added across currencies, breaking
+            // currency safety and the SIMM calculation-currency convention.
+            self.convert_sensitivities_to_base(sens, market, as_of, &position.position_id)
         } else {
             // Default: return empty sensitivities
             Ok(SimmSensitivities::new(self.base_currency))
         }
+    }
+
+    /// Re-express a position's SIMM sensitivities in the aggregator base
+    /// currency via an explicit spot FX conversion.
+    fn convert_sensitivities_to_base(
+        &self,
+        sensitivities: SimmSensitivities,
+        market: &MarketContext,
+        as_of: Date,
+        position_id: &PositionId,
+    ) -> Result<SimmSensitivities> {
+        if sensitivities.base_currency == self.base_currency {
+            return Ok(sensitivities);
+        }
+        // One unit of the sensitivity currency expressed in base currency is the
+        // spot conversion factor applied uniformly to every (amount) entry.
+        let fx_rate = self
+            .convert_to_base(Money::new(1.0, sensitivities.base_currency), market, as_of)
+            .map_err(|e| Error::valuation(position_id.clone(), e.to_string()))?;
+        Ok(sensitivities.scaled_to_currency(self.base_currency, fx_rate))
     }
 
     /// Calculate margin for a netting set.

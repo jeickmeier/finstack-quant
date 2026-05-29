@@ -23,6 +23,40 @@ fn generated_calendar_constants_exist_and_work() {
 }
 
 #[test]
+fn holiday_rules_respect_effective_year() {
+    use finstack_core::dates::calendar::NYSE;
+
+    // Juneteenth: NYSE first closed in 2022. Pre-adoption dates must NOT be
+    // holidays (regression: previously every year 1970–2150 was marked).
+    assert!(
+        !NYSE.is_holiday(make_date(1990, 6, 19)),
+        "Juneteenth must not be an NYSE holiday before 2022"
+    );
+    assert!(
+        NYSE.is_holiday(make_date(2023, 6, 19)),
+        "Juneteenth 2023 (Monday) is an NYSE holiday"
+    );
+
+    // MLK Day (3rd Monday of January): NYSE observed from 1998.
+    // 1990's 3rd Monday is Jan 15; must not be a holiday.
+    assert!(
+        !NYSE.is_holiday(make_date(1990, 1, 15)),
+        "MLK Day must not be an NYSE holiday before 1998"
+    );
+    // 2023's 3rd Monday is Jan 16.
+    assert!(
+        NYSE.is_holiday(make_date(2023, 1, 16)),
+        "MLK Day 2023 is an NYSE holiday"
+    );
+
+    // Un-gated holidays remain valid historically.
+    assert!(
+        NYSE.is_holiday(make_date(1990, 1, 1)),
+        "New Year's Day is always an NYSE holiday"
+    );
+}
+
+#[test]
 fn calendar_registry_resolves_generated_calendars() {
     let registry = CalendarRegistry::global();
 

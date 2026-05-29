@@ -1,8 +1,12 @@
-//! Option-Adjusted Spread (OAS) calculation for agency MBS.
+//! Static Z-spread calculation for agency MBS.
 //!
-//! OAS is the constant spread over the risk-free yield curve that equates
-//! the theoretical MBS price to its market price, accounting for the
-//! prepayment option embedded in the security.
+//! This computes the constant spread over the discount curve that equates the
+//! MBS price under a **single deterministic prepayment scenario** to its market
+//! price. It is a **static Z-spread**, *not* an option-adjusted spread: it does
+//! not simulate interest-rate paths or rate-dependent prepayment, so it does
+//! not value the embedded prepayment option. The registered `Oas` metric routes
+//! to the Monte Carlo OAS engine (`mc_oas`); this helper is the fast static
+//! approximation.
 
 use crate::instruments::fixed_income::mbs_passthrough::pricer::price_with_spread;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
@@ -11,12 +15,12 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::solver::{BrentSolver, Solver};
 use finstack_core::Result;
 
-/// OAS calculation result.
+/// Static Z-spread calculation result.
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // public API result struct
-pub(crate) struct OasResult {
-    /// Option-adjusted spread in decimal (e.g., 0.01 for 100 bps)
-    pub oas: f64,
+pub(crate) struct StaticSpreadResult {
+    /// Static Z-spread in decimal (e.g., 0.01 for 100 bps)
+    pub spread: f64,
     /// Model price at the calculated OAS
     pub model_price: f64,
     /// Target (market) price
@@ -29,46 +33,29 @@ pub(crate) struct OasResult {
     pub converged: bool,
 }
 
-/// Calculate OAS via root-finding.
+/// Calculate the static Z-spread via root-finding.
 ///
-/// Uses Brent's method to find the spread that equates model price
-/// to market price.
+/// Uses Brent's method to find the constant spread that equates the model price
+/// (under a single deterministic prepayment scenario) to the market price. This
+/// is a static Z-spread, not an OAS — it does not simulate rate paths.
 ///
 /// # Arguments
 ///
 /// * `mbs` - Agency MBS passthrough instrument
-/// * `market_price` - Target price (per $100 face, e.g., 98.5)
+/// * `market_price_pct` - Target price (per $100 face, e.g., 98.5)
 /// * `market` - Market context with discount curves
 /// * `as_of` - Valuation date
 ///
 /// # Returns
 ///
-/// OAS result with spread and convergence information
-///
-/// # Examples
-///
-/// ```text
-/// use finstack_valuations::instruments::fixed_income::mbs_passthrough::{
-///     AgencyMbsPassthrough,
-///     metrics::oas::calculate_oas,
-/// };
-/// use finstack_core::market_data::context::MarketContext;
-/// use finstack_core::dates::Date;
-/// use time::Month;
-///
-/// let mbs = AgencyMbsPassthrough::example().unwrap();
-/// let market = MarketContext::new(); // Add curves...
-/// let as_of = Date::from_calendar_date(2024, Month::January, 15).unwrap();
-///
-/// let result = calculate_oas(&mbs, 98.5, &market, as_of).expect("OAS calculation");
-/// println!("OAS: {:.0} bps", result.oas * 10_000.0);
-/// ```
-pub(crate) fn calculate_oas(
+/// Static-spread result with the spread and convergence information.
+#[allow(dead_code)] // retained static-spread helper; currently exercised by tests
+pub(crate) fn calculate_static_zspread(
     mbs: &AgencyMbsPassthrough,
     market_price_pct: f64,
     market: &MarketContext,
     as_of: Date,
-) -> Result<OasResult> {
+) -> Result<StaticSpreadResult> {
     // Convert market price from percentage to dollar amount
     let market_price = market_price_pct / 100.0 * mbs.current_face.amount();
 
@@ -106,8 +93,8 @@ pub(crate) fn calculate_oas(
     match result {
         Ok(oas) => {
             let final_price = price_with_spread(mbs, market, as_of, oas)?;
-            Ok(OasResult {
-                oas,
+            Ok(StaticSpreadResult {
+                spread: oas,
                 model_price: final_price,
                 market_price,
                 price_error: final_price - market_price,
@@ -118,8 +105,8 @@ pub(crate) fn calculate_oas(
         Err(_) => {
             // Solver did not converge — return best-effort result at zero spread
             let model_price_zero = price_with_spread(mbs, market, as_of, 0.0)?;
-            Ok(OasResult {
-                oas: 0.0,
+            Ok(StaticSpreadResult {
+                spread: 0.0,
                 model_price: model_price_zero,
                 market_price,
                 price_error: model_price_zero - market_price,
@@ -128,21 +115,6 @@ pub(crate) fn calculate_oas(
             })
         }
     }
-}
-
-/// Calculate static spread (Z-spread) using simplified discounting.
-///
-/// Unlike OAS, static spread does not account for the prepayment option.
-/// It's faster to compute but less accurate for MBS.
-#[allow(dead_code)] // public API for external bindings
-pub(crate) fn calculate_static_spread(
-    mbs: &AgencyMbsPassthrough,
-    market_price_pct: f64,
-    market: &MarketContext,
-    as_of: Date,
-) -> Result<f64> {
-    let result = calculate_oas(mbs, market_price_pct, market, as_of)?;
-    Ok(result.oas)
 }
 
 #[cfg(test)]
@@ -209,10 +181,10 @@ mod tests {
         let market_price_pct = base_price / mbs.current_face.amount() * 100.0;
 
         // OAS should be approximately zero when market price equals model price
-        let result = calculate_oas(&mbs, market_price_pct, &market, as_of).expect("oas");
+        let result = calculate_static_zspread(&mbs, market_price_pct, &market, as_of).expect("oas");
 
         assert!(result.converged);
-        assert!(result.oas.abs() < 0.001); // Within 10 bps of zero
+        assert!(result.spread.abs() < 0.001); // Within 10 bps of zero
     }
 
     #[test]
@@ -224,7 +196,7 @@ mod tests {
         // Test with discount price (should give positive OAS)
         let discount_price = 95.0; // 95% of par
 
-        let result = calculate_oas(&mbs, discount_price, &market, as_of).expect("oas");
+        let result = calculate_static_zspread(&mbs, discount_price, &market, as_of).expect("oas");
 
         // Price below par should imply positive spread
         // (this depends on the specific curve setup)
@@ -240,7 +212,7 @@ mod tests {
         // Test with premium price (should give negative OAS)
         let premium_price = 105.0; // 105% of par
 
-        let result = calculate_oas(&mbs, premium_price, &market, as_of).expect("oas");
+        let result = calculate_static_zspread(&mbs, premium_price, &market, as_of).expect("oas");
 
         // Price above par should imply negative spread
         assert!(result.converged || result.iterations > 0);

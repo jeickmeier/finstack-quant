@@ -586,12 +586,18 @@ pub(crate) fn remaining_forward_variance(
         );
         Ok(fallback_variance)
     } else {
-        tracing::warn!(
+        // Level 4/4: no surface and no scalar implied vol. Marking to the
+        // contract strike makes the swap mark to ~zero, which is easily mistaken
+        // for a real flat mark. Log at ERROR (not WARN) so the degraded mark is
+        // still visible when WARN-level logs are filtered out in production.
+        tracing::error!(
             instrument_id = %inst.id,
             ticker = %inst.underlying_ticker,
             strike_variance = inst.strike_variance,
             "VarianceSwap forward variance: no surface or scalar implied vol found; \
-             falling back to contract strike_variance (level 4/4 — swap will mark to zero)"
+             falling back to contract strike_variance (level 4/4 — swap marks to zero). \
+             Supply a vol surface or {ticker}_IMPL_VOL to obtain a real mark.",
+            ticker = inst.underlying_ticker.as_str()
         );
         Ok(inst.strike_variance)
     }

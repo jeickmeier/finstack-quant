@@ -28,7 +28,6 @@ use crate::evaluator::results::EvalWarning;
 use finstack_core::dates::PeriodId;
 use finstack_core::expr::{Expr, ExprNode, Function};
 use finstack_core::math::ZERO_TOLERANCE;
-use indexmap::IndexMap;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -198,22 +197,6 @@ pub(crate) fn build_context_for_period(
     // Share the full historical Arc -- the period_id on the new context
     // determines what is "current". Aggregate functions that walk historical
     // already filter by period ordering, so passing the full map is safe.
-    let current_period_values: IndexMap<String, f64> = if target_period == context.period_id {
-        context
-            .node_to_column
-            .iter()
-            .filter_map(|(node_id, idx)| {
-                context.current_values[*idx].map(|value| (node_id.as_str().to_string(), value))
-            })
-            .collect()
-    } else {
-        context
-            .historical_results
-            .get(&target_period)
-            .cloned()
-            .unwrap_or_default()
-    };
-
     let mut period_context = EvaluationContext::new(
         target_period,
         std::sync::Arc::clone(&context.node_to_column),
@@ -232,8 +215,21 @@ pub(crate) fn build_context_for_period(
             .cloned()
     };
 
-    for (node_id, value) in current_period_values {
-        period_context.set_value(&node_id, value)?;
+    if target_period == context.period_id {
+        // Same period: the column layout is identical (both share the same
+        // `node_to_column` via `Arc`), so copy the evaluated column vector
+        // directly. This avoids round-tripping every node through a
+        // `String`-keyed `IndexMap` (one heap allocation per node) and
+        // re-hashing each name via `set_value`. The temporary context is only
+        // used to re-evaluate an expression and read back a single value, so
+        // skipping `set_value`'s warning bookkeeping is intentional.
+        period_context.current_values = context.current_values.clone();
+    } else if let Some(period_values) = context.historical_results.get(&target_period) {
+        // Historical period: fill columns from the borrowed history map without
+        // cloning the whole map first.
+        for (node_id, value) in period_values {
+            period_context.set_value(node_id, *value)?;
+        }
     }
 
     Ok(period_context)

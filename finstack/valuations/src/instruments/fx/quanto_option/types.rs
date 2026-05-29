@@ -574,9 +574,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
         )?;
         let pv_up = self.value(&up, as_of)?.amount();
         let pv_dn = self.value(&dn, as_of)?.amount();
-        Ok(Some(
-            (pv_up - 2.0 * base_pv + pv_dn) / (vol_bump * vol_bump),
-        ))
+        // Report volga per **vol point squared** (consistent with vega and
+        // `MetricId::Volga`): normalize by the bump expressed in vol points.
+        let width = vol_bump * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
+        Ok(Some((pv_up - 2.0 * base_pv + pv_dn) / (width * width)))
     }
 }
 

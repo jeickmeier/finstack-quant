@@ -1,3 +1,4 @@
+use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::fixed_income::bond::CashflowSpec;
 use crate::instruments::Bond;
@@ -87,12 +88,30 @@ impl MetricCalculator for YtmCalculator {
             let dirty_amt = quote_ctx.dirty_from_clean_pct(clean_px, notional.amount());
             Money::new(dirty_amt, notional.currency())
         } else {
-            // Fallback: use model PV as dirty price. This preserves the semantic
-            // that YTM is the IRR of the full projected cashflows.
-            // Note: base_value is PV at as_of, but for bonds with settlement_days,
-            // we should ideally forward-value to quote_date. For simplicity,
-            // we use base_value directly here.
-            context.base_value
+            // Fallback: forward-value the model PV (computed at `as_of`) to the
+            // quote/settlement date so the solved YTM discounts cashflows from
+            // the same origin (`quote_date`) at which the dirty price is
+            // expressed. `base_value` is PV at `as_of`; dividing by
+            // `DF(as_of → quote_date)` removes the settlement-period (typically
+            // T+2) carry that would otherwise bias the YTM and the
+            // duration/convexity derived from it.
+            let pv_as_of = context.base_value.amount();
+            let pv_at_quote = if quote_ctx.quote_date > context.as_of {
+                let curve = context.curves.get_discount(discount_curve_id.as_str())?;
+                let df = relative_df_discount_curve(
+                    curve.as_ref(),
+                    context.as_of,
+                    quote_ctx.quote_date,
+                )?;
+                if df > 0.0 {
+                    pv_as_of / df
+                } else {
+                    pv_as_of
+                }
+            } else {
+                pv_as_of
+            };
+            Money::new(pv_at_quote, notional.currency())
         };
 
         // Build and cache flows and hints if not already present

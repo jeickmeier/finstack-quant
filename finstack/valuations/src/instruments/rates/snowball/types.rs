@@ -251,10 +251,17 @@ impl crate::instruments::common_impl::traits::Instrument for Snowball {
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         match self.variant {
-            // Snowball is path-dependent, needs MC
+            // Snowball is path-dependent, needs MC.
             SnowballVariant::Snowball => crate::pricer::ModelKey::MonteCarloHullWhite1F,
-            // Inverse floater is deterministic given a curve, but MC handles callability
-            SnowballVariant::InverseFloater => crate::pricer::ModelKey::Discounting,
+            // An inverse-floater coupon `max(fixed − leverage·float, floor)`
+            // (optionally capped) is an option on the floating rate: the floor
+            // is a floorlet, the cap a caplet. The `Discounting` pricer applies
+            // `compute_coupon` to a single deterministic forward, so it captures
+            // only intrinsic value and drops the floor/cap time value (and
+            // leveraged convexity). Default to the HW1F MC pricer, which prices
+            // the embedded optionality correctly; `Discounting` remains an
+            // explicit, fast, intrinsic-only approximation for callers who opt in.
+            SnowballVariant::InverseFloater => crate::pricer::ModelKey::MonteCarloHullWhite1F,
         }
     }
 
@@ -344,6 +351,19 @@ mod tests {
         // c_3 = max(0.08 + 0.05 - 0.06, 0) = 0.07
         let c3 = s.compute_coupon(0.06, c2);
         assert!((c3 - 0.07).abs() < 1e-12);
+    }
+
+    #[test]
+    fn inverse_floater_defaults_to_mc_to_capture_floor_optionality() {
+        use crate::instruments::common_impl::traits::Instrument;
+        use crate::pricer::ModelKey;
+        // A floored/capped inverse floater carries floorlet/caplet optionality,
+        // so the default model must be the HW1F MC pricer (which prices the
+        // floor's time value), not the intrinsic-only Discounting pricer.
+        let inv = Snowball::example_inverse_floater();
+        assert_eq!(inv.coupon_floor, 0.0);
+        assert!(inv.coupon_cap.is_some());
+        assert_eq!(inv.default_model(), ModelKey::MonteCarloHullWhite1F);
     }
 
     #[test]

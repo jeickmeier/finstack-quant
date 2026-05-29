@@ -64,6 +64,13 @@ impl Check for RetainedEarningsReconciliation {
         let periods = &context.model.periods;
 
         for i in 1..periods.len() {
+            // Roll-forward identities only hold for chronologically consecutive
+            // periods. Skip any pair that is not in ascending order so a
+            // misordered or interleaved `periods` list cannot reconcile the
+            // current period against the wrong "prior" period.
+            if periods[i].start < periods[i - 1].start {
+                continue;
+            }
             let prev_pid = &periods[i - 1].id;
             let curr_pid = &periods[i].id;
 

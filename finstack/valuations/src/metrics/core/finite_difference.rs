@@ -28,6 +28,16 @@ pub(crate) mod bump_sizes {
     pub(crate) const CORRELATION: f64 = 0.01;
 }
 
+/// Number of vol points in one unit (1.00) of absolute implied volatility.
+///
+/// Vega is reported per **vol point** (1% = 0.01) across the library
+/// (see `closed_form::greeks::bs_vega`). Second-order vol Greeks must use the
+/// same axis: volga (`∂²V/∂σ²`) is reported per **vol point squared**, so a
+/// finite difference taken in absolute-vol units must be multiplied by
+/// `(1 vol point)² = (0.01)²` — equivalently divided by
+/// `(bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL)²`.
+pub(crate) const VOL_POINTS_PER_ABSOLUTE_VOL: f64 = 100.0;
+
 /// Minimum width tolerated when normalizing a finite difference.
 const MIN_FINITE_DIFF_WIDTH: f64 = 1e-12;
 

@@ -99,18 +99,31 @@ impl std::fmt::Display for VolSurfaceAxis {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VolInterpolationMode {
-    /// Interpolate implied volatility directly.
+    /// Interpolate implied volatility directly (the default).
     ///
     /// This is the most literal choice when market quotes are already given as
     /// implied volatilities on the stored grid and you want local interpolation
     /// in quote space.
+    ///
+    /// # ⚠️ Not calendar-arbitrage-safe across expiry
+    ///
+    /// Linear-in-vol interpolation along the **expiry** axis does not preserve
+    /// monotonicity of total variance `σ²·t`, so an off-grid vol read between
+    /// two expiry pillars can imply *decreasing* total variance with time —
+    /// i.e. calendar arbitrage — even when the pillar grid is itself
+    /// arbitrage-free. For arbitrage-sensitive workflows (Dupire local vol,
+    /// no-arb checks, term-structure interpolation) select
+    /// [`TotalVariance`](Self::TotalVariance) via
+    /// [`VolSurfaceBuilder::with_interpolation_mode`]. The default is retained
+    /// for backward compatibility and quote-space fidelity at the pillars.
     #[default]
     Vol,
     /// Interpolate total variance `sigma^2 * t`, then convert back to implied vol.
     ///
-    /// This is often preferred when blending across expiries because total
-    /// variance tends to behave more linearly in time and better preserves
-    /// no-arbitrage intuition for variance accumulation.
+    /// Preferred when blending across expiries: total variance behaves more
+    /// linearly in time and preserves the no-arbitrage intuition for variance
+    /// accumulation, avoiding the calendar-arbitrage trap of linear-in-vol
+    /// interpolation (see [`Vol`](Self::Vol)).
     TotalVariance,
 }
 

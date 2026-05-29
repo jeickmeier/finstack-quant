@@ -34,9 +34,16 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{FactorTimeSeries, YieldForecast, YieldPanel};
 
-/// Default Diebold-Li decay parameter: maximizes curvature factor loading
-/// at approximately 30-month maturity.
-const DEFAULT_LAMBDA: f64 = 0.0609;
+/// Default Diebold-Li decay parameter, expressed for tenors **in years** (the
+/// workspace-wide tenor convention; see the `dtsm` module examples).
+///
+/// Diebold & Li (2006) use `λ = 0.0609` for maturities in **months**, which
+/// maximizes the curvature loading at ≈30 months. Because `λ·τ` is
+/// dimensionless, the years-equivalent is `12 × 0.0609 = 0.7308`, placing the
+/// curvature peak at the same ≈2.45-year (≈30-month) maturity. Using the raw
+/// months value with year tenors would mis-place the peak at ≈30 **years** and
+/// distort the level/slope/curvature decomposition.
+const DEFAULT_LAMBDA: f64 = 0.7308;
 
 // ---------------------------------------------------------------------------
 // DieboldLi
@@ -73,8 +80,10 @@ pub struct DieboldLiBuilder {
 impl DieboldLiBuilder {
     /// Set the decay parameter lambda.
     ///
-    /// Default: 0.0609 (Diebold-Li canonical value, maximizes curvature
-    /// factor loading at 30-month maturity).
+    /// Default: `0.7308` for tenors in **years** (the years-equivalent of
+    /// Diebold-Li's canonical `0.0609` months value; curvature loading peaks at
+    /// ≈2.45 years ≈ 30 months). Pass a months-scaled lambda only if you also
+    /// supply tenors in months.
     #[must_use]
     pub fn lambda(mut self, lambda: f64) -> Self {
         self.lambda = lambda;
@@ -108,7 +117,7 @@ impl DieboldLiBuilder {
 // ---------------------------------------------------------------------------
 
 impl DieboldLi {
-    /// Create a builder with default lambda = 0.0609.
+    /// Create a builder with default lambda = 0.7308 (years convention).
     #[must_use]
     pub fn builder() -> DieboldLiBuilder {
         DieboldLiBuilder {
@@ -508,7 +517,8 @@ mod tests {
     #[test]
     fn builder_default_lambda() {
         let model = DieboldLi::builder().build().unwrap();
-        assert!((model.lambda() - 0.0609).abs() < 1e-10);
+        // Years-convention default (12 × Diebold-Li's 0.0609 months value).
+        assert!((model.lambda() - 0.7308).abs() < 1e-10);
     }
 
     #[test]

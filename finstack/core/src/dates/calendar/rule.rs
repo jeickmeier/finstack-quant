@@ -387,6 +387,50 @@ pub enum Rule {
     /// - Formula valid for years 1900-2100
     /// - Source: Japan National Astronomical Observatory (国立天文台)
     AutumnalEquinoxJP,
+
+    /// Effective-date wrapper that gates an inner rule to a closed range of
+    /// calendar years.
+    ///
+    /// Holidays are adopted (and occasionally retired) on specific dates — e.g.
+    /// NYSE first closed for Juneteenth in 2022 and for Martin Luther King Jr.
+    /// Day in 1998. Without gating, a rule applies to every year in
+    /// `[BASE_YEAR, END_YEAR]`, which silently marks pre-adoption dates as
+    /// holidays and corrupts historical accruals, settlement, and day counts.
+    ///
+    /// `from_year` / `to_year` are **inclusive** bounds; `None` means unbounded
+    /// on that side. The inner rule is delegated to only when
+    /// `from_year <= date.year() <= to_year`.
+    ///
+    /// # Note
+    /// Like [`Span`](Rule::Span) this variant contains `&'static Rule` and so is
+    /// not serializable; it is produced only by the compiled calendar
+    /// definitions.
+    #[serde(skip)]
+    Effective {
+        /// Inclusive first year the inner rule applies (`None` = unbounded).
+        from_year: Option<i32>,
+        /// Inclusive last year the inner rule applies (`None` = unbounded).
+        to_year: Option<i32>,
+        /// The gated rule.
+        inner: &'static Rule,
+    },
+}
+
+/// Returns `true` when `year` lies within the inclusive `[from, to]` bounds
+/// (`None` bounds are treated as unbounded).
+#[inline]
+const fn year_in_effective_range(year: i32, from: Option<i32>, to: Option<i32>) -> bool {
+    if let Some(f) = from {
+        if year < f {
+            return false;
+        }
+    }
+    if let Some(t) = to {
+        if year > t {
+            return false;
+        }
+    }
+    true
 }
 
 // ---------------------------------------------------------------------------
@@ -652,6 +696,11 @@ impl Rule {
             Rule::BuddhasBirthday => buddhas_birthday_date(date.year()) == Some(date),
             Rule::VernalEquinoxJP => vernal_equinox_jp(date.year()).is_some_and(|d| d == date),
             Rule::AutumnalEquinoxJP => autumnal_equinox_jp(date.year()).is_some_and(|d| d == date),
+            Rule::Effective {
+                from_year,
+                to_year,
+                inner,
+            } => year_in_effective_range(date.year(), *from_year, *to_year) && inner.applies(date),
         }
     }
 }
@@ -727,6 +776,15 @@ impl Rule {
             Rule::AutumnalEquinoxJP => {
                 if let Some(d) = autumnal_equinox_jp(year) {
                     out.push(d);
+                }
+            }
+            Rule::Effective {
+                from_year,
+                to_year,
+                inner,
+            } => {
+                if year_in_effective_range(year, *from_year, *to_year) {
+                    inner.materialize_year(year, out);
                 }
             }
         }

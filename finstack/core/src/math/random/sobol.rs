@@ -195,12 +195,23 @@ impl SobolRng {
         value
     }
 
-    /// Apply proper Owen scrambling to a Sobol value.
+    /// Apply an Owen-style scramble to a Sobol value.
     ///
     /// Owen scrambling (Owen 1995, 1997) applies a recursive bitwise permutation
     /// where each bit's flip decision depends on all higher-order (more significant)
-    /// bits. This preserves the (t,m,s)-net structure and achieves better variance
-    /// reduction compared to simple XOR scrambling.
+    /// bits, achieving better variance reduction than simple XOR scrambling.
+    ///
+    /// # Approximation
+    ///
+    /// This is an **approximate** Owen scramble: the per-bit flip is a *hash* of
+    /// the higher-order bits XOR a fixed per-bit scramble seed, not the canonical
+    /// nested-uniform permutation tree. It decorrelates replications and is
+    /// adequate for randomized-QMC error bars at the dimensions used here, but it
+    /// does **not** strictly guarantee the (t,m,s)-net-preserving randomization
+    /// that scrambled-net variance theory assumes — quality can degrade in high
+    /// dimensions where the higher-bit space is sparse. Replace with a Matoušek
+    /// linear scramble or a full nested-uniform construction (validated against a
+    /// reference scrambled-Sobol sequence) if strict net preservation is needed.
     ///
     /// The algorithm processes bits from most significant to least significant,
     /// where the decision to flip bit `i` depends on:

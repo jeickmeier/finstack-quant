@@ -65,10 +65,17 @@ const MIN_BUMP_BP_THRESHOLD: f64 = 1e-10;
 
 /// Central-difference sensitivity: `(pv_up - pv_down) / (2 * bump_bp)`.
 ///
-/// Returns 0.0 when `bump_bp` is below [`MIN_BUMP_BP_THRESHOLD`] to avoid
-/// numerically unstable division.
+/// `bump_bp` comes from config validated with `ensure_finite_positive`, so a
+/// degenerate width is a misconfiguration rather than normal input. A
+/// `debug_assert` flags it loudly in debug/test builds (a silent 0.0 is
+/// indistinguishable from a true zero CS01); release builds fall back to 0.0
+/// rather than divide by ~0 and emit inf/NaN.
 #[inline]
 pub(crate) fn sensitivity_central_diff(pv_up: f64, pv_down: f64, bump_bp: f64) -> f64 {
+    debug_assert!(
+        bump_bp.abs() > MIN_BUMP_BP_THRESHOLD,
+        "CS01 bump_bp must exceed {MIN_BUMP_BP_THRESHOLD} (got {bump_bp}); validate upstream"
+    );
     if bump_bp.abs() <= MIN_BUMP_BP_THRESHOLD {
         return 0.0;
     }
