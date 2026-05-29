@@ -1616,28 +1616,35 @@ fn sample_correlation_flat(
             // ratio that is not a Pearson correlation (it can even exceed 1
             // before the clamp). Compute the overlap mean for each factor here
             // so the assembled entry is a proper sample correlation.
-            let mut overlap_i: Vec<f64> = Vec::new();
-            let mut overlap_j: Vec<f64> = Vec::new();
+            // Two passes over the same slices (no per-pair Vec materialisation):
+            // pass 1 accumulates the overlap means, pass 2 the demeaned cross-
+            // and self-products. This keeps the exact two-pass demeaning math
+            // while avoiding O(n²) heap allocations across the factor pairs.
+            let mut sum_i = 0.0_f64;
+            let mut sum_j = 0.0_f64;
+            let mut count = 0usize;
             for (vi_opt, vj_opt) in series[i].iter().zip(series[j].iter()) {
                 if let (Some(vi), Some(vj)) = (*vi_opt, *vj_opt) {
-                    overlap_i.push(vi);
-                    overlap_j.push(vj);
+                    sum_i += vi;
+                    sum_j += vj;
+                    count += 1;
                 }
             }
-            let count = overlap_i.len();
             let corr = if count >= 2 {
                 let nf = count as f64;
-                let mean_i = overlap_i.iter().sum::<f64>() / nf;
-                let mean_j = overlap_j.iter().sum::<f64>() / nf;
+                let mean_i = sum_i / nf;
+                let mean_j = sum_j / nf;
                 let mut cov_ij = 0.0_f64;
                 let mut var_i = 0.0_f64;
                 let mut var_j = 0.0_f64;
-                for (vi, vj) in overlap_i.iter().zip(overlap_j.iter()) {
-                    let di = vi - mean_i;
-                    let dj = vj - mean_j;
-                    cov_ij += di * dj;
-                    var_i += di * di;
-                    var_j += dj * dj;
+                for (vi_opt, vj_opt) in series[i].iter().zip(series[j].iter()) {
+                    if let (Some(vi), Some(vj)) = (*vi_opt, *vj_opt) {
+                        let di = vi - mean_i;
+                        let dj = vj - mean_j;
+                        cov_ij += di * dj;
+                        var_i += di * di;
+                        var_j += dj * dj;
+                    }
                 }
                 // `cov_ij`, `var_i`, `var_j` share the same denominator
                 // (n − 1), so it cancels in the ratio and need not be applied.

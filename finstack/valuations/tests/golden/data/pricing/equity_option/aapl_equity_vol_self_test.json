@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "aapl_equity_vol_self_test",
-  "domain": "equity.equity_option",
-  "description": "Self-test fixture for SABR equity vol surface calibration. AAPL 1Y call option, strike 175 (ATM), 100-share notional. Two-step envelope: USD-OIS discount + AAPL-EQUITY-VOL SABR surface calibrated from 9 OptionVol quotes (3 expiries \u00d7 3 strikes, beta=0.5). Closes the surface-step coverage gap (plan \u00a718 follow-up #2). Note: SABR fit has rmse ~1e-3 (typical for vol-surface calibration); the self-test contract is cross-platform round-trip reproduction of the priced metrics, not zero rmse.",
-  "provenance": {
-    "as_of": "2026-05-08",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "aapl_equity_vol_self_test",
+    "domain": "equity.equity_option",
+    "description": "Self-test fixture for SABR equity vol surface calibration. AAPL 1Y call option, strike 175 (ATM), 100-share notional. Two-step envelope: USD-OIS discount + AAPL-EQUITY-VOL SABR surface calibrated from 9 OptionVol quotes (3 expiries \u00d7 3 strikes, beta=0.5). Closes the surface-step coverage gap (plan \u00a718 follow-up #2). Note: SABR fit has rmse ~1e-3 (typical for vol-surface calibration); the self-test contract is cross-platform round-trip reproduction of the priced metrics, not zero rmse.",
+    "valuation_date": "2026-05-08",
     "source": "formula",
     "source_detail": "Self-test fixture closing the surface-step coverage gap. Reuses the AAPL equity-vol reference envelope (Phase 2 catalog entry 08_equity_vol_surface.json) as the calibration plan. Adds AAPL-SPOT and AAPL-DIVYIELD prices to initial_market and an AAPL 1Y ATM call option to price against the calibrated SABR surface. Expected outputs captured from Finstack's own calibrate + black76-price round-trip; cross-platform reproduction within documented numerical tolerance is the contract.",
     "captured_by": "claude",
@@ -15,42 +15,11 @@
     "regen_command": "uv run pytest finstack-py/tests/golden/test_pricing_equity_option.py -v -k self_test",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-05-08",
-    "model": "black76",
-    "metrics": [
-      "delta",
-      "gamma",
-      "vega",
-      "theta"
-    ],
-    "instrument_json": {
-      "type": "equity_option",
-      "spec": {
-        "id": "AAPL-CALL-1Y-SELF-TEST",
-        "underlying_ticker": "AAPL",
-        "strike": 175.0,
-        "option_type": "call",
-        "expiry": "2027-05-08",
-        "notional": {
-          "amount": "100",
-          "currency": "USD"
-        },
-        "discount_curve_id": "USD-OIS",
-        "spot_id": "AAPL-SPOT",
-        "vol_surface_id": "AAPL-EQUITY-VOL",
-        "div_yield_id": "AAPL-DIVYIELD",
-        "attributes": {
-          "tags": [
-            "golden",
-            "self_test",
-            "vol_surface"
-          ],
-          "meta": {}
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "black76",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "$schema": "../../schemas/calibration/3/calibration.schema.json",
       "schema": "finstack.calibration",
       "plan": {
@@ -384,20 +353,35 @@
         }
       ],
       "prior_market": []
-    },
-    "source_reference": {
-      "note": "Self-test fixture closing the surface-step coverage gap (plan \u00a718 follow-up #2). The reference envelope's SABR calibration converges with rmse ~1e-3 (typical for SABR fits across 3 expiries \u00d7 3 strikes). Expected outputs from Finstack's calibrate + price round-trip; contract is cross-platform reproduction within documented SABR calibration tolerance.",
-      "design_metrics": [
-        "npv",
-        "delta",
-        "gamma",
-        "vega",
-        "theta"
-      ],
-      "self_test_origin": "Authored 2026-05-09 to cover the `vol_surface` (SABR) calibration step kind."
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "equity_option",
+    "spec": {
+      "id": "AAPL-CALL-1Y-SELF-TEST",
+      "underlying_ticker": "AAPL",
+      "strike": 175.0,
+      "option_type": "call",
+      "expiry": "2027-05-08",
+      "notional": {
+        "amount": "100",
+        "currency": "USD"
+      },
+      "discount_curve_id": "USD-OIS",
+      "spot_id": "AAPL-SPOT",
+      "vol_surface_id": "AAPL-EQUITY-VOL",
+      "div_yield_id": "AAPL-DIVYIELD",
+      "attributes": {
+        "tags": [
+          "golden",
+          "self_test",
+          "vol_surface"
+        ],
+        "meta": {}
+      }
+    }
+  },
+  "expected": {
     "npv": 1856.838956431154,
     "delta": 59.664710852014,
     "gamma": 0.948100459255,

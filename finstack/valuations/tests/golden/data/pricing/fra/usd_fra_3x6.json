@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "usd_fra_3x6",
-  "domain": "rates.fra",
-  "description": "Bloomberg SWPM USD 2M x 5M FRA captured from screens on 2026-05-02.",
-  "provenance": {
-    "as_of": "2026-05-02",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "usd_fra_3x6",
+    "domain": "rates.fra",
+    "description": "Bloomberg SWPM USD 2M x 5M FRA captured from screens on 2026-05-02.",
+    "valuation_date": "2026-05-05",
     "source": "bloomberg-screen",
     "source_detail": "Bloomberg SWPM FRA, curve 490 USD SOFR discounting, curve 559 USD 3M CME Term SOFR projection, curve date 2026-05-02, valuation date 2026-05-05 Phase-2 envelope migration (2026-05-09): hybrid Tier-AB. The USD-SOFR discount curve is now calibrated from 12 SWPM Curve 490 input rates (deposits + OIS swaps) using the per-step ois_compounding override (CompoundedWithRateCutoff{cutoff_days: 1}). The USD-3M-CME-TERM-SOFR forward curve is a synthetic flat 3.6437% test curve that doesn't correspond to a Bloomberg-conformant calibration; it is preserved verbatim in initial_market.curves.",
     "captured_by": "jeickmeier",
@@ -40,57 +40,11 @@
       }
     ]
   },
-  "inputs": {
-    "valuation_date": "2026-05-05",
-    "model": "discounting",
-    "metrics": [
-      "par_rate",
-      "pv01",
-      "forward_pv01",
-      "dv01"
-    ],
-    "instrument_json": {
-      "schema": "finstack.instrument/1",
-      "instrument": {
-        "type": "forward_rate_agreement",
-        "spec": {
-          "id": "USD-FRA-2X5-SWPM-20260502",
-          "notional": {
-            "amount": "10000000",
-            "currency": "USD"
-          },
-          "fixing_date": "2026-07-01",
-          "start_date": "2026-07-06",
-          "maturity": "2026-10-06",
-          "fixed_rate": "0.036437",
-          "day_count": "Act360",
-          "reset_lag": 2,
-          "fixing_calendar_id": "usny",
-          "fixing_bdc": "modified_following",
-          "discount_curve_id": "USD-SOFR",
-          "forward_curve_id": "USD-3M-CME-TERM-SOFR",
-          "side": "receive",
-          "attributes": {
-            "tags": [
-              "golden",
-              "bloomberg",
-              "swpm"
-            ],
-            "meta": {
-              "bloomberg_screen": "SWPM",
-              "bloomberg_side": "Sell (Lend)",
-              "curve_number_discount": "490",
-              "curve_name_discount": "USD SOFR",
-              "curve_number_forward": "559",
-              "curve_name_forward": "USD 3M CME Term SOFR",
-              "fra_type": "2M x 5M",
-              "calendar": "GT"
-            }
-          }
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "usd_fra_3x6_calibrated",
@@ -377,183 +331,50 @@
           }
         }
       ]
-    },
-    "source_reference": {
-      "strict_metric_keys": {
-        "pv01": "br01_559_usd_3",
-        "forward_pv01": "br01_559_usd_3",
-        "dv01": "dv01"
-      },
-      "risk_convention_note": "Bloomberg displays BR01 and DV01 as positive screen risks. Finstack stores signed risk: Sell/Lend maps to receive-fixed, so forward-curve PV01/BR01 and aggregate rate-curve DV01 are negative. DV01 is computed by shocking calibration quotes and rebuilding the discount/projection curves.",
-      "curve_date": "2026-05-02",
-      "bloomberg_reference": {
-        "trade": {
-          "trade_date": "2026-05-02",
-          "valuation_date": "2026-05-05",
-          "curve_date": "2026-05-02",
-          "currency": "USD",
-          "notional": 10000000.0,
-          "side": "Sell (Lend)",
-          "fra_type": "2M x 5M",
-          "effective_date": "2026-07-06",
-          "maturity_date": "2026-10-06",
-          "reset_date": "2026-07-01",
-          "calendar": "GT",
-          "business_day_adjustment": "ModifiedFollowing",
-          "day_count": "ACT/360",
-          "fixed_rate": 0.036437,
-          "index": "TSFR3M",
-          "discount_curve": "490 USD SOFR",
-          "forward_curve": "559 USD 3M CME Term SOFR"
+    }
+  },
+  "instrument": {
+    "schema": "finstack.instrument/1",
+    "instrument": {
+      "type": "forward_rate_agreement",
+      "spec": {
+        "id": "USD-FRA-2X5-SWPM-20260502",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
         },
-        "screen_results": {
-          "projected_cashflow": -0.01,
-          "premium": 0.0,
-          "discount_settle": 0.99375,
-          "npv": -0.01,
-          "market_rate": 0.036437,
-          "bp_value": -1e-05,
-          "br01_559_usd_3": -251.51,
-          "dv01": -337.37,
-          "gamma_1bp": 0.04
-        },
-        "cashflows": [
-          {
-            "pay_date": "2026-07-06",
-            "accrual_start": "2026-07-06",
-            "accrual_end": "2026-10-06",
-            "days": 92,
-            "notional": 10000000.0,
-            "principal": 0.0,
-            "fra_strike": 0.036437,
-            "reset_date": "2026-07-01",
-            "reset_rate": 0.036437,
-            "payment": -0.01,
-            "discount": 0.993752
+        "fixing_date": "2026-07-01",
+        "start_date": "2026-07-06",
+        "maturity": "2026-10-06",
+        "fixed_rate": "0.036437",
+        "day_count": "Act360",
+        "reset_lag": 2,
+        "fixing_calendar_id": "usny",
+        "fixing_bdc": "modified_following",
+        "discount_curve_id": "USD-SOFR",
+        "forward_curve_id": "USD-3M-CME-TERM-SOFR",
+        "side": "receive",
+        "attributes": {
+          "tags": [
+            "golden",
+            "bloomberg",
+            "swpm"
+          ],
+          "meta": {
+            "bloomberg_screen": "SWPM",
+            "bloomberg_side": "Sell (Lend)",
+            "curve_number_discount": "490",
+            "curve_name_discount": "USD SOFR",
+            "curve_number_forward": "559",
+            "curve_name_forward": "USD 3M CME Term SOFR",
+            "fra_type": "2M x 5M",
+            "calendar": "GT"
           }
-        ],
-        "discount_curve_screen": [
-          {
-            "term": "1W",
-            "market_rate": 0.03634,
-            "zero_rate": 0.0368266,
-            "discount": 0.998992
-          },
-          {
-            "term": "2W",
-            "market_rate": 0.036351,
-            "zero_rate": 0.0368272,
-            "discount": 0.998286
-          },
-          {
-            "term": "3W",
-            "market_rate": 0.036335,
-            "zero_rate": 0.0368024,
-            "discount": 0.997583
-          },
-          {
-            "term": "1M",
-            "market_rate": 0.036432,
-            "zero_rate": 0.0368744,
-            "discount": 0.996571
-          },
-          {
-            "term": "2M",
-            "market_rate": 0.0365047,
-            "zero_rate": 0.0368921,
-            "discount": 0.993452
-          },
-          {
-            "term": "3M",
-            "market_rate": 0.036544,
-            "zero_rate": 0.0368776,
-            "discount": 0.990448
-          },
-          {
-            "term": "4M",
-            "market_rate": 0.036589,
-            "zero_rate": 0.0368606,
-            "discount": 0.987057
-          },
-          {
-            "term": "5M",
-            "market_rate": 0.036629,
-            "zero_rate": 0.0368509,
-            "discount": 0.984373
-          },
-          {
-            "term": "6M",
-            "market_rate": 0.0366705,
-            "zero_rate": 0.0368353,
-            "discount": 0.981305
-          },
-          {
-            "term": "12M",
-            "market_rate": 0.0372495,
-            "zero_rate": 0.0370691,
-            "discount": 0.963316
-          },
-          {
-            "term": "18M",
-            "market_rate": 0.0372925,
-            "zero_rate": 0.0372293,
-            "discount": 0.945253
-          },
-          {
-            "term": "2Y",
-            "market_rate": 0.0371735,
-            "zero_rate": 0.0369938,
-            "discount": 0.928307
-          }
-        ],
-        "forward_curve_screen": [
-          {
-            "term": "3M",
-            "type": "Cash",
-            "market_rate": 0.0366395,
-            "zero_rate": 0.0369735,
-            "discount": 0.990423
-          },
-          {
-            "term": "6M",
-            "type": "Basis",
-            "market_rate": 0.0,
-            "zero_rate": 0.0368255,
-            "discount": 0.98131
-          },
-          {
-            "term": "9M",
-            "type": "Basis",
-            "market_rate": 0.0,
-            "zero_rate": 0.0369114,
-            "discount": 0.97218
-          },
-          {
-            "term": "12M",
-            "type": "Basis",
-            "market_rate": 0.0,
-            "zero_rate": 0.0370584,
-            "discount": 0.963326
-          },
-          {
-            "term": "18M",
-            "type": "Basis",
-            "market_rate": 0.0,
-            "zero_rate": 0.0372171,
-            "discount": 0.94527
-          },
-          {
-            "term": "2Y",
-            "type": "Basis",
-            "market_rate": 0.0,
-            "zero_rate": 0.0369821,
-            "discount": 0.928329
-          }
-        ]
+        }
       }
     }
   },
-  "expected_outputs": {
+  "expected": {
     "npv": -0.01,
     "par_rate": 0.036437,
     "pv01": -251.51,

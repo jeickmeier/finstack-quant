@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "eurusd_fx_swap_3m",
-  "domain": "fx.fx_swap",
-  "description": "Synthetic EUR/USD 3M FX swap with explicit FX matrix and discount curves.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "eurusd_fx_swap_3m",
+    "domain": "fx.fx_swap",
+    "description": "Synthetic EUR/USD 3M FX swap with explicit FX matrix and discount curves.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical FX swap discounting calculation on deterministic synthetic EUR/USD market data Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
     "captured_by": "jeickmeier",
@@ -15,41 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "dv01_domestic",
-      "dv01_foreign"
-    ],
-    "instrument_json": {
-      "schema": "finstack.instrument/1",
-      "instrument": {
-        "type": "fx_swap",
-        "spec": {
-          "id": "EURUSD-FXSWAP-3M-GOLDEN",
-          "base_currency": "EUR",
-          "quote_currency": "USD",
-          "near_date": "2026-05-04",
-          "far_date": "2026-08-04",
-          "base_notional": {
-            "amount": "10000000",
-            "currency": "EUR"
-          },
-          "domestic_discount_curve_id": "USD-OIS",
-          "foreign_discount_curve_id": "EUR-OIS",
-          "near_rate": 1.1,
-          "far_rate": 1.105,
-          "attributes": {
-            "tags": [
-              "golden"
-            ],
-            "meta": {}
-          }
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "eurusd_fx_swap_3m_tier_a_wrap",
@@ -127,16 +97,36 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "design_metrics": [
-        "npv",
-        "dv01_domestic",
-        "dv01_foreign"
-      ]
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "schema": "finstack.instrument/1",
+    "instrument": {
+      "type": "fx_swap",
+      "spec": {
+        "id": "EURUSD-FXSWAP-3M-GOLDEN",
+        "base_currency": "EUR",
+        "quote_currency": "USD",
+        "near_date": "2026-05-04",
+        "far_date": "2026-08-04",
+        "base_notional": {
+          "amount": "10000000",
+          "currency": "EUR"
+        },
+        "domestic_discount_curve_id": "USD-OIS",
+        "foreign_discount_curve_id": "EUR-OIS",
+        "near_rate": 1.1,
+        "far_rate": 1.105,
+        "attributes": {
+          "tags": [
+            "golden"
+          ],
+          "meta": {}
+        }
+      }
+    }
+  },
+  "expected": {
     "npv": 28453.284469692793,
     "dv01_domestic": -275.47062049712986,
     "dv01_foreign": 274.74677893445187

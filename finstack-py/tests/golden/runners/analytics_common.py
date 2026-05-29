@@ -1,18 +1,19 @@
-"""Domain runner for flattened analytics golden fixtures."""
+"""Domain runner placeholder for analytics golden fixtures.
+
+No analytics fixtures are committed yet. Executable analytics dispatch must be
+wired (canonical return/price inputs mapped to the analytics API) before any
+``analytics.*`` fixture can run.
+"""
 
 from __future__ import annotations
 
-from tests.golden.runners import reject_flattened_outputs, validate_source_validation_fixture
 from tests.golden.schema import GoldenFixture
 
 
 def run(fixture: GoldenFixture) -> dict[str, float]:
-    """Run executable analytics fixtures or validate explicit source-only fixtures."""
-    validate_source_validation_fixture("analytics runner", fixture)
-    if "computations" not in fixture.inputs:
-        return reject_flattened_outputs("analytics runner", fixture)
+    """Reject analytics fixtures until executable dispatch is wired."""
     msg = (
-        "analytics runner found computations, but executable analytics dispatch is not wired yet; "
+        f"analytics runner is not wired yet for domain '{fixture.metadata.domain}'; "
         "add canonical return/price inputs and API mapping before enabling this golden"
     )
     raise ValueError(msg)

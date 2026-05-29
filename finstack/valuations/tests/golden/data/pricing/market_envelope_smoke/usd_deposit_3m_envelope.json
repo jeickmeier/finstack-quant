@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "usd_deposit_3m_envelope",
-  "domain": "rates.deposit",
-  "description": "Phase-1 smoke fixture: same deposit + expected outputs as deposit/usd_deposit_3m.json, but the discount curve is built via market_envelope rather than a materialized snapshot.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "usd_deposit_3m_envelope",
+    "domain": "rates.deposit",
+    "description": "Phase-1 smoke fixture: same deposit + expected outputs as deposit/usd_deposit_3m.json, but the discount curve is built via market_envelope rather than a materialized snapshot.",
+    "valuation_date": "2026-04-30",
     "source": "quantlib",
     "source_detail": "Phase-1 smoke: same QuantLib-Python 1.42.1 oracle values as deposit/usd_deposit_3m.json; discount curve carried through initial_market with no calibration steps to produce byte-identical pricing",
     "captured_by": "jeickmeier",
@@ -15,40 +15,11 @@
     "regen_command": "manual QuantLib-Python oracle; see inputs.source_reference for reproduction formulas and intermediate values",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "deposit_par_rate",
-      "dv01"
-    ],
-    "instrument_json": {
-      "schema": "finstack.instrument/1",
-      "instrument": {
-        "type": "deposit",
-        "spec": {
-          "id": "USD-DEP-3M-GOLDEN",
-          "notional": {
-            "amount": "10000000",
-            "currency": "USD"
-          },
-          "start_date": "2026-04-30",
-          "maturity": "2026-07-30",
-          "day_count": "Act360",
-          "quote_rate": "0.041",
-          "discount_curve_id": "USD-OIS",
-          "attributes": {
-            "tags": [
-              "golden"
-            ],
-            "meta": {}
-          },
-          "spot_lag_days": 0,
-          "calendar_id": null
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "smoke_carry_through",
@@ -104,24 +75,35 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "note": "QuantLib oracle: par rate follows IborIndex::forecastFixing, (DF(start) / DF(end) - 1) / Act360 year fraction; NPV follows CashFlows.npv over the -notional start flow and notional * (1 + quote_rate * year_fraction) maturity flow. Because this fixture uses Finstack synthetic time knots, the QuantLib reproduction is fed the maturity discount factor implied by the fixture's Act/365F log-linear discount curve interpolation. This smoke fixture routes the same curve through market_envelope/initial_market instead of a materialized market snapshot.",
-      "quantlib_version": "1.42.1",
-      "quantlib_reference_urls": [
-        "https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/indexes/iborindex.hpp",
-        "https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/termstructures/yield/ratehelpers.cpp",
-        "https://quantlib-python-docs.readthedocs.io/en/latest/helpers/rates.html"
-      ],
-      "oracle_values": {
-        "act360_year_fraction": 0.25277777777777777,
-        "act365f_curve_time": 0.2493150684931507,
-        "maturity_discount_factor": 0.9900272601903599,
-        "redemption": 10103638.888888888
+    }
+  },
+  "instrument": {
+    "schema": "finstack.instrument/1",
+    "instrument": {
+      "type": "deposit",
+      "spec": {
+        "id": "USD-DEP-3M-GOLDEN",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "start_date": "2026-04-30",
+        "maturity": "2026-07-30",
+        "day_count": "Act360",
+        "quote_rate": "0.041",
+        "discount_curve_id": "USD-OIS",
+        "attributes": {
+          "tags": [
+            "golden"
+          ],
+          "meta": {}
+        },
+        "spot_lag_days": 0,
+        "calendar_id": null
       }
     }
   },
-  "expected_outputs": {
+  "expected": {
     "npv": 2877.927119438455,
     "deposit_par_rate": 0.03985001083863061,
     "dv01": -249.38681957910967

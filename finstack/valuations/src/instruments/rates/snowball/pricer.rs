@@ -136,7 +136,16 @@ impl Payoff for SnowballPayoff {
     }
 }
 
-/// Discounting pricer for path-independent inverse floaters.
+/// Intrinsic-only discounting pricer for inverse floaters.
+///
+/// Projects a single deterministic forward per coupon and applies
+/// [`Snowball::compute_coupon`], which clamps to the floor/cap. This captures
+/// only the **intrinsic** value of the embedded floorlet/caplet and ignores
+/// their time value, so it understates a floored/capped inverse floater. It is
+/// exact only in the (rare) limit where the floor/cap never bind. The default
+/// model for `InverseFloater` is therefore [`ModelKey::MonteCarloHullWhite1F`];
+/// this pricer is retained as an explicit, fast approximation for callers who
+/// knowingly opt in via the `Discounting` model key.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SnowballDiscountingPricer;
 

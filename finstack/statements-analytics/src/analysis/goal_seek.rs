@@ -197,9 +197,13 @@ pub fn goal_seek(
         let (ref mut eval, ref mut temp_model) = *borrow;
 
         if let Some(node) = temp_model.nodes.get_mut(driver_node) {
-            let mut values = node.values.clone().unwrap_or_default();
-            values.insert(driver_period, AmountOrScalar::scalar(driver_value));
-            node.values = Some(values);
+            // Update only the driver period's entry in place. Cloning the whole
+            // `values` map here would copy every period on every solver
+            // iteration; Brent's method probes the objective many times, so a
+            // per-iteration map clone is pure overhead.
+            node.values
+                .get_or_insert_with(Default::default)
+                .insert(driver_period, AmountOrScalar::scalar(driver_value));
         }
 
         match eval.evaluate_prepared(temp_model, &prepared) {

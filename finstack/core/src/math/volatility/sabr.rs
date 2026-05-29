@@ -184,6 +184,12 @@ impl SabrParams {
     ///
     /// Black-76 implied volatility (lognormal). Returns `alpha` for the ATM case.
     ///
+    /// Returns `f64::NAN` for degenerate inputs (non-positive forward/strike,
+    /// non-positive expiry, or a χ(z) breakdown). Callers on pricing/risk paths
+    /// must guard the result with `is_finite()`, or use the fallible
+    /// [`try_implied_vol_lognormal`](Self::try_implied_vol_lognormal), since a
+    /// silent NaN poisons Black-76 pricing and compensated summations downstream.
+    ///
     /// # Special Cases
     ///
     /// - ATM (`f ≈ k`): Uses the simplified ATM formula for numerical stability
@@ -272,6 +278,12 @@ impl SabrParams {
     /// * `f` - Forward rate (may be negative)
     /// * `k` - Strike rate (may be negative)
     /// * `t` - Time to expiry in years
+    ///
+    /// # Returns
+    ///
+    /// Normal/Bachelier implied volatility, or `f64::NAN` for non-positive
+    /// expiry or a χ(z) breakdown. Guard with `is_finite()` or use the fallible
+    /// [`try_implied_vol_normal`](Self::try_implied_vol_normal) on pricing paths.
     pub fn implied_vol_normal(&self, f: f64, k: f64, t: f64) -> f64 {
         let alpha = self.alpha;
         let beta = self.beta;
@@ -323,23 +335,67 @@ impl SabrParams {
 
         let z_over_chi = if chi_z.abs() < 1e-14 { 1.0 } else { z / chi_z };
 
-        // Normal vol = α * (FK)^(β/2) * (z/χ(z)) * [F-K] / [(FK)^((1-β)/2) * ln(F/K)] × correction
+        // Normal vol (Hagan 2002, eq. 2.17b):
+        //   σ_N = α·(FK)^(β/2) · [numerator series] / [denominator series]
+        //         · (z/χ(z)) · [1 + correction·T]
         let fk_beta_half = fk.powf(beta / 2.0);
 
         let omb2 = one_minus_beta * one_minus_beta;
         let log_fk_sq = log_fk * log_fk;
 
-        // Series expansion for (F-K) / [(FK)^((1-β)/2) * ln(F/K)]
-        let ratio = 1.0 + omb2 / 24.0 * log_fk_sq + omb2 * omb2 / 1920.0 * log_fk_sq * log_fk_sq;
+        // Numerator series (β-independent):
+        //   1 + (1/24)ln²(F/K) + (1/1920)ln⁴(F/K)
+        let numer_series = 1.0 + log_fk_sq / 24.0 + log_fk_sq * log_fk_sq / 1920.0;
+        // Denominator series:
+        //   1 + ((1-β)²/24)ln²(F/K) + ((1-β)⁴/1920)ln⁴(F/K)
+        let denom_series =
+            1.0 + omb2 / 24.0 * log_fk_sq + omb2 * omb2 / 1920.0 * log_fk_sq * log_fk_sq;
 
+        // First-order time correction. The leading term uses the normal-SABR
+        // coefficient −β(2−β)/24 (eq. 2.17b), NOT the lognormal (1−β)²/24.
         let fk_omb = fk.powf(one_minus_beta);
         let correction = 1.0
-            + (-omb2 / 24.0 * alpha * alpha / fk_omb
+            + (-beta * (2.0 - beta) / 24.0 * alpha * alpha / fk_omb
                 + 0.25 * rho * beta * nu * alpha / fk_mid
                 + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu)
                 * t;
 
-        alpha * fk_beta_half / ratio * z_over_chi * correction
+        alpha * fk_beta_half * numer_series / denom_series * z_over_chi * correction
+    }
+
+    /// Fallible [`implied_vol_lognormal`](Self::implied_vol_lognormal): returns
+    /// an error instead of a silent `f64::NAN` for degenerate inputs.
+    ///
+    /// Prefer this on any pricing/risk path where a NaN vol could silently
+    /// propagate into Black-76 valuation or a compensated aggregation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InputError::Invalid`](crate::error::InputError::Invalid) when
+    /// the underlying expansion yields a non-finite volatility.
+    pub fn try_implied_vol_lognormal(&self, f: f64, k: f64, t: f64) -> crate::Result<f64> {
+        let v = self.implied_vol_lognormal(f, k, t);
+        if v.is_finite() {
+            Ok(v)
+        } else {
+            Err(crate::error::InputError::Invalid.into())
+        }
+    }
+
+    /// Fallible [`implied_vol_normal`](Self::implied_vol_normal): returns an
+    /// error instead of a silent `f64::NAN` for degenerate inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InputError::Invalid`](crate::error::InputError::Invalid) when
+    /// the underlying expansion yields a non-finite volatility.
+    pub fn try_implied_vol_normal(&self, f: f64, k: f64, t: f64) -> crate::Result<f64> {
+        let v = self.implied_vol_normal(f, k, t);
+        if v.is_finite() {
+            Ok(v)
+        } else {
+            Err(crate::error::InputError::Invalid.into())
+        }
     }
 
     /// Check for negative implied probability density across a strike grid.
@@ -432,8 +488,10 @@ impl SabrParams {
 
         let base = alpha * f_beta;
 
+        // Normal-SABR leading coefficient is −β(2−β)/24 (Hagan 2.17b at F=K),
+        // NOT the lognormal (1−β)²/24. The two series cancel at ATM.
         let correction = 1.0
-            + (-omb * omb / 24.0 * alpha * alpha / (f_omb * f_omb)
+            + (-beta * (2.0 - beta) / 24.0 * alpha * alpha / (f_omb * f_omb)
                 + 0.25 * rho * beta * nu * alpha / f_omb
                 + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu)
                 * t;
@@ -457,7 +515,8 @@ fn black_call_undiscounted(forward: f64, strike: f64, expiry: f64, vol: f64) -> 
 #[inline]
 fn chi(z: f64, rho: f64) -> crate::Result<f64> {
     if z.abs() < 1e-10 {
-        // Taylor expansion: χ(z) ≈ z + ρz²/2 + (2ρ²-1)z³/6 + ...
+        // Taylor expansion to O(z²): χ(z) ≈ z + ρz²/2. Higher-order terms are
+        // negligible at the |z| < 1e-10 cutover (z³ ≲ 1e-30).
         return Ok(z * (1.0 + 0.5 * rho * z));
     }
 
@@ -853,6 +912,24 @@ mod tests {
     }
 
     #[test]
+    fn sabr_try_implied_vol_errors_on_degenerate_inputs() {
+        let params = SabrParams::new(0.035, 0.5, -0.2, 0.4).expect("valid params");
+        // Valid inputs return Ok and match the infallible path.
+        let ok = params
+            .try_implied_vol_lognormal(0.05, 0.06, 1.0)
+            .expect("finite vol");
+        assert!((ok - params.implied_vol_lognormal(0.05, 0.06, 1.0)).abs() < 1e-12);
+
+        // Degenerate inputs (non-positive forward/strike/expiry) yield NaN in the
+        // infallible path and an error in the fallible one.
+        assert!(params.implied_vol_lognormal(-0.05, 0.06, 1.0).is_nan());
+        assert!(params.try_implied_vol_lognormal(-0.05, 0.06, 1.0).is_err());
+        assert!(params.try_implied_vol_lognormal(0.05, 0.06, 0.0).is_err());
+        assert!(params.try_implied_vol_normal(0.05, 0.06, 0.0).is_err());
+        assert!(params.try_implied_vol_normal(0.01, -0.01, 1.0).is_ok());
+    }
+
+    #[test]
     fn sabr_vol_smile_shape() {
         let params = SabrParams::new(0.035, 0.5, -0.25, 0.45).expect("valid params");
         let fwd = 0.05;
@@ -901,6 +978,77 @@ mod tests {
         let fwd = 0.05;
         let vol = params.implied_vol_normal(fwd, fwd, 1.0);
         assert!(vol > 0.0, "Normal vol should be positive: {vol}");
+    }
+
+    /// Independent textbook implementation of Hagan (2002) eq. 2.17b, used as a
+    /// reference to lock in [`SabrParams::implied_vol_normal`].
+    fn hagan_normal_vol_reference(
+        alpha: f64,
+        beta: f64,
+        rho: f64,
+        nu: f64,
+        f: f64,
+        k: f64,
+        t: f64,
+    ) -> f64 {
+        let fk = f * k;
+        let omb = 1.0 - beta;
+        let log_fk = (f / k).ln();
+        let z = (nu / alpha) * fk.powf(omb / 2.0) * log_fk;
+        let chi = (((1.0 - 2.0 * rho * z + z * z).sqrt() + z - rho) / (1.0 - rho)).ln();
+        let z_over_chi = if z.abs() < 1e-12 { 1.0 } else { z / chi };
+        let l2 = log_fk * log_fk;
+        let num = 1.0 + l2 / 24.0 + l2 * l2 / 1920.0;
+        let den = 1.0 + omb * omb / 24.0 * l2 + omb.powi(4) / 1920.0 * l2 * l2;
+        let corr = 1.0
+            + (-beta * (2.0 - beta) / 24.0 * alpha * alpha / fk.powf(omb)
+                + 0.25 * rho * beta * nu * alpha / fk.powf(omb / 2.0)
+                + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu)
+                * t;
+        alpha * fk.powf(beta / 2.0) * num / den * z_over_chi * corr
+    }
+
+    #[test]
+    fn sabr_normal_vol_matches_hagan_2_17b() {
+        // Grid over β and OTM/ITM strikes, where the numerator series and the
+        // −β(2−β)/24 correction term both contribute, vs the canonical formula.
+        let f = 0.03;
+        let t = 1.5;
+        for &(alpha, beta, rho, nu) in &[
+            (0.01, 0.0, -0.3, 0.4),
+            (0.02, 0.5, -0.2, 0.3),
+            (0.20, 1.0, -0.15, 0.35),
+        ] {
+            let p = SabrParams::new(alpha, beta, rho, nu).expect("valid params");
+            for &k in &[0.018_f64, 0.024, 0.036, 0.045] {
+                let got = p.implied_vol_normal(f, k, t);
+                let want = hagan_normal_vol_reference(alpha, beta, rho, nu, f, k, t);
+                assert!(
+                    (got - want).abs() <= 1e-9 * want.abs() + 1e-13,
+                    "β={beta} k={k}: got {got:.12}, want {want:.12}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sabr_normal_atm_beta_zero_has_no_alpha_squared_term() {
+        // At β=0 the normal-SABR time correction has NO α²/(FK)^(1-β) term
+        // (−β(2−β)/24 = 0). The pre-fix code used −(1−β)²/24 = −1/24, adding a
+        // spurious term that biased β=0 (negative-rate) ATM normal vols.
+        let alpha = 0.01;
+        let nu = 0.3;
+        let rho = 0.0;
+        let f = 0.03;
+        let t = 2.0;
+        let p = SabrParams::new(alpha, 0.0, rho, nu).expect("valid params");
+        let got = p.atm_vol_normal(f, t);
+        // Expected: α·[1 + (2−3ρ²)/24·ν²·t]  (ρ=0 ⇒ ρβ term gone, β=0 ⇒ α² gone).
+        let want = alpha * (1.0 + (2.0 - 3.0 * rho * rho) / 24.0 * nu * nu * t);
+        assert!(
+            (got - want).abs() <= 1e-12,
+            "got {got:.12}, want {want:.12}"
+        );
     }
 
     #[test]

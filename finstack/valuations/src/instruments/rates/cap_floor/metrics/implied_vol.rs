@@ -67,31 +67,57 @@ impl MetricCalculator for ImpliedVolCalculator {
         let discount_curve = context.curves.get_discount(&option.discount_curve_id)?;
         let dc_ctx = finstack_core::dates::DayCountContext::default();
 
+        // Use the same canonical schedule the pricer uses so fixing date,
+        // payment date, forward period, and accrual all match pricing exactly.
+        // (Single-period caplet/floorlet, validated above, so exactly one period.)
+        let period = option
+            .pricing_periods()?
+            .into_iter()
+            .next()
+            .ok_or_else(|| {
+                finstack_core::Error::Validation(
+                    "Implied vol requires a non-empty caplet/floorlet schedule".to_string(),
+                )
+            })?;
+        let fixing_date = option.option_fixing_date(&period);
+
         // Use instrument day count for time-to-fixing (consistent with pricing and vol surface lookup)
-        let time_to_fixing = if option.start_date > context.as_of {
+        let time_to_fixing = if fixing_date > context.as_of {
             option
                 .day_count
-                .year_fraction(context.as_of, option.start_date, dc_ctx)?
+                .year_fraction(context.as_of, fixing_date, dc_ctx)?
         } else {
             0.0
         };
 
         if time_to_fixing <= 0.0 {
-            return Ok(0.0); // Expired option has no vol
+            return Ok(0.0); // Expired/seasoned option has no implied vol
         }
 
         // Use curve-consistent helpers for forward rate and discount factor
         // (same as in the main pricing implementation)
-        let forward_rate =
-            rate_period_on_dates(forward_curve.as_ref(), option.start_date, option.maturity)?;
-        let discount_factor =
-            relative_df_discount_curve(discount_curve.as_ref(), context.as_of, option.maturity)?;
-
-        let accrual_fraction = option.day_count.year_fraction(
-            option.start_date,
-            option.maturity,
-            finstack_core::dates::DayCountContext::default(),
+        let forward_rate = rate_period_on_dates(
+            forward_curve.as_ref(),
+            period.accrual_start,
+            period.accrual_end,
         )?;
+
+        // Black implied vol is only defined for a positive forward. Fail loudly
+        // rather than letting the solver thrash against an undefined objective.
+        if forward_rate <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Black implied vol requires a positive forward rate; got {forward_rate:.6}. \
+                 Use a normal (Bachelier) implied-vol workflow for non-positive forwards."
+            )));
+        }
+
+        let discount_factor = relative_df_discount_curve(
+            discount_curve.as_ref(),
+            context.as_of,
+            period.payment_date,
+        )?;
+
+        let accrual_fraction = period.accrual_year_fraction;
         let is_cap = matches!(
             option.rate_option_type,
             RateOptionType::Cap | RateOptionType::Caplet

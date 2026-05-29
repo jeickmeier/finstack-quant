@@ -142,10 +142,22 @@ pub enum FundingLeg {
         day_count: DayCount,
     },
     /// Floating rate funding leg.
+    ///
+    /// # Convention: no payment lag
+    ///
+    /// This leg models each period by its `payment_dates` only and assumes the
+    /// **accrual end equals the payment date** (no payment lag, no
+    /// accrual-vs-pay adjustment). The pricer projects the floating forward over
+    /// `[previous payment date, payment date]` and discounts to the payment
+    /// date. For funding with a genuine payment lag or accrual end ≠ payment
+    /// date, model the floating side as a full IRS float leg (which carries
+    /// explicit accrual start/end and payment dates) instead of this simplified
+    /// funding leg.
     Floating {
         /// Spread over the floating index (decimal, e.g., 0.001 = 10bp).
         spread: f64,
-        /// Payment dates for each period.
+        /// Payment dates for each period. Each is also treated as the period's
+        /// accrual-end date (no payment lag — see the variant docs).
         #[schemars(with = "Vec<String>")]
         payment_dates: Vec<Date>,
         /// Accrual fractions for each period.

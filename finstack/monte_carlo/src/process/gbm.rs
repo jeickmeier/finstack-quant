@@ -233,7 +233,12 @@ impl DriftSchedule {
     pub fn cumulative(&self, t: f64) -> f64 {
         let times = &self.times;
         let m = &self.cumulative_drift;
-        match times.binary_search_by(|x| x.partial_cmp(&t).unwrap_or(std::cmp::Ordering::Less)) {
+        // Knot times are validated finite at construction and `t` comes from the
+        // (finite) engine time grid. Use `total_cmp` for a total order so a
+        // stray NaN query cannot silently collapse to `Ordering::Less` and
+        // mis-locate the segment (the INVARIANTS §2.4 float-comparison rule).
+        debug_assert!(t.is_finite(), "DriftSchedule::cumulative requires finite t");
+        match times.binary_search_by(|x| x.total_cmp(&t)) {
             Ok(i) => m[i],
             Err(0) => {
                 let slope = (m[1] - m[0]) / (times[1] - times[0]);

@@ -13,15 +13,15 @@ from tests.golden.schema import GoldenFixture
 
 
 def run(fixture: GoldenFixture) -> dict[str, float]:
-    inputs = fixture.inputs
+    body = fixture.body
     params = SabrParameters(
-        float(inputs["alpha"]),
-        float(inputs["beta"]),
-        float(inputs["nu"]),
-        float(inputs["rho"]),
+        float(body["alpha"]),
+        float(body["beta"]),
+        float(body["nu"]),
+        float(body["rho"]),
     )
-    smile = SabrSmile(params, float(inputs["forward"]), float(inputs["time_to_expiry"]))
-    strikes = inputs["strikes"]
+    smile = SabrSmile(params, float(body["forward"]), float(body["time_to_expiry"]))
+    strikes = body["strikes"]
     keys = [entry["key"] for entry in strikes]
     strike_values = [float(entry["strike"]) for entry in strikes]
     vols = smile.generate_smile(strike_values)

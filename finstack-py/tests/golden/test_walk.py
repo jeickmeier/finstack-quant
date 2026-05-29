@@ -11,7 +11,7 @@ from .conftest import DATA_ROOTS, WORKSPACE_ROOT, validate_fixture
 from .schema import GoldenFixture
 
 VALUATION_DATA_ROOT = WORKSPACE_ROOT / "finstack/valuations/tests/golden/data"
-PYTHON_DISCOVER_FIXTURES_RE = re.compile(r'discover_fixtures\("([^"]+)"\)')
+PYTHON_DISCOVER_FIXTURES_RE = re.compile(r'discover_fixtures(?:_with_marks)?\("([^"]+)"\)')
 
 
 def _all_fixtures() -> list[Path]:

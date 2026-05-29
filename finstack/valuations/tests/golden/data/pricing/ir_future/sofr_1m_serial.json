@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "sofr_1m_serial",
-  "domain": "rates.ir_future",
-  "description": "Synthetic 1M SOFR serial future on committed USD discount and forward curves.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "sofr_1m_serial",
+    "domain": "rates.ir_future",
+    "description": "Synthetic 1M SOFR serial future on committed USD discount and forward curves.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical IR future calculation with explicit zero convexity adjustment Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
     "captured_by": "jeickmeier",
@@ -15,52 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "dv01",
-      "futures_price",
-      "implied_forward",
-      "convexity_adjustment"
-    ],
-    "instrument_json": {
-      "schema": "finstack.instrument/1",
-      "instrument": {
-        "type": "interest_rate_future",
-        "spec": {
-          "id": "SOFR-1M-SERIAL-GOLDEN",
-          "notional": {
-            "amount": "10000000",
-            "currency": "USD"
-          },
-          "expiry": "2026-05-20",
-          "fixing_date": "2026-05-20",
-          "period_start": "2026-05-22",
-          "period_end": "2026-06-22",
-          "quoted_price": 95.95,
-          "day_count": "Act360",
-          "position": "long",
-          "contract_specs": {
-            "face_value": 1000000.0,
-            "tick_size": 0.0025,
-            "tick_value": 6.25,
-            "delivery_months": 1,
-            "convexity_adjustment": 0.0
-          },
-          "discount_curve_id": "USD-OIS",
-          "forward_curve_id": "USD-SOFR-3M",
-          "vol_surface_id": null,
-          "attributes": {
-            "tags": [
-              "golden"
-            ],
-            "meta": {}
-          }
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "sofr_1m_serial_tier_a_wrap",
@@ -145,18 +104,45 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "design_metrics": [
-        "npv",
-        "dv01",
-        "futures_price",
-        "implied_forward",
-        "convexity_adjustment"
-      ]
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "schema": "finstack.instrument/1",
+    "instrument": {
+      "type": "interest_rate_future",
+      "spec": {
+        "id": "SOFR-1M-SERIAL-GOLDEN",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "expiry": "2026-05-20",
+        "fixing_date": "2026-05-20",
+        "period_start": "2026-05-22",
+        "period_end": "2026-06-22",
+        "quoted_price": 95.95,
+        "day_count": "Act360",
+        "position": "long",
+        "contract_specs": {
+          "face_value": 1000000.0,
+          "tick_size": 0.0025,
+          "tick_value": 6.25,
+          "delivery_months": 1,
+          "convexity_adjustment": 0.0
+        },
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "USD-SOFR-3M",
+        "vol_surface_id": null,
+        "attributes": {
+          "tags": [
+            "golden"
+          ],
+          "meta": {}
+        }
+      }
+    }
+  },
+  "expected": {
     "npv": 71.7592592592394,
     "dv01": -86.11111111111359,
     "futures_price": 95.95,

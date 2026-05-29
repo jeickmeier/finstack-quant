@@ -43,6 +43,10 @@ pub struct FxMatrix {
     quotes: Mutex<LruCache<Pair, f64>>,
     /// Query-sensitive quotes observed from providers or triangulation.
     observed_quotes: Mutex<LruCache<QueryKey, f64>>,
+    /// Authoritative date/policy-scoped quotes pinned via [`FxMatrix::set_quote_on`].
+    /// Unlike `observed_quotes`, this map never evicts, so a pinned fixing is
+    /// never silently replaced by the provider under cache pressure.
+    pinned_quotes: Mutex<HashMap<QueryKey, f64>>,
     config: FxConfig,
 }
 
@@ -86,6 +90,7 @@ impl FxMatrix {
             provider,
             quotes: Mutex::new(LruCache::new(capacity)),
             observed_quotes: Mutex::new(LruCache::new(capacity)),
+            pinned_quotes: Mutex::new(HashMap::new()),
             config,
         }
     }
@@ -104,6 +109,7 @@ impl FxMatrix {
             provider,
             quotes: Mutex::new(quotes),
             observed_quotes: Mutex::new(observed_quotes),
+            pinned_quotes: Mutex::new(HashMap::new()),
             config,
         })
     }
@@ -170,6 +176,8 @@ impl FxMatrix {
         // Check cache first. Explicit quotes are pair-global, while provider-observed
         // quotes are scoped by date/policy to avoid cross-query contamination.
         let (direct_opt, reciprocal_opt) = self.read_cached_pair_bidir(from, to);
+        let (pinned_direct_opt, pinned_reciprocal_opt) =
+            self.read_pinned_pair_bidir(from, to, on, policy);
         let (observed_direct_opt, observed_reciprocal_opt) =
             self.read_observed_pair_bidir(from, to, on, policy);
 
@@ -181,6 +189,21 @@ impl FxMatrix {
             });
         }
         if let Some(r_rev) = reciprocal_opt {
+            return Ok(FxRateResult {
+                rate: reciprocal_rate_or_err(r_rev, to, from)?,
+                triangulated: false,
+            });
+        }
+        // Pinned fixings are authoritative and outrank the transient provider
+        // cache and the provider itself for their `(on, policy)`.
+        if let Some(rate) = pinned_direct_opt {
+            let rate = validate_fx_rate(from, to, rate)?;
+            return Ok(FxRateResult {
+                rate,
+                triangulated: false,
+            });
+        }
+        if let Some(r_rev) = pinned_reciprocal_opt {
             return Ok(FxRateResult {
                 rate: reciprocal_rate_or_err(r_rev, to, from)?,
                 triangulated: false,
@@ -222,7 +245,20 @@ impl FxMatrix {
         }
     }
 
-    /// Seed or update a single quote directly inside the matrix.
+    /// Seed or update a single **date- and policy-independent constant** quote.
+    ///
+    /// # ⚠️ Shadows the provider for every query
+    ///
+    /// An explicit quote set here is checked *before* the underlying
+    /// [`FxProvider`] in [`rate`](Self::rate) and is **not** keyed by `on` or
+    /// [`FxConversionPolicy`]. Once set, the pair is pinned to this single rate
+    /// for **all** valuation dates and policies — a date-aware provider is
+    /// silently bypassed. Use this only for genuinely constant rates (e.g.
+    /// pegged currencies or deterministic tests).
+    ///
+    /// For a rate that should vary across a time series, do **not** call this:
+    /// either rely on the date-aware provider, or seed a specific date with
+    /// [`set_quote_on`](Self::set_quote_on), which is scoped by `(on, policy)`.
     ///
     /// Note: This does not automatically insert a reciprocal. Lookups will use
     /// the reciprocal on demand if the opposite direction is requested.
@@ -269,6 +305,39 @@ impl FxMatrix {
         Ok(())
     }
 
+    /// Seed a quote scoped to a specific date and policy.
+    ///
+    /// Unlike [`set_quote`](Self::set_quote), this keys the quote by
+    /// `(from, to, on, policy)`, so it only answers queries for that date and
+    /// policy and does **not** shadow the provider across an entire time
+    /// series. Use it to pin individual fixings while letting the provider
+    /// supply every other date.
+    ///
+    /// The quote is stored in a dedicated, **non-evicting** pinned-quote map
+    /// (separate from the bounded provider-observed cache), so it is never
+    /// silently dropped under cache pressure and always wins over the provider
+    /// for its `(on, policy)`. It is, however, outranked by a pair-global
+    /// [`set_quote`](Self::set_quote).
+    ///
+    /// # Parameters
+    /// - `from`: base currency for the quote
+    /// - `to`: quote currency
+    /// - `on`: the date the quote applies to
+    /// - `policy`: the conversion policy the quote applies to
+    /// - `rate`: raw FX rate (`from → to`)
+    pub fn set_quote_on(
+        &self,
+        from: Currency,
+        to: Currency,
+        on: Date,
+        policy: FxConversionPolicy,
+        rate: f64,
+    ) -> crate::Result<()> {
+        let rate = validate_fx_rate(from, to, rate)?;
+        self.insert_pinned_quote(from, to, on, policy, rate);
+        Ok(())
+    }
+
     /// Seed multiple quotes at once.
     ///
     /// # Parameters
@@ -302,6 +371,7 @@ impl FxMatrix {
     pub fn clear_cache(&self) {
         self.quotes.lock().clear();
         self.observed_quotes.lock().clear();
+        self.pinned_quotes.lock().clear();
     }
 
     /// Return cached quote count for quick diagnostics.
@@ -454,6 +524,19 @@ impl FxMatrix {
                 dst.put(*pair, *rate);
             }
         }
+        // Carry over authoritative pinned fixings (except the bumped pair, both
+        // directions): they are independent market fixings, not crosses derived
+        // from the bumped leg, so the bumped matrix must keep pricing with them.
+        {
+            let src = self.pinned_quotes.lock();
+            let mut dst = bumped.pinned_quotes.lock();
+            for (key, rate) in src.iter() {
+                if (key.from == from && key.to == to) || (key.from == to && key.to == from) {
+                    continue;
+                }
+                dst.insert(*key, *rate);
+            }
+        }
         // Do not carry over provider-observed quotes. They may be date/policy-sensitive
         // or derived crosses that depend transitively on the bumped leg.
         // IMPORTANT: ensure the bumped pair is not shadowed by copied explicit quotes.
@@ -486,6 +569,17 @@ impl FxMatrix {
 
         {
             let quotes = self.observed_quotes.lock();
+            for (query, &rate) in quotes.iter() {
+                if rate.is_finite() && rate > 0.0 {
+                    rates.entry((query.from, query.to)).or_insert(rate);
+                    currencies.insert(query.from);
+                    currencies.insert(query.to);
+                }
+            }
+        }
+
+        {
+            let quotes = self.pinned_quotes.lock();
             for (query, &rate) in quotes.iter() {
                 if rate.is_finite() && rate > 0.0 {
                     rates.entry((query.from, query.to)).or_insert(rate);
@@ -614,6 +708,58 @@ impl FxMatrix {
             },
             rate,
         );
+    }
+
+    /// Insert an authoritative, non-evicting pinned quote (via `set_quote_on`).
+    /// The rate is validated by the caller.
+    fn insert_pinned_quote(
+        &self,
+        from: Currency,
+        to: Currency,
+        on: Date,
+        policy: FxConversionPolicy,
+        rate: f64,
+    ) {
+        self.pinned_quotes.lock().insert(
+            QueryKey {
+                from,
+                to,
+                on,
+                policy,
+            },
+            rate,
+        );
+    }
+
+    /// Read pinned `(direct, reciprocal)` quotes for a pair on `(on, policy)`.
+    /// Never evicts; only positive, finite rates are returned.
+    fn read_pinned_pair_bidir(
+        &self,
+        from: Currency,
+        to: Currency,
+        on: Date,
+        policy: FxConversionPolicy,
+    ) -> (Option<f64>, Option<f64>) {
+        let quotes = self.pinned_quotes.lock();
+        let direct = quotes
+            .get(&QueryKey {
+                from,
+                to,
+                on,
+                policy,
+            })
+            .copied()
+            .filter(|r| r.is_finite() && *r > 0.0);
+        let rev = quotes
+            .get(&QueryKey {
+                from: to,
+                to: from,
+                on,
+                policy,
+            })
+            .copied()
+            .filter(|r| r.is_finite() && *r > 0.0);
+        (direct, rev)
     }
 
     /// Get rate preferring explicit quotes, then provider, then reciprocal.

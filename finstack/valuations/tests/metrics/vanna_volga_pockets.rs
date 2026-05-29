@@ -148,7 +148,10 @@ fn equity_vanna_and_volga_match_reference_fd() -> finstack_core::Result<()> {
     let pv_up = opt.value(&curves_vol_up, as_of)?.amount();
     let pv_0 = opt.value(&market, as_of)?.amount();
     let pv_dn = opt.value(&curves_vol_dn, as_of)?.amount();
-    let volga_ref = (pv_up - 2.0 * pv_0 + pv_dn) / (delta_sigma * delta_sigma);
+    // Volga is reported per **vol point squared** (consistent with vega, which
+    // is per vol point), so normalize by the bump expressed in vol points.
+    let volga_width = delta_sigma * 100.0;
+    let volga_ref = (pv_up - 2.0 * pv_0 + pv_dn) / (volga_width * volga_width);
 
     // Tolerances: these are FD-vs-FD comparisons, so keep them tight but not brittle.
     approx_eq(vanna, vanna_ref, 5e-6);

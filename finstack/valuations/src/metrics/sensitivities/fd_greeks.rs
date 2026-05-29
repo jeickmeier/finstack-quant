@@ -48,7 +48,7 @@ use finstack_core::Result;
 /// this floor.
 pub const MIN_ABSOLUTE_BUMP: f64 = 1e-8;
 
-const VOL_POINTS_PER_ABSOLUTE_VOL: f64 = 100.0;
+use crate::metrics::core::finite_difference::VOL_POINTS_PER_ABSOLUTE_VOL;
 
 /// Common random number seed scenario for MC greek calculations.
 ///
@@ -817,7 +817,14 @@ where
             Ok((base_pv, pv_up, pv_down))
         })?;
 
-        let volga = (pv_up - 2.0 * base_pv + pv_down) / (bump_abs * bump_abs);
+        // Report volga per **vol point squared** (consistent with vega, which
+        // is per vol point — see the vega path above and `MetricId::Volga`).
+        // The central second difference is taken in absolute-vol units, so the
+        // normalizing width is the bump expressed in vol points
+        // (`bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL`), squared. Dividing by the
+        // raw `bump_abs²` instead would overstate volga by `100² = 10,000×`.
+        let width = bump_abs * VOL_POINTS_PER_ABSOLUTE_VOL;
+        let volga = (pv_up - 2.0 * base_pv + pv_down) / (width * width);
 
         ensure_finite(volga, "fd_volga")
     }

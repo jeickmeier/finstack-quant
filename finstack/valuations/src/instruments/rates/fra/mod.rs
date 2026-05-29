@@ -39,7 +39,8 @@
 //!
 //! # Market Conventions
 //!
-//! FRA naming: "3x6" means 3-month forward starting in 6 months
+//! FRA naming: "3x6" means a 3-month rate fixing in 3 months — it covers the
+//! period from month 3 to month 6 (starts 3 months forward, 3-month tenor)
 //!
 //! Standard conventions by currency:
 //! - **USD**: ACT/360, SOFR-based, T+2 settlement

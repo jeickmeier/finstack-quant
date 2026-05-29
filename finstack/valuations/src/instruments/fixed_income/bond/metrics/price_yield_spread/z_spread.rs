@@ -124,8 +124,11 @@ impl Default for ZSpreadSolverConfig {
 ///
 /// Calculates the zero-volatility spread (Z-spread) as the constant additive spread
 /// to the base discount curve that makes the discounted value of future cashflows
-/// equal to the bond's dirty market price. The spread is applied as an exponential
-/// shift: `df_z(t) = df_base(t) * exp(-z * t)`.
+/// equal to the bond's dirty market price. The spread is applied on the
+/// **periodically-compounded zero rate**: the base discount factor is converted
+/// to its zero rate at the quote frequency `m`, the spread `z` is added, and the
+/// flow is re-discounted at frequency `m` (see `z_spread_discount_factor`). It is
+/// not a continuous `exp(-z·t)` shift.
 ///
 /// Uses Brent's method with a maturity-aware initial bracket and a configurable
 /// tolerance. The default configuration is tuned for production use:
@@ -259,7 +262,8 @@ impl MetricCalculator for ZSpreadCalculator {
         // Both year fractions and discount factors use the same origin (quote_date).
         // Note: quote_date is the settlement date, which is the correct anchor
         // for market-convention z-spread calculations. This ensures the z-spread
-        // shift exp(-z * t) is applied relative to the same date as the base DFs.
+        // shift (applied via `z_spread_discount_factor` on the periodically-
+        // compounded zero rate) is anchored to the same date as the base DFs.
         let flows = bond.pricing_dated_cashflows(&context.curves, context.as_of)?;
         let disc = context.curves.get_discount(&bond.discount_curve_id)?;
         let (spread_flows, quote_date) = if let Some((_, workout_flows, workout_quote_date)) =

@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "usd_sofr_5y_receive_fixed_swpm",
-  "domain": "rates.irs",
-  "description": "Bloomberg SWPM USD SOFR 5Y receive-fixed swap captured from screens on 2026-04-30.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "usd_sofr_5y_receive_fixed_swpm",
+    "domain": "rates.irs",
+    "description": "Bloomberg SWPM USD SOFR 5Y receive-fixed swap captured from screens on 2026-04-30.",
+    "valuation_date": "2026-05-04",
     "source": "bloomberg-screen",
     "source_detail": "Bloomberg SWPM, curve 490 USD SOFR, curve date 2026-04-30, valuation date 2026-05-04 Phase-2 envelope migration (2026-05-09): replaced materialized market.curves with a calibration plan driven by SWPM Curve 490 Market Rates (26 quotes, deposits + OIS swaps) transcribed from the curve screenshot.",
     "captured_by": "jeickmeier",
@@ -46,87 +46,11 @@
       }
     ]
   },
-  "inputs": {
-    "valuation_date": "2026-05-04",
-    "model": "discounting",
-    "metrics": [
-      "par_rate",
-      "dv01",
-      "fixed_leg_payment_count",
-      "floating_leg_payment_count",
-      "fixed_first_payment_date",
-      "fixed_last_payment_date",
-      "floating_first_payment_date",
-      "floating_last_payment_date",
-      "fixed_first_accrual_factor",
-      "floating_first_accrual_factor"
-    ],
-    "instrument_json": {
-      "schema": "finstack.instrument/1",
-      "instrument": {
-        "type": "interest_rate_swap",
-        "spec": {
-          "id": "USD-SOFR-5Y-RCV-FIXED-SWPM-20260430",
-          "notional": {
-            "amount": "10000000",
-            "currency": "USD"
-          },
-          "side": "receive",
-          "fixed": {
-            "discount_curve_id": "USD-SOFR",
-            "rate": "0.035",
-            "frequency": {
-              "count": 1,
-              "unit": "years"
-            },
-            "day_count": "Act360",
-            "calendar_id": "usny",
-            "stub": "None",
-            "start": "2026-05-04",
-            "end": "2031-05-04",
-            "par_method": null,
-            "payment_lag_days": 2,
-            "compounding_simple": true
-          },
-          "float": {
-            "discount_curve_id": "USD-SOFR",
-            "forward_curve_id": "USD-SOFR",
-            "spread_bp": "0",
-            "frequency": {
-              "count": 1,
-              "unit": "years"
-            },
-            "day_count": "Act360",
-            "calendar_id": "usny",
-            "stub": "None",
-            "reset_lag_days": 0,
-            "payment_lag_days": 2,
-            "fixing_calendar_id": "usny",
-            "start": "2026-05-04",
-            "end": "2031-05-04",
-            "compounding": {
-              "CompoundedWithRateCutoff": {
-                "cutoff_days": 1
-              }
-            }
-          },
-          "attributes": {
-            "tags": [
-              "golden",
-              "bloomberg",
-              "swpm"
-            ],
-            "meta": {
-              "bloomberg_screen": "SWPM",
-              "curve_number": "490",
-              "curve_name": "USD SOFR",
-              "schedule_adjust": "acc_and_pay_dates"
-            }
-          }
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "usd_sofr_5y_swpm_calibrated",
@@ -533,245 +457,74 @@
         }
       ],
       "prior_market": []
-    },
-    "source_reference": {
-      "screen_outputs": {
-        "npv": -91334.81,
-        "par_rate": 0.0370075,
-        "dv01": 4523.48
-      },
-      "screen_reference_reason": "Bloomberg SWPM NPV/par coupon and screen-positive DV01 are retained as source values. Executable pricing uses visible rounded curve-grid discount factors, single-curve OIS discount projection for future compounded SOFR periods, and Finstack's signed receive-fixed DV01 convention.",
-      "design_metrics": [
-        "npv",
-        "par_rate",
-        "dv01"
-      ],
-      "curve_date": "2026-04-30",
-      "bloomberg_reference": {
-        "trade": {
-          "trade_date": "2026-04-30",
-          "valuation_date": "2026-05-04",
-          "curve_date": "2026-04-30",
-          "currency": "USD",
-          "notional": 10000000.0,
-          "fixed_side": "receive",
-          "float_side": "pay",
-          "fixed_coupon": 0.035,
-          "index": "SOFRRATE",
-          "spread_bp": 0.0
+    }
+  },
+  "instrument": {
+    "schema": "finstack.instrument/1",
+    "instrument": {
+      "type": "interest_rate_swap",
+      "spec": {
+        "id": "USD-SOFR-5Y-RCV-FIXED-SWPM-20260430",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
         },
-        "screen_results": {
-          "par_coupon": 0.0370075,
-          "premium": -0.91335,
-          "principal": -91334.81,
-          "accrued": 0.0,
-          "npv": -91334.81,
-          "pv01": 4549.67,
-          "dv01": 4523.48,
-          "gamma_1bp": 2.6,
-          "leg_1_npv": 9906421.75,
-          "leg_1_dv01": 4529.49,
-          "leg_2_npv": -9997756.56,
-          "leg_2_dv01": -6.01
+        "side": "receive",
+        "fixed": {
+          "discount_curve_id": "USD-SOFR",
+          "rate": "0.035",
+          "frequency": {
+            "count": 1,
+            "unit": "years"
+          },
+          "day_count": "Act360",
+          "calendar_id": "usny",
+          "stub": "None",
+          "start": "2026-05-04",
+          "end": "2031-05-04",
+          "par_method": null,
+          "payment_lag_days": 2,
+          "compounding_simple": true
         },
-        "cashflows": [
-          {
-            "pay_date": "2027-05-06",
-            "payments_receive": 354861.11,
-            "payments_pay": -377369.46,
-            "net_payments": -22508.35,
-            "discount": 0.963437,
-            "pv": -21685.38
+        "float": {
+          "discount_curve_id": "USD-SOFR",
+          "forward_curve_id": "USD-SOFR",
+          "spread_bp": "0",
+          "frequency": {
+            "count": 1,
+            "unit": "years"
           },
-          {
-            "pay_date": "2028-05-08",
-            "payments_receive": 355833.33,
-            "payments_pay": -375403.54,
-            "net_payments": -19570.2,
-            "discount": 0.928405,
-            "pv": -18169.09
-          },
-          {
-            "pay_date": "2029-05-08",
-            "payments_receive": 354861.11,
-            "payments_pay": -365287.52,
-            "net_payments": -10426.4,
-            "discount": 0.895683,
-            "pv": -9338.75
-          },
-          {
-            "pay_date": "2030-05-08",
-            "payments_receive": 356805.56,
-            "payments_pay": -375646.18,
-            "net_payments": -18840.62,
-            "discount": 0.863421,
-            "pv": -16267.39
-          },
-          {
-            "pay_date": "2031-05-07",
-            "payments_receive": 10353888.89,
-            "payments_pay": -10385010.0,
-            "net_payments": -31121.11,
-            "discount": 0.831404,
-            "pv": -25874.21
+          "day_count": "Act360",
+          "calendar_id": "usny",
+          "stub": "None",
+          "reset_lag_days": 0,
+          "payment_lag_days": 2,
+          "fixing_calendar_id": "usny",
+          "start": "2026-05-04",
+          "end": "2031-05-04",
+          "compounding": {
+            "CompoundedWithRateCutoff": {
+              "cutoff_days": 1
+            }
           }
-        ],
-        "curve_screen": [
-          {
-            "term": "1W",
-            "market_rate": 0.036425,
-            "zero_rate": 0.0368702,
-            "discount": 0.998183
-          },
-          {
-            "term": "3W",
-            "market_rate": 0.03638,
-            "zero_rate": 0.0368297,
-            "discount": 0.99738
-          },
-          {
-            "term": "1M",
-            "market_rate": 0.03644,
-            "zero_rate": 0.0368724,
-            "discount": 0.996471
-          },
-          {
-            "term": "2M",
-            "market_rate": 0.0365342,
-            "zero_rate": 0.0369133,
-            "discount": 0.993247
-          },
-          {
-            "term": "3M",
-            "market_rate": 0.0365665,
-            "zero_rate": 0.0368958,
-            "discount": 0.990343
-          },
-          {
-            "term": "4M",
-            "market_rate": 0.0365978,
-            "zero_rate": 0.036872,
-            "discount": 0.987252
-          },
-          {
-            "term": "5M",
-            "market_rate": 0.0366465,
-            "zero_rate": 0.0368643,
-            "discount": 0.984169
-          },
-          {
-            "term": "6M",
-            "market_rate": 0.036695,
-            "zero_rate": 0.0368577,
-            "discount": 0.981195
-          },
-          {
-            "term": "7M",
-            "market_rate": 0.036749,
-            "zero_rate": 0.0368563,
-            "discount": 0.978228
-          },
-          {
-            "term": "8M",
-            "market_rate": 0.03684,
-            "zero_rate": 0.0368888,
-            "discount": 0.975149
-          },
-          {
-            "term": "9M",
-            "market_rate": 0.036924,
-            "zero_rate": 0.0369143,
-            "discount": 0.972079
-          },
-          {
-            "term": "10M",
-            "market_rate": 0.037011,
-            "zero_rate": 0.036948,
-            "discount": 0.969303
-          },
-          {
-            "term": "11M",
-            "market_rate": 0.037124,
-            "zero_rate": 0.0369992,
-            "discount": 0.966122
-          },
-          {
-            "term": "12M",
-            "market_rate": 0.03722,
-            "zero_rate": 0.0370392,
-            "discount": 0.963247
-          },
-          {
-            "term": "18M",
-            "market_rate": 0.0372225,
-            "zero_rate": 0.0371592,
-            "discount": 0.945257
-          },
-          {
-            "term": "2Y",
-            "market_rate": 0.037075,
-            "zero_rate": 0.0368963,
-            "discount": 0.928395
-          },
-          {
-            "term": "3Y",
-            "market_rate": 0.036739,
-            "zero_rate": 0.0365582,
-            "discount": 0.895677
-          },
-          {
-            "term": "4Y",
-            "market_rate": 0.0367649,
-            "zero_rate": 0.0365875,
-            "discount": 0.863249
-          },
-          {
-            "term": "5Y",
-            "market_rate": 0.0370075,
-            "zero_rate": 0.0368448,
-            "discount": 0.831246
-          },
-          {
-            "term": "6Y",
-            "market_rate": 0.0374452,
-            "zero_rate": 0.0373128,
-            "discount": 0.798923
-          },
-          {
-            "term": "7Y",
-            "market_rate": 0.03789,
-            "zero_rate": 0.0377934,
-            "discount": 0.767072
-          },
-          {
-            "term": "8Y",
-            "market_rate": 0.0383675,
-            "zero_rate": 0.038317,
-            "discount": 0.735528
-          },
-          {
-            "term": "9Y",
-            "market_rate": 0.0388245,
-            "zero_rate": 0.0388248,
-            "discount": 0.704645
-          },
-          {
-            "term": "10Y",
-            "market_rate": 0.0392685,
-            "zero_rate": 0.0393249,
-            "discount": 0.674279
-          },
-          {
-            "term": "12Y",
-            "market_rate": 0.0401351,
-            "zero_rate": 0.0403283,
-            "discount": 0.615874
+        },
+        "attributes": {
+          "tags": [
+            "golden",
+            "bloomberg",
+            "swpm"
+          ],
+          "meta": {
+            "bloomberg_screen": "SWPM",
+            "curve_number": "490",
+            "curve_name": "USD SOFR",
+            "schedule_adjust": "acc_and_pay_dates"
           }
-        ]
+        }
       }
     }
   },
-  "expected_outputs": {
+  "expected": {
     "npv": -91334.81,
     "par_rate": 0.0370075,
     "dv01": -4523.48,

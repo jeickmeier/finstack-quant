@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "cds_quantlib_flat_hazard_decomposition",
-  "domain": "credit.cds",
-  "description": "QuantLib IsdaCdsEngine flat hazard/flat discount CDS decomposition benchmark.",
-  "provenance": {
-    "as_of": "2026-01-05",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "cds_quantlib_flat_hazard_decomposition",
+    "domain": "credit.cds",
+    "description": "QuantLib IsdaCdsEngine flat hazard/flat discount CDS decomposition benchmark.",
+    "valuation_date": "2026-01-05",
     "source": "quantlib",
     "source_detail": "QuantLib 1.42.1 Python, IsdaCdsEngine(Taylor, HalfDayBias, Piecewise), flat 1% Actual/365F hazard, flat 2% continuous Actual/365F discount curve, WeekendsOnly calendar, DateGeneration.CDS schedule, buyer protection 5Y CDS with 100bp running coupon. Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved.",
     "captured_by": "agent",
@@ -15,72 +15,11 @@
     "regen_command": "uv run python scripts/golden/quantlib/cds_flat_hazard_decomposition.py",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-01-05",
-    "model": "hazard_rate",
-    "metrics": [
-      "par_spread",
-      "risky_annuity",
-      "risky_pv01",
-      "protection_leg_pv",
-      "premium_leg_pv",
-      "dv01",
-      "cs01"
-    ],
-    "instrument_json": {
-      "type": "credit_default_swap",
-      "spec": {
-        "id": "QL-FLAT-HAZARD-CDS-5Y-20260105",
-        "notional": {
-          "amount": "10000000",
-          "currency": "USD"
-        },
-        "side": "pay",
-        "convention": "isda_na",
-        "premium": {
-          "start": "2025-09-22",
-          "end": "2030-12-20",
-          "frequency": {
-            "count": 3,
-            "unit": "months"
-          },
-          "calendar_id": "weekends",
-          "day_count": "Act360",
-          "spread_bp": "100.0",
-          "discount_curve_id": "USD-FLAT-2PCT"
-        },
-        "protection": {
-          "credit_curve_id": "QL-FLAT-HAZARD",
-          "recovery_rate": 0.4,
-          "settlement_delay": 0
-        },
-        "pricing_overrides": {
-          "cds_aod_half_day_bias": true,
-          "cds_act360_include_last_day": true
-        },
-        "valuation_convention": "quant_lib_isda_parity",
-        "doc_clause": "xr14",
-        "protection_effective_date": "2026-01-05",
-        "attributes": {
-          "tags": [
-            "golden",
-            "quantlib",
-            "cds",
-            "flat-hazard",
-            "decomposition"
-          ],
-          "meta": {
-            "quantlib_engine": "IsdaCdsEngine",
-            "quantlib_version": "1.42.1",
-            "schedule_generation": "DateGeneration.CDS",
-            "calendar": "WeekendsOnly",
-            "discount_rate_continuous": "0.02",
-            "flat_hazard_rate": "0.01"
-          }
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "hazard_rate",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "cds_quantlib_flat_hazard_decomposition_tier_a_wrap",
@@ -142,36 +81,62 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "quantlib_outputs": {
-        "npv": -198586.76210266817,
-        "par_spread": 58.19641516560695,
-        "protection_leg_pv": 276460.44470837293,
-        "premium_leg_pv": 475047.2068110411,
-        "risky_annuity": 4.750472068110411,
-        "risky_pv01": 4750.472068110411,
-        "dv01_parallel_rate_bp": 52.99810024019098,
-        "cs01_direct_hazard_bp": 2811.5386566023517,
-        "cs01_spread_equivalent_bp": 4685.898087090987
-      },
-      "quantlib_coupon_schedule": [
-        {
-          "accrual_start": "2025-09-22",
-          "accrual_end": "2025-12-22",
-          "payment_date": "2025-12-22",
-          "accrual_period": 0.25555555555555554
-        },
-        {
-          "accrual_start": "2025-12-22",
-          "accrual_end": "2026-03-20",
-          "payment_date": "2026-03-20",
-          "accrual_period": 0.24722222222222223
-        }
-      ]
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "credit_default_swap",
+    "spec": {
+      "id": "QL-FLAT-HAZARD-CDS-5Y-20260105",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "side": "pay",
+      "convention": "isda_na",
+      "premium": {
+        "start": "2025-09-22",
+        "end": "2030-12-20",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "calendar_id": "weekends",
+        "day_count": "Act360",
+        "spread_bp": "100.0",
+        "discount_curve_id": "USD-FLAT-2PCT"
+      },
+      "protection": {
+        "credit_curve_id": "QL-FLAT-HAZARD",
+        "recovery_rate": 0.4,
+        "settlement_delay": 0
+      },
+      "pricing_overrides": {
+        "cds_aod_half_day_bias": true,
+        "cds_act360_include_last_day": true
+      },
+      "valuation_convention": "quant_lib_isda_parity",
+      "doc_clause": "xr14",
+      "protection_effective_date": "2026-01-05",
+      "attributes": {
+        "tags": [
+          "golden",
+          "quantlib",
+          "cds",
+          "flat-hazard",
+          "decomposition"
+        ],
+        "meta": {
+          "quantlib_engine": "IsdaCdsEngine",
+          "quantlib_version": "1.42.1",
+          "schedule_generation": "DateGeneration.CDS",
+          "calendar": "WeekendsOnly",
+          "discount_rate_continuous": "0.02",
+          "flat_hazard_rate": "0.01"
+        }
+      }
+    }
+  },
+  "expected": {
     "npv": -198586.76210266817,
     "par_spread": 58.19641516560695,
     "risky_annuity": 4.744408070298757,

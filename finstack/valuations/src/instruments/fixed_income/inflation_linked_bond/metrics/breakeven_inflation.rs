@@ -21,7 +21,16 @@ impl MetricCalculator for BreakevenInflationCalculator {
 
         let day_count = disc_curve.day_count();
         let base_date = disc_curve.base_date();
-        let t = day_count.year_fraction(base_date, ilb.maturity, DayCountContext::default())?;
+        // Provide the coupon frequency so an ACT/ACT (ISMA) discount-curve day
+        // count does not error; ignored by other conventions.
+        let t = day_count.year_fraction(
+            base_date,
+            ilb.maturity,
+            DayCountContext {
+                frequency: Some(ilb.frequency),
+                ..Default::default()
+            },
+        )?;
         // Use annually-compounded (effective-annual) zero rate so that the
         // nominal yield passed to `breakeven_inflation` is on the same basis as
         // the real yield after its Street→Annual conversion inside that method.

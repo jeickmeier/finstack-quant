@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 import csv
 from datetime import date
+from functools import cache
 import importlib
 import json
 import os
@@ -16,11 +17,11 @@ import time
 from types import ModuleType
 
 from finstack.core.market_data import MarketContext
+import pytest
 
 from finstack.valuations import validate_calibration_json
 
-from .pricing_validation import validate_requested_metrics, validated_instrument_json
-from .runners import validate_source_validation_fixture
+from .pricing_validation import requested_metrics, validate_requested_metrics, validated_instrument_json
 from .schema import SCHEMA_VERSION, GoldenFixture
 from .tolerance import compare
 
@@ -43,9 +44,10 @@ REPORT_LOCK_POLL_SECONDS = 0.01
 
 DATA_ROOTS = {
     "pricing": WORKSPACE_ROOT / "finstack/valuations/tests/golden/data",
+    "market_data": WORKSPACE_ROOT / "finstack/valuations/tests/golden/data",
     "analytics": WORKSPACE_ROOT / "finstack/analytics/tests/golden/data",
-    "volatility": WORKSPACE_ROOT / "finstack/valuations/tests/golden/data",
 }
+KNOWN_NON_EXECUTABLE_PATH = WORKSPACE_ROOT / "finstack/valuations/tests/golden/known_non_executable.json"
 VALID_SOURCES = {
     "quantlib",
     "bloomberg-api",
@@ -71,15 +73,6 @@ ZERO_RISK_METRICS_REQUIRING_REASON = {
     "spread_dv01",
     "vega",
 }
-PRICING_INPUT_KEYS = {
-    "valuation_date",
-    "model",
-    "metrics",
-    "instrument_json",
-    "source_reference",
-}
-PRICING_OPTIONAL_INPUT_KEYS = {"source_validation", "market", "market_envelope"}
-
 _DOMAIN_RUNNERS = {
     "analytics.benchmark": "analytics_common",
     "analytics.drawdown": "analytics_common",
@@ -136,6 +129,34 @@ def discover_fixtures(relative_dir: str) -> list[str]:
     return sorted(str(path.relative_to(data_root)) for path in root.rglob("*.json"))
 
 
+@cache
+def _known_non_executable() -> dict[str, str]:
+    """Load the shared {fixture path: reason} allowlist of non-executable goldens.
+
+    The same `known_non_executable.json` drives the Rust runner's non-fatal
+    handling, so the allowlist lives in one place across both languages.
+    """
+    raw = json.loads(KNOWN_NON_EXECUTABLE_PATH.read_text(encoding="utf-8"))
+    return {entry["path"]: entry["reason"] for entry in raw["fixtures"]}
+
+
+def discover_fixtures_with_marks(relative_dir: str) -> list:
+    """Discover fixtures, marking known non-executable ones as xfail(strict=False).
+
+    Setting `GOLDEN_IGNORE_NON_EXECUTABLE` skips the marks so every fixture runs
+    strictly and all failures surface (see `mise goldens-test-strict`).
+    """
+    allowlist = {} if os.environ.get("GOLDEN_IGNORE_NON_EXECUTABLE") else _known_non_executable()
+    params = []
+    for fixture in discover_fixtures(relative_dir):
+        reason = allowlist.get(fixture)
+        if reason is None:
+            params.append(fixture)
+        else:
+            params.append(pytest.param(fixture, marks=pytest.mark.xfail(reason=reason, strict=False)))
+    return params
+
+
 def _load_runner(domain: str) -> ModuleType:
     if domain not in _DOMAIN_RUNNERS:
         msg = f"no Python runner registered for domain '{domain}'"
@@ -149,12 +170,12 @@ def run_golden(relative_path: str) -> None:
     path = fixture_path(relative_path)
     fixture = GoldenFixture.from_path(path)
     validate_fixture(path, fixture)
-    runner = _load_runner(fixture.domain)
+    runner = _load_runner(fixture.metadata.domain)
     actuals = runner.run(fixture)
 
     failures = []
     results = []
-    for metric, expected in fixture.expected_outputs.items():
+    for metric, expected in fixture.expected.items():
         if metric not in actuals:
             failures.append(f"{path}: runner did not produce metric '{metric}'")
             continue
@@ -173,22 +194,23 @@ def run_golden(relative_path: str) -> None:
 
 def validate_fixture(path: Path, fixture: GoldenFixture) -> None:
     """Validate one golden fixture before runner dispatch."""
+    metadata = fixture.metadata
     assert fixture.schema_version == SCHEMA_VERSION, (
         f"schema_version is {fixture.schema_version!r}, expected {SCHEMA_VERSION!r}"
     )
-    assert fixture.name.strip(), "name is empty"
-    assert fixture.domain.strip(), "domain is empty"
-    assert fixture.description.strip(), "description is empty"
-    assert fixture.provenance.source in VALID_SOURCES, f"unknown provenance.source {fixture.provenance.source!r}"
-    assert fixture.provenance.as_of.strip(), "provenance.as_of is empty"
-    assert fixture.provenance.source_detail.strip(), "provenance.source_detail is empty"
-    assert fixture.provenance.captured_by.strip(), "provenance.captured_by is empty"
-    assert fixture.provenance.captured_on.strip(), "provenance.captured_on is empty"
-    assert fixture.provenance.last_reviewed_by.strip(), "provenance.last_reviewed_by is empty"
-    assert fixture.provenance.last_reviewed_on.strip(), "provenance.last_reviewed_on is empty"
+    assert metadata.name.strip(), "metadata.name is empty"
+    assert metadata.domain.strip(), "metadata.domain is empty"
+    assert metadata.description.strip(), "metadata.description is empty"
+    assert metadata.valuation_date.strip(), "metadata.valuation_date is empty"
+    assert metadata.source in VALID_SOURCES, f"unknown metadata.source {metadata.source!r}"
+    assert metadata.source_detail.strip(), "metadata.source_detail is empty"
+    assert metadata.captured_by.strip(), "metadata.captured_by is empty"
+    assert metadata.captured_on.strip(), "metadata.captured_on is empty"
+    assert metadata.last_reviewed_by.strip(), "metadata.last_reviewed_by is empty"
+    assert metadata.last_reviewed_on.strip(), "metadata.last_reviewed_on is empty"
 
-    extra_tolerances = set(fixture.tolerances) - set(fixture.expected_outputs)
-    missing_tolerances = set(fixture.expected_outputs) - set(fixture.tolerances)
+    extra_tolerances = set(fixture.tolerances) - set(fixture.expected)
+    missing_tolerances = set(fixture.expected) - set(fixture.tolerances)
     assert not extra_tolerances, f"tolerances has extra keys: {extra_tolerances}"
     assert not missing_tolerances, f"tolerances missing keys: {missing_tolerances}"
 
@@ -197,57 +219,55 @@ def validate_fixture(path: Path, fixture: GoldenFixture) -> None:
             f"tolerance for {metric!r} has neither abs nor rel"
         )
 
-    for metric, expected in fixture.expected_outputs.items():
+    for metric, expected in fixture.expected.items():
         if abs(expected) <= ZERO_RISK_EPSILON and _metric_base(metric) in ZERO_RISK_METRICS_REQUIRING_REASON:
             assert _has_zero_metric_reason(fixture, metric), (
-                f"zero risk metric {metric!r} requires a tolerance_reason or "
-                "inputs.source_reference.zero_metric_reasons entry"
+                f"zero risk metric {metric!r} requires a tolerances[metric].tolerance_reason"
             )
 
-    _validate_required_pricing_risk_metrics(fixture)
     _validate_screenshots(path, fixture)
-    _validate_source_reference_coverage(fixture)
-    _validate_source_validation_metadata(fixture)
-    _validate_pricing_input_schema(path, fixture)
+    if fixture.kind == "pricing":
+        _validate_pricing_body(fixture)
+    else:
+        _validate_sabr_body(fixture)
 
 
-def _validate_pricing_input_schema(path: Path, fixture: GoldenFixture) -> None:
-    try:
-        relative_path = path.relative_to(DATA_ROOTS["pricing"])
-    except ValueError:
-        return
-    if not str(relative_path).startswith("pricing/"):
-        return
+def _validate_pricing_body(fixture: GoldenFixture) -> None:
+    body = fixture.body
+    assert str(body.get("model", "")).strip(), "pricing fixture model is empty"
 
-    inputs = fixture.inputs
-    assert isinstance(inputs, dict), "pricing fixture inputs must be an object"
-    _validate_object_keys("inputs", inputs, PRICING_INPUT_KEYS, PRICING_OPTIONAL_INPUT_KEYS)
-
-    has_market = "market" in inputs
-    has_envelope = "market_envelope" in inputs
-    assert not (has_market and has_envelope), (
-        "pricing fixture must not supply both 'market' and 'market_envelope'; specify exactly one"
-    )
-    assert has_market or has_envelope, "pricing fixture must supply either 'market' or 'market_envelope'"
-
-    if has_market:
+    market = body["market"]
+    assert isinstance(market, dict), "pricing fixture market must be an object"
+    kind = market.get("kind")
+    if kind == "snapshot":
         try:
-            MarketContext.from_json(json.dumps(inputs["market"]))
+            MarketContext.from_json(json.dumps(market["data"]))
         except Exception as exc:
-            raise AssertionError(f"pricing fixture inputs.market is not a valid MarketContext: {exc}") from exc
-    if has_envelope:
+            raise AssertionError(f"market.data is not a valid MarketContext: {exc}") from exc
+    elif kind == "envelope":
         try:
-            validate_calibration_json(json.dumps(inputs["market_envelope"]))
+            validate_calibration_json(json.dumps(market["envelope"]))
         except Exception as exc:
-            raise AssertionError(
-                f"pricing fixture inputs.market_envelope is not a valid CalibrationEnvelope: {exc}"
-            ) from exc
+            raise AssertionError(f"market.envelope is not a valid CalibrationEnvelope: {exc}") from exc
+    else:
+        msg = f"pricing fixture market.kind must be 'snapshot' or 'envelope', got {kind!r}"
+        raise AssertionError(msg)
+
     try:
-        validated_instrument_json(inputs["instrument_json"])
+        validated_instrument_json(body["instrument"])
     except Exception as exc:
-        raise AssertionError(f"pricing fixture inputs.instrument_json is not valid: {exc}") from exc
-    _validate_swaption_underlying_tenor(inputs["instrument_json"])
-    validate_requested_metrics(list(inputs["metrics"]), fixture.expected_outputs)
+        raise AssertionError(f"pricing fixture instrument is not valid: {exc}") from exc
+    _validate_swaption_underlying_tenor(body["instrument"])
+    validate_requested_metrics(requested_metrics(fixture.expected))
+    _validate_required_pricing_risk_metrics(fixture)
+
+
+def _validate_sabr_body(fixture: GoldenFixture) -> None:
+    strikes = fixture.body["strikes"]
+    assert strikes, "sabr_smile fixture must define at least one strike"
+    strike_keys = {entry["key"] for entry in strikes}
+    assert len(strike_keys) == len(strikes), "sabr_smile strike keys must be unique"
+    assert strike_keys == set(fixture.expected), "sabr_smile strike keys must match the expected metric keys exactly"
 
 
 def _validate_swaption_underlying_tenor(instrument_json: dict) -> None:
@@ -255,7 +275,7 @@ def _validate_swaption_underlying_tenor(instrument_json: dict) -> None:
     if instrument.get("type") != "swaption":
         return
     spec = instrument.get("spec", {})
-    assert isinstance(spec, dict), "swaption instrument_json.spec must be an object"
+    assert isinstance(spec, dict), "swaption instrument.spec must be an object"
     top_tenor = _tenor_days(spec, "swap_start", "swap_end")
     fixed_tenor = _tenor_days(spec["underlying_fixed_leg"], "start", "end")
     float_tenor = _tenor_days(spec["underlying_float_leg"], "start", "end")
@@ -271,35 +291,29 @@ def _tenor_days(obj: dict, start_key: str, end_key: str) -> int:
     return (date.fromisoformat(obj[end_key]) - date.fromisoformat(obj[start_key])).days
 
 
-def _validate_object_keys(field: str, obj: dict, required: set[str], optional: set[str]) -> None:
-    allowed = required | optional
-    unexpected = sorted(set(obj) - allowed)
-    missing = sorted(required - set(obj))
-    assert not unexpected, f"{field} has unexpected keys: {unexpected}"
-    assert not missing, f"{field} is missing required keys: {missing}"
-
-
 def _validate_required_pricing_risk_metrics(fixture: GoldenFixture) -> None:
-    if fixture.domain.startswith("rates."):
+    domain = fixture.metadata.domain
+    if domain.startswith("rates."):
         assert _has_expected_metric(fixture, "dv01"), "rates pricing fixtures must assert dv01"
 
-    if fixture.domain.startswith("fixed_income."):
+    if domain.startswith("fixed_income."):
         assert _has_expected_metric(fixture, "dv01"), "fixed-income pricing fixtures must assert dv01"
 
-    if fixture.domain.startswith("credit."):
+    if domain.startswith("credit."):
         assert _has_expected_metric(fixture, "dv01"), "credit pricing fixtures must assert dv01"
         assert _has_expected_metric(fixture, "cs01"), "credit pricing fixtures must assert cs01"
 
 
 def _has_expected_metric(fixture: GoldenFixture, base_metric: str) -> bool:
-    return any(_metric_base(metric) == base_metric for metric in fixture.expected_outputs)
+    return any(_metric_base(metric) == base_metric for metric in fixture.expected)
 
 
 def _validate_screenshots(path: Path, fixture: GoldenFixture) -> None:
-    if fixture.provenance.source in MANUAL_SCREENSHOT_SOURCES:
-        assert fixture.provenance.screenshots, f"source {fixture.provenance.source!r} requires at least one screenshot"
+    metadata = fixture.metadata
+    if metadata.source in MANUAL_SCREENSHOT_SOURCES:
+        assert metadata.screenshots, f"source {metadata.source!r} requires at least one screenshot"
 
-    for screenshot in fixture.provenance.screenshots:
+    for screenshot in metadata.screenshots:
         screenshot_path = Path(screenshot.path)
         assert _is_valid_screenshot_path(screenshot_path), (
             f"screenshot {screenshot.path!r} must be a relative path under screenshots/"
@@ -318,99 +332,13 @@ def _is_valid_screenshot_path(path: Path) -> bool:
     return not path.is_absolute() and ".." not in path.parts and path.parts[:1] == ("screenshots",)
 
 
-def _validate_source_reference_coverage(fixture: GoldenFixture) -> None:
-    source_reference = fixture.inputs.get("source_reference")
-    if source_reference is None:
-        return
-    assert isinstance(source_reference, dict), "inputs.source_reference must be an object"
-    planned = _source_reference_strings(source_reference, "planned_metrics_not_compared")
-    non_compared = _source_reference_strings(source_reference, "non_compared_metrics")
-    if planned or non_compared:
-        assert _has_metric_omission_reason(source_reference), (
-            "inputs.source_reference planned/non-compared metrics require an explicit reason"
-        )
-    invalid = [metric for metric in non_compared if is_required_executable_pricing_risk_metric(fixture, metric)]
-    assert not invalid, (
-        "required executable pricing/risk metrics cannot be listed in "
-        f"inputs.source_reference.non_compared_metrics: {invalid}"
-    )
-
-    asserted = set(fixture.expected_outputs)
-    omitted = planned | non_compared
-    for metric in _source_reference_strings(source_reference, "design_metrics"):
-        aliases = _design_metric_aliases(source_reference, metric)
-        assert metric in asserted or metric in omitted or aliases & asserted or aliases & omitted, (
-            f"inputs.source_reference design metric {metric!r} is neither asserted nor listed as planned/non-compared"
-        )
-
-
-def _source_reference_strings(source_reference: dict, key: str) -> set[str]:
-    values = source_reference.get(key, [])
-    assert isinstance(values, list), f"inputs.source_reference.{key} must be a list"
-    assert all(isinstance(value, str) for value in values), f"inputs.source_reference.{key} entries must be strings"
-    return set(values)
-
-
-def _has_metric_omission_reason(source_reference: dict) -> bool:
-    reason_keys = {
-        "planned_metrics_reason",
-        "non_compared_metrics_reason",
-        "omission_reason",
-        "delta_convention_note",
-        "waterfall_reference",
-        "note",
-    }
-    return any(str(source_reference.get(key, "")).strip() for key in reason_keys)
-
-
 def _has_zero_metric_reason(fixture: GoldenFixture, metric: str) -> bool:
     tolerance = fixture.tolerances.get(metric)
-    if tolerance and tolerance.tolerance_reason and tolerance.tolerance_reason.strip():
-        return True
-    source_reference = fixture.inputs.get("source_reference", {})
-    if not isinstance(source_reference, dict):
-        return False
-    zero_metric_reasons = source_reference.get("zero_metric_reasons", {})
-    if not isinstance(zero_metric_reasons, dict):
-        return False
-    reason = zero_metric_reasons.get(metric, zero_metric_reasons.get(_metric_base(metric)))
-    return isinstance(reason, str) and bool(reason.strip())
-
-
-def is_required_executable_pricing_risk_metric(fixture: GoldenFixture, metric: str) -> bool:
-    metric = _metric_base(metric)
-    if fixture.domain.startswith("rates."):
-        return metric == "dv01"
-    if fixture.domain.startswith("fixed_income."):
-        return metric == "dv01"
-    return fixture.domain.startswith("credit.") and metric in {"dv01", "cs01"}
+    return bool(tolerance and tolerance.tolerance_reason and tolerance.tolerance_reason.strip())
 
 
 def _metric_base(metric: str) -> str:
     return metric.split("::", 1)[0]
-
-
-def _validate_source_validation_metadata(fixture: GoldenFixture) -> None:
-    if "source_validation" not in fixture.inputs:
-        return
-    validate_source_validation_fixture("walk validation", fixture)
-
-
-def _design_metric_aliases(source_reference: dict, metric: str) -> set[str]:
-    aliases: set[str] = set()
-    alias = source_reference.get(f"{metric}_key")
-    if isinstance(alias, str):
-        aliases.add(alias)
-    if metric == "mod_duration":
-        duration_alias = source_reference.get("duration_key")
-        if isinstance(duration_alias, str):
-            aliases.add(duration_alias)
-    strict_metric_keys = source_reference.get("strict_metric_keys", {})
-    if isinstance(strict_metric_keys, dict):
-        strict_alias = strict_metric_keys.get(metric)
-        if isinstance(strict_alias, str):
-            aliases.add(strict_alias)
-    return aliases
 
 
 def is_git_tracked(path: Path) -> bool:

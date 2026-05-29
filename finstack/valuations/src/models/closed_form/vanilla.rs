@@ -279,6 +279,13 @@ pub fn bs_greeks(
     option_type: OptionType,
     theta_days_per_year: f64,
 ) -> BsGreeks {
+    // Theta divides by this basis; a non-positive value would yield inf/NaN.
+    // All in-tree callers pass 252/365, so guard against a degenerate caller.
+    debug_assert!(
+        theta_days_per_year > 0.0,
+        "theta_days_per_year must be positive, got {theta_days_per_year}"
+    );
+
     // Use combined d1_d2 to compute both values in one pass (avoids duplicate ln/sqrt)
     let (d1, d2) = d1_d2(spot, strike, r, sigma, t, q);
 

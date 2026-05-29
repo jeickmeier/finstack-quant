@@ -162,8 +162,10 @@ impl HolidayCalendar for Calendar {
         }
         let mut is_holiday = self.rules.iter().any(|rule| rule.applies(date));
 
-        // Apply weekend ignore logic
-        if self.ignore_weekends && date.is_weekend() {
+        // Apply weekend ignore logic using the calendar's own weekend rule
+        // (not a hardcoded Sat/Sun) so Fri/Sat-weekend calendars agree with
+        // `is_business_day`.
+        if self.ignore_weekends && self.weekend_rule.is_weekend(date.weekday()) {
             is_holiday = false;
         }
 

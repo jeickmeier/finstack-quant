@@ -1,4 +1,4 @@
-"""Dataclasses mirroring the Rust `finstack.golden/1` fixture schema."""
+"""Dataclasses mirroring the Rust `finstack.golden/2` fixture schema."""
 
 from __future__ import annotations
 
@@ -7,19 +7,31 @@ import json
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "finstack.golden/1"
-_GOLDEN_FIXTURE_KEYS = {
+SCHEMA_VERSION = "finstack.golden/2"
+
+_COMMON_TOP_LEVEL_KEYS = {
     "schema_version",
+    "metadata",
+    "kind",
+    "expected",
+    "tolerances",
+}
+_PRICING_BODY_KEYS = {"model", "market", "instrument"}
+_SABR_BODY_KEYS = {
+    "alpha",
+    "beta",
+    "nu",
+    "rho",
+    "shift",
+    "forward",
+    "time_to_expiry",
+    "strikes",
+}
+_METADATA_KEYS = {
     "name",
     "domain",
     "description",
-    "provenance",
-    "inputs",
-    "expected_outputs",
-    "tolerances",
-}
-_PROVENANCE_KEYS = {
-    "as_of",
+    "valuation_date",
     "source",
     "source_detail",
     "captured_by",
@@ -32,6 +44,7 @@ _PROVENANCE_KEYS = {
 }
 _SCREENSHOT_KEYS = {"path", "screen", "captured_on", "description"}
 _TOLERANCE_KEYS = {"abs", "rel", "tolerance_reason"}
+_KINDS = {"pricing", "sabr_smile"}
 
 
 @dataclass
@@ -45,10 +58,13 @@ class Screenshot:
 
 
 @dataclass
-class Provenance:
-    """Fixture provenance and review metadata."""
+class Metadata:
+    """Fixture identity, provenance, and review metadata."""
 
-    as_of: str
+    name: str
+    domain: str
+    description: str
+    valuation_date: str
     source: str
     source_detail: str
     captured_by: str
@@ -74,51 +90,65 @@ class GoldenFixture:
     """Top-level fixture envelope loaded from one JSON file."""
 
     schema_version: str
-    name: str
-    domain: str
-    description: str
-    provenance: Provenance
-    inputs: dict[str, Any]
-    expected_outputs: dict[str, float]
+    metadata: Metadata
+    kind: str
+    body: dict[str, Any]
+    expected: dict[str, float]
     tolerances: dict[str, ToleranceEntry]
 
     @classmethod
     def from_path(cls, path: Path) -> GoldenFixture:
         """Load and parse a golden fixture from disk."""
         raw = json.loads(path.read_text(encoding="utf-8"))
-        _reject_unknown_keys("fixture", raw, _GOLDEN_FIXTURE_KEYS)
-        prov_raw = raw["provenance"]
-        _reject_unknown_keys("provenance", prov_raw, _PROVENANCE_KEYS)
-        screenshots = []
-        for screenshot in prov_raw.get("screenshots", []):
-            _reject_unknown_keys("screenshot", screenshot, _SCREENSHOT_KEYS)
-            screenshots.append(Screenshot(**screenshot))
-        provenance = Provenance(
-            as_of=prov_raw["as_of"],
-            source=prov_raw["source"],
-            source_detail=prov_raw["source_detail"],
-            captured_by=prov_raw["captured_by"],
-            captured_on=prov_raw["captured_on"],
-            last_reviewed_by=prov_raw["last_reviewed_by"],
-            last_reviewed_on=prov_raw["last_reviewed_on"],
-            review_interval_months=prov_raw["review_interval_months"],
-            regen_command=prov_raw["regen_command"],
-            screenshots=screenshots,
-        )
+        return cls.from_dict(raw)
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any]) -> GoldenFixture:
+        """Parse a golden fixture from an in-memory mapping."""
+        kind = raw.get("kind")
+        if kind not in _KINDS:
+            msg = f"fixture kind must be one of {sorted(_KINDS)}, got {kind!r}"
+            raise ValueError(msg)
+        body_keys = _PRICING_BODY_KEYS if kind == "pricing" else _SABR_BODY_KEYS
+        _reject_unknown_keys("fixture", raw, _COMMON_TOP_LEVEL_KEYS | body_keys)
+
+        metadata = _parse_metadata(raw["metadata"])
         tolerances = {}
         for metric, tolerance in raw["tolerances"].items():
             _reject_unknown_keys(f"tolerances.{metric}", tolerance, _TOLERANCE_KEYS)
             tolerances[metric] = ToleranceEntry(**tolerance)
+        body = {key: raw[key] for key in body_keys if key in raw}
         return cls(
             schema_version=raw["schema_version"],
-            name=raw["name"],
-            domain=raw["domain"],
-            description=raw["description"],
-            provenance=provenance,
-            inputs=raw["inputs"],
-            expected_outputs={metric: float(value) for metric, value in raw["expected_outputs"].items()},
+            metadata=metadata,
+            kind=kind,
+            body=body,
+            expected={metric: float(value) for metric, value in raw["expected"].items()},
             tolerances=tolerances,
         )
+
+
+def _parse_metadata(raw: dict[str, Any]) -> Metadata:
+    _reject_unknown_keys("metadata", raw, _METADATA_KEYS)
+    screenshots = []
+    for screenshot in raw.get("screenshots", []):
+        _reject_unknown_keys("screenshot", screenshot, _SCREENSHOT_KEYS)
+        screenshots.append(Screenshot(**screenshot))
+    return Metadata(
+        name=raw["name"],
+        domain=raw["domain"],
+        description=raw["description"],
+        valuation_date=raw["valuation_date"],
+        source=raw["source"],
+        source_detail=raw["source_detail"],
+        captured_by=raw["captured_by"],
+        captured_on=raw["captured_on"],
+        last_reviewed_by=raw["last_reviewed_by"],
+        last_reviewed_on=raw["last_reviewed_on"],
+        review_interval_months=raw["review_interval_months"],
+        regen_command=raw["regen_command"],
+        screenshots=screenshots,
+    )
 
 
 def _reject_unknown_keys(label: str, value: dict[str, Any], allowed: set[str]) -> None:

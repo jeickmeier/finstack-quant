@@ -724,12 +724,16 @@ impl InflationLinkedBond {
             let end = period.accrual_end;
             if start <= as_of && as_of < end {
                 // Found the active period
-                let total_yf =
-                    self.day_count
-                        .year_fraction(start, end, DayCountContext::default())?;
-                let elapsed_yf =
-                    self.day_count
-                        .year_fraction(start, as_of, DayCountContext::default())?;
+                // ACT/ACT (ISMA) — the default real day count for TIPS/linkers —
+                // requires the coupon frequency and reference period; otherwise
+                // year_fraction errors with MissingFrequencyForActActIsma.
+                let isma_ctx = DayCountContext {
+                    frequency: Some(self.frequency),
+                    coupon_period: Some((start, end)),
+                    ..Default::default()
+                };
+                let total_yf = self.day_count.year_fraction(start, end, isma_ctx)?;
+                let elapsed_yf = self.day_count.year_fraction(start, as_of, isma_ctx)?;
 
                 if total_yf <= 0.0 {
                     return Ok(0.0);
@@ -793,7 +797,11 @@ impl InflationLinkedBond {
                 .year_fraction(
                     period.accrual_start,
                     period.accrual_end,
-                    DayCountContext::default(),
+                    DayCountContext {
+                        frequency: Some(self.frequency),
+                        coupon_period: Some((period.accrual_start, period.accrual_end)),
+                        ..Default::default()
+                    },
                 )?
                 .max(0.0);
             let coupon_rate = self
@@ -931,7 +939,14 @@ impl InflationLinkedBond {
         // For annual frequency, Periodic(1) == Annual, so no correction is applied.
         let t = self
             .day_count
-            .year_fraction(as_of, self.maturity, DayCountContext::default())
+            .year_fraction(
+                as_of,
+                self.maturity,
+                DayCountContext {
+                    frequency: Some(self.frequency),
+                    ..Default::default()
+                },
+            )
             .unwrap_or(1.0)
             .max(1e-6); // guard against zero / expired bond
 
@@ -1094,7 +1109,11 @@ impl CashflowProvider for InflationLinkedBond {
                 .year_fraction(
                     period.accrual_start,
                     period.accrual_end,
-                    DayCountContext::default(),
+                    DayCountContext {
+                        frequency: Some(self.frequency),
+                        coupon_period: Some((period.accrual_start, period.accrual_end)),
+                        ..Default::default()
+                    },
                 )?
                 .max(0.0);
             let coupon_rate = self
@@ -1296,6 +1315,30 @@ mod tests {
             (result_annual_freq - wrong_breakeven).abs() < tol,
             "annual-freq bond should not be corrected: got {result_annual_freq:.6}, wrong={wrong_breakeven:.6}"
         );
+    }
+
+    /// Regression: the canonical TIPS/linker constructors default to ACT/ACT
+    /// (ISMA), which requires a coupon frequency in the `DayCountContext`.
+    /// Previously every real year-fraction call passed `DayCountContext::default()`
+    /// (frequency = `None`) and errored with `MissingFrequencyForActActIsma`, so
+    /// a default `example()` bond could not be scheduled or accrued at all —
+    /// tests only passed by overriding `day_count` to `Thirty360`.
+    #[test]
+    fn act_act_isma_real_schedule_and_accrual_need_no_day_count_override() {
+        let bond = InflationLinkedBond::example();
+        assert_eq!(bond.day_count, DayCount::ActActIsma);
+
+        let as_of = d(2026, Month::April, 10); // mid-life, between coupons
+
+        let schedule = bond
+            .build_real_schedule(as_of)
+            .expect("ACT/ACT (ISMA) real schedule must not require a day-count override");
+        assert!(!schedule.is_empty(), "schedule should contain future flows");
+
+        let accrued = bond
+            .accrued_real_interest(as_of)
+            .expect("ACT/ACT (ISMA) accrued interest must not require a day-count override");
+        assert!(accrued.is_finite() && accrued >= 0.0, "accrued = {accrued}");
     }
 
     fn d(year: i32, month: Month, day: u8) -> Date {

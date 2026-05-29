@@ -985,7 +985,14 @@ impl CovenantEngine {
             }
         };
 
-        let passed = if !metric_value.is_finite() {
+        let passed = if metric_value.is_nan() {
+            // Only a NaN metric is genuinely indeterminate → treat as a breach.
+            // An infinite metric is *not* a breach per se: e.g. an interest- or
+            // fixed-charge-coverage ratio with a ~zero denominator yields +∞,
+            // which is infinitely *good* for a minimum (`AtLeast`) covenant.
+            // IEEE ordering already gives the right answer once NaN is excluded:
+            // `+∞ >= threshold` passes `AtLeast`, `-∞ <= threshold` passes
+            // `AtMost`, and the opposite infinities correctly fail.
             false
         } else {
             match covenant_type.bound_kind() {

@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "inflation_linked_bond_5y",
-  "domain": "fixed_income.inflation_linked_bond",
-  "description": "Synthetic 5Y inflation-linked bond on deterministic real and CPI curves.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "inflation_linked_bond_5y",
+    "domain": "fixed_income.inflation_linked_bond",
+    "description": "Synthetic 5Y inflation-linked bond on deterministic real and CPI curves.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved.",
     "captured_by": "jeickmeier",
@@ -15,54 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "real_yield",
-      "breakeven_inflation",
-      "index_ratio",
-      "real_duration",
-      "dv01"
-    ],
-    "instrument_json": {
-      "type": "inflation_linked_bond",
-      "spec": {
-        "id": "INFLATION-LINKED-BOND-5Y-GOLDEN",
-        "notional": {
-          "amount": "1000000",
-          "currency": "USD"
-        },
-        "real_coupon": 0.0125,
-        "frequency": {
-          "count": 6,
-          "unit": "months"
-        },
-        "issue_date": "2024-01-15",
-        "maturity": "2031-04-30",
-        "base_index": 300.0,
-        "base_date": "2024-01-15",
-        "indexation_method": "TIPS",
-        "lag": {
-          "months": 3
-        },
-        "deflation_protection": "MaturityOnly",
-        "bdc": "following",
-        "stub": "ShortBack",
-        "calendar_id": "nyse",
-        "discount_curve_id": "USD-TIPS",
-        "inflation_index_id": "US-CPI",
-        "attributes": {
-          "tags": [
-            "golden"
-          ],
-          "meta": {}
-        },
-        "quoted_clean": 101.25,
-        "day_count": "Act365F"
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "inflation_linked_bond_5y_tier_a_wrap",
@@ -200,24 +157,46 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "design_metrics": [
-        "clean_price",
-        "real_yield",
-        "breakeven_inflation",
-        "inflation_adjusted_principal",
-        "mod_duration"
-      ],
-      "planned_metrics_reason": "Clean price and inflation-adjusted principal are not exposed as strict linker metric ids yet.",
-      "planned_metrics_not_compared": [
-        "clean_price",
-        "inflation_adjusted_principal"
-      ],
-      "duration_key": "real_duration"
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "inflation_linked_bond",
+    "spec": {
+      "id": "INFLATION-LINKED-BOND-5Y-GOLDEN",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "real_coupon": 0.0125,
+      "frequency": {
+        "count": 6,
+        "unit": "months"
+      },
+      "issue_date": "2024-01-15",
+      "maturity": "2031-04-30",
+      "base_index": 300.0,
+      "base_date": "2024-01-15",
+      "indexation_method": "TIPS",
+      "lag": {
+        "months": 3
+      },
+      "deflation_protection": "MaturityOnly",
+      "bdc": "following",
+      "stub": "ShortBack",
+      "calendar_id": "nyse",
+      "discount_curve_id": "USD-TIPS",
+      "inflation_index_id": "US-CPI",
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
+      },
+      "quoted_clean": 101.25,
+      "day_count": "Act365F"
+    }
+  },
+  "expected": {
     "npv": 1140567.9278137966,
     "real_yield": 0.009932285188,
     "breakeven_inflation": 0.004617685695,

@@ -20,6 +20,10 @@ enum RuleDef {
         month: MonthName,
         day: u8,
         observed: Option<ObservedName>,
+        #[serde(default)]
+        from_year: Option<i32>,
+        #[serde(default)]
+        to_year: Option<i32>,
     },
     EasterOffset {
         days: i16,
@@ -28,6 +32,10 @@ enum RuleDef {
         n: i8,
         weekday: WeekdayName,
         month: MonthName,
+        #[serde(default)]
+        from_year: Option<i32>,
+        #[serde(default)]
+        to_year: Option<i32>,
     },
     WeekdayShift {
         weekday: WeekdayName,
@@ -207,6 +215,24 @@ impl ObservedName {
     }
 }
 
+/// Wrap an inner rule's generated code in a `Rule::Effective { .. }` gate when
+/// either bound is present; otherwise return the inner code unchanged.
+fn wrap_effective(inner: String, from_year: Option<i32>, to_year: Option<i32>) -> String {
+    if from_year.is_none() && to_year.is_none() {
+        return inner;
+    }
+    let render = |b: Option<i32>| match b {
+        Some(y) => format!("Some({y})"),
+        None => "None".to_string(),
+    };
+    format!(
+        "Rule::Effective {{ from_year: {}, to_year: {}, inner: &({}) }}",
+        render(from_year),
+        render(to_year),
+        inner,
+    )
+}
+
 impl RuleDef {
     fn to_rust_code(&self) -> String {
         match self {
@@ -214,25 +240,37 @@ impl RuleDef {
                 month,
                 day,
                 observed,
-            } => match observed {
-                None => format!("Rule::fixed({}, {})", month.to_rust_code(), day),
-                Some(obs) => format!(
-                    "Rule::Fixed {{ month: {}, day: {}, observed: {} }}",
-                    month.to_rust_code(),
-                    day,
-                    obs.to_rust_code()
-                ),
-            },
+                from_year,
+                to_year,
+            } => {
+                let inner = match observed {
+                    None => format!("Rule::fixed({}, {})", month.to_rust_code(), day),
+                    Some(obs) => format!(
+                        "Rule::Fixed {{ month: {}, day: {}, observed: {} }}",
+                        month.to_rust_code(),
+                        day,
+                        obs.to_rust_code()
+                    ),
+                };
+                wrap_effective(inner, *from_year, *to_year)
+            }
             RuleDef::EasterOffset { days } => {
                 format!("Rule::EasterOffset({})", days)
             }
-            RuleDef::NthWeekday { n, weekday, month } => {
-                format!(
+            RuleDef::NthWeekday {
+                n,
+                weekday,
+                month,
+                from_year,
+                to_year,
+            } => {
+                let inner = format!(
                     "Rule::NthWeekday {{ n: {}, weekday: {}, month: {} }}",
                     n,
                     weekday.to_rust_code(),
                     month.to_rust_code()
-                )
+                );
+                wrap_effective(inner, *from_year, *to_year)
             }
             RuleDef::WeekdayShift {
                 weekday,

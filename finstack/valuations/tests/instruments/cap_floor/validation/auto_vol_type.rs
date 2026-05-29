@@ -1,8 +1,11 @@
 //! Tests for `CapFloorVolType::Auto` model selection.
 //!
-//! Validates that `Auto` correctly selects Black (lognormal) for positive rates
-//! and Normal (Bachelier) for negative/zero rates, both for single caplets
-//! and portfolio-level cap/floor pricing.
+//! `Auto` treats the supplied surface as a **lognormal** surface: it prices with
+//! Black-76 where the model is well-defined (`forward > 0` and `strike > 0`) and
+//! otherwise converts the lognormal vol to an equivalent normal vol and uses
+//! Bachelier. This keeps a single, consistent interpretation of the surface
+//! across every caplet, so `Auto` behaves identically to `Lognormal` (which uses
+//! the same fallback) rather than feeding the raw surface number to Bachelier.
 
 use finstack_core::currency::Currency;
 use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -128,38 +131,46 @@ fn auto_selects_black_for_positive_rates() {
 }
 
 // ---------------------------------------------------------------------------
-// Auto selects Normal for negative rates
+// Auto matches the lognormal fallback for negative rates
 // ---------------------------------------------------------------------------
 
 #[test]
-fn auto_selects_normal_for_negative_forward() {
+fn auto_matches_lognormal_fallback_for_negative_forward() {
     let as_of = date!(2024 - 01 - 01);
     let fixing = date!(2024 - 04 - 01);
     let payment = date!(2024 - 07 - 01);
     let fwd_rate = -0.005; // negative forward (EUR environment)
     let strike = 0.0; // ATM-ish
-    let sigma = 0.005; // normal vol (50bp)
+    let sigma = 0.20; // lognormal vol on the surface
 
     let auto_cap = make_caplet(fixing, payment, strike, CapFloorVolType::Auto, true);
-    let normal_cap = make_caplet(fixing, payment, strike, CapFloorVolType::Normal, true);
+    let lognormal_cap = make_caplet(fixing, payment, strike, CapFloorVolType::Lognormal, true);
 
     let ctx = context_from(as_of, fwd_rate, sigma);
 
     let auto_pv = auto_cap
         .value(&ctx, as_of)
         .expect("Auto should succeed with negative forward");
-    let normal_pv = normal_cap
+    let lognormal_pv = lognormal_cap
         .value(&ctx, as_of)
-        .expect("Normal should succeed with negative forward");
+        .expect("Lognormal should fall back to Bachelier on a negative forward");
 
-    // Auto should produce the same result as Normal for negative rates
-    let diff = (auto_pv.amount() - normal_pv.amount()).abs();
+    // Auto and Lognormal share the same lognormal→normal conversion + Bachelier
+    // fallback, so they must agree exactly. (They must NOT feed the raw 0.20
+    // surface number straight into Bachelier, which would price it as a 2000bp
+    // normal vol.)
+    let diff = (auto_pv.amount() - lognormal_pv.amount()).abs();
     assert!(
         diff < 1e-10,
-        "Auto should match Normal for negative forward: auto={}, normal={}, diff={}",
+        "Auto should match the Lognormal fallback for negative forward: auto={}, lognormal={}, diff={}",
         auto_pv.amount(),
-        normal_pv.amount(),
+        lognormal_pv.amount(),
         diff
+    );
+    assert!(
+        auto_pv.amount().is_finite() && auto_pv.amount() >= 0.0,
+        "Auto PV must be finite and non-negative, got {}",
+        auto_pv.amount()
     );
 }
 

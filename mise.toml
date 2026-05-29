@@ -49,6 +49,15 @@ mise run python-build -- --release &&
 uv run pytest finstack-py/tests/golden -v
 """
 
+[tasks.goldens-test-strict]
+description = "Run golden tests ignoring known_non_executable.json (surface every failure)"
+env = { GOLDEN_IGNORE_NON_EXECUTABLE = "1" }
+run = """
+cargo test -p finstack-valuations --test golden -- --include-ignored &&
+mise run python-build -- --release &&
+uv run pytest finstack-py/tests/golden -v
+"""
+
 [tasks.all-fmt]
 description = "Format + auto-fix Rust, Python, and WASM code (mutating)"
 depends = ["rust-fmt", "python-fmt", "wasm-fmt"]

@@ -1,12 +1,13 @@
 //! Golden test framework.
 //!
-//! See `docs/archive/plans/2026-04-30-golden-tests-framework-design.md`.
+//! Fixtures live under `tests/golden/data/` and use the `finstack.golden/2`
+//! schema defined in [`schema`]. Each fixture is validated by [`walk`] and
+//! executed by [`runner`].
 
 mod pricing;
 mod pricing_common;
 mod runner;
 mod sabr;
 mod schema;
-mod source_validation;
 mod tolerance;
 mod walk;

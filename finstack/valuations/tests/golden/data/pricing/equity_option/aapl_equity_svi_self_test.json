@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "aapl_equity_svi_self_test",
-  "domain": "equity.equity_option",
-  "description": "Self-test fixture for SVI equity vol surface calibration. AAPL 1Y call option, strike 175, 100-share notional. Two-step envelope: USD-OIS discount + AAPL-EQUITY-SVI-VOL SVI surface fitted from 15 OptionVol quotes (3 expiries \u00d7 5 strikes, quadratic smile). Closes the svi_surface step coverage gap (the last remaining primary step kind without a golden after \u00a720).",
-  "provenance": {
-    "as_of": "2026-05-08",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "aapl_equity_svi_self_test",
+    "domain": "equity.equity_option",
+    "description": "Self-test fixture for SVI equity vol surface calibration. AAPL 1Y call option, strike 175, 100-share notional. Two-step envelope: USD-OIS discount + AAPL-EQUITY-SVI-VOL SVI surface fitted from 15 OptionVol quotes (3 expiries \u00d7 5 strikes, quadratic smile). Closes the svi_surface step coverage gap (the last remaining primary step kind without a golden after \u00a720).",
+    "valuation_date": "2026-05-08",
     "source": "formula",
     "source_detail": "Self-test fixture closing the svi_surface step coverage gap. Two-step plan: SOFR OIS discount calibration, then SVI surface fitting from a 3 expiries \u00d7 5 strikes (quadratic-smile) OptionVol quote grid. SVI requires \u22655 strikes per the step's validation. Spot=175 (override on the step), base date 2026-05-08. Expected outputs captured from Finstack's calibrate + black76-price round-trip; bit-stable reproduction is the contract.",
     "captured_by": "claude",
@@ -15,42 +15,11 @@
     "regen_command": "uv run pytest finstack-py/tests/golden/test_pricing_equity_option.py -v -k svi_self_test",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-05-08",
-    "model": "black76",
-    "metrics": [
-      "delta",
-      "gamma",
-      "vega",
-      "theta"
-    ],
-    "instrument_json": {
-      "type": "equity_option",
-      "spec": {
-        "id": "AAPL-CALL-1Y-SVI-SELF-TEST",
-        "underlying_ticker": "AAPL",
-        "strike": 175.0,
-        "option_type": "call",
-        "expiry": "2027-05-08",
-        "notional": {
-          "amount": "100",
-          "currency": "USD"
-        },
-        "discount_curve_id": "USD-OIS",
-        "spot_id": "AAPL-SPOT",
-        "vol_surface_id": "AAPL-EQUITY-SVI-VOL",
-        "div_yield_id": "AAPL-DIVYIELD",
-        "attributes": {
-          "tags": [
-            "golden",
-            "self_test",
-            "vol_surface"
-          ],
-          "meta": {}
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "black76",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "$schema": "../../schemas/calibration/3/calibration.schema.json",
       "schema": "finstack.calibration",
       "plan": {
@@ -580,20 +549,35 @@
         }
       ],
       "prior_market": []
-    },
-    "source_reference": {
-      "note": "Self-test fixture closing the svi_surface step coverage gap (the last primary step kind without a golden after \u00a720). SVI fit converges with rmse ~2.5e-6 (tight, as expected for a well-conditioned 3\u00d75 grid).",
-      "design_metrics": [
-        "npv",
-        "delta",
-        "gamma",
-        "vega",
-        "theta"
-      ],
-      "self_test_origin": "Authored 2026-05-10 to cover the `svi_surface` step kind."
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "equity_option",
+    "spec": {
+      "id": "AAPL-CALL-1Y-SVI-SELF-TEST",
+      "underlying_ticker": "AAPL",
+      "strike": 175.0,
+      "option_type": "call",
+      "expiry": "2027-05-08",
+      "notional": {
+        "amount": "100",
+        "currency": "USD"
+      },
+      "discount_curve_id": "USD-OIS",
+      "spot_id": "AAPL-SPOT",
+      "vol_surface_id": "AAPL-EQUITY-SVI-VOL",
+      "div_yield_id": "AAPL-DIVYIELD",
+      "attributes": {
+        "tags": [
+          "golden",
+          "self_test",
+          "vol_surface"
+        ],
+        "meta": {}
+      }
+    }
+  },
+  "expected": {
     "npv": 2065.8558859654518,
     "delta": 59.55546272296108,
     "gamma": 0.8339191904563482,

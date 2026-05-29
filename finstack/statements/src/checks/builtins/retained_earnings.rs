@@ -67,6 +67,31 @@ impl Check for RetainedEarningsReconciliation {
             let prev_pid = &periods[i - 1].id;
             let curr_pid = &periods[i].id;
 
+            // Roll-forward identities only hold for *strictly* chronologically
+            // consecutive periods. Skip any pair whose starts are not strictly
+            // ascending — out-of-order or equal-start (e.g. interleaved annual +
+            // quarterly) — so a misordered list cannot reconcile the current
+            // period against the wrong "prior" period. Emit an Info finding so
+            // the skip is visible rather than silent.
+            if periods[i].start <= periods[i - 1].start {
+                findings.push(CheckFinding {
+                    check_id: self.id().to_string(),
+                    severity: Severity::Info,
+                    message: format!(
+                        "Retained earnings reconciliation skipped for {curr_pid}: period starts \
+                         are not strictly ascending relative to prior {prev_pid}; the roll-forward \
+                         identity is only evaluated for chronologically consecutive periods."
+                    ),
+                    period: Some(*curr_pid),
+                    materiality: None,
+                    nodes: vec![
+                        self.retained_earnings_node.clone(),
+                        self.net_income_node.clone(),
+                    ],
+                });
+                continue;
+            }
+
             let re_prev = get_node_value(context.results, &self.retained_earnings_node, prev_pid);
             let re_curr = get_node_value(context.results, &self.retained_earnings_node, curr_pid);
             let ni = get_node_value(context.results, &self.net_income_node, curr_pid);

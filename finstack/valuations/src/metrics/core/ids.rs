@@ -645,7 +645,12 @@ impl MetricId {
     /// Commonly interpreted as `d²PV / (dS dσ)` under the instrument's bump
     /// convention.
     ///
-    /// Units: currency per unit-underlying per 1 vol point.
+    /// Units: currency per unit-underlying per **unit (decimal) volatility**
+    /// (i.e. per 1.00 change in σ, not per vol point). All producers — the
+    /// analytic FX/equity/quanto/FX-barrier providers and `GenericFdVanna` —
+    /// normalize by the absolute vol bump, so vanna is per decimal vol while
+    /// `Volga` is per vol-point squared; the two second-order vol Greeks
+    /// intentionally use different vol-axis units.
     pub const Vanna: Self = Self(Cow::Borrowed("vanna"));
 
     /// Volga, the second-order sensitivity to volatility.

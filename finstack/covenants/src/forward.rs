@@ -284,6 +284,22 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
             let base = values[i];
             let thr = thresholds[i];
 
+            // The lognormal multiplicative shock `base · exp(...)` is only valid
+            // for a strictly positive base: the multiplier is always > 0, so for
+            // a non-positive base (e.g. a distressed name with negative EBITDA →
+            // negative coverage/leverage) the sign can never cross zero and the
+            // shock direction inverts, producing a backwards breach probability.
+            // Fall back to a deterministic assessment in that regime.
+            if !base.is_finite() || base <= 0.0 {
+                let breached = match bound_kind {
+                    BoundKind::AtMost => base > thr,
+                    BoundKind::AtLeast => base < thr,
+                };
+                breach_probability[i] = if breached { 1.0 } else { 0.0 };
+                breach_probability_stderr_mc[i] = 0.0;
+                continue;
+            }
+
             let t_years = (test_dates[i] - ref_date).whole_days().max(0) as f64 / 365.25;
             let sqrt_t = t_years.sqrt();
             let drift = -0.5 * sigma * sigma * t_years;

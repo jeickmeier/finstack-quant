@@ -1143,7 +1143,7 @@ impl DiscountCurve {
     ///
     /// * `forward_id` - Identifier for the resulting forward curve
     /// * `tenor_years` - Tenor of the forward rate in years
-    /// * `interp_style` - Optional interpolation style; defaults to `Linear` if `None`
+    /// * `interp_style` - Optional interpolation style; defaults to `MonotoneConvex` if `None`
     pub fn to_forward_curve(
         &self,
         forward_id: impl Into<CurveId>,
@@ -1152,7 +1152,10 @@ impl DiscountCurve {
     ) -> crate::Result<super::forward_curve::ForwardCurve> {
         use super::forward_curve::ForwardCurve;
 
-        let style = interp_style.unwrap_or(InterpStyle::Linear);
+        // Default to the discount curve's own interpolation style
+        // (`MonotoneConvex`) so the derived forward curve is shape-consistent
+        // with its parent rather than defaulting to plain linear.
+        let style = interp_style.unwrap_or(InterpStyle::MonotoneConvex);
 
         // Calculate forward rates at each knot point
         let mut forward_rates = Vec::with_capacity(self.knots.len());
@@ -1174,13 +1177,13 @@ impl DiscountCurve {
                 let dt = t_next - t;
 
                 if dt > 0.0 && df_next > 0.0 && df > 0.0 {
+                    // Forward to the next point. When t = 0 and DF(0) = 1 this
+                    // reduces to -ln(DF_next)/t_next (the spot rate to the next
+                    // point), so no separate t=0 case is needed.
                     (df / df_next).ln() / dt
                 } else if t > 0.0 && df > 0.0 {
                     // Use spot rate
                     (-df.ln()) / t
-                } else if t == 0.0 && dt > 0.0 && df == 1.0 && df_next > 0.0 {
-                    // Special case: t=0 with DF(0)=1, use forward to next point
-                    (-df_next.ln()) / t_next
                 } else {
                     return Err(crate::error::InputError::Invalid.into());
                 }

@@ -4,7 +4,9 @@
 //! contributions for a given functional form (e.g., delta/gamma/vega/theta).
 
 use crate::instruments::common_impl::vol_resolution::resolve_sigma_at;
+use crate::instruments::rates::cap_floor::pricing::{black, normal};
 use crate::instruments::rates::cap_floor::CapFloor;
+use crate::instruments::rates::swaption::types::lognormal_to_normal_vol;
 use crate::metrics::MetricContext;
 
 const MIN_EFFECTIVE_FIXING_TIME: f64 = 1e-6;
@@ -12,10 +14,10 @@ const MIN_EFFECTIVE_FIXING_TIME: f64 = 1e-6;
 /// Per-caplet inputs passed to the aggregation closure.
 ///
 /// `fixing_t` is the year fraction from `as_of` to the option's fixing date
-/// (floored at `MIN_EFFECTIVE_FIXING_TIME`). `risk_t` is the same time for
-/// non-RFR options, and the observation-window midpoint for RFR options —
-/// useful when a Greek formula's time argument needs to reflect the actual
-/// rate-observation window (e.g., vega) rather than the option's fixing date.
+/// (floored at `MIN_EFFECTIVE_FIXING_TIME`) — the same time the pricer uses for
+/// both the vol-surface lookup and the model `T`. Greeks use this single time so
+/// they remain consistent with the reported price (a finite-difference Greek
+/// reconciles with the analytic one).
 pub(crate) struct CapletInputs {
     /// Atomic forward rate for the accrual period.
     pub forward: f64,
@@ -23,9 +25,52 @@ pub(crate) struct CapletInputs {
     pub sigma: f64,
     /// Year fraction to the option fixing date (clamped above `MIN_EFFECTIVE_FIXING_TIME`).
     pub fixing_t: f64,
-    /// Risk-time year fraction. Equal to `fixing_t` except for RFR options,
-    /// where it is the observation-window midpoint.
-    pub risk_t: f64,
+}
+
+/// Lognormal-convention forward delta with graceful Bachelier fallback.
+///
+/// Mirrors the pricer's `Lognormal`/`Auto` path: uses Black-76 where the model
+/// is well-defined (`forward > 0` and `strike > 0`); otherwise converts the
+/// lognormal vol to an equivalent normal vol and uses Bachelier so the Greek
+/// stays finite and consistent with the price. Shared by the `Lognormal` and
+/// `Auto` vol types.
+pub(crate) fn lognormal_delta_with_fallback(
+    is_cap: bool,
+    strike: f64,
+    forward: f64,
+    sigma: f64,
+    t: f64,
+) -> f64 {
+    if forward > 0.0 && strike > 0.0 {
+        black::delta(is_cap, strike, forward, sigma, t)
+    } else {
+        let normal_vol = lognormal_to_normal_vol(sigma, forward, strike, t, None);
+        normal::delta(is_cap, strike, forward, normal_vol, t)
+    }
+}
+
+/// Lognormal-convention forward gamma with graceful Bachelier fallback.
+///
+/// See [`lognormal_delta_with_fallback`] for the model-selection rationale.
+pub(crate) fn lognormal_gamma_with_fallback(strike: f64, forward: f64, sigma: f64, t: f64) -> f64 {
+    if forward > 0.0 && strike > 0.0 {
+        black::gamma(strike, forward, sigma, t)
+    } else {
+        let normal_vol = lognormal_to_normal_vol(sigma, forward, strike, t, None);
+        normal::gamma(strike, forward, normal_vol, t)
+    }
+}
+
+/// Lognormal-convention vega (per 1% vol) with graceful Bachelier fallback.
+///
+/// See [`lognormal_delta_with_fallback`] for the model-selection rationale.
+pub(crate) fn lognormal_vega_with_fallback(strike: f64, forward: f64, sigma: f64, t: f64) -> f64 {
+    if forward > 0.0 && strike > 0.0 {
+        black::vega_per_pct(strike, forward, sigma, t)
+    } else {
+        let normal_vol = lognormal_to_normal_vol(sigma, forward, strike, t, None);
+        normal::vega_per_pct(strike, forward, normal_vol, t)
+    }
 }
 
 /// Iterate over caplets/floorlets and aggregate contributions.
@@ -56,7 +101,6 @@ where
         .get_forward(option.forward_curve_id.as_ref())?;
     let strike = option.strike_f64()?;
     let dc_ctx = finstack_core::dates::DayCountContext::default();
-    let use_rfr = option.uses_overnight_rfr_index();
 
     let periods = option.pricing_periods()?;
     if periods.is_empty() {
@@ -74,11 +118,6 @@ where
             .day_count
             .year_fraction(context.as_of, fixing_date, dc_ctx)?
             .max(MIN_EFFECTIVE_FIXING_TIME);
-        let risk_t = if use_rfr {
-            rfr_observation_midpoint_time(option, context.as_of, period, dc_ctx)?
-        } else {
-            fixing_t
-        };
 
         let forward = crate::instruments::common_impl::pricing::time::rate_period_on_dates(
             fwd_curve.as_ref(),
@@ -102,34 +141,8 @@ where
             forward,
             sigma,
             fixing_t,
-            risk_t,
         });
         sum += per_unit * option.notional.amount() * period.accrual_year_fraction * df;
     }
     Ok(sum)
-}
-
-/// Year fraction from `as_of` to the midpoint of an RFR option's observation
-/// window. Clamped above `MIN_EFFECTIVE_FIXING_TIME` to avoid degeneracies at
-/// the front stub.
-pub(crate) fn rfr_observation_midpoint_time(
-    option: &CapFloor,
-    as_of: finstack_core::dates::Date,
-    period: &crate::cashflow::builder::periods::SchedulePeriod,
-    dc_ctx: finstack_core::dates::DayCountContext,
-) -> finstack_core::Result<f64> {
-    let observation_start = if period.accrual_start > as_of {
-        period.accrual_start
-    } else {
-        as_of
-    };
-    let t_start = option
-        .day_count
-        .year_fraction(as_of, observation_start, dc_ctx)?
-        .max(0.0);
-    let t_end = option
-        .day_count
-        .year_fraction(as_of, period.accrual_end, dc_ctx)?
-        .max(0.0);
-    Ok(((t_start + t_end) * 0.5).max(MIN_EFFECTIVE_FIXING_TIME))
 }

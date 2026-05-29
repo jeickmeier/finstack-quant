@@ -11,6 +11,7 @@ use crate::instruments::rates::cms_option::types::CmsOption;
 use crate::metrics::bump_discount_curve_parallel;
 use crate::metrics::bump_sizes;
 use crate::metrics::bump_surface_vol_absolute;
+use crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId, MetricRegistry};
 use crate::models::d1_d2_black76;
 use finstack_core::dates::{DateExt, DayCountContext};
@@ -112,8 +113,11 @@ impl MetricCalculator for VegaCalculator {
         // Reprice with bumped vol
         let pv_bumped = option.value(&curves_bumped, as_of)?.amount();
 
-        // Vega = (PV(σ+Δσ) - PV(σ)) / Δσ  (Δσ in absolute vol units).
-        let vega = (pv_bumped - base_pv) / bump_sizes::VOLATILITY;
+        // Vega per **vol point** (consistent with `MetricId::Vega` and the
+        // FD/analytic vega used elsewhere): normalize by the bump expressed in
+        // vol points (`bump * VOL_POINTS_PER_ABSOLUTE_VOL`), not the raw
+        // absolute-vol bump, which would overstate vega by 100×.
+        let vega = (pv_bumped - base_pv) / (bump_sizes::VOLATILITY * VOL_POINTS_PER_ABSOLUTE_VOL);
 
         Ok(vega)
     }
@@ -286,7 +290,11 @@ impl MetricCalculator for VolgaCalculator {
             bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), -vol_bump)?;
         let pv_vol_down = option.value(&curves_vol_down, as_of)?.amount();
 
-        let volga = (pv_vol_up - 2.0 * base_pv + pv_vol_down) / (vol_bump * vol_bump);
+        // Volga per **vol point squared** (consistent with `MetricId::Volga`):
+        // normalize by the bump in vol points, squared. Dividing by the raw
+        // `vol_bump²` would overstate volga by 100² = 10,000×.
+        let width = vol_bump * VOL_POINTS_PER_ABSOLUTE_VOL;
+        let volga = (pv_vol_up - 2.0 * base_pv + pv_vol_down) / (width * width);
         Ok(volga)
     }
 }

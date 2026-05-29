@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "usd_deposit_3m",
-  "domain": "rates.deposit",
-  "description": "QuantLib-parity USD 3M money-market deposit on a committed discount curve.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "usd_deposit_3m",
+    "domain": "rates.deposit",
+    "description": "QuantLib-parity USD 3M money-market deposit on a committed discount curve.",
+    "valuation_date": "2026-04-30",
     "source": "quantlib",
     "source_detail": "QuantLib-Python 1.42.1 parity check using IborIndex forecast fixing for deposit par rate, CashFlows.npv for start and maturity flows, and central finite-difference DV01 on a deterministic USD discount curve. Phase-2 envelope migration (2026-05-09): wrapped in market_envelope with the curve carried in initial_market.curves and an empty plan.steps. The QuantLib oracle's synthetic time pillars are not bootstrap-reproducible; true-calibration migration would require >1e-12 par_rate tolerance. The envelope wrap still routes through engine::execute_with_diagnostics, so the fixture exercises the calibration entry point's plumbing.",
     "captured_by": "jeickmeier",
@@ -15,40 +15,11 @@
     "regen_command": "manual QuantLib-Python oracle; see inputs.source_reference for reproduction formulas and intermediate values",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "deposit_par_rate",
-      "dv01"
-    ],
-    "instrument_json": {
-      "schema": "finstack.instrument/1",
-      "instrument": {
-        "type": "deposit",
-        "spec": {
-          "id": "USD-DEP-3M-GOLDEN",
-          "notional": {
-            "amount": "10000000",
-            "currency": "USD"
-          },
-          "start_date": "2026-04-30",
-          "maturity": "2026-07-30",
-          "day_count": "Act360",
-          "quote_rate": "0.041",
-          "discount_curve_id": "USD-OIS",
-          "attributes": {
-            "tags": [
-              "golden"
-            ],
-            "meta": {}
-          },
-          "spot_lag_days": 0,
-          "calendar_id": null
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "usd_deposit_3m",
@@ -104,24 +75,35 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "note": "QuantLib oracle: par rate follows IborIndex::forecastFixing, (DF(start) / DF(end) - 1) / Act360 year fraction; NPV follows CashFlows.npv over the -notional start flow and notional * (1 + quote_rate * year_fraction) maturity flow. Because this fixture uses Finstack synthetic time knots, the QuantLib reproduction is fed the maturity discount factor implied by the fixture's Act/365F log-linear discount curve interpolation.",
-      "quantlib_version": "1.42.1",
-      "quantlib_reference_urls": [
-        "https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/indexes/iborindex.hpp",
-        "https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/termstructures/yield/ratehelpers.cpp",
-        "https://quantlib-python-docs.readthedocs.io/en/latest/helpers/rates.html"
-      ],
-      "oracle_values": {
-        "act360_year_fraction": 0.25277777777777777,
-        "act365f_curve_time": 0.2493150684931507,
-        "maturity_discount_factor": 0.9900272601903599,
-        "redemption": 10103638.888888888
+    }
+  },
+  "instrument": {
+    "schema": "finstack.instrument/1",
+    "instrument": {
+      "type": "deposit",
+      "spec": {
+        "id": "USD-DEP-3M-GOLDEN",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "start_date": "2026-04-30",
+        "maturity": "2026-07-30",
+        "day_count": "Act360",
+        "quote_rate": "0.041",
+        "discount_curve_id": "USD-OIS",
+        "attributes": {
+          "tags": [
+            "golden"
+          ],
+          "meta": {}
+        },
+        "spot_lag_days": 0,
+        "calendar_id": null
       }
     }
   },
-  "expected_outputs": {
+  "expected": {
     "npv": 2877.927119438455,
     "deposit_par_rate": 0.03985001083863061,
     "dv01": -249.38681957910967

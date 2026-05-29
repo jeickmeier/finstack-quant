@@ -305,6 +305,24 @@ fn validate_simm_params(params: &SimmParams) -> finstack_core::Result<()> {
     Ok(())
 }
 
+/// One-sided 99.5% standard-normal quantile `Φ⁻¹(0.995)`, used in the ISDA
+/// SIMM curvature `λ` scaling. ISDA specifies this exact constant.
+const SIMM_CURVATURE_Z: f64 = 2.575_829_303_548_900_4;
+
+/// Normalize an incoming IR tenor label to the registry's canonical casing.
+///
+/// The SIMM registry (`simm.v*.json`) keys IR tenors in lowercase (`"5y"`,
+/// `"6m"`), and `IrTenorCorrelationMatrix::tenor_to_idx` is derived from those
+/// keys. Sensitivity producers (e.g. `Marginable` in `finstack-valuations`)
+/// emit uppercase SIMM labels (`"5Y"`, `"6M"`). Without normalization the
+/// exact-match `HashMap::get` lookups silently drop every uppercase tenor,
+/// zeroing IR delta/vega margin. Lowercasing at the lookup boundary makes the
+/// match case-insensitive.
+#[inline]
+fn normalize_ir_tenor(tenor: &str) -> String {
+    tenor.to_ascii_lowercase()
+}
+
 /// Pre-computed flat correlation matrix for IR tenor lookups.
 /// Avoids per-lookup String allocations in the O(n^2) delta/vega loops.
 #[derive(Debug, Clone)]
@@ -520,8 +538,9 @@ impl SimmCalculator {
                 let weighted: Vec<(usize, f64)> = tenor_map
                     .iter()
                     .filter_map(|(tenor, dv01)| {
-                        let w = self.params.ir_delta_weights.get(tenor)?;
-                        let idx = self.ir_corr_matrix.tenor_to_idx.get(tenor)?;
+                        let key = normalize_ir_tenor(tenor);
+                        let w = self.params.ir_delta_weights.get(&key)?;
+                        let idx = self.ir_corr_matrix.tenor_to_idx.get(&key)?;
                         Some((*idx, dv01 * w))
                     })
                     .collect();
@@ -569,8 +588,9 @@ impl SimmCalculator {
         let weighted: Vec<(usize, f64)> = dv01_by_tenor
             .iter()
             .filter_map(|(tenor, dv01)| {
-                let weight = self.params.ir_delta_weights.get(tenor)?;
-                let idx = self.ir_corr_matrix.tenor_to_idx.get(tenor)?;
+                let key = normalize_ir_tenor(tenor);
+                let weight = self.params.ir_delta_weights.get(&key)?;
+                let idx = self.ir_corr_matrix.tenor_to_idx.get(&key)?;
                 Some((*idx, dv01 * weight))
             })
             .collect();
@@ -814,7 +834,10 @@ impl SimmCalculator {
         let indexed: Vec<(usize, f64)> = vega_by_tenor
             .iter()
             .filter_map(|(tenor, vega)| {
-                let idx = self.ir_corr_matrix.tenor_to_idx.get(tenor.as_str())?;
+                let idx = self
+                    .ir_corr_matrix
+                    .tenor_to_idx
+                    .get(normalize_ir_tenor(tenor).as_str())?;
                 Some((*idx, *vega * weight))
             })
             .collect();
@@ -857,26 +880,33 @@ impl SimmCalculator {
         (total_vega * self.params.commodity_vega_weight).abs()
     }
 
-    /// Calculate the curvature margin add-on across risk classes.
+    /// Calculate the curvature margin add-on across risk classes per the ISDA
+    /// SIMM curvature aggregation formula.
     ///
-    /// # Approximation — not full ISDA SIMM v2.6 curvature aggregation
+    /// Given per-risk-class curvature contributions `CVR_i` (signed currency
+    /// amounts, before the flat `curvature_scale_factor`), this applies the
+    /// scale factor and then aggregates with the ISDA SIMM combination
     ///
-    /// Given per-risk-class curvature contributions (`CVR`), this computes a
-    /// **simplified** charge
-    /// `sqrt(max(0, Σ_i Σ_j ρ_ij · (SF·CVR_i)(SF·CVR_j)))`, reusing the **delta**
-    /// cross-risk-class correlation matrix `ρ_ij` and a single flat
-    /// `curvature_scale_factor`. It deliberately does **not** implement the full
-    /// ISDA SIMM v2.6 §8–9 curvature aggregation, which uses squared curvature
-    /// correlations (`ρ²`) and a lambda/theta bucket combination
-    /// `K = max(0, ΣCVR_b) + λ·sqrt(max(0, Σ_b Σ_{c≠b} ρ²·CVR_b·CVR_c + Σ CVR_b²))`,
-    /// nor the per-tenor scale factor `SF(t) = 0.5·min(1, 14/t_days)` used upstream
-    /// to turn vega into `CVR` (the inputs here are taken as already-formed `CVR`).
+    /// ```text
+    /// θ = min( ΣCVR_i / Σ|CVR_i| , 0 )
+    /// λ = (Φ⁻¹(0.995)² − 1)·(1 + θ) − θ
+    /// K = sqrt( max(0, Σ_i Σ_j ρ_ij² · CVR_i · CVR_j) )
+    /// curvature = max( 0, ΣCVR_i + λ·K )
+    /// ```
     ///
-    /// Consequently this add-on will **not** tie out to an ISDA SIMM benchmark for
-    /// portfolios with material curvature/gamma (e.g. option-heavy books). The
-    /// registry (`simm.v1.json`) carries only `curvature_scale_factor`, not the
-    /// spec's `ρ²` / lambda parameters; implementing the full methodology is
-    /// deferred pending SIMM golden vectors to validate against.
+    /// using **squared** cross-risk-class correlations `ρ_ij²` (diagonal 1),
+    /// the `λ(θ)` scaling with `Φ⁻¹(0.995) ≈ 2.5758`, and the `max(0, ·)` floor —
+    /// matching ISDA SIMM §8–9.
+    ///
+    /// # Remaining approximation
+    ///
+    /// The cross-risk-class correlations are reused from the delta matrix, and a
+    /// single flat `curvature_scale_factor` stands in for the per-tenor SIMM
+    /// scale `SF(t) = 0.5·min(1, 14/t_days)` that ISDA applies upstream when
+    /// forming `CVR` from vega (the inputs here are taken as already-formed
+    /// `CVR`). It has not been tied out against ISDA golden vectors, so it may
+    /// differ at the margins for option-heavy books; the aggregation *shape*
+    /// (ρ², λ, θ, max-floor) now follows the spec.
     ///
     /// `curvature_by_risk_class` should contain signed currency curvature
     /// contributions before the SIMM scale factor is applied.
@@ -885,16 +915,40 @@ impl SimmCalculator {
         curvature_by_risk_class: &HashMap<SimmRiskClass, f64>,
     ) -> f64 {
         let scale = self.params.curvature_scale_factor;
-        let mut sum = 0.0;
-        for (risk_i, cvr_i) in curvature_by_risk_class {
-            let weighted_i = cvr_i * scale;
-            for (risk_j, cvr_j) in curvature_by_risk_class {
-                let weighted_j = cvr_j * scale;
-                let rho = self.params.correlation(*risk_i, *risk_j);
-                sum += rho * weighted_i * weighted_j;
+        // Scaled per-risk-class curvature contributions. Sort into a canonical
+        // order (independent of `HashMap` iteration) so the f64 quadratic-form
+        // reduction below is bit-reproducible across runs and toolchains.
+        let mut cvr: Vec<(SimmRiskClass, f64)> = curvature_by_risk_class
+            .iter()
+            .map(|(rc, v)| (*rc, v * scale))
+            .collect();
+        cvr.sort_by_key(|(rc, _)| *rc as u8);
+
+        let sum_cvr: f64 = cvr.iter().map(|(_, v)| *v).sum();
+        let sum_abs: f64 = cvr.iter().map(|(_, v)| v.abs()).sum();
+        if sum_abs == 0.0 {
+            return 0.0;
+        }
+
+        // θ ∈ [-1, 0]; λ scales the diversified term per ISDA SIMM.
+        let theta = (sum_cvr / sum_abs).min(0.0);
+        let lambda = (SIMM_CURVATURE_Z * SIMM_CURVATURE_Z - 1.0) * (1.0 + theta) - theta;
+
+        // Diversified term using squared correlations (diagonal = 1).
+        let mut quad = 0.0;
+        for (i, (risk_i, cvr_i)) in cvr.iter().enumerate() {
+            for (j, (risk_j, cvr_j)) in cvr.iter().enumerate() {
+                let rho = if i == j {
+                    1.0
+                } else {
+                    self.params.correlation(*risk_i, *risk_j)
+                };
+                quad += rho * rho * cvr_i * cvr_j;
             }
         }
-        sum.max(0.0).sqrt()
+        let k = quad.max(0.0).sqrt();
+
+        (sum_cvr + lambda * k).max(0.0)
     }
 
     /// Calculate concentration add-on for a risk class.
@@ -1320,6 +1374,33 @@ mod tests {
     }
 
     #[test]
+    fn ir_delta_tenor_lookup_is_case_insensitive() {
+        // Regression: the SIMM registry keys IR tenors in lowercase ("5y"),
+        // but sensitivity producers emit uppercase SIMM labels ("5Y"). Before
+        // case-normalization the exact-match lookup silently dropped uppercase
+        // tenors, zeroing IR delta margin for every swap. Uppercase input must
+        // now produce the same non-zero margin as lowercase.
+        let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
+
+        let lower: HashMap<String, f64> = [("5y".to_string(), 100_000.0)].into_iter().collect();
+        let upper: HashMap<String, f64> = [("5Y".to_string(), 100_000.0)].into_iter().collect();
+
+        let lower_margin = calc.calculate_ir_delta(&lower);
+        let upper_margin = calc.calculate_ir_delta(&upper);
+
+        assert!(upper_margin > 0.0, "uppercase tenor must not be dropped");
+        assert!((upper_margin - lower_margin).abs() < 1e-6);
+
+        // Vega path shares the same tenor index lookup.
+        let lower_vega: HashMap<String, f64> = [("5y".to_string(), 50_000.0)].into_iter().collect();
+        let upper_vega: HashMap<String, f64> = [("5Y".to_string(), 50_000.0)].into_iter().collect();
+        let lower_vm = calc.calculate_ir_vega(&lower_vega);
+        let upper_vm = calc.calculate_ir_vega(&upper_vega);
+        assert!(upper_vm > 0.0, "uppercase vega tenor must not be dropped");
+        assert!((upper_vm - lower_vm).abs() < 1e-6);
+    }
+
+    #[test]
     fn credit_delta_calculation() {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
 
@@ -1433,7 +1514,7 @@ mod tests {
     }
 
     #[test]
-    fn curvature_uses_correlated_aggregation_across_risk_classes() {
+    fn curvature_uses_isda_lambda_and_squared_correlation_aggregation() {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
         let curvature_by_risk_class: HashMap<SimmRiskClass, f64> = [
             (SimmRiskClass::InterestRate, 1_000_000.0),
@@ -1443,19 +1524,35 @@ mod tests {
         .collect();
 
         let actual = calc.calculate_curvature(&curvature_by_risk_class);
+
+        // ISDA SIMM curvature aggregation: max(0, ΣCVR + λ·sqrt(Σ ρ²·CVR_i·CVR_j)).
         let scale = calc.params.curvature_scale_factor;
         let rho = calc
             .params
             .correlation(SimmRiskClass::InterestRate, SimmRiskClass::Equity);
         let ir = 1_000_000.0 * scale;
         let eq = -600_000.0 * scale;
-        let expected = (ir * ir + eq * eq + 2.0 * rho * ir * eq).sqrt();
+        let sum_cvr = ir + eq;
+        let theta = (sum_cvr / (ir.abs() + eq.abs())).min(0.0);
+        let z = 2.575_829_303_548_900_4_f64;
+        let lambda = (z * z - 1.0) * (1.0 + theta) - theta;
+        // Squared correlation on the off-diagonal (diagonal = 1).
+        let quad = ir * ir + eq * eq + 2.0 * rho * rho * ir * eq;
+        let expected = (sum_cvr + lambda * quad.max(0.0).sqrt()).max(0.0);
 
         assert!(
             (actual - expected).abs() < 1.0,
-            "expected correlated curvature {}, got {}",
+            "expected ISDA curvature {}, got {}",
             expected,
             actual
+        );
+
+        // Discriminator: λ ≈ 5.63 inflates the diversified term well beyond the
+        // plain correlated sqrt the old approximation produced.
+        let old_approx = (ir * ir + eq * eq + 2.0 * rho * ir * eq).sqrt();
+        assert!(
+            actual > old_approx * 1.5,
+            "λ scaling must materially exceed the old plain-sqrt charge (old={old_approx}, new={actual})"
         );
     }
 

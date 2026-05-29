@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "ust_ty_10y_front_month",
-  "domain": "fixed_income.bond_future",
-  "description": "Synthetic UST 10Y front-month bond future with embedded CTD bond.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "ust_ty_10y_front_month",
+    "domain": "fixed_income.bond_future",
+    "description": "Synthetic UST 10Y front-month bond future with embedded CTD bond.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
     "captured_by": "jeickmeier",
@@ -15,90 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "bond_future_clean_price_proxy",
-    "metrics": [
-      "futures_price",
-      "conversion_factor",
-      "dv01"
-    ],
-    "instrument_json": {
-      "type": "bond_future",
-      "spec": {
-        "id": "UST-TY-10Y-FRONT-MONTH-GOLDEN",
-        "notional": {
-          "amount": "1000000",
-          "currency": "USD"
-        },
-        "expiry": "2026-06-19",
-        "delivery_start": "2026-06-22",
-        "delivery_end": "2026-06-30",
-        "quoted_price": 119.5,
-        "position": "long",
-        "contract_specs": {
-          "contract_size": 100000.0,
-          "tick_size": 0.015625,
-          "tick_value": 15.625,
-          "standard_coupon": 0.06,
-          "standard_maturity_years": 10.0,
-          "settlement_days": 2,
-          "calendar_id": "nyse",
-          "repo_day_count_basis": "act360"
-        },
-        "deliverable_basket": [
-          {
-            "bond_id": "US91282CJL54",
-            "conversion_factor": 0.8234
-          }
-        ],
-        "ctd_bond_id": "US91282CJL54",
-        "ctd_bond": {
-          "id": "US91282CJL54",
-          "notional": {
-            "amount": "100000",
-            "currency": "USD"
-          },
-          "issue_date": "2024-05-15",
-          "maturity": "2034-05-15",
-          "cashflow_spec": {
-            "Fixed": {
-              "rate": "0.0425",
-              "freq": {
-                "count": 6,
-                "unit": "months"
-              },
-              "dc": "Thirty360",
-              "calendar_id": "nyse",
-              "stub": "None"
-            }
-          },
-          "discount_curve_id": "USD-TREASURY",
-          "credit_curve_id": null,
-          "pricing_overrides": {
-            "quoted_clean_price": 98.5
-          },
-          "call_put": null,
-          "accrual_method": "Linear",
-          "attributes": {
-            "tags": [
-              "golden"
-            ],
-            "meta": {}
-          },
-          "settlement_days": 1,
-          "ex_coupon_days": 0
-        },
-        "discount_curve_id": "USD-TREASURY",
-        "attributes": {
-          "tags": [
-            "golden"
-          ],
-          "meta": {}
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "bond_future_clean_price_proxy",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "ust_ty_10y_front_month_tier_a_wrap",
@@ -208,25 +129,84 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "planned_metrics_reason": "Bond-future basis, implied repo, CTD labels, and non-zero contract DV01 are not exposed as strict metric ids yet; scalar NPV, model futures price, and conversion factor are compared.",
-      "planned_metrics_not_compared": [
-        "gross_basis",
-        "net_basis",
-        "implied_repo",
-        "ctd_isin",
-        "dv01"
+    }
+  },
+  "instrument": {
+    "type": "bond_future",
+    "spec": {
+      "id": "UST-TY-10Y-FRONT-MONTH-GOLDEN",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "expiry": "2026-06-19",
+      "delivery_start": "2026-06-22",
+      "delivery_end": "2026-06-30",
+      "quoted_price": 119.5,
+      "position": "long",
+      "contract_specs": {
+        "contract_size": 100000.0,
+        "tick_size": 0.015625,
+        "tick_value": 15.625,
+        "standard_coupon": 0.06,
+        "standard_maturity_years": 10.0,
+        "settlement_days": 2,
+        "calendar_id": "nyse",
+        "repo_day_count_basis": "act360"
+      },
+      "deliverable_basket": [
+        {
+          "bond_id": "US91282CJL54",
+          "conversion_factor": 0.8234
+        }
       ],
-      "ctd_isin": "US91282CJL54",
-      "conversion_factor": 0.8234,
-      "quoted_futures_price": 119.5,
-      "zero_metric_reasons": {
-        "dv01": "Canonical metric currently returns zero for this deterministic fixture; golden locks the output and will catch future non-zero metric plumbing changes."
+      "ctd_bond_id": "US91282CJL54",
+      "ctd_bond": {
+        "id": "US91282CJL54",
+        "notional": {
+          "amount": "100000",
+          "currency": "USD"
+        },
+        "issue_date": "2024-05-15",
+        "maturity": "2034-05-15",
+        "cashflow_spec": {
+          "Fixed": {
+            "rate": "0.0425",
+            "freq": {
+              "count": 6,
+              "unit": "months"
+            },
+            "dc": "Thirty360",
+            "calendar_id": "nyse",
+            "stub": "None"
+          }
+        },
+        "discount_curve_id": "USD-TREASURY",
+        "credit_curve_id": null,
+        "pricing_overrides": {
+          "quoted_clean_price": 98.5
+        },
+        "call_put": null,
+        "accrual_method": "Linear",
+        "attributes": {
+          "tags": [
+            "golden"
+          ],
+          "meta": {}
+        },
+        "settlement_days": 1,
+        "ex_coupon_days": 0
+      },
+      "discount_curve_id": "USD-TREASURY",
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
       }
     }
   },
-  "expected_outputs": {
+  "expected": {
     "npv": -1048.052660635932,
     "futures_price": 119.6048052660636,
     "conversion_factor": 0.8234,
