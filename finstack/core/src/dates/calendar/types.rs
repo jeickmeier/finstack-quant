@@ -1,14 +1,13 @@
-//! Calendar implementation using rule-based evaluation with bitset optimization.
+//! Calendar implementation using rule-based holiday evaluation.
 //!
 //! The `Calendar` struct provides a clean, efficient implementation supporting:
 //! - Rule-based holiday definition (see [`super::rule::Rule`])
-//! - Precomputed bitsets for fast lookup (1970-2150)
-//! - Fallback to rule evaluation outside bitset range
+//! - A validated year range (`BASE_YEAR..=END_YEAR`); out-of-range queries still
+//!   evaluate but emit a one-time warning
 
 use super::business_days::{CalendarMetadata, HolidayCalendar};
-use super::generated::{bit_test, day_of_year_0_based, YearBits, BASE_YEAR, END_YEAR};
+use super::generated::{BASE_YEAR, END_YEAR};
 use super::rule::Rule;
-use crate::dates::DateExt;
 use time::{Date, Weekday};
 
 /// Weekend convention for a calendar jurisdiction.
@@ -54,8 +53,7 @@ impl WeekendRule {
     }
 }
 
-/// A holiday calendar implementation that uses rule-based evaluation
-/// with optional precomputed bitsets for performance.
+/// A holiday calendar implementation that evaluates holiday rules at runtime.
 #[derive(Debug, Clone, Copy)]
 pub struct Calendar {
     /// Unique identifier (e.g., "target2", "gblo")
@@ -69,9 +67,6 @@ pub struct Calendar {
 
     /// The rules defining this calendar's holidays
     pub rules: &'static [Rule],
-
-    /// Optional precomputed bitsets for fast lookup (1970-2150)
-    pub bitsets: Option<&'static [YearBits]>,
 
     /// Weekend convention for this calendar's jurisdiction.
     ///
@@ -96,15 +91,8 @@ impl Calendar {
             name,
             ignore_weekends,
             rules,
-            bitsets: None,
             weekend_rule: WeekendRule::SaturdaySunday,
         }
-    }
-
-    /// Add precomputed bitsets to this calendar for fast lookup.
-    pub const fn with_bitsets(mut self, bitsets: &'static [YearBits]) -> Self {
-        self.bitsets = Some(bitsets);
-        self
     }
 
     /// Override the weekend convention for this calendar.
@@ -126,28 +114,10 @@ impl Calendar {
 
 impl HolidayCalendar for Calendar {
     fn is_holiday(&self, date: Date) -> bool {
-        // Use fast bitset lookup if available and date is in range
-        if let Some(bitsets) = self.bitsets {
-            if (BASE_YEAR..=END_YEAR).contains(&date.year()) {
-                let year_idx = (date.year() - BASE_YEAR) as usize;
-                if year_idx < bitsets.len() {
-                    let day_idx = day_of_year_0_based(date);
-                    let mut is_holiday = bit_test(&bitsets[year_idx], day_idx);
-
-                    // Apply weekend ignore logic
-                    if self.ignore_weekends && date.is_weekend() {
-                        is_holiday = false;
-                    }
-
-                    return is_holiday;
-                }
-            }
-        }
-
-        // Fall back to rule-based evaluation for dates outside bitset range
-        // or when bitsets are not available
+        // Holiday rules are validated against `[BASE_YEAR, END_YEAR]`; they still
+        // evaluate algorithmically outside that window, but accuracy is not
+        // guaranteed, so warn once per process when queried out of range.
         if !(BASE_YEAR..=END_YEAR).contains(&date.year()) {
-            // Emit a one-time warning per process when falling back
             static ONCE: core::sync::atomic::AtomicBool =
                 core::sync::atomic::AtomicBool::new(false);
             if !ONCE.swap(true, core::sync::atomic::Ordering::Relaxed) {
@@ -156,7 +126,7 @@ impl HolidayCalendar for Calendar {
                     year = date.year(),
                     base_year = BASE_YEAR,
                     end_year = END_YEAR,
-                    "calendar falling back to rule-based evaluation outside bitset range"
+                    "calendar evaluated outside its validated year range"
                 );
             }
         }

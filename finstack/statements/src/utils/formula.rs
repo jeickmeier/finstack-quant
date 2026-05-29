@@ -31,28 +31,24 @@ pub(crate) fn is_standalone_identifier(
     end_idx: usize,
     allow_dot_after: bool,
 ) -> bool {
-    // Check character before identifier
-    let before_ok = if start_idx > 0 {
-        formula
-            .chars()
-            .nth(start_idx - 1)
-            .is_none_or(|c| is_identifier_boundary(c) && c != '.')
-    } else {
-        true
-    };
+    // `start_idx`/`end_idx` are BYTE offsets (from `str::find` + `str::len`), so
+    // index via byte slices rather than `chars().nth()` (which counts chars and
+    // would read the wrong boundary for any non-ASCII formula). Both offsets sit
+    // on char boundaries (substring match), so slicing is panic-free. This is
+    // also O(1) instead of O(n).
+    let before_ok = formula[..start_idx]
+        .chars()
+        .next_back()
+        .is_none_or(|c| is_identifier_boundary(c) && c != '.');
 
     // Check character after identifier
-    let after_ok = if end_idx < formula.len() {
-        formula.chars().nth(end_idx).is_none_or(|c| {
-            if allow_dot_after {
-                is_identifier_boundary(c)
-            } else {
-                is_identifier_boundary(c) && c != '.'
-            }
-        })
-    } else {
-        true
-    };
+    let after_ok = formula[end_idx..].chars().next().is_none_or(|c| {
+        if allow_dot_after {
+            is_identifier_boundary(c)
+        } else {
+            is_identifier_boundary(c) && c != '.'
+        }
+    });
 
     before_ok && after_ok
 }

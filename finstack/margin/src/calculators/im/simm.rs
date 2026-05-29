@@ -531,11 +531,18 @@ impl SimmCalculator {
         // For each currency: weight the sensitivities, derive the per-
         // currency concentration factor from the net weighted amount,
         // then compute K_c using the (scaled) weighted sensitivities.
-        let k_values: Vec<f64> = by_currency
-            .values()
-            .map(|tenor_map| {
+        //
+        // Iterate currencies in a canonical (sorted) order and sort each tenor
+        // bucket by index, so the order-sensitive f64 quadratic-form reductions
+        // below are bit-reproducible regardless of `HashMap` iteration order
+        // (mirrors the sort in `calculate_curvature`).
+        let mut currencies: Vec<(&Currency, &HashMap<String, f64>)> = by_currency.iter().collect();
+        currencies.sort_by_key(|(ccy, _)| **ccy);
+        let k_values: Vec<f64> = currencies
+            .into_iter()
+            .map(|(_, tenor_map)| {
                 // Compute WS per tenor, then net_ws, then CR, then K.
-                let weighted: Vec<(usize, f64)> = tenor_map
+                let mut weighted: Vec<(usize, f64)> = tenor_map
                     .iter()
                     .filter_map(|(tenor, dv01)| {
                         let key = normalize_ir_tenor(tenor);
@@ -544,6 +551,7 @@ impl SimmCalculator {
                         Some((*idx, dv01 * w))
                     })
                     .collect();
+                weighted.sort_by_key(|(idx, _)| *idx);
                 let net_ws: f64 = weighted.iter().map(|(_, ws)| *ws).sum();
                 let cf = self.concentration_factor(SimmRiskClass::InterestRate, net_ws);
                 let mut sum = 0.0;
@@ -585,7 +593,7 @@ impl SimmCalculator {
     ///
     /// The interest-rate delta margin contribution in the caller's implicit currency units.
     pub fn calculate_ir_delta(&self, dv01_by_tenor: &HashMap<String, f64>) -> f64 {
-        let weighted: Vec<(usize, f64)> = dv01_by_tenor
+        let mut weighted: Vec<(usize, f64)> = dv01_by_tenor
             .iter()
             .filter_map(|(tenor, dv01)| {
                 let key = normalize_ir_tenor(tenor);
@@ -594,6 +602,8 @@ impl SimmCalculator {
                 Some((*idx, dv01 * weight))
             })
             .collect();
+        // Canonical tenor order so the f64 quadratic form is bit-reproducible.
+        weighted.sort_by_key(|(idx, _)| *idx);
 
         let mut sum = 0.0;
         for &(idx_i, ws_i) in &weighted {
@@ -697,7 +707,9 @@ impl SimmCalculator {
             // K_b = sqrt(sum_i sum_j rho_ij * (CR*WS_i) * (CR*WS_j))
             //     = |CR| * sqrt(sum_i sum_j rho_ij * WS_i * WS_j)
             // Build it from the scaled WS directly for clarity.
-            let scaled: Vec<f64> = weighted_sensitivities.iter().map(|ws| ws * cf).collect();
+            let mut scaled: Vec<f64> = weighted_sensitivities.iter().map(|ws| ws * cf).collect();
+            // Canonical order so the intra-bucket f64 quadratic form is reproducible.
+            scaled.sort_by(f64::total_cmp);
             let mut k_squared = 0.0;
             for (i, ws_i) in scaled.iter().enumerate() {
                 for (j, ws_j) in scaled.iter().enumerate() {
@@ -713,6 +725,10 @@ impl SimmCalculator {
 
             bucket_results.push((*sector, k_b, s_b));
         }
+
+        // Canonical bucket order so the inter-bucket f64 reduction is
+        // reproducible regardless of `HashMap` iteration order.
+        bucket_results.sort_by_key(|(sector, _, _)| *sector as u8);
 
         // Inter-bucket aggregation:
         //   K = sqrt(sum_b K_b^2 + sum_{b != c} gamma_bc * S_b * S_c)
@@ -762,7 +778,7 @@ impl SimmCalculator {
     /// between distinct currency risk factors. This prevents opposite-signed
     /// currency deltas from receiving full rho=1 offset.
     pub fn calculate_fx_delta_bucketed(&self, fx_delta: &HashMap<Currency, f64>) -> f64 {
-        let weighted: Vec<f64> = fx_delta
+        let mut weighted: Vec<f64> = fx_delta
             .values()
             .map(|delta| {
                 let ws = delta * self.params.fx_delta_weight;
@@ -770,6 +786,9 @@ impl SimmCalculator {
                 ws * cf
             })
             .collect();
+        // Canonical order (by value) so the f64 quadratic form is reproducible
+        // regardless of `HashMap` iteration order.
+        weighted.sort_by(f64::total_cmp);
 
         let mut total = 0.0;
         for (i, ws_i) in weighted.iter().enumerate() {
@@ -796,7 +815,7 @@ impl SimmCalculator {
     ///
     /// The commodity delta margin contribution after bucket weighting and inter-bucket correlation.
     pub fn calculate_commodity_delta(&self, delta_by_bucket: &HashMap<String, f64>) -> f64 {
-        let weighted_buckets: Vec<(u8, f64)> = delta_by_bucket
+        let mut weighted_buckets: Vec<(u8, f64)> = delta_by_bucket
             .iter()
             .filter_map(|(bucket, delta)| {
                 let bucket_id = bucket_id_from_label(bucket)?;
@@ -804,6 +823,8 @@ impl SimmCalculator {
                 Some((bucket_id, delta * weight))
             })
             .collect();
+        // Canonical order so the f64 quadratic form is reproducible.
+        weighted_buckets.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.total_cmp(&b.1)));
 
         let mut sum = 0.0;
         for &(bucket_i, weighted_i) in &weighted_buckets {
@@ -831,7 +852,7 @@ impl SimmCalculator {
     /// The interest-rate vega margin contribution.
     pub fn calculate_ir_vega(&self, vega_by_tenor: &HashMap<String, f64>) -> f64 {
         let weight = self.params.ir_vega_weight;
-        let indexed: Vec<(usize, f64)> = vega_by_tenor
+        let mut indexed: Vec<(usize, f64)> = vega_by_tenor
             .iter()
             .filter_map(|(tenor, vega)| {
                 let idx = self
@@ -841,6 +862,8 @@ impl SimmCalculator {
                 Some((*idx, *vega * weight))
             })
             .collect();
+        // Canonical tenor order so the f64 quadratic form is bit-reproducible.
+        indexed.sort_by_key(|(idx, _)| *idx);
 
         let mut sum = 0.0;
         for &(idx_i, wv_i) in &indexed {
@@ -928,6 +951,20 @@ impl SimmCalculator {
         let sum_abs: f64 = cvr.iter().map(|(_, v)| v.abs()).sum();
         if sum_abs == 0.0 {
             return 0.0;
+        }
+
+        // Gate: the curvature add-on uses a flat `curvature_scale_factor` in place
+        // of ISDA's per-tenor SF(t) and has not been tied out against ISDA golden
+        // vectors. Warn once per process so a desk consciously accepts the
+        // approximation rather than relying on an unvalidated regulatory number.
+        static CURVATURE_WARNED: std::sync::atomic::AtomicBool =
+            std::sync::atomic::AtomicBool::new(false);
+        if !CURVATURE_WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            tracing::warn!(
+                "SIMM curvature add-on uses an unvalidated flat scale factor \
+                 (no per-tenor SF(t), not tied out vs ISDA golden vectors); \
+                 treat the curvature component as approximate"
+            );
         }
 
         // θ ∈ [-1, 0]; λ scales the diversified term per ISDA SIMM.
@@ -1222,10 +1259,16 @@ impl SimmCalculator {
     ///
     /// `Total = sqrt(sum_i sum_j rho(i,j) * K_i * K_j)`
     pub fn aggregate_risk_classes(&self, risk_class_margins: &HashMap<SimmRiskClass, f64>) -> f64 {
+        // Reduce in a canonical risk-class order so the f64 quadratic form is
+        // bit-reproducible across runs, independent of `HashMap` iteration order
+        // (mirrors `calculate_curvature`).
+        let mut margins: Vec<(SimmRiskClass, f64)> =
+            risk_class_margins.iter().map(|(rc, m)| (*rc, *m)).collect();
+        margins.sort_by_key(|(rc, _)| *rc as u8);
         let mut sum = 0.0;
-        for (risk_i, margin_i) in risk_class_margins {
-            for (risk_j, margin_j) in risk_class_margins {
-                let rho = self.params.correlation(*risk_i, *risk_j);
+        for &(risk_i, margin_i) in &margins {
+            for &(risk_j, margin_j) in &margins {
+                let rho = self.params.correlation(risk_i, risk_j);
                 sum += rho * margin_i * margin_j;
             }
         }

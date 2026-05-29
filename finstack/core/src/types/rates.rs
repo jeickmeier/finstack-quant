@@ -304,7 +304,13 @@ impl From<Rate> for f64 {
     }
 }
 
-// Arithmetic operations
+// Arithmetic operations.
+//
+// These operators panic if the result is non-finite (e.g. overflow of two large
+// finite rates to ±∞, or multiplication by a non-finite scalar), because they
+// route through [`Rate::from_decimal`]. For inputs that may be untrusted or
+// computed, use the `checked_*` variants ([`Rate::checked_add`], etc.), which
+// return an error instead of panicking.
 impl Add for Rate {
     type Output = Self;
 
@@ -720,7 +726,11 @@ impl From<Percentage> for f64 {
     }
 }
 
-// Arithmetic operations for Percentage
+// Arithmetic operations for Percentage.
+//
+// As with [`Rate`], these operators panic on a non-finite result (they route
+// through [`Percentage::new`]). Use the `checked_*` variants for untrusted or
+// computed inputs.
 impl Add for Percentage {
     type Output = Self;
 

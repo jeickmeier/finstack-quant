@@ -90,7 +90,12 @@ pub(crate) fn try_repr_mul_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Er
     let Some(rhs_decimal) = Decimal::from_f64_retain(rhs) else {
         return Err(InputError::ConversionOverflow.into());
     };
-    Ok(a * rhs_decimal)
+    // Checked Decimal multiply: a finite, representable scalar can still drive
+    // the product past Decimal's range (~7.9e28). Surface that as an error so
+    // `checked_mul_f64` is genuinely panic-free, rather than relying on the
+    // panicking `*` operator.
+    a.checked_mul(rhs_decimal)
+        .ok_or_else(|| InputError::ConversionOverflow.into())
 }
 
 /// Fallible division by an `f64` scalar (no silent substitution).
@@ -118,7 +123,10 @@ pub(crate) fn try_repr_div_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Er
     let Some(rhs_decimal) = Decimal::from_f64_retain(rhs) else {
         return Err(InputError::ConversionOverflow.into());
     };
-    Ok(a / rhs_decimal)
+    // Checked Decimal divide: dividing by a tiny scalar can overflow Decimal's
+    // range. Surface as an error so `checked_div_f64` never panics.
+    a.checked_div(rhs_decimal)
+        .ok_or_else(|| InputError::ConversionOverflow.into())
 }
 
 /// Fallible rounding of an `f64` into a Decimal (no silent substitution).

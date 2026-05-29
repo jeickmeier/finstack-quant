@@ -330,6 +330,24 @@ impl CompiledExpr {
         }
     }
 
+    /// Resolve the EWM smoothing factor `alpha` to the valid pandas domain `(0, 1]`.
+    ///
+    /// `ewm_mean` and `ewm_std`/`ewm_var` previously disagreed on how `alpha` was
+    /// interpreted (the mean used the raw value while the variance clamped to
+    /// `[0.001, 0.999]`, which silently rescaled slow EWMs and wrongly excluded
+    /// the valid `alpha = 1.0`). Both now funnel through this helper so a given
+    /// `alpha` always means the same thing. Non-finite or non-positive inputs are
+    /// floored to a tiny epsilon (which keeps the `adjust = true` bias weight
+    /// `alpha / (1 - (1 - alpha)^n)` away from `0/0`); values above 1 are capped.
+    #[inline]
+    fn resolve_ewm_alpha(raw: f64) -> f64 {
+        const EWM_ALPHA_FLOOR: f64 = 1e-12;
+        if !raw.is_finite() {
+            return EWM_ALPHA_FLOOR;
+        }
+        raw.clamp(EWM_ALPHA_FLOOR, 1.0)
+    }
+
     pub(super) fn eval_ewm_mean(&self, arg_results: &[&[f64]]) -> Vec<f64> {
         let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
         if arg_results.len() >= 2 && !arg_results[1].is_empty() {
@@ -346,7 +364,7 @@ impl CompiledExpr {
             return;
         }
         let base = &arg_results[0];
-        let alpha = arg_results[1][0];
+        let alpha = Self::resolve_ewm_alpha(arg_results[1][0]);
         let adjust = if arg_results.len() >= 3 && !arg_results[2].is_empty() {
             arg_results[2][0] != 0.0
         } else {
@@ -850,7 +868,7 @@ impl CompiledExpr {
             if base.is_empty() {
                 return out;
             }
-            let alpha = arg_results[1][0].clamp(0.001, 0.999);
+            let alpha = Self::resolve_ewm_alpha(arg_results[1][0]);
             let adjust = arg_results
                 .get(2)
                 .and_then(|v| v.first())

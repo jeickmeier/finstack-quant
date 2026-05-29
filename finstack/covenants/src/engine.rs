@@ -48,6 +48,15 @@ pub struct Covenant {
     pub scope: CovenantScope,
     /// Optional activation condition for springing covenants.
     pub springing_condition: Option<SpringingCondition>,
+    /// Optional instance label disambiguating covenants of the same type.
+    ///
+    /// [`CovenantType::covenant_id`] is discriminant-only, so two covenants of
+    /// the same type (e.g. a senior and a total leverage test, or two baskets)
+    /// would otherwise collide in compliance reports and breach tracking. Set a
+    /// distinct label here and waivers/breaches will key off it; when `None`,
+    /// the identity falls back to the type's `covenant_id` (legacy behavior).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 impl Covenant {
@@ -61,6 +70,7 @@ impl Covenant {
             is_active: true,
             scope: CovenantScope::Maintenance,
             springing_condition: None,
+            label: None,
         }
     }
 
@@ -88,9 +98,27 @@ impl Covenant {
         self
     }
 
+    /// Set an instance label disambiguating covenants that share a type.
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
     /// Get human-readable description of the covenant
     pub fn description(&self) -> String {
         self.covenant_type.to_string()
+    }
+
+    /// Stable identity key for reports, breaches, and waivers.
+    ///
+    /// Returns the instance [`label`](Self::label) if set, otherwise falls back
+    /// to the type's discriminant-only [`CovenantType::covenant_id`]. Using this
+    /// (rather than `covenant_id` alone) prevents two same-type covenants from
+    /// silently overwriting each other in reports/breach tracking.
+    pub fn instance_key(&self) -> String {
+        self.label
+            .clone()
+            .unwrap_or_else(|| self.covenant_type.covenant_id().to_string())
     }
 }
 
@@ -649,12 +677,16 @@ impl CovenantEngine {
         let mut reports = IndexMap::new();
 
         for spec in specs {
-            let cid = spec.covenant.covenant_type.covenant_id();
+            // Identity key (instance label if set, else the type discriminant).
+            // Reports and breaches are keyed on this so two same-type covenants
+            // don't silently overwrite each other.
+            let cid = spec.covenant.instance_key();
+            let cid = cid.as_str();
             let description = spec.covenant.description();
 
             if !spec.covenant.is_active {
                 reports.insert(
-                    description.clone(),
+                    cid.to_string(),
                     CovenantReport::passed(&description)
                         .with_covenant_id(cid)
                         .with_details("Covenant inactive"),
@@ -666,7 +698,7 @@ impl CovenantEngine {
                 if waiver.amended_threshold.is_none() {
                     tracing::info!(covenant_id = cid, %test_date, "covenant waived by lender agreement");
                     reports.insert(
-                        description.clone(),
+                        cid.to_string(),
                         CovenantReport::passed(&description)
                             .with_covenant_id(cid)
                             .with_details("Waived by lender agreement"),
@@ -713,7 +745,7 @@ impl CovenantEngine {
                 report = report.with_details(&detail);
             }
 
-            reports.insert(description, report);
+            reports.insert(cid.to_string(), report);
         }
 
         Ok(reports)
@@ -757,12 +789,15 @@ impl CovenantEngine {
     ) -> finstack_core::Result<IndexMap<String, CovenantReport>> {
         let reports = self.evaluate(context, test_date)?;
 
-        for (description, report) in &reports {
+        for (_key, report) in &reports {
             if report.passed {
                 continue;
             }
 
             let cid = report.covenant_id.as_deref().unwrap_or("unknown");
+            // Human-readable label for the breach record (the map key is the
+            // stable identity key, not the display name).
+            let description = report.covenant_type.clone();
 
             let already_tracked = self
                 .breach_history
@@ -772,10 +807,7 @@ impl CovenantEngine {
                 continue;
             }
 
-            let spec = self
-                .specs
-                .iter()
-                .find(|s| s.covenant.covenant_type.covenant_id() == cid);
+            let spec = self.specs.iter().find(|s| s.covenant.instance_key() == cid);
 
             let cure_deadline = spec.and_then(|s| {
                 s.covenant
@@ -849,7 +881,7 @@ impl CovenantEngine {
             let spec = self
                 .specs
                 .iter()
-                .find(|s| s.covenant.covenant_type.covenant_id() == breach.covenant_id)
+                .find(|s| s.covenant.instance_key() == breach.covenant_id)
                 .ok_or(finstack_core::InputError::NotFound {
                     id: format!("covenant_spec:{}", breach.covenant_id),
                 })?;
@@ -957,9 +989,9 @@ impl CovenantEngine {
         };
 
         // Resolve the effective threshold: waiver amendment > schedule > static.
-        let covenant_cid = covenant_type.covenant_id();
+        let covenant_cid = spec.covenant.instance_key();
         let threshold = self
-            .active_waiver(covenant_cid, test_date)
+            .active_waiver(&covenant_cid, test_date)
             .and_then(|w| w.amended_threshold)
             .or_else(|| {
                 spec.threshold_schedule

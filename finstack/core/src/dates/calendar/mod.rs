@@ -15,9 +15,9 @@
 //!
 //! # Supported Date Range
 //!
-//! Holiday calendars are optimized for years **1970-2150** using pre-computed
-//! bitsets. Years outside this range fall back to runtime rule evaluation
-//! (slower but still correct).
+//! Holiday rules are validated for years **1970-2150**. Years outside this range
+//! still evaluate via the same rules (a one-time warning is emitted), but their
+//! accuracy is not guaranteed.
 //!
 //! # Key Concepts
 //!
@@ -72,7 +72,7 @@
 //! - `registry`: Calendar registration and lookup system
 //! - `business_days`: Business day adjustment and counting
 //! - `composite`: Multi-calendar union support
-//! - `generated`: Build-time generated bitsets for performance
+//! - `generated`: Build-time generated year-range constants and shared date helpers
 //!
 //! # See Also
 //!

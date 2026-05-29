@@ -273,6 +273,18 @@ impl CreditCalibrator {
         Self { config }
     }
 
+    /// Borrow the calibrator configuration.
+    #[must_use]
+    pub fn config(&self) -> &CreditCalibrationConfig {
+        &self.config
+    }
+
+    /// Borrow diagnostics from a calibrated model artifact.
+    #[must_use]
+    pub fn diagnostics(model: &CreditFactorModel) -> &CalibrationDiagnostics {
+        &model.diagnostics
+    }
+
     /// Run the full calibration pipeline.
     ///
     /// # Errors
@@ -499,25 +511,6 @@ impl CreditCalibrator {
 
         model.validate()?;
         Ok(model)
-    }
-}
-
-impl crate::calibration::FactorCalibrator for CreditCalibrator {
-    type Config = CreditCalibrationConfig;
-    type Inputs = CreditCalibrationInputs;
-    type Model = CreditFactorModel;
-    type Diagnostics = CalibrationDiagnostics;
-
-    fn config(&self) -> &Self::Config {
-        &self.config
-    }
-
-    fn calibrate(&self, inputs: Self::Inputs) -> Result<Self::Model> {
-        Self::calibrate(self, inputs)
-    }
-
-    fn diagnostics(model: &Self::Model) -> &Self::Diagnostics {
-        &model.diagnostics
     }
 }
 

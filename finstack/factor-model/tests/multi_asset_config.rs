@@ -2,9 +2,9 @@ use finstack_core::currency::Currency;
 use finstack_core::market_data::bumps::BumpUnits;
 use finstack_core::types::CurveId;
 use finstack_factor_model::{
-    AttributeFilter, BumpSizeConfig, DependencyFilter, DependencyType, FactorCalibrator,
-    FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType, MappingRule,
-    MarketMapping, MatchingConfig, PricingMode, RiskMeasure, UnmatchedPolicy,
+    AttributeFilter, BumpSizeConfig, DependencyFilter, DependencyType, FactorCovarianceMatrix,
+    FactorDefinition, FactorId, FactorModelConfig, FactorType, MappingRule, MarketMapping,
+    MatchingConfig, PricingMode, RiskMeasure, UnmatchedPolicy,
 };
 
 #[test]
@@ -130,30 +130,6 @@ fn matching_config_validation_rejects_undeclared_non_credit_factor() {
     };
 
     assert!(config.validate_matching_factor_ids().is_err());
-}
-
-#[test]
-fn credit_calibrator_implements_generic_factor_calibrator_trait() {
-    use finstack_factor_model::{
-        credit::hierarchy::CreditFactorModel, CreditCalibrationConfig, CreditCalibrationInputs,
-        CreditCalibrator,
-    };
-
-    fn accepts_trait<C>(calibrator: &C)
-    where
-        C: FactorCalibrator<
-            Config = CreditCalibrationConfig,
-            Inputs = CreditCalibrationInputs,
-            Model = CreditFactorModel,
-            Diagnostics = finstack_factor_model::credit::hierarchy::CalibrationDiagnostics,
-        >,
-    {
-        let _ = calibrator.config();
-    }
-
-    let config = CreditCalibrationConfig::default();
-    let calibrator = CreditCalibrator::new(config);
-    accepts_trait(&calibrator);
 }
 
 fn curve_factor(

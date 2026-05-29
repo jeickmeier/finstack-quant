@@ -98,6 +98,21 @@ fn fill_shocks<R: RandomStream>(
 /// work without fragile float comparisons such as `t < ε` to detect path
 /// boundaries — the cost is one memset of `work_size()` doubles per path,
 /// which is negligible relative to the path simulation itself.
+/// Draw the per-step uniform into `state` only when the payoff actually
+/// consumes it (e.g. barrier bridge correction). Skipping the draw for payoffs
+/// that never read it avoids one RNG draw per step per path. Because the gate is
+/// deterministic in the payoff type, serial and parallel runs stay bit-identical.
+#[inline]
+fn draw_uniform_if_needed<R: RandomStream, F: Payoff>(
+    rng: &mut R,
+    payoff: &F,
+    state: &mut PathState,
+) {
+    if payoff.needs_uniform_random() {
+        state.set_uniform_random(rng.next_u01());
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_path_loop<R, P, D, F>(
     rng: &mut R,
@@ -129,7 +144,7 @@ where
 
     let mut path_state = PathState::new(0, 0.0);
     process.populate_path_state(state, &mut path_state);
-    path_state.set_uniform_random(rng.next_u01());
+    draw_uniform_if_needed(rng, payoff, &mut path_state);
     payoff.on_event(&mut path_state);
 
     for step in 0..time_grid.num_steps() {
@@ -141,7 +156,7 @@ where
 
         path_state.set_step_time(step + 1, t + dt);
         process.populate_path_state(state, &mut path_state);
-        path_state.set_uniform_random(rng.next_u01());
+        draw_uniform_if_needed(rng, payoff, &mut path_state);
         payoff.on_event(&mut path_state);
     }
 
@@ -226,7 +241,7 @@ impl McEngine {
         // Create initial path state for payoff
         let mut path_state = PathState::new(0, 0.0);
         process.populate_path_state(state, &mut path_state);
-        path_state.set_uniform_random(rng.next_u01());
+        draw_uniform_if_needed(rng, payoff, &mut path_state);
         payoff.on_event(&mut path_state);
 
         // Initialize simulated path after the initial event so step-0 payoff and
@@ -255,7 +270,7 @@ impl McEngine {
 
             path_state.set_step_time(step + 1, t + dt);
             process.populate_path_state(state, &mut path_state);
-            path_state.set_uniform_random(rng.next_u01());
+            draw_uniform_if_needed(rng, payoff, &mut path_state);
 
             // Process payoff event (payoff may add cashflows to path_state)
             payoff.on_event(&mut path_state);
@@ -337,15 +352,25 @@ impl McEngine {
         state_p.copy_from_slice(initial_state);
         let mut path_state_p = PathState::new(0, 0.0);
         process.populate_path_state(state_p, &mut path_state_p);
-        let u_init = rng.next_u01();
-        path_state_p.set_uniform_random(u_init);
+        // Draw the shared per-path uniform only when the payoff consumes it
+        // (the antithetic partner mirrors it as `1 - u`).
+        let u_init = if payoff_p.needs_uniform_random() {
+            Some(rng.next_u01())
+        } else {
+            None
+        };
+        if let Some(u) = u_init {
+            path_state_p.set_uniform_random(u);
+        }
         payoff_p.on_event(&mut path_state_p);
 
         // Antithetic path
         state_a.copy_from_slice(initial_state);
         let mut path_state_a = PathState::new(0, 0.0);
         process.populate_path_state(state_a, &mut path_state_a);
-        path_state_a.set_uniform_random(1.0 - u_init);
+        if let Some(u) = u_init {
+            path_state_a.set_uniform_random(1.0 - u);
+        }
         payoff_a.on_event(&mut path_state_a);
 
         let hook = NoiseHook::Correlation(correlation);
@@ -361,16 +386,24 @@ impl McEngine {
             disc.step(process, t, dt, state_p, z, work);
             disc.step(process, t, dt, state_a, z_anti, work_anti);
 
-            let u_step = rng.next_u01();
+            let u_step = if payoff_p.needs_uniform_random() {
+                Some(rng.next_u01())
+            } else {
+                None
+            };
 
             path_state_p.set_step_time(step + 1, t + dt);
             process.populate_path_state(state_p, &mut path_state_p);
-            path_state_p.set_uniform_random(u_step);
+            if let Some(u) = u_step {
+                path_state_p.set_uniform_random(u);
+            }
             payoff_p.on_event(&mut path_state_p);
 
             path_state_a.set_step_time(step + 1, t + dt);
             process.populate_path_state(state_a, &mut path_state_a);
-            path_state_a.set_uniform_random(1.0 - u_step);
+            if let Some(u) = u_step {
+                path_state_a.set_uniform_random(1.0 - u);
+            }
             payoff_a.on_event(&mut path_state_a);
         }
 

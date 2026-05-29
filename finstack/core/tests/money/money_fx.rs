@@ -291,6 +291,64 @@ fn fx_matrix_pinned_quote_survives_cache_pressure() {
 }
 
 #[test]
+fn fx_matrix_explicit_quote_survives_cache_pressure() {
+    // Regression: a pair-global `set_quote` (e.g. a pegged currency) must never
+    // be evicted under cache pressure. It used to share the bounded provider
+    // cache and could be silently dropped past `cache_capacity` distinct pairs,
+    // after which the matrix would fall through to the provider and return a
+    // *different* rate — a silent mispricing.
+    struct RampFx;
+    impl FxProvider for RampFx {
+        fn rate(
+            &self,
+            _from: Currency,
+            _to: Currency,
+            on: Date,
+            _policy: FxConversionPolicy,
+        ) -> finstack_core::Result<f64> {
+            let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+            Ok(1.10 + (on - base).whole_days() as f64 * 0.01)
+        }
+    }
+
+    // Tiny cache: a pair-global quote on the bounded store would be evicted by a
+    // couple of unrelated lookups.
+    let matrix = FxMatrix::try_with_config(
+        Arc::new(RampFx),
+        FxConfig {
+            enable_triangulation: false,
+            cache_capacity: 2,
+            ..Default::default()
+        },
+    )
+    .expect("valid FxConfig");
+
+    // Pin a constant, date-independent peg.
+    matrix
+        .set_quote(Currency::EUR, Currency::USD, 9.99)
+        .expect("pin a pair-global peg");
+
+    // Flood the observed cache far past its capacity with other dates.
+    for day in 2..=28 {
+        let d = Date::from_calendar_date(2025, time::Month::January, day).unwrap();
+        let _ = matrix
+            .rate(FxQuery::new(Currency::EUR, Currency::USD, d))
+            .unwrap();
+    }
+
+    // The peg must still win for every date — it is not evictable.
+    let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    let r = matrix
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, jan_1))
+        .unwrap();
+    assert!(
+        (r.rate - 9.99).abs() < 1e-12,
+        "pair-global peg must survive cache pressure, got {}",
+        r.rate
+    );
+}
+
+#[test]
 fn fx_matrix_try_with_config_rejects_zero_capacity() {
     let err = FxMatrix::try_with_config(
         Arc::new(StaticFx { rate: 1.0 }),

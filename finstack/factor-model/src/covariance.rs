@@ -145,39 +145,15 @@ impl FactorCovarianceMatrix {
         Ok(index)
     }
 
+    /// Positive-semidefinite test via the shared pivoted Cholesky routine.
+    ///
+    /// Delegates to [`finstack_core::math::linalg::cholesky_correlation`], the
+    /// same PSD-detection primitive used by `finstack_analytics`'s correlation
+    /// validation. A symmetric matrix is positive semi-definite iff the pivoted
+    /// Cholesky factorization succeeds (indefinite matrices produce a
+    /// `NotPositiveDefinite` error).
     fn is_psd(data: &[f64], n: usize) -> bool {
-        let eps = 1e-12;
-        let mut lower = vec![0.0_f64; n * n];
-
-        for i in 0..n {
-            for j in 0..=i {
-                let mut sum = 0.0;
-                for k in 0..j {
-                    sum += lower[i * n + k] * lower[j * n + k];
-                }
-
-                if i == j {
-                    let diagonal = data[i * n + i] - sum;
-                    if diagonal < -eps {
-                        return false;
-                    }
-                    lower[i * n + j] = diagonal.max(0.0).sqrt();
-                } else {
-                    let denominator = lower[j * n + j];
-                    let value = data[i * n + j] - sum;
-                    if denominator.abs() <= eps {
-                        if value.abs() > eps {
-                            return false;
-                        }
-                        lower[i * n + j] = 0.0;
-                    } else {
-                        lower[i * n + j] = value / denominator;
-                    }
-                }
-            }
-        }
-
-        true
+        finstack_core::math::linalg::cholesky_correlation(data, n).is_ok()
     }
 }
 

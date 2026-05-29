@@ -52,8 +52,9 @@ Credit-specific today:
 - `CreditCalibrator` and `decompose_levels` / `decompose_period`.
 - Credit hierarchy issuer beta, bucket folding, and idiosyncratic vol state.
 
-Future rates/equity/vol calibrators should implement `FactorCalibrator` and
-return their own model artifact while reusing the generic primitives above.
+Future rates/equity/vol calibrators should follow the same
+`calibrate(inputs) -> model` shape as `CreditCalibrator` and return their own
+model artifact while reusing the generic primitives above.
 
 ## Credit concepts
 

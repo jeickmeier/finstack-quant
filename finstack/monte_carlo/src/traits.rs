@@ -790,6 +790,19 @@ pub trait Payoff: Send + Sync + Clone {
     /// before the first event is processed. Implementations that draw here
     /// should also clear the drawn value in [`Payoff::reset`].
     fn on_path_start<R: RandomStream>(&mut self, _rng: &mut R) {}
+
+    /// Whether this payoff consumes the per-step uniform random draw exposed via
+    /// [`PathState::uniform_random`] (e.g. the Brownian-bridge barrier
+    /// correction).
+    ///
+    /// Returns `false` by default. The engine only draws the per-step uniform
+    /// when this is `true`, so the common case (European/Asian/lookback/basket
+    /// payoffs that never read it) avoids ~one RNG draw per step per path. Note
+    /// that enabling/disabling this changes a payoff's RNG stream, so the value
+    /// is part of a payoff's reproducibility contract.
+    fn needs_uniform_random(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

@@ -500,6 +500,7 @@ mod tests {
             total_base_ccy: Money::new(0.0, Currency::USD),
             by_entity: IndexMap::new(),
             degraded_positions: Vec::new(),
+            fx_collapse_policy: finstack_core::money::fx::FxConversionPolicy::CashflowDate,
         }
     }
 

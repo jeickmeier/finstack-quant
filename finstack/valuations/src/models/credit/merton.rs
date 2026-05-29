@@ -832,6 +832,16 @@ impl MertonModel {
                 )));
             }
             let dt = sorted_tenors[i] - sorted_tenors[i - 1];
+            // Duplicate/non-increasing tenors give dt == 0; the equal survivals
+            // pass the monotonic check above, so guard here to avoid emitting a
+            // NaN hazard knot (-ln(1)/0 = 0/0) into the curve.
+            if dt <= 0.0 {
+                return Err(Error::Validation(format!(
+                    "Merton hazard bootstrap requires strictly increasing tenors; \
+                     got duplicate or non-increasing tenor {:.6}y",
+                    sorted_tenors[i]
+                )));
+            }
             let lambda_i = -(survivals[i] / survivals[i - 1]).ln() / dt;
             knots.push((sorted_tenors[i], lambda_i));
         }
@@ -1291,6 +1301,20 @@ mod tests {
         );
 
         assert!(m.to_hazard_curve("BAD", base, &[1.0, 5.0], 0.40).is_err());
+    }
+
+    #[test]
+    fn to_hazard_curve_rejects_duplicate_tenors() {
+        // Duplicate tenors (after sorting) give dt == 0 with equal survivals,
+        // which previously slipped past the monotonic-survival check and emitted
+        // a NaN hazard knot (-ln(1)/0). It must now be rejected.
+        let m = MertonModel::new(120.0, 0.25, 100.0, 0.05).expect("valid");
+        let base = time::Date::from_calendar_date(2026, time::Month::March, 1).expect("valid date");
+        let result = m.to_hazard_curve("DUP", base, &[1.0, 5.0, 5.0], 0.40);
+        assert!(
+            result.is_err(),
+            "duplicate tenors must be rejected, got {result:?}"
+        );
     }
 
     #[test]

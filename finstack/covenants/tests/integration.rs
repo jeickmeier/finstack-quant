@@ -8,10 +8,10 @@
 //! - CovenantEngine spec management
 //! - Covenant evaluation with custom metrics
 
-use finstack_core::dates::Tenor;
+use finstack_core::dates::{Date, Tenor};
 use finstack_covenants::{
     Covenant, CovenantEngine, CovenantMetricId, CovenantReport, CovenantScope, CovenantSpec,
-    CovenantType, ThresholdTest,
+    CovenantType, HashMapMetricSource, ThresholdTest,
 };
 
 // =============================================================================
@@ -121,6 +121,50 @@ fn covenant_engine_add_specs() {
     ));
 
     assert_eq!(engine.specs.len(), 2);
+}
+
+#[test]
+fn same_type_covenants_with_distinct_labels_do_not_collide() {
+    // Regression: two covenants of the same type+threshold (e.g. a senior and a
+    // total leverage test) used to collide — reports were keyed by the (identical)
+    // description and breaches by the discriminant-only `covenant_id`, so one
+    // silently overwrote the other. Distinct instance labels must keep them apart.
+    let mut engine = CovenantEngine::new();
+    engine.add_spec(CovenantSpec::with_metric(
+        Covenant::new(
+            CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+            Tenor::quarterly(),
+        )
+        .with_label("senior_leverage"),
+        CovenantMetricId::from("debt_to_ebitda"),
+    ));
+    engine.add_spec(CovenantSpec::with_metric(
+        Covenant::new(
+            CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+            Tenor::quarterly(),
+        )
+        .with_label("total_leverage"),
+        CovenantMetricId::from("debt_to_ebitda"),
+    ));
+
+    let mut metrics = HashMapMetricSource::new();
+    metrics.insert("debt_to_ebitda", 5.0); // breaches the 4.0 max
+
+    let test_date = Date::from_calendar_date(2025, time::Month::March, 31).unwrap();
+    let reports = engine.evaluate(&mut metrics, test_date).expect("evaluate");
+
+    // Both covenants must be reported under their distinct labels — no collision.
+    assert_eq!(
+        reports.len(),
+        2,
+        "same-type covenants must not collide: {reports:?}"
+    );
+    assert!(reports.contains_key("senior_leverage"));
+    assert!(reports.contains_key("total_leverage"));
+    assert!(
+        reports.values().all(|r| !r.passed),
+        "both leverage tests breach 4.0x"
+    );
 }
 
 #[test]

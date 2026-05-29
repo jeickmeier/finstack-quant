@@ -39,9 +39,14 @@ struct QueryKey {
 /// pricing, consider pre-fetching rates or using one `FxMatrix` per thread.
 pub struct FxMatrix {
     provider: Arc<dyn FxProvider>,
-    /// Explicit quotes inserted by callers or restored from serialized state.
-    quotes: Mutex<LruCache<Pair, f64>>,
-    /// Query-sensitive quotes observed from providers or triangulation.
+    /// Explicit, pair-global quotes inserted by callers or restored from
+    /// serialized state. These are authoritative constant rates (e.g. pegged
+    /// currencies), so the store is a plain `HashMap` that **never evicts** — a
+    /// seeded peg must never be silently dropped under cache pressure and then
+    /// re-derived from the provider (which would be a silent mispricing).
+    quotes: Mutex<HashMap<Pair, f64>>,
+    /// Query-sensitive quotes observed from providers or triangulation. This is
+    /// the only genuinely bounded cache (governed by `config.cache_capacity`).
     observed_quotes: Mutex<LruCache<QueryKey, f64>>,
     /// Authoritative date/policy-scoped quotes pinned via [`FxMatrix::set_quote_on`].
     /// Unlike `observed_quotes`, this map never evicts, so a pinned fixing is
@@ -88,7 +93,7 @@ impl FxMatrix {
         });
         Self {
             provider,
-            quotes: Mutex::new(LruCache::new(capacity)),
+            quotes: Mutex::new(HashMap::new()),
             observed_quotes: Mutex::new(LruCache::new(capacity)),
             pinned_quotes: Mutex::new(HashMap::new()),
             config,
@@ -103,11 +108,10 @@ impl FxMatrix {
             ));
         }
         let capacity = NonZeroUsize::new(config.cache_capacity).unwrap_or(NonZeroUsize::MIN);
-        let quotes = LruCache::new(capacity);
         let observed_quotes = LruCache::new(capacity);
         Ok(Self {
             provider,
-            quotes: Mutex::new(quotes),
+            quotes: Mutex::new(HashMap::new()),
             observed_quotes: Mutex::new(observed_quotes),
             pinned_quotes: Mutex::new(HashMap::new()),
             config,
@@ -260,6 +264,10 @@ impl FxMatrix {
     /// either rely on the date-aware provider, or seed a specific date with
     /// [`set_quote_on`](Self::set_quote_on), which is scoped by `(on, policy)`.
     ///
+    /// The quote is stored in a **non-evicting** map, so a seeded peg is never
+    /// silently dropped under cache pressure (the bounded LRU governs only the
+    /// transient provider-observed cache).
+    ///
     /// Note: This does not automatically insert a reciprocal. Lookups will use
     /// the reciprocal on demand if the opposite direction is requested.
     ///
@@ -346,7 +354,7 @@ impl FxMatrix {
         let mut map = self.quotes.lock();
         for &(from, to, rate) in quotes {
             validate_fx_rate(from, to, rate)?;
-            map.put(Pair(from, to), rate);
+            map.insert(Pair(from, to), rate);
         }
         Ok(())
     }
@@ -421,7 +429,7 @@ impl FxMatrix {
         let mut seen = std::collections::HashSet::new();
         let mut quote_vec: Vec<(Currency, Currency, f64)> = Vec::new();
 
-        // Explicit LRU quotes take precedence.
+        // Explicit pair-global quotes take precedence.
         {
             let quotes = self.quotes.lock();
             for (pair, rate) in quotes.iter() {
@@ -521,7 +529,7 @@ impl FxMatrix {
                 if (pair.0 == from && pair.1 == to) || (pair.0 == to && pair.1 == from) {
                     continue;
                 }
-                dst.put(*pair, *rate);
+                dst.insert(*pair, *rate);
             }
         }
         // Carry over authoritative pinned fixings (except the bumped pair, both
@@ -681,7 +689,7 @@ impl FxMatrix {
             "FxMatrix internal quote must be finite, positive (got {from}->{to}={rate})"
         );
         let mut quotes = self.quotes.lock();
-        quotes.put(Pair(from, to), rate);
+        quotes.insert(Pair(from, to), rate);
     }
 
     /// Insert a query-sensitive provider-observed quote.
@@ -814,7 +822,7 @@ impl FxMatrix {
                 Some(r)
             } else {
                 // Purge invalid cached value.
-                let _ = quotes.pop(&direct_key);
+                let _ = quotes.remove(&direct_key);
                 None
             }
         });
@@ -822,7 +830,7 @@ impl FxMatrix {
             if r.is_finite() && r > 0.0 {
                 Some(r)
             } else {
-                let _ = quotes.pop(&rev_key);
+                let _ = quotes.remove(&rev_key);
                 None
             }
         });

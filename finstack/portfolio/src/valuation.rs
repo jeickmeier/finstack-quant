@@ -7,6 +7,7 @@ use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::summation::neumaier_sum;
+use finstack_core::money::fx::FxConversionPolicy;
 use finstack_core::money::Money;
 use finstack_valuations::metrics::MetricId;
 use finstack_valuations::results::ValuationResult;
@@ -126,6 +127,21 @@ pub struct PortfolioValuation {
     /// metrics could not be computed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub degraded_positions: Vec<PositionId>,
+
+    /// FX policy applied when collapsing position values to the base currency.
+    ///
+    /// Base-currency rollups use an explicit spot-equivalent conversion at
+    /// [`as_of`](Self::as_of) through the market FX matrix; this records the
+    /// applied [`FxConversionPolicy`] so the result envelope satisfies the
+    /// policy-visibility invariant (the FX strategy is stamped, not implied).
+    #[serde(default = "default_fx_collapse_policy")]
+    pub fx_collapse_policy: FxConversionPolicy,
+}
+
+/// Default FX policy stamped on a [`PortfolioValuation`]: the spot-equivalent
+/// `as_of` conversion used by [`crate::fx::convert_to_base`].
+fn default_fx_collapse_policy() -> FxConversionPolicy {
+    FxConversionPolicy::CashflowDate
 }
 
 impl PortfolioValuation {
@@ -261,6 +277,7 @@ fn assemble_valuation(
         total_base_ccy,
         by_entity,
         degraded_positions,
+        fx_collapse_policy: default_fx_collapse_policy(),
     })
 }
 

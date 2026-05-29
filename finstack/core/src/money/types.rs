@@ -608,6 +608,12 @@ impl Money {
 // -------------------------------------------------------------------------
 // Scalar arithmetic keeping currency intact
 // -------------------------------------------------------------------------
+/// Scale a [`Money`] by an `f64`, preserving currency.
+///
+/// # Panics
+/// Panics if `rhs` is non-finite (NaN/±∞) or if the product overflows the
+/// underlying `Decimal` range (~7.9e28). For scalars from untrusted or computed
+/// input, prefer [`Money::checked_mul_f64`], which returns an error instead.
 impl Mul<f64> for Money {
     type Output = Self;
     #[inline]
@@ -619,6 +625,12 @@ impl Mul<f64> for Money {
     }
 }
 
+/// Divide a [`Money`] by an `f64`, preserving currency.
+///
+/// # Panics
+/// Panics if `rhs` is non-finite, exactly zero, or if the quotient overflows the
+/// underlying `Decimal` range. For divisors from untrusted or computed input,
+/// prefer [`Money::checked_div_f64`], which returns an error instead.
 impl Div<f64> for Money {
     type Output = Self;
     #[inline]

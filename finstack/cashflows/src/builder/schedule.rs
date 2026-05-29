@@ -186,14 +186,15 @@ impl Discountable for CashFlowSchedule {
 
         let mut ccy = None;
 
-        // First pass: determine currency and validate non-empty
+        // First pass: determine currency and validate non-empty.
+        // Stop at the first non-DefaultedNotional flow; the currency is
+        // representative for the whole schedule.
         for cf in &self.flows {
             if cf.kind == CFKind::DefaultedNotional {
                 continue;
             }
-            if ccy.is_none() {
-                ccy = Some(cf.amount.currency());
-            }
+            ccy = Some(cf.amount.currency());
+            break;
         }
 
         let ccy = match ccy {

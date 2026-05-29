@@ -8,8 +8,6 @@
 
 #![deny(missing_docs)]
 
-/// Shared calibration abstractions for factor-model implementations.
-pub mod calibration;
 /// Factor-model run configuration, risk measures, and bump sizing.
 pub mod config;
 /// Factor covariance matrix storage and validation.
@@ -26,7 +24,6 @@ pub mod primitives;
 /// Positions × factors sensitivity matrix storage.
 pub mod sensitivity_matrix;
 
-pub use calibration::FactorCalibrator;
 pub use config::{BumpSizeConfig, FactorBumpUnit, FactorModelConfig, PricingMode, RiskMeasure};
 pub use covariance::FactorCovarianceMatrix;
 pub use credit::{

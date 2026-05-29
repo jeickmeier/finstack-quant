@@ -169,6 +169,13 @@ impl BarrierOptionPayoff {
 }
 
 impl Payoff for BarrierOptionPayoff {
+    /// Reads the per-step uniform draw for the Brownian-bridge barrier
+    /// correction (`state.uniform_random()` in `on_event`), so the engine must
+    /// draw it.
+    fn needs_uniform_random(&self) -> bool {
+        true
+    }
+
     fn on_event(&mut self, state: &mut PathState) {
         let current_spot = state.spot().unwrap_or(0.0);
 

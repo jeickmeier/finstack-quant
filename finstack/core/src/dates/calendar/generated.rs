@@ -1,46 +1,13 @@
-//! Generated holidays support: fast year-indexed bitsets and helper macro.
+//! Generated holiday support: validated year range and shared date helpers.
 //!
 //! Design:
-//! - Years covered: BASE_YEAR..=END_YEAR (configured via build-generated constants)
-//! - Precomputed 366-bit bitsets per year are generated at build-time for fast O(1) lookup.
-//! - Years outside the range fall back to evaluating rules at runtime for correctness.
+//! - Years covered: `BASE_YEAR..=END_YEAR` (build-generated constants); holiday
+//!   rules are validated within this range and evaluated at runtime.
 
 use time::{Date, Duration, Month, Weekday};
 
-// Rule import no longer needed at runtime; kept for IDE hints in generated constants.
-
 // Include generated constants directly from src/generated for IDE discoverability.
 include!("../../generated/holiday_generated.rs");
-
-/// Words needed to cover 366 bits.
-pub(crate) const BITSET_WORDS: usize = 366_usize.div_ceil(64); // 6 u64 words
-
-/// Bitset type for one year (366 bits).
-pub(crate) type YearBits = [u64; BITSET_WORDS];
-
-#[inline]
-/// Return the zero-based day-of-year index for `date`.
-///
-/// This helper is used to address the precomputed holiday bitsets, where
-/// January 1 maps to `0` and December 31 maps to `364` or `365` depending on
-/// whether the year is a leap year.
-pub(crate) fn day_of_year_0_based(date: Date) -> u16 {
-    date.ordinal() - 1
-}
-
-#[inline]
-/// Test whether the bit at `idx` is set in a yearly holiday bitset.
-///
-/// The index is expected to come from [`day_of_year_0_based`] and therefore
-/// address one of the 366 possible calendar days in a Gregorian year.
-pub(crate) fn bit_test(bits: &YearBits, idx: u16) -> bool {
-    let i = idx as usize;
-    let word = i >> 6;
-    let off = i & 63;
-    ((bits[word] >> off) & 1) == 1
-}
-
-// Build-time precomputation provides static bitsets; no runtime materialization.
 
 /// Helper to compute nth weekday of month.
 #[inline]

@@ -1,20 +1,23 @@
-//! Hull-White 1-factor tree pricer for interest rate caps and floors.
+//! Hull-White 1-factor closed-form pricer for interest rate caps and floors.
 //!
-//! Prices a cap/floor by building a calibrated Hull-White trinomial tree and
-//! pricing each caplet/floorlet via backward induction. Each caplet is an
-//! option on the forward rate for a single accrual period.
+//! Prices a cap/floor as a sum of caplet/floorlet values. Each caplet is an
+//! option on the forward rate for a single accrual period; under the
+//! Hull-White 1-factor model the forward rate is Gaussian, so each
+//! caplet/floorlet is priced **in closed form** with a Bachelier (normal)
+//! formula using the HW1F-implied normal volatility — no tree or backward
+//! induction is built.
 //!
 //! # Algorithm
 //!
-//! For each caplet/floorlet period [T_start, T_end]:
+//! For each caplet/floorlet period `[T_start, T_end]`:
 //!
-//! 1. The caplet payoff at T_end is:
-//!    `N * tau * max(L(T_start, T_end) - K, 0)` for a caplet
-//!    `N * tau * max(K - L(T_start, T_end), 0)` for a floorlet
-//!    where L is the simply-compounded forward rate and tau is the accrual.
+//! 1. The payoff at `T_end` is `N * tau * max(±(L(T_start, T_end) - K), 0)`,
+//!    where `L` is the simply-compounded forward rate and `tau` the accrual.
 //!
-//! 2. Under the HW model, this is equivalent to an option on a zero-coupon
-//!    bond. We use the tree's backward induction to evaluate this.
+//! 2. The HW1F-implied normal volatility of the forward rate over the period is
+//!    computed via [`hw1f_caplet_forward_rate_normal_vol`] (from the HW `B(t,T)`
+//!    and `G(t,T)` variance terms), and the caplet/floorlet is valued with the
+//!    Bachelier formula.
 //!
 //! 3. The cap/floor value is the sum of all caplet/floorlet values.
 //!
@@ -23,7 +26,8 @@
 //! - Hull, J. & White, A. (1990). "Pricing Interest-Rate-Derivative Securities."
 //!   *Review of Financial Studies*, 3(4), 573-592.
 //! - Brigo, D. & Mercurio, F. (2006). *Interest Rate Models - Theory and Practice*,
-//!   Chapter 3: One-factor Short-Rate Models, Section 3.3.2.
+//!   Chapter 3: One-factor Short-Rate Models, Section 3.3.2 (Gaussian forward-rate
+//!   dynamics underpinning the closed-form caplet normal volatility).
 
 use crate::calibration::hull_white::hw1f_caplet_forward_rate_normal_vol;
 use crate::instruments::common_impl::helpers::year_fraction;
@@ -45,20 +49,10 @@ use finstack_core::dates::DayCountContext;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 
-/// Number of tree steps per caplet period.
-pub(crate) const DEFAULT_STEPS_PER_PERIOD: usize = 30;
-
-/// Minimum tree steps for the full cap/floor.
-pub(crate) const MIN_TREE_STEPS: usize = 50;
-
-/// Maximum tree steps for the full cap/floor.
-pub(crate) const MAX_TREE_STEPS: usize = 300;
-
-/// Hull-White 1-factor tree pricer for caps and floors.
+/// Hull-White 1-factor closed-form pricer for caps and floors.
 ///
-/// Prices each caplet/floorlet by building a single Hull-White tree
-/// spanning the full cap maturity and evaluating each caplet's payoff
-/// via backward induction.
+/// Prices each caplet/floorlet with a Bachelier (normal) formula using the
+/// HW1F-implied normal volatility of the forward rate; no tree is built.
 pub(crate) struct CapFloorHullWhitePricer;
 
 impl Pricer for CapFloorHullWhitePricer {
@@ -154,8 +148,6 @@ impl CapFloorHullWhitePricer {
             RateOptionType::Cap | RateOptionType::Caplet
         );
 
-        let model_config = &cap_floor.pricing_overrides.model_config;
-
         // Resolve HW1F parameters following the documented precedence:
         // explicit `pricing_overrides` κ/σ → calibrated MarketContext scalars
         // → warned `HullWhiteParams::default()`.
@@ -163,13 +155,8 @@ impl CapFloorHullWhitePricer {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
-        let tree_steps = model_config.tree_steps.unwrap_or_else(|| {
-            (periods.len() * DEFAULT_STEPS_PER_PERIOD).clamp(MIN_TREE_STEPS, MAX_TREE_STEPS)
-        });
-
-        let _tree_steps = tree_steps;
-
-        // Price each caplet/floorlet using the tree
+        // Price each caplet/floorlet in closed form (Bachelier with the
+        // HW1F-implied normal vol); no tree is built.
         let mut total_pv = 0.0;
 
         for period in &periods {
