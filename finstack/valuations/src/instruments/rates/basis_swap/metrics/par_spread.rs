@@ -1,7 +1,7 @@
+use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::rates::basis_swap::types::BasisSwap;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_core::{Error, Result};
-use rust_decimal::prelude::ToPrimitive;
 
 /// Calculator for the **absolute** par spread on the primary leg that sets NPV to zero.
 ///
@@ -191,7 +191,10 @@ impl MetricCalculator for IncrementalParSpreadCalculator {
             .ok_or(Error::Input(finstack_core::InputError::Invalid))?;
 
         // Current spread in bp (convert Decimal to f64 at arithmetic boundary)
-        let current_spread_bp = swap.primary_leg.spread_bp.to_f64().unwrap_or_default();
+        let current_spread_bp = decimal_to_f64(
+            swap.primary_leg.spread_bp,
+            "BasisSwap primary_leg spread_bp",
+        )?;
 
         // Incremental = absolute par spread - current spread
         Ok(absolute_par_spread_bp - current_spread_bp)

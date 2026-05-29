@@ -523,7 +523,7 @@ pub fn compute_fva(
 
 /// Compute bilateral XVA: CVA, DVA, FVA, and the combined bilateral adjustment.
 ///
-/// This is the comprehensive bilateral XVA calculation that accounts for:
+/// Accounts for:
 /// - Counterparty default risk (CVA)
 /// - Own-default benefit (DVA)
 /// - Funding costs and benefits (FVA, if funding config provided)

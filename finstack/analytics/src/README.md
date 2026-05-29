@@ -7,7 +7,7 @@ source modules and documents how to extend the crate.
 
 | Path | Role | Public surface |
 |------|------|----------------|
-| `lib.rs` | Crate root; re-exports | `Performance`, `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult`, `CagrBasis`, `AnnualizationConvention`, `DatedSeries`, `DatedSeries`, `DatedSeries`, `DatedSeries`, `beta`, `correlation` |
+| `lib.rs` | Crate root; re-exports | `Performance`, `LookbackReturns`, `PeriodStats`, `DrawdownEpisode`, `BetaResult`, `GreeksResult`, `RollingGreeks`, `MultiFactorResult`, `CagrBasis`, `AnnualizationConvention`, `DatedSeries`, `beta`, `correlation` |
 | `performance/` | Stateful orchestrator | `Performance`, `LookbackReturns` |
 | `risk_metrics/` | Return-based, tail, rolling metrics | Config and rolling result types only |
 | `benchmark.rs` | Benchmark-relative metrics | `beta`, result types |
@@ -42,7 +42,7 @@ that need row-major correlation validation or repair without depending on
 
 ## Adding a rolling series
 
-Rolling outputs use `DatedSeries` (or a type alias such as `DatedSeries`):
+Rolling outputs use `DatedSeries`:
 
 - Produce `n - window + 1` points when `n >= window > 0`; otherwise return empty vectors.
 - Label each point with the last date in its window (right-labeled).
@@ -51,8 +51,9 @@ Rolling outputs use `DatedSeries` (or a type alias such as `DatedSeries`):
 ## Adding a `PeriodStats` field
 
 1. Add the field to `PeriodStats` in `aggregation.rs`.
-2. Compute it inside `period_stats_from_grouped`.
-3. Set a zero/default in the empty-input early return.
+2. Compute it inside `period_stats_inner` (the shared kernel that
+   `period_stats_from_grouped` delegates to).
+3. Set a zero/default in the empty-input early return (`PeriodStats::empty()`).
 4. Extend the unit test.
 
 ## Adding a lookback horizon

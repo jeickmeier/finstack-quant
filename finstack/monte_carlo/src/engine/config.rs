@@ -29,8 +29,9 @@ pub struct McEngineConfig {
     pub target_ci_half_width: Option<f64>,
     /// Use parallel execution (requires parallel feature)
     pub use_parallel: bool,
-    /// Chunk size for parallel execution
-    pub chunk_size: usize,
+    /// Chunk size for parallel execution. `None` selects an adaptive chunk size
+    /// from the path and CPU counts; `Some(n)` uses exactly `n` paths per chunk.
+    pub chunk_size: Option<usize>,
     /// Path capture configuration
     pub path_capture: PathCaptureConfig,
     /// Use antithetic variance reduction (pair `z` and `-z` per step).
@@ -61,7 +62,7 @@ impl McEngineConfig {
             time_grid,
             target_ci_half_width: None,
             use_parallel: defaults.use_parallel,
-            chunk_size: defaults.chunk_size,
+            chunk_size: None,
             path_capture: PathCaptureConfig::default(),
             antithetic: defaults.antithetic,
         }
@@ -81,12 +82,12 @@ impl McEngineConfig {
         self
     }
 
-    /// Set the parallel chunk size.
+    /// Set the parallel chunk size to exactly `size`.
     ///
-    /// A value of `1000` keeps the engine's adaptive chunking behavior. Runtime
+    /// Leave unset (the default) to keep the engine's adaptive chunking. Runtime
     /// validation rejects `0`.
     pub fn with_chunk_size(mut self, size: usize) -> Self {
-        self.chunk_size = size;
+        self.chunk_size = Some(size);
         self
     }
 
@@ -123,7 +124,7 @@ pub struct McEngineBuilder {
     time_grid: Option<TimeGrid>,
     target_ci: Option<f64>,
     parallel: bool,
-    chunk_size: usize,
+    chunk_size: Option<usize>,
     path_capture: PathCaptureConfig,
     antithetic: bool,
 }
@@ -143,7 +144,7 @@ impl McEngineBuilder {
             time_grid: None,
             target_ci: None,
             parallel: defaults.use_parallel,
-            chunk_size: defaults.chunk_size,
+            chunk_size: None,
             path_capture: PathCaptureConfig::default(),
             antithetic: defaults.antithetic,
         }
@@ -190,9 +191,9 @@ impl McEngineBuilder {
         self
     }
 
-    /// Set the parallel chunk size.
+    /// Set the parallel chunk size to exactly `size`. Leave unset for adaptive chunking.
     pub fn chunk_size(mut self, size: usize) -> Self {
-        self.chunk_size = size;
+        self.chunk_size = Some(size);
         self
     }
 

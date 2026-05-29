@@ -1037,11 +1037,11 @@ cargo test --doc --all-features
 ///
 /// let a = Money::new(100.0, Currency::USD);
 /// let b = Money::new(50.0, Currency::USD);
-/// let sum = (a + b)?;
+/// let sum = a.checked_add(b)?;
 /// assert_eq!(sum.amount(), 150.0);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub fn add(&self, other: Money) -> Result<Money, Error> {
+pub fn checked_add(&self, other: Money) -> Result<Money, Error> {
     // implementation
 }
 ```

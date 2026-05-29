@@ -42,6 +42,7 @@ valuations.
 | [`accrual`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/accrual/index.html) | `accrued_interest_amount`, `AccrualConfig` |
 | [`traits`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/traits/index.html) | `CashflowProvider`, `schedule_from_dated_flows`, `schedule_from_classified_flows` |
 | [`primitives`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/primitives/index.html) | Re-exports `CashFlow` and `CFKind` from `finstack-core` |
+| [`json`](https://docs.rs/finstack-cashflows/latest/finstack_cashflows/json/index.html) | Serde-first JSON bridge for building/validating schedules (`build_cashflow_schedule_json`, `validate_cashflow_schedule_json`, `accrued_interest_json`); binding surface |
 
 `ScheduleParams` ships ten presets: `quarterly_act360`, `semiannual_30360`,
 `annual_actact`, and seven regional templates (`usd_sofr_swap`,

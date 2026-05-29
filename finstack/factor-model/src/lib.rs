@@ -23,6 +23,7 @@ pub mod matching;
 mod parse;
 /// Generic factor identifiers, definitions, and market dependencies.
 pub mod primitives;
+/// Positions × factors sensitivity matrix storage.
 pub mod sensitivity_matrix;
 
 pub use calibration::FactorCalibrator;

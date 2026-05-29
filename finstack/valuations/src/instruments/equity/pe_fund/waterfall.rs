@@ -534,6 +534,23 @@ impl<'a> EquityWaterfallEngine<'a> {
         let mut sorted_events = events.to_vec();
         sorted_events.sort_by(|a, b| a.date.cmp(&b.date));
 
+        // Currency-safety: the waterfall performs raw f64 arithmetic across event
+        // amounts, so every event must share a single currency. Reject mixed
+        // currencies up front rather than silently summing across them. (Empty
+        // input is left to the per-style handlers, which return `TooFewPoints`.)
+        if let Some(first) = sorted_events.first() {
+            let expected = first.amount.currency();
+            if let Some(bad) = sorted_events
+                .iter()
+                .find(|e| e.amount.currency() != expected)
+            {
+                return Err(finstack_core::Error::CurrencyMismatch {
+                    expected,
+                    actual: bad.amount.currency(),
+                });
+            }
+        }
+
         let contributions: Vec<(Date, Money)> = sorted_events
             .iter()
             .filter(|e| e.kind == FundEventKind::Contribution)
@@ -650,7 +667,19 @@ impl<'a> EquityWaterfallEngine<'a> {
             .amount
             .currency();
 
-        for (deal_id, deal_events) in deals {
+        // Iterate deals in a deterministic, economically meaningful order: by each
+        // deal's earliest event date, then `deal_id` as a stable tie-break. HashMap
+        // iteration order is hash-arbitrary; because LP/GP balances are threaded
+        // across deals sequentially, the processing order changes the allocations,
+        // so we must not depend on it.
+        let mut ordered_deals: Vec<(&String, &Vec<&FundEvent>)> = deals.iter().collect();
+        ordered_deals.sort_by(|a, b| {
+            let a_first = a.1.first().map(|e| e.date);
+            let b_first = b.1.first().map(|e| e.date);
+            a_first.cmp(&b_first).then_with(|| a.0.cmp(b.0))
+        });
+
+        for (deal_id, deal_events) in ordered_deals {
             // For each deal, allocate proceeds through the waterfall
             for event in deal_events {
                 let lp_distributed_so_far: f64 = ledger_rows.iter().map(|r| r.to_lp.amount()).sum();
@@ -1249,6 +1278,105 @@ mod tests {
         // LP should get back their $1M capital first
         let total_lp_roc: f64 = roc_rows.iter().map(|r| r.to_lp.amount()).sum();
         assert!((total_lp_roc - 1000000.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn mixed_currency_events_rejected() {
+        let spec = WaterfallSpec::builder()
+            .return_of_capital()
+            .promote_tier(0.0, 0.8, 0.2)
+            .build()
+            .expect("spec builds");
+
+        let events = vec![
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::new(1_000_000.0, Currency::USD),
+            ),
+            FundEvent::distribution(
+                test_date(2025, 1, 1),
+                Money::new(1_500_000.0, Currency::EUR),
+            ),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let err = engine
+            .run(&events)
+            .expect_err("mixed-currency events must be rejected");
+        assert!(matches!(err, finstack_core::Error::CurrencyMismatch { .. }));
+    }
+
+    #[test]
+    fn american_waterfall_processes_deals_chronologically() {
+        let spec = WaterfallSpec::builder()
+            .style(WaterfallStyle::American)
+            .return_of_capital()
+            .promote_tier(0.0, 0.8, 0.2)
+            .build()
+            .expect("spec builds");
+
+        // The chronological order of the two deals is the REVERSE of their deal_id
+        // order, so this only passes if deals are processed by earliest date rather
+        // than by id or hash bucket.
+        let events = vec![
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::new(2_000_000.0, test_currency()),
+            ),
+            FundEvent::proceeds(
+                test_date(2022, 1, 1),
+                Money::new(1_000_000.0, test_currency()),
+                "A_late",
+            ),
+            FundEvent::proceeds(
+                test_date(2021, 1, 1),
+                Money::new(1_000_000.0, test_currency()),
+                "Z_early",
+            ),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let ledger = engine.run(&events).expect("runs");
+
+        let first_deal = ledger
+            .rows
+            .iter()
+            .find_map(|r| r.deal_id.as_deref())
+            .expect("at least one deal-tagged row");
+        assert_eq!(first_deal, "Z_early");
+    }
+
+    #[test]
+    fn american_waterfall_invariant_to_input_order() {
+        let spec = WaterfallSpec::builder()
+            .style(WaterfallStyle::American)
+            .return_of_capital()
+            .promote_tier(0.0, 0.8, 0.2)
+            .build()
+            .expect("spec builds");
+
+        let mut events = vec![
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::new(2_000_000.0, test_currency()),
+            ),
+            FundEvent::proceeds(
+                test_date(2022, 1, 1),
+                Money::new(1_500_000.0, test_currency()),
+                "deal_a",
+            ),
+            FundEvent::proceeds(
+                test_date(2021, 1, 1),
+                Money::new(900_000.0, test_currency()),
+                "deal_b",
+            ),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let ledger_a = engine.run(&events).expect("runs");
+        events.reverse();
+        let ledger_b = engine.run(&events).expect("runs");
+        assert_eq!(ledger_a.rows, ledger_b.rows);
     }
 
     #[test]

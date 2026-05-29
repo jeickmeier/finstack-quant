@@ -258,7 +258,10 @@ fn test_parallel_execution_error_propagation() {
 
 #[test]
 fn test_serial_vs_parallel_consistency() {
-    // Test that serial and parallel paths produce consistent results
+    // Constant-payoff case: serial and parallel agree exactly because a constant
+    // reduces order-independently. See
+    // `test_serial_vs_parallel_bit_identical_for_varying_payoff` for the meaningful
+    // varying-payoff case that actually exercises the reduction order.
     let engine_serial = McEngine::builder()
         .num_paths(1000)
         .uniform_grid(1.0, 10)
@@ -309,6 +312,58 @@ fn test_serial_vs_parallel_consistency() {
     assert_eq!(serial_result.num_paths, 1000);
     assert_eq!(parallel_result.num_paths, 1000);
     assert_eq!(serial_result.mean.amount(), parallel_result.mean.amount());
+}
+
+#[test]
+fn test_serial_vs_parallel_bit_identical_for_varying_payoff() {
+    // INVARIANTS.md §2.1: with a splittable RNG and auto-stop disabled, serial and
+    // parallel must be bit-identical. `PathIndexedRng` yields a distinct, varying
+    // value per path id, and both engines use the SAME chunk size, so the per-path
+    // values and the chunk -> merge reduction tree match exactly.
+    let build = |parallel: bool| {
+        McEngine::builder()
+            .num_paths(1000)
+            .uniform_grid(1.0, 10)
+            .parallel(parallel)
+            .chunk_size(64)
+            .build()
+            .expect("McEngine builder should succeed with valid test data")
+    };
+    let engine_serial = build(false);
+    let engine_parallel = build(true);
+
+    let rng = PathIndexedRng::root();
+    let process = DummyProcess;
+    let disc = DummyDisc;
+    let initial_state = vec![100.0];
+    let payoff = CapturedValuePayoff::default();
+
+    let serial = engine_serial
+        .price(
+            &rng,
+            &process,
+            &disc,
+            &initial_state,
+            &payoff,
+            Currency::USD,
+            1.0,
+        )
+        .expect("serial pricing should succeed");
+    let parallel = engine_parallel
+        .price(
+            &rng,
+            &process,
+            &disc,
+            &initial_state,
+            &payoff,
+            Currency::USD,
+            1.0,
+        )
+        .expect("parallel pricing should succeed");
+
+    assert_eq!(serial.num_paths, parallel.num_paths);
+    // Bit-identical, not merely close: the reduction tree and per-path values match.
+    assert_eq!(serial.mean.amount(), parallel.mean.amount());
 }
 
 /// A minimal RNG that declares it does not support splitting (mimicking SobolRng).
@@ -524,7 +579,7 @@ fn test_price_rejects_zero_paths() {
         time_grid,
         target_ci_half_width: None,
         use_parallel: false,
-        chunk_size: 1,
+        chunk_size: Some(1),
         path_capture: PathCaptureConfig::new(),
         antithetic: false,
     });
@@ -552,7 +607,7 @@ fn test_price_rejects_zero_chunk_size() {
         time_grid,
         target_ci_half_width: None,
         use_parallel: false,
-        chunk_size: 0,
+        chunk_size: Some(0),
         path_capture: PathCaptureConfig::new(),
         antithetic: false,
     });
@@ -603,7 +658,7 @@ fn test_price_with_capture_rejects_invalid_sample_count() {
         time_grid: TimeGrid::uniform(1.0, 1).expect("grid should build"),
         target_ci_half_width: None,
         use_parallel: false,
-        chunk_size: 1,
+        chunk_size: Some(1),
         path_capture: PathCaptureConfig::sample(0, 99),
         antithetic: false,
     });
@@ -631,7 +686,7 @@ fn test_price_with_capture_rejects_antithetic_capture_combination() {
         time_grid: TimeGrid::uniform(1.0, 1).expect("grid should build"),
         target_ci_half_width: None,
         use_parallel: false,
-        chunk_size: 1,
+        chunk_size: Some(1),
         path_capture: PathCaptureConfig::all(),
         antithetic: true,
     });
@@ -660,7 +715,7 @@ fn test_price_rejects_parallel_auto_stop_configuration() {
         time_grid,
         target_ci_half_width: Some(0.01),
         use_parallel: true,
-        chunk_size: 2,
+        chunk_size: Some(2),
         path_capture: PathCaptureConfig::new(),
         antithetic: false,
     });
@@ -688,7 +743,7 @@ fn test_price_with_capture_captures_initial_event_cashflows_and_payoff() {
         time_grid: TimeGrid::uniform(1.0, 1).expect("grid should build"),
         target_ci_half_width: None,
         use_parallel: false,
-        chunk_size: 1,
+        chunk_size: Some(1),
         path_capture: PathCaptureConfig::all().with_payoffs(),
         antithetic: false,
     });
@@ -725,7 +780,7 @@ fn test_price_with_capture_preserves_cashflows_across_multiple_timesteps() {
         time_grid: TimeGrid::uniform(1.0, 2).expect("grid should build"),
         target_ci_half_width: None,
         use_parallel: false,
-        chunk_size: 1000,
+        chunk_size: None,
         path_capture: PathCaptureConfig::all(),
         antithetic: false,
     });
@@ -775,7 +830,7 @@ fn test_price_with_capture_uses_actual_path_count_after_auto_stop() {
         time_grid: TimeGrid::uniform(1.0, 1).expect("grid should build"),
         target_ci_half_width: Some(0.01),
         use_parallel: false,
-        chunk_size: 100,
+        chunk_size: Some(100),
         path_capture: PathCaptureConfig::all(),
         antithetic: false,
     });
@@ -1206,7 +1261,7 @@ mod correlation_regression {
             time_grid: grid,
             target_ci_half_width: None,
             use_parallel: false,
-            chunk_size: 1_000,
+            chunk_size: None,
             path_capture: PathCaptureConfig::new(),
             antithetic: false,
         };

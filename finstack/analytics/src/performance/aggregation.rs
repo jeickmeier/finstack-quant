@@ -66,35 +66,29 @@ impl Performance {
 
         // One Welford pass per column gives mean+variance; centering once
         // avoids the n²-mean recomputation hidden inside pairwise `covariance`.
-        let mut centered: Vec<Vec<f64>> = Vec::with_capacity(n);
+        // Store the centered panel as a single flat row-major buffer (`n × t`)
+        // so the pairwise dot products read contiguous memory.
+        let mut centered: Vec<f64> = Vec::with_capacity(n * t);
         let mut std_devs: Vec<f64> = Vec::with_capacity(n);
         for i in 0..n {
             let series = &self.active_returns(i)[..t];
             let (m, var) = crate::math::stats::mean_var(series);
-            let mut c = Vec::with_capacity(t);
-            for &v in series {
-                c.push(v - m);
-            }
-            centered.push(c);
+            centered.extend(series.iter().map(|&v| v - m));
             std_devs.push(var.sqrt());
         }
 
         let denom = if t > 1 { (t - 1) as f64 } else { 1.0 };
         for i in 0..n {
             matrix[i][i] = 1.0;
+            let ci = &centered[i * t..i * t + t];
             for j in (i + 1)..n {
                 let scale = std_devs[i] * std_devs[j];
                 let corr = if scale == 0.0 {
                     0.0
                 } else {
-                    let ci = &centered[i];
-                    let cj = &centered[j];
-                    let mut dot = 0.0_f64;
-                    for k in 0..t {
-                        dot += ci[k] * cj[k];
-                    }
-                    let cov = dot / denom;
-                    cov / scale
+                    let cj = &centered[j * t..j * t + t];
+                    let dot: f64 = ci.iter().zip(cj).map(|(a, b)| a * b).sum();
+                    (dot / denom) / scale
                 };
                 matrix[i][j] = corr;
                 matrix[j][i] = corr;

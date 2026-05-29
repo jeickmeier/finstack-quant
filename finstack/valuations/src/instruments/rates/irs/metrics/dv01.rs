@@ -54,18 +54,21 @@ fn annuity_derivative_per_bp(
         return Ok(0.0);
     }
 
-    let mut scratch = context.curves.as_ref().clone();
-    let token_up = scratch
+    // Bump up and down on independent clones that are moved straight into the
+    // annuity computation (which needs an owned `MarketContext` to Arc-wrap). This
+    // drops one full `MarketContext` clone per DV01 versus bumping a shared scratch
+    // in place and cloning it for each side, and removes the revert bookkeeping.
+    let mut curves_up = context.curves.as_ref().clone();
+    let _bump_up = curves_up
         .apply_curve_bump_in_place(&irs.fixed.discount_curve_id, BumpSpec::parallel_bp(bump_bp))?;
-    let annuity_up = annuity_with_curves(context, scratch.clone())?;
-    scratch.revert_scratch_bump(token_up)?;
+    let annuity_up = annuity_with_curves(context, curves_up)?;
 
-    let token_down = scratch.apply_curve_bump_in_place(
+    let mut curves_down = context.curves.as_ref().clone();
+    let _bump_down = curves_down.apply_curve_bump_in_place(
         &irs.fixed.discount_curve_id,
         BumpSpec::parallel_bp(-bump_bp),
     )?;
-    let annuity_down = annuity_with_curves(context, scratch.clone())?;
-    scratch.revert_scratch_bump(token_down)?;
+    let annuity_down = annuity_with_curves(context, curves_down)?;
 
     Ok((annuity_up - annuity_down) / (2.0 * bump_bp))
 }

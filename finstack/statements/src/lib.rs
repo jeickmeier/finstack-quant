@@ -63,8 +63,11 @@
 //! - **adjustments**: Normalization engine plus add-back specs/caps for adjusted EBITDA
 //! - **dsl**: Formula DSL (parser, AST, compiler) for arithmetic, time-series, rolling and statistical functions
 //! - **evaluator**: DAG-based evaluation with topological sort, precedence resolution, and capital structure integration
+//! - **capital_structure**: Debt/equity structure modeling and the `cs.*` market-context namespace
 //! - **forecast**: Deterministic and statistical forecast methods (growth, seasonal, Monte Carlo)
 //! - **registry**: Dynamic metric registry with namespace management and built-in `fin.*` metrics
+//! - **checks**: Financial-statement consistency checks framework
+//! - **formula**: Public formula helpers for identifier extraction and qualification
 //!
 //! ## Analytics
 //!

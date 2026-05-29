@@ -213,12 +213,6 @@ All `TreeModel` implementations support finite-difference Greeks via the default
 | Theta | Forward difference on time | 1 day |
 | Rho | Central difference on rate | 1 bp |
 
-**Adaptive bump sizing** adjusts spot bumps based on moneyness (smaller near ATM, larger for deep ITM/OTM):
-
-```rust
-let config = GreeksBumpConfig::adaptive().with_spot_bump(0.005);
-```
-
 **Richardson extrapolation** on Greeks (N vs 2N steps, O(h⁴) accuracy):
 
 ```rust

@@ -377,10 +377,9 @@ impl Money {
 
     /// Add two amounts, returning an error when currencies do not match.
     ///
-    /// This method is semantically identical to the `+` operator, but is preferred
-    /// in application code because it makes the `Result` return type explicit.
-    /// The `Add` trait impl for `Money` unusually returns `Result<Money, Error>`
-    /// rather than `Money`, which can surprise readers unfamiliar with the API.
+    /// `Money` intentionally does **not** implement [`std::ops::Add`]: cross-currency
+    /// addition must be fallible, so the currency-checked sum is exposed through this
+    /// method rather than a `+` operator that could silently mismatch currencies.
     ///
     /// # Examples
     /// ```rust
@@ -406,10 +405,10 @@ impl Money {
 
     /// Subtract two amounts, returning an error when currencies do not match.
     ///
-    /// This method is semantically identical to the `-` operator, but is preferred
-    /// in application code because it makes the `Result` return type explicit.
-    /// The `Sub` trait impl for `Money` unusually returns `Result<Money, Error>`
-    /// rather than `Money`, which can surprise readers unfamiliar with the API.
+    /// `Money` intentionally does **not** implement [`std::ops::Sub`]: cross-currency
+    /// subtraction must be fallible, so the currency-checked difference is exposed
+    /// through this method rather than a `-` operator that could silently mismatch
+    /// currencies.
     ///
     /// # Examples
     /// ```rust

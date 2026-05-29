@@ -290,9 +290,9 @@ impl fmt::Display for Rate {
 }
 
 impl From<f64> for Rate {
-    /// Prefer [`TryFrom<f64>`] for untrusted inputs; this panics on non-finite
-    /// values and is retained only for backward compatibility with
-    /// `rate.into()` call sites.
+    /// Prefer the fallible [`Rate::try_from_decimal`] for untrusted inputs; this
+    /// panics on non-finite values and is retained only for backward compatibility
+    /// with `rate.into()` call sites.
     fn from(decimal: f64) -> Self {
         Self::from_decimal(decimal)
     }
@@ -697,8 +697,8 @@ impl fmt::Display for Percentage {
 }
 
 impl From<f64> for Percentage {
-    /// Prefer [`TryFrom<f64>`]; this panics on non-finite input and remains
-    /// only for backward compatibility.
+    /// Prefer the fallible [`Percentage::try_new`]; this panics on non-finite input
+    /// and remains only for backward compatibility.
     fn from(percent: f64) -> Self {
         Self::new(percent)
     }
@@ -754,6 +754,9 @@ impl Neg for Percentage {
 }
 
 // Cross-conversions between types
+/// Converts to whole basis points, **rounding** to the nearest bp — `Bps` is an
+/// integer type, so sub-bp precision (common for credit/swap spreads) is lost.
+/// Keep the [`Rate`] (or use [`Rate::as_decimal`]) when full precision matters.
 impl From<Rate> for Bps {
     fn from(rate: Rate) -> Self {
         Bps::new(rate.as_bps())
@@ -784,6 +787,8 @@ impl From<Percentage> for Rate {
     }
 }
 
+/// Converts to whole basis points, **rounding** to the nearest bp — `Bps` is an
+/// integer type, so sub-bp precision is lost.
 impl From<Percentage> for Bps {
     fn from(pct: Percentage) -> Self {
         Bps::new(pct.as_bps())

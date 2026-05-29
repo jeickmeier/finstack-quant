@@ -666,7 +666,9 @@ impl<'a> TsiveriotisZhangEngine<'a> {
             values.push((total_val, cash_val));
         }
 
-        // 2. Backward Induction
+        // 2. Backward Induction. Double-buffer the value layers so each per-step
+        // layer reuses one allocation (cleared) instead of allocating a fresh Vec.
+        let mut next_values: Vec<(f64, f64)> = Vec::with_capacity(values.len());
         for step in (0..self.steps).rev() {
             let current_num_nodes = match tree_type {
                 ConvertibleTreeType::Binomial(_) => step + 1,
@@ -677,7 +679,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
             let df_rf = self.valuator.rf_step_dfs[step];
             let df_risky = self.valuator.risky_step_dfs[step];
 
-            let mut next_values = Vec::with_capacity(current_num_nodes);
+            next_values.clear();
 
             for i in 0..current_num_nodes {
                 let (exp_total, exp_cash) = match tree_type {
@@ -791,7 +793,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
 
                 next_values.push((final_total, final_cash));
             }
-            values = next_values;
+            std::mem::swap(&mut values, &mut next_values);
         }
 
         Ok(values[0])

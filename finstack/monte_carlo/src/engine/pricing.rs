@@ -151,7 +151,7 @@ impl McEngine {
             )));
         }
 
-        if self.config.chunk_size == 0 {
+        if self.config.chunk_size == Some(0) {
             return Err(finstack_core::Error::Validation(
                 "Monte Carlo chunk_size must be greater than zero".to_string(),
             ));
@@ -270,6 +270,14 @@ impl McEngine {
     /// * `target_ci_half_width` is non-positive or combined with parallel mode
     /// * parallel mode is requested with an RNG that does not support splitting
     ///
+    /// # Determinism
+    ///
+    /// With a splittable RNG (e.g. `PhiloxRng`) and auto-stopping disabled, the
+    /// serial and parallel paths return bit-identical estimates: both reduce
+    /// per-path values through the same chunk -> `OnlineStats::merge` tree, and the
+    /// per-path values themselves come from `rng.split(path_id)`, independent of
+    /// thread count (see INVARIANTS.md §2.1).
+    ///
     /// # Examples
     ///
     /// ```ignore
@@ -325,7 +333,7 @@ impl McEngine {
             num_steps = self.config.time_grid.num_steps(),
             parallel = self.config.use_parallel,
             antithetic = self.config.antithetic,
-            chunk_size = self.config.chunk_size,
+            chunk_size = ?self.config.chunk_size,
         )
         .entered();
 
@@ -578,7 +586,6 @@ impl McEngine {
         D: Discretization<P>,
         F: Payoff,
     {
-        let mut stats = OnlineStats::new();
         let dim = process.dim();
         let num_factors = process.num_factors();
         let work_size = disc.work_size(process);
@@ -621,121 +628,146 @@ impl McEngine {
         let use_split_streams = rng.supports_splitting();
         let mut sequential_rng = (!use_split_streams).then(|| rng.clone());
 
-        for path_id in 0..self.config.num_paths {
-            let mut split_rng;
-            let path_rng = if use_split_streams {
-                split_rng = rng.split(path_id as u64).ok_or_else(|| {
-                    finstack_core::Error::Validation(
-                        "RandomStream reports splitting support but split() returned None"
-                            .to_string(),
-                    )
-                })?;
-                &mut split_rng
-            } else {
-                sequential_rng.as_mut().ok_or_else(|| {
-                    finstack_core::Error::Validation(
-                        "serial non-splittable RNG was not initialized".to_string(),
-                    )
-                })?
-            };
+        // Reduce via the same chunk -> merge tree as `price_parallel` so that, for
+        // a splittable RNG with auto-stopping disabled, serial and parallel results
+        // are bit-identical (INVARIANTS.md §2.1). Auto-stopping has no parallel
+        // counterpart, so it runs as a single chunk with a running accumulator that
+        // evaluates the stopping rule sequentially.
+        let chunk_ranges: Vec<Range<usize>> = if self.config.target_ci_half_width.is_some() {
+            std::iter::once(0..self.config.num_paths).collect()
+        } else {
+            let effective_chunk_size = self
+                .config
+                .chunk_size
+                .unwrap_or_else(|| adaptive_chunk_size(self.config.num_paths));
+            parallel_path_chunks(self.config.num_paths, effective_chunk_size)
+        };
 
-            payoff_local.reset();
-            payoff_local.on_path_start(&mut *path_rng);
-            if let Some(p) = payoff_anti.as_mut() {
-                p.reset();
-                p.on_path_start(&mut *path_rng);
-            }
+        let mut combined = OnlineStats::new();
+        let mut auto_stopped = false;
+        for range in &chunk_ranges {
+            let mut stats = OnlineStats::new();
+            for path_id in range.clone() {
+                let mut split_rng;
+                let path_rng = if use_split_streams {
+                    split_rng = rng.split(path_id as u64).ok_or_else(|| {
+                        finstack_core::Error::Validation(
+                            "RandomStream reports splitting support but split() returned None"
+                                .to_string(),
+                        )
+                    })?;
+                    &mut split_rng
+                } else {
+                    sequential_rng.as_mut().ok_or_else(|| {
+                        finstack_core::Error::Validation(
+                            "serial non-splittable RNG was not initialized".to_string(),
+                        )
+                    })?
+                };
 
-            let should_capture = capture
-                && self
-                    .config
-                    .path_capture
-                    .should_capture(path_id, self.config.num_paths);
-
-            let payoff_value = if should_capture {
-                // `validate_runtime` rejects antithetic+capture, so this branch
-                // is only reached with antithetic disabled.
-                let (v, path) = self.simulate_path_with_capture(
-                    &mut *path_rng,
-                    process,
-                    disc,
-                    initial_state,
-                    &mut payoff_local,
-                    &mut state,
-                    &mut z,
-                    &mut z_raw,
-                    &mut work,
-                    correlation.as_ref(),
-                    path_id,
-                    discount_factor,
-                    currency,
-                )?;
-                captured_paths.push(path);
-                v
-            } else if let Some(payoff_anti_mut) = payoff_anti.as_mut() {
-                // antithetic = true ⇒ payoff_anti is Some by construction.
-                self.simulate_antithetic_pair(
-                    &mut *path_rng,
-                    process,
-                    disc,
-                    initial_state,
-                    &mut payoff_local,
-                    payoff_anti_mut,
-                    &mut state,
-                    &mut state_a,
-                    &mut z,
-                    &mut z_anti,
-                    &mut z_raw,
-                    &mut work,
-                    &mut work_anti,
-                    correlation.as_ref(),
-                    currency,
-                )?
-            } else {
-                self.simulate_path(
-                    &mut *path_rng,
-                    process,
-                    disc,
-                    initial_state,
-                    &mut payoff_local,
-                    &mut state,
-                    &mut z,
-                    &mut z_raw,
-                    &mut work,
-                    correlation.as_ref(),
-                    currency,
-                )?
-            };
-
-            let discounted_value =
-                validate_discounted_payoff(path_id, payoff_value, discount_factor)?;
-            stats.update(discounted_value);
-
-            // Check auto-stop condition. A 5 000-sample warm-up keeps the
-            // half-width estimate stable — the standard error of the sample
-            // standard error is ~1/√(2n), so at n=1 000 the stopping criterion
-            // itself has ≈ 2 % noise which routinely trips the threshold
-            // early.
-            if let Some(target) = self.config.target_ci_half_width {
-                if stats.count() >= AUTO_STOP_MIN_SAMPLES && stats.ci_half_width() < target {
-                    break;
+                payoff_local.reset();
+                payoff_local.on_path_start(&mut *path_rng);
+                if let Some(p) = payoff_anti.as_mut() {
+                    p.reset();
+                    p.on_path_start(&mut *path_rng);
                 }
+
+                let should_capture = capture
+                    && self
+                        .config
+                        .path_capture
+                        .should_capture(path_id, self.config.num_paths);
+
+                let payoff_value = if should_capture {
+                    // `validate_runtime` rejects antithetic+capture, so this branch
+                    // is only reached with antithetic disabled.
+                    let (v, path) = self.simulate_path_with_capture(
+                        &mut *path_rng,
+                        process,
+                        disc,
+                        initial_state,
+                        &mut payoff_local,
+                        &mut state,
+                        &mut z,
+                        &mut z_raw,
+                        &mut work,
+                        correlation.as_ref(),
+                        path_id,
+                        discount_factor,
+                        currency,
+                    )?;
+                    captured_paths.push(path);
+                    v
+                } else if let Some(payoff_anti_mut) = payoff_anti.as_mut() {
+                    // antithetic = true ⇒ payoff_anti is Some by construction.
+                    self.simulate_antithetic_pair(
+                        &mut *path_rng,
+                        process,
+                        disc,
+                        initial_state,
+                        &mut payoff_local,
+                        payoff_anti_mut,
+                        &mut state,
+                        &mut state_a,
+                        &mut z,
+                        &mut z_anti,
+                        &mut z_raw,
+                        &mut work,
+                        &mut work_anti,
+                        correlation.as_ref(),
+                        currency,
+                    )?
+                } else {
+                    self.simulate_path(
+                        &mut *path_rng,
+                        process,
+                        disc,
+                        initial_state,
+                        &mut payoff_local,
+                        &mut state,
+                        &mut z,
+                        &mut z_raw,
+                        &mut work,
+                        correlation.as_ref(),
+                        currency,
+                    )?
+                };
+
+                let discounted_value =
+                    validate_discounted_payoff(path_id, payoff_value, discount_factor)?;
+                stats.update(discounted_value);
+
+                // Check auto-stop condition. A 5 000-sample warm-up keeps the
+                // half-width estimate stable — the standard error of the sample
+                // standard error is ~1/√(2n), so at n=1 000 the stopping criterion
+                // itself has ≈ 2 % noise which routinely trips the threshold
+                // early.
+                if let Some(target) = self.config.target_ci_half_width {
+                    if stats.count() >= AUTO_STOP_MIN_SAMPLES && stats.ci_half_width() < target {
+                        auto_stopped = true;
+                        break;
+                    }
+                }
+            }
+            combined.merge(&stats);
+            if auto_stopped {
+                break;
             }
         }
 
-        let num_paths = stats.count();
+        let num_paths = combined.count();
         let num_simulated_paths = if self.config.antithetic {
             num_paths.saturating_mul(2)
         } else {
             num_paths
         };
         let estimate = Estimate::new(
-            stats.mean(),
-            stats.stderr(),
-            stats.confidence_interval(0.05),
+            combined.mean(),
+            combined.stderr(),
+            combined.confidence_interval(0.05),
             num_paths,
         )
-        .with_std_dev(stats.std_dev())
+        .with_std_dev(combined.std_dev())
         .with_num_simulated_paths(num_simulated_paths);
 
         Ok((estimate, captured_paths))
@@ -760,13 +792,12 @@ impl McEngine {
         D: Discretization<P>,
         F: Payoff,
     {
-        // Split paths into chunks for parallel processing
-        // Use adaptive chunk size if default (1000), otherwise use configured size
-        let effective_chunk_size = if self.config.chunk_size == 1000 {
-            adaptive_chunk_size(self.config.num_paths)
-        } else {
-            self.config.chunk_size
-        };
+        // Split paths into chunks for parallel processing. `None` requests
+        // adaptive chunking; `Some(n)` uses exactly `n`.
+        let effective_chunk_size = self
+            .config
+            .chunk_size
+            .unwrap_or_else(|| adaptive_chunk_size(self.config.num_paths));
 
         let chunks = parallel_path_chunks(self.config.num_paths, effective_chunk_size);
         let captured_sink: Option<Mutex<Vec<SimulatedPath>>> =

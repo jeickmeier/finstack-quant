@@ -782,19 +782,28 @@ pub struct MultiFactorResult {
     pub residual_vol: f64,
 }
 
-fn svd_least_squares(columns: &[Vec<f64>], y: &[f64]) -> crate::Result<Vec<f64>> {
+/// OLS via SVD of the design matrix `[1 | f₁ | … | f_k]` (leading intercept
+/// column), solving for `[α, β₁, …, β_k]`.
+///
+/// The design matrix is built directly from the borrowed factor slices: the
+/// intercept column is synthesized inline as `1.0` rather than materialized,
+/// avoiding the `k + 1` intermediate owned column vectors.
+fn svd_least_squares(factors: &[&[f64]], y: &[f64]) -> crate::Result<Vec<f64>> {
     use nalgebra::{DMatrix, DVector};
 
-    let p = columns.len();
+    let k = factors.len();
+    let p = k + 1; // intercept + k factors
     let n = y.len();
-    if p == 0 || n == 0 || columns.iter().any(|column| column.len() != n) {
+    if n == 0 || factors.iter().any(|column| column.len() != n) {
         return Err(crate::error::InputError::Invalid.into());
     }
 
     // Normalize columns before the SVD so factor scale alone does not trigger
     // false "singular" classifications in otherwise full-rank regressions.
+    // The intercept column of ones has Euclidean norm sqrt(n).
     let mut scales = Vec::with_capacity(p);
-    for column in columns {
+    scales.push((n as f64).sqrt());
+    for column in factors {
         let norm = neumaier_sum(column.iter().map(|value| value * value)).sqrt();
         if !norm.is_finite() || norm <= 0.0 {
             return Err(crate::error::InputError::Invalid.into());
@@ -804,8 +813,9 @@ fn svd_least_squares(columns: &[Vec<f64>], y: &[f64]) -> crate::Result<Vec<f64>>
 
     let mut design = Vec::with_capacity(n * p);
     for row in 0..n {
-        for (col_idx, column) in columns.iter().enumerate() {
-            design.push(column[row] / scales[col_idx]);
+        design.push(1.0 / scales[0]);
+        for (col_idx, column) in factors.iter().enumerate() {
+            design.push(column[row] / scales[col_idx + 1]);
         }
     }
 
@@ -845,8 +855,8 @@ where
         return 0.0;
     }
 
-    let mut port_logs = Vec::new();
-    let mut bench_logs = Vec::new();
+    let mut port_logs = Vec::with_capacity(n);
+    let mut bench_logs = Vec::with_capacity(n);
     for i in 0..n {
         if include(benchmark[i]) {
             let port_growth = 1.0 + returns[i];
@@ -997,11 +1007,7 @@ pub(crate) fn multi_factor_greeks(
         );
         return Err(crate::error::InputError::DimensionMismatch.into());
     }
-    let mut columns = Vec::with_capacity(p);
-    columns.push(vec![1.0_f64; n]);
-    columns.extend(factors.iter().map(|factor| factor.to_vec()));
-
-    let beta = svd_least_squares(&columns, returns)?;
+    let beta = svd_least_squares(factors, returns)?;
 
     let alpha_per_period = beta[0];
     let factor_betas: Vec<f64> = beta[1..].to_vec();

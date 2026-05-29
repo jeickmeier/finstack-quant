@@ -25,6 +25,6 @@ pub use short_rate_tree::{
 };
 pub use tree_framework::{
     single_factor_equity_state, state_keys, two_factor_equity_rates_state, BarrierSpec,
-    BarrierStyle, EvolutionParams, GreeksBumpConfig, NodeState, TreeBranching, TreeGreeks,
-    TreeModel, TreeParameters, TreeValuator,
+    BarrierStyle, EvolutionParams, NodeState, TreeBranching, TreeGreeks, TreeModel, TreeParameters,
+    TreeValuator,
 };

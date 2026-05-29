@@ -157,15 +157,22 @@ impl<'a> SensitivityAnalyzer<'a> {
             })
             .collect();
 
+        // Compile the model structure ONCE: `prepare` runs DAG construction, cycle
+        // detection, and formula compilation, all identical across perturbations
+        // (which change values, not topology). Workers clone the prepared evaluator
+        // — cheap, since the compiled-formula cache is `Arc`-shared — instead of each
+        // re-running `prepare`, and share the read-only evaluation plan.
+        let mut base_evaluator = Evaluator::new();
+        let prepared = base_evaluator.prepare(self.model)?;
+
         let scenarios: Result<Vec<SensitivityScenario>> = work
             .par_iter()
             .map(|(param, perturbation)| {
-                // Each worker owns its own model and evaluator — no shared
-                // mutable state, no restore bookkeeping needed because the
-                // local model is dropped at the end of the closure.
+                // Each worker owns its own model and evaluator clone — no shared
+                // mutable state, no restore bookkeeping needed because the local
+                // model is dropped at the end of the closure.
                 let mut local_model = self.model.clone();
-                let mut local_evaluator = Evaluator::new();
-                let prepared = local_evaluator.prepare(&local_model)?;
+                let mut local_evaluator = base_evaluator.clone();
 
                 self.apply_parameter_override(
                     &mut local_model,

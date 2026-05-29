@@ -38,7 +38,7 @@ finer breakdowns:
 - **RatesCurves** — per-curve and optional per-tenor IR risk
   (`RatesCurvesAttribution`).
 - **CreditCurves** — per-hazard-curve spread P&L, with optional generic /
-  per-level / adder decomposition via a calibrated `CreditFactorModelRef`
+  per-level / adder decomposition via a calibrated `CreditFactorModel`
   (`CreditFactorAttribution`).
 - **InflationCurves** — real-rate and CPI curve moves.
 - **Correlations** — base correlation curve changes for structured credit.
@@ -66,6 +66,7 @@ attribution/
 ├── credit_cascade.rs       # Waterfall credit-factor cascade
 ├── credit_decomposition.rs # Generic / per-level / adder decomposition
 ├── execution.rs            # AttributionSpec::execute dispatcher
+├── target_ccy.rs           # translate_to_target_ccy (native → reporting currency)
 └── spec.rs                 # JSON envelope, AttributionSpec, AttributionResult
 ```
 
@@ -200,8 +201,9 @@ the Python and WASM layers. Schemas live under `schemas/attribution/1/`.
 | `CarryDetail`, `RatesCurvesAttribution`, `CreditCurvesAttribution`, `CreditFactorAttribution`, `InflationCurvesAttribution`, `CorrelationsAttribution`, `FxAttribution`, `VolAttribution`, `ModelParamsAttribution`, `ScalarsAttribution`, `CrossFactorDetail`, `CreditCarryDecomposition`, `CreditCarryByLevel`, `LevelCarry`, `LevelPnl`, `SourceLine` | `types` | Per-factor detail structs                   |
 | `MarketSnapshot`, `MarketRestoreFlags`                                             | `factors`        | T₀/T₁ snapshot and per-factor restore primitives |
 | `compute_pnl`, `compute_pnl_with_fx`                                              | `helpers`        | Money/FX arithmetic for P&L computation     |
+| `translate_to_target_ccy`                                                         | `target_ccy`     | Post-hoc translation of a native-currency `PnlAttribution` into a reporting currency, adding `fx_translation_pnl` |
 | `extract_model_params`, `with_model_params`, `measure_prepayment_shift`, `measure_default_shift`, `measure_recovery_shift`, `measure_conversion_shift` | `model_params` | Model-parameter snapshotting and shift attribution; use `finstack_valuations::instruments::model_params::ModelParamsSnapshot` for the snapshot type |
-| `compute_credit_factor_attribution`, `CreditAttributionInput`, `CreditFactorDetailOptions`, `CreditFactorModelRef`, `credit_factor_model_id` | `credit_factor` | Calibrated credit-factor decomposition of `credit_curves_pnl` |
+| `compute_credit_factor_attribution`, `CreditAttributionInput`, `CreditFactorDetailOptions`, `credit_factor_model_id` | `credit_factor` | Calibrated credit-factor decomposition of `credit_curves_pnl`; the model type is `finstack_factor_model::credit::hierarchy::CreditFactorModel` |
 | `AttributionEnvelope`, `AttributionSpec`, `AttributionConfig`, `AttributionResult`, `AttributionResultEnvelope`, `ATTRIBUTION_SCHEMA_V1`, `default_attribution_metrics` | `spec` | JSON contract |
 
 ## Conventions
@@ -277,7 +279,7 @@ Follow an existing factor (e.g. `Fx` or `Volatility`) end-to-end as a template.
 
 - [`finstack-valuations`](../valuations/README.md) — instrument repricing used at T₀ and T₁.
 - [`finstack-cashflows`](../cashflows/README.md) — accrual and carry inputs.
-- [`finstack-factor-model`](../factor-model/README.md) — calibrated credit-factor models consumed via `CreditFactorModelRef`.
+- [`finstack-factor-model`](../factor-model/README.md) — calibrated credit-factor models consumed via `CreditFactorModel`.
 - [`finstack-portfolio`](../portfolio/README.md) — aggregates per-instrument `PnlAttribution`s into book-level views.
 
 ## References

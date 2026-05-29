@@ -18,9 +18,9 @@
 // Allow expect() in doc tests (they are test code)
 #![doc(test(attr(allow(clippy::expect_used))))]
 
-//! Comprehensive financial instrument pricing, risk, and cashflow analysis.
+//! Financial instrument pricing, risk, and cashflow analysis.
 //!
-//! This crate provides a deterministic, production-ready valuation engine for fixed income,
+//! This crate provides a deterministic valuation engine for fixed income,
 //! equity, credit, and derivative instruments. Built on accounting-grade numerics
 //! (Decimal by default), currency safety, and stable wire formats.
 //!

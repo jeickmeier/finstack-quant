@@ -37,6 +37,7 @@
 
 use std::collections::BTreeMap;
 
+use finstack_core::math::special_functions::{norm_pdf, standard_normal_inv_cdf};
 use finstack_core::types::IssuerId;
 use finstack_factor_model::credit::hierarchy::{
     CreditFactorModel, FactorVolModel, IdiosyncraticVolModel,
@@ -319,8 +320,11 @@ pub struct CreditVolReport {
     /// Per-hierarchy-level rollup, indexed positionally so callers can pair
     /// each entry with the matching [`CreditFactorModel::hierarchy`] level.
     pub by_level: Vec<LevelVolContribution>,
-    /// Sum of all per-position residual variance contributions (from
-    /// [`RiskDecomposition::position_residual_contributions`]).
+    /// Portfolio idiosyncratic risk in the units of [`Self::measure`]: the sum
+    /// of independent per-position residual *variances* (from
+    /// [`RiskDecomposition::position_residual_contributions`]), converted to
+    /// `measure` units — identity for Variance, `sqrt` for Volatility, and the
+    /// standalone parametric tail figure carrying the loss sign for VaR/ES.
     pub idiosyncratic_total: f64,
     /// Optional per-position breakdown if requested by the caller.
     pub by_position_optional: Option<Vec<PositionVolContribution>>,
@@ -348,9 +352,11 @@ pub struct PositionVolContribution {
     /// Total factor-driven (systematic) risk for the position.
     pub factor_total: f64,
     /// Idiosyncratic (issuer-specific) risk for the position in the units of
-    /// [`CreditVolReport::measure`]. Computed by summing per-position residual
-    /// *variances* (independent across positions), then converting to match
-    /// `measure` (sqrt for Volatility, identity for Variance).
+    /// [`CreditVolReport::measure`]. Computed from the per-position residual
+    /// *variance*, then converted to match `measure`: identity for Variance,
+    /// `sqrt` for Volatility, and the standalone parametric tail figure
+    /// (`-z·σ` for VaR, `-(φ(z)/(1−c))·σ` for ES, carrying the loss sign) for
+    /// the tail measures.
     pub idiosyncratic: f64,
     /// Approximate total combining factor and idiosyncratic contributions in
     /// the units of `measure`. For Volatility, this is `factor + idio` rather
@@ -444,16 +450,9 @@ pub fn build_credit_vol_report(
         .iter()
         .map(|c| c.residual_variance)
         .sum();
-    // Convert to match `measure`.
-    let idiosyncratic_total = match decomposition.measure {
-        RiskMeasure::Volatility => idiosyncratic_variance_sum.sqrt(),
-        // Variance: keep as-is.
-        RiskMeasure::Variance => idiosyncratic_variance_sum,
-        // For other measures (e.g. VaR/ES if added): treat as vol-flavoured
-        // (sqrt). Revisit when such measures are wired.
-        #[allow(unreachable_patterns)]
-        _ => idiosyncratic_variance_sum.sqrt(),
-    };
+    // Convert to match `measure` (sign/scale consistent with the systematic side).
+    let idiosyncratic_total =
+        idiosyncratic_in_measure_units(idiosyncratic_variance_sum, decomposition.measure);
 
     let by_position_optional = if by_position {
         // Aggregate per-position factor totals. We key on the position id's
@@ -477,14 +476,7 @@ pub fn build_credit_vol_report(
         }
         // Convert variance sums to match `measure`.
         for (_, variance) in idio_by_pos.values_mut() {
-            *variance = match decomposition.measure {
-                RiskMeasure::Volatility => variance.max(0.0).sqrt(),
-                RiskMeasure::Variance => *variance,
-                // For other measures: treat as vol-flavoured (sqrt).
-                // Revisit when such measures are wired.
-                #[allow(unreachable_patterns)]
-                _ => variance.max(0.0).sqrt(),
-            };
+            *variance = idiosyncratic_in_measure_units(*variance, decomposition.measure);
         }
 
         let mut all_keys: std::collections::BTreeSet<String> =
@@ -527,6 +519,36 @@ pub fn build_credit_vol_report(
         by_level,
         idiosyncratic_total,
         by_position_optional,
+    }
+}
+
+/// Convert an idiosyncratic (residual) *variance* into the units of `measure`,
+/// matching the sign/scale convention used for the systematic side
+/// ([`RiskDecomposition::total_risk`]).
+///
+/// Residual contributions are independent across positions, so a portfolio (or
+/// per-position) idiosyncratic variance maps to:
+/// - [`RiskMeasure::Variance`] → the variance unchanged;
+/// - [`RiskMeasure::Volatility`] → its square root (a volatility);
+/// - [`RiskMeasure::VaR`] → the standalone parametric VaR `-z_c · σ`, where
+///   `z_c = Φ⁻¹(c)`;
+/// - [`RiskMeasure::ExpectedShortfall`] → `-(φ(z_c) / (1 − c)) · σ`.
+///
+/// The tail measures carry the loss (negative) sign so the idiosyncratic figure
+/// is directly comparable to the systematic total. The `-z·σ` and
+/// `-(φ(z)/(1−c))·σ` forms are exactly what the systematic simulation converges
+/// to for a normal factor model.
+fn idiosyncratic_in_measure_units(variance: f64, measure: RiskMeasure) -> f64 {
+    match measure {
+        RiskMeasure::Variance => variance,
+        RiskMeasure::Volatility => variance.max(0.0).sqrt(),
+        RiskMeasure::VaR { confidence } => {
+            -standard_normal_inv_cdf(confidence) * variance.max(0.0).sqrt()
+        }
+        RiskMeasure::ExpectedShortfall { confidence } => {
+            let z = standard_normal_inv_cdf(confidence);
+            -(norm_pdf(z) / (1.0 - confidence)) * variance.max(0.0).sqrt()
+        }
     }
 }
 
@@ -940,5 +962,63 @@ mod tests {
         assert!(report.generic.abs() < 1e-12);
         assert!(report.by_level.iter().all(|l| l.total.abs() < 1e-12));
         assert!(report.by_position_optional.is_none());
+    }
+
+    #[test]
+    fn credit_vol_report_idiosyncratic_in_var_units() {
+        use finstack_core::math::special_functions::standard_normal_inv_cdf;
+
+        let model = two_factor_model();
+        let confidence = 0.99;
+        let decomposition = RiskDecomposition {
+            total_risk: -50.0,
+            measure: RiskMeasure::VaR { confidence },
+            factor_contributions: vec![],
+            residual_risk: 0.0,
+            position_factor_contributions: vec![],
+            position_residual_contributions: vec![
+                PositionResidualContribution {
+                    position_id: PositionId::new("pos-1"),
+                    residual_variance: 4.0,
+                    source: ResidualContributionSource::FromCreditModel {
+                        issuer_id: IssuerId::new("ACME"),
+                    },
+                },
+                PositionResidualContribution {
+                    position_id: PositionId::new("pos-2"),
+                    residual_variance: 5.0,
+                    source: ResidualContributionSource::FromCreditModel {
+                        issuer_id: IssuerId::new("BETA"),
+                    },
+                },
+            ],
+        };
+
+        let report = build_credit_vol_report(&decomposition, &model, true);
+
+        // VaR idiosyncratic must be reported in loss (negative) units consistent
+        // with the systematic total: -z_c * sqrt(sum of independent residual
+        // variances).
+        let z = standard_normal_inv_cdf(confidence);
+        let expected_total = -z * (4.0_f64 + 5.0).sqrt();
+        assert!(
+            (report.idiosyncratic_total - expected_total).abs() < 1e-9,
+            "idio VaR units: got {}, expected {}",
+            report.idiosyncratic_total,
+            expected_total
+        );
+        assert!(
+            report.idiosyncratic_total < 0.0,
+            "VaR idiosyncratic must carry the loss sign"
+        );
+
+        // Per-position idiosyncratic uses the same convention.
+        let by_pos = report.by_position_optional.expect("by_position rows");
+        let pos1 = by_pos
+            .iter()
+            .find(|p| p.position_id == PositionId::new("pos-1"))
+            .expect("pos-1 present");
+        let expected_pos1 = -z * 4.0_f64.sqrt();
+        assert!((pos1.idiosyncratic - expected_pos1).abs() < 1e-9);
     }
 }

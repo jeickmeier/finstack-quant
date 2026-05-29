@@ -70,4 +70,4 @@ pub use recombining::{
     price_recombining_tree, single_factor_equity_state, two_factor_equity_rates_state,
     RecombiningInputs,
 };
-pub use traits::{GreeksBumpConfig, TreeGreeks, TreeModel, TreeValuator};
+pub use traits::{TreeGreeks, TreeModel, TreeValuator};

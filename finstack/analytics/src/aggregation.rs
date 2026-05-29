@@ -199,18 +199,15 @@ pub(crate) fn group_by_period(
 /// ```
 pub(crate) fn period_stats_from_grouped(grouped: &[(PeriodId, f64)]) -> PeriodStats {
     // The period-id label is discarded; the stats depend only on the return
-    // series. Delegating via a slice keeps the two public entry points
-    // trivially equivalent and makes it obvious that no synthetic ids matter.
-    let returns: Vec<f64> = grouped.iter().map(|&(_, r)| r).collect();
-    period_stats_inner(&returns)
+    // series. Feeding the kernel an iterator over the compounded returns keeps
+    // the two public entry points trivially equivalent without materializing an
+    // intermediate `Vec<f64>`.
+    period_stats_inner(grouped.iter().map(|&(_, r)| r))
 }
 
-fn period_stats_inner(returns: &[f64]) -> PeriodStats {
-    if returns.is_empty() {
-        return PeriodStats::empty();
-    }
-
+fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodStats {
     // Single pass: compute all stats without intermediate allocations.
+    let mut total = 0usize;
     let mut best = f64::NEG_INFINITY;
     let mut worst = f64::INFINITY;
     let mut total_acc = NeumaierAccumulator::new();
@@ -224,7 +221,8 @@ fn period_stats_inner(returns: &[f64]) -> PeriodStats {
     let mut consecutive_wins = 0usize;
     let mut consecutive_losses = 0usize;
 
-    for &r in returns {
+    for r in returns {
+        total += 1;
         if r > best {
             best = r;
         }
@@ -254,7 +252,10 @@ fn period_stats_inner(returns: &[f64]) -> PeriodStats {
         }
     }
 
-    let total = returns.len();
+    if total == 0 {
+        return PeriodStats::empty();
+    }
+
     let total_sum = total_acc.total();
     let win_sum = win_acc.total();
     let loss_sum = loss_acc.total();

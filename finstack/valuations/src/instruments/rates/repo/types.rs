@@ -2,6 +2,7 @@
 
 use crate::cashflow::traits::CashflowProvider;
 use crate::contract_specs::embedded_registry;
+use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use finstack_core::dates::{adjust, BusinessDayConvention, Date, DateExt, DayCount};
 use finstack_core::market_data::context::MarketContext;
@@ -9,7 +10,6 @@ use finstack_core::money::Money;
 use finstack_core::types::{Bps, CalendarId, CurveId, InstrumentId};
 use finstack_core::{Error, Result};
 use finstack_margin::RepoMarginSpec;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
 use crate::impl_instrument_base;
@@ -393,9 +393,13 @@ impl Repo {
     }
 
     /// Calculate the effective repo rate considering special collateral adjustments.
-    pub fn effective_rate(&self) -> f64 {
-        let base_rate = self.repo_rate.to_f64().unwrap_or(0.0);
-        match &self.collateral.collateral_type {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `repo_rate` cannot be represented as `f64`.
+    pub fn effective_rate(&self) -> Result<f64> {
+        let base_rate = decimal_to_f64(self.repo_rate, "Repo repo_rate")?;
+        Ok(match &self.collateral.collateral_type {
             CollateralType::General => base_rate,
             CollateralType::Special {
                 rate_adjustment_bp, ..
@@ -407,7 +411,7 @@ impl Repo {
                     base_rate
                 }
             }
-        }
+        })
     }
 
     /// Calculate required collateral value including haircut.
@@ -497,7 +501,7 @@ impl Repo {
             finstack_core::dates::DayCountContext::default(),
         )?;
 
-        let effective_rate = self.effective_rate();
+        let effective_rate = self.effective_rate()?;
         let interest = self.cash_amount.amount() * effective_rate * year_fraction;
 
         Ok(Money::new(interest, self.cash_amount.currency()))

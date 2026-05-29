@@ -1,22 +1,16 @@
 //! Shared pricing utilities for swap legs.
 //!
-//! This module consolidates the floating and fixed leg pricing logic that was
-//! previously duplicated across IRS, BasisSwap, and other swap instruments.
-//! The implementation preserves the Bloomberg-validated methodology from IRS.
+//! This module consolidates the floating and fixed leg pricing logic shared by
+//! IRS, BasisSwap, and other swap instruments.
 //!
-//! # Key Features
+//! # Capabilities
 //!
-//! - Numerical stability via robust relative discount factor calculation
+//! - Numerical stability via relative discount factor calculation
+//!   ([`robust_relative_df`])
 //! - Neumaier compensated summation for long-dated swaps
 //! - Holiday-aware payment delay handling
 //! - Compounded-in-arrears support for RFR swaps (SOFR, SONIA, etc.)
 //! - Forward rate projection with floor/cap/gearing
-//!
-//! # Bloomberg Validation
-//!
-//! The `robust_relative_df` function implements the same numerical stability
-//! checks used in IRS pricing that have been validated against Bloomberg SWPM
-//! for discount factor calibration.
 
 use crate::cashflow::builder::rate_helpers::FloatingRateParams;
 use finstack_core::dates::CalendarRegistry;

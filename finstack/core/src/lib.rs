@@ -61,10 +61,16 @@
 //! - [`types`]: Core type definitions (IDs, rates, etc.)
 //! - [`prelude`]: Convenient re-exports of commonly used types
 //! - [`cashflow`]: Cashflow primitives and discounting
+//! - [`credit`]: Credit risk primitives (migration models, generator extraction, CTMC simulation)
 //! - [`math`]: Numerical utilities and interpolation
 //! - [`expr`]: Expression engine for formula evaluation
 //! - [`explain`]: Computation tracing and debugging
 //! - [`error`]: Error types and result handling
+//! - [`decimal`]: `f64 ↔ Decimal` conversion helpers with explicit error propagation
+//! - [`rating_scales`]: Shared credit rating-scale registry
+//! - [`table`]: Serializable columnar table envelope for host-language bindings
+//! - [`validation`]: Generic invariant-checking helpers
+//! - [`versions`]: Canonical model-version strings for calibration reports
 //!
 //! For most users, importing `use finstack_core::prelude::*;` provides
 //! all commonly needed types.

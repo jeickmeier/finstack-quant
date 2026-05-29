@@ -261,6 +261,68 @@ pub fn binomial_probability(n: usize, k: usize, p: f64) -> f64 {
     }
 }
 
+/// Compute the full binomial PMF `P(K = k)` for every `k` in `0..=n` in one pass.
+///
+/// Returns a vector `pmf` of length `n + 1` where `pmf[k]` is the probability of
+/// exactly `k` successes in `n` independent trials each with success probability
+/// `p`. This is mathematically equivalent to calling [`binomial_probability`] for
+/// every `k`, but evaluates the whole distribution in `O(n)` arithmetic via the
+/// forward recurrence
+///
+/// ```text
+/// P(0)     = (1 - p)^n
+/// P(k + 1) = P(k) · (n - k) / (k + 1) · p / (1 - p)
+/// ```
+///
+/// instead of constructing `n + 1` separate distributions. Prefer this when an
+/// algorithm needs the PMF across a range of `k` for fixed `(n, p)` — for example
+/// summing a portfolio loss over the number of defaults.
+///
+/// # Arguments
+///
+/// * `n` - Number of trials.
+/// * `p` - Success probability. Values `<= 0` and `>= 1` collapse to the
+///   degenerate distributions (all mass on `k = 0` and `k = n` respectively),
+///   matching [`binomial_probability`].
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_core::math::{binomial_pmf_all, binomial_probability};
+///
+/// let pmf = binomial_pmf_all(10, 0.3);
+/// assert_eq!(pmf.len(), 11);
+/// for k in 0..=10 {
+///     assert!((pmf[k] - binomial_probability(10, k, 0.3)).abs() < 1e-12);
+/// }
+/// ```
+///
+/// # References
+///
+/// - Johnson, N. L., Kotz, S., & Kemp, A. W. (1993). *Univariate Discrete Distributions*
+///   (2nd ed.). Wiley. Chapter 3.
+#[must_use]
+pub fn binomial_pmf_all(n: usize, p: f64) -> Vec<f64> {
+    let mut pmf = vec![0.0; n + 1];
+    if p <= 0.0 {
+        pmf[0] = 1.0;
+        return pmf;
+    }
+    if p >= 1.0 {
+        pmf[n] = 1.0;
+        return pmf;
+    }
+
+    let ratio = p / (1.0 - p);
+    let mut prob = (1.0 - p).powi(n as i32);
+    pmf[0] = prob;
+    for k in 0..n {
+        prob *= (n - k) as f64 / (k + 1) as f64 * ratio;
+        pmf[k + 1] = prob;
+    }
+    pmf
+}
+
 /// Calculate log of binomial coefficient ln(C(n,k)).
 ///
 /// Computes the natural logarithm of "n choose k" using numerically stable
@@ -1779,6 +1841,35 @@ mod tests {
 
         // sigma = 0 is valid (degenerate distribution)
         assert!(sample_lognormal(&mut rng as &mut dyn RandomNumberGenerator, 0.0, 0.0).is_ok());
+    }
+
+    #[test]
+    fn binomial_pmf_all_matches_binomial_probability() {
+        for &(n, p) in &[(10usize, 0.3f64), (50, 0.05), (126, 0.5), (20, 0.9)] {
+            let pmf = binomial_pmf_all(n, p);
+            assert_eq!(pmf.len(), n + 1);
+            for (k, &prob) in pmf.iter().enumerate() {
+                assert!(
+                    (prob - binomial_probability(n, k, p)).abs() < 1e-10,
+                    "n={n}, k={k}, p={p}: recurrence {} vs statrs {}",
+                    prob,
+                    binomial_probability(n, k, p)
+                );
+            }
+            let total: f64 = pmf.iter().sum();
+            assert!((total - 1.0).abs() < 1e-9, "n={n}, p={p}: pmf sum={total}");
+        }
+    }
+
+    #[test]
+    fn binomial_pmf_all_handles_degenerate_p() {
+        let lo = binomial_pmf_all(5, 0.0);
+        assert_eq!(lo[0], 1.0);
+        assert!(lo[1..].iter().all(|&x| x == 0.0));
+
+        let hi = binomial_pmf_all(5, 1.0);
+        assert_eq!(hi[5], 1.0);
+        assert!(hi[..5].iter().all(|&x| x == 0.0));
     }
 
     #[test]

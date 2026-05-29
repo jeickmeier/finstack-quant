@@ -7,7 +7,7 @@
 use crate::dates::{Date, Duration, PeriodKind};
 
 use super::drawdown::to_drawdown_series;
-use super::returns::{clean_returns, simple_returns};
+use super::returns::{clean_returns, pairwise_returns};
 
 mod aggregation;
 mod benchmark;
@@ -256,7 +256,7 @@ impl Performance {
 
         let returns_matrix: Vec<Vec<f64>> = prices
             .iter()
-            .map(|price_col| simple_returns(price_col)[1..].to_vec())
+            .map(|price_col| pairwise_returns(price_col))
             .collect();
         let return_dates = if dates.len() > 1 {
             dates[1..].to_vec()

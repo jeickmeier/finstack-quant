@@ -154,24 +154,6 @@ fn tree_greeks_richardson_extrapolation_matches_formula() {
 }
 
 #[test]
-fn greeks_bump_config_defaults_adaptive_ranges_and_custom_spot_bump() {
-    let default_cfg = GreeksBumpConfig::default();
-    assert!((default_cfg.spot_bump_fraction - 0.01).abs() < 1e-12);
-    assert!((default_cfg.vol_bump_absolute - 0.01).abs() < 1e-12);
-    assert!((default_cfg.rate_bump_absolute - 0.0001).abs() < 1e-12);
-    assert!((default_cfg.time_bump_years - 1.0 / 365.25).abs() < 1e-12);
-    assert!(!default_cfg.adaptive);
-    assert!((default_cfg.spot_bump(100.0, Some(100.0)) - 1.0).abs() < 1e-12);
-
-    let adaptive = GreeksBumpConfig::adaptive().with_spot_bump(0.02);
-    assert!(adaptive.adaptive);
-    assert!((adaptive.spot_bump(100.0, Some(100.0)) - 1.0).abs() < 1e-12);
-    assert!((adaptive.spot_bump(100.0, Some(160.0)) - 2.0).abs() < 1e-12);
-    assert!((adaptive.spot_bump(100.0, Some(260.0)) - 4.0).abs() < 1e-12);
-    assert!((adaptive.spot_bump(100.0, None) - 2.0).abs() < 1e-12);
-}
-
-#[test]
 fn default_tree_model_calculate_greeks_uses_central_differences_and_restores_vars() {
     let model = MockTreeModel;
     let valuator = QuadraticValuator;

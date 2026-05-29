@@ -11,6 +11,27 @@ use finstack_core::{dates::Date, market_data::context::MarketContext, money::Mon
 /// Pricer for Discounted Cash Flow instruments.
 pub(crate) struct DcfPricer;
 
+/// Compute the DCF equity present value.
+///
+/// # Discounting basis (two distinct rates, by design)
+///
+/// This model deliberately uses two separate rates:
+/// - **Discount rate** — explicit cash flows *and* the terminal value are
+///   present-valued with the market discount curve named by
+///   [`DiscountedCashFlow::discount_curve_id`] when that curve is loaded in
+///   `market`. This is what gives the instrument its rate sensitivity; the
+///   `Dv01`/`BucketedDv01`/`EnterpriseValue` metrics bump exactly this curve.
+///   When the curve is **not** loaded, discounting falls back to the
+///   instrument's own `wacc` via `(1 + wacc)^t`.
+/// - **Terminal cap rate** — the terminal value itself is *capitalized* at
+///   `wacc` inside [`DiscountedCashFlow::calculate_terminal_value`] (the
+///   Gordon/H-model `1 / (wacc - g)` factor), independent of the discount rate.
+///
+/// Pairing a WACC cap rate with curve discounting is intentional: the exit value
+/// is a long-run, growth-adjusted multiple (WACC-based), while the path back to
+/// today is discounted at observable market rates. Consequently the PV moves with
+/// the loaded curve. The metric calculators in `metrics/mod.rs` mirror this exact
+/// convention so the reported PV and its sensitivities stay consistent.
 pub(crate) fn compute_pv(
     dcf: &DiscountedCashFlow,
     market: &MarketContext,

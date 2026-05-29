@@ -1,20 +1,23 @@
 # Finstack Valuations
 
-`finstack-valuations` prices instruments, computes risk metrics, calibrates market structures, attributes P&L, and evaluates covenants. Results use deterministic numerics and schema-versioned JSON where serialization applies.
+`finstack-valuations` prices instruments, computes risk metrics, and calibrates market structures. Results use deterministic numerics and schema-versioned JSON where serialization applies.
 
 ## Layout
 
 | Path | Role |
 |------|------|
 | `src/instruments/` | Instrument types, pricing, JSON loading |
+| `src/pricer/` | Pricing dispatch and registry infrastructure |
+| `src/models/` | Pricing models and numerical methods (analytical, tree, PDE, Monte Carlo) |
 | `src/metrics/` | `MetricId`, registries, sensitivity calculators |
 | `src/calibration/` | Calibration plans, solvers, validation |
 | `src/market/` | Quotes, conventions, quote-to-instrument builders |
-| `src/attribution/` | Parallel, waterfall, and metrics-based P&L attribution |
-| `src/covenants/` | Covenant evaluation and forward projection |
 | `src/results/` | `ValuationResult` and export helpers |
 | `src/correlation/` | Correlation, copula, and factor models for credit structures |
 | `schemas/` | Generated JSON Schema artifacts |
+
+P&L attribution and covenant evaluation live in the separate `finstack-attribution`
+and `finstack-covenants` crates (the latter is a dependency of this crate).
 
 ## Dependencies
 
@@ -49,7 +52,7 @@ finstack = { path = "../finstack", features = ["valuations"] }
 
 Crate API docs: `cargo doc -p finstack-valuations --open`.
 
-Module READMEs under `src/` cover calibration, metrics, instruments, attribution, and related areas.
+Module READMEs under `src/` cover calibration, metrics, instruments, market, and results.
 
 ## Verification
 

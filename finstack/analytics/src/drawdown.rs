@@ -4,7 +4,7 @@
 //! root). `///` doc examples target crate developers and are marked `ignore`.
 //!
 //! Drawdown measures the peak-to-trough decline in cumulative wealth.
-//! This module provides four levels of granularity:
+//! This module provides five levels of granularity:
 //! - [`to_drawdown_series`]: per-period drawdown depth as a time series.
 //! - [`drawdown_details`]: structured episodes (start, valley, recovery).
 //! - [`mean_episode_drawdown`]: scalar average of the worst N episode minima.

@@ -17,8 +17,8 @@ serde-friendly specs and executed by a single engine.
 
 ## Operation families
 
-- **Market data**: FX, equity, discount/forward/hazard/inflation curves, base correlation,
-  volatility surfaces.
+- **Market data**: FX, equity, discount/forward/par-CDS/inflation/commodity curves,
+  base correlation, volatility surfaces.
 - **Statements**: forecast percent/assign, rate bindings.
 - **Instruments**: price and spread shocks by type or attribute selector.
 - **Time**: horizon roll-forward with carry/theta-aware paths.

@@ -517,6 +517,16 @@ impl MertonMcEngine {
         let mut uniforms = vec![0.0f64; total_steps];
         let mut toggle_uniforms = vec![0.0f64; num_coupons];
 
+        // First-passage barriers depend only on the time step (deterministic in
+        // `t`), so precompute them once rather than evaluating two `exp()` per step
+        // per path. Empty for `Terminal`, which uses the flat `debt_barrier`.
+        let first_passage_barriers: Vec<f64> = match barrier_type {
+            BarrierType::FirstPassage { .. } => (0..=total_steps)
+                .map(|i| debt_barrier * (barrier_growth_rate * (i as f64 * dt)).exp())
+                .collect(),
+            BarrierType::Terminal => Vec::new(),
+        };
+
         for path_idx in 0..n_base {
             // Per-path RNG for determinism
             let mut rng = Pcg64Rng::new_with_stream(config.seed, path_idx as u64);
@@ -554,7 +564,6 @@ impl MertonMcEngine {
                 let mut coupon_idx: usize = 0;
 
                 for (step, &normal_draw) in normals.iter().enumerate().take(total_steps) {
-                    let t_prev = step as f64 * dt;
                     let t = (step + 1) as f64 * dt;
                     let z = normal_draw * sign;
                     // For the antithetic path (sign = -1) the trajectory is
@@ -572,9 +581,7 @@ impl MertonMcEngine {
 
                     let v_prev = v;
                     let barrier_prev = match barrier_type {
-                        BarrierType::FirstPassage { .. } => {
-                            debt_barrier * (barrier_growth_rate * t_prev).exp()
-                        }
+                        BarrierType::FirstPassage { .. } => first_passage_barriers[step],
                         BarrierType::Terminal => debt_barrier,
                     };
 
@@ -603,7 +610,7 @@ impl MertonMcEngine {
                             }
                         }
                         BarrierType::FirstPassage { .. } => {
-                            let barrier = debt_barrier * (barrier_growth_rate * t).exp();
+                            let barrier = first_passage_barriers[step + 1];
                             let crossed = if v < barrier {
                                 true
                             } else if matches!(

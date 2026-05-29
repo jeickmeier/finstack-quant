@@ -153,7 +153,11 @@ fn test_effective_rate_metric() {
 
     let effective_rate = results.get(&MetricId::EffectiveRate).unwrap();
 
-    assert_approx_eq(*effective_rate, repo.effective_rate(), 1e-9);
+    assert_approx_eq(
+        *effective_rate,
+        repo.effective_rate().expect("effective rate"),
+        1e-9,
+    );
 }
 
 #[test]

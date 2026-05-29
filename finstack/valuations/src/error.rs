@@ -15,7 +15,7 @@
 //! ```
 //!
 //! All variants convert one-way into [`finstack_core::Error`] via [`From`] for
-//! seamless integration with the core error hierarchy.  The `Core` variant
+//! integration with the core error hierarchy.  The `Core` variant
 //! enables ergonomic `?` propagation from core functions, consistent with
 //! all other Finstack crates (portfolio, statements, scenarios, io).
 //! For richer context when mapping core errors inside pricers, see
@@ -27,7 +27,6 @@
 //! `ValidationError`) so they can be imported
 //! alongside `finstack_core::Error` without ambiguity. The unified wrapper
 //! is re-exported at crate root as `Error` (matching the standard convention).
-//! See `docs/CONVENTIONS_ERROR_NAMING.md` for the cross-crate naming rationale.
 //!
 //! # Module Layout Convention
 //!

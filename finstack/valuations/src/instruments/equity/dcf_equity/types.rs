@@ -227,7 +227,15 @@ pub struct DiscountedCashFlow {
     /// Valuation date (as-of date for the DCF).
     #[schemars(with = "String")]
     pub valuation_date: Date,
-    /// Discount curve identifier for pricing.
+    /// Discount curve used to present-value the explicit cash flows and the
+    /// terminal value.
+    ///
+    /// When this curve is loaded in the market context it acts as the discount
+    /// rate — which is what gives the DCF its rate sensitivity (DV01). When the
+    /// curve is absent, discounting falls back to [`wacc`](Self::wacc). The
+    /// terminal value is always *capitalized* at `wacc` (see
+    /// [`calculate_terminal_value`](Self::calculate_terminal_value)); the cap
+    /// rate and the discount rate are intentionally distinct.
     pub discount_curve_id: CurveId,
     /// Mid-year discounting convention (default: `false` = end-of-year).
     ///
@@ -1003,6 +1011,50 @@ mod tests {
     fn build_market_with_flat_curve(as_of: Date, curve_id: &CurveId, rate: f64) -> MarketContext {
         let curve = build_flat_discount_curve(curve_id, as_of, rate);
         MarketContext::new().insert(curve)
+    }
+
+    #[test]
+    fn curve_present_discounts_at_curve_not_wacc() {
+        let as_of =
+            Date::from_calendar_date(2025, Month::January, 1).expect("valid valuation date");
+        let mut dcf = build_simple_dcf_gordon();
+        dcf.valuation_date = as_of;
+
+        // Curve at 5% is below the 10% WACC, so present-valuing on the curve must
+        // yield a strictly higher value than the WACC fallback. This pins the
+        // curve-present path and proves the loaded curve is the discount rate.
+        let market_curve = build_market_with_flat_curve(as_of, &dcf.discount_curve_id, 0.05);
+        let pv_curve = dcf.value(&market_curve, as_of).expect("curve pv");
+        let pv_wacc = dcf
+            .value(&MarketContext::new(), as_of)
+            .expect("wacc fallback pv");
+
+        assert!(
+            pv_curve.amount() > pv_wacc.amount(),
+            "curve(5%) discounting should exceed WACC(10%) fallback: curve={}, wacc={}",
+            pv_curve.amount(),
+            pv_wacc.amount()
+        );
+
+        // The pricer path must reconstruct exactly from the same curve discount
+        // factors: terminal value is capitalized at WACC, then discounted on the
+        // curve along with the explicit flows.
+        let curve = market_curve
+            .get_discount(&dcf.discount_curve_id)
+            .expect("curve loaded");
+        let tv = dcf.calculate_terminal_value().expect("terminal value");
+        let mut expected_ev = 0.0;
+        for (date, amount) in &dcf.flows {
+            let years = dcf.discount_years(dcf.valuation_date, *date);
+            expected_ev += amount * curve.df(years);
+        }
+        if let Some((tdate, _)) = dcf.flows.last() {
+            let years = dcf.discount_years(dcf.valuation_date, *tdate);
+            expected_ev += tv * curve.df(years);
+        }
+        // `build_simple_dcf_gordon` has zero net debt and no bridge/discounts, so
+        // equity value equals enterprise value.
+        assert!((pv_curve.amount() - expected_ev).abs() < 1e-6);
     }
 
     fn build_metric_context(

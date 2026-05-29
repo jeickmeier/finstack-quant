@@ -28,7 +28,6 @@
 //! Result and config types ([`PeriodStats`], [`DrawdownEpisode`],
 //! [`BetaResult`], [`GreeksResult`], [`RollingGreeks`], [`MultiFactorResult`],
 //! [`CagrBasis`], [`AnnualizationConvention`], [`DatedSeries`],
-//! [`DatedSeries`], [`DatedSeries`], [`DatedSeries`],
 //! [`LookbackReturns`]) are re-exported here because `Performance` returns
 //! them.
 //!

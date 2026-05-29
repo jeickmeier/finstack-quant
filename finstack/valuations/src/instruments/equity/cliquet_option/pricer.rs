@@ -396,7 +396,7 @@ impl CliquetOptionMcPricer {
             time_grid,
             target_ci_half_width: None,
             use_parallel: merged_cfg.use_parallel,
-            chunk_size: merged_cfg.chunk_size,
+            chunk_size: Some(merged_cfg.chunk_size),
             path_capture: merged_cfg.path_capture.clone(),
             antithetic: merged_cfg.antithetic,
         };

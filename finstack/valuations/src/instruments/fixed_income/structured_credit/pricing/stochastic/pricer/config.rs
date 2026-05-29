@@ -124,53 +124,6 @@ impl StochasticPricerConfig {
         }
     }
 
-    /// Create RMBS-standard configuration.
-    // Intentionally-kept convenience constructor: mirrors `ScenarioTreeConfig::rmbs_standard`
-    // and is referenced from the module docs; not currently exercised by callers.
-    #[allow(dead_code)]
-    pub(crate) fn rmbs_standard(
-        valuation_date: Date,
-        discount_curve: Arc<DiscountCurve>,
-        pool_coupon: f64,
-        horizon_years: f64,
-    ) -> Self {
-        let tree_config = ScenarioTreeConfig::rmbs_standard(horizon_years, pool_coupon);
-        Self {
-            valuation_date,
-            discount_curve,
-            pricing_mode: PricingMode::Tree,
-            tree_config,
-            compute_risk_metrics: true,
-            es_confidence: 0.95,
-            seed: 42,
-            max_tree_paths: 100_000,
-            pool_granularity: PoolGranularity::default(),
-        }
-    }
-
-    /// Create CLO-standard configuration.
-    // Intentionally-kept convenience constructor: mirrors `ScenarioTreeConfig::clo_standard`;
-    // not currently exercised by callers.
-    #[allow(dead_code)]
-    pub(crate) fn clo_standard(
-        valuation_date: Date,
-        discount_curve: Arc<DiscountCurve>,
-        horizon_years: f64,
-    ) -> Self {
-        let tree_config = ScenarioTreeConfig::clo_standard(horizon_years);
-        Self {
-            valuation_date,
-            discount_curve,
-            pricing_mode: PricingMode::Tree,
-            tree_config,
-            compute_risk_metrics: true,
-            es_confidence: 0.95,
-            seed: 42,
-            max_tree_paths: 100_000,
-            pool_granularity: PoolGranularity::default(),
-        }
-    }
-
     /// Select the pool-granularity policy for copula-based default models.
     ///
     /// Defaults to [`PoolGranularity::PerName`]; pass
@@ -182,57 +135,10 @@ impl StochasticPricerConfig {
         self
     }
 
-    /// Set maximum terminal paths for explicit tree mode.
-    // Intentionally-kept builder method; not currently exercised by callers.
-    #[allow(dead_code)]
-    pub(crate) fn with_max_tree_paths(mut self, max_paths: usize) -> Self {
-        self.max_tree_paths = max_paths.max(1);
-        self
-    }
-
     /// Set pricing mode.
     pub(crate) fn with_pricing_mode(mut self, mode: PricingMode) -> Self {
         self.pricing_mode = mode;
         self
-    }
-
-    /// Set whether to compute risk metrics.
-    // Intentionally-kept builder method; exercised by unit tests, no production caller yet.
-    #[allow(dead_code)]
-    pub(crate) fn with_risk_metrics(mut self, compute: bool) -> Self {
-        self.compute_risk_metrics = compute;
-        self
-    }
-
-    /// Set ES confidence level.
-    // Intentionally-kept builder method; exercised by unit tests, no production caller yet.
-    #[allow(dead_code)]
-    pub(crate) fn with_es_confidence(mut self, confidence: f64) -> Self {
-        self.es_confidence = confidence.clamp(0.80, 0.9999);
-        self
-    }
-
-    /// Set random seed.
-    // Intentionally-kept builder method; exercised by unit tests, no production caller yet.
-    #[allow(dead_code)]
-    pub(crate) fn with_seed(mut self, seed: u64) -> Self {
-        self.seed = seed;
-        self.tree_config = self.tree_config.with_seed(seed);
-        self
-    }
-
-    /// Check if using tree pricing mode.
-    // Intentionally-kept query accessor; exercised by unit tests, no production caller yet.
-    #[allow(dead_code)]
-    pub(crate) fn is_tree_mode(&self) -> bool {
-        matches!(self.pricing_mode, PricingMode::Tree)
-    }
-
-    /// Check if using Monte Carlo pricing mode.
-    // Intentionally-kept query accessor; exercised by unit tests, no production caller yet.
-    #[allow(dead_code)]
-    pub(crate) fn is_monte_carlo_mode(&self) -> bool {
-        matches!(self.pricing_mode, PricingMode::MonteCarlo { .. })
     }
 }
 
@@ -297,7 +203,7 @@ mod tests {
         let config = StochasticPricerConfig::new(today, curve, tree_config);
 
         assert_eq!(config.valuation_date, today);
-        assert!(config.is_tree_mode());
+        assert!(matches!(config.pricing_mode, PricingMode::Tree));
         assert!(config.compute_risk_metrics);
     }
 
@@ -314,13 +220,11 @@ mod tests {
         );
 
         let config = StochasticPricerConfig::new(today, curve, tree_config)
-            .with_pricing_mode(PricingMode::monte_carlo(10000))
-            .with_risk_metrics(true)
-            .with_es_confidence(0.99)
-            .with_seed(12345);
+            .with_pricing_mode(PricingMode::monte_carlo(10000));
 
-        assert!(config.is_monte_carlo_mode());
-        assert!((config.es_confidence - 0.99).abs() < 1e-10);
-        assert_eq!(config.seed, 12345);
+        assert!(matches!(
+            config.pricing_mode,
+            PricingMode::MonteCarlo { .. }
+        ));
     }
 }

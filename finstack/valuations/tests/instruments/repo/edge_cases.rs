@@ -350,7 +350,7 @@ fn test_special_collateral_without_rate_adjustment() {
     )
     .expect("Repo construction should succeed");
 
-    let effective_rate = repo.effective_rate();
+    let effective_rate = repo.effective_rate().expect("effective rate");
 
     // No adjustment, so should equal base rate
     assert_approx_eq(effective_rate, 0.05, 1e-9);

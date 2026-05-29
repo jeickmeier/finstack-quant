@@ -17,6 +17,7 @@ use crate::cashflow::builder::{
 use crate::cashflow::primitives::CFKind;
 use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
+use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::pricing::swap_legs::robust_relative_df;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -26,7 +27,6 @@ use finstack_core::money::fx::FxQuery;
 use finstack_core::money::Money;
 use finstack_core::types::{CurveId, InstrumentId};
 use finstack_core::Result;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
 /// Threshold for extremely negative forward rates that warrant a warning.
@@ -797,7 +797,8 @@ impl XccySwap {
                 );
             }
 
-            let total_rate = forward_rate + leg.spread_bp.to_f64().unwrap_or_default() / 10_000.0;
+            let spread = decimal_to_f64(leg.spread_bp, "XccySwap leg spread_bp")?;
+            let total_rate = forward_rate + spread / 10_000.0;
             let coupon = leg.side.coupon_sign()
                 * leg.notional.amount()
                 * total_rate

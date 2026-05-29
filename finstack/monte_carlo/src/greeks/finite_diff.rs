@@ -490,7 +490,7 @@ mod tests {
             time_grid,
             target_ci_half_width: None,
             use_parallel: false,
-            chunk_size: 1000,
+            chunk_size: None,
             path_capture: crate::engine::PathCaptureConfig::default(),
             antithetic: false,
         });
@@ -526,7 +526,7 @@ mod tests {
             time_grid,
             target_ci_half_width: None,
             use_parallel: false,
-            chunk_size: 1000,
+            chunk_size: None,
             path_capture: crate::engine::PathCaptureConfig::default(),
             antithetic: false,
         });
@@ -574,7 +574,7 @@ mod tests {
             time_grid,
             target_ci_half_width: None,
             use_parallel: false,
-            chunk_size: 1000,
+            chunk_size: None,
             path_capture: crate::engine::PathCaptureConfig::default(),
             antithetic: false,
         });
@@ -608,7 +608,7 @@ mod tests {
             time_grid,
             target_ci_half_width: None,
             use_parallel: false,
-            chunk_size: 1000,
+            chunk_size: None,
             path_capture: crate::engine::PathCaptureConfig::default(),
             antithetic: false,
         });

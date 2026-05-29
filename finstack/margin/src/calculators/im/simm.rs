@@ -857,9 +857,26 @@ impl SimmCalculator {
         (total_vega * self.params.commodity_vega_weight).abs()
     }
 
-    /// Calculate curvature margin across risk classes.
+    /// Calculate the curvature margin add-on across risk classes.
     ///
-    /// SIMM curvature risk = scale_factor x max(0, sum of curvature CVR)
+    /// # Approximation — not full ISDA SIMM v2.6 curvature aggregation
+    ///
+    /// Given per-risk-class curvature contributions (`CVR`), this computes a
+    /// **simplified** charge
+    /// `sqrt(max(0, Σ_i Σ_j ρ_ij · (SF·CVR_i)(SF·CVR_j)))`, reusing the **delta**
+    /// cross-risk-class correlation matrix `ρ_ij` and a single flat
+    /// `curvature_scale_factor`. It deliberately does **not** implement the full
+    /// ISDA SIMM v2.6 §8–9 curvature aggregation, which uses squared curvature
+    /// correlations (`ρ²`) and a lambda/theta bucket combination
+    /// `K = max(0, ΣCVR_b) + λ·sqrt(max(0, Σ_b Σ_{c≠b} ρ²·CVR_b·CVR_c + Σ CVR_b²))`,
+    /// nor the per-tenor scale factor `SF(t) = 0.5·min(1, 14/t_days)` used upstream
+    /// to turn vega into `CVR` (the inputs here are taken as already-formed `CVR`).
+    ///
+    /// Consequently this add-on will **not** tie out to an ISDA SIMM benchmark for
+    /// portfolios with material curvature/gamma (e.g. option-heavy books). The
+    /// registry (`simm.v1.json`) carries only `curvature_scale_factor`, not the
+    /// spec's `ρ²` / lambda parameters; implementing the full methodology is
+    /// deferred pending SIMM golden vectors to validate against.
     ///
     /// `curvature_by_risk_class` should contain signed currency curvature
     /// contributions before the SIMM scale factor is applied.

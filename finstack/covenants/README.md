@@ -9,6 +9,9 @@ covenants/
 ├── engine.rs    # CovenantEngine, specs, consequences, breach tracking
 ├── forward.rs   # Forward projection (deterministic or MC)
 ├── schedule.rs  # Piecewise threshold schedules
+├── metric.rs    # CovenantMetricId, metric-source traits
+├── templates.rs # Preset covenant packages (lbo_standard, cov_lite, ...)
+├── json.rs      # Serde-first JSON binding surface
 └── report.rs    # CovenantReport
 ```
 
@@ -53,6 +56,18 @@ After cure expiry, `apply_consequences` can apply `RateIncrease`, `CashSweep`, `
 ## Windows
 
 `CovenantWindow` restricts which specs apply between `start` and `end`; active windows override base specs.
+
+## Templates
+
+`templates` provides preset covenant packages that return `Vec<CovenantSpec>`
+ready for `CovenantEngine`: `lbo_standard`, `cov_lite`, `real_estate`, and
+`project_finance`.
+
+## JSON
+
+`json` is a serde-first binding surface: `evaluate_engine_json`, the
+`validate_*_json` validators, and JSON template builders (`lbo_standard_json`,
+`cov_lite_json`, `project_finance_json`, `real_estate_json`).
 
 ## Related
 

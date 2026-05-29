@@ -57,11 +57,13 @@ pub(crate) fn clean_returns(r: &mut Vec<f64>, ticker: &str) {
     }
 }
 
-/// Simple (percentage-change) returns from a price series.
+/// Pairwise simple (percentage-change) returns from a price series.
 ///
-/// For prices `[p0, p1, p2, ...]` returns `[0.0, p1/p0 - 1, p2/p1 - 1, ...]`.
-/// The leading zero mirrors the Python "prepend a zero before first valid"
-/// convention, keeping output length equal to input length.
+/// For prices `[p0, p1, p2, ...]` returns `[p1/p0 - 1, p2/p1 - 1, ...]`
+/// (length `prices.len() - 1`). Unlike the Python "prepend a zero before
+/// first valid" convention, no leading `0.0` is emitted, so the output
+/// pairs 1:1 with the return-aligned date grid used by
+/// [`crate::Performance::new`].
 ///
 /// Non-positive or non-finite prices produce `NaN` for that element.
 ///
@@ -71,25 +73,29 @@ pub(crate) fn clean_returns(r: &mut Vec<f64>, ticker: &str) {
 ///
 /// # Returns
 ///
-/// A `Vec<f64>` of the same length as `prices`. The first element is always
-/// `0.0`. Returns a vector of `0.0`s for single-element input.
+/// A `Vec<f64>` of length `prices.len() - 1`. Returns an empty vector for
+/// fewer than two prices.
 ///
 /// # Examples
 ///
 /// ```ignore
-/// use finstack_analytics::returns::simple_returns;
+/// use finstack_analytics::returns::pairwise_returns;
 ///
-/// let r = simple_returns(&[100.0, 110.0, 99.0]);
-/// assert_eq!(r[0], 0.0);
-/// assert!((r[1] - 0.1).abs() < 1e-12);   // +10%
-/// assert!((r[2] - (-0.1)).abs() < 1e-12); // −10%
+/// let r = pairwise_returns(&[100.0, 110.0, 99.0]);
+/// assert!((r[0] - 0.1).abs() < 1e-12);   // +10%
+/// assert!((r[1] - (-0.1)).abs() < 1e-12); // −10%
 /// ```
-pub(crate) fn simple_returns(prices: &[f64]) -> Vec<f64> {
+pub(crate) fn pairwise_returns(prices: &[f64]) -> Vec<f64> {
     if prices.len() < 2 {
-        return vec![0.0; prices.len()];
+        return Vec::new();
     }
-    let mut out = Vec::with_capacity(prices.len());
-    out.push(0.0);
+    let mut out = Vec::with_capacity(prices.len() - 1);
+    push_pairwise_returns(prices, &mut out);
+    out
+}
+
+#[inline]
+fn push_pairwise_returns(prices: &[f64], out: &mut Vec<f64>) {
     for w in prices.windows(2) {
         let p0 = w[0];
         let p1 = w[1];
@@ -104,7 +110,6 @@ pub(crate) fn simple_returns(prices: &[f64]) -> Vec<f64> {
             }
         }
     }
-    out
 }
 
 /// Excess returns = portfolio returns minus risk-free returns.
@@ -279,24 +284,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn simple_returns_basic() {
+    fn pairwise_returns_basic() {
         let prices = [100.0, 110.0, 99.0];
-        let r = simple_returns(&prices);
-        assert_eq!(r.len(), 3);
-        assert_eq!(r[0], 0.0);
-        assert!((r[1] - 0.1).abs() < 1e-12);
-        assert!((r[2] - (-0.1)).abs() < 1e-12);
+        let r = pairwise_returns(&prices);
+        assert_eq!(r.len(), 2);
+        assert!((r[0] - 0.1).abs() < 1e-12);
+        assert!((r[1] - (-0.1)).abs() < 1e-12);
     }
 
     #[test]
-    fn simple_returns_empty() {
-        assert!(simple_returns(&[]).is_empty());
+    fn pairwise_returns_empty() {
+        assert!(pairwise_returns(&[]).is_empty());
     }
 
     #[test]
-    fn simple_returns_single() {
-        let r = simple_returns(&[100.0]);
-        assert_eq!(r, vec![0.0]);
+    fn pairwise_returns_single() {
+        assert!(pairwise_returns(&[100.0]).is_empty());
     }
 
     #[test]

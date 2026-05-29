@@ -30,6 +30,8 @@
 //! - [`aggregation`]: period rollups and PV aggregation inputs
 //! - [`accrual`]: schedule-driven accrued interest
 //! - [`traits`]: [`CashflowProvider`] and `schedule_from_*` helpers
+//! - [`json`]: serde-first JSON bridge for building and validating schedules
+//!   (binding surface)
 //!
 //! # Conventions
 //!

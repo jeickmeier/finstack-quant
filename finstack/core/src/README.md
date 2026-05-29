@@ -24,6 +24,11 @@ Low-level building blocks for the Finstack workspace:
 | `math/volatility/` | Volatility models and option pricing formulas |
 | `error.rs` | Unified `Error` type |
 | `explain.rs` | Computation tracing |
+| `decimal.rs` | `f64 ↔ Decimal` conversion helpers |
+| `rating_scales.rs` | Shared credit rating-scale registry |
+| `table.rs` | Serializable columnar table envelope for bindings |
+| `validation.rs` | Generic invariant-checking helpers |
+| `versions.rs` | Canonical model-version strings |
 | `generated/` | Build-time currency and calendar tables |
 
 ## Quick examples

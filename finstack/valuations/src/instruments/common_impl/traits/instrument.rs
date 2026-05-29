@@ -571,7 +571,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     }
 
     /// Optional typed [`ValuationDetails`](crate::results::ValuationDetails)
-    /// to attach to this instrument's [`ValuationResult`].
+    /// to attach to this instrument's [`ValuationResult`](crate::results::ValuationResult).
     ///
     /// The generic instrument pricer
     /// ([`GenericInstrumentPricer`](crate::instruments::common_impl::GenericInstrumentPricer))

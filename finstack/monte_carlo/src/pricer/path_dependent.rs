@@ -360,7 +360,7 @@ impl PathDependentPricer {
             time_grid: time_grid.clone(),
             target_ci_half_width: None,
             use_parallel: false,
-            chunk_size: self.config.chunk_size,
+            chunk_size: Some(self.config.chunk_size),
             path_capture: self.config.path_capture.clone(),
             antithetic: false,
         };
@@ -555,7 +555,7 @@ impl PathDependentPricer {
             time_grid,
             target_ci_half_width: None,
             use_parallel: self.config.use_parallel,
-            chunk_size: self.config.chunk_size,
+            chunk_size: Some(self.config.chunk_size),
             path_capture: self.config.path_capture.clone(),
             antithetic: self.config.antithetic,
         };
@@ -631,7 +631,7 @@ impl PathDependentPricer {
             time_grid,
             target_ci_half_width: None,
             use_parallel: self.config.use_parallel,
-            chunk_size: self.config.chunk_size,
+            chunk_size: Some(self.config.chunk_size),
             path_capture: self.config.path_capture.clone(),
             antithetic: false,
         };
@@ -684,7 +684,7 @@ impl PathDependentPricer {
             time_grid,
             target_ci_half_width: None,
             use_parallel: self.config.use_parallel,
-            chunk_size: self.config.chunk_size,
+            chunk_size: Some(self.config.chunk_size),
             path_capture: PathCaptureConfig::all().with_payoffs(),
             antithetic: false,
         };

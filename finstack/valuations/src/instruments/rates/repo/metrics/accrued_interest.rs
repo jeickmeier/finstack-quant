@@ -40,7 +40,7 @@ impl MetricCalculator for AccruedInterestCalculator {
                 adj_start,
                 adj_maturity,
                 repo.cash_amount.amount(),
-                repo.effective_rate(),
+                repo.effective_rate()?,
             )
         };
 

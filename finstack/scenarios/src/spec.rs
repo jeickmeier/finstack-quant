@@ -231,7 +231,7 @@ pub enum OperationSpec {
     /// };
     /// ```
     CurveParallelBp {
-        /// Type of curve (Discount, Forward, Hazard, etc.).
+        /// Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
         curve_kind: CurveKind,
         /// Curve identifier.
         curve_id: CurveId,
@@ -267,7 +267,7 @@ pub enum OperationSpec {
     /// };
     /// ```
     CurveNodeBp {
-        /// Type of curve (Discount, Forward, Hazard, etc.).
+        /// Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
         curve_kind: CurveKind,
         /// Curve identifier.
         curve_id: CurveId,
@@ -622,7 +622,7 @@ pub enum OperationSpec {
     /// hierarchy operations reach the same curve, [`ScenarioSpec::resolution_mode`]
     /// determines whether they accumulate or only the most specific match survives.
     HierarchyCurveParallelBp {
-        /// Type of curve (Discount, Forward, Hazard, etc.).
+        /// Type of curve (Discount, Forward, ParCDS, Inflation, Commodity).
         curve_kind: CurveKind,
         /// Hierarchy target to resolve to curves.
         target: HierarchyTarget,

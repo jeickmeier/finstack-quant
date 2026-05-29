@@ -8,7 +8,7 @@ use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_core::dates::{next_cds_date, Date};
 use finstack_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
-use finstack_core::math::binomial_probability;
+use finstack_core::math::binomial_pmf_all;
 use finstack_core::{Error, Result};
 
 impl CDSTranchePricer {
@@ -30,8 +30,10 @@ impl CDSTranchePricer {
             let x = (correlation - (max_corr - width)) / width;
             max_corr - width * (1.0 - x.tanh()) / 2.0
         } else {
-            // Normal range: no adjustment needed
-            correlation.clamp(min_corr, max_corr)
+            // Normal range: the branch conditions already guarantee
+            // `min_corr + width < correlation < max_corr - width`, so no adjustment
+            // (and no clamp) is needed here.
+            correlation
         }
     }
 
@@ -48,13 +50,14 @@ impl CDSTranchePricer {
         let loss_given_default = 1.0 - recovery_rate;
         let individual_notional = 1.0 / num_constituents as f64; // Normalized to 1.0 total
 
+        // Evaluate the whole conditional binomial PMF once (O(n)) instead of
+        // reconstructing a distribution per `k`.
+        let pmf = binomial_pmf_all(num_constituents, conditional_default_prob);
+
         let mut expected_loss = 0.0;
 
         // Sum over all possible numbers of defaults
-        for k in 0..=num_constituents {
-            let prob_k_defaults =
-                binomial_probability(num_constituents, k, conditional_default_prob);
-
+        for (k, &prob_k_defaults) in pmf.iter().enumerate() {
             // Portfolio loss given k defaults
             let portfolio_loss = k as f64 * individual_notional * loss_given_default;
 
@@ -763,23 +766,24 @@ impl CDSTranchePricer {
 mod tests {
     use super::*;
 
-    /// W-20: `conditional_equity_tranche_loss` evaluates `binomial_probability`
-    /// for every `k` in `0..=N`. With `N = 125` a naive factorial-based
-    /// binomial would overflow `C(125, 62)` and yield `inf`/`0`. Confirm the
-    /// binomial is numerically stable: `C(125, 62) * 0.5^125` is a finite
-    /// value matching the exact result `0.07094031336820422`.
+    /// W-20: `conditional_equity_tranche_loss` evaluates the conditional binomial
+    /// PMF for every `k` in `0..=N` via [`binomial_pmf_all`]. With `N = 125` a
+    /// naive factorial-based binomial would overflow `C(125, 62)` and yield
+    /// `inf`/`0`. Confirm the recurrence stays numerically stable:
+    /// `C(125, 62) * 0.5^125` is finite and matches `0.07094031336820422`.
     #[test]
-    fn binomial_probability_finite_for_large_n() {
-        let p = binomial_probability(125, 62, 0.5);
+    fn binomial_pmf_all_finite_for_large_n() {
+        let pmf = binomial_pmf_all(125, 0.5);
+        let p = pmf[62];
         assert!(
             p.is_finite(),
-            "binomial_probability(125,62,0.5) must be finite, got {p}"
+            "binomial_pmf_all(125,0.5)[62] must be finite, got {p}"
         );
         assert!(p > 0.0, "probability must be strictly positive, got {p}");
         // Exact: comb(125,62) * 0.5^125.
         assert!(
             (p - 0.070_940_313_368_204_22).abs() < 1e-12,
-            "binomial_probability(125,62,0.5) = {p}, expected 0.07094031336820422"
+            "binomial_pmf_all(125,0.5)[62] = {p}, expected 0.07094031336820422"
         );
     }
 
@@ -806,7 +810,7 @@ mod tests {
         );
 
         // The binomial pmf over 0..=N must form a valid probability mass.
-        let total: f64 = (0..=125).map(|k| binomial_probability(125, k, 0.10)).sum();
+        let total: f64 = binomial_pmf_all(125, 0.10).iter().sum();
         assert!(
             (total - 1.0).abs() < 1e-9,
             "binomial pmf over 0..=125 must sum to 1, got {total}"
