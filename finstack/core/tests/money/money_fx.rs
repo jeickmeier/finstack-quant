@@ -221,6 +221,76 @@ fn fx_matrix_set_quote_on_overrides_only_the_seeded_date() {
 }
 
 #[test]
+fn fx_matrix_pinned_quote_survives_cache_pressure() {
+    // Date-aware provider so a pinned fixing is distinguishable from the
+    // provider's answer on the same date.
+    struct RampFx;
+    impl FxProvider for RampFx {
+        fn rate(
+            &self,
+            _from: Currency,
+            _to: Currency,
+            on: Date,
+            _policy: FxConversionPolicy,
+        ) -> finstack_core::Result<f64> {
+            let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+            Ok(1.10 + (on - base).whole_days() as f64 * 0.01)
+        }
+    }
+
+    // Tiny LRU: any pinned fixing sharing the provider-observed cache would be
+    // evicted after two unrelated lookups.
+    let matrix = FxMatrix::try_with_config(
+        Arc::new(RampFx),
+        FxConfig {
+            enable_triangulation: false,
+            cache_capacity: 2,
+            ..Default::default()
+        },
+    )
+    .expect("valid FxConfig");
+
+    let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    matrix
+        .set_quote_on(
+            Currency::EUR,
+            Currency::USD,
+            jan_1,
+            FxConversionPolicy::CashflowDate,
+            9.99,
+        )
+        .expect("pin a fixing");
+
+    // Flood the observed cache far past its capacity with other dates.
+    for day in 2..=28 {
+        let d = Date::from_calendar_date(2025, time::Month::January, day).unwrap();
+        let _ = matrix
+            .rate(FxQuery::new(Currency::EUR, Currency::USD, d))
+            .unwrap();
+    }
+
+    // The pinned fixing must still win for its own date — it is not evictable.
+    let r = matrix
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, jan_1))
+        .unwrap();
+    assert!(
+        (r.rate - 9.99).abs() < 1e-12,
+        "pinned fixing must survive cache pressure, got {}",
+        r.rate
+    );
+
+    // The reciprocal of the pinned fixing is served too.
+    let rev = matrix
+        .rate(FxQuery::new(Currency::USD, Currency::EUR, jan_1))
+        .unwrap();
+    assert!(
+        (rev.rate - 1.0 / 9.99).abs() < 1e-12,
+        "pinned reciprocal served, got {}",
+        rev.rate
+    );
+}
+
+#[test]
 fn fx_matrix_try_with_config_rejects_zero_capacity() {
     let err = FxMatrix::try_with_config(
         Arc::new(StaticFx { rate: 1.0 }),

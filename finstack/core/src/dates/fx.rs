@@ -186,12 +186,22 @@ pub fn add_joint_business_days(
 /// Add N business days on a joint calendar that also includes an optional
 /// **third settlement calendar** (typically USD).
 ///
-/// For FX cross pairs that do not involve USD (e.g. EUR/JPY), the market T+2
-/// rule requires every counted day — including the intermediate day(s) — to be
-/// a good business day in USD as well as in the two named currencies, and the
-/// final value date to be good in all three. Passing `settlement_cal_id =
+/// For FX cross pairs that do not involve USD (e.g. EUR/JPY), USD-good days
+/// matter because the cross settles as two USD legs. This helper implements the
+/// **strict (conservative) variant**: every counted day — including the
+/// intermediate day(s) **and the final value date** — must be good in USD as
+/// well as in the two named currencies. Passing `settlement_cal_id =
 /// Some("usny")` enforces that; `None` reproduces the two-calendar rule of
 /// [`add_joint_business_days`].
+///
+/// # Convention note
+///
+/// The widely-cited CLS/market convention constrains USD only on the
+/// **intermediate** day(s): a USD holiday on the value date itself does not, by
+/// that convention, push out a non-USD cross's settlement. This function
+/// deliberately adopts the stricter "USD good on the value date too" variant.
+/// Choose `settlement_cal_id` accordingly, and prefer [`add_joint_business_days`]
+/// (two-calendar) when the standard convention is required.
 ///
 /// # Arguments
 ///

@@ -23,8 +23,11 @@
 //! use finstack_core::market_data::dtsm::{DieboldLi, YieldPca, YieldPanel};
 //! use nalgebra::DMatrix;
 //!
-//! // Build a yield panel with time-varying NS-shaped curves
-//! let lambda = 0.0609_f64;
+//! // Build a yield panel with time-varying NS-shaped curves.
+//! // Years-convention lambda (12 × Diebold-Li's 0.0609 months value, matching
+//! // the builder default) so the curvature peak sits at ≈2.45 years given the
+//! // year-denominated tenors below.
+//! let lambda = 0.7308_f64;
 //! let tenors = vec![0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 20.0, 30.0];
 //! let n = tenors.len();
 //! let t = 50;

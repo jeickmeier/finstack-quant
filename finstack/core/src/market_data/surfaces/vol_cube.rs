@@ -351,23 +351,33 @@ impl VolCube {
 
     /// Implied volatility with bounds checking.
     ///
-    /// Returns `Err` if `expiry` or `tenor` falls outside the grid.
+    /// Returns `Err` if `expiry` or `tenor` falls outside the grid, or if the
+    /// SABR expansion yields a non-finite volatility (e.g. a χ(z) breakdown).
+    /// Guarding here stops a silent `NaN` from poisoning Black-76 pricing or a
+    /// compensated aggregation downstream.
     pub fn vol(&self, expiry: f64, tenor: f64, strike: f64) -> crate::Result<f64> {
         // Validate coordinates are within grid bounds
         locate_segment(&self.expiries, expiry)?;
         locate_segment(&self.tenors, tenor)?;
 
         let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
-        Ok(params.implied_vol_lognormal(fwd, strike, exp_c))
+        params.try_implied_vol_lognormal(fwd, strike, exp_c)
     }
 
     /// Implied volatility with clamped extrapolation.
     ///
-    /// Clamps expiry and tenor to the grid edges before interpolation.
-    /// Never panics.
+    /// Clamps expiry and tenor to the grid edges before interpolation. Never
+    /// panics and never returns a non-finite or non-positive value: a
+    /// degenerate expansion is floored to a small positive vol, matching the
+    /// `materialize_*` slice helpers.
     pub fn vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
         let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
-        params.implied_vol_lognormal(fwd, strike, exp_c)
+        let v = params.implied_vol_lognormal(fwd, strike, exp_c);
+        if v.is_finite() && v > 0.0 {
+            v
+        } else {
+            0.001
+        }
     }
 }
 

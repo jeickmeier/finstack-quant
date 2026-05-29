@@ -915,11 +915,14 @@ impl SimmCalculator {
         curvature_by_risk_class: &HashMap<SimmRiskClass, f64>,
     ) -> f64 {
         let scale = self.params.curvature_scale_factor;
-        // Scaled per-risk-class curvature contributions, in a stable order.
-        let cvr: Vec<(SimmRiskClass, f64)> = curvature_by_risk_class
+        // Scaled per-risk-class curvature contributions. Sort into a canonical
+        // order (independent of `HashMap` iteration) so the f64 quadratic-form
+        // reduction below is bit-reproducible across runs and toolchains.
+        let mut cvr: Vec<(SimmRiskClass, f64)> = curvature_by_risk_class
             .iter()
             .map(|(rc, v)| (*rc, v * scale))
             .collect();
+        cvr.sort_by_key(|(rc, _)| *rc as u8);
 
         let sum_cvr: f64 = cvr.iter().map(|(_, v)| *v).sum();
         let sum_abs: f64 = cvr.iter().map(|(_, v)| v.abs()).sum();

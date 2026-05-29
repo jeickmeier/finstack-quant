@@ -49,10 +49,91 @@ fn holiday_rules_respect_effective_year() {
         "MLK Day 2023 is an NYSE holiday"
     );
 
+    // Tight boundary years — the exact off-by-one the gating prevents.
+    // Juneteenth: 2021-06-19 was a Saturday (observed Fri 06-18), gated off
+    // entirely; 2022-06-19 was a Sunday, observed Mon 06-20 — first NYSE close.
+    assert!(
+        !NYSE.is_holiday(make_date(2021, 6, 18)),
+        "Juneteenth must be absent in 2021 (year before from_year=2022)"
+    );
+    assert!(
+        NYSE.is_holiday(make_date(2022, 6, 20)),
+        "Juneteenth observed Monday 2022-06-20 is the first NYSE closure"
+    );
+    // MLK: 1997 3rd Monday = Jan 20 (absent); 1998 3rd Monday = Jan 19 (present).
+    assert!(
+        !NYSE.is_holiday(make_date(1997, 1, 20)),
+        "MLK Day must be absent in 1997 (year before from_year=1998)"
+    );
+    assert!(
+        NYSE.is_holiday(make_date(1998, 1, 19)),
+        "MLK Day 1998-01-19 is the first NYSE observance"
+    );
+
     // Un-gated holidays remain valid historically.
     assert!(
         NYSE.is_holiday(make_date(1990, 1, 1)),
         "New Year's Day is always an NYSE holiday"
+    );
+}
+
+#[test]
+fn sifma_cme_respect_effective_year_for_new_holidays() {
+    use finstack_core::dates::calendar::{CME, SIFMA};
+
+    // SIFMA (U.S. bond market): Juneteenth from 2022, MLK from 1998, and
+    // Columbus Day (2nd Monday October, federal form) from 1971.
+    assert!(
+        !SIFMA.is_holiday(make_date(2021, 6, 18)),
+        "SIFMA Juneteenth must be absent before 2022"
+    );
+    assert!(
+        SIFMA.is_holiday(make_date(2022, 6, 20)),
+        "SIFMA Juneteenth observed 2022-06-20"
+    );
+    assert!(
+        !SIFMA.is_holiday(make_date(1997, 1, 20)),
+        "SIFMA MLK Day must be absent before 1998"
+    );
+    assert!(
+        SIFMA.is_holiday(make_date(1998, 1, 19)),
+        "SIFMA MLK Day present from 1998"
+    );
+    assert!(
+        !SIFMA.is_holiday(make_date(1970, 10, 12)),
+        "SIFMA Columbus Day must be absent before 1971"
+    );
+    assert!(
+        SIFMA.is_holiday(make_date(1971, 10, 11)),
+        "SIFMA Columbus Day present from 1971"
+    );
+
+    // CME: Juneteenth from 2022, MLK from 1998.
+    assert!(
+        !CME.is_holiday(make_date(2021, 6, 18)),
+        "CME Juneteenth must be absent before 2022"
+    );
+    assert!(
+        CME.is_holiday(make_date(2022, 6, 20)),
+        "CME Juneteenth observed 2022-06-20"
+    );
+    assert!(
+        !CME.is_holiday(make_date(1997, 1, 20)),
+        "CME MLK Day must be absent before 1998"
+    );
+    assert!(
+        CME.is_holiday(make_date(1998, 1, 19)),
+        "CME MLK Day present from 1998"
+    );
+
+    // Sanity: an un-gated holiday is present historically on both calendars.
+    assert!(
+        SIFMA.is_holiday(make_date(1990, 7, 4)),
+        "Independence Day is always a SIFMA holiday"
+    );
+    assert!(
+        CME.is_holiday(make_date(1990, 12, 25)),
+        "Christmas is always a CME holiday"
     );
 }
 

@@ -4,16 +4,16 @@
   "ignore_weekends": false,
   "rules": [
     { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "fixed", "name": "Juneteenth National Independence Day", "month": "june", "day": 19, "observed": "fri_if_sat_mon_if_sun" },
+    { "type": "fixed", "name": "Juneteenth National Independence Day", "month": "june", "day": 19, "observed": "fri_if_sat_mon_if_sun", "from_year": 2022 },
     { "type": "fixed", "name": "Independence Day", "month": "july", "day": 4, "observed": "fri_if_sat_mon_if_sun" },
     { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "nth_weekday", "name": "Martin Luther King Jr. Day", "n": 3, "weekday": "monday", "month": "january" },
+    { "type": "nth_weekday", "name": "Martin Luther King Jr. Day", "n": 3, "weekday": "monday", "month": "january", "from_year": 1998 },
     { "type": "nth_weekday", "name": "Washington's Birthday", "n": 3, "weekday": "monday", "month": "february" },
     { "type": "nth_weekday", "name": "Memorial Day", "n": -1, "weekday": "monday", "month": "may" },
     { "type": "nth_weekday", "name": "Labor Day", "n": 1, "weekday": "monday", "month": "september" },
     { "type": "nth_weekday", "name": "Thanksgiving Day", "n": 4, "weekday": "thursday", "month": "november" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
-    { "type": "nth_weekday", "name": "Columbus Day", "n": 2, "weekday": "monday", "month": "october" },
+    { "type": "nth_weekday", "name": "Columbus Day", "n": 2, "weekday": "monday", "month": "october", "from_year": 1971 },
     { "type": "fixed", "name": "Veterans Day", "month": "november", "day": 11, "observed": "fri_if_sat_mon_if_sun" }
   ]
 }

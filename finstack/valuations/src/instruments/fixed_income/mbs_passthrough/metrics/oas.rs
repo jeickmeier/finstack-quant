@@ -21,7 +21,7 @@ use finstack_core::Result;
 pub(crate) struct StaticSpreadResult {
     /// Static Z-spread in decimal (e.g., 0.01 for 100 bps)
     pub spread: f64,
-    /// Model price at the calculated OAS
+    /// Model price at the solved static Z-spread
     pub model_price: f64,
     /// Target (market) price
     pub market_price: f64,

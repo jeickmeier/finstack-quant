@@ -551,7 +551,7 @@ impl Money {
         // mid-calculation, so the result of a chained computation would depend
         // on *where* a `convert` was inserted and could break serial≡parallel
         // determinism. Apply minor-unit rounding only at the reporting boundary
-        // (e.g. `format`/`round_to_currency`), not on every conversion.
+        // (e.g. via `format`), not on every conversion.
         let new_amount = super::rounding::try_repr_mul_f64(self.amount, rate)?;
         Ok(Self {
             amount: new_amount,

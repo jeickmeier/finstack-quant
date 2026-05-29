@@ -4,10 +4,6 @@
     {
       "path": "pricing/cap_floor/usd_cap_5y_atm_black.json",
       "reason": "Bloomberg cap/floor fixture is not yet reproducible by the executable runner; preserve screen expected values until quote-basis cap/floor risk support lands."
-    },
-    {
-      "path": "pricing/cds_option/cdx_ig_46_payer_atm_jun26.json",
-      "reason": "CDX IG 46 Bloomberg fixture expected values do not match current model output (sign convention + model gap); tracked as a follow-up so Bloomberg values are preserved verbatim instead of being retuned."
     }
   ]
 }

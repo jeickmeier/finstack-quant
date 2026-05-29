@@ -49,7 +49,7 @@ impl MetricCalculator for EffectiveConvexityCalculator {
 /// Reports the **Monte Carlo OAS** ([`calculate_mc_oas`]): a true
 /// option-adjusted spread computed over stochastic Hull-White rate paths with
 /// rate-dependent prepayment. The bare-curve static Z-spread
-/// ([`calculate_oas`]) does not account for the prepayment option and is
+/// ([`calculate_static_zspread`]) does not account for the prepayment option and is
 /// retained only as a separate public-API helper — it is *not* what the `Oas`
 /// metric returns.
 pub(crate) struct OasCalculator;

@@ -94,7 +94,11 @@ impl MetricCalculator for YtmCalculator {
             // expressed. `base_value` is PV at `as_of`; dividing by
             // `DF(as_of → quote_date)` removes the settlement-period (typically
             // T+2) carry that would otherwise bias the YTM and the
-            // duration/convexity derived from it.
+            // duration/convexity derived from it. This assumes no cashflow falls
+            // strictly between `as_of` and `quote_date`; for a standard T+1/T+2
+            // settlement lag that window contains no coupon, but a coupon inside
+            // it would be carried forward yet excluded by the solver, leaving a
+            // small residual bias.
             let pv_as_of = context.base_value.amount();
             let pv_at_quote = if quote_ctx.quote_date > context.as_of {
                 let curve = context.curves.get_discount(discount_curve_id.as_str())?;

@@ -1143,7 +1143,7 @@ impl DiscountCurve {
     ///
     /// * `forward_id` - Identifier for the resulting forward curve
     /// * `tenor_years` - Tenor of the forward rate in years
-    /// * `interp_style` - Optional interpolation style; defaults to `Linear` if `None`
+    /// * `interp_style` - Optional interpolation style; defaults to `MonotoneConvex` if `None`
     pub fn to_forward_curve(
         &self,
         forward_id: impl Into<CurveId>,

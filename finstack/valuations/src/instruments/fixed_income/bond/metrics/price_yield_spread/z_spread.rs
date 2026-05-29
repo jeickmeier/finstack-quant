@@ -262,7 +262,8 @@ impl MetricCalculator for ZSpreadCalculator {
         // Both year fractions and discount factors use the same origin (quote_date).
         // Note: quote_date is the settlement date, which is the correct anchor
         // for market-convention z-spread calculations. This ensures the z-spread
-        // shift exp(-z * t) is applied relative to the same date as the base DFs.
+        // shift (applied via `z_spread_discount_factor` on the periodically-
+        // compounded zero rate) is anchored to the same date as the base DFs.
         let flows = bond.pricing_dated_cashflows(&context.curves, context.as_of)?;
         let disc = context.curves.get_discount(&bond.discount_curve_id)?;
         let (spread_flows, quote_date) = if let Some((_, workout_flows, workout_quote_date)) =

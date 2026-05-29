@@ -47,15 +47,33 @@ impl Check for CashReconciliation {
         let periods = &context.model.periods;
 
         for i in 1..periods.len() {
-            // Roll-forward identities only hold for chronologically consecutive
-            // periods. Skip any pair that is not in ascending order so a
-            // misordered or interleaved `periods` list cannot reconcile the
-            // current period against the wrong "prior" period.
-            if periods[i].start < periods[i - 1].start {
-                continue;
-            }
             let prev_pid = &periods[i - 1].id;
             let curr_pid = &periods[i].id;
+
+            // Roll-forward identities only hold for *strictly* chronologically
+            // consecutive periods. Skip any pair whose starts are not strictly
+            // ascending — out-of-order or equal-start (e.g. interleaved annual +
+            // quarterly) — so a misordered list cannot reconcile the current
+            // period against the wrong "prior" period. Emit an Info finding so
+            // the skip is visible rather than silent.
+            if periods[i].start <= periods[i - 1].start {
+                findings.push(CheckFinding {
+                    check_id: self.id().to_string(),
+                    severity: Severity::Info,
+                    message: format!(
+                        "Cash reconciliation skipped for {curr_pid}: period starts are not \
+                         strictly ascending relative to prior {prev_pid}; the roll-forward \
+                         identity is only evaluated for chronologically consecutive periods."
+                    ),
+                    period: Some(*curr_pid),
+                    materiality: None,
+                    nodes: vec![
+                        self.cash_balance_node.clone(),
+                        self.total_cash_flow_node.clone(),
+                    ],
+                });
+                continue;
+            }
 
             let cash_prev = get_node_value(context.results, &self.cash_balance_node, prev_pid);
             let cash_curr = get_node_value(context.results, &self.cash_balance_node, curr_pid);
