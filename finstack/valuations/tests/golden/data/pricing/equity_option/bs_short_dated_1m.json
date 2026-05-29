@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "bs_short_dated_1m",
-  "domain": "equity.equity_option",
-  "description": "Synthetic one-month at-the-money SPX European call stressing short-dated gamma and theta.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "bs_short_dated_1m",
+    "domain": "equity.equity_option",
+    "description": "Synthetic one-month at-the-money SPX European call stressing short-dated gamma and theta.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical Black-Scholes equity option calculation on deterministic synthetic SPX market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
     "captured_by": "jeickmeier",
@@ -15,38 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "black76",
-    "metrics": [
-      "gamma",
-      "theta"
-    ],
-    "instrument_json": {
-      "type": "equity_option",
-      "spec": {
-        "id": "SPX-BS-SHORT-DATED-1M-GOLDEN",
-        "underlying_ticker": "SPX",
-        "strike": 4500.0,
-        "option_type": "call",
-        "expiry": "2026-05-29",
-        "notional": {
-          "amount": "100",
-          "currency": "USD"
-        },
-        "discount_curve_id": "USD-OIS",
-        "spot_id": "SPX-SPOT",
-        "vol_surface_id": "SPX-VOL",
-        "div_yield_id": "SPX-DIVYIELD",
-        "attributes": {
-          "tags": [
-            "golden"
-          ],
-          "meta": {}
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "black76",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "bs_short_dated_1m_tier_a_wrap",
@@ -171,14 +144,33 @@
           ]
         }
       ]
-    },
-    "source_reference": {
-      "note": "Formula fixture; expected_outputs are populated from the live Rust/Python golden runners.",
-      "spot": 4500.0,
-      "continuous_dividend_yield": 0.0
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "equity_option",
+    "spec": {
+      "id": "SPX-BS-SHORT-DATED-1M-GOLDEN",
+      "underlying_ticker": "SPX",
+      "strike": 4500.0,
+      "option_type": "call",
+      "expiry": "2026-05-29",
+      "notional": {
+        "amount": "100",
+        "currency": "USD"
+      },
+      "discount_curve_id": "USD-OIS",
+      "spot_id": "SPX-SPOT",
+      "vol_surface_id": "SPX-VOL",
+      "div_yield_id": "SPX-DIVYIELD",
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
+      }
+    }
+  },
+  "expected": {
     "npv": 11079.193227965425,
     "gamma": 0.15289018419,
     "theta": -294.182312312405

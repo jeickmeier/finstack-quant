@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "bs_itm_put",
-  "domain": "equity.equity_option",
-  "description": "Synthetic in-the-money SPX European put under Black-Scholes.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "bs_itm_put",
+    "domain": "equity.equity_option",
+    "description": "Synthetic in-the-money SPX European put under Black-Scholes.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical Black-Scholes equity option calculation on deterministic synthetic SPX market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
     "captured_by": "jeickmeier",
@@ -15,39 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "black76",
-    "metrics": [
-      "delta",
-      "gamma",
-      "vega"
-    ],
-    "instrument_json": {
-      "type": "equity_option",
-      "spec": {
-        "id": "SPX-BS-ITM-PUT-GOLDEN",
-        "underlying_ticker": "SPX",
-        "strike": 5000.0,
-        "option_type": "put",
-        "expiry": "2027-04-30",
-        "notional": {
-          "amount": "100",
-          "currency": "USD"
-        },
-        "discount_curve_id": "USD-OIS",
-        "spot_id": "SPX-SPOT",
-        "vol_surface_id": "SPX-VOL",
-        "div_yield_id": "SPX-DIVYIELD",
-        "attributes": {
-          "tags": [
-            "golden"
-          ],
-          "meta": {}
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "black76",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "bs_itm_put_tier_a_wrap",
@@ -172,14 +144,33 @@
           ]
         }
       ]
-    },
-    "source_reference": {
-      "note": "Formula fixture; expected_outputs are populated from the live Rust/Python golden runners.",
-      "spot": 4500.0,
-      "continuous_dividend_yield": 0.0
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "equity_option",
+    "spec": {
+      "id": "SPX-BS-ITM-PUT-GOLDEN",
+      "underlying_ticker": "SPX",
+      "strike": 5000.0,
+      "option_type": "put",
+      "expiry": "2027-04-30",
+      "notional": {
+        "amount": "100",
+        "currency": "USD"
+      },
+      "discount_curve_id": "USD-OIS",
+      "spot_id": "SPX-SPOT",
+      "vol_surface_id": "SPX-VOL",
+      "div_yield_id": "SPX-DIVYIELD",
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
+      }
+    }
+  },
+  "expected": {
     "npv": 51596.3559778656,
     "delta": -60.289957085794,
     "gamma": 0.046317963695,

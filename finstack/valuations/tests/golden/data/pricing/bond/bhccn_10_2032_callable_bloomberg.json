@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "bhccn_10_2032_callable_bloomberg",
-  "domain": "fixed_income.bond",
-  "description": "Bloomberg DES/YAS/OAS/ASW BHCCN USD 10% 2032 callable 1st-lien corporate bond captured from screens on 2026-05-03.",
-  "provenance": {
-    "as_of": "2026-05-01",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "bhccn_10_2032_callable_bloomberg",
+    "domain": "fixed_income.bond",
+    "description": "Bloomberg DES/YAS/OAS/ASW BHCCN USD 10% 2032 callable 1st-lien corporate bond captured from screens on 2026-05-03.",
+    "valuation_date": "2026-05-01",
     "source": "bloomberg-screen",
     "source_detail": "Bloomberg DES/YAS/OAS/ASW for BHCCN 10 04/15/32 Corp, USD 144A 1st-lien callable corporate bond, settlement 2026-05-05, price 103.3975, curve 490 SOFR OIS for ASW, OAS curve S23, Treasury benchmark T 3 7/8 04/15/29. Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
     "captured_by": "jeickmeier",
@@ -94,121 +94,11 @@
       }
     ]
   },
-  "inputs": {
-    "valuation_date": "2026-05-01",
-    "model": "tree",
-    "metrics": [
-      "clean_price",
-      "dirty_price",
-      "accrued",
-      "ytm",
-      "ytw",
-      "z_spread",
-      "i_spread",
-      "oas",
-      "asw_market",
-      "duration_mod",
-      "convexity",
-      "dv01",
-      "yield_dv01",
-      "embedded_option_value",
-      "vega"
-    ],
-    "instrument_json": {
-      "schema": "finstack.instrument/1",
-      "instrument": {
-        "type": "bond",
-        "spec": {
-          "id": "BHCCN-USD-10.00-20320415-BLOOMBERG-20260503",
-          "notional": {
-            "amount": "1000000",
-            "currency": "USD"
-          },
-          "issue_date": "2025-04-15",
-          "maturity": "2032-04-15",
-          "cashflow_spec": {
-            "Fixed": {
-              "rate": "0.10",
-              "freq": {
-                "count": 6,
-                "unit": "months"
-              },
-              "dc": "Thirty360",
-              "bdc": "following",
-              "calendar_id": "weekends_only"
-            }
-          },
-          "discount_curve_id": "USD-SWAP-490",
-          "forward_curve_id": "USD-SOFRRATE",
-          "pricing_overrides": {
-            "quoted_clean_price": 103.3975,
-            "tree_steps": 200,
-            "implied_volatility": 0.2223,
-            "vol_model": "black",
-            "mean_reversion": 0.0,
-            "tree_discount_curve_id": "USD-OAS-S23",
-            "oas_quote_compounding": "continuous",
-            "oas_price_basis": "forward_accrued_clean"
-          },
-          "call_put": {
-            "calls": [
-              {
-                "start_date": "2028-04-15",
-                "end_date": "2029-04-15",
-                "price_pct_of_par": 105.0
-              },
-              {
-                "start_date": "2029-04-15",
-                "end_date": "2030-04-15",
-                "price_pct_of_par": 102.5
-              },
-              {
-                "start_date": "2030-04-15",
-                "end_date": "2032-04-15",
-                "price_pct_of_par": 100.0
-              }
-            ],
-            "puts": []
-          },
-          "attributes": {
-            "tags": [
-              "golden",
-              "bloomberg",
-              "yas",
-              "oas",
-              "asw"
-            ],
-            "meta": {
-              "bloomberg_screen": "DES/YAS/OAS/ASW",
-              "ticker": "BHCCN 10 04/15/32 Corp",
-              "issuer": "1261229 BC LTD",
-              "figi": "BBG01SXN7B44",
-              "cusip": "68288AAA5",
-              "isin": "US68288AAA51",
-              "rank": "1st lien",
-              "series": "144A",
-              "rating_moodys": "Caa1",
-              "rating_sp": "B",
-              "rating_composite": "B-",
-              "benchmark": "T 3 7/8 04/15/29",
-              "benchmark_price": "99-29+",
-              "benchmark_yield": "0.03903",
-              "asw_curve": "490 SOFR OIS",
-              "oas_curve": "S23 Semi US Dollar",
-              "oas_model": "Lognormal",
-              "oas_volatility": "0.2223",
-              "issue_date_source": "2025-04-08",
-              "interest_accrual_date_source": "2025-04-08",
-              "first_coupon_date_source": "2025-10-15",
-              "schedule_anchor_note": "The executable schedule is anchored on 2025-04-15 to match Bloomberg regular coupon dates and 20-day accrued-interest display after the long first coupon has passed."
-            }
-          },
-          "settlement_days": 2,
-          "ex_coupon_days": 0
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "tree",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "bhccn_10_2032_callable_bloomberg_tier_a_wrap",
@@ -1131,708 +1021,103 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "strict_metric_keys": {
-        "clean_price": "clean_price",
-        "dirty_price": "invoice_total",
-        "accrued": "accrued_interest",
-        "ytm": "oas_to_maturity_yield",
-        "ytw": "yield_to_worst",
-        "z_spread": "z_spread",
-        "i_spread": "i_spread",
-        "oas": "oas",
-        "asw_market": "asw_spread",
-        "duration_mod": "modified_duration",
-        "convexity": "convexity",
-        "dv01": "dv01",
-        "yield_dv01": "dv01",
-        "embedded_option_value": "option_px_value",
-        "vega": "vega"
-      },
-      "risk_convention_note": "Bloomberg screen values are retained directly as expected_outputs. Finstack may use signed risk conventions for some metrics; any mismatch is intentional evidence for Bloomberg parity work.",
-      "curve_date": "2026-05-03",
-      "bloomberg_reference": {
-        "security": {
-          "ticker": "BHCCN 10 04/15/32 Corp",
-          "issuer": "1261229 BC LTD",
-          "currency": "USD",
-          "notional": 1000000.0,
-          "coupon": 0.1,
-          "coupon_frequency": "SemiAnnual",
-          "day_count": "30/360",
-          "issue_date": "2025-04-08",
-          "interest_accrual_date": "2025-04-08",
-          "first_coupon_date": "2025-10-15",
-          "maturity_date": "2032-04-15",
-          "rank": "1st lien",
-          "coupon_type": "Fixed",
-          "call_type": "Street Convention",
-          "call_schedule": [
+    }
+  },
+  "instrument": {
+    "schema": "finstack.instrument/1",
+    "instrument": {
+      "type": "bond",
+      "spec": {
+        "id": "BHCCN-USD-10.00-20320415-BLOOMBERG-20260503",
+        "notional": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "issue_date": "2025-04-15",
+        "maturity": "2032-04-15",
+        "cashflow_spec": {
+          "Fixed": {
+            "rate": "0.10",
+            "freq": {
+              "count": 6,
+              "unit": "months"
+            },
+            "dc": "Thirty360",
+            "bdc": "following",
+            "calendar_id": "weekends_only"
+          }
+        },
+        "discount_curve_id": "USD-SWAP-490",
+        "forward_curve_id": "USD-SOFRRATE",
+        "pricing_overrides": {
+          "quoted_clean_price": 103.3975,
+          "tree_steps": 200,
+          "implied_volatility": 0.2223,
+          "vol_model": "black",
+          "mean_reversion": 0.0,
+          "tree_discount_curve_id": "USD-OAS-S23",
+          "oas_quote_compounding": "continuous",
+          "oas_price_basis": "forward_accrued_clean"
+        },
+        "call_put": {
+          "calls": [
             {
-              "date": "2028-04-15",
-              "price": 105.0
+              "start_date": "2028-04-15",
+              "end_date": "2029-04-15",
+              "price_pct_of_par": 105.0
             },
             {
-              "date": "2029-04-15",
-              "price": 102.5
+              "start_date": "2029-04-15",
+              "end_date": "2030-04-15",
+              "price_pct_of_par": 102.5
             },
             {
-              "date": "2030-04-15",
-              "price": 100.0
+              "start_date": "2030-04-15",
+              "end_date": "2032-04-15",
+              "price_pct_of_par": 100.0
             }
           ],
-          "figi": "BBG01SXN7B44",
-          "cusip": "68288AAA5",
-          "isin": "US68288AAA51",
-          "moodys": "Caa1",
-          "sp": "B",
-          "composite": "B-"
+          "puts": []
         },
-        "screen_outputs": {
-          "clean_price_pct": 103.3975,
-          "clean_price": 1033975.0,
-          "accrued_interest": 5555.56,
-          "invoice_total": 1039530.56,
-          "yield_to_worst": 0.08955349,
-          "current_yield": 0.09671,
-          "g_spread": 0.04997,
-          "i_spread": 0.05299,
-          "basis": 0.09778,
-          "z_spread": 0.05244,
-          "asw_spread": 0.05334,
-          "oas": 0.04771,
-          "o_spread": 0.05299,
-          "mms_spread": 0.05267,
-          "modified_duration": 3.206,
-          "risk": 3.333,
-          "convexity": 0.129,
-          "dv01": 333.0,
-          "benchmark_risk": 4.462,
-          "risk_hedge": 747000000.0,
-          "proceeds_hedge": 1046000.0,
-          "oas_volatility": 0.2223,
-          "option_px_value": -19800.0,
-          "vega": -0.06,
-          "oas_option_free_yield": 0.08815,
-          "oas_option_free_spread": 0.04768,
-          "oas_option_free_duration": 3.6,
-          "oas_option_free_risk": 3.75,
-          "oas_option_free_convexity": -0.22,
-          "oas_to_call_yield": 0.10404,
-          "oas_to_call_spread": 0.06396,
-          "oas_to_call_duration": 1.7,
-          "oas_to_call_risk": 1.79,
-          "oas_to_call_convexity": 0.04,
-          "oas_to_maturity_yield": 0.09242,
-          "oas_to_maturity_spread": 0.05194,
-          "oas_to_maturity_duration": 4.42,
-          "oas_to_maturity_risk": 4.59,
-          "oas_to_maturity_convexity": 0.25,
-          "asw_net_cash_at_settlement": 34534.72
+        "attributes": {
+          "tags": [
+            "golden",
+            "bloomberg",
+            "yas",
+            "oas",
+            "asw"
+          ],
+          "meta": {
+            "bloomberg_screen": "DES/YAS/OAS/ASW",
+            "ticker": "BHCCN 10 04/15/32 Corp",
+            "issuer": "1261229 BC LTD",
+            "figi": "BBG01SXN7B44",
+            "cusip": "68288AAA5",
+            "isin": "US68288AAA51",
+            "rank": "1st lien",
+            "series": "144A",
+            "rating_moodys": "Caa1",
+            "rating_sp": "B",
+            "rating_composite": "B-",
+            "benchmark": "T 3 7/8 04/15/29",
+            "benchmark_price": "99-29+",
+            "benchmark_yield": "0.03903",
+            "asw_curve": "490 SOFR OIS",
+            "oas_curve": "S23 Semi US Dollar",
+            "oas_model": "Lognormal",
+            "oas_volatility": "0.2223",
+            "issue_date_source": "2025-04-08",
+            "interest_accrual_date_source": "2025-04-08",
+            "first_coupon_date_source": "2025-10-15",
+            "schedule_anchor_note": "The executable schedule is anchored on 2025-04-15 to match Bloomberg regular coupon dates and 20-day accrued-interest display after the long first coupon has passed."
+          }
         },
-        "bond_cashflows_to_workout": [
-          {
-            "payment_date": "2026-10-15",
-            "interest": 50000.0,
-            "principal": 0.0,
-            "total": 50000.0
-          },
-          {
-            "payment_date": "2027-04-15",
-            "interest": 50000.0,
-            "principal": 0.0,
-            "total": 50000.0
-          },
-          {
-            "payment_date": "2027-10-15",
-            "interest": 50000.0,
-            "principal": 0.0,
-            "total": 50000.0
-          },
-          {
-            "payment_date": "2028-04-15",
-            "interest": 50000.0,
-            "principal": 0.0,
-            "total": 50000.0
-          },
-          {
-            "payment_date": "2028-10-15",
-            "interest": 50000.0,
-            "principal": 0.0,
-            "total": 50000.0
-          },
-          {
-            "payment_date": "2029-04-15",
-            "interest": 50000.0,
-            "principal": 0.0,
-            "total": 50000.0
-          },
-          {
-            "payment_date": "2029-10-15",
-            "interest": 50000.0,
-            "principal": 0.0,
-            "total": 50000.0
-          },
-          {
-            "payment_date": "2030-04-15",
-            "interest": 50000.0,
-            "principal": 1000000.0,
-            "total": 1050000.0
-          }
-        ],
-        "present_value_screen": {
-          "curve": "YCGT0025 US Treasury Actives",
-          "price": 103.483,
-          "yield": 0.08929707,
-          "present_value": 1223849.81,
-          "rows": [
-            {
-              "payment_date": "2026-10-15",
-              "cashflow": 50000.0,
-              "spot_rate": 0.03646701,
-              "present_value": 49187.84,
-              "discount": 0.9837568
-            },
-            {
-              "payment_date": "2027-04-15",
-              "cashflow": 50000.0,
-              "spot_rate": 0.03692713,
-              "present_value": 48291.05,
-              "discount": 0.965821
-            },
-            {
-              "payment_date": "2027-10-15",
-              "cashflow": 50000.0,
-              "spot_rate": 0.03837785,
-              "present_value": 47335.6,
-              "discount": 0.946712
-            },
-            {
-              "payment_date": "2028-04-15",
-              "cashflow": 50000.0,
-              "spot_rate": 0.03929538,
-              "present_value": 46399.05,
-              "discount": 0.927981
-            },
-            {
-              "payment_date": "2028-10-15",
-              "cashflow": 50000.0,
-              "spot_rate": 0.03987624,
-              "present_value": 45494.83,
-              "discount": 0.9098966
-            },
-            {
-              "payment_date": "2029-04-15",
-              "cashflow": 50000.0,
-              "spot_rate": 0.04038911,
-              "present_value": 44614.23,
-              "discount": 0.8922846
-            },
-            {
-              "payment_date": "2029-10-15",
-              "cashflow": 50000.0,
-              "spot_rate": 0.04125276,
-              "present_value": 43695.98,
-              "discount": 0.8739196
-            },
-            {
-              "payment_date": "2030-04-15",
-              "cashflow": 1050000.0,
-              "spot_rate": 0.04201675,
-              "present_value": 898831.24,
-              "discount": 0.856029752381
-            }
-          ]
-        },
-        "oas_curve_s23": [
-          {
-            "tenor": 0.25,
-            "yield": 0.03995
-          },
-          {
-            "tenor": 0.5,
-            "yield": 0.03991
-          },
-          {
-            "tenor": 1.0,
-            "yield": 0.04016
-          },
-          {
-            "tenor": 2.0,
-            "yield": 0.04008
-          },
-          {
-            "tenor": 3.0,
-            "yield": 0.03976
-          },
-          {
-            "tenor": 4.0,
-            "yield": 0.0398
-          },
-          {
-            "tenor": 5.0,
-            "yield": 0.04007
-          },
-          {
-            "tenor": 7.0,
-            "yield": 0.04092
-          },
-          {
-            "tenor": 10.0,
-            "yield": 0.04226
-          },
-          {
-            "tenor": 20.0,
-            "yield": 0.04504
-          },
-          {
-            "tenor": 30.0,
-            "yield": 0.04475
-          }
-        ],
-        "swap_curve_490": [
-          {
-            "date": "2026-05-12",
-            "market_rate": 0.03634,
-            "zero_rate": 0.036828400000000004,
-            "discount": 0.999092
-          },
-          {
-            "date": "2026-05-19",
-            "market_rate": 0.036351,
-            "zero_rate": 0.0368282,
-            "discount": 0.998387
-          },
-          {
-            "date": "2026-05-26",
-            "market_rate": 0.036335,
-            "zero_rate": 0.036802100000000004,
-            "discount": 0.997684
-          },
-          {
-            "date": "2026-06-05",
-            "market_rate": 0.036432,
-            "zero_rate": 0.0368763,
-            "discount": 0.996672
-          },
-          {
-            "date": "2026-07-06",
-            "market_rate": 0.0365047,
-            "zero_rate": 0.0368934,
-            "discount": 0.993552
-          },
-          {
-            "date": "2026-08-05",
-            "market_rate": 0.036544,
-            "zero_rate": 0.0368783,
-            "discount": 0.990548
-          },
-          {
-            "date": "2026-09-08",
-            "market_rate": 0.036589,
-            "zero_rate": 0.036861000000000005,
-            "discount": 0.987157
-          },
-          {
-            "date": "2026-10-05",
-            "market_rate": 0.036629,
-            "zero_rate": 0.0368512,
-            "discount": 0.984473
-          },
-          {
-            "date": "2026-11-05",
-            "market_rate": 0.0366705,
-            "zero_rate": 0.0368355,
-            "discount": 0.981404
-          },
-          {
-            "date": "2026-12-07",
-            "market_rate": 0.0367315,
-            "zero_rate": 0.036837,
-            "discount": 0.978239
-          },
-          {
-            "date": "2027-01-05",
-            "market_rate": 0.036836,
-            "zero_rate": 0.0368866,
-            "discount": 0.975347
-          },
-          {
-            "date": "2027-02-05",
-            "market_rate": 0.0369315,
-            "zero_rate": 0.0369234,
-            "discount": 0.972269
-          },
-          {
-            "date": "2027-03-05",
-            "market_rate": 0.037023,
-            "zero_rate": 0.036961400000000005,
-            "discount": 0.969488
-          },
-          {
-            "date": "2027-04-05",
-            "market_rate": 0.0371385,
-            "zero_rate": 0.0370171,
-            "discount": 0.9664
-          },
-          {
-            "date": "2027-05-05",
-            "market_rate": 0.037249500000000005,
-            "zero_rate": 0.0370698,
-            "discount": 0.963413
-          },
-          {
-            "date": "2027-11-05",
-            "market_rate": 0.0373,
-            "zero_rate": 0.0372374,
-            "discount": 0.945338
-          },
-          {
-            "date": "2028-05-05",
-            "market_rate": 0.0371735,
-            "zero_rate": 0.0369941,
-            "discount": 0.9284
-          },
-          {
-            "date": "2029-05-07",
-            "market_rate": 0.0368595,
-            "zero_rate": 0.036676,
-            "discount": 0.895359
-          },
-          {
-            "date": "2030-05-06",
-            "market_rate": 0.036904,
-            "zero_rate": 0.0367258,
-            "discount": 0.86303
-          },
-          {
-            "date": "2031-05-05",
-            "market_rate": 0.037174,
-            "zero_rate": 0.0370119,
-            "discount": 0.830802
-          },
-          {
-            "date": "2032-05-05",
-            "market_rate": 0.037587,
-            "zero_rate": 0.0374529,
-            "discount": 0.798414
-          },
-          {
-            "date": "2033-05-05",
-            "market_rate": 0.038033000000000004,
-            "zero_rate": 0.0379352,
-            "discount": 0.766468
-          },
-          {
-            "date": "2034-05-05",
-            "market_rate": 0.03848,
-            "zero_rate": 0.0384248,
-            "discount": 0.735048
-          },
-          {
-            "date": "2035-05-07",
-            "market_rate": 0.038924,
-            "zero_rate": 0.038917600000000004,
-            "discount": 0.704056
-          },
-          {
-            "date": "2036-05-05",
-            "market_rate": 0.03936,
-            "zero_rate": 0.03941,
-            "discount": 0.673923
-          },
-          {
-            "date": "2038-05-05",
-            "market_rate": 0.0402133,
-            "zero_rate": 0.040398199999999995,
-            "discount": 0.615493
-          },
-          {
-            "date": "2041-05-07",
-            "market_rate": 0.0412821,
-            "zero_rate": 0.041680999999999996,
-            "discount": 0.534719
-          },
-          {
-            "date": "2046-05-07",
-            "market_rate": 0.042160500000000004,
-            "zero_rate": 0.042726499999999994,
-            "discount": 0.425053
-          },
-          {
-            "date": "2051-05-05",
-            "market_rate": 0.0421985,
-            "zero_rate": 0.0425995,
-            "discount": 0.34441
-          },
-          {
-            "date": "2056-05-05",
-            "market_rate": 0.0418556,
-            "zero_rate": 0.041861800000000005,
-            "discount": 0.284506
-          },
-          {
-            "date": "2066-05-05",
-            "market_rate": 0.0407525,
-            "zero_rate": 0.0395568,
-            "discount": 0.205241
-          },
-          {
-            "date": "2076-05-05",
-            "market_rate": 0.0395695,
-            "zero_rate": 0.036980400000000004,
-            "discount": 0.157153
-          }
-        ],
-        "swap_curve_490_quotes": [
-          {
-            "tenor": "1W",
-            "bid": null,
-            "ask": null,
-            "mid": 0.03634
-          },
-          {
-            "tenor": "2W",
-            "bid": null,
-            "ask": null,
-            "mid": 0.036351
-          },
-          {
-            "tenor": "3W",
-            "bid": null,
-            "ask": null,
-            "mid": 0.036335
-          },
-          {
-            "tenor": "1M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.036432
-          },
-          {
-            "tenor": "2M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0365047
-          },
-          {
-            "tenor": "3M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.036544
-          },
-          {
-            "tenor": "4M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.036589
-          },
-          {
-            "tenor": "5M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.036628999999999995
-          },
-          {
-            "tenor": "6M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0366705
-          },
-          {
-            "tenor": "7M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0367315
-          },
-          {
-            "tenor": "8M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.036836
-          },
-          {
-            "tenor": "9M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0369315
-          },
-          {
-            "tenor": "10M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.037023
-          },
-          {
-            "tenor": "11M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0371385
-          },
-          {
-            "tenor": "12M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0372495
-          },
-          {
-            "tenor": "18M",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0373
-          },
-          {
-            "tenor": "2Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0371735
-          },
-          {
-            "tenor": "3Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0368595
-          },
-          {
-            "tenor": "4Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.036904000000000006
-          },
-          {
-            "tenor": "5Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.037174
-          },
-          {
-            "tenor": "6Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.037587
-          },
-          {
-            "tenor": "7Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.038033000000000004
-          },
-          {
-            "tenor": "8Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.03848
-          },
-          {
-            "tenor": "9Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.038924
-          },
-          {
-            "tenor": "10Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.03936
-          },
-          {
-            "tenor": "12Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0402133
-          },
-          {
-            "tenor": "15Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.04128215
-          },
-          {
-            "tenor": "20Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.042160500000000004
-          },
-          {
-            "tenor": "25Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0421985
-          },
-          {
-            "tenor": "30Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.04185565
-          },
-          {
-            "tenor": "40Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.040752500000000004
-          },
-          {
-            "tenor": "50Y",
-            "bid": null,
-            "ask": null,
-            "mid": 0.0395695
-          }
-        ],
-        "swap_curve_490_asw_cashflow_discounts": [
-          {
-            "date": "2026-10-15",
-            "discount": 0.98368
-          },
-          {
-            "date": "2027-04-15",
-            "discount": 0.965599
-          },
-          {
-            "date": "2027-10-15",
-            "discount": 0.947558
-          },
-          {
-            "date": "2028-04-15",
-            "discount": 0.930417
-          },
-          {
-            "date": "2028-10-15",
-            "discount": 0.913804
-          },
-          {
-            "date": "2029-04-15",
-            "discount": 0.897492
-          },
-          {
-            "date": "2029-10-15",
-            "discount": 0.881203
-          },
-          {
-            "date": "2030-04-15",
-            "discount": 0.865064
-          },
-          {
-            "date": "2027-04-19",
-            "discount": 0.9652
-          },
-          {
-            "date": "2028-04-19",
-            "discount": 0.930051
-          },
-          {
-            "date": "2029-04-18",
-            "discount": 0.897224
-          },
-          {
-            "date": "2030-04-17",
-            "discount": 0.864887
-          }
-        ]
+        "settlement_days": 2,
+        "ex_coupon_days": 0
       }
     }
   },
-  "expected_outputs": {
+  "expected": {
     "npv": 1039530.56,
     "clean_price": 1033975.0,
     "dirty_price": 1039530.56,

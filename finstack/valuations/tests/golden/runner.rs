@@ -45,18 +45,16 @@ fn is_pricing_domain(domain: &str) -> bool {
 
 /// Run a fixture end-to-end and return one comparison result per expected metric.
 pub fn run_fixture(fixture: &GoldenFixture) -> Result<Vec<ComparisonResult>, String> {
-    let actuals = if fixture.domain == "volatility.sabr" {
+    let domain = fixture.metadata.domain.as_str();
+    let actuals = if domain == "volatility.sabr" {
         crate::golden::sabr::run_sabr_fixture(fixture)?
-    } else if is_pricing_domain(&fixture.domain) {
+    } else if is_pricing_domain(domain) {
         crate::golden::pricing_common::run_pricing_fixture(fixture)?
     } else {
-        return Err(format!(
-            "no runner registered for domain '{}'",
-            fixture.domain
-        ));
+        return Err(format!("no runner registered for domain '{domain}'"));
     };
     fixture
-        .expected_outputs
+        .expected
         .iter()
         .map(|(metric, expected)| {
             let actual = actuals
@@ -218,8 +216,6 @@ fn csv_escape(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::golden::schema::{Provenance, ToleranceEntry};
-    use std::collections::BTreeMap;
 
     #[test]
     fn run_golden_at_path_writes_comparison_csv() {
@@ -246,11 +242,11 @@ mod tests {
             &fixture_path,
             r#"{
               "schema_version": "finstack.golden/0",
-              "name": "invalid_schema",
-              "domain": "rates.irs",
-              "description": "Fixture with stale schema version.",
-              "provenance": {
-                "as_of": "2026-04-30",
+              "metadata": {
+                "name": "invalid_schema",
+                "domain": "rates.irs",
+                "description": "Fixture with stale schema version.",
+                "valuation_date": "2026-04-30",
                 "source": "formula",
                 "source_detail": "unit test",
                 "captured_by": "test",
@@ -258,11 +254,13 @@ mod tests {
                 "last_reviewed_by": "test",
                 "last_reviewed_on": "2026-04-30",
                 "review_interval_months": 6,
-                "regen_command": "",
-                "screenshots": []
+                "regen_command": ""
               },
-              "inputs": {},
-              "expected_outputs": {"npv": 0.0},
+              "kind": "pricing",
+              "model": "discounting",
+              "market": {"kind": "envelope", "envelope": {"schema": "finstack.calibration"}},
+              "instrument": {},
+              "expected": {"npv": 0.0},
               "tolerances": {"npv": {"abs": 0.0}}
             }"#,
         )
@@ -274,144 +272,5 @@ mod tests {
             err.contains("schema_version is 'finstack.golden/0'"),
             "unexpected error: {err}"
         );
-    }
-
-    #[test]
-    fn source_validation_rejects_reference_outputs() {
-        let fixture = GoldenFixture {
-            schema_version: crate::golden::schema::SCHEMA_VERSION.to_string(),
-            name: "bad_source_validation".to_string(),
-            domain: "rates.deposit".to_string(),
-            description: "Source validation duplicate references fixture".to_string(),
-            provenance: test_provenance(),
-            inputs: serde_json::json!({
-                "source_validation": {
-                    "status": "non_executable",
-                    "reason": "unit test",
-                    "reference_outputs": {"npv": 0.0}
-                }
-            }),
-            expected_outputs: BTreeMap::from([("npv".to_string(), 0.0)]),
-            tolerances: BTreeMap::from([("npv".to_string(), abs_zero())]),
-        };
-
-        let err = crate::golden::source_validation::validate_source_validation_fixture(
-            "test runner",
-            &fixture,
-        )
-        .expect_err("source reference outputs must fail");
-
-        assert!(
-            err.contains("reference_outputs is not allowed"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn pricing_source_validation_still_dispatches_to_runner() {
-        let fixture = GoldenFixture {
-            schema_version: crate::golden::schema::SCHEMA_VERSION.to_string(),
-            name: "source_validation_pricing_dispatch".to_string(),
-            domain: "rates.deposit".to_string(),
-            description: "Source validation pricing dispatch test".to_string(),
-            provenance: test_provenance(),
-            inputs: serde_json::json!({
-                "source_validation": {
-                    "status": "non_executable",
-                    "reason": "unit test"
-                }
-            }),
-            expected_outputs: BTreeMap::from([("npv".to_string(), 0.0)]),
-            tolerances: BTreeMap::from([("npv".to_string(), abs_zero())]),
-        };
-
-        let err = run_fixture(&fixture).expect_err("pricing source validation must execute runner");
-
-        assert!(
-            err.contains("parse pricing inputs"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn source_validation_requires_reason_before_reference_comparison() {
-        let fixture = GoldenFixture {
-            schema_version: crate::golden::schema::SCHEMA_VERSION.to_string(),
-            name: "source_validation_missing_reason".to_string(),
-            domain: "rates.deposit".to_string(),
-            description: "Source validation reason test".to_string(),
-            provenance: test_provenance(),
-            inputs: serde_json::json!({
-                "components": {"selection::tech": 0.01},
-                "source_validation": {
-                    "status": "non_executable"
-                }
-            }),
-            expected_outputs: BTreeMap::from([("selection::tech".to_string(), 0.01)]),
-            tolerances: BTreeMap::from([("selection::tech".to_string(), abs_zero())]),
-        };
-
-        let err = crate::golden::source_validation::validate_source_validation_fixture(
-            "test runner",
-            &fixture,
-        )
-        .expect_err("source validation must explain non-execution");
-
-        assert!(err.contains("must explain"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn source_validation_rejects_legacy_actual_outputs() {
-        let fixture = GoldenFixture {
-            schema_version: crate::golden::schema::SCHEMA_VERSION.to_string(),
-            name: "source_validation_actual_outputs".to_string(),
-            domain: "rates.deposit".to_string(),
-            description: "Source validation actual_outputs test".to_string(),
-            provenance: test_provenance(),
-            inputs: serde_json::json!({
-                "actual_outputs": {"selection::tech": 0.01},
-                "components": {"selection::tech": 0.01},
-                "source_validation": {
-                    "status": "non_executable",
-                    "reason": "unit test"
-                }
-            }),
-            expected_outputs: BTreeMap::from([("selection::tech".to_string(), 0.01)]),
-            tolerances: BTreeMap::from([("selection::tech".to_string(), abs_zero())]),
-        };
-
-        let err = crate::golden::source_validation::validate_source_validation_fixture(
-            "test runner",
-            &fixture,
-        )
-        .expect_err("source validation must reject actual_outputs");
-
-        assert!(
-            err.contains("must not keep inputs.actual_outputs"),
-            "unexpected error: {err}"
-        );
-    }
-
-    fn test_provenance() -> Provenance {
-        Provenance {
-            as_of: "2026-04-30".to_string(),
-            source: "formula".to_string(),
-            source_detail: "unit test".to_string(),
-            captured_by: "test".to_string(),
-            captured_on: "2026-04-30".to_string(),
-            last_reviewed_by: "test".to_string(),
-            last_reviewed_on: "2026-04-30".to_string(),
-            review_interval_months: 6,
-            regen_command: String::new(),
-            screenshots: Vec::new(),
-        }
-    }
-
-    fn abs_zero() -> ToleranceEntry {
-        ToleranceEntry {
-            abs: Some(0.0),
-            rel: None,
-            tolerance_reason: None,
-        }
     }
 }

@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "usd_swaption_normal_vol_self_test",
-  "domain": "rates.swaption",
-  "description": "Self-test fixture for SABR swaption-vol cube calibration. 1Y-into-5Y USD receiver swaption (10MM USD notional, ATM strike), priced against a SABR-fitted normal-vol cube calibrated from 27 swaption-vol quotes across a 3 expiries \u00d7 3 tenors grid (\u03b2=0.0, normal SABR). Three-step envelope: USD-OIS discount + USD-SOFR-3M forward + USD-SWAPTION-NORMAL-VOL cube. Closes the swaption_vol step coverage gap (plan \u00a719 next-gap follow-up).",
-  "provenance": {
-    "as_of": "2026-05-08",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "usd_swaption_normal_vol_self_test",
+    "domain": "rates.swaption",
+    "description": "Self-test fixture for SABR swaption-vol cube calibration. 1Y-into-5Y USD receiver swaption (10MM USD notional, ATM strike), priced against a SABR-fitted normal-vol cube calibrated from 27 swaption-vol quotes across a 3 expiries \u00d7 3 tenors grid (\u03b2=0.0, normal SABR). Three-step envelope: USD-OIS discount + USD-SOFR-3M forward + USD-SWAPTION-NORMAL-VOL cube. Closes the swaption_vol step coverage gap (plan \u00a719 next-gap follow-up).",
+    "valuation_date": "2026-05-08",
     "source": "formula",
     "source_detail": "Self-test fixture closing the swaption_vol step coverage gap. Reuses the Phase-2 reference envelope catalog entry 07_swaption_vol_surface.json as the calibration plan. Three steps: (1) USD-OIS bootstrapped from 6 SOFR OIS quotes, (2) USD-SOFR-3M forward bootstrapped against the calibrated discount, (3) USD-SWAPTION-NORMAL-VOL SABR-fitted from 27 swaption-vol quotes (3 expiries \u00d7 3 tenors \u00d7 3 strikes; bilinear interpolation; normal-vol convention; \u03b2=0.0). The surface is produced as a vol_cube (not a vol_surface) \u2014 its presence in the calibrated market is the principal verification of the swaption_vol step. Expected outputs captured from Finstack's calibrate + black76 swaption-price round-trip; bit-stable reproduction is the contract.",
     "captured_by": "claude",
@@ -15,106 +15,11 @@
     "regen_command": "uv run pytest finstack-py/tests/golden/test_pricing_swaption.py -v -k self_test",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-05-08",
-    "model": "black76",
-    "metrics": [
-      "vega",
-      "dv01"
-    ],
-    "instrument_json": {
-      "schema": "finstack.instrument/1",
-      "instrument": {
-        "type": "swaption",
-        "spec": {
-          "id": "USD-SWAPTION-1Y-INTO-5Y-SELF-TEST",
-          "option_type": "put",
-          "notional": {
-            "amount": "10000000",
-            "currency": "USD"
-          },
-          "strike": "0.03766225",
-          "expiry": "2027-05-08",
-          "swap_start": "2027-05-08",
-          "swap_end": "2032-05-08",
-          "fixed_freq": {
-            "count": 12,
-            "unit": "months"
-          },
-          "float_freq": {
-            "count": 12,
-            "unit": "months"
-          },
-          "day_count": "Act360",
-          "cash_settlement_method": "isda_par_par",
-          "vol_model": "normal",
-          "discount_curve_id": "USD-OIS",
-          "forward_curve_id": "USD-SOFR-3M",
-          "vol_surface_id": "USD-SWAPTION-NORMAL-VOL",
-          "calendar_id": "usny",
-          "underlying_fixed_leg": {
-            "discount_curve_id": "USD-OIS",
-            "rate": "0.03766225",
-            "frequency": {
-              "count": 12,
-              "unit": "months"
-            },
-            "day_count": "Act360",
-            "calendar_id": "usny",
-            "stub": "None",
-            "start": "2027-05-05",
-            "end": "2032-05-05",
-            "par_method": null,
-            "compounding_simple": true,
-            "payment_lag_days": 2
-          },
-          "underlying_float_leg": {
-            "discount_curve_id": "USD-OIS",
-            "forward_curve_id": "USD-SOFR-3M",
-            "spread_bp": "0",
-            "frequency": {
-              "count": 12,
-              "unit": "months"
-            },
-            "day_count": "Act360",
-            "calendar_id": "usny",
-            "stub": "None",
-            "reset_lag_days": 0,
-            "fixing_calendar_id": "usny",
-            "start": "2027-05-05",
-            "end": "2032-05-05",
-            "compounding": {
-              "CompoundedWithRateCutoff": {
-                "cutoff_days": 1
-              }
-            },
-            "payment_lag_days": 2
-          },
-          "pricing_overrides": {
-            "vol_surface_extrapolation": "clamp"
-          },
-          "sabr_params": null,
-          "attributes": {
-            "tags": [
-              "golden",
-              "bloomberg",
-              "swpm"
-            ],
-            "meta": {
-              "bloomberg_screen": "SWPM",
-              "curve_number": "490",
-              "curve_name": "USD SOFR",
-              "vol_cube": "USD RFR BVOL Cube",
-              "screen_model": "Normal",
-              "screen_volatility_type": "Normal",
-              "legacy_fixture_name": "usd_swaption_5y_into_5y_receiver_25_otm"
-            }
-          },
-          "settlement": "cash"
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "black76",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "$schema": "../../schemas/calibration/3/calibration.schema.json",
       "schema": "finstack.calibration",
       "plan": {
@@ -697,18 +602,101 @@
         }
       ],
       "prior_market": []
-    },
-    "source_reference": {
-      "note": "Self-test fixture closing the swaption_vol step coverage gap. The SABR fit converges with rmse ~3e-4 (typical for a 3\u00d73 swaption grid); the self-test contract is bit-stable round-trip reproduction of priced metrics, not zero residual on calibration.",
-      "design_metrics": [
-        "npv",
-        "vega",
-        "dv01"
-      ],
-      "self_test_origin": "Authored 2026-05-10 to cover the `swaption_vol` step kind."
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "schema": "finstack.instrument/1",
+    "instrument": {
+      "type": "swaption",
+      "spec": {
+        "id": "USD-SWAPTION-1Y-INTO-5Y-SELF-TEST",
+        "option_type": "put",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "strike": "0.03766225",
+        "expiry": "2027-05-08",
+        "swap_start": "2027-05-08",
+        "swap_end": "2032-05-08",
+        "fixed_freq": {
+          "count": 12,
+          "unit": "months"
+        },
+        "float_freq": {
+          "count": 12,
+          "unit": "months"
+        },
+        "day_count": "Act360",
+        "cash_settlement_method": "isda_par_par",
+        "vol_model": "normal",
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "USD-SOFR-3M",
+        "vol_surface_id": "USD-SWAPTION-NORMAL-VOL",
+        "calendar_id": "usny",
+        "underlying_fixed_leg": {
+          "discount_curve_id": "USD-OIS",
+          "rate": "0.03766225",
+          "frequency": {
+            "count": 12,
+            "unit": "months"
+          },
+          "day_count": "Act360",
+          "calendar_id": "usny",
+          "stub": "None",
+          "start": "2027-05-05",
+          "end": "2032-05-05",
+          "par_method": null,
+          "compounding_simple": true,
+          "payment_lag_days": 2
+        },
+        "underlying_float_leg": {
+          "discount_curve_id": "USD-OIS",
+          "forward_curve_id": "USD-SOFR-3M",
+          "spread_bp": "0",
+          "frequency": {
+            "count": 12,
+            "unit": "months"
+          },
+          "day_count": "Act360",
+          "calendar_id": "usny",
+          "stub": "None",
+          "reset_lag_days": 0,
+          "fixing_calendar_id": "usny",
+          "start": "2027-05-05",
+          "end": "2032-05-05",
+          "compounding": {
+            "CompoundedWithRateCutoff": {
+              "cutoff_days": 1
+            }
+          },
+          "payment_lag_days": 2
+        },
+        "pricing_overrides": {
+          "vol_surface_extrapolation": "clamp"
+        },
+        "sabr_params": null,
+        "attributes": {
+          "tags": [
+            "golden",
+            "bloomberg",
+            "swpm"
+          ],
+          "meta": {
+            "bloomberg_screen": "SWPM",
+            "curve_number": "490",
+            "curve_name": "USD SOFR",
+            "vol_cube": "USD RFR BVOL Cube",
+            "screen_model": "Normal",
+            "screen_volatility_type": "Normal",
+            "legacy_fixture_name": "usd_swaption_5y_into_5y_receiver_25_otm"
+          }
+        },
+        "settlement": "cash"
+      }
+    }
+  },
+  "expected": {
     "npv": 2301362.522336341,
     "vega": 169491.5971228461,
     "dv01": -2904.926587405615

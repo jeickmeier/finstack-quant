@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "conv_bond_atm_3y",
-  "domain": "fixed_income.convertible",
-  "description": "Synthetic ATM 3Y convertible bond with flat equity vol and dividend yield.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "conv_bond_atm_3y",
+    "domain": "fixed_income.convertible",
+    "description": "Synthetic ATM 3Y convertible bond with flat equity vol and dividend yield.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical fixed-income pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): two-step calibration (term_loan pattern). USD-OIS + USD-SOFR-3M calibrated; USD-CORP, USD-TREASURY, hazard curves, equity data preserved in initial_market. Expected outputs recaptured from Finstack.",
     "captured_by": "jeickmeier",
@@ -15,55 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "clean_price",
-      "dv01",
-      "cs01"
-    ],
-    "instrument_json": {
-      "type": "convertible_bond",
-      "spec": {
-        "notional": {
-          "amount": "1000000",
-          "currency": "USD"
-        },
-        "maturity": "2029-04-30",
-        "discount_curve_id": "USD-OIS",
-        "credit_curve_id": "USD-CORP",
-        "conversion": {
-          "ratio": 10.0,
-          "policy": "Voluntary",
-          "anti_dilution": "None",
-          "dividend_adjustment": "None"
-        },
-        "underlying_equity_id": "ACME",
-        "fixed_coupon": {
-          "rate": 0.02,
-          "freq": {
-            "count": 6,
-            "unit": "months"
-          },
-          "dc": "Thirty360",
-          "bdc": "following",
-          "stub": "None",
-          "calendar_id": "weekends_only"
-        },
-        "attributes": {
-          "tags": [
-            "golden"
-          ],
-          "meta": {
-            "vol_surface_id": "ACME-VOL"
-          }
-        },
-        "id": "CONV-BOND-ATM-3Y-GOLDEN",
-        "issue_date": "2026-04-30"
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "conv_bond_atm_3y_market",
@@ -588,25 +544,49 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "note": "Formula fixture; expected_outputs are populated from the live Rust/Python golden runners.",
-      "planned_metrics_reason": "Convertible greeks currently return zero under the discounting snapshot path and need dedicated optionality metric plumbing before they are compared.",
-      "non_compared_metrics": [
-        "parity",
-        "conversion_premium"
-      ],
-      "planned_metrics_not_compared": [
-        "delta",
-        "vega",
-        "rho"
-      ],
-      "zero_metric_reasons": {
-        "dv01": "Canonical metric currently returns zero for this deterministic fixture; golden locks the output and will catch future non-zero metric plumbing changes."
-      }
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "convertible_bond",
+    "spec": {
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "maturity": "2029-04-30",
+      "discount_curve_id": "USD-OIS",
+      "credit_curve_id": "USD-CORP",
+      "conversion": {
+        "ratio": 10.0,
+        "policy": "Voluntary",
+        "anti_dilution": "None",
+        "dividend_adjustment": "None"
+      },
+      "underlying_equity_id": "ACME",
+      "fixed_coupon": {
+        "rate": 0.02,
+        "freq": {
+          "count": 6,
+          "unit": "months"
+        },
+        "dc": "Thirty360",
+        "bdc": "following",
+        "stub": "None",
+        "calendar_id": "weekends_only"
+      },
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {
+          "vol_surface_id": "ACME-VOL"
+        }
+      },
+      "id": "CONV-BOND-ATM-3Y-GOLDEN",
+      "issue_date": "2026-04-30"
+    }
+  },
+  "expected": {
     "npv": 906935.6121183528,
     "clean_price": 906935.6121183528,
     "dv01": 0.0,

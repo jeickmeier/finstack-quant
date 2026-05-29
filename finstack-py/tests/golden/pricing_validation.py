@@ -22,17 +22,21 @@ def validated_instrument_json(instrument_json: dict[str, Any]) -> str:
     return validate_instrument_json(json.dumps(instrument_json))
 
 
-def validate_requested_metrics(metrics: list[str], expected_outputs: dict[str, float]) -> None:
-    """Validate requested metric names and coverage of expected outputs."""
+def requested_metrics(expected: dict[str, float]) -> list[str]:
+    """Derive the requested-metric list from expected keys (npv excluded)."""
+    metrics: list[str] = []
+    for key in expected:
+        base = _metric_base(key)
+        if base != "npv" and base not in metrics:
+            metrics.append(base)
+    return metrics
+
+
+def validate_requested_metrics(metrics: list[str]) -> None:
+    """Validate that derived metric names are known standard metrics."""
     standard_metrics = set(list_standard_metrics())
     unknown = [metric for metric in metrics if metric not in standard_metrics]
-    assert not unknown, f"pricing fixture inputs.metrics contains unknown metric(s): {unknown}"
-
-    requested = set(metrics)
-    missing = [
-        metric for metric in expected_outputs if _metric_base(metric) != "npv" and _metric_base(metric) not in requested
-    ]
-    assert not missing, f"pricing fixture expected_outputs has metric(s) not requested in inputs.metrics: {missing}"
+    assert not unknown, f"expected metric base name(s) are not standard metrics: {unknown}"
 
 
 def _is_instrument_envelope(instrument_json: dict[str, Any]) -> bool:

@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "usd_5y_zcis_self_test",
-  "domain": "rates.inflation_swap",
-  "description": "Self-test fixture for zero-coupon inflation swap pricing with two-step calibration. Receive-fixed at 2.20% against US-CPI ZCIS for 5Y, 10MM USD notional. Exercises both the discount step (USD-OIS, with ois_compounding override) and the inflation step (US-CPI from 6 ZCIS quotes, against the calibrated discount curve). Closes the inflation calibration step coverage gap (plan \u00a718 follow-up #1).",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "usd_5y_zcis_self_test",
+    "domain": "rates.inflation_swap",
+    "description": "Self-test fixture for zero-coupon inflation swap pricing with two-step calibration. Receive-fixed at 2.20% against US-CPI ZCIS for 5Y, 10MM USD notional. Exercises both the discount step (USD-OIS, with ois_compounding override) and the inflation step (US-CPI from 6 ZCIS quotes, against the calibrated discount curve). Closes the inflation calibration step coverage gap (plan \u00a718 follow-up #1).",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Self-test fixture: 6 ZCIS quotes (1Y-10Y, ~2.0-2.4% rising) calibrate the US-CPI inflation curve against a SOFR OIS-bootstrapped discount curve. Expected outputs captured from Finstack's own calibration + pricing pipeline. Round-trip stability: re-running calibrate + price_instrument_with_metrics must reproduce these values within solver tolerance. Guards regressions in the inflation-step bootstrap, the inflation-swap pricing kernel, and the new `inflation` step kind's plumbing through engine::execute_with_diagnostics.",
     "captured_by": "claude",
@@ -15,38 +15,11 @@
     "regen_command": "uv run pytest finstack-py/tests/golden/test_pricing_inflation_swap.py -v -k self_test",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "dv01"
-    ],
-    "instrument_json": {
-      "type": "inflation_swap",
-      "spec": {
-        "id": "USD-5Y-ZCIS-SELF-TEST",
-        "notional": {
-          "amount": "10000000",
-          "currency": "USD"
-        },
-        "start_date": "2026-04-30",
-        "maturity": "2031-04-30",
-        "fixed_rate": 0.022,
-        "inflation_index_id": "US-CPI",
-        "discount_curve_id": "USD-OIS",
-        "side": "receive",
-        "attributes": {
-          "tags": [
-            "golden",
-            "self_test",
-            "inflation_calibration"
-          ],
-          "meta": {}
-        },
-        "day_count": "Act365F"
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "usd_5y_zcis_self_test_market",
@@ -333,17 +306,34 @@
         }
       ],
       "prior_market": []
-    },
-    "source_reference": {
-      "note": "Self-test fixture closing the inflation step coverage gap (plan \u00a718 follow-up #1). Expected outputs captured from Finstack's calibrate + price round-trip; contract is bit-stable reproduction within 1e-9 absolute / 5e-9 relative tolerance.",
-      "design_metrics": [
-        "npv",
-        "dv01"
-      ],
-      "self_test_origin": "Authored 2026-05-09 to cover the `inflation` step kind."
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "inflation_swap",
+    "spec": {
+      "id": "USD-5Y-ZCIS-SELF-TEST",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "start_date": "2026-04-30",
+      "maturity": "2031-04-30",
+      "fixed_rate": 0.022,
+      "inflation_index_id": "US-CPI",
+      "discount_curve_id": "USD-OIS",
+      "side": "receive",
+      "attributes": {
+        "tags": [
+          "golden",
+          "self_test",
+          "inflation_calibration"
+        ],
+        "meta": {}
+      },
+      "day_count": "Act365F"
+    }
+  },
+  "expected": {
     "npv": -91501.4714497153,
     "dv01": 45.77580653056066
   },

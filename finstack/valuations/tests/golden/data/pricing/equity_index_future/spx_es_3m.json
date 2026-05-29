@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "spx_es_3m",
-  "domain": "equity.equity_index_future",
-  "description": "Synthetic three-month E-mini S&P 500 futures contract.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "spx_es_3m",
+    "domain": "equity.equity_index_future",
+    "description": "Synthetic three-month E-mini S&P 500 futures contract.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
     "captured_by": "jeickmeier",
@@ -15,46 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "delta",
-      "dv01",
-      "futures_price",
-      "basis"
-    ],
-    "instrument_json": {
-      "type": "equity_index_future",
-      "spec": {
-        "id": "SPX-ES-3M-GOLDEN",
-        "underlying_ticker": "SPX",
-        "notional": {
-          "amount": "2250000",
-          "currency": "USD"
-        },
-        "expiry": "2026-07-30",
-        "last_trading_date": "2026-07-29",
-        "entry_price": 4500.0,
-        "position": "long",
-        "contract_specs": {
-          "multiplier": 50.0,
-          "tick_size": 0.25,
-          "tick_value": 12.5,
-          "settlement_method": "cash"
-        },
-        "discount_curve_id": "USD-OIS",
-        "spot_id": "SPX-SPOT",
-        "div_yield_id": "SPX-DIVYIELD",
-        "attributes": {
-          "tags": [
-            "golden"
-          ],
-          "meta": {}
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "spx_es_3m_tier_a_wrap",
@@ -136,17 +101,39 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "planned_metrics_reason": "Design alias dv01_rate maps to strict dv01; futures_price and basis are now compared directly.",
-      "planned_metrics_not_compared": [
-        "dv01_rate"
-      ],
-      "spot": 4500.0,
-      "continuous_dividend_yield": 0.015
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "equity_index_future",
+    "spec": {
+      "id": "SPX-ES-3M-GOLDEN",
+      "underlying_ticker": "SPX",
+      "notional": {
+        "amount": "2250000",
+        "currency": "USD"
+      },
+      "expiry": "2026-07-30",
+      "last_trading_date": "2026-07-29",
+      "entry_price": 4500.0,
+      "position": "long",
+      "contract_specs": {
+        "multiplier": 50.0,
+        "tick_size": 0.25,
+        "tick_value": 12.5,
+        "settlement_method": "cash"
+      },
+      "discount_curve_id": "USD-OIS",
+      "spot_id": "SPX-SPOT",
+      "div_yield_id": "SPX-DIVYIELD",
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
+      }
+    }
+  },
+  "expected": {
     "npv": 14181.422799385473,
     "delta": 500.0,
     "dv01": 56.44945465678575,

@@ -7,7 +7,7 @@ import pytest
 from .conftest import discover_fixtures, run_golden
 
 
-@pytest.mark.parametrize("fixture", discover_fixtures("volatility/sabr"))
+@pytest.mark.parametrize("fixture", discover_fixtures("market_data/sabr"))
 def test_volatility_sabr_smile(fixture: str) -> None:
     """Run every SABR smile fixture through the Python bindings."""
     run_golden(fixture)

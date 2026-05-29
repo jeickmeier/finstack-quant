@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "cdx_ig_5y_3_7_mezz",
-  "domain": "credit.cds_tranche",
-  "description": "Synthetic CDX IG 5Y 3-7 percent mezzanine tranche.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "cdx_ig_5y_3_7_mezz",
+    "domain": "credit.cds_tranche",
+    "description": "Synthetic CDX IG 5Y 3-7 percent mezzanine tranche.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical credit pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved.",
     "captured_by": "jeickmeier",
@@ -15,51 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "hazard_rate",
-    "metrics": [
-      "par_spread",
-      "spread_dv01",
-      "dv01",
-      "cs01"
-    ],
-    "instrument_json": {
-      "type": "cds_tranche",
-      "spec": {
-        "id": "CDX-IG-5Y-3-7-MEZZ-GOLDEN",
-        "index_name": "CDX.NA.IG",
-        "series": 42,
-        "attach_pct": 3.0,
-        "detach_pct": 7.0,
-        "notional": {
-          "amount": "10000000",
-          "currency": "USD"
-        },
-        "maturity": "2031-04-30",
-        "running_coupon_bp": 100.0,
-        "frequency": {
-          "count": 3,
-          "unit": "months"
-        },
-        "day_count": "Act360",
-        "bdc": "following",
-        "calendar_id": "nyse",
-        "discount_curve_id": "USD-OIS",
-        "credit_index_id": "CDX.NA.IG.HAZARD",
-        "side": "buy_protection",
-        "effective_date": "2026-04-30",
-        "accumulated_loss": 0.0,
-        "standard_imm_dates": false,
-        "attributes": {
-          "tags": [
-            "golden"
-          ],
-          "meta": {}
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "hazard_rate",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "cdx_ig_5y_3_7_mezz_tier_a_wrap",
@@ -274,23 +234,44 @@
           ]
         }
       ]
-    },
-    "source_reference": {
-      "design_metrics": [
-        "upfront",
-        "par_spread",
-        "cs01"
-      ],
-      "non_compared_metrics_reason": "Upfront and base-correlation diagnostics are not exposed as strict tranche metric ids yet.",
-      "non_compared_metrics": [
-        "upfront",
-        "base_correlation"
-      ],
-      "cs01_methodology_note": "CS01 is an executable regression gate using the corrected par-spread rebootstrap methodology from the explicit CDX.NA.IG.HAZARD par_spreads committed in this fixture.",
-      "fixture_correction_note": "Expected cs01 was updated from the pre-correction direct/formula value after Phase 5 required par-spread inputs made tranche CS01 executable under the market par-spread bump methodology."
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "cds_tranche",
+    "spec": {
+      "id": "CDX-IG-5Y-3-7-MEZZ-GOLDEN",
+      "index_name": "CDX.NA.IG",
+      "series": 42,
+      "attach_pct": 3.0,
+      "detach_pct": 7.0,
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "maturity": "2031-04-30",
+      "running_coupon_bp": 100.0,
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "day_count": "Act360",
+      "bdc": "following",
+      "calendar_id": "nyse",
+      "discount_curve_id": "USD-OIS",
+      "credit_index_id": "CDX.NA.IG.HAZARD",
+      "side": "buy_protection",
+      "effective_date": "2026-04-30",
+      "accumulated_loss": 0.0,
+      "standard_imm_dates": false,
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
+      }
+    }
+  },
+  "expected": {
     "npv": 1851426.9422832413,
     "par_spread": 547.1016968145245,
     "spread_dv01": -4140.952618775773,

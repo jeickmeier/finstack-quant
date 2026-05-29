@@ -12,61 +12,51 @@ from finstack.valuations import (
     ValuationResult,
     calibrate,
 )
-from tests.golden.pricing_validation import validated_instrument_json
-from tests.golden.runners import validate_source_validation_fixture
+from tests.golden.pricing_validation import requested_metrics, validated_instrument_json
 from tests.golden.schema import GoldenFixture
 
 
-def _resolve_market(inputs: dict) -> MarketContext:
-    """Return a MarketContext from either the 'market' or 'market_envelope' key.
+def _resolve_market(market: dict) -> MarketContext:
+    """Return a MarketContext from a `snapshot` or `envelope` market block.
 
-    Mutually exclusive: the fixture must provide exactly one. 'market' is the
-    materialized MarketContext JSON (snapshot); 'market_envelope' is a
-    CalibrationEnvelope routed through the calibration engine.
-
-    On envelope-driven failures the wrapped exception preserves the
-    structured ``CalibrationEnvelopeError`` payload (``kind``, ``step_id``,
-    ``details``) for downstream debugging — the legacy ``except ValueError``
-    pattern would have missed Phase 4's ``CalibrationEnvelopeError``
-    (RuntimeError subclass) entirely.
+    A `snapshot` carries materialized MarketContext JSON; an `envelope`
+    carries a CalibrationEnvelope routed through the calibration engine. On
+    envelope failures the wrapped exception preserves the structured
+    ``CalibrationEnvelopeError`` payload (``kind``, ``step_id``, ``details``).
     """
-    has_market = "market" in inputs
-    has_envelope = "market_envelope" in inputs
-    if has_market and has_envelope:
-        raise ValueError("pricing fixture supplied both 'market' and 'market_envelope'; specify exactly one")
-    if has_market:
-        return MarketContext.from_json(json.dumps(inputs["market"]))
-    if has_envelope:
-        envelope = inputs["market_envelope"]
+    kind = market.get("kind")
+    if kind == "snapshot":
+        return MarketContext.from_json(json.dumps(market["data"]))
+    if kind == "envelope":
+        envelope = market["envelope"]
         plan_id = envelope.get("plan", {}).get("id", "?")
         try:
             result = calibrate(json.dumps(envelope))
         except CalibrationEnvelopeError as exc:
             raise CalibrationEnvelopeError(
-                f"calibrate market_envelope for plan '{plan_id}' failed ({exc.kind}, step={exc.step_id}): {exc}"
+                f"calibrate market envelope for plan '{plan_id}' failed ({exc.kind}, step={exc.step_id}): {exc}"
             ) from exc
         return result.market
-    raise ValueError("pricing fixture must supply either 'market' or 'market_envelope'")
+    msg = f"pricing fixture market.kind must be 'snapshot' or 'envelope', got {kind!r}"
+    raise ValueError(msg)
 
 
 def run_pricing_fixture(fixture: GoldenFixture) -> dict[str, float]:
     """Run one common pricing fixture through the Python bindings."""
-    validate_source_validation_fixture("pricing runner", fixture)
-
-    inputs = fixture.inputs
-    market = _resolve_market(inputs)
-    instrument_json = validated_instrument_json(inputs["instrument_json"])
+    body = fixture.body
+    market = _resolve_market(body["market"])
+    instrument_json = validated_instrument_json(body["instrument"])
     result_json = price_instrument_with_metrics(
         instrument_json,
         market,
-        inputs["valuation_date"],
-        model=inputs["model"],
-        metrics=list(inputs["metrics"]),
+        fixture.metadata.valuation_date,
+        model=body["model"],
+        metrics=requested_metrics(fixture.expected),
     )
     result = ValuationResult.from_json(result_json)
 
     actuals: dict[str, float] = {}
-    for metric in fixture.expected_outputs:
+    for metric in fixture.expected:
         if metric == "npv":
             actuals[metric] = float(result.price)
             continue

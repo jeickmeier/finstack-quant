@@ -1,65 +1,57 @@
 //! Shared pricing runner helpers for instrument-level golden fixtures.
 
-use crate::golden::schema::GoldenFixture;
+use crate::golden::schema::{GoldenFixture, Market};
 use finstack_core::market_data::context::MarketContext;
 use finstack_valuations::calibration::api::engine::{self, ExecuteError};
 use finstack_valuations::calibration::api::schema::CalibrationEnvelope;
 use finstack_valuations::pricer::price_instrument_json_with_metrics;
-use serde::Deserialize;
 use std::collections::BTreeMap;
 
-#[derive(Debug, Deserialize)]
-struct PricingInputs {
-    valuation_date: String,
-    model: String,
-    metrics: Vec<String>,
-    instrument_json: serde_json::Value,
-    /// Materialized MarketContext JSON (snapshot form). Mutually exclusive with `market_envelope`.
-    #[serde(default)]
-    market: Option<MarketContext>,
-    /// CalibrationEnvelope JSON (quote-driven form). Mutually exclusive with `market`.
-    #[serde(default)]
-    market_envelope: Option<CalibrationEnvelope>,
+fn metric_base(metric: &str) -> &str {
+    metric.split_once("::").map_or(metric, |(base, _)| base)
 }
 
-impl PricingInputs {
-    fn resolve_market(&self) -> Result<MarketContext, String> {
-        match (&self.market, &self.market_envelope) {
-            (Some(_), Some(_)) => Err(
-                "pricing fixture supplied both 'market' and 'market_envelope'; specify exactly one"
-                    .to_string(),
-            ),
-            (Some(m), None) => Ok(m.clone()),
-            (None, Some(env)) => {
-                // Use `execute_with_diagnostics` so envelope failures surface
-                // the structured `EnvelopeError::SolverNotConverged`
-                // (worst-quote ID, tolerance, etc.) instead of the lossy
-                // `finstack_core::Error::Calibration { message, category }`
-                // form. The plan_id wrapper preserves the calling fixture's
-                // context while the inner Display carries the structured
-                // detail.
-                let result = engine::execute_with_diagnostics(env).map_err(|err| {
-                    let plan_id = &env.plan.id;
-                    match &err {
-                        ExecuteError::Envelope(envelope_err) => format!(
-                            "calibrate market_envelope for plan '{plan_id}' failed \
-                             ({}, step={:?}): {envelope_err}",
-                            envelope_err.kind_str(),
-                            envelope_err.step_id(),
-                        ),
-                        ExecuteError::Other(other) => {
-                            format!("calibrate market_envelope for plan '{plan_id}': {other}")
-                        }
+/// Metrics to request from the pricer, derived from the expected-output keys.
+///
+/// `npv` is always produced by the pricer and is therefore never requested.
+pub(crate) fn requested_metrics(fixture: &GoldenFixture) -> Vec<String> {
+    let mut metrics = Vec::new();
+    for key in fixture.expected.keys() {
+        let base = metric_base(key);
+        if base != "npv" && !metrics.iter().any(|m| m == base) {
+            metrics.push(base.to_string());
+        }
+    }
+    metrics
+}
+
+fn resolve_market(market: &Market) -> Result<MarketContext, String> {
+    match market {
+        Market::Snapshot { data } => serde_json::from_value::<MarketContext>(data.clone())
+            .map_err(|err| format!("parse market snapshot: {err}")),
+        Market::Envelope { envelope } => {
+            let env: CalibrationEnvelope = serde_json::from_value(envelope.clone())
+                .map_err(|err| format!("parse market envelope: {err}"))?;
+            // Use `execute_with_diagnostics` so envelope failures surface the
+            // structured `EnvelopeError::SolverNotConverged` (worst-quote ID,
+            // tolerance, etc.) instead of the lossy `Error::Calibration` form.
+            let result = engine::execute_with_diagnostics(&env).map_err(|err| {
+                let plan_id = &env.plan.id;
+                match &err {
+                    ExecuteError::Envelope(envelope_err) => format!(
+                        "calibrate market envelope for plan '{plan_id}' failed \
+                         ({}, step={:?}): {envelope_err}",
+                        envelope_err.kind_str(),
+                        envelope_err.step_id(),
+                    ),
+                    ExecuteError::Other(other) => {
+                        format!("calibrate market envelope for plan '{plan_id}': {other}")
                     }
-                })?;
-                let plan_id = env.plan.id.clone();
-                MarketContext::try_from(result.result.final_market).map_err(|err| {
-                    format!("rehydrate calibrated market for plan '{plan_id}': {err}")
-                })
-            }
-            (None, None) => {
-                Err("pricing fixture must supply either 'market' or 'market_envelope'".to_string())
-            }
+                }
+            })?;
+            let plan_id = env.plan.id.clone();
+            MarketContext::try_from(result.result.final_market)
+                .map_err(|err| format!("rehydrate calibrated market for plan '{plan_id}': {err}"))
         }
     }
 }
@@ -68,29 +60,26 @@ impl PricingInputs {
 pub(crate) fn run_pricing_fixture(
     fixture: &GoldenFixture,
 ) -> Result<BTreeMap<String, f64>, String> {
-    crate::golden::source_validation::validate_source_validation_fixture(
-        "pricing runner",
-        fixture,
-    )?;
-
-    let inputs: PricingInputs = serde_json::from_value(fixture.inputs.clone())
-        .map_err(|err| format!("parse pricing inputs: {err}"))?;
-    let market = inputs.resolve_market()?;
-    let instrument_json = serde_json::to_string(&inputs.instrument_json)
-        .map_err(|err| format!("serialize instrument_json: {err}"))?;
+    let pricing = fixture
+        .pricing()
+        .ok_or("pricing runner requires a 'pricing' fixture body")?;
+    let market = resolve_market(&pricing.market)?;
+    let instrument_json = serde_json::to_string(&pricing.instrument)
+        .map_err(|err| format!("serialize instrument: {err}"))?;
+    let metrics = requested_metrics(fixture);
 
     let result = price_instrument_json_with_metrics(
         &instrument_json,
         &market,
-        &inputs.valuation_date,
-        &inputs.model,
-        &inputs.metrics,
+        &fixture.metadata.valuation_date,
+        &pricing.model,
+        &metrics,
         None,
     )
     .map_err(|err| format!("price instrument JSON: {err}"))?;
 
     let mut actuals = BTreeMap::new();
-    for metric in fixture.expected_outputs.keys() {
+    for metric in fixture.expected.keys() {
         let value = if metric == "npv" {
             result.value.amount()
         } else {
@@ -105,13 +94,39 @@ pub(crate) fn run_pricing_fixture(
 }
 
 #[cfg(test)]
-mod market_envelope_input_tests {
+mod tests {
     use super::*;
-    use serde_json::json;
+    use crate::golden::schema::SCHEMA_VERSION;
 
-    /// Minimal valid MarketContext JSON (empty curves, no surfaces).
+    fn pricing_fixture(market: serde_json::Value) -> GoldenFixture {
+        let json = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "metadata": {
+                "name": "market_test",
+                "domain": "rates.deposit",
+                "description": "market resolution test",
+                "valuation_date": "2026-04-30",
+                "source": "formula",
+                "source_detail": "unit test",
+                "captured_by": "test",
+                "captured_on": "2026-04-30",
+                "last_reviewed_by": "test",
+                "last_reviewed_on": "2026-04-30",
+                "review_interval_months": 6,
+                "regen_command": ""
+            },
+            "kind": "pricing",
+            "model": "discounting",
+            "market": market,
+            "instrument": {},
+            "expected": {"npv": 0.0},
+            "tolerances": {"npv": {"abs": 0.0}}
+        });
+        serde_json::from_value(json).expect("parse fixture")
+    }
+
     fn minimal_market() -> serde_json::Value {
-        json!({
+        serde_json::json!({
             "version": 2,
             "curves": [],
             "fx": null,
@@ -127,96 +142,56 @@ mod market_envelope_input_tests {
         })
     }
 
-    /// Minimal valid CalibrationEnvelope JSON (no steps, no initial market).
     fn minimal_envelope() -> serde_json::Value {
-        json!({
+        serde_json::json!({
             "schema": "finstack.calibration",
-            "plan": {
-                "id": "test_envelope",
-                "quote_sets": {},
-                "steps": [],
-                "settings": {}
-            }
+            "plan": {"id": "test_envelope", "quote_sets": {}, "steps": [], "settings": {}}
         })
     }
 
     #[test]
-    fn pricing_inputs_reject_when_both_market_and_market_envelope_supplied() {
-        let inputs = json!({
-            "valuation_date": "2026-04-30",
+    fn requested_metrics_derives_from_expected_and_excludes_npv() {
+        let json = serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "metadata": {
+                "name": "m", "domain": "rates.irs", "description": "d",
+                "valuation_date": "2026-04-30", "source": "formula",
+                "source_detail": "u", "captured_by": "t", "captured_on": "2026-04-30",
+                "last_reviewed_by": "t", "last_reviewed_on": "2026-04-30",
+                "review_interval_months": 6, "regen_command": ""
+            },
+            "kind": "pricing",
             "model": "discounting",
-            "metrics": [],
-            "instrument_json": {},
-            "market": minimal_market(),
-            "market_envelope": minimal_envelope()
-        });
-        // Either deserialization fails, OR PricingInputs::resolve_market returns the
-        // expected mutually-exclusive error. Both are acceptable as long as the
-        // runtime end result is a clear rejection mentioning both field names.
-        let result: Result<PricingInputs, _> = serde_json::from_value(inputs);
-        match result {
-            Err(err) => {
-                let msg = err.to_string();
-                assert!(
-                    msg.contains("market"),
-                    "deserialize error should mention 'market', got: {msg}"
-                );
+            "market": {"kind": "envelope", "envelope": minimal_envelope()},
+            "instrument": {},
+            "expected": {"npv": 1.0, "dv01": 1.0, "bucketed_dv01::USD-OIS::1y": 1.0},
+            "tolerances": {
+                "npv": {"abs": 1.0}, "dv01": {"abs": 1.0},
+                "bucketed_dv01::USD-OIS::1y": {"abs": 1.0}
             }
-            Ok(parsed) => {
-                let err = parsed.resolve_market().expect_err(
-                    "must reject fixtures that supply both 'market' and 'market_envelope'",
-                );
-                assert!(
-                    err.contains("market") && err.contains("market_envelope"),
-                    "resolve_market error should name both fields, got: {err}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn pricing_inputs_reject_when_neither_market_nor_market_envelope_supplied() {
-        let inputs = json!({
-            "valuation_date": "2026-04-30",
-            "model": "discounting",
-            "metrics": [],
-            "instrument_json": {},
         });
-        let parsed: PricingInputs = serde_json::from_value(inputs).expect("parse");
-        let err = parsed
-            .resolve_market()
-            .expect_err("must reject fixtures that supply neither input");
-        assert!(
-            err.contains("market") && err.contains("market_envelope"),
-            "error should name both fields, got: {err}"
+        let fixture: GoldenFixture = serde_json::from_value(json).expect("parse");
+        let metrics = requested_metrics(&fixture);
+        assert_eq!(
+            metrics,
+            vec!["bucketed_dv01".to_string(), "dv01".to_string()]
         );
     }
 
     #[test]
-    fn pricing_inputs_resolve_market_only() {
-        let inputs = json!({
-            "valuation_date": "2026-04-30",
-            "model": "discounting",
-            "metrics": [],
-            "instrument_json": {},
-            "market": minimal_market(),
-        });
-        let parsed: PricingInputs = serde_json::from_value(inputs).expect("parse");
-        parsed.resolve_market().expect("market-only resolves");
+    fn resolve_market_snapshot_only() {
+        let fixture =
+            pricing_fixture(serde_json::json!({"kind": "snapshot", "data": minimal_market()}));
+        let pricing = fixture.pricing().expect("pricing body");
+        resolve_market(&pricing.market).expect("snapshot resolves");
     }
 
     #[test]
-    fn pricing_inputs_resolve_market_envelope_only() {
-        let inputs = json!({
-            "valuation_date": "2026-04-30",
-            "model": "discounting",
-            "metrics": [],
-            "instrument_json": {},
-            "market_envelope": minimal_envelope(),
-        });
-        let parsed: PricingInputs = serde_json::from_value(inputs).expect("parse");
-        parsed
-            .resolve_market()
-            .expect("market_envelope-only resolves through engine::execute");
+    fn resolve_market_envelope_only() {
+        let fixture = pricing_fixture(
+            serde_json::json!({"kind": "envelope", "envelope": minimal_envelope()}),
+        );
+        let pricing = fixture.pricing().expect("pricing body");
+        resolve_market(&pricing.market).expect("envelope resolves through engine::execute");
     }
 }

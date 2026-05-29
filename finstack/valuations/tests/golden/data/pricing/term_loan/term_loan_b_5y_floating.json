@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "term_loan_b_5y_floating",
-  "domain": "fixed_income.term_loan",
-  "description": "Synthetic USD term loan B 5Y floating-rate facility with quarterly amortization. Two-step calibration: USD-OIS bootstrapped from synthetic SOFR OIS quotes, USD-SOFR-3M bootstrapped from synthetic 3M-Term-SOFR IRS quotes against the calibrated discount curve. The instrument's primary discount curve (USD-CORP), credit curve (ACME-HZD), and the auxiliary curves (USD-TREASURY, HYCO-HZD) are preserved verbatim in initial_market. Self-test contract: re-running calibration + pricing must reproduce the recorded values within solver tolerance.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "term_loan_b_5y_floating",
+    "domain": "fixed_income.term_loan",
+    "description": "Synthetic USD term loan B 5Y floating-rate facility with quarterly amortization. Two-step calibration: USD-OIS bootstrapped from synthetic SOFR OIS quotes, USD-SOFR-3M bootstrapped from synthetic 3M-Term-SOFR IRS quotes against the calibrated discount curve. The instrument's primary discount curve (USD-CORP), credit curve (ACME-HZD), and the auxiliary curves (USD-TREASURY, HYCO-HZD) are preserved verbatim in initial_market. Self-test contract: re-running calibration + pricing must reproduce the recorded values within solver tolerance.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical fixed-income pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): replaced the materialized USD-OIS and USD-SOFR-3M curves with a two-step calibration plan (POC #4 pattern from market-bootstrap-phase-5 plan \u00a716). Other curves (USD-CORP, USD-TREASURY, ACME-HZD, HYCO-HZD) remain materialized in initial_market. Expected outputs recaptured from Finstack itself; the original synthetic-curve test contract is replaced by a self-test contract: bit-stable round-trip through calibrate + price.",
     "captured_by": "jeickmeier",
@@ -15,69 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "discount_margin",
-      "ytm",
-      "dv01",
-      "cs01"
-    ],
-    "instrument_json": {
-      "type": "term_loan",
-      "spec": {
-        "id": "TERM-LOAN-B-5Y-FLOATING-GOLDEN",
-        "currency": "USD",
-        "notional_limit": {
-          "amount": "25000000",
-          "currency": "USD"
-        },
-        "issue_date": "2026-04-30",
-        "maturity": "2031-04-30",
-        "rate": {
-          "Floating": {
-            "index_id": "USD-SOFR-3M",
-            "spread_bp": "375",
-            "gearing": "1",
-            "gearing_includes_spread": true,
-            "floor_bp": "0",
-            "reset_freq": {
-              "count": 3,
-              "unit": "months"
-            },
-            "reset_lag_days": 2,
-            "dc": "Act360",
-            "calendar_id": "weekends_only",
-            "fixing_calendar_id": "weekends_only"
-          }
-        },
-        "frequency": {
-          "count": 3,
-          "unit": "months"
-        },
-        "day_count": "Act360",
-        "stub": "None",
-        "discount_curve_id": "USD-CORP",
-        "credit_curve_id": "ACME-HZD",
-        "amortization": {
-          "PercentPerPeriod": {
-            "bp": 250
-          }
-        },
-        "pricing_overrides": {
-          "quoted_clean_price": 99.0
-        },
-        "settlement_days": 2,
-        "attributes": {
-          "tags": [
-            "golden"
-          ],
-          "meta": {}
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "term_loan_b_5y_market",
@@ -577,15 +519,62 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "note": "Formula fixture; expected_outputs are populated from the live Rust/Python golden runners.",
-      "zero_metric_reasons": {
-        "cs01": "Canonical metric currently returns zero for this deterministic fixture; golden locks the output and will catch future non-zero metric plumbing changes."
+    }
+  },
+  "instrument": {
+    "type": "term_loan",
+    "spec": {
+      "id": "TERM-LOAN-B-5Y-FLOATING-GOLDEN",
+      "currency": "USD",
+      "notional_limit": {
+        "amount": "25000000",
+        "currency": "USD"
+      },
+      "issue_date": "2026-04-30",
+      "maturity": "2031-04-30",
+      "rate": {
+        "Floating": {
+          "index_id": "USD-SOFR-3M",
+          "spread_bp": "375",
+          "gearing": "1",
+          "gearing_includes_spread": true,
+          "floor_bp": "0",
+          "reset_freq": {
+            "count": 3,
+            "unit": "months"
+          },
+          "reset_lag_days": 2,
+          "dc": "Act360",
+          "calendar_id": "weekends_only",
+          "fixing_calendar_id": "weekends_only"
+        }
+      },
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "day_count": "Act360",
+      "stub": "None",
+      "discount_curve_id": "USD-CORP",
+      "credit_curve_id": "ACME-HZD",
+      "amortization": {
+        "PercentPerPeriod": {
+          "bp": 250
+        }
+      },
+      "pricing_overrides": {
+        "quoted_clean_price": 99.0
+      },
+      "settlement_days": 2,
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
       }
     }
   },
-  "expected_outputs": {
+  "expected": {
     "npv": 27319795.883921828,
     "discount_margin": -0.028902425292646708,
     "ytm": 0.08569773041816574,

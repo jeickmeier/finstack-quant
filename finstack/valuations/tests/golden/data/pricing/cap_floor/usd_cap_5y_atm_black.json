@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "usd_cap_5y_atm_black",
-  "domain": "rates.cap_floor",
-  "description": "Bloomberg SWPM USD 5Y ATM SOFR cap captured from screens on 2026-05-02.",
-  "provenance": {
-    "as_of": "2026-05-02",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "usd_cap_5y_atm_black",
+    "domain": "rates.cap_floor",
+    "description": "Bloomberg SWPM USD 5Y ATM SOFR cap captured from screens on 2026-05-02.",
+    "valuation_date": "2026-05-02",
     "source": "bloomberg-screen",
     "source_detail": "Bloomberg SWPM USD SOFR cap, curve 490 USD SOFR discount/projection, USD RFR BVOL Cube, trade date 2026-05-02, valuation date 2026-05-02. The legacy fixture filename is retained; the screen uses normal volatility/HW1F market setup, represented here through finstack's normal cap/floor pricing path. Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved in initial_market with empty plan.steps. Bloomberg-parity contract (NPV abs 1.0) preserved.",
     "captured_by": "jeickmeier",
@@ -52,66 +52,11 @@
       }
     ]
   },
-  "inputs": {
-    "valuation_date": "2026-05-02",
-    "model": "hull_white_1f",
-    "metrics": [
-      "vega",
-      "dv01"
-    ],
-    "instrument_json": {
-      "type": "cap_floor",
-      "spec": {
-        "id": "USD-SOFR-CAP-5Y-ATM-SWPM-20260502",
-        "rate_option_type": "cap",
-        "notional": {
-          "amount": "10000000",
-          "currency": "USD"
-        },
-        "strike": "0.0366561",
-        "start_date": "2026-05-05",
-        "maturity": "2031-05-06",
-        "frequency": {
-          "count": 3,
-          "unit": "months"
-        },
-        "day_count": "Act360",
-        "calendar_id": "usny",
-        "discount_curve_id": "USD-SOFR-DISC",
-        "forward_curve_id": "USD-SOFR",
-        "vol_surface_id": "USD-RFR-BVOL-CUBE-5Y",
-        "vol_type": "normal",
-        "pricing_overrides": {
-          "tree_steps": 300,
-          "implied_volatility": 0.0094182,
-          "mean_reversion": 0.0342
-        },
-        "attributes": {
-          "tags": [
-            "golden",
-            "bloomberg",
-            "swpm"
-          ],
-          "meta": {
-            "bloomberg_screen": "SWPM",
-            "curve_number": "490",
-            "curve_name": "USD SOFR",
-            "vol_cube": "USD RFR BVOL Cube",
-            "screen_model": "HW1F",
-            "screen_volatility_type": "Normal",
-            "screen_convexity_adjustment": "Normal",
-            "hw1f_calibration_method": "fixed_kappa_sigma_from_visible_caplet_normal_vol_strip",
-            "hw1f_fixed_kappa": "0.0342",
-            "hw1f_source_quote": "VCUB USD RFR BVOL Cube visible 5Y tenor caplet normal-vol strip transcribed in inputs.market.surfaces[USD-RFR-BVOL-CUBE-5Y].vols_row_major",
-            "hw1f_source_quote_normal_vol": "caplet strip, 20 quarterly expiries",
-            "hw1f_calibrated_implied_volatility": "0.0094182",
-            "hw1f_calibration_note": "Bloomberg screenshot shows HW1F and normal-vol VCUB inputs but does not show mean reversion. Kappa is an explicit fixed calibration assumption; sigma is derived from the visible caplet normal-vol strip rather than tuned to expected_outputs.",
-            "legacy_fixture_name": "usd_cap_5y_atm_black"
-          }
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "hull_white_1f",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "usd_cap_5y_tier_a_wrap",
@@ -573,395 +518,61 @@
           ]
         }
       ]
-    },
-    "source_reference": {
-      "design_metrics": [
-        "vega",
-        "dv01"
-      ],
-      "source_validation_note": "The fixture is source-validation until quote-basis cap/floor risk can be executed without hiding Bloomberg-vs-model drift.",
-      "curve_date": "2026-05-02",
-      "bloomberg_reference": {
-        "trade": {
-          "trade_date": "2026-05-02",
-          "valuation_date": "2026-05-02",
-          "curve_date": "2026-05-02",
-          "currency": "USD",
-          "notional": 10000000.0,
-          "option_type": "cap",
-          "position": "long",
-          "index": "SOFRRATE",
-          "spread_bp": 0.0,
-          "leverage": 1.0,
-          "day_count": "ACT/360",
-          "index_tenor": "1D",
-          "reset_frequency": "daily",
-          "payment_frequency": "quarterly",
-          "effective_date": "2026-05-05",
-          "first_payment_field": "2026-08-06",
-          "next_last_payment_field": "2031-02-06",
-          "maturity_date": "2031-05-06",
-          "cap_strike": 0.0366561
-        },
-        "contract_detail": {
-          "business_day_adjustment": "Modified Following",
-          "date_adjustment": "Acc & Pay Dates",
-          "roll_convention": "Backward",
-          "calculation_calendar": "FD",
-          "fixing_calendar": "GT",
-          "reset_type": "In Arrears",
-          "payment_lag_days": 2,
-          "payment_lag_units": "business_days",
-          "compounding": "ExcludeSprd",
-          "days_before_accrual": 0,
-          "days_before_type": "Lookback",
-          "rate_cutoff_days": 1,
-          "custom_date_generation": "None",
-          "amortization_rate_pct": 0.0,
-          "amortization_amount": 0.0,
-          "balance": 10000000.0,
-          "schedule_cap_strike_pct": 3.66561,
-          "visible_accrual_row_count": 20,
-          "first_visible_accrual_start": "2026-05-05",
-          "first_visible_accrual_end": "2026-08-06",
-          "first_visible_pay_date": "2026-08-10",
-          "last_visible_accrual_start": "2031-02-06",
-          "last_visible_accrual_end": "2031-05-06",
-          "last_visible_pay_date": "2031-05-08"
-        },
-        "screen_results": {
-          "atm_strike": 0.0366561,
-          "yield_value_bp": 56.012,
-          "premium": 0.0258328,
-          "bp_value": 258.32794,
-          "npv": 258327.94,
-          "dv01": -2158.57,
-          "gamma_1bp": 16.22,
-          "vega_1bp": 2659.46,
-          "theta_1day": -173.08
-        },
-        "finstack_reconciliation": {
-          "pricing_path": "black76 pricer with cap_floor vol_type=normal (Bachelier)",
-          "npv": 258327.30287,
-          "npv_minus_bloomberg": -0.63713,
-          "npv_relative_difference": 2.466e-06,
-          "npv_note": "Finstack NPV reconciles to Bloomberg SWPM screen within $1 on $10MM notional (~2.5e-6 relative). Residual is at-or-below screen rounding precision.",
-          "vega_per_1pct_normal_vol": 265953.839136,
-          "bloomberg_vega_per_1pct_normal_vol": 265946.0,
-          "vega_per_1pct_minus_100x_bloomberg_vega_1bp": 7.839136,
-          "vega_relative_difference": 2.948e-05,
-          "vega_note": "Bloomberg displays Vega(1bp)=2,659.46; expected_outputs stores per-1pct normal-vol value 265,946.0. Finstack matches within ~$8 (3e-5 relative).",
-          "dv01_unsigned": 2136.424312,
-          "bloomberg_dv01_unsigned": 2158.57,
-          "dv01_minus_bloomberg_unsigned": -22.145688,
-          "dv01_relative_difference": 0.01026,
-          "dv01_note": "Bloomberg screen reports DV01=-2158.57 (signed); expected_outputs stores the positive magnitude 2158.57 per the long-cap rate-up convention. Finstack's quote-basis DV01 is 2136.42 (signed combined-curve parallel bump). Residual ~1% reflects the remaining quote-basis vs Bloomberg-published-DV01 convention gap; see the dv01 tolerance_reason for the open investigation."
-        },
-        "curve_points": [
-          {
-            "term": "1W",
-            "market_rate": 0.03634,
-            "zero_rate": 0.0368266,
-            "discount": 0.998992
-          },
-          {
-            "term": "2W",
-            "market_rate": 0.036351,
-            "zero_rate": 0.0368272,
-            "discount": 0.998286
-          },
-          {
-            "term": "3W",
-            "market_rate": 0.036335,
-            "zero_rate": 0.0368024,
-            "discount": 0.997583
-          },
-          {
-            "term": "1M",
-            "market_rate": 0.036432,
-            "zero_rate": 0.0368744,
-            "discount": 0.996571
-          },
-          {
-            "term": "2M",
-            "market_rate": 0.0365047,
-            "zero_rate": 0.0368921,
-            "discount": 0.993452
-          },
-          {
-            "term": "3M",
-            "market_rate": 0.036544,
-            "zero_rate": 0.0368766,
-            "discount": 0.990448
-          },
-          {
-            "term": "6M",
-            "market_rate": 0.0366705,
-            "zero_rate": 0.0368353,
-            "discount": 0.981305
-          },
-          {
-            "term": "1Y",
-            "market_rate": 0.0372495,
-            "zero_rate": 0.0370619,
-            "discount": 0.963316
-          },
-          {
-            "term": "2Y",
-            "market_rate": 0.0371735,
-            "zero_rate": 0.0369938,
-            "discount": 0.928307
-          },
-          {
-            "term": "5Y",
-            "market_rate": 0.0371715,
-            "zero_rate": 0.0370091,
-            "discount": 0.830729
-          },
-          {
-            "term": "10Y",
-            "market_rate": 0.03936,
-            "zero_rate": 0.0384243,
-            "discount": 0.673855
-          },
-          {
-            "term": "12Y",
-            "market_rate": 0.0402133,
-            "zero_rate": 0.0403973,
-            "discount": 0.615431
-          }
-        ],
-        "cashflows": [
-          {
-            "pay_date": "2026-08-10",
-            "days": 93,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 2325.19,
-            "discount": 0.990248,
-            "intrinsic_pv": 0.0,
-            "time_pv": 2302.52,
-            "pv": 2302.52
-          },
-          {
-            "pay_date": "2026-11-10",
-            "days": 92,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 4539.94,
-            "discount": 0.981108,
-            "intrinsic_pv": 0.0,
-            "time_pv": 4454.17,
-            "pv": 4454.17
-          },
-          {
-            "pay_date": "2027-02-10",
-            "days": 94,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 6648.95,
-            "discount": 0.971969,
-            "intrinsic_pv": 305.86,
-            "time_pv": 6156.62,
-            "pv": 6462.48
-          },
-          {
-            "pay_date": "2027-05-10",
-            "days": 87,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 7768.99,
-            "discount": 0.96311,
-            "intrinsic_pv": 1244.31,
-            "time_pv": 6238.09,
-            "pv": 7482.39
-          },
-          {
-            "pay_date": "2027-08-10",
-            "days": 92,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 11943.68,
-            "discount": 0.953995,
-            "intrinsic_pv": 1789.79,
-            "time_pv": 9604.62,
-            "pv": 11394.21
-          },
-          {
-            "pay_date": "2027-11-10",
-            "days": 94,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 12978.04,
-            "discount": 0.94506,
-            "intrinsic_pv": 896.72,
-            "time_pv": 11368.31,
-            "pv": 12265.03
-          },
-          {
-            "pay_date": "2028-02-10",
-            "days": 91,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 12584.46,
-            "discount": 0.936499,
-            "intrinsic_pv": 0.0,
-            "time_pv": 11785.33,
-            "pv": 11785.33
-          },
-          {
-            "pay_date": "2028-05-10",
-            "days": 91,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 12954.48,
-            "discount": 0.928131,
-            "intrinsic_pv": 0.0,
-            "time_pv": 12023.45,
-            "pv": 12023.45
-          },
-          {
-            "pay_date": "2028-08-09",
-            "days": 91,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 13234.26,
-            "discount": 0.919856,
-            "intrinsic_pv": 0.0,
-            "time_pv": 12173.49,
-            "pv": 12173.49
-          },
-          {
-            "pay_date": "2028-11-08",
-            "days": 91,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 14132.86,
-            "discount": 0.911644,
-            "intrinsic_pv": 0.0,
-            "time_pv": 12884.13,
-            "pv": 12884.13
-          },
-          {
-            "pay_date": "2029-02-09",
-            "days": 92,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 15236.27,
-            "discount": 0.90339,
-            "intrinsic_pv": 0.0,
-            "time_pv": 13764.3,
-            "pv": 13764.3
-          },
-          {
-            "pay_date": "2029-05-08",
-            "days": 90,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 15843.27,
-            "discount": 0.895351,
-            "intrinsic_pv": 0.0,
-            "time_pv": 14185.29,
-            "pv": 14185.29
-          },
-          {
-            "pay_date": "2029-08-08",
-            "days": 91,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 16743.26,
-            "discount": 0.887247,
-            "intrinsic_pv": 0.0,
-            "time_pv": 14855.4,
-            "pv": 14855.4
-          },
-          {
-            "pay_date": "2029-11-08",
-            "days": 92,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 17937.39,
-            "discount": 0.879072,
-            "intrinsic_pv": 0.0,
-            "time_pv": 15768.26,
-            "pv": 15768.26
-          },
-          {
-            "pay_date": "2030-02-08",
-            "days": 92,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 18963.7,
-            "discount": 0.870912,
-            "intrinsic_pv": 4.78,
-            "time_pv": 16510.93,
-            "pv": 16515.7
-          },
-          {
-            "pay_date": "2030-05-08",
-            "days": 89,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 19315.44,
-            "discount": 0.863027,
-            "intrinsic_pv": 619.73,
-            "time_pv": 16050.02,
-            "pv": 16669.76
-          },
-          {
-            "pay_date": "2030-08-08",
-            "days": 92,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 20368.61,
-            "discount": 0.854883,
-            "intrinsic_pv": 1340.31,
-            "time_pv": 16072.47,
-            "pv": 17412.79
-          },
-          {
-            "pay_date": "2030-11-08",
-            "days": 92,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 21420.63,
-            "discount": 0.846742,
-            "intrinsic_pv": 2080.0,
-            "time_pv": 16057.74,
-            "pv": 18137.74
-          },
-          {
-            "pay_date": "2031-02-10",
-            "days": 92,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 22492.4,
-            "discount": 0.838421,
-            "intrinsic_pv": 2859.75,
-            "time_pv": 15998.35,
-            "pv": 18858.1
-          },
-          {
-            "pay_date": "2031-05-08",
-            "days": 89,
-            "notional": 10000000.0,
-            "cap_strike": 0.0366561,
-            "payment": 22791.7,
-            "discount": 0.830715,
-            "intrinsic_pv": 3534.43,
-            "time_pv": 15398.97,
-            "pv": 18933.4
-          }
-        ]
-      }
-    },
-    "source_validation": {
-      "status": "non_executable",
-      "reason": "Bloomberg cap/floor NPV and risk outputs are retained as source screen values, but quote-basis cap/floor DV01/vega require a source-instrument quote rebootstrap contract that this executable pricing runner does not yet support.",
-      "required_for_execution": "Add executable cap/floor quote calibration inputs and quote-basis risk calculators, then move this fixture back to pricing execution."
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "cap_floor",
+    "spec": {
+      "id": "USD-SOFR-CAP-5Y-ATM-SWPM-20260502",
+      "rate_option_type": "cap",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "strike": "0.0366561",
+      "start_date": "2026-05-05",
+      "maturity": "2031-05-06",
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "day_count": "Act360",
+      "calendar_id": "usny",
+      "discount_curve_id": "USD-SOFR-DISC",
+      "forward_curve_id": "USD-SOFR",
+      "vol_surface_id": "USD-RFR-BVOL-CUBE-5Y",
+      "vol_type": "normal",
+      "pricing_overrides": {
+        "tree_steps": 300,
+        "implied_volatility": 0.0094182,
+        "mean_reversion": 0.0342
+      },
+      "attributes": {
+        "tags": [
+          "golden",
+          "bloomberg",
+          "swpm"
+        ],
+        "meta": {
+          "bloomberg_screen": "SWPM",
+          "curve_number": "490",
+          "curve_name": "USD SOFR",
+          "vol_cube": "USD RFR BVOL Cube",
+          "screen_model": "HW1F",
+          "screen_volatility_type": "Normal",
+          "screen_convexity_adjustment": "Normal",
+          "hw1f_calibration_method": "fixed_kappa_sigma_from_visible_caplet_normal_vol_strip",
+          "hw1f_fixed_kappa": "0.0342",
+          "hw1f_source_quote": "VCUB USD RFR BVOL Cube visible 5Y tenor caplet normal-vol strip transcribed in inputs.market.surfaces[USD-RFR-BVOL-CUBE-5Y].vols_row_major",
+          "hw1f_source_quote_normal_vol": "caplet strip, 20 quarterly expiries",
+          "hw1f_calibrated_implied_volatility": "0.0094182",
+          "hw1f_calibration_note": "Bloomberg screenshot shows HW1F and normal-vol VCUB inputs but does not show mean reversion. Kappa is an explicit fixed calibration assumption; sigma is derived from the visible caplet normal-vol strip rather than tuned to expected_outputs.",
+          "legacy_fixture_name": "usd_cap_5y_atm_black"
+        }
+      }
+    }
+  },
+  "expected": {
     "npv": 258327.94,
     "vega": 265946.0,
     "dv01": 2158.57

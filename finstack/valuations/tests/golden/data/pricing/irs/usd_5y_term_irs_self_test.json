@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "usd_5y_term_irs_self_test",
-  "domain": "rates.irs",
-  "description": "Self-test fixture for term-rate IRS pricing with two-step calibration. Receives fixed at 4.25% against 3M-Term-SOFR floating, 5Y to maturity, 10M USD notional. Exercises both the discount calibration step (USD-OIS from SOFR OIS quotes with `ois_compounding = CompoundedWithRateCutoff {cutoff_days: 1}`) and the forward calibration step (USD-SOFR-3M with tenor_years=0.25 against the calibrated discount curve). The forward curve spans 10Y, the realistic horizon for floating-rate bonds, term loans, and structured products that project floating coupons over multi-year tenors.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "usd_5y_term_irs_self_test",
+    "domain": "rates.irs",
+    "description": "Self-test fixture for term-rate IRS pricing with two-step calibration. Receives fixed at 4.25% against 3M-Term-SOFR floating, 5Y to maturity, 10M USD notional. Exercises both the discount calibration step (USD-OIS from SOFR OIS quotes with `ois_compounding = CompoundedWithRateCutoff {cutoff_days: 1}`) and the forward calibration step (USD-SOFR-3M with tenor_years=0.25 against the calibrated discount curve). The forward curve spans 10Y, the realistic horizon for floating-rate bonds, term loans, and structured products that project floating coupons over multi-year tenors.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Self-test fixture: synthetic but self-consistent. Quote set is hand-authored with simple rates (~4.0-4.5%) producing a non-trivial term-structure across both curves. Expected outputs are captured from Finstack's own calibration + pricing pipeline (no vendor comparison). The contract is: re-running calibrate + price_instrument_with_metrics on this fixture must reproduce exactly these NPV / par_rate / DV01 values within solver tolerance. This guards against regressions in the discount-step bootstrap, the forward-step bootstrap (with sequential dependency on the calibrated discount curve), the OIS compounding override plumbing, and the term-rate IRS pricing kernel.",
     "captured_by": "claude",
@@ -15,71 +15,11 @@
     "regen_command": "Re-run via: `uv run pytest finstack-py/tests/golden/test_pricing_irs.py -v -k self_test`. To regenerate expected outputs (after deliberate calibration or pricing changes), call `finstack.valuations.calibrate(envelope)` + `price_instrument_with_metrics(...)` and update expected_outputs.",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "par_rate",
-      "dv01"
-    ],
-    "instrument_json": {
-      "schema": "finstack.instrument/1",
-      "instrument": {
-        "type": "interest_rate_swap",
-        "spec": {
-          "id": "USD-5Y-TERM-IRS-SELF-TEST",
-          "notional": {
-            "amount": "10000000",
-            "currency": "USD"
-          },
-          "side": "receive",
-          "fixed": {
-            "discount_curve_id": "USD-OIS",
-            "rate": "0.0425",
-            "frequency": {
-              "count": 6,
-              "unit": "months"
-            },
-            "day_count": "Thirty360",
-            "calendar_id": "usny",
-            "stub": "None",
-            "start": "2026-05-04",
-            "end": "2031-05-04",
-            "par_method": null,
-            "payment_lag_days": 0,
-            "compounding_simple": true
-          },
-          "float": {
-            "discount_curve_id": "USD-OIS",
-            "forward_curve_id": "USD-SOFR-3M",
-            "spread_bp": "0",
-            "frequency": {
-              "count": 3,
-              "unit": "months"
-            },
-            "day_count": "Act360",
-            "calendar_id": "usny",
-            "stub": "None",
-            "reset_lag_days": 2,
-            "payment_lag_days": 0,
-            "fixing_calendar_id": "usny",
-            "start": "2026-05-04",
-            "end": "2031-05-04",
-            "compounding": "Simple"
-          },
-          "attributes": {
-            "tags": [
-              "golden",
-              "self_test",
-              "term_rate",
-              "forward_calibration"
-            ],
-            "meta": {}
-          }
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "usd_5y_term_irs_self_test_market",
@@ -413,17 +353,66 @@
         }
       ],
       "prior_market": []
-    },
-    "source_reference": {
-      "note": "Self-test fixture: expected outputs were captured from Finstack itself rather than a vendor (Bloomberg, QuantLib). The contract is round-trip stability: re-calibration + re-pricing must reproduce the recorded values within the solver's 1e-12 tolerance. This is the canonical multi-step calibration test for the forward-curve step kind.",
-      "design_metrics": [
-        "par_rate",
-        "dv01"
-      ],
-      "self_test_origin": "Authored 2026-05-09 to close the forward-step coverage gap documented in docs/archive/plans/2026-05-09-golden-fixture-envelope-migration-plan.md \u00a715. None of the 33 pre-existing pricing goldens have a calibratable forward curve; this fixture is the reference pattern for future floating-rate-instrument migrations (term loans, FRBs, structured products)."
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "schema": "finstack.instrument/1",
+    "instrument": {
+      "type": "interest_rate_swap",
+      "spec": {
+        "id": "USD-5Y-TERM-IRS-SELF-TEST",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "side": "receive",
+        "fixed": {
+          "discount_curve_id": "USD-OIS",
+          "rate": "0.0425",
+          "frequency": {
+            "count": 6,
+            "unit": "months"
+          },
+          "day_count": "Thirty360",
+          "calendar_id": "usny",
+          "stub": "None",
+          "start": "2026-05-04",
+          "end": "2031-05-04",
+          "par_method": null,
+          "payment_lag_days": 0,
+          "compounding_simple": true
+        },
+        "float": {
+          "discount_curve_id": "USD-OIS",
+          "forward_curve_id": "USD-SOFR-3M",
+          "spread_bp": "0",
+          "frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "day_count": "Act360",
+          "calendar_id": "usny",
+          "stub": "None",
+          "reset_lag_days": 2,
+          "payment_lag_days": 0,
+          "fixing_calendar_id": "usny",
+          "start": "2026-05-04",
+          "end": "2031-05-04",
+          "compounding": "Simple"
+        },
+        "attributes": {
+          "tags": [
+            "golden",
+            "self_test",
+            "term_rate",
+            "forward_calibration"
+          ],
+          "meta": {}
+        }
+      }
+    }
+  },
+  "expected": {
     "npv": -44732.80969452881,
     "par_rate": 0.04350274836282764,
     "dv01": -4449.044543000348

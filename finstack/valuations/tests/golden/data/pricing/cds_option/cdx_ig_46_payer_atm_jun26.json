@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "cdx_ig_46_payer_atm_jun26",
-  "domain": "credit.cds_option",
-  "description": "Bloomberg CDSO CDX.NA.IG.46 100MM USD payer option struck at the ATM forward spread.",
-  "provenance": {
-    "as_of": "2026-05-07",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "cdx_ig_46_payer_atm_jun26",
+    "domain": "credit.cds_option",
+    "description": "Bloomberg CDSO CDX.NA.IG.46 100MM USD payer option struck at the ATM forward spread.",
+    "valuation_date": "2026-05-07",
     "source": "bloomberg-screen",
     "source_detail": "Bloomberg CDSO/CDSW/CDSD CDX.NA.IG.46 V1, 100MM USD notional, S531 USD ISDA Swap Curve - Mid, CBBT Mid CDX curve, valuation date 2026-05-07, expiry 2026-06-17, ATM payer struck at 55.2848bp, Spread Vol 36.03% [dv01 re-blessed 2026-05-17: audit fix W-18 reconciled the CDS-option IR DV01 to finstack's internal central-difference convention (consistent with the CDS DV01) for portfolio aggregation; dv01 is now an internal signed slope = -(Bloomberg CDSO screen DV01)/2, no longer a like-for-like Bloomberg-screen value.]",
     "captured_by": "jeickmeier",
@@ -40,75 +40,11 @@
       }
     ]
   },
-  "inputs": {
-    "valuation_date": "2026-05-07",
-    "model": "bloomberg_cdso",
-    "metrics": [
-      "par_spread",
-      "delta",
-      "gamma",
-      "vega",
-      "dv01",
-      "cs01",
-      "spread_dv01",
-      "theta"
-    ],
-    "instrument_json": {
-      "type": "cds_option",
-      "spec": {
-        "id": "CDX-NA-IG-46-CDSO-PAYER-ATM-20260507",
-        "strike": "0.00552848",
-        "option_type": "call",
-        "expiry": "2026-06-17",
-        "cds_maturity": "2031-06-20",
-        "notional": {
-          "amount": "100000000",
-          "currency": "USD"
-        },
-        "recovery_rate": 0.4,
-        "discount_curve_id": "USD-S531-SWAP-20260507",
-        "credit_curve_id": "CDX-NA-IG-46-CBBT",
-        "vol_surface_id": "CDX-NA-IG-46-CDSO-VOL",
-        "underlying_convention": "isda_na",
-        "pricing_overrides": {
-          "implied_volatility": 0.3603
-        },
-        "cash_settlement_date": "2026-05-12",
-        "exercise_settlement_date": "2026-06-23",
-        "underlying_effective_date": "2026-03-20",
-        "underlying_is_index": true,
-        "index_factor": 1.0,
-        "realized_index_loss": null,
-        "underlying_cds_coupon": "0.01",
-        "exercise_style": "european",
-        "settlement": "cash",
-        "attributes": {
-          "tags": [
-            "golden",
-            "bloomberg",
-            "cdso",
-            "cdx",
-            "index-cds-option",
-            "payer",
-            "atm"
-          ],
-          "meta": {
-            "bloomberg_screen": "CDSO",
-            "index": "MARKIT CDX.NA.IG.46 06/31",
-            "bbg_index_id": "SP650F62",
-            "red_pair_code": "2165BYEJ0",
-            "position": "Long Payer",
-            "trade_date": "2026-05-07",
-            "spread_vol_pct": "36.03",
-            "atm_forward_bp": "55.2848",
-            "strike_spread_bp": "55.2848",
-            "swap_curve": "S531 USD ISDA Swap Curve - Mid",
-            "cds_curve": "CBBT Mid"
-          }
-        }
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "bloomberg_cdso",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "cdx_ig_46_pricing_market",
@@ -615,301 +551,68 @@
           ]
         }
       ]
-    },
-    "source_reference": {
-      "design_metrics": [
-        "npv",
-        "par_spread",
-        "delta",
-        "gamma",
-        "vega",
-        "dv01",
-        "cs01",
-        "spread_dv01",
-        "theta"
-      ],
-      "curve_date": "2026-05-07",
-      "trade_date": "2026-05-07",
-      "valuation_date": "2026-05-07",
-      "option_expiry": "2026-06-17",
+    }
+  },
+  "instrument": {
+    "type": "cds_option",
+    "spec": {
+      "id": "CDX-NA-IG-46-CDSO-PAYER-ATM-20260507",
+      "strike": "0.00552848",
+      "option_type": "call",
+      "expiry": "2026-06-17",
       "cds_maturity": "2031-06-20",
+      "notional": {
+        "amount": "100000000",
+        "currency": "USD"
+      },
+      "recovery_rate": 0.4,
+      "discount_curve_id": "USD-S531-SWAP-20260507",
+      "credit_curve_id": "CDX-NA-IG-46-CBBT",
+      "vol_surface_id": "CDX-NA-IG-46-CDSO-VOL",
+      "underlying_convention": "isda_na",
+      "pricing_overrides": {
+        "implied_volatility": 0.3603
+      },
       "cash_settlement_date": "2026-05-12",
       "exercise_settlement_date": "2026-06-23",
-      "underlying_accrual_start": "2026-03-20",
-      "first_coupon": "2026-06-22",
-      "notional": 100000000.0,
+      "underlying_effective_date": "2026-03-20",
+      "underlying_is_index": true,
       "index_factor": 1.0,
-      "coupon_bp": 100.0,
-      "trade_spread_bp": 53.6264,
-      "strike_spread_bp": 55.2848,
-      "atm_forward_bp": 55.2848,
-      "forward_spread_adjust_bp": 2.00505473838,
-      "spread_vol_pct": 36.03,
-      "recovery_rate": 0.4,
-      "position": "long_payer",
-      "discount_curve_note": "Bloomberg S531 USD Custom Swap Curve - Mid benchmark rates are transcribed from the supplied 2026-05-07 benchmark curve popup. The executable MarketContext stores deterministic continuous-rate discount factors derived from those screen rates; assertions remain the Bloomberg CDSO screen values.",
-      "swap_curve_rates_pct": [
-        {
-          "tenor": "1M",
-          "years": 0.08333333333333333,
-          "rate": 3.6363
-        },
-        {
-          "tenor": "2M",
-          "years": 0.16666666666666666,
-          "rate": 3.6438
-        },
-        {
-          "tenor": "3M",
-          "years": 0.25,
-          "rate": 3.6488
-        },
-        {
-          "tenor": "6M",
-          "years": 0.5,
-          "rate": 3.6618
-        },
-        {
-          "tenor": "1Y",
-          "years": 1.0,
-          "rate": 3.724
-        },
-        {
-          "tenor": "2Y",
-          "years": 2.0,
-          "rate": 3.7105
-        },
-        {
-          "tenor": "3Y",
-          "years": 3.0,
-          "rate": 3.683
-        },
-        {
-          "tenor": "4Y",
-          "years": 4.0,
-          "rate": 3.6885
-        },
-        {
-          "tenor": "5Y",
-          "years": 5.0,
-          "rate": 3.717
-        },
-        {
-          "tenor": "6Y",
-          "years": 6.0,
-          "rate": 3.7595
-        },
-        {
-          "tenor": "7Y",
-          "years": 7.0,
-          "rate": 3.805
-        },
-        {
-          "tenor": "8Y",
-          "years": 8.0,
-          "rate": 3.8495
-        },
-        {
-          "tenor": "9Y",
-          "years": 9.0,
-          "rate": 3.894
-        },
-        {
-          "tenor": "10Y",
-          "years": 10.0,
-          "rate": 3.938
-        },
-        {
-          "tenor": "12Y",
-          "years": 12.0,
-          "rate": 4.024
-        },
-        {
-          "tenor": "15Y",
-          "years": 15.0,
-          "rate": 4.131
-        },
-        {
-          "tenor": "20Y",
-          "years": 20.0,
-          "rate": 4.22
-        },
-        {
-          "tenor": "25Y",
-          "years": 25.0,
-          "rate": 4.2265
-        },
-        {
-          "tenor": "30Y",
-          "years": 30.0,
-          "rate": 4.196
-        }
-      ],
-      "hazard_curve_note": "CDX.NA.IG.46 CBBT Mid curve spot par spreads are transcribed directly from the CDSD forward CDS matrix screen. Hazard knots are bootstrapped from the par_points using `finstack_valuations::calibration::bumps::bump_hazard_spreads` with a zero parallel bump — i.e. the same procedure the cs01/dv01 paths use. The bootstrapped 5Y hazard ≈ 0.0172 brings the natural model forward close to Bloomberg ATM Fwd 55.2848 bp. The Rust CDSO pricer does not implement the legacy `forward_spread_adjust` knob referenced in earlier reconciliation notes; remaining ATM Fwd / NPV residuals are documented in finstack_reconciliation.known_gaps.",
-      "vol_surface_note": "Bloomberg displays a single Spread Vol of 36.03%; the surface and pricing override are flat at 0.3603.",
-      "credit_curve_spreads_bp": [
-        {
-          "tenor": "6M",
-          "years": 0.5,
-          "spread": 16.14
-        },
-        {
-          "tenor": "1Y",
-          "years": 1.0,
-          "spread": 16.14
-        },
-        {
-          "tenor": "2Y",
-          "years": 2.0,
-          "spread": 24.14
-        },
-        {
-          "tenor": "3Y",
-          "years": 3.0,
-          "spread": 32.36
-        },
-        {
-          "tenor": "4Y",
-          "years": 4.0,
-          "spread": 42.9932
-        },
-        {
-          "tenor": "5Y",
-          "years": 5.0,
-          "spread": 53.6264
-        },
-        {
-          "tenor": "7Y",
-          "years": 7.0,
-          "spread": 72.64
-        },
-        {
-          "tenor": "10Y",
-          "years": 10.0,
-          "spread": 92.35
-        }
-      ],
-      "forward_cds_matrix_bp": {
-        "5Y_row": {
-          "spot": 53.6264,
-          "6M": 63.19,
-          "1Y": 73.99,
-          "2Y": 93.55,
-          "3Y": 114.45,
-          "4Y": 130.92,
-          "5Y": 142.81,
-          "7Y": 154.55,
-          "10Y": 155.97
-        }
-      },
-      "bloomberg_underlying_cds_outputs": {
-        "price": 102.13773585,
-        "principal": -2137736.0,
-        "accrued_49_days": -136111.0,
-        "cash_amount": -2273847.0,
-        "spread_dv01": 46963.21,
-        "ir_dv01": 537.99,
-        "recovery_risk_1pct": 790.27,
-        "default_exposure": 62137736.0
-      },
-      "bloomberg_outputs": {
-        "market_value": 118781.76,
-        "premium_pct": 0.118782,
-        "spread_dv01": 25352.02,
-        "ir_dv01": 228.21,
-        "vega_1pct": 3411.78,
-        "theta_per_day": -1499.93,
-        "delta_pct_n_d1": 50.7,
-        "gamma_5bp_pct": 54.7,
-        "breakeven_bp": 57.8824
-      },
-      "finstack_reconciliation": {
-        "expected_outputs_policy": "Expected outputs are raw Bloomberg CDSO screen values. NPV reconciles to source precision after the front-end-protection timing fix. Vega, CS01, and Theta retain explicit known-gap tolerances for Bloomberg convention residuals that diagnostics could not close without admitting parallel calibration pathways.",
-        "last_checked_on": "2026-05-18",
-        "command": "GOLDEN_FIXTURE_FILTER=cdx_ig_46_payer_atm_jun26 cargo test -p finstack-valuations --test golden golden::pricing::golden_pricing_fixtures_from_existing_json_files -- --exact",
-        "reference_implementation": "Bloomberg L.P. Quantitative Analytics, *Pricing Credit Index Options* (DOCS 2055833, March 2012); Bloomberg L.P. Quantitative Analytics, *The Bloomberg CDS Model* (DOCS 2057273, August 2024); CDSO Loss Amount Calculation (DOCS 2151513); O'Kane-style CDS index option mechanics: front-end protection is part of the index option exercise economics and is represented in finstack as a deterministic D payoff measured from T+2 business days to legal expiry. The legacy closed-form Black-on-spreads model \u2014 used in finstack's old pricer \u2014 was decommissioned on the Bloomberg CDSO screen in 2010 (DOCS 2055833 \u00a71.2). finstack now implements the Bloomberg quadrature model `O = P(t_e) \u00b7 E_0[(V_te + H(K) + D)+]` (DOCS 2055833 Eq. 2.5) with: V_te = \u03beN(S_te \u2212 c)L_te (random swap value at expiry), H(K) = \u03beN(c \u2212 K)A(K) (deterministic strike adjustment), D = \u03beN_0\u00b7loss(t_v) plus expected index front-end protection through legal expiry. The lognormal mean m is calibrated by Brent root-finding so that F_0 = E[V_te] matches the clean forward swap value; index FEP is not added a second time to F_0.",
-        "actual_outputs_under_bloomberg_quadrature": {
-          "npv": 118781.67,
-          "par_spread": 55.2228,
-          "delta": 0.5070,
-          "gamma": 0.5443,
-          "vega": 3390.72,
-          "dv01": -112.54,
-          "cs01": 24759.81,
-          "spread_dv01": 46963.21,
-          "theta": -1451.58,
-          "captured_on": "2026-05-18",
-          "migration_note": "Front-end-protection timing fix: index FEP moved from an extra F_0 calibration term into the deterministic exercise payoff D and is measured from T+2 business days through legal expiry. This closes NPV from +$1,681.26 to -$0.09 versus Bloomberg while preserving raw Bloomberg expected_outputs. Vega is now the plain one-sided σ+0.01 forward difference of the canonical Bloomberg quadrature NPV (Phase 8 simplification); CS01, Theta, and Vega remain documented convention residuals."
-        },
-        "phase4_forward_cds_diagnostic": {
-          "valuation_date": "2026-05-07",
-          "option_expiry": "2026-06-17",
-          "t_expiry_years": 0.11232877,
-          "synthetic_cds_premium_start": "2026-03-20",
-          "synthetic_cds_protection_effective_date": null,
-          "natural_atm_forward_bp": 55.2453,
-          "bloomberg_atm_forward_bp": 55.2848,
-          "gap_bp": 0.0395,
-          "gap_pct": 0.071,
-          "atm_fwd_formula_implementation": "ATM Fwd = Default_Leg(0, T_mat) / Premium_Leg(T_exp, T_mat) per Bloomberg HELP CDSO <GO>. Default_Leg = spot pv_protection_leg integrated from valuation date to maturity, with +1-day inclusive on the end (DOCS 2057273 \u00a73 'TM-T+1 days for protection and coupon'); scoped to the option pricer to preserve standard CDS valuation. Premium_Leg = post-expiry premium PV01 (no AoD per DOCS 2057273 \u00a73.3 risky-annuity definition) with the entire first-cashflow PV01 subtracted when the schedule has a STRADDLING first period (premium.start strictly < T_exp). The displayed `par_spread` uses the literal Bloomberg drop-first formula; the option NPV calibration uses the economically-self-consistent PCD-subtracted variant (preserves put/call parity at ATF for non-straddling schedules and matches Bloomberg's NPV within 0.6%).",
-          "remediation_steps": [
-            "Phase 4c: hazard-curve day_count fix (Act365F\u2192Act360). $73k spot CDS / 1.7 bp ATM Fwd / 28% option-NPV residual.",
-            "Phase 4d: AoD removed from annuity (DOCS 2057273 \u00a73.3). 0.06 bp tighter.",
-            "Phase 4e: +1-day inclusive on protection integration end (DOCS 2057273 \u00a73). 0.06 bp tighter.",
-            "Phase 4f: decoupled display ATM Fwd (drop-first per HELP CDSO) from calibration anchor (PCD-corrected economic par). 0.16 bp tighter."
-          ]
-        },
-        "remediation_history": [
-          "Phase 1 \u2014 Surgery: deleted legacy Black-on-spreads pricer per DOCS 2055833 \u00a71.2; reimplemented around DOCS 2055833 numerical-quadrature model.",
-          "Phase 2 \u2014 Bloomberg CDSO quadrature pricer (trapezoidal on z \u2208 [-6, 6] step 0.05; Brent calibration of m so E[V_te] = F_0; H(K) strike adjustment; credit-triangle flat-spread L(s)).",
-          "Phase 3 \u2014 Spot CDS reconciliation diagnostic (test_bloomberg_cdsw_parity).",
-          "Phase 4a \u2014 PCD subtraction in forward annuity for self-consistency between `bootstrapped_l_at_expiry` and `flat_annuity(s)`.",
-          "Phase 4b \u2014 ATM Fwd numerator switched to *spot* protection from valuation date per Bloomberg HELP CDSO methodology; removed `cds.protection_effective_date = Some(option.expiry)` override.",
-          "Phase 4c \u2014 Hazard curve day_count Act365F\u2192Act360 (matched bootstrap output emitted by `bump_hazard_spreads` under IsdaNa conventions). Closed $73k spot CDS gap and 1.7 bp ATM Fwd / 28% option-NPV residual.",
-          "Phase 4d \u2014 Annuity uses no-AoD risky-annuity (DOCS 2057273 \u00a73.3 par-spread denominator).",
-          "Phase 4e \u2014 +1-day inclusive on protection-leg END (DOCS 2057273 \u00a73 'TM-T+1 days'), scoped to the option's spot-protection calc.",
-          "Phase 4f \u2014 Decoupled display ATM Fwd (drop-first per HELP CDSO) from calibration anchor (PCD-corrected economic par); preserves put/call parity at ATF for non-straddling schedules.",
-          "Phase 5a \u2014 IR DV01 sign convention: now positive (bond-convention: NPV increase per \u22121bp rate move) per Bloomberg CDSO screen. Hazard rates held constant during the rate bump (DOCS 2057273 \u00a74 'holding all other inputs constant'); previously rebootstrapped from par spreads. Result: \u2212$18 \u2192 +$115 (vs Bloomberg's $228).",
-          "Phase 5b \u2014 Theta convention: implemented DOCS 2055833 \u00a72.5 pure exercise-time shortening by 1/365.25 while retaining the same calibrated forward price and lognormal mean. Result: \u2212$1,479.45 vs Bloomberg's \u2212$1,499.93; this is much closer than the prior as-of-shift implementation (\u2212$1,704.95).",
-          "Phase 5c \u2014 Protection-leg integration sub-step subdivision: per DOCS 2057273 \u00a73 ('the timeline from T to TM is discretized into segments that are sufficiently small to justify constant forward discounting rates and constant hazard rate on each segment, no longer than any accrual period'), the protection-leg integration now subdivides the time axis at ~25 sub-steps per year (matching FinancePy's `GLOB_NUM_STEPS_PER_YEAR`, \u224814-day spacing) on top of the curve-knot boundaries. The previous knot-only segmentation used the average-rate approximation across each curve segment \u2014 for LogLinear DF curves where the continuous rate varies within a knot interval, this introduces a bias of order 0.005% on cdx_ig_46. Empirical effect on the option metrics: NPV $119,448 \u2192 $119,504 (+$56), theta \u2212$1,718 \u2192 \u2212$1,705 (closer to Bloomberg by $13), dv01 +$115.14 \u2192 +$115.03 (\u2212$0.11), vega +$0.14, cs01 +$0.01. The diagnostic guard rail in `test_bloomberg_cdsw_parity` was updated from $1.0 to $200.0 to reflect the new fine-step integration's floating-point summation floor (~$114 on a 100M-notional 5Y CDS at par).",
-          "Phase 5d \u2014 IR DV01 quote-bump convention: added Bloomberg S531 USD swap-curve quote calibration metadata, rebuilt the discount curve from shocked swap/deposit quotes, and matched the CDSO screen's symmetric \u00b11bp quote-shock amount with hazard rates held constant. Result: $225.84 vs Bloomberg $228.21; fixture tolerance tightened from $115 to $3 while expected_outputs remains the raw Bloomberg screen value.",
-          "Phase 2 market-bootstrap migration \u2014 discount and hazard curves now bootstrapped from raw S531 swap-curve deposit/swap quotes and CDX par-spread quotes via market_envelope CalibrationEnvelope (was: hand-entered knot points in inputs.market). The SABR vol surface continues to ship as a materialized snapshot in initial_market.surfaces. Bootstrap-vs-snapshot drift: npv \u2212$514, par_spread \u22120.025 bp, vega +$0.65, dv01 \u2212$0.77, cs01 \u2212$33.64, theta \u2212$0.28. Also: calibration engine extended to propagate rate_calibration metadata from deposit/swap quotes to the bootstrapped DiscountCurve (required by CDS option IR DV01 quote-bump path) and par_spread points from CDS quotes to the bootstrapped HazardCurve (required by CDS option CS01 quote-bump path).",
-          "Phase 6 \u2014 Index front-end-protection timing fix: O'Kane-style index option mechanics treat FEP as exercise economics. finstack now adds expected index FEP to D from T+2 business days after valuation through legal expiry, and keeps F_0 as the clean forward swap value. Diagnostic result on this fixture: no-FEP F_0 + D(T+2 FEP) = $118,781.67 vs Bloomberg $118,781.76.",
-          "Phase 7 \u2014 Greek reconciliation: Vega now re-applies the FEP-adjusted exercise mechanics under the bumped vol and reconciles to Bloomberg within $1. CS01 recomputes FEP on each bumped hazard curve but remains $592.21 under the raw Bloomberg Spread DV01; holding FEP fixed worsens the match. Theta diagnostics tested pure time shift, as-of shift, and FEP-horizon shrink conventions; pure DOCS 2055833 time shortening remains the least-overfit convention, with a $48.35 residual.",
-          "Phase 8 \u2014 Delta / Gamma / Vega canonicalization: collapsed parallel pricer pathways onto a single canonical implementation per Greek. Delta and Gamma are now the closed-form Black-76 N(d1) and \u00b15bp central difference of N(d1) on the displayed ATM forward (the Bloomberg CDSO screen convention), removing the prior bump-and-reprice swap-PV ratio. Vega is now the plain one-sided \u03c3+0.01 forward difference of the canonical Bloomberg quadrature NPV; the Phase 7 FEP-beta re-parameterization (with silent bracket-failure fallbacks) was removed. Effect on this fixture: vega 3411.89 \u2192 3390.72 (\u2212$21, \u22120.62% \u2014 a documented convention residual). NPV, par_spread, dv01, cs01, spread_dv01, theta are unchanged."
+      "realized_index_loss": null,
+      "underlying_cds_coupon": "0.01",
+      "exercise_style": "european",
+      "settlement": "cash",
+      "attributes": {
+        "tags": [
+          "golden",
+          "bloomberg",
+          "cdso",
+          "cdx",
+          "index-cds-option",
+          "payer",
+          "atm"
         ],
-        "investigated_but_not_changed": [
-          "BloombergCdswClean final-period +1-day inclusive rule on coupon_accrual: kept. Standard CDSW convention.",
-          "AOD half-day bias flag: not a meaningful driver.",
-          "IR DV01 hazard rebootstrap under the bumped discount curve: rejected because it worsened the cdx_ig_46 option DV01 residual ($21.42 vs Bloomberg $228.21, compared with $225.84 for swap-quote bump with hazard held constant)."
-        ],
-        "known_gaps": [
-          "ATM Fwd: current displayed par_spread is 55.2477 bp vs Bloomberg's 55.2848 bp, within the 0.05 bp source-display tolerance after settlement-window and protection-start convention alignment.",
-          "NPV: -$0.09 versus Bloomberg after the Phase 6 index front-end-protection timing fix; expected output remains the raw Bloomberg Market Value.",
-          "IR DV01: $225.84 vs Bloomberg $228.21 (under by 1.04%). The executable convention now bumps the stored Bloomberg S531 swap/deposit quotes, rebuilds the discount curve, and reports the CDSO screen's symmetric \u00b11bp quote-shock amount with hazard rates held constant. Rebootstrapping hazard under the bumped swap curve worsens the residual to $21.42.",
-          "Spread DV01 (CS01): $24,759.81 vs Bloomberg $25,352.02 (under by $592.21). FEP is recomputed on each bumped hazard curve; the residual appears to be Bloomberg screen convention noise rather than stale FEP memoization.",
-          "Theta: \u2212$1,451.58 vs Bloomberg \u2212$1,499.93 (under by $48.35). Diagnostics tested FEP-horizon shortening and as-of-shift variants; the pure DOCS 2055833 exercise-time shortening convention remains the least-overfit implementation.",
-          "Vega(1%): $3,390.72 vs Bloomberg $3,411.78 (under by $21.06, \u22120.62%). The plain one-sided \u03c3+0.01 forward difference of the canonical Bloomberg quadrature NPV is now the canonical implementation. The Phase 7 FEP-beta re-parameterization could close this gap but introduced a parallel calibration pathway with silent bracket-failure fallbacks; removing it traded a $21 documented residual for ~200 lines of single-purpose solver glue and a single source of truth for vega."
-        ]
-      },
-      "risk_metric_notes": {
-        "npv": "Bloomberg Market Value is the option premium in USD for 100MM notional.",
-        "par_spread": "Bloomberg ATM Fwd (bp) is the forward CDS spread used as the ATM strike.",
-        "delta": "Bloomberg Delta is the CDSO screen N(d1) for the payer option, stored as a unitless ratio (50.70% -> 0.5070).",
-        "gamma": "Bloomberg Gamma 5bp is the CDSO screen +/-5bp gamma display, stored as a unitless ratio (54.70% -> 0.5470).",
-        "vega": "Bloomberg Vega(1%) is the dollar PV change for a +1 absolute percentage point move in lognormal spread vol.",
-        "dv01": "Bloomberg IR DV01 is the swap-curve quote-bump sensitivity displayed on CDSO; finstack reports the symmetric \u00b11bp quote-shock amount in bond sign.",
-        "cs01": "Bloomberg Spread DV01 is the spread sensitivity displayed on CDSO.",
-        "spread_dv01": "Bloomberg underlying CDS Spread DV01 from the CDS<GO> screen linked from the CDSO deal.",
-        "theta": "Bloomberg Theta is the displayed one-day time decay in dollars."
+        "meta": {
+          "bloomberg_screen": "CDSO",
+          "index": "MARKIT CDX.NA.IG.46 06/31",
+          "bbg_index_id": "SP650F62",
+          "red_pair_code": "2165BYEJ0",
+          "position": "Long Payer",
+          "trade_date": "2026-05-07",
+          "spread_vol_pct": "36.03",
+          "atm_forward_bp": "55.2848",
+          "strike_spread_bp": "55.2848",
+          "swap_curve": "S531 USD ISDA Swap Curve - Mid",
+          "cds_curve": "CBBT Mid"
+        }
       }
     }
   },
-  "expected_outputs": {
+  "expected": {
     "npv": 118781.76,
     "par_spread": 55.2848,
-    "delta": 0.5070,
-    "gamma": 0.5470,
+    "delta": 0.507,
+    "gamma": 0.547,
     "vega": 3411.78,
     "dv01": -112.536042572938,
     "cs01": 25352.02,
@@ -919,17 +622,17 @@
   "tolerances": {
     "npv": {
       "abs": 1.0,
-      "rel": 1e-6,
+      "rel": 1e-06,
       "tolerance_reason": "Expected output is the raw Bloomberg Market Value. Phase 6 index front-end-protection timing fix reconciles NPV to -$0.09 versus Bloomberg; keep a $1 absolute source precision band."
     },
     "par_spread": {
       "abs": 0.07,
-      "rel": 1e-6,
+      "rel": 1e-06,
       "tolerance_reason": "Bloomberg displays ATM Fwd to 4 decimals in bp. Phase 2 bootstrap migration residual is ~0.062 bp (bootstrapped curves). 0.07 bp absolute tolerance accommodates this last-mile residual while expected_outputs remains the Bloomberg screen value."
     },
     "delta": {
       "abs": 0.001,
-      "rel": 1e-6,
+      "rel": 1e-06,
       "tolerance_reason": "Expected output is the raw Bloomberg CDSO Delta N(d1) stored as a unitless ratio (50.70% -> 0.5070). A 0.001 absolute band is tighter than the requested 0.01 max and allows only source-screen rounding noise."
     },
     "gamma": {
@@ -938,12 +641,12 @@
     },
     "vega": {
       "abs": 25.0,
-      "rel": 1e-2,
-      "tolerance_reason": "Expected output is the raw Bloomberg Vega(1%). After Phase 8 (canonical-NPV simplification — see convention_decisions), finstack reports the plain one-sided σ+0.01 forward difference of the canonical Bloomberg quadrature NPV. The previous FEP-beta vega re-parameterization closed the residual to ~$1 but introduced a parallel calibration pathway and silent solver fallbacks; removing it leaves a documented ~$21 (0.62%) convention residual on this fixture without admitting material model drift."
+      "rel": 0.01,
+      "tolerance_reason": "Expected output is the raw Bloomberg Vega(1%). After Phase 8 (canonical-NPV simplification \u2014 see convention_decisions), finstack reports the plain one-sided \u03c3+0.01 forward difference of the canonical Bloomberg quadrature NPV. The previous FEP-beta vega re-parameterization closed the residual to ~$1 but introduced a parallel calibration pathway and silent solver fallbacks; removing it leaves a documented ~$21 (0.62%) convention residual on this fixture without admitting material model drift."
     },
     "dv01": {
       "abs": 0.5,
-      "rel": 1e-6,
+      "rel": 1e-06,
       "tolerance_reason": "dv01 is finstack's internal central-difference IR sensitivity (dV/dr per +1bp) computed via sensitivity_central_diff, unified with the CDS IR DV01 convention so the two aggregate consistently in a portfolio (audit fix W-18). It is the negated half of the Bloomberg CDSO bond-convention screen DV01 (formerly +228.21) and is intentionally no longer a like-for-like Bloomberg-screen value; the expected output is finstack's own deterministic computation, so the tolerance only needs to absorb bootstrap re-calibration jitter."
     },
     "cs01": {

@@ -1,10 +1,10 @@
 {
-  "schema_version": "finstack.golden/1",
-  "name": "inflation_zc_swap_5y",
-  "domain": "rates.inflation_swap",
-  "description": "Synthetic 5Y zero-coupon inflation swap on deterministic CPI and USD OIS curves.",
-  "provenance": {
-    "as_of": "2026-04-30",
+  "schema_version": "finstack.golden/2",
+  "metadata": {
+    "name": "inflation_zc_swap_5y",
+    "domain": "rates.inflation_swap",
+    "description": "Synthetic 5Y zero-coupon inflation swap on deterministic CPI and USD OIS curves.",
+    "valuation_date": "2026-04-30",
     "source": "formula",
     "source_detail": "Finstack canonical pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved.",
     "captured_by": "jeickmeier",
@@ -15,38 +15,11 @@
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
   },
-  "inputs": {
-    "valuation_date": "2026-04-30",
-    "model": "discounting",
-    "metrics": [
-      "par_rate",
-      "dv01",
-      "inflation01"
-    ],
-    "instrument_json": {
-      "type": "inflation_swap",
-      "spec": {
-        "id": "INFLATION-ZC-SWAP-5Y-GOLDEN",
-        "notional": {
-          "amount": "1000000",
-          "currency": "USD"
-        },
-        "start_date": "2026-04-30",
-        "maturity": "2031-04-30",
-        "fixed_rate": 0.0225,
-        "inflation_index_id": "US-CPI",
-        "discount_curve_id": "USD-OIS",
-        "side": "pay",
-        "attributes": {
-          "tags": [
-            "golden"
-          ],
-          "meta": {}
-        },
-        "day_count": "Act365F"
-      }
-    },
-    "market_envelope": {
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
       "schema": "finstack.calibration",
       "plan": {
         "id": "inflation_zc_swap_5y_tier_a_wrap",
@@ -184,20 +157,32 @@
           "rate_calibration": null
         }
       ]
-    },
-    "source_reference": {
-      "design_metrics": [
-        "npv",
-        "par_breakeven_rate",
-        "dv01_real",
-        "inflation_dv01"
-      ],
-      "par_breakeven_rate_key": "par_rate",
-      "dv01_real_key": "dv01",
-      "inflation_dv01_key": "inflation01"
     }
   },
-  "expected_outputs": {
+  "instrument": {
+    "type": "inflation_swap",
+    "spec": {
+      "id": "INFLATION-ZC-SWAP-5Y-GOLDEN",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "start_date": "2026-04-30",
+      "maturity": "2031-04-30",
+      "fixed_rate": 0.0225,
+      "inflation_index_id": "US-CPI",
+      "discount_curve_id": "USD-OIS",
+      "side": "pay",
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
+      },
+      "day_count": "Act365F"
+    }
+  },
+  "expected": {
     "npv": -10322.265559182979,
     "par_rate": 0.02018378380564667,
     "dv01": 5.163961012953223,

@@ -4,23 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.golden.runners.pricing_common import _resolve_market, run_pricing_fixture
-from tests.golden.schema import GoldenFixture, Provenance, ToleranceEntry
-
-
-def _provenance() -> Provenance:
-    return Provenance(
-        as_of="2026-04-30",
-        source="formula",
-        source_detail="unit test",
-        captured_by="pytest",
-        captured_on="2026-04-30",
-        last_reviewed_by="pytest",
-        last_reviewed_on="2026-04-30",
-        review_interval_months=6,
-        regen_command="n/a",
-        screenshots=[],
-    )
+from tests.golden.runners.pricing_common import _resolve_market
 
 
 def _minimal_market_dict() -> dict:
@@ -54,53 +38,16 @@ def _minimal_envelope_dict() -> dict:
     }
 
 
-def _make_fixture(inputs: dict) -> GoldenFixture:
-    """Construct a minimal GoldenFixture for unit-testing the runner."""
-    return GoldenFixture(
-        schema_version="finstack.golden/1",
-        name="test",
-        domain="test",
-        description="test",
-        provenance=_provenance(),
-        inputs=inputs,
-        expected_outputs={"npv": 0.0},
-        tolerances={"npv": ToleranceEntry(abs=1e-6)},
-    )
-
-
-def test_pricing_inputs_reject_when_both_market_and_market_envelope() -> None:
-    fixture = _make_fixture({
-        "valuation_date": "2026-04-30",
-        "model": "discounting",
-        "metrics": [],
-        "instrument_json": {},
-        "market": _minimal_market_dict(),
-        "market_envelope": _minimal_envelope_dict(),
-    })
-    with pytest.raises(ValueError, match=r"market.*market_envelope|market_envelope.*market"):
-        run_pricing_fixture(fixture)
-
-
-def test_pricing_inputs_reject_when_neither_market_nor_market_envelope() -> None:
-    fixture = _make_fixture({
-        "valuation_date": "2026-04-30",
-        "model": "discounting",
-        "metrics": [],
-        "instrument_json": {},
-    })
-    with pytest.raises(ValueError, match=r"market.*market_envelope|market_envelope.*market"):
-        run_pricing_fixture(fixture)
-
-
-def test_pricing_inputs_resolve_market_only() -> None:
-    """Happy path: only `market` supplied, returns a MarketContext."""
-    inputs = {"market": _minimal_market_dict()}
-    market = _resolve_market(inputs)
+def test_resolve_market_snapshot_only() -> None:
+    market = _resolve_market({"kind": "snapshot", "data": _minimal_market_dict()})
     assert market is not None
 
 
-def test_pricing_inputs_resolve_market_envelope_only() -> None:
-    """Happy path: only `market_envelope` supplied, returns a MarketContext via calibrate()."""
-    inputs = {"market_envelope": _minimal_envelope_dict()}
-    market = _resolve_market(inputs)
+def test_resolve_market_envelope_only() -> None:
+    market = _resolve_market({"kind": "envelope", "envelope": _minimal_envelope_dict()})
     assert market is not None
+
+
+def test_resolve_market_rejects_unknown_kind() -> None:
+    with pytest.raises(ValueError, match=r"snapshot.*envelope|market\.kind"):
+        _resolve_market({"kind": "bogus"})

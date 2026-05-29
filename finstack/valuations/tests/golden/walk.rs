@@ -1,6 +1,7 @@
 //! Walk-test for validating every committed golden fixture.
 
-use crate::golden::schema::{GoldenFixture, SCHEMA_VERSION};
+use crate::golden::pricing_common::requested_metrics;
+use crate::golden::schema::{Body, GoldenFixture, Market, SCHEMA_VERSION};
 use finstack_core::market_data::context::MarketContext;
 use finstack_valuations::calibration::api::schema::CalibrationEnvelope;
 use finstack_valuations::metrics::MetricId;
@@ -20,14 +21,24 @@ const VALID_SOURCES: &[&str] = &[
     "formula",
     "textbook",
 ];
-const PRICING_INPUT_KEYS: &[&str] = &[
-    "valuation_date",
-    "model",
-    "metrics",
-    "instrument_json",
-    "source_reference",
+const COMMON_TOP_LEVEL_KEYS: &[&str] = &[
+    "schema_version",
+    "metadata",
+    "kind",
+    "expected",
+    "tolerances",
 ];
-const PRICING_OPTIONAL_INPUT_KEYS: &[&str] = &["source_validation", "market", "market_envelope"];
+const PRICING_BODY_KEYS: &[&str] = &["model", "market", "instrument"];
+const SABR_BODY_KEYS: &[&str] = &[
+    "alpha",
+    "beta",
+    "nu",
+    "rho",
+    "shift",
+    "forward",
+    "time_to_expiry",
+    "strikes",
+];
 const ZERO_RISK_METRICS_REQUIRING_REASON: &[&str] = &[
     "bucketed_dv01",
     "convexity",
@@ -119,69 +130,59 @@ pub(crate) fn validate_fixture(path: &Path) -> Result<(), String> {
         ));
     }
 
-    if !VALID_SOURCES.contains(&fixture.provenance.source.as_str()) {
+    validate_top_level_keys(&raw, &fixture)?;
+
+    if !VALID_SOURCES.contains(&fixture.metadata.source.as_str()) {
         return Err(format!(
-            "provenance.source '{}' is not recognized",
-            fixture.provenance.source
+            "metadata.source '{}' is not recognized",
+            fixture.metadata.source
         ));
     }
 
-    validate_non_empty("name", &fixture.name)?;
-    validate_non_empty("domain", &fixture.domain)?;
-    validate_non_empty("description", &fixture.description)?;
-    validate_non_empty("provenance.as_of", &fixture.provenance.as_of)?;
+    validate_non_empty("metadata.name", &fixture.metadata.name)?;
+    validate_non_empty("metadata.domain", &fixture.metadata.domain)?;
+    validate_non_empty("metadata.description", &fixture.metadata.description)?;
+    validate_non_empty("metadata.valuation_date", &fixture.metadata.valuation_date)?;
+    validate_non_empty("metadata.source_detail", &fixture.metadata.source_detail)?;
+    validate_non_empty("metadata.captured_by", &fixture.metadata.captured_by)?;
+    validate_non_empty("metadata.captured_on", &fixture.metadata.captured_on)?;
     validate_non_empty(
-        "provenance.source_detail",
-        &fixture.provenance.source_detail,
-    )?;
-    validate_non_empty("provenance.captured_by", &fixture.provenance.captured_by)?;
-    validate_non_empty("provenance.captured_on", &fixture.provenance.captured_on)?;
-    validate_non_empty(
-        "provenance.last_reviewed_by",
-        &fixture.provenance.last_reviewed_by,
+        "metadata.last_reviewed_by",
+        &fixture.metadata.last_reviewed_by,
     )?;
     validate_non_empty(
-        "provenance.last_reviewed_on",
-        &fixture.provenance.last_reviewed_on,
+        "metadata.last_reviewed_on",
+        &fixture.metadata.last_reviewed_on,
     )?;
 
-    for metric in fixture.expected_outputs.keys() {
+    for metric in fixture.expected.keys() {
         if !fixture.tolerances.contains_key(metric) {
-            return Err(format!(
-                "expected_outputs has '{}' but tolerances does not",
-                metric
-            ));
+            return Err(format!("expected has '{metric}' but tolerances does not"));
         }
     }
 
     for (metric, tolerance) in &fixture.tolerances {
-        if !fixture.expected_outputs.contains_key(metric) {
-            return Err(format!(
-                "tolerances has '{}' but expected_outputs does not",
-                metric
-            ));
+        if !fixture.expected.contains_key(metric) {
+            return Err(format!("tolerances has '{metric}' but expected does not"));
         }
         if tolerance.abs.is_none() && tolerance.rel.is_none() {
-            return Err(format!(
-                "tolerance for '{}' has neither abs nor rel",
-                metric
-            ));
+            return Err(format!("tolerance for '{metric}' has neither abs nor rel"));
         }
     }
 
     validate_zero_risk_metric_reasons(&fixture)?;
-    validate_source_reference_coverage(&fixture)?;
-    validate_source_validation_metadata(&fixture)?;
-    validate_pricing_input_schema(path, &fixture)?;
-    validate_required_pricing_risk_metrics(&fixture)?;
-    validate_required_metrics_not_non_compared(&fixture)?;
 
-    if MANUAL_SCREENSHOT_SOURCES.contains(&fixture.provenance.source.as_str())
-        && fixture.provenance.screenshots.is_empty()
+    match &fixture.body {
+        Body::Pricing(_) => validate_pricing_body(&fixture)?,
+        Body::SabrSmile(_) => validate_sabr_body(&fixture)?,
+    }
+
+    if MANUAL_SCREENSHOT_SOURCES.contains(&fixture.metadata.source.as_str())
+        && fixture.metadata.screenshots.is_empty()
     {
         return Err(format!(
             "source '{}' requires at least one screenshot",
-            fixture.provenance.source
+            fixture.metadata.source
         ));
     }
 
@@ -190,78 +191,83 @@ pub(crate) fn validate_fixture(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_pricing_input_schema(path: &Path, fixture: &GoldenFixture) -> Result<(), String> {
-    let Ok(relative) = path.strip_prefix(data_root()) else {
-        return Ok(());
+fn validate_top_level_keys(raw: &str, fixture: &GoldenFixture) -> Result<(), String> {
+    let value: serde_json::Value =
+        serde_json::from_str(raw).map_err(|err| format!("parse top-level keys: {err}"))?;
+    let object = value.as_object().ok_or("fixture must be a JSON object")?;
+
+    let mut allowed = COMMON_TOP_LEVEL_KEYS
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let body_keys: &[&str] = match &fixture.body {
+        Body::Pricing(_) => PRICING_BODY_KEYS,
+        Body::SabrSmile(_) => SABR_BODY_KEYS,
     };
-    if !relative.to_string_lossy().starts_with("pricing/") {
-        return Ok(());
+    allowed.extend(body_keys.iter().copied());
+
+    for key in object.keys() {
+        if !allowed.contains(key.as_str()) {
+            return Err(format!("fixture has unexpected top-level key '{key}'"));
+        }
     }
+    Ok(())
+}
 
-    let inputs = fixture
-        .inputs
-        .as_object()
-        .ok_or("pricing fixture inputs must be an object")?;
-    validate_object_keys(
-        "inputs",
-        inputs,
-        PRICING_INPUT_KEYS,
-        PRICING_OPTIONAL_INPUT_KEYS,
-    )?;
+fn validate_pricing_body(fixture: &GoldenFixture) -> Result<(), String> {
+    let pricing = fixture.pricing().ok_or("pricing body expected")?;
+    validate_non_empty("model", &pricing.model)?;
 
-    // Exactly one of `market` or `market_envelope` must be present.
-    match (inputs.get("market"), inputs.get("market_envelope")) {
-        (Some(_), Some(_)) => {
-            return Err(
-                "pricing fixture inputs must not supply both 'market' and 'market_envelope'"
-                    .to_string(),
-            );
+    match &pricing.market {
+        Market::Snapshot { data } => {
+            serde_json::from_value::<MarketContext>(data.clone())
+                .map_err(|err| format!("market.data is not a valid MarketContext: {err}"))?;
         }
-        (None, None) => {
-            return Err(
-                "pricing fixture inputs must supply either 'market' or 'market_envelope'"
-                    .to_string(),
-            );
-        }
-        (Some(market), None) => {
-            serde_json::from_value::<MarketContext>(market.clone()).map_err(|err| {
-                format!("pricing fixture inputs.market is not a valid MarketContext: {err}")
-            })?;
-        }
-        (None, Some(envelope)) => {
+        Market::Envelope { envelope } => {
             serde_json::from_value::<CalibrationEnvelope>(envelope.clone()).map_err(|err| {
-                format!(
-                    "pricing fixture inputs.market_envelope is not a valid CalibrationEnvelope: {err}"
-                )
+                format!("market.envelope is not a valid CalibrationEnvelope: {err}")
             })?;
         }
-    };
-
-    let instrument_json = inputs
-        .get("instrument_json")
-        .ok_or("pricing fixture inputs.instrument_json is required")?;
-    validate_swaption_underlying_tenor(instrument_json)?;
-    let instrument_json = serde_json::to_string(instrument_json)
-        .map_err(|err| format!("serialize pricing fixture inputs.instrument_json: {err}"))?;
-    parse_boxed_instrument_json(&instrument_json, None).map_err(|err| {
-        format!("pricing fixture inputs.instrument_json is not a valid instrument: {err}")
-    })?;
-
-    let metrics = string_array(inputs, "inputs", "metrics")?;
-    for metric in &metrics {
-        MetricId::parse_strict(metric)
-            .map_err(|err| format!("pricing fixture inputs.metrics contains '{metric}': {err}"))?;
-    }
-    let requested = metrics.iter().map(String::as_str).collect::<BTreeSet<_>>();
-    for metric in fixture.expected_outputs.keys() {
-        let base_metric = metric_base(metric);
-        if base_metric != "npv" && !requested.contains(base_metric) {
-            return Err(format!(
-                "expected_outputs has '{metric}' but inputs.metrics does not request it"
-            ));
-        }
     }
 
+    validate_swaption_underlying_tenor(&pricing.instrument)?;
+    let instrument_json = serde_json::to_string(&pricing.instrument)
+        .map_err(|err| format!("serialize instrument: {err}"))?;
+    parse_boxed_instrument_json(&instrument_json, None)
+        .map_err(|err| format!("instrument is not a valid instrument: {err}"))?;
+
+    for metric in requested_metrics(fixture) {
+        MetricId::parse_strict(&metric)
+            .map_err(|err| format!("expected metric base '{metric}': {err}"))?;
+    }
+
+    validate_required_pricing_risk_metrics(fixture)
+}
+
+fn validate_sabr_body(fixture: &GoldenFixture) -> Result<(), String> {
+    let sabr = fixture.sabr().ok_or("sabr_smile body expected")?;
+    if sabr.strikes.is_empty() {
+        return Err("sabr_smile fixture must define at least one strike".to_string());
+    }
+
+    let strike_keys = sabr
+        .strikes
+        .iter()
+        .map(|entry| entry.key.as_str())
+        .collect::<BTreeSet<_>>();
+    if strike_keys.len() != sabr.strikes.len() {
+        return Err("sabr_smile strike keys must be unique".to_string());
+    }
+    let expected_keys = fixture
+        .expected
+        .keys()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    if strike_keys != expected_keys {
+        return Err(
+            "sabr_smile strike keys must match the expected metric keys exactly".to_string(),
+        );
+    }
     Ok(())
 }
 
@@ -362,7 +368,7 @@ fn validate_swaption_underlying_tenor(instrument_json: &serde_json::Value) -> Re
     let spec = instrument
         .get("spec")
         .and_then(serde_json::Value::as_object)
-        .ok_or("swaption instrument_json.spec must be an object")?;
+        .ok_or("swaption instrument.spec must be an object")?;
     let top_tenor = tenor_years(spec, "swap_start", "swap_end")?;
     let fixed_tenor = leg_tenor_years(spec, "underlying_fixed_leg")?;
     let float_tenor = leg_tenor_years(spec, "underlying_float_leg")?;
@@ -413,40 +419,17 @@ fn iso_year(date: &str) -> Result<i32, String> {
         .map_err(|err| format!("swaption date '{date}' has invalid year: {err}"))
 }
 
-fn validate_object_keys(
-    field: &str,
-    object: &serde_json::Map<String, serde_json::Value>,
-    required: &[&str],
-    optional: &[&str],
-) -> Result<(), String> {
-    let allowed = required
-        .iter()
-        .chain(optional.iter())
-        .copied()
-        .collect::<BTreeSet<_>>();
-    for key in object.keys() {
-        if !allowed.contains(key.as_str()) {
-            return Err(format!("{field} has unexpected key '{key}'"));
-        }
-    }
-    for key in required {
-        if !object.contains_key(*key) {
-            return Err(format!("{field} is missing required key '{key}'"));
-        }
-    }
-    Ok(())
-}
-
 fn validate_required_pricing_risk_metrics(fixture: &GoldenFixture) -> Result<(), String> {
-    if fixture.domain.starts_with("rates.") && !has_expected_metric(fixture, "dv01") {
+    let domain = fixture.metadata.domain.as_str();
+    if domain.starts_with("rates.") && !has_expected_metric(fixture, "dv01") {
         return Err("rates pricing fixtures must assert dv01".to_string());
     }
 
-    if fixture.domain.starts_with("fixed_income.") && !has_expected_metric(fixture, "dv01") {
+    if domain.starts_with("fixed_income.") && !has_expected_metric(fixture, "dv01") {
         return Err("fixed-income pricing fixtures must assert dv01".to_string());
     }
 
-    if fixture.domain.starts_with("credit.") {
+    if domain.starts_with("credit.") {
         if !has_expected_metric(fixture, "dv01") {
             return Err("credit pricing fixtures must assert dv01".to_string());
         }
@@ -460,66 +443,20 @@ fn validate_required_pricing_risk_metrics(fixture: &GoldenFixture) -> Result<(),
 
 fn has_expected_metric(fixture: &GoldenFixture, base_metric: &str) -> bool {
     fixture
-        .expected_outputs
+        .expected
         .keys()
         .any(|metric| metric_base(metric) == base_metric)
 }
 
-fn validate_required_metrics_not_non_compared(fixture: &GoldenFixture) -> Result<(), String> {
-    let Some(source_reference) = fixture
-        .inputs
-        .get("source_reference")
-        .and_then(serde_json::Value::as_object)
-    else {
-        return Ok(());
-    };
-    let non_compared = string_array(
-        source_reference,
-        "inputs.source_reference",
-        "non_compared_metrics",
-    )?;
-    let invalid = non_compared
-        .iter()
-        .filter(|metric| is_required_executable_pricing_risk_metric(fixture, metric))
-        .cloned()
-        .collect::<Vec<_>>();
-    if invalid.is_empty() {
-        Ok(())
-    } else {
-        Err(format!(
-            "required executable pricing/risk metrics cannot be listed in inputs.source_reference.non_compared_metrics: {}",
-            invalid.join(", ")
-        ))
-    }
-}
-
-fn is_required_executable_pricing_risk_metric(fixture: &GoldenFixture, metric: &str) -> bool {
-    let metric = metric_base(metric);
-    if fixture.domain.starts_with("rates.") {
-        return metric == "dv01";
-    }
-    if fixture.domain.starts_with("fixed_income.") {
-        return metric == "dv01";
-    }
-    fixture.domain.starts_with("credit.") && matches!(metric, "dv01" | "cs01")
-}
-
-fn validate_source_validation_metadata(fixture: &GoldenFixture) -> Result<(), String> {
-    if fixture.inputs.get("source_validation").is_none() {
-        return Ok(());
-    }
-    crate::golden::source_validation::validate_source_validation_fixture("walk validation", fixture)
-}
-
 fn validate_zero_risk_metric_reasons(fixture: &GoldenFixture) -> Result<(), String> {
-    for (metric, expected) in &fixture.expected_outputs {
+    for (metric, expected) in &fixture.expected {
         let base_metric = metric_base(metric);
         if expected.abs() <= f64::EPSILON
             && ZERO_RISK_METRICS_REQUIRING_REASON.contains(&base_metric)
             && !has_zero_metric_reason(fixture, metric)
         {
             return Err(format!(
-                "zero risk metric '{metric}' requires a tolerance_reason or inputs.source_reference.zero_metric_reasons entry"
+                "zero risk metric '{metric}' requires a tolerances[metric].tolerance_reason"
             ));
         }
     }
@@ -527,157 +464,11 @@ fn validate_zero_risk_metric_reasons(fixture: &GoldenFixture) -> Result<(), Stri
 }
 
 fn has_zero_metric_reason(fixture: &GoldenFixture, metric: &str) -> bool {
-    if fixture
+    fixture
         .tolerances
         .get(metric)
         .and_then(|tolerance| tolerance.tolerance_reason.as_deref())
         .is_some_and(|reason| !reason.trim().is_empty())
-    {
-        return true;
-    }
-    let base_metric = metric_base(metric);
-    fixture
-        .inputs
-        .get("source_reference")
-        .and_then(serde_json::Value::as_object)
-        .and_then(|source_reference| source_reference.get("zero_metric_reasons"))
-        .and_then(serde_json::Value::as_object)
-        .and_then(|reasons| reasons.get(metric).or_else(|| reasons.get(base_metric)))
-        .and_then(serde_json::Value::as_str)
-        .is_some_and(|reason| !reason.trim().is_empty())
-}
-
-fn validate_source_reference_coverage(fixture: &GoldenFixture) -> Result<(), String> {
-    let Some(source_reference) = fixture.inputs.get("source_reference") else {
-        return Ok(());
-    };
-    let Some(source_reference) = source_reference.as_object() else {
-        return Err("inputs.source_reference must be an object".to_string());
-    };
-
-    let planned = string_array(
-        source_reference,
-        "inputs.source_reference",
-        "planned_metrics_not_compared",
-    )?;
-    let non_compared = string_array(
-        source_reference,
-        "inputs.source_reference",
-        "non_compared_metrics",
-    )?;
-    if (!planned.is_empty() || !non_compared.is_empty())
-        && !has_metric_omission_reason(source_reference)
-    {
-        return Err(
-            "inputs.source_reference planned/non-compared metrics require an explicit reason"
-                .to_string(),
-        );
-    }
-
-    let expected = fixture
-        .expected_outputs
-        .keys()
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-    let omitted = planned
-        .iter()
-        .chain(non_compared.iter())
-        .map(String::as_str)
-        .collect::<BTreeSet<_>>();
-
-    for metric in string_array(
-        source_reference,
-        "inputs.source_reference",
-        "design_metrics",
-    )? {
-        let aliases = design_metric_aliases(source_reference, &metric);
-        let alias_asserted = aliases
-            .iter()
-            .any(|alias| expected.contains(alias.as_str()));
-        let alias_omitted = aliases.iter().any(|alias| omitted.contains(alias.as_str()));
-        if !expected.contains(metric.as_str())
-            && !omitted.contains(metric.as_str())
-            && !alias_asserted
-            && !alias_omitted
-        {
-            return Err(format!(
-                "inputs.source_reference design metric '{metric}' is neither asserted nor listed as planned/non-compared"
-            ));
-        }
-    }
-
-    Ok(())
-}
-
-fn string_array(
-    object: &serde_json::Map<String, serde_json::Value>,
-    parent: &str,
-    key: &str,
-) -> Result<Vec<String>, String> {
-    let Some(value) = object.get(key) else {
-        return Ok(Vec::new());
-    };
-    let Some(values) = value.as_array() else {
-        return Err(format!("{parent}.{key} must be an array"));
-    };
-    values
-        .iter()
-        .map(|value| {
-            value
-                .as_str()
-                .map(str::to_string)
-                .ok_or_else(|| format!("{parent}.{key} entries must be strings"))
-        })
-        .collect()
-}
-
-fn has_metric_omission_reason(object: &serde_json::Map<String, serde_json::Value>) -> bool {
-    [
-        "planned_metrics_reason",
-        "non_compared_metrics_reason",
-        "omission_reason",
-        "delta_convention_note",
-        "waterfall_reference",
-        "note",
-    ]
-    .iter()
-    .any(|key| {
-        object
-            .get(*key)
-            .and_then(serde_json::Value::as_str)
-            .is_some_and(|value| !value.trim().is_empty())
-    })
-}
-
-fn design_metric_aliases(
-    object: &serde_json::Map<String, serde_json::Value>,
-    metric: &str,
-) -> Vec<String> {
-    let mut aliases = Vec::new();
-    let key = format!("{metric}_key");
-    if let Some(alias) = object.get(&key).and_then(serde_json::Value::as_str) {
-        aliases.push(alias.to_string());
-    }
-    if metric == "mod_duration" {
-        if let Some(alias) = object
-            .get("duration_key")
-            .and_then(serde_json::Value::as_str)
-        {
-            aliases.push(alias.to_string());
-        }
-    }
-    if let Some(strict_metric_keys) = object
-        .get("strict_metric_keys")
-        .and_then(serde_json::Value::as_object)
-    {
-        if let Some(alias) = strict_metric_keys
-            .get(metric)
-            .and_then(serde_json::Value::as_str)
-        {
-            aliases.push(alias.to_string());
-        }
-    }
-    aliases
 }
 
 fn validate_non_empty(field: &str, value: &str) -> Result<(), String> {
@@ -689,7 +480,7 @@ fn validate_non_empty(field: &str, value: &str) -> Result<(), String> {
 
 fn validate_screenshot_paths(path: &Path, fixture: &GoldenFixture) -> Result<(), String> {
     let parent = path.parent().ok_or("fixture has no parent dir")?;
-    for shot in &fixture.provenance.screenshots {
+    for shot in &fixture.metadata.screenshots {
         let relative = Path::new(&shot.path);
         if relative.is_absolute()
             || relative.components().any(|component| {
@@ -755,87 +546,52 @@ fn fixture_relative_path(path: &Path) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
 
     const CAP_FLOOR_FIXTURE: &str = "pricing/cap_floor/usd_cap_5y_atm_black.json";
     const DEPOSIT_FIXTURE: &str = "pricing/deposit/usd_deposit_3m.json";
     const SWAPTION_FIXTURE: &str = "pricing/swaption/usd_swaption_normal_vol_self_test.json";
 
     #[test]
-    fn pricing_input_schema_rejects_invalid_instrument_json() {
-        let path = data_root().join(DEPOSIT_FIXTURE);
+    fn pricing_body_rejects_invalid_instrument() {
         let mut fixture = load_fixture(DEPOSIT_FIXTURE);
-        fixture.inputs["instrument_json"] = serde_json::json!({
+        let Body::Pricing(pricing) = &mut fixture.body else {
+            panic!("deposit fixture must be a pricing fixture");
+        };
+        pricing.instrument = serde_json::json!({
             "schema": "finstack.instrument/1",
-            "instrument": {
-                "type": "deposit",
-                "spec": {}
-            }
+            "instrument": {"type": "deposit", "spec": {}}
         });
 
-        let err = validate_pricing_input_schema(&path, &fixture)
-            .expect_err("invalid instrument_json must fail pricing walk validation");
+        let err = validate_pricing_body(&fixture)
+            .expect_err("invalid instrument must fail pricing walk validation");
 
-        assert!(err.contains("instrument_json"), "unexpected error: {err}");
+        assert!(err.contains("instrument"), "unexpected error: {err}");
     }
 
     #[test]
-    fn pricing_input_schema_rejects_unknown_metric_name() {
-        let path = data_root().join(DEPOSIT_FIXTURE);
+    fn pricing_body_rejects_zero_risk_metric_without_reason() {
         let mut fixture = load_fixture(DEPOSIT_FIXTURE);
-        fixture.inputs["metrics"] = serde_json::json!(["deposit_par_rate", "dv01x"]);
+        fixture.expected.insert("dv01".to_string(), 0.0);
+        fixture.tolerances.insert(
+            "dv01".to_string(),
+            crate::golden::schema::ToleranceEntry {
+                abs: Some(1e-9),
+                rel: None,
+                tolerance_reason: None,
+            },
+        );
 
-        let err = validate_pricing_input_schema(&path, &fixture)
-            .expect_err("unknown metric names must fail pricing walk validation");
-
-        assert!(err.contains("dv01x"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn pricing_input_schema_requires_expected_metrics_to_be_requested() {
-        let path = data_root().join(DEPOSIT_FIXTURE);
-        let mut fixture = load_fixture(DEPOSIT_FIXTURE);
-        fixture.inputs["metrics"] = serde_json::json!(["deposit_par_rate"]);
-
-        let err = validate_pricing_input_schema(&path, &fixture)
-            .expect_err("expected risk metrics must be requested in pricing inputs");
+        let err = validate_zero_risk_metric_reasons(&fixture)
+            .expect_err("zero dv01 without a reason must fail");
 
         assert!(err.contains("dv01"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn pricing_input_schema_allows_dynamic_metric_keys_from_requested_base_metric() {
-        let path = data_root().join(DEPOSIT_FIXTURE);
-        let mut fixture = load_fixture(DEPOSIT_FIXTURE);
-        fixture.inputs["metrics"] = serde_json::json!(["dv01", "bucketed_dv01"]);
-        fixture.expected_outputs = BTreeMap::from([
-            ("dv01".to_string(), 1.0),
-            ("bucketed_dv01::USD-OIS::1y".to_string(), 1.0),
-        ]);
-        fixture.tolerances = fixture
-            .expected_outputs
-            .keys()
-            .map(|metric| {
-                (
-                    metric.clone(),
-                    crate::golden::schema::ToleranceEntry {
-                        abs: Some(1e-9),
-                        rel: None,
-                        tolerance_reason: None,
-                    },
-                )
-            })
-            .collect();
-
-        validate_pricing_input_schema(&path, &fixture)
-            .expect("dynamic metric keys should be covered by the requested base metric");
     }
 
     #[test]
     fn manual_screenshot_paths_must_stay_under_screenshots_directory() {
         let path = data_root().join(CAP_FLOOR_FIXTURE);
         let mut fixture = load_fixture(CAP_FLOOR_FIXTURE);
-        fixture.provenance.screenshots[0].path = "../usd_cap_5y_atm_black.json".to_string();
+        fixture.metadata.screenshots[0].path = "../usd_cap_5y_atm_black.json".to_string();
 
         let err = validate_screenshot_paths(&path, &fixture)
             .expect_err("manual screenshot evidence must not escape screenshots/");
@@ -844,104 +600,36 @@ mod tests {
     }
 
     #[test]
-    fn pricing_input_schema_rejects_inconsistent_swaption_underlying_tenor() {
-        let path = data_root().join(SWAPTION_FIXTURE);
+    fn pricing_body_rejects_inconsistent_swaption_underlying_tenor() {
         let mut fixture = load_fixture(SWAPTION_FIXTURE);
-        fixture.inputs["instrument_json"]["instrument"]["spec"]["swap_end"] =
-            serde_json::json!("2029-05-08");
-        fixture.inputs["instrument_json"]["instrument"]["spec"]["underlying_fixed_leg"]["end"] =
+        let Body::Pricing(pricing) = &mut fixture.body else {
+            panic!("swaption fixture must be a pricing fixture");
+        };
+        pricing.instrument["instrument"]["spec"]["swap_end"] = serde_json::json!("2029-05-08");
+        pricing.instrument["instrument"]["spec"]["underlying_fixed_leg"]["end"] =
             serde_json::json!("2032-05-05");
-        fixture.inputs["instrument_json"]["instrument"]["spec"]["underlying_float_leg"]["end"] =
+        pricing.instrument["instrument"]["spec"]["underlying_float_leg"]["end"] =
             serde_json::json!("2032-05-05");
 
-        let err = validate_pricing_input_schema(&path, &fixture)
+        let err = validate_pricing_body(&fixture)
             .expect_err("swaption top-level tenor must agree with underlying leg tenors");
 
         assert!(err.contains("swaption"), "unexpected error: {err}");
     }
 
     #[test]
-    fn source_validation_does_not_allow_required_metric_as_non_compared() {
-        let mut fixture = load_fixture(DEPOSIT_FIXTURE);
-        fixture.inputs["source_validation"] = serde_json::json!({
-            "status": "non_executable",
-            "reason": "unit test"
-        });
-        fixture.inputs["source_reference"]["non_compared_metrics"] = serde_json::json!(["dv01"]);
-        fixture.inputs["source_reference"]["non_compared_metrics_reason"] =
-            serde_json::json!("unit test");
+    fn top_level_keys_reject_unknown_field() {
+        let path = data_root().join(DEPOSIT_FIXTURE);
+        let raw = fs::read_to_string(&path).expect("read fixture");
+        let mut value: serde_json::Value = serde_json::from_str(&raw).expect("parse");
+        value["unexpected"] = serde_json::json!(true);
+        let raw = serde_json::to_string(&value).expect("serialize");
+        let fixture: GoldenFixture = serde_json::from_str(&raw).expect("reparse");
 
-        let err = validate_required_metrics_not_non_compared(&fixture)
-            .expect_err("source_validation must not hide required executable risk metrics");
+        let err = validate_top_level_keys(&raw, &fixture)
+            .expect_err("unknown top-level key must be rejected");
 
-        assert!(err.contains("dv01"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn source_validation_metadata_requires_reason() {
-        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let path = manifest_dir.join("../../target/golden-source-validation-missing-reason.json");
-        std::fs::write(
-            &path,
-            r#"{
-              "schema_version": "finstack.golden/1",
-              "name": "missing_source_validation_reason",
-              "domain": "analytics.returns",
-              "description": "Source validation missing reason test.",
-              "provenance": {
-                "as_of": "2026-04-30",
-                "source": "formula",
-                "source_detail": "unit test",
-                "captured_by": "test",
-                "captured_on": "2026-04-30",
-                "last_reviewed_by": "test",
-                "last_reviewed_on": "2026-04-30",
-                "review_interval_months": 6,
-                "regen_command": "",
-                "screenshots": []
-              },
-              "inputs": {
-                "components": {"selection::tech": 0.01},
-                "source_validation": {
-                  "status": "non_executable"
-                }
-              },
-              "expected_outputs": {"selection::tech": 0.01},
-              "tolerances": {"selection::tech": {"abs": 0.0}}
-            }"#,
-        )
-        .expect("write source validation fixture");
-
-        let err = validate_fixture(&path).expect_err("source_validation reason is required");
-
-        assert!(err.contains("must explain"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn cap_floor_bloomberg_fixture_executes_with_hw1f_inputs() {
-        let fixture = load_fixture(CAP_FLOOR_FIXTURE);
-        assert_eq!(
-            fixture
-                .inputs
-                .get("model")
-                .and_then(serde_json::Value::as_str),
-            Some("hull_white_1f")
-        );
-
-        let spec = fixture
-            .inputs
-            .pointer("/instrument_json/spec")
-            .and_then(serde_json::Value::as_object)
-            .expect("cap/floor fixture has instrument spec");
-        let pricing_overrides = spec
-            .get("pricing_overrides")
-            .and_then(serde_json::Value::as_object);
-        for forbidden in ["quoted_dv01", "quoted_vega"] {
-            assert!(
-                !pricing_overrides.is_some_and(|overrides| overrides.contains_key(forbidden)),
-                "cap/floor fixture must not force {forbidden} through pricing_overrides"
-            );
-        }
+        assert!(err.contains("unexpected"), "unexpected error: {err}");
     }
 
     fn load_fixture(relative_path: &str) -> GoldenFixture {
@@ -1016,10 +704,11 @@ fn stripped_default_instrument_parse_error(path: &Path) -> Option<String> {
         Ok(fixture) => fixture,
         Err(err) => return Some(format!("parse failed: {err}")),
     };
-    let Some(mut instrument_json) = fixture.inputs.get("instrument_json").cloned() else {
-        return Some("missing inputs.instrument_json".to_string());
+    let Some(pricing) = fixture.pricing() else {
+        return Some("not a pricing fixture".to_string());
     };
 
+    let mut instrument_json = pricing.instrument.clone();
     strip_default_instrument_inputs(&mut instrument_json);
     let instrument_json = match serde_json::to_string(&instrument_json) {
         Ok(instrument_json) => instrument_json,

@@ -9,14 +9,14 @@ they do, they need a new runner registered in `tests/golden/runner.rs`.
 
 Calibration math is exercised end-to-end through the **pricing-runner**
 fixtures under `tests/golden/data/pricing/`. Each pricing fixture supplies a
-`market_envelope` that the runner feeds to
+`market` block of kind `envelope` that the runner feeds to
 `engine::execute_with_diagnostics`. The calibrated `MarketContext` is then
-used to price the fixture's `instrument_json`, and the resulting metrics are
-compared against `expected_outputs`.
+used to price the fixture's `instrument`, and the resulting metrics are
+compared against `expected`.
 
 This pattern covers two distinct test shapes with one runner:
 
-1. **Vendor parity** — `expected_outputs` are sourced from a vendor
+1. **Vendor parity** — `expected` values are sourced from a vendor
    (Bloomberg SWPM, QuantLib `IsdaCdsEngine`, etc.). Any drift in
    calibration math surfaces as a parity failure.
    - Example: [`pricing/irs/usd_sofr_5y_receive_fixed_swpm.json`](../pricing/irs/usd_sofr_5y_receive_fixed_swpm.json)
@@ -27,7 +27,7 @@ This pattern covers two distinct test shapes with one runner:
      values from QuantLib `IsdaCdsEngine`.
 
 2. **Round-trip self-test** — the priced instrument *is* one of the
-   calibration inputs. `expected_outputs.npv` ≈ 0 with a tight tolerance,
+   calibration inputs. `expected.npv` ≈ 0 with a tight tolerance,
    demonstrating the bootstrap converged. These are formula-source and
    serve as bit-stable regression catches for any calibration code change.
    - Example: [`pricing/cds/usd_5y_cds_self_test.json`](../pricing/cds/usd_5y_cds_self_test.json)
@@ -42,22 +42,22 @@ If we ever need to assert on:
 - **Per-quote residuals** as a vector (not aggregated max/RMSE).
 
 … then a calibration runner could read fixtures from this directory and
-compare against a `CalibrationReport`-shaped `expected_outputs`. Until
+compare against a `CalibrationReport`-shaped `expected` block. Until
 that need is concrete, the pricing runner's "calibrate then reprice"
 contract delivers stronger invariants (fits *and* prices) than a
 calibration-only runner would.
 
 ## Conventions for any future calibration goldens
 
-When you add a fixture here, follow the same `finstack.golden/1` schema
+When you add a fixture here, follow the same `finstack.golden/2` schema
 the pricing runner uses (`tests/golden/schema.rs`). The runner will need:
 
 - Domain prefix `calibration.<asset_class>` (e.g. `calibration.discount`).
-- `inputs.market_envelope` with the calibration plan + quotes.
-- `expected_outputs` keyed on calibration-report metric names.
+- `market` of kind `envelope` with the calibration plan + quotes.
+- `expected` keyed on calibration-report metric names.
 - Tolerances per metric, with a reason.
-- `provenance` block per the standard template (vendor source, regen
-  command, screenshots if applicable).
+- `metadata` block per the standard template (vendor source, valuation
+  date, regen command, screenshots if applicable).
 
 Add your domain to a new `is_calibration_domain` matcher and route through
 a `calibration_common::run_calibration_fixture` helper that returns
