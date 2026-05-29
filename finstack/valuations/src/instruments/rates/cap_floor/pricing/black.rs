@@ -151,7 +151,11 @@ pub(crate) fn price_caplet_floorlet(inputs: CapletFloorletInputs) -> finstack_co
 /// - Caplet: 1 if ITM (F > K), 0 if OTM
 /// - Floorlet: -1 if ITM (F < K), 0 if OTM
 pub(crate) fn delta(is_cap: bool, strike: f64, forward: f64, sigma: f64, t_fix: f64) -> f64 {
-    if t_fix <= 0.0 || sigma <= 0.0 {
+    // `forward <= 0.0` makes `ln(F/K)` (hence d1) non-finite; return the
+    // intrinsic delta rather than a NaN. Callers that want a finite-vol delta on
+    // a non-positive forward should route through the Bachelier fallback (see
+    // `common::lognormal_delta_with_fallback`).
+    if t_fix <= 0.0 || sigma <= 0.0 || forward <= 0.0 {
         if is_cap {
             return if forward > strike { 1.0 } else { 0.0 };
         } else {
@@ -184,13 +188,13 @@ pub(crate) fn gamma(strike: f64, forward: f64, sigma: f64, t_fix: f64) -> f64 {
 /// Returns the sensitivity of option price to a 1% (absolute) change in volatility.
 /// Vega is always non-negative for long options.
 pub(crate) fn vega_per_pct(strike: f64, forward: f64, sigma: f64, t_fix: f64) -> f64 {
-    if t_fix <= 0.0 || forward <= 0.0 {
+    // At `sigma <= 0` the true Black vega is zero away from the money and only
+    // finite exactly at-the-money; a degenerate (extrapolated) zero vol should
+    // report zero vega rather than the `n(0)` value an ATM-equivalent d1 would
+    // give, which would overstate vega for ITM/OTM strikes.
+    if t_fix <= 0.0 || forward <= 0.0 || sigma <= 0.0 {
         return 0.0;
     }
-    let d1 = if sigma > 0.0 {
-        d1_black76(forward, strike, sigma, t_fix)
-    } else {
-        0.0
-    };
+    let d1 = d1_black76(forward, strike, sigma, t_fix);
     forward * norm_pdf(d1) * t_fix.sqrt() / 100.0
 }

@@ -24,20 +24,17 @@ const MIN_VOL_LOOKUP_TIME: f64 = 1e-6;
 
 /// Resolve the effective vol type.
 ///
-/// `Auto` selects a compatible model based on forward/strike sign. Explicit
-/// model selections remain explicit and should fail if their domain
-/// assumptions are violated.
-fn resolve_vol_type(vol_type: CapFloorVolType, forward: f64, strike: f64) -> CapFloorVolType {
+/// `Auto` is treated as a **lognormal** surface and resolves to `Lognormal`. The
+/// `Lognormal` pricing arm prices each caplet with Black-76 where the model is
+/// well-defined (`forward > 0` and `strike > 0`) and otherwise converts the
+/// lognormal vol to an equivalent normal vol and uses Bachelier. This keeps a
+/// single, consistent interpretation of the supplied surface across every
+/// caplet — including a cap whose schedule crosses zero — rather than feeding the
+/// same surface number to two incompatible models. Explicit model selections
+/// remain explicit.
+fn resolve_vol_type(vol_type: CapFloorVolType) -> CapFloorVolType {
     match vol_type {
-        CapFloorVolType::Auto => {
-            if forward > 0.0 && strike > 0.0 {
-                CapFloorVolType::Lognormal
-            } else {
-                CapFloorVolType::Normal
-            }
-        }
-        CapFloorVolType::Lognormal => CapFloorVolType::Lognormal,
-        CapFloorVolType::ShiftedLognormal => CapFloorVolType::ShiftedLognormal,
+        CapFloorVolType::Auto => CapFloorVolType::Lognormal,
         other => other,
     }
 }
@@ -139,19 +136,20 @@ pub(crate) fn price_cap_floor(
             currency: cap_floor.notional.currency(),
         };
         let vol_shift = cap_floor.resolved_vol_shift();
-        let resolved = resolve_vol_type(cap_floor.vol_type, forward, strike);
+        let resolved = resolve_vol_type(cap_floor.vol_type);
         let leg_pv = match resolved {
             CapFloorVolType::Lognormal => {
-                if forward > 0.0 {
+                if forward > 0.0 && strike > 0.0 {
                     black::price_caplet_floorlet(inputs())?
                 } else {
-                    // Lognormal (Black) pricing is undefined for a non-positive
-                    // forward — fall back to Bachelier (normal). `sigma` is a
-                    // LOGNORMAL vol; it must be converted to a normal vol
-                    // before the Bachelier pricer, otherwise the price is
-                    // wrong by ~ a factor of the forward rate. Convert via the
-                    // standard lognormal→normal mapping (no shift on this
-                    // explicit-Lognormal path).
+                    // Black-76 is undefined unless both the forward and strike
+                    // are strictly positive (it takes `ln(F/K)`) — fall back to
+                    // Bachelier (normal). `sigma` is a LOGNORMAL vol; it must be
+                    // converted to a normal vol before the Bachelier pricer,
+                    // otherwise the price is wrong by ~ a factor of the forward
+                    // rate. Convert via the standard lognormal→normal mapping
+                    // (no shift on this lognormal path). `Auto` resolves here
+                    // too, so this is also the negative-rate path for `Auto`.
                     let normal_vol =
                         crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
                             sigma,

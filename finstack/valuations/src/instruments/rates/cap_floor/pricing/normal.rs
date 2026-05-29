@@ -133,13 +133,11 @@ pub(crate) fn gamma(strike: f64, forward: f64, sigma: f64, t_fix: f64) -> f64 {
 ///
 /// Vega = √T · n(d) / 100
 pub(crate) fn vega_per_pct(strike: f64, forward: f64, sigma: f64, t_fix: f64) -> f64 {
-    if t_fix <= 0.0 {
+    // A degenerate (extrapolated) zero/negative vol reports zero vega rather
+    // than the `n(0)` value an ATM-equivalent `d` would give.
+    if t_fix <= 0.0 || sigma <= 0.0 {
         return 0.0;
     }
-    let d = if sigma > 0.0 {
-        d_bachelier(forward, strike, sigma, t_fix)
-    } else {
-        0.0
-    };
+    let d = d_bachelier(forward, strike, sigma, t_fix);
     norm_pdf(d) * t_fix.sqrt() / 100.0
 }

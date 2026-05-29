@@ -27,22 +27,22 @@ impl MetricCalculator for GammaCalculator {
 }
 
 fn caplet_gamma(vol_type: CapFloorVolType, strike: f64, vol_shift: f64, c: CapletInputs) -> f64 {
-    use crate::instruments::rates::cap_floor::pricing::{black, normal};
+    use super::common::lognormal_gamma_with_fallback;
+    use crate::instruments::rates::cap_floor::pricing::black;
     match vol_type {
-        CapFloorVolType::Lognormal => black::gamma(strike, c.forward, c.sigma, c.fixing_t),
+        // `Auto` is a lognormal surface; both share the Black-with-Bachelier
+        // fallback path so the Greek matches the pricer for any rate sign.
+        CapFloorVolType::Lognormal | CapFloorVolType::Auto => {
+            lognormal_gamma_with_fallback(strike, c.forward, c.sigma, c.fixing_t)
+        }
         CapFloorVolType::ShiftedLognormal => black::gamma(
             strike + vol_shift,
             c.forward + vol_shift,
             c.sigma,
             c.fixing_t,
         ),
-        CapFloorVolType::Normal => normal::gamma(strike, c.forward, c.sigma, c.fixing_t),
-        CapFloorVolType::Auto => {
-            if c.forward > 0.0 && strike > 0.0 {
-                black::gamma(strike, c.forward, c.sigma, c.fixing_t)
-            } else {
-                normal::gamma(strike, c.forward, c.sigma, c.fixing_t)
-            }
-        }
+        CapFloorVolType::Normal => crate::instruments::rates::cap_floor::pricing::normal::gamma(
+            strike, c.forward, c.sigma, c.fixing_t,
+        ),
     }
 }
