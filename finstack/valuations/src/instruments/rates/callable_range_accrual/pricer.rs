@@ -116,14 +116,29 @@ impl CallableRangeAccrualPayoff {
         rate >= self.lower_bound && rate <= self.upper_bound
     }
 
-    fn coupon_value(&self) -> f64 {
+    /// Pathwise value of the callable range-accrual **note** when it is *not*
+    /// called: the range-accrual coupon (a single payment based on the full-life
+    /// fraction of observations in range) plus redemption of principal, both at
+    /// the final payment date.
+    ///
+    /// Principal is included so this continuation value is on the same basis as
+    /// the par call price returned by [`Self::intrinsic_at`]. With a coupon-only
+    /// value (a few percent of notional) the continuation is always far below par,
+    /// so `exercise_value < continuation` never holds, the issuer call never
+    /// fires, and the callable note is mispriced identically to a non-callable
+    /// bullet. Because the coupon is modelled as a single payment at the final
+    /// date, calling early correctly forfeits it (the holder receives par via
+    /// `intrinsic_at`).
+    fn note_value(&self) -> f64 {
         let total_observations = self.total_past_observations + self.future_observations;
-        if total_observations == 0 {
-            return 0.0;
-        }
-        let total_in_range = self.past_in_range + self.days_in_range;
-        let accrual_fraction = total_in_range as f64 / total_observations as f64;
-        self.coupon_rate * accrual_fraction * self.notional * self.final_payment_discount_factor
+        let accrual_fraction = if total_observations == 0 {
+            0.0
+        } else {
+            let total_in_range = self.past_in_range + self.days_in_range;
+            total_in_range as f64 / total_observations as f64
+        };
+        let coupon = self.coupon_rate * accrual_fraction * self.notional;
+        (coupon + self.notional) * self.final_payment_discount_factor
     }
 }
 
@@ -149,7 +164,7 @@ impl Payoff for CallableRangeAccrualPayoff {
     }
 
     fn value(&self, currency: finstack_core::currency::Currency) -> Money {
-        Money::new(self.coupon_value(), currency)
+        Money::new(self.note_value(), currency)
     }
 
     fn reset(&mut self) {
@@ -714,9 +729,11 @@ mod tests {
     }
 
     #[test]
-    fn no_eligible_call_dates_prices_like_noncallable_coupon() {
+    fn no_eligible_call_dates_prices_like_noncallable_note() {
         let as_of = date(2025, Month::January, 1);
         let curves = market(as_of, 0.02, 0.03);
+        // Lockout of 10 periods makes the single call date ineligible, so the note
+        // is never called and prices as a bullet: coupon + principal redemption.
         let inst = test_callable(vec![date(2025, Month::July, 1)], 10, 0.06);
         let maturity = *inst
             .range_accrual
@@ -728,13 +745,47 @@ mod tests {
             .expect("discount")
             .df_between_dates(as_of, maturity)
             .expect("df");
-        let expected = inst.range_accrual.notional.amount() * inst.range_accrual.coupon_rate * df;
+        // All observations are in range (deterministic short rate ≈ 3%), so the
+        // accrual fraction is 1: value = notional·(coupon_rate + 1)·df.
+        let expected =
+            inst.range_accrual.notional.amount() * (inst.range_accrual.coupon_rate + 1.0) * df;
 
         let estimate = deterministic_pricer(8)
             .price_estimate(&inst, &curves, as_of)
             .expect("price");
 
         assert!((estimate.mean.amount() - expected).abs() < 1.0);
+    }
+
+    #[test]
+    fn issuer_call_reduces_value_below_bullet_at_realistic_coupon() {
+        let as_of = date(2025, Month::January, 1);
+        let curves = market(as_of, 0.02, 0.03);
+        let call_date = date(2025, Month::July, 1);
+        // Callable: one eligible call date (no lockout) at a realistic 6% coupon.
+        let callable = test_callable(vec![call_date], 0, 0.06);
+        // Bullet: the same note but the call is locked out, so it never fires.
+        let bullet = test_callable(vec![call_date], 10, 0.06);
+
+        let callable_pv = deterministic_pricer(8)
+            .price_estimate(&callable, &curves, as_of)
+            .expect("callable")
+            .mean
+            .amount();
+        let bullet_pv = deterministic_pricer(8)
+            .price_estimate(&bullet, &curves, as_of)
+            .expect("bullet")
+            .mean
+            .amount();
+
+        // The issuer call strips value from the holder: a realistic-coupon
+        // callable note must price strictly below the otherwise-identical bullet.
+        // (Before the principal-inclusion fix the call never fired and the two
+        // were identical.)
+        assert!(
+            callable_pv < bullet_pv - 1.0,
+            "issuer call must reduce note value: callable={callable_pv}, bullet={bullet_pv}"
+        );
     }
 
     #[test]

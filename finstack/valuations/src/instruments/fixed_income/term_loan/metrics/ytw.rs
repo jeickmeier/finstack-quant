@@ -10,7 +10,7 @@ use finstack_core::dates::Date;
 use finstack_core::money::Money;
 
 use super::irr_helpers::{
-    cached_full_schedule, outstanding_before, solve_irr_to_exercise,
+    cached_full_schedule, outstanding_before, settlement_discount_factor, solve_irr_to_exercise,
     target_price_from_quote_or_model,
 };
 
@@ -24,7 +24,8 @@ impl MetricCalculator for YtwCalculator {
         // Snapshot scalar fields off the loan before borrowing the cached schedule.
         let (currency, maturity, dirty_now, candidate_calls) = {
             let loan: &TermLoan = context.instrument_as()?;
-            let dirty_now = target_price_from_quote_or_model(loan, context.base_value);
+            let settle_df = settlement_discount_factor(loan, &context.curves, context.as_of)?;
+            let dirty_now = target_price_from_quote_or_model(loan, context.base_value, settle_df);
             let calls: Vec<_> = if let Some(cs) = &loan.call_schedule {
                 cs.calls
                     .iter()

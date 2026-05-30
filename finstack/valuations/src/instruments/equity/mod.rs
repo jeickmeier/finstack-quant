@@ -86,6 +86,9 @@ pub mod equity_option;
 pub mod equity_trs;
 /// PE fund module - Private equity/markets funds (renamed from private_markets_fund).
 pub mod pe_fund;
+/// Shared piecewise-constant GBM process and forward-vol/rate bootstrap for the
+/// equity path-dependent MC pricers (cliquet, autocallable).
+pub(crate) mod piecewise_gbm;
 /// Real estate module - Real estate asset valuation.
 pub mod real_estate;
 /// Equity spot module - Equity spot positions.

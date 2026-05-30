@@ -60,6 +60,20 @@ impl MetricCalculator for OasCalculator {
         let tree_type = ConvertibleTreeType::Binomial(100);
         let base_market = context.curves.as_ref();
 
+        // The quoted clean price is a *settlement-date* price, so the model PV
+        // (computed at `as_of`) is forward-valued to settlement before comparison.
+        // With the default `settlement_days = None`, settle == as_of and this
+        // factor is 1.0 (no change); it only matters when a settlement lag is set.
+        let settle =
+            crate::instruments::fixed_income::convertible::pricer::settlement_date(bond, as_of);
+        let settle_df = if settle > as_of {
+            base_market
+                .get_discount(bond.discount_curve_id.as_str())?
+                .df_between_dates(as_of, settle)?
+        } else {
+            1.0
+        };
+
         // Bump the credit curve when available (affects cash/debt component only
         // in TZ). Fall back to discount curve when no separate credit curve is set.
         let curve_to_bump = bond
@@ -96,7 +110,7 @@ impl MetricCalculator for OasCalculator {
                 }
             };
             match price_convertible_bond(bond, &bumped, tree_type, as_of) {
-                Ok(pv) => pv.amount() - target_dirty,
+                Ok(pv) => pv.amount() / settle_df - target_dirty,
                 Err(e) => {
                     record_err(e);
                     f64::NAN

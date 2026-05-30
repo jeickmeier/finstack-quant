@@ -163,9 +163,14 @@ fn price_touch(
     }
 
     let mu = (r_d - r_f - sigma2 / 2.0) / sigma2;
-    let lambda_r = match payout_timing {
-        PayoutTiming::AtExpiry => 0.0,
-        PayoutTiming::AtHit => r_d,
+    // A no-touch can only ever settle at expiry, so its value uses the
+    // *undiscounted* touch probability (survival-to-expiry) regardless of
+    // `payout_timing`. Only an at-hit one-touch folds hit-time discounting into
+    // the touch probability (the extra 2·r_d/σ² term in λ).
+    let lambda_r = match (touch_type, payout_timing) {
+        (TouchType::NoTouch, _) => 0.0,
+        (TouchType::OneTouch, PayoutTiming::AtExpiry) => 0.0,
+        (TouchType::OneTouch, PayoutTiming::AtHit) => r_d,
     };
     let lambda_sq = mu * mu + 2.0 * lambda_r / sigma2;
     if lambda_sq < 0.0 {
@@ -194,25 +199,18 @@ fn price_touch(
     let n_eta_z_prime = finstack_core::math::norm_cdf(eta * z_prime);
     let one_touch_prob = power1 * n_eta_z + power2 * n_eta_z_prime;
 
-    Ok(match payout_timing {
-        PayoutTiming::AtExpiry => {
-            let df = (-r_d * t).exp();
-            let one_touch_pv = df * payout * one_touch_prob;
-            match touch_type {
-                TouchType::OneTouch => one_touch_pv,
-                TouchType::NoTouch => df * payout - one_touch_pv,
-            }
-        }
-        PayoutTiming::AtHit => {
-            let one_touch_pv = payout * one_touch_prob;
-            match touch_type {
-                TouchType::OneTouch => one_touch_pv,
-                TouchType::NoTouch => {
-                    let df = (-r_d * t).exp();
-                    df * payout - one_touch_pv
-                }
-            }
-        }
+    let df = (-r_d * t).exp();
+    Ok(match touch_type {
+        TouchType::OneTouch => match payout_timing {
+            // `one_touch_prob` already includes hit-time discounting (λ uses r_d).
+            PayoutTiming::AtHit => payout * one_touch_prob,
+            // Undiscounted touch probability, then discount the expiry payout.
+            PayoutTiming::AtExpiry => df * payout * one_touch_prob,
+        },
+        // A no-touch pays at expiry iff the barrier is never hit:
+        //   payout · e^{-r_d·T} · P(no touch) = df · payout · (1 − P_touch),
+        // with P_touch the undiscounted touch probability (λ uses lambda_r = 0).
+        TouchType::NoTouch => df * payout * (1.0 - one_touch_prob),
     })
 }
 
@@ -299,5 +297,61 @@ mod tests {
 
         assert!((via_pricer.amount() - via_instrument.amount()).abs() < 1e-10);
         assert_eq!(via_pricer.currency(), via_instrument.currency());
+    }
+
+    fn build_no_touch(
+        expiry: Date,
+        timing: crate::instruments::fx::fx_touch_option::PayoutTiming,
+    ) -> FxTouchOption {
+        FxTouchOption::builder()
+            .id(InstrumentId::new("FX-NOTOUCH-TEST"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .barrier_level(1.10)
+            .touch_type(crate::instruments::fx::fx_touch_option::TouchType::NoTouch)
+            .barrier_direction(crate::instruments::fx::fx_touch_option::BarrierDirection::Down)
+            .payout_amount(Money::new(100_000.0, Currency::USD))
+            .payout_timing(timing)
+            .expiry(expiry)
+            .day_count(DayCount::Act365F)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
+            .vol_surface_id(CurveId::new("EURUSD-VOL"))
+            .pricing_overrides(PricingOverrides::default())
+            .attributes(Attributes::new())
+            .build()
+            .expect("fx no-touch option")
+    }
+
+    /// A no-touch option pays only at expiry (if the barrier is never hit), so its
+    /// value must be independent of `payout_timing`. The at-hit branch previously
+    /// discounted the touch probability at the (earlier) hit time, understating
+    /// the no-touch value.
+    #[test]
+    fn no_touch_value_is_independent_of_payout_timing() {
+        use crate::instruments::fx::fx_touch_option::PayoutTiming;
+        let as_of = date!(2024 - 01 - 01);
+        let expiry = date!(2025 - 01 - 01);
+        let market = build_market(as_of);
+
+        let pv_expiry = compute_pv(
+            &build_no_touch(expiry, PayoutTiming::AtExpiry),
+            &market,
+            as_of,
+        )
+        .expect("no-touch at-expiry pv");
+        let pv_hit = compute_pv(&build_no_touch(expiry, PayoutTiming::AtHit), &market, as_of)
+            .expect("no-touch at-hit pv");
+
+        assert!(
+            (pv_expiry.amount() - pv_hit.amount()).abs() < 1e-9,
+            "no-touch value must not depend on payout timing: at_expiry={} at_hit={}",
+            pv_expiry.amount(),
+            pv_hit.amount()
+        );
+        assert!(
+            pv_expiry.amount() > 0.0,
+            "no-touch should have positive value"
+        );
     }
 }

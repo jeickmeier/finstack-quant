@@ -108,9 +108,32 @@ pub fn split_io_po(_passthrough_coupon: f64, face_amount: f64) -> (f64, f64) {
     (face_amount, face_amount)
 }
 
+/// Scheduled (level-pay) principal for one month of a fully-amortizing pool.
+///
+/// With a positive monthly mortgage rate this is the standard annuity principal
+/// component; with a non-positive rate it falls back to straight-line
+/// amortization. The final month returns the full remaining balance.
+fn scheduled_principal(remaining: f64, monthly_mortgage_rate: f64, remaining_months: u32) -> f64 {
+    if remaining_months <= 1 {
+        remaining
+    } else if monthly_mortgage_rate > 1e-12 {
+        let factor = (1.0 + monthly_mortgage_rate).powi(remaining_months as i32);
+        let payment = remaining * monthly_mortgage_rate * factor / (factor - 1.0);
+        (payment - remaining * monthly_mortgage_rate)
+            .max(0.0)
+            .min(remaining)
+    } else {
+        remaining / remaining_months as f64
+    }
+}
+
 /// Calculate theoretical IO value.
 ///
-/// IO value = PV of expected interest payments.
+/// IO value = PV of expected interest payments. Interest accrues on the
+/// outstanding balance, which amortizes from both scheduled (level-pay)
+/// principal and prepayments — see [`theoretical_io_value_with_wac`]. This
+/// convenience wrapper assumes straight-line scheduled amortization (WAC = 0),
+/// matching [`theoretical_po_value`].
 ///
 /// # Arguments
 ///
@@ -130,8 +153,36 @@ pub fn theoretical_io_value(
     discount_rate: f64,
     psa: f64,
 ) -> f64 {
+    theoretical_io_value_with_wac(notional, coupon, wam, discount_rate, psa, 0.0)
+}
+
+/// Theoretical IO strip value with explicit WAC for scheduled amortization.
+///
+/// The IO notional decays from BOTH scheduled (level-pay) principal and
+/// prepayments, exactly mirroring [`theoretical_po_value_with_wac`] so the IO
+/// and PO halves reconcile to the same balance path. Decaying by prepayment
+/// alone leaves the notional too high every month and overstates the IO value,
+/// increasingly so for seasoned / high-WAC collateral.
+///
+/// # Arguments
+///
+/// * `notional` - IO notional amount
+/// * `coupon` - IO coupon rate (interest accrues on the outstanding balance)
+/// * `wam` - Remaining weighted average maturity in months
+/// * `discount_rate` - Discount rate (annual)
+/// * `psa` - Expected prepayment speed
+/// * `wac` - Weighted average coupon of the underlying pool (drives amortization)
+pub fn theoretical_io_value_with_wac(
+    notional: f64,
+    coupon: f64,
+    wam: u32,
+    discount_rate: f64,
+    psa: f64,
+    wac: f64,
+) -> f64 {
     let monthly_rate = discount_rate / 12.0;
     let monthly_coupon = coupon / 12.0;
+    let monthly_mortgage_rate = wac / 12.0;
 
     let mut value = 0.0;
     let mut remaining_notional = notional;
@@ -141,19 +192,19 @@ pub fn theoretical_io_value(
             break;
         }
 
-        // SMM from PSA (registry-backed canonical curve)
-        let smm = psa_to_smm(psa, month);
-
-        // Interest payment this month
+        // Interest accrues on the pre-amortization (start-of-month) balance.
         let interest = remaining_notional * monthly_coupon;
-
-        // Discount factor
         let df = 1.0 / (1.0 + monthly_rate).powi(month as i32);
-
         value += interest * df;
 
-        // Update remaining notional
-        remaining_notional *= 1.0 - smm;
+        // Balance amortizes from scheduled principal plus prepayments (SMM on the
+        // post-scheduled balance), matching the PO strip.
+        let remaining_months = wam - month + 1;
+        let scheduled =
+            scheduled_principal(remaining_notional, monthly_mortgage_rate, remaining_months);
+        let smm = psa_to_smm(psa, month);
+        let prepayment = (remaining_notional - scheduled).max(0.0) * smm;
+        remaining_notional -= scheduled + prepayment;
     }
 
     value / notional * 100.0 // Return as percentage of notional
@@ -207,19 +258,9 @@ pub fn theoretical_po_value_with_wac(
             break;
         }
 
-        // Scheduled amortization (level-pay formula)
+        // Scheduled (level-pay) amortization for this month.
         let remaining_months = wam - month + 1;
-        let scheduled = if remaining_months <= 1 {
-            remaining
-        } else if monthly_mortgage_rate > 1e-12 {
-            let factor = (1.0 + monthly_mortgage_rate).powi(remaining_months as i32);
-            let payment = remaining * monthly_mortgage_rate * factor / (factor - 1.0);
-            (payment - remaining * monthly_mortgage_rate)
-                .max(0.0)
-                .min(remaining)
-        } else {
-            remaining / remaining_months as f64
-        };
+        let scheduled = scheduled_principal(remaining, monthly_mortgage_rate, remaining_months);
 
         // SMM from PSA (registry-backed canonical curve), applied to the
         // post-scheduled balance per Fabozzi Ch. 4.

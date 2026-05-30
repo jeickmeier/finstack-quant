@@ -6,8 +6,9 @@
 use crate::instruments::TermLoan;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_core::dates::Date;
+use finstack_core::money::Money;
 
-use super::irr_helpers::solve_irr_to_date;
+use super::irr_helpers::{settlement_discount_factor, solve_irr_to_date};
 
 /// Compute a date N years ahead of `as_of`, with leap-year fallback.
 ///
@@ -32,11 +33,17 @@ macro_rules! define_ytn {
         impl MetricCalculator for $name {
             fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
                 let as_of = context.as_of;
-                let target_price = context.base_value;
-                let maturity = {
+                // Forward-value the model PV to settlement so horizon yields share
+                // the same price origin as YTM/YTC/YTW (no spurious settlement carry).
+                let (maturity, settle_df) = {
                     let loan: &TermLoan = context.instrument_as()?;
-                    loan.maturity
+                    let settle_df = settlement_discount_factor(loan, &context.curves, as_of)?;
+                    (loan.maturity, settle_df)
                 };
+                let target_price = Money::new(
+                    context.base_value.amount() / settle_df,
+                    context.base_value.currency(),
+                );
 
                 let target = years_ahead(as_of, $years)?;
                 let exercise_date = if target < maturity { target } else { maturity };

@@ -9,7 +9,7 @@ use crate::instruments::TermLoan;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_core::money::Money;
 
-use super::irr_helpers::target_price_from_quote_or_model;
+use super::irr_helpers::{settlement_discount_factor, target_price_from_quote_or_model};
 
 /// Yield-to-maturity calculator for term loans.
 ///
@@ -32,8 +32,11 @@ impl MetricCalculator for YtmCalculator {
         let mut flows: Vec<(finstack_core::dates::Date, Money)> =
             Vec::with_capacity(holder_flows.len() + 1);
 
-        // Add initial price leg at settlement_date (negative = outflow for purchase)
-        let target_price = target_price_from_quote_or_model(loan, context.base_value);
+        // Add initial price leg at settlement_date (negative = outflow for purchase).
+        // The model PV is forward-valued to settlement so the price leg and the
+        // discounted future flows share one origin.
+        let settle_df = settlement_discount_factor(loan, &context.curves, as_of)?;
+        let target_price = target_price_from_quote_or_model(loan, context.base_value, settle_df);
         flows.push((
             settlement_date,
             Money::new(-target_price.amount(), target_price.currency()),

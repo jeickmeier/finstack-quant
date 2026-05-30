@@ -1294,26 +1294,31 @@ pub fn calculate_accrued_interest(bond: &ConvertibleBond, as_of: Date) -> Result
         return Ok(0.0);
     }
 
+    // ACT/ACT (ISMA) requires the coupon frequency and reference period; without
+    // them year_fraction errors (MissingFrequencyForActActIsma). Propagate that
+    // error rather than silently treating accrued as zero — which would corrupt
+    // the dirty/clean price and the OAS target for ISMA-day-count convertibles.
+    let frequency = bond
+        .fixed_coupon
+        .as_ref()
+        .map(|c| c.freq)
+        .or_else(|| bond.floating_coupon.as_ref().map(|c| c.freq));
+
     let mut period_start = bond.issue_date;
     for cf in &coupons {
         let period_end = cf.date;
         if settle >= period_start && settle < period_end {
+            let dc_ctx = finstack_core::dates::DayCountContext {
+                frequency,
+                coupon_period: Some((period_start, period_end)),
+                ..Default::default()
+            };
             let period_yf = schedule
                 .day_count
-                .year_fraction(
-                    period_start,
-                    period_end,
-                    finstack_core::dates::DayCountContext::default(),
-                )
-                .unwrap_or(0.0);
+                .year_fraction(period_start, period_end, dc_ctx)?;
             let accrued_yf = schedule
                 .day_count
-                .year_fraction(
-                    period_start,
-                    settle,
-                    finstack_core::dates::DayCountContext::default(),
-                )
-                .unwrap_or(0.0);
+                .year_fraction(period_start, settle, dc_ctx)?;
 
             if period_yf > 0.0 {
                 let fraction = accrued_yf / period_yf;

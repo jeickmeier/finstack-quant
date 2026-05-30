@@ -130,11 +130,38 @@ pub fn fixed_strike_lookback_call(
 
         (intrinsic_pv + floating_premium).max(0.0)
     } else {
-        // Case: M < K (out-of-the-money based on observed maximum)
-        // Need to reach K first, then capture upside above K
-        // Use the floating-strike formula with "minimum" = K as approximation
-        // This gives the value of max(S_max_future - K, 0)
-        floating_strike_lookback_call(spot, time, rate, div_yield, vol, strike)
+        // Case: M < K (out-of-the-money based on observed maximum). Exact
+        // Conze-Viswanathan (1991) fixed-strike lookback call for K ≥ M:
+        //   c = S·e^{-qT}·N(d1) − K·e^{-rT}·N(d2)
+        //     + S·e^{-rT}·(σ²/2b)·[−(S/K)^{-2b/σ²}·N(d1 − 2b√T/σ) + e^{bT}·N(d1)]
+        // The observed maximum M does not appear: while M < K it carries no
+        // intrinsic value, so the price depends only on the future max crossing K.
+        let sqrt_t = time.sqrt();
+        let vol_sqrt_t = vol * sqrt_t;
+        let vol2 = vol * vol;
+        let df_q = (-div_yield * time).exp();
+        let b = rate - div_yield;
+        let d1 = ((spot / strike).ln() + (b + 0.5 * vol2) * time) / vol_sqrt_t;
+        let d2 = d1 - vol_sqrt_t;
+
+        let term1 = spot * df_q * norm_cdf(d1);
+        let term2 = -strike * df * norm_cdf(d2);
+        let term3 = if b.abs() < RATE_EQ_DIV_TOL {
+            // L'Hôpital limit of the (σ²/2b)[…] term as b = r − q → 0.
+            let log_ratio = (spot / strike).ln();
+            spot * df
+                * (vol * sqrt_t * norm_pdf(d1)
+                    + log_ratio * norm_cdf(d1)
+                    + 0.5 * vol2 * time * norm_cdf(d1))
+        } else {
+            let ratio_power = (spot / strike).powf(-2.0 * b / vol2);
+            let d_corr = d1 - 2.0 * b * sqrt_t / vol;
+            spot * df
+                * (vol2 / (2.0 * b))
+                * (-ratio_power * norm_cdf(d_corr) + (b * time).exp() * norm_cdf(d1))
+        };
+
+        (term1 + term2 + term3).max(0.0)
     }
 }
 
@@ -199,10 +226,38 @@ pub fn fixed_strike_lookback_put(
 
         (intrinsic_pv + floating_premium).max(0.0)
     } else {
-        // Case: m > K (out-of-the-money based on observed minimum)
-        // Need to reach K first, then capture downside below K
-        // Use the floating-strike formula with "maximum" = K
-        floating_strike_lookback_put(spot, time, rate, div_yield, vol, strike)
+        // Case: m > K (out-of-the-money based on observed minimum). Exact
+        // Conze-Viswanathan (1991) fixed-strike lookback put for K ≤ m:
+        //   p = K·e^{-rT}·N(−d2) − S·e^{-qT}·N(−d1)
+        //     + S·e^{-rT}·(σ²/2b)·[(S/K)^{-2b/σ²}·N(−d1 + 2b√T/σ) − e^{bT}·N(−d1)]
+        // The observed minimum m does not appear: while m > K it carries no
+        // intrinsic value, so the price depends only on the future min crossing K.
+        let sqrt_t = time.sqrt();
+        let vol_sqrt_t = vol * sqrt_t;
+        let vol2 = vol * vol;
+        let df_q = (-div_yield * time).exp();
+        let b = rate - div_yield;
+        let d1 = ((spot / strike).ln() + (b + 0.5 * vol2) * time) / vol_sqrt_t;
+        let d2 = d1 - vol_sqrt_t;
+
+        let term1 = strike * df * norm_cdf(-d2);
+        let term2 = -spot * df_q * norm_cdf(-d1);
+        let term3 = if b.abs() < RATE_EQ_DIV_TOL {
+            // L'Hôpital limit of the (σ²/2b)[…] term as b = r − q → 0.
+            let log_ratio = (spot / strike).ln();
+            spot * df
+                * (vol * sqrt_t * norm_pdf(d1)
+                    - log_ratio * norm_cdf(-d1)
+                    - 0.5 * vol2 * time * norm_cdf(-d1))
+        } else {
+            let ratio_power = (spot / strike).powf(-2.0 * b / vol2);
+            let d_corr = d1 - 2.0 * b * sqrt_t / vol;
+            spot * df
+                * (vol2 / (2.0 * b))
+                * (ratio_power * norm_cdf(-d_corr) - (b * time).exp() * norm_cdf(-d1))
+        };
+
+        (term1 + term2 + term3).max(0.0)
     }
 }
 
@@ -745,6 +800,73 @@ mod tests {
             rel_diff_put < 1e-3,
             "Floating-strike lookback put should be continuous at RATE_EQ_DIV_TOL boundary: \
              inside={put_inside:.8}, outside={put_outside:.8}, rel_diff={rel_diff_put:.2e}"
+        );
+    }
+
+    /// The exact Conze-Viswanathan OTM fixed-strike lookback (observed extremum
+    /// has not crossed the strike) must match a path Monte Carlo of the
+    /// continuous-extremum payoff, validating the closed form that replaced the
+    /// previous floating-strike approximation. Discrete monitoring slightly
+    /// underestimates the continuous max/min, so MC sits just below the analytic.
+    #[test]
+    fn fixed_strike_lookback_otm_matches_monte_carlo() {
+        let (time, r, q, vol) = (1.0_f64, 0.05_f64, 0.0_f64, 0.20_f64);
+        let n_paths = 12_000usize;
+        let n_steps = 500usize;
+        let dt = time / n_steps as f64;
+        let drift = (r - q - 0.5 * vol * vol) * dt;
+        let diff = vol * dt.sqrt();
+        let df = (-r * time).exp();
+
+        // Broadie-Glasserman-Kou (1997) continuity correction: discrete monitoring
+        // underestimates the continuous extremum by ≈ exp(±β·σ·√dt) in level
+        // (β = 0.5826 = −ζ(1/2)/√(2π)). Applying it lets the discrete-path MC
+        // match the continuous-monitoring closed form tightly.
+        let corr = (0.5826 * vol * dt.sqrt()).exp();
+        let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+        // Deterministic GBM MC from `spot`, returning discounted E[payoff(run_max, run_min)].
+        let mut mc = |spot: f64, payoff: &dyn Fn(f64, f64) -> f64| -> f64 {
+            let mut next_unit = || {
+                state = state
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
+                ((state >> 11) as f64 + 0.5) / (1u64 << 53) as f64
+            };
+            let mut sum = 0.0;
+            for _ in 0..n_paths {
+                let mut s = spot;
+                let (mut run_max, mut run_min) = (spot, spot);
+                for _ in 0..n_steps {
+                    let u1 = next_unit();
+                    let u2 = next_unit();
+                    let z = (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos();
+                    s *= (drift + diff * z).exp();
+                    run_max = run_max.max(s);
+                    run_min = run_min.min(s);
+                }
+                sum += payoff(run_max * corr, run_min / corr);
+            }
+            df * sum / n_paths as f64
+        };
+
+        // OTM call: observed max = spot (95) < strike (100).
+        let mc_call = mc(95.0, &|run_max, _| (run_max - 100.0).max(0.0));
+        let analytic_call = fixed_strike_lookback_call(95.0, 100.0, time, r, q, vol, 95.0);
+        let rel_call = (analytic_call - mc_call).abs() / analytic_call.max(1.0);
+        assert!(
+            rel_call < 0.02,
+            "OTM fixed-strike lookback call must match MC: analytic={analytic_call:.4}, \
+             mc={mc_call:.4}, rel={rel_call:.4}"
+        );
+
+        // OTM put: observed min = spot (110) > strike (100).
+        let mc_put = mc(110.0, &|_, run_min| (100.0 - run_min).max(0.0));
+        let analytic_put = fixed_strike_lookback_put(110.0, 100.0, time, r, q, vol, 110.0);
+        let rel_put = (analytic_put - mc_put).abs() / analytic_put.max(1.0);
+        assert!(
+            rel_put < 0.02,
+            "OTM fixed-strike lookback put must match MC: analytic={analytic_put:.4}, \
+             mc={mc_put:.4}, rel={rel_put:.4}"
         );
     }
 }
