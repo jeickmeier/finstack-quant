@@ -902,21 +902,14 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.setattr("__all__", all)?;
 
-    let pkg: String = match parent.getattr("__package__") {
-        Ok(attr) => match attr.extract::<String>() {
-            Ok(s) => s,
-            Err(_) => "finstack.valuations".to_string(),
-        },
-        Err(_) => "finstack.valuations".to_string(),
-    };
-    let qual = format!("{pkg}.correlation");
-    m.setattr("__package__", &qual)?;
-
-    parent.add_submodule(&m)?;
-
-    let sys = PyModule::import(py, "sys")?;
-    let modules = sys.getattr("modules")?;
-    modules.set_item(&qual, &m)?;
+    crate::bindings::module_utils::register_submodule(
+        py,
+        parent,
+        &m,
+        "correlation",
+        "finstack.finstack.valuations",
+        crate::bindings::module_utils::ParentNameSource::Package,
+    )?;
 
     Ok(())
 }

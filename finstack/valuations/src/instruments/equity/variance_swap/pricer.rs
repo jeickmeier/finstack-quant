@@ -138,31 +138,44 @@ pub(crate) fn compute_pv(
         return Ok(undiscounted * disc.df(t));
     }
 
-    let forward = remaining_forward_variance(inst, curves, as_of)?;
-    // Seasoned MTM blends already-annualized realized and forward variance.
-    // The accrued-variance identity time-weights the un-annualized total
-    // variance: σ²_expected = (V_accrued + E[V_fwd]·τ) / T, which reduces to
-    // realized·(t_elapsed/T) + forward·(τ_remaining/T). Use the day-count
-    // `time_elapsed_fraction` rather than an observation-count fraction, which
-    // only coincides for perfectly uniform schedules (W-32).
-    let w = inst.time_elapsed_fraction(as_of);
-    // The realized-variance term must be annualized on the SAME day-count time
-    // basis as the blend weight `w`. `partial_realized_variance` annualizes on
-    // an observation-count basis (Σr²/N · ~252), a different time base, so the
-    // accrued-variance identity would not close (W-33). `seasoned_realized_variance`
-    // re-bases it to `V_accrued / t_elapsed` so `realized·w` equals
-    // `V_accrued / T` exactly.
-    let total_t =
-        inst.day_count
-            .year_fraction(inst.start_date, inst.maturity, Default::default())?;
-    let t_elapsed = w * total_t;
-    let realized = seasoned_realized_variance(inst, curves, as_of, t_elapsed)?;
-    let expected_var = realized * w + forward * (1.0 - w);
+    // Seasoned mark-to-market: the day-count time-weighted blend of realized-to-date
+    // and remaining forward variance. Shared with the `ExpectedVariance` metric via
+    // `seasoned_expected_variance` so the reported metric can never drift from the
+    // variance implied by this PV (W-32/W-33).
+    let expected_var = seasoned_expected_variance(inst, curves, as_of)?;
     let undiscounted = inst.payoff(expected_var);
     let t = inst
         .day_count
         .year_fraction(as_of, inst.maturity, Default::default())?;
     Ok(undiscounted * disc.df(t))
+}
+
+/// Seasoned mark-to-market expected variance: the day-count time-weighted blend
+/// of realized-to-date and remaining forward variance.
+///
+/// Used for a partially-observed swap (`start_date <= as_of < maturity`). Both
+/// the realized term and the blend weight `w = time_elapsed_fraction` are on the
+/// **day-count time basis**, so the accrued-variance identity
+/// `σ²_expected = (V_accrued + E[V_fwd]·τ) / T` closes exactly. The realized term
+/// therefore uses [`seasoned_realized_variance`] (`V_accrued / t_elapsed`), not
+/// [`partial_realized_variance`] (observation-count annualization), which would
+/// disagree for non-uniform schedules (W-33).
+///
+/// `compute_pv` and the `ExpectedVariance` metric both call this, guaranteeing the
+/// reported expected variance always equals the variance implied by the swap's PV.
+pub(crate) fn seasoned_expected_variance(
+    inst: &VarianceSwap,
+    curves: &MarketContext,
+    as_of: Date,
+) -> Result<f64> {
+    let forward = remaining_forward_variance(inst, curves, as_of)?;
+    let w = inst.time_elapsed_fraction(as_of);
+    let total_t =
+        inst.day_count
+            .year_fraction(inst.start_date, inst.maturity, Default::default())?;
+    let t_elapsed = w * total_t;
+    let realized = seasoned_realized_variance(inst, curves, as_of, t_elapsed)?;
+    Ok(realized * w + forward * (1.0 - w))
 }
 
 pub(crate) fn observation_dates(inst: &VarianceSwap) -> Vec<Date> {

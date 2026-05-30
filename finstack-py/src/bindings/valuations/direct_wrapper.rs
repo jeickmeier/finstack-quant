@@ -9,6 +9,7 @@ use finstack_valuations::pricer::{
     pretty_instrument_json, price_instrument_json, price_instrument_json_with_metrics,
     validate_instrument_json,
 };
+use finstack_valuations::results::ValuationResult;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 
@@ -56,9 +57,18 @@ pub(super) fn price_payload(
     as_of: &str,
     model: &str,
 ) -> PyResult<String> {
-    let market = extract_market_ref(market)?;
-    let result = price_instrument_json(json, &market, as_of, model).map_err(display_to_py)?;
+    let result = price_payload_result(json, market, as_of, model)?;
     serde_json::to_string(&result).map_err(display_to_py)
+}
+
+pub(super) fn price_payload_result(
+    json: &str,
+    market: &Bound<'_, PyAny>,
+    as_of: &str,
+    model: &str,
+) -> PyResult<ValuationResult> {
+    let market = extract_market_ref(market)?;
+    price_instrument_json(json, &market, as_of, model).map_err(display_to_py)
 }
 
 pub(super) fn price_payload_with_metrics(

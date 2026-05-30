@@ -11,11 +11,13 @@
 //! the same instrument JSON is bit-reproducible. Callers needing a distinct
 //! deterministic stream set `mc_seed_scenario` inside the instrument JSON.
 
+use super::pricing::{
+    metric_value_with_context, parse_market_json, price_instrument_with_context,
+    price_instrument_with_metrics_context, standard_option_greeks_with_context,
+};
 use crate::utils::to_js_err;
 use finstack_valuations::pricer::{
-    canonical_instrument_json, canonical_instrument_json_from_str,
-    metric_value_from_instrument_json, present_standard_option_greeks_from_instrument_json,
-    pretty_instrument_json, price_instrument_json,
+    canonical_instrument_json, canonical_instrument_json_from_str, pretty_instrument_json,
 };
 use serde_json::{Map, Value};
 use wasm_bindgen::prelude::*;
@@ -46,11 +48,8 @@ fn price_payload(
     as_of: &str,
     model: Option<String>,
 ) -> Result<String, JsValue> {
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    let result = price_instrument_json(json, &market, as_of, model.as_deref().unwrap_or("default"))
-        .map_err(to_js_err)?;
-    serde_json::to_string(&result).map_err(to_js_err)
+    let market = parse_market_json(market_json)?;
+    price_instrument_with_context(json, &market, as_of, model.as_deref().unwrap_or("default"))
 }
 
 fn price_payload_with_metrics(
@@ -62,20 +61,17 @@ fn price_payload_with_metrics(
     pricing_options: Option<String>,
     market_history: Option<String>,
 ) -> Result<String, JsValue> {
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
+    let market = parse_market_json(market_json)?;
     let metrics: Vec<String> = serde_wasm_bindgen::from_value(metrics).map_err(to_js_err)?;
-    let result = finstack_valuations::pricer::price_instrument_json_with_metrics_and_history(
+    price_instrument_with_metrics_context(
         json,
         &market,
         as_of,
         model.as_deref().unwrap_or("default"),
-        &metrics,
+        metrics,
         pricing_options.as_deref(),
         market_history.as_deref(),
     )
-    .map_err(to_js_err)?;
-    serde_json::to_string(&result).map_err(to_js_err)
 }
 
 fn metric_value(
@@ -85,16 +81,14 @@ fn metric_value(
     model: Option<String>,
     metric: &str,
 ) -> Result<f64, JsValue> {
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    metric_value_from_instrument_json(
+    let market = parse_market_json(market_json)?;
+    metric_value_with_context(
         json,
         &market,
         as_of,
         model.as_deref().unwrap_or("default"),
         metric,
     )
-    .map_err(to_js_err)
 }
 
 macro_rules! fx_class {
@@ -243,15 +237,13 @@ macro_rules! fx_option_class {
                 as_of: &str,
                 model: Option<String>,
             ) -> Result<JsValue, JsValue> {
-                let market: finstack_core::market_data::context::MarketContext =
-                    serde_json::from_str(market_json).map_err(to_js_err)?;
-                let pairs = present_standard_option_greeks_from_instrument_json(
+                let market = parse_market_json(market_json)?;
+                let pairs = standard_option_greeks_with_context(
                     &self.json,
                     &market,
                     as_of,
                     model.as_deref().unwrap_or("default"),
-                )
-                .map_err(to_js_err)?;
+                )?;
                 let mut out = Map::new();
                 for (metric, value) in pairs {
                     out.insert(metric.to_string(), Value::from(value));

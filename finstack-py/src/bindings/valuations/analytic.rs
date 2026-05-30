@@ -14,43 +14,16 @@
 //!   want a business-day convention).
 
 use crate::errors::display_to_py;
-use finstack_valuations::instruments::OptionType;
 use finstack_valuations::models::closed_form::implied_vol::{black76_implied_vol, bs_implied_vol};
 use finstack_valuations::models::closed_form::{
-    arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks, bs_price, down_in_call,
-    down_out_call, fixed_strike_lookback_call, fixed_strike_lookback_put,
-    floating_strike_lookback_call, floating_strike_lookback_put, geometric_asian_call,
-    geometric_asian_put, quanto_call, quanto_put, up_in_call, up_out_call, BsGreeks,
+    arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks, bs_price_checked,
+    checked_closed_form_value, down_in_call, down_out_call, fixed_strike_lookback_call,
+    fixed_strike_lookback_put, floating_strike_lookback_call, floating_strike_lookback_put,
+    geometric_asian_call, geometric_asian_put, option_type_from_bool, quanto_call, quanto_put,
+    up_in_call, up_out_call, BsGreeks,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-
-fn option_type(is_call: bool) -> OptionType {
-    if is_call {
-        OptionType::Call
-    } else {
-        OptionType::Put
-    }
-}
-
-/// Guard a closed-form price against non-finite results.
-///
-/// The underlying `closed_form` formulas return a raw `f64` and yield `NaN`
-/// or `±inf` for degenerate / out-of-domain inputs (e.g. negative volatility,
-/// zero time with a spot–strike mismatch). Surfacing that as an exception —
-/// rather than a silent `NaN` — keeps these wrappers consistent with
-/// `bs_implied_vol`, which already returns a `Result`. `what` names the
-/// quantity for the error message.
-fn finite_price(value: f64, what: &str) -> PyResult<f64> {
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(crate::errors::value_error(format!(
-            "{what} is not finite ({value}); check inputs (volatility, time \
-             to expiry, spot, strike) are in the model's valid domain"
-        )))
-    }
-}
 
 // ---------------------------------------------------------------------------
 // bs_price
@@ -95,10 +68,8 @@ fn bs_price_wrapper(
     t: f64,
     is_call: bool,
 ) -> PyResult<f64> {
-    finite_price(
-        bs_price(spot, strike, r, q, sigma, t, option_type(is_call)),
-        "Black-Scholes price",
-    )
+    bs_price_checked(spot, strike, r, q, sigma, t, option_type_from_bool(is_call))
+        .map_err(display_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +115,7 @@ fn bs_greeks_wrapper<'py>(
         q,
         sigma,
         t,
-        option_type(is_call),
+        option_type_from_bool(is_call),
         theta_days,
     );
     let out = PyDict::new(py);
@@ -189,7 +160,8 @@ fn bs_implied_vol_wrapper(
     price: f64,
     is_call: bool,
 ) -> PyResult<f64> {
-    bs_implied_vol(spot, strike, r, q, t, option_type(is_call), price).map_err(display_to_py)
+    bs_implied_vol(spot, strike, r, q, t, option_type_from_bool(is_call), price)
+        .map_err(display_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +204,15 @@ fn black76_implied_vol_wrapper(
     price: f64,
     is_call: bool,
 ) -> PyResult<f64> {
-    black76_implied_vol(forward, strike, df, t, option_type(is_call), price).map_err(display_to_py)
+    black76_implied_vol(
+        forward,
+        strike,
+        df,
+        t,
+        option_type_from_bool(is_call),
+        price,
+    )
+    .map_err(display_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -432,7 +412,7 @@ fn quanto_option_wrapper(
             correlation,
         )
     };
-    finite_price(price, "quanto option price")
+    checked_closed_form_value(price, "quanto option price").map_err(display_to_py)
 }
 
 // ---------------------------------------------------------------------------

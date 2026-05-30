@@ -15,13 +15,18 @@
 //!
 //! The present value of a volatility index future is:
 //! ```text
-//! NPV = (Quoted_Price - Forward_Vol) × Multiplier × Contracts × Position_Sign
+//! NPV = (Forward_Vol - Quoted_Price) × Multiplier × Contracts × Position_Sign
 //! ```
 //! where:
-//! - Quoted_Price = Market price of the future
-//! - Forward_Vol = Interpolated forward volatility from vol index curve
+//! - Quoted_Price = Entry/traded price of the future position
+//! - Forward_Vol = Today's fair forward level (mark) interpolated from the vol index curve
 //! - Multiplier = Contract multiplier (typically 1000 for VIX)
 //! - Position_Sign = +1 for long, -1 for short
+//!
+//! This is standard futures mark-to-market: a long gains when the forward mark
+//! rises above its entry price (matching [`EquityIndexFuture`]).
+//!
+//! [`EquityIndexFuture`]: crate::instruments::equity::EquityIndexFuture
 //!
 //! Unlike interest rate futures, VIX futures do not require convexity
 //! adjustments because the underlying is already a volatility measure.
@@ -352,17 +357,17 @@ mod tests {
     }
 
     #[test]
-    fn test_long_position_benefits_from_high_quote() {
+    fn test_long_position_above_forward_has_loss() {
         let market = setup_market();
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-        // Long position with quoted price above forward
+        // Long position entered above today's forward mark
         let future = VolatilityIndexFuture::builder()
             .id(InstrumentId::new("VIX-LONG"))
             .notional(Money::new(22_000.0, Currency::USD)) // ~1 contract
             .expiry(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
             .settlement_date(Date::from_calendar_date(2025, Month::April, 1).expect("valid date"))
-            .quoted_price(22.0) // Above the ~20 forward level
+            .quoted_price(22.0) // Entry above the ~20 forward level
             .position(Position::Long)
             .contract_specs(VolIndexContractSpecs::vix())
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -371,10 +376,10 @@ mod tests {
             .expect("valid future");
 
         let npv = future.value(&market, as_of).expect("value calculation");
-        // Long at 22, forward at ~20, so positive PV (we locked in high price to sell)
+        // Long entered at 22, forward now ~20: mark-to-market loss (bought high).
         assert!(
-            npv.amount() > 0.0,
-            "Long future above forward should have positive NPV"
+            npv.amount() < 0.0,
+            "Long future entered above the forward should have negative NPV"
         );
     }
 
@@ -398,10 +403,10 @@ mod tests {
             .expect("valid future");
 
         let npv = future.value(&market, as_of).expect("value calculation");
-        // Short at 22, forward at ~20, so negative PV (we sold cheap)
+        // Short entered at 22, forward now ~20: mark-to-market gain (sold high).
         assert!(
-            npv.amount() < 0.0,
-            "Short future above forward should have negative NPV"
+            npv.amount() > 0.0,
+            "Short future entered above the forward should have positive NPV"
         );
     }
 
@@ -421,11 +426,11 @@ mod tests {
             .expect("valid future");
 
         let delta = future.delta_vol();
-        // Long 1 contract: delta = -1 × 1000 = -1000
-        // (NPV decreases by $1000 for each 1-point increase in forward vol)
+        // Long 1 contract: delta = +1 × 1000 = +1000
+        // (NPV increases by $1000 for each 1-point increase in forward vol)
         assert!(
-            (delta + 1000.0).abs() < 10.0,
-            "Delta should be approximately -1000, got {}",
+            (delta - 1000.0).abs() < 10.0,
+            "Delta should be approximately +1000, got {}",
             delta
         );
     }

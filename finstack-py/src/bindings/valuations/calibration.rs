@@ -302,8 +302,7 @@ impl PyCalibrationResult {
 ///     If the JSON is not a valid calibration envelope.
 #[pyfunction]
 fn validate_calibration_json(py: Python<'_>, json: &str) -> PyResult<String> {
-    let parsed = validate_api::parse_envelope_v3(json).map_err(|e| envelope_error_to_py(py, &e))?;
-    serde_json::to_string_pretty(&parsed).map_err(display_to_py)
+    validate_api::validate_calibration_json(json).map_err(|e| envelope_error_to_py(py, &e))
 }
 
 /// Pre-flight envelope validation without invoking the solver.

@@ -29,15 +29,15 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_valuations::results::ValuationResult;
 use wasm_bindgen::prelude::*;
 
-fn parse_market_json(market_json: &str) -> Result<MarketContext, JsValue> {
+pub(super) fn parse_market_json(market_json: &str) -> Result<MarketContext, JsValue> {
     serde_json::from_str(market_json).map_err(to_js_err)
 }
 
-fn valuation_result_json(result: ValuationResult) -> Result<String, JsValue> {
+pub(super) fn valuation_result_json(result: ValuationResult) -> Result<String, JsValue> {
     serde_json::to_string(&result).map_err(to_js_err)
 }
 
-fn price_instrument_with_context(
+pub(super) fn price_instrument_with_context(
     instrument_json: &str,
     market: &MarketContext,
     as_of: &str,
@@ -49,14 +49,14 @@ fn price_instrument_with_context(
     valuation_result_json(result)
 }
 
-fn price_instrument_with_metrics_context(
+pub(super) fn price_instrument_with_metrics_context(
     instrument_json: &str,
     market: &MarketContext,
     as_of: &str,
     model: &str,
     metrics: Vec<String>,
-    pricing_options: Option<String>,
-    market_history: Option<String>,
+    pricing_options: Option<&str>,
+    market_history_json: Option<&str>,
 ) -> Result<String, JsValue> {
     let result = finstack_valuations::pricer::price_instrument_json_with_metrics_and_history(
         instrument_json,
@@ -64,11 +64,43 @@ fn price_instrument_with_metrics_context(
         as_of,
         model,
         &metrics,
-        pricing_options.as_deref(),
-        market_history.as_deref(),
+        pricing_options,
+        market_history_json,
     )
     .map_err(|e| to_js_error(&e))?;
     valuation_result_json(result)
+}
+
+pub(super) fn metric_value_with_context(
+    instrument_json: &str,
+    market: &MarketContext,
+    as_of: &str,
+    model: &str,
+    metric: &str,
+) -> Result<f64, JsValue> {
+    finstack_valuations::pricer::metric_value_from_instrument_json(
+        instrument_json,
+        market,
+        as_of,
+        model,
+        metric,
+    )
+    .map_err(to_js_err)
+}
+
+pub(super) fn standard_option_greeks_with_context(
+    instrument_json: &str,
+    market: &MarketContext,
+    as_of: &str,
+    model: &str,
+) -> Result<Vec<(&'static str, f64)>, JsValue> {
+    finstack_valuations::pricer::present_standard_option_greeks_from_instrument_json(
+        instrument_json,
+        market,
+        as_of,
+        model,
+    )
+    .map_err(to_js_err)
 }
 
 /// Deserialize a `ValuationResult` from JSON and return the canonical JSON.
@@ -124,8 +156,8 @@ pub fn price_instrument_with_metrics(
         as_of,
         model,
         metric_strs,
-        pricing_options,
-        market_history,
+        pricing_options.as_deref(),
+        market_history.as_deref(),
     )
 }
 
@@ -199,8 +231,8 @@ pub fn price_instrument_with_metrics_and_market(
         as_of,
         model,
         metric_strs,
-        pricing_options,
-        market_history,
+        pricing_options.as_deref(),
+        market_history.as_deref(),
     )
 }
 

@@ -117,6 +117,16 @@ pub fn dependency_graph_json(envelope_json: &str) -> Result<String, EnvelopeErro
     serialize_pretty_json(&graph, "DependencyGraph")
 }
 
+/// Validate a calibration envelope JSON string and return its canonical form.
+///
+/// This is the Rust-owned implementation used by host-language bindings. It
+/// centralizes the parse and pretty-serialization path so Python and WASM do
+/// not each reimplement the same validation logic.
+pub fn validate_calibration_json(envelope_json: &str) -> Result<String, EnvelopeError> {
+    let envelope = parse_envelope_v3(envelope_json)?;
+    serialize_pretty_json(&envelope, "CalibrationEnvelope")
+}
+
 // =============================================================================
 // Internal helpers
 // =============================================================================
@@ -883,5 +893,30 @@ mod v3_validation_tests {
             "expected QuoteIdNotInMarketData, got: {:?}",
             report.errors
         );
+    }
+
+    #[test]
+    fn validate_calibration_json_returns_canonical_envelope() {
+        let envelope = CalibrationEnvelope {
+            schema_url: None,
+            schema: CALIBRATION_SCHEMA.to_string(),
+            plan: CalibrationPlan {
+                id: "canonical".into(),
+                description: None,
+                quote_sets: HashMap::default(),
+                steps: vec![],
+                settings: Default::default(),
+            },
+            market_data: vec![],
+            prior_market: vec![],
+        };
+        let json = serde_json::to_string(&envelope).expect("serialize envelope");
+
+        let canonical = validate_calibration_json(&json).expect("canonical envelope");
+        let reparsed: CalibrationEnvelope =
+            serde_json::from_str(&canonical).expect("canonical JSON should parse");
+
+        assert_eq!(reparsed.schema, CALIBRATION_SCHEMA);
+        assert_eq!(reparsed.plan.id, "canonical");
     }
 }

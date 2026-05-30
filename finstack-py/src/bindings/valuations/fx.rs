@@ -196,18 +196,14 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     )?;
     m.setattr("__all__", all)?;
 
-    parent.add_submodule(&m)?;
-    parent.add("fx", &m)?;
-
-    // Register the submodule under its fully-qualified path in `sys.modules`
-    // so that `import finstack.valuations.fx` works the same as attribute
-    // access on the parent. PyO3 sets `parent.__name__`; surface any failure
-    // to read it instead of silently using a wrong fallback.
-    let parent_name: String = parent.getattr("__name__")?.extract()?;
-    let qual = format!("{parent_name}.fx");
-    m.setattr("__package__", &qual)?;
-    let sys = PyModule::import(py, "sys")?;
-    sys.getattr("modules")?.set_item(&qual, &m)?;
+    crate::bindings::module_utils::register_submodule(
+        py,
+        parent,
+        &m,
+        "fx",
+        "finstack.finstack.valuations",
+        crate::bindings::module_utils::ParentNameSource::Package,
+    )?;
 
     Ok(())
 }

@@ -49,19 +49,10 @@ use wasm_bindgen::prelude::*;
 ///
 /// Parses the envelope and returns its canonical (pretty-printed) form. A parse
 /// failure surfaces a structured [`EnvelopeError`] preserving the full parse
-/// diagnostic; a re-serialization failure surfaces an [`ExecuteError::Other`]
-/// internal error. Re-serializing a value that just parsed is not expected to
-/// fail, but the failure is *propagated* rather than masked by a silent `"{}"`
-/// fallback that would look like a successful validation to the JS caller.
+/// diagnostic. The Rust calibration API owns the canonical serialization path,
+/// keeping the WASM layer to error mapping only.
 fn validate_calibration_json_inner(json: &str) -> Result<String, ExecuteError> {
-    let parsed = validate::parse_envelope_v3(json)?;
-    // Surface any re-serialization failure as an internal error rather than
-    // returning a literal empty object that masquerades as a valid envelope.
-    serde_json::to_string_pretty(&parsed).map_err(|e| {
-        ExecuteError::Other(finstack_core::Error::Internal(format!(
-            "failed to serialize validated calibration envelope: {e}"
-        )))
-    })
+    validate::validate_calibration_json(json).map_err(ExecuteError::Envelope)
 }
 
 /// Validate a calibration plan JSON and return the canonical (pretty-printed) form.

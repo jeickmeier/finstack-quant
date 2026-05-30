@@ -24,7 +24,7 @@ pub(crate) fn compute_pv_raw(
         crate::instruments::rates::ir_future::Position::Short => -1.0,
     };
     let contracts = future.num_contracts();
-    let pv_per_contract = (future.quoted_price - forward_vol) * future.contract_specs.multiplier;
+    let pv_per_contract = (forward_vol - future.quoted_price) * future.contract_specs.multiplier;
     Ok(sign * contracts * pv_per_contract)
 }
 
@@ -49,7 +49,7 @@ pub(crate) fn delta_vol(future: &VolatilityIndexFuture) -> f64 {
         crate::instruments::rates::ir_future::Position::Long => 1.0,
         crate::instruments::rates::ir_future::Position::Short => -1.0,
     };
-    -sign * future.num_contracts() * future.contract_specs.multiplier
+    sign * future.num_contracts() * future.contract_specs.multiplier
 }
 
 #[cfg(test)]

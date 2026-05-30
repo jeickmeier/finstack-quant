@@ -16,7 +16,6 @@ mod fx;
 mod pricing;
 mod sabr;
 
-use crate::bindings::date_utils::parse_iso_date_py as parse_date;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
@@ -133,6 +132,13 @@ fn validate_instrument_json(json: &str) -> PyResult<String> {
 
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = PyModule::new(py, "valuations")?;
+    let qual = crate::bindings::module_utils::set_submodule_package(
+        parent,
+        &m,
+        "valuations",
+        crate::bindings::module_utils::ROOT_PACKAGE,
+        crate::bindings::module_utils::ParentNameSource::Name,
+    )?;
     m.setattr(
         "__doc__",
         "Instrument pricing: bonds, swaps, options, and calibration.",
@@ -190,18 +196,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    parent.add_submodule(&m)?;
-
-    let parent_name = crate::bindings::module_utils::parent_qualified_name(
-        parent,
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
-    );
-    let qual = format!("{parent_name}.valuations");
-    m.setattr("__package__", &qual)?;
-    let sys = PyModule::import(py, "sys")?;
-    let modules = sys.getattr("modules")?;
-    modules.set_item(&qual, &m)?;
+    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
 
     Ok(())
 }

@@ -46,13 +46,6 @@ pub fn embedded_defaults() -> Result<&'static CalibrationDefaults> {
     }
 }
 
-/// Panic-on-failure access for infallible calibration paths backed by embedded data.
-#[must_use]
-#[allow(clippy::expect_used)]
-pub fn embedded_defaults_or_panic() -> &'static CalibrationDefaults {
-    embedded_defaults().expect("embedded calibration defaults are compile-time assets")
-}
-
 /// Loads calibration defaults from configuration or falls back to embedded defaults.
 pub fn defaults_from_config(config: &FinstackConfig) -> Result<CalibrationDefaults> {
     if let Some(value) = config.extensions.get(CALIBRATION_DEFAULTS_EXTENSION_KEY) {

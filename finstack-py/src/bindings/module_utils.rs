@@ -55,12 +55,24 @@ pub(crate) fn set_submodule_package_by_package(
     submod_name: &str,
     parent_default_pkg: &str,
 ) -> PyResult<String> {
-    let qual = submodule_name(
+    set_submodule_package(
         parent,
+        submodule,
         submod_name,
         parent_default_pkg,
         ParentNameSource::Package,
-    );
+    )
+}
+
+/// Set `submodule.__package__` using the selected parent-name source.
+pub(crate) fn set_submodule_package(
+    parent: &Bound<'_, PyModule>,
+    submodule: &Bound<'_, PyModule>,
+    submod_name: &str,
+    parent_default: &str,
+    source: ParentNameSource,
+) -> PyResult<String> {
+    let qual = submodule_name(parent, submod_name, parent_default, source);
     submodule.setattr("__package__", &qual)?;
     Ok(qual)
 }

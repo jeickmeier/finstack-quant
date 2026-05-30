@@ -273,21 +273,13 @@ fn test_expected_variance_blends_realized_and_forward_mid_period() {
         .get(MetricId::ExpectedVariance.as_str())
         .unwrap();
 
-    // Assert - realized and forward variances are annualized, so seasoned MTM
-    // blends them by elapsed day-count fraction.
-    let obs_dates = swap.observation_dates();
-    let used_prices: Vec<f64> = obs_dates
-        .iter()
-        .filter(|d| **d <= as_of)
-        .filter_map(|d| prices.iter().find(|(pd, _)| pd == d).map(|(_, p)| *p))
-        .collect();
-    let annualization = swap.annualization_factor_with_policy(&ctx);
-    let realized = realized_variance(&used_prices, RealizedVarMethod::CloseToClose, annualization)
-        .expect("CloseToClose should succeed");
-    let forward = 0.23_f64.powi(2);
-    let w = swap.time_elapsed_fraction(as_of);
-    let expected = realized * w + forward * (1.0 - w);
-
+    // Assert - the metric is the seasoned mark-to-market expected variance: the
+    // day-count time-weighted blend of realized-to-date and remaining forward
+    // variance that the swap is actually priced on (W-33). It must equal that
+    // shared quantity end-to-end through `price_with_metrics`.
+    let expected = swap
+        .seasoned_expected_variance(&ctx, as_of)
+        .expect("seasoned expected variance");
     assert!((ev - expected).abs() < LOOSE_EPSILON);
 }
 

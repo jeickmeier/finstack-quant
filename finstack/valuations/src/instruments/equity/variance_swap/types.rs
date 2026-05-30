@@ -319,6 +319,16 @@ impl VarianceSwap {
     pub fn remaining_forward_variance(&self, context: &MarketContext, _as_of: Date) -> Result<f64> {
         pricer::remaining_forward_variance(self, context, _as_of)
     }
+
+    /// Seasoned mark-to-market expected variance: the day-count time-weighted
+    /// blend of realized-to-date and remaining forward variance.
+    ///
+    /// This is exactly the expected variance the pricer feeds into the payoff for
+    /// a partially-observed swap (`start_date <= as_of < maturity`), so the
+    /// `ExpectedVariance` metric and the swap's PV stay consistent (W-33).
+    pub fn seasoned_expected_variance(&self, context: &MarketContext, as_of: Date) -> Result<f64> {
+        pricer::seasoned_expected_variance(self, context, as_of)
+    }
 }
 
 // Use the macro to implement Instrument with pricing

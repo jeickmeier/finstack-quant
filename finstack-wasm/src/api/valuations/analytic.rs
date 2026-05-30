@@ -9,43 +9,17 @@
 //! `thetaDays` day-count (ACT/365 by default).
 
 use crate::utils::to_js_err;
-use finstack_valuations::instruments::OptionType;
 use finstack_valuations::models::closed_form::implied_vol::{
     black76_implied_vol as black76_implied_vol_core, bs_implied_vol as bs_implied_vol_core,
 };
 use finstack_valuations::models::closed_form::{
     arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks as bs_greeks_core,
-    bs_price as bs_price_core, down_in_call, down_out_call, fixed_strike_lookback_call,
-    fixed_strike_lookback_put, floating_strike_lookback_call, floating_strike_lookback_put,
-    geometric_asian_call, geometric_asian_put, quanto_call, quanto_put, up_in_call, up_out_call,
+    bs_price_checked, checked_closed_form_value, down_in_call, down_out_call,
+    fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
+    floating_strike_lookback_put, geometric_asian_call, geometric_asian_put, option_type_from_bool,
+    quanto_call, quanto_put, up_in_call, up_out_call,
 };
 use wasm_bindgen::prelude::*;
-
-fn option_type(is_call: bool) -> OptionType {
-    if is_call {
-        OptionType::Call
-    } else {
-        OptionType::Put
-    }
-}
-
-/// Guard a closed-form price against non-finite results.
-///
-/// The underlying `closed_form` formulas return a raw `f64` and yield `NaN`
-/// or `±inf` for degenerate / out-of-domain inputs (e.g. negative volatility).
-/// Surfacing that as a thrown error — rather than a silent `NaN` crossing the
-/// wasm boundary — keeps these wrappers consistent with `bsImpliedVol`, which
-/// already returns a `Result`. `what` names the quantity for the message.
-fn finite_price(value: f64, what: &str) -> Result<f64, JsValue> {
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(to_js_err(format!(
-            "{what} is not finite ({value}); check inputs (volatility, time \
-             to expiry, spot, strike) are in the model's valid domain"
-        )))
-    }
-}
 
 /// Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
 ///
@@ -88,10 +62,8 @@ pub fn bs_price(
     t: f64,
     is_call: bool,
 ) -> Result<f64, JsValue> {
-    finite_price(
-        bs_price_core(spot, strike, r, q, sigma, t, option_type(is_call)),
-        "Black-Scholes price",
-    )
+    bs_price_checked(spot, strike, r, q, sigma, t, option_type_from_bool(is_call))
+        .map_err(to_js_err)
 }
 
 /// Black-Scholes / Garman-Kohlhagen Greeks as a `{delta, gamma, vega, theta, rho, rhoQ}` object.
@@ -135,7 +107,7 @@ pub fn bs_greeks(
         q,
         sigma,
         t,
-        option_type(is_call),
+        option_type_from_bool(is_call),
         theta_days.unwrap_or(365.0),
     );
     let obj = js_sys::Object::new();
@@ -176,7 +148,8 @@ pub fn bs_implied_vol(
     price: f64,
     is_call: bool,
 ) -> Result<f64, JsValue> {
-    bs_implied_vol_core(spot, strike, r, q, t, option_type(is_call), price).map_err(to_js_err)
+    bs_implied_vol_core(spot, strike, r, q, t, option_type_from_bool(is_call), price)
+        .map_err(to_js_err)
 }
 
 /// Solve for Black-76 (forward-based) implied volatility.
@@ -189,7 +162,15 @@ pub fn black76_implied_vol(
     price: f64,
     is_call: bool,
 ) -> Result<f64, JsValue> {
-    black76_implied_vol_core(forward, strike, df, t, option_type(is_call), price).map_err(to_js_err)
+    black76_implied_vol_core(
+        forward,
+        strike,
+        df,
+        t,
+        option_type_from_bool(is_call),
+        price,
+    )
+    .map_err(to_js_err)
 }
 
 // ---------------------------------------------------------------------------
@@ -328,7 +309,7 @@ pub fn quanto_option_price(
             correlation,
         )
     };
-    finite_price(price, "quanto option price")
+    checked_closed_form_value(price, "quanto option price").map_err(to_js_err)
 }
 
 #[cfg(test)]

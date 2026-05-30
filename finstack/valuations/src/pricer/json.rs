@@ -234,12 +234,14 @@ pub fn metric_value_from_instrument_json(
     model: &str,
     metric: &str,
 ) -> finstack_core::Result<f64> {
-    let result = price_instrument_json_with_metrics(
+    let metric_ids = [metric.to_string()];
+    let result = price_instrument_json_request(
         instrument_json,
         market,
         as_of,
         model,
-        &[metric.to_string()],
+        &metric_ids,
+        None,
         None,
     )?;
     result
@@ -257,12 +259,13 @@ pub fn present_metric_values_from_instrument_json<'a>(
     metrics: &'a [&'a str],
 ) -> finstack_core::Result<Vec<(&'a str, f64)>> {
     let metric_ids: Vec<String> = metrics.iter().map(|m| (*m).to_string()).collect();
-    let result = price_instrument_json_with_metrics(
+    let result = price_instrument_json_request(
         instrument_json,
         market,
         as_of,
         model,
         &metric_ids,
+        None,
         None,
     )?;
     Ok(metrics

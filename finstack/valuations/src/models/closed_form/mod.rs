@@ -168,4 +168,7 @@ pub use quanto::{
     quanto_call, quanto_call_simple, quanto_drift_adjustment, quanto_put, quanto_put_simple,
 };
 pub(crate) use vanilla::{black76_call, black76_put};
-pub use vanilla::{bs_greeks, bs_price, BsGreeks, ONE_PERCENT};
+pub use vanilla::{
+    bs_greeks, bs_price, bs_price_checked, checked_closed_form_value, option_type_from_bool,
+    BsGreeks, ONE_PERCENT,
+};

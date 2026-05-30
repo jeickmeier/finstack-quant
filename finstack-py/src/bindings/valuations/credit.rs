@@ -268,7 +268,13 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
         ],
     )?;
     module.setattr("__all__", all)?;
-    parent.add_submodule(&module)?;
-    parent.setattr("credit", &module)?;
+    crate::bindings::module_utils::register_submodule(
+        py,
+        parent,
+        &module,
+        "credit",
+        "finstack.finstack.valuations",
+        crate::bindings::module_utils::ParentNameSource::Package,
+    )?;
     Ok(())
 }

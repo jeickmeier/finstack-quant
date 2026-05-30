@@ -46,6 +46,7 @@
 
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::models::volatility::black::{d1_d2, d1_d2_black76};
+use finstack_core::{Error, Result};
 use std::fmt;
 
 /// Conversion constant for per-1% Greeks.
@@ -136,6 +137,29 @@ impl BsGreeks {
     }
 }
 
+/// Convert host-language call/put booleans into the canonical Rust option type.
+#[must_use]
+#[inline]
+pub fn option_type_from_bool(is_call: bool) -> OptionType {
+    if is_call {
+        OptionType::Call
+    } else {
+        OptionType::Put
+    }
+}
+
+/// Return a closed-form value when finite, otherwise report a validation error.
+pub fn checked_closed_form_value(value: f64, what: &str) -> Result<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(Error::Validation(format!(
+            "{what} is not finite ({value}); check inputs (volatility, time \
+             to expiry, spot, strike) are in the model's valid domain"
+        )))
+    }
+}
+
 /// Black–Scholes / Garman–Kohlhagen price (per unit, no contract scaling).
 ///
 /// # Arguments
@@ -202,6 +226,27 @@ pub fn bs_price(
 
     // Numerical cancellation can produce tiny negative values for deep OTM options.
     raw_price.max(0.0)
+}
+
+/// Checked Black–Scholes / Garman–Kohlhagen price for host-language bindings.
+///
+/// The raw [`bs_price`] primitive remains an infallible formula for Rust call
+/// sites that intentionally handle `NaN` / infinity. Bindings should use this
+/// checked wrapper so invalid inputs cross the host boundary as errors.
+#[allow(clippy::too_many_arguments)]
+pub fn bs_price_checked(
+    spot: f64,
+    strike: f64,
+    r: f64,
+    q: f64,
+    sigma: f64,
+    t: f64,
+    option_type: OptionType,
+) -> Result<f64> {
+    checked_closed_form_value(
+        bs_price(spot, strike, r, q, sigma, t, option_type),
+        "Black-Scholes price",
+    )
 }
 
 /// Black–Scholes / Garman–Kohlhagen Greeks (per unit, per-1% for vega and rhos).
@@ -420,6 +465,23 @@ mod tests {
         let price = bs_price(100.0, 100.0, 0.05, 0.02, 0.20, 1.0, OptionType::Call);
         // ATM call with these params should be around 9-10
         assert!(price > 8.0 && price < 12.0, "price = {}", price);
+    }
+
+    #[test]
+    fn option_type_from_bool_maps_binding_flags() {
+        assert!(matches!(option_type_from_bool(true), OptionType::Call));
+        assert!(matches!(option_type_from_bool(false), OptionType::Put));
+    }
+
+    #[test]
+    fn checked_closed_form_value_rejects_non_finite_result() {
+        let err = checked_closed_form_value(f64::NAN, "Black-Scholes price")
+            .expect_err("non-finite closed-form values must error");
+        let message = err.to_string();
+        assert!(
+            message.contains("Black-Scholes price is not finite"),
+            "unexpected error: {message}"
+        );
     }
 
     #[test]

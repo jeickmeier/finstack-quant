@@ -1,68 +1,58 @@
 //! Python wrappers for CDS-family instruments.
 
-use super::{parse_date, PyValuationResult};
-use crate::bindings::extract::extract_market_ref;
+use super::direct_wrapper::{
+    from_json_payload, pretty_json, price_payload_result, validate_payload,
+};
+use super::PyValuationResult;
 use crate::errors::display_to_py;
 use finstack_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_valuations::instruments::credit_derivatives::cds_index::CDSIndex;
 use finstack_valuations::instruments::credit_derivatives::cds_option::CDSOption;
 use finstack_valuations::instruments::credit_derivatives::cds_tranche::CDSTranche;
-use finstack_valuations::instruments::InstrumentJson;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyList, PyModule};
+use serde::Serialize;
+
+fn example_payload<T: Serialize>(type_tag: &str, instrument: &T) -> PyResult<String> {
+    let value = serde_json::to_value(instrument).map_err(display_to_py)?;
+    finstack_valuations::pricer::canonical_instrument_json(type_tag, value).map_err(display_to_py)
+}
 
 macro_rules! credit_derivative_wrapper {
-    ($py_name:literal, $py_struct:ident, $rust_ty:ty, $variant:ident, $model:literal, $example:expr) => {
+    ($py_name:literal, $py_struct:ident, $rust_ty:ty, $type_tag:literal, $model:literal, $example:expr) => {
         #[pyclass(name = $py_name, module = "finstack.valuations.credit_derivatives", skip_from_py_object)]
         #[derive(Clone)]
         struct $py_struct {
-            inner: $rust_ty,
+            json: String,
         }
 
         #[pymethods]
         impl $py_struct {
             #[staticmethod]
             fn example() -> PyResult<Self> {
-                Ok(Self { inner: $example.map_err(display_to_py)? })
+                let instrument: $rust_ty = $example.map_err(display_to_py)?;
+                Ok(Self {
+                    json: example_payload($type_tag, &instrument)?,
+                })
             }
 
             #[staticmethod]
             fn from_json(json: &str) -> PyResult<Self> {
-                let value: serde_json::Value = serde_json::from_str(json).map_err(display_to_py)?;
-                if let Ok(inner) = serde_json::from_value::<$rust_ty>(value.clone()) {
-                    return Ok(Self { inner });
-                }
-                match serde_json::from_value::<InstrumentJson>(value).map_err(display_to_py)? {
-                    InstrumentJson::$variant(inner) => Ok(Self { inner }),
-                    _ => Err(display_to_py(format!("JSON is not a {}", $py_name))),
-                }
+                Ok(Self {
+                    json: from_json_payload($type_tag, json)?,
+                })
             }
 
             fn to_json(&self) -> PyResult<String> {
-                serde_json::to_string_pretty(&InstrumentJson::$variant(self.inner.clone()))
-                    .map_err(display_to_py)
+                pretty_json(&self.json)
             }
 
             fn validate(&self) -> PyResult<()> {
-                let json = serde_json::to_string(&InstrumentJson::$variant(self.inner.clone()))
-                    .map_err(display_to_py)?;
-                finstack_valuations::pricer::validate_instrument_json(&json)
-                    .map(|_| ())
-                    .map_err(display_to_py)
+                validate_payload(&self.json)
             }
 
             fn price(&self, market: &Bound<'_, PyAny>, as_of: &str) -> PyResult<PyValuationResult> {
-                let market = extract_market_ref(market)?;
-                let result = finstack_valuations::pricer::standard_registry()
-                    .price_with_metrics(
-                        &self.inner,
-                        finstack_valuations::pricer::parse_model_key($model).map_err(display_to_py)?,
-                        &market,
-                        parse_date(as_of)?,
-                        &[],
-                        Default::default(),
-                    )
-                    .map_err(display_to_py)?;
+                let result = price_payload_result(&self.json, market, as_of, $model)?;
                 Ok(PyValuationResult { inner: result })
             }
         }
@@ -73,7 +63,7 @@ credit_derivative_wrapper!(
     "CreditDefaultSwap",
     PyCreditDefaultSwap,
     CreditDefaultSwap,
-    CreditDefaultSwap,
+    "credit_default_swap",
     "hazard_rate",
     Ok::<CreditDefaultSwap, finstack_core::Error>(CreditDefaultSwap::example())
 );
@@ -82,7 +72,7 @@ credit_derivative_wrapper!(
     "CDSIndex",
     PyCDSIndex,
     CDSIndex,
-    CDSIndex,
+    "cds_index",
     "hazard_rate",
     Ok::<CDSIndex, finstack_core::Error>(CDSIndex::example())
 );
@@ -91,7 +81,7 @@ credit_derivative_wrapper!(
     "CDSTranche",
     PyCDSTranche,
     CDSTranche,
-    CDSTranche,
+    "cds_tranche",
     "hazard_rate",
     Ok::<CDSTranche, finstack_core::Error>(CDSTranche::example())
 );
@@ -100,7 +90,7 @@ credit_derivative_wrapper!(
     "CDSOption",
     PyCDSOption,
     CDSOption,
-    CDSOption,
+    "cds_option",
     "black76",
     CDSOption::example()
 );
@@ -116,7 +106,13 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
         ["CreditDefaultSwap", "CDSIndex", "CDSTranche", "CDSOption"],
     )?;
     module.setattr("__all__", all)?;
-    parent.add_submodule(&module)?;
-    parent.setattr("credit_derivatives", &module)?;
+    crate::bindings::module_utils::register_submodule(
+        py,
+        parent,
+        &module,
+        "credit_derivatives",
+        "finstack.finstack.valuations",
+        crate::bindings::module_utils::ParentNameSource::Package,
+    )?;
     Ok(())
 }

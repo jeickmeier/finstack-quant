@@ -167,14 +167,14 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     )?;
     m.setattr("__all__", all)?;
 
-    parent.add_submodule(&m)?;
-    parent.add("exotics", &m)?;
-
-    let parent_name: String = parent.getattr("__name__")?.extract()?;
-    let qual = format!("{parent_name}.exotics");
-    m.setattr("__package__", &qual)?;
-    let sys = PyModule::import(py, "sys")?;
-    sys.getattr("modules")?.set_item(&qual, &m)?;
+    crate::bindings::module_utils::register_submodule(
+        py,
+        parent,
+        &m,
+        "exotics",
+        "finstack.finstack.valuations",
+        crate::bindings::module_utils::ParentNameSource::Package,
+    )?;
 
     Ok(())
 }

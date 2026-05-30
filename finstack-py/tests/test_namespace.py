@@ -449,3 +449,23 @@ class TestValuationsNamespace:
 
         for name in ("AsianOption", "BarrierOption", "LookbackOption", "Basket"):
             assert hasattr(exotics, name)
+
+    def test_valuations_extension_submodules_are_registered(self) -> None:
+        """PyO3 valuation submodules should have stable extension-qualified names."""
+        import sys
+
+        from finstack.finstack import valuations as ext_valuations
+
+        root_package = ext_valuations.__package__
+        assert root_package == "finstack.finstack.valuations"
+        for name in (
+            "correlation",
+            "credit",
+            "credit_derivatives",
+            "exotics",
+            "fx",
+        ):
+            module = getattr(ext_valuations, name)
+            qualified = f"{root_package}.{name}"
+            assert module.__package__ == qualified
+            assert sys.modules[qualified] is module
