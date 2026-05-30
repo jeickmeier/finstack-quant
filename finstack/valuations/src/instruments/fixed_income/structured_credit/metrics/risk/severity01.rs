@@ -43,6 +43,12 @@ impl MetricCalculator for Severity01Calculator {
             recovery_lag: instrument.credit_model.recovery_spec.recovery_lag,
         };
 
+        // Actual severity bump width after clamping recovery to [0, 1]. Severity
+        // = 1 − recovery, so Δseverity = recovery_down.rate − recovery_up.rate.
+        // Using the nominal 2·bump would bias the sensitivity when recovery sits
+        // within one bump of 0 or 1 and one side clamps.
+        let achieved_bump = recovery_down.rate - recovery_up.rate;
+
         // Calculate up scenario (lower recovery = higher severity)
         let mut inst_up = instrument.clone();
         inst_up.credit_model.recovery_spec = recovery_up;
@@ -53,10 +59,14 @@ impl MetricCalculator for Severity01Calculator {
         inst_down.credit_model.recovery_spec = recovery_down;
         let pv_down = inst_down.price(context.curves.as_ref(), as_of)?.amount();
 
-        // Severity01 = (PV_up - PV_down) / (2 * bump_size)
+        // Severity01 = (PV_up - PV_down) / achieved_bump
         // PV_up is with lower recovery (higher severity)
         // PV_down is with higher recovery (lower severity)
-        let severity01 = (pv_up - pv_down) / (2.0 * SEVERITY_BUMP);
+        let severity01 = if achieved_bump > 0.0 {
+            (pv_up - pv_down) / achieved_bump
+        } else {
+            0.0
+        };
 
         Ok(severity01)
     }

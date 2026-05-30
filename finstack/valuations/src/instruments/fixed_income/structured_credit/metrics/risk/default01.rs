@@ -37,6 +37,11 @@ impl MetricCalculator for Default01Calculator {
             curve: instrument.credit_model.default_spec.curve.clone(),
         };
 
+        // Actual CDR bump width after clamping at 0. Near CDR ≈ 0 the down bump
+        // clamps and the move becomes one-sided, so dividing by the nominal 2·bump
+        // would understate the sensitivity.
+        let achieved_bump = default_up.cdr - default_down.cdr;
+
         // Calculate up scenario
         let mut inst_up = instrument.clone();
         inst_up.credit_model.default_spec = default_up;
@@ -47,8 +52,12 @@ impl MetricCalculator for Default01Calculator {
         inst_down.credit_model.default_spec = default_down;
         let pv_down = inst_down.price(context.curves.as_ref(), as_of)?.amount();
 
-        // Default01 = (PV_up - PV_down) / (2 * bump_size)
-        let default01 = (pv_up - pv_down) / (2.0 * DEFAULT_BUMP_CDR);
+        // Default01 = (PV_up - PV_down) / achieved_bump
+        let default01 = if achieved_bump > 0.0 {
+            (pv_up - pv_down) / achieved_bump
+        } else {
+            0.0
+        };
 
         Ok(default01)
     }

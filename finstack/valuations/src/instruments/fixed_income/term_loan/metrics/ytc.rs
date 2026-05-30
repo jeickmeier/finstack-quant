@@ -9,7 +9,7 @@ use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_core::money::Money;
 
 use super::irr_helpers::{
-    cached_full_schedule, outstanding_before, solve_irr_to_exercise,
+    cached_full_schedule, outstanding_before, settlement_discount_factor, solve_irr_to_exercise,
     target_price_from_quote_or_model,
 };
 
@@ -48,7 +48,8 @@ impl MetricCalculator for YtcCalculator {
         };
 
         // Resolve scalar fields off `loan` before re-borrowing context for the cache.
-        let target_price = target_price_from_quote_or_model(loan, context.base_value);
+        let settle_df = settlement_discount_factor(loan, &context.curves, as_of)?;
+        let target_price = target_price_from_quote_or_model(loan, context.base_value, settle_df);
         let currency = loan.currency;
 
         // Use the cached internal schedule (rebuilt only if absent).

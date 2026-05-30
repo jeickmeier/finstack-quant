@@ -234,21 +234,29 @@ fn price_geometric_kv_commodity(
     price * df
 }
 
-/// Seasoned geometric Asian pricing with adjusted strike.
+/// Seasoned geometric Asian pricing on commodity forwards.
 ///
-/// For a seasoned geometric Asian with `hist_count` realized fixings and
-/// `m` future fixings remaining, we compute the adjusted strike:
-/// ```text
-/// K_adj = (K^n / exp(hist_prod_log))^(1/m)
-/// ```
-/// Then price a fresh geometric Asian on the remaining fixings with the
-/// adjusted strike. This maintains consistent hedge ratios as fixings
-/// are observed (no discontinuous jump from geometric to arithmetic).
+/// Once `n − m` of the `n` fixings are realized, the geometric average factors
+/// as `G = A · G_fut^(m/n)`, where `A = exp(hist_prod_log / n)` is the realized
+/// contribution and `G_fut = exp((1/m) Σ ln F_j)` is the geometric mean of the
+/// `m` remaining forwards. The terminal quantity `X = A · G_fut^(m/n)` is
+/// lognormal, so the option prices in closed form via Black-76 against the
+/// original strike `K`.
+///
+/// Crucially the remaining geometric mean enters at power `m/n`, not `1`: a
+/// realized fixing both shrinks the remaining uncertainty
+/// (`Var[ln X] = (m/n)²·Var[ln G_fut]`) and reshapes the effective forward.
+/// Pricing a *fresh* geometric Asian on `G_fut` (power `1`) with an adjusted
+/// strike — as a naive strike transform does — overstates the remaining
+/// volatility by a factor of `n/m` and uses the wrong moneyness. This
+/// formulation reduces continuously to [`price_geometric_kv_commodity`] as
+/// `m → n` (no realized fixings), preserving hedge ratios across fixings.
 ///
 /// # References
 ///
 /// Kemna, A. G. Z., & Vorst, A. C. F. (1990). "A Pricing Method for Options
-/// Based on Average Asset Values." - Section on seasoned options.
+/// Based on Average Asset Values." *Journal of Banking & Finance*, 14(1),
+/// 113-129 — partially-averaged (seasoned) geometric options.
 #[allow(clippy::too_many_arguments)]
 fn price_seasoned_geometric_commodity(
     future_forwards: &[(f64, f64)], // (time, forward_price)
@@ -263,17 +271,42 @@ fn price_seasoned_geometric_commodity(
     let n = total_fixings as f64;
     let m = future_forwards.len() as f64;
 
-    if m == 0.0 {
+    if m == 0.0 || n <= 0.0 {
         return 0.0;
     }
 
-    // Adjusted strike: K_adj = (K^n / exp(hist_prod_log))^(1/m)
-    // In log space: ln(K_adj) = (n * ln(K) - hist_prod_log) / m
-    let ln_k_adj = (n * strike.ln() - hist_prod_log) / m;
+    // Geometric mean and exact log-variance of the m remaining forwards
+    // (same basis as the unseasoned Kemna-Vorst pricer).
+    let log_sum: f64 = future_forwards.iter().map(|(_, f)| f.ln()).sum();
+    let geo_mean_fwd = (log_sum / m).exp();
+    let mut var_sum = 0.0;
+    for (t_i, _) in future_forwards.iter() {
+        for (t_j, _) in future_forwards.iter() {
+            var_sum += sigma * sigma * t_i.min(*t_j);
+        }
+    }
+    let vol_adj_sq = var_sum / (m * m); // Var[ln G_fut]
 
-    // If adjusted strike is degenerate (non-finite from bad inputs), return intrinsic
-    if !ln_k_adj.is_finite() {
-        let log_sum: f64 = future_forwards.iter().map(|(_, f)| f.ln()).sum();
+    // X = A · G_fut^(m/n), using the same lognormal model the unseasoned pricer
+    // assumes for G_fut, i.e. ln G_fut ~ N(ln geo_mean_fwd − vol_adj_sq/2, vol_adj_sq).
+    // Then, with r = m/n:
+    //   Var[ln X] = r² · vol_adj_sq
+    //   E[X]      = A · geo_mean_fwd^r · exp(½ · vol_adj_sq · r · (r − 1))
+    let realized_factor = (hist_prod_log / n).exp();
+    let ratio = m / n;
+    let var_x = ratio * ratio * vol_adj_sq;
+    let fwd_x = realized_factor
+        * geo_mean_fwd.powf(ratio)
+        * (0.5 * vol_adj_sq * ratio * (ratio - 1.0)).exp();
+
+    let t_last = future_forwards
+        .iter()
+        .map(|(t, _)| *t)
+        .fold(0.0_f64, f64::max);
+
+    // Degenerate / zero-variance: settle at the deterministic geometric average
+    // A · geo_mean_fwd^(m/n) = exp((hist_prod_log + Σ ln F_j) / n).
+    if !fwd_x.is_finite() || fwd_x <= 0.0 || var_x <= 0.0 || t_last <= 0.0 {
         let geo_avg_all = ((hist_prod_log + log_sum) / n).exp();
         let payoff = match option_type {
             OptionType::Call => (geo_avg_all - strike).max(0.0),
@@ -282,12 +315,20 @@ fn price_seasoned_geometric_commodity(
         return payoff * df;
     }
 
-    let k_adj = ln_k_adj.exp();
+    // Black-76 on X against the ORIGINAL strike K.
+    let total_vol = var_x.sqrt();
+    let d1 = ((fwd_x / strike).ln() + 0.5 * var_x) / total_vol;
+    let d2 = d1 - total_vol;
+    let price = match option_type {
+        OptionType::Call => {
+            fwd_x * finstack_core::math::norm_cdf(d1) - strike * finstack_core::math::norm_cdf(d2)
+        }
+        OptionType::Put => {
+            strike * finstack_core::math::norm_cdf(-d2) - fwd_x * finstack_core::math::norm_cdf(-d1)
+        }
+    };
 
-    // Price a fresh geometric Asian on remaining fixings with adjusted strike.
-    // The adjusted-strike transform already encodes the realized-fixing history,
-    // so the result should not be scaled again by m/n.
-    price_geometric_kv_commodity(future_forwards, k_adj, sigma, df, option_type)
+    price * df
 }
 
 /// Arithmetic Asian pricing with commodity forwards (Turnbull-Wakeman adapted).
@@ -726,6 +767,104 @@ mod tests {
         assert!(
             result.value.amount() > 0.0,
             "Registry pricer should return positive value"
+        );
+    }
+
+    /// Seasoned geometric Asian must reduce to the unseasoned Kemna-Vorst price
+    /// when no fixings are realized (m = n, A = 1): the seasoning is continuous,
+    /// with no jump in price/hedge as fixings begin to season.
+    #[test]
+    fn seasoned_geometric_reduces_to_unseasoned_when_no_history() {
+        let fwds = [(0.25_f64, 80.0_f64), (0.5, 82.0), (0.75, 84.0), (1.0, 86.0)];
+        let (strike, sigma, df) = (83.0_f64, 0.30_f64, 0.97_f64);
+
+        let fresh = price_geometric_kv_commodity(&fwds, strike, sigma, df, OptionType::Call);
+        // hist_prod_log = 0, total_fixings = m  =>  A = 1, ratio = 1.
+        let seasoned = price_seasoned_geometric_commodity(
+            &fwds,
+            strike,
+            sigma,
+            df,
+            OptionType::Call,
+            0.0,
+            0,
+            fwds.len(),
+        );
+        assert!(
+            (fresh - seasoned).abs() < 1e-10,
+            "seasoned must equal unseasoned at m=n: fresh={fresh} seasoned={seasoned}"
+        );
+    }
+
+    /// The seasoned geometric price must match a direct numerical integration of
+    /// `E[df·max(A·G_fut^(m/n) − K, 0)]` under the same lognormal model the pricer
+    /// assumes for `G_fut`. This validates the (forward, variance) moments of
+    /// `X = A·G_fut^(m/n)`. The previous naive strike-transform priced
+    /// `max(G_fut − K_adj, 0)` — overstating the remaining variance by `n/m` — and
+    /// is shown here to differ materially.
+    #[test]
+    fn seasoned_geometric_matches_lognormal_integration() {
+        let fwds = [(0.20_f64, 78.0_f64), (0.45, 81.0), (0.70, 85.0)];
+        let (strike, sigma, df) = (80.0_f64, 0.35_f64, 0.96_f64);
+        // Three realized fixings (n = 6 total, m = 3 remaining).
+        let hist_prod_log: f64 = [77.0_f64.ln(), 79.0_f64.ln(), 76.0_f64.ln()].iter().sum();
+        let total_fixings = 6usize;
+
+        let analytic = price_seasoned_geometric_commodity(
+            &fwds,
+            strike,
+            sigma,
+            df,
+            OptionType::Call,
+            hist_prod_log,
+            3,
+            total_fixings,
+        );
+
+        // Reconstruct the lognormal moments of G_fut used by the pricer.
+        let m = fwds.len() as f64;
+        let n = total_fixings as f64;
+        let log_sum: f64 = fwds.iter().map(|(_, f)| f.ln()).sum();
+        let geo_mean_fwd = (log_sum / m).exp();
+        let mut var_sum = 0.0;
+        for (ti, _) in &fwds {
+            for (tj, _) in &fwds {
+                var_sum += sigma * sigma * ti.min(*tj);
+            }
+        }
+        let v = var_sum / (m * m);
+        let a = (hist_prod_log / n).exp();
+        let r = m / n;
+
+        // E[df·max(A·G_fut^r − K, 0)] via fine left-Riemann quadrature in z, with
+        // ln G_fut = mu + z·sd so that E[G_fut] = geo_mean_fwd.
+        let mu = geo_mean_fwd.ln() - 0.5 * v;
+        let sd = v.sqrt();
+        let dz = 0.0005;
+        let mut z = -8.0;
+        let mut integral = 0.0;
+        while z < 8.0 {
+            let g_fut = (mu + z * sd).exp();
+            let x = a * g_fut.powf(r);
+            let payoff = (x - strike).max(0.0);
+            let phi = (-0.5 * z * z).exp() / (2.0 * std::f64::consts::PI).sqrt();
+            integral += payoff * phi * dz;
+            z += dz;
+        }
+        let numeric = integral * df;
+
+        assert!(
+            (analytic - numeric).abs() < 2e-3 * numeric.max(1.0),
+            "seasoned geometric analytic ({analytic}) must match lognormal integration ({numeric})"
+        );
+
+        // The corrected price must differ materially from the old naive transform.
+        let k_adj = ((n * strike.ln() - hist_prod_log) / m).exp();
+        let old_naive = price_geometric_kv_commodity(&fwds, k_adj, sigma, df, OptionType::Call);
+        assert!(
+            (analytic - old_naive).abs() / numeric.max(1.0) > 0.05,
+            "fix must materially change the price vs the naive transform: \
+             corrected={analytic} naive={old_naive}"
         );
     }
 }

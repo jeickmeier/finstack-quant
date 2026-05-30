@@ -31,6 +31,12 @@ impl MetricCalculator for Recovery01Calculator {
             recovery_lag: instrument.credit_model.recovery_spec.recovery_lag,
         };
 
+        // Actual symmetric bump width after clamping to [0, 1]. Using the nominal
+        // 2·bump would halve/bias the sensitivity whenever the recovery rate sits
+        // within one bump of 0 or 1 (distressed-recovery or near-boundary deals),
+        // where one side clamps and the move becomes one-sided.
+        let achieved_bump = recovery_up.rate - recovery_down.rate;
+
         // Calculate up scenario
         let mut inst_up = instrument.clone();
         inst_up.credit_model.recovery_spec = recovery_up;
@@ -41,8 +47,12 @@ impl MetricCalculator for Recovery01Calculator {
         inst_down.credit_model.recovery_spec = recovery_down;
         let pv_down = inst_down.price(context.curves.as_ref(), as_of)?.amount();
 
-        // RECOVERY01 = (PV_up - PV_down) / (2 * bump)
-        let recovery01 = (pv_up - pv_down) / (2.0 * RECOVERY_BUMP);
+        // RECOVERY01 = (PV_up - PV_down) / achieved_bump
+        let recovery01 = if achieved_bump > 0.0 {
+            (pv_up - pv_down) / achieved_bump
+        } else {
+            0.0
+        };
 
         Ok(recovery01)
     }

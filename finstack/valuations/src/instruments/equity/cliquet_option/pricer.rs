@@ -5,6 +5,7 @@ use crate::instruments::equity::cliquet_option::monte_carlo::{
     CliquetCallPayoff, CliquetPayoffType as McPayoffType,
 };
 use crate::instruments::equity::cliquet_option::types::{CliquetOption, CliquetPayoffType};
+use crate::instruments::equity::piecewise_gbm::PiecewiseExactGbm;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -14,102 +15,9 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::Result;
 use finstack_monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_monte_carlo::paths::ProcessParams;
 use finstack_monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
-use finstack_monte_carlo::process::metadata::ProcessMetadata;
 use finstack_monte_carlo::rng::philox::PhiloxRng;
 use finstack_monte_carlo::time_grid::TimeGrid;
-use finstack_monte_carlo::traits::Discretization;
-use finstack_monte_carlo::traits::StochasticProcess;
-
-/// Piecewise constant GBM process for cliquet options.
-/// Handles term structure of volatility and rates between reset dates.
-#[derive(Debug, Clone)]
-struct PiecewiseGbmProcess {
-    /// End times of intervals (sorted)
-    times: Vec<f64>,
-    /// Risk-free rates per interval
-    rs: Vec<f64>,
-    /// Dividend yields per interval
-    qs: Vec<f64>,
-    /// Volatilities per interval
-    sigmas: Vec<f64>,
-}
-
-impl StochasticProcess for PiecewiseGbmProcess {
-    fn dim(&self) -> usize {
-        1
-    }
-
-    fn num_factors(&self) -> usize {
-        1
-    }
-
-    fn drift(&self, t: f64, x: &[f64], out: &mut [f64]) {
-        let idx = self.times.partition_point(|&time| time < t);
-        let idx = idx.min(self.times.len() - 1);
-        // μ(S) = (r - q) S
-        out[0] = (self.rs[idx] - self.qs[idx]) * x[0];
-    }
-
-    fn diffusion(&self, t: f64, x: &[f64], out: &mut [f64]) {
-        let idx = self.times.partition_point(|&time| time < t);
-        let idx = idx.min(self.times.len() - 1);
-        // σ(S) = σ S
-        out[0] = self.sigmas[idx] * x[0];
-    }
-}
-
-impl ProcessMetadata for PiecewiseGbmProcess {
-    fn metadata(&self) -> ProcessParams {
-        let mut params = ProcessParams::new("PiecewiseGBM");
-        // Just report first interval params as representative for metadata
-        if !self.rs.is_empty() {
-            params.add_param("r_initial", self.rs[0]);
-            params.add_param("q_initial", self.qs[0]);
-            params.add_param("sigma_initial", self.sigmas[0]);
-        }
-        params.with_factors(vec!["spot".to_string()])
-    }
-}
-
-/// Exact discretization for Piecewise GBM.
-#[derive(Debug, Clone, Default)]
-struct PiecewiseExactGbm;
-
-impl PiecewiseExactGbm {
-    fn new() -> Self {
-        Self
-    }
-}
-
-impl Discretization<PiecewiseGbmProcess> for PiecewiseExactGbm {
-    fn step(
-        &self,
-        process: &PiecewiseGbmProcess,
-        t: f64,
-        dt: f64,
-        x: &mut [f64],
-        z: &[f64],
-        _work: &mut [f64],
-    ) {
-        let idx = process.times.partition_point(|&time| time < t);
-        let idx = idx.min(process.times.len() - 1);
-
-        let r = process.rs[idx];
-        let q = process.qs[idx];
-        let sigma = process.sigmas[idx];
-
-        // S(t+dt) = S(t) * exp( (r - q - 0.5*sigma^2)*dt + sigma*sqrt(dt)*Z )
-        let drift = (r - q - 0.5 * sigma * sigma) * dt;
-        let diffusion = sigma * dt.sqrt() * z[0];
-        x[0] *= (drift + diffusion).exp();
-    }
-
-    fn work_size(&self, _process: &PiecewiseGbmProcess) -> usize {
-        0
-    }
-}
 
 /// Cliquet option Monte Carlo pricer.
 pub struct CliquetOptionMcPricer {
@@ -174,17 +82,8 @@ impl CliquetOptionMcPricer {
             0.0
         };
 
-        // Build piecewise parameters
-        // Interval boundaries: reset dates
-        let mut times = Vec::new();
-        let mut rs = Vec::new();
-        let mut qs = Vec::new();
-        let mut sigmas = Vec::new();
-
-        let mut prev_t = 0.0;
-        let mut prev_var = 0.0;
-
-        // Combine reset dates into a sorted list of times including maturity
+        // Period boundaries for the forward-vol/rate bootstrap: the reset dates
+        // plus the final maturity so the process covers the whole horizon.
         let mut check_points: Vec<f64> = inst
             .reset_dates
             .iter()
@@ -198,8 +97,6 @@ impl CliquetOptionMcPricer {
             .collect();
         check_points.sort_by(|a, b| a.total_cmp(b));
         check_points.dedup();
-
-        // Ensure we cover up to t if not in reset dates
         if let Some(&last) = check_points.last() {
             if last < t - 1e-6 {
                 check_points.push(t);
@@ -208,107 +105,17 @@ impl CliquetOptionMcPricer {
             check_points.push(t);
         }
 
-        // Hoist loop-invariant year fractions out of the per-period loop:
-        // disc_curve.df(t) takes a curve-time relative to base_date, so we
-        // need t_curve = year_fraction(base_date, as_of) + period_offset.
-        let t_base_to_as_of = disc_curve.day_count().year_fraction(
-            disc_curve.base_date(),
+        let process = crate::instruments::equity::piecewise_gbm::bootstrap_forward_gbm(
+            disc_curve.as_ref(),
+            curves,
+            &inst.pricing_overrides.market_quotes,
+            inst.vol_surface_id.as_str(),
             as_of,
-            DayCountContext::default(),
+            initial_spot,
+            div_yield,
+            &check_points,
+            &format!("CliquetOption {}", inst.id),
         )?;
-        let df_base_to_as_of = disc_curve.df(t_base_to_as_of);
-
-        for &curr_t in &check_points {
-            if curr_t <= prev_t {
-                continue;
-            }
-
-            let df_prev = disc_curve.df(t_base_to_as_of + prev_t);
-            let df_curr = disc_curve.df(t_base_to_as_of + curr_t);
-            let dt = curr_t - prev_t;
-
-            // Forward rate over [prev_t, curr_t] using df_prev / df_curr.
-            // Reject degenerate curve data instead of silently using r=0.
-            if df_curr <= 0.0 || !df_curr.is_finite() {
-                return Err(finstack_core::Error::Validation(format!(
-                    "CliquetOption: discount factor at t={} is non-positive ({}); \
-                     curve '{}' is degenerate or extrapolated past its valid range",
-                    curr_t, df_curr, inst.discount_curve_id
-                )));
-            }
-            if dt <= 1e-6 {
-                return Err(finstack_core::Error::Validation(format!(
-                    "CliquetOption: degenerate time step dt={} between periods at \
-                     t_prev={} and t_curr={}; check that reset_dates are distinct",
-                    dt, prev_t, curr_t
-                )));
-            }
-            let fwd_r = (df_prev / df_curr).ln() / dt;
-
-            // ATM forward price for vol surface lookup:
-            //   F(0, curr_t) = S_0 * exp(-q*curr_t) / DF(as_of, curr_t)
-            //   DF(as_of, curr_t) = df_curr / df_base_to_as_of
-            let forward_price =
-                initial_spot * (-div_yield * curr_t).exp() / df_curr * df_base_to_as_of;
-
-            let vol_curr = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-                &inst.pricing_overrides.market_quotes,
-                curves,
-                inst.vol_surface_id.as_str(),
-                curr_t,
-                forward_price,
-            )?;
-            let var_curr = vol_curr * vol_curr * curr_t;
-
-            // Forward variance over [prev_t, curr_t] from the bootstrap:
-            //   fwd_var = σ²(curr_t)·curr_t − σ²(prev_t)·prev_t.
-            //
-            // A well-formed (calendar-arbitrage-free) total-variance surface is
-            // non-decreasing in maturity, so `fwd_var >= 0`. A non-monotone
-            // surface yields `fwd_var < 0`, which is an impossible (negative)
-            // period variance.
-            //
-            // The previous code silently substituted the *terminal* vol
-            // `vol_curr` for that period — an arbitrary value unrelated to the
-            // (degenerate) forward variance, mis-setting the period vol. Handle
-            // the non-monotone case explicitly instead: floor the forward
-            // variance at zero (the no-arbitrage minimum — that period simply
-            // contributes ~no volatility) and emit a diagnostic so the bad
-            // surface is visible in production logs.
-            let fwd_var = var_curr - prev_var;
-            let fwd_sigma = if fwd_var >= 0.0 {
-                (fwd_var / dt).sqrt()
-            } else {
-                tracing::warn!(
-                    instrument_id = %inst.id,
-                    surface_id = %inst.vol_surface_id,
-                    t_prev = prev_t,
-                    t_curr = curr_t,
-                    total_var_prev = prev_var,
-                    total_var_curr = var_curr,
-                    forward_variance = fwd_var,
-                    "CliquetOption forward-vol bootstrap: total-variance surface is \
-                     non-monotone over [t_prev, t_curr] (calendar-spread arbitrage); \
-                     flooring the negative forward variance to zero for this period"
-                );
-                0.0
-            };
-
-            times.push(curr_t);
-            rs.push(fwd_r);
-            qs.push(div_yield);
-            sigmas.push(fwd_sigma);
-
-            prev_t = curr_t;
-            prev_var = var_curr;
-        }
-
-        let process = PiecewiseGbmProcess {
-            times,
-            rs,
-            qs,
-            sigmas,
-        };
 
         let steps_per_year = self.config.steps_per_year;
         let num_steps = ((t * steps_per_year).round() as usize).max(self.config.min_steps);

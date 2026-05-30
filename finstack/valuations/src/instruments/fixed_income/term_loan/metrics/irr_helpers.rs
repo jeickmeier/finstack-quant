@@ -17,6 +17,7 @@ use crate::instruments::TermLoan;
 use crate::metrics::MetricContext;
 use finstack_core::cashflow::{xirr_with_daycount, CFKind};
 use finstack_core::dates::Date;
+use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 
 /// Return the term loan's full internal cashflow schedule, populating the
@@ -56,15 +57,40 @@ pub(super) fn cached_full_schedule(
     Ok(Arc::clone(arc))
 }
 
+/// Discount factor from `as_of` to the loan's settlement date on its discount
+/// curve. Used to forward-value an `as_of` model PV to a settlement-dated price.
+/// Returns 1.0 when settlement coincides with `as_of`.
+pub(super) fn settlement_discount_factor(
+    loan: &TermLoan,
+    curves: &MarketContext,
+    as_of: Date,
+) -> finstack_core::Result<f64> {
+    let settle = loan.settlement_date(as_of)?;
+    if settle <= as_of {
+        return Ok(1.0);
+    }
+    curves
+        .get_discount(loan.discount_curve_id.as_str())?
+        .df_between_dates(as_of, settle)
+}
+
 /// Resolve the target purchase price for quote-derived term-loan yield metrics.
 ///
-/// Uses quoted clean price first when present; otherwise falls back to the
-/// model dirty PV already computed in `context.base_value`.
-pub(super) fn target_price_from_quote_or_model(loan: &TermLoan, base_value: Money) -> Money {
+/// Uses the quoted clean price when present (already a settlement-date price);
+/// otherwise forward-values the `as_of` model PV (`context.base_value`) to the
+/// settlement date via `settle_df = DF(as_of → settlement)`. Anchoring the model
+/// PV at `as_of` while dating the IRR price leg at settlement would otherwise
+/// leave a spurious ~settlement-lag of carry in every quoted yield (the bond
+/// yield path forward-values for exactly this reason).
+pub(super) fn target_price_from_quote_or_model(
+    loan: &TermLoan,
+    base_value: Money,
+    settle_df: f64,
+) -> Money {
     if let Some(px) = loan.pricing_overrides.market_quotes.quoted_clean_price {
         Money::new(px * loan.notional_limit.amount() / 100.0, loan.currency)
     } else {
-        base_value
+        Money::new(base_value.amount() / settle_df, base_value.currency())
     }
 }
 

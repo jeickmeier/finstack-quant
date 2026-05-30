@@ -5,6 +5,7 @@ use crate::instruments::equity::autocallable::monte_carlo::{
     AutocallablePayoff, FinalPayoffType as McFinalPayoffType,
 };
 use crate::instruments::equity::autocallable::types::{Autocallable, FinalPayoffType};
+use crate::instruments::equity::piecewise_gbm::{bootstrap_forward_gbm, PiecewiseExactGbm};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -13,10 +14,10 @@ use finstack_core::dates::{Date, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::Result;
-use finstack_monte_carlo::pricer::path_dependent::{
-    PathDependentPricer, PathDependentPricerConfig,
-};
-use finstack_monte_carlo::process::gbm::{GbmParams, GbmProcess};
+use finstack_monte_carlo::engine::{McEngine, McEngineConfig};
+use finstack_monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
+use finstack_monte_carlo::rng::philox::PhiloxRng;
+use finstack_monte_carlo::time_grid::TimeGrid;
 
 /// Autocallable Monte Carlo pricer.
 pub struct AutocallableMcPricer {
@@ -64,7 +65,6 @@ impl AutocallableMcPricer {
             return Ok(Money::new(0.0, inst.notional.currency()));
         }
 
-        let r = disc_curve.zero(t);
         let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
 
         // Dividend yield from scalar id if provided
@@ -93,27 +93,38 @@ impl AutocallableMcPricer {
             0.0
         };
 
-        // NOTE: Vol surface expiries are assumed to be expressed in the same day count
-        // convention as the discount curve (both typically use ACT/365F for equity vol).
-        // If the surface was built with a different convention, this lookup may be
-        // slightly off. Consider adding explicit day_count to VolSurface in future.
-        let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.pricing_overrides.market_quotes,
-            curves,
-            inst.vol_surface_id.as_str(),
-            t,
-            initial_spot,
-        )?;
-
-        let gbm_params = GbmParams::new(r, q, sigma)?;
-        let process = GbmProcess::new(gbm_params);
-
-        // Map observation dates to times
+        // Map observation dates to times.
         let observation_times: Vec<f64> = inst
             .observation_dates
             .iter()
             .map(|&date| disc_dc.year_fraction(as_of, date, DayCountContext::default()))
             .collect::<finstack_core::Result<Vec<_>>>()?;
+
+        // Bootstrap a piecewise-constant forward GBM over the autocall observation
+        // schedule (plus the final maturity) so the simulation carries the term
+        // structure of volatility and rates. A single flat-vol GBM misprices the
+        // knock-in put and the path-dependent autocall probabilities when the
+        // surface/curve is not flat; for a flat surface this reduces exactly to the
+        // previous constant-GBM process.
+        //
+        // NOTE: vol-surface expiries are assumed to share the discount curve's day
+        // count (both typically ACT/365F for equity vol).
+        let mut check_points = observation_times.clone();
+        check_points.retain(|&ct| ct > 0.0);
+        check_points.push(t);
+        check_points.sort_by(|a, b| a.total_cmp(b));
+        check_points.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
+        let process = bootstrap_forward_gbm(
+            disc_curve.as_ref(),
+            curves,
+            &inst.pricing_overrides.market_quotes,
+            inst.vol_surface_id.as_str(),
+            as_of,
+            initial_spot,
+            q,
+            &check_points,
+            &format!("Autocallable {}", inst.id),
+        )?;
 
         let mc_final_payoff = Self::convert_final_payoff_type(inst.final_payoff_type);
 
@@ -152,29 +163,50 @@ impl AutocallableMcPricer {
             df_ratios,
         )?;
 
-        // Derive deterministic seed from instrument ID and scenario
-
+        // Derive deterministic seed from instrument ID and scenario.
         use finstack_monte_carlo::seed;
-
-        let base_cfg = crate::instruments::common_impl::helpers::merged_path_config(
-            &self.config,
-            &inst.pricing_overrides,
-        )?;
-
         let seed = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
         };
 
-        let mut config = base_cfg;
-        config.seed = seed;
-        let pricer = PathDependentPricer::new(config);
-        let time_grid = pricer.config().build_time_grid(t, &observation_times)?;
-        let result = pricer.price_with_grid(
-            &process,
-            initial_spot,
+        let merged_cfg = crate::instruments::common_impl::helpers::merged_path_config(
+            &self.config,
+            &inst.pricing_overrides,
+        )?;
+
+        // Identical grid to the previous constant-GBM path (uniform steps plus the
+        // observation dates as required times), so a flat surface reproduces the
+        // prior prices bit-for-bit.
+        let time_grid = TimeGrid::uniform_with_required_times(
+            t,
+            merged_cfg.steps_per_year,
+            merged_cfg.min_steps,
+            &observation_times,
+        )?;
+
+        // Mirror `PathDependentPricer::price_with_grid` (non-Sobol path) but drive
+        // the piecewise process with its exact discretization.
+        let engine_config = McEngineConfig {
+            num_paths: merged_cfg.num_paths,
             time_grid,
+            target_ci_half_width: None,
+            use_parallel: merged_cfg.use_parallel,
+            chunk_size: Some(merged_cfg.chunk_size),
+            path_capture: merged_cfg.path_capture.clone(),
+            antithetic: merged_cfg.antithetic,
+        };
+        let engine = McEngine::new(engine_config);
+        let rng = PhiloxRng::new(seed);
+        let disc = PiecewiseExactGbm::new();
+        let initial_state = vec![initial_spot];
+
+        let result = engine.price(
+            &rng,
+            &process,
+            &disc,
+            &initial_state,
             &payoff,
             inst.notional.currency(),
             discount_factor,
