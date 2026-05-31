@@ -834,36 +834,20 @@ mod tests {
     use finstack_core::market_data::context::MarketContext;
 
     #[derive(serde::Deserialize)]
-    struct GoldenFixtureEnvelope {
-        inputs: GoldenFixtureInputs,
-    }
-
-    #[derive(serde::Deserialize)]
-    struct GoldenFixtureInputs {
+    struct GoldenV2Metadata {
         valuation_date: String,
-        instrument_json: serde_json::Value,
-        market_envelope: CalibrationEnvelope,
-        source_reference: GoldenSourceReference,
     }
 
     #[derive(serde::Deserialize)]
-    struct GoldenSourceReference {
-        bloomberg_reference: BloombergReference,
+    struct GoldenV2Market {
+        envelope: CalibrationEnvelope,
     }
 
     #[derive(serde::Deserialize)]
-    struct BloombergReference {
-        cashflows: Vec<BloombergCashflow>,
-    }
-
-    #[derive(serde::Deserialize)]
-    struct BloombergCashflow {
-        pay_date: String,
-        payments_receive: f64,
-        payments_pay: f64,
-        net_payments: f64,
-        discount: f64,
-        pv: f64,
+    struct GoldenV2PricingFixture {
+        metadata: GoldenV2Metadata,
+        market: GoldenV2Market,
+        instrument: serde_json::Value,
     }
 
     #[test]
@@ -939,7 +923,7 @@ mod tests {
     #[test]
     fn fixed_leg_pv_uses_builder_payment_dates_once() {
         let fixture = load_bloomberg_fixture();
-        let as_of = finstack_core::dates::parse_iso_date(&fixture.inputs.valuation_date)
+        let as_of = finstack_core::dates::parse_iso_date(&fixture.metadata.valuation_date)
             .expect("fixture valuation date parses");
         let irs = load_fixture_irs(&fixture);
         let market = load_fixture_market(&fixture);
@@ -969,7 +953,7 @@ mod tests {
     #[test]
     fn float_leg_pv_uses_schedule_payment_dates_once() {
         let fixture = load_bloomberg_fixture();
-        let as_of = finstack_core::dates::parse_iso_date(&fixture.inputs.valuation_date)
+        let as_of = finstack_core::dates::parse_iso_date(&fixture.metadata.valuation_date)
             .expect("fixture valuation date parses");
         let irs = load_fixture_irs(&fixture);
         let market = load_fixture_market(&fixture);
@@ -1000,7 +984,7 @@ mod tests {
     #[test]
     fn write_bloomberg_schedule_diagnostic_csv() {
         let fixture = load_bloomberg_fixture();
-        let as_of = finstack_core::dates::parse_iso_date(&fixture.inputs.valuation_date)
+        let as_of = finstack_core::dates::parse_iso_date(&fixture.metadata.valuation_date)
             .expect("fixture valuation date parses");
         let irs = load_fixture_irs(&fixture);
         let market = load_fixture_market(&fixture);
@@ -1015,32 +999,19 @@ mod tests {
         }
 
         let mut csv = String::from(
-            "row,finstack_fixed_date,finstack_float_date,finstack_fixed_amount,finstack_float_amount,finstack_net_amount,bloomberg_pay_date,bloomberg_fixed_amount,bloomberg_float_amount,bloomberg_net_amount,bloomberg_discount,bloomberg_pv\n",
+            "row,finstack_fixed_date,finstack_float_date,finstack_fixed_amount,finstack_float_amount,finstack_net_amount\n",
         );
-        for (idx, bbg) in fixture
-            .inputs
-            .source_reference
-            .bloomberg_reference
-            .cashflows
-            .iter()
-            .enumerate()
+        for (idx, (fixed_flow, float_flow)) in
+            fixed.flows.iter().zip(float.flows.iter()).enumerate()
         {
-            let fixed_flow = &fixed.flows[idx];
-            let float_flow = &float.flows[idx];
             csv.push_str(&format!(
-                "{},{},{},{:.8},{:.8},{:.8},{},{:.8},{:.8},{:.8},{:.8},{:.8}\n",
+                "{},{},{},{:.8},{:.8},{:.8}\n",
                 idx + 1,
                 fixed_flow.date,
                 float_flow.date,
                 fixed_flow.amount.amount(),
                 float_flow.amount.amount(),
                 fixed_flow.amount.amount() - float_flow.amount.amount(),
-                bbg.pay_date,
-                coupon_only_fixed_amount(bbg),
-                coupon_only_float_amount(bbg),
-                bbg.net_payments,
-                bbg.discount,
-                bbg.pv,
             ));
         }
 
@@ -1154,7 +1125,7 @@ mod tests {
         );
     }
 
-    fn load_bloomberg_fixture() -> GoldenFixtureEnvelope {
+    fn load_bloomberg_fixture() -> GoldenV2PricingFixture {
         serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/golden/data/pricing/irs/usd_sofr_5y_receive_fixed_swpm.json"
@@ -1162,38 +1133,19 @@ mod tests {
         .expect("fixture parses")
     }
 
-    fn load_fixture_irs(fixture: &GoldenFixtureEnvelope) -> InterestRateSwap {
-        crate::instruments::json_loader::InstrumentEnvelope::from_value(
-            fixture.inputs.instrument_json.clone(),
-        )
-        .expect("fixture instrument loads")
-        .as_any()
-        .downcast_ref::<InterestRateSwap>()
-        .expect("fixture instrument is IRS")
-        .clone()
+    fn load_fixture_irs(fixture: &GoldenV2PricingFixture) -> InterestRateSwap {
+        crate::instruments::json_loader::InstrumentEnvelope::from_value(fixture.instrument.clone())
+            .expect("fixture instrument loads")
+            .as_any()
+            .downcast_ref::<InterestRateSwap>()
+            .expect("fixture instrument is IRS")
+            .clone()
     }
 
-    fn load_fixture_market(fixture: &GoldenFixtureEnvelope) -> MarketContext {
-        let result = engine::execute_with_diagnostics(&fixture.inputs.market_envelope)
+    fn load_fixture_market(fixture: &GoldenV2PricingFixture) -> MarketContext {
+        let result = engine::execute_with_diagnostics(&fixture.market.envelope)
             .expect("fixture market envelope calibrates");
         MarketContext::try_from(result.result.final_market)
             .expect("fixture calibrated market rehydrates")
-    }
-
-    fn coupon_only_fixed_amount(cashflow: &BloombergCashflow) -> f64 {
-        if cashflow.payments_receive.abs() > 1_000_000.0 {
-            cashflow.payments_receive - 10_000_000.0
-        } else {
-            cashflow.payments_receive
-        }
-    }
-
-    fn coupon_only_float_amount(cashflow: &BloombergCashflow) -> f64 {
-        let payment = -cashflow.payments_pay;
-        if payment.abs() > 1_000_000.0 {
-            payment - 10_000_000.0
-        } else {
-            payment
-        }
     }
 }

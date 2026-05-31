@@ -63,6 +63,18 @@ fn load_fixture_json() -> Value {
     serde_json::from_str(&raw).expect("parse fixture")
 }
 
+fn fixture_market_envelope(fixture: &Value) -> &Value {
+    &fixture["market"]["envelope"]
+}
+
+fn fixture_instrument(fixture: &Value) -> &Value {
+    &fixture["instrument"]
+}
+
+fn fixture_instrument_spec(fixture: &Value) -> &Value {
+    &fixture["instrument"]["spec"]
+}
+
 fn snapshot_curves(as_of: Date) -> MarketContext {
     let disc_knots: Vec<(f64, f64)> = vec![
         (0.0, 1.0),
@@ -122,14 +134,13 @@ fn snapshot_curves(as_of: Date) -> MarketContext {
 
 fn bootstrap_market(fixture: &Value) -> MarketContext {
     let envelope: CalibrationEnvelope =
-        serde_json::from_value(fixture["inputs"]["market_envelope"].clone())
-            .expect("parse envelope");
+        serde_json::from_value(fixture_market_envelope(fixture).clone()).expect("parse envelope");
     let result = engine::execute_with_diagnostics(&envelope).expect("calibrate");
     MarketContext::try_from(result.result.final_market).expect("rehydrate market")
 }
 
 fn load_option(fixture: &Value) -> CDSOption {
-    let spec = &fixture["inputs"]["instrument_json"]["spec"];
+    let spec = fixture_instrument_spec(fixture);
     serde_json::from_value(spec.clone()).expect("parse cds option spec")
 }
 
@@ -312,7 +323,7 @@ fn diag_cdx_ig_46_cdso_internals() {
     }
 
     eprintln!("\n--- Golden runner path (sanity) ---");
-    let instrument_json = fixture["inputs"]["instrument_json"].clone();
+    let instrument_json = fixture_instrument(&fixture).clone();
     let result = price_instrument_json_with_metrics(
         &serde_json::to_string(&instrument_json).unwrap(),
         &bootstrap,
@@ -621,12 +632,10 @@ fn cdx_fixture_internal() -> (CDSOption, MarketContext) {
         .join("tests/golden/data/pricing/cds_option/cdx_ig_46_payer_atm_jun26.json");
     let raw = fs::read_to_string(path).expect("read cdx fixture");
     let fixture: Value = serde_json::from_str(&raw).expect("parse fixture");
-    let option: CDSOption =
-        serde_json::from_value(fixture["inputs"]["instrument_json"]["spec"].clone())
-            .expect("parse option spec");
+    let option: CDSOption = serde_json::from_value(fixture_instrument_spec(&fixture).clone())
+        .expect("parse option spec");
     let envelope: CalibrationEnvelope =
-        serde_json::from_value(fixture["inputs"]["market_envelope"].clone())
-            .expect("parse envelope");
+        serde_json::from_value(fixture_market_envelope(&fixture).clone()).expect("parse envelope");
     let result = engine::execute_with_diagnostics(&envelope).expect("calibrate market");
     let market = MarketContext::try_from(result.result.final_market).expect("market context");
     (option, market)
