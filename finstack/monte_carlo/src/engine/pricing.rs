@@ -1,4 +1,4 @@
-use super::config::{McEngineBuilder, McEngineConfig, MAX_NUM_PATHS};
+use super::config::{McEngineBuilder, McEngineConfig, MAX_CAPTURED_PATHS, MAX_NUM_PATHS};
 use super::path_capture::PathCaptureMode;
 use crate::captured_path_stats::apply_captured_path_statistics;
 use crate::estimate::Estimate;
@@ -217,6 +217,18 @@ impl McEngine {
                 return Err(finstack_core::Error::Validation(
                     "Path capture is currently unsupported with antithetic=true".to_string(),
                 ));
+            }
+
+            let requested_captured_paths = match self.config.path_capture.capture_mode {
+                PathCaptureMode::All => self.config.num_paths,
+                PathCaptureMode::Sample { count, .. } => count,
+            };
+
+            if requested_captured_paths > MAX_CAPTURED_PATHS {
+                return Err(finstack_core::Error::Validation(format!(
+                    "Path capture budget exceeded: requested {requested_captured_paths} captured \
+                     paths, maximum is {MAX_CAPTURED_PATHS}; use sampled capture for diagnostics"
+                )));
             }
 
             if let PathCaptureMode::Sample { count, .. } = self.config.path_capture.capture_mode {

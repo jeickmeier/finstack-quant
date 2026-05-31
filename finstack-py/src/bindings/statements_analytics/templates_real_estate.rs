@@ -12,19 +12,10 @@
 use crate::bindings::extract::extract_model_ref;
 use crate::errors::display_to_py;
 use finstack_core::dates::PeriodId;
-use finstack_statements::builder::{ModelBuilder, Ready};
-use finstack_statements::types::{CapitalStructureSpec, FinancialModelSpec};
 use finstack_statements_analytics::templates::real_estate as rust_re;
-use indexmap::IndexMap;
 use pyo3::prelude::*;
-use serde_json::Value;
 
-/// Rebuilt model builder with preserved metadata.
-type RebuiltBuilder = (
-    ModelBuilder<Ready>,
-    IndexMap<String, Value>,
-    Option<CapitalStructureSpec>,
-);
+use super::templates_common::{finalize_json, rebuild_builder};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -32,33 +23,6 @@ type RebuiltBuilder = (
 
 fn parse_period(s: &str) -> PyResult<PeriodId> {
     s.parse().map_err(display_to_py)
-}
-
-fn rebuild_builder(spec: FinancialModelSpec) -> PyResult<RebuiltBuilder> {
-    let meta = spec.meta.clone();
-    let capital_structure = spec.capital_structure.clone();
-    let id = spec.id.clone();
-    let periods = spec.periods.clone();
-    let nodes = spec.nodes;
-
-    let mut builder = ModelBuilder::new(id)
-        .periods_explicit(periods)
-        .map_err(display_to_py)?;
-    for (node_id, node_spec) in nodes {
-        builder.insert_node(node_id, node_spec);
-    }
-    Ok((builder, meta, capital_structure))
-}
-
-fn finalize_builder(
-    builder: ModelBuilder<finstack_statements::builder::Ready>,
-    meta: indexmap::IndexMap<String, serde_json::Value>,
-    capital_structure: Option<finstack_statements::types::CapitalStructureSpec>,
-) -> PyResult<String> {
-    let mut new_spec = builder.build().map_err(display_to_py)?;
-    new_spec.meta = meta;
-    new_spec.capital_structure = capital_structure;
-    serde_json::to_string(&new_spec).map_err(display_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -838,7 +802,7 @@ fn add_noi_buildup(
         noi_node,
     )
     .map_err(display_to_py)?;
-    finalize_builder(builder, meta, capital_structure)
+    finalize_json(builder, meta, capital_structure)
 }
 
 // ---------------------------------------------------------------------------
@@ -858,7 +822,7 @@ fn add_ncf_buildup(
     let capex_refs: Vec<&str> = capex_nodes.iter().map(String::as_str).collect();
     let builder = rust_re::add_ncf_buildup(builder, noi_node, &capex_refs, ncf_node)
         .map_err(display_to_py)?;
-    finalize_builder(builder, meta, capital_structure)
+    finalize_json(builder, meta, capital_structure)
 }
 
 // ---------------------------------------------------------------------------
@@ -879,7 +843,7 @@ fn add_rent_roll(
     let nodes_inner = nodes.map(|n| n.inner).unwrap_or_default();
     let builder =
         rust_re::add_rent_roll(builder, &lease_specs, &nodes_inner).map_err(display_to_py)?;
-    finalize_builder(builder, meta, capital_structure)
+    finalize_json(builder, meta, capital_structure)
 }
 
 // ---------------------------------------------------------------------------
@@ -898,7 +862,7 @@ fn add_rent_roll_rental_revenue(
     let lease_specs: Vec<rust_re::SimpleLeaseSpec> = leases.into_iter().map(|l| l.inner).collect();
     let builder = rust_re::add_rent_roll_rental_revenue(builder, &lease_specs, total_rent_node)
         .map_err(display_to_py)?;
-    finalize_builder(builder, meta, capital_structure)
+    finalize_json(builder, meta, capital_structure)
 }
 
 // ---------------------------------------------------------------------------
@@ -943,7 +907,7 @@ fn add_property_operating_statement(
         &nodes_inner,
     )
     .map_err(display_to_py)?;
-    finalize_builder(builder, meta, capital_structure)
+    finalize_json(builder, meta, capital_structure)
 }
 
 // ---------------------------------------------------------------------------

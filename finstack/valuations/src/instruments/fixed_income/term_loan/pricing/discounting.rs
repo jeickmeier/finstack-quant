@@ -163,6 +163,37 @@ impl TermLoanDiscountingPricer {
         market: &MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<Money> {
+        // Retrieve discount curve and discount the holder-view flows to the
+        // settlement date using date-based DF mapping. This anchors valuation on
+        // the settlement date rather than the trade date, consistent with
+        // leveraged loan market conventions.
+        let (settlement_date, flows) = Self::pricing_flows(loan, market, as_of)?;
+        let disc = market.get_discount(loan.discount_curve_id.as_str())?;
+
+        crate::instruments::common_impl::discountable::npv_by_date(
+            disc.as_ref(),
+            settlement_date,
+            &flows,
+        )
+    }
+
+    /// Build the holder-view cashflows the discounting pricer values, anchored
+    /// to the loan's settlement date.
+    ///
+    /// Returns `(settlement_date, flows)` where `flows` are the same `(date,
+    /// amount)` pairs [`price`](Self::price) discounts: PIK capitalization and
+    /// pre-settlement flows are excluded, and seasoned floating coupons reflect
+    /// historical fixings where available. Sharing this builder keeps the
+    /// z-spread CS01 fallback (which reprices these flows under a spread bump)
+    /// consistent with the base PV.
+    pub(crate) fn pricing_flows(
+        loan: &TermLoan,
+        market: &MarketContext,
+        as_of: finstack_core::dates::Date,
+    ) -> finstack_core::Result<(
+        finstack_core::dates::Date,
+        Vec<(finstack_core::dates::Date, Money)>,
+    )> {
         use finstack_core::cashflow::CFKind;
 
         // Compute settlement date using business-day conventions when calendar is available.
@@ -176,11 +207,6 @@ impl TermLoanDiscountingPricer {
         // Graceful degradation: if fixings are unavailable, keep forward projection.
         Self::apply_fixings(loan, market, as_of, &mut schedule);
 
-        // Retrieve discount curve and discount flows to settlement_date using date-based
-        // DF mapping. This ensures valuation is anchored on the settlement date rather
-        // than the trade date, consistent with leveraged loan market conventions.
-        let disc = market.get_discount(loan.discount_curve_id.as_str())?;
-
         // Filter flows: exclude PIK (capitalized interest) and past flows from PV.
         // PIK increases outstanding and is repaid via principal redemption.
         // Past flows (before settlement_date) have already settled and must not be discounted.
@@ -191,11 +217,7 @@ impl TermLoanDiscountingPricer {
             .map(|cf| (cf.date, cf.amount))
             .collect();
 
-        crate::instruments::common_impl::discountable::npv_by_date(
-            disc.as_ref(),
-            settlement_date,
-            &flows,
-        )
+        Ok((settlement_date, flows))
     }
 
     /// Replace forward-projected rates with historical fixings for seasoned

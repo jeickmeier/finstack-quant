@@ -137,3 +137,17 @@ pub(crate) fn py_to_json_value<'py>(
     serde_json::from_str(&json)
         .map_err(|e| crate::errors::value_error(format!("invalid {label} JSON: {e}")))
 }
+
+/// Serialize a Python object to a compact JSON string.
+///
+/// Accepts dicts/lists (via ``json.dumps``) or pre-serialized JSON strings
+/// (validated, not double-encoded).
+pub(crate) fn py_to_json_string<'py>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+    label: &str,
+) -> PyResult<String> {
+    let value = py_to_json_value(py, obj, label)?;
+    serde_json::to_string(&value)
+        .map_err(|e| crate::errors::value_error(format!("failed to serialize {label}: {e}")))
+}

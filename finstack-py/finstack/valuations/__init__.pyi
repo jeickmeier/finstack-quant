@@ -280,6 +280,11 @@ __all__ = [
     "SabrCalibrator",
     "instrument_cashflows",
     "instrument_cashflows_json",
+    "validate_instrument_json",
+    "price_instrument",
+    "price_instrument_with_metrics",
+    "list_standard_metrics",
+    "list_standard_metrics_grouped",
 ]
 
 class ValuationResult:
@@ -493,6 +498,75 @@ class ValuationResult:
             ''
         """
         ...
+
+def validate_instrument_json(json: str) -> str:
+    """Validate tagged instrument JSON and return canonical pretty-printed JSON.
+
+    Args:
+        json: Raw tagged instrument JSON string.
+
+    Returns:
+        Canonical, pretty-printed JSON suitable for :func:`price_instrument`.
+
+    Raises:
+        ValueError: If the instrument JSON is invalid.
+    """
+    ...
+
+def price_instrument(
+    instrument_json: str,
+    market: MarketContext | str,
+    as_of: str,
+    model: str = "default",
+) -> str:
+    """Price an instrument from tagged JSON, returning a ``ValuationResult`` JSON.
+
+    Args:
+        instrument_json: Tagged instrument JSON.
+        market: ``MarketContext`` instance or JSON string.
+        as_of: ISO 8601 valuation date.
+        model: Model key (e.g. ``"default"``, ``"discounting"``,
+            ``"hazard_rate"``, ``"black76"``).
+
+    Returns:
+        JSON-serialized ``ValuationResult``.
+    """
+    ...
+
+def price_instrument_with_metrics(
+    instrument_json: str,
+    market: MarketContext | str,
+    as_of: str,
+    model: str = "default",
+    metrics: list[str] = [],
+    pricing_options: str | None = None,
+    market_history: str | None = None,
+) -> str:
+    """Price an instrument with explicit metric requests.
+
+    Args:
+        instrument_json: Tagged instrument JSON.
+        market: ``MarketContext`` instance or JSON string.
+        as_of: ISO 8601 valuation date.
+        model: Model key string.
+        metrics: Metric identifiers to compute (e.g.
+            ``["ytm", "dv01", "modified_duration"]``).
+        pricing_options: Optional JSON string of ``MetricPricingOverrides``.
+        market_history: Optional JSON string of ``MarketHistory`` scenarios
+            required by ``hvar`` and ``expected_shortfall`` metrics.
+
+    Returns:
+        JSON-serialized ``ValuationResult`` including requested metrics.
+    """
+    ...
+
+def list_standard_metrics() -> list[str]:
+    """Return all metric IDs in the standard metric registry (sorted)."""
+    ...
+
+def list_standard_metrics_grouped() -> dict[str, list[str]]:
+    """Return standard metrics organized by human-readable group name."""
+    ...
 
 def instrument_cashflows_json(
     instrument_json: str,

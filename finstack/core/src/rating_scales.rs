@@ -45,6 +45,26 @@ pub struct ScorecardScale {
     pub ratings: Vec<RatingLevel>,
 }
 
+impl RatingLevel {
+    /// Deserialize a rating level from JSON and validate scores and name.
+    pub fn from_json(json: &str) -> Result<Self> {
+        let level: RatingLevel = serde_json::from_str(json)
+            .map_err(|err| Error::Validation(format!("invalid rating level JSON: {err}")))?;
+        validate_rating_level(&level)?;
+        Ok(level)
+    }
+}
+
+impl ScorecardScale {
+    /// Deserialize a scorecard scale from JSON and validate its rating levels.
+    pub fn from_json(json: &str) -> Result<Self> {
+        let scale: ScorecardScale = serde_json::from_str(json)
+            .map_err(|err| Error::Validation(format!("invalid scorecard scale JSON: {err}")))?;
+        validate_scorecard_scale(&scale, &scale.scale_name)?;
+        Ok(scale)
+    }
+}
+
 /// Policy for unknown scorecard rating-scale names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -57,6 +77,14 @@ pub enum UnknownScalePolicy {
     WarnAndFallback,
 }
 
+impl UnknownScalePolicy {
+    /// Deserialize a policy from JSON.
+    pub fn from_json(json: &str) -> Result<Self> {
+        serde_json::from_str(json)
+            .map_err(|err| Error::Validation(format!("invalid unknown scale policy JSON: {err}")))
+    }
+}
+
 /// Versioned registry of rating scales and scorecard defaults.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -67,6 +95,22 @@ pub struct RatingScaleRegistry {
 }
 
 impl RatingScaleRegistry {
+    /// Deserialize a registry from JSON and validate it.
+    ///
+    /// Validation enforces the supported schema version, unique scale ids and
+    /// aliases, existence of the default scale, and in-range scores — the same
+    /// checks applied to the embedded and config-loaded registries.
+    ///
+    /// # Errors
+    /// Returns [`Error::Validation`] when the JSON cannot be parsed or the
+    /// deserialized registry fails validation.
+    pub fn from_json(json: &str) -> Result<Self> {
+        let registry: RatingScaleRegistry = serde_json::from_str(json).map_err(|err| {
+            Error::Validation(format!("invalid rating scale registry JSON: {err}"))
+        })?;
+        validate_registry(registry)
+    }
+
     /// Returns the configured default scorecard score for threshold gaps.
     pub fn default_scorecard_score(&self) -> f64 {
         self.scorecard_policy.default_score
@@ -163,30 +207,7 @@ impl RatingScaleRegistry {
         }
 
         for entry in &self.rating_scales {
-            if entry.scale.ratings.is_empty() {
-                return Err(Error::Validation(format!(
-                    "rating scale '{}' has no rating levels",
-                    first_id(&entry.ids)
-                )));
-            }
-            let mut names = BTreeSet::new();
-            for level in &entry.scale.ratings {
-                if level.name.trim().is_empty() {
-                    return Err(Error::Validation(format!(
-                        "rating scale '{}' contains a blank rating level",
-                        first_id(&entry.ids)
-                    )));
-                }
-                if !names.insert(level.name.clone()) {
-                    return Err(Error::Validation(format!(
-                        "rating scale '{}' contains duplicate level '{}'",
-                        first_id(&entry.ids),
-                        level.name
-                    )));
-                }
-                validate_score(level.score, "rating level score")?;
-                validate_score(level.min_score, "rating level minimum score")?;
-            }
+            validate_scorecard_scale(&entry.scale, first_id(&entry.ids))?;
         }
 
         Ok(())
@@ -206,6 +227,43 @@ pub fn registry_from_config(config: &FinstackConfig) -> Result<RatingScaleRegist
 fn validate_registry(registry: RatingScaleRegistry) -> Result<RatingScaleRegistry> {
     registry.validate()?;
     Ok(registry)
+}
+
+fn validate_rating_level(level: &RatingLevel) -> Result<()> {
+    if level.name.trim().is_empty() {
+        return Err(Error::Validation(
+            "rating level contains a blank name".to_string(),
+        ));
+    }
+    validate_score(level.score, "rating level score")?;
+    validate_score(level.min_score, "rating level minimum score")?;
+    Ok(())
+}
+
+fn validate_scorecard_scale(scale: &ScorecardScale, scale_label: &str) -> Result<()> {
+    if scale.ratings.is_empty() {
+        return Err(Error::Validation(format!(
+            "rating scale '{scale_label}' has no rating levels"
+        )));
+    }
+    let mut names = BTreeSet::new();
+    for level in &scale.ratings {
+        if !names.insert(level.name.clone()) {
+            return Err(Error::Validation(format!(
+                "rating scale '{scale_label}' contains duplicate level '{}'",
+                level.name
+            )));
+        }
+        validate_rating_level(level).map_err(|err| match err {
+            Error::Validation(msg) if msg == "rating level contains a blank name" => {
+                Error::Validation(format!(
+                    "rating scale '{scale_label}' contains a blank rating level"
+                ))
+            }
+            other => other,
+        })?;
+    }
+    Ok(())
 }
 
 fn validate_score(value: f64, label: &str) -> Result<()> {
@@ -332,5 +390,40 @@ mod tests {
             loaded.default_scorecard_score(),
             embedded.default_scorecard_score()
         );
+    }
+
+    #[test]
+    fn from_json_round_trips_valid_registry() {
+        let embedded = embedded_registry().expect("registry should load").clone();
+        let json = serde_json::to_string(&embedded).expect("registry should serialize");
+        let parsed = RatingScaleRegistry::from_json(&json).expect("valid registry should parse");
+        assert_eq!(parsed.default_scale_id(), embedded.default_scale_id());
+    }
+
+    #[test]
+    fn from_json_rejects_invalid_default_scale_id() {
+        let embedded = embedded_registry().expect("registry should load").clone();
+        let mut value = serde_json::to_value(&embedded).expect("registry should serialize");
+        value["scorecard_policy"]["default_scale_id"] =
+            serde_json::Value::String("nonexistent".to_string());
+        let json = serde_json::to_string(&value).expect("value should serialize");
+
+        let err = RatingScaleRegistry::from_json(&json)
+            .expect_err("registry with unknown default scale id must be rejected");
+        assert!(matches!(err, Error::Validation(_)));
+    }
+
+    #[test]
+    fn rating_level_from_json_rejects_out_of_range_score() {
+        let json = r#"{"name":"BB","score":150.0,"min_score":50.0}"#;
+        let err = RatingLevel::from_json(json).expect_err("score out of range must be rejected");
+        assert!(matches!(err, Error::Validation(_)));
+    }
+
+    #[test]
+    fn scorecard_scale_from_json_rejects_empty_ratings() {
+        let json = r#"{"scale_name":"Test","ratings":[]}"#;
+        let err = ScorecardScale::from_json(json).expect_err("empty ratings must be rejected");
+        assert!(matches!(err, Error::Validation(_)));
     }
 }

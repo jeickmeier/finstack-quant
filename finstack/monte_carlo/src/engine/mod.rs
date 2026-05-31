@@ -50,7 +50,7 @@ mod simulation;
 #[allow(clippy::expect_used, clippy::panic)]
 mod tests;
 
-pub use config::{McEngineBuilder, McEngineConfig, MAX_NUM_PATHS};
+pub use config::{McEngineBuilder, McEngineConfig, MAX_CAPTURED_PATHS, MAX_NUM_PATHS};
 pub use path_capture::{PathCaptureConfig, PathCaptureMode};
 pub use pricing::McEngine;
 

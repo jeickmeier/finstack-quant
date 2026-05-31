@@ -110,6 +110,11 @@ if _TYPE_CHECKING:
     import pandas as pd
 
 ValuationResult = _valuations.ValuationResult
+validate_instrument_json = _valuations.validate_instrument_json
+price_instrument = _valuations.price_instrument
+price_instrument_with_metrics = _valuations.price_instrument_with_metrics
+list_standard_metrics = _valuations.list_standard_metrics
+list_standard_metrics_grouped = _valuations.list_standard_metrics_grouped
 CalibrationResult = _valuations.CalibrationResult
 CalibrationEnvelopeError = _valuations.CalibrationEnvelopeError
 validate_calibration_json = _valuations.validate_calibration_json
@@ -296,11 +301,16 @@ __all__: list[str] = [
     "instrument_cashflows",
     "instrument_cashflows_json",
     "instruments",
+    "list_standard_metrics",
+    "list_standard_metrics_grouped",
     "lookback_option_price",
     "merton_jump_cos_price",
+    "price_instrument",
+    "price_instrument_with_metrics",
     "quanto_option_price",
     "snowball_coupon_profile",
     "tarn_coupon_profile",
     "validate_calibration_json",
+    "validate_instrument_json",
     "vg_cos_price",
 ]

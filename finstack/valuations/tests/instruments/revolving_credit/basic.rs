@@ -282,6 +282,58 @@ fn test_revolving_credit_standard_metrics() {
 }
 
 #[test]
+fn test_revolving_credit_cs01_z_spread_fallback_without_credit_curve() {
+    // A deterministic facility with NO credit curve previously reported
+    // CS01 = 0.0 (the discounting pricer survival-weights cashflows only when a
+    // hazard curve is present). It now reports the market-standard z-spread
+    // bump, so CS01 is a real, negative credit-spread sensitivity for the
+    // lender.
+    let val_date = date!(2025 - 01 - 01);
+    let facility = RevolvingCredit::builder()
+        .id("RC-ZS-001".into())
+        .commitment_amount(Money::new(20_000_000.0, Currency::USD))
+        .drawn_amount(Money::new(15_000_000.0, Currency::USD))
+        .commitment_date(val_date)
+        .maturity(date!(2030 - 01 - 01)) // 5y
+        .base_rate_spec(BaseRateSpec::Fixed { rate: 0.06 })
+        .day_count(DayCount::Act360)
+        .frequency(Tenor::quarterly())
+        .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0))
+        .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
+        .discount_curve_id("USD-OIS".into())
+        // No credit_curve_id → z-spread fallback path.
+        .build()
+        .unwrap();
+
+    let disc_curve = build_flat_discount_curve(0.04, val_date, "USD-OIS");
+    let market = MarketContext::new().insert(disc_curve);
+
+    let result = facility
+        .price_with_metrics(
+            &market,
+            val_date,
+            &[MetricId::Cs01, MetricId::BucketedCs01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+
+    let cs01 = *result.measures.get("cs01").unwrap();
+    assert!(cs01.is_finite(), "CS01 should be finite, got {cs01}");
+    assert!(
+        cs01 < -1.0,
+        "z-spread CS01 should be clearly negative for a lender with no credit curve, got {cs01}"
+    );
+
+    // Key-rate buckets must reconcile to the parallel z-spread CS01: PV is
+    // additive over flows, so per-bucket spread bumps sum exactly.
+    let bucketed_total = *result.measures.get("bucketed_cs01").unwrap();
+    assert!(
+        (bucketed_total - cs01).abs() <= 1e-6 * cs01.abs().max(1.0),
+        "bucketed CS01 total {bucketed_total} should reconcile to parallel CS01 {cs01}"
+    );
+}
+
+#[test]
 fn test_revolving_credit_bucketed_dv01() {
     let val_date = date!(2025 - 01 - 01);
     let commitment_date = date!(2025 - 01 - 01);

@@ -609,7 +609,6 @@ class McEngine:
         time_grid: Discretisation grid.
         seed: RNG seed (default ``42``).
         use_parallel: Enable parallel path generation (default ``False``).
-        antithetic: Enable antithetic variates (default ``False``).
 
     Returns:
         N/A (instance type).
@@ -626,7 +625,6 @@ class McEngine:
         time_grid: TimeGrid,
         seed: int | None = None,
         use_parallel: bool | None = None,
-        antithetic: bool | None = None,
     ) -> None:
         """See class docstring for parameters.
 
@@ -635,14 +633,13 @@ class McEngine:
             time_grid: Simulation grid.
             seed: Seed.
             use_parallel: Parallel flag.
-            antithetic: Antithetic flag.
 
         Returns:
             None
 
         Example:
             >>> from finstack.monte_carlo import McEngine, TimeGrid
-            >>> McEngine(10, TimeGrid(1.0, 5), seed=1, use_parallel=True, antithetic=True)  # doctest: +ELLIPSIS
+            >>> McEngine(10, TimeGrid(1.0, 5), seed=1, use_parallel=True)  # doctest: +ELLIPSIS
             McEngine(...)
         """
         ...

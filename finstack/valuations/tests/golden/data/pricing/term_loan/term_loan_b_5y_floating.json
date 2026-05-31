@@ -6,11 +6,11 @@
     "description": "Synthetic USD term loan B 5Y floating-rate facility with quarterly amortization. Two-step calibration: USD-OIS bootstrapped from synthetic SOFR OIS quotes, USD-SOFR-3M bootstrapped from synthetic 3M-Term-SOFR IRS quotes against the calibrated discount curve. The instrument's primary discount curve (USD-CORP), credit curve (ACME-HZD), and the auxiliary curves (USD-TREASURY, HYCO-HZD) are preserved verbatim in initial_market. Self-test contract: re-running calibration + pricing must reproduce the recorded values within solver tolerance.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack canonical fixed-income pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): replaced the materialized USD-OIS and USD-SOFR-3M curves with a two-step calibration plan (POC #4 pattern from market-bootstrap-phase-5 plan \u00a716). Other curves (USD-CORP, USD-TREASURY, ACME-HZD, HYCO-HZD) remain materialized in initial_market. Expected outputs recaptured from Finstack itself; the original synthetic-curve test contract is replaced by a self-test contract: bit-stable round-trip through calibrate + price.",
+    "source_detail": "Finstack canonical fixed-income pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): replaced the materialized USD-OIS and USD-SOFR-3M curves with a two-step calibration plan (POC #4 pattern from market-bootstrap-phase-5 plan \u00a716). Other curves (USD-CORP, USD-TREASURY, ACME-HZD, HYCO-HZD) remain materialized in initial_market. Expected outputs recaptured from Finstack itself; the original synthetic-curve test contract is replaced by a self-test contract: bit-stable round-trip through calibrate + price. Re-blessed 2026-05-30: term-loan CS01 now reports the market-standard z-spread bump instead of 0.0. The discounting pricer never consumes the hazard curve, so the canonical par-spread/hazard CS01 was identically zero for loans; CS01 is now computed by solving the z-spread to the quoted clean price and bumping +/-1bp (see metrics::sensitivities::cs01_z_spread). Old: cs01=0.0. New: cs01=-8112.699659444392 (negative = long credit risk; larger magnitude than the floating-rate DV01 because the z-spread shift hits discounting on all flows including principal, whereas DV01 largely offsets via floating-coupon reprojection).",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_on": "2026-05-30",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -579,7 +579,7 @@
     "discount_margin": -0.028902425292646708,
     "ytm": 0.08569773041816574,
     "dv01": -487.9932949580252,
-    "cs01": 0.0
+    "cs01": -8112.699659444392
   },
   "tolerances": {
     "npv": {
@@ -605,7 +605,7 @@
     "cs01": {
       "abs": 1e-09,
       "rel": 5e-09,
-      "tolerance_reason": "Self-test fixture: tolerance pinned to ~10x the worst observed deterministic FP residual on Finstack's own calibrate + price round-trip (synthetic two-step calibration with USD-OIS + USD-SOFR-3M). Tightening to 1e-9 catches drift from refactors, FP-contract changes, calibration convention shifts, or pricing-kernel algorithm swaps that would be invisible at looser bands."
+      "tolerance_reason": "Self-test fixture: tolerance pinned to ~10x the worst observed deterministic FP residual on Finstack's own calibrate + price round-trip. CS01 is the market-standard z-spread bump (the term-loan discounting pricer never consumes the hazard curve, so a par-spread/hazard bump leaves PV unchanged): the z-spread is solved to the quoted clean price (99.0% of notional), then bumped +/-1bp with a symmetric central difference. The Brent z-solve converges to 1e-10 on the spread axis and CS01's dependence on the anchor is second-order, so the value is deterministic to well within 1e-9; this band catches drift from refactors, FP-contract changes, or pricing-kernel algorithm swaps."
     }
   }
 }

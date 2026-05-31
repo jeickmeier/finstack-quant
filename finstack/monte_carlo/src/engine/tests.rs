@@ -680,6 +680,34 @@ fn test_price_with_capture_rejects_invalid_sample_count() {
 }
 
 #[test]
+fn test_price_with_capture_rejects_full_capture_above_budget() {
+    let engine = McEngine::new(McEngineConfig {
+        num_paths: 100_001,
+        time_grid: TimeGrid::uniform(1.0, 1).expect("grid should build"),
+        target_ci_half_width: None,
+        use_parallel: false,
+        chunk_size: Some(1),
+        path_capture: PathCaptureConfig::all(),
+        antithetic: false,
+    });
+
+    let err = engine
+        .price_with_capture(
+            &DummyRng,
+            &DummyProcess,
+            &DummyDisc,
+            &[100.0],
+            &DummyPayoff,
+            Currency::USD,
+            1.0,
+            ProcessParams::new("test"),
+        )
+        .expect_err("full path capture above the diagnostics budget should be rejected");
+
+    assert!(err.to_string().contains("Path capture budget"));
+}
+
+#[test]
 fn test_price_with_capture_rejects_antithetic_capture_combination() {
     let engine = McEngine::new(McEngineConfig {
         num_paths: 10,

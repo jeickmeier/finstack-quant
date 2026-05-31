@@ -16,7 +16,7 @@ use numpy::PyArray1;
 use pyo3::create_exception;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyString};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
@@ -112,16 +112,21 @@ impl PyCalibrationResult {
     }
 }
 
-fn cached_json<F>(cache: &OnceLock<String>, serialize: F) -> PyResult<String>
+fn cached_json<'py, F>(
+    py: Python<'py>,
+    cache: &OnceLock<String>,
+    serialize: F,
+) -> PyResult<Bound<'py, PyString>>
 where
     F: FnOnce() -> serde_json::Result<String>,
 {
     if let Some(value) = cache.get() {
-        return Ok(value.clone());
+        return Ok(PyString::new(py, value));
     }
     let value = serialize().map_err(display_to_py)?;
-    let _ = cache.set(value.clone());
-    Ok(value)
+    let py_value = PyString::new(py, &value);
+    let _ = cache.set(value);
+    Ok(py_value)
 }
 
 #[pymethods]
@@ -134,8 +139,8 @@ impl PyCalibrationResult {
     }
 
     /// Serialize to a pretty-printed JSON string.
-    fn to_json(&self) -> PyResult<String> {
-        cached_json(&self.cached_json, || {
+    fn to_json<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
+        cached_json(py, &self.cached_json, || {
             serde_json::to_string_pretty(&self.inner)
         })
     }
@@ -156,8 +161,8 @@ impl PyCalibrationResult {
 
     /// The calibrated market serialized as a JSON string.
     #[getter]
-    fn market_json(&self) -> PyResult<String> {
-        cached_json(&self.cached_market_json, || {
+    fn market_json<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
+        cached_json(py, &self.cached_market_json, || {
             serde_json::to_string_pretty(&self.inner.result.final_market)
         })
     }
@@ -168,8 +173,8 @@ impl PyCalibrationResult {
 
     /// The aggregated calibration report as a JSON string.
     #[getter]
-    fn report_json(&self) -> PyResult<String> {
-        cached_json(&self.cached_report_json, || {
+    fn report_json<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
+        cached_json(py, &self.cached_report_json, || {
             serde_json::to_string_pretty(&self.inner.result.report)
         })
     }
@@ -218,7 +223,11 @@ impl PyCalibrationResult {
     /// ------
     /// ValueError
     ///     If no step with the given *step_id* exists.
-    fn step_report_json(&self, step_id: &str) -> PyResult<String> {
+    fn step_report_json<'py>(
+        &self,
+        py: Python<'py>,
+        step_id: &str,
+    ) -> PyResult<Bound<'py, PyString>> {
         if self.cached_step_reports.get().is_none() {
             let mut reports = HashMap::with_capacity(self.inner.result.step_reports.len());
             for (id, report) in &self.inner.result.step_reports {
@@ -233,7 +242,7 @@ impl PyCalibrationResult {
         self.cached_step_reports
             .get()
             .and_then(|reports| reports.get(step_id))
-            .cloned()
+            .map(|report| PyString::new(py, report))
             .ok_or_else(|| crate::errors::value_error(format!("No step report for '{step_id}'")))
     }
 

@@ -38,6 +38,8 @@ use finstack_valuations::metrics::MetricId;
 
 use crate::errors::display_to_py;
 
+use super::json_bridge::{deserialize_json, serialize_json};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -480,13 +482,13 @@ impl PyPerPositionMetric {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PerPositionMetric = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PerPositionMetric = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     /// Variant tag (``"metric"``, ``"pv_base"``, etc.).
@@ -601,13 +603,13 @@ impl PyPositionFilter {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PositionFilter = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PositionFilter = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     /// Variant tag (``"all"``, ``"by_entity_id"``, ...).
@@ -686,13 +688,13 @@ impl PyMetricExpr {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: MetricExpr = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: MetricExpr = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -747,13 +749,13 @@ impl PyObjective {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: Objective = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: Objective = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     /// Variant tag: ``"maximize"`` or ``"minimize"``.
@@ -909,13 +911,13 @@ impl PyConstraint {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: Constraint = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: Constraint = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     /// Variant tag (``"metric_bound"`` / ``"weight_bounds"`` / ``"max_turnover"`` / ``"budget"``).
@@ -1129,13 +1131,13 @@ impl PyOptimizationStatus {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: OptimizationStatus = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: OptimizationStatus = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     /// Variant tag (``"optimal"``, ``"feasible_but_suboptimal"``, ...).
@@ -1209,13 +1211,13 @@ impl PyTradeSpec {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: TradeSpec = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: TradeSpec = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -1354,14 +1356,13 @@ impl PyOptimizationParameters {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: OptimizationParameters =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: OptimizationParameters = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -1453,7 +1454,7 @@ impl PyPortfolioOptimizationSpec {
         objective: PyObjective,
     ) -> PyResult<Self> {
         let portfolio: finstack_portfolio::portfolio::PortfolioSpec =
-            serde_json::from_str(portfolio_spec_json).map_err(display_to_py)?;
+            deserialize_json(portfolio_spec_json)?;
         Ok(Self::from_inner(PortfolioOptimizationSpec {
             portfolio,
             objective: objective.inner,
@@ -1507,14 +1508,13 @@ impl PyPortfolioOptimizationSpec {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PortfolioOptimizationSpec =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PortfolioOptimizationSpec = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -1554,7 +1554,7 @@ impl PyPortfolioOptimizationSpec {
     /// Portfolio specification body (raw JSON).
     #[pyo3(text_signature = "(self)")]
     fn portfolio_spec_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.portfolio).map_err(display_to_py)
+        serialize_json(&self.inner.portfolio)
     }
 
     fn __repr__(&self) -> String {
@@ -1591,7 +1591,7 @@ impl PyPortfolioOptimizationResult {
     /// Serialize to the canonical JSON wire format.
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]

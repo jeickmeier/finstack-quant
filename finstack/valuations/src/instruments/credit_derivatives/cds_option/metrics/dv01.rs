@@ -1,9 +1,13 @@
 //! CDS-Option-specific DV01 calculator.
 //!
-//! CDS-option IR DV01 is a swap-curve quote sensitivity: bump the stored swap
-//! curve market quotes, rebuild the discount curve, and reprice. Direct
-//! discount-factor bumps are intentionally rejected so the reported value has a
-//! single market convention.
+//! CDS-option IR DV01 is a swap-curve quote sensitivity: when the discount
+//! curve stores its swap-curve calibration quotes, bump those quotes, rebuild
+//! the curve, and reprice (Bloomberg CDSO convention). When the curve carries
+//! no calibration metadata (e.g. a directly-specified discount curve), fall
+//! back to a parallel bump of the discount factors — identical to the sibling
+//! [`CdsDv01Calculator`](crate::instruments::credit_derivatives::cds::metrics)
+//! so CDS and CDS-option IR DV01 share a single unit and sign convention and
+//! can be aggregated across a portfolio regardless of how the curve was built.
 
 use crate::calibration::bumps::rates::bump_discount_curve_from_rate_calibration;
 use crate::calibration::bumps::BumpRequest;
@@ -11,13 +15,15 @@ use crate::instruments::credit_derivatives::cds_option::CDSOption;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::sensitivity_central_diff;
 use crate::metrics::{MetricCalculator, MetricContext};
+use finstack_core::market_data::bumps::BumpSpec;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::Result;
 
 const MIN_BUMP_BP: f64 = 1e-10;
 
-/// CDS option DV01 calculator with par-spread hazard re-bootstrap when
-/// possible (Bloomberg CDSO convention).
+/// CDS option DV01 calculator: swap-curve quote bump when calibration metadata
+/// is present, parallel discount-factor bump otherwise (Bloomberg CDSO
+/// convention, hazard curve held fixed).
 pub(crate) struct CdsOptionDv01Calculator;
 
 impl CdsOptionDv01Calculator {
@@ -30,20 +36,24 @@ impl CdsOptionDv01Calculator {
         let base_discount = context
             .curves
             .get_discount(option.discount_curve_id.as_str())?;
-        let calibration = base_discount.rate_calibration().ok_or_else(|| {
-            finstack_core::Error::Validation(format!(
-                "CDS option '{}' IR DV01 requires swap-curve quote calibration metadata for discount curve '{}'",
-                option.id,
-                option.discount_curve_id.as_str()
-            ))
-        })?;
-        let bumped_discount = bump_discount_curve_from_rate_calibration(
-            base_discount.as_ref(),
-            calibration,
-            context.curves.as_ref(),
-            &BumpRequest::Parallel(bump_bp),
-        )?;
-        bumped_market = bumped_market.insert(bumped_discount);
+        // Prefer the market-standard swap-quote bump when the curve records its
+        // calibration; otherwise bump the discount factors directly so a
+        // directly-specified curve still yields a well-defined IR DV01 (matches
+        // `CdsDv01Calculator`).
+        if let Some(calibration) = base_discount.rate_calibration() {
+            let bumped_discount = bump_discount_curve_from_rate_calibration(
+                base_discount.as_ref(),
+                calibration,
+                context.curves.as_ref(),
+                &BumpRequest::Parallel(bump_bp),
+            )?;
+            bumped_market = bumped_market.insert(bumped_discount);
+        } else {
+            bumped_market.apply_curve_bump_in_place(
+                &option.discount_curve_id,
+                BumpSpec::parallel_bp(bump_bp),
+            )?;
+        }
 
         context.reprice_raw(&bumped_market, context.as_of)
     }

@@ -212,7 +212,11 @@ fn test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention() {
 }
 
 #[test]
-fn test_cds_option_dv01_requires_swap_curve_quote_calibration() {
+fn test_cds_option_dv01_falls_back_to_direct_bump_without_calibration() {
+    // A directly-specified discount curve carries no swap-quote calibration
+    // metadata. IR DV01 must still be well-defined: fall back to a parallel
+    // discount-factor bump (same as `CdsDv01Calculator`) instead of erroring,
+    // so the metric is available for portfolio aggregation.
     let as_of = date!(2025 - 01 - 01);
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
@@ -223,18 +227,33 @@ fn test_cds_option_dv01_requires_swap_curve_quote_calibration() {
     let market = MarketContext::new().insert(discount).insert(hazard);
     let option = CDSOptionBuilder::new().build(as_of);
 
-    let err = option
+    let result = option
         .price_with_metrics(
             &market,
             as_of,
             &[MetricId::Dv01],
             finstack_valuations::instruments::PricingOptions::default(),
         )
-        .expect_err("CDS option DV01 should reject direct discount-factor bumps");
-    let message = err.to_string();
+        .expect("CDS option DV01 should fall back to a direct discount-factor bump");
+    let dv01 = *result.measures.get("dv01").expect("dv01 present");
+    assert_finite(dv01, "CDS option DV01 (direct-bump fallback)");
+
+    // Reproduce: parallel-bump the discount factors directly, hazard held fixed.
+    let bumped_pv = |bump_bp: f64| {
+        let mut bumped = market.clone();
+        bumped
+            .apply_curve_bump_in_place(
+                &"USD-OIS".into(),
+                finstack_core::market_data::bumps::BumpSpec::parallel_bp(bump_bp),
+            )
+            .unwrap();
+        option.value_raw(&bumped, as_of).unwrap()
+    };
+    let expected = (bumped_pv(1.0) - bumped_pv(-1.0)) / 2.0;
+    let tol = 1e-6_f64.max(1e-8 * expected.abs());
     assert!(
-        message.contains("swap-curve quote calibration"),
-        "unexpected error: {message}"
+        (dv01 - expected).abs() <= tol,
+        "CDS option DV01 fallback should match a direct central-difference bump: metric={dv01}, expected={expected}"
     );
 }
 
@@ -327,7 +346,10 @@ fn test_cds_option_rejects_hazard_rate_cs01_metrics() {
 }
 
 #[test]
-fn test_cds_option_cs01_requires_cds_quote_points() {
+fn test_cds_option_cs01_falls_back_to_hazard_shift_without_quote_points() {
+    // A directly-specified hazard curve has no CDS par-spread points. CS01 must
+    // still be well-defined: the shared CS01 engine falls back to a parallel
+    // hazard-rate shift (same as the underlying CDS) instead of erroring.
     let as_of = date!(2025 - 01 - 01);
     let discount = flat_discount("USD-OIS", as_of, 0.03);
     let hazard = HazardCurve::builder("HZ-SN")
@@ -349,14 +371,13 @@ fn test_cds_option_cs01_requires_cds_quote_points() {
     );
 
     let registry = standard_registry();
-    let err = registry
+    let results = registry
         .compute(&[MetricId::Cs01], &mut ctx)
-        .expect_err("CDS option CS01 should require CDS quote/par-spread bumps");
-    let message = err.to_string();
-    assert!(
-        message.contains("CDS quote") || message.contains("par-spread"),
-        "unexpected error: {message}"
-    );
+        .expect("CDS option CS01 should fall back to a hazard-rate shift");
+    let cs01 = *results.get(&MetricId::Cs01).unwrap();
+    assert_finite(cs01, "CDS option CS01 (hazard-shift fallback)");
+    // A call on the (long-protection) underlying gains as spreads widen.
+    assert_positive(cs01, "CDS option CS01 (hazard-shift fallback)");
 }
 
 #[test]

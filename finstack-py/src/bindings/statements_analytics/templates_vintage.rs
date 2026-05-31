@@ -10,10 +10,11 @@
 
 use crate::bindings::extract::extract_model_ref;
 use crate::errors::display_to_py;
-use finstack_statements::builder::ModelBuilder;
 use finstack_statements::types::FinancialModelSpec;
 use finstack_statements_analytics::templates::vintage as rust_vintage;
 use pyo3::prelude::*;
+
+use super::templates_common::{finalize_spec, rebuild_builder};
 
 /// Apply the vintage (cohort) buildup template to a model spec.
 ///
@@ -54,24 +55,10 @@ fn apply_vintage(
     new_volume_node: &str,
     decay_curve: &[f64],
 ) -> PyResult<FinancialModelSpec> {
-    let meta = spec.meta.clone();
-    let capital_structure = spec.capital_structure.clone();
-    let id = spec.id.clone();
-    let periods = spec.periods.clone();
-    let nodes = spec.nodes;
-
-    let mut builder = ModelBuilder::new(id)
-        .periods_explicit(periods)
-        .map_err(display_to_py)?;
-    for (node_id, node_spec) in nodes {
-        builder.insert_node(node_id, node_spec);
-    }
+    let (builder, meta, capital_structure) = rebuild_builder(spec)?;
     let builder = rust_vintage::add_vintage_buildup(builder, name, new_volume_node, decay_curve)
         .map_err(display_to_py)?;
-    let mut new_spec = builder.build().map_err(display_to_py)?;
-    new_spec.meta = meta;
-    new_spec.capital_structure = capital_structure;
-    Ok(new_spec)
+    finalize_spec(builder, meta, capital_structure)
 }
 
 /// Register the vintage template binding on the parent module.

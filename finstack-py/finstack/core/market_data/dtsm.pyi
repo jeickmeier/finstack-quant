@@ -22,7 +22,7 @@ __all__ = [
 def diebold_li_fit_factors(
     tenors: list[float],
     yields_matrix: list[list[float]],
-    lambda_decay: float = 0.0609,
+    lambda_decay: float = 0.7308,
     /,
 ) -> dict[str, Any]:
     """Extract Nelson-Siegel factors from a yield panel via Diebold-Li.
@@ -37,7 +37,7 @@ def diebold_li_forecast(
     tenors: list[float],
     yields_matrix: list[list[float]],
     horizon: int,
-    lambda_decay: float = 0.0609,
+    lambda_decay: float = 0.7308,
     /,
 ) -> dict[str, Any]:
     """VAR(1) forecast of Diebold-Li factors out to ``horizon`` periods.

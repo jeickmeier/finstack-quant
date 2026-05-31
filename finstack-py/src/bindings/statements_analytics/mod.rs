@@ -11,6 +11,7 @@ mod comps;
 mod corkscrew;
 mod ecl;
 mod scorecards;
+mod templates_common;
 mod templates_real_estate;
 mod templates_roll_forward;
 mod templates_vintage;

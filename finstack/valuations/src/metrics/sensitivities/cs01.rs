@@ -89,7 +89,7 @@ pub(crate) fn sensitivity_central_diff(pv_up: f64, pv_down: f64, bump_bp: f64) -
 /// unsorted or duplicate tenors silently produce wrong per-bucket sensitivities
 /// (each duplicate tenor would be shocked twice and double-counted in the
 /// series), so reject them up front with a clear error.
-fn validate_buckets_strictly_increasing(buckets: &[f64]) -> finstack_core::Result<()> {
+pub(crate) fn validate_buckets_strictly_increasing(buckets: &[f64]) -> finstack_core::Result<()> {
     for win in buckets.windows(2) {
         if win[1].partial_cmp(&win[0]) != Some(std::cmp::Ordering::Greater) {
             return Err(finstack_core::Error::Validation(format!(
@@ -480,17 +480,6 @@ impl<I> Default for GenericParallelCs01<I> {
     }
 }
 
-impl<I> GenericParallelCs01<I> {
-    /// Construct a calculator that reports CS01 as `0.0` for instruments with
-    /// no credit curve, rather than raising a validation error.
-    pub(crate) fn with_empty_credit_curve_zero() -> Self {
-        Self {
-            empty_credit_curve_zero: true,
-            _phantom: PhantomData,
-        }
-    }
-}
-
 impl<I> MetricCalculator for GenericParallelCs01<I>
 where
     I: Instrument + CurveDependencies + 'static,
@@ -532,17 +521,6 @@ impl<I> Default for GenericBucketedCs01<I> {
     fn default() -> Self {
         Self {
             empty_credit_curve_zero: false,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<I> GenericBucketedCs01<I> {
-    /// Construct a calculator that reports CS01 as `0.0` for instruments with
-    /// no credit curve, rather than raising a validation error.
-    pub(crate) fn with_empty_credit_curve_zero() -> Self {
-        Self {
-            empty_credit_curve_zero: true,
             _phantom: PhantomData,
         }
     }

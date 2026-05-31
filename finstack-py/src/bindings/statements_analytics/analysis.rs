@@ -11,8 +11,27 @@
 
 use crate::bindings::extract::{extract_market_opt, extract_model_ref, extract_results_ref};
 use crate::errors::display_to_py;
+use finstack_statements_analytics::analysis::CorporateValuationResult;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+
+fn dcf_equity_result_dict<'py>(
+    py: Python<'py>,
+    result: &CorporateValuationResult,
+) -> PyResult<Bound<'py, PyDict>> {
+    let dict = PyDict::new(py);
+    dict.set_item("equity_value", result.equity_value.amount())?;
+    dict.set_item(
+        "equity_currency",
+        result.equity_value.currency().to_string(),
+    )?;
+    dict.set_item("enterprise_value", result.enterprise_value.amount())?;
+    dict.set_item("net_debt", result.net_debt.amount())?;
+    dict.set_item("terminal_value_pv", result.terminal_value_pv.amount())?;
+    dict.set_item("equity_value_per_share", result.equity_value_per_share)?;
+    dict.set_item("diluted_shares", result.diluted_shares)?;
+    Ok(dict)
+}
 
 // ---------------------------------------------------------------------------
 // Sensitivity analysis
@@ -379,18 +398,7 @@ fn evaluate_dcf<'py>(
         })
         .map_err(display_to_py)?;
 
-    let dict = PyDict::new(py);
-    dict.set_item("equity_value", result.equity_value.amount())?;
-    dict.set_item(
-        "equity_currency",
-        result.equity_value.currency().to_string(),
-    )?;
-    dict.set_item("enterprise_value", result.enterprise_value.amount())?;
-    dict.set_item("net_debt", result.net_debt.amount())?;
-    dict.set_item("terminal_value_pv", result.terminal_value_pv.amount())?;
-    dict.set_item("equity_value_per_share", result.equity_value_per_share)?;
-    dict.set_item("diluted_shares", result.diluted_shares)?;
-    Ok(dict)
+    dcf_equity_result_dict(py, &result)
 }
 
 // ---------------------------------------------------------------------------
@@ -485,18 +493,7 @@ fn run_corporate_analysis<'py>(
     dict.set_item("statement_json", stmt_json)?;
 
     if let Some(ref equity) = analysis.equity {
-        let eq_dict = PyDict::new(py);
-        eq_dict.set_item("equity_value", equity.equity_value.amount())?;
-        eq_dict.set_item(
-            "equity_currency",
-            equity.equity_value.currency().to_string(),
-        )?;
-        eq_dict.set_item("enterprise_value", equity.enterprise_value.amount())?;
-        eq_dict.set_item("net_debt", equity.net_debt.amount())?;
-        eq_dict.set_item("terminal_value_pv", equity.terminal_value_pv.amount())?;
-        eq_dict.set_item("equity_value_per_share", equity.equity_value_per_share)?;
-        eq_dict.set_item("diluted_shares", equity.diluted_shares)?;
-        dict.set_item("equity", eq_dict)?;
+        dict.set_item("equity", dcf_equity_result_dict(py, equity)?)?;
     }
 
     let credit_dict = PyDict::new(py);

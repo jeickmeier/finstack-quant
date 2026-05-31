@@ -132,9 +132,10 @@ fn parametric_var_decomposition<'py>(
     let mut config = DecompositionConfig::parametric_95();
     config.confidence = confidence;
 
-    let decomposer = ParametricPositionDecomposer;
-    let result = decomposer
-        .decompose_positions(&weights, &cov_flat, &ids, &config)
+    let result = py
+        .detach(move || {
+            ParametricPositionDecomposer.decompose_positions(&weights, &cov_flat, &ids, &config)
+        })
         .map_err(core_to_py)?;
 
     var_decomposition_to_dict(py, &result)
@@ -173,9 +174,10 @@ fn parametric_es_decomposition<'py>(
     let mut config = DecompositionConfig::parametric_95();
     config.confidence = confidence;
 
-    let decomposer = ParametricPositionDecomposer;
-    let result = decomposer
-        .decompose_positions(&weights, &cov_flat, &ids, &config)
+    let result = py
+        .detach(move || {
+            ParametricPositionDecomposer.decompose_positions(&weights, &cov_flat, &ids, &config)
+        })
         .map_err(core_to_py)?;
 
     es_decomposition_to_dict(py, &result)
@@ -220,8 +222,8 @@ fn historical_var_decomposition<'py>(
     if n == 0 {
         let ids = to_position_ids(position_ids);
         let config = DecompositionConfig::historical(confidence);
-        let result = HistoricalPositionDecomposer
-            .decompose_from_pnls(&[], &ids, 0, &config)
+        let result = py
+            .detach(move || HistoricalPositionDecomposer.decompose_from_pnls(&[], &ids, 0, &config))
             .map_err(core_to_py)?;
         return var_decomposition_to_dict(py, &result);
     }
@@ -236,19 +238,19 @@ fn historical_var_decomposition<'py>(
         }
     }
 
-    // Transpose to row-major scenarios x positions layout expected by the engine.
-    let mut flat = Vec::with_capacity(n_scenarios * n);
-    for s in 0..n_scenarios {
-        for row in &position_pnls {
-            flat.push(row[s]);
-        }
-    }
-
-    let ids = to_position_ids(position_ids);
     let config = DecompositionConfig::historical(confidence);
-
-    let result = HistoricalPositionDecomposer
-        .decompose_from_pnls(&flat, &ids, n_scenarios, &config)
+    let result = py
+        .detach(move || {
+            // Transpose to row-major scenarios x positions layout expected by the engine.
+            let mut flat = Vec::with_capacity(n_scenarios * n);
+            for s in 0..n_scenarios {
+                for row in &position_pnls {
+                    flat.push(row[s]);
+                }
+            }
+            let ids = to_position_ids(position_ids);
+            HistoricalPositionDecomposer.decompose_from_pnls(&flat, &ids, n_scenarios, &config)
+        })
         .map_err(core_to_py)?;
 
     var_decomposition_to_dict(py, &result)
@@ -319,11 +321,13 @@ fn evaluate_risk_budget<'py>(
         targets.insert(id.clone(), pct);
     }
     let budget = RiskBudget::new(targets).with_threshold(utilization_threshold);
-    let result = budget
-        .evaluate_components(
-            shared_ids.iter().zip(actual_var.iter().copied()),
-            portfolio_var,
-        )
+    let result = py
+        .detach(move || {
+            budget.evaluate_components(
+                shared_ids.iter().zip(actual_var.iter().copied()),
+                portfolio_var,
+            )
+        })
         .map_err(core_to_py)?;
 
     let out = PyDict::new(py);

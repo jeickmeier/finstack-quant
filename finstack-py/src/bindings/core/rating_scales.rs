@@ -99,9 +99,9 @@ impl PyUnknownScalePolicy {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json)")]
     fn from_json(_cls: &Bound<'_, PyType>, json: &str) -> PyResult<Self> {
-        let inner: UnknownScalePolicy = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid UnknownScalePolicy JSON"))?;
-        Ok(Self::from_inner(inner))
+        UnknownScalePolicy::from_json(json)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 }
 
@@ -174,9 +174,9 @@ impl PyRatingLevel {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json)")]
     fn from_json(_cls: &Bound<'_, PyType>, json: &str) -> PyResult<Self> {
-        let inner: RatingLevel = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid RatingLevel JSON"))?;
-        Ok(Self::from_inner(inner))
+        RatingLevel::from_json(json)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 }
 
@@ -265,9 +265,9 @@ impl PyScorecardScale {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json)")]
     fn from_json(_cls: &Bound<'_, PyType>, json: &str) -> PyResult<Self> {
-        let inner: ScorecardScale = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid ScorecardScale JSON"))?;
-        Ok(Self::from_inner(inner))
+        ScorecardScale::from_json(json)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 }
 
@@ -348,14 +348,9 @@ impl PyRatingScaleRegistry {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json)")]
     fn from_json(_cls: &Bound<'_, PyType>, json: &str) -> PyResult<Self> {
-        let inner: RatingScaleRegistry = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid RatingScaleRegistry JSON"))?;
-        // Round-trip through the canonical loader so validation runs.
-        let validated_json = serde_json::to_string(&inner)
-            .map_err(|err| serde_json_to_py(err, "invalid RatingScaleRegistry"))?;
-        let validated: RatingScaleRegistry = serde_json::from_str(&validated_json)
-            .map_err(|err| serde_json_to_py(err, "invalid RatingScaleRegistry JSON"))?;
-        Ok(Self::from_inner(validated))
+        RatingScaleRegistry::from_json(json)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 }
 

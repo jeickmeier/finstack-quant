@@ -6,6 +6,14 @@ use finstack_core::Result;
 /// Maximum number of Monte Carlo paths allowed per simulation run.
 pub const MAX_NUM_PATHS: usize = 10_000_000;
 
+/// Maximum number of paths that diagnostics capture may retain in memory.
+///
+/// Captured paths store every retained path point, state vector, payoff snapshot,
+/// and diagnostic cashflow. Keep this separate from [`MAX_NUM_PATHS`] so
+/// production pricing can run many paths without accidentally retaining the
+/// full simulation in memory.
+pub const MAX_CAPTURED_PATHS: usize = 100_000;
+
 /// Stores the runtime configuration for a Monte Carlo pricing run.
 ///
 /// This configuration is consumed by [`McEngine`] and can either be built

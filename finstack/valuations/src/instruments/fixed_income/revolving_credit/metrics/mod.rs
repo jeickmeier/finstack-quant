@@ -4,6 +4,7 @@
 //! facility-specific metrics (utilization rate, available capacity, weighted average cost, IRR).
 
 pub(crate) mod available_capacity;
+pub(crate) mod cs01;
 pub(crate) mod irr;
 pub(crate) mod utilization_rate;
 pub(crate) mod weighted_average_cost;
@@ -27,15 +28,17 @@ pub(crate) fn register_revolving_credit_metrics(registry: &mut MetricRegistry) {
             (Dv01, crate::metrics::UnifiedDv01Calculator::<
                 crate::instruments::RevolvingCredit,
             >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            // CS01: delegate to the canonical generic calculators. The
-            // `with_empty_credit_curve_zero` constructor reports CS01 as 0.0
-            // for facilities with no credit curve (no credit-model dependency).
-            (Cs01, crate::metrics::GenericParallelCs01::<
+            // CS01: when a credit curve is present the pricer survival-weights
+            // cashflows, so a par-spread bump moves PV — delegate to the
+            // canonical hazard CS01. With no credit curve, survival is 1.0 and
+            // the canonical CS01 is zero, so fall back to the market-standard
+            // z-spread bump. See `metrics::sensitivities::cs01_z_spread`.
+            (Cs01, crate::metrics::ZSpreadParallelCs01::<
                 crate::instruments::RevolvingCredit,
-            >::with_empty_credit_curve_zero()),
-            (BucketedCs01, crate::metrics::GenericBucketedCs01::<
+            >::hazard_when_credit_curve()),
+            (BucketedCs01, crate::metrics::ZSpreadBucketedCs01::<
                 crate::instruments::RevolvingCredit,
-            >::with_empty_credit_curve_zero()),
+            >::hazard_when_credit_curve()),
             (Cs01Hazard, crate::metrics::GenericParallelCs01Hazard::<
                 crate::instruments::RevolvingCredit,
             >::with_empty_credit_curve_zero()),

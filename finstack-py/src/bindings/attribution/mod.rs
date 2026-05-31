@@ -3,6 +3,7 @@
 //! Exposes the JSON-spec attribution pipeline and a `PnlAttribution` wrapper
 //! for interactive exploration from Python.
 
+use crate::bindings::module_utils::py_to_json_string;
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe, serde_rows_to_dataframe,
 };
@@ -177,19 +178,6 @@ fn default_attribution_metrics() -> Vec<String> {
         .into_iter()
         .map(|m| m.to_string())
         .collect()
-}
-
-/// Serialize a Python object to JSON via `json.dumps`.
-fn py_to_json_string<'py>(
-    py: Python<'py>,
-    obj: &Bound<'py, PyAny>,
-    label: &str,
-) -> PyResult<String> {
-    let json_mod = py.import("json")?;
-    json_mod
-        .call_method1("dumps", (obj,))
-        .and_then(|value| value.extract())
-        .map_err(|e| crate::errors::value_error(format!("invalid {label}: {e}")))
 }
 
 // ---------------------------------------------------------------------------

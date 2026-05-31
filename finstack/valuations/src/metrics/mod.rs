@@ -234,6 +234,9 @@ pub(crate) use sensitivities::cross_factor::{
 pub(crate) use sensitivities::cs01::{
     GenericBucketedCs01, GenericBucketedCs01Hazard, GenericParallelCs01, GenericParallelCs01Hazard,
 };
+pub(crate) use sensitivities::cs01_z_spread::{
+    ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01,
+};
 pub(crate) use sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator};
 pub(crate) use sensitivities::fd_greeks::{
     GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga, HasDayCount,

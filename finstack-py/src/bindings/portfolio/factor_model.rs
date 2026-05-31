@@ -35,7 +35,9 @@ use finstack_portfolio::factor_model::{
 };
 use finstack_portfolio::types::PositionId;
 
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::core_to_py;
+
+use super::json_bridge::{deserialize_json, serialize_json};
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -90,14 +92,14 @@ impl PyFactorContribution {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: FactorContribution = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: FactorContribution = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     /// Serialize to JSON.
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -158,14 +160,13 @@ impl PyPositionFactorContribution {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PositionFactorContribution =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PositionFactorContribution = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -220,14 +221,13 @@ impl PyPositionResidualContribution {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PositionResidualContribution =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PositionResidualContribution = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -297,13 +297,13 @@ impl PyRiskDecomposition {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: RiskDecomposition = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: RiskDecomposition = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -314,7 +314,7 @@ impl PyRiskDecomposition {
     /// Risk measure used for aggregation (serialized as a JSON-compatible string).
     #[getter]
     fn measure_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.measure).map_err(display_to_py)
+        serialize_json(&self.inner.measure)
     }
 
     #[getter]
@@ -391,14 +391,13 @@ impl PyPositionVarContribution {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PositionVarContribution =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PositionVarContribution = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -461,14 +460,13 @@ impl PyPositionEsContribution {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PositionEsContribution =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PositionEsContribution = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -529,14 +527,13 @@ impl PyPositionRiskDecomposition {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PositionRiskDecomposition =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PositionRiskDecomposition = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -630,13 +627,13 @@ impl PyPositionBudgetEntry {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PositionBudgetEntry = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PositionBudgetEntry = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -699,13 +696,13 @@ impl PyRiskBudgetResult {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: RiskBudgetResult = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: RiskBudgetResult = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -765,14 +762,13 @@ impl PyFactorContributionDelta {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: FactorContributionDelta =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: FactorContributionDelta = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -827,13 +823,13 @@ impl PyWhatIfResult {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: WhatIfResult = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: WhatIfResult = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -893,13 +889,13 @@ impl PyStressResult {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: StressResult = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: StressResult = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -959,13 +955,13 @@ impl PyStressPositionEntry {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: StressPositionEntry = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: StressPositionEntry = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -1022,13 +1018,13 @@ impl PyTailScenarioBreakdown {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: TailScenarioBreakdown = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: TailScenarioBreakdown = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -1084,13 +1080,13 @@ impl PyStressAttribution {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: StressAttribution = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: StressAttribution = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -1166,13 +1162,13 @@ impl PyPositionAssignment {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: PositionAssignment = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: PositionAssignment = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -1189,7 +1185,7 @@ impl PyPositionAssignment {
     /// Matched ``(dependency, factor_id)`` pairs as a JSON string.
     #[pyo3(text_signature = "(self)")]
     fn mappings_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.mappings).map_err(display_to_py)
+        serialize_json(&self.inner.mappings)
     }
 
     /// Matched factor identifiers (in mapping order).
@@ -1234,13 +1230,13 @@ impl PyUnmatchedEntry {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: UnmatchedEntry = serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: UnmatchedEntry = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -1251,7 +1247,7 @@ impl PyUnmatchedEntry {
     /// Unmatched dependency as a JSON string.
     #[pyo3(text_signature = "(self)")]
     fn dependency_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.dependency).map_err(display_to_py)
+        serialize_json(&self.inner.dependency)
     }
 
     fn __repr__(&self) -> String {
@@ -1285,14 +1281,13 @@ impl PyFactorAssignmentReport {
     #[classmethod]
     #[pyo3(text_signature = "(cls, json_str)")]
     fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: FactorAssignmentReport =
-            serde_json::from_str(json_str).map_err(display_to_py)?;
+        let inner: FactorAssignmentReport = deserialize_json(json_str)?;
         Ok(Self::from_inner(inner))
     }
 
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serialize_json(&self.inner)
     }
 
     #[getter]
@@ -1452,7 +1447,7 @@ impl PyCreditVolReport {
     /// Risk measure serialized as a JSON-compatible string (e.g. ``"variance"``).
     #[getter]
     fn measure_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.measure).map_err(display_to_py)
+        serialize_json(&self.inner.measure)
     }
 
     #[getter]
@@ -1682,6 +1677,7 @@ impl PyDecompositionConfig {
 #[pyfunction]
 #[pyo3(signature = (position_ids, weights, covariance, confidence = 0.95, compute_incremental = false))]
 fn parametric_var_decomposition_typed(
+    py: Python<'_>,
     position_ids: Vec<String>,
     weights: Vec<f64>,
     covariance: Vec<Vec<f64>>,
@@ -1698,8 +1694,10 @@ fn parametric_var_decomposition_typed(
         config = config.with_incremental();
     }
 
-    let result = ParametricPositionDecomposer
-        .decompose_positions(&weights, &cov_flat, &ids, &config)
+    let result = py
+        .detach(move || {
+            ParametricPositionDecomposer.decompose_positions(&weights, &cov_flat, &ids, &config)
+        })
         .map_err(core_to_py)?;
 
     Ok(PyPositionRiskDecomposition::from_inner(result))
@@ -1710,6 +1708,7 @@ fn parametric_var_decomposition_typed(
 #[pyfunction]
 #[pyo3(signature = (position_ids, position_pnls, confidence = 0.95))]
 fn historical_var_decomposition_typed(
+    py: Python<'_>,
     position_ids: Vec<String>,
     position_pnls: Vec<Vec<f64>>,
     confidence: f64,
@@ -1724,8 +1723,8 @@ fn historical_var_decomposition_typed(
     if n == 0 {
         let ids = to_position_ids(position_ids);
         let config = DecompositionConfig::historical(confidence);
-        let result = HistoricalPositionDecomposer
-            .decompose_from_pnls(&[], &ids, 0, &config)
+        let result = py
+            .detach(move || HistoricalPositionDecomposer.decompose_from_pnls(&[], &ids, 0, &config))
             .map_err(core_to_py)?;
         return Ok(PyPositionRiskDecomposition::from_inner(result));
     }
@@ -1740,19 +1739,19 @@ fn historical_var_decomposition_typed(
         }
     }
 
-    // Transpose to row-major scenarios x positions layout expected by the engine.
-    let mut flat = Vec::with_capacity(n_scenarios * n);
-    for s in 0..n_scenarios {
-        for row in &position_pnls {
-            flat.push(row[s]);
-        }
-    }
-
-    let ids = to_position_ids(position_ids);
     let config = DecompositionConfig::historical(confidence);
-
-    let result = HistoricalPositionDecomposer
-        .decompose_from_pnls(&flat, &ids, n_scenarios, &config)
+    let result = py
+        .detach(move || {
+            // Transpose to row-major scenarios x positions layout expected by the engine.
+            let mut flat = Vec::with_capacity(n_scenarios * n);
+            for s in 0..n_scenarios {
+                for row in &position_pnls {
+                    flat.push(row[s]);
+                }
+            }
+            let ids = to_position_ids(position_ids);
+            HistoricalPositionDecomposer.decompose_from_pnls(&flat, &ids, n_scenarios, &config)
+        })
         .map_err(core_to_py)?;
 
     Ok(PyPositionRiskDecomposition::from_inner(result))
@@ -1763,6 +1762,7 @@ fn historical_var_decomposition_typed(
 #[pyfunction]
 #[pyo3(signature = (position_ids, actual_var, target_var_pct, portfolio_var, utilization_threshold = 1.20))]
 fn evaluate_risk_budget_typed(
+    py: Python<'_>,
     position_ids: Vec<String>,
     actual_var: Vec<f64>,
     target_var_pct: Vec<f64>,
@@ -1790,11 +1790,13 @@ fn evaluate_risk_budget_typed(
         targets.insert(id.clone(), pct);
     }
     let budget = RiskBudget::new(targets).with_threshold(utilization_threshold);
-    let result = budget
-        .evaluate_components(
-            shared_ids.iter().zip(actual_var.iter().copied()),
-            portfolio_var,
-        )
+    let result = py
+        .detach(move || {
+            budget.evaluate_components(
+                shared_ids.iter().zip(actual_var.iter().copied()),
+                portfolio_var,
+            )
+        })
         .map_err(core_to_py)?;
 
     Ok(PyRiskBudgetResult::from_inner(result))

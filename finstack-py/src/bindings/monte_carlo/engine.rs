@@ -21,24 +21,26 @@ pub struct PyMcEngine {
 #[pymethods]
 impl PyMcEngine {
     /// Build an engine from a time grid configuration.
+    ///
+    /// European call/put pricing runs through the GBM `EuropeanPricer`, whose
+    /// simulation vocabulary is `num_paths`, `seed`, and `use_parallel`;
+    /// antithetic variates are not part of that path, so no antithetic knob is
+    /// exposed here.
     #[new]
-    #[pyo3(signature = (num_paths, time_grid, seed=None, use_parallel=None, antithetic=None))]
+    #[pyo3(signature = (num_paths, time_grid, seed=None, use_parallel=None))]
     fn new(
         num_paths: usize,
         time_grid: &PyTimeGrid,
         seed: Option<u64>,
         use_parallel: Option<bool>,
-        antithetic: Option<bool>,
     ) -> Self {
         let defaults = &registry::embedded_defaults_or_panic()
             .python_bindings
             .engine;
         let seed = seed.unwrap_or(defaults.seed);
         let use_parallel = use_parallel.unwrap_or(defaults.use_parallel);
-        let antithetic = antithetic.unwrap_or(defaults.antithetic);
-        let config = McEngineConfig::new(num_paths, time_grid.inner.clone())
-            .with_parallel(use_parallel)
-            .with_antithetic(antithetic);
+        let config =
+            McEngineConfig::new(num_paths, time_grid.inner.clone()).with_parallel(use_parallel);
         Self {
             inner: McEngine::new(config),
             seed,
@@ -59,13 +61,18 @@ impl PyMcEngine {
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMonteCarloResult> {
         let ccy = resolve_currency(currency)?;
-        let t_max = self.inner.config().time_grid.t_max();
-        let num_steps = self.inner.config().time_grid.num_steps();
-        let pricer = EuropeanPricer::new(self.inner.config().num_paths)
-            .with_seed(self.seed)
-            .with_parallel(self.inner.config().use_parallel);
         py.detach(|| {
-            pricer.price_gbm_call(spot, strike, rate, div_yield, vol, t_max, num_steps, ccy)
+            price_european_gbm(
+                &self.inner,
+                self.seed,
+                true,
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                ccy,
+            )
         })
         .map(PyMonteCarloResult::from_inner)
         .map_err(core_to_py)
@@ -85,13 +92,18 @@ impl PyMcEngine {
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMonteCarloResult> {
         let ccy = resolve_currency(currency)?;
-        let t_max = self.inner.config().time_grid.t_max();
-        let num_steps = self.inner.config().time_grid.num_steps();
-        let pricer = EuropeanPricer::new(self.inner.config().num_paths)
-            .with_seed(self.seed)
-            .with_parallel(self.inner.config().use_parallel);
         py.detach(|| {
-            pricer.price_gbm_put(spot, strike, rate, div_yield, vol, t_max, num_steps, ccy)
+            price_european_gbm(
+                &self.inner,
+                self.seed,
+                false,
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                ccy,
+            )
         })
         .map(PyMonteCarloResult::from_inner)
         .map_err(core_to_py)
@@ -111,6 +123,56 @@ impl PyMcEngine {
 // ---------------------------------------------------------------------------
 // Module-level convenience functions
 // ---------------------------------------------------------------------------
+
+#[allow(clippy::too_many_arguments)]
+fn price_european_gbm(
+    engine: &McEngine,
+    seed: u64,
+    is_call: bool,
+    spot: f64,
+    strike: f64,
+    rate: f64,
+    div_yield: f64,
+    vol: f64,
+    ccy: finstack_core::currency::Currency,
+) -> finstack_core::Result<finstack_monte_carlo::results::MoneyEstimate> {
+    use finstack_monte_carlo::discretization::exact::ExactGbm;
+    use finstack_monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
+    use finstack_monte_carlo::process::gbm::GbmProcess;
+    use finstack_monte_carlo::rng::philox::PhiloxRng;
+
+    let t_max = engine.config().time_grid.t_max();
+    let num_steps = engine.config().time_grid.num_steps();
+    let rng = PhiloxRng::new(seed);
+    let process = GbmProcess::with_params(rate, div_yield, vol)?;
+    let disc = ExactGbm::new();
+    let initial_state = vec![spot];
+    let discount_factor = (-rate * t_max).exp();
+
+    if is_call {
+        let payoff = EuropeanCall::new(strike, 1.0, num_steps);
+        engine.price(
+            &rng,
+            &process,
+            &disc,
+            &initial_state,
+            &payoff,
+            ccy,
+            discount_factor,
+        )
+    } else {
+        let payoff = EuropeanPut::new(strike, 1.0, num_steps);
+        engine.price(
+            &rng,
+            &process,
+            &disc,
+            &initial_state,
+            &payoff,
+            ccy,
+            discount_factor,
+        )
+    }
+}
 
 /// Resolve an optional currency argument, defaulting to USD.
 pub(super) fn resolve_currency(

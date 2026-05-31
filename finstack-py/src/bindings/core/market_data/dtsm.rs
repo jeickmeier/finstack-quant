@@ -25,8 +25,11 @@ use crate::errors::core_to_py;
 ///     yields_matrix: Yield panel ``yields_matrix[date_idx][tenor_idx]`` as a
 ///         list of lists (T rows of N tenors each). Yields are continuously
 ///         compounded zero rates.
-///     lambda: Diebold-Li decay parameter (default 0.0609, which maximizes
-///         the curvature factor loading at ~30-month maturity).
+///     lambda: Diebold-Li decay parameter for tenors **in years** (default
+///         0.7308, the years-equivalent of Diebold-Li's canonical 0.0609
+///         months value; curvature loading peaks at ~2.45 years ~ 30 months).
+///         Pass a months-scaled lambda only if you also supply tenors in
+///         months.
 ///
 /// Returns a dict with keys:
 ///     beta1: list[float] -- level factor per date (length T).
@@ -35,8 +38,8 @@ use crate::errors::core_to_py;
 ///     r_squared: list[float] -- R-squared per tenor (length N).
 ///     r_squared_avg: float -- cross-sectional average R-squared.
 #[pyfunction]
-#[pyo3(signature = (tenors, yields_matrix, lambda=0.0609))]
-#[pyo3(text_signature = "(tenors, yields_matrix, lambda=0.0609)")]
+#[pyo3(signature = (tenors, yields_matrix, lambda=0.7308))]
+#[pyo3(text_signature = "(tenors, yields_matrix, lambda=0.7308)")]
 fn diebold_li_fit_factors<'py>(
     py: Python<'py>,
     tenors: Vec<f64>,
@@ -86,7 +89,9 @@ fn diebold_li_fit_factors<'py>(
 ///     yields_matrix: Yield panel as ``yields_matrix[date_idx][tenor_idx]``
 ///         (T rows, N columns).
 ///     horizon: Forecast horizon (>= 1) in observation periods.
-///     lambda: Diebold-Li decay parameter (default 0.0609).
+///     lambda: Diebold-Li decay parameter for tenors **in years** (default
+///         0.7308; see ``diebold_li_fit_factors`` for the years-vs-months
+///         convention).
 ///
 /// Returns a dict with keys:
 ///     horizon: int -- the forecast horizon.
@@ -97,8 +102,8 @@ fn diebold_li_fit_factors<'py>(
 ///         each a list[float] of length N (95% Gaussian forecast band from
 ///         the h-step VAR(1) forecast error covariance).
 #[pyfunction]
-#[pyo3(signature = (tenors, yields_matrix, horizon, lambda=0.0609))]
-#[pyo3(text_signature = "(tenors, yields_matrix, horizon, lambda=0.0609)")]
+#[pyo3(signature = (tenors, yields_matrix, horizon, lambda=0.7308))]
+#[pyo3(text_signature = "(tenors, yields_matrix, horizon, lambda=0.7308)")]
 fn diebold_li_forecast<'py>(
     py: Python<'py>,
     tenors: Vec<f64>,

@@ -670,18 +670,9 @@ impl PyFactorCovarianceForecast {
         let measure: finstack_factor_model::RiskMeasure =
             serde_json::from_str(risk_measure_json).map_err(display_to_py)?;
         let forecast = finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
-        // Validate the model can be assembled at this horizon+measure.
-        // We return the underlying FactorModelConfig as JSON (the canonical portable form)
-        // since FactorModel itself doesn't implement Serialize.
-        let _fm = forecast
-            .factor_model_at(h, measure)
+        let config = forecast
+            .factor_model_config_at(h, measure)
             .map_err(display_to_py)?;
-        // Build the config manually: original config + horizon-scaled covariance.
-        // Reuse the same forecast instance — no need to construct a second one.
-        let covariance = forecast.covariance_at(h).map_err(display_to_py)?;
-        let mut config = self.model.config.clone();
-        config.covariance = covariance;
-        config.risk_measure = measure;
         serde_json::to_string_pretty(&config).map_err(display_to_py)
     }
 

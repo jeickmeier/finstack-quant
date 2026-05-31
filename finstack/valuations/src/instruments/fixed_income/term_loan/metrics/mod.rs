@@ -63,6 +63,7 @@
 //! - [`AllInRateCalculator`] for borrower cost calculation
 
 mod all_in_rate;
+mod cs01;
 mod discount_margin;
 mod embedded_option_value;
 mod irr_helpers;
@@ -122,15 +123,17 @@ pub(crate) fn register_term_loan_metrics(registry: &mut MetricRegistry) {
                 crate::instruments::TermLoan,
             >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
 
-            // CS01: delegate to the canonical generic calculators. The
-            // `with_empty_credit_curve_zero` constructor reports CS01 as 0.0
-            // for loans with no credit curve (no credit-model dependency).
-            (Cs01, crate::metrics::GenericParallelCs01::<
+            // CS01: the term-loan discounting pricer never consumes a hazard
+            // curve, so a par-spread / hazard bump leaves PV unchanged (CS01 =
+            // 0). Report credit-spread risk via the market-standard z-spread
+            // bump instead, anchored to the quoted price when supplied. See
+            // `metrics::sensitivities::cs01_z_spread`.
+            (Cs01, crate::metrics::ZSpreadParallelCs01::<
                 crate::instruments::TermLoan,
-            >::with_empty_credit_curve_zero()),
-            (BucketedCs01, crate::metrics::GenericBucketedCs01::<
+            >::always()),
+            (BucketedCs01, crate::metrics::ZSpreadBucketedCs01::<
                 crate::instruments::TermLoan,
-            >::with_empty_credit_curve_zero()),
+            >::always()),
         ]
     }
 

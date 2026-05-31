@@ -32,9 +32,14 @@ use crate::metrics::MetricRegistry;
 /// quote-spread risk measured against the *synthetic underlying CDS*, so the
 /// conventions are read off `synthetic_underlying_cds`.
 ///
-/// `cs01_precheck` reproduces the two legacy guards: a `0.0` short-circuit
-/// once the option has expired, and a hard calibration error when the hazard
-/// curve carries no CDS quote / par-spread points.
+/// `cs01_precheck` short-circuits CS01 to `0.0` once the option has expired
+/// (no spread risk remains). When the hazard curve carries CDS quote /
+/// par-spread points, CS01 is the par-spread bump with hazard re-bootstrap;
+/// when it does not (a directly-specified hazard curve), the shared CS01
+/// engine falls back to a parallel hazard-rate shift — the same graceful
+/// fallback the underlying CDS uses, so a CDS option on a directly-specified
+/// curve still reports a well-defined credit-spread sensitivity instead of
+/// erroring.
 ///
 /// CDS options price through their `value` path (Bloomberg CDSO), so
 /// `cs01_use_pricer_registry` returns `false` to keep scenario overrides and
@@ -65,7 +70,7 @@ impl crate::metrics::sensitivities::cs01::CdsCs01Conventions
     fn cs01_precheck(
         &self,
         context: &crate::metrics::MetricContext,
-        hazard_id: &finstack_core::types::CurveId,
+        _hazard_id: &finstack_core::types::CurveId,
     ) -> finstack_core::Result<Option<f64>> {
         let as_of = context.as_of;
         if as_of >= self.expiry {
@@ -78,17 +83,10 @@ impl crate::metrics::sensitivities::cs01::CdsCs01Conventions
             return Ok(Some(0.0));
         }
 
-        let hazard = context.curves.get_hazard(hazard_id.as_str())?;
-        if hazard.par_spread_points().next().is_none() {
-            return Err(finstack_core::Error::Calibration {
-                message: format!(
-                    "CDS option '{}' CS01 requires CDS quote/par-spread points on hazard curve '{}'",
-                    self.id,
-                    hazard_id.as_str()
-                ),
-                category: "cs01_quote_bump".to_string(),
-            });
-        }
+        // No par-spread guard: when the hazard curve has no CDS quote points the
+        // shared CS01 engine falls back to a parallel hazard-rate shift (same as
+        // the underlying CDS), so a directly-specified hazard curve still yields
+        // a well-defined CS01 rather than an error.
         Ok(None)
     }
 

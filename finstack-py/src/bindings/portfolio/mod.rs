@@ -7,6 +7,7 @@
 
 mod brinson;
 mod factor_model;
+mod json_bridge;
 mod liquidity;
 mod optimization;
 mod optimization_spec;

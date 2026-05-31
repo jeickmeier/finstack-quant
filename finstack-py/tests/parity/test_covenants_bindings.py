@@ -21,7 +21,7 @@ def test_covenant_template_roundtrip_and_evaluate() -> None:
         )
     )
 
-    assert reports["Debt/EBITDA <= 5.00x"]["passed"] is True
+    assert reports["max_debt_ebitda"]["passed"] is True
 
 
 def test_covenant_report_json_roundtrip() -> None:

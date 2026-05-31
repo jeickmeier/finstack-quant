@@ -155,7 +155,7 @@ fn run_greek(
     )?;
     py.detach(|| match setup.option_type {
         OptionType::Call => {
-            let payoff = EuropeanCall::new(strike, expiry, setup.num_steps);
+            let payoff = EuropeanCall::new(strike, 1.0, setup.num_steps);
             call_estimator(
                 &setup.engine,
                 &setup.rng,
@@ -169,7 +169,7 @@ fn run_greek(
             )
         }
         OptionType::Put => {
-            let payoff = EuropeanPut::new(strike, expiry, setup.num_steps);
+            let payoff = EuropeanPut::new(strike, 1.0, setup.num_steps);
             put_estimator(
                 &setup.engine,
                 &setup.rng,
