@@ -608,11 +608,11 @@ def compute_ecl_weighted(
 # Comparable-company analysis
 # ---------------------------------------------------------------------------
 
-def percentile_rank(value: float, peer_values: list[float]) -> float:
+def percentile_rank(value: float, peer_values: list[float]) -> float | None:
     """Percentile rank of ``value`` within ``peer_values`` on a 0-1 scale."""
     ...
 
-def z_score(value: float, peer_values: list[float]) -> float:
+def z_score(value: float, peer_values: list[float]) -> float | None:
     """Standard score of ``value`` within the peer distribution."""
     ...
 

@@ -32,23 +32,23 @@ use crate::errors::{core_to_py, display_to_py};
 /// Percentile rank of ``value`` within ``peer_values`` (0-1 scale).
 ///
 /// Uses the "fraction of values less than or equal" convention. Returns
-/// 0.5 as a neutral fallback when ``peer_values`` is empty.
+/// ``None`` when ``peer_values`` is empty.
 ///
 /// Arguments:
 ///     value: The subject value to rank.
 ///     peer_values: Peer distribution (need not be sorted).
 ///
 /// Returns:
-///     Percentile rank in [0, 1].
+///     Percentile rank in [0, 1], or ``None`` when ``peer_values`` is empty.
 #[pyfunction]
 #[pyo3(text_signature = "(value, peer_values)")]
-fn percentile_rank(value: f64, peer_values: Vec<f64>) -> f64 {
-    core_percentile_rank(&peer_values, value).unwrap_or(0.5)
+fn percentile_rank(value: f64, peer_values: Vec<f64>) -> Option<f64> {
+    core_percentile_rank(&peer_values, value)
 }
 
 /// Standard (z-) score of ``value`` in the peer distribution.
 ///
-/// Returns ``0.0`` if fewer than two peers are provided or the peer
+/// Returns ``None`` if fewer than two peers are provided or the peer
 /// distribution has zero variance.
 ///
 /// Arguments:
@@ -56,11 +56,11 @@ fn percentile_rank(value: f64, peer_values: Vec<f64>) -> f64 {
 ///     peer_values: Peer distribution.
 ///
 /// Returns:
-///     ``(value - mean(peers)) / stddev(peers)``.
+///     ``(value - mean(peers)) / stddev(peers)``, or ``None`` when undefined.
 #[pyfunction]
 #[pyo3(text_signature = "(value, peer_values)")]
-fn z_score(value: f64, peer_values: Vec<f64>) -> f64 {
-    core_z_score(&peer_values, value).unwrap_or(0.0)
+fn z_score(value: f64, peer_values: Vec<f64>) -> Option<f64> {
+    core_z_score(&peer_values, value)
 }
 
 /// Descriptive statistics for a peer distribution.

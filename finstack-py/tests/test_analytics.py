@@ -18,6 +18,7 @@ from finstack.statements_analytics import (
     percentile_rank,
     regression_fair_value,
     score_relative_value,
+    z_score,
 )
 import pandas as pd
 import pytest
@@ -336,6 +337,12 @@ class TestCompsBindings:
 
     def test_percentile_rank(self) -> None:
         assert percentile_rank(250.0, [100.0, 200.0, 300.0, 400.0, 500.0]) == pytest.approx(0.4)
+        assert percentile_rank(100.0, []) is None
+
+    def test_z_score(self) -> None:
+        assert z_score(3.0, [1.0, 2.0, 3.0, 4.0, 5.0]) == pytest.approx(0.0)
+        assert z_score(1.0, [1.0]) is None
+        assert z_score(5.0, [5.0, 5.0, 5.0]) is None
 
     def test_score_relative_value(self) -> None:
         subject = {"leverage": 2.0, "oas_bps": 250.0}
