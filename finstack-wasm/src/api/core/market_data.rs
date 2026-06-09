@@ -301,6 +301,7 @@ impl FxConversionPolicy {
 
     /// String form of the conversion policy.
     #[wasm_bindgen(js_name = toString)]
+    #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         self.inner.to_string()
     }
