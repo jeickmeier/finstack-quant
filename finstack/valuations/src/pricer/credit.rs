@@ -5,7 +5,7 @@
 //! # Model keys
 //!
 //! Credit products register only their *real* model key (`HazardRate` for
-//! CDS / CDSIndex / CDSTranche, `Black76` for CDSOption).
+//! CDS / CDSIndex / CDSTranche, `BloombergCdso` for CDSOption).
 
 use super::{
     expect_inst, register_generic, InstrumentType, ModelKey, Pricer, PricerKey, PricerRegistry,

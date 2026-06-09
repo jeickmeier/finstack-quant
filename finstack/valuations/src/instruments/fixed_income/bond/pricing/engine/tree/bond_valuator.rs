@@ -312,8 +312,12 @@ impl BondValuator {
                     // Weight for the upper step (fractional part)
                     let weight = raw_clamped - step_idx as f64;
 
-                    // Distribute to step_idx (weight: 1.0 - weight)
-                    if step_idx > 0 && step_idx < num_steps {
+                    // Distribute to step_idx (weight: 1.0 - weight). Step 0 is
+                    // included: backward induction reads cashflow_vec[0], and
+                    // value_at_step_time corrects the DF timing for a piece
+                    // booked at t=0, so a coupon inside the first time step
+                    // keeps its full (1 - weight) share.
+                    if step_idx < num_steps {
                         cashflow_vec[step_idx] += Self::value_at_step_time(
                             amount.amount() * (1.0 - weight),
                             time_frac,
@@ -771,6 +775,108 @@ mod tests {
             "tree cashflow mapping must preserve present value under distributed \
              (non-exercise) off-grid coupons: pv_mapped={pv_mapped}, pv_true={pv_true}, \
              diff={}",
+            (pv_mapped - pv_true).abs()
+        );
+    }
+
+    /// Blocker B2 regression: a coupon whose raw step index lands in (0, 1)
+    /// (i.e. inside the first time step) must keep its `(1 - weight)` share at
+    /// step 0. The old guard `step_idx > 0` silently dropped that share,
+    /// leaking up to a full coupon of PV for any callable bond valued within
+    /// one tree step of a coupon date.
+    #[test]
+    fn coupon_inside_first_time_step_books_share_at_step_zero() {
+        let as_of = date!(2025 - 01 - 01);
+        let call_date = date!(2031 - 06 - 15);
+        let maturity = date!(2035 - 01 - 01);
+        // 10y with 9 steps -> dt ≈ 1.11y, so the first annual coupon (t ≈ 1.0)
+        // has raw index ≈ 0.9 ∈ (0, 1) and splits across steps 0 and 1.
+        let tree_steps = 9;
+        let mut bond = Bond::fixed(
+            "FIRST-STEP-COUPON",
+            Money::new(1_000.0, Currency::USD),
+            0.06,
+            as_of,
+            maturity,
+            "USD-OIS",
+        )
+        .expect("bond");
+        bond.cashflow_spec = CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F)
+            .expect("finite test coupon");
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: call_date,
+                end_date: call_date,
+                price_pct_of_par: 100.0,
+                make_whole: None,
+            }],
+            puts: vec![],
+        });
+
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (10.0, 0.60)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+        let discount_curve = market.get_discount("USD-OIS").expect("discount curve");
+        let dc = discount_curve.day_count();
+        let time_to_maturity = dc
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("time to maturity");
+        let dt = time_to_maturity / tree_steps as f64;
+
+        let flows = bond
+            .pricing_dated_cashflows(&market, as_of)
+            .expect("cashflows");
+        // Test premise: at least one cashflow lands strictly inside the first step.
+        let has_first_step_coupon = flows.iter().any(|(date, _)| {
+            if *date <= as_of {
+                return false;
+            }
+            let tf = dc
+                .year_fraction(as_of, *date, DayCountContext::default())
+                .unwrap_or(0.0);
+            let raw = (tf / time_to_maturity) * tree_steps as f64;
+            raw > 1e-6 && raw < 1.0 - 1e-6
+        });
+        assert!(
+            has_first_step_coupon,
+            "test premise: a coupon must fall inside the first time step"
+        );
+
+        let valuator =
+            BondValuator::new(bond, &market, as_of, time_to_maturity, tree_steps).expect("tree");
+
+        // The (1 - weight) share of the first coupon must be booked at step 0.
+        assert!(
+            valuator.cashflow_vec[0] > 0.0,
+            "step 0 must receive the lower-step share of a first-step coupon, got {}",
+            valuator.cashflow_vec[0]
+        );
+
+        // PV-preservation identity: mapped cashflows discounted at step times
+        // must reproduce the raw cashflows discounted at their true times.
+        // Under the old `step_idx > 0` guard the first coupon's step-0 share
+        // vanished and this identity failed by ~0.1 coupon.
+        let mut pv_mapped = 0.0;
+        for (step, amount) in valuator.cashflow_vec.iter().enumerate() {
+            pv_mapped += amount * discount_curve.df(step as f64 * dt);
+        }
+        let mut pv_true = 0.0;
+        for (date, amount) in &flows {
+            if *date <= as_of {
+                continue;
+            }
+            let tf = dc
+                .year_fraction(as_of, *date, DayCountContext::default())
+                .expect("year fraction");
+            pv_true += amount.amount() * discount_curve.df(tf);
+        }
+        assert!(
+            (pv_mapped - pv_true).abs() < 1e-9,
+            "PV must be preserved when a coupon falls inside the first time step: \
+             pv_mapped={pv_mapped}, pv_true={pv_true}, diff={}",
             (pv_mapped - pv_true).abs()
         );
     }

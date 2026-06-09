@@ -41,10 +41,11 @@ pub(crate) enum SeasoningCurve {
 
     /// SDA (Standard Default Assumption) curve for residential mortgages.
     ///
-    /// Follows PSA standard:
-    /// - Ramps from 0% to 0.6% CDR over months 1-30
-    /// - Peaks at month 30
-    /// - Declines to 0.03% by month 60
+    /// Follows the PSA/BMA standard shape (expressed as a multiplier of the
+    /// base/peak CDR):
+    /// - Ramps from 0% to the peak over months 1-30
+    /// - Flat plateau at the peak through month 60
+    /// - Declines linearly to 5% of the peak by month 120
     /// - Stays flat thereafter
     ///
     /// The multiplier scales the entire curve (e.g., 150% SDA = 1.5x).
@@ -82,10 +83,13 @@ impl SeasoningCurve {
             SeasoningCurve::Flat => 1.0,
 
             SeasoningCurve::Sda { speed_multiplier } => {
-                // SDA curve parameters (industry standard)
+                // PSA/BMA SDA curve shape: ramp to peak at month 30, flat
+                // plateau through month 60, linear decline to the terminal
+                // level (5% of peak: 0.03%/0.60%) by month 120, flat after.
                 let peak_month = 30;
                 let peak_cdr_mult = 1.0; // Peak at 100% of base at month 30
-                let terminal_month = 60;
+                let plateau_end_month = 60;
+                let terminal_month = 120;
                 let terminal_cdr_mult = 0.05; // Terminal at 5% of peak
 
                 let base_mult = if seasoning_months == 0 {
@@ -93,12 +97,16 @@ impl SeasoningCurve {
                 } else if seasoning_months <= peak_month {
                     // Ramp up to peak
                     (seasoning_months as f64 / peak_month as f64) * peak_cdr_mult
+                } else if seasoning_months <= plateau_end_month {
+                    // Flat plateau at the peak
+                    peak_cdr_mult
                 } else if seasoning_months <= terminal_month {
                     // Decline to terminal
-                    let months_past_peak = (seasoning_months - peak_month) as f64;
-                    let decline_period = (terminal_month - peak_month) as f64;
+                    let months_past_plateau = (seasoning_months - plateau_end_month) as f64;
+                    let decline_period = (terminal_month - plateau_end_month) as f64;
                     peak_cdr_mult
-                        - (months_past_peak / decline_period) * (peak_cdr_mult - terminal_cdr_mult)
+                        - (months_past_plateau / decline_period)
+                            * (peak_cdr_mult - terminal_cdr_mult)
                 } else {
                     // Terminal rate
                     terminal_cdr_mult
@@ -419,15 +427,31 @@ mod tests {
         assert!(m15 > 0.0 && m15 < m30, "Multiplier should ramp up");
         assert!((m30 - 1.0).abs() < 1e-10, "Peak at month 30 should be 1.0");
 
-        // Decline after peak
+        // Flat plateau through month 60
         let m45 = curve.multiplier(45);
         let m60 = curve.multiplier(60);
-        assert!(m45 < m30, "Multiplier should decline after peak");
-        assert!(m60 < m45, "Multiplier should continue declining");
+        assert!(
+            (m45 - 1.0).abs() < 1e-10,
+            "Plateau at month 45 should be 1.0"
+        );
+        assert!(
+            (m60 - 1.0).abs() < 1e-10,
+            "Plateau at month 60 should be 1.0"
+        );
 
-        // Terminal rate
+        // Decline after the plateau
+        let m90 = curve.multiplier(90);
+        assert!(m90 < m60, "Multiplier should decline after the plateau");
+        assert!(
+            (m90 - 0.525).abs() < 1e-10,
+            "Mid-decline at month 90 should be 0.525"
+        );
+
+        // Terminal rate at month 120 and beyond
         let m120 = curve.multiplier(120);
+        let m200 = curve.multiplier(200);
         assert!((m120 - 0.05).abs() < 1e-10, "Terminal rate should be 5%");
+        assert!((m200 - 0.05).abs() < 1e-10, "Terminal rate stays flat");
     }
 
     #[test]

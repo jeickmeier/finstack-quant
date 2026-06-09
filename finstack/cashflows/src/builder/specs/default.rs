@@ -35,14 +35,18 @@ impl DefaultModelSpec {
     ///
     /// `MDR = 1 - (1 - CDR)^(1/12)`
     ///
-    /// For the SDA curve, the annual CDR is first derived from seasoning:
+    /// For the SDA curve, the annual CDR is first derived from seasoning using
+    /// the PSA/BMA Standard Default Assumption (100 SDA):
     ///
-    /// - months `1..=30`: linear ramp to a 6% annual CDR peak
-    /// - months `31..=60`: linear decline from 6% to a 3% terminal annual CDR
-    /// - months `> 60`: flat 3% annual CDR terminal level
+    /// - months `1..=30`: linear ramp of 0.02% CDR per month to a 0.60% annual
+    ///   CDR peak at month 30
+    /// - months `31..=60`: flat 0.60% annual CDR plateau
+    /// - months `61..=120`: linear decline from 0.60% to a 0.03% terminal
+    ///   annual CDR at month 120
+    /// - months `> 120`: flat 0.03% annual CDR terminal level
     ///
     /// The `speed_multiplier` scales the resulting annual CDR before conversion
-    /// into MDR.
+    /// into MDR (e.g. `2.0` = 200 SDA).
     ///
     /// # Arguments
     ///
@@ -64,16 +68,23 @@ impl DefaultModelSpec {
         let cdr = match &self.curve {
             None | Some(DefaultCurve::Constant) => self.cdr,
             Some(DefaultCurve::Sda { speed_multiplier }) => {
-                // SDA: peak at month 30, decline to terminal
+                // PSA/BMA 100 SDA: 0.02%/month ramp to 0.60% CDR at month 30,
+                // flat plateau through month 60, linear decline to 0.03% by
+                // month 120, flat thereafter.
                 const PEAK_MONTH: u32 = 30;
-                const PEAK_CDR: f64 = 0.06;
-                const TERMINAL_CDR: f64 = 0.03;
+                const PLATEAU_END_MONTH: u32 = 60;
+                const TERMINAL_MONTH: u32 = 120;
+                const PEAK_CDR: f64 = 0.006;
+                const TERMINAL_CDR: f64 = 0.0003;
 
                 let base = if seasoning_months <= PEAK_MONTH {
                     (seasoning_months as f64 / PEAK_MONTH as f64) * PEAK_CDR
-                } else if seasoning_months <= PEAK_MONTH + 30 {
-                    let past_peak = (seasoning_months - PEAK_MONTH) as f64;
-                    PEAK_CDR - (past_peak / 30.0) * (PEAK_CDR - TERMINAL_CDR)
+                } else if seasoning_months <= PLATEAU_END_MONTH {
+                    PEAK_CDR
+                } else if seasoning_months <= TERMINAL_MONTH {
+                    let past_plateau = (seasoning_months - PLATEAU_END_MONTH) as f64;
+                    let decline_months = (TERMINAL_MONTH - PLATEAU_END_MONTH) as f64;
+                    PEAK_CDR - (past_plateau / decline_months) * (PEAK_CDR - TERMINAL_CDR)
                 } else {
                     TERMINAL_CDR
                 };
@@ -110,8 +121,10 @@ impl DefaultModelSpec {
 
     /// SDA curve with multiplier (1.0 = 100% SDA).
     ///
-    /// The implementation ramps annual CDR to a 6% peak by month 30, then
-    /// decays linearly to a 3% terminal annual CDR by month 60.
+    /// Implements the PSA/BMA Standard Default Assumption: annual CDR ramps
+    /// 0.02%/month to a 0.60% peak at month 30, stays flat through month 60,
+    /// declines linearly to a 0.03% terminal annual CDR at month 120, and is
+    /// flat thereafter.
     ///
     /// # Arguments
     ///
@@ -137,7 +150,7 @@ impl DefaultModelSpec {
     /// - `docs/REFERENCES.md#tuckman-serrat-fixed-income`
     pub fn sda(speed_multiplier: f64) -> Self {
         Self {
-            cdr: 0.03, // 100% SDA terminal rate
+            cdr: 0.0003, // 100% SDA terminal annual CDR
             curve: Some(DefaultCurve::Sda { speed_multiplier }),
         }
     }

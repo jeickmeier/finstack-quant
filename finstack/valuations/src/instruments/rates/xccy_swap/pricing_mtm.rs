@@ -3,7 +3,7 @@
 //! Implements the cashflow stream under the CIP no-FX-vol approximation. The constant leg
 //! behaves like a vanilla fixed-notional XCCY leg (initial exchange, periodic coupons on
 //! `N_C`, final exchange). The resetting leg's notional is re-marked at each accrual-period
-//! start using `N_j^R = N_C / X_j^FRA` where `X_j^FRA = X_0 * P_C(T_j) / P_R(T_j)`, with
+//! start using `N_j^R = N_C / X_j^FRA` where `X_j^FRA = X_0 * P_R(T_j) / P_C(T_j)`, with
 //! coupons accruing on the new notional and a rebalancing cashflow paid on the resetting
 //! leg only to fund the notional change.
 //!
@@ -86,7 +86,7 @@ pub(crate) fn pv_mtm_reset(
     let reporting_ccy = swap.reporting_currency;
 
     // FX rate (resetting -> constant) at the valuation date. The forward FX at any
-    // curve-time T is derived as `spot_x_at_as_of * P_C(T) / P_R(T)` via CIP; the
+    // curve-time T is derived as `spot_x_at_as_of * P_R(T) / P_C(T)` via CIP; the
     // spec's `X_0` is this value at the swap's start date, NOT necessarily spot.
     let spot_x_at_as_of = fx
         .rate(FxQuery::new(
@@ -463,7 +463,7 @@ pub(crate) fn mtm_resetting_leg_schedule(
 /// Per-period resetting-leg notional under CIP no-FX-vol: `N_C / X_t^FRA`.
 ///
 /// Uses *relative* discount factors from `as_of` (via `robust_relative_df`) so the CIP
-/// forward FX `X_t^FRA = spot_x_at_as_of · P_C(as_of, t) / P_R(as_of, t)` is consistent
+/// forward FX `X_t^FRA = spot_x_at_as_of · P_R(as_of, t) / P_C(as_of, t)` is consistent
 /// with the spot rate observed at `as_of`. Using absolute DFs from each curve's base
 /// date would only agree when `as_of == curve.base_date` — i.e., the same day the
 /// curves were calibrated — and would silently bias every intraday revaluation.
@@ -483,7 +483,7 @@ fn compute_resetting_notional_and_df_r(
     let p_c = require_positive_df(p_c, swap_id, "constant-leg", date)?;
     let p_r = robust_relative_df(disc_r, as_of, date)?;
     let p_r = require_positive_df(p_r, swap_id, "resetting-leg", date)?;
-    let x_t = spot_x_at_as_of * (p_c / p_r);
+    let x_t = spot_x_at_as_of * (p_r / p_c);
     if !x_t.is_finite() || x_t <= 0.0 {
         return Err(finstack_core::Error::Validation(format!(
             "XccySwap '{swap_id}': non-positive forward FX at date {date}"
@@ -571,13 +571,77 @@ mod tests {
         // When `as_of == curve.base_date`, robust_relative_df reduces to df_on_date_curve.
         let p_c = disc_c.df_on_date_curve(date).expect("p_c");
         let p_r = disc_r.df_on_date_curve(date).expect("p_r");
-        let expected = n_c / (spot * p_c / p_r);
+        let expected = n_c / (spot * p_r / p_c);
 
         let actual = compute_resetting_notional(n_c, spot, base, date, &disc_c, &disc_r, &swap_id)
             .expect("formula ok");
         assert!(
             (actual - expected).abs() < 1e-6,
             "got {actual}, expected {expected}"
+        );
+    }
+
+    /// Blocker B1 regression: the resetting notional must use the CIP forward
+    /// `F = S · P_R / P_C` (low-yield currency trades at a forward premium),
+    /// verified against a hand-computed value rather than the implementation's
+    /// own DF lookups.
+    ///
+    /// EUR@1% (resetting), USD@2% (constant), S = 1.10 USD per EUR:
+    /// F(1y) = 1.10 · e^{-0.01} / e^{-0.02} = 1.10 · e^{0.01} ≈ 1.111055,
+    /// so N_R(1y) = N_C / F(1y) ≈ 9,000,455 EUR for N_C = 10mm USD.
+    #[test]
+    fn resetting_notional_matches_hand_computed_cip_forward() {
+        use finstack_core::market_data::term_structures::DiscountCurve;
+        use finstack_core::math::interp::{ExtrapolationPolicy, InterpStyle};
+        use finstack_core::types::{CurveId, InstrumentId};
+        use time::Month;
+
+        let base = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+        // Pin an explicit knot at t = 1.0 so the 1y DF is exactly e^{-r}
+        // regardless of the linear-in-DF interpolation between knots.
+        let disc_c = DiscountCurve::builder(CurveId::new("USD-OIS"))
+            .base_date(base)
+            .day_count(finstack_core::dates::DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (1.0, (-0.02_f64).exp()),
+                (5.0, (-0.02_f64 * 5.0).exp()),
+            ])
+            .interp(InterpStyle::Linear)
+            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .build()
+            .expect("build USD curve");
+        let disc_r = DiscountCurve::builder(CurveId::new("EUR-OIS"))
+            .base_date(base)
+            .day_count(finstack_core::dates::DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (1.0, (-0.01_f64).exp()),
+                (5.0, (-0.01_f64 * 5.0).exp()),
+            ])
+            .interp(InterpStyle::Linear)
+            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .build()
+            .expect("build EUR curve");
+
+        let spot = 1.10_f64; // USD per EUR
+        let n_c = 10_000_000.0; // USD
+                                // Exactly 365 days from base under Act/365F -> t = 1.0.
+        let date = Date::from_calendar_date(2026, Month::January, 2).expect("date");
+        let swap_id = InstrumentId::new("TEST-XCCY-SWAP");
+
+        let forward = spot * (0.01_f64).exp(); // S · e^{(r_C − r_R)·1y}
+        assert!(
+            forward > spot,
+            "low-yield EUR must be at a forward premium vs USD"
+        );
+        let expected = n_c / forward;
+
+        let actual = compute_resetting_notional(n_c, spot, base, date, &disc_c, &disc_r, &swap_id)
+            .expect("formula ok");
+        assert!(
+            (actual - expected).abs() < 1e-6,
+            "got {actual}, expected hand-computed {expected}"
         );
     }
 }

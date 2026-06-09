@@ -35,9 +35,19 @@ pub struct CarryResult {
 ///
 /// # Formula
 ///
+/// The roll seller (drops the bond, invests proceeds) forgoes the coupon
+/// income and the paydown's pull-to-par gain over the roll, but buys back
+/// cheaper by the drop. Break-even financing therefore satisfies:
+///
 /// ```text
-/// implied_rate = (drop + coupon_income - paydown) / price × (360 / days)
+/// implied_rate = (coupon_income + paydown × (100 − back_price)/100 − drop)
+///                / front_price × (360 / days)
 /// ```
+///
+/// A larger drop *lowers* the implied financing rate (the roll is special /
+/// cheap to finance). Principal paid down at par is not a full-par cost: the
+/// seller only forgoes the pull-to-par component `(100 − back_price)` per 100
+/// of paydown.
 ///
 /// # Arguments
 ///
@@ -105,7 +115,9 @@ pub fn implied_financing_rate(roll: &DollarRoll, prepay_rate: f64) -> Result<Car
     let avg_balance = (100.0 + (100.0 - principal_paydown).max(0.0)) / 2.0;
     let coupon_income = roll.coupon * (days as f64 / 360.0) * avg_balance;
 
-    let net_benefit = drop + coupon_income - principal_paydown;
+    // Net financing benefit forgone by the roll seller: coupon income plus the
+    // paydown's pull-to-par gain, less the drop captured by buying back cheaper.
+    let net_benefit = coupon_income + principal_paydown * (100.0 - roll.back_price) / 100.0 - drop;
 
     let price = roll.front_price;
     let implied_rate = if days > 0 {
@@ -137,18 +149,26 @@ pub fn roll_specialness(roll: &DollarRoll, prepay_rate: f64, repo_rate: f64) -> 
 
 /// Calculate break-even drop given a target financing rate.
 ///
+/// Inverts the implied-rate formula for the drop:
+///
+/// ```text
+/// drop = coupon_income + paydown × (100 − back_price)/100
+///        − target_rate × front_price × days/360
+/// ```
+///
 /// # Returns
 ///
 /// Break-even drop (in price points)
 pub fn break_even_drop(
     target_rate: f64,
     front_price: f64,
+    back_price: f64,
     coupon_income: f64,
     principal_paydown: f64,
     days: i64,
 ) -> f64 {
     let required_net = target_rate * front_price * (days as f64 / 360.0);
-    required_net - coupon_income + principal_paydown
+    coupon_income + principal_paydown * (100.0 - back_price) / 100.0 - required_net
 }
 
 #[cfg(test)]
@@ -228,14 +248,26 @@ mod tests {
 
         let specialness =
             roll_specialness(&roll, prepay_rate, repo_rate).expect("should calculate");
-        assert!(specialness > -500.0);
-        assert!(specialness < 500.0);
+
+        // Definition: specialness = (repo − implied) in bp.
+        let carry = implied_financing_rate(&roll, prepay_rate).expect("carry");
+        let expected = (repo_rate - carry.implied_rate) * 10_000.0;
+        assert!(
+            (specialness - expected).abs() < 1e-9,
+            "specialness {specialness} should equal (repo − implied)·1e4 = {expected}"
+        );
+
+        // The example's 0.5-point drop over ~1 month dwarfs the carry, so the
+        // roll screens strongly special (implied rate well below repo).
+        assert!(specialness > 0.0, "example roll should be special");
+        assert!(specialness < 2_000.0);
     }
 
     #[test]
     fn test_break_even_drop() {
         let target_rate = 0.04;
         let front_price = 98.5;
+        let back_price = 98.0;
         let coupon_income = 0.333;
         let principal_paydown = 0.5;
         let days = 30;
@@ -243,6 +275,7 @@ mod tests {
         let break_even = break_even_drop(
             target_rate,
             front_price,
+            back_price,
             coupon_income,
             principal_paydown,
             days,
@@ -258,6 +291,7 @@ mod tests {
         let be = break_even_drop(
             result.implied_rate,
             roll.front_price,
+            roll.back_price,
             result.coupon_income,
             result.principal_paydown,
             result.settlement_days,
@@ -266,6 +300,37 @@ mod tests {
             (be - roll.drop()).abs() < 0.01,
             "break-even at implied rate should ≈ actual drop, got {be} vs {}",
             roll.drop()
+        );
+    }
+
+    /// Blocker B3 regression: a larger drop must *lower* the implied financing
+    /// rate (the roll is special / cheap to finance) and therefore *raise*
+    /// specialness vs a fixed repo rate. The pre-fix convention
+    /// (`net_benefit = drop + coupon − paydown`) moved both the wrong way.
+    #[test]
+    fn larger_drop_lowers_implied_rate_and_raises_specialness() {
+        let base = DollarRoll::example().expect("DollarRoll example is valid");
+        // Widen the drop by cheapening the back price.
+        let mut wide = base.clone();
+        wide.back_price = base.back_price - 0.25;
+        assert!(wide.drop() > base.drop());
+
+        let prepay = 0.005;
+        let r_base = implied_financing_rate(&base, prepay).expect("base carry");
+        let r_wide = implied_financing_rate(&wide, prepay).expect("wide carry");
+        assert!(
+            r_wide.implied_rate < r_base.implied_rate,
+            "larger drop must lower implied financing rate: base={}, wide={}",
+            r_base.implied_rate,
+            r_wide.implied_rate
+        );
+
+        let repo = 0.05;
+        let s_base = roll_specialness(&base, prepay, repo).expect("base specialness");
+        let s_wide = roll_specialness(&wide, prepay, repo).expect("wide specialness");
+        assert!(
+            s_wide > s_base,
+            "larger drop must raise specialness: base={s_base}bp, wide={s_wide}bp"
         );
     }
 }

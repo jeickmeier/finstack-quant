@@ -82,8 +82,9 @@ fn psa_smm_golden_values() {
 
 #[test]
 fn sda_mdr_golden_values() {
-    // SDA (Standard Default Assumption) Model Golden Values
-    // SDA peaks at month 30 with 6% CDR, then declines to 3% terminal over next 30 months
+    // SDA (Standard Default Assumption) Model Golden Values — PSA/BMA 100 SDA:
+    // 0.02%/month ramp to 0.60% CDR at month 30, flat plateau months 30-60,
+    // linear decline to 0.03% CDR by month 120, flat thereafter.
     use finstack_cashflows::builder::smm_to_cpr;
     use finstack_cashflows::builder::DefaultModelSpec;
 
@@ -97,40 +98,58 @@ fn sda_mdr_golden_values() {
         mdr_0
     );
 
-    // Month 15: 3% CDR (halfway to peak)
+    // Month 15: 0.30% CDR (halfway to peak)
     let mdr_15 = model.mdr(15).unwrap();
     let cdr_15 = smm_to_cpr(mdr_15).expect("valid SMM");
     assert!(
-        (cdr_15 - 0.03).abs() < RATE_TOLERANCE,
-        "SDA at month 15 should be 3% CDR, got {}",
+        (cdr_15 - 0.003).abs() < RATE_TOLERANCE,
+        "SDA at month 15 should be 0.30% CDR, got {}",
         cdr_15
     );
 
-    // Month 30: 6% CDR (peak)
+    // Month 30: 0.60% CDR (peak)
     let mdr_30 = model.mdr(30).unwrap();
     let cdr_30 = smm_to_cpr(mdr_30).expect("valid SMM");
     assert!(
-        (cdr_30 - 0.06).abs() < RATE_TOLERANCE,
-        "SDA at month 30 should be 6% CDR (peak), got {}",
+        (cdr_30 - 0.006).abs() < RATE_TOLERANCE,
+        "SDA at month 30 should be 0.60% CDR (peak), got {}",
         cdr_30
     );
 
-    // Month 60: 3% CDR (terminal, 30 months after peak)
+    // Month 60: still 0.60% CDR (end of plateau)
     let mdr_60 = model.mdr(60).unwrap();
     let cdr_60 = smm_to_cpr(mdr_60).expect("valid SMM");
     assert!(
-        (cdr_60 - 0.03).abs() < RATE_TOLERANCE,
-        "SDA at month 60 should be 3% CDR (terminal), got {}",
+        (cdr_60 - 0.006).abs() < RATE_TOLERANCE,
+        "SDA at month 60 should be 0.60% CDR (plateau), got {}",
         cdr_60
     );
 
-    // Month 90: Still 3% CDR (flat after terminal)
+    // Month 90: 0.315% CDR (halfway down the 60-month decline)
     let mdr_90 = model.mdr(90).unwrap();
     let cdr_90 = smm_to_cpr(mdr_90).expect("valid SMM");
     assert!(
-        (cdr_90 - 0.03).abs() < RATE_TOLERANCE,
-        "SDA at month 90 should still be 3% CDR, got {}",
+        (cdr_90 - 0.00315).abs() < RATE_TOLERANCE,
+        "SDA at month 90 should be 0.315% CDR (mid-decline), got {}",
         cdr_90
+    );
+
+    // Month 120: 0.03% CDR (terminal)
+    let mdr_120 = model.mdr(120).unwrap();
+    let cdr_120 = smm_to_cpr(mdr_120).expect("valid SMM");
+    assert!(
+        (cdr_120 - 0.0003).abs() < RATE_TOLERANCE,
+        "SDA at month 120 should be 0.03% CDR (terminal), got {}",
+        cdr_120
+    );
+
+    // Month 200: still 0.03% CDR (flat after terminal)
+    let mdr_200 = model.mdr(200).unwrap();
+    let cdr_200 = smm_to_cpr(mdr_200).expect("valid SMM");
+    assert!(
+        (cdr_200 - 0.0003).abs() < RATE_TOLERANCE,
+        "SDA at month 200 should still be 0.03% CDR, got {}",
+        cdr_200
     );
 }
 
@@ -310,16 +329,17 @@ fn psa_terminal_rate_is_flat() {
 
 #[test]
 fn sda_matches_industry_standard_curve() {
-    // Reference: Standard Default Assumption curve
-    // Ramp to 6% CDR at month 30, decline to 3% CDR terminal by month 60
+    // Reference: PSA/BMA Standard Default Assumption curve (100 SDA)
+    // 0.02%/month ramp to 0.60% CDR at month 30, flat plateau through month
+    // 60, linear decline to 0.03% CDR by month 120, flat thereafter.
     use finstack_cashflows::builder::smm_to_cpr;
     use finstack_cashflows::builder::DefaultModelSpec;
 
     let model = DefaultModelSpec::sda(1.0);
 
-    // Verify ramp phase (months 1-30)
+    // Verify ramp phase (months 1-30): 0.02% CDR per month
     for month in 1..=30 {
-        let expected_cdr = (month as f64 / 30.0) * 0.06;
+        let expected_cdr = (month as f64 / 30.0) * 0.006;
         let actual_cdr = smm_to_cpr(model.mdr(month).unwrap()).expect("valid SMM");
         assert!(
             (actual_cdr - expected_cdr).abs() < RATE_TOLERANCE,
@@ -330,10 +350,21 @@ fn sda_matches_industry_standard_curve() {
         );
     }
 
-    // Verify decline phase (months 31-60)
+    // Verify plateau phase (months 31-60): flat 0.60% CDR
     for month in 31..=60 {
-        let months_past_peak = (month - 30) as f64;
-        let expected_cdr = 0.06 - (months_past_peak / 30.0) * 0.03;
+        let actual_cdr = smm_to_cpr(model.mdr(month).unwrap()).expect("valid SMM");
+        assert!(
+            (actual_cdr - 0.006).abs() < RATE_TOLERANCE,
+            "SDA month {} (plateau) should be 0.60% CDR, got {:.4}%",
+            month,
+            actual_cdr * 100.0
+        );
+    }
+
+    // Verify decline phase (months 61-120): linear to 0.03% CDR
+    for month in 61..=120 {
+        let months_past_plateau = (month - 60) as f64;
+        let expected_cdr = 0.006 - (months_past_plateau / 60.0) * (0.006 - 0.0003);
         let actual_cdr = smm_to_cpr(model.mdr(month).unwrap()).expect("valid SMM");
         assert!(
             (actual_cdr - expected_cdr).abs() < RATE_TOLERANCE,
@@ -344,12 +375,12 @@ fn sda_matches_industry_standard_curve() {
         );
     }
 
-    // Verify terminal phase (month 61+)
-    for month in [61, 100, 360] {
+    // Verify terminal phase (month 121+): flat 0.03% CDR
+    for month in [121, 200, 360] {
         let actual_cdr = smm_to_cpr(model.mdr(month).unwrap()).expect("valid SMM");
         assert!(
-            (actual_cdr - 0.03).abs() < RATE_TOLERANCE,
-            "SDA month {} (terminal) should be 3% CDR, got {}",
+            (actual_cdr - 0.0003).abs() < RATE_TOLERANCE,
+            "SDA month {} (terminal) should be 0.03% CDR, got {}",
             month,
             actual_cdr
         );
@@ -370,29 +401,29 @@ fn sda_multiplier_scales_correctly() {
     let cdr_200_peak = smm_to_cpr(sda_200.mdr(30).unwrap()).expect("valid SMM");
 
     assert!(
-        (cdr_100_peak - 0.06).abs() < RATE_TOLERANCE,
-        "100% SDA peak should be 6% CDR"
+        (cdr_100_peak - 0.006).abs() < RATE_TOLERANCE,
+        "100% SDA peak should be 0.60% CDR"
     );
     assert!(
-        (cdr_200_peak - 0.12).abs() < RATE_TOLERANCE,
-        "200% SDA peak should be 12% CDR"
+        (cdr_200_peak - 0.012).abs() < RATE_TOLERANCE,
+        "200% SDA peak should be 1.20% CDR"
     );
     assert!(
         (cdr_200_peak - 2.0 * cdr_100_peak).abs() < RATE_TOLERANCE,
         "200% SDA should be 2x 100% SDA at peak"
     );
 
-    // At terminal (month 90)
-    let cdr_100_term = smm_to_cpr(sda_100.mdr(90).unwrap()).expect("valid SMM");
-    let cdr_200_term = smm_to_cpr(sda_200.mdr(90).unwrap()).expect("valid SMM");
+    // At terminal (month 150)
+    let cdr_100_term = smm_to_cpr(sda_100.mdr(150).unwrap()).expect("valid SMM");
+    let cdr_200_term = smm_to_cpr(sda_200.mdr(150).unwrap()).expect("valid SMM");
 
     assert!(
-        (cdr_100_term - 0.03).abs() < RATE_TOLERANCE,
-        "100% SDA terminal should be 3% CDR"
+        (cdr_100_term - 0.0003).abs() < RATE_TOLERANCE,
+        "100% SDA terminal should be 0.03% CDR"
     );
     assert!(
-        (cdr_200_term - 0.06).abs() < RATE_TOLERANCE,
-        "200% SDA terminal should be 6% CDR"
+        (cdr_200_term - 0.0006).abs() < RATE_TOLERANCE,
+        "200% SDA terminal should be 0.06% CDR"
     );
 }
 
@@ -833,19 +864,19 @@ mod property_tests {
             );
         }
 
-        /// Property: SDA MDR reaches terminal rate after month 60
+        /// Property: SDA MDR reaches terminal rate after month 120
         #[test]
-        fn sda_mdr_terminal_after_60(month in 60u32..500) {
+        fn sda_mdr_terminal_after_120(month in 120u32..500) {
             use finstack_cashflows::builder::{smm_to_cpr, DefaultModelSpec};
 
             let model = DefaultModelSpec::sda(1.0);
             let mdr = model.mdr(month).unwrap();
             let cdr = smm_to_cpr(mdr).expect("valid SMM");
 
-            // Terminal rate for 100% SDA is 3% CDR
+            // Terminal rate for 100% SDA is 0.03% CDR
             prop_assert!(
-                (cdr - 0.03).abs() < RATE_TOLERANCE,
-                "SDA should be at terminal 3% CDR after month 60: month={}, cdr={}",
+                (cdr - 0.0003).abs() < RATE_TOLERANCE,
+                "SDA should be at terminal 0.03% CDR after month 120: month={}, cdr={}",
                 month, cdr
             );
         }

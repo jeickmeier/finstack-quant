@@ -1,7 +1,7 @@
 {
   "schema": "finstack.cashflow/1",
   "default_model_spec": {
-    "cdr": 0.03,
+    "cdr": 0.0003,
     "curve": {
       "curve": "sda",
       "speed_multiplier": 1.0

@@ -19,7 +19,7 @@ fn example_payload<T: Serialize>(type_tag: &str, instrument: &T) -> PyResult<Str
 }
 
 macro_rules! credit_derivative_wrapper {
-    ($py_name:literal, $py_struct:ident, $rust_ty:ty, $type_tag:literal, $model:literal, $example:expr) => {
+    ($py_name:literal, $py_struct:ident, $rust_ty:ty, $type_tag:literal, $example:expr) => {
         #[pyclass(name = $py_name, module = "finstack.valuations.credit_derivatives", skip_from_py_object)]
         #[derive(Clone)]
         struct $py_struct {
@@ -52,7 +52,11 @@ macro_rules! credit_derivative_wrapper {
             }
 
             fn price(&self, market: &Bound<'_, PyAny>, as_of: &str) -> PyResult<PyValuationResult> {
-                let result = price_payload_result(&self.json, market, as_of, $model)?;
+                // "default" resolves to `Instrument::default_model()` in the
+                // pricer JSON layer, so each instrument always prices with its
+                // registered model (a hardcoded literal here broke CDSOption
+                // when its model moved from Black76 to BloombergCdso).
+                let result = price_payload_result(&self.json, market, as_of, "default")?;
                 Ok(PyValuationResult { inner: result })
             }
         }
@@ -64,7 +68,6 @@ credit_derivative_wrapper!(
     PyCreditDefaultSwap,
     CreditDefaultSwap,
     "credit_default_swap",
-    "hazard_rate",
     Ok::<CreditDefaultSwap, finstack_core::Error>(CreditDefaultSwap::example())
 );
 
@@ -73,7 +76,6 @@ credit_derivative_wrapper!(
     PyCDSIndex,
     CDSIndex,
     "cds_index",
-    "hazard_rate",
     Ok::<CDSIndex, finstack_core::Error>(CDSIndex::example())
 );
 
@@ -82,7 +84,6 @@ credit_derivative_wrapper!(
     PyCDSTranche,
     CDSTranche,
     "cds_tranche",
-    "hazard_rate",
     Ok::<CDSTranche, finstack_core::Error>(CDSTranche::example())
 );
 
@@ -91,7 +92,6 @@ credit_derivative_wrapper!(
     PyCDSOption,
     CDSOption,
     "cds_option",
-    "black76",
     CDSOption::example()
 );
 
