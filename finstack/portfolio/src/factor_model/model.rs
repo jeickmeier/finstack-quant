@@ -848,7 +848,8 @@ mod tests {
     fn unreachable_config() -> FactorModelConfig {
         FactorModelConfig {
             factors: Vec::new(),
-            covariance: FactorCovarianceMatrix::new_unchecked(Vec::new(), Vec::new()),
+            covariance: FactorCovarianceMatrix::new(Vec::new(), Vec::new())
+                .expect("empty covariance matrix is valid"),
             matching: MatchingConfig::MappingTable(Vec::new()),
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,

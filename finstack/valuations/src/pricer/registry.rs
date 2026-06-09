@@ -275,7 +275,7 @@ impl PricerRegistry {
     ///
     /// This avoids cloning the registry when metric calculators need to reprice
     /// through the same dispatch table.
-    pub fn price_with_metrics_shared(
+    pub(crate) fn price_with_metrics_shared(
         registry: &Arc<Self>,
         instrument: &dyn Priceable,
         model: ModelKey,
@@ -513,36 +513,6 @@ impl PricerRegistry {
                 options,
             },
             shared,
-        )
-    }
-
-    /// Price a batch through an already shared registry, preserving input order.
-    ///
-    /// The registry and market snapshot are shared across the batch's metric
-    /// pipeline instead of being cloned once per instrument.
-    pub fn price_batch_shared(
-        registry: &Arc<Self>,
-        instruments: &[&dyn Priceable],
-        model: ModelKey,
-        market: &Market,
-        as_of: finstack_core::dates::Date,
-        metrics: &[crate::metrics::MetricId],
-        options: crate::instruments::PricingOptions,
-    ) -> Vec<std::result::Result<crate::results::ValuationResult, PricingError>> {
-        let shared_market = (!metrics.is_empty()).then(|| Arc::new(market.clone()));
-        registry.as_ref().price_batch_impl(
-            BatchPricingRequest {
-                instruments,
-                model,
-                market,
-                as_of,
-                metrics,
-                options,
-            },
-            SharedPricingInputs {
-                registry: Some(Arc::clone(registry)),
-                market: shared_market,
-            },
         )
     }
 

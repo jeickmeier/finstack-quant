@@ -6,7 +6,7 @@ use crate::errors::display_to_py;
 use finstack_valuations::pricer::{
     canonical_instrument_json, canonical_instrument_json_from_str,
     metric_value_from_instrument_json, present_standard_option_greeks_from_instrument_json,
-    pretty_instrument_json, price_instrument_json, price_instrument_json_with_metrics,
+    pretty_instrument_json, price_instrument_json, price_instrument_json_with_metrics_and_history,
     validate_instrument_json,
 };
 use finstack_valuations::results::ValuationResult;
@@ -80,9 +80,16 @@ pub(super) fn price_payload_with_metrics(
     pricing_options: Option<&str>,
 ) -> PyResult<String> {
     let market = extract_market_ref(market)?;
-    let result =
-        price_instrument_json_with_metrics(json, &market, as_of, model, &metrics, pricing_options)
-            .map_err(display_to_py)?;
+    let result = price_instrument_json_with_metrics_and_history(
+        json,
+        &market,
+        as_of,
+        model,
+        &metrics,
+        pricing_options,
+        None,
+    )
+    .map_err(display_to_py)?;
     serde_json::to_string(&result).map_err(display_to_py)
 }
 

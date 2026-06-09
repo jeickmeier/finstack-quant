@@ -55,20 +55,6 @@ fn bench_covariance_construction(c: &mut Criterion) {
         });
     }
 
-    for n in [5, 10, 25, 50, 100] {
-        let ids = make_factor_ids(n);
-        let data = make_psd_matrix(n);
-        group.bench_with_input(BenchmarkId::new("unchecked", n), &n, |b, _| {
-            b.iter(|| {
-                let m = FactorCovarianceMatrix::new_unchecked(
-                    black_box(ids.clone()),
-                    black_box(data.clone()),
-                );
-                black_box(m);
-            })
-        });
-    }
-
     group.finish();
 }
 

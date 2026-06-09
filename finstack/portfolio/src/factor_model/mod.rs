@@ -39,7 +39,6 @@ mod assignment;
 mod credit_vol_forecast;
 mod math;
 mod model;
-mod optimization;
 mod parametric;
 mod position_risk;
 mod risk_budget;
@@ -54,7 +53,6 @@ pub use credit_vol_forecast::{
     PositionVolContribution, VolHorizon,
 };
 pub use model::{FactorModel, FactorModelBuilder};
-pub use optimization::{FactorConstraint, FactorOptimizationResult};
 pub use parametric::ParametricDecomposer;
 pub use position_risk::{
     DecompositionConfig, DecompositionMethod, HistoricalPositionDecomposer,

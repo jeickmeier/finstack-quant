@@ -26,7 +26,7 @@ use finstack_valuations::instruments::credit_derivatives::cds_option::CDSOption;
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::market::conventions::ids::CdsDocClause;
 use finstack_valuations::metrics::MetricId;
-use finstack_valuations::pricer::price_instrument_json_with_metrics;
+use finstack_valuations::pricer::price_instrument_json_with_metrics_and_history;
 use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
@@ -324,7 +324,7 @@ fn diag_cdx_ig_46_cdso_internals() {
 
     eprintln!("\n--- Golden runner path (sanity) ---");
     let instrument_json = fixture_instrument(&fixture).clone();
-    let result = price_instrument_json_with_metrics(
+    let result = price_instrument_json_with_metrics_and_history(
         &serde_json::to_string(&instrument_json).unwrap(),
         &bootstrap,
         "2026-05-07",
@@ -336,10 +336,11 @@ fn diag_cdx_ig_46_cdso_internals() {
             "theta".to_string(),
         ],
         None,
+        None,
     )
     .unwrap();
     print_row(
-        "price_instrument_json_with_metrics",
+        "price_instrument_json_with_metrics_and_history",
         result.value.amount(),
         result.measures["par_spread"],
         result.measures["vega"],

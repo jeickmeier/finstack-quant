@@ -649,33 +649,6 @@ mod tests {
     }
 
     #[test]
-    fn test_simulation_rejects_asymmetric_unchecked_covariance() -> TestResult {
-        let mut sensitivities = SensitivityMatrix::zeros(
-            vec!["pos-A".into()],
-            vec![FactorId::new("Rates"), FactorId::new("Credit")],
-        );
-        sensitivities.set_delta(0, 0, 10.0);
-        sensitivities.set_delta(0, 1, 5.0);
-
-        let covariance = FactorCovarianceMatrix::new_unchecked(
-            vec![FactorId::new("Rates"), FactorId::new("Credit")],
-            vec![1.0, 0.25, 0.10, 1.0],
-        );
-
-        let decomposer = SimulationDecomposer::new(1_024, 7);
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance);
-        assert!(result.is_err());
-        let Err(error) = result else {
-            return Err(finstack_core::Error::Validation(
-                "asymmetric covariance should be rejected before simulation".to_string(),
-            ));
-        };
-        assert!(format!("{error}").contains("symmetric"));
-
-        Ok(())
-    }
-
-    #[test]
     fn test_simulation_variance_uses_already_weighted_exposures() -> TestResult {
         let mut sensitivities = SensitivityMatrix::zeros(
             vec!["pos-A".into(), "pos-B".into()],
@@ -734,48 +707,6 @@ mod tests {
             ));
         };
         assert!(format!("{error}").contains("factor"));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_simulation_rejects_non_psd_unchecked_covariance() -> TestResult {
-        let mut sensitivities =
-            SensitivityMatrix::zeros(vec!["pos-A".into()], vec![FactorId::new("Rates")]);
-        sensitivities.set_delta(0, 0, 10.0);
-
-        let covariance =
-            FactorCovarianceMatrix::new_unchecked(vec![FactorId::new("Rates")], vec![-1.0]);
-        let decomposer = SimulationDecomposer::new(1_024, 17);
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance);
-        assert!(result.is_err());
-        let Err(error) = result else {
-            return Err(finstack_core::Error::Validation(
-                "non-psd covariance should be rejected".to_string(),
-            ));
-        };
-        assert!(format!("{error}").contains("positive semi-definite"));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_simulation_rejects_non_finite_unchecked_covariance() -> TestResult {
-        let mut sensitivities =
-            SensitivityMatrix::zeros(vec!["pos-A".into()], vec![FactorId::new("Rates")]);
-        sensitivities.set_delta(0, 0, 10.0);
-
-        let covariance =
-            FactorCovarianceMatrix::new_unchecked(vec![FactorId::new("Rates")], vec![f64::NAN]);
-        let decomposer = SimulationDecomposer::new(1_024, 23);
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance);
-        assert!(result.is_err());
-        let Err(error) = result else {
-            return Err(finstack_core::Error::Validation(
-                "non-finite covariance should be rejected".to_string(),
-            ));
-        };
-        assert!(format!("{error}").contains("finite"));
 
         Ok(())
     }

@@ -562,34 +562,6 @@ mod tests {
     }
 
     #[test]
-    fn test_parametric_rejects_negative_portfolio_variance_from_unchecked_covariance() {
-        let mut sensitivities =
-            SensitivityMatrix::zeros(vec!["pos-A".into()], vec![FactorId::new("Rates")]);
-        sensitivities.set_delta(0, 0, 10.0);
-
-        let covariance =
-            FactorCovarianceMatrix::new_unchecked(vec![FactorId::new("Rates")], vec![-1.0]);
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_parametric_rejects_non_finite_unchecked_covariance() {
-        let mut sensitivities =
-            SensitivityMatrix::zeros(vec!["pos-A".into()], vec![FactorId::new("Rates")]);
-        sensitivities.set_delta(0, 0, 10.0);
-
-        let covariance =
-            FactorCovarianceMatrix::new_unchecked(vec![FactorId::new("Rates")], vec![f64::NAN]);
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance);
-
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_parametric_accepts_rank_deficient_psd_covariance() -> TestResult {
         // Two perfectly collinear factors: covariance is PSD but not PD
         // (rank 1). The parametric decomposer should accept this because
@@ -614,24 +586,5 @@ mod tests {
         assert!((result.total_risk - 16.0).abs() < 1e-10);
 
         Ok(())
-    }
-
-    #[test]
-    fn test_parametric_rejects_asymmetric_unchecked_covariance() {
-        let mut sensitivities = SensitivityMatrix::zeros(
-            vec!["pos-A".into()],
-            vec![FactorId::new("Rates"), FactorId::new("Credit")],
-        );
-        sensitivities.set_delta(0, 0, 10.0);
-        sensitivities.set_delta(0, 1, 5.0);
-
-        let covariance = FactorCovarianceMatrix::new_unchecked(
-            vec![FactorId::new("Rates"), FactorId::new("Credit")],
-            vec![1.0, 0.25, 0.10, 1.0],
-        );
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance);
-
-        assert!(result.is_err());
     }
 }

@@ -138,7 +138,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "TradeUniverse",
         "OptimizationStatus",
         "TradeSpec",
-        "OptimizationParameters",
         "PortfolioOptimizationSpec",
         "PortfolioOptimizationResult",
         "optimize_portfolio_typed",

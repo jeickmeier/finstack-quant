@@ -29,9 +29,9 @@ use pyo3::types::{PyModule, PyType};
 
 use finstack_portfolio::optimization::{
     self as opt, CandidatePosition, Constraint, Inequality, MetricExpr, MissingMetricPolicy,
-    Objective, OptimizationParameters, OptimizationStatus, PerPositionMetric,
-    PortfolioOptimizationResult, PortfolioOptimizationSpec, PositionFilter, TradeDirection,
-    TradeSpec, TradeType, TradeUniverse, WeightingScheme,
+    Objective, OptimizationStatus, PerPositionMetric, PortfolioOptimizationResult,
+    PortfolioOptimizationSpec, PositionFilter, TradeDirection, TradeSpec, TradeType, TradeUniverse,
+    WeightingScheme,
 };
 use finstack_portfolio::types::{AttributeTest, AttributeValue, ComparisonOp, PositionId};
 use finstack_valuations::metrics::MetricId;
@@ -1285,138 +1285,6 @@ impl PyTradeSpec {
 }
 
 // ---------------------------------------------------------------------------
-// OptimizationParameters
-// ---------------------------------------------------------------------------
-
-/// Optimization parameters without an embedded portfolio.
-#[pyclass(
-    name = "OptimizationParameters",
-    module = "finstack.portfolio",
-    from_py_object
-)]
-#[derive(Clone)]
-pub struct PyOptimizationParameters {
-    pub(crate) inner: OptimizationParameters,
-}
-
-impl PyOptimizationParameters {
-    pub(crate) fn from_inner(inner: OptimizationParameters) -> Self {
-        Self { inner }
-    }
-}
-
-#[pymethods]
-impl PyOptimizationParameters {
-    /// Construct with an objective; defaults for other fields mirror the
-    /// JSON helpers (`ValueWeight`, `Zero` policy, empty constraints).
-    #[new]
-    #[pyo3(text_signature = "(objective)")]
-    fn new(objective: PyObjective) -> Self {
-        Self::from_inner(OptimizationParameters {
-            objective: objective.inner,
-            constraints: Vec::new(),
-            weighting: WeightingScheme::ValueWeight,
-            missing_metric_policy: MissingMetricPolicy::Zero,
-            label: None,
-        })
-    }
-
-    /// Append a constraint (returns a new wrapper).
-    #[pyo3(text_signature = "(self, constraint)")]
-    fn with_constraint(&self, constraint: PyConstraint) -> Self {
-        let mut next = self.inner.clone();
-        next.constraints.push(constraint.inner);
-        Self::from_inner(next)
-    }
-
-    /// Replace the weighting scheme.
-    #[pyo3(text_signature = "(self, weighting)")]
-    fn with_weighting(&self, weighting: PyWeightingScheme) -> Self {
-        let mut next = self.inner.clone();
-        next.weighting = weighting.inner;
-        Self::from_inner(next)
-    }
-
-    /// Replace the missing-metric policy.
-    #[pyo3(text_signature = "(self, policy)")]
-    fn with_missing_metric_policy(&self, policy: PyMissingMetricPolicy) -> Self {
-        let mut next = self.inner.clone();
-        next.missing_metric_policy = policy.inner;
-        Self::from_inner(next)
-    }
-
-    /// Replace the auditability label.
-    #[pyo3(text_signature = "(self, label)")]
-    fn with_label(&self, label: String) -> Self {
-        let mut next = self.inner.clone();
-        next.label = Some(label);
-        Self::from_inner(next)
-    }
-
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, json_str)")]
-    fn from_json(_cls: &Bound<'_, PyType>, json_str: &str) -> PyResult<Self> {
-        let inner: OptimizationParameters = deserialize_json(json_str)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serialize_json(&self.inner)
-    }
-
-    #[getter]
-    fn objective(&self) -> PyObjective {
-        PyObjective::from_inner(self.inner.objective.clone())
-    }
-
-    #[getter]
-    fn constraints(&self) -> Vec<PyConstraint> {
-        self.inner
-            .constraints
-            .iter()
-            .cloned()
-            .map(PyConstraint::from_inner)
-            .collect()
-    }
-
-    #[getter]
-    fn weighting(&self) -> PyWeightingScheme {
-        PyWeightingScheme {
-            inner: self.inner.weighting,
-        }
-    }
-
-    #[getter]
-    fn missing_metric_policy(&self) -> PyMissingMetricPolicy {
-        PyMissingMetricPolicy {
-            inner: self.inner.missing_metric_policy,
-        }
-    }
-
-    #[getter]
-    fn label(&self) -> Option<String> {
-        self.inner.label.clone()
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "OptimizationParameters(direction={:?}, constraints={}, weighting={:?})",
-            match self.inner.objective {
-                Objective::Maximize(_) => "maximize",
-                Objective::Minimize(_) => "minimize",
-            },
-            self.inner.constraints.len(),
-            match self.inner.weighting {
-                WeightingScheme::ValueWeight => "value_weight",
-                WeightingScheme::NotionalWeight => "notional_weight",
-                WeightingScheme::UnitScaling => "unit_scaling",
-            },
-        )
-    }
-}
-
-// ---------------------------------------------------------------------------
 // PortfolioOptimizationSpec
 // ---------------------------------------------------------------------------
 
@@ -1763,7 +1631,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTradeUniverse>()?;
     m.add_class::<PyOptimizationStatus>()?;
     m.add_class::<PyTradeSpec>()?;
-    m.add_class::<PyOptimizationParameters>()?;
     m.add_class::<PyPortfolioOptimizationSpec>()?;
     m.add_class::<PyPortfolioOptimizationResult>()?;
 

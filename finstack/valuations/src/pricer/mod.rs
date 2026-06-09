@@ -39,9 +39,8 @@ pub use json::{
     list_standard_metrics_grouped, metric_value_from_instrument_json, parse_boxed_instrument_json,
     parse_instrument_json, parse_model_key, present_metric_values_from_instrument_json,
     present_standard_option_greeks_from_instrument_json, pretty_instrument_json,
-    price_instrument_json, price_instrument_json_with_metrics,
-    price_instrument_json_with_metrics_and_history, validate_instrument_json,
-    STANDARD_OPTION_GREEKS,
+    price_instrument_json, price_instrument_json_with_metrics_and_history,
+    validate_instrument_json, STANDARD_OPTION_GREEKS,
 };
 pub use keys::{InstrumentType, ModelKey, PricerKey};
 pub use registry::{expect_inst, Pricer, PricerRegistry};

@@ -4,7 +4,7 @@ use crate::golden::schema::{GoldenFixture, Market};
 use finstack_core::market_data::context::MarketContext;
 use finstack_valuations::calibration::api::engine::{self, ExecuteError};
 use finstack_valuations::calibration::api::schema::CalibrationEnvelope;
-use finstack_valuations::pricer::price_instrument_json_with_metrics;
+use finstack_valuations::pricer::price_instrument_json_with_metrics_and_history;
 use std::collections::BTreeMap;
 
 fn metric_base(metric: &str) -> &str {
@@ -68,12 +68,13 @@ pub(crate) fn run_pricing_fixture(
         .map_err(|err| format!("serialize instrument: {err}"))?;
     let metrics = requested_metrics(fixture);
 
-    let result = price_instrument_json_with_metrics(
+    let result = price_instrument_json_with_metrics_and_history(
         &instrument_json,
         &market,
         &fixture.metadata.valuation_date,
         &pricing.model,
         &metrics,
+        None,
         None,
     )
     .map_err(|err| format!("price instrument JSON: {err}"))?;

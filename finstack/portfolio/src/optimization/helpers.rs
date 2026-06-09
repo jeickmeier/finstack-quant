@@ -72,34 +72,7 @@ pub fn optimize_from_spec(
     )
 }
 
-/// Optimization-spec sans embedded portfolio.
-///
-/// Mirrors [`PortfolioOptimizationSpec`] for callers that already hold a
-/// built [`Portfolio`] (typed FFI handles, repeated optimization across
-/// scenarios, etc.) and want to skip the per-call `from_spec` rebuild.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct OptimizationParameters {
-    /// Optimization objective.
-    pub objective: Objective,
-    /// Constraints on the optimized portfolio.
-    #[serde(default)]
-    pub constraints: Vec<Constraint>,
-    /// How weights are defined.
-    #[serde(default = "default_weighting")]
-    pub weighting: WeightingScheme,
-    /// Policy for handling positions missing required metrics.
-    #[serde(default)]
-    pub missing_metric_policy: MissingMetricPolicy,
-    /// Optional label for auditability.
-    #[serde(default)]
-    pub label: Option<String>,
-}
-
 /// Run portfolio optimization against an already-built `Portfolio`.
-///
-/// Use this in hot paths (FFI handles, scenario sweeps) to avoid the cost of
-/// `Portfolio::from_spec` on every call. The semantics match
-/// [`optimize_from_spec`] otherwise.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn optimize_from_parts(
     portfolio: &Portfolio,
@@ -119,26 +92,4 @@ pub(crate) fn optimize_from_parts(
 
     let optimizer = DefaultLpOptimizer;
     optimizer.optimize(&problem, market, config)
-}
-
-/// Run portfolio optimization against a built `Portfolio` plus pre-parsed
-/// [`OptimizationParameters`]. Convenience wrapper over the internal
-/// `optimize_from_parts` helper for binding code that already has a parameters
-/// struct on hand.
-pub fn optimize_with_parameters(
-    portfolio: &Portfolio,
-    params: &OptimizationParameters,
-    market: &MarketContext,
-    config: &FinstackConfig,
-) -> Result<PortfolioOptimizationResult> {
-    optimize_from_parts(
-        portfolio,
-        &params.objective,
-        &params.constraints,
-        params.weighting,
-        params.missing_metric_policy,
-        params.label.as_deref(),
-        market,
-        config,
-    )
 }

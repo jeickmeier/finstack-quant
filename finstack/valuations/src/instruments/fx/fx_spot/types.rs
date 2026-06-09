@@ -302,20 +302,6 @@ impl FxSpot {
         Ok(self)
     }
 
-    /// Set the spot rate without validation (unchecked).
-    ///
-    /// **Warning**: This method bypasses rate validation. Use `with_rate` for
-    /// normal usage. This method exists for testing edge cases or when the rate
-    /// has already been validated externally.
-    ///
-    /// # Safety
-    ///
-    /// Caller is responsible for ensuring the rate is valid (positive, non-zero).
-    pub fn with_rate_unchecked(mut self, rate: f64) -> Self {
-        self.spot_rate = Some(rate);
-        self
-    }
-
     /// Set the notional amount with currency validation.
     ///
     /// # Errors

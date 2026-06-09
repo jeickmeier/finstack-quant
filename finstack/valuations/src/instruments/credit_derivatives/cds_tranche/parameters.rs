@@ -70,18 +70,6 @@ impl CDSTrancheParams {
         Ok(self)
     }
 
-    /// Set the accumulated loss without validation (internal use only).
-    ///
-    /// # Safety
-    ///
-    /// Caller must ensure `loss` is in [0.0, 1.0]. Use `with_accumulated_loss()`
-    /// for validated construction.
-    #[doc(hidden)]
-    pub fn with_accumulated_loss_unchecked(mut self, loss: f64) -> Self {
-        self.accumulated_loss = loss;
-        self
-    }
-
     /// Create equity tranche parameters (0-3% typically)
     pub fn equity_tranche(
         index_name: impl Into<String>,

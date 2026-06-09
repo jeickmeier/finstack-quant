@@ -22,9 +22,8 @@
 //! **Stable, JSON-shape may evolve** — function names stable, but the
 //! returned / accepted JSON payload structure may grow additive
 //! (non-breaking) fields between releases:
-//! - `optimizePortfolio` / `optimizePortfolioBuilt`
-//!   (`PortfolioOptimizationSpec` / `OptimizationParameters` /
-//!   `PortfolioOptimizationResult` JSON)
+//! - `optimizePortfolio`
+//!   (`PortfolioOptimizationSpec` / `PortfolioOptimizationResult` JSON)
 //! - `parametricVarDecomposition`, `parametricEsDecomposition`,
 //!   `historicalVarDecomposition`, `evaluateRiskBudget`
 //!
@@ -315,31 +314,6 @@ pub fn apply_scenario_and_revalue_built(
     )
     .map_err(to_js_err)?;
     serde_wasm_bindgen::to_value(&out).map_err(to_js_err)
-}
-
-/// Optimize an already-built [`Portfolio`] handle against pre-parsed
-/// [`OptimizationParameters`] (objective + constraints + weighting). Skips
-/// the per-call portfolio rebuild; use this for scenario-sweep style
-/// workflows.
-#[wasm_bindgen(js_name = optimizePortfolioBuilt)]
-pub fn optimize_portfolio_built(
-    portfolio: &WasmPortfolio,
-    params_json: &str,
-    market_json: &str,
-) -> Result<String, JsValue> {
-    let params: finstack_portfolio::optimization::OptimizationParameters =
-        serde_json::from_str(params_json).map_err(to_js_err)?;
-    let market: finstack_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    let config = finstack_core::config::FinstackConfig::default();
-    let result = finstack_portfolio::optimization::optimize_with_parameters(
-        &portfolio.inner,
-        &params,
-        &market,
-        &config,
-    )
-    .map_err(to_js_err)?;
-    serde_json::to_string_pretty(&result).map_err(to_js_err)
 }
 
 /// Apply a scenario to a portfolio and revalue.

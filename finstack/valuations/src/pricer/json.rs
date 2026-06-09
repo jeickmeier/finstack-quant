@@ -146,26 +146,6 @@ pub fn price_instrument_json(
     price_instrument_json_request(instrument_json, market, as_of, model, &[], None, None)
 }
 
-/// Price a tagged instrument JSON payload with explicit metric requests.
-pub fn price_instrument_json_with_metrics(
-    instrument_json: &str,
-    market: &MarketContext,
-    as_of: &str,
-    model: &str,
-    metrics: &[String],
-    pricing_options: Option<&str>,
-) -> finstack_core::Result<ValuationResult> {
-    price_instrument_json_with_metrics_and_history(
-        instrument_json,
-        market,
-        as_of,
-        model,
-        metrics,
-        pricing_options,
-        None,
-    )
-}
-
 /// Price a tagged instrument JSON payload with explicit metric requests and
 /// optional historical scenarios for VaR-style metrics.
 pub fn price_instrument_json_with_metrics_and_history(
@@ -582,27 +562,29 @@ mod tests {
     }
 
     #[test]
-    fn price_instrument_json_with_metrics_accepts_pricing_options() {
-        let result = price_instrument_json_with_metrics(
+    fn price_instrument_json_with_metrics_and_history_accepts_pricing_options() {
+        let result = price_instrument_json_with_metrics_and_history(
             &bond_instrument_json(),
             &market_context(),
             "2024-01-01",
             "discounting",
             &["dirty_price".to_string()],
             Some(r#"{"theta_period":"1D"}"#),
+            None,
         )
         .expect("price");
         assert_eq!(result.instrument_id, "TEST-BOND");
     }
 
     #[test]
-    fn price_instrument_json_with_metrics_rejects_unknown_metric_names() {
-        let err = price_instrument_json_with_metrics(
+    fn price_instrument_json_with_metrics_and_history_rejects_unknown_metric_names() {
+        let err = price_instrument_json_with_metrics_and_history(
             &bond_instrument_json(),
             &market_context(),
             "2024-01-01",
             "discounting",
             &["dvO1".to_string()],
+            None,
             None,
         )
         .expect_err("JSON pricing boundary should parse requested metrics strictly");
@@ -614,7 +596,7 @@ mod tests {
     }
 
     #[test]
-    fn price_instrument_json_with_metrics_accepts_market_history_for_hvar() {
+    fn price_instrument_json_with_metrics_and_history_accepts_market_history_for_hvar() {
         let history = crate::metrics::risk::MarketHistory::new(
             time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
             2,

@@ -145,7 +145,7 @@ cargo bench --package finstack-core -- --baseline baseline_name
 
 ### `factor_model.rs`
 
-- FactorCovarianceMatrix validated vs unchecked construction (5 to 100 factors)
+- FactorCovarianceMatrix validated construction (5 to 100 factors)
 - Variance, covariance, and correlation lookups by factor ID
 - Batch variance and full correlation matrix extraction
 - MappingTableMatcher with first-hit, last-hit, and miss scenarios

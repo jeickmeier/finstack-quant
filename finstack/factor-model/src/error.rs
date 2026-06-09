@@ -39,11 +39,6 @@ pub enum FactorModelError {
         /// Candidate factor identifiers.
         candidates: Vec<FactorId>,
     },
-    /// Optimization or factor constraints could not be satisfied.
-    InfeasibleConstraints {
-        /// Reason constraints were infeasible.
-        reason: String,
-    },
 }
 
 impl fmt::Display for FactorModelError {
@@ -77,9 +72,6 @@ impl fmt::Display for FactorModelError {
                 f,
                 "Ambiguous factor match for position '{position_id}': {candidates:?}"
             ),
-            Self::InfeasibleConstraints { reason } => {
-                write!(f, "Factor-constrained optimization infeasible: {reason}")
-            }
         }
     }
 }

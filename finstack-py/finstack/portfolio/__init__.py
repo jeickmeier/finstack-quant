@@ -133,7 +133,6 @@ MetricExpr = _portfolio.MetricExpr
 Objective = _portfolio.Objective
 Constraint = _portfolio.Constraint
 TradeSpec = _portfolio.TradeSpec
-OptimizationParameters = _portfolio.OptimizationParameters
 PortfolioOptimizationSpec = _portfolio.PortfolioOptimizationSpec
 PortfolioOptimizationResult = _portfolio.PortfolioOptimizationResult
 CandidatePosition = _portfolio.CandidatePosition
@@ -158,7 +157,6 @@ __all__: list[str] = [
     "MetricExpr",
     "MissingMetricPolicy",
     "Objective",
-    "OptimizationParameters",
     "OptimizationStatus",
     "PerPositionMetric",
     "Portfolio",

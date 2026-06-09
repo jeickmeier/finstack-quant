@@ -2,9 +2,8 @@ use finstack_core::types::CurveId;
 use finstack_factor_model::{CurveType, FactorId, MarketDependency, RiskMeasure};
 use finstack_portfolio::factor_model::RiskDecomposition;
 use finstack_portfolio::factor_model::{
-    FactorAssignmentReport, FactorConstraint, FactorContribution, FactorContributionDelta,
-    FactorOptimizationResult, PositionAssignment, PositionFactorContribution, StressResult,
-    UnmatchedEntry, WhatIfResult,
+    FactorAssignmentReport, FactorContribution, FactorContributionDelta, PositionAssignment,
+    PositionFactorContribution, StressResult, UnmatchedEntry, WhatIfResult,
 };
 use finstack_portfolio::types::PositionId;
 
@@ -85,15 +84,6 @@ fn test_factor_model_report_types_roundtrip() {
         total_pnl: -1_250.0,
         position_pnl: vec![(PositionId::new("POS_1"), -750.0)],
         stressed_decomposition: sample_decomposition(),
-    });
-
-    assert_roundtrip_value(&FactorConstraint::MaxFactorConcentration {
-        factor_id: FactorId::new("Rates"),
-        max_fraction: 0.35,
-    });
-
-    assert_roundtrip_value(&FactorOptimizationResult {
-        optimized_quantities: vec![(PositionId::new("POS_1"), 1.25)],
     });
 }
 

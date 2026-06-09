@@ -19,7 +19,6 @@ export const portfolio = {
   applyScenarioAndRevalue: wasm.applyScenarioAndRevalue,
   applyScenarioAndRevalueBuilt: wasm.applyScenarioAndRevalueBuilt,
   optimizePortfolio: wasm.optimizePortfolio,
-  optimizePortfolioBuilt: wasm.optimizePortfolioBuilt,
   replayPortfolio: wasm.replayPortfolio,
   parametricVarDecomposition: wasm.parametricVarDecomposition,
   parametricEsDecomposition: wasm.parametricEsDecomposition,

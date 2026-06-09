@@ -721,8 +721,7 @@ fn test_standard_price_batch_with_metrics_matches_serial_results() {
     let serial_results: Vec<_> = instruments
         .iter()
         .map(|&instrument| {
-            PricerRegistry::price_with_metrics_shared(
-                &registry,
+            registry.price_with_metrics(
                 instrument,
                 ModelKey::Discounting,
                 &market,
@@ -732,8 +731,7 @@ fn test_standard_price_batch_with_metrics_matches_serial_results() {
             )
         })
         .collect();
-    let batch_results = PricerRegistry::price_batch_shared(
-        &registry,
+    let batch_results = registry.price_batch(
         &instruments,
         ModelKey::Discounting,
         &market,

@@ -59,27 +59,6 @@ impl FactorCovarianceMatrix {
         })
     }
 
-    /// Construct a covariance matrix without validation.
-    ///
-    /// Use this only when the caller has already validated symmetry, PSD, and
-    /// factor ordering externally.
-    #[must_use]
-    pub fn new_unchecked(factor_ids: Vec<FactorId>, data: Vec<f64>) -> Self {
-        let n = factor_ids.len();
-        let index = factor_ids
-            .iter()
-            .enumerate()
-            .map(|(idx, factor_id)| (factor_id.clone(), idx))
-            .collect();
-
-        Self {
-            factor_ids,
-            n,
-            data,
-            index,
-        }
-    }
-
     /// Number of factors represented by the matrix.
     #[must_use]
     pub fn n_factors(&self) -> usize {
@@ -314,14 +293,6 @@ mod tests {
         let ids = two_factor_ids();
         let data = vec![1.0, 3.0, 3.0, 1.0];
         assert!(FactorCovarianceMatrix::new(ids, data).is_err());
-    }
-
-    #[test]
-    fn test_new_unchecked_skips_validation() {
-        let ids = two_factor_ids();
-        let data = vec![1.0, 3.0, 3.0, 1.0];
-        let covariance = FactorCovarianceMatrix::new_unchecked(ids, data);
-        assert_eq!(covariance.n_factors(), 2);
     }
 
     #[test]

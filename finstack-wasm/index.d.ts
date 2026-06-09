@@ -1716,8 +1716,6 @@ export interface PortfolioNamespace {
   ): ScenarioRevalueResult;
   /** Optimize portfolio weights using the LP-based optimizer. */
   optimizePortfolio(specJson: string, marketJson: string): string;
-  /** Fast-path optimization that reuses a built `Portfolio` handle. */
-  optimizePortfolioBuilt(portfolio: Portfolio, paramsJson: string, marketJson: string): string;
   replayPortfolio(specJson: string, snapshotsJson: string, configJson: string): string;
   parametricVarDecomposition(
     positionIdsJson: string,
