@@ -106,9 +106,9 @@ Recurring failure patterns:
 
 ### Bindings
 
-27. **WASM map-returning functions emit ES2015 `Map`s; `index.d.ts` declares plain objects** — `api/valuations/exotic_rates.rs:51` (`tarnCouponProfile`), `fx.rs:247-251` (`FxOption.greeks()`), `sabr.rs:179-184` (`arbitrageDiagnostics`), `pricing.rs:194-197` (`listStandardMetricsGrouped`). serde-wasm-bindgen 0.6 default; nothing enables `json_compatible()`. TS users get silent `undefined` property reads; Python returns dicts (shape parity broken). No `.test.mjs` facade tests exist. Fix: `Serializer::json_compatible()` or `js_sys::Reflect` (as `analytic.rs` `bsGreeks` already does); add facade tests.
-28. **`SabrCalibrator.calibrate` defaults `beta=1.0` only in Python** — `finstack-py/src/bindings/valuations/sabr.rs:35,390`; Rust and WASM require it. Omitting beta silently fixes the equity convention for a rates user. Fix: make required (match Rust/WASM).
-29. **WASM SABR surface drift** — missing `params` getter on `SabrModel` and `withTolerance` on `SabrCalibrator` (Python has both); `calibrate_auto_shift` / `calibrate_auto_shift_with_derivatives` unreachable from both hosts (relevant for negative-rate smiles).
+27. **[FIXED 2026-06-09]** **WASM map-returning functions emit ES2015 `Map`s; `index.d.ts` declares plain objects** — `api/valuations/exotic_rates.rs:51` (`tarnCouponProfile`), `fx.rs:247-251` (`FxOption.greeks()`), `sabr.rs:179-184` (`arbitrageDiagnostics`), `pricing.rs:194-197` (`listStandardMetricsGrouped`). serde-wasm-bindgen 0.6 default; nothing enables `json_compatible()`. TS users get silent `undefined` property reads; Python returns dicts (shape parity broken). No `.test.mjs` facade tests exist. Fix: `Serializer::json_compatible()` or `js_sys::Reflect` (as `analytic.rs` `bsGreeks` already does); add facade tests.
+28. **[FIXED 2026-06-09]** **`SabrCalibrator.calibrate` defaults `beta=1.0` only in Python** — `finstack-py/src/bindings/valuations/sabr.rs:35,390`; Rust and WASM require it. Omitting beta silently fixes the equity convention for a rates user. Fix: make required (match Rust/WASM).
+29. **[FIXED 2026-06-09]** **WASM SABR surface drift** — missing `params` getter on `SabrModel` and `withTolerance` on `SabrCalibrator` (Python has both); `calibrate_auto_shift` / `calibrate_auto_shift_with_derivatives` unreachable from both hosts (relevant for negative-rate smiles).
 
 ---
 
