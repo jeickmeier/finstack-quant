@@ -37,37 +37,43 @@ impl CDSTranchePricer {
         }
     }
 
-    /// Calculate expected loss of equity tranche conditional on market factor.
+    /// Conditional expected capped pool quantity `E[min(Σᵢ eᵢ·Bᵢ, cap) | Z]`
+    /// for a homogeneous pool, where `eᵢ = exposure / n` per name.
+    ///
+    /// With `exposure = 1 − R` (loss given default) this is the conditional
+    /// equity-tranche LOSS `E[min(L, K) | Z]`; with `exposure = R` it is the
+    /// conditional capped RECOVERED notional `E[min(G, cap) | Z]` used for
+    /// senior-side recovery amortization (see
+    /// `calculate_equity_tranche_recovery`).
     ///
     /// Uses the binomial distribution to sum over all possible numbers of defaults.
-    pub(super) fn conditional_equity_tranche_loss(
+    pub(super) fn conditional_equity_tranche_capped(
         &self,
         num_constituents: usize,
-        detachment_notional: f64,
+        cap_notional: f64,
         conditional_default_prob: f64,
-        recovery_rate: f64,
+        exposure: f64,
     ) -> f64 {
-        let loss_given_default = 1.0 - recovery_rate;
         let individual_notional = 1.0 / num_constituents as f64; // Normalized to 1.0 total
 
         // Evaluate the whole conditional binomial PMF once (O(n)) instead of
         // reconstructing a distribution per `k`.
         let pmf = binomial_pmf_all(num_constituents, conditional_default_prob);
 
-        let mut expected_loss = 0.0;
+        let mut expected = 0.0;
 
         // Sum over all possible numbers of defaults
         for (k, &prob_k_defaults) in pmf.iter().enumerate() {
-            // Portfolio loss given k defaults
-            let portfolio_loss = k as f64 * individual_notional * loss_given_default;
+            // Pool quantity (loss or recovered notional) given k defaults
+            let pool_amount = k as f64 * individual_notional * exposure;
 
-            // Tranche loss (equity tranche [0, detachment_notional])
-            let tranche_loss = portfolio_loss.min(detachment_notional);
+            // Capped at the strike (equity tranche [0, cap_notional])
+            let capped = pool_amount.min(cap_notional);
 
-            expected_loss += prob_k_defaults * tranche_loss;
+            expected += prob_k_defaults * capped;
         }
 
-        expected_loss
+        expected
     }
 
     /// Get default probability for the index at a given maturity.
@@ -221,6 +227,56 @@ impl CDSTranchePricer {
         // Fraction of tranche already wiped out
         let loss_in_tranche = (l - attach).clamp(0.0, width);
         loss_in_tranche / width
+    }
+
+    /// Realized pool default state implied by the accumulated loss.
+    ///
+    /// `accumulated_loss` records the realized pool LOSS fraction `L`
+    /// (original-pool units). With recovery `R`, the defaulted NOTIONAL
+    /// fraction is `X = L / (1 − R)` and the recovered notional `G = X·R`
+    /// is amortized from the top of the capital structure (senior-side
+    /// writedown). Returns `(defaulted_fraction, recovered_fraction)`, both
+    /// clamped so `X ≤ 1`.
+    pub(super) fn realized_default_state(
+        &self,
+        tranche: &CDSTranche,
+        recovery_rate: f64,
+    ) -> (f64, f64) {
+        let l = tranche.accumulated_loss.clamp(0.0, 1.0);
+        let lgd = (1.0 - recovery_rate).max(1e-9);
+        let defaulted = (l / lgd).min(1.0);
+        let recovered = defaulted * recovery_rate.clamp(0.0, 1.0);
+        (defaulted, recovered)
+    }
+
+    /// Fraction of the tranche notional already WRITTEN DOWN from the top by
+    /// realized recoveries (senior-side amortization).
+    ///
+    /// Recovered notional `G` erodes the pool from `1.0` downward, so the
+    /// tranche `[A, D]` loses `(G − (1−D))⁺ − (G − (1−A))⁺` of notional from
+    /// the top. Returned as a fraction of tranche width, clamped so the sum
+    /// with `calculate_prior_tranche_loss` never exceeds `1`.
+    pub(super) fn calculate_prior_tranche_writedown(
+        &self,
+        tranche: &CDSTranche,
+        recovery_rate: f64,
+    ) -> f64 {
+        let attach = tranche.attach_pct / 100.0;
+        let detach = tranche.detach_pct / 100.0;
+        let width = detach - attach;
+
+        if width <= 1e-9 {
+            return 0.0;
+        }
+
+        let (_, recovered) = self.realized_default_state(tranche, recovery_rate);
+        let wd_top = (recovered - (1.0 - detach)).max(0.0) - (recovered - (1.0 - attach)).max(0.0);
+        let wd_fraction = (wd_top / width).clamp(0.0, 1.0);
+
+        // Joint cap: realized loss (bottom-up) + writedown (top-down) cannot
+        // exceed the whole tranche.
+        let loss_fraction = self.calculate_prior_tranche_loss(tranche);
+        wd_fraction.min(1.0 - loss_fraction)
     }
 
     /// Generate payment schedule for the tranche using canonical schedule builder.
@@ -793,11 +849,11 @@ mod tests {
     #[test]
     fn conditional_equity_tranche_loss_finite_for_full_index() {
         let pricer = CDSTranchePricer::new();
-        let el = pricer.conditional_equity_tranche_loss(
-            125,  // num_constituents
-            0.03, // detachment_notional (3% equity tranche)
-            0.10, // conditional default probability
-            0.40, // recovery rate
+        let el = pricer.conditional_equity_tranche_capped(
+            125,        // num_constituents
+            0.03,       // cap_notional (3% equity tranche)
+            0.10,       // conditional default probability
+            1.0 - 0.40, // exposure = LGD at 40% recovery
         );
         assert!(
             el.is_finite(),

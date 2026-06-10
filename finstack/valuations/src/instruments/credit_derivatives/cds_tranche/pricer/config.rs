@@ -377,17 +377,77 @@ pub struct CDSTranchePricer {
     pub(super) quadrature_cache: OnceLock<GaussHermiteQuadrature>,
 }
 
+/// Which per-name exposure a capped pool expectation integrates over.
+///
+/// The copula machinery computes `E[min(Σᵢ wᵢ·eᵢ·Bᵢ, cap)]`; the exposure
+/// `eᵢ` is either the loss given default (loss side, erodes the tranche from
+/// the bottom) or the recovered notional (recovery side, amortizes the
+/// detachment from the top).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PoolExposure {
+    /// Per-name exposure `1 − Rᵢ` — expected tranche LOSS.
+    Loss,
+    /// Per-name exposure `Rᵢ` — expected capped RECOVERED notional.
+    Recovery,
+}
+
+/// One point of the projected tranche erosion curve.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct ElWdPoint {
+    /// Payment date.
+    pub(super) date: Date,
+    /// Cumulative expected LOSS as a fraction of tranche notional.
+    pub(super) el_fraction: f64,
+    /// Cumulative expected senior-side recovery WRITEDOWN as a fraction of
+    /// tranche notional. `el_fraction + wd_fraction ≤ 1`.
+    pub(super) wd_fraction: f64,
+}
+
+/// Effective tranche structure after realized losses and recoveries.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct EffectiveStructure {
+    /// Attachment re-normalized to the surviving pool, in `[0, 1]`.
+    pub(super) eff_attach: f64,
+    /// Detachment re-normalized to the surviving pool, in `[0, 1]`.
+    pub(super) eff_detach: f64,
+    /// Surviving pool fraction `1 − defaulted_notional` (NOT `1 − loss`).
+    pub(super) pool_factor: f64,
+}
+
 pub(super) type ProjectionInputs = (
     std::sync::Arc<CreditIndexData>,
     Date,
     Vec<Date>,
-    Vec<(Date, f64)>,
+    Vec<ElWdPoint>,
 );
+
+/// Where to discount a projected tranche cashflow.
+///
+/// All discounting is performed on the DISCOUNT curve's own time axis
+/// (its day count and base date) as a relative factor from `as_of`,
+/// mirroring the single-name CDS `df_asof_to` convention. The hazard
+/// curve's axis is never used for discount lookups.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum DiscountAt {
+    /// Discount at the cashflow's payment date:
+    /// `df_between_dates(as_of, cashflow.date)`.
+    PaymentDate,
+    /// Discount at a point inside the coupon period `[start, cashflow.date]`:
+    /// the time is interpolated at `fraction` of the period measured on the
+    /// discount curve's axis, then divided by `df` at `as_of` (relative DF).
+    /// Used for mid-period protection timing.
+    WithinPeriod {
+        /// Period start date.
+        start: Date,
+        /// Survival-weighted default-time fraction of the period, in `[0, 1]`.
+        fraction: f64,
+    },
+}
 
 #[derive(Debug, Clone)]
 pub(super) struct ProjectedDiscountedRow {
     pub(super) cashflow: CashFlow,
-    pub(super) discount_time: Option<f64>,
+    pub(super) discount_at: DiscountAt,
 }
 
 impl Default for CDSTranchePricer {

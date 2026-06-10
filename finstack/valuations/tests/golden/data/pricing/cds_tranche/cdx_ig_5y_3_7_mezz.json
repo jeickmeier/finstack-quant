@@ -6,7 +6,7 @@
     "description": "Synthetic CDX IG 5Y 3-7 percent mezzanine tranche.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack canonical credit pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved.",
+    "source_detail": "Finstack canonical credit pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved. Re-baselined 2026-06-09 after intentional tranche pricer corrections (2026-06-09 quant review Majors 4-6): accrual-on-default complement fix ((1-f)*dEL), discount-curve-axis relative discounting from as_of, and senior-side recovery amortization of the detachment. Formula self-test goldens track the canonical calculation; tolerance contract unchanged.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "claude",
@@ -272,11 +272,11 @@
     }
   },
   "expected": {
-    "npv": 1851426.9422832413,
-    "par_spread": 547.1016968145245,
-    "spread_dv01": -4140.952618775773,
-    "dv01": -580.3723847564543,
-    "cs01": 27934.543280274374
+    "npv": 1851470.0883021809,
+    "par_spread": 547.116731873908,
+    "spread_dv01": -4140.909870544099,
+    "dv01": -580.285728658782,
+    "cs01": 27975.398847605335
   },
   "tolerances": {
     "npv": {

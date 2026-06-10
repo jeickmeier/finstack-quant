@@ -1885,6 +1885,390 @@ fn within_period_default_fraction_is_survival_weighted() {
     );
 }
 
+/// Review Major 5: discounting must be RELATIVE to `as_of` on the discount
+/// curve's own time axis, never an absolute `df(t)` with `t` measured on the
+/// hazard curve's axis. Pins this via re-basing invariance: two discount
+/// curves describing the SAME flat continuously-compounded rate but with
+/// base dates one year apart must produce identical tranche PVs. Under the
+/// old absolute-DF lookup the early-based curve's stale year of discounting
+/// leaked into every cashflow.
+#[test]
+fn discounting_is_invariant_under_curve_rebasing() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let early_base = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+    let rate = 0.04_f64;
+
+    // Flat-rate curve as exp(-r t) knots on each curve's own axis.
+    let make_disc = |base: Date| {
+        let knots: Vec<(f64, f64)> = (0..=12)
+            .map(|y| (y as f64, (-rate * y as f64).exp()))
+            .collect();
+        DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .knots(knots)
+            .interp(finstack_core::math::interp::InterpStyle::LogLinear)
+            .build()
+            .expect("discount curve")
+    };
+
+    let index_curve = HazardCurve::builder("CDX.NA.IG.42")
+        .base_date(as_of)
+        .recovery_rate(0.40)
+        .knots(vec![(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
+        .par_spreads(vec![(1.0, 60.0), (3.0, 80.0), (5.0, 100.0), (10.0, 140.0)])
+        .build()
+        .expect("hazard curve");
+    let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+        .knots(vec![
+            (3.0, 0.25),
+            (7.0, 0.30),
+            (10.0, 0.34),
+            (15.0, 0.40),
+            (30.0, 0.50),
+        ])
+        .build()
+        .expect("base corr");
+    let index_data = CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(0.40)
+        .index_credit_curve(Arc::new(index_curve))
+        .base_correlation_curve(Arc::new(base_corr_curve))
+        .build()
+        .expect("index data");
+
+    let make_ctx = |base: Date| {
+        MarketContext::new()
+            .insert(make_disc(base))
+            .insert_credit_index("CDX.NA.IG.42", index_data.clone())
+    };
+
+    let pricer = CDSTranchePricer::new();
+    let tranche = sample_tranche();
+
+    let pv_asof_based = pricer
+        .price_tranche(&tranche, &make_ctx(as_of), as_of)
+        .expect("pricing with as_of-based curve")
+        .amount();
+    let pv_early_based = pricer
+        .price_tranche(&tranche, &make_ctx(early_base), as_of)
+        .expect("pricing with early-based curve")
+        .amount();
+
+    let tol = 1e-9 * pv_asof_based.abs().max(1.0);
+    assert!(
+        (pv_asof_based - pv_early_based).abs() < tol,
+        "tranche PV must be invariant under discount-curve re-basing: \
+         as_of-based={pv_asof_based}, early-based={pv_early_based}"
+    );
+}
+
+/// Premium leg PV (sell-protection sign: positive) for a given pricer config.
+fn premium_leg_pv(pricer: &CDSTranchePricer, tranche: &CDSTranche, ctx: &MarketContext) -> f64 {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let discount = ctx
+        .get_discount(tranche.discount_curve_id.as_ref())
+        .expect("discount curve");
+    let rows = pricer
+        .project_discountable_rows(tranche, ctx, as_of)
+        .expect("projected rows");
+    pricer
+        .discount_projected_rows(
+            &rows
+                .iter()
+                .filter(|row| row.cashflow.kind == CFKind::Fixed)
+                .cloned()
+                .collect::<Vec<_>>(),
+            discount.as_ref(),
+            as_of,
+        )
+        .expect("premium PV")
+}
+
+/// Review Major 4: the accrual-on-default adjustment must be the COMPLEMENT
+/// of the survival-weighted default fraction. A name defaulting at fraction
+/// `f` of the period pays accrued `f·Δ`, so the premium notional lost on the
+/// defaulted slice is `(1−f)·ΔEL` when AoD is enabled and the full `ΔEL`
+/// when disabled (defaulted names pay nothing for the period).
+///
+/// Pins the ordering: premium(AoD enabled) > premium(AoD disabled), because
+/// the AoD credit recovers the `f·Δ` accrued by defaulters.
+#[test]
+fn aod_enabled_premium_exceeds_disabled_premium() {
+    let market_ctx = sample_market_context();
+    let tranche = sample_tranche(); // sell protection, 500bp coupon
+
+    let mut enabled = CDSTranchePricer::new();
+    enabled.params.accrual_on_default_enabled = true;
+    let mut disabled = CDSTranchePricer::new();
+    disabled.params.accrual_on_default_enabled = false;
+
+    let pv_enabled = premium_leg_pv(&enabled, &tranche, &market_ctx);
+    let pv_disabled = premium_leg_pv(&disabled, &tranche, &market_ctx);
+
+    assert!(
+        pv_enabled > 0.0 && pv_disabled > 0.0,
+        "sell-protection premium legs must be positive: enabled={pv_enabled}, \
+         disabled={pv_disabled}"
+    );
+    assert!(
+        pv_enabled > pv_disabled,
+        "AoD-enabled premium must exceed AoD-disabled premium (defaulters pay \
+         partial accrual): enabled={pv_enabled}, disabled={pv_disabled}"
+    );
+}
+
+/// Review Major 4: rising index hazard must LOWER the premium-leg PV — more
+/// defaults mean less premium notional. Before the fix the complement-swapped
+/// adjustment under-reduced (AoD on) or never reduced (AoD off) the premium,
+/// muting this direction.
+#[test]
+fn rising_hazard_lowers_premium_leg_pv() {
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let tranche = sample_tranche();
+
+    let build_ctx = |hazard_scale: f64| {
+        let discount_curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
+            .interp(finstack_core::math::interp::InterpStyle::LogLinear)
+            .build()
+            .expect("discount curve");
+        let index_curve = HazardCurve::builder("CDX.NA.IG.42")
+            .base_date(base_date)
+            .recovery_rate(0.40)
+            .knots(vec![
+                (1.0, 0.01 * hazard_scale),
+                (3.0, 0.015 * hazard_scale),
+                (5.0, 0.02 * hazard_scale),
+                (10.0, 0.025 * hazard_scale),
+            ])
+            .par_spreads(vec![(1.0, 60.0), (3.0, 80.0), (5.0, 100.0), (10.0, 140.0)])
+            .build()
+            .expect("hazard curve");
+        let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+            .knots(vec![
+                (3.0, 0.25),
+                (7.0, 0.30),
+                (10.0, 0.34),
+                (15.0, 0.40),
+                (30.0, 0.50),
+            ])
+            .build()
+            .expect("base corr");
+        let index_data = CreditIndexData::builder()
+            .num_constituents(125)
+            .recovery_rate(0.40)
+            .index_credit_curve(Arc::new(index_curve))
+            .base_correlation_curve(Arc::new(base_corr_curve))
+            .build()
+            .expect("index data");
+        MarketContext::new()
+            .insert(discount_curve)
+            .insert_credit_index("CDX.NA.IG.42", index_data)
+    };
+
+    for aod_enabled in [true, false] {
+        let mut pricer = CDSTranchePricer::new();
+        pricer.params.accrual_on_default_enabled = aod_enabled;
+
+        let pv_low = premium_leg_pv(&pricer, &tranche, &build_ctx(1.0));
+        let pv_high = premium_leg_pv(&pricer, &tranche, &build_ctx(3.0));
+        assert!(
+            pv_high < pv_low,
+            "rising hazard must lower premium PV (aod_enabled={aod_enabled}): \
+             low-hazard={pv_low}, high-hazard={pv_high}"
+        );
+    }
+}
+
+/// Review Major 6 helper: market context with configurable index recovery
+/// and hazard scale.
+fn recovery_market_context(recovery: f64, hazard_scale: f64) -> MarketContext {
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let discount_curve = DiscountCurve::builder("USD-OIS")
+        .base_date(base_date)
+        .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
+        .interp(finstack_core::math::interp::InterpStyle::LogLinear)
+        .build()
+        .expect("discount curve");
+    let index_curve = HazardCurve::builder("CDX.NA.IG.42")
+        .base_date(base_date)
+        .recovery_rate(recovery)
+        .knots(vec![
+            (1.0, 0.01 * hazard_scale),
+            (3.0, 0.015 * hazard_scale),
+            (5.0, 0.02 * hazard_scale),
+            (10.0, 0.025 * hazard_scale),
+        ])
+        .par_spreads(vec![(1.0, 60.0), (3.0, 80.0), (5.0, 100.0), (10.0, 140.0)])
+        .build()
+        .expect("hazard curve");
+    let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+        .knots(vec![
+            (3.0, 0.25),
+            (7.0, 0.30),
+            (10.0, 0.34),
+            (15.0, 0.40),
+            (30.0, 0.50),
+        ])
+        .build()
+        .expect("base corr");
+    let index_data = CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(recovery)
+        .index_credit_curve(Arc::new(index_curve))
+        .base_correlation_curve(Arc::new(base_corr_curve))
+        .build()
+        .expect("index data");
+    MarketContext::new()
+        .insert(discount_curve)
+        .insert_credit_index("CDX.NA.IG.42", index_data)
+}
+
+fn super_senior_tranche(attach: f64, detach: f64) -> CDSTranche {
+    let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
+    let params = CDSTrancheParams::new(
+        "CDX.NA.IG.42",
+        42,
+        attach,
+        detach,
+        Money::new(10_000_000.0, Currency::USD),
+        maturity,
+        25.0,
+    );
+    let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
+    CDSTranche::new(
+        "SS_TEST",
+        &params,
+        &schedule_params,
+        finstack_core::types::CurveId::from("USD-OIS"),
+        finstack_core::types::CurveId::from("CDX.NA.IG.42"),
+        TrancheSide::SellProtection,
+    )
+    .expect("Valid tranche parameters")
+}
+
+/// Review Major 6: with zero recovery there is NO recovered notional, so the
+/// senior-side writedown curve must be identically zero and the defaulted
+/// fraction equals the loss (`X = L`) — i.e. the pre-fix behavior is
+/// reproduced exactly at `R = 0`.
+#[test]
+fn zero_recovery_has_no_senior_writedown() {
+    let ctx = recovery_market_context(0.0, 1.0);
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let pricer = CDSTranchePricer::new();
+    let tranche = super_senior_tranche(60.0, 100.0);
+
+    let index_data = ctx.get_credit_index("CDX.NA.IG.42").expect("credit index");
+    let dates = pricer
+        .generate_payment_schedule(&tranche, as_of)
+        .expect("schedule");
+    let curve = pricer
+        .build_el_wd_curve(&tranche, &index_data, &dates)
+        .expect("EL/WD curve");
+    for p in &curve {
+        assert!(
+            p.wd_fraction.abs() < 1e-15,
+            "R=0 must produce zero senior writedown, got {} at {:?}",
+            p.wd_fraction,
+            p.date
+        );
+    }
+
+    // Realized state: X = L when R = 0.
+    let mut seasoned = tranche.clone();
+    seasoned.accumulated_loss = 0.05;
+    let (defaulted, recovered) = pricer.realized_default_state(&seasoned, 0.0);
+    assert!((defaulted - 0.05).abs() < 1e-12, "X must equal L at R=0");
+    assert!(recovered.abs() < 1e-15, "G must be zero at R=0");
+}
+
+/// Review Major 6 (headline symptom): a super-senior tranche has near-zero
+/// expected LOSS, but rising hazard amortizes its notional from the top via
+/// recoveries — so its premium leg must FALL as hazard rises. Before the fix
+/// the detachment was never written down and the super-senior kept paying
+/// full premium after defaults.
+#[test]
+fn super_senior_premium_falls_as_hazard_rises() {
+    let tranche = super_senior_tranche(60.0, 100.0);
+    let pricer = CDSTranchePricer::new();
+
+    let pv_low = premium_leg_pv(&pricer, &tranche, &recovery_market_context(0.40, 1.0));
+    let pv_high = premium_leg_pv(&pricer, &tranche, &recovery_market_context(0.40, 5.0));
+
+    assert!(
+        pv_low > 0.0 && pv_high > 0.0,
+        "super-senior premium legs must be positive: low={pv_low}, high={pv_high}"
+    );
+    assert!(
+        pv_high < pv_low,
+        "rising hazard must erode super-senior premium notional via recovery \
+         writedown: low-hazard={pv_low}, high-hazard={pv_high}"
+    );
+
+    // The writedown curve itself must be positive and monotone for R > 0.
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let ctx = recovery_market_context(0.40, 5.0);
+    let index_data = ctx.get_credit_index("CDX.NA.IG.42").expect("index");
+    let dates = pricer
+        .generate_payment_schedule(&tranche, as_of)
+        .expect("schedule");
+    let curve = pricer
+        .build_el_wd_curve(&tranche, &index_data, &dates)
+        .expect("EL/WD curve");
+    let final_point = curve.last().expect("non-empty curve");
+    assert!(
+        final_point.wd_fraction > 0.0,
+        "super-senior writedown at maturity must be positive for R>0, got {}",
+        final_point.wd_fraction
+    );
+    for w in curve.windows(2) {
+        assert!(
+            w[1].wd_fraction >= w[0].wd_fraction - 1e-12,
+            "writedown curve must be monotone"
+        );
+        assert!(
+            w[1].el_fraction + w[1].wd_fraction <= 1.0 + 1e-12,
+            "el + wd must never exceed 1"
+        );
+    }
+}
+
+/// Review Major 6 (realized state): hand-computed seasoned case. With
+/// `accumulated_loss = 6%` and `R = 40%`: defaulted `X = 0.06/0.6 = 10%`,
+/// recovered `G = 4%`, pool factor `0.9`. A `[95%, 100%]` super-senior is
+/// written down from the top by `G = 4%` of the pool = 80% of its 5% width;
+/// effective detach erodes to `1 − G`.
+#[test]
+fn seasoned_recovery_writedown_matches_hand_computation() {
+    let pricer = CDSTranchePricer::new();
+    let mut tranche = super_senior_tranche(95.0, 100.0);
+    tranche.accumulated_loss = 0.06;
+    let recovery = 0.40;
+
+    let (defaulted, recovered) = pricer.realized_default_state(&tranche, recovery);
+    assert!((defaulted - 0.10).abs() < 1e-12, "X = L/(1−R) = 0.10");
+    assert!((recovered - 0.04).abs() < 1e-12, "G = X·R = 0.04");
+
+    let prior_wd = pricer.calculate_prior_tranche_writedown(&tranche, recovery);
+    assert!(
+        (prior_wd - 0.80).abs() < 1e-12,
+        "writedown fraction must be (0.04 − 0)/0.05 = 0.80, got {prior_wd}"
+    );
+    // No loss reaches a 95% attachment at L = 6%.
+    assert!(pricer.calculate_prior_tranche_loss(&tranche).abs() < 1e-15);
+
+    let eff = pricer.calculate_effective_structure(&tranche, recovery);
+    assert!((eff.pool_factor - 0.90).abs() < 1e-12, "pool factor 1 − X");
+    let expected_detach = ((1.0 - recovered).min(1.0) - 0.06) / 0.90;
+    assert!(
+        (eff.eff_detach - expected_detach).abs() < 1e-12,
+        "effective detach must erode by recovered notional: got {}, want {}",
+        eff.eff_detach,
+        expected_detach
+    );
+}
+
 /// Item 6: with `mid_period_protection`, raising the index hazard moves the
 /// survival-weighted default time earlier within each period, so the
 /// within-period loss is discounted at an earlier (higher-DF) point. This

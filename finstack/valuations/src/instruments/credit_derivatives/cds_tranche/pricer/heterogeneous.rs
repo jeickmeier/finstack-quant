@@ -1,6 +1,7 @@
 use super::config::{
-    CDSTranchePricer, HeteroMethod, ADAPTIVE_INTEGRATION_HIGH, ADAPTIVE_INTEGRATION_LOW, CDF_CLIP,
-    GRID_STEP_MIN, HOMOGENEITY_TOLERANCE, LGD_FLOOR, MAX_GRID_POINTS, NUMERICAL_TOLERANCE,
+    CDSTranchePricer, HeteroMethod, PoolExposure, ADAPTIVE_INTEGRATION_HIGH,
+    ADAPTIVE_INTEGRATION_LOW, CDF_CLIP, GRID_STEP_MIN, HOMOGENEITY_TOLERANCE, LGD_FLOOR,
+    MAX_GRID_POINTS, NUMERICAL_TOLERANCE,
 };
 use super::saddlepoint::conditional_min_loss_normal;
 use crate::constants::credit;
@@ -13,32 +14,47 @@ use finstack_core::{Error, Result};
 use tracing::warn;
 
 impl CDSTranchePricer {
-    /// Heterogeneous equity tranche loss via a genuine cumulant-generating-
-    /// function saddle-point approximation (SPA) or an exact convolution
-    /// fallback for small pools.
+    /// Heterogeneous capped pool expectation `E[min(Σᵢ wᵢ·eᵢ·Bᵢ, cap)]` via a
+    /// moment-matched normal approximation or an exact convolution fallback
+    /// for small pools. The per-issuer exposure `eᵢ` is the LGD (`exposure =
+    /// PoolExposure::Loss` — equity tranche loss) or the recovery rate
+    /// (`PoolExposure::Recovery` — capped recovered notional for senior-side
+    /// amortization).
     ///
     /// Supports full bespoke portfolio heterogeneity:
     /// - Per-issuer hazard curves (default probability)
-    /// - Per-issuer recovery rates (LGD)
+    /// - Per-issuer recovery rates (LGD / recovered notional)
     /// - Per-issuer weights (notional allocation)
-    pub(super) fn calculate_equity_tranche_loss_hetero(
+    pub(super) fn calculate_equity_tranche_capped_hetero(
         &self,
-        detachment_pct: f64,
+        cap_pct: f64,
         correlation: f64,
         index_data: &CreditIndexData,
         maturity: Date,
+        exposure: PoolExposure,
     ) -> Result<f64> {
         // Precompute unconditional PD_i(t)
         let t = self.years_from_base(index_data, maturity)?;
-        let tranche_width = detachment_pct / 100.0;
+        let tranche_width = cap_pct / 100.0;
         let correlation = self.smooth_correlation_boundary(correlation);
 
         // Quadrature setup
         let quad = self.select_quadrature()?;
 
-        // Build heterogeneous vectors: PD, LGD, and Weight per issuer
+        // Per-issuer exposure from the recovery rate: LGD for the loss side
+        // (floored to avoid zero exposure corner cases), the recovery itself
+        // for the senior-writedown side (a genuine zero is meaningful there:
+        // R = 0 ⇒ no recovered notional ⇒ no writedown).
+        let exposure_of = |rec: f64| -> f64 {
+            match exposure {
+                PoolExposure::Loss => (1.0 - rec).max(LGD_FLOOR),
+                PoolExposure::Recovery => rec.clamp(0.0, 1.0),
+            }
+        };
+
+        // Build heterogeneous vectors: PD, exposure, and Weight per issuer
         let mut pd_i: Vec<f64> = Vec::with_capacity(index_data.num_constituents as usize);
-        let mut lgd_i: Vec<f64> = Vec::with_capacity(index_data.num_constituents as usize);
+        let mut exposure_i: Vec<f64> = Vec::with_capacity(index_data.num_constituents as usize);
         let mut weight_i: Vec<f64> = Vec::with_capacity(index_data.num_constituents as usize);
 
         if let Some(curves) = &index_data.issuer_credit_curves {
@@ -52,7 +68,7 @@ impl CDSTranchePricer {
                 pd_i.push((1.0 - sp).clamp(0.0, 1.0));
 
                 let rec = index_data.get_issuer_recovery(id);
-                lgd_i.push((1.0 - rec).max(LGD_FLOOR));
+                exposure_i.push(exposure_of(rec));
 
                 let w = index_data.get_issuer_weight(id);
                 weight_i.push(w);
@@ -62,7 +78,7 @@ impl CDSTranchePricer {
             let sp = index_data.index_credit_curve.sp(t);
             let count = index_data.num_constituents as usize;
             pd_i = vec![(1.0 - sp).clamp(0.0, 1.0); count];
-            lgd_i = vec![(1.0 - index_data.recovery_rate).max(LGD_FLOOR); count];
+            exposure_i = vec![exposure_of(index_data.recovery_rate); count];
             weight_i = vec![1.0 / count as f64; count];
         }
 
@@ -79,10 +95,10 @@ impl CDSTranchePricer {
                     .all(|&p| (p - first).abs() <= HOMOGENEITY_TOLERANCE)
             })
             .unwrap_or(true);
-        let is_uniform_lgd = lgd_i
+        let is_uniform_exposure = exposure_i
             .first()
             .map(|&first| {
-                lgd_i
+                exposure_i
                     .iter()
                     .all(|&l| (l - first).abs() <= HOMOGENEITY_TOLERANCE)
             })
@@ -96,15 +112,27 @@ impl CDSTranchePricer {
             })
             .unwrap_or(true);
 
-        if is_uniform_pd && is_uniform_lgd && is_uniform_weight {
+        if is_uniform_pd && is_uniform_exposure && is_uniform_weight {
             // Use homogeneous binomial path (faster)
             let num_constituents = index_data.num_constituents as usize;
-            let detachment_notional = detachment_pct / 100.0;
-            let base_recovery = 1.0 - lgd_i[0];
+            let cap_notional = cap_pct / 100.0;
+            let base_exposure = exposure_i[0];
 
             // Build recovery model if configured (same as homogeneous path)
             let recovery_model: Option<Box<dyn RecoveryModel>> =
                 self.params.recovery_spec.as_ref().map(|spec| spec.build());
+            let exposure_at = |z: f64| -> f64 {
+                match &recovery_model {
+                    Some(model) => {
+                        let recovery = model.conditional_recovery(z);
+                        match exposure {
+                            PoolExposure::Loss => 1.0 - recovery,
+                            PoolExposure::Recovery => recovery.clamp(0.0, 1.0),
+                        }
+                    }
+                    None => base_exposure,
+                }
+            };
 
             let default_prob = self.get_default_probability(index_data, t)?;
             let default_threshold = self.default_threshold_for_copula(default_prob);
@@ -117,17 +145,11 @@ impl CDSTranchePricer {
                         z,
                     );
 
-                    // Use stochastic recovery if configured, otherwise constant
-                    let recovery = match &recovery_model {
-                        Some(model) => model.conditional_recovery(z),
-                        None => base_recovery,
-                    };
-
-                    self.conditional_equity_tranche_loss(
+                    self.conditional_equity_tranche_capped(
                         num_constituents,
-                        detachment_notional,
+                        cap_notional,
                         p,
-                        recovery,
+                        exposure_at(z),
                     )
                 };
                 let expected_loss = if !(ADAPTIVE_INTEGRATION_LOW..=ADAPTIVE_INTEGRATION_HIGH)
@@ -149,15 +171,11 @@ impl CDSTranchePricer {
                     correlation,
                 );
                 let z = factors.first().copied().unwrap_or(0.0);
-                let recovery = match &recovery_model {
-                    Some(model) => model.conditional_recovery(z),
-                    None => base_recovery,
-                };
-                self.conditional_equity_tranche_loss(
+                self.conditional_equity_tranche_capped(
                     num_constituents,
-                    detachment_notional,
+                    cap_notional,
                     p,
-                    recovery,
+                    exposure_at(z),
                 )
             });
             return Ok(expected_loss);
@@ -209,7 +227,7 @@ impl CDSTranchePricer {
                     let cthr = (th - sqrt_rho * z) / sqrt_1mr;
                     let p = norm_cdf(cthr).clamp(0.0, 1.0);
 
-                    let w = weight_i[i] * lgd_i[i];
+                    let w = weight_i[i] * exposure_i[i];
                     mean += w * p;
                     var += w * w * p * (1.0 - p);
                 }
@@ -219,10 +237,10 @@ impl CDSTranchePricer {
 
             let el = if n_const <= credit::SMALL_POOL_THRESHOLD {
                 self.hetero_exact_convolution_full(
-                    detachment_pct,
+                    cap_pct,
                     correlation,
                     &thresholds,
-                    &lgd_i,
+                    &exposure_i,
                     &weight_i,
                 )?
             } else {
@@ -245,10 +263,10 @@ impl CDSTranchePricer {
                         }
                     }
                     HeteroMethod::ExactConvolution => self.hetero_exact_convolution_full(
-                        detachment_pct,
+                        cap_pct,
                         correlation,
                         &thresholds,
-                        &lgd_i,
+                        &exposure_i,
                         &weight_i,
                     )?,
                 }
@@ -274,7 +292,7 @@ impl CDSTranchePricer {
                     correlation,
                 );
 
-                let w = weight_i[i] * lgd_i[i];
+                let w = weight_i[i] * exposure_i[i];
                 mean += w * p;
                 var += w * w * p * (1.0 - p);
             }
@@ -284,20 +302,20 @@ impl CDSTranchePricer {
 
         let el = if n_const <= credit::SMALL_POOL_THRESHOLD {
             self.hetero_exact_convolution_full(
-                detachment_pct,
+                cap_pct,
                 correlation,
                 &thresholds,
-                &lgd_i,
+                &exposure_i,
                 &weight_i,
             )?
         } else {
             match self.params.hetero_method {
                 HeteroMethod::Spa => copula_ref.integrate_fn(&integrand),
                 HeteroMethod::ExactConvolution => self.hetero_exact_convolution_full(
-                    detachment_pct,
+                    cap_pct,
                     correlation,
                     &thresholds,
-                    &lgd_i,
+                    &exposure_i,
                     &weight_i,
                 )?,
             }
@@ -310,17 +328,17 @@ impl CDSTranchePricer {
     ///
     /// This is the fully bespoke version that supports per-issuer:
     /// - Hazard rates (via probit thresholds)
-    /// - Recovery rates (via lgd_i)
+    /// - Recovery rates (via exposure_i)
     /// - Notional weights (via weight_i)
     fn hetero_exact_convolution_full(
         &self,
-        detachment_pct: f64,
+        cap_pct: f64,
         correlation: f64,
         thresholds: &[f64],
-        lgd_i: &[f64],
+        exposure_i: &[f64],
         weight_i: &[f64],
     ) -> Result<f64> {
-        let k = detachment_pct / 100.0;
+        let k = cap_pct / 100.0;
         let grid_step = self.params.grid_step.max(GRID_STEP_MIN);
         // The convolved portfolio-loss PMF has support up to total LGD
         // (Σ wᵢ·lgdᵢ), which is far beyond the tranche detachment `k` for any
@@ -330,7 +348,7 @@ impl CDSTranchePricer {
         // alone silently drops that tail mass and biases tranche EL low.
         let total_lgd: f64 = weight_i
             .iter()
-            .zip(lgd_i.iter())
+            .zip(exposure_i.iter())
             .map(|(&w, &l)| w * l)
             .sum();
         let max_points = (total_lgd / grid_step).ceil() as usize + 2;
@@ -344,7 +362,14 @@ impl CDSTranchePricer {
 
         if max_points > MAX_GRID_POINTS {
             // Performance guard: fall back to SPA approximation with heterogeneous vectors
-            return self.hetero_spa_full(thresholds, correlation, k, lgd_i, weight_i, copula_ref);
+            return self.hetero_spa_full(
+                thresholds,
+                correlation,
+                k,
+                exposure_i,
+                weight_i,
+                copula_ref,
+            );
         }
 
         let sqrt_rho = correlation.sqrt();
@@ -367,7 +392,7 @@ impl CDSTranchePricer {
 
                 for i in 0..thresholds.len() {
                     let th = thresholds[i];
-                    let lgd = lgd_i[i];
+                    let lgd = exposure_i[i];
                     let weight = weight_i[i];
 
                     let cthr = (th - sqrt_rho * z) / sqrt_1mr;
@@ -412,7 +437,7 @@ impl CDSTranchePricer {
 
             for i in 0..thresholds.len() {
                 let th = thresholds[i];
-                let lgd = lgd_i[i];
+                let lgd = exposure_i[i];
                 let weight = weight_i[i];
 
                 let p = self.conditional_default_prob_copula(copula_ref, th, factors, correlation);
@@ -450,7 +475,7 @@ impl CDSTranchePricer {
         thresholds: &[f64],
         correlation: f64,
         k: f64,
-        lgd_i: &[f64],
+        exposure_i: &[f64],
         weight_i: &[f64],
         copula: Option<&dyn Copula>,
     ) -> Result<f64> {
@@ -468,7 +493,7 @@ impl CDSTranchePricer {
                     let th = thresholds[i];
                     let cthr = (th - sqrt_rho * z) / sqrt_1mr;
                     let p = norm_cdf(cthr).clamp(0.0, 1.0);
-                    let w = weight_i[i] * lgd_i[i];
+                    let w = weight_i[i] * exposure_i[i];
                     mean += w * p;
                     var += w * w * p * (1.0 - p);
                 }
@@ -502,7 +527,7 @@ impl CDSTranchePricer {
                     factors,
                     correlation,
                 );
-                let w = weight_i[i] * lgd_i[i];
+                let w = weight_i[i] * exposure_i[i];
                 mean += w * p;
                 var += w * w * p * (1.0 - p);
             }

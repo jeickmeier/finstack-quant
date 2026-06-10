@@ -1,6 +1,6 @@
 use super::config::{
-    CDSTranchePricer, CDSTranchePricerConfig, ProjectedDiscountedRow, ProjectionInputs,
-    PROBABILITY_CLIP,
+    CDSTranchePricer, CDSTranchePricerConfig, DiscountAt, EffectiveStructure,
+    ProjectedDiscountedRow, ProjectionInputs, PROBABILITY_CLIP,
 };
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
 use crate::cashflow::primitives::{CFKind, CashFlow};
@@ -209,17 +209,26 @@ impl CDSTranchePricer {
         let mut rows =
             Vec::with_capacity(payment_dates.len() * 2 + usize::from(tranche.upfront.is_some()));
         let mut prev_el_fraction = self.calculate_prior_tranche_loss(tranche);
+        let mut prev_wd_fraction =
+            self.calculate_prior_tranche_writedown(tranche, _index_data_arc.recovery_rate);
 
-        // Pre-compute payment times once to avoid calling years_from_base twice per iteration.
+        // Hazard-axis payment times, used ONLY for survival quantities
+        // (within-period default timing). Discounting uses the discount
+        // curve's own axis via `DiscountAt` (see `discount_projected_rows`).
         let payment_times: Vec<f64> = payment_dates
             .iter()
             .map(|&d| self.years_from_base(_index_data_arc.as_ref(), d))
             .collect::<Result<Vec<_>>>()?;
 
         for (i, &payment_date) in payment_dates.iter().enumerate() {
-            let el_fraction = el_curve[i].1;
+            let el_fraction = el_curve[i].el_fraction;
+            let wd_fraction = el_curve[i].wd_fraction;
             let delta_el_fraction = (el_fraction - prev_el_fraction).max(0.0);
-            let outstanding_notional = tranche_notional * (1.0 - prev_el_fraction);
+            let delta_wd_fraction = (wd_fraction - prev_wd_fraction).max(0.0);
+            // Premium accrues on the notional surviving BOTH bottom-up loss
+            // erosion and top-down recovery writedown (senior amortization).
+            let outstanding_notional =
+                tranche_notional * (1.0 - prev_el_fraction - prev_wd_fraction).max(0.0);
             let period_start = if i == 0 {
                 tranche
                     .contractual_effective_date(valuation_date)
@@ -254,12 +263,24 @@ impl CDSTranchePricer {
                 payment_time,
             );
 
+            // Premium reduction on the slice that defaults within the period.
+            //
+            // A name defaulting at the survival-weighted fraction `f` of the
+            // period pays accrued premium over `f·Δ` only, so the premium
+            // notional lost on the defaulted slice is `(1−f)·Δerosion`. With
+            // accrual-on-default disabled, a defaulted name pays nothing for
+            // the period — the full erosion drops out of the premium
+            // notional. Both the loss increment (bottom-up) and the recovery
+            // writedown increment (top-down) occur at default time, so they
+            // receive the same treatment.
+            let delta_erosion = delta_el_fraction + delta_wd_fraction;
             let aod_adjustment = if self.params.accrual_on_default_enabled {
-                default_fraction * tranche_notional * delta_el_fraction
+                (1.0 - default_fraction) * tranche_notional * delta_erosion
             } else {
-                0.0
+                tranche_notional * delta_erosion
             };
-            let premium_amount = coupon * accrual_period * (outstanding_notional - aod_adjustment);
+            let premium_amount =
+                coupon * accrual_period * (outstanding_notional - aod_adjustment).max(0.0);
 
             if premium_amount.abs() > f64::EPSILON {
                 rows.push(ProjectedDiscountedRow {
@@ -274,7 +295,7 @@ impl CDSTranchePricer {
                         accrual_factor: accrual_period,
                         rate: Some(coupon),
                     },
-                    discount_time: Some(payment_time),
+                    discount_at: DiscountAt::PaymentDate,
                 });
             }
 
@@ -296,21 +317,28 @@ impl CDSTranchePricer {
                     // defaults actually occur, not the period end. With
                     // `mid_period_protection`, the within-period loss is
                     // discounted at the SURVIVAL-WEIGHTED mean default time
-                    // (Item 6) — `t_{i-1} + default_fraction · period` —
+                    // (Item 6) — `fraction` of the way through the period —
                     // rather than the flat period midpoint, which
                     // over-discounted the increment by assuming all loss
                     // lands at the midpoint. The default fraction is < 0.5
                     // for a positive hazard, so the loss is correctly
-                    // discounted slightly earlier than mid-period.
-                    discount_time: Some(if self.params.mid_period_protection {
-                        prior_time + default_fraction * (payment_time - prior_time)
+                    // discounted slightly earlier than mid-period. The
+                    // fraction is measured on the hazard axis (a survival
+                    // quantity); the DF lookup itself happens on the
+                    // discount curve's axis in `discount_projected_rows`.
+                    discount_at: if self.params.mid_period_protection {
+                        DiscountAt::WithinPeriod {
+                            start: period_start,
+                            fraction: default_fraction,
+                        }
                     } else {
-                        payment_time
-                    }),
+                        DiscountAt::PaymentDate
+                    },
                 });
             }
 
             prev_el_fraction = el_fraction;
+            prev_wd_fraction = wd_fraction;
         }
 
         if let Some((date, amount)) = tranche.upfront.filter(|(date, _)| *date >= as_of) {
@@ -323,13 +351,18 @@ impl CDSTranchePricer {
                     accrual_factor: 0.0,
                     rate: None,
                 },
-                discount_time: None,
+                discount_at: DiscountAt::PaymentDate,
             });
         }
 
         Ok(rows)
     }
 
+    /// Discount projected rows on the DISCOUNT curve's own time axis,
+    /// relative to `as_of` (`DF(as_of → t) = DF(0 → t) / DF(0 → as_of)`),
+    /// mirroring the single-name CDS `df_asof_to` convention. This is exact
+    /// regardless of the discount curve's base date or any day-count
+    /// mismatch with the hazard curve.
     pub(super) fn discount_projected_rows(
         &self,
         rows: &[ProjectedDiscountedRow],
@@ -338,9 +371,26 @@ impl CDSTranchePricer {
     ) -> Result<f64> {
         let mut pv = 0.0;
         for row in rows {
-            let df = match row.discount_time {
-                Some(t) => discount_curve.df(t),
-                None => discount_curve.df_between_dates(as_of, row.cashflow.date)?,
+            let df = match row.discount_at {
+                DiscountAt::PaymentDate => {
+                    discount_curve.df_between_dates(as_of, row.cashflow.date)?
+                }
+                DiscountAt::WithinPeriod { start, fraction } => {
+                    // Interpolate the survival-weighted default date inside
+                    // the period in calendar days, then take the relative DF
+                    // from as_of on the discount curve's axis. The date is
+                    // clamped to [as_of, payment_date]: a stub period can
+                    // start before as_of, but the EL increment only covers
+                    // defaults occurring on or after the valuation date.
+                    let end = row.cashflow.date;
+                    let period_days = (end - start).whole_days().max(0);
+                    let offset_days = (fraction * period_days as f64).round() as i64;
+                    let mid = start
+                        .checked_add(time::Duration::days(offset_days))
+                        .unwrap_or(end)
+                        .clamp(as_of, end);
+                    discount_curve.df_between_dates(as_of, mid)?
+                }
             };
             pv += row.cashflow.amount.amount() * df;
         }
@@ -368,7 +418,7 @@ impl CDSTranchePricer {
         let el_curve = if payment_dates.is_empty() || valuation_date >= tranche.maturity {
             Vec::new()
         } else {
-            self.build_el_curve(tranche, index_data_arc.as_ref(), &payment_dates)?
+            self.build_el_wd_curve(tranche, index_data_arc.as_ref(), &payment_dates)?
         };
         Ok((index_data_arc, valuation_date, payment_dates, el_curve))
     }
@@ -486,17 +536,32 @@ impl CDSTranchePricer {
         fraction.clamp(0.0, UNIFORM_MIDPOINT)
     }
 
-    /// Calculate effective attachment/detachment points given accumulated losses.
+    /// Calculate effective attachment/detachment points given realized
+    /// defaults (losses AND recoveries).
     ///
-    /// Returns (effective_attach, effective_detach, survival_factor)
-    /// where survival_factor is (1 - L).
+    /// `accumulated_loss` is the realized pool LOSS fraction `L`
+    /// (original-pool units). With recovery `R` the realized DEFAULTED
+    /// notional fraction is `X = L / (1 − R)`:
+    ///
+    /// - The loss `L` erodes the structure from the BOTTOM (attachment up).
+    /// - The recovered notional `G = X·R` amortizes the structure from the
+    ///   TOP (detachment down) — senior-side recovery writedown.
+    /// - The surviving pool is `1 − X` (defaulted names leave the pool
+    ///   entirely), NOT `1 − L` — using the loss conflates loss with
+    ///   defaulted notional and is exact only at `R = 0`.
+    ///
+    /// Strikes are re-normalized to the surviving pool.
     ///
     /// # Invariants
     ///
     /// - Accumulated loss is in [0, 1]
     /// - Attachment <= Detachment (after percentage conversion)
     /// - Results are always in [0, 1]
-    pub(super) fn calculate_effective_structure(&self, tranche: &CDSTranche) -> (f64, f64, f64) {
+    pub(super) fn calculate_effective_structure(
+        &self,
+        tranche: &CDSTranche,
+        recovery_rate: f64,
+    ) -> EffectiveStructure {
         let l = tranche.accumulated_loss;
         let attach = tranche.attach_pct / 100.0;
         let detach = tranche.detach_pct / 100.0;
@@ -524,28 +589,35 @@ impl CDSTranchePricer {
             detach
         );
 
-        if l >= 1.0 - 1e-9 {
-            return (0.0, 0.0, 0.0);
+        let (defaulted, recovered) = self.realized_default_state(tranche, recovery_rate);
+
+        if defaulted >= 1.0 - 1e-9 {
+            return EffectiveStructure {
+                eff_attach: 0.0,
+                eff_detach: 0.0,
+                pool_factor: 0.0,
+            };
         }
 
-        let survival_factor = 1.0 - l;
+        let pool_factor = 1.0 - defaulted;
 
-        let eff_attach = (attach - l).max(0.0) / survival_factor;
-        let eff_detach = (detach - l).max(0.0) / survival_factor;
+        // Bottom erosion by realized loss, top erosion by realized recovery.
+        let eroded_top = 1.0 - recovered;
+        let eff_attach = (attach.min(eroded_top) - l).max(0.0) / pool_factor;
+        let eff_detach = (detach.min(eroded_top) - l).max(0.0) / pool_factor;
 
-        // Clamp to [0, 1] (eff_detach can be > 1 theoretically if L is huge but we check L >= D before)
-        let result = (
-            eff_attach.clamp(0.0, 1.0),
-            eff_detach.clamp(0.0, 1.0),
-            survival_factor,
-        );
+        let result = EffectiveStructure {
+            eff_attach: eff_attach.clamp(0.0, 1.0),
+            eff_detach: eff_detach.clamp(0.0, 1.0),
+            pool_factor,
+        };
 
         // Post-condition assertions
         debug_assert!(
-            result.0 <= result.1,
+            result.eff_attach <= result.eff_detach,
             "effective attach {} > effective detach {}",
-            result.0,
-            result.1
+            result.eff_attach,
+            result.eff_detach
         );
 
         result

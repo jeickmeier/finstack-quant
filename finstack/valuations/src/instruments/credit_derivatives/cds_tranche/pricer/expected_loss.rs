@@ -1,6 +1,6 @@
 use super::config::{
-    CDSTranchePricer, ADAPTIVE_INTEGRATION_HIGH, ADAPTIVE_INTEGRATION_LOW, NUMERICAL_TOLERANCE,
-    PROBABILITY_CLIP,
+    CDSTranchePricer, ElWdPoint, PoolExposure, ADAPTIVE_INTEGRATION_HIGH, ADAPTIVE_INTEGRATION_LOW,
+    NUMERICAL_TOLERANCE, PROBABILITY_CLIP,
 };
 use crate::correlation::recovery::RecoveryModel;
 use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
@@ -21,11 +21,14 @@ const BASE_CORR_ARBITRAGE_TOL: f64 = 1e-9;
 struct ElInvariants {
     eff_attach: f64,
     eff_detach: f64,
-    survival_factor: f64,
+    pool_factor: f64,
     corr_attach: f64,
     corr_detach: f64,
     orig_width: f64,
     prior_loss: f64,
+    /// Fraction of tranche notional already written down from the top by
+    /// realized recoveries (senior-side amortization).
+    prior_wd: f64,
     /// Original (contractual) attachment point, percent. Retained for
     /// base-correlation arbitrage diagnostics.
     attach_pct: f64,
@@ -45,7 +48,9 @@ impl CDSTranchePricer {
         index_data: &CreditIndexData,
         maturity: Date,
     ) -> Result<f64> {
-        let (eff_attach, eff_detach, survival_factor) = self.calculate_effective_structure(tranche);
+        let eff = self.calculate_effective_structure(tranche, index_data.recovery_rate);
+        let (eff_attach, eff_detach, pool_factor) =
+            (eff.eff_attach, eff.eff_detach, eff.pool_factor);
 
         // If effective width is zero, no loss
         if eff_detach <= eff_attach {
@@ -107,7 +112,7 @@ impl CDSTranchePricer {
         }
 
         let orig_port_notional = tranche.notional.amount() / orig_width;
-        let loss_amount = current_portfolio_loss_fraction * orig_port_notional * survival_factor;
+        let loss_amount = current_portfolio_loss_fraction * orig_port_notional * pool_factor;
 
         Ok(loss_amount)
     }
@@ -118,16 +123,17 @@ impl CDSTranchePricer {
         tranche: &CDSTranche,
         index_data: &CreditIndexData,
     ) -> Result<ElInvariants> {
-        let (eff_attach, eff_detach, survival_factor) = self.calculate_effective_structure(tranche);
-        if eff_detach <= eff_attach {
+        let eff = self.calculate_effective_structure(tranche, index_data.recovery_rate);
+        if eff.eff_detach <= eff.eff_attach {
             return Ok(ElInvariants {
                 eff_attach: 0.0,
                 eff_detach: 0.0,
-                survival_factor: 0.0,
+                pool_factor: 0.0,
                 corr_attach: 0.0,
                 corr_detach: 0.0,
                 orig_width: 0.0,
                 prior_loss: 0.0,
+                prior_wd: 0.0,
                 attach_pct: tranche.attach_pct,
                 detach_pct: tranche.detach_pct,
             });
@@ -144,29 +150,33 @@ impl CDSTranchePricer {
         );
         let orig_width = (tranche.detach_pct - tranche.attach_pct) / 100.0;
         let prior_loss = self.calculate_prior_tranche_loss(tranche);
+        let prior_wd = self.calculate_prior_tranche_writedown(tranche, index_data.recovery_rate);
         Ok(ElInvariants {
-            eff_attach,
-            eff_detach,
-            survival_factor,
+            eff_attach: eff.eff_attach,
+            eff_detach: eff.eff_detach,
+            pool_factor: eff.pool_factor,
             corr_attach,
             corr_detach,
             orig_width,
             prior_loss,
+            prior_wd,
             attach_pct: tranche.attach_pct,
             detach_pct: tranche.detach_pct,
         })
     }
 
-    /// EL fraction at a date using pre-computed invariants (avoids redundant
-    /// effective-structure and base-correlation lookups per date).
-    fn el_fraction_at_date(
+    /// EL and recovery-writedown fractions at a date using pre-computed
+    /// invariants (avoids redundant effective-structure and base-correlation
+    /// lookups per date). Returns `(el_fraction, wd_fraction)` with
+    /// `el + wd ≤ 1`.
+    fn el_wd_fraction_at_date(
         &self,
         inv: &ElInvariants,
         index_data: &CreditIndexData,
         date: Date,
-    ) -> Result<f64> {
+    ) -> Result<(f64, f64)> {
         if inv.eff_detach <= inv.eff_attach || inv.orig_width <= 1e-9 {
-            return Ok(0.0);
+            return Ok((0.0, 0.0));
         }
         let el_to_attach = self.calculate_equity_tranche_loss(
             inv.eff_attach * 100.0,
@@ -191,8 +201,39 @@ impl CDSTranchePricer {
             date,
         )?;
         let tranche_loss_fraction =
-            (current_portfolio_loss_fraction * inv.survival_factor) / inv.orig_width;
-        Ok((tranche_loss_fraction + inv.prior_loss).clamp(0.0, 1.0))
+            (current_portfolio_loss_fraction * inv.pool_factor) / inv.orig_width;
+        let el_fraction = (tranche_loss_fraction + inv.prior_loss).clamp(0.0, 1.0);
+
+        // Senior-side recovery writedown: recovered pool notional G erodes
+        // the structure from the top, so the tranche [A, D] (current-pool
+        // strikes) loses E[(G − (1−D))⁺] − E[(G − (1−A))⁺] of notional.
+        // Using E[(G−s)⁺] = E[G] − E[min(G,s)] this is
+        //     E[min(G, 1−A)] − E[min(G, 1−D)],
+        // a difference of two capped recovered-notional expectations
+        // evaluated with the SAME copula machinery as the loss side. The
+        // base correlations are sticky to the original strikes, mirroring
+        // the loss decomposition: the (1−A) cap pairs with ρ(A) and the
+        // (1−D) cap with ρ(D). Any small negative residual from that
+        // correlation mismatch is benign and clamped to zero (the recovery
+        // leg has no arbitrage-validation contract).
+        let rec_to_attach_cap = self.calculate_equity_tranche_recovery(
+            (1.0 - inv.eff_attach) * 100.0,
+            inv.corr_attach,
+            index_data,
+            date,
+        )?;
+        let rec_to_detach_cap = self.calculate_equity_tranche_recovery(
+            (1.0 - inv.eff_detach) * 100.0,
+            inv.corr_detach,
+            index_data,
+            date,
+        )?;
+        let current_portfolio_wd_fraction = (rec_to_attach_cap - rec_to_detach_cap).max(0.0);
+        let tranche_wd_fraction =
+            (current_portfolio_wd_fraction * inv.pool_factor) / inv.orig_width;
+        let wd_fraction = (tranche_wd_fraction + inv.prior_wd).clamp(0.0, 1.0 - el_fraction);
+
+        Ok((el_fraction, wd_fraction))
     }
 
     /// Reconcile the base-correlation tranchelet difference `EL(0,D) − EL(0,A)`.
@@ -258,23 +299,49 @@ impl CDSTranchePricer {
     ///
     /// Returns a vector of (Date, EL_fraction) pairs where EL_fraction
     /// is the cumulative expected loss as a fraction of tranche notional.
-    ///
-    /// When `enforce_el_monotonicity` is enabled (default), any computed EL
-    /// value that is less than the previous date's EL will be clamped to
-    /// maintain monotonicity. This prevents small arbitrage opportunities
-    /// that can arise from base correlation model inconsistencies.
+    /// Loss-only view of [`Self::build_el_wd_curve`], kept for the public
+    /// expected-loss-curve accessor and diagnostics.
     pub(super) fn build_el_curve(
         &self,
         tranche: &CDSTranche,
         index_data: &CreditIndexData,
         dates: &[Date],
     ) -> Result<Vec<(Date, f64)>> {
+        Ok(self
+            .build_el_wd_curve(tranche, index_data, dates)?
+            .into_iter()
+            .map(|p| (p.date, p.el_fraction))
+            .collect())
+    }
+
+    /// Build the expected loss AND senior-side recovery-writedown curve for
+    /// all payment dates.
+    ///
+    /// Each point carries the cumulative expected loss fraction (erodes the
+    /// tranche from the bottom) and the cumulative expected recovery
+    /// writedown fraction (amortizes the detachment from the top); their sum
+    /// never exceeds 1. The premium leg accrues on
+    /// `1 − el_fraction − wd_fraction`, while only the loss side triggers
+    /// protection payments.
+    ///
+    /// When `enforce_el_monotonicity` is enabled (default), any computed EL
+    /// or WD value that is less than the previous date's will be clamped to
+    /// maintain monotonicity. This prevents small arbitrage opportunities
+    /// that can arise from base correlation model inconsistencies.
+    pub(super) fn build_el_wd_curve(
+        &self,
+        tranche: &CDSTranche,
+        index_data: &CreditIndexData,
+        dates: &[Date],
+    ) -> Result<Vec<ElWdPoint>> {
         let inv = self.el_invariants(tranche, index_data)?;
-        let mut el_curve = Vec::with_capacity(dates.len());
+        let mut curve = Vec::with_capacity(dates.len());
         let mut prev_el = 0.0;
+        let mut prev_wd = 0.0;
 
         for &date in dates {
-            let mut el_fraction = self.el_fraction_at_date(&inv, index_data, date)?;
+            let (mut el_fraction, mut wd_fraction) =
+                self.el_wd_fraction_at_date(&inv, index_data, date)?;
 
             // Check for non-monotonic EL (indicates numerical issue or model limitation)
             // This can happen due to base correlation model inconsistencies
@@ -291,18 +358,25 @@ impl CDSTranchePricer {
                         ""
                     }
                 );
-
-                // Enforce monotonicity if configured (default: true)
-                if self.params.enforce_el_monotonicity {
-                    el_fraction = prev_el;
-                }
             }
+            // Enforce monotonicity if configured (default: true)
+            if self.params.enforce_el_monotonicity {
+                el_fraction = el_fraction.max(prev_el);
+                wd_fraction = wd_fraction.max(prev_wd);
+            }
+            // Joint cap after monotonicity repair.
+            wd_fraction = wd_fraction.min(1.0 - el_fraction);
 
-            el_curve.push((date, el_fraction));
+            curve.push(ElWdPoint {
+                date,
+                el_fraction,
+                wd_fraction,
+            });
             prev_el = el_fraction;
+            prev_wd = wd_fraction;
         }
 
-        Ok(el_curve)
+        Ok(curve)
     }
 
     /// Calculate expected loss for an equity tranche [0, K] using Gaussian Copula.
@@ -323,13 +397,58 @@ impl CDSTranchePricer {
         index_data: &CreditIndexData,
         maturity: Date,
     ) -> Result<f64> {
+        self.calculate_equity_tranche_capped(
+            detachment_pct,
+            correlation,
+            index_data,
+            maturity,
+            PoolExposure::Loss,
+        )
+    }
+
+    /// Calculate the expected CAPPED RECOVERED notional `E[min(G, cap)]`
+    /// where `G = Σᵢ wᵢ·Rᵢ·Bᵢ` is the recovered pool notional.
+    ///
+    /// This is the recovery-side analogue of
+    /// [`Self::calculate_equity_tranche_loss`] — same conditional default
+    /// distribution and copula machinery, with per-name exposure `Rᵢ`
+    /// instead of LGD `1 − Rᵢ`. Used to amortize the detachment point from
+    /// the top: the senior writedown of tranche `[A, D]` is
+    /// `E[min(G, 1−A)] − E[min(G, 1−D)]`.
+    pub(super) fn calculate_equity_tranche_recovery(
+        &self,
+        cap_pct: f64,
+        correlation: f64,
+        index_data: &CreditIndexData,
+        maturity: Date,
+    ) -> Result<f64> {
+        self.calculate_equity_tranche_capped(
+            cap_pct,
+            correlation,
+            index_data,
+            maturity,
+            PoolExposure::Recovery,
+        )
+    }
+
+    /// Shared engine for capped pool expectations `E[min(Σᵢ wᵢ·eᵢ·Bᵢ, cap)]`
+    /// with `eᵢ` selected by `exposure` (loss given default or recovery).
+    fn calculate_equity_tranche_capped(
+        &self,
+        cap_pct: f64,
+        correlation: f64,
+        index_data: &CreditIndexData,
+        maturity: Date,
+        exposure: PoolExposure,
+    ) -> Result<f64> {
         // Heterogeneous path if enabled and issuer curves present
         if self.params.use_issuer_curves && index_data.has_issuer_curves() {
-            self.calculate_equity_tranche_loss_hetero(
-                detachment_pct,
+            self.calculate_equity_tranche_capped_hetero(
+                cap_pct,
                 correlation,
                 index_data,
                 maturity,
+                exposure,
             )
         } else {
             // Homogeneous: use index marginals
@@ -339,8 +458,18 @@ impl CDSTranchePricer {
             // Build recovery model if configured, otherwise use constant
             let recovery_model: Option<Box<dyn RecoveryModel>> =
                 self.params.recovery_spec.as_ref().map(|spec| spec.build());
+            let exposure_at = |z: f64| -> f64 {
+                let recovery = match &recovery_model {
+                    Some(model) => model.conditional_recovery(z),
+                    None => base_recovery,
+                };
+                match exposure {
+                    PoolExposure::Loss => 1.0 - recovery,
+                    PoolExposure::Recovery => recovery.clamp(0.0, 1.0),
+                }
+            };
 
-            let detachment_notional = detachment_pct / 100.0;
+            let cap_notional = cap_pct / 100.0;
             let maturity_years = self.years_from_base(index_data, maturity)?;
             let default_prob = self.get_default_probability(index_data, maturity_years)?;
             let correlation = self.smooth_correlation_boundary(correlation);
@@ -363,31 +492,25 @@ impl CDSTranchePricer {
                         z,
                     );
 
-                    // Use stochastic recovery if configured, otherwise constant
-                    let recovery_rate = match &recovery_model {
-                        Some(model) => model.conditional_recovery(z),
-                        None => base_recovery,
-                    };
-
-                    self.conditional_equity_tranche_loss(
+                    self.conditional_equity_tranche_capped(
                         num_constituents,
-                        detachment_notional,
+                        cap_notional,
                         p,
-                        recovery_rate,
+                        exposure_at(z),
                     )
                 };
-                let expected_loss = if !(ADAPTIVE_INTEGRATION_LOW..=ADAPTIVE_INTEGRATION_HIGH)
+                let expected = if !(ADAPTIVE_INTEGRATION_LOW..=ADAPTIVE_INTEGRATION_HIGH)
                     .contains(&correlation)
                 {
                     quad.integrate_adaptive(integrand, NUMERICAL_TOLERANCE)
                 } else {
                     quad.integrate(integrand)
                 };
-                Ok(expected_loss)
+                Ok(expected)
             } else {
                 let copula_ref = self.copula();
                 let default_threshold = self.default_threshold_for_copula(default_prob);
-                let expected_loss = copula_ref.integrate_fn(&|factors| {
+                let expected = copula_ref.integrate_fn(&|factors| {
                     let p = self.conditional_default_prob_copula(
                         copula_ref,
                         default_threshold,
@@ -396,19 +519,14 @@ impl CDSTranchePricer {
                     );
 
                     let z = factors.first().copied().unwrap_or(0.0);
-                    let recovery_rate = match &recovery_model {
-                        Some(model) => model.conditional_recovery(z),
-                        None => base_recovery,
-                    };
-
-                    self.conditional_equity_tranche_loss(
+                    self.conditional_equity_tranche_capped(
                         num_constituents,
-                        detachment_notional,
+                        cap_notional,
                         p,
-                        recovery_rate,
+                        exposure_at(z),
                     )
                 });
-                Ok(expected_loss)
+                Ok(expected)
             }
         }
     }
