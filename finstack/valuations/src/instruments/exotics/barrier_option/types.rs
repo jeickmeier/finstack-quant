@@ -113,8 +113,20 @@ pub struct BarrierOption {
     pub strike: f64,
     /// Barrier level (price that triggers knock-in/out)
     pub barrier: Money,
-    /// Optional rebate amount (paid at expiry if barrier condition met)
+    /// Optional rebate amount (paid if the barrier condition is met; see
+    /// `rebate_timing` for when a knock-out rebate pays)
     pub rebate: Option<Money>,
+    /// Timing of the knock-out rebate payment.
+    ///
+    /// `at_hit` (default, market standard) pays the rebate the moment a
+    /// knock-out barrier is breached; `at_expiry` defers payment to expiry.
+    /// Knock-in rebates always pay at expiry (a no-hit is only known then),
+    /// so this setting does not affect them. The analytical pricer values
+    /// at-hit rebates via the discounted first-passage closed form; the Monte
+    /// Carlo pricers currently approximate at-hit rebates as at-expiry.
+    #[builder(default)]
+    #[serde(default)]
+    pub rebate_timing: crate::models::closed_form::barrier::RebateTiming,
     /// Option type (call or put)
     pub option_type: OptionType,
     /// Barrier type (up/down, in/out)

@@ -24,8 +24,8 @@
       "spot_id": "NKY-SPOT",
       "vol_surface_id": "NKY-VOL",
       "div_yield_id": "NKY-DIV",
-      "fx_rate_id": "USDJPY-SPOT",
-      "fx_vol_id": "USDJPY-VOL",
+      "fx_rate_id": "JPYUSD-SPOT",
+      "fx_vol_id": "JPYUSD-VOL",
       "pricing_overrides": {
         "quoted_clean_price": null,
         "rho_bump_decimal": null,

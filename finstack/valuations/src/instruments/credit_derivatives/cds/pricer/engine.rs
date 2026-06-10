@@ -133,11 +133,30 @@ impl CDSPricer {
         // with shrinking notional schedules) would have to extend
         // `ProtectionLegSpec` with an explicit `end_date: Option<Date>`
         // and prefer it here when present.
-        let protection_start = as_of.max(cds.protection_start());
+        // Protection step-in: ISDA-standard conventions step protection in at
+        // T+1 calendar (a default on the valuation date itself is not
+        // covered); Bloomberg CDSW/CDSO conventions integrate from the
+        // valuation date ("protection starts immediately"). See
+        // `CdsValuationConvention::protection_step_in_days`.
+        let step_in = as_of
+            + finstack_core::dates::Duration::days(
+                cds.valuation_convention.protection_step_in_days(),
+            );
+        let protection_start = step_in.max(cds.protection_start());
         let protection_end = cds.premium.end;
 
-        // Forward-start at or past maturity: no protection interval by construction.
-        if cds.protection_start() >= protection_end {
+        // Expired contract: protection ended on or before the valuation date.
+        if protection_end <= as_of {
+            return Err(Error::Validation(format!(
+                "CDS '{}' is expired: protection end {} is on or before valuation date {}",
+                cds.id, protection_end, as_of
+            )));
+        }
+
+        // Step-in at/after the protection end (e.g. valuing a 1-day CDS where
+        // T+1 step-in lands on maturity): empty protection interval, zero
+        // protection value.
+        if protection_start >= protection_end {
             return Ok(0.0);
         }
 

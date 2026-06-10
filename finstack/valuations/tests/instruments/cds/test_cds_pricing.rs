@@ -206,8 +206,8 @@ fn test_par_spread_errors_when_expired() {
         .expect_err("expired CDS should error");
     let msg = err.to_string();
     assert!(
-        msg.contains("denominator") || msg.contains("start time"),
-        "expected denominator/start time error, got {msg}"
+        msg.contains("expired") || msg.contains("denominator"),
+        "expected expired/denominator error, got {msg}"
     );
 }
 

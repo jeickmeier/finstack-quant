@@ -100,6 +100,12 @@ pub fn bs_greeks(
     is_call: bool,
     theta_days: Option<f64>,
 ) -> Result<JsValue, JsValue> {
+    let theta_days = theta_days.unwrap_or(365.0);
+    if !theta_days.is_finite() || theta_days <= 0.0 {
+        return Err(JsValue::from_str(&format!(
+            "thetaDays must be positive, got {theta_days}"
+        )));
+    }
     let g = bs_greeks_core(
         spot,
         strike,
@@ -108,7 +114,7 @@ pub fn bs_greeks(
         sigma,
         t,
         option_type_from_bool(is_call),
-        theta_days.unwrap_or(365.0),
+        theta_days,
     );
     let obj = js_sys::Object::new();
     js_sys::Reflect::set(&obj, &"delta".into(), &g.delta.into())?;
@@ -193,7 +199,7 @@ pub fn barrier_call(
     direction: &str,
     knock: &str,
 ) -> Result<f64, JsValue> {
-    Ok(match (direction, knock) {
+    let value = match (direction, knock) {
         ("up", "in") => up_in_call(spot, strike, barrier, t, r, q, sigma),
         ("up", "out") => up_out_call(spot, strike, barrier, t, r, q, sigma),
         ("down", "in") => down_in_call(spot, strike, barrier, t, r, q, sigma),
@@ -203,7 +209,9 @@ pub fn barrier_call(
                 "unknown barrier spec: direction='{direction}' knock='{knock}'"
             )));
         }
-    })
+    };
+    finstack_valuations::models::closed_form::checked_closed_form_value(value, "barrier price")
+        .map_err(to_js_err)
 }
 
 /// Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option.

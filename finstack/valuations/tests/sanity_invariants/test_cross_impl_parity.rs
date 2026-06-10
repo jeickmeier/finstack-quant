@@ -163,6 +163,7 @@ mod gbm_barrier {
             strike: STRIKE,
             barrier: Money::new(85.0, Currency::USD),
             rebate: None,
+            rebate_timing: Default::default(),
             option_type: OptionType::Call,
             barrier_type: BarrierType::DownAndOut,
             expiry,

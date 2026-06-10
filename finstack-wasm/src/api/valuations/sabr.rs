@@ -184,10 +184,36 @@ impl WasmSabrSmile {
             .inner
             .validate_no_arbitrage(&strikes, r.unwrap_or(0.0), q.unwrap_or(0.0))
             .map_err(to_js_err)?;
+        // Re-map nested violation keys to camelCase so the whole payload
+        // follows the JS naming convention (the Rust structs serialize
+        // snake_case).
+        let butterfly: Vec<serde_json::Value> = result
+            .butterfly_violations
+            .iter()
+            .map(|v| {
+                serde_json::json!({
+                    "strike": v.strike,
+                    "butterflyValue": v.butterfly_value,
+                    "severityPct": v.severity_pct,
+                })
+            })
+            .collect();
+        let monotonicity: Vec<serde_json::Value> = result
+            .monotonicity_violations
+            .iter()
+            .map(|v| {
+                serde_json::json!({
+                    "strikeLow": v.strike_low,
+                    "strikeHigh": v.strike_high,
+                    "priceLow": v.price_low,
+                    "priceHigh": v.price_high,
+                })
+            })
+            .collect();
         let out = serde_json::json!({
             "arbitrageFree": result.is_arbitrage_free(),
-            "butterflyViolations": result.butterfly_violations,
-            "monotonicityViolations": result.monotonicity_violations,
+            "butterflyViolations": butterfly,
+            "monotonicityViolations": monotonicity,
         });
         to_js_value(&out)
     }

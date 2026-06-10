@@ -1,6 +1,8 @@
 //! CDS Tranche correlation sensitivity metric calculator.
 //!
-//! Measures PV sensitivity to a shift in the base correlation curve (per 1% correlation change).
+//! Measures PV sensitivity to a shift in the base correlation curve, reported
+//! **per 1% (0.01 absolute) correlation change** — the same per-1% unit as
+//! `Recovery01`.
 
 use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use crate::metrics::{MetricCalculator, MetricContext};

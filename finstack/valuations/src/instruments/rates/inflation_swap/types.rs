@@ -305,15 +305,14 @@ impl InflationSwap {
         let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
         let fixed_payment = self.notional * ((1.0 + fixed_rate).powf(tau_accrual) - 1.0);
 
-        // Use curve's day count for discounting (market standard)
+        // Date-based DF from as_of to payment: correct when the curve base
+        // date differs from as_of.
         let payment_date = self.adjusted_payment_date(self.maturity);
-        let curve_dc = disc.day_count();
-        let t_discount = curve_dc.year_fraction(
+        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+            disc.as_ref(),
             as_of,
             payment_date,
-            finstack_core::dates::DayCountContext::default(),
         )?;
-        let df = disc.df(t_discount);
 
         Ok(fixed_payment * df)
     }
@@ -349,15 +348,14 @@ impl InflationSwap {
         let index_ratio = self.projected_index_ratio(curves, as_of)?;
         let inflation_payment = self.notional * (index_ratio - 1.0);
 
-        // Use curve's day count for discounting (market standard)
+        // Date-based DF from as_of to payment: correct when the curve base
+        // date differs from as_of.
         let payment_date = self.adjusted_payment_date(self.maturity);
-        let curve_dc = disc.day_count();
-        let t_discount = curve_dc.year_fraction(
+        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+            disc.as_ref(),
             as_of,
             payment_date,
-            finstack_core::dates::DayCountContext::default(),
         )?;
-        let df = disc.df(t_discount);
 
         Ok(inflation_payment * df)
     }

@@ -723,7 +723,8 @@ pub struct RatesStepConventions {
     /// the calibration's bootstrap-internal swaps.
     ///
     /// When unset, the bootstrap uses the registered per-index default
-    /// (e.g. SOFR → `CompoundedInArrears { lookback_days: 2 }` per ARRC).
+    /// (e.g. SOFR → `CompoundedInArrears { lookback_days: 0 }`, the cleared
+    /// OIS plain in-arrears convention).
     /// Set this to match a vendor convention that differs from the registry
     /// default — e.g. Bloomberg SWPM SOFR uses
     /// `CompoundedWithRateCutoff { cutoff_days: 1 }` for the daily-compounded

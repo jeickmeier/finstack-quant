@@ -17,7 +17,7 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
-use finstack_core::dates::{Date, DateExt, DayCountContext, Tenor};
+use finstack_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::traits::VolProvider;
 use finstack_core::math::{norm_cdf, GaussHermiteQuadrature};
@@ -92,7 +92,8 @@ impl CmsSpreadOptionPricer {
         let time_to_expiry = if inst.expiry_date <= as_of {
             0.0
         } else {
-            inst.day_count
+            // Option expiry is calendar time: ACT/365F, not the accrual day count.
+            DayCount::Act365F
                 .year_fraction(as_of, inst.expiry_date, DayCountContext::default())?
                 .max(0.0)
         };

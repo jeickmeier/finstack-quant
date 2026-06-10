@@ -239,8 +239,9 @@ fn black76_pv(
 ) -> f64 {
     let annuity = swaption.swap_annuity(disc, as_of).unwrap_or(0.0);
 
-    let t = swaption
-        .day_count
+    // Option expiry time uses ACT/365F (calendar-time vol axis convention),
+    // matching the pricer; the instrument day count governs accruals only.
+    let t = finstack_core::dates::DayCount::Act365F
         .year_fraction(as_of, swaption.expiry, DayCountContext::default())
         .unwrap_or(0.0)
         .max(0.0);

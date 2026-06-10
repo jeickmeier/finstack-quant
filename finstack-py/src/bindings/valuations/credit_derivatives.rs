@@ -51,12 +51,17 @@ macro_rules! credit_derivative_wrapper {
                 validate_payload(&self.json)
             }
 
-            fn price(&self, market: &Bound<'_, PyAny>, as_of: &str) -> PyResult<PyValuationResult> {
+            fn price(
+                &self,
+                py: Python<'_>,
+                market: &Bound<'_, PyAny>,
+                as_of: &str,
+            ) -> PyResult<PyValuationResult> {
                 // "default" resolves to `Instrument::default_model()` in the
                 // pricer JSON layer, so each instrument always prices with its
                 // registered model (a hardcoded literal here broke CDSOption
                 // when its model moved from Black76 to BloombergCdso).
-                let result = price_payload_result(&self.json, market, as_of, "default")?;
+                let result = price_payload_result(py, &self.json, market, as_of, "default")?;
                 Ok(PyValuationResult { inner: result })
             }
         }

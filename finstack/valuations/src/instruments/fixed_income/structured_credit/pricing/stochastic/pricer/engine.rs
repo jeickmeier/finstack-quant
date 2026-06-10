@@ -35,6 +35,16 @@ use std::sync::Arc;
 /// itself is arbitrary; only its disjointness from `0` matters.
 const PER_NAME_SEED_SALT: u64 = 0x5350_4552_4E41_4D45; // "SPERNAME"
 
+/// Seed salt for the tree-mode tail-month RNG.
+///
+/// Tree-mode paths enumerate base-`branch_count` digits of the path index for
+/// the leading months; months beyond `log_branch(path_count)` carry no digit
+/// information and are drawn from a Philox substream seeded with
+/// `config.seed ^ TREE_TAIL_SEED_SALT` instead (see [`tree_path_factors`]).
+/// The salt keeps these tail streams disjoint from the systematic-factor and
+/// per-name stream spaces.
+const TREE_TAIL_SEED_SALT: u64 = 0x5452_4545_5441_494C; // "TREETAIL"
+
 /// Stochastic pricing engine for structured credit.
 ///
 /// Each scenario path feeds period SMM/MDR/recovery assumptions into the same
@@ -94,7 +104,7 @@ impl StochasticPricer {
             .branches_at_node(self.branching_variance_proxy())
             .max(1);
         let path_count = terminal_paths.max(1);
-        let per_name_simulator = self.per_name_simulator();
+        let per_name_simulator = self.per_name_simulator()?;
         // Tree mode draws no antithetic pairs: every path is an independent
         // stratified node, so the std-error is the plain i.i.d. estimator.
         let mut collector = ScenarioCollector::new(instrument, path_count, false)?;
@@ -242,7 +252,7 @@ impl StochasticPricer {
         antithetic: bool,
         pricing_mode: &str,
     ) -> Result<StochasticPricingResult> {
-        let per_name_simulator = self.per_name_simulator();
+        let per_name_simulator = self.per_name_simulator()?;
         // `into_par_iter().enumerate()` on a `Vec` is an order-preserving
         // `IndexedParallelIterator`: `collect()` returns outputs in path
         // order regardless of rayon scheduling, and each path keeps a stable
@@ -330,9 +340,14 @@ impl StochasticPricer {
 
     /// Build the per-name copula default simulator, if the scenario uses a
     /// copula default model. Shared (cheap `Arc` clone) across all paths.
-    fn per_name_simulator(&self) -> Option<Arc<PerNameCopulaDefault>> {
+    ///
+    /// # Errors
+    ///
+    /// Propagates copula construction failures (no silent Gaussian fallback).
+    fn per_name_simulator(&self) -> Result<Option<Arc<PerNameCopulaDefault>>> {
         self.copula_default()
-            .map(|(spec, correlation)| Arc::new(PerNameCopulaDefault::new(&spec, correlation)))
+            .map(|(spec, correlation)| Ok(Arc::new(PerNameCopulaDefault::new(&spec, correlation)?)))
+            .transpose()
     }
 
     /// Construct the per-path per-name default engine.
@@ -465,11 +480,41 @@ impl StochasticPricer {
     ) -> Vec<f64> {
         let path_count = path_count.max(1);
         let branch_count = branch_count.max(1);
+        let original_path_index = path_index;
         let mut factors = Vec::with_capacity(month_count);
         let stratified = matches!(
             self.config.tree_config.branching,
             super::super::tree::BranchingSpec::Stratified { .. }
         );
+
+        // Number of leading months the base-`branch_count` digits of the path
+        // index can actually resolve: the largest `m` with
+        // `branch_count^m <= path_count`. Beyond that every path's digit is 0,
+        // which previously pinned a deterministic z = Φ⁻¹(0.5/branch_count)
+        // shock (≈ −0.97 for trinomial trees) on all trailing months. Those
+        // months are instead drawn from a per-path Philox substream so the
+        // tail diffuses like a genuine Monte Carlo continuation.
+        let resolved_months = if stratified {
+            month_count
+        } else {
+            let mut resolved = 0usize;
+            let mut capacity = 1usize;
+            while resolved < month_count {
+                match capacity.checked_mul(branch_count) {
+                    Some(next) if next <= path_count => {
+                        capacity = next;
+                        resolved += 1;
+                    }
+                    _ => break,
+                }
+            }
+            resolved
+        };
+        let mut tail_rng =
+            (resolved_months < month_count && self.has_stochastic_rates()).then(|| {
+                PhiloxRng::new(self.config.seed ^ TREE_TAIL_SEED_SALT)
+                    .substream(original_path_index as u64)
+            });
 
         for month in 0..month_count {
             let z = if !self.has_stochastic_rates() {
@@ -477,11 +522,15 @@ impl StochasticPricer {
             } else if stratified {
                 let p = (((path_index + month) % path_count) as f64 + 0.5) / path_count as f64;
                 finstack_core::math::standard_normal_inv_cdf(p)
-            } else {
+            } else if month < resolved_months {
                 let branch = path_index % branch_count;
                 path_index /= branch_count;
                 let p = (branch as f64 + 0.5) / branch_count as f64;
                 finstack_core::math::standard_normal_inv_cdf(p)
+            } else if let Some(rng) = tail_rng.as_mut() {
+                rng.next_std_normal()
+            } else {
+                0.0
             };
             factors.push(z);
         }

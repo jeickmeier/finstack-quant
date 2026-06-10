@@ -721,6 +721,233 @@ fn arithmetic_asian_put_tw_core(
     put_price.max(0.0).min(upper_bound)
 }
 
+// ============================================================================
+// GENERAL FIXING-TIME VARIANTS
+// ============================================================================
+//
+// The `*_times` functions below take the actual fixing times instead of
+// assuming `n` equally-spaced fixings over `[0, T]`. They are the canonical
+// entry points for instrument pricers, whose fixing schedules (weekly windows
+// near expiry, seasoned remainders, business-day calendars) are generally NOT
+// equally spaced; the equal-spacing wrappers above remain for callers that
+// genuinely have a uniform grid.
+
+/// Validate a general fixing-time schedule: non-empty, finite, strictly
+/// positive and non-decreasing.
+fn validate_fixing_times(fixing_times: &[f64]) -> Result<()> {
+    if fixing_times.is_empty() {
+        return Err(finstack_core::Error::Validation(
+            "Asian fixing-time pricer requires at least one future fixing time".to_string(),
+        ));
+    }
+    let mut prev = 0.0_f64;
+    for &t in fixing_times {
+        if !t.is_finite() || t <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Asian fixing times must be finite and positive, got {t}"
+            )));
+        }
+        if t < prev {
+            return Err(finstack_core::Error::Validation(
+                "Asian fixing times must be sorted ascending".to_string(),
+            ));
+        }
+        prev = t;
+    }
+    Ok(())
+}
+
+/// Price a geometric-average Asian option on an arbitrary fixing schedule.
+///
+/// Exact closed form: `ln G = (Σᵢ ln S_{tᵢ}) / N` is normal with
+/// * `E[ln G] = ln S + (r − q − σ²/2) · t̄`            (`t̄` = mean fixing time)
+/// * `Var[ln G] = σ² · ΣᵢΣⱼ min(tᵢ, tⱼ) / N²`
+///
+/// so the option prices as a Black call/put on the lognormal `G`. Reduces to
+/// [`geometric_asian_call`] / [`geometric_asian_put`] when the times are
+/// `i·T/n`. Discounting uses the supplied `df` (date-based curve lookup);
+/// the moment drift uses `r = −ln(df)/t_expiry` for consistency.
+///
+/// # Errors
+///
+/// Returns a validation error when `df` is not strictly positive/finite or
+/// the fixing schedule is empty / non-positive / unsorted.
+// Closed-form pricer: the flat scalar argument list mirrors the sibling
+// equal-spacing pricers and the textbook formula inputs.
+#[allow(clippy::too_many_arguments)]
+pub fn geometric_asian_price_times(
+    spot: f64,
+    strike: f64,
+    t_expiry: f64,
+    df: f64,
+    div_yield: f64,
+    vol: f64,
+    fixing_times: &[f64],
+    is_call: bool,
+) -> Result<f64> {
+    if t_expiry <= 0.0 {
+        let intrinsic = if is_call {
+            spot - strike
+        } else {
+            strike - spot
+        };
+        return Ok(intrinsic.max(0.0));
+    }
+    validate_discount_factor(df)?;
+    validate_fixing_times(fixing_times)?;
+    let rate = -df.ln() / t_expiry;
+
+    let n = fixing_times.len() as f64;
+    let drift = rate - div_yield - 0.5 * vol * vol;
+
+    let mut mean_acc = NeumaierAccumulator::new();
+    for &t_i in fixing_times {
+        mean_acc.add(drift * t_i);
+    }
+    let mu = spot.ln() + mean_acc.total() / n;
+
+    // Var[ln G] = σ² ΣᵢΣⱼ min(tᵢ,tⱼ) / N². With sorted times the double sum
+    // reduces to Σₖ (2(N−k)+1)·tₖ (1-based k), evaluated in O(n).
+    let mut var_acc = NeumaierAccumulator::new();
+    let n_usize = fixing_times.len();
+    for (k, &t_k) in fixing_times.iter().enumerate() {
+        let weight = (2 * (n_usize - 1 - k) + 1) as f64;
+        var_acc.add(weight * t_k);
+    }
+    let var_ln_g = vol * vol * var_acc.total() / (n * n);
+
+    if var_ln_g <= 0.0 {
+        let g = mu.exp();
+        let intrinsic = if is_call { g - strike } else { strike - g };
+        return Ok(df * intrinsic.max(0.0));
+    }
+
+    let std = var_ln_g.sqrt();
+    let expected_g = (mu + 0.5 * var_ln_g).exp();
+    let d1 = (mu + var_ln_g - strike.ln()) / std;
+    let d2 = d1 - std;
+    let price = if is_call {
+        expected_g * norm_cdf(d1) - strike * norm_cdf(d2)
+    } else {
+        strike * norm_cdf(-d2) - expected_g * norm_cdf(-d1)
+    };
+    Ok(df * price.max(0.0))
+}
+
+/// Turnbull-Wakeman arithmetic-average Asian option on an arbitrary fixing
+/// schedule.
+///
+/// Same lognormal moment-matching as [`arithmetic_asian_call_tw`] /
+/// [`arithmetic_asian_put_tw`], with the first and second moments of the
+/// average evaluated on the actual fixing times instead of an equal-spacing
+/// grid. Discounting uses the supplied `df`; the moment drift uses
+/// `r = −ln(df)/t_expiry`.
+///
+/// # Errors
+///
+/// Returns a validation error when `df` is not strictly positive/finite or
+/// the fixing schedule is empty / non-positive / unsorted.
+// Closed-form pricer: the flat scalar argument list mirrors the sibling
+// equal-spacing pricers and the textbook formula inputs.
+#[allow(clippy::too_many_arguments)]
+pub fn arithmetic_asian_tw_price_times(
+    spot: f64,
+    strike: f64,
+    t_expiry: f64,
+    df: f64,
+    div_yield: f64,
+    vol: f64,
+    fixing_times: &[f64],
+    is_call: bool,
+) -> Result<f64> {
+    if t_expiry <= 0.0 {
+        let intrinsic = if is_call {
+            spot - strike
+        } else {
+            strike - spot
+        };
+        return Ok(intrinsic.max(0.0));
+    }
+    validate_discount_factor(df)?;
+    validate_fixing_times(fixing_times)?;
+    let rate = -df.ln() / t_expiry;
+
+    let m1 = arithmetic_mean_first_moment_times(spot, rate, div_yield, fixing_times);
+    let upper_bound = if is_call { df * m1 } else { df * strike };
+    let degenerate = |m1: f64| -> f64 {
+        let intrinsic = if is_call { m1 - strike } else { strike - m1 };
+        (df * intrinsic.max(0.0)).min(upper_bound)
+    };
+
+    if vol <= 0.0 {
+        return Ok(degenerate(m1));
+    }
+
+    let m2 = arithmetic_mean_second_moment_times(spot, rate, div_yield, vol, fixing_times);
+    if m2 <= m1 * m1 {
+        return Ok(degenerate(m1));
+    }
+    let var = (m2 / (m1 * m1)).ln();
+    if var <= 0.0 {
+        return Ok(degenerate(m1));
+    }
+
+    let sigma_star = var.sqrt();
+    let mu_star = m1.ln() - 0.5 * var;
+    let d1 = (mu_star - strike.ln() + var) / sigma_star;
+    let d2 = d1 - sigma_star;
+    let price = if is_call {
+        df * (m1 * norm_cdf(d1) - strike * norm_cdf(d2))
+    } else {
+        df * (strike * norm_cdf(-d2) - m1 * norm_cdf(-d1))
+    };
+    Ok(price.max(0.0).min(upper_bound))
+}
+
+/// `E[A]` for an arithmetic average on arbitrary fixing times.
+fn arithmetic_mean_first_moment_times(
+    spot: f64,
+    rate: f64,
+    div_yield: f64,
+    fixing_times: &[f64],
+) -> f64 {
+    let drift = rate - div_yield;
+    let mut acc = NeumaierAccumulator::new();
+    for &t_i in fixing_times {
+        acc.add((drift * t_i).exp());
+    }
+    spot * acc.total() / fixing_times.len() as f64
+}
+
+/// `E[A²]` for an arithmetic average on arbitrary (sorted) fixing times.
+///
+/// Same O(n) prefix-sum reduction as [`compute_arithmetic_mean_second_moment`]
+/// — the algorithm only requires the times to be sorted, not equally spaced.
+fn arithmetic_mean_second_moment_times(
+    spot: f64,
+    rate: f64,
+    div_yield: f64,
+    vol: f64,
+    fixing_times: &[f64],
+) -> f64 {
+    let n = fixing_times.len() as f64;
+    let a = 2.0 * rate - 2.0 * div_yield + vol * vol;
+    let b = rate - div_yield;
+    let a_minus_b = a - b;
+
+    let mut diag_acc = NeumaierAccumulator::new();
+    let mut upper_acc = NeumaierAccumulator::new();
+    let mut prefix_ab = 0.0_f64;
+
+    for &tk in fixing_times {
+        diag_acc.add((a * tk).exp());
+        upper_acc.add((b * tk).exp() * prefix_ab);
+        prefix_ab += (a_minus_b * tk).exp();
+    }
+
+    spot * spot * (diag_acc.total() + 2.0 * upper_acc.total()) / (n * n)
+}
+
 /// Deterministic geometric average of `S * exp((r - q) t_i)` over discrete
 /// fixings (or the continuous limit for `num_fixings == 0`).
 ///
@@ -1351,6 +1578,89 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The general fixing-time variants must reduce exactly to the
+    /// equal-spacing formulas when handed the uniform grid `i·T/n`, and must
+    /// actually respond to non-uniform schedules (front-loaded fixings have a
+    /// shorter effective averaging window than back-loaded ones).
+    #[test]
+    fn times_variants_match_equal_spacing_and_react_to_schedule() {
+        let spot = 100.0_f64;
+        let strike = 100.0_f64;
+        let time = 1.0_f64;
+        let rate = 0.05_f64;
+        let div_yield = 0.02_f64;
+        let vol = 0.2_f64;
+        let num_fixings = 12_usize;
+        let df = (-rate * time).exp();
+
+        let uniform: Vec<f64> = (1..=num_fixings)
+            .map(|i| time * i as f64 / num_fixings as f64)
+            .collect();
+
+        let geo_uniform =
+            geometric_asian_call(spot, strike, time, rate, div_yield, vol, num_fixings);
+        let geo_times =
+            geometric_asian_price_times(spot, strike, time, df, div_yield, vol, &uniform, true)
+                .expect("valid schedule");
+        assert!(
+            (geo_uniform - geo_times).abs() < 1e-10,
+            "geometric times-variant {geo_times} must match equal-spacing {geo_uniform}"
+        );
+
+        let tw_uniform =
+            arithmetic_asian_call_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
+        let tw_times =
+            arithmetic_asian_tw_price_times(spot, strike, time, df, div_yield, vol, &uniform, true)
+                .expect("valid schedule");
+        assert!(
+            (tw_uniform - tw_times).abs() < 1e-10,
+            "TW times-variant {tw_times} must match equal-spacing {tw_uniform}"
+        );
+
+        // Non-uniform schedules: back-loaded fixings carry more variance than
+        // front-loaded ones, so the option must be worth more.
+        let front_loaded: Vec<f64> = (1..=num_fixings)
+            .map(|i| 0.25 * time * i as f64 / num_fixings as f64)
+            .collect();
+        let back_loaded: Vec<f64> = (1..=num_fixings)
+            .map(|i| time * (0.75 + 0.25 * i as f64 / num_fixings as f64))
+            .collect();
+        let geo_front = geometric_asian_price_times(
+            spot,
+            strike,
+            time,
+            df,
+            div_yield,
+            vol,
+            &front_loaded,
+            true,
+        )
+        .expect("valid schedule");
+        let geo_back =
+            geometric_asian_price_times(spot, strike, time, df, div_yield, vol, &back_loaded, true)
+                .expect("valid schedule");
+        assert!(
+            geo_back > geo_front,
+            "back-loaded schedule {geo_back} must exceed front-loaded {geo_front}"
+        );
+
+        // Schedule validation.
+        assert!(
+            geometric_asian_price_times(spot, strike, time, df, div_yield, vol, &[], true).is_err()
+        );
+        assert!(arithmetic_asian_tw_price_times(
+            spot,
+            strike,
+            time,
+            df,
+            div_yield,
+            vol,
+            &[0.5, 0.25],
+            true
+        )
+        .is_err());
     }
 
     #[test]

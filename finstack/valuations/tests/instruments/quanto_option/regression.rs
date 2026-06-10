@@ -71,13 +71,14 @@ fn build_market(equity_vol: f64, fx_vol: f64) -> MarketContext {
         .insert(usd)
         .insert(jpy)
         .insert_surface(flat_surface("NKY-VOL", equity_vol))
-        .insert_surface(flat_fx_surface("USDJPY-VOL", fx_vol))
+        .insert_surface(flat_fx_surface("JPYUSD-VOL", fx_vol))
         .insert_fx(fx)
         // Dividend yield is read as a unitless price scalar by
         // `resolve_optional_dividend_yield`, not a discount curve.
         .insert_price("NKY-DIV", MarketScalar::Unitless(0.01))
         .insert_price("NKY-SPOT", MarketScalar::Unitless(35_000.0))
-        .insert_price("USDJPY-SPOT", MarketScalar::Unitless(150.0))
+        // Quote-per-base direction (USD per JPY), matching the JPYUSD id.
+        .insert_price("JPYUSD-SPOT", MarketScalar::Unitless(1.0 / 150.0))
 }
 
 fn build_option(correlation: f64) -> QuantoOption {
@@ -99,8 +100,8 @@ fn build_option(correlation: f64) -> QuantoOption {
         .spot_id("NKY-SPOT".into())
         .vol_surface_id(CurveId::new("NKY-VOL"))
         .div_yield_id_opt(Some(CurveId::new("NKY-DIV")))
-        .fx_rate_id_opt(Some("USDJPY-SPOT".to_string()))
-        .fx_vol_id_opt(Some(CurveId::new("USDJPY-VOL")))
+        .fx_rate_id_opt(Some("JPYUSD-SPOT".to_string()))
+        .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
         .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()

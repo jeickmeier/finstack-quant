@@ -24,7 +24,7 @@ fn resolve_oas_decimal(bond: &Bond, context: &MetricContext) -> finstack_core::R
         return Ok(oas);
     }
     if let Some(clean_price) = bond.pricing_overrides.market_quotes.quoted_clean_price {
-        let pricer = TreePricer::with_config(bond_tree_config(bond));
+        let pricer = TreePricer::with_config(bond_tree_config(bond)?);
         return Ok(pricer.calculate_oas(
             bond,
             context.curves.as_ref(),
@@ -61,7 +61,7 @@ impl MetricCalculator for BondVegaCalculator {
         let defaults =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
         let bump = defaults.vol_bump_pct;
-        let base_vol = bond_tree_config(bond).volatility;
+        let base_vol = bond_tree_config(bond)?.volatility;
         let source_vol = bond
             .pricing_overrides
             .market_quotes

@@ -72,9 +72,22 @@ pub struct QuantoOption {
     pub vol_surface_id: CurveId,
     /// Optional dividend yield curve ID
     pub div_yield_id: Option<CurveId>,
-    /// Optional FX rate identifier
+    /// Optional FX rate identifier.
+    ///
+    /// The referenced scalar must be quoted as **quote currency per unit of
+    /// base currency** (e.g. for base JPY / quote USD, USD-per-JPY ≈ 0.0071,
+    /// conventionally named `JPYUSD`). The pricer compounds it with
+    /// `exp((r_quote − r_base)·t)` to obtain the ATM forward for the FX vol
+    /// lookup, so an inverted quote (JPY-per-USD) silently mislocates the
+    /// smile. `validate()` rejects ids whose embedded pair name contradicts
+    /// this direction.
     pub fx_rate_id: Option<String>,
-    /// Optional FX volatility surface ID
+    /// Optional FX volatility surface ID.
+    ///
+    /// Must be calibrated in the same **quote-per-base** direction as
+    /// `fx_rate_id` so absolute-strike lookups at the CIRP forward land on
+    /// the correct smile. `validate()` rejects ids whose embedded pair name
+    /// contradicts this direction.
     pub fx_vol_id: Option<CurveId>,
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
@@ -206,8 +219,8 @@ impl QuantoOption {
             .spot_id("NKY-SPOT".into())
             .vol_surface_id(CurveId::new("NKY-VOL"))
             .div_yield_id_opt(Some(CurveId::new("NKY-DIV")))
-            .fx_rate_id_opt(Some("USDJPY-SPOT".to_string()))
-            .fx_vol_id_opt(Some(CurveId::new("USDJPY-VOL")))
+            .fx_rate_id_opt(Some("JPYUSD-SPOT".to_string()))
+            .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
             .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
@@ -283,6 +296,36 @@ impl QuantoOption {
                     "QuantoOption requires both underlying_quantity and payoff_fx_rate when either is supplied".to_string(),
                 ));
             }
+        }
+        if let Some(fx_rate_id) = &self.fx_rate_id {
+            self.validate_fx_id_direction(fx_rate_id, "fx_rate_id")?;
+        }
+        if let Some(fx_vol_id) = &self.fx_vol_id {
+            self.validate_fx_id_direction(fx_vol_id.as_str(), "fx_vol_id")?;
+        }
+        Ok(())
+    }
+
+    /// Reject FX market-data ids whose embedded pair name contradicts the
+    /// required **quote-per-base** direction.
+    ///
+    /// The pricer interprets the referenced rate/vol in quote-per-base terms
+    /// (conventional pair name `{base}{quote}`, e.g. `JPYUSD` for base JPY /
+    /// quote USD). An id embedding the reversed pair (`USDJPY`) is the classic
+    /// silent-inversion bug, so it fails validation. Ids that embed neither
+    /// ordering are accepted (no naming magic beyond the contradiction check).
+    fn validate_fx_id_direction(&self, fx_id: &str, field: &str) -> finstack_core::Result<()> {
+        let base = self.base_currency.to_string().to_uppercase();
+        let quote = self.quote_currency.to_string().to_uppercase();
+        let id_upper = fx_id.to_uppercase();
+        let correct = format!("{base}{quote}");
+        let reversed = format!("{quote}{base}");
+        if id_upper.contains(&reversed) && !id_upper.contains(&correct) {
+            return Err(finstack_core::Error::Validation(format!(
+                "QuantoOption {field} '{fx_id}' embeds the pair {reversed}, but the quanto \
+                 pricer requires quote-per-base market data ({correct}: {quote} per unit \
+                 {base}). Re-quote the rate/vol in the {correct} direction or rename the id.",
+            )));
         }
         Ok(())
     }

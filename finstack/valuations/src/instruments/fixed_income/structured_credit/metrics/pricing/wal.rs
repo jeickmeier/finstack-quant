@@ -85,12 +85,14 @@ impl MetricCalculator for WalCalculator {
                 if flow.date <= context.as_of {
                     continue;
                 }
+                // Cash principal only — Amortization / Notional / PrePayment.
+                // Write-downs (`DefaultedNotional`) are losses, not principal
+                // repayments, and are excluded so this fallback matches the
+                // primary `principal_flows` path (which never contains
+                // write-downs).
                 if !matches!(
                     flow.kind,
-                    CFKind::Amortization
-                        | CFKind::Notional
-                        | CFKind::PrePayment
-                        | CFKind::DefaultedNotional
+                    CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
                 ) {
                     continue;
                 }
@@ -267,6 +269,53 @@ mod tests {
         assert!(
             (wal - expected).abs() < 1e-9,
             "wal={wal}, expected={expected}"
+        );
+    }
+
+    /// Write-downs are losses, not principal repayments: the tagged-cashflow
+    /// fallback must ignore `DefaultedNotional` flows so it matches the
+    /// primary `principal_flows` path (which never contains write-downs).
+    #[test]
+    fn wal_fallback_excludes_writedowns() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let instrument = Arc::new(DummyInstrument {
+            attrs: Attributes::new(),
+        }) as Arc<dyn Instrument>;
+        let curves = Arc::new(MarketContext::new());
+        let base_value = Money::new(0.0, Currency::USD);
+
+        let mut context = MetricContext::new(
+            instrument,
+            curves,
+            as_of,
+            base_value,
+            MetricContext::default_config(),
+        );
+        context.tagged_cashflows = Some(vec![
+            CashFlow {
+                date: Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
+                reset_date: None,
+                amount: Money::new(100.0, Currency::USD),
+                kind: CFKind::Amortization,
+                accrual_factor: 0.0,
+                rate: None,
+            },
+            // A large write-down much later: if counted as principal it would
+            // drag WAL far above 1y.
+            CashFlow {
+                date: Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
+                reset_date: None,
+                amount: Money::new(-500.0, Currency::USD),
+                kind: CFKind::DefaultedNotional,
+                accrual_factor: 0.0,
+                rate: None,
+            },
+        ]);
+
+        let wal = WalCalculator.calculate(&mut context).expect("wal");
+        assert!(
+            (wal - 1.0).abs() < 1e-2,
+            "wal={wal}: write-down must not be weighted as principal"
         );
     }
 }

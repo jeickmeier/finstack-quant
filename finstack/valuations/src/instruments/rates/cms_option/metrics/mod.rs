@@ -199,9 +199,12 @@ impl MetricCalculator for VannaCalculator {
                 pricer.calculate_forward_swap_rate(inst, curves, as_of, swap_start, swap_end)?;
 
             // 2. Volatility and Time
-            let time_to_fixing =
-                inst.day_count
-                    .year_fraction(as_of, fixing_date, DayCountContext::default())?;
+            // Calendar time for the vol axis: ACT/365F, not the accrual day count.
+            let time_to_fixing = finstack_core::dates::DayCount::Act365F.year_fraction(
+                as_of,
+                fixing_date,
+                DayCountContext::default(),
+            )?;
 
             if time_to_fixing <= 1e-6 {
                 continue;

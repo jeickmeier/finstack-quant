@@ -72,7 +72,11 @@ fn actual_psa_from_model(model: &PrepaymentModelSpec) -> f64 {
 /// plain sequential/pro-rata allocation. When a PAC tranche is present, the PAC
 /// schedule is generated from the *collateral* balance (the correct basis for
 /// the PAC band) and the carved PAC tranche balance.
-fn build_pac_context(cmo: &AgencyCmo, collateral: &AgencyMbsPassthrough) -> Option<PacContext> {
+fn build_pac_context(
+    cmo: &AgencyCmo,
+    collateral: &AgencyMbsPassthrough,
+    as_of: Date,
+) -> Option<PacContext> {
     let pac_tranches: Vec<&CmoTranche> = cmo
         .waterfall
         .tranches
@@ -98,6 +102,9 @@ fn build_pac_context(cmo: &AgencyCmo, collateral: &AgencyMbsPassthrough) -> Opti
         pac_balance,
         collateral.wam,
         collateral.wac,
+        // Anchor the PSA seasoning ramp at the pool's current age (WALA);
+        // a seasoned pool must not restart the 30-month ramp at age 0.
+        collateral.seasoning_months(as_of),
         collar,
     );
 
@@ -124,7 +131,7 @@ pub(crate) fn generate_tranche_cashflows(
 
     // Build the PAC context once (None for non-PAC deals). The schedule is
     // collateral-derived; only `period_index` advances per period below.
-    let mut pac_context = build_pac_context(cmo, &collateral);
+    let mut pac_context = build_pac_context(cmo, &collateral, as_of);
 
     // Create a working copy of the waterfall
     let mut waterfall = cmo.waterfall.clone();
@@ -477,6 +484,7 @@ mod tests {
             pac_tranche.current_face.amount(),
             collateral.wam,
             collateral.wac,
+            collateral.seasoning_months(as_of),
             pac_tranche.pac_collar.clone().expect("PAC has a collar"),
         );
 

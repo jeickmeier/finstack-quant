@@ -102,7 +102,16 @@ impl SABRSmile {
             .implied_volatility(self.forward, self.forward, self.time_to_expiry)
     }
 
-    /// Generate volatility smile for given strikes
+    /// Quoting convention of the vols this smile produces (normal for β≈0,
+    /// Black otherwise) — see [`crate::models::volatility::sabr::SabrVolType`].
+    /// Check this before inserting generated vols into a vol surface.
+    pub fn vol_type(&self) -> crate::models::volatility::sabr::SabrVolType {
+        self.model.vol_type()
+    }
+
+    /// Generate volatility smile for given strikes.
+    ///
+    /// The output quoting convention is β-dependent; see [`Self::vol_type`].
     pub fn generate_smile(&self, strikes: &[f64]) -> Result<Vec<f64>> {
         let mut vols = Vec::with_capacity(strikes.len());
 

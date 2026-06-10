@@ -37,9 +37,10 @@ fn test_black_formula_manual_validation() {
 
     let pv_inst = swaption.value(&market, as_of).unwrap().amount();
 
-    // Manual Black76 calculation
-    let t = swaption
-        .day_count
+    // Manual Black76 calculation. Option expiry time uses ACT/365F
+    // (calendar-time vol axis convention), matching the pricer; the
+    // instrument day count governs accruals only.
+    let t = finstack_core::dates::DayCount::Act365F
         .year_fraction(as_of, expiry, DayCountContext::default())
         .unwrap();
     let forward = swaption.forward_swap_rate(&market, as_of).unwrap();

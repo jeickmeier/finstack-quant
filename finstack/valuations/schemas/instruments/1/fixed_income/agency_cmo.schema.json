@@ -104,6 +104,146 @@
       "properties": {
         "spec": {
           "$defs": {
+            "AgencyMbsPassthrough": {
+              "additionalProperties": false,
+              "description": "Agency MBS passthrough instrument (pool or specified pool).\n\nRepresents an agency mortgage-backed security where principal and interest\npayments from the underlying mortgage pool are passed through to investors,\nnet of servicing and guarantee fees.\n\n# Cashflow Sign Convention\n\nAll cashflows are from the holder's (investor's) perspective:\n- Principal and interest received are positive\n- The initial purchase price is handled at trade level\n\n# Payment Delay\n\nAgency MBS have standardized payment delays measured from the **start**\nof the accrual period (first day of the month) to the payment date:\n- FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1\n- GNMA I: ~14 days → payment on the 15th of M\n- GNMA II: ~50 days → payment on the 20th of M+1\n\n# Examples\n\n```rust\nuse finstack_valuations::instruments::fixed_income::mbs_passthrough::{\n    AgencyMbsPassthrough, AgencyProgram, PoolType,\n};\nuse finstack_cashflows::builder::specs::PrepaymentModelSpec;\nuse finstack_core::currency::Currency;\nuse finstack_core::money::Money;\nuse finstack_core::dates::Date;\nuse finstack_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet mbs = AgencyMbsPassthrough::builder()\n    .id(InstrumentId::new(\"FN-MA1234\"))\n    .pool_id(\"MA1234\".into())\n    .agency(AgencyProgram::Fnma)\n    .pool_type(PoolType::Generic)\n    .original_face(Money::new(1_000_000.0, Currency::USD))\n    .current_face(Money::new(950_000.0, Currency::USD))\n    .current_factor(0.95)\n    .wac(0.045)\n    .pass_through_rate(0.04)\n    .servicing_fee_rate(0.0025)\n    .guarantee_fee_rate(0.0025)\n    .wam(348)\n    .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())\n    .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())\n    .prepayment_model(PrepaymentModelSpec::psa(1.0))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .day_count(finstack_core::dates::DayCount::Thirty360)\n    .build()\n    .expect(\"Valid MBS\");\n```",
+              "properties": {
+                "agency": {
+                  "$ref": "#/$defs/AgencyProgram",
+                  "description": "Agency program (FNMA, FHLMC, GNMA)."
+                },
+                "attributes": {
+                  "$ref": "#/$defs/Attributes",
+                  "default": {},
+                  "description": "Attributes for scenario selection and tagging.\nAttributes for scenario selection and tagging"
+                },
+                "current_face": {
+                  "$ref": "#/$defs/Money",
+                  "description": "Current face amount (remaining principal balance)."
+                },
+                "current_factor": {
+                  "description": "Current pool factor (current_face / original_face).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "day_count": {
+                  "$ref": "#/$defs/DayCount",
+                  "description": "Day count convention for accrual."
+                },
+                "discount_curve_id": {
+                  "$ref": "#/$defs/Id",
+                  "description": "Discount curve identifier for pricing."
+                },
+                "guarantee_fee_rate": {
+                  "default": 0.0,
+                  "description": "Guarantee fee rate (annual, as decimal e.g., 0.0025 for 25 bps).\n\nDefaults to `0.0` when omitted.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "id": {
+                  "$ref": "#/$defs/Id",
+                  "description": "Unique instrument identifier."
+                },
+                "issue_date": {
+                  "description": "Issue date of the pool.",
+                  "type": "string"
+                },
+                "maturity": {
+                  "description": "Legal maturity date.",
+                  "type": "string"
+                },
+                "original_face": {
+                  "$ref": "#/$defs/Money",
+                  "description": "Original face amount (initial principal balance)."
+                },
+                "pass_through_rate": {
+                  "description": "Pass-through rate (net coupon to investor).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "payment_lag_days": {
+                  "description": "Optional custom payment delay (overrides agency default).",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "pool_id": {
+                  "$ref": "#/$defs/Id",
+                  "description": "Pool identifier (CUSIP or internal pool ID)."
+                },
+                "pool_type": {
+                  "$ref": "#/$defs/PoolType",
+                  "default": "generic",
+                  "description": "Pool type (generic or specified)."
+                },
+                "prepayment_model": {
+                  "$ref": "#/$defs/PrepaymentModelSpec",
+                  "description": "Prepayment model specification."
+                },
+                "pricing_overrides": {
+                  "$ref": "#/$defs/PricingOverrides",
+                  "default": {
+                    "adaptive_bumps": false,
+                    "call_friction_cents": null,
+                    "cds_act360_include_last_day": false,
+                    "cds_aod_half_day_bias": false,
+                    "credit_spread_bump_bp": null,
+                    "mc_seed_scenario": null,
+                    "mean_reversion": null,
+                    "oas_price_basis": "settlement_dirty",
+                    "oas_quote_compounding": "continuous",
+                    "rate_bump_bp": null,
+                    "rho_bump_decimal": null,
+                    "spot_bump_pct": null,
+                    "theta_period": null,
+                    "tree_steps": null,
+                    "use_gobet_miri": false,
+                    "vega_bump_decimal": null,
+                    "vol_bump_pct": null,
+                    "vol_surface_extrapolation": "error",
+                    "ytm_bump_decimal": null
+                  },
+                  "description": "Pricing overrides (including quoted price for OAS)."
+                },
+                "servicing_fee_rate": {
+                  "default": 0.0,
+                  "description": "Servicing fee rate (annual, as decimal e.g., 0.0025 for 25 bps).\n\nDefaults to `0.0` when omitted.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "wac": {
+                  "description": "Weighted average coupon (gross rate on underlying mortgages).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "wam": {
+                  "description": "Remaining weighted average maturity in months as of the valuation\ndate (current WAM, not the original term). Pool age (WALA) for\nseasoning ramps is derived separately from `issue_date`.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "pool_id",
+                "agency",
+                "original_face",
+                "current_face",
+                "current_factor",
+                "wac",
+                "pass_through_rate",
+                "wam",
+                "issue_date",
+                "maturity",
+                "prepayment_model",
+                "discount_curve_id",
+                "day_count"
+              ],
+              "type": "object"
+            },
             "AgencyProgram": {
               "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 14-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. The legacy `Gnma`\nvariant maps to GNMA II (the larger and more actively traded program).",
               "oneOf": [
@@ -1127,6 +1267,51 @@
                 }
               ]
             },
+            "DayCount": {
+              "description": "Supported day-count conventions with industry-standard definitions.\n\nEach variant implements a specific day count convention as defined by\nISDA, ICMA, or local market conventions. The conventions determine how\ninterest accrues between payment dates.\n\n# Standards References\n\nImplementations follow:\n- **ISDA**: 2006 ISDA Definitions, Section 4.16\n- **ICMA**: ICMA Rule Book, Rule 251\n- **ISO**: ISO 20022 Day Count Fraction Codes\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 1).expect(\"Valid date\");\n\n// Actual/360 - money market convention\nlet yf_360 = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\n// 30/360 - bond convention\nlet yf_30360 = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n\nassert!(yf_360 > yf_30360); // Act/360 has larger denominator\n```",
+              "oneOf": [
+                {
+                  "const": "Act360",
+                  "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French\n\n# Usage\n\nStandard for:\n- USD money market deposits\n- EUR money market instruments\n- Short-term rate derivatives (SOFR, €STR)\n- FX swaps and forwards\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::April, 1).expect(\"Valid date\"); // 90 days\n\nlet yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 90.0 / 360.0);\n```",
+                  "type": "string"
+                },
+                {
+                  "const": "Act365F",
+                  "description": "Actual/365 Fixed day count convention.\n\nYear fraction = (actual days between dates) / 365\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(e)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365 Fixed\" (A005)\n- **Also known as**: Act/365F, A/365F, English\n\n# Usage\n\nStandard for:\n- GBP money markets (SONIA)\n- Cable (GBP/USD) FX transactions\n- Some Commonwealth bond markets\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2026, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365F.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert!((yf - 1.0).abs() < 1e-9); // 365 days / 365 = 1.0\n```",
+                  "type": "string"
+                },
+                {
+                  "const": "Act365L",
+                  "description": "Actual/365 Leap day count convention (Actual/365L or AFB).\n\nYear fraction = (actual days) / (366 if Feb 29 in period else 365)\n\n# Standards Reference\n\n- **AFB**: Association Française des Banques (French Bankers Association)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, AFB, ISMA-Year\n\n# Usage\n\nUsed in:\n- French government bonds (OATs)\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```",
+                  "type": "string"
+                },
+                {
+                  "const": "Thirty360",
+                  "description": "30/360 US (Bond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with US market adjustments.\n\n# Standards Reference\n\n- **SIA/PSA**: Standard Securities Calculation Methods (SIA Standard Formulas)\n  — primary reference for this implementation, including the February\n  end-of-month rule\n- **ISO 20022**: Day Count Fraction Code \"30/360\" (A001)\n- **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA\n\n# SIA/PSA vs ISDA\n\nThis implementation follows the SIA/PSA convention, which includes a\nFebruary end-of-month rule: when both the start date and the end date\nfall on the last day of February, D₂ is changed to 30. ISDA 2006\n§4.16(f) specifies a slightly different set of adjustment rules that\nomit this February-EOM logic. Both are commonly referred to as\n\"30/360 US\", but they can produce different day counts for periods\nthat start or end on the last day of February.\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere (SIA/PSA rules):\n  D₁' = 30                       if D₁ is 31 or last day of February\n  D₂' = 30                       if D₂ is 31 and D₁' = 30\n  D₂' = 30                       if D₂ is last day of Feb and D₁ is last day of Feb\n  otherwise D₁' = D₁, D₂' = D₂\n```\n\n# Usage\n\nStandard for:\n- US corporate bonds\n- US municipal bonds\n- US agency debt\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::February, 28).expect(\"Valid date\");\n\nlet yf = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats Jan 31 as day 30, Feb 28 as day 28: 28 days / 360\nassert_eq!(yf, 28.0 / 360.0);\n```",
+                  "type": "string"
+                },
+                {
+                  "const": "ThirtyE360",
+                  "description": "30E/360 (Eurobond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with European adjustments.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **ISO 20022**: Day Count Fraction Code \"30E/360\" (A002)\n- **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere:\n  D₁' = min(D₁, 30)\n  D₂' = min(D₂, 30)\n```\n\n# Usage\n\nStandard for:\n- Eurobonds\n- International bonds\n- Some interest rate swaps\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::March, 31).expect(\"Valid date\");\n\nlet yf = DayCount::ThirtyE360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats both 31st as day 30: 60 days / 360\nassert_eq!(yf, 60.0 / 360.0);\n```",
+                  "type": "string"
+                },
+                {
+                  "const": "ActAct",
+                  "description": "Actual/Actual (ISDA) day count convention.\n\nUses actual days in numerator and actual days in the containing year(s)\nas denominator, splitting across year boundaries.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(b) - \"Actual/Actual (ISDA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ISDA\" (A006)\n- **Also known as**: Act/Act (ISDA), Actual/Actual, Act/Act\n\n# Algorithm\n\nFor a period spanning multiple calendar years:\n1. Split period at year boundaries\n2. For each year segment: (days in segment) / (days in that year)\n3. Sum the year fractions\n\n# Usage\n\nStandard for:\n- US Treasury bonds\n- Interest rate swaps (USD, EUR fixed legs)\n- Government bonds in many markets\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period spanning year boundary (leap year 2024)\nlet start = Date::from_calendar_date(2024, Month::July, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 1).expect(\"Valid date\");\n\nlet yf = DayCount::ActAct.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 184/366 (Jul-Dec 2024 in leap year) + 365/365 (all of 2025)\nassert!((yf - 1.0).abs() < 0.01);\n```\n\n# References\n\n- ISDA (2006). \"2006 ISDA Definitions.\" Section 4.16(b).",
+                  "type": "string"
+                },
+                {
+                  "const": "ActActIsma",
+                  "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet freq = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(freq), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251.\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\"",
+                  "type": "string"
+                },
+                {
+                  "const": "Bus252",
+                  "description": "Business/252 day count convention.\n\nYear fraction = (business days between dates) / 252\n\n# Market Convention\n\n- **Brazil**: Standard for BRL-denominated instruments (ANBIMA)\n- **Also used**: Some equity derivatives and variance swaps\n- **Basis**: 252 represents typical trading days per year\n\n# Requirements\n\nRequires `calendar` in [`DayCountContext`] to determine business days.\n\n# Performance\n\nIterates each calendar day in the range to check business-day status,\ngiving O(n) cost where n is the number of calendar days between the\ndates. For 30Y instruments this is ~11,000 iterations.\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse finstack_core::dates::calendar::NYSE;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 6).expect(\"Valid date\"); // Monday\nlet end = Date::from_calendar_date(2025, Month::January, 13).expect(\"Valid date\"); // Next Monday\n\nlet yf = DayCount::Bus252.year_fraction(\n    start,\n    end,\n    DayCountContext { calendar: Some(&NYSE), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// 5 business days / 252\nassert!((yf * 252.0 - 5.0).abs() < 0.1);\n```",
+                  "type": "string"
+                }
+              ]
+            },
             "Id": {
               "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
               "type": "string"
@@ -1216,6 +1401,104 @@
                   "type": "string"
                 }
               ]
+            },
+            "PoolType": {
+              "description": "Pool type classification.\n\nDistinguishes between generic (TBA-eligible) pools and specified pools\nwith known characteristics.",
+              "oneOf": [
+                {
+                  "const": "generic",
+                  "description": "Generic pool (TBA-eligible, standard assumptions)",
+                  "type": "string"
+                },
+                {
+                  "const": "specified",
+                  "description": "Specified pool with known loan-level characteristics",
+                  "type": "string"
+                }
+              ]
+            },
+            "PrepaymentCurve": {
+              "description": "Prepayment curve shape.",
+              "oneOf": [
+                {
+                  "description": "Constant CPR (no seasoning effect)",
+                  "properties": {
+                    "curve": {
+                      "const": "constant",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "curve"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "description": "PSA standard curve: ramps to 6% CPR over 30 months",
+                  "properties": {
+                    "curve": {
+                      "const": "psa",
+                      "type": "string"
+                    },
+                    "speed_multiplier": {
+                      "description": "Speed multiplier (1.0 = 100% PSA)",
+                      "format": "double",
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "curve",
+                    "speed_multiplier"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "description": "CMBS-style lockout: zero prepayment for an initial period, then constant CPR.\n\nCommercial mortgage-backed securities typically have prepayment lockout\nperiods (defeasance/yield maintenance) lasting 5-10 years, after which\nvoluntary prepayment resumes at the specified CPR.",
+                  "properties": {
+                    "curve": {
+                      "const": "cmbs_lockout",
+                      "type": "string"
+                    },
+                    "lockout_months": {
+                      "description": "Number of months with zero prepayment (e.g., 60 for 5-year lockout)",
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "curve",
+                    "lockout_months"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "PrepaymentModelSpec": {
+              "description": "Prepayment model specification.",
+              "properties": {
+                "cpr": {
+                  "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%)",
+                  "format": "double",
+                  "type": "number"
+                },
+                "curve": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/PrepaymentCurve"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "Optional curve shape (default: constant)"
+                }
+              },
+              "required": [
+                "cpr"
+              ],
+              "type": "object"
             },
             "PricingOverrides": {
               "description": "Optional parameters that override model pricing with market quotes.\n\nFields are organized into focused sub-structs:\n- [`market_quotes`](MarketQuoteOverrides): quoted prices, implied vol, spreads, upfront payments\n- [`metrics`](MetricPricingOverrides): bump sizes, theta period, deterministic MC seeds\n- [`model_config`](ModelConfig): vol model selection, tree pricing, exercise friction\n- [`scenario`](ScenarioPricingOverrides): scenario-only revaluation adjustments\n\n# Serde Compatibility\n\nSub-struct fields are flattened so existing JSON payloads with flat field names\ncontinue to round-trip correctly.",
@@ -1797,6 +2080,17 @@
               "$ref": "#/$defs/Attributes",
               "default": {},
               "description": "Attributes for tagging and selection.\nAttributes for scenario selection and tagging"
+            },
+            "collateral": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/AgencyMbsPassthrough"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Collateral pool (optional - for detailed cashflow projection)"
             },
             "collateral_wac": {
               "description": "Collateral WAC (if no explicit collateral)",

@@ -49,23 +49,53 @@ fn default_rfr_calendar(currency: finstack_core::currency::Currency) -> Option<&
     }
 }
 
-fn compounded_total_shift_days(compounding: FloatingLegCompounding) -> i32 {
+/// Total backward shift (in business days) applied to overnight observation
+/// dates.
+///
+/// `CompoundedInArrears.observation_shift` follows ISDA 2021 observation-shift
+/// semantics (backward shift, same direction as `lookback_days` and as
+/// `CompoundedWithObservationShift.shift_days`). Combining a non-zero lookback
+/// with a non-zero observation shift is rejected — the conventions are
+/// mutually exclusive, and the in-module loop and the canonical-schedule
+/// builder must agree on the semantics.
+fn compounded_total_shift_days(compounding: FloatingLegCompounding) -> Result<i32> {
     match compounding {
         FloatingLegCompounding::CompoundedInArrears {
             lookback_days,
             observation_shift,
-        } => -lookback_days + observation_shift.unwrap_or(0),
-        FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => -shift_days,
-        FloatingLegCompounding::CompoundedWithRateCutoff { .. } => 0,
-        FloatingLegCompounding::Simple => 0,
+        } => {
+            let shift = observation_shift.unwrap_or(0);
+            if lookback_days != 0 && shift != 0 {
+                return Err(finstack_core::Error::Validation(format!(
+                    "Compounded-in-arrears with both a lookback ({lookback_days} days) and an \
+                     observation shift ({shift} days) is not supported: the conventions are \
+                     mutually exclusive. Use a lookback-only or observation-shift-only \
+                     convention.",
+                )));
+            }
+            if shift != 0 {
+                Ok(-shift)
+            } else {
+                Ok(-lookback_days)
+            }
+        }
+        FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => Ok(-shift_days),
+        FloatingLegCompounding::CompoundedWithRateCutoff { .. } => Ok(0),
+        FloatingLegCompounding::Simple => Ok(0),
     }
 }
 
+/// Whether the day-count-fraction weights follow the shifted observation dates
+/// (ISDA 2021 observation shift) rather than the original accrual dates
+/// (lookback).
 fn uses_observation_shift_dcf(compounding: FloatingLegCompounding) -> bool {
-    matches!(
-        compounding,
-        FloatingLegCompounding::CompoundedWithObservationShift { .. }
-    )
+    match compounding {
+        FloatingLegCompounding::CompoundedWithObservationShift { .. } => true,
+        FloatingLegCompounding::CompoundedInArrears {
+            observation_shift, ..
+        } => observation_shift.unwrap_or(0) != 0,
+        _ => false,
+    }
 }
 
 fn rate_cutoff_days(compounding: FloatingLegCompounding) -> Option<i32> {
@@ -337,7 +367,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
     }
 
     let cal = resolve_compounded_fixing_calendar(irs)?;
-    let total_shift = compounded_total_shift_days(float.compounding.clone());
+    let total_shift = compounded_total_shift_days(float.compounding.clone())?;
     let shift_dcf = uses_observation_shift_dcf(float.compounding.clone());
     let cutoff_days = rate_cutoff_days(float.compounding.clone());
     let disc_fallback = if proj.is_none() { Some(disc) } else { None };
@@ -918,6 +948,54 @@ mod tests {
             })
             .is_ok()
         );
+    }
+
+    /// The in-module compounding loop must agree with the canonical-schedule
+    /// builder on `observation_shift` semantics: hybrid lookback+shift is an
+    /// error (it must never silently cancel), a pure observation shift is a
+    /// *backward* shift with shifted DCF weights, and a pure lookback shifts
+    /// observations only.
+    #[test]
+    fn loop_shift_semantics_match_builder() {
+        // Hybrid {lookback: 2, shift: 2} errors instead of cancelling to 0.
+        let hybrid = FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 2,
+            observation_shift: Some(2),
+        };
+        assert!(
+            compounded_total_shift_days(hybrid).is_err(),
+            "hybrid lookback + observation-shift must be rejected on the loop path"
+        );
+
+        // Pure observation shift: backward shift, DCF follows observations.
+        let shift_only = FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 0,
+            observation_shift: Some(2),
+        };
+        assert_eq!(
+            compounded_total_shift_days(shift_only.clone()).expect("shift-only is valid"),
+            -2
+        );
+        assert!(uses_observation_shift_dcf(shift_only));
+
+        // Pure lookback: backward shift, DCF anchored to accrual dates.
+        let lookback_only = FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 5,
+            observation_shift: None,
+        };
+        assert_eq!(
+            compounded_total_shift_days(lookback_only.clone()).expect("lookback-only is valid"),
+            -5
+        );
+        assert!(!uses_observation_shift_dcf(lookback_only));
+
+        // The dedicated observation-shift variant matches the embedded form.
+        let dedicated = FloatingLegCompounding::CompoundedWithObservationShift { shift_days: 2 };
+        assert_eq!(
+            compounded_total_shift_days(dedicated.clone()).expect("dedicated variant is valid"),
+            -2
+        );
+        assert!(uses_observation_shift_dcf(dedicated));
     }
 
     #[test]

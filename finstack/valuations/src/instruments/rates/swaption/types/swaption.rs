@@ -505,6 +505,16 @@ impl Swaption {
     // Pricing Methods (moved from engine for direct access)
     // ============================================================================
 
+    /// Time to option expiry in years, measured with ACT/365F.
+    ///
+    /// Option expiry enters the Black/Bachelier formulas as calendar time, so
+    /// it uses ACT/365F regardless of the instrument's accrual `day_count`
+    /// (which still governs annuity and accrual computations). Using the
+    /// accrual day count (e.g. Act360) would inflate T by ~365/360.
+    fn time_to_expiry(&self, as_of: Date) -> Result<f64> {
+        year_fraction(DayCount::Act365F, as_of, self.expiry)
+    }
+
     /// Helper for common pricing logic
     fn price_model_base<F>(
         &self,
@@ -516,7 +526,7 @@ impl Swaption {
     where
         F: Fn(f64, f64, f64, f64, f64) -> f64, // forward, strike, vol, t, annuity -> value
     {
-        let time_to_expiry = year_fraction(self.day_count, as_of, self.expiry)?;
+        let time_to_expiry = self.time_to_expiry(as_of)?;
         if time_to_expiry <= 0.0 {
             return Ok(Money::new(0.0, self.notional.currency()));
         }
@@ -543,7 +553,7 @@ impl Swaption {
     ) -> Result<Money> {
         use super::lognormal_to_normal_vol;
 
-        let time_to_expiry = year_fraction(self.day_count, as_of, self.expiry)?;
+        let time_to_expiry = self.time_to_expiry(as_of)?;
         if time_to_expiry <= 0.0 {
             return Ok(Money::new(0.0, self.notional.currency()));
         }
@@ -642,22 +652,28 @@ impl Swaption {
             .as_ref()
             .ok_or_else(|| Error::internal("swaption SABR pricing requires sabr_params"))?;
         let model = SABRModel::new(params.to_internal()?);
-        let time_to_expiry = year_fraction(self.day_count, as_of, self.expiry)?;
+        let time_to_expiry = self.time_to_expiry(as_of)?;
         if time_to_expiry <= 0.0 {
             return Ok(Money::new(0.0, self.notional.currency()));
         }
         let forward_rate = self.forward_swap_rate(curves, as_of)?;
         let strike = self.strike_f64()?;
 
-        // SABR outputs lognormal (Black) volatility
-        let sabr_lognormal_vol = model.implied_volatility(forward_rate, strike, time_to_expiry)?;
+        // SABR output convention is β-dependent: lognormal (Black) vol for
+        // β>0, normal (Bachelier) vol for β≈0. Branch on the tag instead of
+        // assuming Black — converting a Bachelier vol as if it were lognormal
+        // silently misprices by orders of magnitude in rate space.
+        let (sabr_vol, sabr_vol_type) =
+            model.implied_volatility_with_type(forward_rate, strike, time_to_expiry)?;
 
-        // Dispatch to the appropriate pricing model
-        match self.vol_model {
-            VolatilityModel::Black => self.price_black(curves, sabr_lognormal_vol, as_of),
-            VolatilityModel::Normal => {
+        use crate::models::volatility::sabr::SabrVolType;
+        match (self.vol_model, sabr_vol_type) {
+            (VolatilityModel::Black, SabrVolType::Black) => {
+                self.price_black(curves, sabr_vol, as_of)
+            }
+            (VolatilityModel::Normal, SabrVolType::Black) => {
                 let sabr_normal_vol = lognormal_to_normal_vol(
-                    sabr_lognormal_vol,
+                    sabr_vol,
                     forward_rate,
                     strike,
                     time_to_expiry,
@@ -665,6 +681,16 @@ impl Swaption {
                 );
                 self.price_normal(curves, sabr_normal_vol, as_of)
             }
+            // β≈0 SABR already produces the normal vol Bachelier needs.
+            (VolatilityModel::Normal, SabrVolType::Normal) => {
+                self.price_normal(curves, sabr_vol, as_of)
+            }
+            (VolatilityModel::Black, SabrVolType::Normal) => Err(Error::Validation(format!(
+                "Swaption {}: SABR with β≈0 produces a normal (Bachelier) vol, which cannot \
+                 feed the Black pricing model directly. Set vol_model to Normal (the natural \
+                 pairing for normal-SABR) or calibrate SABR with β>0.",
+                self.id
+            ))),
         }
     }
 
@@ -964,7 +990,7 @@ impl Swaption {
         if as_of >= self.expiry {
             return Ok(None);
         }
-        let t = year_fraction(self.day_count, as_of, self.expiry)?;
+        let t = self.time_to_expiry(as_of)?;
 
         if t <= 0.0 {
             return Ok(None);
@@ -1029,7 +1055,7 @@ impl crate::instruments::common_impl::traits::Instrument for Swaption {
             return self.price_sabr(curves, as_of);
         }
 
-        let time_to_expiry = year_fraction(self.day_count, as_of, self.expiry)?;
+        let time_to_expiry = self.time_to_expiry(as_of)?;
         let forward = self.forward_swap_rate(curves, as_of)?;
         let vol = self.resolve_volatility(curves, forward, time_to_expiry)?;
 

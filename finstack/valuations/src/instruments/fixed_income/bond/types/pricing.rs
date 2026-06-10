@@ -23,6 +23,11 @@ impl Bond {
     /// Internal pricing engines (discount, hazard, spread solvers) should use
     /// this instead of the public [`CashflowProvider::dated_cashflows`] which
     /// now returns the full signed canonical schedule.
+    ///
+    /// Cashflows dated exactly on `as_of` are **excluded** (strict
+    /// `date > as_of`): a buyer settling on `as_of` does not receive that
+    /// day's payment (settlement convention). This matches the tree and YTM
+    /// engines, which always filtered `> as_of`.
     pub(crate) fn pricing_dated_cashflows(
         &self,
         curves: &finstack_core::market_data::context::MarketContext,
@@ -34,7 +39,7 @@ impl Bond {
         let schedule = self.full_cashflow_schedule(curves)?;
         let mut flows = Vec::with_capacity(schedule.flows.len());
         for cf in schedule.flows {
-            let keep = cf.date >= as_of
+            let keep = cf.date > as_of
                 && cf.kind != CFKind::PIK
                 && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0);
             if !keep {
@@ -124,7 +129,7 @@ impl Bond {
 
         // Use the same dispatch as OAS/quote conversions so direct callable PV
         // honors BDT, Hull-White, hazard-tree, and tree-curve overrides.
-        let config = bond_tree_config(self);
+        let config = bond_tree_config(self)?;
         let price_amount =
             TreePricer::with_config(config).price_at_oas(self, market, as_of, 0.0)?;
 

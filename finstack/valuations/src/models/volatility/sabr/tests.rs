@@ -318,6 +318,47 @@ fn test_sabr_chi_function_stability() {
     assert!(chi_rho_minus_one.is_ok());
 }
 
+/// The ρ→1 branch of χ(z) must use the exact analytic limit −ln(1−z) (the
+/// ρ=1 discriminant is (1−z)², making the generic formula 0/0), not the old
+/// `z/(1+z/2)` Padé guess; and it must reject z ≥ 1 where the limit diverges.
+#[test]
+fn test_sabr_chi_rho_one_uses_exact_log_limit() {
+    let params = SABRParameters::new(0.2, 0.5, 0.3, 1.0).expect("rho = 1 is a valid bound");
+    let model = SABRModel::new(params);
+
+    for &z in &[0.05_f64, 0.3, 0.7, 0.95] {
+        let chi = model.calculate_chi_robust(z).expect("chi at rho=1, z<1");
+        let exact = -(1.0 - z).ln();
+        assert!(
+            (chi - exact).abs() < 1e-12,
+            "rho=1 chi({z}) = {chi}, expected -ln(1-z) = {exact}"
+        );
+        // The old Padé approximation deviates materially for moderate z.
+        let pade = z / (1.0 + z / 2.0);
+        if z >= 0.3 {
+            assert!(
+                (chi - pade).abs() > 1e-3,
+                "rho=1 chi({z}) should not match the old Padé form"
+            );
+        }
+    }
+
+    // Continuity with the near-limit generic formula.
+    let near =
+        SABRModel::new(SABRParameters::new(0.2, 0.5, 0.3, 1.0 - 1e-9).expect("valid params"));
+    let z = 0.4_f64;
+    let chi_near = near.calculate_chi_robust(z).expect("chi near rho=1");
+    let chi_limit = -(1.0 - z).ln();
+    assert!(
+        (chi_near - chi_limit).abs() < 1e-4,
+        "generic formula at rho=1-1e-9 ({chi_near}) must approach the limit ({chi_limit})"
+    );
+
+    // z ≥ 1 is outside the Hagan expansion's domain at rho=1.
+    assert!(model.calculate_chi_robust(1.0).is_err());
+    assert!(model.calculate_chi_robust(1.5).is_err());
+}
+
 /// The `z/χ(z)` correction (`factor2`) must use the well-defined `z→0` limit
 /// for small z and must NOT fabricate `1.0` for an arbitrary tiny χ.
 ///
@@ -1372,5 +1413,42 @@ fn test_sabr_normal_convention_calibration_reprices_wings_unweighted() {
             (fitted - market_vol).abs() < 5e-5,
             "wing not repriced at strike {strike}: fitted={fitted:.8}, market={market_vol:.8}"
         );
+    }
+}
+
+/// The χ(z) Taylor series must agree with the exact formula near the series
+/// crossover (`|z| ≈ 1e-5`) and through the blend region, for a range of ρ.
+/// Guards the c3 = (3ρ²−1)/6 and c4 = ρ(5ρ²−3)/8 coefficients.
+#[test]
+fn test_chi_series_matches_exact_near_crossover() {
+    for &rho in &[-0.9, -0.5, -0.1, 0.0, 0.1, 0.5, 0.9] {
+        let params =
+            SABRParameters::new(0.2, 0.5, 0.3, rho).expect("SABR parameters should be valid");
+        let model = SABRModel::new(params);
+
+        for &z in &[-1e-3, -1e-4, -2e-5, -9e-6, 9e-6, 2e-5, 1e-4, 1e-3] {
+            // Exact χ(z) = ln((√(1−2ρz+z²)+z−ρ)/(1−ρ)), well-conditioned here.
+            let disc = (1.0 - 2.0 * rho * z + z * z).sqrt();
+            let exact = ((disc + z - rho) / (1.0 - rho)).ln();
+            let robust = model
+                .calculate_chi_robust(z)
+                .expect("chi should compute for small z");
+            // Tolerance: series truncation is O(z⁵); the dominant term is the
+            // ~1e-16/(1−ρ) floating-point noise of the exact reference itself.
+            assert!(
+                (robust - exact).abs() < 1e-10 * z.abs() + 1e-14,
+                "chi mismatch at rho={rho}, z={z:e}: robust={robust:e}, exact={exact:e}"
+            );
+
+            // z/χ(z) Taylor ratio must be consistent with the same expansion.
+            let ratio = model
+                .z_over_chi(z, robust)
+                .expect("z/chi should compute for small z");
+            assert!(
+                (ratio - z / exact).abs() < 1e-10,
+                "z/chi mismatch at rho={rho}, z={z:e}: ratio={ratio:e}, exact={:e}",
+                z / exact
+            );
+        }
     }
 }

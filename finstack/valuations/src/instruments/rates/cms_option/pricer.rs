@@ -39,7 +39,7 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
-use finstack_core::dates::{Date, DateExt, DayCountContext};
+use finstack_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::Result;
@@ -121,20 +121,57 @@ impl CmsOptionPricer {
             let (forward_swap_rate, _) =
                 self.calculate_forward_swap_rate(inst, curves, as_of, swap_start, swap_end)?;
 
-            // Validate forward rate for Black-76 (must be positive for log calculation)
+            // Negative-rate regimes (EUR/JPY/CHF): Black-76 and the Hagan
+            // lognormal convexity adjustment are undefined for F ≤ 0. Fall
+            // back to the Bachelier (normal) model — matching the swaption
+            // and cap/floor pricers — with the surface's lognormal vol
+            // converted to a normal vol. The lognormal convexity adjustment
+            // scales with F²σ²T and vanishes as F → 0, so it is omitted on
+            // this path.
             if forward_swap_rate <= 0.0 {
-                return Err(finstack_core::Error::Validation(format!(
-                    "Forward swap rate {} is non-positive for fixing date {}; \
-                     Black-76 requires positive forward rates",
-                    forward_swap_rate, fixing_date
-                )));
+                let time_to_fixing = DayCount::Act365F.year_fraction(
+                    as_of,
+                    fixing_date,
+                    DayCountContext::default(),
+                )?;
+                let option_val = if time_to_fixing <= 0.0 {
+                    match inst.option_type {
+                        crate::instruments::OptionType::Call => {
+                            (forward_swap_rate - strike).max(0.0)
+                        }
+                        crate::instruments::OptionType::Put => {
+                            (strike - forward_swap_rate).max(0.0)
+                        }
+                    }
+                } else {
+                    let strike_vol = vol_surface.value_clamped(time_to_fixing, strike);
+                    let normal_vol =
+                        crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
+                            strike_vol,
+                            forward_swap_rate,
+                            strike,
+                            time_to_fixing,
+                            None,
+                        );
+                    crate::models::volatility::normal::bachelier_price(
+                        inst.option_type,
+                        forward_swap_rate,
+                        strike,
+                        normal_vol,
+                        time_to_fixing,
+                        1.0,
+                    )
+                };
+                let df_pay =
+                    relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+                total_pv += option_val * accrual_fraction * df_pay;
+                continue;
             }
 
             // 2. Calculate Convexity Adjustment
-            // Time to fixing uses instrument's day_count for vol surface lookup
+            // Time to fixing is calendar time for the vol-surface axis: ACT/365F.
             let time_to_fixing =
-                inst.day_count
-                    .year_fraction(as_of, fixing_date, DayCountContext::default())?;
+                DayCount::Act365F.year_fraction(as_of, fixing_date, DayCountContext::default())?;
 
             // Get volatility from surface.
             //

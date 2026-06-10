@@ -20,14 +20,14 @@ impl MetricCalculator for ExpectedVarianceCalculator {
             return swap.remaining_forward_variance(&context.curves, as_of);
         }
 
-        let realized = swap.partial_realized_variance(&context.curves, as_of)?;
-        let forward = swap.remaining_forward_variance(&context.curves, as_of)?;
-        // Blend with the day-count `time_elapsed_fraction`, matching the
-        // pricer's seasoned-MTM time-weighting. Using an observation-count
-        // fraction here would make the metric inconsistent with the booked PV.
-        let w = swap.time_elapsed_fraction(as_of)?;
-
-        Ok(realized * w + forward * (1.0 - w))
+        // Shared with `compute_pv` so the reported expected variance can
+        // never drift from the variance implied by the booked PV (W-32/W-33):
+        // day-count time weighting AND day-count-basis realized annualization.
+        crate::instruments::fx::fx_variance_swap::pricer::seasoned_expected_variance(
+            swap,
+            &context.curves,
+            as_of,
+        )
     }
 }
 
@@ -132,8 +132,20 @@ mod tests {
         let forward = swap
             .remaining_forward_variance(&market, as_of)
             .expect("forward");
-        let expected_time = realized * time_w + forward * (1.0 - time_w);
         let expected_count = realized * count_w + forward * (1.0 - count_w);
+
+        // The metric must equal the pricer's shared seasoned blend (day-count
+        // weight AND day-count-basis realized annualization), so payoff(metric)
+        // discounted reproduces the booked PV exactly.
+        let expected_time =
+            crate::instruments::fx::fx_variance_swap::pricer::seasoned_expected_variance(
+                &swap, &market, as_of,
+            )
+            .expect("seasoned blend");
+        let dom = market.get_discount("USD-OIS").expect("curve");
+        let df = dom
+            .df_between_dates(as_of, swap.maturity)
+            .expect("date-based df");
 
         let instrument: Arc<dyn Instrument> = Arc::new(swap.clone());
         let base_value = swap.value(&market, as_of).expect("base value");
@@ -152,6 +164,14 @@ mod tests {
             (metric - expected_time).abs() < 1e-9,
             "expected variance must use the time-weighted blend: metric={metric} \
              time-weighted={expected_time}"
+        );
+        let pv_from_metric = swap.payoff(metric).amount() * df;
+        assert!(
+            (base_value.amount() - pv_from_metric).abs()
+                < 1e-6 * base_value.amount().abs().max(1.0),
+            "payoff(metric) discounted must reproduce the booked PV: pv={} from_metric={}",
+            base_value.amount(),
+            pv_from_metric
         );
         assert!(
             (metric - expected_count).abs() > 1e-9,

@@ -207,8 +207,13 @@ fn compensated_covariance(xs: &[f64], ys: &[f64], mean_x: f64, mean_y: f64) -> f
 ///
 /// The drift uses `r` and discounting uses `df` so the value is consistent
 /// with how the MC simulates and discounts (the unseasoned case reduces to the
-/// standard Kemna-Vorst control). Returns `df · max(forward_intrinsic, 0)` in
-/// the degenerate zero-variance case.
+/// standard Kemna-Vorst control). When the MC attaches a time-varying drift
+/// schedule (curve-implied forwards on a non-flat curve), the same schedule
+/// MUST be supplied here: the control variate is only unbiased when the
+/// analytic control equals the true mean of the simulated geometric payoff,
+/// so `E[ln S_{tᵢ}]` has to use the schedule's cumulative drift, not the
+/// maturity-averaged constant `r − q`. Returns `df · max(forward_intrinsic,
+/// 0)` in the degenerate zero-variance case.
 #[allow(clippy::too_many_arguments)]
 fn seasoned_geometric_asian_control(
     spot: f64,
@@ -221,6 +226,7 @@ fn seasoned_geometric_asian_control(
     hist_count: usize,
     future_times: &[f64],
     is_call: bool,
+    drift_schedule: Option<&finstack_monte_carlo::process::gbm::DriftSchedule>,
 ) -> f64 {
     let k = future_times.len();
     let n_total = hist_count + k;
@@ -229,13 +235,20 @@ fn seasoned_geometric_asian_control(
     }
     let n = n_total as f64;
     let ln_spot = spot.ln();
-    let drift = r - q - 0.5 * sigma * sigma;
+    let constant_drift = r - q - 0.5 * sigma * sigma;
 
     // Mean of ln(G): fixed past contribution + future drift contribution.
+    // With a drift schedule, E[ln S_{tᵢ}] = ln S + M(tᵢ) − σ²tᵢ/2 where
+    // M(t) is the schedule's cumulative log-drift — identical to what the MC
+    // engine applies step by step.
     let mut mean_acc = finstack_core::math::NeumaierAccumulator::new();
     mean_acc.add(hist_prod_log);
     for &t_i in future_times {
-        mean_acc.add(ln_spot + drift * t_i);
+        let drift_to_t = match drift_schedule {
+            Some(schedule) => schedule.cumulative(t_i) - 0.5 * sigma * sigma * t_i,
+            None => constant_drift * t_i,
+        };
+        mean_acc.add(ln_spot + drift_to_t);
     }
     let mu = mean_acc.total() / n;
 
@@ -395,7 +408,7 @@ impl AsianOptionMcPricer {
         // forward drift so per-fixing spots (which drive the Asian average)
         // are unbiased on a non-flat rate curve. On a flat curve this is
         // bit-equivalent to the constant `(r - q)` drift.
-        let process = process.with_drift_schedule(std::sync::Arc::new(
+        let drift_schedule = std::sync::Arc::new(
             crate::instruments::common_impl::helpers::build_gbm_drift_schedule(
                 disc_curve.as_ref(),
                 r,
@@ -403,7 +416,8 @@ impl AsianOptionMcPricer {
                 t,
                 num_steps,
             )?,
-        ));
+        );
+        let process = process.with_drift_schedule(drift_schedule.clone());
 
         // Effective future-fixing times on the MC grid. The seasoned geometric
         // control variate (W-07) is built on exactly these times, so its
@@ -548,6 +562,7 @@ impl AsianOptionMcPricer {
                     hist_count,
                     &future_fixing_times,
                     true,
+                    Some(drift_schedule.as_ref()),
                 );
                 let adj = apply_control_variate(
                     mean_x,
@@ -652,6 +667,7 @@ impl AsianOptionMcPricer {
                     hist_count,
                     &future_fixing_times,
                     false,
+                    Some(drift_schedule.as_ref()),
                 );
                 let adj = apply_control_variate(
                     mean_x,
@@ -957,7 +973,7 @@ pub fn npv_with_lrm_greeks(
 
 use crate::instruments::common_impl::helpers::collect_black_scholes_inputs;
 use crate::models::closed_form::asian::{
-    arithmetic_asian_call_tw, arithmetic_asian_put_tw, geometric_asian_call, geometric_asian_put,
+    arithmetic_asian_tw_price_times, geometric_asian_price_times,
 };
 
 /// Geometric Asian option analytical pricer.
@@ -1058,18 +1074,48 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             ));
         }
 
-        let price = match asian.option_type {
-            crate::instruments::OptionType::Call => {
-                geometric_asian_call(spot, asian.strike, t, r, q, sigma, total_fixings)
-            }
-            crate::instruments::OptionType::Put => {
-                geometric_asian_put(spot, asian.strike, t, r, q, sigma, total_fixings)
-            }
-        };
+        // Price on the actual fixing schedule. Falling back to the
+        // equal-spacing formula would misprice contracts whose fixings are
+        // not uniformly spaced over [as_of, expiry] (e.g. averaging windows
+        // concentrated near expiry).
+        let fixing_times = fixing_year_fractions(asian, as_of).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
+        let df = (-r * t).exp();
+        let is_call = matches!(asian.option_type, crate::instruments::OptionType::Call);
+        let price = geometric_asian_price_times(
+            spot,
+            asian.strike,
+            t,
+            df,
+            q,
+            sigma,
+            &fixing_times,
+            is_call,
+        )
+        .map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
 
         let pv = Money::new(price * asian.notional.amount(), asian.notional.currency());
         Ok(ValuationResult::stamped(asian.id(), as_of, pv))
     }
+}
+
+/// Year fractions (instrument day count) from `as_of` to each strictly-future
+/// fixing date, sorted ascending (fixing dates are stored sorted).
+fn fixing_year_fractions(asian: &AsianOption, as_of: Date) -> finstack_core::Result<Vec<f64>> {
+    let mut times = Vec::with_capacity(asian.fixing_dates.len());
+    for date in &asian.fixing_dates {
+        if *date > as_of {
+            times.push(
+                asian
+                    .day_count
+                    .year_fraction(as_of, *date, DayCountContext::default())?,
+            );
+        }
+    }
+    Ok(times)
 }
 
 /// Arithmetic Asian option semi-analytical pricer (Turnbull-Wakeman).
@@ -1129,8 +1175,6 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         let q = bs_inputs.q;
         let sigma = bs_inputs.sigma;
         let t = bs_inputs.t;
-        // Derive r_eff for TW formula (which still needs a rate for moment calculations)
-        let r = bs_inputs.r_eff();
 
         let (sum, _, count) = asian.accumulated_state(as_of);
         let total_fixings = asian.fixing_dates.len();
@@ -1264,14 +1308,33 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
                 }
             }
         } else {
-            let unscaled = match asian.option_type {
-                crate::instruments::OptionType::Call => {
-                    arithmetic_asian_call_tw(spot, k_eff, t, r, q, sigma, future_fixings)
-                }
-                crate::instruments::OptionType::Put => {
-                    arithmetic_asian_put_tw(spot, k_eff, t, r, q, sigma, future_fixings)
-                }
-            };
+            // Price the remaining-fixings option on the ACTUAL future fixing
+            // times: seasoned schedules are concentrated near expiry, so the
+            // equal-spacing-over-[0, t] assumption misstates the average's
+            // variance.
+            let future_times = fixing_year_fractions(asian, as_of).map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+            let is_call = matches!(asian.option_type, crate::instruments::OptionType::Call);
+            let unscaled = arithmetic_asian_tw_price_times(
+                spot,
+                k_eff,
+                t,
+                df_expiry,
+                q,
+                sigma,
+                &future_times,
+                is_call,
+            )
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
             unscaled * scale
         };
 
@@ -1400,11 +1463,35 @@ mod tests {
             .day_count
             .year_fraction(as_of, expiry, DayCountContext::default())
             .expect("year fraction");
-        let expected =
-            geometric_asian_call(spot, strike, t, rate, div_yield, vol, fixing_dates.len());
+        // Benchmark on the ACTUAL fixing times (calendar quarters are not
+        // exactly uniform under ACT/365F), matching the pricer's schedule-
+        // aware formula.
+        let times: Vec<f64> = fixing_dates
+            .iter()
+            .map(|d| {
+                option
+                    .day_count
+                    .year_fraction(as_of, *d, DayCountContext::default())
+                    .expect("year fraction")
+            })
+            .collect();
+        let expected = crate::models::closed_form::asian::geometric_asian_price_times(
+            spot,
+            strike,
+            t,
+            (-rate * t).exp(),
+            div_yield,
+            vol,
+            &times,
+            true,
+        )
+        .expect("valid schedule");
+        // And it must stay close to the uniform-grid Kemna-Vorst benchmark.
+        let kv = geometric_asian_call(spot, strike, t, rate, div_yield, vol, fixing_dates.len());
         let expected_money = Money::new(expected, Currency::USD).amount();
 
         assert!((pv - expected_money).abs() < 1e-12);
+        assert!((pv - kv).abs() < 0.05, "pv {pv} far from Kemna-Vorst {kv}");
     }
 
     #[test]
@@ -1434,11 +1521,34 @@ mod tests {
             .day_count
             .year_fraction(as_of, expiry, DayCountContext::default())
             .expect("year fraction");
-        let expected =
-            geometric_asian_put(spot, strike, t, rate, div_yield, vol, fixing_dates.len());
+        let times: Vec<f64> = fixing_dates
+            .iter()
+            .map(|d| {
+                option
+                    .day_count
+                    .year_fraction(as_of, *d, DayCountContext::default())
+                    .expect("year fraction")
+            })
+            .collect();
+        let expected = crate::models::closed_form::asian::geometric_asian_price_times(
+            spot,
+            strike,
+            t,
+            (-rate * t).exp(),
+            div_yield,
+            vol,
+            &times,
+            false,
+        )
+        .expect("valid schedule");
+        let kv = geometric_asian_put(spot, strike, t, rate, div_yield, vol, fixing_dates.len());
         let expected_money = Money::new(expected, Currency::USD).amount();
 
         assert!((pv - expected_money).abs() < 1e-12);
+        // With only 2 fixings the calendar schedule (≈0.41y, 1y) deviates
+        // visibly from the uniform grid (0.5y, 1y); the prices stay close
+        // but not equal.
+        assert!((pv - kv).abs() < 0.5, "pv {pv} far from Kemna-Vorst {kv}");
     }
 
     #[test]
@@ -1952,6 +2062,7 @@ mod tests {
             0,
             &future_times,
             true,
+            None,
         );
         let kv_call = geometric_asian_call(spot, strike, t, r, q, sigma, n);
         assert!(
@@ -1971,6 +2082,7 @@ mod tests {
             0,
             &future_times,
             false,
+            None,
         );
         let kv_put = geometric_asian_put(spot, strike, t, r, q, sigma, n);
         assert!(
@@ -2009,6 +2121,7 @@ mod tests {
             2,
             &future_times,
             true,
+            None,
         );
         let call_high = seasoned_geometric_asian_control(
             spot,
@@ -2021,6 +2134,7 @@ mod tests {
             2,
             &future_times,
             true,
+            None,
         );
 
         assert!(call_low.is_finite() && call_low >= 0.0);

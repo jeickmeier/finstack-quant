@@ -113,6 +113,12 @@ pub struct FxSpot {
     /// Optional spot rate (if not provided, will look up from market data)
     #[builder(optional)]
     pub spot_rate: Option<f64>,
+    /// Optional quote-currency discount curve for PV-ing the settlement
+    /// cashflow. When absent the settlement amount is reported undiscounted
+    /// (a 1–2 day effect for standard spot lags).
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discount_curve_id: Option<finstack_core::types::CurveId>,
     /// Notional amount in base currency.
     pub notional: Money,
     /// Per-instrument pricing/sensitivity override knobs.
@@ -152,6 +158,8 @@ struct FxSpotUnchecked {
     settlement: Option<Date>,
     settlement_lag_days: Option<i32>,
     spot_rate: Option<f64>,
+    #[serde(default)]
+    discount_curve_id: Option<finstack_core::types::CurveId>,
     notional: Money,
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
     bdc: BusinessDayConvention,
@@ -173,6 +181,7 @@ impl TryFrom<FxSpotUnchecked> for FxSpot {
             settlement: value.settlement,
             settlement_lag_days: value.settlement_lag_days,
             spot_rate: value.spot_rate,
+            discount_curve_id: value.discount_curve_id,
             notional: value.notional,
             pricing_overrides: value.pricing_overrides,
             bdc: value.bdc,
@@ -197,6 +206,7 @@ impl FxSpot {
             settlement: None,
             settlement_lag_days: None,
             spot_rate: None,
+            discount_curve_id: None,
             notional: Money::new(1.0, base_currency),
             pricing_overrides: crate::instruments::PricingOverrides::default(),
             bdc: BusinessDayConvention::ModifiedFollowing,
@@ -378,6 +388,21 @@ impl FxSpot {
                 actual: self.notional.currency(),
             });
         }
+        // The builder and serde paths must enforce the same `spot_rate`
+        // invariants as `with_rate`: finite and strictly positive.
+        if let Some(rate) = self.spot_rate {
+            if !rate.is_finite() {
+                return Err(finstack_core::Error::Validation(format!(
+                    "FX spot rate must be finite (got {rate}). \
+                     NaN and Infinity are not valid rates."
+                )));
+            }
+            if rate <= 0.0 {
+                return Err(finstack_core::Error::Validation(format!(
+                    "FX spot rate must be positive (got {rate})."
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -466,11 +491,24 @@ impl crate::instruments::common_impl::traits::Instrument for FxSpot {
         market: &finstack_core::market_data::context::MarketContext,
         as_of: finstack_core::dates::Date,
     ) -> finstack_core::Result<finstack_core::money::Money> {
-        self.dated_cashflows(market, as_of)?
-            .into_iter()
-            .try_fold(Money::new(0.0, self.quote_currency), |acc, (_, amount)| {
-                acc.checked_add(amount)
-            })
+        // PV the settlement cashflow on the configured quote-currency
+        // discount curve; without one the flow is reported undiscounted
+        // (1–2 days of carry for standard spot lags).
+        let disc = self
+            .discount_curve_id
+            .as_ref()
+            .map(|id| market.get_discount(id))
+            .transpose()?;
+        self.dated_cashflows(market, as_of)?.into_iter().try_fold(
+            Money::new(0.0, self.quote_currency),
+            |acc, (date, amount)| {
+                let df = match disc.as_ref() {
+                    Some(curve) => curve.df_between_dates(as_of, date)?,
+                    None => 1.0,
+                };
+                acc.checked_add(Money::new(amount.amount() * df, amount.currency()))
+            },
+        )
     }
 
     fn value_raw(
@@ -503,8 +541,11 @@ impl crate::instruments::common_impl::traits::CurveDependencies for FxSpot {
     fn curve_dependencies(
         &self,
     ) -> finstack_core::Result<crate::instruments::common_impl::traits::InstrumentCurves> {
-        // FxSpot has no curve dependencies
-        crate::instruments::common_impl::traits::InstrumentCurves::builder().build()
+        let mut builder = crate::instruments::common_impl::traits::InstrumentCurves::builder();
+        if let Some(ref id) = self.discount_curve_id {
+            builder = builder.discount(id.clone());
+        }
+        builder.build()
     }
 }
 
@@ -809,6 +850,88 @@ mod tests {
             .effective_settlement_date(as_of)
             .expect("should compute");
         assert_eq!(settle, as_of, "T+0 should settle same day");
+    }
+
+    #[test]
+    fn builder_and_serde_reject_invalid_spot_rate() {
+        // Builder path: validation runs through validate_economics.
+        let result = FxSpot::builder()
+            .id(InstrumentId::new("EURUSD"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .spot_rate_opt(Some(-1.10))
+            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .attributes(Attributes::new())
+            .build();
+        assert!(result.is_err(), "builder must reject a negative spot rate");
+
+        let result = FxSpot::builder()
+            .id(InstrumentId::new("EURUSD"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .spot_rate_opt(Some(0.0))
+            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .attributes(Attributes::new())
+            .build();
+        assert!(result.is_err(), "builder must reject a zero spot rate");
+
+        // Serde path: try_from validation.
+        let json = serde_json::json!({
+            "id": "EURUSD",
+            "base_currency": "EUR",
+            "quote_currency": "USD",
+            "settlement": null,
+            "settlement_lag_days": null,
+            "spot_rate": -1.10,
+            "notional": {"amount": "1000000", "currency": "EUR"},
+            "base_calendar_id": null,
+            "quote_calendar_id": null,
+            "attributes": {}
+        });
+        let parsed: std::result::Result<FxSpot, _> = serde_json::from_value(json);
+        assert!(parsed.is_err(), "serde must reject a negative spot rate");
+    }
+
+    #[test]
+    fn settlement_cashflow_is_discounted_when_curve_configured() {
+        use finstack_core::market_data::term_structures::DiscountCurve;
+
+        let as_of = date(2025, Month::January, 15);
+        let settle = date(2026, Month::January, 15); // 1y out: visible discount
+        let rate = 0.05_f64;
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (2.0, (-rate * 2.0_f64).exp())])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+
+        let undiscounted = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
+            .with_rate(1.10)
+            .expect("valid rate")
+            .with_settlement(settle);
+        let mut discounted = undiscounted.clone();
+        discounted.discount_curve_id = Some(finstack_core::types::CurveId::new("USD-OIS"));
+
+        let pv_undisc = undiscounted.value(&market, as_of).expect("pv");
+        let pv_disc = discounted.value(&market, as_of).expect("pv");
+
+        let df = market
+            .get_discount("USD-OIS")
+            .expect("curve")
+            .df_between_dates(as_of, settle)
+            .expect("df");
+        assert!(
+            df < 0.96,
+            "1y DF at 5% must be materially below 1, got {df}"
+        );
+        assert!((pv_undisc.amount() - 1.10).abs() < 1e-10);
+        assert!(
+            (pv_disc.amount() - 1.10 * df).abs() < 1e-10,
+            "settlement cashflow must be discounted: got {}, expected {}",
+            pv_disc.amount(),
+            1.10 * df
+        );
     }
 
     #[test]

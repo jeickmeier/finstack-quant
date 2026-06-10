@@ -746,14 +746,21 @@ impl BondFuture {
 
     /// Determine the Cheapest-to-Deliver (CTD) bond from the deliverable basket.
     ///
-    /// This method calculates the **net basis** for each deliverable bond and returns
-    /// the bond with the lowest basis (i.e., the cheapest to deliver).
+    /// This method calculates the **gross basis** (price-only, ignoring accrued
+    /// interest and carry) for each deliverable bond and returns the bond with
+    /// the lowest basis (i.e., the cheapest to deliver).
     ///
-    /// # Net Basis Calculation
+    /// # Gross Basis Calculation
     ///
     /// ```text
-    /// Net Basis = Clean Price - (Futures Price × Conversion Factor)
+    /// Gross Basis = Clean Price - (Futures Price × Conversion Factor)
     /// ```
+    ///
+    /// This is the market-standard *gross* basis. The *net* basis additionally
+    /// subtracts the carry to delivery (coupon income net of financing); for a
+    /// carry-aware ranking use
+    /// [`determine_ctd_by_implied_repo`](Self::determine_ctd_by_implied_repo),
+    /// which is the market-preferred CTD criterion.
     ///
     /// The CTD is the bond that minimizes this value. A lower basis means the bond
     /// is cheaper relative to its invoice value, making it the optimal choice for
@@ -767,7 +774,7 @@ impl BondFuture {
     ///
     /// # Returns
     ///
-    /// Returns the `InstrumentId` of the CTD bond and its net basis.
+    /// Returns the `InstrumentId` of the CTD bond and its gross basis.
     ///
     /// # Errors
     ///
@@ -815,8 +822,8 @@ impl BondFuture {
     ///     (bond2_id.clone(), 107.50),
     /// ];
     ///
-    /// let (ctd_id, net_basis) = future.determine_ctd(&bond_prices)?;
-    /// println!("CTD bond: {}, Net basis: {:.4}", ctd_id.as_str(), net_basis);
+    /// let (ctd_id, gross_basis) = future.determine_ctd(&bond_prices)?;
+    /// println!("CTD bond: {}, Gross basis: {:.4}", ctd_id.as_str(), gross_basis);
     /// # Ok(())
     /// # }
     /// ```
@@ -845,16 +852,16 @@ impl BondFuture {
                     continue; // Skip invalid prices
                 }
 
-                // Calculate net basis: Clean Price - (Futures Price × CF)
-                let net_basis = clean_price - (self.quoted_price * deliverable.conversion_factor);
+                // Calculate gross basis: Clean Price - (Futures Price × CF)
+                let gross_basis = clean_price - (self.quoted_price * deliverable.conversion_factor);
 
                 match &best_ctd {
                     None => {
-                        best_ctd = Some((deliverable.bond_id.clone(), net_basis));
+                        best_ctd = Some((deliverable.bond_id.clone(), gross_basis));
                     }
                     Some((_, current_best_basis)) => {
-                        if net_basis < *current_best_basis {
-                            best_ctd = Some((deliverable.bond_id.clone(), net_basis));
+                        if gross_basis < *current_best_basis {
+                            best_ctd = Some((deliverable.bond_id.clone(), gross_basis));
                         }
                     }
                 }
@@ -969,6 +976,81 @@ impl BondFuture {
         best_ctd.ok_or_else(|| {
             finstack_core::Error::Validation(
                 "No valid bond prices provided for any bond in the deliverable basket".to_string(),
+            )
+        })
+    }
+
+    /// Determine the CTD bond by ranking deliverables on **implied repo rate**.
+    ///
+    /// The market-preferred CTD criterion: the cheapest-to-deliver bond is the
+    /// one whose purchase-and-deliver round trip earns the **highest** implied
+    /// repo rate (it offers the short the best financing arbitrage). Unlike
+    /// gross-basis ranking this accounts for accrued interest, interim coupon
+    /// income, and the time to delivery.
+    ///
+    /// # Arguments
+    ///
+    /// * `bond_data` - A slice of `(InstrumentId, f64, f64, f64, f64)` tuples:
+    ///   - `InstrumentId`: bond identifier
+    ///   - `f64` (position 1): clean price per 100 face
+    ///   - `f64` (position 2): accrued interest per 100 face as of today
+    ///   - `f64` (position 3): projected accrued interest per 100 face at delivery
+    ///   - `f64` (position 4): coupon income per 100 face received before delivery
+    /// * `days_to_delivery` - Number of days until delivery (must be positive)
+    ///
+    /// # Returns
+    ///
+    /// The `InstrumentId` of the CTD bond and its annualized implied repo rate
+    /// (decimal, e.g. `0.05` for 5%).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `days_to_delivery` is non-positive or if no valid
+    /// bond data is provided for any bond in the deliverable basket.
+    pub fn determine_ctd_by_implied_repo(
+        &self,
+        bond_data: &[(InstrumentId, f64, f64, f64, f64)],
+        days_to_delivery: i32,
+    ) -> finstack_core::Result<(InstrumentId, f64)> {
+        if days_to_delivery <= 0 {
+            return Err(finstack_core::Error::Validation(
+                "Days to delivery must be positive".to_string(),
+            ));
+        }
+
+        let mut best_ctd: Option<(InstrumentId, f64)> = None;
+
+        for deliverable in &self.deliverable_basket {
+            if let Some((id, clean_price, accrued_today, accrued_at_delivery, coupon_income)) =
+                bond_data.iter().find(|(id, ..)| *id == deliverable.bond_id)
+            {
+                if *clean_price <= 0.0 {
+                    continue;
+                }
+
+                let repo = self.implied_repo_rate(
+                    id,
+                    *clean_price,
+                    *accrued_today,
+                    *accrued_at_delivery,
+                    *coupon_income,
+                    days_to_delivery,
+                )?;
+
+                match &best_ctd {
+                    None => best_ctd = Some((deliverable.bond_id.clone(), repo)),
+                    Some((_, current_best)) => {
+                        if repo > *current_best {
+                            best_ctd = Some((deliverable.bond_id.clone(), repo));
+                        }
+                    }
+                }
+            }
+        }
+
+        best_ctd.ok_or_else(|| {
+            finstack_core::Error::Validation(
+                "No valid bond data provided for any bond in the deliverable basket".to_string(),
             )
         })
     }
@@ -1296,6 +1378,63 @@ mod tests {
         assert_eq!(future.quoted_price, 125.50);
         assert_eq!(future.position, Position::Long);
         assert_eq!(future.deliverable_basket.len(), 1);
+    }
+
+    #[test]
+    fn test_determine_ctd_by_implied_repo_ranks_highest_repo() {
+        let bond1 = InstrumentId::new("BOND-1");
+        let bond2 = InstrumentId::new("BOND-2");
+
+        let future = BondFuture::builder()
+            .id(InstrumentId::new("TYH5"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .expiry(Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"))
+            .delivery_start(Date::from_calendar_date(2025, Month::March, 21).expect("Valid date"))
+            .delivery_end(Date::from_calendar_date(2025, Month::March, 31).expect("Valid date"))
+            .quoted_price(125.50)
+            .position(Position::Long)
+            .contract_specs(BondFutureSpecs::default())
+            .deliverable_basket(vec![
+                DeliverableBond {
+                    bond_id: bond1.clone(),
+                    conversion_factor: 0.8234,
+                },
+                DeliverableBond {
+                    bond_id: bond2.clone(),
+                    conversion_factor: 0.8567,
+                },
+            ])
+            .ctd_bond_id(bond1.clone())
+            .discount_curve_id(CurveId::new("USD-TREASURY"))
+            .attributes(Attributes::new())
+            .build()
+            .expect("Valid bond future");
+
+        // Bond 2 is cheap relative to its invoice (high implied repo);
+        // bond 1 is expensive (low / negative implied repo).
+        let bond_data = vec![
+            (bond1.clone(), 104.50, 1.25, 1.75, 0.0),
+            (bond2.clone(), 106.50, 1.50, 2.00, 0.0),
+        ];
+
+        let (ctd_id, repo) = future
+            .determine_ctd_by_implied_repo(&bond_data, 30)
+            .expect("CTD by implied repo");
+        assert_eq!(ctd_id, bond2);
+
+        // The winner's repo must equal the single-bond calculation and
+        // dominate the alternative.
+        let repo1 = future
+            .implied_repo_rate(&bond1, 104.50, 1.25, 1.75, 0.0, 30)
+            .expect("repo bond1");
+        let repo2 = future
+            .implied_repo_rate(&bond2, 106.50, 1.50, 2.00, 0.0, 30)
+            .expect("repo bond2");
+        assert!((repo - repo2).abs() < 1e-12);
+        assert!(repo2 > repo1);
+
+        // Non-positive horizon is rejected.
+        assert!(future.determine_ctd_by_implied_repo(&bond_data, 0).is_err());
     }
 
     #[test]

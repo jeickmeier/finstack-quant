@@ -716,6 +716,53 @@ fn test_cs01_calculation() {
     // (higher spreads -> higher protection premium income)
 }
 
+/// `calculate_cs01` is a par-spread (re-bootstrap) bump; without stored par
+/// spreads a silent fallback to a hazard-λ bump would mislabel units by
+/// ≈1/(1−R), so the solve must fail loudly instead.
+#[test]
+fn test_cs01_errors_without_par_spreads() {
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let discount_curve = DiscountCurve::builder("USD-OIS")
+        .base_date(base_date)
+        .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
+        .interp(finstack_core::math::interp::InterpStyle::LogLinear)
+        .build()
+        .expect("Curve builder should succeed with valid test data");
+    // Hazard curve WITHOUT par-spread points.
+    let index_curve = HazardCurve::builder("CDX.NA.IG.42")
+        .base_date(base_date)
+        .recovery_rate(0.40)
+        .knots(vec![(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
+        .build()
+        .expect("Curve builder should succeed with valid test data");
+    let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+        .knots(vec![(3.0, 0.25), (7.0, 0.30), (15.0, 0.40), (30.0, 0.50)])
+        .build()
+        .expect("Curve builder should succeed with valid test data");
+    let index_data = CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(0.40)
+        .index_credit_curve(Arc::new(index_curve))
+        .base_correlation_curve(Arc::new(base_corr_curve))
+        .build()
+        .expect("CreditIndexData builder should succeed");
+    let market_ctx = MarketContext::new()
+        .insert(discount_curve)
+        .insert_credit_index("CDX.NA.IG.42", index_data);
+
+    let model = CDSTranchePricer::new();
+    let tranche = sample_tranche();
+    let as_of = base_date;
+
+    let err = model
+        .calculate_cs01(&tranche, &market_ctx, as_of)
+        .expect_err("CS01 without par spreads must error, not fall back to a hazard bump");
+    assert!(
+        err.to_string().contains("par-spread"),
+        "error should explain the par-spread requirement: {err}"
+    );
+}
+
 #[test]
 fn test_correlation_delta_calculation() {
     let model = CDSTranchePricer::new();
@@ -2308,5 +2355,60 @@ fn mid_period_protection_uses_survival_weighted_timing() {
     assert!(
         pv_mid.is_finite() && pv_end.is_finite(),
         "both protection-timing PVs must be finite"
+    );
+}
+
+/// EL-consistency of the stochastic-recovery override with the bootstrapped
+/// index curve: the 0–100% equity tranche must reproduce the index expected
+/// loss `p · (1 − R_base)` even when recovery varies with the systematic
+/// factor. Without renormalization, the factor-dependence of `R(Z)` makes
+/// `E_Z[p(Z)·(1−R(Z))] ≠ p·(1−R_base)` and the sum of all tranches drifts
+/// away from the index.
+#[test]
+fn test_stochastic_recovery_full_pool_el_matches_index() {
+    let market_ctx = sample_market_context();
+    let index_data = market_ctx
+        .get_credit_index("CDX.NA.IG.42")
+        .expect("test index data");
+    let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("date");
+
+    let pricer_stoch =
+        CDSTranchePricer::with_params(CDSTranchePricerConfig::default().with_stochastic_recovery());
+
+    // Index-implied expected loss with the flat bootstrapped recovery.
+    let t = pricer_stoch
+        .years_from_base(&index_data, maturity)
+        .expect("year fraction");
+    let p = pricer_stoch
+        .get_default_probability(&index_data, t)
+        .expect("default probability");
+    let index_el = p * (1.0 - index_data.recovery_rate);
+
+    // 0–100% equity tranche: cap never binds, so this is the full pool EL.
+    let full_pool_el = pricer_stoch
+        .calculate_equity_tranche_loss(100.0, 0.30, &index_data, maturity)
+        .expect("full-pool equity tranche EL");
+
+    let rel_err = (full_pool_el - index_el).abs() / index_el;
+    assert!(
+        rel_err < 1e-6,
+        "0–100% tranche EL with stochastic recovery must match the index EL: \
+         tranche={full_pool_el}, index={index_el}, rel_err={rel_err}"
+    );
+
+    // The renormalization must not flatten the override into constant
+    // recovery: a strict sub-pool tranche (where the cap binds and the
+    // z-shape matters) must still differ from the constant-recovery pricer.
+    let pricer_const = CDSTranchePricer::new();
+    let equity_stoch = pricer_stoch
+        .calculate_equity_tranche_loss(3.0, 0.25, &index_data, maturity)
+        .expect("stochastic equity EL");
+    let equity_const = pricer_const
+        .calculate_equity_tranche_loss(3.0, 0.25, &index_data, maturity)
+        .expect("constant equity EL");
+    assert!(
+        (equity_stoch - equity_const).abs() > 1e-12,
+        "stochastic recovery should still reshape sub-pool tranche EL: \
+         stoch={equity_stoch}, const={equity_const}"
     );
 }

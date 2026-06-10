@@ -153,15 +153,11 @@ pub struct TotalReturnLegParams<'a> {
 /// impl TrsReturnModel for EquityReturn {
 ///     fn period_return(
 ///         &self,
-///         period_start: Date,
-///         period_end: Date,
-///         t_start: f64,
-///         t_end: f64,
-///         initial_level: f64,
+///         inputs: &PeriodReturnInputs,
 ///         context: &MarketContext,
 ///     ) -> finstack_core::Result<f64> {
-///         let start_price = context.get_equity_spot(self.ticker, t_start)?;
-///         let end_price = context.get_equity_spot(self.ticker, t_end)?;
+///         let start_price = context.get_equity_spot(self.ticker, inputs.t_start)?;
+///         let end_price = context.get_equity_spot(self.ticker, inputs.t_end)?;
 ///
 ///         // Return as decimal (e.g., 0.05 for 5% return)
 ///         let ret = (end_price - start_price) / initial_level;
@@ -175,14 +171,10 @@ pub struct TotalReturnLegParams<'a> {
 /// }
 /// ```
 pub trait TrsReturnModel {
-    /// Computes total return over a period given times from as_of and initial level.
+    /// Computes total return over a period.
     ///
     /// # Arguments
-    /// * `period_start` — Start date of the period
-    /// * `period_end` — End date of the period
-    /// * `t_start` — Time from as_of to period start (year fraction)
-    /// * `t_end` — Time from as_of to period end (year fraction)
-    /// * `initial_level` — Initial level of the underlying
+    /// * `inputs` — Valuation date, period dates, year fractions, and initial level
     /// * `context` — Market context for data access
     ///
     /// # Returns
@@ -196,13 +188,33 @@ pub trait TrsReturnModel {
     /// - Implementations should return an error rather than returning NaN/Inf
     fn period_return(
         &self,
-        period_start: Date,
-        period_end: Date,
-        t_start: f64,
-        t_end: f64,
-        initial_level: f64,
+        inputs: &PeriodReturnInputs,
         context: &MarketContext,
     ) -> finstack_core::Result<f64>;
+}
+
+/// Inputs for a single-period total-return computation.
+///
+/// Bundles the valuation date, period dates, and the schedule-day-count year
+/// fractions the engine has already computed. Implementations should prefer
+/// the *dates* (with date-based curve lookups) over the raw year fractions
+/// whenever a discount factor is needed, so results stay correct when the
+/// curve base date differs from `as_of`.
+#[derive(Debug, Clone, Copy)]
+pub struct PeriodReturnInputs {
+    /// Valuation date.
+    pub as_of: Date,
+    /// Start date of the period.
+    pub period_start: Date,
+    /// End date of the period.
+    pub period_end: Date,
+    /// Year fraction from `as_of` to the period start (negative when the
+    /// period is already in progress).
+    pub t_start: f64,
+    /// Year fraction from `as_of` to the period end.
+    pub t_end: f64,
+    /// Initial level of the underlying.
+    pub initial_level: f64,
 }
 
 /// Common TRS pricing engine for shared calculations.
@@ -275,11 +287,14 @@ impl TrsEngine {
                 .year_fraction(as_of, period_end, ctx)?;
 
             let total_return = model.period_return(
-                period_start,
-                period_end,
-                t_start,
-                t_end,
-                params.initial_level.unwrap_or(1.0),
+                &PeriodReturnInputs {
+                    as_of,
+                    period_start,
+                    period_end,
+                    t_start,
+                    t_end,
+                    initial_level: params.initial_level.unwrap_or(1.0),
+                },
                 context,
             )?;
 
@@ -579,11 +594,7 @@ mod tests {
     impl TrsReturnModel for FlatReturnModel {
         fn period_return(
             &self,
-            _period_start: Date,
-            _period_end: Date,
-            _t_start: f64,
-            _t_end: f64,
-            _initial_level: f64,
+            _inputs: &super::PeriodReturnInputs,
             _context: &MarketContext,
         ) -> finstack_core::Result<f64> {
             Ok(self.rate)
@@ -593,11 +604,7 @@ mod tests {
     impl TrsReturnModel for SequencedReturnModel {
         fn period_return(
             &self,
-            _period_start: Date,
-            _period_end: Date,
-            _t_start: f64,
-            _t_end: f64,
-            _initial_level: f64,
+            _inputs: &super::PeriodReturnInputs,
             _context: &MarketContext,
         ) -> finstack_core::Result<f64> {
             let idx = self.next_idx.get();

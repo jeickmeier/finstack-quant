@@ -120,7 +120,18 @@ pub(crate) fn fair_forward(
     let t = DayCount::Act365F
         .year_fraction(as_of, future.expiry, DayCountContext::default())?
         .max(0.0);
-    let r = disc.zero(t);
+    // Date-based zero rate over [as_of, expiry]: avoids the axis bias of
+    // `disc.zero(t)` when curve base != as_of or day counts differ.
+    let r = if t > 0.0 {
+        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+            disc.as_ref(),
+            as_of,
+            future.expiry,
+        )?;
+        -df.ln() / t
+    } else {
+        0.0
+    };
 
     if !future.discrete_dividends.is_empty() {
         let day_count = DayCount::Act365F;

@@ -1632,6 +1632,17 @@
               "$ref": "#/$defs/BusinessDayConvention",
               "default": "modified_following"
             },
+            "discount_curve_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
             "id": {
               "$ref": "#/$defs/Id"
             },

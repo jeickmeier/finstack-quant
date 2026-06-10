@@ -87,18 +87,19 @@
 /// let simple = FloatingLegCompounding::Simple;
 /// assert_eq!(simple, FloatingLegCompounding::default());
 ///
-/// // SOFR swap with 2-day lookback
+/// // SOFR OIS swap: plain compounded in arrears (no lookback)
 /// let sofr = FloatingLegCompounding::CompoundedInArrears {
-///     lookback_days: 2,
+///     lookback_days: 0,
 ///     observation_shift: None,
 /// };
 /// assert_eq!(sofr, FloatingLegCompounding::sofr());
 ///
-/// // SONIA swap with 5-day lookback
-/// let sonia = FloatingLegCompounding::sonia();
-/// if let FloatingLegCompounding::CompoundedInArrears { lookback_days, .. } = sonia {
-///     assert_eq!(lookback_days, 5);
-/// }
+/// // SONIA FRN-style leg with the BoE 5-day lookback (explicit, not the OIS preset)
+/// let sonia_frn = FloatingLegCompounding::CompoundedInArrears {
+///     lookback_days: 5,
+///     observation_shift: None,
+/// };
+/// assert_ne!(sonia_frn, FloatingLegCompounding::sonia());
 /// ```
 ///
 /// # References
@@ -158,17 +159,19 @@ pub enum FloatingLegCompounding {
         /// described in the ISDA 2021 Definitions and ARRC SOFR conventions.
         lookback_days: i32,
 
-        /// Optional additional date shift applied on top of the lookback
-        /// (in business days).
+        /// Optional ISDA 2021 observation shift (in business days), as an
+        /// **alternative** to a lookback.
         ///
-        /// **Implementation note – lookback semantics, not true observation shift:**
-        /// This parameter shifts observation dates only; DCF weights are always
-        /// computed from the original (unshifted) accrual period dates.  Under the
-        /// ISDA 2021 "observation shift" convention, both observation dates *and*
-        /// DCF weights should be shifted.  All current market presets (SOFR, SONIA,
-        /// ESTR, TONA) use lookback semantics so this distinction does not affect
-        /// standard swaps.  If true observation-shift behavior is required, a
-        /// dedicated variant should be added.
+        /// When set (non-zero), observation dates are shifted *backward* by
+        /// this many business days and the day-count-fraction weights are
+        /// shifted with them — identical semantics to
+        /// [`FloatingLegCompounding::CompoundedWithObservationShift`].
+        ///
+        /// Combining a non-zero `lookback_days` with a non-zero
+        /// `observation_shift` is **rejected** at pricing time on every
+        /// pricing path: the two conventions are mutually exclusive, and the
+        /// previous behavior (the shift silently cancelling the lookback on
+        /// one path while erroring on the other) was a defect.
         observation_shift: Option<i32>,
     },
 
@@ -205,12 +208,21 @@ impl Default for FloatingLegCompounding {
     }
 }
 
-/// Market-standard compounding presets for common RFR swaps.
+/// Market-standard compounding presets for common RFR **swaps** (cleared OIS).
+///
+/// Cleared OIS swaps compound the overnight rate plain in-arrears over the
+/// accrual period, with only a payment delay — no observation lookback or
+/// shift. The ARRC 2-business-day and BoE 5-business-day lookbacks are *FRN
+/// coupon* conventions, not OIS swap conventions; using them on OIS both
+/// introduces a small basis (sub-bp to ~1bp) and disables the exact `1/DF`
+/// telescoping fast path. FRN-style legs should use
+/// [`FloatingLegCompounding::CompoundedInArrears`] with an explicit lookback or
+/// the `*_observation_shift` presets.
 impl FloatingLegCompounding {
-    /// USD SOFR standard convention (2-day lookback per ARRC).
+    /// USD SOFR OIS convention (plain compounded in arrears, payment delay only).
     pub fn sofr() -> Self {
         Self::CompoundedInArrears {
-            lookback_days: 2,
+            lookback_days: 0,
             observation_shift: None,
         }
     }
@@ -226,33 +238,38 @@ impl FloatingLegCompounding {
         }
     }
 
-    /// GBP SONIA standard convention (5-day lookback per BoE).
+    /// GBP SONIA OIS convention (plain compounded in arrears).
+    ///
+    /// The BoE 5-business-day lookback applies to SONIA FRNs, not OIS swaps.
     pub fn sonia() -> Self {
         Self::CompoundedInArrears {
-            lookback_days: 5,
+            lookback_days: 0,
             observation_shift: None,
         }
     }
 
-    /// EUR €STR standard convention (2-day shift per ECB).
+    /// EUR €STR OIS convention (plain compounded in arrears).
     pub fn estr() -> Self {
         Self::CompoundedInArrears {
-            lookback_days: 2,
+            lookback_days: 0,
             observation_shift: None,
         }
     }
 
-    /// JPY TONA standard convention (2-day lag per JSCC).
+    /// JPY TONA OIS convention (plain compounded in arrears).
     pub fn tona() -> Self {
         Self::CompoundedInArrears {
-            lookback_days: 2,
+            lookback_days: 0,
             observation_shift: None,
         }
     }
 
-    /// CHF SARON standard convention (2-day true observation shift).
+    /// CHF SARON OIS convention (plain compounded in arrears).
     pub fn saron() -> Self {
-        Self::CompoundedWithObservationShift { shift_days: 2 }
+        Self::CompoundedInArrears {
+            lookback_days: 0,
+            observation_shift: None,
+        }
     }
 
     /// USD SOFR with ISDA 2021 observation shift (2-day shift).
@@ -336,22 +353,24 @@ mod tests {
 
     #[test]
     fn test_market_presets() {
-        // Verify standard market conventions
-        assert_eq!(
+        // Cleared OIS compounds plain in-arrears (payment delay only); the
+        // ARRC 2bd / BoE 5bd lookbacks are FRN conventions, not OIS.
+        for preset in [
             FloatingLegCompounding::sofr(),
-            FloatingLegCompounding::CompoundedInArrears {
-                lookback_days: 2,
-                observation_shift: None,
-            }
-        );
-
-        assert_eq!(
             FloatingLegCompounding::sonia(),
-            FloatingLegCompounding::CompoundedInArrears {
-                lookback_days: 5,
-                observation_shift: None,
-            }
-        );
+            FloatingLegCompounding::estr(),
+            FloatingLegCompounding::tona(),
+            FloatingLegCompounding::saron(),
+            FloatingLegCompounding::fedfunds(),
+        ] {
+            assert_eq!(
+                preset,
+                FloatingLegCompounding::CompoundedInArrears {
+                    lookback_days: 0,
+                    observation_shift: None,
+                }
+            );
+        }
     }
 
     #[test]

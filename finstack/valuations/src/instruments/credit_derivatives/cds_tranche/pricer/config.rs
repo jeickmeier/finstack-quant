@@ -169,7 +169,8 @@ pub struct CDSTranchePricerConfig {
     // ========================================================================
     // Risk Metric Parameters
     // ========================================================================
-    /// CS01 bump size, applied as an additive hazard-rate basis-point bump.
+    /// CS01 bump size in basis points, applied as a parallel par-spread bump
+    /// with hazard-curve recalibration.
     pub cs01_bump_size: f64,
     /// Correlation bump for correlation delta calculation (absolute)
     pub corr_bump_abs: f64,

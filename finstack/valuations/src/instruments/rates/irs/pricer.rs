@@ -573,7 +573,13 @@ mod tests {
 
         let mut swap_lookback = swap_no_lookback.clone();
         swap_lookback.id = InstrumentId::new("OIS-LOOKBACK-2D");
-        swap_lookback.float.compounding = FloatingLegCompounding::sofr(); // lookback=2
+        // Cleared-OIS presets (sofr/sonia/...) are plain in-arrears with no
+        // lookback; use an explicit FRN-style 2-day lookback to exercise the
+        // lookback path without a forward curve.
+        swap_lookback.float.compounding = FloatingLegCompounding::CompoundedInArrears {
+            lookback_days: 2,
+            observation_shift: None,
+        };
 
         // Both should price without a forward curve present.
         let pv0 = swap_no_lookback.value(&ctx, as_of).expect("pv no lookback");

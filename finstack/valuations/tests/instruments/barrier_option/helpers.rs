@@ -89,6 +89,7 @@ pub fn create_down_and_out_call(
         strike,
         barrier: Money::new(barrier, Currency::USD),
         rebate: None,
+        rebate_timing: Default::default(),
         option_type: OptionType::Call,
         barrier_type: BarrierType::DownAndOut,
         expiry,

@@ -179,6 +179,30 @@ impl CdsValuationConvention {
             Self::BloombergCdswCleanFullPremium | Self::QuantLibIsdaParity
         )
     }
+
+    /// Calendar days between `as_of` and the protection step-in (effective)
+    /// date used as the lower bound of the protection-leg integral.
+    ///
+    /// - ISDA Standard Model / Markit step protection in at T+1: a default on
+    ///   the valuation date itself is not covered (~$5/$10M/day on a 100bp
+    ///   name).
+    /// - QuantLib's `IsdaCdsEngine` integrates the default leg from the
+    ///   valuation date even when the instrument carries a T+1 protection
+    ///   start (verified against QuantLib 1.42.1; the in-tree
+    ///   `cds_quantlib_flat_hazard_decomposition` golden pins this), so the
+    ///   parity convention uses 0 days.
+    /// - Bloomberg CDSW/CDSO integrate from the valuation date itself
+    ///   ("Protection starts immediately", DOCS 2057273 §3); the in-tree
+    ///   Bloomberg parity goldens pin this behaviour.
+    #[must_use]
+    pub fn protection_step_in_days(self) -> i64 {
+        match self {
+            Self::IsdaDirty => 1,
+            Self::QuantLibIsdaParity
+            | Self::BloombergCdswClean
+            | Self::BloombergCdswCleanFullPremium => 0,
+        }
+    }
 }
 
 impl CDSConvention {

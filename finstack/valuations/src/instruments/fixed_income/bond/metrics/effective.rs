@@ -137,7 +137,7 @@ pub(crate) fn option_risk_bond_and_base_price(
     let quote_ctx = QuoteDateContext::new(bond, market, as_of)?;
     let clean_price_pct =
         (base_price - quote_ctx.accrued_at_quote_date) / bond.notional.amount() * 100.0;
-    let oas_bp = TreePricer::with_config(bond_tree_config(bond)).calculate_oas(
+    let oas_bp = TreePricer::with_config(bond_tree_config(bond)?).calculate_oas(
         bond,
         market,
         as_of,

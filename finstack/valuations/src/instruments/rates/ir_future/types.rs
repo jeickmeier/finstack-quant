@@ -451,6 +451,16 @@ impl InterestRateFuture {
     /// `(T_start, T_end)` formula disagree by an entire accrual period. The
     /// convexity adjustment accrues until the rate locks in at the period
     /// start, so the consistent expiry-axis value is `T_start`.
+    ///
+    /// # Volatility units (normal / Bachelier contract)
+    ///
+    /// `σ` in `0.5·σ²·T_start·T_end` is an **absolute (normal) rate vol** in
+    /// decimal rate units per √year — e.g. `0.012` for 120 bp/yr. Feeding a
+    /// lognormal (Black) vol such as `0.20` inflates the adjustment by
+    /// `(σ_LN/σ_N)² ≈ (σ_LN/(σ_N))²` — typically hundreds×. A sanity bound
+    /// rejects vols above `MAX_NORMAL_RATE_VOL` (5% absolute, ≈500 bp/yr):
+    /// genuine normal rate vols sit far below it while lognormal quotes sit
+    /// far above it.
     fn calculate_convexity_adjusted_rate(
         &self,
         context: &MarketContext,
@@ -459,6 +469,11 @@ impl InterestRateFuture {
         t_start: f64,
         t_end: f64,
     ) -> finstack_core::Result<f64> {
+        /// Upper sanity bound for an absolute (normal) rate vol in decimal
+        /// units per √year. 500 bp/yr is far beyond any observed G10/EM normal
+        /// rate vol; values above it are almost certainly lognormal quotes.
+        const MAX_NORMAL_RATE_VOL: f64 = 0.05;
+
         // Hull-White zero-mean-reversion convexity adjustment: 0.5 σ² T_start T_end.
         let t1 = t_start.max(0.0);
         let t2 = t_end.max(t1);
@@ -480,6 +495,18 @@ impl InterestRateFuture {
                 },
             ));
         };
+
+        if !(0.0..=MAX_NORMAL_RATE_VOL).contains(&vol_estimate) {
+            return Err(finstack_core::Error::Validation(format!(
+                "IR Future {}: convexity-adjustment vol {vol_estimate} from surface '{}' is \
+                 outside the normal-vol sanity range [0, {MAX_NORMAL_RATE_VOL}]. The \
+                 0.5·σ²·T₁·T₂ formula requires an absolute (normal/Bachelier) rate vol in \
+                 decimal units (e.g. 0.012 = 120 bp/yr); a lognormal (Black) vol here \
+                 inflates the adjustment by hundreds of times.",
+                self.id,
+                self.vol_surface_id.as_ref().map_or("", |v| v.as_str()),
+            )));
+        }
 
         let convexity = 0.5 * vol_estimate * vol_estimate * t1 * t2;
         Ok(forward_rate + convexity)

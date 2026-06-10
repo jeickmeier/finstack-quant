@@ -2184,6 +2184,17 @@ fn simulate_period(
         // that must be opted into per tranche.
         if let Some(current) = state.tranche_balances.get_mut(tranche_id_str) {
             let after_principal = current.checked_sub(principal_payment).unwrap_or(*current);
+            // The waterfall nets in-period principal against the period-start
+            // balance snapshot, so TranchePrincipal payments cannot exceed the
+            // remaining balance. Residual/equity distributions, however, are
+            // booked here as "principal" against a zero balance — floor at
+            // zero so a negative balance never propagates into later periods'
+            // interest accrual and coverage tests.
+            let after_principal = if after_principal.amount() < 0.0 {
+                Money::new(0.0, state.base_ccy)
+            } else {
+                after_principal
+            };
             if tranche.pik_enabled && current_interest_shortfall.amount() > 0.0 {
                 *current = after_principal.checked_add(current_interest_shortfall)?;
             } else {

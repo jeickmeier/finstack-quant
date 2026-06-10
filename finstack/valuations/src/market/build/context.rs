@@ -94,8 +94,9 @@ pub struct BuildCtx {
     /// classified as `OvernightRfr`.
     ///
     /// When `None`, [`crate::market::build::rates::build_swap`] uses the
-    /// per-index registry default (e.g. `CompoundedInArrears { lookback_days: 2 }`
-    /// for SOFR per ARRC convention). Set this from a calibration step to
+    /// per-index registry default (e.g. `CompoundedInArrears { lookback_days: 0 }`
+    /// for SOFR, the cleared OIS plain in-arrears convention). Set this from a
+    /// calibration step to
     /// match a different vendor convention (e.g. Bloomberg SWPM SOFR uses
     /// `CompoundedWithRateCutoff { cutoff_days: 1 }`).
     ois_compounding_override: Option<FloatingLegCompounding>,

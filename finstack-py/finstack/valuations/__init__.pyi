@@ -1125,7 +1125,7 @@ def bs_cos_price(
     vol: float,
     maturity: float,
     is_call: bool,
-    n_terms: int = 128,
+    n_terms: int | None = None,
 ) -> float:
     """Price a European option under Black-Scholes with the COS method."""
     ...
@@ -1140,7 +1140,7 @@ def vg_cos_price(
     nu: float,
     maturity: float,
     is_call: bool,
-    n_terms: int = 128,
+    n_terms: int | None = None,
 ) -> float:
     """Price a European option under Variance Gamma with the COS method."""
     ...
@@ -1156,7 +1156,7 @@ def merton_jump_cos_price(
     lambda_: float,
     maturity: float,
     is_call: bool,
-    n_terms: int = 128,
+    n_terms: int | None = None,
 ) -> float:
     """Price a European option under Merton jump-diffusion with the COS method."""
     ...

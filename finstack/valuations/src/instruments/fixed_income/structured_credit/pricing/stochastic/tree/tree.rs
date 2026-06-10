@@ -11,7 +11,6 @@ use super::{
 };
 use crate::correlation::factor_model::LatentFactorSpec;
 use crate::correlation::recovery::RecoverySpec;
-use finstack_core::math::standard_normal_inv_cdf;
 use finstack_core::HashMap;
 
 /// Error returned by the recombining `ScenarioTree`'s dispersion / tail-risk
@@ -135,9 +134,23 @@ impl ScenarioTree {
                     2 => vec![-1, 1],
                     _ => vec![-1, 0, 1],
                 };
+                let moment_matched = deltas.len() == 3 && vol_sq_dt > 0.0 && vol_sq_dt < 1.0;
+                // Per-step variance of the lattice position under the actual
+                // transition probabilities; needed to standardize the node's
+                // cumulative position into a Brownian level (see
+                // `generate_factors_stateless`).
+                let per_step_position_var = if moment_matched {
+                    vol_sq_dt
+                } else {
+                    deltas.iter().map(|d| (d * d) as f64).sum::<f64>() / deltas.len() as f64
+                };
 
-                for (branch_idx, delta) in deltas.iter().enumerate() {
-                    let factors = self.generate_factors_stateless(branch_idx, deltas.len());
+                for delta in deltas.iter() {
+                    let factors = self.generate_factors_stateless(
+                        position + delta,
+                        dt,
+                        per_step_position_var,
+                    );
                     let smm = self.conditional_smm_stateless(&factors, burnout_factor);
                     let mdr = self.conditional_mdr_stateless(&factors);
                     let recovery = self.conditional_recovery(&factors);
@@ -259,16 +272,29 @@ impl ScenarioTree {
         target.cumulative_probability = total_prob;
     }
 
-    /// Generate factor realizations for a branch (stateless version).
+    /// Generate factor realizations for a lattice node from its cumulative
+    /// position.
     ///
-    /// Uses stratified sampling to ensure good coverage of the distribution.
-    fn generate_factors_stateless(&self, branch_idx: usize, num_branches: usize) -> Vec<f64> {
-        // Stratified sampling: divide normal distribution into equal-probability regions
-        let n = num_branches as f64;
-        let p = (branch_idx as f64 + 0.5) / n; // Midpoint of each stratum
-
-        // Use standard normal inverse CDF from core library
-        let z = standard_normal_inv_cdf(p);
+    /// The latent factor is a driftless random walk on the lattice: each
+    /// period the position moves by one of the branch deltas, so the node's
+    /// cumulative `position` after `n` periods has variance
+    /// `n · per_step_position_var`. Standardizing by
+    /// `√(dt / per_step_position_var)` turns the position into a Brownian
+    /// level `z ~ N(0, t)` whose distribution *diffuses with lattice depth* —
+    /// previously every node at every depth reused the same three one-step
+    /// stratified quantiles, so the factor marginal never widened and the
+    /// SMM/MDR dispersion was understated at long horizons.
+    fn generate_factors_stateless(
+        &self,
+        position: i32,
+        dt: f64,
+        per_step_position_var: f64,
+    ) -> Vec<f64> {
+        let z = if per_step_position_var > 0.0 {
+            f64::from(position) * (dt / per_step_position_var).sqrt()
+        } else {
+            0.0
+        };
 
         // Apply factor model structure
         match &self.config.factor_spec {
@@ -533,6 +559,7 @@ impl ScenarioTree {
 mod tests {
     use super::*;
     use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::BranchingSpec;
+    use finstack_core::math::standard_normal_inv_cdf;
 
     #[test]
     fn test_build_simple_tree() {
@@ -642,6 +669,46 @@ mod tests {
 
         let z_025 = standard_normal_inv_cdf(0.025);
         assert!((z_025 + 1.96).abs() < 0.01);
+    }
+
+    /// The latent-factor marginal must widen with lattice depth: the factor
+    /// is a random walk on the lattice positions, so its terminal-layer
+    /// variance scales with the number of periods. Previously every node at
+    /// every depth reused the same one-step stratified quantiles and the
+    /// distribution never diffused.
+    #[test]
+    fn test_factor_distribution_diffuses_with_depth() {
+        fn terminal_factor_variance(tree: &ScenarioTree) -> f64 {
+            let mut total_prob = 0.0;
+            let mut mean = 0.0;
+            for node in tree.terminal_nodes() {
+                let f = node.factor_realizations.first().copied().unwrap_or(0.0);
+                mean += node.cumulative_probability * f;
+                total_prob += node.cumulative_probability;
+            }
+            mean /= total_prob;
+            let mut var = 0.0;
+            for node in tree.terminal_nodes() {
+                let f = node.factor_realizations.first().copied().unwrap_or(0.0);
+                var += node.cumulative_probability * (f - mean).powi(2);
+            }
+            var / total_prob
+        }
+
+        // Same dt (1 month) at two depths, trinomial branching.
+        let shallow_cfg = ScenarioTreeConfig::new(2, 2.0 / 12.0, BranchingSpec::fixed(3));
+        let deep_cfg = ScenarioTreeConfig::new(12, 1.0, BranchingSpec::fixed(3));
+        let shallow = ScenarioTree::build(&shallow_cfg).expect("shallow tree");
+        let deep = ScenarioTree::build(&deep_cfg).expect("deep tree");
+
+        let var_shallow = terminal_factor_variance(&shallow);
+        let var_deep = terminal_factor_variance(&deep);
+
+        assert!(
+            var_deep > 3.0 * var_shallow,
+            "terminal factor variance must grow with lattice depth: \
+             shallow={var_shallow}, deep={var_deep}"
+        );
     }
 
     #[test]

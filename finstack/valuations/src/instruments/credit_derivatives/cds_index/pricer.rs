@@ -430,17 +430,29 @@ impl CDSIndexPricer {
         let hazard_ref = hazard.as_ref();
         let has_par_points = hazard_ref.par_spread_points().next().is_some();
 
+        // Par-spread re-bootstrap is the CS01 contract when par points exist.
+        // A silent fallback to a direct hazard-λ shift on re-bootstrap failure
+        // would change units by ≈1/(1−R) with no signal, so the error is
+        // propagated instead. Curves without par points use the hazard shift
+        // explicitly (the only available definition).
         let bump_hazard_for = |bp: f64| -> Result<_> {
             if has_par_points {
-                match bump_hazard_spreads(
+                bump_hazard_spreads(
                     hazard_ref,
                     curves,
                     &BumpRequest::Parallel(bp),
                     Some(discount_id),
-                ) {
-                    Ok(curve) => Ok(curve),
-                    Err(_) => bump_hazard_shift(hazard_ref, &BumpRequest::Parallel(bp)),
-                }
+                )
+                .map_err(|e| finstack_core::Error::Calibration {
+                    message: format!(
+                        "CDS index CS01: par-spread re-bootstrap failed for curve '{}' \
+                             ({e}); refusing silent fallback to a hazard-rate bump \
+                             (≈1/(1−R) unit mismatch). Fix the par-spread quotes or strip \
+                             them to opt into hazard-shift CS01.",
+                        credit_id
+                    ),
+                    category: "cs01_rebootstrap".to_string(),
+                })
             } else {
                 bump_hazard_shift(hazard_ref, &BumpRequest::Parallel(bp))
             }

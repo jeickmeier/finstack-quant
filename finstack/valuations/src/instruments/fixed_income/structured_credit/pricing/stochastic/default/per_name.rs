@@ -28,8 +28,9 @@
 //! [`PoolGranularity`] for pools granular enough that the limit is an
 //! acceptable, faster approximation.
 
-use crate::correlation::copula::{Copula, CopulaSpec, GaussianCopula};
+use crate::correlation::copula::{Copula, CopulaSpec};
 use finstack_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
+use finstack_core::Result;
 use finstack_monte_carlo::rng::philox::PhiloxRng;
 use finstack_monte_carlo::traits::RandomStream;
 
@@ -113,14 +114,22 @@ pub(crate) struct PerNameCopulaDefault {
 
 impl PerNameCopulaDefault {
     /// Build a per-name simulator from a copula specification.
-    pub(crate) fn new(copula_spec: &CopulaSpec, correlation: f64) -> Self {
-        Self {
-            copula: copula_spec
-                .build()
-                .unwrap_or_else(|_| Box::new(GaussianCopula::new())),
+    ///
+    /// # Errors
+    ///
+    /// Propagates copula construction failures (e.g. invalid Student-t
+    /// degrees of freedom) instead of silently substituting a Gaussian
+    /// copula, which would drop the requested tail dependence.
+    pub(crate) fn new(copula_spec: &CopulaSpec, correlation: f64) -> Result<Self> {
+        Ok(Self {
+            copula: copula_spec.build().map_err(|e| {
+                finstack_core::Error::Validation(format!(
+                    "per-name copula construction failed for {copula_spec:?}: {e}"
+                ))
+            })?,
             correlation: correlation.clamp(0.0, 0.99),
             threshold_kind: ThresholdKind::from_spec(copula_spec),
-        }
+        })
     }
 
     /// Realize per-name default indicators for one payment period.
@@ -248,7 +257,7 @@ mod tests {
     /// the realized default count would be biased.
     #[test]
     fn per_name_marginal_recovers_pd() {
-        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.30);
+        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.30).expect("copula builds");
         let pd = 0.04;
         let names = vec![pd; 200];
         let mut rng = PhiloxRng::new(123);
@@ -273,7 +282,7 @@ mod tests {
     /// finite-pool → LHP correctness anchor.
     #[test]
     fn large_pool_converges_to_lhp_conditional() {
-        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.25);
+        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.25).expect("copula builds");
         let pd = 0.05;
         let n = 20_000usize;
         let names = vec![pd; n];
@@ -295,7 +304,7 @@ mod tests {
     /// defaults than a positive one — the copula's systematic channel.
     #[test]
     fn stress_factor_increases_defaults() {
-        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.30);
+        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.30).expect("copula builds");
         let pd = 0.05;
         let names = vec![pd; 5_000];
         let mut rng = PhiloxRng::new(7);
@@ -317,7 +326,7 @@ mod tests {
     /// unlike the LHP limit which is a deterministic function of `Z`.
     #[test]
     fn finite_pool_has_idiosyncratic_dispersion() {
-        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.20);
+        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.20).expect("copula builds");
         let pd = 0.06;
         let n = 80usize;
         let names = vec![pd; n];
@@ -350,7 +359,8 @@ mod tests {
                 degrees_of_freedom: 6.0,
             },
             0.30,
-        );
+        )
+        .expect("copula builds");
         let pd = 0.05;
         let names = vec![pd; 128];
         let mut rng = PhiloxRng::new(555);
@@ -384,7 +394,8 @@ mod tests {
                 degrees_of_freedom: 6.0,
             },
             0.30,
-        );
+        )
+        .expect("copula builds");
         let pd = 0.05;
         let mut rng = PhiloxRng::new(909);
 
@@ -424,7 +435,8 @@ mod tests {
                 degrees_of_freedom: 6.0,
             },
             0.30,
-        );
+        )
+        .expect("copula builds");
         let pd = 0.05;
         let n = 8_192usize;
         let names = vec![pd; n];
@@ -479,7 +491,7 @@ mod tests {
     /// no idiosyncratic-channel variance reduction.
     #[test]
     fn antithetic_per_name_mask_is_complement_of_normal() {
-        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.30);
+        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.30).expect("copula builds");
         let pd = 0.5; // barrier c = Φ⁻¹(0.5) = 0
         let names = vec![pd; 256];
 
@@ -509,7 +521,7 @@ mod tests {
     /// mask bit-for-bit.
     #[test]
     fn per_name_simulation_is_deterministic() {
-        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.30);
+        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.30).expect("copula builds");
         let names = vec![0.05; 100];
 
         let run = |seed: u64| {

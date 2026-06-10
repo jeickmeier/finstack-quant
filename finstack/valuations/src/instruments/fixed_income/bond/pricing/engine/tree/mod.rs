@@ -100,7 +100,9 @@ impl Pricer for SimpleBondOasPricer {
                 )
             })?;
 
-        let oas_bp = TreePricer::with_config(bond_tree_config(bond))
+        let config = bond_tree_config(bond)
+            .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx.clone()))?;
+        let oas_bp = TreePricer::with_config(config)
             .calculate_oas(bond, market, as_of, clean_pct)
             .map_err(|e| PricingError::model_failure_with_context(e.to_string(), ctx))?;
 

@@ -14,6 +14,7 @@
 //! - Computing the "equity option value" = CB price - bond floor
 //! - Monitoring busted convertibles (trading near bond floor)
 
+use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_core::Result;
@@ -40,33 +41,22 @@ impl MetricCalculator for BondFloorCalculator {
             .unwrap_or(&bond.discount_curve_id);
         let curve = context.curves.get_discount(curve_id.as_str())?;
 
-        let day_count = schedule.day_count;
-
+        // Date-based DFs on the curve's own axis: correct when the curve base
+        // date differs from as_of, and a day-count failure is an error rather
+        // than a silent t=0 (which would discount nothing).
         let mut pv = 0.0;
 
         for cf in schedule.coupons() {
             if cf.date <= as_of {
                 continue;
             }
-            let t = day_count
-                .year_fraction(
-                    as_of,
-                    cf.date,
-                    finstack_core::dates::DayCountContext::default(),
-                )
-                .unwrap_or(0.0);
-            pv += cf.amount.amount() * curve.df(t);
+            let df = relative_df_discount_curve(curve.as_ref(), as_of, cf.date)?;
+            pv += cf.amount.amount() * df;
         }
 
         // Add principal redemption at maturity
-        let t_mat = day_count
-            .year_fraction(
-                as_of,
-                bond.maturity,
-                finstack_core::dates::DayCountContext::default(),
-            )
-            .unwrap_or(0.0);
-        pv += bond.notional.amount() * curve.df(t_mat);
+        let df_mat = relative_df_discount_curve(curve.as_ref(), as_of, bond.maturity)?;
+        pv += bond.notional.amount() * df_mat;
 
         Ok(pv)
     }

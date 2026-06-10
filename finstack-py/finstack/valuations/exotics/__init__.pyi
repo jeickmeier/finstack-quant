@@ -18,6 +18,7 @@ class _ExoticInstrument:
         model: str = "default",
         metrics: list[str] = ...,
         pricing_options: str | None = None,
+        market_history: str | None = None,
     ) -> str: ...
 
 class _ExoticOptionInstrument(_ExoticInstrument):

@@ -95,9 +95,9 @@ pub(crate) fn price_cap_floor(
         let t_fix = if is_fixed_unpaid {
             0.0
         } else {
-            cap_floor
-                .day_count
-                .year_fraction(as_of, fixing_date, dc_ctx)?
+            // Option expiry is calendar time: ACT/365F, not the accrual day
+            // count (Act360 would inflate T by ~365/360 and bias the vol).
+            finstack_core::dates::DayCount::Act365F.year_fraction(as_of, fixing_date, dc_ctx)?
         };
         let effective_t_fix = if is_fixed_unpaid {
             0.0

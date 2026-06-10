@@ -37,8 +37,11 @@ impl PacSchedule {
     ///
     /// * `collateral_balance` - Current balance of the underlying collateral pool
     /// * `pac_balance` - Current balance of the PAC tranche being carved
-    /// * `wam` - Weighted average maturity in months
+    /// * `wam` - Remaining weighted average maturity in months
     /// * `wac` - Weighted average coupon (annual)
+    /// * `collateral_age_months` - Current collateral age (WALA) in months;
+    ///   the PSA seasoning ramp is anchored at this age, not at age 0, so
+    ///   seasoned collateral projects at the correct (post-ramp) speeds
     /// * `collar` - PAC collar (lower/upper PSA bounds)
     ///
     /// Reference: Fabozzi "Handbook of Mortgage-Backed Securities" Ch. 8
@@ -47,14 +50,25 @@ impl PacSchedule {
         pac_balance: f64,
         wam: u32,
         wac: f64,
+        collateral_age_months: u32,
         collar: PacCollar,
     ) -> Self {
         // Project collateral principal at lower PSA
-        let lower_principals =
-            project_principal_stream(collateral_balance, wam, wac, collar.lower_psa);
+        let lower_principals = project_principal_stream(
+            collateral_balance,
+            wam,
+            wac,
+            collateral_age_months,
+            collar.lower_psa,
+        );
         // Project collateral principal at upper PSA
-        let upper_principals =
-            project_principal_stream(collateral_balance, wam, wac, collar.upper_psa);
+        let upper_principals = project_principal_stream(
+            collateral_balance,
+            wam,
+            wac,
+            collateral_age_months,
+            collar.upper_psa,
+        );
 
         // Collateral-derived PAC band = minimum principal at each period.
         let collateral_schedule = lower_principals
@@ -102,7 +116,17 @@ impl PacSchedule {
 /// - Monthly payment = P * r * (1+r)^n / ((1+r)^n - 1)
 /// - Scheduled principal = Monthly payment - Interest
 /// - Prepayment = (Balance - Scheduled principal) * SMM
-fn project_principal_stream(initial_balance: f64, wam: u32, wac: f64, psa_speed: f64) -> Vec<f64> {
+///
+/// `age_months` anchors the PSA seasoning ramp: projection month `m` of a
+/// pool aged `a` months uses the PSA CPR at loan age `a + m`, so seasoned
+/// collateral does not restart the 30-month ramp at age 0.
+fn project_principal_stream(
+    initial_balance: f64,
+    wam: u32,
+    wac: f64,
+    age_months: u32,
+    psa_speed: f64,
+) -> Vec<f64> {
     let monthly_rate = wac / 12.0;
     let mut remaining = initial_balance;
     let mut principals = Vec::with_capacity(wam as usize);
@@ -130,8 +154,8 @@ fn project_principal_stream(initial_balance: f64, wam: u32, wac: f64, psa_speed:
 
         let scheduled_principal = scheduled_principal.min(remaining);
 
-        // Prepayment on post-scheduled balance
-        let smm = psa_to_smm(psa_speed, month);
+        // Prepayment on post-scheduled balance, at the pool's actual loan age.
+        let smm = psa_to_smm(psa_speed, age_months.saturating_add(month));
         let balance_after_scheduled = remaining - scheduled_principal;
         let prepayment = balance_after_scheduled * smm;
 
@@ -218,7 +242,7 @@ mod tests {
     fn test_pac_schedule_generation() {
         // Collateral pool of 100k, PAC tranche of 60k carved from it.
         let schedule =
-            PacSchedule::generate(100_000.0, 60_000.0, 360, 0.045, PacCollar::standard());
+            PacSchedule::generate(100_000.0, 60_000.0, 360, 0.045, 0, PacCollar::standard());
 
         assert!(!schedule.scheduled_payments.is_empty());
         assert!(schedule.total_scheduled() > 0.0);
@@ -229,7 +253,7 @@ mod tests {
     #[test]
     fn test_within_collar() {
         let schedule =
-            PacSchedule::generate(100_000.0, 100_000.0, 360, 0.045, PacCollar::standard());
+            PacSchedule::generate(100_000.0, 100_000.0, 360, 0.045, 0, PacCollar::standard());
 
         // 100% PSA is within 100-300 collar
         assert!(schedule.is_within_collar(1.0));
@@ -255,18 +279,18 @@ mod tests {
         let lower_psa = collar.lower_psa;
         let upper_psa = collar.upper_psa;
 
-        let schedule = PacSchedule::generate(collateral_balance, pac_balance, wam, wac, collar);
+        let schedule = PacSchedule::generate(collateral_balance, pac_balance, wam, wac, 0, collar);
 
         // The carved schedule's early-period principal must equal the
         // collateral-derived minimum-principal stream (before the PAC
         // balance cap binds), NOT a PAC-balance-derived stream.
-        let lo = project_principal_stream(collateral_balance, wam, wac, lower_psa);
-        let hi = project_principal_stream(collateral_balance, wam, wac, upper_psa);
+        let lo = project_principal_stream(collateral_balance, wam, wac, 0, lower_psa);
+        let hi = project_principal_stream(collateral_balance, wam, wac, 0, upper_psa);
         let collateral_min: Vec<f64> = lo.iter().zip(hi.iter()).map(|(l, h)| l.min(*h)).collect();
 
         // The (incorrect) PAC-balance-derived stream, for contrast.
-        let pac_lo = project_principal_stream(pac_balance, wam, wac, lower_psa);
-        let pac_hi = project_principal_stream(pac_balance, wam, wac, upper_psa);
+        let pac_lo = project_principal_stream(pac_balance, wam, wac, 0, lower_psa);
+        let pac_hi = project_principal_stream(pac_balance, wam, wac, 0, upper_psa);
         let pac_balance_min: Vec<f64> = pac_lo
             .iter()
             .zip(pac_hi.iter())
@@ -291,6 +315,35 @@ mod tests {
 
         // Carved cumulative principal never exceeds the PAC balance.
         assert!(schedule.total_scheduled() <= pac_balance + 1e-6);
+    }
+
+    #[test]
+    fn test_pac_schedule_anchors_ramp_at_collateral_age() {
+        // A pool seasoned past the 30-month PSA ramp prepays at terminal CPR
+        // from projection month 1; a fresh pool is still ramping. The seasoned
+        // schedule must therefore start with strictly more principal.
+        let balance = 100_000.0;
+        let wam = 330;
+        let wac = 0.05;
+
+        let fresh = PacSchedule::generate(balance, balance, wam, wac, 0, PacCollar::standard());
+        let seasoned = PacSchedule::generate(balance, balance, wam, wac, 30, PacCollar::standard());
+
+        assert!(
+            seasoned.scheduled_payments[0] > fresh.scheduled_payments[0],
+            "seasoned month-1 principal ({}) must exceed fresh ({}) — the PSA \
+             ramp must anchor at the pool's current age",
+            seasoned.scheduled_payments[0],
+            fresh.scheduled_payments[0]
+        );
+
+        // At age ≥ 30 the ramp is flat, so adding more age changes nothing.
+        let very_seasoned =
+            PacSchedule::generate(balance, balance, wam, wac, 120, PacCollar::standard());
+        assert!(
+            (very_seasoned.scheduled_payments[0] - seasoned.scheduled_payments[0]).abs() < 1e-9,
+            "post-ramp ages must produce identical schedules"
+        );
     }
 
     #[test]

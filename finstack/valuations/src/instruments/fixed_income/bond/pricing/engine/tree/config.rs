@@ -253,6 +253,14 @@ impl Default for TreePricerConfig {
 ///
 /// A `TreePricerConfig` with values from pricing_overrides or defaults.
 ///
+/// # Errors
+///
+/// Returns a validation error when the bond selects the Black-Derman-Toy
+/// model (`vol_model = Black` with embedded options) but provides no
+/// `implied_volatility`: BDT calibrates to a *lognormal* short-rate vol, and
+/// silently defaulting it (the old behavior used 1%) materially misprices the
+/// embedded option.
+///
 /// # Examples
 ///
 /// ```ignore
@@ -260,14 +268,11 @@ impl Default for TreePricerConfig {
 /// use finstack_valuations::instruments::fixed_income::bond::pricing::engine::tree::bond_tree_config;
 ///
 /// let bond = Bond::example().unwrap();
-/// let config = bond_tree_config(&bond);
+/// let config = bond_tree_config(&bond)?;
 /// ```
-pub fn bond_tree_config(bond: &Bond) -> TreePricerConfig {
-    let volatility = bond
-        .pricing_overrides
-        .market_quotes
-        .implied_volatility
-        .unwrap_or(0.01);
+pub fn bond_tree_config(bond: &Bond) -> finstack_core::Result<TreePricerConfig> {
+    let implied_volatility = bond.pricing_overrides.market_quotes.implied_volatility;
+    let volatility = implied_volatility.unwrap_or(0.01);
 
     let uses_black_lognormal = matches!(
         bond.pricing_overrides.model_config.vol_model,
@@ -279,6 +284,14 @@ pub fn bond_tree_config(bond: &Bond) -> TreePricerConfig {
     // is available in the market context.
     let tree_model = if bond.call_put.is_some() {
         if uses_black_lognormal {
+            let Some(sigma) = implied_volatility else {
+                return Err(finstack_core::Error::Validation(format!(
+                    "Bond '{}' selects the Black-Derman-Toy tree (vol_model = Black) but \
+                     provides no implied_volatility in pricing_overrides.market_quotes. BDT \
+                     requires an explicit lognormal short-rate volatility (e.g. 0.20 for 20%).",
+                    bond.id.as_str()
+                )));
+            };
             let mean_reversion = bond
                 .pricing_overrides
                 .model_config
@@ -286,7 +299,7 @@ pub fn bond_tree_config(bond: &Bond) -> TreePricerConfig {
                 .unwrap_or(0.0);
             TreeModelChoice::BlackDermanToy {
                 mean_reversion,
-                sigma: volatility,
+                sigma,
             }
         } else {
             let mean_reversion = bond
@@ -308,7 +321,7 @@ pub fn bond_tree_config(bond: &Bond) -> TreePricerConfig {
         TreeCompounding::default()
     };
 
-    TreePricerConfig {
+    Ok(TreePricerConfig {
         tree_steps: bond
             .pricing_overrides
             .model_config
@@ -328,7 +341,7 @@ pub fn bond_tree_config(bond: &Bond) -> TreePricerConfig {
         oas_quote_compounding: bond.pricing_overrides.model_config.oas_quote_compounding,
         oas_price_basis: bond.pricing_overrides.model_config.oas_price_basis,
         tree_compounding,
-    }
+    })
 }
 
 impl TreePricerConfig {
@@ -647,13 +660,40 @@ mod tests {
             puts: vec![],
         });
         bond.pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
+        bond.pricing_overrides.market_quotes.implied_volatility = Some(0.20);
 
-        let config = bond_tree_config(&bond);
+        let config = bond_tree_config(&bond).expect("explicit vol should produce a config");
 
         assert_eq!(config.tree_compounding, TreeCompounding::Simple);
         assert!(matches!(
             config.tree_model,
-            TreeModelChoice::BlackDermanToy { .. }
+            TreeModelChoice::BlackDermanToy { sigma, .. } if (sigma - 0.20).abs() < 1e-12
         ));
+    }
+
+    #[test]
+    fn black_lognormal_callable_config_errors_without_implied_vol() {
+        let mut bond = Bond::fixed(
+            "BDT-CALLABLE-NO-VOL",
+            Money::new(1_000.0, Currency::USD),
+            0.05,
+            date!(2025 - 01 - 01),
+            date!(2030 - 01 - 01),
+            "USD-OIS",
+        )
+        .expect("fixed bond should build");
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start_date: date!(2027 - 01 - 01),
+                end_date: date!(2028 - 01 - 01),
+                price_pct_of_par: 101.0,
+                make_whole: None,
+            }],
+            puts: vec![],
+        });
+        bond.pricing_overrides.model_config.vol_model = Some(VolatilityModel::Black);
+
+        let err = bond_tree_config(&bond).expect_err("missing BDT vol must error");
+        assert!(err.to_string().contains("implied_volatility"));
     }
 }

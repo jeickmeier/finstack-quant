@@ -22,14 +22,15 @@ fn test_npv_before_start_uses_forward_variance_and_discounting() {
     // Act
     let pv = swap.value(&ctx, as_of).unwrap();
 
-    // Assert
+    // Assert. Discounting is date-based (`df_between_dates`), correct even
+    // when the curve base date differs from `as_of`.
     let forward_var = 0.22_f64.powi(2);
     let undiscounted = swap.payoff(forward_var).amount();
-    let t = swap
-        .day_count
-        .year_fraction(as_of, swap.maturity, Default::default())
+    let df = ctx
+        .get_discount(DISC_ID)
+        .unwrap()
+        .df_between_dates(as_of, swap.maturity)
         .unwrap();
-    let df = ctx.get_discount(DISC_ID).unwrap().df(t);
     let expected = undiscounted * df;
 
     assert!((pv.amount() - expected).abs() < LOOSE_EPSILON);
@@ -132,11 +133,12 @@ fn test_npv_mid_period_blends_realized_and_forward_components() {
 
     let forward = swap.remaining_forward_variance(&ctx, as_of).unwrap();
     let expected_var = realized * weight + forward * (1.0 - weight);
-    let t = swap
-        .day_count
-        .year_fraction(as_of, swap.maturity, Default::default())
+    // Date-based discounting, matching the engine's `df_between_dates`.
+    let df = ctx
+        .get_discount(DISC_ID)
+        .unwrap()
+        .df_between_dates(as_of, swap.maturity)
         .unwrap();
-    let df = ctx.get_discount(DISC_ID).unwrap().df(t);
     let expected = swap.payoff(expected_var).amount() * df;
 
     assert!((pv.amount() - expected).abs() < LOOSE_EPSILON);

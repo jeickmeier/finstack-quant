@@ -172,15 +172,18 @@ impl MetricCalculator for ModifiedDurationCalculator {
 
 /// Calculate tranche-specific modified duration from cashflows and discount curve.
 ///
-/// This is the primary duration calculation for tranche-level analytics,
-/// measuring PV-weighted average time to receive cashflows.
+/// True modified duration: `-(1/P)·dP/dy` measured by bumping the
+/// continuously-compounded discounting of the tranche's cashflows by 1bp
+/// (the same approach as [`ModifiedDurationCalculator`]). The previous
+/// implementation returned the Macaulay duration (PV-weighted time) under
+/// this name.
 ///
 /// # Arguments
 ///
 /// * `cashflows` - The dated cashflows for the tranche
 /// * `discount_curve` - The discount curve for PV calculation
 /// * `as_of` - The valuation date
-/// * `pv` - The present value of the tranche
+/// * `pv` - The present value of the tranche (guards the degenerate case)
 ///
 /// # Returns
 ///
@@ -191,8 +194,15 @@ pub fn calculate_tranche_duration(
     as_of: Date,
     pv: Money,
 ) -> Result<f64> {
+    if pv.amount() <= 0.0 {
+        return Ok(0.0);
+    }
+
     let day_count = DayCount::Act365F;
-    let mut weighted_pv = 0.0;
+    let yield_shift = ONE_BASIS_POINT;
+
+    let mut base_pv = 0.0;
+    let mut shifted_pv = 0.0;
 
     for (date, amount) in cashflows {
         if *date <= as_of {
@@ -204,11 +214,14 @@ pub fn calculate_tranche_duration(
         let df = discount_curve.df_between_dates(as_of, *date)?;
         let flow_pv = amount.amount() * df;
 
-        weighted_pv += flow_pv * years;
+        base_pv += flow_pv;
+        shifted_pv += flow_pv * (-yield_shift * years).exp();
     }
 
-    if pv.amount() > 0.0 {
-        Ok(weighted_pv / pv.amount())
+    if base_pv > 0.0 {
+        // Modified duration = -(dP/dy) / P on the cashflow-discounted PV, so
+        // numerator and denominator come from the same discounting.
+        Ok(-(shifted_pv - base_pv) / (base_pv * yield_shift))
     } else {
         Ok(0.0)
     }

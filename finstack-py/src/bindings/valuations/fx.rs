@@ -54,29 +54,38 @@ macro_rules! fx_class {
             #[pyo3(signature = (market, as_of, model="default"))]
             fn price(
                 &self,
+                py: Python<'_>,
                 market: &Bound<'_, PyAny>,
                 as_of: &str,
                 model: &str,
             ) -> PyResult<String> {
-                price_payload(&self.json, market, as_of, model)
+                price_payload(py, &self.json, market, as_of, model)
             }
 
-            #[pyo3(signature = (market, as_of, model="default", metrics=vec![], pricing_options=None))]
+            #[pyo3(signature = (market, as_of, model="default", metrics=vec![], pricing_options=None, market_history=None))]
+            // PyO3 binding: the argument list mirrors the Python
+            // keyword-argument API, so it cannot be collapsed into a
+            // parameter struct without changing that API.
+            #[allow(clippy::too_many_arguments)]
             fn price_with_metrics(
                 &self,
+                py: Python<'_>,
                 market: &Bound<'_, PyAny>,
                 as_of: &str,
                 model: &str,
                 metrics: Vec<String>,
                 pricing_options: Option<&str>,
+                market_history: Option<&str>,
             ) -> PyResult<String> {
                 price_payload_with_metrics(
+                    py,
                     &self.json,
                     market,
                     as_of,
                     model,
                     metrics,
                     pricing_options,
+                    market_history,
                 )
             }
 
@@ -94,48 +103,91 @@ macro_rules! fx_option_class {
         #[pymethods]
         impl $rust_name {
             #[pyo3(signature = (market, as_of, model="default"))]
-            fn delta(&self, market: &Bound<'_, PyAny>, as_of: &str, model: &str) -> PyResult<f64> {
-                metric_value(&self.json, market, as_of, model, "delta")
+            fn delta(
+                &self,
+                py: Python<'_>,
+                market: &Bound<'_, PyAny>,
+                as_of: &str,
+                model: &str,
+            ) -> PyResult<f64> {
+                metric_value(py, &self.json, market, as_of, model, "delta")
             }
 
             #[pyo3(signature = (market, as_of, model="default"))]
-            fn gamma(&self, market: &Bound<'_, PyAny>, as_of: &str, model: &str) -> PyResult<f64> {
-                metric_value(&self.json, market, as_of, model, "gamma")
+            fn gamma(
+                &self,
+                py: Python<'_>,
+                market: &Bound<'_, PyAny>,
+                as_of: &str,
+                model: &str,
+            ) -> PyResult<f64> {
+                metric_value(py, &self.json, market, as_of, model, "gamma")
             }
 
             #[pyo3(signature = (market, as_of, model="default"))]
-            fn vega(&self, market: &Bound<'_, PyAny>, as_of: &str, model: &str) -> PyResult<f64> {
-                metric_value(&self.json, market, as_of, model, "vega")
+            fn vega(
+                &self,
+                py: Python<'_>,
+                market: &Bound<'_, PyAny>,
+                as_of: &str,
+                model: &str,
+            ) -> PyResult<f64> {
+                metric_value(py, &self.json, market, as_of, model, "vega")
             }
 
             #[pyo3(signature = (market, as_of, model="default"))]
-            fn theta(&self, market: &Bound<'_, PyAny>, as_of: &str, model: &str) -> PyResult<f64> {
-                metric_value(&self.json, market, as_of, model, "theta")
+            fn theta(
+                &self,
+                py: Python<'_>,
+                market: &Bound<'_, PyAny>,
+                as_of: &str,
+                model: &str,
+            ) -> PyResult<f64> {
+                metric_value(py, &self.json, market, as_of, model, "theta")
             }
 
             #[pyo3(signature = (market, as_of, model="default"))]
-            fn rho(&self, market: &Bound<'_, PyAny>, as_of: &str, model: &str) -> PyResult<f64> {
-                metric_value(&self.json, market, as_of, model, "rho")
+            fn rho(
+                &self,
+                py: Python<'_>,
+                market: &Bound<'_, PyAny>,
+                as_of: &str,
+                model: &str,
+            ) -> PyResult<f64> {
+                metric_value(py, &self.json, market, as_of, model, "rho")
             }
 
             #[pyo3(signature = (market, as_of, model="default"))]
             fn foreign_rho(
                 &self,
+                py: Python<'_>,
                 market: &Bound<'_, PyAny>,
                 as_of: &str,
                 model: &str,
             ) -> PyResult<f64> {
-                metric_value(&self.json, market, as_of, model, "foreign_rho")
+                metric_value(py, &self.json, market, as_of, model, "foreign_rho")
             }
 
             #[pyo3(signature = (market, as_of, model="default"))]
-            fn vanna(&self, market: &Bound<'_, PyAny>, as_of: &str, model: &str) -> PyResult<f64> {
-                metric_value(&self.json, market, as_of, model, "vanna")
+            fn vanna(
+                &self,
+                py: Python<'_>,
+                market: &Bound<'_, PyAny>,
+                as_of: &str,
+                model: &str,
+            ) -> PyResult<f64> {
+                metric_value(py, &self.json, market, as_of, model, "vanna")
             }
 
             #[pyo3(signature = (market, as_of, model="default"))]
-            fn volga(&self, market: &Bound<'_, PyAny>, as_of: &str, model: &str) -> PyResult<f64> {
-                metric_value(&self.json, market, as_of, model, "volga")
+            fn volga(
+                &self,
+                py: Python<'_>,
+                market: &Bound<'_, PyAny>,
+                as_of: &str,
+                model: &str,
+            ) -> PyResult<f64> {
+                metric_value(py, &self.json, market, as_of, model, "volga")
             }
 
             #[pyo3(signature = (market, as_of, model="default"))]

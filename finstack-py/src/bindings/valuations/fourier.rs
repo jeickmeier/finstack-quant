@@ -163,8 +163,9 @@ fn vg_cos_price(
 ///     Mean of log-jump size (negative for left-skewed crash risk).
 /// sigma_jump : float
 ///     Standard deviation of log-jump size.
-/// lambda : float
-///     Jump intensity (expected number of jumps per year).
+/// lambda_ : float
+///     Jump intensity (expected number of jumps per year). Named ``lambda_``
+///     because ``lambda`` is a Python keyword.
 /// maturity : float
 ///     Time to maturity in years.
 /// is_call : bool
@@ -177,7 +178,7 @@ fn vg_cos_price(
 /// float
 ///     Present-value option price.
 #[pyfunction]
-#[pyo3(signature = (spot, strike, rate, dividend, sigma, mu_jump, sigma_jump, lambda, maturity, is_call, n_terms=None))]
+#[pyo3(signature = (spot, strike, rate, dividend, sigma, mu_jump, sigma_jump, lambda_, maturity, is_call, n_terms=None))]
 #[allow(clippy::too_many_arguments)]
 fn merton_jump_cos_price(
     py: Python<'_>,
@@ -188,7 +189,7 @@ fn merton_jump_cos_price(
     sigma: f64,
     mu_jump: f64,
     sigma_jump: f64,
-    lambda: f64,
+    lambda_: f64,
     maturity: f64,
     is_call: bool,
     n_terms: Option<usize>,
@@ -202,7 +203,7 @@ fn merton_jump_cos_price(
             sigma,
             mu_jump,
             sigma_jump,
-            lambda,
+            lambda: lambda_,
             maturity,
             is_call,
             n_terms,

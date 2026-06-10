@@ -81,11 +81,14 @@ impl MetricCalculator for ImpliedVolCalculator {
             })?;
         let fixing_date = option.option_fixing_date(&period);
 
-        // Use instrument day count for time-to-fixing (consistent with pricing and vol surface lookup)
+        // Time-to-fixing uses ACT/365F (calendar-time vol axis convention),
+        // matching the pricer; the instrument day count governs accruals only.
         let time_to_fixing = if fixing_date > context.as_of {
-            option
-                .day_count
-                .year_fraction(context.as_of, fixing_date, dc_ctx)?
+            finstack_core::dates::DayCount::Act365F.year_fraction(
+                context.as_of,
+                fixing_date,
+                dc_ctx,
+            )?
         } else {
             0.0
         };

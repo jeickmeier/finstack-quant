@@ -33,7 +33,10 @@ fn test_sabr_beta_range() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
     let market = create_flat_market(as_of, 0.05, 0.30);
 
-    // Test different beta values (0 = normal, 1 = lognormal)
+    // Test different beta values (0 = normal, 1 = lognormal). β≈0 SABR
+    // produces a normal (Bachelier) vol, so the instrument's vol_model must
+    // be set to Normal — feeding a normal vol into the Black model is now a
+    // hard error rather than a silent unit mismatch.
     for beta in [0.0, 0.5, 1.0] {
         let params = SABRParameters {
             alpha: if beta == 0.0 { 0.01 } else { 0.20 },
@@ -43,8 +46,12 @@ fn test_sabr_beta_range() {
             shift: None,
         };
 
-        let swaption =
+        let mut swaption =
             create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05).with_sabr(params);
+        if beta == 0.0 {
+            swaption.vol_model =
+                finstack_valuations::instruments::rates::swaption::VolatilityModel::Normal;
+        }
 
         let pv = swaption.value(&market, as_of).unwrap().amount();
         assert!(

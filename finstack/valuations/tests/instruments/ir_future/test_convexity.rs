@@ -169,7 +169,8 @@ fn test_volatility_based_convexity_adjustment() {
     // Build market with volatility surface
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
-    let vol_surface = build_flat_vol_surface(0.20, "USD_SWAPTION_VOL"); // 20% vol
+    // 120bp/yr normal (Bachelier) vol — the CA formula's contract.
+    let vol_surface = build_flat_vol_surface(0.012, "USD_SWAPTION_VOL");
 
     let market = MarketContext::new()
         .insert(disc_curve)
@@ -212,7 +213,7 @@ fn test_volatility_based_convexity_adjustment() {
     let pv_zero_ca = future_zero_ca.value(&market, as_of).unwrap().amount();
 
     // Convexity adjustment should make a difference (positive adjustment reduces PV for long)
-    // For 2-year forward with 20% vol: CA ≈ 0.5 × 0.20² × 2 × 2.25 ≈ 9bp
+    // For 2-year forward with 120bp normal vol: CA ≈ 0.5 × 0.012² × 2 × 2.25 ≈ 3bp
     assert_ne!(
         pv.amount(),
         pv_zero_ca,
@@ -231,7 +232,8 @@ fn test_volatility_based_convexity_increases_with_maturity() {
     // Build market with volatility surface
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
-    let vol_surface = build_flat_vol_surface(0.15, "USD_SWAPTION_VOL"); // 15% vol
+    // 100bp/yr normal (Bachelier) vol — the CA formula's contract.
+    let vol_surface = build_flat_vol_surface(0.010, "USD_SWAPTION_VOL");
 
     let market = MarketContext::new()
         .insert(disc_curve)
@@ -320,15 +322,15 @@ fn test_volatility_based_convexity_increases_with_vol() {
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
 
-    // Low volatility market
-    let low_vol_surface = build_flat_vol_surface(0.10, "USD_SWAPTION_VOL"); // 10% vol
+    // Low volatility market: 50bp/yr normal vol
+    let low_vol_surface = build_flat_vol_surface(0.005, "USD_SWAPTION_VOL");
     let low_vol_market = MarketContext::new()
         .insert(disc_curve.clone())
         .insert(fwd_curve.clone())
         .insert_surface(low_vol_surface);
 
-    // High volatility market
-    let high_vol_surface = build_flat_vol_surface(0.30, "USD_SWAPTION_VOL"); // 30% vol
+    // High volatility market: 150bp/yr normal vol (3× the low-vol case)
+    let high_vol_surface = build_flat_vol_surface(0.015, "USD_SWAPTION_VOL");
     let high_vol_market = MarketContext::new()
         .insert(disc_curve)
         .insert(fwd_curve)
@@ -360,7 +362,7 @@ fn test_volatility_based_convexity_increases_with_vol() {
     );
 
     // The impact should scale roughly with vol² (CA ∝ σ²)
-    // With 3x vol, expect ~9x convexity impact
+    // With 3x vol (150bp vs 50bp), expect ~9x convexity impact
     // Get zero-CA baseline
     let mut future_zero =
         create_custom_future("ZERO", 1_000_000.0, start, start, end, 95.0, Position::Long);
@@ -370,7 +372,7 @@ fn test_volatility_based_convexity_increases_with_vol() {
     let low_vol_impact = pv_zero - pv_low_vol;
     let high_vol_impact = pv_zero - pv_high_vol;
 
-    // High vol impact should be roughly 9x low vol impact (30%/10%)² = 9
+    // High vol impact should be roughly 9x low vol impact (150bp/50bp)² = 9
     let ratio = high_vol_impact / low_vol_impact;
     assert!(
         ratio > 7.0 && ratio < 11.0,

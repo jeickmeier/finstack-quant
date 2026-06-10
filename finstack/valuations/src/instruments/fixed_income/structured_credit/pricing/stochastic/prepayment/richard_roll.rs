@@ -64,6 +64,11 @@ pub(crate) struct RichardRollPrepay {
     cpr_volatility: f64,
     /// Ramp months (typically 30 for PSA-like ramp)
     ramp_months: u32,
+    /// Calendar month of pool origination (1-12). Used to map seasoning to
+    /// the calendar month for the seasonality multiplier. When unset,
+    /// seasonality falls back to keying off `seasoning % 12` (origination
+    /// assumed in January).
+    origination_month: Option<u32>,
 }
 
 impl RichardRollPrepay {
@@ -90,6 +95,7 @@ impl RichardRollPrepay {
             factor_loading: 0.4,
             cpr_volatility: 0.20,
             ramp_months: 30,
+            origination_month: None,
         }
     }
 
@@ -110,6 +116,7 @@ impl RichardRollPrepay {
             factor_loading: 0.4,
             cpr_volatility: 0.20,
             ramp_months: 30,
+            origination_month: None,
         }
     }
 
@@ -136,6 +143,7 @@ impl RichardRollPrepay {
             factor_loading: factor_loading.clamp(-1.0, 1.0),
             cpr_volatility: cpr_volatility.clamp(0.0, 1.0),
             ramp_months: ramp_months.max(1),
+            origination_month: None,
         }
     }
 
@@ -162,6 +170,7 @@ impl RichardRollPrepay {
             factor_loading: factor_loading.clamp(-1.0, 1.0),
             cpr_volatility: cpr_volatility.as_decimal().clamp(0.0, 1.0),
             ramp_months: ramp_months.max(1),
+            origination_month: None,
         }
     }
 
@@ -208,7 +217,18 @@ impl RichardRollPrepay {
             factor_loading: 0.4,
             cpr_volatility: 0.20,
             ramp_months: 30,
+            origination_month: None,
         }
+    }
+
+    /// Set the calendar month of pool origination (1-12).
+    ///
+    /// Enables calendar-correct seasonality: a pool originated in `month`
+    /// reaches calendar month `((month - 1 + seasoning) % 12) + 1` at a given
+    /// seasoning. Values outside 1-12 are clamped.
+    pub(crate) fn with_origination_month(mut self, month: u32) -> Self {
+        self.origination_month = Some(month.clamp(1, 12));
+        self
     }
 
     /// Get the base CPR.
@@ -248,6 +268,17 @@ impl RichardRollPrepay {
         }
     }
 
+    /// Calendar month (1-12) reached at the given seasoning.
+    ///
+    /// Anchored to `origination_month` when set; otherwise falls back to
+    /// `seasoning % 12 + 1` (origination assumed in January).
+    fn calendar_month(&self, seasoning: u32) -> u32 {
+        match self.origination_month {
+            Some(m0) => ((m0 - 1 + seasoning) % 12) + 1,
+            None => (seasoning % 12) + 1,
+        }
+    }
+
     /// Calculate the seasonality multiplier.
     ///
     /// Mortgage prepayments are higher in spring/summer (home sales).
@@ -273,7 +304,7 @@ impl StochasticPrepayment for RichardRollPrepay {
         // Base CPR with multipliers
         let refi_mult = self.refi_multiplier(market_rate);
         let season_mult = self.seasoning_multiplier(seasoning);
-        let month_mult = self.seasonality_multiplier((seasoning % 12) + 1);
+        let month_mult = self.seasonality_multiplier(self.calendar_month(seasoning));
 
         let base_conditional_cpr = self.base_cpr * refi_mult * season_mult * month_mult * burnout;
 
@@ -286,12 +317,20 @@ impl StochasticPrepayment for RichardRollPrepay {
     }
 
     fn expected_smm(&self, seasoning: u32) -> f64 {
-        // Expected SMM at current market rate (assume pool coupon)
+        // Expected SMM assuming the market rate sits at the pool coupon
+        // (zero refi incentive). The refi multiplier is kept explicit so the
+        // expectation stays consistent with `conditional_smm` if the
+        // at-the-money convention changes.
+        let refi_mult = self.refi_multiplier(self.pool_coupon);
         let season_mult = self.seasoning_multiplier(seasoning);
-        let month_mult = self.seasonality_multiplier((seasoning % 12) + 1);
+        let month_mult = self.seasonality_multiplier(self.calendar_month(seasoning));
+        // Jensen correction: `conditional_smm` applies a lognormal factor
+        // shock `e^{βσz}`, so E[shock] = e^{β²σ²/2}, not 1.
+        let jensen = (0.5 * (self.factor_loading * self.cpr_volatility).powi(2)).exp();
 
-        let base_cpr = self.base_cpr * season_mult * month_mult;
-        cpr_to_smm(base_cpr)
+        let expected_cpr =
+            (self.base_cpr * refi_mult * season_mult * month_mult * jensen).clamp(0.0, 1.0);
+        cpr_to_smm(expected_cpr)
     }
 
     fn factor_loading(&self) -> f64 {

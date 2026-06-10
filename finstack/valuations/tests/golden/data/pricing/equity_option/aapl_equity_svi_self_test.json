@@ -3,10 +3,10 @@
   "metadata": {
     "name": "aapl_equity_svi_self_test",
     "domain": "equity.equity_option",
-    "description": "Self-test fixture for SVI equity vol surface calibration. AAPL 1Y call option, strike 175, 100-share notional. Two-step envelope: USD-OIS discount + AAPL-EQUITY-SVI-VOL SVI surface fitted from 15 OptionVol quotes (3 expiries \u00d7 5 strikes, quadratic smile). Closes the svi_surface step coverage gap (the last remaining primary step kind without a golden after \u00a720).",
+    "description": "Self-test fixture for SVI equity vol surface calibration. AAPL 1Y call option, strike 175, 100-share notional. Two-step envelope: USD-OIS discount + AAPL-EQUITY-SVI-VOL SVI surface fitted from 15 OptionVol quotes (3 expiries × 5 strikes, quadratic smile). Closes the svi_surface step coverage gap (the last remaining primary step kind without a golden after §20).",
     "valuation_date": "2026-05-08",
     "source": "formula",
-    "source_detail": "Self-test fixture closing the svi_surface step coverage gap. Two-step plan: SOFR OIS discount calibration, then SVI surface fitting from a 3 expiries \u00d7 5 strikes (quadratic-smile) OptionVol quote grid. SVI requires \u22655 strikes per the step's validation. Spot=175 (override on the step), base date 2026-05-08. Expected outputs captured from Finstack's calibrate + black76-price round-trip; bit-stable reproduction is the contract.",
+    "source_detail": "Self-test fixture closing the svi_surface step coverage gap. Two-step plan: SOFR OIS discount calibration, then SVI surface fitting from a 3 expiries × 5 strikes (quadratic-smile) OptionVol quote grid. SVI requires ≥5 strikes per the step's validation. Spot=175 (override on the step), base date 2026-05-08. Expected outputs captured from Finstack's calibrate + black76-price round-trip; bit-stable reproduction is the contract.",
     "captured_by": "claude",
     "captured_on": "2026-05-10",
     "last_reviewed_by": "claude",
@@ -24,7 +24,7 @@
       "schema": "finstack.calibration",
       "plan": {
         "id": "aapl_equity_svi_self_test_market",
-        "description": "AAPL equity SABR volatility surface calibrated from a 3\u00d73 (expiry \u00d7 strike) grid of OptionVol lognormal quotes, chained on a USD-OIS discount curve bootstrapped from deposit and IRS quotes in the same plan. Step 1 produces the USD-OIS discount curve; step 2 fits the vol surface against it. Snapshot data (AAPL spot price and quarterly dividend schedule) are supplied via initial_market.prices and initial_market.dividends \u2014 these are not bootstrappable and remain as legitimate snapshot inputs. This is the dependency-richest Phase 2 envelope: it demonstrates how Track A (discount curve) and Track B (equity spot, dividends, vol quotes) data are composed in a single envelope. The vol_surface step uses \u03b2=0.5 (the CEV backbone, widely used for equity) rather than \u03b2=1.0 (lognormal) because the engine's \u03b1-solver bound of 5.0 is incompatible with \u03b2=1 at large absolute equity strikes: for \u03b2=1 the ATM relationship is \u03b1 \u2248 \u03c3_ATM\u00d7F \u2248 0.25\u00d7175=43.75, far exceeding the solver bound. With \u03b2=0.5, ATM \u03b1 \u2248 \u03c3_ATM\u00d7\u221aF \u2248 0.25\u00d713.2=3.3, comfortably within bounds. SABR calibrates \u03b1/\u03bd/\u03c1 per expiry against a monotone put-skew smile (higher vol at low strikes, lower vol at high strikes). The quote grid is designed so that total variance is nearly linear in strike (ratio of mid-point variance to linear interpolation \u2248 0.985), ensuring the SABR-fitted surface passes the butterfly arbitrage check. fail_on_bad_fit is set to false because the vol_surface report uses config.solver.tolerance() (1e-12) as the residual threshold: even a perfectly converged SABR calibration produces vol residuals in decimal units (1e-2 scale) far above 1e-12, so the report always marks the step as failed regardless of calibration quality. This is a known mismatch between the solver-convergence tolerance and vol-residual scale. Strikes are absolute price levels (155, 175, 195) around the ATM spot of 175.0. The produced VolSurface is keyed as 'AAPL-EQUITY-VOL' and is retrievable via MarketContext::get_surface().",
+        "description": "AAPL equity SABR volatility surface calibrated from a 3×3 (expiry × strike) grid of OptionVol lognormal quotes, chained on a USD-OIS discount curve bootstrapped from deposit and IRS quotes in the same plan. Step 1 produces the USD-OIS discount curve; step 2 fits the vol surface against it. Snapshot data (AAPL spot price and quarterly dividend schedule) are supplied via initial_market.prices and initial_market.dividends — these are not bootstrappable and remain as legitimate snapshot inputs. This is the dependency-richest Phase 2 envelope: it demonstrates how Track A (discount curve) and Track B (equity spot, dividends, vol quotes) data are composed in a single envelope. The vol_surface step uses β=0.5 (the CEV backbone, widely used for equity) rather than β=1.0 (lognormal) because the engine's α-solver bound of 5.0 is incompatible with β=1 at large absolute equity strikes: for β=1 the ATM relationship is α ≈ σ_ATM×F ≈ 0.25×175=43.75, far exceeding the solver bound. With β=0.5, ATM α ≈ σ_ATM×√F ≈ 0.25×13.2=3.3, comfortably within bounds. SABR calibrates α/ν/ρ per expiry against a monotone put-skew smile (higher vol at low strikes, lower vol at high strikes). The quote grid is designed so that total variance is nearly linear in strike (ratio of mid-point variance to linear interpolation ≈ 0.985), ensuring the SABR-fitted surface passes the butterfly arbitrage check. fail_on_bad_fit is set to false because the vol_surface report uses config.solver.tolerance() (1e-12) as the residual threshold: even a perfectly converged SABR calibration produces vol residuals in decimal units (1e-2 scale) far above 1e-12, so the report always marks the step as failed regardless of calibration quality. This is a known mismatch between the solver-convergence tolerance and vol-residual scale. Strikes are absolute price levels (155, 175, 195) around the ATM spot of 175.0. The produced VolSurface is keyed as 'AAPL-EQUITY-VOL' and is retrievable via MarketContext::get_surface().",
         "quote_sets": {
           "usd_rate_quotes": [
             "USD-SOFR-DEP-1M",
@@ -578,11 +578,11 @@
     }
   },
   "expected": {
-    "npv": 2065.8558859654518,
-    "delta": 59.55546272296108,
-    "gamma": 0.8339191904563482,
-    "vega": 66.39977305506545,
-    "theta": -4.467626566605436
+    "npv": 2068.367666155231,
+    "delta": 59.599308311976,
+    "gamma": 0.833663114046,
+    "vega": 66.379383369843,
+    "theta": -4.47711538837
   },
   "tolerances": {
     "npv": {

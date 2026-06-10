@@ -47,13 +47,15 @@ fn sample_cashflows() -> Vec<(Date, Money)> {
 }
 
 #[test]
-fn test_tranche_duration_matches_weighted_pv_time() {
+fn test_tranche_duration_is_true_modified_duration() {
     let as_of = base_date();
     let curve = flat_discount_curve(0.05);
     let flows = sample_cashflows();
 
     let day_count = DayCount::Act365F;
+    let shift = 1e-4; // 1bp, matching the calculator
     let mut pv = 0.0;
+    let mut shifted_pv = 0.0;
     let mut weighted_pv = 0.0;
 
     for (date, amount) in &flows {
@@ -63,16 +65,27 @@ fn test_tranche_duration_matches_weighted_pv_time() {
         let df = curve.df_between_dates(as_of, *date).unwrap();
         let flow_pv = amount.amount() * df;
         pv += flow_pv;
+        shifted_pv += flow_pv * (-shift * t).exp();
         weighted_pv += flow_pv * t;
     }
 
-    let expected_duration = weighted_pv / pv;
+    // True modified duration: -(dP/dy)/P from a 1bp continuous-compounding
+    // bump. For continuous compounding this is the Macaulay measure only to
+    // first order; the calculator must reproduce the bump value exactly.
+    let expected_duration = -(shifted_pv - pv) / (pv * shift);
+    let macaulay = weighted_pv / pv;
     let duration =
         calculate_tranche_duration(&flows, &curve, as_of, Money::new(pv, Currency::USD)).unwrap();
 
     assert!(
-        (duration - expected_duration).abs() < 1e-4,
-        "Duration should match PV-weighted average time"
+        (duration - expected_duration).abs() < 1e-10,
+        "Duration must equal the 1bp-bump modified duration; got {duration}, expected {expected_duration}"
+    );
+    // Sanity: for a 1bp continuous bump the modified duration is close to but
+    // not identical to Macaulay (second-order convexity effect).
+    assert!(
+        (duration - macaulay).abs() < 1e-3,
+        "modified duration {duration} should be near Macaulay {macaulay}"
     );
 }
 

@@ -144,6 +144,13 @@ impl CDSTranche {
                 self.attach_pct, self.detach_pct
             )));
         }
+        if self.detach_pct <= 1.0 && self.detach_pct > 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "detach_pct={} looks like a fraction; attach/detach are quoted in percent \
+                 (e.g., 3.0 for 3%). Multiply fractional inputs by 100.",
+                self.detach_pct
+            )));
+        }
         if self.notional.amount() <= 0.0 {
             return Err(finstack_core::Error::Validation(format!(
                 "Tranche notional must be positive, got {}",
@@ -221,12 +228,16 @@ impl CDSTranche {
             )));
         }
 
-        // Warn if values look like fractions (very small non-zero detachment)
+        // Reject values that look like fractions (very small non-zero
+        // detachment). Tranche points are quoted in percent; a 0.03/0.07
+        // "3-7%" tranche passed as fractions would silently price a 100×
+        // thinner tranche.
         if tranche_params.detach_pct <= 1.0 && tranche_params.detach_pct > 0.0 {
-            tracing::warn!(
-                "detach_pct={} looks like a fraction; expected percent (e.g., 3.0 for 3%)",
+            return Err(finstack_core::Error::Validation(format!(
+                "detach_pct={} looks like a fraction; attach/detach are quoted in percent \
+                 (e.g., 3.0 for 3%). Multiply fractional inputs by 100.",
                 tranche_params.detach_pct
-            );
+            )));
         }
 
         Ok(Self {
@@ -321,7 +332,8 @@ impl CDSTranche {
         pricer.calculate_jump_to_default(self, curves, as_of)
     }
 
-    /// Calculate correlation delta (sensitivity to correlation changes)
+    /// Calculate correlation delta (Correlation01): PV change per **1%
+    /// (0.01 absolute)** base-correlation shift, matching `Recovery01` units.
     pub fn correlation_delta(
         &self,
         curves: &MarketContext,

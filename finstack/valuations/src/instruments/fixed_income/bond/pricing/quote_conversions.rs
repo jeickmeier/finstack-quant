@@ -1012,7 +1012,7 @@ pub fn price_from_oas(
     let oas_bp = oas_decimal * 10_000.0;
     let pricer =
         crate::instruments::fixed_income::bond::pricing::engine::tree::TreePricer::with_config(
-            crate::instruments::fixed_income::bond::pricing::engine::tree::bond_tree_config(bond),
+            crate::instruments::fixed_income::bond::pricing::engine::tree::bond_tree_config(bond)?,
         );
     pricer.price_at_oas(bond, curves, as_of, oas_bp)
 }

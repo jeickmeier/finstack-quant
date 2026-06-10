@@ -558,7 +558,7 @@ export interface AnalyticsNamespace {
 
 export declare const analytics: AnalyticsNamespace;
 
-// --- valuations.creditFactorHierarchy ----------------------------------------
+// --- factor_model.credit ------------------------------------------------------
 
 /**
  * Calibrated credit factor hierarchy artifact.
@@ -1201,14 +1201,14 @@ export interface SabrSmileArbitrageResult {
   arbitrageFree: boolean;
   butterflyViolations: Array<{
     strike: number;
-    butterfly_value: number;
-    severity_pct: number;
+    butterflyValue: number;
+    severityPct: number;
   }>;
   monotonicityViolations: Array<{
-    strike_low: number;
-    strike_high: number;
-    price_low: number;
-    price_high: number;
+    strikeLow: number;
+    strikeHigh: number;
+    priceLow: number;
+    priceHigh: number;
   }>;
 }
 
@@ -1278,10 +1278,10 @@ export interface ValuationCreditNamespace {
   endogenousHazardPowerLawJson(baseHazard: number, baseLeverage: number, exponent: number): string;
   creditStateJson(
     hazardRate: number,
+    distanceToDefault: number | null | undefined,
     leverage: number,
     accretedNotional: number,
     couponDue: number,
-    distanceToDefault?: number | null,
     assetValue?: number | null
   ): string;
   toggleExerciseThresholdJson(

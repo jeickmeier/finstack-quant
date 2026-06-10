@@ -32,8 +32,20 @@ pub struct FxBarrierOption {
     pub strike: f64,
     /// Barrier level (exchange rate that triggers knock-in/out, dimensionless)
     pub barrier: f64,
-    /// Optional rebate amount (paid at expiry if barrier condition met, dimensionless)
+    /// Optional rebate amount (paid if the barrier condition is met, dimensionless;
+    /// see `rebate_timing` for when a knock-out rebate pays)
     pub rebate: Option<f64>,
+    /// Timing of the knock-out rebate payment.
+    ///
+    /// `at_hit` (default, market standard) pays the rebate the moment a
+    /// knock-out barrier is breached; `at_expiry` defers payment to expiry.
+    /// Knock-in rebates always pay at expiry, so this setting does not affect
+    /// them. The analytical pricer values at-hit rebates via the discounted
+    /// first-passage closed form; the Monte Carlo path currently approximates
+    /// at-hit rebates as at-expiry.
+    #[builder(default)]
+    #[serde(default)]
+    pub rebate_timing: crate::models::closed_form::barrier::RebateTiming,
     /// Option type (call or put on foreign currency)
     pub option_type: OptionType,
     /// Barrier type (up/down, in/out)

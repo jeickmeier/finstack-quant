@@ -27,6 +27,26 @@ use finstack_monte_carlo::pricer::path_dependent::{
 };
 use finstack_monte_carlo::process::gbm::{GbmParams, GbmProcess};
 
+/// The MC payoffs pay rebates at expiry; warn when an at-hit KO rebate is
+/// requested so the timing approximation is visible in production logs.
+pub(crate) fn warn_mc_at_hit_rebate_approximation(inst: &BarrierOption) {
+    use crate::instruments::exotics::barrier_option::types::BarrierType;
+    use crate::models::closed_form::barrier::RebateTiming;
+    if inst.rebate.is_some()
+        && inst.rebate_timing == RebateTiming::AtHit
+        && matches!(
+            inst.barrier_type,
+            BarrierType::UpAndOut | BarrierType::DownAndOut
+        )
+    {
+        tracing::warn!(
+            instrument_id = %inst.id,
+            "barrier MC pricer approximates the at-hit knock-out rebate as paid at expiry; \
+             use the analytical pricer for exact at-hit rebate discounting"
+        );
+    }
+}
+
 /// Barrier option Monte Carlo pricer.
 pub struct BarrierOptionMcPricer {
     config: PathDependentPricerConfig,
@@ -122,6 +142,7 @@ impl BarrierOptionMcPricer {
         let maturity_step = num_steps;
 
         // Create payoff (using vol surface time for barrier adjustment calculations)
+        warn_mc_at_hit_rebate_approximation(inst);
         let mc_barrier_type: McBarrierType = inst.barrier_type.into();
         let payoff = BarrierOptionPayoff::new(
             inst.strike,
@@ -229,6 +250,7 @@ impl BarrierOptionMcPricer {
         let time_grid = finstack_monte_carlo::time_grid::TimeGrid::uniform(t_vol, num_steps)?;
         // See `price_internal` for the maturity_step = num_steps rationale.
         let maturity_step = num_steps;
+        warn_mc_at_hit_rebate_approximation(inst);
         let mc_barrier_type: McBarrierType = inst.barrier_type.into();
         let payoff = BarrierOptionPayoff::new(
             inst.strike,
@@ -390,7 +412,7 @@ fn price_expired_barrier(
 // ========================= ANALYTICAL PRICER =========================
 
 use crate::models::closed_form::barrier::{
-    barrier_call_continuous, barrier_put_continuous, barrier_rebate_continuous, BarrierParams,
+    barrier_call_continuous, barrier_put_continuous, barrier_rebate, BarrierParams,
     BarrierType as AnalyticalBarrierType,
 };
 /// Broadie-Glasserman-Kou / Gobet-Miri discrete barrier adjustment constant.
@@ -553,7 +575,12 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         };
 
         let rebate_val = if let Some(rebate) = barrier_opt.rebate {
-            barrier_rebate_continuous(&params, rebate.amount(), analytical_barrier_type)
+            barrier_rebate(
+                &params,
+                rebate.amount(),
+                analytical_barrier_type,
+                barrier_opt.rebate_timing,
+            )
         } else {
             0.0
         };
@@ -619,6 +646,7 @@ mod tests {
             strike,
             barrier: Money::new(barrier, Currency::USD),
             rebate: None,
+            rebate_timing: Default::default(),
             option_type: OptionType::Call,
             barrier_type: BarrierType::DownAndOut,
             expiry,
@@ -683,11 +711,19 @@ mod tests {
             rebate: Some(Money::new(rebate, Currency::USD)),
             ..base.clone()
         };
+        let with_rebate_at_expiry = BarrierOption {
+            rebate_timing: crate::models::closed_form::barrier::RebateTiming::AtExpiry,
+            ..with_rebate.clone()
+        };
 
         let base_pv = base.value(&market, as_of).expect("base pv").amount();
         let rebate_pv = with_rebate
             .value(&market, as_of)
             .expect("rebate pv")
+            .amount();
+        let rebate_pv_at_expiry = with_rebate_at_expiry
+            .value(&market, as_of)
+            .expect("rebate pv at expiry")
             .amount();
 
         let t = with_rebate
@@ -695,9 +731,23 @@ mod tests {
             .year_fraction(as_of, expiry, DayCountContext::default())
             .expect("year fraction");
         let p = BarrierParams::new(spot, barrier, barrier, t, rate, div_yield, vol);
-        let expected_rebate = barrier_rebate_continuous(&p, rebate, AnalyticalBarrierType::UpOut);
 
-        assert!(((rebate_pv - base_pv) - expected_rebate).abs() < 1e-12);
+        // Default timing is at-hit (market standard).
+        let expected_at_hit = crate::models::closed_form::barrier::barrier_rebate(
+            &p,
+            rebate,
+            AnalyticalBarrierType::UpOut,
+            crate::models::closed_form::barrier::RebateTiming::AtHit,
+        );
+        assert!(((rebate_pv - base_pv) - expected_at_hit).abs() < 1e-12);
+
+        // Explicit AtExpiry reproduces the legacy pay-at-expiry value.
+        let expected_at_expiry =
+            barrier_rebate_continuous(&p, rebate, AnalyticalBarrierType::UpOut);
+        assert!(((rebate_pv_at_expiry - base_pv) - expected_at_expiry).abs() < 1e-12);
+
+        // At-hit must dominate at-expiry under positive rates.
+        assert!(rebate_pv >= rebate_pv_at_expiry);
     }
 
     #[test]
@@ -1129,6 +1179,7 @@ mod tests {
             strike,
             barrier: Money::new(barrier, Currency::USD),
             rebate: None,
+            rebate_timing: Default::default(),
             option_type: OptionType::Call,
             barrier_type: BarrierType::UpAndOut,
             expiry,

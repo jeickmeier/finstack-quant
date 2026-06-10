@@ -54,7 +54,7 @@ impl MetricCalculator for OasCalculator {
             crate::instruments::fixed_income::bond::pricing::engine::tree::TreePricer::with_config(
                 crate::instruments::fixed_income::bond::pricing::engine::tree::bond_tree_config(
                     bond,
-                ),
+                )?,
             );
         // Tree pricer returns OAS in **basis points**; convert to decimal
         // so all bond spread-style metrics use a consistent convention

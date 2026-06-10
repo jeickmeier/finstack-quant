@@ -19,8 +19,8 @@
           },
           "expiry": "2024-12-20",
           "foreign_discount_curve_id": "JPY-OIS",
-          "fx_rate_id": "USDJPY-SPOT",
-          "fx_vol_id": "USDJPY-VOL",
+          "fx_rate_id": "JPYUSD-SPOT",
+          "fx_vol_id": "JPYUSD-VOL",
           "id": "QUANTO-NKY-USD-CALL",
           "notional": {
             "amount": "1000000",

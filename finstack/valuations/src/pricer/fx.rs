@@ -20,7 +20,9 @@ pub(crate) fn register_fx_pricers(registry: &mut PricerRegistry) {
         crate::instruments::XccySwap
     );
 
-    // FX Option
+    // FX Option — registered under the lognormal `Black76` key; the pricer
+    // itself is Garman-Kohlhagen spot-form (mathematically equivalent via
+    // the CIP forward). See `FxOption::default_model`.
     register_generic!(
         registry,
         InstrumentType::FxOption,

@@ -40,6 +40,37 @@ pub struct TreePricer {
 }
 
 impl TreePricer {
+    /// Resolve the hazard curve for credit-risky tree pricing from the bond's
+    /// explicit `credit_curve_id` opt-in.
+    ///
+    /// - `credit_curve_id = None` → `Ok(None)`: risk-free tree pricing.
+    ///   Implicit discovery by naming convention (`discount_curve_id` /
+    ///   `<discount_curve_id>-CREDIT`) is intentionally not supported — it
+    ///   silently switched bonds to credit-risky pricing.
+    /// - `credit_curve_id = Some(id)` but the curve is missing → `Err`: the
+    ///   instrument opted into credit pricing, so silently degrading to
+    ///   risk-free pricing would misprice with no signal.
+    fn resolve_opt_in_hazard_curve(
+        bond: &Bond,
+        market_context: &MarketContext,
+    ) -> Result<Option<std::sync::Arc<finstack_core::market_data::term_structures::HazardCurve>>>
+    {
+        match bond.credit_curve_id.as_ref() {
+            None => Ok(None),
+            Some(hid) => market_context
+                .get_hazard(hid.as_str())
+                .map(Some)
+                .map_err(|_| {
+                    finstack_core::Error::Validation(format!(
+                        "Bond '{}' opts into credit-risky tree pricing via credit_curve_id \
+                         '{}', but no hazard curve with that id exists in the market context.",
+                        bond.id.as_str(),
+                        hid.as_str()
+                    ))
+                }),
+        }
+    }
+
     fn effective_steps_for_model(
         &self,
         bond: &Bond,
@@ -203,18 +234,7 @@ impl TreePricer {
             return Ok(0.0);
         }
 
-        let hazard_curve = if let Some(hid) = bond.credit_curve_id.as_ref() {
-            market_context.get_hazard(hid.as_str()).ok()
-        } else {
-            market_context
-                .get_hazard(bond.discount_curve_id.as_str())
-                .ok()
-                .or_else(|| {
-                    market_context
-                        .get_hazard(format!("{}-CREDIT", bond.discount_curve_id.as_str()))
-                        .ok()
-                })
-        };
+        let hazard_curve = Self::resolve_opt_in_hazard_curve(bond, market_context)?;
 
         let valuator = BondValuator::new(
             tree_bond.clone(),
@@ -394,9 +414,9 @@ impl TreePricer {
                 clean_target + quote_ctx.accrued_at_quote_date - accrued_at_as_of
             }
         };
-        // Choose model: if a hazard curve is present in MarketContext whose ID matches the bond's
-        // discount ID (preferred) or the fallback pattern "{discount_curve_id}-CREDIT", use the rates+credit
-        // two-factor tree; otherwise, fall back to short-rate.
+        // Choose model: if the bond opts into credit via `credit_curve_id` and
+        // that hazard curve exists, use the rates+credit two-factor tree;
+        // otherwise, fall back to short-rate.
         let mut use_rates_credit = false;
         let mut rc_tree: Option<RatesCreditTree> = None;
         let tree_discount_curve_id = self
@@ -429,18 +449,7 @@ impl TreePricer {
         if time_to_maturity <= 0.0 {
             return Ok(0.0);
         }
-        let hazard_curve = if let Some(hid) = bond.credit_curve_id.as_ref() {
-            market_context.get_hazard(hid.as_str()).ok()
-        } else {
-            market_context
-                .get_hazard(bond.discount_curve_id.as_str())
-                .ok()
-                .or_else(|| {
-                    market_context
-                        .get_hazard(format!("{}-CREDIT", bond.discount_curve_id.as_str()))
-                        .ok()
-                })
-        };
+        let hazard_curve = Self::resolve_opt_in_hazard_curve(bond, market_context)?;
         if let Some(hc) = hazard_curve.as_ref() {
             let cfg = RatesCreditConfig {
                 steps: self.config.tree_steps,
@@ -543,6 +552,25 @@ impl TreePricer {
             0.0 // Not used for rates+credit or HW tree
         };
 
+        // Capture the first tree-pricing error so a solver failure can report
+        // the underlying cause instead of a generic bracket/convergence error.
+        let pricing_error: std::cell::RefCell<Option<finstack_core::Error>> =
+            std::cell::RefCell::new(None);
+        let record_error = |e: finstack_core::Error| -> f64 {
+            let mut slot = pricing_error.borrow_mut();
+            if slot.is_none() {
+                *slot = Some(e);
+            }
+            // Flat large positive residual — same pattern as the YTM/DM
+            // solvers. The model price is monotonically decreasing in OAS and
+            // tree pricing fails in the divergent (deeply negative OAS)
+            // regime where the true price → +∞, so `price - target` is
+            // unambiguously large and positive. The previous `±1e6` keyed to
+            // `sign(oas)` flipped sign at oas = 0 and could hand Brent a
+            // fabricated bracket around a non-root.
+            1.0e12
+        };
+
         let objective_fn = |oas: f64| -> f64 {
             if use_rates_credit {
                 let mut vars = HashMap::<&'static str, f64>::default();
@@ -550,10 +578,12 @@ impl TreePricer {
                 if let Some(tree) = rc_tree.as_ref() {
                     match tree.price(vars, time_to_maturity, market_context, &valuator) {
                         Ok(model_price) => model_price - dirty_target,
-                        Err(_) => 1.0e6,
+                        Err(e) => record_error(e),
                     }
                 } else {
-                    1.0e6
+                    record_error(finstack_core::Error::internal(
+                        "rates+credit OAS solve invoked without a calibrated tree",
+                    ))
                 }
             } else if let Some(ref tree) = hw_tree {
                 // Hull-White trinomial tree: OAS applied inside backward induction
@@ -566,16 +596,12 @@ impl TreePricer {
                 if let Some(tree) = sr_tree.as_ref() {
                     match tree.price(vars, time_to_maturity, market_context, &valuator) {
                         Ok(model_price) => model_price - dirty_target,
-                        Err(_) => {
-                            if oas > 0.0 {
-                                1.0e6
-                            } else {
-                                -1.0e6
-                            }
-                        }
+                        Err(e) => record_error(e),
                     }
                 } else {
-                    1.0e6
+                    record_error(finstack_core::Error::internal(
+                        "short-rate OAS solve invoked without a calibrated tree",
+                    ))
                 }
             }
         };
@@ -586,7 +612,14 @@ impl TreePricer {
         // Respect the configured maximum iteration cap for OAS root-finding.
         solver.max_iterations = self.config.max_iterations;
         let initial_guess = 0.0;
-        let continuous_oas_bp = solver.solve(objective_fn, initial_guess)?;
+        let continuous_oas_bp = solver.solve(objective_fn, initial_guess).map_err(|e| {
+            match pricing_error.borrow_mut().take() {
+                Some(tree_err) => finstack_core::Error::Validation(format!(
+                    "OAS tree solve failed: {e}; first underlying tree-pricing error: {tree_err}"
+                )),
+                None => e,
+            }
+        })?;
         Ok(self
             .config
             .oas_quote_compounding
@@ -751,7 +784,7 @@ pub fn calculate_oas(
     as_of: Date,
     clean_price: f64,
 ) -> Result<f64> {
-    let calculator = TreePricer::with_config(super::config::bond_tree_config(bond));
+    let calculator = TreePricer::with_config(super::config::bond_tree_config(bond)?);
     calculator.calculate_oas(bond, market_context, as_of, clean_price)
 }
 

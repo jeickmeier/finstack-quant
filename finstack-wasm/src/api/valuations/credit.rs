@@ -127,13 +127,17 @@ pub fn endogenous_hazard_power_law_json(
 }
 
 /// Build a credit-state JSON payload for toggle-exercise decisions.
+///
+/// Parameter order follows the canonical Rust `CreditState` field order
+/// (and the Python binding): `hazardRate`, `distanceToDefault`, `leverage`,
+/// `accretedNotional`, `couponDue`, `assetValue`.
 #[wasm_bindgen(js_name = creditStateJson)]
 pub fn credit_state_json(
     hazard_rate: f64,
+    distance_to_default: Option<f64>,
     leverage: f64,
     accreted_notional: f64,
     coupon_due: f64,
-    distance_to_default: Option<f64>,
     asset_value: Option<f64>,
 ) -> Result<String, JsValue> {
     let state = CreditState {

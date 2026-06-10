@@ -108,6 +108,11 @@ fn bs_greeks_wrapper<'py>(
     is_call: bool,
     theta_days: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
+    if !theta_days.is_finite() || theta_days <= 0.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "theta_days must be positive, got {theta_days}"
+        )));
+    }
     let greeks: BsGreeks = bs_greeks(
         spot,
         strike,
@@ -250,7 +255,7 @@ fn barrier_call_wrapper(
     direction: &str,
     knock: &str,
 ) -> PyResult<f64> {
-    Ok(match (direction, knock) {
+    let value = match (direction, knock) {
         ("up", "in") => up_in_call(spot, strike, barrier, t, r, q, sigma),
         ("up", "out") => up_out_call(spot, strike, barrier, t, r, q, sigma),
         ("down", "in") => down_in_call(spot, strike, barrier, t, r, q, sigma),
@@ -261,7 +266,9 @@ fn barrier_call_wrapper(
                  expected direction in {{'up','down'}} and knock in {{'in','out'}}"
             )))
         }
-    })
+    };
+    finstack_valuations::models::closed_form::checked_closed_form_value(value, "barrier price")
+        .map_err(crate::errors::core_to_py)
 }
 
 /// Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option call.

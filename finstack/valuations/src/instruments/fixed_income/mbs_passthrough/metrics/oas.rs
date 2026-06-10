@@ -102,18 +102,13 @@ pub(crate) fn calculate_static_zspread(
                 converged: true,
             })
         }
-        Err(_) => {
-            // Solver did not converge — return best-effort result at zero spread
-            let model_price_zero = price_with_spread(mbs, market, as_of, 0.0)?;
-            Ok(StaticSpreadResult {
-                spread: 0.0,
-                model_price: model_price_zero,
-                market_price,
-                price_error: model_price_zero - market_price,
-                iterations: solver.max_iterations as u32,
-                converged: false,
-            })
-        }
+        // Non-convergence is an error: a fabricated `spread: 0.0` result was
+        // previously consumed downstream as a real spread with no signal.
+        Err(e) => Err(finstack_core::Error::Validation(format!(
+            "MBS OAS solve did not converge for '{}' (target price {market_price_pct}% of \
+             face): {e}. Check the market price quote and discount curve.",
+            mbs.id
+        ))),
     }
 }
 

@@ -47,8 +47,8 @@ pub(crate) struct AssumedPoolAssumptions {
     pub(crate) psa_multiplier: f64,
 }
 
-pub(crate) fn assumed_pool_assumptions_or_panic() -> AssumedPoolAssumptions {
-    tba_assumptions_or_panic().assumed_pool
+pub(crate) fn assumed_pool_assumptions() -> Result<AssumedPoolAssumptions> {
+    Ok(embedded_tba_assumptions()?.assumed_pool)
 }
 
 /// Pool allocation result.
@@ -120,8 +120,12 @@ impl PoolCharacteristics {
     /// Estimate prepayment speed adjustment based on characteristics.
     ///
     /// Returns a PSA multiplier (1.0 = baseline).
-    pub fn estimated_psa_multiplier(&self) -> f64 {
-        let assumptions = tba_assumptions_or_panic();
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the embedded TBA assumptions fail to load.
+    pub fn estimated_psa_multiplier(&self) -> Result<f64> {
+        let assumptions = embedded_tba_assumptions()?;
         let pool = &assumptions.pool_characteristics;
         let mut multiplier = pool.base_psa_multiplier;
 
@@ -148,7 +152,7 @@ impl PoolCharacteristics {
             }
         }
 
-        multiplier
+        Ok(multiplier)
     }
 
     /// Check if pool meets TBA good delivery standards.
@@ -191,11 +195,6 @@ impl PoolCharacteristics {
 
         true
     }
-}
-
-#[allow(clippy::expect_used)]
-fn tba_assumptions_or_panic() -> &'static TbaAssumptions {
-    embedded_tba_assumptions().expect("embedded TBA assumptions should load")
 }
 
 fn embedded_tba_assumptions() -> Result<&'static TbaAssumptions> {
@@ -313,7 +312,7 @@ mod tests {
             geographic_concentration: None,
         };
 
-        let psa = chars.estimated_psa_multiplier();
+        let psa = chars.estimated_psa_multiplier().expect("assumptions load");
         // Should be around 1.0 for standard characteristics
         assert!(psa > 0.8 && psa < 1.2);
     }
@@ -329,7 +328,7 @@ mod tests {
             geographic_concentration: None,
         };
 
-        let psa = chars.estimated_psa_multiplier();
+        let psa = chars.estimated_psa_multiplier().expect("assumptions load");
         // Should be lower due to burnout
         assert!(psa < 1.0);
     }

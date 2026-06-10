@@ -133,23 +133,36 @@ impl CDSTranchePricer {
                     None => base_exposure,
                 }
             };
+            let recovery_is_stochastic = recovery_model
+                .as_ref()
+                .is_some_and(|model| model.is_stochastic());
 
             let default_prob = self.get_default_probability(index_data, t)?;
             let default_threshold = self.default_threshold_for_copula(default_prob);
 
             if self.params.copula_spec.is_gaussian() {
+                let conditional_p = |z: f64| {
+                    self.conditional_default_probability_enhanced(default_threshold, correlation, z)
+                };
+                // Renormalize the stochastic-recovery override so the pool's
+                // unconditional exposure matches the bootstrapped curve (see
+                // `stochastic_recovery_exposure_scale`).
+                let scale = if recovery_is_stochastic {
+                    let unconditional_pool_exposure =
+                        quad.integrate(|z| conditional_p(z) * exposure_at(z));
+                    super::expected_loss::stochastic_recovery_exposure_scale(
+                        default_prob * base_exposure,
+                        unconditional_pool_exposure,
+                    )
+                } else {
+                    1.0
+                };
                 let integrand = |z: f64| {
-                    let p = self.conditional_default_probability_enhanced(
-                        default_threshold,
-                        correlation,
-                        z,
-                    );
-
                     self.conditional_equity_tranche_capped(
                         num_constituents,
                         cap_notional,
-                        p,
-                        exposure_at(z),
+                        conditional_p(z),
+                        scale * exposure_at(z),
                     )
                 };
                 let expected_loss = if !(ADAPTIVE_INTEGRATION_LOW..=ADAPTIVE_INTEGRATION_HIGH)
@@ -163,19 +176,33 @@ impl CDSTranchePricer {
             }
 
             let copula_ref = self.copula();
-            let expected_loss = copula_ref.integrate_fn(&|factors| {
-                let p = self.conditional_default_prob_copula(
+            let conditional_p = |factors: &[f64]| {
+                self.conditional_default_prob_copula(
                     copula_ref,
                     default_threshold,
                     factors,
                     correlation,
-                );
+                )
+            };
+            let scale = if recovery_is_stochastic {
+                let unconditional_pool_exposure = copula_ref.integrate_fn(&|factors| {
+                    let z = factors.first().copied().unwrap_or(0.0);
+                    conditional_p(factors) * exposure_at(z)
+                });
+                super::expected_loss::stochastic_recovery_exposure_scale(
+                    default_prob * base_exposure,
+                    unconditional_pool_exposure,
+                )
+            } else {
+                1.0
+            };
+            let expected_loss = copula_ref.integrate_fn(&|factors| {
                 let z = factors.first().copied().unwrap_or(0.0);
                 self.conditional_equity_tranche_capped(
                     num_constituents,
                     cap_notional,
-                    p,
-                    exposure_at(z),
+                    conditional_p(factors),
+                    scale * exposure_at(z),
                 )
             });
             return Ok(expected_loss);

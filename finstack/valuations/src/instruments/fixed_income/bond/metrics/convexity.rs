@@ -12,10 +12,13 @@ use std::borrow::Cow;
 /// Convexity measures the curvature of the price/yield relationship and is
 /// computed using the closed-form second derivative of price with respect to yield:
 /// ```text
-/// Convexity = (1 / P) * d²P/dy²
+/// Convexity = (1 / P) * d²P/dy² / 100
 /// ```
 /// where `P` is the yield-implied price and `y` uses the bond's yield compounding
-/// convention (street/periodic by default).
+/// convention (street/periodic by default). The `/100` matches the
+/// Bloomberg/street quoting convention (verified against the Bloomberg YAS
+/// golden): the price impact of a yield move is
+/// `ΔP/P ≈ −ModDur·Δy + (1/2)·Convexity·100·Δy²`.
 ///
 /// # Quote-Date Convention
 ///

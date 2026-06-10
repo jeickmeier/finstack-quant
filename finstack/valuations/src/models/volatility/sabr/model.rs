@@ -11,6 +11,21 @@ use finstack_core::{Error, Result};
 /// branch when ATM-pricing the same parameter set.
 pub(crate) const BETA_SNAP_TOL: f64 = 1e-4;
 
+/// Quoting convention of the implied volatility produced by Hagan's SABR
+/// expansion.
+///
+/// The β≈0 (normal-SABR) branch of `implied_volatility` outputs a **normal
+/// (Bachelier)** vol in absolute rate units; every other β outputs a
+/// **lognormal (Black)** vol. Storing a Bachelier vol in a Black surface (or
+/// vice versa) is a silent unit error, so callers must branch on this tag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SabrVolType {
+    /// Normal (Bachelier) volatility in absolute rate units (β≈0 branch).
+    Normal,
+    /// Lognormal (Black) volatility (β > 0 branches, including β=1).
+    Black,
+}
+
 /// SABR model for volatility smile dynamics
 pub struct SABRModel {
     params: SABRParameters,
@@ -20,6 +35,38 @@ impl SABRModel {
     /// Create new SABR model
     pub fn new(params: SABRParameters) -> Self {
         Self { params }
+    }
+
+    /// Quoting convention of the vols this model's Hagan expansion produces.
+    ///
+    /// Determined by the same β-snap tolerance the pricing branches use:
+    /// β within `BETA_SNAP_TOL` of 0 routes to the normal-SABR branch and
+    /// yields [`SabrVolType::Normal`]; everything else yields
+    /// [`SabrVolType::Black`].
+    pub fn vol_type(&self) -> SabrVolType {
+        if self.params.beta < BETA_SNAP_TOL {
+            SabrVolType::Normal
+        } else {
+            SabrVolType::Black
+        }
+    }
+
+    /// Calculate implied volatility together with its quoting convention.
+    ///
+    /// Identical to [`Self::implied_volatility`] but returns the
+    /// [`SabrVolType`] tag alongside the number so callers cannot silently
+    /// store a Bachelier vol (β≈0 branch) in a Black-vol surface.
+    #[must_use = "computed volatility should be used"]
+    pub fn implied_volatility_with_type(
+        &self,
+        forward: f64,
+        strike: f64,
+        time_to_expiry: f64,
+    ) -> Result<(f64, SabrVolType)> {
+        Ok((
+            self.implied_volatility(forward, strike, time_to_expiry)?,
+            self.vol_type(),
+        ))
     }
 
     /// Calculate implied volatility using Hagan's approximation
@@ -264,7 +311,7 @@ impl SABRModel {
     ///
     /// # Implementation Notes
     ///
-    /// - Series expansion: χ(z) ≈ z + (ρ/2)z² + ((2ρ² - 1)/6)z³ + O(z⁴)
+    /// - Series expansion: χ(z) ≈ z + (ρ/2)z² + ((3ρ² - 1)/6)z³ + (ρ(5ρ² - 3)/8)z⁴ + O(z⁵)
     /// - Smooth sigmoid blend in transition region [1e-5, 1e-3]
     /// - Special handling for extreme rho values (±1)
     #[inline]
@@ -274,12 +321,12 @@ impl SABRModel {
         // Fourth-order Taylor series expansion around z = 0:
         // χ(z) = ln((√(1 - 2ρz + z²) + z - ρ)/(1 - ρ))
         //
-        // Expand: Let f(z) = √(1 - 2ρz + z²) + z - ρ
-        // f(0) = 1 - ρ
-        // f'(0) = (-ρ + 0)/1 + 1 = 1 - ρ (since d/dz √(1-2ρz+z²)|_{z=0} = -ρ)
-        // etc.
-        //
-        // After careful expansion: χ(z) ≈ z + (ρ/2)z² + ((2ρ² - 1)/6)z³ + O(z⁴)
+        // With g(z) = √(1 - 2ρz + z²) = 1 - ρz + (1-ρ²)z²/2 + ρ(1-ρ²)z³/2
+        //             + (1-ρ²)(5ρ²-1)z⁴/8 + O(z⁵),
+        // (g + z - ρ)/(1 - ρ) = 1 + z + (1+ρ)z²/2 + ρ(1+ρ)z³/2 + (1+ρ)(5ρ²-1)z⁴/8,
+        // and ln(1 + w) = w - w²/2 + w³/3 - w⁴/4 gives:
+        // χ(z) = z + (ρ/2)z² + ((3ρ² - 1)/6)z³ + (ρ(5ρ² - 3)/8)z⁴ + O(z⁵)
+        // (ρ=0 check: χ(z) = asinh(z) = z - z³/6 + O(z⁵))
         let series_chi = |z_val: f64| -> f64 {
             let z2 = z_val * z_val;
             let z3 = z2 * z_val;
@@ -287,8 +334,8 @@ impl SABRModel {
             // Coefficients from Taylor expansion
             let c1 = 1.0; // coefficient of z
             let c2 = rho / 2.0; // coefficient of z²
-            let c3 = (2.0 * rho * rho - 1.0) / 6.0; // coefficient of z³
-            let c4 = rho * (5.0 * rho * rho - 3.0) / 24.0; // coefficient of z⁴
+            let c3 = (3.0 * rho * rho - 1.0) / 6.0; // coefficient of z³
+            let c4 = rho * (5.0 * rho * rho - 3.0) / 8.0; // coefficient of z⁴
             c1 * z_val + c2 * z2 + c3 * z3 + c4 * z4
         };
 
@@ -307,8 +354,17 @@ impl SABRModel {
 
             // Handle extreme rho cases
             if (1.0 - rho).abs() < 1e-10 {
-                // rho ≈ 1: Use approximation χ(z) ≈ z / (1 + z/2)
-                return Ok(z_val / (1.0 + z_val / 2.0));
+                // ρ → 1 limit of χ(z) = ln((√(1−2ρz+z²)+z−ρ)/(1−ρ)).
+                // With ρ=1 the discriminant is (1−z)², so for z<1 the exact
+                // limit is χ(z) = −ln(1−z); the formula diverges at z ≥ 1
+                // (the SABR density degenerates there).
+                if z_val >= 1.0 {
+                    return Err(Error::Validation(format!(
+                        "SABR chi function: rho≈1 with z={z_val:.6} ≥ 1 — \
+                         Hagan expansion is undefined in this limit"
+                    )));
+                }
+                return Ok(-(1.0 - z_val).ln());
             }
             if (1.0 + rho).abs() < 1e-10 {
                 // rho ≈ -1: Use stable form
@@ -363,7 +419,7 @@ impl SABRModel {
     ///
     /// - For small `|z|` (`< 1e-5`, matching the series region of
     ///   `calculate_chi_robust`) the Taylor ratio is used:
-    ///   `z/χ(z) = 1 − (ρ/2)z + ((2−ρ²)/12)z² − (ρ/24)z³ + O(z⁴)`.
+    ///   `z/χ(z) = 1 − (ρ/2)z + ((2−3ρ²)/12)z² + (ρ(5−6ρ²)/24)z³ + O(z⁴)`.
     ///   This is the correct `z → 0` limit and also avoids the `0/0`
     ///   catastrophic cancellation of dividing two near-zero numbers.
     /// - Otherwise the exact division `z/χ(z)` is returned.
@@ -380,8 +436,10 @@ impl SABRModel {
             let z2 = z * z;
             let z3 = z2 * z;
             // z/χ(z) Taylor coefficients (derived from χ(z) = z + (ρ/2)z²
-            // + ((2ρ²−1)/6)z³ + (ρ(5ρ²−3)/24)z⁴ via 1/(1+u) inversion).
-            return Ok(1.0 - 0.5 * rho * z + (2.0 - rho * rho) / 12.0 * z2 - rho / 24.0 * z3);
+            // + ((3ρ²−1)/6)z³ + (ρ(5ρ²−3)/8)z⁴ via 1/(1+u) inversion).
+            return Ok(1.0 - 0.5 * rho * z
+                + (2.0 - 3.0 * rho * rho) / 12.0 * z2
+                + rho * (5.0 - 6.0 * rho * rho) / 24.0 * z3);
         }
 
         if chi.abs() < 1e-14 {

@@ -86,6 +86,7 @@ fn create_barrier_option() -> BarrierOption {
         strike: 100.0,
         barrier: Money::new(80.0, Currency::USD),
         rebate: None,
+        rebate_timing: Default::default(),
         option_type: OptionType::Call,
         barrier_type: BarrierType::DownAndOut,
         expiry: as_of + time::Duration::days(365),

@@ -43,6 +43,52 @@ pub(crate) fn vega_weight(
     vega.max(MIN_VEGA)
 }
 
+/// Initial alpha guess for the LM calibration.
+///
+/// From Hagan's ATM expansion `σ_ATM ≈ α / F^(1−β)`, so `α₀ = σ_ATM·F^(1−β)`
+/// for lognormal-convention quotes. For `β ≈ 0` (within [`BETA_SNAP_TOL`])
+/// the quotes and the model output are *normal* vols where `σ_N,ATM ≈ α`
+/// directly — scaling by `F` would start the solver orders of magnitude off
+/// for rate-like forwards.
+#[inline]
+fn initial_alpha_guess(atm_vol: f64, forward: f64, beta: f64) -> f64 {
+    if beta.abs() < BETA_SNAP_TOL {
+        atm_vol
+    } else {
+        atm_vol * forward.powf(1.0 - beta)
+    }
+}
+
+/// Standardized shift ladder for shifted-SABR auto-shift selection.
+///
+/// Market practice quotes shifted-Black smiles against a small set of
+/// standardized shifts (e.g. 1% for EUR/CHF swaptions, 2%/3% for deeply
+/// negative short rates) rather than an ad-hoc data-dependent value, so the
+/// same surface re-calibrated on a slightly different day does not silently
+/// change convention. `calibrate_auto_shift` rounds the required minimum
+/// shift (`−min_rate + 10bp` headroom) *up* to the next rung. Callers that
+/// need an exact per-currency convention should pass an explicit shift to
+/// [`SABRCalibrator::calibrate_shifted`].
+const STANDARD_SHIFTS: [f64; 5] = [0.005, 0.01, 0.02, 0.03, 0.04];
+
+/// Round the minimum required shift up to the standardized ladder.
+///
+/// Errors if rates are so negative that even the largest standardized shift
+/// (4%) cannot make all shifted rates positive.
+fn standard_shift(min_rate: f64) -> Result<f64> {
+    let required = (-min_rate + 0.001).max(0.001); // at least 10bp headroom
+    STANDARD_SHIFTS
+        .iter()
+        .copied()
+        .find(|&s| s >= required)
+        .ok_or_else(|| {
+            Error::Validation(format!(
+                "SABR auto-shift: minimum rate {min_rate:.6} requires a shift larger than the \
+                 maximum standardized shift of 4%; pass an explicit shift via calibrate_shifted"
+            ))
+        })
+}
+
 /// SABR calibration using market prices.
 ///
 /// # Tolerance Considerations
@@ -148,8 +194,8 @@ impl SABRCalibrator {
         let min_rate = forward.min(*min_strike);
 
         if min_rate < 0.0 {
-            // Use shifted SABR
-            let shift = (-min_rate + 0.001).max(0.001); // At least 10bps shift
+            // Use shifted SABR with a standardized shift
+            let shift = standard_shift(min_rate)?;
             self.calibrate_shifted(forward, strikes, market_vols, time_to_expiry, beta, shift)
         } else {
             // Use standard SABR
@@ -174,8 +220,8 @@ impl SABRCalibrator {
         let min_rate = forward.min(*min_strike);
 
         if min_rate < 0.0 {
-            // Use shifted SABR with derivatives
-            let shift = (-min_rate + 0.001).max(0.001); // At least 10bps shift
+            // Use shifted SABR (standardized shift) with derivatives
+            let shift = standard_shift(min_rate)?;
             self.calibrate_shifted_with_derivatives(
                 forward,
                 strikes,
@@ -245,7 +291,15 @@ impl SABRCalibrator {
         )
     }
 
-    /// Calibrate SABR parameters to market implied volatilities using multi-dimensional solver
+    /// Calibrate SABR parameters to market implied volatilities using multi-dimensional solver.
+    ///
+    /// # Vol quoting convention
+    ///
+    /// The objective compares Hagan-expansion vols to `market_vols` directly,
+    /// and the expansion's output convention is β-dependent (see
+    /// `SabrVolType`): pass **normal (Bachelier)** quotes when calibrating
+    /// with β≈0 and **lognormal (Black)** quotes for β>0. Mixing conventions
+    /// silently mis-calibrates.
     pub fn calibrate(
         &self,
         forward: f64,
@@ -301,9 +355,9 @@ impl SABRCalibrator {
         // Initial guess for parameters
         let atm_vol = self.find_atm_vol(forward, strikes, market_vols)?;
         let initial = vec![
-            atm_vol * forward.powf(1.0 - beta), // alpha: ATM vol adjusted for beta
-            0.3,                                // nu: typical vol-of-vol
-            0.0,                                // rho: start neutral
+            initial_alpha_guess(atm_vol, forward, beta), // alpha
+            0.3,                                         // nu: typical vol-of-vol
+            0.0,                                         // rho: start neutral
         ];
 
         // Parameter bounds for SABR model
@@ -392,9 +446,9 @@ impl SABRCalibrator {
         // Initial guess for parameters
         let atm_vol = self.find_atm_vol(forward, strikes, market_vols)?;
         let initial = vec![
-            atm_vol * forward.powf(1.0 - beta), // alpha
-            0.3,                                // nu
-            0.0,                                // rho
+            initial_alpha_guess(atm_vol, forward, beta), // alpha
+            0.3,                                         // nu
+            0.0,                                         // rho
         ];
 
         // Parameter bounds
@@ -682,14 +736,18 @@ pub(super) fn solve_alpha_for_atm(
     let f_pow = forward.powf(1.0 - beta);
     let mut alpha = target_atm_vol * f_pow;
 
+    const MAX_ITER: usize = 50;
+
     // Newton iteration to refine alpha
-    for _ in 0..50 {
+    let mut last_error = f64::INFINITY;
+    for _ in 0..MAX_ITER {
         // Compute model ATM vol with current alpha
         let params = SABRParameters::new(alpha, beta, nu, rho)?;
         let model = SABRModel::new(params);
         let model_vol = model.atm_volatility(forward, time_to_expiry)?;
 
         let error = model_vol - target_atm_vol;
+        last_error = error;
         if error.abs() < tolerance {
             return Ok(alpha);
         }
@@ -715,8 +773,18 @@ pub(super) fn solve_alpha_for_atm(
         }
     }
 
-    // Return best alpha found even if not converged
-    Ok(alpha)
+    // Non-convergence is an error: silently returning the last iterate breaks
+    // the ATM-pinning contract (the pinning objective excludes the ATM strike,
+    // so nothing downstream would catch a mismatched ATM vol).
+    Err(Error::Calibration {
+        message: format!(
+            "solve_alpha_for_atm did not converge within {MAX_ITER} Newton iterations: \
+             last alpha {alpha:.6e} leaves ATM vol error {last_error:.3e} \
+             (tolerance {tolerance:.1e}) at forward {forward}, T {time_to_expiry}, \
+             beta {beta}, nu {nu}, rho {rho}."
+        ),
+        category: "sabr_atm_alpha".to_string(),
+    })
 }
 
 impl Default for SABRCalibrator {

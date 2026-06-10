@@ -4,7 +4,10 @@
 //! a cost-of-carry forward model with dividend yield.
 
 use super::types::EquityTotalReturnSwap;
-use crate::instruments::common_impl::pricing::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
+use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
+use crate::instruments::common_impl::pricing::{
+    PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
+};
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::scalars::MarketScalar;
@@ -98,17 +101,19 @@ impl EquityReturnModel<'_> {
 }
 
 impl TrsReturnModel for EquityReturnModel<'_> {
-    fn period_return(
-        &self,
-        period_start: Date,
-        period_end: Date,
-        t_start: f64,
-        t_end: f64,
-        initial_level: f64,
-        context: &MarketContext,
-    ) -> Result<f64> {
+    fn period_return(&self, inputs: &PeriodReturnInputs, context: &MarketContext) -> Result<f64> {
+        let PeriodReturnInputs {
+            as_of,
+            period_start,
+            period_end,
+            t_start,
+            t_end,
+            initial_level,
+        } = *inputs;
         let disc = context.get_discount(self.trs.financing.discount_curve_id.as_str())?;
-        let df_end = disc.df(t_end);
+        // Date-based DF from as_of to the period end: correct even when the
+        // curve base date differs from as_of (axis-based `disc.df(t)` is not).
+        let df_end = relative_df_discount_curve(disc.as_ref(), as_of, period_end)?;
 
         let uses_discrete_dividends = !self.trs.discrete_dividends.is_empty();
         let carry_div_yield = if uses_discrete_dividends {
@@ -124,14 +129,12 @@ impl TrsReturnModel for EquityReturnModel<'_> {
             // start and project the live spot forward to the period end. The
             // realized move (spot vs. start fixing) stays in the return.
             let start_level = self.period_start_level(period_start)?;
-            let df_now = disc.df(0.0);
-            let fwd_spot_end =
-                self.spot * (df_end / df_now).recip() * (-carry_div_yield * t_end).exp();
+            let fwd_spot_end = self.spot * df_end.recip() * (-carry_div_yield * t_end).exp();
             (start_level, fwd_spot_end)
         } else {
             // Future period: deterministic carry — the level cancels in the
             // ratio, so anchoring to `initial_level` is exact.
-            let df_start = disc.df(t_start);
+            let df_start = relative_df_discount_curve(disc.as_ref(), as_of, period_start)?;
             let fwd_start = initial_level * df_start.recip() * (-carry_div_yield * t_start).exp();
             let fwd_end = initial_level * df_end.recip() * (-carry_div_yield * t_end).exp();
             (fwd_start, fwd_end)
@@ -269,7 +272,17 @@ mod tests {
         };
 
         let period_return = model
-            .period_return(period_start, period_end, 0.0, 1.0, 100.0, &context)
+            .period_return(
+                &super::PeriodReturnInputs {
+                    as_of: period_start,
+                    period_start,
+                    period_end,
+                    t_start: 0.0,
+                    t_end: 1.0,
+                    initial_level: 100.0,
+                },
+                &context,
+            )
             .expect("period return");
 
         let expected = neumaier_sum([1e16, 1.0, 1.0]) / 100.0;

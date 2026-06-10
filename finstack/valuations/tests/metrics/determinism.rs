@@ -279,6 +279,7 @@ mod tests {
             pricing_overrides: Default::default(),
             attributes: Default::default(),
             rebate: None,
+            rebate_timing: Default::default(),
             monitoring_frequency: None,
         };
 

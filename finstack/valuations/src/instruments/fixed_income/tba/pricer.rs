@@ -8,7 +8,7 @@ use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::instruments::fixed_income::mbs_passthrough::{
     pricer::price_mbs, AgencyMbsPassthrough, AgencyProgram, PoolType,
 };
-use crate::instruments::fixed_income::tba::allocation::assumed_pool_assumptions_or_panic;
+use crate::instruments::fixed_income::tba::allocation::assumed_pool_assumptions;
 use finstack_core::dates::{Date, DateExt, DayCount};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
@@ -22,7 +22,7 @@ use finstack_core::Result;
 pub(crate) fn create_assumed_pool(tba: &AgencyTba, _as_of: Date) -> Result<AgencyMbsPassthrough> {
     let settlement_date = tba.get_settlement_date()?;
     let term_months = tba.term.months();
-    let defaults = assumed_pool_assumptions_or_panic();
+    let defaults = assumed_pool_assumptions()?;
 
     // Use provided pool factor or default to 1.0 (newly issued)
     let factor = tba.pool_factor.unwrap_or(defaults.default_pool_factor);

@@ -195,24 +195,6 @@ impl CDSTranchePricer {
         builder.build()
     }
 
-    fn bump_index_hazard(
-        &self,
-        original_index: &CreditIndexData,
-        delta_lambda: f64,
-    ) -> Result<CreditIndexData> {
-        // Create bumped hazard curve
-        let bumped_hazard_curve = original_index
-            .index_credit_curve
-            .with_parallel_bump(delta_lambda)?;
-
-        self.rebuild_credit_index(
-            original_index,
-            original_index.recovery_rate,
-            std::sync::Arc::new(bumped_hazard_curve),
-            std::sync::Arc::clone(&original_index.base_correlation_curve),
-        )
-    }
-
     /// Calculate prior realized loss on the tranche as a fraction of original tranche notional.
     pub(super) fn calculate_prior_tranche_loss(&self, tranche: &CDSTranche) -> f64 {
         let l = tranche.accumulated_loss;
@@ -291,19 +273,33 @@ impl CDSTranchePricer {
         let start_date = tranche.contractual_effective_date(as_of).unwrap_or(as_of);
 
         let dates = if self.params.use_isda_coupon_dates || tranche.standard_imm_dates {
+            // Business-day-adjust IMM roll dates with the tranche's calendar
+            // and convention (Modified Following per ISDA standard), matching
+            // the single-name CDS schedule path. Unadjusted 20ths landing on
+            // weekends/holidays would misstate accrual periods and payment
+            // timing.
+            let calendar = tranche
+                .calendar_id
+                .as_deref()
+                .and_then(finstack_core::dates::calendar::calendar_by_id);
+            let adjust_date = |d: Date| -> Result<Date> {
+                if let Some(cal) = calendar {
+                    finstack_core::dates::adjust(d, tranche.bdc, cal)
+                } else {
+                    Ok(d)
+                }
+            };
             let mut out = vec![start_date];
             let mut current = start_date;
             while current < tranche.maturity {
                 current = next_cds_date(current);
                 // Ensure we don't go past maturity (next_cds_date can go past if close)
                 if current > tranche.maturity {
-                    out.push(tranche.maturity);
+                    out.push(adjust_date(tranche.maturity)?);
                     break;
                 }
-                out.push(current);
+                out.push(adjust_date(current)?);
             }
-            // If precise maturity match is needed, we might need to adjust the last date
-            // But standard CDS rolls on 20th.
             out
         } else {
             build_dates(
@@ -500,7 +496,20 @@ impl CDSTranchePricer {
         self.calculate_expected_tranche_loss(tranche, index_data_arc.as_ref(), tranche.maturity)
     }
 
-    /// Calculate CS01 (sensitivity to 1bp parallel shift in credit spreads) using central difference.
+    /// Calculate CS01 (sensitivity to a 1bp parallel shift in credit *par
+    /// spreads*) using a central difference.
+    ///
+    /// The index hazard curve is re-bootstrapped from its stored par-spread
+    /// points after a ±`cs01_bump_size` bp parallel spread shock — the same
+    /// market convention as the registered tranche CS01 metric calculator.
+    /// Bumping the hazard intensity λ directly instead would overstate the
+    /// spread sensitivity by ≈ `1/(1−R)` (≈1.67x at R=40%).
+    ///
+    /// # Errors
+    ///
+    /// Returns a calibration error when the hazard curve carries no par-spread
+    /// points (a λ-bump fallback would silently change units); use the
+    /// `cs01_hazard` metric for direct hazard-rate bumps in that case.
     #[must_use = "CS01 result should be used for hedging"]
     pub fn calculate_cs01(
         &self,
@@ -515,28 +524,61 @@ impl CDSTranchePricer {
         }
 
         let original_index_arc = market_ctx.get_credit_index(&tranche.credit_index_id)?;
-        let delta_lambda = self.params.cs01_bump_size * 1e-4;
+        let hazard = &original_index_arc.index_credit_curve;
+        if hazard.par_spread_points().next().is_none() {
+            return Err(finstack_core::Error::Calibration {
+                message: format!(
+                    "CDS tranche '{}' CS01 requires par-spread points on hazard curve '{}' \
+                     for spread-bump recalibration; a direct hazard-rate bump would \
+                     mislabel units (≈1/(1−R) overstatement). Bootstrap the curve from \
+                     par spreads or use the cs01_hazard metric.",
+                    tranche.id,
+                    hazard.id().as_str()
+                ),
+                category: "cs01_rebootstrap".to_string(),
+            });
+        }
+
+        let bump_bp = self.params.cs01_bump_size;
+        let bump_index_spreads = |sign: f64| -> Result<_> {
+            let bumped_hazard = crate::calibration::bumps::hazard::bump_hazard_spreads(
+                hazard.as_ref(),
+                market_ctx,
+                &crate::calibration::bumps::BumpRequest::Parallel(sign * bump_bp),
+                Some(&tranche.discount_curve_id),
+            )?;
+            self.rebuild_credit_index(
+                original_index_arc.as_ref(),
+                original_index_arc.recovery_rate,
+                std::sync::Arc::new(bumped_hazard),
+                std::sync::Arc::clone(&original_index_arc.base_correlation_curve),
+            )
+        };
 
         // Central difference: (PV_up - PV_down) / 2 for O(h²) accuracy
-        let bumped_index_up = self.bump_index_hazard(original_index_arc.as_ref(), delta_lambda)?;
-        let bumped_index_down =
-            self.bump_index_hazard(original_index_arc.as_ref(), -delta_lambda)?;
-
         let ctx_up = market_ctx
             .clone()
-            .insert_credit_index(&tranche.credit_index_id, bumped_index_up);
+            .insert_credit_index(&tranche.credit_index_id, bump_index_spreads(1.0)?);
         let ctx_down = market_ctx
             .clone()
-            .insert_credit_index(&tranche.credit_index_id, bumped_index_down);
+            .insert_credit_index(&tranche.credit_index_id, bump_index_spreads(-1.0)?);
 
         let pv_up = self.price_tranche(tranche, &ctx_up, as_of)?.amount();
         let pv_down = self.price_tranche(tranche, &ctx_down, as_of)?.amount();
 
         // Return sensitivity normalized to a 1bp configured bump.
-        Ok((pv_up - pv_down) / (2.0 * self.params.cs01_bump_size))
+        Ok((pv_up - pv_down) / (2.0 * bump_bp))
     }
 
-    /// Calculate correlation delta (sensitivity to correlation changes) using central difference.
+    /// Calculate correlation delta (Correlation01) using a central difference.
+    ///
+    /// # Units
+    ///
+    /// Returns the PV change for a **+1% (0.01 absolute)** parallel shift of
+    /// the base-correlation curve, matching the per-1% convention of
+    /// `Recovery01`. (Internally the curve is bumped by
+    /// `params.corr_bump_abs` and the central difference is rescaled to the
+    /// 1% reporting unit.)
     #[must_use = "Correlation01 result should be used for hedging"]
     pub fn calculate_correlation_delta(
         &self,
@@ -577,8 +619,9 @@ impl CDSTranchePricer {
         let pv_up = self.price_tranche(tranche, &ctx_up, as_of)?.amount();
         let pv_down = self.price_tranche(tranche, &ctx_down, as_of)?.amount();
 
-        // Return sensitivity per unit correlation change (central difference)
-        Ok((pv_up - pv_down) / (2.0 * bump_abs))
+        // Central difference per unit ρ, rescaled to the per-1% (0.01 absolute
+        // correlation) reporting convention shared with Recovery01.
+        Ok((pv_up - pv_down) / (2.0 * bump_abs) * 0.01)
     }
 
     /// Calculate jump-to-default (immediate loss from specific entity default).

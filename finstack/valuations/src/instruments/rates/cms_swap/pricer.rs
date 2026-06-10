@@ -27,7 +27,7 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
-use finstack_core::dates::{Date, DateExt, DayCountContext};
+use finstack_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::Result;
@@ -148,9 +148,9 @@ impl CmsSwapPricer {
                 )));
             }
 
+            // Calendar time for the vol axis: ACT/365F, not the accrual day count.
             let time_to_fixing =
-                inst.cms_day_count
-                    .year_fraction(as_of, fixing_date, DayCountContext::default())?;
+                DayCount::Act365F.year_fraction(as_of, fixing_date, DayCountContext::default())?;
 
             let adj = if time_to_fixing > 0.0 {
                 // ASSUMPTION: `vol_surface` must be the swaption volatility
@@ -353,7 +353,11 @@ pub(super) fn apply_cms_cap_floor(
 /// the smile vol is taken at `strike`.
 ///
 /// Returns the intrinsic value when the option has expired or is degenerate
-/// (`time_to_fixing ≤ 0`, non-positive forward/strike, or non-positive vol).
+/// (`time_to_fixing ≤ 0` or non-positive vol). When the forward or strike is
+/// non-positive (negative-rate regimes), prices under the Bachelier (normal)
+/// model with the surface's lognormal vol converted to a normal vol — the
+/// same fallback the swaption and cap/floor pricers use — instead of
+/// collapsing to intrinsic and dropping all time value.
 pub(super) fn cms_embedded_option_value(
     adjusted_forward: f64,
     strike: f64,
@@ -361,22 +365,37 @@ pub(super) fn cms_embedded_option_value(
     time_to_fixing: f64,
     option_type: crate::instruments::OptionType,
 ) -> f64 {
+    use crate::instruments::rates::swaption::types::lognormal_to_normal_vol;
     use crate::instruments::OptionType;
     use crate::models::d1_d2_black76;
+    use crate::models::volatility::normal::bachelier_price;
 
     let intrinsic = match option_type {
         OptionType::Call => (adjusted_forward - strike).max(0.0),
         OptionType::Put => (strike - adjusted_forward).max(0.0),
     };
 
-    // Black-76 needs a positive forward, strike, time, and vol; otherwise the
-    // option value is its intrinsic.
-    if time_to_fixing <= 0.0 || adjusted_forward <= 0.0 || strike <= 0.0 {
+    if time_to_fixing <= 0.0 {
         return intrinsic;
     }
     let vol = vol_surface.value_clamped(time_to_fixing, strike);
     if vol <= 0.0 {
         return intrinsic;
+    }
+
+    // Black-76 is undefined for non-positive forward/strike: fall back to
+    // Bachelier, which prices negative rates natively.
+    if adjusted_forward <= 0.0 || strike <= 0.0 {
+        let normal_vol =
+            lognormal_to_normal_vol(vol, adjusted_forward, strike, time_to_fixing, None);
+        return bachelier_price(
+            option_type,
+            adjusted_forward,
+            strike,
+            normal_vol,
+            time_to_fixing,
+            1.0,
+        );
     }
 
     let (d1, d2) = d1_d2_black76(adjusted_forward, strike, vol, time_to_fixing);
@@ -405,7 +424,6 @@ mod tests {
     use super::*;
     use crate::instruments::common_impl::parameters::IRSConvention;
     use finstack_core::currency::Currency;
-    use finstack_core::dates::DayCount;
     use finstack_core::types::{CurveId, InstrumentId};
     use test_utils::{date, flat_discount_with_tenor, flat_forward_with_tenor};
 
@@ -473,6 +491,52 @@ mod tests {
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
             .insert(flat_forward_with_tenor("USD-LIBOR-3M", as_of, 0.03, 1.0))
             .insert_surface(builder.build().expect("vol surface"))
+    }
+
+    /// Negative-rate regimes: the embedded caplet/floorlet must fall back to
+    /// the Bachelier model and retain time value instead of collapsing to
+    /// intrinsic when the (adjusted) forward or strike is non-positive.
+    #[test]
+    fn embedded_option_bachelier_fallback_keeps_time_value_for_negative_rates() {
+        use finstack_core::market_data::surfaces::VolSurface;
+
+        let strikes = vec![0.005, 0.02, 0.04, 0.10];
+        let expiries = vec![0.25, 1.0, 5.0];
+        let mut builder = VolSurface::builder(CurveId::new("V"))
+            .expiries(&expiries)
+            .strikes(&strikes);
+        for _ in 0..expiries.len() {
+            builder = builder.row(&vec![0.4; strikes.len()]);
+        }
+        let surface = builder.build().expect("vol surface");
+
+        // ATM with a negative forward: intrinsic is 0, so any positive value
+        // is genuine Bachelier time value.
+        let v = cms_embedded_option_value(
+            -0.005,
+            -0.005,
+            &surface,
+            1.0,
+            crate::instruments::OptionType::Call,
+        );
+        assert!(
+            v > 0.0 && v.is_finite(),
+            "negative-rate embedded caplet must keep Bachelier time value, got {v}"
+        );
+
+        // Deep ITM put on a negative forward: value must be at least intrinsic.
+        let intrinsic = 0.02 - (-0.005_f64);
+        let p = cms_embedded_option_value(
+            -0.005,
+            0.02,
+            &surface,
+            1.0,
+            crate::instruments::OptionType::Put,
+        );
+        assert!(
+            p >= intrinsic,
+            "ITM floorlet under Bachelier must dominate intrinsic: {p} < {intrinsic}"
+        );
     }
 
     /// Build a 1-period CMS swap fixing 1Y out (so the embedded option has

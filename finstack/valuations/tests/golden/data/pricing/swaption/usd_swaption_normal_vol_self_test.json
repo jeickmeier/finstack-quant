@@ -3,10 +3,10 @@
   "metadata": {
     "name": "usd_swaption_normal_vol_self_test",
     "domain": "rates.swaption",
-    "description": "Self-test fixture for SABR swaption-vol cube calibration. 1Y-into-5Y USD receiver swaption (10MM USD notional, ATM strike), priced against a SABR-fitted normal-vol cube calibrated from 27 swaption-vol quotes across a 3 expiries \u00d7 3 tenors grid (\u03b2=0.0, normal SABR). Three-step envelope: USD-OIS discount + USD-SOFR-3M forward + USD-SWAPTION-NORMAL-VOL cube. Closes the swaption_vol step coverage gap (plan \u00a719 next-gap follow-up).",
+    "description": "Self-test fixture for SABR swaption-vol cube calibration. 1Y-into-5Y USD receiver swaption (10MM USD notional, ATM strike), priced against a SABR-fitted normal-vol cube calibrated from 27 swaption-vol quotes across a 3 expiries × 3 tenors grid (β=0.0, normal SABR). Three-step envelope: USD-OIS discount + USD-SOFR-3M forward + USD-SWAPTION-NORMAL-VOL cube. Closes the swaption_vol step coverage gap (plan §19 next-gap follow-up).",
     "valuation_date": "2026-05-08",
     "source": "formula",
-    "source_detail": "Self-test fixture closing the swaption_vol step coverage gap. Reuses the Phase-2 reference envelope catalog entry 07_swaption_vol_surface.json as the calibration plan. Three steps: (1) USD-OIS bootstrapped from 6 SOFR OIS quotes, (2) USD-SOFR-3M forward bootstrapped against the calibrated discount, (3) USD-SWAPTION-NORMAL-VOL SABR-fitted from 27 swaption-vol quotes (3 expiries \u00d7 3 tenors \u00d7 3 strikes; bilinear interpolation; normal-vol convention; \u03b2=0.0). The surface is produced as a vol_cube (not a vol_surface) \u2014 its presence in the calibrated market is the principal verification of the swaption_vol step. Expected outputs captured from Finstack's calibrate + black76 swaption-price round-trip; bit-stable reproduction is the contract.",
+    "source_detail": "Self-test fixture closing the swaption_vol step coverage gap. Reuses the Phase-2 reference envelope catalog entry 07_swaption_vol_surface.json as the calibration plan. Three steps: (1) USD-OIS bootstrapped from 6 SOFR OIS quotes, (2) USD-SOFR-3M forward bootstrapped against the calibrated discount, (3) USD-SWAPTION-NORMAL-VOL SABR-fitted from 27 swaption-vol quotes (3 expiries × 3 tenors × 3 strikes; bilinear interpolation; normal-vol convention; β=0.0). The surface is produced as a vol_cube (not a vol_surface) — its presence in the calibrated market is the principal verification of the swaption_vol step. Expected outputs captured from Finstack's calibrate + black76 swaption-price round-trip; bit-stable reproduction is the contract.",
     "captured_by": "claude",
     "captured_on": "2026-05-10",
     "last_reviewed_by": "claude",
@@ -24,7 +24,7 @@
       "schema": "finstack.calibration",
       "plan": {
         "id": "usd_swaption_normal_vol",
-        "description": "USD swaption normal-vol surface calibrated against a 3\u00d73 (expiry \u00d7 tenor) grid of SwaptionVol quotes, chained on a USD-OIS discount curve and USD-SOFR-3M forward curve that are bootstrapped in the same plan. Step 1 produces the USD-OIS discount curve from deposit and IRS quotes; step 2 bootstraps the USD-SOFR-3M forward curve from FRA quotes; step 3 fits per-bucket SABR (\u03b2=0) parameters to normal vols quoted in basis points. The envelope is fully self-bootstrapping from quotes \u2014 no hand-entered curves in initial_market. The produced VolCube is keyed as 'USD-SWAPTION-NORMAL-VOL' and is retrievable via MarketContext::get_vol_provider(). Note: swaption_vol calibration produces a VolCube (not a VolSurface), so the accessor is get_vol_provider rather than get_surface. The grid uses 3 expiries (1y, 2y, 5y from base 2026-05-08) \u00d7 3 swap tenors (2y, 5y, 10y) \u00d7 3 strikes (ATM-50bp, ATM, ATM+50bp) for a total of 27 quotes. Normal vols range from 55\u201380 bp, representative of a 5% rate environment.",
+        "description": "USD swaption normal-vol surface calibrated against a 3×3 (expiry × tenor) grid of SwaptionVol quotes, chained on a USD-OIS discount curve and USD-SOFR-3M forward curve that are bootstrapped in the same plan. Step 1 produces the USD-OIS discount curve from deposit and IRS quotes; step 2 bootstraps the USD-SOFR-3M forward curve from FRA quotes; step 3 fits per-bucket SABR (β=0) parameters to normal vols quoted in basis points. The envelope is fully self-bootstrapping from quotes — no hand-entered curves in initial_market. The produced VolCube is keyed as 'USD-SWAPTION-NORMAL-VOL' and is retrievable via MarketContext::get_vol_provider(). Note: swaption_vol calibration produces a VolCube (not a VolSurface), so the accessor is get_vol_provider rather than get_surface. The grid uses 3 expiries (1y, 2y, 5y from base 2026-05-08) × 3 swap tenors (2y, 5y, 10y) × 3 strikes (ATM-50bp, ATM, ATM+50bp) for a total of 27 quotes. Normal vols range from 55–80 bp, representative of a 5% rate environment.",
         "quote_sets": {
           "usd_rate_quotes": [
             "USD-SOFR-DEP-1M",
@@ -697,9 +697,9 @@
     }
   },
   "expected": {
-    "npv": 2301362.522336341,
-    "vega": 169491.5971228461,
-    "dv01": -2904.926587405615
+    "npv": 2279586.309279019,
+    "vega": 168274.70819123028,
+    "dv01": -2894.36311271321
   },
   "tolerances": {
     "npv": {

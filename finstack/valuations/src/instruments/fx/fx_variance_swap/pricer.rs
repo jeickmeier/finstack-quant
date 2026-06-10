@@ -67,16 +67,7 @@ pub(crate) fn compute_pv(
         return Ok(undiscounted * df);
     }
 
-    let realized = partial_realized_variance_with_dates(inst, context, as_of, &obs_dates)?;
-    let forward = remaining_forward_variance(inst, context, as_of)?;
-    // Seasoned MTM blends already-annualized realized and forward variance.
-    // The accrued-variance identity time-weights the un-annualized total
-    // variance: σ²_expected = (V_accrued + E[V_fwd]·τ) / T, i.e. weights
-    // t_elapsed/T and τ_remaining/T. Use the day-count `time_elapsed_fraction`
-    // rather than an observation-count fraction, which only coincides for
-    // perfectly uniform schedules (W-32).
-    let w = time_elapsed_fraction(inst, as_of)?;
-    let expected_var = realized * w + forward * (1.0 - w);
+    let expected_var = seasoned_expected_variance_with_dates(inst, context, as_of, &obs_dates)?;
     let undiscounted = inst.payoff(expected_var);
     // Date-based discounting (see the pre-start branch above): `df_between_dates`
     // resolves the year fraction on the curve's own time axis.
@@ -299,6 +290,16 @@ fn partial_realized_variance_with_dates(
     as_of: Date,
     obs_dates: &[Date],
 ) -> Result<f64> {
+    realized_variance_with_factor(inst, context, as_of, obs_dates, annualization_factor(inst))
+}
+
+fn realized_variance_with_factor(
+    inst: &FxVarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+    obs_dates: &[Date],
+    annualization_factor: f64,
+) -> Result<f64> {
     if inst.realized_var_method.requires_ohlc() {
         let (open, high, low, close) =
             get_historical_ohlc_with_dates(inst, context, as_of, obs_dates)?;
@@ -311,18 +312,88 @@ fn partial_realized_variance_with_dates(
             &low,
             &close,
             inst.realized_var_method,
-            annualization_factor(inst),
+            annualization_factor,
         );
     }
     let prices = get_historical_prices_with_dates(inst, context, as_of, obs_dates)?;
     if prices.len() < 2 {
         return Ok(0.0);
     }
-    realized_variance(
-        &prices,
-        inst.realized_var_method,
-        annualization_factor(inst),
-    )
+    realized_variance(&prices, inst.realized_var_method, annualization_factor)
+}
+
+/// Number of per-period samples (return periods or OHLC bars) accrued by
+/// `as_of`.
+fn realized_sample_count(
+    inst: &FxVarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+    obs_dates: &[Date],
+) -> Result<f64> {
+    if inst.realized_var_method.requires_ohlc() {
+        let (_, _, _, close) = get_historical_ohlc_with_dates(inst, context, as_of, obs_dates)?;
+        Ok((close.len() as f64).max(0.0))
+    } else {
+        let prices = get_historical_prices_with_dates(inst, context, as_of, obs_dates)?;
+        Ok((prices.len() as f64 - 1.0).max(0.0))
+    }
+}
+
+/// Realized variance for the seasoned mark-to-market blend, annualized on the
+/// **day-count time basis** (`V_accrued / t_elapsed`) so it is consistent with
+/// the day-count blend weight `w` (mirrors the equity W-33 fix).
+///
+/// [`partial_realized_variance`] annualizes on an observation-count basis
+/// (`Σr²/N · AF`), which disagrees with the day-count basis for non-uniform
+/// schedules. Re-basing with `AF = M / t_elapsed` (M = accrued sample count)
+/// yields exactly `V_accrued / t_elapsed` for both close-to-close and OHLC
+/// estimators. Degenerate windows (no time or samples accrued) fall back to
+/// the observation-count annualization.
+pub(crate) fn seasoned_realized_variance(
+    inst: &FxVarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+    t_elapsed: f64,
+    obs_dates: &[Date],
+) -> Result<f64> {
+    let m = realized_sample_count(inst, context, as_of, obs_dates)?;
+    if t_elapsed > 0.0 && m > 0.0 {
+        realized_variance_with_factor(inst, context, as_of, obs_dates, m / t_elapsed)
+    } else {
+        partial_realized_variance_with_dates(inst, context, as_of, obs_dates)
+    }
+}
+
+/// Seasoned mark-to-market expected variance: the day-count time-weighted
+/// blend of realized-to-date and remaining forward variance (W-32), with the
+/// realized term annualized on the same day-count basis (W-33, mirroring the
+/// equity sibling).
+///
+/// `compute_pv` and the `ExpectedVariance` metric both call this, so the
+/// reported expected variance always equals the variance implied by the
+/// swap's PV.
+pub(crate) fn seasoned_expected_variance(
+    inst: &FxVarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+) -> Result<f64> {
+    seasoned_expected_variance_with_dates(inst, context, as_of, &observation_dates(inst))
+}
+
+fn seasoned_expected_variance_with_dates(
+    inst: &FxVarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+    obs_dates: &[Date],
+) -> Result<f64> {
+    let w = time_elapsed_fraction(inst, as_of)?;
+    let total_t =
+        inst.day_count
+            .year_fraction(inst.start_date, inst.maturity, DayCountContext::default())?;
+    let t_elapsed = w * total_t;
+    let realized = seasoned_realized_variance(inst, context, as_of, t_elapsed, obs_dates)?;
+    let forward = remaining_forward_variance(inst, context, as_of)?;
+    Ok(realized * w + forward * (1.0 - w))
 }
 
 pub(crate) fn remaining_forward_variance(
@@ -515,7 +586,17 @@ mod tests {
 
         let pv = compute_pv(&swap, &market, as_of).expect("seasoned fx pv");
 
-        let realized = partial_realized_variance(&swap, &market, as_of).expect("realized");
+        // Recompute the identity from the same building blocks. The realized
+        // term must be on the day-count time basis (`seasoned_realized_variance`,
+        // W-33) so it is consistent with the day-count blend weight.
+        let total_t = swap
+            .day_count
+            .year_fraction(swap.start_date, swap.maturity, DayCountContext::default())
+            .expect("total yf");
+        let t_elapsed = time_w * total_t;
+        let realized =
+            seasoned_realized_variance(&swap, &market, as_of, t_elapsed, &observation_dates(&swap))
+                .expect("realized");
         let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
         let expected_var = realized * time_w + forward * (1.0 - time_w);
         let dom = market.get_discount("USD-OIS").expect("curve");

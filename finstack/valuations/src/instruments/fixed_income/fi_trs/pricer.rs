@@ -25,7 +25,9 @@
 //! It intentionally omits roll-down and mark-to-market from underlying rate/spread moves.
 
 use super::types::FIIndexTotalReturnSwap;
-use crate::instruments::common_impl::pricing::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
+use crate::instruments::common_impl::pricing::{
+    PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel,
+};
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::scalars::MarketScalar;
@@ -107,15 +109,13 @@ struct FiIndexReturnModel<'a> {
 }
 
 impl TrsReturnModel for FiIndexReturnModel<'_> {
-    fn period_return(
-        &self,
-        period_start: Date,
-        period_end: Date,
-        t_start: f64,
-        _t_end: f64,
-        _initial_level: f64,
-        _context: &MarketContext,
-    ) -> Result<f64> {
+    fn period_return(&self, inputs: &PeriodReturnInputs, _context: &MarketContext) -> Result<f64> {
+        let PeriodReturnInputs {
+            period_start,
+            period_end,
+            t_start,
+            ..
+        } = *inputs;
         // Seasoned (in-progress) periods are not supported by the carry
         // model: the realized index move since the period start would be
         // silently replaced by projected carry. Fail loud (this preserves
@@ -170,10 +170,15 @@ pub(crate) fn pv_total_return_leg(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    tracing::warn!(
-        "FIIndexTotalReturnSwap total-return leg uses a carry-only analytic model; \
-         it is not a full mark-to-market index return model"
-    );
+    // Warn once per process, not on every valuation call (batch pricing and
+    // FD sensitivities call this hundreds of times).
+    static CARRY_MODEL_WARNING: std::sync::Once = std::sync::Once::new();
+    CARRY_MODEL_WARNING.call_once(|| {
+        tracing::warn!(
+            "FIIndexTotalReturnSwap total-return leg uses a carry-only analytic model; \
+             it is not a full mark-to-market index return model"
+        );
+    });
     let index_yield = extract_index_yield(trs, context)?;
 
     let params = TotalReturnLegParams {

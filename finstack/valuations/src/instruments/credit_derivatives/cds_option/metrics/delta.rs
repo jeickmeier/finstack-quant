@@ -72,6 +72,9 @@ pub(super) fn delta_display_forward(
     let cds = synthetic_underlying_cds(option, as_of)?;
     let disc = curves.get_discount(&option.discount_curve_id)?;
     let surv = curves.get_hazard(&option.credit_curve_id)?;
+    // Bloomberg CDSO Default_Leg(0, T_mat): the synthetic CDS carries the
+    // `BloombergCdswClean` convention, so protection integrates from the
+    // valuation date itself (step-in 0).
     let spot_protection_pv = CDSPricer::new()
         .pv_protection_leg(&cds, disc.as_ref(), surv.as_ref(), as_of)?
         .amount();

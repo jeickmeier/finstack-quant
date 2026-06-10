@@ -400,6 +400,10 @@ impl ForwardCdsContext {
         // because non-forward-CDS pricing in finstack assumes the standard
         // [T, TM] integration; the +1-day rule is a CDSO-specific tightening
         // that closes ~0.05 bp of the cdx_ig_46 ATM Fwd residual.
+        // The same Bloomberg formula integrates the default leg from the
+        // valuation date itself; the synthetic CDS carries the
+        // `BloombergCdswClean` convention, whose protection step-in is 0
+        // days (see `CdsValuationConvention::protection_step_in_days`).
         let spot_cds_plus_one = super::pricer::cds_with_bloomberg_protection_end_extension(cds);
         let spot_protection_pv = cds_pricer
             .pv_protection_leg(&spot_cds_plus_one, disc, surv, as_of)?

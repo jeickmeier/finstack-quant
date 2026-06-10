@@ -177,10 +177,25 @@ impl Pricer for QuantoOptionAnalyticalPricer {
             })?;
 
         if t <= 0.0 {
+            // Expiry convention: settle at intrinsic (consistent with the
+            // FxOption/digital/barrier siblings) rather than returning 0.
+            // The quanto payoff converts the foreign-currency intrinsic at
+            // the contractual fixed FX rate via `payoff_scale`.
+            let scale = payoff_scale(quanto).map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+            let strike = quanto.equity_strike.amount();
+            let intrinsic_unit = match quanto.option_type {
+                crate::instruments::OptionType::Call => (spot - strike).max(0.0),
+                crate::instruments::OptionType::Put => (strike - spot).max(0.0),
+            };
             return Ok(ValuationResult::stamped(
                 quanto.id(),
                 as_of,
-                Money::new(0.0, quanto.quote_currency),
+                Money::new(intrinsic_unit * scale, quanto.quote_currency),
             ));
         }
 
@@ -272,7 +287,7 @@ mod tests {
             .row(&[0.22])
             .build()
             .expect("equity vol");
-        let fx_vol = VolSurface::builder("USDJPY-VOL")
+        let fx_vol = VolSurface::builder("JPYUSD-VOL")
             .expiries(&[2.0])
             .strikes(&[1.0])
             .row(&[0.10])
@@ -304,7 +319,7 @@ mod tests {
             .spot_id("NKY-SPOT".into())
             .vol_surface_id(CurveId::new("NKY-VOL"))
             .div_yield_id_opt(None)
-            .fx_vol_id_opt(Some(CurveId::new("USDJPY-VOL")))
+            .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
             .attributes(Attributes::new())
             .build()
             .expect("quanto");
@@ -342,6 +357,97 @@ mod tests {
         assert!(
             ((-bug_r_dom * t).exp() - df_dom).abs() > 1e-4,
             "fixture must expose the curve-axis bug for the domestic rate"
+        );
+    }
+
+    /// Expiry-day convention: a quanto valued at `t <= 0` settles at the
+    /// quanto-adjusted intrinsic (payoff converted at the fixed FX rate),
+    /// matching the FxOption/digital/barrier siblings, not 0.
+    #[test]
+    fn quanto_settles_at_intrinsic_on_expiry_day() {
+        let curve_base = date!(2025 - 01 - 02);
+        let expiry = date!(2026 - 07 - 01);
+        let as_of = expiry; // valuation on the expiry day → t == 0
+
+        let usd = DiscountCurve::builder("USD-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (3.0, (-0.09_f64).exp())])
+            .build()
+            .expect("usd curve");
+        let jpy = DiscountCurve::builder("JPY-OIS")
+            .base_date(curve_base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (3.0, (-0.03_f64).exp())])
+            .build()
+            .expect("jpy curve");
+        let eq_vol = VolSurface::builder("NKY-VOL")
+            .expiries(&[2.0])
+            .strikes(&[35000.0])
+            .row(&[0.22])
+            .build()
+            .expect("equity vol");
+        let fx_vol = VolSurface::builder("JPYUSD-VOL")
+            .expiries(&[2.0])
+            .strikes(&[1.0])
+            .row(&[0.10])
+            .build()
+            .expect("fx vol");
+        let market = MarketContext::new()
+            .insert(usd)
+            .insert(jpy)
+            .insert_surface(eq_vol)
+            .insert_surface(fx_vol)
+            .insert_price(
+                "NKY-SPOT",
+                MarketScalar::Price(Money::new(36_000.0, Currency::JPY)),
+            );
+
+        let quanto = QuantoOption::builder()
+            .id(InstrumentId::new("QUANTO-EXPIRY"))
+            .underlying_ticker("NKY".to_string())
+            .equity_strike(Money::new(35_000.0, Currency::JPY))
+            .option_type(crate::instruments::OptionType::Call)
+            .expiry(expiry)
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .base_currency(Currency::JPY)
+            .quote_currency(Currency::USD)
+            .correlation(-0.2)
+            .day_count(DayCount::Act365F)
+            .domestic_discount_curve_id(CurveId::new("USD-OIS"))
+            .foreign_discount_curve_id(CurveId::new("JPY-OIS"))
+            .spot_id("NKY-SPOT".into())
+            .vol_surface_id(CurveId::new("NKY-VOL"))
+            .div_yield_id_opt(None)
+            .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
+            .attributes(Attributes::new())
+            .build()
+            .expect("quanto");
+
+        let result = QuantoOptionAnalyticalPricer::new()
+            .price_dyn(&quanto, &market, as_of)
+            .expect("expiry-day valuation");
+
+        // Intrinsic (36 000 − 35 000) × payoff_scale, where the default
+        // payoff_scale is notional / strike.
+        let expected = 1_000.0 * (1_000_000.0 / 35_000.0);
+        assert!(
+            (result.value.amount() - expected).abs() < 1e-9,
+            "expiry-day quanto must settle at quanto-adjusted intrinsic: \
+             got {}, expected {expected}",
+            result.value.amount()
+        );
+
+        // OTM put on the same fixture is worthless at expiry.
+        let mut put = quanto;
+        put.option_type = crate::instruments::OptionType::Put;
+        let put_result = QuantoOptionAnalyticalPricer::new()
+            .price_dyn(&put, &market, as_of)
+            .expect("expiry-day put valuation");
+        assert!(
+            put_result.value.amount().abs() < 1e-12,
+            "OTM expiry-day quanto put must be worthless, got {}",
+            put_result.value.amount()
         );
     }
 

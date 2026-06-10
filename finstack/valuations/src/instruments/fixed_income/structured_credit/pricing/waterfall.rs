@@ -218,6 +218,14 @@ fn execute_waterfall_core(
     // Track how much cure cash has already been diverted (for partial diversion).
     let mut cure_remaining = total_cure_amount;
 
+    // Track principal already paid to each tranche within THIS period.
+    // `context.tranche_balances` is a period-start snapshot, so a tranche
+    // that receives principal from multiple tiers (its regular principal
+    // tier plus an OC/IC diversion into the senior principal tier) would
+    // otherwise request its full remaining balance twice — over-paying
+    // principal and driving the tranche balance negative.
+    let mut principal_paid_in_period: HashMap<String, Money> = HashMap::default();
+
     // Process tiers in priority order
     for tier in &waterfall.tiers {
         let (target_recipients, tier_diverted): (&[Recipient], bool) = if tier.divertible
@@ -256,6 +264,7 @@ fn execute_waterfall_core(
                 tier_diverted,
                 &mut allocation_output,
                 &explain,
+                &mut principal_paid_in_period,
             )?,
             AllocationMode::ProRata => allocate_pro_rata(
                 &allocation_ctx,
@@ -266,6 +275,7 @@ fn execute_waterfall_core(
                 tier_diverted,
                 &mut allocation_output,
                 &explain,
+                &mut principal_paid_in_period,
             )?,
         };
 
@@ -488,6 +498,7 @@ fn allocate_sequential(
     diverted: bool,
     output: &mut AllocationOutput,
     explain: &ExplainOpts,
+    principal_paid_in_period: &mut HashMap<String, Money>,
 ) -> Result<Money> {
     let base_currency = ctx.base_currency;
     let mut tier_total = Money::new(0.0, base_currency);
@@ -510,6 +521,8 @@ fn allocate_sequential(
             ctx.payment_date,
             ctx.market,
             ctx.reserve_balance,
+            principal_paid_in_period,
+            diverted,
         )?;
 
         let paid = if requested.amount() <= available.amount() {
@@ -517,6 +530,13 @@ fn allocate_sequential(
         } else {
             available
         };
+
+        record_in_period_principal(
+            principal_paid_in_period,
+            &recipient.calculation,
+            paid,
+            base_currency,
+        )?;
 
         let shortfall = requested
             .checked_sub(paid)
@@ -590,6 +610,7 @@ fn allocate_pro_rata(
     diverted: bool,
     output: &mut AllocationOutput,
     explain: &ExplainOpts,
+    principal_paid_in_period: &mut HashMap<String, Money>,
 ) -> Result<Money> {
     let base_currency = ctx.base_currency;
     if recipients.is_empty() {
@@ -614,6 +635,8 @@ fn allocate_pro_rata(
             ctx.payment_date,
             ctx.market,
             ctx.reserve_balance,
+            principal_paid_in_period,
+            diverted,
         )?;
         total_requested = total_requested.checked_add(requested)?;
         recipient_requests.push((recipient, requested));
@@ -683,6 +706,13 @@ fn allocate_pro_rata(
         } else {
             *requested
         };
+
+        record_in_period_principal(
+            principal_paid_in_period,
+            &recipient.calculation,
+            paid,
+            base_currency,
+        )?;
 
         let shortfall = requested
             .checked_sub(paid)
@@ -855,6 +885,27 @@ struct CoverageTestResult {
     cure_amount: Option<Money>,
 }
 
+/// Record principal paid to a tranche within the current waterfall period so
+/// later tiers (e.g. an OC/IC diversion into the senior principal tier) see
+/// the post-payment balance instead of the stale period-start snapshot.
+fn record_in_period_principal(
+    principal_paid_in_period: &mut HashMap<String, Money>,
+    calculation: &PaymentCalculation,
+    paid: Money,
+    base_currency: Currency,
+) -> Result<()> {
+    if paid.amount() <= 0.0 {
+        return Ok(());
+    }
+    if let PaymentCalculation::TranchePrincipal { tranche_id, .. } = calculation {
+        let entry = principal_paid_in_period
+            .entry(tranche_id.clone())
+            .or_insert(Money::new(0.0, base_currency));
+        *entry = entry.checked_add(paid)?;
+    }
+    Ok(())
+}
+
 /// Calculate payment amount for a recipient.
 #[allow(clippy::too_many_arguments)]
 fn calculate_payment_amount(
@@ -870,6 +921,8 @@ fn calculate_payment_amount(
     payment_date: Date,
     market: &MarketContext,
     reserve_balance: Money,
+    principal_paid_in_period: &HashMap<String, Money>,
+    diverted: bool,
 ) -> Result<Money> {
     let (raw_amount, rounding) = match calculation {
         PaymentCalculation::FixedAmount { amount, rounding } => (amount.amount(), *rounding),
@@ -941,11 +994,25 @@ fn calculate_payment_amount(
                 .and_then(|b| b.get(tranche_id.as_str()))
                 .copied()
                 .unwrap_or(tranche.current_balance);
-            let target = target_balance.unwrap_or(Money::new(0.0, base_currency));
-            let needed = current
-                .checked_sub(target)
-                .unwrap_or(Money::new(0.0, base_currency));
-            (needed.amount(), *rounding)
+            // Net out principal already paid to this tranche by earlier tiers
+            // in the SAME period (e.g. its regular principal tier before an
+            // OC/IC diversion). The snapshot balance is period-start, so
+            // without this the tranche requests its full balance twice and
+            // gets over-paid into a negative balance.
+            let paid_this_period = principal_paid_in_period
+                .get(tranche_id.as_str())
+                .map(|m| m.amount())
+                .unwrap_or(0.0);
+            // A coverage-cure diversion pays the senior tranche *below* its
+            // scheduled target (toward zero) to de-leverage the structure;
+            // the scheduled target only applies to the tier's regular pass.
+            let target = if diverted {
+                Money::new(0.0, base_currency)
+            } else {
+                target_balance.unwrap_or(Money::new(0.0, base_currency))
+            };
+            let needed = (current.amount() - paid_this_period - target.amount()).max(0.0);
+            (needed, *rounding)
         }
 
         PaymentCalculation::ResidualCash => (available.amount(), None),
@@ -1420,6 +1487,158 @@ mod ic_diversion_tests {
             "diverted cash {diverted:.0} must be strictly below the summed \
              cures {summed:.0} — coverage cures are not additive across \
              tranches"
+        );
+    }
+
+    /// In-period diversion must net out principal already paid this period:
+    /// a small senior tranche whose regular principal tier pays it to zero
+    /// must NOT receive additional diverted principal (the period-start
+    /// balance snapshot is stale after the regular pass). Pre-fix the
+    /// diversion re-requested the full period-start balance and drove the
+    /// tranche balance negative.
+    #[test]
+    fn diversion_never_over_pays_senior_principal() {
+        let currency = Currency::USD;
+
+        let mut pool = AssetPool::new("POOL", DealType::CLO, currency);
+        {
+            use crate::instruments::fixed_income::structured_credit::types::{
+                AssetType, PoolAsset,
+            };
+            use finstack_core::types::{CreditRating, InstrumentId};
+            pool.assets.push(PoolAsset {
+                day_count: finstack_core::dates::DayCount::Act360,
+                id: InstrumentId::new("ASSET_0"),
+                asset_type: AssetType::FirstLienLoan {
+                    industry: Some("Technology".into()),
+                },
+                // Collateral below the tranche stack so the OC test breaches
+                // and the junior tier diverts to the senior principal tier.
+                balance: Money::new(20_000_000.0, currency),
+                rate: 0.08,
+                spread_bps: Some(400.0),
+                index_id: None,
+                maturity: Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+                credit_quality: Some(CreditRating::BB),
+                industry: Some("Technology".into()),
+                obligor_id: Some("OBLIGOR_0".into()),
+                is_defaulted: false,
+                recovery_amount: None,
+                purchase_price: None,
+                acquisition_date: None,
+                smm_override: None,
+                mdr_override: None,
+            });
+        }
+
+        // Small senior tranche: 3M. Plenty of cash (10M) so its regular
+        // principal tier (target None → pay to zero) retires it in full.
+        let class_a_balance = 3_000_000.0;
+        let class_a = Tranche::new(
+            "CLASS_A",
+            0.0,
+            10.0,
+            TrancheSeniority::Senior,
+            Money::new(class_a_balance, currency),
+            TrancheCoupon::Fixed { rate: 0.05 },
+            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+        )
+        .unwrap();
+        let class_b = Tranche::new(
+            "CLASS_B",
+            10.0,
+            100.0,
+            TrancheSeniority::Subordinated,
+            Money::new(27_000_000.0, currency),
+            TrancheCoupon::Fixed { rate: 0.08 },
+            Date::from_calendar_date(2031, Month::January, 1).unwrap(),
+        )
+        .unwrap();
+        let tranches = TrancheStructure::new(vec![class_a, class_b]).unwrap();
+
+        let waterfall = WaterfallBuilder::new(currency)
+            .add_tier(
+                WaterfallTier::new("interest", 1, PaymentType::Interest)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_interest("class_a_int", "CLASS_A"))
+                    .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B")),
+            )
+            .add_tier(
+                WaterfallTier::new("senior_principal", 2, PaymentType::Principal)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::tranche_principal(
+                        "class_a_prin",
+                        "CLASS_A",
+                        None,
+                    )),
+            )
+            .add_tier(
+                WaterfallTier::new("junior_principal", 3, PaymentType::Principal)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .divertible(true)
+                    .add_recipient(Recipient::tranche_principal(
+                        "class_b_prin",
+                        "CLASS_B",
+                        None,
+                    )),
+            )
+            .add_tier(
+                WaterfallTier::new("equity", 4, PaymentType::Residual)
+                    .allocation_mode(AllocationMode::Sequential)
+                    .add_recipient(Recipient::new(
+                        "equity_dist",
+                        RecipientType::Equity,
+                        PaymentCalculation::ResidualCash,
+                    )),
+            )
+            // Collateral 20M + cash vs 30M stack: the OC test breaches.
+            .add_coverage_trigger(CoverageTrigger {
+                tranche_id: "CLASS_B".into(),
+                oc_trigger: Some(1.20),
+                ic_trigger: None,
+            })
+            .build()
+            .expect("build waterfall");
+
+        let market = MarketContext::new();
+        let payment_date = Date::from_calendar_date(2024, Month::April, 1).unwrap();
+        let period_start = Date::from_calendar_date(2024, Month::January, 1).unwrap();
+
+        let context = WaterfallContext {
+            available_cash: Money::new(10_000_000.0, currency),
+            interest_collections: Money::new(1_000_000.0, currency),
+            payment_date,
+            period_start,
+            pool_balance: Money::new(20_000_000.0, currency),
+            market: &market,
+            tranche_balances: None,
+            deferred_interest: None,
+            reserve_balance: Money::new(0.0, currency),
+            recovery_proceeds: Money::new(0.0, currency),
+        };
+
+        let result =
+            execute_waterfall(&waterfall, &tranches, &pool, context).expect("waterfall execution");
+
+        assert!(
+            result.had_diversions,
+            "test setup: the OC breach must trigger a diversion"
+        );
+
+        // Invariant: total principal paid to CLASS_A across ALL tiers
+        // (regular + diverted) must not exceed its period-start balance —
+        // i.e. the post-payment balance never goes negative.
+        let class_a_principal_paid: f64 = result
+            .payment_records
+            .iter()
+            .filter(|r| r.recipient_id == "class_a_prin")
+            .map(|r| r.paid_amount.amount())
+            .sum();
+        assert!(
+            class_a_principal_paid <= class_a_balance + 1e-6,
+            "CLASS_A principal paid {class_a_principal_paid:.2} exceeds its \
+             balance {class_a_balance:.2}: diversion used a stale \
+             period-start balance and over-paid principal"
         );
     }
 }

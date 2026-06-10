@@ -163,8 +163,15 @@ impl CmoTranche {
     }
 
     /// Get current factor.
+    ///
+    /// Returns `0.0` for a zero-original-face tranche (fully retired or
+    /// degenerate placeholder) rather than dividing by zero.
     pub fn factor(&self) -> f64 {
-        self.current_face.amount() / self.original_face.amount()
+        let original = self.original_face.amount();
+        if original == 0.0 {
+            return 0.0;
+        }
+        self.current_face.amount() / original
     }
 
     /// Check if tranche is interest-bearing.
@@ -255,7 +262,7 @@ pub struct AgencyCmo {
     pub reference_tranche_id: String,
     /// Collateral pool (optional - for detailed cashflow projection)
     #[builder(optional)]
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collateral: Option<Box<AgencyMbsPassthrough>>,
     /// Collateral WAC (if no explicit collateral)
     #[builder(optional)]

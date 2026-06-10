@@ -21,4 +21,4 @@ pub mod variance_replication;
 pub use generic::GenericInstrumentPricer;
 
 // Re-export TRS types
-pub use trs::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
+pub use trs::{PeriodReturnInputs, TotalReturnLegParams, TrsEngine, TrsReturnModel};

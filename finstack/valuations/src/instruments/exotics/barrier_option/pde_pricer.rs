@@ -521,6 +521,7 @@ mod tests {
             strike,
             barrier: Money::new(barrier, Currency::USD),
             rebate: None,
+            rebate_timing: Default::default(),
             option_type,
             barrier_type,
             expiry,

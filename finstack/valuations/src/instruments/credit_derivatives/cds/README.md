@@ -130,7 +130,7 @@ let mtm = cds.mtm_for_vm(&market, as_of)?;
 
 - Assumes deterministic recovery and hazard curves; no stochastic credit or default correlation modeling.
 - No quanto/currency basis handling beyond chosen discount curve.
-- Does not yet expose full CDS-family lifecycle semantics such as explicit step-in date, cash settlement date, or front-end protection toggles.
+- Protection step-in follows the valuation convention (`CdsValuationConvention::protection_step_in_days`): T+1 calendar for the ISDA Standard Model convention, valuation-date start for QuantLib parity (QuantLib's `IsdaCdsEngine` integrates from the valuation date) and Bloomberg CDSW ("protection starts immediately"). An explicit per-trade step-in override, cash settlement date, and front-end protection toggles are not yet exposed.
 - Broader CDS-family ISDA remediation for index, tranche, option, and canonical hazard calibration is still in progress.
 
 ## Pricing Methodology

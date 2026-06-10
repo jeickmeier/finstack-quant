@@ -50,13 +50,13 @@ impl MetricCalculator for BondWalCalculator {
                 continue;
             }
 
-            let years = finstack_core::dates::DayCount::Act365F
-                .year_fraction(
-                    context.as_of,
-                    cf.date,
-                    finstack_core::dates::DayCountContext::default(),
-                )
-                .unwrap_or(0.0);
+            // Propagate day-count failures: a silent 0.0 would zero-weight the
+            // flow and understate WAL with no diagnostic.
+            let years = finstack_core::dates::DayCount::Act365F.year_fraction(
+                context.as_of,
+                cf.date,
+                finstack_core::dates::DayCountContext::default(),
+            )?;
 
             weighted_sum += principal * years;
             total_principal += principal;

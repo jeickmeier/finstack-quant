@@ -1484,6 +1484,21 @@
               },
               "type": "object"
             },
+            "RebateTiming": {
+              "description": "Timing of a knock-out rebate payment.\n\nMarket-standard KO rebates pay **at hit** (the moment the barrier is\nbreached); paying at expiry is the less common variant. Knock-in rebates\nalways pay at expiry by definition (only at expiry is it known that the\noption failed to knock in), so this setting does not affect them.",
+              "oneOf": [
+                {
+                  "const": "at_hit",
+                  "description": "Rebate is paid at the barrier hit time (market standard for KO rebates).",
+                  "type": "string"
+                },
+                {
+                  "const": "at_expiry",
+                  "description": "Rebate is paid at option expiry.",
+                  "type": "string"
+                }
+              ]
+            },
             "SABRParameters": {
               "description": "SABR model parameters",
               "properties": {
@@ -1771,12 +1786,17 @@
               "description": "Quote currency (the pricing/settlement currency, formerly domestic_currency)"
             },
             "rebate": {
-              "description": "Optional rebate amount (paid at expiry if barrier condition met, dimensionless)",
+              "description": "Optional rebate amount (paid if the barrier condition is met, dimensionless;\nsee `rebate_timing` for when a knock-out rebate pays)",
               "format": "double",
               "type": [
                 "number",
                 "null"
               ]
+            },
+            "rebate_timing": {
+              "$ref": "#/$defs/RebateTiming",
+              "default": "at_hit",
+              "description": "Timing of the knock-out rebate payment.\n\n`at_hit` (default, market standard) pays the rebate the moment a\nknock-out barrier is breached; `at_expiry` defers payment to expiry.\nKnock-in rebates always pay at expiry, so this setting does not affect\nthem. The analytical pricer values at-hit rebates via the discounted\nfirst-passage closed form; the Monte Carlo path currently approximates\nat-hit rebates as at-expiry."
             },
             "strike": {
               "description": "Strike exchange rate (quote per base, dimensionless)",

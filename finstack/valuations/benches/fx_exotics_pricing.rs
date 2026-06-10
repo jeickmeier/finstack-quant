@@ -52,7 +52,7 @@ fn base_date() -> Date {
 /// - `NKY-DIV` dividend yield curve (1%) for quanto benchmarks
 /// - Flat `EURUSD-VOL` vol surface at 10%
 /// - Flat `NKY-VOL` equity vol surface at 20% (strikes in JPY levels)
-/// - Flat `USDJPY-VOL` FX vol surface at 8%
+/// - Flat `JPYUSD-VOL` FX vol surface at 8% (quote-per-base: USD per JPY)
 /// - EUR/USD spot = 1.10; JPY/USD spot = 1/150; NKY-SPOT = 35 000
 fn create_market(as_of: Date) -> MarketContext {
     let usd_disc = DiscountCurve::builder("USD-OIS")
@@ -129,17 +129,24 @@ fn create_market(as_of: Date) -> MarketContext {
     }
     let nky_vol = nky_vol_builder.build().unwrap();
 
-    // Flat USDJPY vol surface — strikes as dimensionless FX rates
-    let usdjpy_strikes = vec![130.0, 140.0, 150.0, 160.0, 170.0];
-    let usdjpy_tenors = vec![0.25, 0.5, 1.0, 2.0, 5.0];
-    let flat_usdjpy_row = vec![0.08_f64; usdjpy_strikes.len()];
-    let mut usdjpy_vol_builder = VolSurface::builder(CurveId::new("USDJPY-VOL"))
-        .expiries(&usdjpy_tenors)
-        .strikes(&usdjpy_strikes);
-    for _ in 0..usdjpy_tenors.len() {
-        usdjpy_vol_builder = usdjpy_vol_builder.row(&flat_usdjpy_row);
+    // Flat JPYUSD vol surface — strikes as dimensionless FX rates quoted
+    // quote-per-base (USD per JPY), the direction the quanto pricer requires.
+    let jpyusd_strikes = vec![
+        1.0 / 170.0,
+        1.0 / 160.0,
+        1.0 / 150.0,
+        1.0 / 140.0,
+        1.0 / 130.0,
+    ];
+    let jpyusd_tenors = vec![0.25, 0.5, 1.0, 2.0, 5.0];
+    let flat_jpyusd_row = vec![0.08_f64; jpyusd_strikes.len()];
+    let mut jpyusd_vol_builder = VolSurface::builder(CurveId::new("JPYUSD-VOL"))
+        .expiries(&jpyusd_tenors)
+        .strikes(&jpyusd_strikes);
+    for _ in 0..jpyusd_tenors.len() {
+        jpyusd_vol_builder = jpyusd_vol_builder.row(&flat_jpyusd_row);
     }
-    let usdjpy_vol = usdjpy_vol_builder.build().unwrap();
+    let jpyusd_vol = jpyusd_vol_builder.build().unwrap();
 
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
@@ -160,12 +167,12 @@ fn create_market(as_of: Date) -> MarketContext {
         .insert(nky_div)
         .insert_surface(eurusd_vol)
         .insert_surface(nky_vol)
-        .insert_surface(usdjpy_vol)
+        .insert_surface(jpyusd_vol)
         .insert_fx(fx)
         .insert_price("EURUSD", MarketScalar::Unitless(1.10))
         .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10))
         .insert_price("NKY-SPOT", MarketScalar::Unitless(35_000.0))
-        .insert_price("USDJPY-SPOT", MarketScalar::Unitless(150.0))
+        .insert_price("JPYUSD-SPOT", MarketScalar::Unitless(1.0 / 150.0))
 }
 
 // ================================================================================================
@@ -290,8 +297,8 @@ fn make_quanto(as_of: Date, tenor_years: i32) -> QuantoOption {
         .spot_id("NKY-SPOT".into())
         .vol_surface_id(CurveId::new("NKY-VOL"))
         .div_yield_id_opt(Some(CurveId::new("NKY-DIV")))
-        .fx_rate_id_opt(Some("USDJPY-SPOT".to_string()))
-        .fx_vol_id_opt(Some(CurveId::new("USDJPY-VOL")))
+        .fx_rate_id_opt(Some("JPYUSD-SPOT".to_string()))
+        .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
         .pricing_overrides(PricingOverrides::default())
         .attributes(Attributes::new())
         .build()

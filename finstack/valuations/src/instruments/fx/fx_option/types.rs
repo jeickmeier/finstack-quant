@@ -438,6 +438,12 @@ impl FxOption {
 impl crate::instruments::common_impl::traits::Instrument for FxOption {
     impl_instrument_base!(crate::pricer::InstrumentType::FxOption);
 
+    /// `ModelKey::Black76` is the library-wide registry key for lognormal
+    /// option pricing. The FX option pricer registered under this key is the
+    /// Garman-Kohlhagen *spot-form* model (BSM with domestic rate `r_d` and
+    /// foreign rate `r_f` as the carry), which is Black-76 applied to the
+    /// CIP forward `F = S·e^{(r_d−r_f)T}` — the key is kept for wire-format
+    /// stability, not because pricing uses the forward-form Black-76 inputs.
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::Black76
     }

@@ -72,7 +72,7 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
-use finstack_core::dates::{Date, DateExt, DayCountContext, Tenor, TenorUnit};
+use finstack_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor, TenorUnit};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::gauss_legendre_integrate;
 use finstack_core::money::Money;
@@ -235,10 +235,9 @@ impl CmsReplicationPricer {
                 )));
             }
 
-            // Time-to-fixing using instrument's day count (consistent with vol surface)
+            // Time-to-fixing is calendar time for the vol axis: ACT/365F.
             let ttf =
-                inst.day_count
-                    .year_fraction(as_of, fixing_date, DayCountContext::default())?;
+                DayCount::Act365F.year_fraction(as_of, fixing_date, DayCountContext::default())?;
 
             // DF to payment date from discount curve (relative to as_of)
             let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;

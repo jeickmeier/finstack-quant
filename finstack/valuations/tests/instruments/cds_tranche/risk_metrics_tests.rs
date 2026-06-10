@@ -144,15 +144,23 @@ fn test_cs01_preserves_bespoke_index_structure_during_bumps() {
     let pricer = CDSTranchePricer::new();
 
     let index = market.get_credit_index(&tranche.credit_index_id).unwrap();
-    let delta_lambda = 1e-4;
-    let bumped_curve_up = index
-        .index_credit_curve
-        .with_parallel_bump(delta_lambda)
-        .unwrap();
-    let bumped_curve_down = index
-        .index_credit_curve
-        .with_parallel_bump(-delta_lambda)
-        .unwrap();
+    // Replicate the production CS01 definition: a ±1bp parallel *par-spread*
+    // bump with hazard-curve recalibration (not a direct λ bump).
+    let bump_bp = 1.0;
+    let bumped_curve_up = finstack_valuations::calibration::bumps::bump_hazard_spreads(
+        index.index_credit_curve.as_ref(),
+        &market,
+        &finstack_valuations::calibration::bumps::BumpRequest::Parallel(bump_bp),
+        Some(&tranche.discount_curve_id),
+    )
+    .unwrap();
+    let bumped_curve_down = finstack_valuations::calibration::bumps::bump_hazard_spreads(
+        index.index_credit_curve.as_ref(),
+        &market,
+        &finstack_valuations::calibration::bumps::BumpRequest::Parallel(-bump_bp),
+        Some(&tranche.discount_curve_id),
+    )
+    .unwrap();
 
     let mut builder_up = finstack_core::market_data::term_structures::CreditIndexData::builder()
         .num_constituents(index.num_constituents)
@@ -206,7 +214,7 @@ fn test_cs01_preserves_bespoke_index_structure_during_bumps() {
         )
         .unwrap()
         .amount();
-    let expected_cs01 = (pv_up - pv_down) / 2.0;
+    let expected_cs01 = (pv_up - pv_down) / (2.0 * bump_bp);
     let actual_cs01 = pricer.calculate_cs01(&tranche, &market, as_of).unwrap();
 
     assert_relative_eq(

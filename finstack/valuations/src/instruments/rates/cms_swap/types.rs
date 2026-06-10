@@ -450,9 +450,10 @@ impl CmsSwap {
                 )));
             }
 
+            // Time-to-fixing is calendar time for the vol axis: ACT/365F,
+            // not the CMS accrual day count.
             let time_to_fixing =
-                self.cms_day_count
-                    .year_fraction(as_of, fixing_date, DayCountContext::default())?;
+                DayCount::Act365F.year_fraction(as_of, fixing_date, DayCountContext::default())?;
             let adj = if time_to_fixing > 0.0 {
                 convexity_adjustment(
                     vol_surface.value_clamped(time_to_fixing.max(0.0), forward_swap_rate),

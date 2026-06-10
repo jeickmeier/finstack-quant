@@ -162,6 +162,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py,
         [
             "ValuationResult",
+            "validate_instrument_json",
+            "price_instrument",
+            "price_instrument_with_metrics",
+            "list_standard_metrics",
+            "list_standard_metrics_grouped",
             "instrument_cashflows_json",
             "CalibrationResult",
             "CalibrationEnvelopeError",

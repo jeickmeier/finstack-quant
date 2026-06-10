@@ -468,6 +468,19 @@ impl CDSTranchePricer {
                     PoolExposure::Recovery => recovery.clamp(0.0, 1.0),
                 }
             };
+            // The exposure the bootstrapped index curve implies: its default
+            // probabilities were stripped from index spreads assuming the
+            // flat `index_data.recovery_rate`. A stochastic recovery override
+            // must be renormalized against this so the 0–100% tranche EL
+            // still reproduces the index EL (see
+            // `stochastic_recovery_exposure_scale`).
+            let base_exposure = match exposure {
+                PoolExposure::Loss => 1.0 - base_recovery,
+                PoolExposure::Recovery => base_recovery.clamp(0.0, 1.0),
+            };
+            let recovery_is_stochastic = recovery_model
+                .as_ref()
+                .is_some_and(|model| model.is_stochastic());
 
             let cap_notional = cap_pct / 100.0;
             let maturity_years = self.years_from_base(index_data, maturity)?;
@@ -485,18 +498,25 @@ impl CDSTranchePricer {
                 let default_prob_clamped =
                     default_prob.clamp(PROBABILITY_CLIP, 1.0 - PROBABILITY_CLIP);
                 let default_threshold = standard_normal_inv_cdf(default_prob_clamped);
+                let conditional_p = |z: f64| {
+                    self.conditional_default_probability_enhanced(default_threshold, correlation, z)
+                };
+                let scale = if recovery_is_stochastic {
+                    let unconditional_pool_exposure =
+                        quad.integrate(|z| conditional_p(z) * exposure_at(z));
+                    stochastic_recovery_exposure_scale(
+                        default_prob_clamped * base_exposure,
+                        unconditional_pool_exposure,
+                    )
+                } else {
+                    1.0
+                };
                 let integrand = |z: f64| {
-                    let p = self.conditional_default_probability_enhanced(
-                        default_threshold,
-                        correlation,
-                        z,
-                    );
-
                     self.conditional_equity_tranche_capped(
                         num_constituents,
                         cap_notional,
-                        p,
-                        exposure_at(z),
+                        conditional_p(z),
+                        scale * exposure_at(z),
                     )
                 };
                 let expected = if !(ADAPTIVE_INTEGRATION_LOW..=ADAPTIVE_INTEGRATION_HIGH)
@@ -510,24 +530,63 @@ impl CDSTranchePricer {
             } else {
                 let copula_ref = self.copula();
                 let default_threshold = self.default_threshold_for_copula(default_prob);
-                let expected = copula_ref.integrate_fn(&|factors| {
-                    let p = self.conditional_default_prob_copula(
+                let conditional_p = |factors: &[f64]| {
+                    self.conditional_default_prob_copula(
                         copula_ref,
                         default_threshold,
                         factors,
                         correlation,
-                    );
-
+                    )
+                };
+                let scale = if recovery_is_stochastic {
+                    let unconditional_pool_exposure = copula_ref.integrate_fn(&|factors| {
+                        let z = factors.first().copied().unwrap_or(0.0);
+                        conditional_p(factors) * exposure_at(z)
+                    });
+                    stochastic_recovery_exposure_scale(
+                        default_prob * base_exposure,
+                        unconditional_pool_exposure,
+                    )
+                } else {
+                    1.0
+                };
+                let expected = copula_ref.integrate_fn(&|factors| {
                     let z = factors.first().copied().unwrap_or(0.0);
                     self.conditional_equity_tranche_capped(
                         num_constituents,
                         cap_notional,
-                        p,
-                        exposure_at(z),
+                        conditional_p(factors),
+                        scale * exposure_at(z),
                     )
                 });
                 Ok(expected)
             }
         }
     }
+}
+
+/// Renormalization factor that makes a stochastic-recovery override
+/// EL-consistent with the bootstrapped index curve.
+///
+/// The index default probabilities were stripped from index spreads assuming
+/// the flat index recovery, so the index-implied unconditional pool exposure
+/// is `p · e_base` (loss side: `p · (1 − R_base)`; recovery side:
+/// `p · R_base`). With a z-dependent recovery `R(Z)` the model's unconditional
+/// pool exposure becomes `E_Z[p(Z) · e(Z)] ≠ p · e_base` because `p(Z)` and
+/// `e(Z)` are driven by the same factor. Scaling the conditional exposure by
+/// `target / actual` restores `E_Z[p(Z) · scale · e(Z)] = p · e_base`, so the
+/// 0–100% equity tranche reproduces the index expected loss while preserving
+/// the factor-dependence shape of the override.
+pub(super) fn stochastic_recovery_exposure_scale(
+    index_implied_pool_exposure: f64,
+    model_pool_exposure: f64,
+) -> f64 {
+    const MIN_POOL_EXPOSURE: f64 = 1e-14;
+    if model_pool_exposure <= MIN_POOL_EXPOSURE || index_implied_pool_exposure <= 0.0 {
+        // Degenerate inputs (e.g. zero default probability or a recovery
+        // model pinned at 100%): renormalization is meaningless; leave the
+        // override unscaled.
+        return 1.0;
+    }
+    index_implied_pool_exposure / model_pool_exposure
 }

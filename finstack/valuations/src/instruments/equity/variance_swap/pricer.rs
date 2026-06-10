@@ -132,10 +132,12 @@ pub(crate) fn compute_pv(
     if as_of < inst.start_date {
         let forward_var = remaining_forward_variance(inst, curves, as_of)?;
         let undiscounted = inst.payoff(forward_var);
-        let t = inst
-            .day_count
-            .year_fraction(as_of, inst.maturity, Default::default())?;
-        return Ok(undiscounted * disc.df(t));
+        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+            disc.as_ref(),
+            as_of,
+            inst.maturity,
+        )?;
+        return Ok(undiscounted * df);
     }
 
     // Seasoned mark-to-market: the day-count time-weighted blend of realized-to-date
@@ -144,10 +146,12 @@ pub(crate) fn compute_pv(
     // variance implied by this PV (W-32/W-33).
     let expected_var = seasoned_expected_variance(inst, curves, as_of)?;
     let undiscounted = inst.payoff(expected_var);
-    let t = inst
-        .day_count
-        .year_fraction(as_of, inst.maturity, Default::default())?;
-    Ok(undiscounted * disc.df(t))
+    let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+        disc.as_ref(),
+        as_of,
+        inst.maturity,
+    )?;
+    Ok(undiscounted * df)
 }
 
 /// Seasoned mark-to-market expected variance: the day-count time-weighted blend
@@ -545,7 +549,15 @@ pub(crate) fn remaining_forward_variance(
                         finstack_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
                         finstack_core::market_data::scalars::MarketScalar::Price(p) => p.amount(),
                     };
-                    let r = disc.zero(t.max(1e-8));
+                    // Date-based zero rate over [as_of, maturity]: avoids the
+                    // axis bias of `disc.zero(t)` when curve base != as_of.
+                    let df_mat =
+                        crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+                            disc.as_ref(),
+                            as_of,
+                            inst.maturity,
+                        )?;
+                    let r = -df_mat.ln() / t.max(1e-8);
                     let q = context
                         .get_price(format!("{}-DIVYIELD", inst.underlying_ticker))
                         .ok()
@@ -752,12 +764,14 @@ mod tests {
             seasoned_realized_variance(&swap, &market, as_of, t_elapsed).expect("realized");
         let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
         let expected_var = realized * time_w + forward * (1.0 - time_w);
-        let t = swap
-            .day_count
-            .year_fraction(as_of, swap.maturity, Default::default())
-            .expect("yf");
         let disc = market.get_discount("USD-OIS").expect("curve");
-        let expected_pv = swap.payoff(expected_var) * disc.df(t);
+        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+            disc.as_ref(),
+            as_of,
+            swap.maturity,
+        )
+        .expect("df");
+        let expected_pv = swap.payoff(expected_var) * df;
 
         assert!(
             (pv.amount() - expected_pv.amount()).abs() < 1e-6,
@@ -768,7 +782,7 @@ mod tests {
 
         // And it must NOT match the (wrong) observation-count weighting.
         let count_var = realized * count_w + forward * (1.0 - count_w);
-        let count_pv = swap.payoff(count_var) * disc.df(t);
+        let count_pv = swap.payoff(count_var) * df;
         assert!(
             (pv.amount() - count_pv.amount()).abs() > 1e-6,
             "seasoned MTM must differ from observation-count weighting"

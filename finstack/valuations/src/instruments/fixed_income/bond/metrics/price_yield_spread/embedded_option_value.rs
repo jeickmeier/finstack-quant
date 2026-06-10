@@ -142,7 +142,7 @@ impl MetricCalculator for EmbeddedOptionValueCalculator {
         } else if let Some(oas) = bond.pricing_overrides.market_quotes.quoted_oas {
             oas
         } else if let Some(clean_price) = bond.pricing_overrides.market_quotes.quoted_clean_price {
-            let pricer = TreePricer::with_config(bond_tree_config(bond));
+            let pricer = TreePricer::with_config(bond_tree_config(bond)?);
             pricer.calculate_oas(bond, market, as_of, clean_price)? / 10_000.0
         } else {
             0.0

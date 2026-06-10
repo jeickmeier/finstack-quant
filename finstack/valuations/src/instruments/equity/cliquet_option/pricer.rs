@@ -649,9 +649,9 @@ mod tests {
 
         let pv = compute_pv(&option, &mkt, as_of).expect("deterministic pv");
 
-        let r1 = 0.03_f64.min(0.05).max(0.0);
-        let r2 = (105.06_f64 / 103.0 - 1.0).min(0.05).max(0.0);
-        let total = (r1 + r2).min(0.20).max(0.0);
+        let r1 = 0.03_f64.clamp(0.0, 0.05);
+        let r2 = (105.06_f64 / 103.0 - 1.0).clamp(0.0, 0.05);
+        let total = (r1 + r2).clamp(0.0, 0.20);
         let disc = mkt.get_discount("USD-OIS").expect("curve");
         let df = disc.df_between_dates(as_of, option.expiry).expect("df");
         let expected = total * 100_000.0 * df;

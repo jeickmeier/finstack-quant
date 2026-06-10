@@ -76,32 +76,20 @@ use super::super::super::types::Bond;
 pub struct HazardBondEngine;
 
 impl HazardBondEngine {
-    /// Resolve a hazard curve for the bond using the same precedence as the
-    /// tree-based bond valuator:
+    /// Resolve the hazard curve for the bond from its explicit
+    /// `credit_curve_id` opt-in.
     ///
-    /// 1. `credit_curve_id` if present.
-    /// 2. `discount_curve_id`.
-    /// 3. `discount_curve_id` with `-CREDIT` suffix.
+    /// Credit-risky pricing requires the instrument to name its hazard curve.
+    /// The previous implicit discovery (`discount_curve_id` /
+    /// `<discount_curve_id>-CREDIT` naming magic) could silently switch a
+    /// bond to credit-risky pricing just because a similarly-named hazard
+    /// curve existed in the market context.
     fn resolve_hazard_curve(
         bond: &Bond,
         market: &MarketContext,
     ) -> Option<std::sync::Arc<HazardCurve>> {
-        if let Some(ref credit_id) = bond.credit_curve_id {
-            if let Ok(hc) = market.get_hazard(credit_id.as_str()) {
-                return Some(hc);
-            }
-        }
-
-        if let Ok(hc) = market.get_hazard(bond.discount_curve_id.as_str()) {
-            return Some(hc);
-        }
-
-        let credit_id = format!("{}-CREDIT", bond.discount_curve_id.as_str());
-        if let Ok(hc) = market.get_hazard(credit_id.as_str()) {
-            return Some(hc);
-        }
-
-        None
+        let credit_id = bond.credit_curve_id.as_ref()?;
+        market.get_hazard(credit_id.as_str()).ok()
     }
 
     /// Build pricing cashflows and the full internal schedule.
@@ -180,17 +168,14 @@ impl HazardBondEngine {
         let hazard = match Self::resolve_hazard_curve(bond, market) {
             Some(h) => h,
             None => {
-                let expected = bond
-                    .credit_curve_id
-                    .as_ref()
-                    .map(|id| id.as_str().to_string())
-                    .unwrap_or_else(|| {
-                        format!(
-                            "{} or {}-CREDIT",
-                            bond.discount_curve_id.as_str(),
-                            bond.discount_curve_id.as_str()
-                        )
-                    });
+                let expected = bond.credit_curve_id.as_ref().map_or_else(
+                    || {
+                        "an explicit credit_curve_id on the bond (implicit hazard-curve \
+                        discovery by naming convention is not supported)"
+                            .to_string()
+                    },
+                    |id| format!("hazard curve '{}' in the market context", id.as_str()),
+                );
                 return Err(finstack_core::Error::Validation(format!(
                     "hazard_rate pricing for bond '{}' requires a hazard curve; expected {}",
                     bond.id.as_str(),
@@ -266,15 +251,13 @@ impl HazardBondEngine {
 
         // Alive leg: survival-weighted PV of signed canonical schedule coupons and principal.
         //
-        // A cashflow dated exactly on `as_of` is included (`d >= as_of`) to stay
-        // consistent with the discounting engine, which discounts it at
-        // `DF(as_of, as_of) = 1`. Here it lands on grid index 0 with `df = 1`
-        // and conditional survival `Q(as_of, as_of) = 1`, so it contributes its
-        // full face value — identical to the discount-engine treatment.
+        // Cashflows dated exactly on `as_of` are excluded (settlement
+        // convention, `d > as_of`) — consistent with `pricing_dated_cashflows`
+        // and the discount / tree / YTM engines.
         // Use Kahan summation from finstack-core for numerical stability.
         let pv_values: Vec<f64> = flows
             .iter()
-            .filter(|(d, amt)| *d >= as_of && amt.amount() != 0.0)
+            .filter(|(d, amt)| *d > as_of && amt.amount() != 0.0)
             .filter_map(|(d, amt)| {
                 // Dates come from the same grid we built, so binary_search should succeed
                 dates.binary_search(d).ok().map(|idx| {
@@ -501,15 +484,12 @@ mod tests {
         );
     }
 
-    /// Item 7 regression: same-day cashflow handling must be consistent across
-    /// the discount and hazard engines.
-    ///
-    /// The discounting engine includes a cashflow dated exactly on `as_of`
-    /// (with `DF(as_of, as_of) = 1`). The hazard engine must do the same — its
-    /// alive leg and time grid previously used a strict `d > as_of` filter,
-    /// dropping the on-`as_of` flow. With a zero hazard intensity the two
-    /// engines must agree to floating-point precision even when a coupon lands
-    /// exactly on the valuation date.
+    /// Same-day cashflow handling must be consistent across the discount and
+    /// hazard engines. The unified convention **excludes** cashflows dated
+    /// exactly on `as_of` (settlement convention, strict `d > as_of`),
+    /// matching the tree and YTM engines. With a zero hazard intensity the
+    /// two engines must agree to floating-point precision even when a coupon
+    /// lands exactly on the valuation date.
     #[test]
     fn hazard_zero_matches_discounting_with_cashflow_on_as_of() {
         // Issue one year before `as_of` with an annual coupon, so a coupon
@@ -538,13 +518,14 @@ mod tests {
         let hazard_zero = build_flat_hazard("USD-CREDIT", issue, 0.0, 0.4);
         let market = MarketContext::new().insert(disc).insert(hazard_zero);
 
-        // Confirm the test premise: a flow really lands on `as_of`.
+        // The unified settlement convention excludes the on-`as_of` coupon
+        // from buyer flows.
         let flows = bond
             .pricing_dated_cashflows(&market, as_of)
             .expect("cashflows");
         assert!(
-            flows.iter().any(|(d, _)| *d == as_of),
-            "test premise: a cashflow must fall exactly on as_of"
+            flows.iter().all(|(d, _)| *d > as_of),
+            "settlement convention: cashflows dated on as_of must be excluded"
         );
 
         let pv_rf = BondEngine::price(&bond, &market, as_of).expect("RF price should succeed");

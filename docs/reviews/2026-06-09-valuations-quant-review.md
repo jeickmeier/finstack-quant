@@ -115,82 +115,82 @@ Recurring failure patterns:
 ## Moderates
 
 ### Time/axis hygiene
-- Option expiry measured with instrument *accrual* day count instead of ACT/365F: `swaption/types/swaption.rs:519,546,645,957`, `cap_floor/pricing/pricer.rs:98-100` (Act360 ⇒ T inflated ×365/360), CMS pricers. `ir_future_option/types.rs:99-104` and `inflation_cap_floor/types.rs:401-410` do it correctly — drift, ~+0.7% vol-equivalent bias.
-- Axis-based `df(t)`/`zero(t)` instead of `df_between_dates`: equity variance swap Carr-Madan (`equity/variance_swap/pricer.rs:542`), autocallable df_ratios numerator, `equity_index_future/pricer.rs:120-151`, `equity_trs/pricer.rs:80-82`, convertible bond floor (`convertible/metrics/bond_floor.rs:51-69`, plus silent `unwrap_or(0.0)` on year fractions — also at `bond/metrics/wal.rs:59`, `bond_valuator.rs:228`), inflation swap (`inflation_swap/types.rs:309-318, 352-362`). All biased whenever curve base ≠ as_of.
+- **[FIXED 2026-06-09]** Option expiry measured with instrument *accrual* day count instead of ACT/365F: `swaption/types/swaption.rs:519,546,645,957`, `cap_floor/pricing/pricer.rs:98-100` (Act360 ⇒ T inflated ×365/360), CMS pricers. `ir_future_option/types.rs:99-104` and `inflation_cap_floor/types.rs:401-410` do it correctly — drift, ~+0.7% vol-equivalent bias. Goldens: `usd_swaption_5y_into_5y_receiver_25_otm` NPV tolerance widened (documented ~0.83% ACT/365F residual vs the Bloomberg SWPM screen); `usd_swaption_normal_vol_self_test` expected values regenerated.
+- **[FIXED 2026-06-09]** Axis-based `df(t)`/`zero(t)` instead of `df_between_dates`: equity variance swap Carr-Madan (`equity/variance_swap/pricer.rs:542`), autocallable df_ratios numerator, `equity_index_future/pricer.rs:120-151`, `equity_trs/pricer.rs:80-82`, convertible bond floor (`convertible/metrics/bond_floor.rs:51-69`, plus silent `unwrap_or(0.0)` on year fractions — also at `bond/metrics/wal.rs:59`, `bond_valuator.rs:228`), inflation swap (`inflation_swap/types.rs:309-318, 352-362`). All biased whenever curve base ≠ as_of.
 
 ### Convention drift
-- OIS presets apply ARRC 2bd / BoE 5bd FRN lookbacks to cleared OIS swaps (`data/conventions/rate_index_conventions.json` + `irs/compounding.rs:211-235`); cleared OIS compounds plain in-arrears with payment delay only. Sub-bp to ~1bp basis; also disables the exact `1/DF` fast path.
-- `CompoundedInArrears.observation_shift` has contradictory sign/DCF semantics between the two IRS pricing paths (`irs/cashflow.rs:52-62` vs `:163-184`); `{lookback:2, shift:2}` silently cancels on one path, errors on the other.
-- Tranche IMM schedule path skips business-day adjustment (`cds_tranche/pricer/sensitivities.rs:237-251`).
-- FX variance swap seasoned MTM mixes annualization bases (`fx_variance_swap/pricer.rs:70-79`) — the W-33 bug fixed on the equity side (`variance_swap/pricer.rs:166-179`).
-- KO rebates pay-at-expiry only (`models/closed_form/barrier.rs:573-614`); market standard is pay-at-hit; the at-hit machinery already exists in `fx_touch_option/pricer.rs:165-214`. Add a `rebate_timing` field.
-- Quanto `fx_rate_id`/`fx_vol_id` quote direction unenforced; shipped example inconsistent (`quanto_option/types.rs:189-215` vs `pricer.rs:67-119`). The drift-adjustment formula itself is correct and parity-tested.
+- **[FIXED 2026-06-09]** OIS presets apply ARRC 2bd / BoE 5bd FRN lookbacks to cleared OIS swaps (`data/conventions/rate_index_conventions.json` + `irs/compounding.rs:211-235`); cleared OIS compounds plain in-arrears with payment delay only. Sub-bp to ~1bp basis; also disables the exact `1/DF` fast path. Goldens: envelope-bootstrapped self-test fixtures regenerated (`aapl_equity_vol/svi_self_test`, `usd_swaption_normal_vol_self_test`, `usd_5y_cds_self_test` dv01, `inflation_linked_bond_5y`); `cdx_ig_46_payer_atm_jun26` NPV band widened to $6 (documented -$5.32 bootstrapped-curve residual vs the Bloomberg screen).
+- **[FIXED 2026-06-09]** `CompoundedInArrears.observation_shift` has contradictory sign/DCF semantics between the two IRS pricing paths (`irs/cashflow.rs:52-62` vs `:163-184`); `{lookback:2, shift:2}` silently cancels on one path, errors on the other.
+- **[FIXED 2026-06-09]** Tranche IMM schedule path skips business-day adjustment (`cds_tranche/pricer/sensitivities.rs:237-251`).
+- **[FIXED 2026-06-09]** FX variance swap seasoned MTM mixes annualization bases (`fx_variance_swap/pricer.rs:70-79`) — the W-33 bug fixed on the equity side (`variance_swap/pricer.rs:166-179`).
+- **[FIXED 2026-06-09]** KO rebates pay-at-expiry only (`models/closed_form/barrier.rs:573-614`); market standard is pay-at-hit; the at-hit machinery already exists in `fx_touch_option/pricer.rs:165-214`. Add a `rebate_timing` field.
+- **[FIXED 2026-06-09]** Quanto `fx_rate_id`/`fx_vol_id` quote direction unenforced; shipped example inconsistent (`quanto_option/types.rs:189-215` vs `pricer.rs:67-119`). The drift-adjustment formula itself is correct and parity-tested.
 
 ### Sensitivity unit traps
-- Tranche `calculate_cs01` bumps hazard λ while documented as a 1bp *spread* bump (≈1.67× mislabel at R=40%) — `cds_tranche/pricer/sensitivities.rs:449-481`; registered metric calculators are correct. Ensure its spread bump only. Make error if par spreads not available.
-- Index CS01 silently falls back from par-spread re-bootstrap to hazard bump on error — `cds_index/pricer.rs:433-447`. Make it an error.
-- `Correlation01` is per-unit-ρ while `Recovery01` is per-1% — 100× internal inconsistency (`cds_tranche/pricer/sensitivities.rs:485-526` vs `metrics/correlation01.rs`).
-- IR-future model convexity adjustment `0.5σ²T₁T₂` has no vol-unit guard (`ir_future/types.rs:454-486`); lognormal vol inflates CA by hundreds×. Document normal-vol contract + sanity bound.
-- `SABRModel::implied_volatility` returns normal vol for β≈0 and Black vol otherwise from one untagged API (`sabr/model.rs:164-180`); generic vol target could store Bachelier vols in a Black surface.
+- **[FIXED 2026-06-09]** Tranche `calculate_cs01` bumps hazard λ while documented as a 1bp *spread* bump (≈1.67× mislabel at R=40%) — `cds_tranche/pricer/sensitivities.rs:449-481`; registered metric calculators are correct. Ensure its spread bump only. Make error if par spreads not available.
+- **[FIXED 2026-06-09]** Index CS01 silently falls back from par-spread re-bootstrap to hazard bump on error — `cds_index/pricer.rs:433-447`. Make it an error.
+- **[FIXED 2026-06-09]** `Correlation01` is per-unit-ρ while `Recovery01` is per-1% — 100× internal inconsistency (`cds_tranche/pricer/sensitivities.rs:485-526` vs `metrics/correlation01.rs`).
+- **[FIXED 2026-06-09]** IR-future model convexity adjustment `0.5σ²T₁T₂` has no vol-unit guard (`ir_future/types.rs:454-486`); lognormal vol inflates CA by hundreds×. Document normal-vol contract + sanity bound.
+- **[FIXED 2026-06-09]** `SABRModel::implied_volatility` returns normal vol for β≈0 and Black vol otherwise from one untagged API (`sabr/model.rs:164-180`); generic vol target could store Bachelier vols in a Black surface.
 
 ### Silent failure modes
-- OAS tree solver failure residual is `±1e6` keyed to `sign(oas)` (`bond/pricing/engine/tree/tree_pricer.rs:563-571`) — can hand Brent a fabricated bracket; the YTM/DM solvers fixed exactly this pattern.
-- MBS/CMO spread solvers return `0.0, converged:false`; CMO metric layer consumes it as a real spread (`mbs_passthrough/metrics/oas.rs:105-117`, `cmo/metrics/oas.rs:114-127`).
-- `solve_alpha_for_atm` returns unconverged alpha silently (`sabr/calibration.rs:695-696`) and the pinning objective skips ATM, so nothing catches it.
-- Implicit hazard-curve discovery by naming convention (`<discount_id>` / `<discount_id>-CREDIT`) silently switches a bond to credit-risky pricing with no instrument opt-in (`bond/.../hazard.rs:85-105`, `tree_pricer.rs:202-213`).
-- BDT default vol = 1% interpreted lognormal (`engine/tree/config.rs:266-301`) — near-zero optionality, OAS ≈ Z-spread, silently.
-- `AgencyCmo.collateral` is `#[serde(skip)]` (`cmo/types.rs:256-258`) — deserialized deals silently price on substituted synthetic collateral; violates the stable-wire-format invariant.
-- Tranche stochastic-recovery overrides not EL-consistent with the bootstrapped index curve (`cds_tranche/pricer/expected_loss.rs:339-411`) — 0–100% tranche sum ≠ index; renormalize or document loudly.
+- **[FIXED 2026-06-09]** OAS tree solver failure residual is `±1e6` keyed to `sign(oas)` (`bond/pricing/engine/tree/tree_pricer.rs:563-571`) — can hand Brent a fabricated bracket; the YTM/DM solvers fixed exactly this pattern.
+- **[FIXED 2026-06-09]** MBS/CMO spread solvers return `0.0, converged:false`; CMO metric layer consumes it as a real spread (`mbs_passthrough/metrics/oas.rs:105-117`, `cmo/metrics/oas.rs:114-127`).
+- **[FIXED 2026-06-09]** `solve_alpha_for_atm` returns unconverged alpha silently (`sabr/calibration.rs:695-696`) and the pinning objective skips ATM, so nothing catches it.
+- **[FIXED 2026-06-09]** Implicit hazard-curve discovery by naming convention (`<discount_id>` / `<discount_id>-CREDIT`) silently switches a bond to credit-risky pricing with no instrument opt-in (`bond/.../hazard.rs:85-105`, `tree_pricer.rs:202-213`).
+- **[FIXED 2026-06-09]** BDT default vol = 1% interpreted lognormal (`engine/tree/config.rs:266-301`) — near-zero optionality, OAS ≈ Z-spread, silently.
+- **[FIXED 2026-06-09]** `AgencyCmo.collateral` is `#[serde(skip)]` (`cmo/types.rs:256-258`) — deserialized deals silently price on substituted synthetic collateral; violates the stable-wire-format invariant.
+- **[FIXED 2026-06-09]** Tranche stochastic-recovery overrides not EL-consistent with the bootstrapped index curve (`cds_tranche/pricer/expected_loss.rs:339-411`) — 0–100% tranche sum ≠ index; renormalize or document loudly.
 
 ### Stochastic engines
-- Structured-credit Tree mode (the default) exhausts base-`branch_count` digits, leaving a deterministic z ≈ −0.97 shock on trailing months (`structured_credit/pricing/stochastic/pricer/engine.rs:459-489, 714-729`).
-- Recombining `ScenarioTree` factors don't diffuse with lattice position (`stochastic/tree/tree.rs:265-300`); period-N factor distribution equals period-1.
-- CLO in-period diversion uses stale balances → possible principal over-payment / negative tranche balance accruing negative interest (`structured_credit/pricing/waterfall.rs:222-247` + `simulation_engine.rs:2185-2192`).
-- Asian MC control variate biased on non-flat curves (drift schedule vs constant-drift analytic control) — `exotics/asian_option/pricer.rs:398-406` vs `:213-273`. Analytical Asian pricers also assume equal fixing spacing (`:1063-1067, 1267-1275`).
-- PAC schedule mis-anchored for seasoned collateral (ramp starts at age 0; `cmo/tranches/pac_support.rs:105-145`).
-- Term-loan tree lacks the DF timing correction for distributed cashflows (`term_loan/pricing/tree_engine.rs:152-200`) that the bond valuator has.
+- **[FIXED 2026-06-09]** Structured-credit Tree mode (the default) exhausts base-`branch_count` digits, leaving a deterministic z ≈ −0.97 shock on trailing months (`structured_credit/pricing/stochastic/pricer/engine.rs:459-489, 714-729`).
+- **[FIXED 2026-06-09]** Recombining `ScenarioTree` factors don't diffuse with lattice position (`stochastic/tree/tree.rs:265-300`); period-N factor distribution equals period-1.
+- **[FIXED 2026-06-09]** CLO in-period diversion uses stale balances → possible principal over-payment / negative tranche balance accruing negative interest (`structured_credit/pricing/waterfall.rs:222-247` + `simulation_engine.rs:2185-2192`).
+- **[FIXED 2026-06-09]** Asian MC control variate biased on non-flat curves (drift schedule vs constant-drift analytic control) — `exotics/asian_option/pricer.rs:398-406` vs `:213-273`. Analytical Asian pricers also assume equal fixing spacing (`:1063-1067, 1267-1275`).
+- **[FIXED 2026-06-09]** PAC schedule mis-anchored for seasoned collateral (ramp starts at age 0; `cmo/tranches/pac_support.rs:105-145`).
+- **[FIXED 2026-06-09]** Term-loan tree lacks the DF timing correction for distributed cashflows (`term_loan/pricing/tree_engine.rs:152-200`) that the bond valuator has. Golden: `term_loan_b_5y_floating` cs01/discount_margin/ytm regenerated.
 
 ### Other moderates
-- CMS has no negative-rate model — hard-errors on F≤0 (fail-loud; swaption/cap-floor have Bachelier/shifted fallbacks).
-- SABR ρ≈1 fallback `χ ≈ z/(1+z/2)` is wrong (true limit `−ln(1−z)`; 10–70% vol error in branch, reachable only at |1−ρ|<1e-10 via direct `SABRParameters::new(…, 1.0)`) — `sabr/model.rs:309-312`.
-- SABR Obloj attribution inverted; genuinely-Obloj z computed then discarded (dead code) — `sabr/model.rs:91-132`.
-- WAL fallback path counts writedowns as principal, primary path doesn't (`structured_credit/metrics/pricing/wal.rs:22-47` vs `:88-99`).
-- `calculate_tranche_duration` computes Macaulay but is named modified (`structured_credit/metrics/risk/duration.rs:188-215`).
-- CTD selection labels gross basis "net basis"; no implied-repo-ranked CTD (`bond_future/types.rs:747-869`). Conversion factor itself verified against all five CME IR232 examples.
-- Same-day cashflow inclusion inconsistent across bond engines (discount/hazard include `as_of` flows; tree and YTM exclude).
-- FxSpot `spot_rate` bypasses validation via builder/serde; settlement cashflow undiscounted (`fx/fx_spot/types.rs:369-382, 464-474`).
-- Python direct instrument wrappers never release the GIL (`finstack-py/src/bindings/valuations/direct_wrapper.rs:54-122`; `pricing.rs`/`calibration.rs`/`fourier.rs` all detach correctly).
-- Python `fx`/`exotics` `price_with_metrics` hardcodes `market_history = None` (hvar/ES unreachable; WASM exposes it) — `direct_wrapper.rs:74-94`.
-- `barrier_call` returns silent NaN on invalid inputs in both bindings (`finstack-py/.../analytic.rs:253-265`, `finstack-wasm/.../analytic.rs:196-207`); siblings use `checked_closed_form_value`.
-- `merton_jump_cos_price` runtime keyword is `lambda` (Python reserved word); stub declares `lambda_` (`finstack-py/.../fourier.rs:180,191` vs `.pyi:1145`).
-- CDS-family Python wrappers hardcode model strings with no override (`"hazard_rate"` currently matches defaults; the pattern is what broke B5). Use `"default"`.
+- **[FIXED 2026-06-09]** CMS has no negative-rate model — hard-errors on F≤0 (fail-loud; swaption/cap-floor have Bachelier/shifted fallbacks).
+- **[FIXED 2026-06-09]** SABR ρ≈1 fallback `χ ≈ z/(1+z/2)` is wrong (true limit `−ln(1−z)`; 10–70% vol error in branch, reachable only at |1−ρ|<1e-10 via direct `SABRParameters::new(…, 1.0)`) — `sabr/model.rs:309-312`.
+- **[FIXED 2026-06-09]** SABR Obloj attribution inverted; genuinely-Obloj z computed then discarded (dead code) — `sabr/model.rs:91-132`.
+- **[FIXED 2026-06-09]** WAL fallback path counts writedowns as principal, primary path doesn't (`structured_credit/metrics/pricing/wal.rs:22-47` vs `:88-99`).
+- **[FIXED 2026-06-09]** `calculate_tranche_duration` computes Macaulay but is named modified (`structured_credit/metrics/risk/duration.rs:188-215`).
+- **[FIXED 2026-06-09]** CTD selection labels gross basis "net basis"; no implied-repo-ranked CTD (`bond_future/types.rs:747-869`). Conversion factor itself verified against all five CME IR232 examples.
+- **[FIXED 2026-06-09]** Same-day cashflow inclusion inconsistent across bond engines (discount/hazard include `as_of` flows; tree and YTM exclude). Unified on strict post-as_of exclusion (settlement convention). Golden: `bhccn_10_2032_callable_bloomberg` OAS tolerance widened to 3bp (documented convention residual vs the Bloomberg screen, combined with the OAS-solver and hazard-opt-in fixes).
+- **[FIXED 2026-06-09]** FxSpot `spot_rate` bypasses validation via builder/serde; settlement cashflow undiscounted (`fx/fx_spot/types.rs:369-382, 464-474`).
+- **[FIXED 2026-06-09]** Python direct instrument wrappers never release the GIL (`finstack-py/src/bindings/valuations/direct_wrapper.rs:54-122`; `pricing.rs`/`calibration.rs`/`fourier.rs` all detach correctly).
+- **[FIXED 2026-06-09]** Python `fx`/`exotics` `price_with_metrics` hardcodes `market_history = None` (hvar/ES unreachable; WASM exposes it) — `direct_wrapper.rs:74-94`.
+- **[FIXED 2026-06-09]** `barrier_call` returns silent NaN on invalid inputs in both bindings (`finstack-py/.../analytic.rs:253-265`, `finstack-wasm/.../analytic.rs:196-207`); siblings use `checked_closed_form_value`.
+- **[FIXED 2026-06-09]** `merton_jump_cos_price` runtime keyword is `lambda` (Python reserved word); stub declares `lambda_` (`finstack-py/.../fourier.rs:180,191` vs `.pyi:1145`).
+- **[FIXED 2026-06-09]** CDS-family Python wrappers hardcode model strings with no override (`"hazard_rate"` currently matches defaults; the pattern is what broke B5). Use `"default"`.
 
 ---
 
 ## Minors
 
-- SDA doc comment mislabels the implemented curve as the standard (entangled with B4).
-- SABR χ(z) Taylor coefficients c3/c4 wrong (`sabr/model.rs:290-291`; true c3 = (3ρ²−1)/6); negligible today (series governs |z|<1e-5) but fix before widening the region.
-- β=0 initial alpha guess scaled by F (`calibration.rs:280-284`); use `alpha₀ = atm_vol` for β≈0.
-- SABR auto-shift magnitude ad hoc (`calibration.rs:129`); market practice uses standardized per-currency shifts.
-- CDS protection integrates from `as_of`, not step-in T+1 (documented in `cds/README.md:133`; ~$5/$10M/day for 100bp name).
-- Index vs single-name Recovery01 methodology differs 2–5× (frozen-curve vs re-bootstrap), documented but worth unifying.
-- Tranche `attach_pct`/`detach_pct` percent-vs-fraction only warns (`cds_tranche/types.rs:225-230`); consider hard error.
-- Convexity docstring omits the /100 scaling (`bond/metrics/convexity.rs:13-16`; value verified against the Bloomberg golden).
-- `fi_trs/pricer.rs:161-164`: `tracing::warn!` on every valuation call — log spam.
-- `tba/allocation.rs:197` and `mbs_passthrough/prepayment.rs:187-198`: panic paths on embedded data in valuation code.
-- `FxOption::default_model` returns `Black76` while pricing is Garman-Kohlhagen spot-form (`fx_option/types.rs:441-443`) — metadata mislabel.
-- Expired-option conventions inconsistent across the FX family (quanto returns 0 at t≤0; FxOption/digitals/barriers return intrinsic at expiry).
-- Richard-Roll seasonality keyed to `seasoning % 12` not calendar month (latent; amplitude defaults to 0); `expected_smm` omits refi multiplier and Jensen term.
-- `CloWalCalculator` returns pool WAM labeled WAL (exported helper, not the registered metric).
-- Native `__all__` in `finstack-py/.../valuations/mod.rs:161-198` omits five registered names; masked by the Python shim.
-- COS `n_terms` stub drift (`.pyi` says `int = 128`; runtime `Option[int] = None`).
-- `CreditState` parameter order diverges Python vs WASM (positional-porting hazard).
-- Stale d.ts header (`index.d.ts:561` labels factor-model exports `valuations.creditFactorHierarchy`).
-- `theta_days=0` returns silent `inf` theta in release wheels (Rust guard is `debug_assert!` only).
-- Stale doc: `pricer/credit.rs:8` still says "Black76 for CDSOption".
-- Mixed key casing in WASM `arbitrageDiagnostics` (camelCase top-level, snake_case violations), pinned by d.ts.
-- `cmo/types.rs:166-168`: `factor()` divides by `original_face` without zero guard; `per_name.rs:116-124`: copula build failure silently falls back to Gaussian.
+- **[FIXED 2026-06-09]** (was already fixed alongside B4) SDA doc comment mislabels the implemented curve as the standard (entangled with B4).
+- **[FIXED 2026-06-09]** SABR χ(z) Taylor coefficients c3/c4 wrong (`sabr/model.rs:290-291`; true c3 = (3ρ²−1)/6); negligible today (series governs |z|<1e-5) but fix before widening the region.
+- **[FIXED 2026-06-09]** β=0 initial alpha guess scaled by F (`calibration.rs:280-284`); use `alpha₀ = atm_vol` for β≈0.
+- **[FIXED 2026-06-09]** SABR auto-shift magnitude ad hoc (`calibration.rs:129`); market practice uses standardized per-currency shifts.
+- **[FIXED 2026-06-09]** CDS protection integrates from `as_of`, not step-in T+1 (documented in `cds/README.md:133`; ~$5/$10M/day for 100bp name). Step-in is now convention-driven: T+1 for the ISDA Standard Model convention, spot for QuantLib parity (QuantLib 1.42.1's `IsdaCdsEngine` integrates from the valuation date — pinned by the `cds_quantlib_flat_hazard_decomposition` golden) and Bloomberg CDSW/CDSO conventions.
+- **[FIXED 2026-06-09]** Index vs single-name Recovery01 methodology differs 2–5× (frozen-curve vs re-bootstrap), documented but worth unifying.
+- **[FIXED 2026-06-09]** Tranche `attach_pct`/`detach_pct` percent-vs-fraction only warns (`cds_tranche/types.rs:225-230`); consider hard error. Now a hard validation error.
+- **[FIXED 2026-06-09]** Convexity docstring omits the /100 scaling (`bond/metrics/convexity.rs:13-16`; value verified against the Bloomberg golden).
+- **[FIXED 2026-06-09]** `fi_trs/pricer.rs:161-164`: `tracing::warn!` on every valuation call — log spam. Now warns once per process via `std::sync::Once`.
+- **[FIXED 2026-06-09]** `tba/allocation.rs:197` and `mbs_passthrough/prepayment.rs:187-198`: panic paths on embedded data in valuation code. Now propagate `Result`.
+- **[FIXED 2026-06-09]** `FxOption::default_model` returns `Black76` while pricing is Garman-Kohlhagen spot-form (`fx_option/types.rs:441-443`) — metadata mislabel. Key kept for wire stability; docs now state pricing is GK spot-form.
+- **[FIXED 2026-06-09]** Expired-option conventions inconsistent across the FX family (quanto returns 0 at t≤0; FxOption/digitals/barriers return intrinsic at expiry). Quanto now returns quanto-adjusted intrinsic at t≤0.
+- **[FIXED 2026-06-09]** Richard-Roll seasonality keyed to `seasoning % 12` not calendar month (latent; amplitude defaults to 0); `expected_smm` omits refi multiplier and Jensen term. Seasonality now keys to calendar month via optional origination month; `expected_smm` includes refi multiplier and Jensen term.
+- **[FIXED 2026-06-09]** `CloWalCalculator` returns pool WAM labeled WAL (exported helper, not the registered metric). Now delegates to the principal-weighted WAL calculator.
+- **[FIXED 2026-06-09]** Native `__all__` in `finstack-py/.../valuations/mod.rs:161-198` omits five registered names; masked by the Python shim.
+- **[FIXED 2026-06-09]** COS `n_terms` stub drift (`.pyi` says `int = 128`; runtime `Option[int] = None`).
+- **[FIXED 2026-06-09]** `CreditState` parameter order diverges Python vs WASM (positional-porting hazard). WASM aligned to Rust/Python canonical order (breaking).
+- **[FIXED 2026-06-09]** Stale d.ts header (`index.d.ts:561` labels factor-model exports `valuations.creditFactorHierarchy`).
+- **[FIXED 2026-06-09]** `theta_days=0` returns silent `inf` theta in release wheels (Rust guard is `debug_assert!` only). Now a hard `assert!` plus input validation in both bindings.
+- **[FIXED 2026-06-09]** (was already fixed) Stale doc: `pricer/credit.rs:8` still says "Black76 for CDSOption".
+- **[FIXED 2026-06-09]** Mixed key casing in WASM `arbitrageDiagnostics` (camelCase top-level, snake_case violations), pinned by d.ts. Violation keys now camelCase (breaking).
+- **[FIXED 2026-06-09]** `cmo/types.rs:166-168`: `factor()` divides by `original_face` without zero guard; `per_name.rs:116-124`: copula build failure silently falls back to Gaussian. Factor returns 0.0 for zero face; copula build errors propagate.
 
 ---
 

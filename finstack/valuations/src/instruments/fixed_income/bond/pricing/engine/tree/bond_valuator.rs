@@ -226,13 +226,13 @@ impl BondValuator {
             // Process any amortization events that occur at or before this step time
             while amort_idx < amort_events.len() {
                 let (amort_date, amort_amt) = amort_events[amort_idx];
-                let amort_time = dc_curve
-                    .year_fraction(
-                        as_of,
-                        amort_date,
-                        finstack_core::dates::DayCountContext::default(),
-                    )
-                    .unwrap_or(0.0);
+                // Propagate day-count failures: a silent 0.0 would book the
+                // amortization at step 0 and misstate outstanding principal.
+                let amort_time = dc_curve.year_fraction(
+                    as_of,
+                    amort_date,
+                    finstack_core::dates::DayCountContext::default(),
+                )?;
 
                 if amort_time <= step_time + dt / 2.0 {
                     // This amortization has occurred by this step
@@ -435,12 +435,8 @@ impl BondValuator {
             }
         }
 
-        // Source recovery rate from hazard curve using the same precedence as
-        // HazardBondEngine and TreePricer::calculate_oas:
-        // 1. credit_curve_id (if present)
-        // 2. discount_curve_id
-        // 3. discount_curve_id with "-CREDIT" suffix
-        // This ensures consistency across all credit-aware pricing paths.
+        // Source recovery rate from the bond's explicit credit_curve_id,
+        // consistent with HazardBondEngine and TreePricer::calculate_oas.
         let recovery_rate = Self::resolve_recovery_rate(&bond, market_context);
         let call_friction_cents = bond
             .pricing_overrides
@@ -556,35 +552,19 @@ impl BondValuator {
         })
     }
 
-    /// Resolve recovery rate from hazard curve using the same precedence as
-    /// HazardBondEngine and TreePricer::calculate_oas.
+    /// Resolve the recovery rate from the bond's explicit `credit_curve_id`
+    /// opt-in, consistent with `HazardBondEngine` and `TreePricer`.
     ///
-    /// Precedence:
-    /// 1. `credit_curve_id` if present
-    /// 2. `discount_curve_id`
-    /// 3. `discount_curve_id` with "-CREDIT" suffix
-    ///
-    /// Returns `None` if no hazard curve can be resolved.
+    /// Returns `None` when the bond has no `credit_curve_id` or the named
+    /// hazard curve is absent from the market context.
     fn resolve_recovery_rate(bond: &Bond, market: &MarketContext) -> Option<f64> {
-        // Try credit_curve_id first
-        if let Some(ref credit_id) = bond.credit_curve_id {
-            if let Ok(hc) = market.get_hazard(credit_id.as_str()) {
-                return Some(hc.recovery_rate());
-            }
-        }
-
-        // Try discount_curve_id
-        if let Ok(hc) = market.get_hazard(bond.discount_curve_id.as_str()) {
-            return Some(hc.recovery_rate());
-        }
-
-        // Try discount_curve_id with "-CREDIT" suffix
-        let credit_id = format!("{}-CREDIT", bond.discount_curve_id.as_str());
-        if let Ok(hc) = market.get_hazard(&credit_id) {
-            return Some(hc.recovery_rate());
-        }
-
-        None
+        // Recovery comes only from the bond's explicit `credit_curve_id`
+        // opt-in; implicit discovery by naming convention is not supported.
+        let credit_id = bond.credit_curve_id.as_ref()?;
+        market
+            .get_hazard(credit_id.as_str())
+            .ok()
+            .map(|hc| hc.recovery_rate())
     }
 }
 

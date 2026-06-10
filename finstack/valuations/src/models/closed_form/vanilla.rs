@@ -325,8 +325,11 @@ pub fn bs_greeks(
     theta_days_per_year: f64,
 ) -> BsGreeks {
     // Theta divides by this basis; a non-positive value would yield inf/NaN.
-    // All in-tree callers pass 252/365, so guard against a degenerate caller.
-    debug_assert!(
+    // All in-tree callers pass 252/365; a hard assert keeps a degenerate
+    // caller from silently producing inf theta in release builds. Bindings
+    // validate user-supplied values and return a proper error before reaching
+    // this point.
+    assert!(
         theta_days_per_year > 0.0,
         "theta_days_per_year must be positive, got {theta_days_per_year}"
     );

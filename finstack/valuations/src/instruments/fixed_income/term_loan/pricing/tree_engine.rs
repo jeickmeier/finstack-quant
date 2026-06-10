@@ -90,6 +90,21 @@ impl TermLoanValuator {
         let disc = market.get_discount(&loan.discount_curve_id)?;
         let dc_curve = disc.day_count();
 
+        // DF timing correction for cashflows mapped onto the tree grid
+        // (same correction the bond valuator's `value_at_step_time` applies):
+        // a piece booked at `step_time` is scaled by `DF(event_time) /
+        // DF(step_time)` so that, once the tree discounts it from
+        // `step_time`, its PV equals the cashflow's PV at its true time.
+        // Without this the floor/ceil linear split silently mis-times
+        // discounting.
+        let value_at_step_time = |amount: f64, event_time: f64, step_time: f64| -> f64 {
+            let step_df = disc.df(step_time);
+            if step_df <= f64::EPSILON {
+                return amount;
+            }
+            amount * disc.df(event_time) / step_df
+        };
+
         let schedule = generate_cashflows(&loan, market, as_of)?;
         let out_path = schedule.outstanding_by_date()?;
 
@@ -122,6 +137,26 @@ impl TermLoanValuator {
             }
         }
 
+        // Book a cashflow onto the grid: exercise cashflows snap to their
+        // (ceil) step, others are distributed between floor/ceil steps —
+        // matching the bond convention — with each piece carrying the DF
+        // timing correction to its destination step time.
+        let book = |vec: &mut Vec<f64>, amount: f64, t: f64, raw_clamped: f64, snap: bool| {
+            if snap {
+                let step = (raw_clamped.ceil() as usize).clamp(0, num_steps - 1);
+                vec[step] += value_at_step_time(amount, t, time_steps[step]);
+            } else {
+                let lo = raw_clamped.floor() as usize;
+                let weight = raw_clamped - lo as f64;
+                if lo < num_steps {
+                    vec[lo] += value_at_step_time(amount * (1.0 - weight), t, time_steps[lo]);
+                }
+                if lo + 1 < num_steps {
+                    vec[lo + 1] += value_at_step_time(amount * weight, t, time_steps[lo + 1]);
+                }
+            }
+        };
+
         for cf in &schedule.flows {
             if cf.date < origin {
                 continue;
@@ -144,59 +179,25 @@ impl TermLoanValuator {
                 | CFKind::CommitmentFee
                 | CFKind::UsageFee
                 | CFKind::FacilityFee => {
-                    let amount = cf.amount.amount();
-                    if is_exercise {
-                        // Exercise cashflows snap exactly to their step.
-                        let step = (raw_clamped.ceil() as usize).clamp(0, num_steps - 1);
-                        coupon_fee_vec[step] += amount;
-                    } else {
-                        // Distribute between floor/ceil steps (matches bond convention).
-                        let lo = raw_clamped.floor() as usize;
-                        let weight = raw_clamped - lo as f64;
-                        if lo < num_steps {
-                            coupon_fee_vec[lo] += amount * (1.0 - weight);
-                        }
-                        if lo + 1 < num_steps {
-                            coupon_fee_vec[lo + 1] += amount * weight;
-                        }
-                    }
+                    book(
+                        &mut coupon_fee_vec,
+                        cf.amount.amount(),
+                        t,
+                        raw_clamped,
+                        is_exercise,
+                    );
                 }
-                CFKind::Amortization => {
-                    // Principal repayment (positive to holder)
+                // Principal repayment / redemption (positive to holder only;
+                // negative notionals are funding legs and excluded).
+                CFKind::Amortization | CFKind::Notional => {
                     if cf.amount.amount() > 0.0 {
-                        let amount = cf.amount.amount();
-                        if is_exercise {
-                            let step = (raw_clamped.ceil() as usize).clamp(0, num_steps - 1);
-                            principal_vec[step] += amount;
-                        } else {
-                            let lo = raw_clamped.floor() as usize;
-                            let weight = raw_clamped - lo as f64;
-                            if lo < num_steps {
-                                principal_vec[lo] += amount * (1.0 - weight);
-                            }
-                            if lo + 1 < num_steps {
-                                principal_vec[lo + 1] += amount * weight;
-                            }
-                        }
-                    }
-                }
-                CFKind::Notional => {
-                    // Only include positive notional (redemptions), exclude funding legs
-                    if cf.amount.amount() > 0.0 {
-                        let amount = cf.amount.amount();
-                        if is_exercise {
-                            let step = (raw_clamped.ceil() as usize).clamp(0, num_steps - 1);
-                            principal_vec[step] += amount;
-                        } else {
-                            let lo = raw_clamped.floor() as usize;
-                            let weight = raw_clamped - lo as f64;
-                            if lo < num_steps {
-                                principal_vec[lo] += amount * (1.0 - weight);
-                            }
-                            if lo + 1 < num_steps {
-                                principal_vec[lo + 1] += amount * weight;
-                            }
-                        }
+                        book(
+                            &mut principal_vec,
+                            cf.amount.amount(),
+                            t,
+                            raw_clamped,
+                            is_exercise,
+                        );
                     }
                 }
                 _ => {}
