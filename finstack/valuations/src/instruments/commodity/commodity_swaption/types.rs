@@ -227,7 +227,7 @@ impl CommoditySwaption {
     /// The forward swap rate is the **annuity-weighted** average of forward
     /// commodity prices observed **on each swap payment date**:
     /// ```text
-    /// F_swap = Σ (F_i · DF_i · τ_i) / Σ (DF_i · τ_i)
+    /// F_swap = Σ (F_i · DF_i) / Σ DF_i
     /// ```
     /// where `F_i = F(payment_date_i)` and `DF_i = DF(as_of, payment_date_i)`.
     ///
@@ -239,10 +239,13 @@ impl CommoditySwaption {
     ///
     /// This is the fair fixed price consistent with the `annuity · Black76`
     /// pricing identity: the swaption is priced as `annuity · Black76(F_swap, K)`
-    /// where `annuity = Σ DF_i · τ_i`, so the fair swap rate must be averaged
-    /// with the same `DF_i · τ_i` weights. It reduces to the equal-weighted mean
-    /// when `DF_i · τ_i` is constant across periods. If the annuity denominator
-    /// is zero (degenerate schedule), the equal-weighted mean is returned.
+    /// where `annuity = Σ DF_i`, so the fair swap rate must be averaged with
+    /// the same `DF_i` weights. The underlying [`super::super::commodity_swap::CommoditySwap`]
+    /// pays `quantity × price` per period with **no** year-fraction accrual,
+    /// so the weights carry no `τ_i` factor (review finding B3). The rate
+    /// reduces to the equal-weighted mean when `DF_i` is constant across
+    /// periods. If the annuity denominator is zero (degenerate schedule), the
+    /// equal-weighted mean is returned.
     pub fn forward_swap_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
@@ -257,7 +260,6 @@ impl CommoditySwaption {
         let mut sum_fwd = 0.0;
         let mut weighted_fwd = 0.0;
         let mut weight_total = 0.0;
-        let mut prev = self.swap_start;
         for &payment_date in &schedule {
             // Read the forward on the payment date — the same date the period
             // settles and is discounted to — so the swap rate is not biased by
@@ -266,18 +268,13 @@ impl CommoditySwaption {
                 .price_on_date(payment_date)
                 .unwrap_or_else(|_| price_curve.spot_price());
 
-            // Annuity weight DF_i * tau_i — identical to the per-period term
+            // Annuity weight DF_i — identical to the per-period term
             // accumulated in `annuity()`.
-            let df = disc.df_between_dates(as_of, payment_date)?;
-            let period_frac =
-                self.day_count
-                    .year_fraction(prev, payment_date, DayCountContext::default())?;
-            let weight = df * period_frac;
+            let weight = disc.df_between_dates(as_of, payment_date)?;
 
             sum_fwd += fwd;
             weighted_fwd += fwd * weight;
             weight_total += weight;
-            prev = payment_date;
         }
 
         // Guard against a zero (or negative) annuity denominator: fall back to
@@ -291,21 +288,19 @@ impl CommoditySwaption {
 
     /// Compute the annuity factor for the underlying swap.
     ///
-    /// The annuity is the sum of (discount factor * period year fraction) for
-    /// each payment period, representing the PV of receiving 1 unit per period.
+    /// The annuity is the sum of discount factors to each payment date — the
+    /// PV of receiving 1 unit per period. The underlying `CommoditySwap` pays
+    /// `quantity × price` per period with no year-fraction accrual, and
+    /// `notional` is a per-period quantity, so the annuity must not carry a
+    /// `τ_i` factor (review finding B3: the IR-swaption `Σ DF·τ` convention
+    /// understated a monthly-settling swaption ~12×).
     pub fn annuity(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let schedule = self.swap_payment_schedule()?;
 
         let mut annuity = 0.0;
-        let mut prev = self.swap_start;
         for &payment_date in &schedule {
-            let df = disc.df_between_dates(as_of, payment_date)?;
-            let period_frac =
-                self.day_count
-                    .year_fraction(prev, payment_date, DayCountContext::default())?;
-            annuity += df * period_frac;
-            prev = payment_date;
+            annuity += disc.df_between_dates(as_of, payment_date)?;
         }
 
         Ok(annuity)
@@ -846,11 +841,9 @@ mod tests {
         let mut mid_weighted = 0.0;
         let mut weight_total = 0.0;
         for &pay in &schedule {
-            let df = dc.df_between_dates(as_of, pay).expect("df");
-            let frac = DayCount::Act365F
-                .year_fraction(prev, pay, DayCountContext::default())
-                .expect("frac");
-            let weight = df * frac;
+            // Annuity weight is DF only (B3): the underlying swap pays
+            // quantity × price per period with no year-fraction accrual.
+            let weight = dc.df_between_dates(as_of, pay).expect("df");
             let fwd_pay = pc.price_on_date(pay).expect("fwd at payment date");
             let mid = prev + (pay - prev) / 2;
             let fwd_mid = pc.price_on_date(mid).expect("fwd at midpoint");
@@ -1077,6 +1070,52 @@ mod tests {
             pv.amount().abs() < 0.01,
             "OTM call with zero vol should be ~0, got {}",
             pv.amount()
+        );
+    }
+
+    /// B3: the swaption annuity must be consistent with its own underlying.
+    /// A `CommoditySwap` pays `quantity × price` per period with no
+    /// year-fraction accrual, so a zero-vol ITM call swaption on a flat
+    /// forward curve must equal `notional × (F − K) × Σ DF_i` — computed here
+    /// independently from the discount curve. The pre-fix `Σ DF·τ` annuity
+    /// understated a monthly-settling swaption ~12×.
+    #[test]
+    fn b3_zero_vol_itm_swaption_matches_underlying_swap_pv() {
+        let as_of = date(2025, 1, 2);
+        let fwd = 4.00;
+        let strike = 3.50;
+
+        // Monthly settlement (τ ≈ 1/12) makes the old mis-scaling ~12×.
+        let mut swaption = base_swaption(OptionType::Call, strike);
+        swaption.pricing_overrides.market_quotes.implied_volatility = Some(0.0);
+
+        let market = build_market(as_of, fwd, 0.30, 0.05);
+        let pv = swaption
+            .value(&market, as_of)
+            .expect("pricing should succeed")
+            .amount();
+
+        // Independent reference: per-period payoff quantity × (F − K),
+        // discounted to each payment date — exactly what the underlying
+        // CommoditySwap would pay if exercised.
+        let dc = market.get_discount("USD-OIS").expect("discount");
+        let schedule = swaption.swap_payment_schedule().expect("schedule");
+        let sum_df: f64 = schedule
+            .iter()
+            .map(|&d| dc.df_between_dates(as_of, d).expect("df"))
+            .sum();
+        let expected = swaption.notional * (fwd - strike) * sum_df;
+
+        let rel = (pv - expected).abs() / expected;
+        assert!(
+            rel < 1e-10,
+            "zero-vol ITM swaption PV ({pv}) must equal the underlying swap \
+             payoff PV ({expected}); rel err {rel}"
+        );
+        // Guard against the old Σ DF·τ annuity (~12× smaller for monthly).
+        assert!(
+            pv > expected * 0.5,
+            "swaption PV ({pv}) shows the Σ DF·τ mis-scaling vs ({expected})"
         );
     }
 }

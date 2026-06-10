@@ -322,9 +322,10 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
             }
         };
 
-        // simulate_path_fractional already returns discounted PV — do not
-        // multiply by discount_factor again.
-        let pv = Money::new(mean_pv, ccy);
+        // Vanilla payoffs from `simulate_path_fractional` are undiscounted
+        // terminal payoffs; discount the path mean to present value, matching
+        // the Heston and rough-Heston MC pricers.
+        let pv = Money::new(mean_pv * (-r * t).exp(), ccy);
         Ok(crate::results::ValuationResult::stamped(
             equity_option.id(),
             as_of,

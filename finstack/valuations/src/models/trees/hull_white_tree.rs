@@ -259,15 +259,15 @@ impl HullWhiteTree {
         // Initial state: single node at t=0 with Q(0,0) = 1
         state_prices.push(vec![1.0]);
 
-        // Get initial short rate from discount curve
-        let r0 = if dt > 0.0 {
-            -discount_curve.df(dt).ln() / dt
-        } else {
-            0.03
-        };
-        alpha[0] = r0;
-
-        // Forward induction: calibrate α(t) at each step
+        // Forward induction: calibrate α(t) at each step.
+        //
+        // The α solved at iteration `step` is the drift adjustment for the
+        // interval [t_step, t_{step+1}] (it matches P(0, t_{step+1}) given the
+        // state prices at t_step), so it must be stored at `alpha[step]` —
+        // the index `forward_state_prices` and `backward_induction` use to
+        // discount that interval. Storing it at `alpha[step+1]` shifted the
+        // whole drift schedule by one step and left the tree unable to
+        // reprice any non-flat curve (review finding B4).
         for step in 0..config.steps {
             let _t = time_grid[step];
             let t_next = time_grid[step + 1];
@@ -285,9 +285,10 @@ impl HullWhiteTree {
             }
             probs.push(step_probs);
 
-            // Calibrate α(step+1) to match discount factor at t_next
+            // Calibrate α for the interval [t_step, t_next] to match the
+            // discount factor at t_next.
             let target_df = discount_curve.df(t_next);
-            alpha[step + 1] = Self::calibrate_alpha(
+            alpha[step] = Self::calibrate_alpha(
                 &state_prices[step],
                 &probs[step],
                 dx,
@@ -311,6 +312,13 @@ impl HullWhiteTree {
                 config.compounding,
             );
             state_prices.push(next_state_prices);
+        }
+
+        // Terminal row: no interval [t_N, t_{N+1}] exists to calibrate, so
+        // extend the last solved drift for accessors that read rates at the
+        // final step.
+        if config.steps > 0 {
+            alpha[config.steps] = alpha[config.steps - 1];
         }
 
         Ok(Self {
@@ -905,8 +913,11 @@ mod tests {
         // Tree should have correct number of steps
         assert_eq!(tree.num_steps(), 200);
 
-        // State prices should sum to discount factors
-        // Production standard: calibration error < 1 basis point (0.0001)
+        // State prices should sum to discount factors. With the drift α
+        // stored at the correct index (B4) the forward induction reprices
+        // the curve essentially exactly; 0.1 bp leaves only solver/float
+        // headroom. The pre-fix off-by-one bug produced ~0.8 bp errors on
+        // this mild curve, which the old 1 bp tolerance could not see.
         for step in [20, 50, 100, 150, 200] {
             let t = tree.time_at_step(step);
             let target_df = curve.df(t);
@@ -917,9 +928,8 @@ mod tests {
             let error = (sum_q - target_df).abs();
             let error_bps = (error / target_df) * 10000.0;
 
-            // Production tolerance: < 1 basis point
             assert!(
-                error_bps < 1.0,
+                error_bps < 0.1,
                 "State price calibration error {:.6} ({:.4} bps) at step {} (t={:.2})",
                 error,
                 error_bps,
@@ -927,6 +937,65 @@ mod tests {
                 t
             );
         }
+    }
+
+    #[test]
+    fn test_tree_calibration_steep_curve() {
+        // B4 regression: on a steep curve the off-by-one drift placement
+        // produced 20-40 bp of ZCB bias. The calibrated tree must reprice
+        // the input curve at every pillar to well under 0.1 bp.
+        let steep_curve = DiscountCurve::builder("USD-OIS-STEEP")
+            .base_date(
+                finstack_core::dates::Date::from_calendar_date(2025, Month::January, 1)
+                    .expect("Valid date"),
+            )
+            // Zero rates rising ~1% -> ~6%: df(t) = exp(-z(t)*t)
+            .knots([
+                (0.0, 1.0),
+                (0.5, (-0.012_f64 * 0.5).exp()),
+                (1.0, (-0.018_f64 * 1.0).exp()),
+                (2.0, (-0.030_f64 * 2.0).exp()),
+                (5.0, (-0.048_f64 * 5.0).exp()),
+                (10.0, (-0.060_f64 * 10.0).exp()),
+            ])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("Valid curve");
+
+        let config = HullWhiteTreeConfig::new(0.03, 0.01, 200);
+        let tree = HullWhiteTree::calibrate(config, &steep_curve, 10.0)
+            .expect("Calibration should succeed");
+
+        for step in [10, 20, 40, 100, 160, 200] {
+            let t = tree.time_at_step(step);
+            let target_df = steep_curve.df(t);
+            let sum_q: f64 = (0..tree.num_nodes(step))
+                .map(|j| tree.state_price(step, j))
+                .sum();
+
+            let error_bps = ((sum_q - target_df) / target_df).abs() * 10000.0;
+            assert!(
+                error_bps < 0.1,
+                "Steep-curve calibration error {:.4} bps at step {} (t={:.2})",
+                error_bps,
+                step,
+                t
+            );
+        }
+
+        // Backward induction of a unit payoff must also recover the curve.
+        let final_step = tree.num_steps();
+        let terminal = vec![1.0; tree.num_nodes(final_step)];
+        let value = tree.backward_induction(&terminal, |_, _, cont| cont);
+        let target_df = steep_curve.df(10.0);
+        let error_bps = ((value - target_df) / target_df).abs() * 10000.0;
+        assert!(
+            error_bps < 0.1,
+            "Steep-curve backward induction error {:.4} bps (value={:.8}, df={:.8})",
+            error_bps,
+            value,
+            target_df
+        );
     }
 
     #[test]

@@ -22,20 +22,22 @@
 //! The characteristic function φ(u, T) = E[e^{iu ln(S_T/S_0)}] is:
 //!
 //! ```text
-//! φ(u, T) = exp(iu(r−q)T + C(u,T) + D(u,T) · v₀)
+//! φ(u, T) = exp(iu(r−q)T + C(u,T) + I^{1−α}D(u,T) · v₀)
 //! ```
 //!
-//! where D(u, t) solves the fractional Riccati ODE and C(u, T) integrates
-//! κθ · D over the trajectory.
+//! where D(u, t) solves the fractional Riccati ODE, C(u, T) integrates
+//! κθ · D over the trajectory, and I^{1−α} is the Riemann-Liouville
+//! fractional integral of order 1−α (El Euch & Rosenbaum 2019, Thm 4.1).
 //!
 //! European option prices are computed via the Lewis (2000) single-integral
 //! formula:
 //!
 //! ```text
-//! Call = S e^{−qT} − (K e^{−rT} / π) ∫₀^∞ Re[φ(u − i/2) e^{−iuk} / (u² + 1/4)] du
+//! Call = S e^{−qT} − (K e^{−rT} / π) ∫₀^∞ Re[e^{i(u−i/2)x} ψ(u − i/2) / (u² + 1/4)] du
 //! ```
 //!
-//! where k = ln(F/K) and F = S e^{(r−q)T}.
+//! where x = ln(F/K), F = S e^{(r−q)T}, and ψ is the characteristic function
+//! of the demeaned log return ln(S_T/F).
 //!
 //! # References
 //!
@@ -67,7 +69,7 @@ const EXPONENT_REAL_LIMIT: f64 = 700.0;
 ///
 /// ```text
 /// D^α_t D(t) = F(D(t))
-/// F(x) = ½(u² − iu) + (iuρσ − κ)x + ½σ²x²
+/// F(x) = −½(u² + iu) + (iuρσ − κ)x + ½σ²x²
 /// ```
 ///
 /// is reformulated as a Volterra integral equation and solved with product
@@ -104,7 +106,7 @@ impl FractionalRiccatiSolver {
     /// Returns a vector of length `num_steps + 1` with D(u, 0) = 0.
     ///
     /// The Riccati function is F(D) = a + b·D + c·D² where:
-    /// - a = ½(−u² + iu)
+    /// - a = −½(u² + iu)
     /// - b = iuρσ − κ
     /// - c = ½σ²
     pub fn solve_d(&self, u: Complex64, kappa: f64, sigma: f64, rho: f64) -> Vec<Complex64> {
@@ -113,10 +115,12 @@ impl FractionalRiccatiSolver {
         let alpha = self.alpha;
 
         // Riccati coefficients: F(D) = a + b*D + c*D^2
-        // El Euch & Rosenbaum (2019): F(u, x) = ½(u²i² + ui) + (ρσui − κ)x + ½σ²x²
-        //   = ½(−u² + iu) + (iuρσ − κ)x + ½σ²x²
+        // El Euch & Rosenbaum (2019): F(u, x) = −½u(u + i) + (iuρσ − κ)x + ½σ²x²
+        //   = −½(u² + iu) + (iuρσ − κ)x + ½σ²x²
+        // The constant term satisfies a(−i) = 0, which makes D(−i, ·) ≡ 0 and
+        // enforces the martingale condition ψ(−i) = 1 (review finding B1).
         let iu = Complex64::i() * u;
-        let a = 0.5 * (iu - u * u);
+        let a = -0.5 * (u * u + iu);
         let b = iu * rho * sigma - kappa;
         let c = Complex64::new(0.5 * sigma * sigma, 0.0);
 
@@ -187,6 +191,55 @@ impl FractionalRiccatiSolver {
         }
 
         kappa_theta * integral
+    }
+
+    /// Compute the Riemann-Liouville fractional integral `I^{1−α}D(T)`:
+    ///
+    /// ```text
+    /// I^{1−α}D(T) = (1/Γ(1−α)) ∫₀ᵀ (T−s)^{−α} D(s) ds
+    /// ```
+    ///
+    /// This is the coefficient of v₀ in the rough Heston characteristic
+    /// function (El Euch & Rosenbaum 2019, Thm 4.1). Using `D(T)` instead is
+    /// correct only at α = 1 (classical Heston); see review finding M7.
+    ///
+    /// The integral is evaluated by product integration: `D` is taken
+    /// piecewise-linear on the solver grid and the kernel moments
+    /// `∫ τ^{−α} dτ` and `∫ τ^{1−α} dτ` are integrated exactly per segment,
+    /// which handles the integrable endpoint singularity at s = T.
+    ///
+    /// # Arguments
+    ///
+    /// * `d_trajectory` - D values at each grid point (from [`solve_d`](Self::solve_d))
+    pub fn fractional_integral_d(&self, d_trajectory: &[Complex64]) -> Complex64 {
+        let n = d_trajectory.len().saturating_sub(1);
+        if n == 0 {
+            return Complex64::new(0.0, 0.0);
+        }
+        let h = self.step_size;
+        let alpha = self.alpha;
+        // 1−α ∈ (0, ½) for H ∈ (0, ½), so both exponents below are positive
+        // and the kernel τ^{−α} is integrable.
+        let e0 = 1.0 - alpha;
+        let e1 = 2.0 - alpha;
+        let inv_gamma = 1.0 / ln_gamma(e0).exp();
+
+        // Segment j spans s ∈ [t_j, t_{j+1}]; substitute τ = T − s so that
+        // τ ∈ [(m−1)h, mh] with m = n − j. With D piecewise-linear,
+        //   ∫ τ^{−α} D(s) ds = D_j·(M0 − c1) + D_{j+1}·c1
+        // where M0 = ∫ τ^{−α} dτ, M1 = ∫ τ^{1−α} dτ, c1 = m·M0 − M1/h.
+        let mut integral = Complex64::new(0.0, 0.0);
+        for (j, pair) in d_trajectory.windows(2).enumerate() {
+            let m = (n - j) as f64;
+            let hi = m * h;
+            let lo = (m - 1.0) * h;
+            let m0 = (hi.powf(e0) - lo.powf(e0)) / e0;
+            let m1 = (hi.powf(e1) - lo.powf(e1)) / e1;
+            let c1 = m * m0 - m1 / h;
+            integral += pair[0] * (m0 - c1) + pair[1] * c1;
+        }
+
+        integral * inv_gamma
     }
 }
 
@@ -316,8 +369,11 @@ impl RoughHestonFourierParams {
     /// Returns E[exp(iu · ln(S_T / S_0))] under the risk-neutral measure:
     ///
     /// ```text
-    /// φ(u, T) = exp(iu(r−q)T + C(u,T) + D(u,T) · v₀)
+    /// φ(u, T) = exp(iu(r−q)T + C(u,T) + I^{1−α}D(u,T) · v₀)
     /// ```
+    ///
+    /// The v₀ coefficient is the fractional integral `I^{1−α}D(T)`, not
+    /// `D(T)` (El Euch & Rosenbaum 2019, Thm 4.1; review finding M7).
     ///
     /// # Arguments
     ///
@@ -329,11 +385,9 @@ impl RoughHestonFourierParams {
         let solver = FractionalRiccatiSolver::new(self.hurst, t, DEFAULT_RICCATI_STEPS);
         let d_traj = solver.solve_d(u, self.kappa, self.sigma, self.rho);
         let c_val = solver.solve_c(&d_traj, self.kappa, self.theta);
+        let i_d_val = solver.fractional_integral_d(&d_traj);
 
-        // D(u, T) is the last element of the trajectory
-        let d_val = d_traj[d_traj.len() - 1];
-
-        let exponent = Complex64::i() * u * (r - q) * t + c_val + d_val * self.v0;
+        let exponent = Complex64::i() * u * (r - q) * t + c_val + i_d_val * self.v0;
 
         if !exponent.is_finite() || exponent.re > EXPONENT_REAL_LIMIT {
             return Complex64::new(0.0, 0.0);
@@ -352,11 +406,14 @@ impl RoughHestonFourierParams {
     /// Uses the demeaned characteristic function ψ(u) of X = ln(S_T/F):
     ///
     /// ```text
-    /// Call = S e^{−qT} − (K e^{−rT} / π) ∫₀^∞ Re[e^{iux} ψ(u−i/2)] / (u²+¼) du
+    /// Call = S e^{−qT} − (K e^{−rT} / π) ∫₀^∞ Re[e^{iwx} ψ(w)] / (u²+¼) du
     /// ```
     ///
-    /// where x = ln(F/K), F = S e^{(r−q)T}, and ψ(u−i/2) = exp(C(w) + D(w)·v₀)
-    /// with w = u − i/2. The drift terms cancel analytically. Puts use put-call parity.
+    /// where x = ln(F/K), F = S e^{(r−q)T}, w = u − i/2, and
+    /// ψ(w) = exp(C(w) + I^{1−α}D(w)·v₀). The contour phase is e^{iwx}
+    /// = e^{x/2}·e^{iux} — the e^{x/2} factor comes from evaluating on the
+    /// Lewis contour Im(w) = −½ (review finding B1). The drift terms cancel
+    /// analytically. Puts use put-call parity.
     ///
     /// # Arguments
     ///
@@ -369,7 +426,9 @@ impl RoughHestonFourierParams {
     ///
     /// # Returns
     ///
-    /// Option price (non-negative).
+    /// Option price. The value is not clamped at zero: tiny negative values
+    /// can arise from quadrature noise on far-OTM options, and materially
+    /// negative values indicate a pricing failure that must stay visible.
     ///
     /// # References
     ///
@@ -416,18 +475,21 @@ impl RoughHestonFourierParams {
         let solver = FractionalRiccatiSolver::new(self.hurst, t, DEFAULT_RICCATI_STEPS);
 
         // Lewis integrand at quadrature point u:
-        //   Re[e^{iux} · ψ(u−i/2)] / (u² + 1/4)
+        //   Re[e^{iwx} · ψ(w)] / (u² + 1/4),  w = u − i/2
         //
-        // where ψ(u−i/2) = exp(C(w) + D(w)·v₀), w = u − i/2.
-        // The risk-neutral drift cancels analytically when converting from
-        // φ (char func of log-return) to ψ (char func of demeaned log-return).
+        // where ψ(w) = exp(C(w) + I^{1−α}D(w)·v₀). The phase i·w·x carries
+        // the real contour factor e^{x/2} (B1); the v₀ coefficient is the
+        // fractional integral I^{1−α}D, not D(T) (M7). The risk-neutral
+        // drift cancels analytically when converting from φ (char func of
+        // log-return) to ψ (char func of demeaned log-return).
         let integrand = |u_real: f64| -> f64 {
             let w = Complex64::new(u_real, -0.5);
             let d_traj = solver.solve_d(w, self.kappa, self.sigma, self.rho);
             let c_val = solver.solve_c(&d_traj, self.kappa, self.theta);
-            let d_val = d_traj[d_traj.len() - 1];
+            let i_d_val = solver.fractional_integral_d(&d_traj);
 
-            let exponent = Complex64::new(0.0, u_real * x) + c_val + d_val * self.v0;
+            // i·w·x = i·(u − i/2)·x = x/2 + i·u·x
+            let exponent = Complex64::new(0.5 * x, u_real * x) + c_val + i_d_val * self.v0;
             if !exponent.is_finite() || exponent.re > EXPONENT_REAL_LIMIT {
                 return 0.0;
             }
@@ -450,13 +512,17 @@ impl RoughHestonFourierParams {
         )
         .unwrap_or(0.0);
 
-        let call = (spot * (-q * t).exp() - strike * (-r * t).exp() * integral / PI).max(0.0);
+        // No `.max(0.0)` clamp: a materially negative value signals a pricer
+        // defect and must stay visible rather than be silently truncated
+        // (the old clamp returned exactly 0 for deep-OTM calls; B1). Small
+        // negative quadrature noise is possible for far-OTM options.
+        let call = spot * (-q * t).exp() - strike * (-r * t).exp() * integral / PI;
 
         if is_call {
             call
         } else {
             // Put-call parity: P = C - S·e^{-qT} + K·e^{-rT}
-            (call - spot * (-q * t).exp() + strike * (-r * t).exp()).max(0.0)
+            call - spot * (-q * t).exp() + strike * (-r * t).exp()
         }
     }
 
@@ -588,6 +654,40 @@ mod tests {
         assert!(c.norm() < 1e-15, "C should be zero for zero D trajectory");
     }
 
+    /// B1 regression: the Riccati constant term must satisfy a(−i) = 0, so
+    /// D(−i, ·) ≡ 0 along the whole trajectory. This is the martingale
+    /// condition E[S_T/F] = 1; the old sign error gave a(−i) = 1.
+    #[test]
+    fn riccati_martingale_condition_d_at_minus_i_is_zero() {
+        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 200);
+        let d = solver.solve_d(Complex64::new(0.0, -1.0), 2.0, 0.3, -0.7);
+        for (j, val) in d.iter().enumerate() {
+            assert!(
+                val.norm() < 1e-12,
+                "martingale condition violated: D(−i)[{j}] = {val}"
+            );
+        }
+    }
+
+    /// `I^{1−α}D` reduces to plain trapezoidal-like integration sanity: for a
+    /// constant trajectory D ≡ c, I^{1−α}D(T) = c·T^{1−α}/Γ(2−α) exactly.
+    #[test]
+    fn fractional_integral_constant_trajectory() {
+        let hurst = 0.1;
+        let t = 1.5;
+        let solver = FractionalRiccatiSolver::new(hurst, t, 200);
+        let c = Complex64::new(0.7, -0.3);
+        let traj = vec![c; 201];
+
+        let alpha = hurst + 0.5;
+        let expected = c * t.powf(1.0 - alpha) / ln_gamma(2.0 - alpha).exp();
+        let actual = solver.fractional_integral_d(&traj);
+        assert!(
+            (actual - expected).norm() < 1e-12,
+            "I^{{1−α}} of a constant must be exact: got {actual}, expected {expected}"
+        );
+    }
+
     // -----------------------------------------------------------------------
     // Characteristic function
     // -----------------------------------------------------------------------
@@ -616,6 +716,23 @@ mod tests {
                 phi.norm()
             );
         }
+    }
+
+    /// B1 regression: φ(−i, T) = E[S_T/S_0] = e^{(r−q)T} (martingale
+    /// property of the discounted spot). With the correct Riccati constant
+    /// term D(−i, ·) ≡ 0 so this holds essentially exactly.
+    #[test]
+    fn char_func_martingale_property() {
+        let params = RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, 0.1).expect("valid");
+        let r = 0.05;
+        let q = 0.02;
+        let t = 1.0;
+        let phi = params.char_func(Complex64::new(0.0, -1.0), r, q, t);
+        let expected = ((r - q) * t).exp();
+        assert!(
+            (phi.re - expected).abs() < 1e-10 && phi.im.abs() < 1e-10,
+            "φ(−i) should equal e^{{(r−q)T}} = {expected}, got {phi}"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -695,13 +812,80 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
+    // Black-Scholes limit golden values (σ → 0, B1/M7 regression)
+    // -----------------------------------------------------------------------
+
+    /// With vanishing vol-of-vol and v₀ = θ the variance is deterministic at
+    /// θ, so the model degenerates to Black-Scholes at vol √θ. This is a
+    /// genuine external reference (no circularity): the pre-fix pricer
+    /// returned 34.22 / 12.66 / 0.00 against the true 24.59 / 10.45 / 3.25.
+    #[test]
+    fn bs_limit_call_prices_across_moneyness() {
+        let vol = 0.2;
+        let params = RoughHestonFourierParams::new(vol * vol, 2.0, vol * vol, 1e-3, 0.0, 0.1)
+            .expect("valid");
+        let spot: f64 = 100.0;
+        let r: f64 = 0.05;
+        let q: f64 = 0.0;
+        let t: f64 = 1.0;
+        let forward = spot * ((r - q) * t).exp();
+        let df = (-r * t).exp();
+
+        // The 200-step fractional Adams scheme leaves ~0.005 absolute bias
+        // (D(t) ~ t^α has a singular derivative at 0); bound both the
+        // absolute error (~0.5 bp of spot) and the relative error. The
+        // pre-fix pricer was off by 10-40% here.
+        for &strike in &[80.0, 100.0, 120.0] {
+            let rough = params.price_european(spot, strike, r, q, t, true);
+            let bs = df * crate::math::volatility::black_call(forward, strike, vol, t);
+            let abs_err = (rough - bs).abs();
+            let rel = abs_err / bs;
+            assert!(
+                abs_err < 1e-2 && rel < 2e-2,
+                "σ→0 rough Heston call (K={strike}) must match Black-Scholes: \
+                 rough={rough:.6}, bs={bs:.6}, abs={abs_err:.2e}, rel={rel:.2e}"
+            );
+        }
+    }
+
+    /// Direct put pricing against the same Black-Scholes limit — guards the
+    /// put leg independently rather than only through put-call parity.
+    #[test]
+    fn bs_limit_put_prices_across_moneyness() {
+        let vol = 0.2;
+        let params = RoughHestonFourierParams::new(vol * vol, 2.0, vol * vol, 1e-3, 0.0, 0.1)
+            .expect("valid");
+        let spot: f64 = 100.0;
+        let r: f64 = 0.05;
+        let q: f64 = 0.0;
+        let t: f64 = 1.0;
+        let forward = spot * ((r - q) * t).exp();
+        let df = (-r * t).exp();
+
+        for &strike in &[80.0, 100.0, 120.0] {
+            let rough = params.price_european(spot, strike, r, q, t, false);
+            let bs = df * crate::math::volatility::black_put(forward, strike, vol, t);
+            let abs_err = (rough - bs).abs();
+            let rel = abs_err / bs;
+            assert!(
+                abs_err < 1e-2 && rel < 2e-2,
+                "σ→0 rough Heston put (K={strike}) must match Black-Scholes: \
+                 rough={rough:.6}, bs={bs:.6}, abs={abs_err:.2e}, rel={rel:.2e}"
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Convergence to standard Heston at H → 0.5
     // -----------------------------------------------------------------------
 
     #[test]
-    fn approx_matches_standard_heston_near_h_half() {
-        // With H close to 0.5, rough Heston should approximate standard Heston.
-        // Use H = 0.499 (as close to 0.5 as allowed).
+    fn matches_standard_heston_near_h_half_across_moneyness() {
+        // With H close to 0.5 (α → 1) the fractional Riccati reduces to the
+        // classical Heston Riccati and I^{1−α}D → D(T), so rough Heston must
+        // agree with the classical Heston pricer tightly — across moneyness,
+        // not just ATM. The pre-fix suite used a 15% ATM-only tolerance that
+        // could not see B1/M7.
         let v0 = 0.04;
         let kappa = 2.0;
         let theta = 0.04;
@@ -715,23 +899,20 @@ mod tests {
                 .expect("valid");
 
         let spot = 100.0;
-        let strike = 100.0;
         let r = 0.05;
         let q = 0.0;
         let t = 1.0;
 
-        let rough_price = rough.price_european(spot, strike, r, q, t, true);
-        let heston_price = standard.price_european(spot, strike, r, q, t, true);
-
-        // The rough Heston at H=0.499 uses a different numerical method
-        // (fractional Adams + Lewis integral) than standard Heston (Gil-Pelaez).
-        // We expect qualitative agreement but not exact match.
-        let rel_diff = (rough_price - heston_price).abs() / heston_price;
-        assert!(
-            rel_diff < 0.15,
-            "Rough Heston (H≈0.5) should be in the neighborhood of standard Heston: \
-             rough={rough_price:.4}, heston={heston_price:.4}, rel_diff={rel_diff:.4}"
-        );
+        for &strike in &[80.0, 90.0, 100.0, 110.0, 120.0] {
+            let rough_price = rough.price_european(spot, strike, r, q, t, true);
+            let heston_price = standard.price_european(spot, strike, r, q, t, true);
+            let rel_diff = (rough_price - heston_price).abs() / heston_price;
+            assert!(
+                rel_diff < 5e-3,
+                "Rough Heston (H≈0.5, K={strike}) must match standard Heston: \
+                 rough={rough_price:.6}, heston={heston_price:.6}, rel_diff={rel_diff:.4e}"
+            );
+        }
     }
 
     // -----------------------------------------------------------------------

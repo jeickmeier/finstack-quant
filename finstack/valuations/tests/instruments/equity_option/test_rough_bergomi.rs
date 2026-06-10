@@ -112,6 +112,43 @@ fn rbergomi_small_eta_converges_to_black_scholes() {
     );
 }
 
+/// With a non-zero risk-free rate the MC PV must be the *discounted* expected
+/// payoff. In the η→0, ρ=0 limit the model collapses to Black-Scholes, so the
+/// price must match BS at r=10% — and in particular must NOT be high by the
+/// undiscounted factor e^{rT} ≈ 10.5% (regression for the missing
+/// `exp(-r*t)` discounting, review finding B2).
+#[test]
+fn rbergomi_nonzero_rate_price_is_discounted() {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+    let spot = 100.0;
+    let strike = 100.0;
+    let vol = 0.20;
+    let rate = 0.10;
+
+    let market = rbergomi_market(as_of, spot, vol, rate, 1e-3, 0.1, 0.0);
+    let mc_price = price_rbergomi_call(&market, as_of, expiry, strike, 40_000);
+
+    // Act365F over a leap year ⇒ t = 366/365.
+    let t = 366.0 / 365.0;
+    let bs_price = black_scholes_spot_call(spot, strike, rate, 0.0, vol, t) * 100.0; // contract size 100
+
+    let rel = (mc_price - bs_price).abs() / bs_price;
+    assert!(
+        rel < 4e-2,
+        "η→0 rBergomi call at r=10% ({mc_price}) should match discounted \
+         Black-Scholes ({bs_price}); rel err {rel}"
+    );
+    // The undiscounted payoff mean would be bs_price·e^{rT} ≈ +10.5%; assert
+    // we are strictly below that.
+    let undiscounted = bs_price * (rate * t).exp();
+    assert!(
+        mc_price < undiscounted * 0.97,
+        "rBergomi PV ({mc_price}) must be discounted, not the raw payoff mean \
+         (~{undiscounted})"
+    );
+}
+
 /// The rBergomi pricer is deterministic: pricing the same instrument twice
 /// with the same seed yields a bit-identical PV (INVARIANTS §2).
 #[test]
