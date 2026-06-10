@@ -71,6 +71,18 @@ pub struct EquityTotalReturnSwap {
     pub side: TrsSide,
     /// Initial index level (if known, otherwise fetched from market).
     pub initial_level: Option<f64>,
+    /// Observed underlying levels at past reset (period-start) dates.
+    ///
+    /// For a seasoned TRS valued inside a return period, the total-return leg
+    /// must anchor the current period to the level *observed* at the period
+    /// start so the realized spot move enters the PV (equity delta). Provide
+    /// `(reset_date, level)` pairs for every period-start date on or before
+    /// the valuation date; the first period may use `initial_level` instead.
+    /// Pricing errors when the current period's start level is unavailable.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(with = "Vec<(String, f64)>")]
+    pub past_fixings: Vec<(Date, f64)>,
     /// Optional OTC margin specification for VM/IM.
     ///
     /// Equity TRS use SIMM equity bucket for margin calculation.
@@ -123,6 +135,9 @@ struct EquityTotalReturnSwapUnchecked {
     side: TrsSide,
     initial_level: Option<f64>,
     #[serde(default)]
+    #[schemars(with = "Vec<(String, f64)>")]
+    past_fixings: Vec<(Date, f64)>,
+    #[serde(default)]
     margin_spec: Option<OtcMarginSpec>,
     #[serde(default)]
     dividend_tax_rate: f64,
@@ -146,6 +161,7 @@ impl TryFrom<EquityTotalReturnSwapUnchecked> for EquityTotalReturnSwap {
             schedule: value.schedule,
             side: value.side,
             initial_level: value.initial_level,
+            past_fixings: value.past_fixings,
             margin_spec: value.margin_spec,
             dividend_tax_rate: value.dividend_tax_rate,
             discrete_dividends: value.discrete_dividends,
@@ -306,7 +322,25 @@ impl EquityTotalReturnSwap {
                 )));
             }
         }
+        for (d, v) in &self.past_fixings {
+            if !v.is_finite() || *v <= 0.0 {
+                return Err(finstack_core::Error::Validation(format!(
+                    "EquityTRS '{}' past_fixings[{}] = {} must be finite and positive",
+                    self.id.as_str(),
+                    d,
+                    v
+                )));
+            }
+        }
         Ok(())
+    }
+
+    /// Look up the observed underlying level for a reset (period-start) date.
+    pub fn fixing_on(&self, date: Date) -> Option<f64> {
+        self.past_fixings
+            .iter()
+            .find(|(d, _)| *d == date)
+            .map(|(_, v)| *v)
     }
 
     /// Calculates the present value of the total return leg.

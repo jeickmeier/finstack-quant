@@ -11,7 +11,7 @@
 //! the two exactly consistent and avoids the accuracy pitfalls of
 //! hand-derived Hagan-expansion gradients.
 
-use super::sabr::{SABRModel, SABRParameters};
+use super::sabr::{vega_weight, SABRModel, SABRParameters};
 use finstack_core::math::solver_multi::AnalyticalDerivatives;
 use finstack_core::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -118,16 +118,40 @@ impl SABRMarketData {
 /// Supplies SABR implied volatility and its parameter gradient
 /// (∂σ/∂α, ∂σ/∂ν, ∂σ/∂ρ) to the Levenberg-Marquardt calibrator. Volatilities
 /// come from [`SABRModel::implied_volatility`]; each gradient component is a
-/// central finite difference of that same routine, so the gradient is exactly
-/// consistent with the least-squares objective.
+/// central finite difference of that same routine, and the gradient carries
+/// the same per-strike vega weights as the calibration objective, so the two
+/// are exactly consistent.
 pub struct SABRCalibrationDerivatives {
     market_data: SABRMarketData,
+    /// Per-strike vega weights matching the calibration objective
+    /// `Σ w·(σ_model − σ_market)²`. They depend only on the (fixed) market
+    /// data, so they are computed once at construction. Any configured shift
+    /// is applied to forward/strike, mirroring `sabr_vol_fd`.
+    weights: Vec<f64>,
 }
 
 impl SABRCalibrationDerivatives {
     /// Create a new SABR derivatives provider.
     pub fn new(market_data: SABRMarketData) -> Self {
-        Self { market_data }
+        let shift = market_data.shift.unwrap_or(0.0);
+        let weights = market_data
+            .strikes
+            .iter()
+            .zip(market_data.market_vols.iter())
+            .map(|(&strike, &market_vol)| {
+                vega_weight(
+                    market_data.forward + shift,
+                    strike + shift,
+                    market_vol,
+                    market_data.time_to_expiry,
+                    market_data.beta,
+                )
+            })
+            .collect();
+        Self {
+            market_data,
+            weights,
+        }
     }
 
     /// Compute SABR implied volatility and its parameter derivatives.
@@ -203,17 +227,20 @@ impl AnalyticalDerivatives for SABRCalibrationDerivatives {
         gradient[1] = 0.0;
         gradient[2] = 0.0;
 
-        // Gradient of the least-squares objective Σ (model_vol − market_vol)².
+        // Gradient of the vega-weighted least-squares objective
+        // Σ w·(model_vol − market_vol)² — the same weighting the
+        // calibration objective applies (see `vega_weight`).
         for (i, &strike) in self.market_data.strikes.iter().enumerate() {
             let (model_vol, d_alpha, d_nu, d_rho) =
                 self.sabr_vol_and_derivatives(strike, alpha, nu, rho);
 
             let market_vol = self.market_data.market_vols[i];
             let residual = model_vol - market_vol;
+            let w = self.weights[i];
 
-            gradient[0] += 2.0 * residual * d_alpha;
-            gradient[1] += 2.0 * residual * d_nu;
-            gradient[2] += 2.0 * residual * d_rho;
+            gradient[0] += 2.0 * w * residual * d_alpha;
+            gradient[1] += 2.0 * w * residual * d_nu;
+            gradient[2] += 2.0 * w * residual * d_rho;
         }
     }
 
@@ -264,13 +291,13 @@ mod tests {
 
         let deriv_provider = SABRCalibrationDerivatives::new(market_data.clone());
 
-        // Provider gradient of the least-squares objective.
+        // Provider gradient of the vega-weighted least-squares objective.
         let params = vec![0.15, 0.3, -0.1];
         let mut provider_grad = vec![0.0; 3];
         deriv_provider.gradient(&params, &mut provider_grad);
 
-        // Numerical gradient of the same objective, built directly from the
-        // SABRModel volatilities.
+        // Numerical gradient of the same vega-weighted objective, built
+        // directly from the SABRModel volatilities.
         let eps = 1e-6;
         let mut numerical_grad = [0.0; 3];
 
@@ -283,7 +310,7 @@ mod tests {
             for (i, &strike) in market_data.strikes.iter().enumerate() {
                 let model_vol = deriv_provider.sabr_vol_fd(strike, alpha, nu, rho);
                 let residual = model_vol - market_data.market_vols[i];
-                sum_sq += residual * residual;
+                sum_sq += deriv_provider.weights[i] * residual * residual;
             }
             sum_sq
         };
@@ -335,7 +362,7 @@ mod tests {
         let mut provider_grad = vec![0.0; 3];
         deriv_provider.gradient(&params, &mut provider_grad);
 
-        // Numerical gradient of the same objective.
+        // Numerical gradient of the same vega-weighted objective.
         let eps = 1e-6;
         let mut numerical_grad = [0.0; 3];
 
@@ -348,7 +375,7 @@ mod tests {
             for (i, &strike) in market_data.strikes.iter().enumerate() {
                 let model_vol = deriv_provider.sabr_vol_fd(strike, alpha, nu, rho);
                 let residual = model_vol - market_data.market_vols[i];
-                sum_sq += residual * residual;
+                sum_sq += deriv_provider.weights[i] * residual * residual;
             }
             sum_sq
         };

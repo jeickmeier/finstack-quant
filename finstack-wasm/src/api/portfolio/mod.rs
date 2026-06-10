@@ -43,7 +43,7 @@
 
 use std::sync::Arc;
 
-use crate::utils::to_js_err;
+use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
 pub mod sensitivity;
@@ -313,7 +313,7 @@ pub fn apply_scenario_and_revalue_built(
         &config,
     )
     .map_err(to_js_err)?;
-    serde_wasm_bindgen::to_value(&out).map_err(to_js_err)
+    to_js_value(&out)
 }
 
 /// Apply a scenario to a portfolio and revalue.

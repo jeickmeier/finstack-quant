@@ -24,6 +24,23 @@ pub fn to_js_error(e: &dyn std::error::Error) -> JsValue {
     js_value_from_message(format_error_chain(e))
 }
 
+/// Serialize a value to a `JsValue` using JSON-compatible conventions.
+///
+/// Unlike `serde_wasm_bindgen::to_value`, which serializes Rust maps (and
+/// `serde_json::Value::Object`) as ES2015 `Map`s, this helper uses
+/// [`serde_wasm_bindgen::Serializer::json_compatible`] so maps become plain
+/// JS objects — matching the shapes declared in `index.d.ts` and the dict
+/// shapes returned by the Python bindings.
+///
+/// # Errors
+///
+/// Returns a structured `JsValue` error if serialization fails.
+pub fn to_js_value<T: serde::Serialize>(value: &T) -> Result<JsValue, JsValue> {
+    value
+        .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+        .map_err(to_js_err)
+}
+
 /// Build a named JS `Error` with optional structured `kind` and `cause`
 /// properties.
 pub fn structured_js_error(

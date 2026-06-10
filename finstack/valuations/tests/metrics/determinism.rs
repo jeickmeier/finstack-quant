@@ -348,6 +348,8 @@ mod tests {
             spot_id: "SPOT".into(),
             vol_surface_id: "SPOT_VOL".into(),
             div_yield_id: None,
+            initial_level: None,
+            past_fixings: vec![],
             pricing_overrides: Default::default(),
             attributes: Default::default(),
         };

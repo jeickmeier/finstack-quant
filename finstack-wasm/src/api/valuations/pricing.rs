@@ -24,7 +24,7 @@
 //! `tests::price_instrument_mc_is_deterministic_without_explicit_seed`.
 
 use super::market_handle::Market;
-use crate::utils::{to_js_err, to_js_error};
+use crate::utils::{to_js_err, to_js_error, to_js_value};
 use finstack_core::market_data::context::MarketContext;
 use finstack_valuations::results::ValuationResult;
 use wasm_bindgen::prelude::*;
@@ -193,7 +193,7 @@ pub fn list_standard_metrics() -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = listStandardMetricsGrouped)]
 pub fn list_standard_metrics_grouped() -> Result<JsValue, JsValue> {
     let map = finstack_valuations::pricer::list_standard_metrics_grouped();
-    serde_wasm_bindgen::to_value(&map).map_err(to_js_err)
+    to_js_value(&map)
 }
 
 // ---------------------------------------------------------------------------

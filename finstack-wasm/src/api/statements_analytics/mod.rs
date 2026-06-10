@@ -10,7 +10,7 @@ pub use comps::{
     z_score,
 };
 
-use crate::utils::to_js_err;
+use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
 /// Run a sensitivity analysis on a financial model.
@@ -93,7 +93,7 @@ pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, 
         "rmse": metrics.rmse,
         "n": metrics.n,
     });
-    serde_wasm_bindgen::to_value(&result).map_err(to_js_err)
+    to_js_value(&result)
 }
 
 /// Generate tornado chart entries for a sensitivity result.
@@ -176,7 +176,7 @@ pub fn goal_seek(
     } else {
         serde_json::json!({ "solved_value": result })
     };
-    serde_wasm_bindgen::to_value(&out).map_err(to_js_err)
+    to_js_value(&out)
 }
 
 /// Trace dependencies for a node and return ASCII tree.

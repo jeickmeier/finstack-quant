@@ -119,6 +119,35 @@ def test_sabr_calibrator_round_trip() -> None:
         assert abs(v_fit - v_orig) < 1e-2
 
 
+def test_sabr_calibrate_requires_explicit_beta() -> None:
+    # beta is required (matching Rust/WASM); omitting it must not silently
+    # apply the equity lognormal convention.
+    with pytest.raises(TypeError):
+        SabrCalibrator().calibrate(100.0, [90.0, 100.0, 110.0], [0.2, 0.19, 0.2], 1.0)
+
+
+def test_sabr_calibrate_auto_shift_positive_rates_matches_calibrate() -> None:
+    params = SabrParameters(0.05, 0.5, 0.4, -0.1)
+    smile = SabrSmile(params, 0.03, 1.0)
+    strikes = [0.01, 0.02, 0.03, 0.04, 0.05]
+    vols = smile.generate_smile(strikes)
+    fitted = SabrCalibrator().calibrate_auto_shift(0.03, strikes, vols, 1.0, 0.5)
+    assert fitted.shift is None
+    assert fitted.alpha > 0.0
+
+
+def test_sabr_calibrate_auto_shift_negative_rates_uses_shift() -> None:
+    params = SabrParameters(0.05, 0.5, 0.4, -0.1, shift=0.03)
+    forward = -0.005
+    strikes = [-0.015, -0.01, -0.005, 0.0, 0.005]
+    smile = SabrSmile(params, forward, 1.0)
+    vols = smile.generate_smile(strikes)
+    fitted = SabrCalibrator().calibrate_auto_shift(forward, strikes, vols, 1.0, 0.5)
+    assert fitted.shift is not None
+    assert fitted.shift > 0.0
+    assert fitted.is_shifted()
+
+
 # ---------------------------------------------------------------------------
 # B4 — instrument_cashflows
 # ---------------------------------------------------------------------------

@@ -1188,6 +1188,8 @@ export interface SabrParametersConstructor {
 
 export interface SabrModel {
   impliedVol(forward: number, strike: number, t: number): number;
+  /** Parameters used by this model. */
+  readonly params: SabrParameters;
   supportsNegativeRates(): boolean;
 }
 
@@ -1222,7 +1224,17 @@ export interface SabrSmileConstructor {
 }
 
 export interface SabrCalibrator {
+  /** Copy of this calibrator with an overridden convergence tolerance. */
+  withTolerance(tolerance: number): SabrCalibrator;
   calibrate(
+    forward: number,
+    strikes: number[],
+    marketVols: number[],
+    t: number,
+    beta: number
+  ): SabrParameters;
+  /** Calibrate with automatic shift selection for negative-rate smiles. */
+  calibrateAutoShift(
     forward: number,
     strikes: number[],
     marketVols: number[],

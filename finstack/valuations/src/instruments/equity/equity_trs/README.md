@@ -12,6 +12,11 @@
 - PV = PV(total-return leg) − PV(financing leg)
 - Forward price model: F_t = S_0 × e^{(r-q)t}
 - Total return = Price return + Dividend return
+- Seasoned trades: the in-progress period anchors to the level observed at
+  the period start (`past_fixings`, or `initial_level` for the first period)
+  against the forward of the live spot, so the realized move enters the PV
+  (equity delta). Fully-future periods are pure forward-ratio carry. Pricing
+  errors when the current period's start level is unavailable.
 - Deterministic curves and spot prices; no stochastic equity modeling
 
 ## Usage Example

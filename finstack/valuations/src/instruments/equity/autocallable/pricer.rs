@@ -67,6 +67,92 @@ impl AutocallableMcPricer {
 
         let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
 
+        // Reference (strike-set) level S_0 for barrier and payoff ratios.
+        // For a new trade this is the spot at as_of; seasoned trades must
+        // carry the observed initial fixing.
+        let s0 = inst.initial_level.unwrap_or(initial_spot);
+
+        // Deterministic evaluation of past observation dates (seasoned trade).
+        //
+        // Every observation date on or before as_of must have an observed
+        // fixing: evaluating past dates against simulated spot would both
+        // randomize already-known outcomes and future-value past cashflows
+        // (df_ratio > 1).
+        let n_past = inst
+            .observation_dates
+            .iter()
+            .take_while(|&&d| d <= as_of)
+            .count();
+        if n_past > 0 && inst.initial_level.is_none() {
+            return Err(finstack_core::Error::Validation(format!(
+                "Autocallable '{}' has {} past observation dates but no initial_level; \
+                 the strike-set level is required to evaluate past barriers",
+                inst.id, n_past
+            )));
+        }
+        let mut past_min_spot = f64::INFINITY;
+        let mut past_max_spot = f64::NEG_INFINITY;
+        let mut prior_memory_coupons = 0.0;
+        for idx in 0..n_past {
+            let obs_date = inst.observation_dates[idx];
+            let fix = inst.fixing_on(obs_date).ok_or_else(|| {
+                finstack_core::Error::Validation(format!(
+                    "Autocallable '{}': observation date {} is on or before as_of {} but has \
+                     no entry in past_fixings; provide the observed fixing to price this \
+                     seasoned trade",
+                    inst.id, obs_date, as_of
+                ))
+            })?;
+            past_min_spot = past_min_spot.min(fix);
+            past_max_spot = past_max_spot.max(fix);
+            if fix >= s0 * inst.autocall_barriers[idx] {
+                // The note autocalled at a past observation date: principal and
+                // coupon settled before as_of, so nothing remains to value.
+                return Ok(Money::new(0.0, inst.notional.currency()));
+            }
+            if inst.memory_coupons {
+                prior_memory_coupons += inst.coupons[idx];
+            }
+        }
+
+        // All observation dates already past and never autocalled: the final
+        // payoff is fully determined by the observed fixings; discount the
+        // known cashflow from the settlement date.
+        if n_past == inst.observation_dates.len() {
+            // n_past > 0 here (observation_dates is validated non-empty), so
+            // the last fixing exists.
+            let last_obs = inst.observation_dates[n_past - 1];
+            let final_fixing = inst.fixing_on(last_obs).ok_or_else(|| {
+                finstack_core::Error::Validation(format!(
+                    "Autocallable '{}': missing fixing for final observation date {}",
+                    inst.id, last_obs
+                ))
+            })?;
+            let payoff = AutocallablePayoff::new(
+                vec![],
+                vec![],
+                vec![],
+                inst.memory_coupons,
+                inst.final_barrier,
+                Self::convert_final_payoff_type(inst.final_payoff_type),
+                inst.participation_rate,
+                inst.cap_level,
+                inst.notional.amount(),
+                inst.notional.currency(),
+                s0,
+                vec![],
+            )?;
+            let ratio = payoff.final_payoff_ratio(final_fixing, past_min_spot);
+            return Ok(Money::new(
+                ratio * inst.notional.amount() * discount_factor,
+                inst.notional.currency(),
+            ));
+        }
+
+        let future_dates = &inst.observation_dates[n_past..];
+        let future_barriers = inst.autocall_barriers[n_past..].to_vec();
+        let future_coupons = inst.coupons[n_past..].to_vec();
+
         // Dividend yield from scalar id if provided
         //
         // When a dividend yield ID is explicitly provided, we require the lookup to succeed
@@ -93,9 +179,8 @@ impl AutocallableMcPricer {
             0.0
         };
 
-        // Map observation dates to times.
-        let observation_times: Vec<f64> = inst
-            .observation_dates
+        // Map remaining (future) observation dates to times.
+        let observation_times: Vec<f64> = future_dates
             .iter()
             .map(|&date| disc_dc.year_fraction(as_of, date, DayCountContext::default()))
             .collect::<finstack_core::Result<Vec<_>>>()?;
@@ -128,30 +213,30 @@ impl AutocallableMcPricer {
 
         let mc_final_payoff = Self::convert_final_payoff_type(inst.final_payoff_type);
 
-        // Calculate discount factor ratios for each observation date
-        // Ratio = DF(T_obs) / DF(T_mat)
-        // This corrects for the engine applying DF(T_mat) to early cashflows
+        // Calculate discount factor ratios for each remaining observation date
+        // Ratio = DF(as_of, T_obs) / DF(as_of, T_mat)
+        // This corrects for the engine applying DF(T_mat) to early cashflows.
         //
-        // IMPORTANT: Use discount curve's day count (disc_dc) consistently for all
-        // time calculations. Mixing inst.day_count with disc_dc would distort timing
-        // and coupon PVs. The observation_times above already use disc_dc, so the
-        // discount factor lookups must match to ensure consistent discounting.
-        let df_ratios: Vec<f64> = observation_times
+        // Date-based lookups (df_between_dates) rather than axis-based df(t):
+        // the ratios stay correct when the curve base date differs from as_of,
+        // and only future dates reach here so no ratio can exceed the
+        // observation date's true discounting.
+        let df_ratios: Vec<f64> = future_dates
             .iter()
-            .map(|&t_obs| {
-                let df_obs = disc_curve.df(t_obs.max(0.0));
-                if discount_factor > 0.0 {
+            .map(|&obs_date| {
+                let df_obs = disc_curve.df_between_dates(as_of, obs_date)?;
+                Ok(if discount_factor > 0.0 {
                     df_obs / discount_factor
                 } else {
                     1.0
-                }
+                })
             })
-            .collect();
+            .collect::<finstack_core::Result<Vec<_>>>()?;
 
         let payoff = AutocallablePayoff::new(
             observation_times.clone(),
-            inst.autocall_barriers.clone(),
-            inst.coupons.clone(),
+            future_barriers,
+            future_coupons,
             inst.memory_coupons,
             inst.final_barrier,
             mc_final_payoff,
@@ -159,9 +244,10 @@ impl AutocallableMcPricer {
             inst.cap_level,
             inst.notional.amount(),
             inst.notional.currency(),
-            initial_spot,
+            s0,
             df_ratios,
-        )?;
+        )?
+        .with_seasoned_state(past_min_spot, past_max_spot, prior_memory_coupons);
 
         // Derive deterministic seed from instrument ID and scenario.
         use finstack_monte_carlo::seed;

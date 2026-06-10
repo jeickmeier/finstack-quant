@@ -25,15 +25,6 @@ use finstack_valuations::models::volatility::sabr::{
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
-/// Default CEV exponent ``beta`` for :meth:`SabrCalibrator.calibrate` when the
-/// caller omits it.
-///
-/// ``1.0`` is the equity-market-standard lognormal convention and matches
-/// `SABRParameters::equity_default().beta`. Use ``0.5`` for rates or ``0.0``
-/// for normal vol. Defined once here so the calibrator's default cannot drift
-/// from the value documented in its docstring.
-const DEFAULT_CALIBRATION_BETA: f64 = 1.0;
-
 // ---------------------------------------------------------------------------
 // SabrParameters
 // ---------------------------------------------------------------------------
@@ -379,15 +370,15 @@ impl PySabrCalibrator {
     ///     Observed Black implied volatilities at each strike.
     /// t : float
     ///     Time to expiry in years.
-    /// beta : float, optional
-    ///     Fixed CEV exponent (default ``1.0`` for equity; use ``0.5`` for
-    ///     rates, ``0.0`` for normal vol).
+    /// beta : float
+    ///     Fixed CEV exponent (``1.0`` for equity lognormal, ``0.5`` for
+    ///     rates, ``0.0`` for normal vol). Required — matching the Rust and
+    ///     WASM signatures — so the convention is always an explicit choice.
     ///
     /// Returns
     /// -------
     /// SabrParameters
     ///     Calibrated parameters (``beta`` fixed to the input value).
-    #[pyo3(signature = (forward, strikes, market_vols, t, beta=DEFAULT_CALIBRATION_BETA))]
     fn calibrate(
         &self,
         forward: f64,
@@ -396,15 +387,47 @@ impl PySabrCalibrator {
         t: f64,
         beta: f64,
     ) -> PyResult<PySabrParameters> {
-        if strikes.len() != market_vols.len() {
-            return Err(crate::errors::value_error(format!(
-                "strikes length ({}) must match market_vols length ({})",
-                strikes.len(),
-                market_vols.len()
-            )));
-        }
+        check_smile_lengths(&strikes, &market_vols)?;
         self.inner
             .calibrate(forward, &strikes, &market_vols, t, beta)
+            .map(|inner| PySabrParameters { inner })
+            .map_err(display_to_py)
+    }
+
+    /// Calibrate with automatic shift selection for negative-rate smiles.
+    ///
+    /// When the forward or any strike is negative, a shifted-SABR fit is
+    /// performed with an automatically chosen shift; otherwise this behaves
+    /// like :meth:`calibrate`.
+    ///
+    /// Parameters
+    /// ----------
+    /// forward : float
+    ///     Forward price / rate (may be negative).
+    /// strikes : list[float]
+    ///     Strikes at which market vols are quoted (may be negative).
+    /// market_vols : list[float]
+    ///     Observed Black implied volatilities at each strike.
+    /// t : float
+    ///     Time to expiry in years.
+    /// beta : float
+    ///     Fixed CEV exponent.
+    ///
+    /// Returns
+    /// -------
+    /// SabrParameters
+    ///     Calibrated parameters; ``shift`` is set when a shifted fit was used.
+    fn calibrate_auto_shift(
+        &self,
+        forward: f64,
+        strikes: Vec<f64>,
+        market_vols: Vec<f64>,
+        t: f64,
+        beta: f64,
+    ) -> PyResult<PySabrParameters> {
+        check_smile_lengths(&strikes, &market_vols)?;
+        self.inner
+            .calibrate_auto_shift(forward, &strikes, &market_vols, t, beta)
             .map(|inner| PySabrParameters { inner })
             .map_err(display_to_py)
     }
@@ -412,6 +435,17 @@ impl PySabrCalibrator {
     fn __repr__(&self) -> String {
         "SabrCalibrator".to_string()
     }
+}
+
+fn check_smile_lengths(strikes: &[f64], market_vols: &[f64]) -> PyResult<()> {
+    if strikes.len() != market_vols.len() {
+        return Err(crate::errors::value_error(format!(
+            "strikes length ({}) must match market_vols length ({})",
+            strikes.len(),
+            market_vols.len()
+        )));
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

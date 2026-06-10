@@ -111,11 +111,23 @@ impl TrsReturnModel for FiIndexReturnModel<'_> {
         &self,
         period_start: Date,
         period_end: Date,
-        _t_start: f64,
+        t_start: f64,
         _t_end: f64,
         _initial_level: f64,
         _context: &MarketContext,
     ) -> Result<f64> {
+        // Seasoned (in-progress) periods are not supported by the carry
+        // model: the realized index move since the period start would be
+        // silently replaced by projected carry. Fail loud (this preserves
+        // the engine's previous behavior, which rejected past period starts).
+        if t_start < 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "FIIndexTotalReturnSwap '{}': period starting {} is already in progress; \
+                 seasoned FI index TRS pricing is not supported",
+                self.trs.id.as_str(),
+                period_start
+            )));
+        }
         // Carry model: the index earns its yield as total return.
         //
         // Year fraction computed using the schedule's day count convention

@@ -138,6 +138,8 @@ fn autocallable_note(mc_paths: usize) -> Autocallable {
         spot_id: "SPOT".into(),
         vol_surface_id: CurveId::new("SPOT_VOL"),
         div_yield_id: Some(CurveId::new("SPOT_DIV")),
+        initial_level: None,
+        past_fixings: vec![],
         pricing_overrides: PricingOverrides::default().with_mc_paths(mc_paths),
         attributes: Attributes::new(),
     }

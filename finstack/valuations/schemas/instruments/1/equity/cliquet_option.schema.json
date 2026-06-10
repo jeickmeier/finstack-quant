@@ -1690,6 +1690,14 @@
             "id": {
               "$ref": "#/$defs/Id"
             },
+            "initial_level": {
+              "default": null,
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "local_cap": {
               "format": "double",
               "type": "number"
@@ -1700,6 +1708,24 @@
             },
             "notional": {
               "$ref": "#/$defs/Money"
+            },
+            "past_fixings": {
+              "default": [],
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
             },
             "payoff_type": {
               "$ref": "#/$defs/CliquetPayoffType",

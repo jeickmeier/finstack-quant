@@ -1781,6 +1781,14 @@
             "id": {
               "$ref": "#/$defs/Id"
             },
+            "initial_level": {
+              "default": null,
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "memory_coupons": {
               "default": false,
               "type": "boolean"
@@ -1797,6 +1805,24 @@
             "participation_rate": {
               "format": "double",
               "type": "number"
+            },
+            "past_fixings": {
+              "default": [],
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
             },
             "pricing_overrides": {
               "$ref": "#/$defs/PricingOverrides",

@@ -460,3 +460,66 @@ pub fn bump_discount_curve_synthetic(
 
     bump_discount_curve(&quotes, &params, context, bump)
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::expect_used, clippy::panic)]
+
+    use super::*;
+    use crate::market::conventions::ids::IrFutureContractId;
+
+    /// Parallel "rate bp" bumps must shock every quote's *rate* by +1bp,
+    /// including futures, where price = 100·(1 − rate) means the price must
+    /// fall by 0.01. Regression for the bug where the decimal bump was added
+    /// to the futures price verbatim (wrong sign, 1/100 magnitude), silently
+    /// mis-shocking futures pillars in plan-driven parallel/key-rate bumps.
+    #[test]
+    fn parallel_bump_shifts_futures_implied_rate_up() {
+        let as_of = Date::from_calendar_date(2026, time::Month::June, 9).expect("valid date");
+        let quotes = vec![
+            RateQuote::Deposit {
+                id: QuoteId::new("USD-DEP-3M"),
+                index: IndexId::new("USD-SOFR-3M"),
+                pillar: Pillar::Tenor("3M".parse().expect("valid tenor")),
+                rate: 0.05,
+            },
+            RateQuote::Futures {
+                id: QuoteId::new("USD-FUT-SEP26"),
+                contract: IrFutureContractId::new("CME:SR3"),
+                expiry: Date::from_calendar_date(2026, time::Month::September, 16)
+                    .expect("valid date"),
+                price: 96.00, // implied rate 4%
+                convexity_adjustment: Some(0.0),
+                vol_surface_id: None,
+            },
+            RateQuote::Swap {
+                id: QuoteId::new("USD-SWAP-2Y"),
+                index: IndexId::new("USD-SOFR-OIS"),
+                pillar: Pillar::Tenor("2Y".parse().expect("valid tenor")),
+                rate: 0.045,
+                spread_decimal: None,
+            },
+        ];
+
+        let implied_rate = |q: &RateQuote| -> f64 {
+            match q {
+                RateQuote::Deposit { rate, .. }
+                | RateQuote::Fra { rate, .. }
+                | RateQuote::Swap { rate, .. } => *rate,
+                RateQuote::Futures { price, .. } => (100.0 - price) / 100.0,
+            }
+        };
+        let base_rates: Vec<f64> = quotes.iter().map(implied_rate).collect();
+
+        let bumped = apply_bump_to_rate_quotes(quotes, &BumpRequest::Parallel(1.0), as_of);
+
+        for (q, base) in bumped.iter().zip(base_rates.iter()) {
+            let moved = implied_rate(q) - base;
+            assert!(
+                (moved - 1e-4).abs() < 1e-12,
+                "{}: implied rate must move +1bp, moved {moved:.8}",
+                q.id().as_str()
+            );
+        }
+    }
+}

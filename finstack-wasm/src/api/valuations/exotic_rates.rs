@@ -5,7 +5,7 @@
 //! trajectories. Full MC / copula / LSMC pricers stay on the standard
 //! `priceInstrument` / `priceInstrumentWithMetrics` pipeline.
 
-use crate::utils::to_js_err;
+use crate::utils::{to_js_err, to_js_value};
 use finstack_valuations::instruments::rates::exotics_shared::coupon_profiles;
 use wasm_bindgen::prelude::*;
 
@@ -48,7 +48,7 @@ pub fn tarn_coupon_profile(
         "redemption_index": profile.redemption_index,
         "redeemed_early": profile.redeemed_early,
     });
-    serde_wasm_bindgen::to_value(&payload).map_err(to_js_err)
+    to_js_value(&payload)
 }
 
 /// Snowball / inverse-floater coupon schedule.

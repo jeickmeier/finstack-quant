@@ -1065,10 +1065,19 @@ fn test_sabr_calibrate_with_derivatives_recovers_known_smile() {
     }
 }
 
+/// At Δ=0.5 (forward delta) the call and put strikes coincide at the
+/// delta-neutral point `F·exp(σ²T/2)` — slightly above the forward, not at
+/// it (N⁻¹(0.5) = 0, leaving only the σ²T/2 convexity term).
 #[test]
-fn test_sabr_strike_from_delta_half_delta_returns_forward() {
+fn test_sabr_strike_from_delta_half_delta_is_delta_neutral_strike() {
     let params = SABRParameters::new(0.2, 0.5, 0.3, -0.2).expect("valid params");
-    let smile = SABRSmile::new(SABRModel::new(params), 100.0, 1.0);
+    let forward = 100.0;
+    let expiry = 1.0;
+    let model = SABRModel::new(params);
+    let atm_vol = model
+        .atm_volatility(forward, expiry)
+        .expect("ATM vol should compute");
+    let smile = SABRSmile::new(model, forward, expiry);
 
     let call_strike = smile
         .strike_from_delta(0.5, true)
@@ -1077,8 +1086,59 @@ fn test_sabr_strike_from_delta_half_delta_returns_forward() {
         .strike_from_delta(0.5, false)
         .expect("put strike should compute");
 
-    assert!((call_strike - 100.0).abs() < 1e-12);
-    assert!((put_strike - 100.0).abs() < 1e-12);
+    let expected = forward * (0.5 * atm_vol * atm_vol * expiry).exp();
+    assert!((call_strike - expected).abs() < 1e-12);
+    assert!((put_strike - expected).abs() < 1e-12);
+}
+
+/// Round-trip at Δ=0.25: the strike returned by `strike_from_delta` must
+/// reproduce the requested forward delta under Black-76 with the same vol,
+/// and land on the correct side of the forward (25Δ call above, 25Δ put
+/// below). Regression for the inverted formula `K = F·exp(N⁻¹(Δ)·σ√T)`,
+/// which put the 25Δ call strike *below* the forward with an actual delta
+/// of ~0.78.
+#[test]
+fn test_sabr_strike_from_delta_round_trip_at_25_delta() {
+    use finstack_core::math::norm_cdf;
+
+    let params = SABRParameters::new(0.2, 0.5, 0.3, -0.2).expect("valid params");
+    let forward = 100.0;
+    let expiry = 1.0;
+    let model = SABRModel::new(params);
+    let atm_vol = model
+        .atm_volatility(forward, expiry)
+        .expect("ATM vol should compute");
+    let smile = SABRSmile::new(model, forward, expiry);
+
+    let sigma_sqrt_t = atm_vol * expiry.sqrt();
+    let d1 =
+        |strike: f64| ((forward / strike).ln() + 0.5 * atm_vol * atm_vol * expiry) / sigma_sqrt_t;
+
+    let call_strike = smile
+        .strike_from_delta(0.25, true)
+        .expect("call strike should compute");
+    assert!(
+        call_strike > forward,
+        "25Δ call strike {call_strike} must be above the forward {forward}"
+    );
+    let call_delta = norm_cdf(d1(call_strike));
+    assert!(
+        (call_delta - 0.25).abs() < 1e-10,
+        "25Δ call round-trip failed: actual delta {call_delta}"
+    );
+
+    let put_strike = smile
+        .strike_from_delta(0.25, false)
+        .expect("put strike should compute");
+    assert!(
+        put_strike < forward,
+        "25Δ put strike {put_strike} must be below the forward {forward}"
+    );
+    let put_delta = norm_cdf(-d1(put_strike));
+    assert!(
+        (put_delta - 0.25).abs() < 1e-10,
+        "25Δ put round-trip failed: actual |delta| {put_delta}"
+    );
 }
 
 // ===================================================================
@@ -1184,4 +1244,133 @@ fn sabr_beta_one_smile_matches_hagan_reference() {
         (vol - reference_vol).abs() < 1e-6,
         "β=1 Hagan reference mismatch: got {vol:.10}, expected {reference_vol:.10}"
     );
+}
+
+/// `calibrate` and `calibrate_with_derivatives` minimize the same
+/// vega-weighted objective, so on a skewed smile they must agree on the
+/// calibrated (α, ν, ρ).
+///
+/// Regression for the bug where `calibrate_with_derivatives` fed LM the
+/// gradient of the *unweighted* SSE while the objective was vega-weighted,
+/// converging to the wrong problem's stationary point.
+#[test]
+fn test_sabr_calibrate_and_calibrate_with_derivatives_agree() {
+    // ATM lognormal vol ≈ α/√F = 0.20, so the ±20% wings sit ~1σ out and
+    // carry genuine vega weight.
+    let true_params = SABRParameters::new(2.0, 0.5, 0.5, -0.35).expect("valid params");
+    let true_model = SABRModel::new(true_params);
+
+    let forward = 100.0;
+    let expiry = 1.0;
+    let beta = 0.5;
+    let strikes = vec![80.0, 90.0, 100.0, 110.0, 120.0];
+    let market_vols: Vec<f64> = strikes
+        .iter()
+        .map(|&strike| {
+            true_model
+                .implied_volatility(forward, strike, expiry)
+                .expect("synthetic vol should compute")
+        })
+        .collect();
+
+    let calibrator = SABRCalibrator::new()
+        .with_tolerance(1e-10)
+        .with_max_iterations(300);
+
+    let fd_free = calibrator
+        .calibrate(forward, &strikes, &market_vols, expiry, beta)
+        .expect("calibrate should succeed");
+    let with_derivs = calibrator
+        .calibrate_with_derivatives(forward, &strikes, &market_vols, expiry, beta)
+        .expect("calibrate_with_derivatives should succeed");
+
+    assert!(
+        (fd_free.alpha - with_derivs.alpha).abs() < 1e-3,
+        "alpha disagreement: {} vs {}",
+        fd_free.alpha,
+        with_derivs.alpha
+    );
+    assert!(
+        (fd_free.nu - with_derivs.nu).abs() < 1e-2,
+        "nu disagreement: {} vs {}",
+        fd_free.nu,
+        with_derivs.nu
+    );
+    assert!(
+        (fd_free.rho - with_derivs.rho).abs() < 1e-2,
+        "rho disagreement: {} vs {}",
+        fd_free.rho,
+        with_derivs.rho
+    );
+
+    // Both must reprice the synthetic smile.
+    let model = SABRModel::new(with_derivs);
+    for (strike, market_vol) in strikes.iter().zip(market_vols.iter()) {
+        let fitted = model
+            .implied_volatility(forward, *strike, expiry)
+            .expect("fitted vol should compute");
+        assert!(
+            (fitted - market_vol).abs() < 5e-4,
+            "calibrate_with_derivatives misfit at strike {strike}: \
+             fitted={fitted:.6}, market={market_vol:.6}"
+        );
+    }
+}
+
+/// Normal-convention (β=0) calibration must actually fit the smile wings.
+///
+/// Regression for the vega-weighting convention bug: ~1% normal vols fed to
+/// the *lognormal* Black vega collapse every wing weight to the 1e-10 floor,
+/// so LM declares convergence at the initial guess (ν=0.3, ρ=0.0) without
+/// fitting anything. With Bachelier vega the calibration must recover a
+/// synthetic skewed β=0 smile to sub-bp accuracy **unweighted**.
+#[test]
+fn test_sabr_normal_convention_calibration_reprices_wings_unweighted() {
+    // Skewed normal smile generated from known β=0 parameters far from the
+    // optimizer's initial guess (ν=0.3, ρ=0.0).
+    let true_params = SABRParameters::new(0.0085, 0.0, 0.55, -0.4).expect("valid β=0 params");
+    let true_model = SABRModel::new(true_params);
+
+    let forward = 0.03_f64;
+    let expiry = 1.0_f64;
+    let strikes = vec![0.01, 0.02, 0.03, 0.04, 0.05];
+    let market_vols: Vec<f64> = strikes
+        .iter()
+        .map(|&strike| {
+            true_model
+                .implied_volatility(forward, strike, expiry)
+                .expect("synthetic normal vol should compute")
+        })
+        .collect();
+
+    // Sanity: these are normal vols (~80–120bp), not lognormal levels.
+    assert!(market_vols.iter().all(|&v| v > 0.004 && v < 0.02));
+    // Sanity: the smile is genuinely skewed — the initial guess can't fit it.
+    assert!((market_vols[0] - market_vols[4]).abs() > 5e-4);
+
+    let calibrated = SABRCalibrator::new()
+        .with_tolerance(1e-10)
+        .with_max_iterations(300)
+        .calibrate_with_atm_pinning(forward, &strikes, &market_vols, expiry, 0.0)
+        .expect("normal-convention calibration should succeed");
+
+    // The optimizer must have moved off the initial guess.
+    assert!(
+        (calibrated.nu - 0.3).abs() > 0.05 || calibrated.rho.abs() > 0.05,
+        "calibration did not move off the initial guess: nu={}, rho={}",
+        calibrated.nu,
+        calibrated.rho
+    );
+
+    // Unweighted wing repricing: every strike within 0.5 normal bp.
+    let calibrated_model = SABRModel::new(calibrated);
+    for (strike, market_vol) in strikes.iter().zip(market_vols.iter()) {
+        let fitted = calibrated_model
+            .implied_volatility(forward, *strike, expiry)
+            .expect("fitted normal vol should compute");
+        assert!(
+            (fitted - market_vol).abs() < 5e-5,
+            "wing not repriced at strike {strike}: fitted={fitted:.8}, market={market_vol:.8}"
+        );
+    }
 }

@@ -1,23 +1,46 @@
-use super::model::SABRModel;
+use super::model::{SABRModel, BETA_SNAP_TOL};
 use super::parameters::SABRParameters;
-use finstack_core::math::volatility::black_vega;
+use finstack_core::math::volatility::{bachelier_vega, black_vega};
 use finstack_core::{Error, Result};
 
 /// Vega weight used by the SABR calibration objectives.
 ///
 /// Standard practitioner choice (Hagan 2002, Bloomberg VCUB): weight each
-/// (strike, market_vol) residual by Black-76 vega. Vega concentrates near ATM
+/// (strike, market_vol) residual by vega. Vega concentrates near ATM
 /// and decays into the wings, so an unweighted `Σ(σ_m − σ_*)²` would
 /// over-fit the wings (large numbers of low-information quotes) at the
 /// expense of the ATM. Vega weighting gives every dollar of premium roughly
 /// equal weight, which is what the market actually quotes against.
 ///
+/// The vega convention must match the vol convention of the quotes being
+/// fitted, which follows the model's own β classification
+/// ([`SABRModel::implied_volatility`] returns normal vols for β≈0):
+///
+/// - `beta ≈ 0` (within [`BETA_SNAP_TOL`]): the quotes are *normal*
+///   (Bachelier) vols, so weight with Bachelier vega `√T·φ((F−K)/(σ_N√T))`.
+///   Feeding a ~1% normal vol to Black vega would collapse all wing weights
+///   to the floor and leave the smile uncalibrated.
+/// - otherwise: lognormal (Black) quotes, weight with Black-76 vega. Shifted
+///   calibrations pass already-shifted forward/strikes, making this the
+///   shifted-Black vega.
+///
 /// Floor at a tiny positive number keeps deep-OTM strikes from getting a
 /// strictly-zero weight (which would let the optimizer drift on the wings).
 #[inline]
-pub(crate) fn vega_weight(forward: f64, strike: f64, market_vol: f64, time_to_expiry: f64) -> f64 {
+pub(crate) fn vega_weight(
+    forward: f64,
+    strike: f64,
+    market_vol: f64,
+    time_to_expiry: f64,
+    beta: f64,
+) -> f64 {
     const MIN_VEGA: f64 = 1e-10;
-    black_vega(forward, strike, market_vol, time_to_expiry).max(MIN_VEGA)
+    let vega = if beta.abs() < BETA_SNAP_TOL {
+        bachelier_vega(forward, strike, market_vol, time_to_expiry)
+    } else {
+        black_vega(forward, strike, market_vol, time_to_expiry)
+    };
+    vega.max(MIN_VEGA)
 }
 
 /// SABR calibration using market prices.
@@ -263,7 +286,7 @@ impl SABRCalibrator {
                     .iter()
                     .zip(market_vols_vec.iter())
                     .map(|(&strike, &market_vol)| {
-                        let w = vega_weight(forward, strike, market_vol, time_to_expiry);
+                        let w = vega_weight(forward, strike, market_vol, time_to_expiry, beta);
                         model
                             .implied_volatility(forward, strike, time_to_expiry)
                             .map(|model_vol| w * (model_vol - market_vol).powi(2))
@@ -354,7 +377,7 @@ impl SABRCalibrator {
                     .iter()
                     .zip(market_data.market_vols.iter())
                     .map(|(&strike, &market_vol)| {
-                        let w = vega_weight(forward, strike, market_vol, time_to_expiry);
+                        let w = vega_weight(forward, strike, market_vol, time_to_expiry, beta);
                         model
                             .implied_volatility(forward, strike, time_to_expiry)
                             .map(|model_vol| w * (model_vol - market_vol).powi(2))
@@ -600,7 +623,7 @@ impl SABRCalibrator {
                         if is_atm {
                             0.0
                         } else {
-                            let w = vega_weight(forward, strike, market_vol, time_to_expiry);
+                            let w = vega_weight(forward, strike, market_vol, time_to_expiry, beta);
                             model
                                 .implied_volatility(forward, strike, time_to_expiry)
                                 .map(|model_vol| w * (model_vol - market_vol).powi(2))

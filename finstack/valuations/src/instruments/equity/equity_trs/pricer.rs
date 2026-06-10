@@ -59,11 +59,42 @@ fn extract_underlying_data(
 /// Equity-specific return model using cost-of-carry forward pricing.
 ///
 /// Models the total return as:
-/// - **Price return**: Forward price change using F_t = S_0 * e^{(r-q)t}
+/// - **Price return**: Forward price change using F_t = S_0 * e^{(r-q)t}.
+///   For the *current* (in-progress) period the return anchors to the level
+///   observed at the period start and the forward of the live spot, so the
+///   realized spot move enters the PV (equity delta). Fully-future periods
+///   are pure carry (the level cancels in the forward ratio).
 /// - **Dividend return**: Continuous dividend yield approximation, net of withholding tax
 struct EquityReturnModel<'a> {
     trs: &'a EquityTotalReturnSwap,
+    spot: f64,
     div_yield: f64,
+}
+
+impl EquityReturnModel<'_> {
+    /// Observed underlying level at the start of the in-progress period.
+    ///
+    /// Resolution order: `past_fixings` entry for `period_start`, then
+    /// `initial_level` when the period is the first one. Errors otherwise —
+    /// without the observed level the realized move (and hence equity delta)
+    /// cannot be computed.
+    fn period_start_level(&self, period_start: Date) -> Result<f64> {
+        if let Some(level) = self.trs.fixing_on(period_start) {
+            return Ok(level);
+        }
+        if period_start <= self.trs.schedule.start {
+            if let Some(level) = self.trs.initial_level {
+                return Ok(level);
+            }
+        }
+        Err(finstack_core::Error::Validation(format!(
+            "EquityTRS '{}': the current return period started {} but no observed level is \
+             available (no past_fixings entry and no applicable initial_level); provide the \
+             period-start fixing to price this seasoned trade",
+            self.trs.id.as_str(),
+            period_start
+        )))
+    }
 }
 
 impl TrsReturnModel for EquityReturnModel<'_> {
@@ -77,7 +108,6 @@ impl TrsReturnModel for EquityReturnModel<'_> {
         context: &MarketContext,
     ) -> Result<f64> {
         let disc = context.get_discount(self.trs.financing.discount_curve_id.as_str())?;
-        let df_start = disc.df(t_start);
         let df_end = disc.df(t_end);
 
         let uses_discrete_dividends = !self.trs.discrete_dividends.is_empty();
@@ -89,8 +119,23 @@ impl TrsReturnModel for EquityReturnModel<'_> {
 
         // Price return component (Forward Price change)
         // F_t = S_0 * e^{(r-q)t}
-        let fwd_start = initial_level * df_start.recip() * (-carry_div_yield * t_start).exp();
-        let fwd_end = initial_level * df_end.recip() * (-carry_div_yield * t_end).exp();
+        let (fwd_start, fwd_end) = if t_start < 0.0 {
+            // In-progress period: anchor to the level observed at the period
+            // start and project the live spot forward to the period end. The
+            // realized move (spot vs. start fixing) stays in the return.
+            let start_level = self.period_start_level(period_start)?;
+            let df_now = disc.df(0.0);
+            let fwd_spot_end =
+                self.spot * (df_end / df_now).recip() * (-carry_div_yield * t_end).exp();
+            (start_level, fwd_spot_end)
+        } else {
+            // Future period: deterministic carry — the level cancels in the
+            // ratio, so anchoring to `initial_level` is exact.
+            let df_start = disc.df(t_start);
+            let fwd_start = initial_level * df_start.recip() * (-carry_div_yield * t_start).exp();
+            let fwd_end = initial_level * df_end.recip() * (-carry_div_yield * t_end).exp();
+            (fwd_start, fwd_end)
+        };
         let price_return = (fwd_end - fwd_start) / fwd_start;
 
         // Dividend return component (Income), net of withholding tax
@@ -171,7 +216,11 @@ pub(crate) fn pv_total_return_leg(
         initial_level: Some(initial),
     };
 
-    let model = EquityReturnModel { trs, div_yield };
+    let model = EquityReturnModel {
+        trs,
+        spot,
+        div_yield,
+    };
     TrsEngine::pv_total_return_leg_with_model(params, context, as_of, &model)
 }
 
@@ -215,6 +264,7 @@ mod tests {
 
         let model = EquityReturnModel {
             trs: &trs,
+            spot: 100.0,
             div_yield: 0.0,
         };
 
@@ -224,5 +274,106 @@ mod tests {
 
         let expected = neumaier_sum([1e16, 1.0, 1.0]) / 100.0;
         assert_eq!(period_return, expected);
+    }
+
+    fn flat_market(as_of: Date, spot: f64) -> MarketContext {
+        use finstack_core::market_data::scalars::MarketScalar;
+
+        let disc = DiscountCurve::builder(CurveId::new("USD-OIS"))
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, 1.0)])
+            .build()
+            .expect("discount curve");
+        MarketContext::new()
+            .insert(disc)
+            .insert_price("SPX-SPOT", MarketScalar::Unitless(spot))
+    }
+
+    fn mid_period_trs() -> EquityTotalReturnSwap {
+        let mut trs = EquityTotalReturnSwap::example().expect("example TRS");
+        trs.underlying.div_yield_id = None;
+        trs
+    }
+
+    /// The total-return leg must carry spot sensitivity for an in-progress
+    /// period: with flat zero rates the current-period return is
+    /// `spot / start_fixing - 1`, so bumping spot moves the PV one-for-one.
+    #[test]
+    fn current_period_return_has_spot_sensitivity() {
+        let as_of = date(2024, 2, 15); // inside Q1 of the example schedule
+        let mut trs = mid_period_trs();
+        trs.past_fixings = vec![(date(2024, 1, 1), 100.0)];
+
+        let pv_base = super::pv_total_return_leg(&trs, &flat_market(as_of, 100.0), as_of)
+            .expect("pv at spot 100");
+        let pv_up = super::pv_total_return_leg(&trs, &flat_market(as_of, 110.0), as_of)
+            .expect("pv at spot 110");
+
+        // Flat zero curve, no dividends: future periods carry zero return and
+        // the current period contributes notional * (spot/100 - 1).
+        let expected_diff = trs.notional.amount() * 0.10;
+        assert!(
+            (pv_up.amount() - pv_base.amount() - expected_diff).abs() < 1e-6 * expected_diff.abs(),
+            "spot bump must move the TR leg PV: base={} up={} expected_diff={expected_diff}",
+            pv_base.amount(),
+            pv_up.amount()
+        );
+        // Realized move at base: spot 100 vs fixing 100 => zero return.
+        assert!(
+            pv_base.amount().abs() < 1e-6,
+            "flat market, spot at fixing: TR leg should be ~0, got {}",
+            pv_base.amount()
+        );
+    }
+
+    /// `initial_level` may anchor the first period when no fixing is recorded.
+    #[test]
+    fn initial_level_anchors_first_period() {
+        let as_of = date(2024, 2, 15);
+        let mut trs = mid_period_trs();
+        trs.initial_level = Some(100.0);
+
+        let pv = super::pv_total_return_leg(&trs, &flat_market(as_of, 105.0), as_of)
+            .expect("pv with initial_level anchor");
+        let expected = trs.notional.amount() * 0.05;
+        assert!(
+            (pv.amount() - expected).abs() < 1e-6 * expected,
+            "initial_level anchor must yield realized move 5%: got {}",
+            pv.amount()
+        );
+    }
+
+    /// Pricing inside a period without the period-start level must error,
+    /// never silently drop the realized move.
+    #[test]
+    fn missing_period_start_level_errors() {
+        let as_of = date(2024, 2, 15);
+        let trs = mid_period_trs(); // no initial_level, no past_fixings
+
+        let err = super::pv_total_return_leg(&trs, &flat_market(as_of, 105.0), as_of)
+            .expect_err("missing period-start level");
+        assert!(
+            err.to_string().contains("period-start fixing")
+                || err.to_string().contains("no observed level"),
+            "expected period-start level error, got: {err}"
+        );
+    }
+
+    /// A new trade priced on its start date has no in-progress period: the
+    /// pure-carry path applies and no fixings are required.
+    #[test]
+    fn new_trade_needs_no_fixings() {
+        let as_of = date(2024, 1, 1); // schedule start of the example TRS
+        let trs = mid_period_trs();
+
+        let pv = super::pv_total_return_leg(&trs, &flat_market(as_of, 100.0), as_of)
+            .expect("new trade prices without fixings");
+        // Flat zero curve, no dividends: all forward-ratio returns are zero.
+        assert!(
+            pv.amount().abs() < 1e-9,
+            "flat-market new trade TR leg should be ~0, got {}",
+            pv.amount()
+        );
     }
 }

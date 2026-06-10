@@ -246,6 +246,15 @@ impl FxTouchOption {
             self.payout_amount,
             "FxTouchOption payout_amount",
         )?;
+        // Pricing discounts the payout at the domestic (quote-currency) rate;
+        // a base-currency payout would need the foreign-cash touch formula.
+        // Reject rather than silently mispricing.
+        if self.payout_amount.currency() != self.quote_currency {
+            return Err(finstack_core::Error::CurrencyMismatch {
+                expected: self.quote_currency,
+                actual: self.payout_amount.currency(),
+            });
+        }
         Ok(())
     }
 
@@ -591,6 +600,19 @@ mod tests {
     #[test]
     fn validation_valid_touch_option_builds_ok() {
         assert!(base_touch_builder().build().is_ok());
+    }
+
+    #[test]
+    fn validation_rejects_base_currency_payout() {
+        // Pricing discounts the payout at the domestic (quote) rate; a base
+        // (foreign) currency payout would be silently mispriced.
+        let result = base_touch_builder()
+            .payout_amount(Money::new(1_000_000.0, Currency::EUR))
+            .build();
+        assert!(
+            result.is_err(),
+            "FxTouchOption must reject a payout_amount not in the quote currency"
+        );
     }
 
     #[test]

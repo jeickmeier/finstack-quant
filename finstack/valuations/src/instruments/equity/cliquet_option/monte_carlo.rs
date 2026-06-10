@@ -48,6 +48,12 @@ pub struct CliquetCallPayoff {
     pub currency: Currency,
     /// Initial spot price S_0
     pub initial_spot: f64,
+    /// Locked-in sum of capped/floored past period returns (seasoned trades;
+    /// 0.0 for a new trade). Seeds the additive aggregation.
+    prior_locked_sum: f64,
+    /// Locked-in growth factor `Π(1 + R_i*)` of past periods (seasoned
+    /// trades; 1.0 for a new trade). Seeds the multiplicative aggregation.
+    prior_locked_growth: f64,
 
     // State variables (tracked during path simulation)
     /// Spot prices at reset dates
@@ -128,10 +134,28 @@ impl CliquetCallPayoff {
             notional,
             currency,
             initial_spot,
+            prior_locked_sum: 0.0,
+            prior_locked_growth: 1.0,
             reset_spots: Vec::new(),
             next_reset_idx: 0,
             payoff_type,
         })
+    }
+
+    /// Seed the payoff with locked-in past period returns of a seasoned trade.
+    ///
+    /// * `locked_sum` — sum of capped/floored past period returns (additive).
+    /// * `locked_growth` — product `Π(1 + R_i*)` over past periods
+    ///   (multiplicative).
+    ///
+    /// The global cap/floor then applies across the whole contract (past and
+    /// simulated periods together), and `initial_spot` should be the level at
+    /// the last observed reset so the in-progress period anchors correctly.
+    #[must_use]
+    pub fn with_prior_locked_returns(mut self, locked_sum: f64, locked_growth: f64) -> Self {
+        self.prior_locked_sum = locked_sum;
+        self.prior_locked_growth = locked_growth;
+        self
     }
 
     /// Compute cliquet return from reset spots.
@@ -144,7 +168,7 @@ impl CliquetCallPayoff {
 
         match self.payoff_type {
             CliquetPayoffType::Additive => {
-                let mut total_return = 0.0;
+                let mut total_return = self.prior_locked_sum;
                 let mut prev_spot = self.initial_spot;
 
                 for &spot in &self.reset_spots {
@@ -160,7 +184,7 @@ impl CliquetCallPayoff {
                 total_return.max(self.global_floor).min(self.global_cap)
             }
             CliquetPayoffType::Multiplicative => {
-                let mut total_growth = 1.0;
+                let mut total_growth = self.prior_locked_growth;
                 let mut prev_spot = self.initial_spot;
 
                 for &spot in &self.reset_spots {

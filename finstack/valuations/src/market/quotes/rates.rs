@@ -209,14 +209,16 @@ impl RateQuote {
         }
     }
 
-    /// Create a new quote with the value bumped by `bump`.
+    /// Create a new quote with the underlying *rate* bumped by `rate_bump`.
     ///
-    /// For rates (deposit, FRA, swap), `bump` is added to the rate (in decimal terms,
-    /// e.g., `0.0001` for 1 basis point). For futures, `bump` is added directly to the price.
+    /// For rates (deposit, FRA, swap), `rate_bump` is added to the rate (in decimal
+    /// terms, e.g., `0.0001` for 1 basis point). For futures, the price convention
+    /// is `price = 100·(1 − rate)`, so a `+rate_bump` rate shock *subtracts*
+    /// `100·rate_bump` from the price (e.g. +1bp rate → price −0.01).
     ///
     /// # Arguments
     ///
-    /// * `bump` - The amount to add to the quote value (decimal for rates, absolute for futures)
+    /// * `rate_bump` - The decimal rate shock applied to the quote's underlying rate
     ///
     /// # Returns
     ///
@@ -281,7 +283,8 @@ impl RateQuote {
                 id: id.clone(),
                 contract: contract.clone(),
                 expiry: *expiry,
-                price: price + rate_bump,
+                // price = 100·(1 − rate): a +rate bump lowers the price 100×.
+                price: price - rate_bump * 100.0,
                 convexity_adjustment: *convexity_adjustment,
                 vol_surface_id: vol_surface_id.clone(),
             },
@@ -475,5 +478,35 @@ mod tests {
             }
             _ => panic!("Expected Swap variant"),
         }
+    }
+
+    /// A +1bp *rate* bump must lower a futures price by 0.01
+    /// (price = 100·(1 − rate)). Regression for the bug where the decimal
+    /// rate bump was added to the price verbatim (wrong sign, 1/100 scale).
+    #[test]
+    fn test_futures_bump_moves_rate_not_price() {
+        let quote = RateQuote::Futures {
+            id: QuoteId::new("TEST-SR3-M6"),
+            contract: IrFutureContractId::new("CME:SR3"),
+            expiry: Date::from_calendar_date(2026, finstack_core::dates::Month::June, 17)
+                .expect("valid date"),
+            price: 96.00,
+            convexity_adjustment: Some(0.0),
+            vol_surface_id: None,
+        };
+
+        let bumped = quote.bump_rate_bp(1.0);
+        assert!(
+            (bumped.value() - 95.99).abs() < 1e-12,
+            "+1bp rate bump should give price 95.99, got {}",
+            bumped.value()
+        );
+
+        let bumped_down = quote.bump_rate_bp(-1.0);
+        assert!(
+            (bumped_down.value() - 96.01).abs() < 1e-12,
+            "-1bp rate bump should give price 96.01, got {}",
+            bumped_down.value()
+        );
     }
 }

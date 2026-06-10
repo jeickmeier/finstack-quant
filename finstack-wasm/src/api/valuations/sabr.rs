@@ -5,7 +5,7 @@
 //! lower-cased acronym, e.g. `SabrParameters` rather than the Rust-native
 //! `SABRParameters`).
 
-use crate::utils::to_js_err;
+use crate::utils::{to_js_err, to_js_value};
 use finstack_valuations::models::volatility::sabr::{
     SABRCalibrator, SABRModel, SABRParameters, SABRSmile,
 };
@@ -117,6 +117,14 @@ impl WasmSabrModel {
             .map_err(to_js_err)
     }
 
+    /// Parameters used by this model.
+    #[wasm_bindgen(getter)]
+    pub fn params(&self) -> WasmSabrParameters {
+        WasmSabrParameters {
+            inner: self.inner.parameters().clone(),
+        }
+    }
+
     #[wasm_bindgen(js_name = supportsNegativeRates)]
     pub fn supports_negative_rates(&self) -> bool {
         self.inner.supports_negative_rates()
@@ -181,7 +189,7 @@ impl WasmSabrSmile {
             "butterflyViolations": result.butterfly_violations,
             "monotonicityViolations": result.monotonicity_violations,
         });
-        serde_wasm_bindgen::to_value(&out).map_err(to_js_err)
+        to_js_value(&out)
     }
 }
 
@@ -211,6 +219,16 @@ impl WasmSabrCalibrator {
         }
     }
 
+    /// Return a copy of this calibrator with an overridden convergence
+    /// tolerance, preserving all other settings (e.g. the iteration cap from
+    /// `highPrecision`).
+    #[wasm_bindgen(js_name = withTolerance)]
+    pub fn with_tolerance(&self, tolerance: f64) -> WasmSabrCalibrator {
+        Self {
+            inner: self.inner.clone().with_tolerance(tolerance),
+        }
+    }
+
     /// Calibrate `(alpha, nu, rho)` to market vols with `beta` fixed.
     pub fn calibrate(
         &self,
@@ -220,18 +238,44 @@ impl WasmSabrCalibrator {
         t: f64,
         beta: f64,
     ) -> Result<WasmSabrParameters, JsValue> {
-        if strikes.len() != market_vols.len() {
-            return Err(to_js_err(format!(
-                "strikes length ({}) must match market_vols length ({})",
-                strikes.len(),
-                market_vols.len()
-            )));
-        }
+        check_smile_lengths(&strikes, &market_vols)?;
         self.inner
             .calibrate(forward, &strikes, &market_vols, t, beta)
             .map(|inner| WasmSabrParameters { inner })
             .map_err(to_js_err)
     }
+
+    /// Calibrate with automatic shift selection for negative-rate smiles.
+    ///
+    /// When the forward or any strike is negative, a shifted-SABR fit is
+    /// performed with an automatically chosen shift; otherwise this behaves
+    /// like `calibrate`.
+    #[wasm_bindgen(js_name = calibrateAutoShift)]
+    pub fn calibrate_auto_shift(
+        &self,
+        forward: f64,
+        strikes: Vec<f64>,
+        market_vols: Vec<f64>,
+        t: f64,
+        beta: f64,
+    ) -> Result<WasmSabrParameters, JsValue> {
+        check_smile_lengths(&strikes, &market_vols)?;
+        self.inner
+            .calibrate_auto_shift(forward, &strikes, &market_vols, t, beta)
+            .map(|inner| WasmSabrParameters { inner })
+            .map_err(to_js_err)
+    }
+}
+
+fn check_smile_lengths(strikes: &[f64], market_vols: &[f64]) -> Result<(), JsValue> {
+    if strikes.len() != market_vols.len() {
+        return Err(to_js_err(format!(
+            "strikes length ({}) must match market_vols length ({})",
+            strikes.len(),
+            market_vols.len()
+        )));
+    }
+    Ok(())
 }
 
 impl Default for WasmSabrCalibrator {
@@ -257,5 +301,47 @@ mod tests {
         let smile = WasmSabrSmile::new(&p, 100.0, 1.0);
         let atm = smile.atm_vol().expect("atm_vol");
         assert!(atm > 0.0 && atm < 1.0);
+    }
+
+    #[test]
+    fn sabr_model_exposes_params_getter() {
+        let p = WasmSabrParameters::new(0.2, 0.5, 0.3, -0.2, None).expect("params");
+        let model = WasmSabrModel::new(&p);
+        let roundtrip = model.params();
+        assert!((roundtrip.alpha() - 0.2).abs() < 1e-12);
+        assert!((roundtrip.beta() - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn sabr_calibrator_with_tolerance_calibrates() {
+        let p = WasmSabrParameters::new(0.05, 0.5, 0.4, -0.1, None).expect("params");
+        let strikes = vec![0.01, 0.02, 0.03, 0.04, 0.05];
+        let smile = WasmSabrSmile::new(&p, 0.03, 1.0);
+        let vols = smile.generate_smile(strikes.clone()).expect("smile");
+
+        let calibrator = WasmSabrCalibrator::new().with_tolerance(1e-8);
+        let fitted = calibrator
+            .calibrate(0.03, strikes, vols, 1.0, 0.5)
+            .expect("calibrate");
+        assert!((fitted.beta() - 0.5).abs() < 1e-12);
+        assert!(fitted.alpha() > 0.0);
+    }
+
+    #[test]
+    fn sabr_calibrate_auto_shift_fits_negative_rate_smile() {
+        let p = WasmSabrParameters::new(0.05, 0.5, 0.4, -0.1, Some(0.03)).expect("params");
+        let forward = -0.005;
+        let strikes = vec![-0.015, -0.01, -0.005, 0.0, 0.005];
+        let smile = WasmSabrSmile::new(&p, forward, 1.0);
+        let vols = smile.generate_smile(strikes.clone()).expect("smile");
+
+        let fitted = WasmSabrCalibrator::new()
+            .calibrate_auto_shift(forward, strikes, vols, 1.0, 0.5)
+            .expect("calibrate_auto_shift");
+        let shift = fitted
+            .shift()
+            .expect("negative-rate fit must carry a shift");
+        assert!(shift > 0.0);
+        assert!(fitted.is_shifted());
     }
 }

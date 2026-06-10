@@ -3,7 +3,7 @@
 //! Exposes CSA specification loading and variation margin calculation
 //! via JSON-based interfaces for JavaScript/TypeScript consumers.
 
-use crate::utils::to_js_err;
+use crate::utils::{to_js_err, to_js_value};
 use wasm_bindgen::prelude::*;
 
 fn serialize_csa(csa: &finstack_margin::CsaSpec) -> Result<String, JsValue> {
@@ -80,7 +80,7 @@ pub fn calculate_vm(
         "net_margin": result.net_margin().amount(),
         "requires_call": result.requires_call(),
     });
-    serde_wasm_bindgen::to_value(&out).map_err(to_js_err)
+    to_js_value(&out)
 }
 
 #[cfg(test)]

@@ -114,16 +114,19 @@ fn test_annualization_factor_daily_equals_252() {
 }
 
 #[test]
-fn test_annualization_factor_weekly_uses_trading_days() {
-    // Arrange: weekly = 252/7 trading periods per year (equity convention)
+fn test_annualization_factor_weekly_uses_calendar_weeks() {
+    // Arrange: weekly schedules step in calendar days, so there are 52
+    // observations per year — not 252/7 (= 36), which mixes a trading-day
+    // basis with a calendar-day step and understates realized variance.
+    // Matches the FX variance-swap convention.
     let mut swap = sample_swap(PayReceive::Receive);
     swap.observation_freq = Tenor::weekly();
 
     // Act
     let factor = swap.annualization_factor();
 
-    // Assert: 252/7 ≈ 36, not 52 (calendar weeks)
-    assert!((factor - 252.0 / 7.0).abs() < 1e-10);
+    // Assert: 52 calendar weeks per year
+    assert_eq!(factor, 52.0);
 }
 
 #[test]

@@ -2379,6 +2379,24 @@
             "notional": {
               "$ref": "#/$defs/Money"
             },
+            "past_fixings": {
+              "default": [],
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
             "pricing_overrides": {
               "$ref": "#/$defs/PricingOverrides",
               "default": {

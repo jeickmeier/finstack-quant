@@ -274,10 +274,29 @@ impl SwaptionVolTarget {
                     // residuals stay in vol units, the most-weighted (≈ATM)
                     // strike is unchanged, and wing strikes are de-emphasized
                     // exactly as the objective de-emphasizes them.
+                    //
+                    // Weight convention must mirror the calibration arm above:
+                    // Normal quotes use Bachelier vega (beta = 0), shifted
+                    // lognormal uses shifted-Black vega (shifted F/K).
+                    let (weight_beta, weight_shift) = match params.vol_convention {
+                        SwaptionVolConvention::Normal => (0.0, 0.0),
+                        SwaptionVolConvention::Lognormal => (params.sabr_beta, 0.0),
+                        SwaptionVolConvention::ShiftedLognormal { shift } => {
+                            (params.sabr_beta, shift)
+                        }
+                    };
                     let weights: Vec<f64> = strikes
                         .iter()
                         .zip(vols.iter())
-                        .map(|(&k, &v)| vega_weight(fwd_rate, k, v, t_exp))
+                        .map(|(&k, &v)| {
+                            vega_weight(
+                                fwd_rate + weight_shift,
+                                k + weight_shift,
+                                v,
+                                t_exp,
+                                weight_beta,
+                            )
+                        })
                         .collect();
                     let w_max = weights
                         .iter()

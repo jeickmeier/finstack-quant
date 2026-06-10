@@ -116,24 +116,38 @@ impl SABRSmile {
         Ok(vols)
     }
 
-    /// Generate strike from delta
+    /// Generate strike from forward (spot-undiscounted) delta.
+    ///
+    /// Inverts the Black-76 forward delta `Δ_call = N(d1)` with
+    /// `d1 = (ln(F/K) + σ²T/2)/(σ√T)`:
+    ///
+    /// ```text
+    /// K_call = F · exp(−σ√T·N⁻¹(Δ) + σ²T/2)
+    /// K_put  = F · exp(+σ√T·N⁻¹(Δ) + σ²T/2)   (Δ = |Δ_put|, positive input)
+    /// ```
+    ///
+    /// Uses the ATM vol as an approximation of the smile vol at the solved
+    /// strike (no iterative smile-consistent solve). A 25Δ call therefore
+    /// lands above the forward and a 25Δ put below, as the market quotes
+    /// them.
     pub fn strike_from_delta(&self, delta: f64, is_call: bool) -> Result<f64> {
-        // This requires iterative solving
-        // Simplified version using ATM vol as approximation
         let atm_vol = self
             .model
             .atm_volatility(self.forward, self.time_to_expiry)?;
         let variance = atm_vol.powi(2) * self.time_to_expiry;
         let std_dev = variance.sqrt();
 
-        // Normal inverse for delta
-        let z = if is_call {
-            finstack_core::math::standard_normal_inv_cdf(delta)
+        // N⁻¹(Δ) for the requested (positive) delta.
+        let z = finstack_core::math::standard_normal_inv_cdf(delta);
+
+        // d1 = z for calls (Δ = N(d1)); d1 = −z for puts (|Δ| = N(−d1)).
+        let exponent = if is_call {
+            -std_dev * z + 0.5 * variance
         } else {
-            finstack_core::math::standard_normal_inv_cdf(1.0 - delta)
+            std_dev * z + 0.5 * variance
         };
 
-        let strike = self.forward * (z * std_dev).exp();
+        let strike = self.forward * exponent.exp();
         Ok(strike)
     }
 

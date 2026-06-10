@@ -206,6 +206,41 @@ impl AutocallablePayoff {
         self.max_spot_observed = prior_max_spot;
         self
     }
+
+    /// Final (non-autocalled) payoff as a ratio of notional, given the spot at
+    /// the final observation and the discretely-monitored minimum spot.
+    ///
+    /// Shared between the path payoff (`value`) and the deterministic
+    /// all-observations-past branch of the pricer.
+    pub fn final_payoff_ratio(&self, final_spot: f64, min_spot_observed: f64) -> f64 {
+        match self.final_payoff_type {
+            FinalPayoffType::CapitalProtection { floor } => {
+                // Use final_spot directly (defaults to 0.0 if never set, which will hit the floor)
+                let return_ratio = (final_spot / self.initial_spot).min(self.cap_level);
+                let participation_term = self.participation_rate * return_ratio;
+                floor.max(participation_term)
+            }
+            FinalPayoffType::Participation { rate } => {
+                let capped_ratio = (final_spot / self.initial_spot).min(self.cap_level);
+                1.0 + rate * ((capped_ratio - 1.0).max(0.0))
+            }
+            FinalPayoffType::KnockInPut { strike } => {
+                let barrier_level = self.initial_spot * self.final_barrier;
+                if min_spot_observed <= barrier_level {
+                    // Knocked in: the note holder is short a down-and-in put, so
+                    // they receive principal reduced by the put loss, floored at
+                    // zero — NOT the bare put intrinsic. A knocked-in path ending
+                    // at-the-money returns full principal (put worth ~0).
+                    let strike_ratio = strike / self.initial_spot;
+                    let spot_ratio = final_spot / self.initial_spot;
+                    let put_loss = (strike_ratio - spot_ratio).max(0.0);
+                    (1.0 - put_loss).max(0.0)
+                } else {
+                    1.0
+                }
+            }
+        }
+    }
 }
 
 impl Payoff for AutocallablePayoff {
@@ -298,33 +333,7 @@ impl Payoff for AutocallablePayoff {
         }
 
         // Final payoff (not autocalled)
-        let final_payoff = match self.final_payoff_type {
-            FinalPayoffType::CapitalProtection { floor } => {
-                // Use final_spot directly (defaults to 0.0 if never set, which will hit the floor)
-                let return_ratio = (self.final_spot / self.initial_spot).min(self.cap_level);
-                let participation_term = self.participation_rate * return_ratio;
-                floor.max(participation_term)
-            }
-            FinalPayoffType::Participation { rate } => {
-                let capped_ratio = (self.final_spot / self.initial_spot).min(self.cap_level);
-                1.0 + rate * ((capped_ratio - 1.0).max(0.0))
-            }
-            FinalPayoffType::KnockInPut { strike } => {
-                let barrier_level = self.initial_spot * self.final_barrier;
-                if self.min_spot_observed <= barrier_level {
-                    // Knocked in: the note holder is short a down-and-in put, so
-                    // they receive principal reduced by the put loss, floored at
-                    // zero — NOT the bare put intrinsic. A knocked-in path ending
-                    // at-the-money returns full principal (put worth ~0).
-                    let strike_ratio = strike / self.initial_spot;
-                    let spot_ratio = self.final_spot / self.initial_spot;
-                    let put_loss = (strike_ratio - spot_ratio).max(0.0);
-                    (1.0 - put_loss).max(0.0)
-                } else {
-                    1.0
-                }
-            }
-        };
+        let final_payoff = self.final_payoff_ratio(self.final_spot, self.min_spot_observed);
 
         Money::new(final_payoff * self.notional, currency)
     }

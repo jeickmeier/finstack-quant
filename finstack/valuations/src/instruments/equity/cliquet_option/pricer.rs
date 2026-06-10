@@ -45,16 +45,90 @@ impl CliquetOptionMcPricer {
             finstack_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
         };
 
-        let final_date = inst.reset_dates.last().copied().unwrap_or(as_of);
+        // Get curves
+        let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
+
+        // Deterministic evaluation of past reset periods (seasoned trade).
+        //
+        // Reset dates on or before as_of are fully observed: their period
+        // returns are locked in and must come from recorded fixings, never
+        // from simulated spot (the old `t > 0` filter silently repriced a
+        // mid-life cliquet as a shorter new contract).
+        let n_past = inst.reset_dates.iter().take_while(|&&d| d <= as_of).count();
+        let has_strictly_past = inst.reset_dates.iter().take(n_past).any(|&d| d < as_of);
+        if has_strictly_past && inst.initial_level.is_none() {
+            return Err(finstack_core::Error::Validation(format!(
+                "CliquetOption '{}' has reset dates before as_of {} but no initial_level; \
+                 the strike-set level is required to compute locked-in period returns",
+                inst.id, as_of
+            )));
+        }
+
+        // Walk the observed anchor chain: strike-set level, then each past
+        // reset fixing. A reset date equal to as_of may fall back to the
+        // current spot (today's level is observable). When no initial_level
+        // is given (fresh trade), a reset at as_of is a strike-set event,
+        // not a period observation (W-36).
+        let mut anchor: Option<f64> = inst.initial_level;
+        let mut locked_sum = 0.0;
+        let mut locked_growth = 1.0;
+        for &d in &inst.reset_dates[..n_past] {
+            let level = match inst.fixing_on(d) {
+                Some(v) => v,
+                None if d == as_of => initial_spot,
+                None => {
+                    return Err(finstack_core::Error::Validation(format!(
+                        "CliquetOption '{}': reset date {} is before as_of {} but has no \
+                         entry in past_fixings; provide the observed fixing to price this \
+                         seasoned trade",
+                        inst.id, d, as_of
+                    )));
+                }
+            };
+            if let Some(prev) = anchor {
+                let period_return = (level / prev - 1.0)
+                    .max(inst.local_floor)
+                    .min(inst.local_cap);
+                locked_sum += period_return;
+                locked_growth *= 1.0 + period_return;
+            }
+            anchor = Some(level);
+        }
+        // Anchor for the first simulated period: last observed reset level,
+        // else the strike-set level, else (fresh trade) the current spot.
+        let sim_anchor = anchor.or(inst.initial_level).unwrap_or(initial_spot);
+
+        let future_resets: Vec<Date> = inst.reset_dates[n_past..].to_vec();
+
+        // All periods observed: the payoff is fully determined; discount the
+        // known cashflow from the contract expiry.
+        if future_resets.is_empty() {
+            if as_of >= inst.expiry {
+                return Ok(Money::new(0.0, inst.notional.currency()));
+            }
+            let total_return = match inst.payoff_type {
+                CliquetPayoffType::Additive => locked_sum,
+                CliquetPayoffType::Multiplicative => locked_growth - 1.0,
+            };
+            let clamped = total_return
+                .max(inst.global_floor)
+                .min(inst.global_cap)
+                .max(0.0);
+            let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
+            return Ok(Money::new(
+                clamped * inst.notional.amount() * df,
+                inst.notional.currency(),
+            ));
+        }
+
+        // Safe: future_resets is non-empty (checked above).
+        let final_date = *future_resets.last().unwrap_or(&inst.expiry);
         let t = inst
             .day_count
             .year_fraction(as_of, final_date, DayCountContext::default())?;
         if t <= 0.0 {
             return Ok(Money::new(0.0, inst.notional.currency()));
         }
-
-        // Get curves
-        let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
 
         // Dividend yield from scalar id if provided
         //
@@ -82,10 +156,10 @@ impl CliquetOptionMcPricer {
             0.0
         };
 
-        // Period boundaries for the forward-vol/rate bootstrap: the reset dates
-        // plus the final maturity so the process covers the whole horizon.
-        let mut check_points: Vec<f64> = inst
-            .reset_dates
+        // Period boundaries for the forward-vol/rate bootstrap: the remaining
+        // reset dates plus the final maturity so the process covers the whole
+        // horizon.
+        let mut check_points: Vec<f64> = future_resets
             .iter()
             .map(|d| {
                 inst.day_count
@@ -120,17 +194,14 @@ impl CliquetOptionMcPricer {
         let steps_per_year = self.config.steps_per_year;
         let num_steps = ((t * steps_per_year).round() as usize).max(self.config.min_steps);
 
-        // Payoff reset times.
+        // Payoff reset times: the remaining (future) reset dates only.
         //
-        // A reset date at the contract start (t == 0) is a strike-set event,
-        // not a period observation: the payoff already anchors period 1 to
-        // `initial_spot`. The MC engine fires `on_event` at t=0 before any
-        // step, so passing a t=0 reset to the payoff records `initial_spot`
-        // as `reset_spots[0]`, producing a guaranteed-zero period-1 return and
-        // shifting every later period by one. Filter `t > 0` here so the
-        // payoff schedule stays consistent with `check_points` and the grid.
-        let reset_times: Vec<f64> = inst
-            .reset_dates
+        // Past reset dates (including a strike-set reset at the contract
+        // start, W-36) were already consumed by the deterministic seasoned
+        // evaluation above; the payoff anchors its first simulated period to
+        // `sim_anchor`. The `t > 0` filter is kept as a guard so the payoff
+        // schedule stays consistent with `check_points` and the grid.
+        let reset_times: Vec<f64> = future_resets
             .iter()
             .map(|&date| {
                 inst.day_count
@@ -181,7 +252,9 @@ impl CliquetOptionMcPricer {
 
         let time_grid = TimeGrid::from_times(grid_times)?;
 
-        // Build payoff (consumes reset_times via move)
+        // Build payoff (consumes reset_times via move). The first simulated
+        // period anchors to the last observed level (`sim_anchor`), and the
+        // locked-in past returns seed the global cap/floor aggregation.
         let payoff = CliquetCallPayoff::new(
             reset_times,
             inst.local_cap,
@@ -190,9 +263,10 @@ impl CliquetOptionMcPricer {
             inst.global_floor,
             inst.notional.amount(),
             inst.notional.currency(),
-            initial_spot,
+            sim_anchor,
             payoff_type,
-        )?;
+        )?
+        .with_prior_locked_returns(locked_sum, locked_growth);
 
         let merged_cfg = crate::instruments::common_impl::helpers::merged_path_config(
             &self.config,
@@ -499,6 +573,93 @@ mod tests {
         // Determinism (seeded RNG) holds through the non-monotone branch.
         let pv2 = compute_pv(&option, &market, as_of).expect("repeat price");
         assert_eq!(pv1.amount(), pv2.amount());
+    }
+
+    /// Seasoned cliquet: reset dates strictly before as_of without fixings
+    /// (or without the strike-set level) must error, never silently reprice
+    /// as a shorter new contract.
+    #[test]
+    fn seasoned_cliquet_requires_initial_level_and_fixings() {
+        let as_of = date(2024, 9, 1); // first reset (2024-06-30) is past
+        let option = live_option();
+        let mkt = market(as_of);
+
+        let err = compute_pv(&option, &mkt, as_of).expect_err("missing initial_level");
+        assert!(
+            err.to_string().contains("initial_level"),
+            "expected initial_level error, got: {err}"
+        );
+
+        let mut with_level = live_option();
+        with_level.initial_level = Some(100.0);
+        let err = compute_pv(&with_level, &mkt, as_of).expect_err("missing fixing");
+        assert!(
+            err.to_string().contains("past_fixings"),
+            "expected past_fixings error, got: {err}"
+        );
+    }
+
+    /// A seasoned cliquet must carry its locked-in past period returns: with a
+    /// positive locked-in return it is worth strictly more than the identical
+    /// contract whose past period return was zero.
+    #[test]
+    fn seasoned_cliquet_carries_locked_in_returns() {
+        let as_of = date(2024, 9, 1);
+        let mkt = market(as_of);
+
+        // Past period 100 -> 104 (capped at 5%): locked-in +4%.
+        let mut up = live_option();
+        up.initial_level = Some(100.0);
+        up.past_fixings = vec![(date(2024, 6, 30), 104.0)];
+
+        // Past period flat: locked-in 0%.
+        let mut flat = live_option();
+        flat.initial_level = Some(100.0);
+        flat.past_fixings = vec![(date(2024, 6, 30), 100.0)];
+
+        let pv_up = compute_pv(&up, &mkt, as_of).expect("pv up");
+        let pv_flat = compute_pv(&flat, &mkt, as_of).expect("pv flat");
+        assert!(
+            pv_up.amount() > pv_flat.amount(),
+            "locked-in +4% must be worth more than locked-in 0%: up={} flat={}",
+            pv_up.amount(),
+            pv_flat.amount()
+        );
+        // The locked-in return is worth roughly 4% of notional discounted; it
+        // must not have been silently discarded (old behavior: identical PVs).
+        assert!(
+            pv_up.amount() - pv_flat.amount() > 0.01 * 100_000.0,
+            "locked-in return contribution too small: diff={}",
+            pv_up.amount() - pv_flat.amount()
+        );
+    }
+
+    /// A cliquet whose reset dates are all observed is a deterministic
+    /// cashflow: clamp the locked-in returns and discount from expiry.
+    #[test]
+    fn fully_observed_cliquet_is_deterministic() {
+        let as_of = date(2025, 1, 10);
+        let mkt = market(as_of);
+
+        let mut option = live_option();
+        option.expiry = date(2025, 1, 31); // settlement after last reset
+        option.initial_level = Some(100.0);
+        // Periods: 100->103 (+3%), 103->105.06 (~+2%); both inside the 5% cap.
+        option.past_fixings = vec![(date(2024, 6, 30), 103.0), (date(2024, 12, 31), 105.06)];
+
+        let pv = compute_pv(&option, &mkt, as_of).expect("deterministic pv");
+
+        let r1 = 0.03_f64.min(0.05).max(0.0);
+        let r2 = (105.06_f64 / 103.0 - 1.0).min(0.05).max(0.0);
+        let total = (r1 + r2).min(0.20).max(0.0);
+        let disc = mkt.get_discount("USD-OIS").expect("curve");
+        let df = disc.df_between_dates(as_of, option.expiry).expect("df");
+        let expected = total * 100_000.0 * df;
+        assert!(
+            (pv.amount() - expected).abs() < 1e-9,
+            "fully observed cliquet must be deterministic: pv={} expected={expected}",
+            pv.amount()
+        );
     }
 
     /// W-36: a reset date at the contract start (`t == 0`) is a strike-set

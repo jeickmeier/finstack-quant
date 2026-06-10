@@ -252,11 +252,22 @@ impl TrsEngine {
                 continue;
             }
 
-            let t_start = params
-                .schedule
-                .params
-                .dc
-                .year_fraction(as_of, period_start, ctx)?;
+            // Signed time to the period start: negative when the period is
+            // already in progress (seasoned trade). Day counts reject inverted
+            // date ranges, so compute the magnitude forward and negate.
+            let t_start = if period_start >= as_of {
+                params
+                    .schedule
+                    .params
+                    .dc
+                    .year_fraction(as_of, period_start, ctx)?
+            } else {
+                -params
+                    .schedule
+                    .params
+                    .dc
+                    .year_fraction(period_start, as_of, ctx)?
+            };
             let t_end = params
                 .schedule
                 .params

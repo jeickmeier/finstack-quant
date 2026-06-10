@@ -1097,9 +1097,20 @@ class SabrCalibrator:
         strikes: list[float],
         market_vols: list[float],
         t: float,
-        beta: float = 1.0,
+        beta: float,
     ) -> SabrParameters:
         """Fit ``(alpha, nu, rho)`` to market vols with ``beta`` fixed."""
+        ...
+
+    def calibrate_auto_shift(
+        self,
+        forward: float,
+        strikes: list[float],
+        market_vols: list[float],
+        t: float,
+        beta: float,
+    ) -> SabrParameters:
+        """Calibrate with automatic shift selection for negative-rate smiles."""
         ...
 
 # ---------------------------------------------------------------------------

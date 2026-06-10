@@ -34,6 +34,7 @@
     "optimize": "command -v wasm-opt >/dev/null 2>&1 && wasm-opt -Oz -o pkg/finstack_wasm_bg.wasm pkg/finstack_wasm_bg.wasm || echo 'wasm-opt not found, skipping optimization'",
     "test": "wasm-pack test --node",
     "test:browser": "wasm-pack test --chrome --headless",
+    "test:facade": "node --test \"tests/facade/**/*.test.mjs\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md,mjs,mks}\"",

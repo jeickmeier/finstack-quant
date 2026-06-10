@@ -15,7 +15,7 @@ use super::pricing::{
     metric_value_with_context, parse_market_json, price_instrument_with_context,
     price_instrument_with_metrics_context, standard_option_greeks_with_context,
 };
-use crate::utils::to_js_err;
+use crate::utils::{to_js_err, to_js_value};
 use finstack_valuations::pricer::{
     canonical_instrument_json, canonical_instrument_json_from_str, pretty_instrument_json,
 };
@@ -248,7 +248,7 @@ macro_rules! fx_option_class {
                 for (metric, value) in pairs {
                     out.insert(metric.to_string(), Value::from(value));
                 }
-                serde_wasm_bindgen::to_value(&Value::Object(out)).map_err(to_js_err)
+                to_js_value(&Value::Object(out))
             }
         }
     };

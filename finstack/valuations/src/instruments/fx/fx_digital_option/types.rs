@@ -159,6 +159,16 @@ impl FxDigitalOption {
                 actual: self.notional.currency(),
             });
         }
+        // The closed form is the domestic (quote-currency) cash digital:
+        // e^{−r_d T}·N(±d₂)·Q. A base-currency payout (foreign-cash digital,
+        // e^{−r_f T}·N(±d₁)) is a different formula — reject rather than
+        // silently mispricing and mislabeling the result currency.
+        if self.payout_amount.currency() != self.quote_currency {
+            return Err(finstack_core::Error::CurrencyMismatch {
+                expected: self.quote_currency,
+                actual: self.payout_amount.currency(),
+            });
+        }
         Ok(())
     }
 
@@ -329,6 +339,19 @@ mod tests {
     #[test]
     fn validation_valid_digital_option_builds_ok() {
         assert!(base_digital_builder().build().is_ok());
+    }
+
+    #[test]
+    fn validation_rejects_base_currency_payout() {
+        // The pricer implements the domestic cash-or-nothing digital only:
+        // a base (foreign) currency payout would be silently mispriced.
+        let result = base_digital_builder()
+            .payout_amount(Money::new(1_000_000.0, Currency::EUR))
+            .build();
+        assert!(
+            result.is_err(),
+            "FxDigitalOption must reject a payout_amount not in the quote currency"
+        );
     }
 
     #[test]
