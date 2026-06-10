@@ -5,14 +5,21 @@
 //! A two-phase algorithm is used:
 //!
 //! 1. **Forward pass.** For each path the harness runs the full simulation
-//!    and records per-path the deterministic PV reported by
-//!    [`finstack_monte_carlo::traits::Payoff::value`], as well as the short-rate,
-//!    exercise value, and inactive flag at each exercise date.
+//!    (accumulating the pathwise money-market numeraire `B(t)`, exposed to
+//!    payoffs via [`StateKey::BankAccount`]) and records per-path the time-0
+//!    PV reported by [`finstack_monte_carlo::traits::Payoff::value`], as well
+//!    as the short rate, undiscounted exercise value, bank factor, and
+//!    inactive flag at each exercise date.
 //! 2. **Backward pass.** Starting from maturity, the harness regresses
-//!    continuation values via [`finstack_monte_carlo::pricer::lsq::solve_least_squares`] against the
+//!    at-exercise continuation values (`cashflow[p] · B_p(t_ex)`, the pathwise
+//!    future value of the time-0 cashflow) via
+//!    [`finstack_monte_carlo::pricer::lsq::solve_least_squares`] against the
 //!    [`standard_basis`] (ITM + active paths only) and rolls the per-path
-//!    cashflow vector back, overwriting `cashflow[p]` with the call value
-//!    whenever exercise is optimal.
+//!    cashflow vector back, overwriting `cashflow[p]` with the pathwise-
+//!    discounted call value `exercise_value / B_p(t_ex)` whenever exercise is
+//!    optimal. Discounting with ratios of the pathwise `B(t)` (rather than the
+//!    deterministic curve DF) keeps the payoff/numeraire correlation that the
+//!    short-rate model exists to capture.
 //! 3. **Aggregation.** The average of the per-path cashflows is reported
 //!    as the LSMC PV estimate together with a 95% confidence interval.
 //!
@@ -38,6 +45,7 @@
 //! Standard error rises by roughly √2 because only half the paths drive the
 //! aggregation; combine the two bounds for an unbiased bracket.
 
+use crate::instruments::rates::exotics_shared::bank_account::bank_step_factor;
 use crate::instruments::rates::exotics_shared::exercise::ExerciseBoundaryPayoff;
 use crate::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig;
 use finstack_core::currency::Currency;
@@ -126,6 +134,7 @@ impl RateExoticHw1fLsmcPricer {
         let mut deterministic_pv = vec![0.0_f64; n_paths];
         let mut exercise_short_rates = vec![0.0_f64; n_paths * n_ex];
         let mut exercise_values = vec![0.0_f64; n_paths * n_ex];
+        let mut exercise_banks = vec![1.0_f64; n_paths * n_ex];
         let mut exercise_inactive = vec![false; n_paths * n_ex];
 
         // Per-path scratch buffers hoisted out of the path loop; the
@@ -139,10 +148,12 @@ impl RateExoticHw1fLsmcPricer {
             for anti in 0..multiplicity {
                 let mut rng = base_rng.substream(path_id as u64);
                 let mut r = self.r0;
+                let mut bank = 1.0_f64;
                 let mut payoff = payoff_factory();
                 payoff.reset();
                 let mut state = PathState::new(0, 0.0);
                 state.set_key(StateKey::ShortRate, r);
+                state.set_key(StateKey::BankAccount, bank);
 
                 let mut next_event = 0usize;
                 let mut next_exercise = 0usize;
@@ -153,6 +164,7 @@ impl RateExoticHw1fLsmcPricer {
                     if anti == 1 {
                         z[0] = -z[0];
                     }
+                    let r_prev = r;
                     disc.step(
                         &process,
                         t,
@@ -161,10 +173,12 @@ impl RateExoticHw1fLsmcPricer {
                         &z,
                         &mut work,
                     );
+                    bank *= bank_step_factor(r_prev, r, dt);
 
                     let t_next = grid.time(step + 1);
                     state.set_step_time(step + 1, t_next);
                     state.set_key(StateKey::ShortRate, r);
+                    state.set_key(StateKey::BankAccount, bank);
 
                     while next_event < event_step_indices.len()
                         && event_step_indices[next_event] == step + 1
@@ -180,6 +194,7 @@ impl RateExoticHw1fLsmcPricer {
                             exercise_values[flat] = payoff
                                 .intrinsic_at(next_exercise, r, self.currency)
                                 .amount();
+                            exercise_banks[flat] = bank;
                             exercise_inactive[flat] = payoff.is_path_inactive();
                             next_exercise += 1;
                         }
@@ -243,7 +258,10 @@ impl RateExoticHw1fLsmcPricer {
                 }
                 active_paths.push(p);
                 active_basis.extend(basis);
-                active_continuation.push(cf);
+                // Regression target is the *at-exercise* continuation value:
+                // the time-0 cashflow compounded forward by the pathwise
+                // numeraire B(t_ex) — equivalent to the B(t)/B(t') rollback.
+                active_continuation.push(cf * exercise_banks[flat]);
             }
 
             if num_basis == 0 {
@@ -273,21 +291,26 @@ impl RateExoticHw1fLsmcPricer {
                     }
                     let r = exercise_short_rates[flat];
                     let basis = basis_payoff.continuation_basis(ex_idx, t_ex, r);
+                    // `cont_hat` estimates the at-exercise continuation value;
+                    // the (undiscounted) exercise value is compared on the same
+                    // basis, and the exercised cashflow is rolled to time 0
+                    // with the pathwise numeraire.
                     let cont_hat: f64 = basis.iter().zip(coeffs.iter()).map(|(b, c)| b * c).sum();
                     if exercise_value < cont_hat {
-                        *cf = exercise_value;
+                        *cf = exercise_value / exercise_banks[flat];
                     }
                 }
             } else {
-                // Fallback: pathwise issuer exercise against realized cashflow.
+                // Fallback: pathwise issuer exercise against realized cashflow
+                // (both sides compared at the exercise date).
                 for (p, cf) in cashflow.iter_mut().enumerate() {
                     let flat = p * n_ex + ex_idx;
                     if exercise_inactive[flat] {
                         continue;
                     }
                     let exercise_value = exercise_values[flat];
-                    if exercise_value > 0.0 && exercise_value < *cf {
-                        *cf = exercise_value;
+                    if exercise_value > 0.0 && exercise_value < *cf * exercise_banks[flat] {
+                        *cf = exercise_value / exercise_banks[flat];
                     }
                 }
             }
@@ -398,17 +421,28 @@ mod tests {
     use finstack_core::money::Money;
     use finstack_monte_carlo::traits::Payoff;
 
-    /// Inert payoff that reports PV = notional (no coupons, no exercise benefit).
+    use finstack_monte_carlo::traits::StateKey;
+
+    /// Zero-coupon-bond payoff: pays `notional` at maturity (the last event),
+    /// discounted pathwise via the bank-account numeraire exposed by the
+    /// harness. Callable at par at every exercise date via `intrinsic_at`,
+    /// which (per the trait contract) returns the *undiscounted* at-exercise
+    /// value.
     #[derive(Debug, Clone)]
     struct ParPayoff {
         notional: f64,
+        bank_at_last_event: f64,
     }
     impl Payoff for ParPayoff {
-        fn on_event(&mut self, _s: &mut PathState) {}
-        fn value(&self, ccy: Currency) -> Money {
-            Money::new(self.notional, ccy)
+        fn on_event(&mut self, s: &mut PathState) {
+            self.bank_at_last_event = s.get_key(StateKey::BankAccount).unwrap_or(1.0);
         }
-        fn reset(&mut self) {}
+        fn value(&self, ccy: Currency) -> Money {
+            Money::new(self.notional / self.bank_at_last_event, ccy)
+        }
+        fn reset(&mut self) {
+            self.bank_at_last_event = 1.0;
+        }
     }
     impl ExerciseBoundaryPayoff for ParPayoff {
         fn intrinsic_at(&self, _i: usize, _r: f64, ccy: Currency) -> Money {
@@ -419,37 +453,47 @@ mod tests {
         }
     }
 
+    fn par_payoff() -> ParPayoff {
+        ParPayoff {
+            notional: 1_000_000.0,
+            bank_at_last_event: 1.0,
+        }
+    }
+
+    /// With θ = r0 the short rate stays near r0 and the at-exercise
+    /// continuation (par discounted from maturity) is always *below* par, so
+    /// the issuer never calls: the LSMC PV is the pathwise-discounted ZCB
+    /// price `notional · E[1/B(2)] ≈ notional · e^{−r0·2}`.
     #[test]
-    fn noexercise_equals_par() {
+    fn noexercise_equals_discounted_par() {
         let pricer = RateExoticHw1fLsmcPricer {
-            process_params: HullWhite1FParams::new(0.05, 0.001, 0.0),
+            process_params: HullWhite1FParams::new(0.05, 0.001, 0.03),
             r0: 0.03,
             event_times: vec![1.0, 2.0],
             exercise_times: vec![1.0, 2.0],
             call_prices: vec![1.0, 1.0],
             notional: 1_000_000.0,
             config: RateExoticMcConfig {
-                num_paths: 200,
+                num_paths: 2_000,
                 ..Default::default()
             },
             currency: Currency::USD,
         };
-        let est = pricer
-            .price(|| ParPayoff {
-                notional: 1_000_000.0,
-            })
-            .expect("ok");
-        // With call_price=1.0, call_value == notional, and deterministic PV is
-        // also notional. Issuer is indifferent; cashflow[p] stays at notional.
-        assert!((est.mean.amount() - 1_000_000.0).abs() < 1e-6);
+        let est = pricer.price(par_payoff).expect("ok");
+        let expected = 1_000_000.0 * (-0.03_f64 * 2.0).exp();
+        assert!(
+            (est.mean.amount() - expected).abs() < 0.002 * expected,
+            "mean {} should be near discounted par {expected}",
+            est.mean.amount()
+        );
     }
 
-    /// Split-sample (out-of-sample) LSMC should also reach par on the degenerate
-    /// no-benefit-to-exercise setup, and report stats over the pricing half only.
+    /// Split-sample (out-of-sample) LSMC should also reach the discounted-par
+    /// value on the no-call setup, and report stats over the pricing half only.
     #[test]
-    fn oos_lsmc_noexercise_equals_par_and_uses_half_paths() {
+    fn oos_lsmc_noexercise_equals_discounted_par_and_uses_half_paths() {
         let pricer = RateExoticHw1fLsmcPricer {
-            process_params: HullWhite1FParams::new(0.05, 0.001, 0.0),
+            process_params: HullWhite1FParams::new(0.05, 0.001, 0.03),
             r0: 0.03,
             event_times: vec![1.0, 2.0],
             exercise_times: vec![1.0, 2.0],
@@ -463,13 +507,13 @@ mod tests {
             },
             currency: Currency::USD,
         };
-        let est = pricer
-            .price(|| ParPayoff {
-                notional: 1_000_000.0,
-            })
-            .expect("ok");
-        // Same indifference argument as in-sample: cashflow[p] stays at notional.
-        assert!((est.mean.amount() - 1_000_000.0).abs() < 1e-6);
+        let est = pricer.price(par_payoff).expect("ok");
+        let expected = 1_000_000.0 * (-0.03_f64 * 2.0).exp();
+        assert!(
+            (est.mean.amount() - expected).abs() < 0.005 * expected,
+            "mean {} should be near discounted par {expected}",
+            est.mean.amount()
+        );
         // The pricing half is half the path count: 200 of 400.
         assert_eq!(est.num_paths, 200);
     }

@@ -506,6 +506,133 @@ fn test_cms_option_requires_vol_surface_in_market() {
     );
 }
 
+/// Build a 1-period seasoned CMS option: fixing in the past, payment in the
+/// future relative to the test's `as_of`.
+fn seasoned_cms_option(fixing: Date, payment: Date) -> CmsOption {
+    CmsOption {
+        id: InstrumentId::new("CMS-SEASONED"),
+        strike: Decimal::try_from(0.025).expect("valid decimal"),
+        cms_tenor: 10.0,
+        fixing_dates: vec![fixing],
+        payment_dates: vec![payment],
+        accrual_fractions: vec![0.25],
+        option_type: OptionType::Call,
+        notional: Money::new(1_000_000.0, Currency::USD),
+        day_count: DayCount::Act365F,
+        swap_convention: None,
+        swap_fixed_freq: Some(Tenor::semi_annual()),
+        swap_float_freq: Some(Tenor::quarterly()),
+        swap_day_count: Some(DayCount::Thirty360),
+        swap_float_day_count: Some(DayCount::Act360),
+        discount_curve_id: CurveId::new("USD-OIS"),
+        forward_curve_id: CurveId::new("USD-LIBOR-3M"),
+        vol_surface_id: CurveId::new("USD-CMS10Y-VOL"),
+        pricing_overrides: PricingOverrides::default(),
+        attributes: Default::default(),
+    }
+}
+
+/// Insert a CMS fixing series (`FIXING:CMS-10Y:USD-LIBOR-3M`) recording
+/// `observed` on `fixing`.
+fn with_cms_fixing(market: MarketContext, fixing: Date, observed: f64) -> MarketContext {
+    use finstack_core::market_data::fixings::cms_fixing_series_id;
+    use finstack_core::market_data::scalars::ScalarTimeSeries;
+
+    let series = ScalarTimeSeries::new(
+        cms_fixing_series_id("USD-LIBOR-3M", 10.0),
+        vec![(fixing, observed)],
+        None,
+    )
+    .expect("fixing series");
+    market.insert_series(series)
+}
+
+/// Seasoned CMS caplet (Black-76 pricer): the period whose fixing is in the
+/// past must be valued as intrinsic on the *recorded* fixing — and a missing
+/// fixing series must be a hard error, never silent live-curve projection.
+#[test]
+fn test_seasoned_cms_option_uses_historical_fixing() {
+    let fixing = Date::from_calendar_date(2024, Month::December, 1).unwrap();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let payment = Date::from_calendar_date(2025, Month::June, 1).unwrap();
+
+    let inst = seasoned_cms_option(fixing, payment);
+    let market = standard_market(as_of);
+
+    // Missing fixing series → hard error.
+    let err = inst
+        .value(&market, as_of)
+        .expect_err("missing CMS fixing series must be a hard error");
+    assert!(
+        err.to_string().contains("FIXING:CMS-10Y:USD-LIBOR-3M"),
+        "error must name the missing series: {err}"
+    );
+
+    // Recorded fixing → intrinsic on the observed rate, discounted from payment.
+    let observed = 0.05;
+    let market = with_cms_fixing(market, fixing, observed);
+    let pv = inst
+        .value(&market, as_of)
+        .expect("seasoned pricing")
+        .amount();
+
+    let df = market
+        .get_discount("USD-OIS")
+        .unwrap()
+        .df_between_dates(as_of, payment)
+        .unwrap();
+    let expected = (observed - 0.025) * 0.25 * df * 1_000_000.0;
+    assert!(
+        (pv - expected).abs() < 0.01,
+        "seasoned CMS caplet must price intrinsic on the recorded fixing: \
+         expected {expected}, got {pv}"
+    );
+}
+
+/// Same seasoned-fixing contract for the static-replication pricer.
+#[test]
+fn test_seasoned_cms_option_replication_uses_historical_fixing() {
+    use finstack_valuations::instruments::rates::cms_option::replication_pricer::CmsReplicationPricer;
+    use finstack_valuations::pricer::Pricer;
+
+    let fixing = Date::from_calendar_date(2024, Month::December, 1).unwrap();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let payment = Date::from_calendar_date(2025, Month::June, 1).unwrap();
+
+    let inst = seasoned_cms_option(fixing, payment);
+    let market = standard_market(as_of);
+
+    // Missing fixing series → hard error.
+    let err = CmsReplicationPricer::new()
+        .price_dyn(&inst, &market, as_of)
+        .expect_err("missing CMS fixing series must be a hard error");
+    assert!(
+        err.to_string().contains("FIXING:CMS-10Y:USD-LIBOR-3M"),
+        "error must name the missing series: {err}"
+    );
+
+    // Recorded fixing → intrinsic on the observed rate, discounted from payment.
+    let observed = 0.05;
+    let market = with_cms_fixing(market, fixing, observed);
+    let pv = CmsReplicationPricer::new()
+        .price_dyn(&inst, &market, as_of)
+        .expect("seasoned replication pricing")
+        .value
+        .amount();
+
+    let df = market
+        .get_discount("USD-OIS")
+        .unwrap()
+        .df_between_dates(as_of, payment)
+        .unwrap();
+    let expected = (observed - 0.025) * 0.25 * df * 1_000_000.0;
+    assert!(
+        (pv - expected).abs() < 0.01,
+        "seasoned replication CMS caplet must price intrinsic on the recorded \
+         fixing: expected {expected}, got {pv}"
+    );
+}
+
 /// Build a market whose vol surface has a strong skew: a fixed ATM vol at the
 /// forward swap rate (~3.5%) but a very different vol at the option strike.
 ///

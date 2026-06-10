@@ -14,12 +14,15 @@ use finstack_monte_carlo::traits::Payoff;
 /// (required because the harness clones payoffs per-path and may simulate
 /// paths across threads).
 pub trait ExerciseBoundaryPayoff: Payoff {
-    /// The intrinsic value (i.e., "what the issuer receives on call") at the
+    /// The intrinsic value (i.e., "what the issuer pays on call") at the
     /// specified exercise-date index, evaluated along a single path whose
     /// state at that date is `short_rate`.
     ///
-    /// For a note callable at par, this is typically `notional * call_price`
-    /// minus the PV of future deterministic coupons available on-path.
+    /// The returned amount is the **undiscounted value at the exercise date**
+    /// (e.g. `notional * call_price` for a note callable at par). The LSMC
+    /// harness discounts it to time 0 with the pathwise money-market
+    /// numeraire `B(t_exercise)` — implementations must NOT pre-discount with
+    /// the deterministic curve DF.
     fn intrinsic_at(&self, exercise_idx: usize, short_rate: f64, currency: Currency) -> Money;
 
     /// Regression basis used for continuation-value estimation at the

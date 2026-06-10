@@ -94,6 +94,33 @@ impl CmsSwapPricer {
                 continue;
             }
 
+            // Seasoned coupon: the CMS rate fixed in the past. Value it off
+            // the recorded fixing (mirroring the cap/floor pricer) — never
+            // re-project from the live curve, which books phantom P&L. The
+            // rate is known, so there is no convexity adjustment and the
+            // embedded cap/floor collapses to intrinsic (time_to_fixing = 0).
+            if fixing_date < as_of {
+                let observed =
+                    crate::instruments::rates::exotics_shared::fixings::historical_cms_fixing(
+                        market,
+                        &inst.forward_curve_id,
+                        inst.cms_tenor,
+                        fixing_date,
+                    )?;
+                let coupon_rate = apply_cms_cap_floor(
+                    observed,
+                    inst.cms_spread,
+                    inst.cms_cap,
+                    inst.cms_floor,
+                    &vol_surface,
+                    0.0,
+                );
+                let df_pay =
+                    relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+                total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
+                continue;
+            }
+
             let swap_start = fixing_date;
             let swap_tenor_months = (inst.cms_tenor * 12.0).round() as i32;
             let swap_end = swap_start.add_months(swap_tenor_months);
@@ -540,6 +567,82 @@ mod tests {
 
         assert!(pv_uncapped.is_finite() && pv_capped.is_finite());
         assert!(pv_capped <= pv_uncapped + 1e-9);
+    }
+
+    /// Build a 1-period seasoned CMS swap: fixing in the past, payment in the
+    /// future relative to the test's `as_of`.
+    fn seasoned_cms_swap(fixing: Date, pay: Date) -> CmsSwap {
+        CmsSwap::builder()
+            .id(InstrumentId::new("CMS-SEASONED"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .cms_tenor(10.0)
+            .cms_fixing_dates(vec![fixing])
+            .cms_payment_dates(vec![pay])
+            .cms_accrual_fractions(vec![0.25])
+            .cms_day_count(DayCount::Act365F)
+            .cms_spread(0.0)
+            .swap_convention_opt(Some(IRSConvention::USDStandard))
+            .funding_leg(FundingLeg::Fixed {
+                rate: 0.0,
+                payment_dates: vec![pay],
+                accrual_fractions: vec![0.25],
+                day_count: DayCount::Act365F,
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .build()
+            .expect("CMS swap should build")
+    }
+
+    /// A seasoned CMS coupon (fixed in the past, paid in the future) must be
+    /// valued off the recorded fixing — and a missing fixing series must be a
+    /// hard error, never a silent fallback to live-curve projection.
+    #[test]
+    fn seasoned_cms_coupon_uses_recorded_fixing() {
+        use finstack_core::market_data::fixings::cms_fixing_series_id;
+        use finstack_core::market_data::scalars::ScalarTimeSeries;
+
+        let fixing = date(2024, 12, 1);
+        let as_of = date(2025, 1, 1);
+        let pay = date(2025, 3, 1);
+        let swap = seasoned_cms_swap(fixing, pay);
+        let market = cms_market_with_vol(as_of, 0.25);
+
+        // Without the fixing series the seasoned coupon must hard-error.
+        let err = CmsSwapPricer::new()
+            .pv_cms_leg(&swap, &market, as_of, 1.0)
+            .expect_err("missing CMS fixing series must be a hard error");
+        assert!(
+            err.to_string().contains("FIXING:CMS-10Y:USD-LIBOR-3M"),
+            "error must name the missing series: {err}"
+        );
+
+        // With the fixing recorded, the PV is the deterministic discounted
+        // coupon off the observed rate.
+        let observed = 0.0412;
+        let series = ScalarTimeSeries::new(
+            cms_fixing_series_id("USD-LIBOR-3M", 10.0),
+            vec![(fixing, observed)],
+            None,
+        )
+        .expect("fixing series");
+        let market = market.insert_series(series);
+
+        let pv = CmsSwapPricer::new()
+            .pv_cms_leg(&swap, &market, as_of, 1.0)
+            .expect("seasoned CMS leg PV");
+        let df = market
+            .get_discount("USD-OIS")
+            .expect("discount curve")
+            .df_between_dates(as_of, pay)
+            .expect("df");
+        let expected = observed * 0.25 * df * 1_000_000.0;
+        assert!(
+            (pv - expected).abs() < 0.01,
+            "seasoned coupon must use the recorded fixing: expected {expected}, got {pv}"
+        );
     }
 
     /// Build a 1-period CMS swap with an optional floor.

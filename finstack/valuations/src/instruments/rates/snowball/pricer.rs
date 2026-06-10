@@ -38,6 +38,17 @@ struct SnowballPayoff {
     discounted_pv: f64,
     next_event: usize,
     prev_coupon: f64,
+    /// `true` in Monte-Carlo mode: cashflows are discounted with the pathwise
+    /// bank-account numeraire `B(t)` read from the simulation state, not the
+    /// deterministic curve DF baked into each [`CouponEvent`]. A coupon fixed
+    /// at the period start is held in `pending` until the simulation reaches
+    /// its payment date (the next event), where `B(T_pay)` is known.
+    pathwise: bool,
+    /// Cashflow amounts fixed but not yet paid; settled (pathwise-discounted)
+    /// at the next event, whose time is the payment date.
+    pending: f64,
+    /// Bank-account numeraire at the most recent event (pathwise mode).
+    last_bank: f64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -51,7 +62,12 @@ struct SnowballCouponSpec {
 }
 
 impl SnowballPayoff {
-    fn new(spec: SnowballCouponSpec, notional: f64, events: Vec<CouponEvent>) -> Self {
+    fn new(
+        spec: SnowballCouponSpec,
+        notional: f64,
+        events: Vec<CouponEvent>,
+        pathwise: bool,
+    ) -> Self {
         Self {
             spec,
             notional,
@@ -59,6 +75,9 @@ impl SnowballPayoff {
             discounted_pv: 0.0,
             next_event: 0,
             prev_coupon: spec.initial_coupon,
+            pathwise,
+            pending: 0.0,
+            last_bank: 1.0,
         }
     }
 
@@ -91,10 +110,30 @@ impl SnowballPayoff {
         // instantaneous short rate r(t) directly as a term index rate.
         let floating_rate = event.forward_coeffs.simple_forward(short_rate);
         let coupon_rate = self.compute_coupon(floating_rate);
-        self.discounted_pv +=
-            coupon_rate * event.accrual_fraction * self.notional * event.discount_factor;
+        let coupon_amount = coupon_rate * event.accrual_fraction * self.notional;
+        if self.pathwise {
+            // Fixed now, paid at the period end — discounted when the
+            // simulation reaches the payment date.
+            self.pending += coupon_amount;
+        } else {
+            self.discounted_pv += coupon_amount * event.discount_factor;
+        }
         self.prev_coupon = coupon_rate;
         self.next_event += 1;
+        if self.pathwise && self.next_event == self.events.len() {
+            // Final coupon settled: par redemption pays at maturity, the same
+            // payment date as the final coupon.
+            self.pending += self.notional;
+        }
+    }
+
+    /// Settle pending cashflows whose payment date has been reached, using the
+    /// pathwise bank-account numeraire at that date.
+    fn flush_pending(&mut self, bank: f64) {
+        if self.pending != 0.0 {
+            self.discounted_pv += self.pending / bank;
+            self.pending = 0.0;
+        }
     }
 
     /// Drain the leading run of already-seasoned coupons (in-advance fixings at
@@ -113,11 +152,18 @@ impl SnowballPayoff {
 
 impl Payoff for SnowballPayoff {
     fn on_event(&mut self, state: &mut PathState) {
-        // The simulation fires one event per *forward-starting* coupon, at that
-        // coupon's period start (the in-advance fixing date). A leading
-        // already-seasoned coupon carries no path event, so drain any such
-        // coupons that precede this path-fixed one before settling it.
+        // The simulation fires one event per *forward-starting* coupon at that
+        // coupon's period start (the in-advance fixing date), plus a final
+        // settlement event at maturity. A leading already-seasoned coupon
+        // carries no path event, so drain any such coupons that precede this
+        // path-fixed one before settling it.
         self.settle_seasoned_prefix();
+        // Coupons fixed at the previous event pay at this event's date
+        // (contiguous periods: period end == next period start; the final
+        // period's payment lands on the maturity settlement event).
+        let bank = state.get_key(StateKey::BankAccount).unwrap_or(1.0);
+        self.last_bank = bank;
+        self.flush_pending(bank);
         if self.next_event >= self.events.len() {
             return;
         }
@@ -127,7 +173,12 @@ impl Payoff for SnowballPayoff {
 
     fn value(&self, currency: finstack_core::currency::Currency) -> Money {
         let mut pv = self.discounted_pv;
-        if let Some(final_event) = self.events.last() {
+        if self.pathwise {
+            // The maturity settlement event flushes all pending cashflows;
+            // discount any defensive remainder with the last observed bank
+            // factor rather than dropping it.
+            pv += self.pending / self.last_bank;
+        } else if let Some(final_event) = self.events.last() {
             pv += self.notional * final_event.discount_factor;
         }
         Money::new(pv, currency)
@@ -137,6 +188,8 @@ impl Payoff for SnowballPayoff {
         self.discounted_pv = 0.0;
         self.next_event = 0;
         self.prev_coupon = self.spec.initial_coupon;
+        self.pending = 0.0;
+        self.last_bank = 1.0;
     }
 }
 
@@ -418,10 +471,23 @@ impl SnowballHw1fMcPricer {
             ));
         }
 
+        // Final settlement event at maturity (the last payment date): coupons
+        // fix in advance but pay at the period end, so the simulation must
+        // reach the last payment date for the pathwise bank-account numeraire
+        // B(T_pay) to be observable.
+        let maturity_date = *inst.coupon_dates.last().ok_or_else(|| {
+            finstack_core::Error::Validation("Snowball requires coupon dates".to_string())
+        })?;
+        let maturity_time =
+            inst.day_count
+                .year_fraction(as_of, maturity_date, DayCountContext::default())?;
+        let mut event_times = event_times;
+        event_times.push(maturity_time);
+
         // Bootstrap a time-dependent θ(t) from the discount curve so the
         // simulated short rate reprices the initial curve (HW1F, not Vasicek).
-        // The grid covers up to the last fixing — no coupon fixes after it and
-        // redemption discounting is deterministic.
+        // The grid covers up to the last payment date so every cashflow is
+        // discounted with the pathwise numeraire.
         let horizon = event_times.last().copied().unwrap_or(0.0);
         let process_params =
             calibrate_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
@@ -433,7 +499,7 @@ impl SnowballHw1fMcPricer {
             currency: inst.notional.currency(),
         };
 
-        let payoff = SnowballPayoff::new(spec, inst.notional.amount(), events);
+        let payoff = SnowballPayoff::new(spec, inst.notional.amount(), events, true);
         mc.price(|| payoff.clone())
     }
 
@@ -675,7 +741,7 @@ fn deterministic_estimate(
     events: &[CouponEvent],
     num_paths: usize,
 ) -> MoneyEstimate {
-    let mut payoff = SnowballPayoff::new(spec, notional.amount(), events.to_vec());
+    let mut payoff = SnowballPayoff::new(spec, notional.amount(), events.to_vec(), false);
     payoff.settle_seasoned_prefix();
     let pv = payoff.value(notional.currency());
     MoneyEstimate {

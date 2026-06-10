@@ -90,6 +90,28 @@ impl CmsOptionPricer {
                 continue; // Period expired
             }
 
+            // Seasoned period: the CMS rate fixed in the past, so the option
+            // payoff is pure intrinsic on the *recorded* fixing (mirroring the
+            // cap/floor pricer) — never on a rate re-projected from the live
+            // curve, which books phantom P&L.
+            if fixing_date < as_of {
+                let observed =
+                    crate::instruments::rates::exotics_shared::fixings::historical_cms_fixing(
+                        curves,
+                        &inst.forward_curve_id,
+                        inst.cms_tenor,
+                        fixing_date,
+                    )?;
+                let option_val = match inst.option_type {
+                    crate::instruments::OptionType::Call => (observed - strike).max(0.0),
+                    crate::instruments::OptionType::Put => (strike - observed).max(0.0),
+                };
+                let df_pay =
+                    relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+                total_pv += option_val * accrual_fraction * df_pay;
+                continue;
+            }
+
             // 1. Calculate Forward Swap Rate
             let swap_start = fixing_date;
             let swap_tenor_months = (inst.cms_tenor * 12.0).round() as i32;

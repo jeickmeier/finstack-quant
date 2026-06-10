@@ -194,6 +194,28 @@ impl CmsReplicationPricer {
                 continue; // Period already settled
             }
 
+            // Seasoned period: the CMS rate fixed in the past, so the option
+            // payoff is pure intrinsic on the *recorded* fixing (mirroring the
+            // cap/floor pricer) — never on a rate re-projected from the live
+            // curve, which books phantom P&L.
+            if fixing_date < as_of {
+                let observed =
+                    crate::instruments::rates::exotics_shared::fixings::historical_cms_fixing(
+                        curves,
+                        &inst.forward_curve_id,
+                        inst.cms_tenor,
+                        fixing_date,
+                    )?;
+                let df_pay =
+                    relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
+                let intrinsic = match inst.option_type {
+                    OptionType::Call => (observed - strike).max(0.0),
+                    OptionType::Put => (strike - observed).max(0.0),
+                };
+                total_pv += df_pay * intrinsic * accrual_fraction;
+                continue;
+            }
+
             // Forward-starting swap parameters for this fixing
             let swap_start = fixing_date;
             let swap_end = swap_start.add_months((inst.cms_tenor * 12.0).round() as i32);

@@ -55,8 +55,10 @@ struct CallableRangeAccrualSchedule {
     events: Vec<CallableRangeAccrualEvent>,
     event_times: Vec<f64>,
     exercise_times: Vec<f64>,
-    exercise_discount_factors: Vec<f64>,
     call_prices: Vec<f64>,
+    /// Index (into `events`) of the event coinciding with the final payment
+    /// date, where the pathwise bank-account numeraire `B(T_pay)` is read.
+    final_payment_event_idx: Option<usize>,
     final_payment_discount_factor: f64,
     future_observations: usize,
 }
@@ -68,8 +70,8 @@ struct CallableRangeAccrualPayoff {
     coupon_rate: f64,
     notional: f64,
     events: Vec<CallableRangeAccrualEvent>,
-    exercise_discount_factors: Vec<f64>,
     call_prices: Vec<f64>,
+    final_payment_event_idx: Option<usize>,
     final_payment_discount_factor: f64,
     past_in_range: usize,
     total_past_observations: usize,
@@ -77,6 +79,9 @@ struct CallableRangeAccrualPayoff {
     days_in_range: usize,
     observations_seen: usize,
     next_event: usize,
+    /// Pathwise bank-account numeraire observed at the final payment event;
+    /// 0.0 until recorded.
+    bank_at_final_payment: f64,
 }
 
 impl CallableRangeAccrualPayoff {
@@ -87,8 +92,8 @@ impl CallableRangeAccrualPayoff {
         coupon_rate: f64,
         notional: f64,
         events: Vec<CallableRangeAccrualEvent>,
-        exercise_discount_factors: Vec<f64>,
         call_prices: Vec<f64>,
+        final_payment_event_idx: Option<usize>,
         final_payment_discount_factor: f64,
         past_in_range: usize,
         total_past_observations: usize,
@@ -100,8 +105,8 @@ impl CallableRangeAccrualPayoff {
             coupon_rate,
             notional,
             events,
-            exercise_discount_factors,
             call_prices,
+            final_payment_event_idx,
             final_payment_discount_factor,
             past_in_range,
             total_past_observations,
@@ -109,6 +114,7 @@ impl CallableRangeAccrualPayoff {
             days_in_range: 0,
             observations_seen: 0,
             next_event: 0,
+            bank_at_final_payment: 0.0,
         }
     }
 
@@ -138,7 +144,14 @@ impl CallableRangeAccrualPayoff {
             total_in_range as f64 / total_observations as f64
         };
         let coupon = self.coupon_rate * accrual_fraction * self.notional;
-        (coupon + self.notional) * self.final_payment_discount_factor
+        // Discount with the pathwise bank-account numeraire observed at the
+        // final payment event; fall back to the deterministic curve DF only
+        // when the simulation never reached that event.
+        if self.bank_at_final_payment > 0.0 {
+            (coupon + self.notional) / self.bank_at_final_payment
+        } else {
+            (coupon + self.notional) * self.final_payment_discount_factor
+        }
     }
 }
 
@@ -146,6 +159,10 @@ impl Payoff for CallableRangeAccrualPayoff {
     fn on_event(&mut self, state: &mut PathState) {
         if self.next_event >= self.events.len() {
             return;
+        }
+
+        if self.final_payment_event_idx == Some(self.next_event) {
+            self.bank_at_final_payment = state.get_key(StateKey::BankAccount).unwrap_or(1.0);
         }
 
         let event = self.events[self.next_event];
@@ -171,6 +188,7 @@ impl Payoff for CallableRangeAccrualPayoff {
         self.days_in_range = 0;
         self.observations_seen = 0;
         self.next_event = 0;
+        self.bank_at_final_payment = 0.0;
     }
 }
 
@@ -181,13 +199,10 @@ impl ExerciseBoundaryPayoff for CallableRangeAccrualPayoff {
         _short_rate: f64,
         currency: finstack_core::currency::Currency,
     ) -> Money {
-        let df = self
-            .exercise_discount_factors
-            .get(exercise_idx)
-            .copied()
-            .unwrap_or(0.0);
+        // Undiscounted at-exercise call amount; the LSMC harness discounts it
+        // to time 0 with the pathwise bank-account numeraire B(t_exercise).
         let call_price = self.call_prices.get(exercise_idx).copied().unwrap_or(0.0);
-        Money::new(call_price * self.notional * df, currency)
+        Money::new(call_price * self.notional, currency)
     }
 
     fn continuation_basis(&self, _exercise_idx: usize, t_years: f64, short_rate: f64) -> Vec<f64> {
@@ -300,8 +315,8 @@ impl CallableRangeAccrualPricer {
             inst.range_accrual.coupon_rate,
             inst.range_accrual.notional.amount(),
             schedule.events.clone(),
-            schedule.exercise_discount_factors.clone(),
             schedule.call_prices.clone(),
+            schedule.final_payment_event_idx,
             schedule.final_payment_discount_factor,
             inst.range_accrual.past_fixings_in_range.unwrap_or(0),
             inst.range_accrual.total_past_observations.unwrap_or(0),
@@ -523,8 +538,15 @@ fn build_schedule(
         }
     }
 
+    // The final payment date must be a simulation event so the payoff can
+    // observe the pathwise bank-account numeraire B(T_pay) there.
+    if final_payment_date > as_of {
+        event_dates.entry(final_payment_date).or_default();
+    }
+
     let mut events = Vec::with_capacity(event_dates.len());
     let mut event_times = Vec::with_capacity(event_dates.len());
+    let mut final_payment_event_idx = None;
     for (date, mut event) in event_dates {
         let t = range
             .day_count
@@ -534,13 +556,15 @@ fn build_schedule(
                 // Term reference rate over [t, t + reference_tenor].
                 event.forward_coeffs = term_forward.period_coeffs(t, reference_tenor);
             }
+            if date == final_payment_date {
+                final_payment_event_idx = Some(events.len());
+            }
             events.push(event);
             event_times.push(t);
         }
     }
 
     let mut exercise_times = Vec::new();
-    let mut exercise_discount_factors = Vec::new();
     let mut call_prices = Vec::new();
     for date in eligible_call_dates.into_iter().filter(|d| *d > as_of) {
         let t = range
@@ -550,11 +574,6 @@ fn build_schedule(
             continue;
         }
         exercise_times.push(t);
-        exercise_discount_factors.push(relative_df_discount_curve(
-            discount_curve.as_ref(),
-            as_of,
-            date,
-        )?);
         call_prices.push(inst.call_provision.call_price);
     }
 
@@ -563,8 +582,8 @@ fn build_schedule(
         events,
         event_times,
         exercise_times,
-        exercise_discount_factors,
         call_prices,
+        final_payment_event_idx,
         final_payment_discount_factor,
         future_observations,
     })

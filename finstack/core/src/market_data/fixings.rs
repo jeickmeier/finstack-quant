@@ -25,6 +25,44 @@ pub fn fixing_series_id(forward_curve_id: &str) -> String {
     format!("{}{}", FIXING_PREFIX, forward_curve_id)
 }
 
+/// Build the canonical series ID for CMS (par swap rate) fixings of a given
+/// reference tenor projected off a given forward curve.
+///
+/// CMS fixings are par swap rates, not the forward curve's own IBOR/RFR
+/// fixings, so the series is qualified by the swap tenor:
+/// `FIXING:CMS-{tenor}:{forward_curve_id}`.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_core::market_data::fixings::cms_fixing_series_id;
+/// assert_eq!(cms_fixing_series_id("USD-SOFR", 10.0), "FIXING:CMS-10Y:USD-SOFR");
+/// assert_eq!(cms_fixing_series_id("USD-SOFR", 0.5), "FIXING:CMS-6M:USD-SOFR");
+/// ```
+pub fn cms_fixing_series_id(forward_curve_id: &str, tenor_years: f64) -> String {
+    format!(
+        "{FIXING_PREFIX}CMS-{}:{forward_curve_id}",
+        format_cms_tenor(tenor_years)
+    )
+}
+
+/// Render a CMS reference tenor as `{n}Y` for whole years, `{n}M` for whole
+/// months, falling back to raw fractional years otherwise.
+fn format_cms_tenor(tenor_years: f64) -> String {
+    let months = tenor_years * 12.0;
+    let rounded = months.round();
+    if rounded > 0.0 && (months - rounded).abs() < 1e-9 {
+        let m = rounded as i64;
+        if m % 12 == 0 {
+            format!("{}Y", m / 12)
+        } else {
+            format!("{m}M")
+        }
+    } else {
+        format!("{tenor_years}Y")
+    }
+}
+
 /// Look up the fixing series for a rate index in MarketContext.
 ///
 /// Returns a clear error when the series is missing, directing the user
@@ -118,6 +156,26 @@ mod tests {
     fn fixing_series_id_builds_correct_key() {
         assert_eq!(fixing_series_id("USD-SOFR"), "FIXING:USD-SOFR");
         assert_eq!(fixing_series_id("EUR-ESTR"), "FIXING:EUR-ESTR");
+    }
+
+    #[test]
+    fn cms_fixing_series_id_builds_tenor_qualified_key() {
+        assert_eq!(
+            cms_fixing_series_id("USD-SOFR", 10.0),
+            "FIXING:CMS-10Y:USD-SOFR"
+        );
+        assert_eq!(
+            cms_fixing_series_id("USD-SOFR", 2.0),
+            "FIXING:CMS-2Y:USD-SOFR"
+        );
+        assert_eq!(
+            cms_fixing_series_id("USD-SOFR", 0.5),
+            "FIXING:CMS-6M:USD-SOFR"
+        );
+        assert_eq!(
+            cms_fixing_series_id("USD-SOFR", 1.5),
+            "FIXING:CMS-18M:USD-SOFR"
+        );
     }
 
     #[test]

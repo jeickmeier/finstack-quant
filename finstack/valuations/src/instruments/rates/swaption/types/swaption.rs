@@ -681,7 +681,13 @@ impl Swaption {
         match self.settlement {
             SwaptionSettlement::Physical => self.swap_annuity(disc, as_of),
             SwaptionSettlement::Cash => match self.cash_settlement_method {
-                CashSettlementMethod::ParYield => self.cash_annuity_par_yield(forward_rate),
+                CashSettlementMethod::ParYield => {
+                    // `cash_annuity_par_yield` is the cash annuity *at expiry*;
+                    // the settlement amount must be discounted back to `as_of`.
+                    use crate::instruments::common_impl::pricing::time::relative_df_discounting;
+                    let df = relative_df_discounting(disc, as_of, self.expiry)?;
+                    Ok(self.cash_annuity_par_yield(forward_rate)? * df)
+                }
                 CashSettlementMethod::IsdaParPar => self.swap_annuity(disc, as_of),
                 CashSettlementMethod::ZeroCoupon => self.cash_annuity_zero_coupon(disc, as_of),
             },
@@ -714,6 +720,10 @@ impl Swaption {
     }
 
     /// Cash settlement annuity using par yield approximation.
+    ///
+    /// Returns the **undiscounted at-expiry** cash annuity. Callers pricing as of
+    /// an earlier date must discount by `DF(as_of → expiry)`; [`Self::annuity`]
+    /// applies that discounting in the `ParYield` arm.
     ///
     /// # Formula
     ///

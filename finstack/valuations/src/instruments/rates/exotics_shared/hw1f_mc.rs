@@ -9,7 +9,15 @@
 //! The pricer handles: time-grid construction aligned to event dates,
 //! HW1F process + exact discretization, RNG streams with antithetic
 //! variates, and cross-path averaging with 95% CIs.
+//!
+//! At every step the pricer also accumulates the pathwise money-market
+//! numeraire `B(t) = exp(∫₀ᵗ r ds)` (trapezoidal rule, see
+//! [`crate::instruments::rates::exotics_shared::bank_account`]) and exposes it
+//! to payoffs through [`StateKey::BankAccount`]. Payoffs must discount
+//! simulated cashflows with this pathwise factor — not the deterministic
+//! time-0 curve DF, which would drop the payoff/numeraire correlation.
 
+use crate::instruments::rates::exotics_shared::bank_account::bank_step_factor;
 use crate::instruments::rates::exotics_shared::mc_config::RateExoticMcConfig;
 use finstack_core::currency::Currency;
 use finstack_core::Result;
@@ -99,10 +107,12 @@ impl RateExoticHw1fMcPricer {
             for anti in 0..multiplicity {
                 let mut rng = base_rng.substream(path_id as u64);
                 let mut r = self.r0;
+                let mut bank = 1.0_f64;
                 let mut payoff = payoff_factory();
                 payoff.reset();
                 let mut state = PathState::new(0, 0.0);
                 state.set_key(StateKey::ShortRate, r);
+                state.set_key(StateKey::BankAccount, bank);
 
                 let mut next_event = 0usize;
                 for step in 0..num_steps {
@@ -112,6 +122,7 @@ impl RateExoticHw1fMcPricer {
                     if anti == 1 {
                         z[0] = -z[0];
                     }
+                    let r_prev = r;
                     disc.step(
                         &process,
                         t,
@@ -120,10 +131,12 @@ impl RateExoticHw1fMcPricer {
                         &z,
                         &mut work,
                     );
+                    bank *= bank_step_factor(r_prev, r, dt);
 
                     let t_next = grid.time(step + 1);
                     state.set_step_time(step + 1, t_next);
                     state.set_key(StateKey::ShortRate, r);
+                    state.set_key(StateKey::BankAccount, bank);
 
                     while next_event < event_step_indices.len()
                         && event_step_indices[next_event] == step + 1
@@ -229,6 +242,51 @@ mod tests {
         fn reset(&mut self) {
             self.paid = 0.0;
         }
+    }
+
+    /// Pays 1.0 at the (single) event, discounted with the pathwise
+    /// bank-account numeraire exposed by the harness.
+    #[derive(Debug, Clone, Default)]
+    struct PathwiseZcbPayoff {
+        pv: f64,
+    }
+    impl Payoff for PathwiseZcbPayoff {
+        fn on_event(&mut self, s: &mut PathState) {
+            let bank = s.get_key(StateKey::BankAccount).unwrap_or(1.0);
+            self.pv = 1.0 / bank;
+        }
+        fn value(&self, ccy: Currency) -> Money {
+            Money::new(self.pv, ccy)
+        }
+        fn reset(&mut self) {
+            self.pv = 0.0;
+        }
+    }
+
+    /// The harness's incremental bank-account accumulation must reproduce the
+    /// money-market numeraire: with θ = r0 and σ → 0 the short rate stays at
+    /// r0, so a unit cashflow at T = 1 discounts to exactly e^{−r0} (the
+    /// trapezoidal rule is exact for a constant rate).
+    #[test]
+    fn pathwise_bank_account_discounts_zcb() {
+        let r0 = 0.03;
+        let pricer = RateExoticHw1fMcPricer {
+            process_params: HullWhite1FParams::new(0.05, 1e-12, r0),
+            r0,
+            event_times: vec![1.0],
+            config: RateExoticMcConfig {
+                num_paths: 16,
+                ..Default::default()
+            },
+            currency: Currency::USD,
+        };
+        let est = pricer.price(PathwiseZcbPayoff::default).expect("ok");
+        assert!(
+            (est.mean.amount() - (-r0).exp()).abs() < 1e-10,
+            "pathwise ZCB {} should equal e^(-r0) = {}",
+            est.mean.amount(),
+            (-r0).exp()
+        );
     }
 
     #[test]

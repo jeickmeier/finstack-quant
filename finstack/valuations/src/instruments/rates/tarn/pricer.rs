@@ -45,6 +45,17 @@ struct TarnPayoff {
     discounted_pv: f64,
     next_event: usize,
     redeemed: bool,
+    /// `true` in Monte-Carlo mode: cashflows are discounted with the pathwise
+    /// bank-account numeraire `B(t)` read from the simulation state, not the
+    /// deterministic curve DF baked into each [`CouponEvent`]. A coupon fixed
+    /// at the period start is held in `pending` until the simulation reaches
+    /// its payment date (the next event), where `B(T_pay)` is known.
+    pathwise: bool,
+    /// Cashflow amounts fixed but not yet paid; settled (pathwise-discounted)
+    /// at the next event, whose time is the payment date.
+    pending: f64,
+    /// Bank-account numeraire at the most recent event (pathwise mode).
+    last_bank: f64,
 }
 
 impl TarnPayoff {
@@ -54,6 +65,7 @@ impl TarnPayoff {
         target_coupon: f64,
         notional: f64,
         events: Arc<[CouponEvent]>,
+        pathwise: bool,
     ) -> Self {
         Self {
             fixed_rate,
@@ -64,13 +76,29 @@ impl TarnPayoff {
             discounted_pv: 0.0,
             next_event: 0,
             redeemed: false,
+            pathwise,
+            pending: 0.0,
+            last_bank: 1.0,
         }
     }
 
     fn add_redemption(&mut self, event: &CouponEvent) {
         if !self.redeemed {
-            self.discounted_pv += self.notional * event.discount_factor;
+            if self.pathwise {
+                self.pending += self.notional;
+            } else {
+                self.discounted_pv += self.notional * event.discount_factor;
+            }
             self.redeemed = true;
+        }
+    }
+
+    /// Settle pending cashflows whose payment date has been reached, using the
+    /// pathwise bank-account numeraire at that date.
+    fn flush_pending(&mut self, bank: f64) {
+        if self.pending != 0.0 {
+            self.discounted_pv += self.pending / bank;
+            self.pending = 0.0;
         }
     }
 
@@ -89,11 +117,24 @@ impl TarnPayoff {
         let period_coupon = coupon_rate * event.accrual_fraction;
         let actual_coupon = self.tracker.add_coupon(period_coupon);
 
-        self.discounted_pv += actual_coupon * self.notional * event.discount_factor;
+        let coupon_amount = actual_coupon * self.notional;
+        if self.pathwise {
+            // Fixed now, paid at the period end — discounted when the
+            // simulation reaches the payment date.
+            self.pending += coupon_amount;
+        } else {
+            self.discounted_pv += coupon_amount * event.discount_factor;
+        }
         if self.tracker.is_knocked_out() {
             self.add_redemption(&event);
         }
         self.next_event += 1;
+        if self.pathwise && !self.redeemed && self.next_event == self.events.len() {
+            // Final coupon settled without knockout: par redemption pays at
+            // maturity, the same payment date as the final coupon.
+            self.pending += self.notional;
+            self.redeemed = true;
+        }
     }
 
     /// Drain the leading run of already-seasoned coupons (in-advance fixings at
@@ -122,11 +163,18 @@ impl TarnPayoff {
 
 impl Payoff for TarnPayoff {
     fn on_event(&mut self, state: &mut PathState) {
-        // The simulation fires one event per *forward-starting* coupon, at that
-        // coupon's period start (the in-advance fixing date). A leading
-        // already-seasoned coupon carries no path event, so drain any such
-        // coupons that precede this path-fixed one before settling it.
+        // The simulation fires one event per *forward-starting* coupon at that
+        // coupon's period start (the in-advance fixing date), plus a final
+        // settlement event at maturity. A leading already-seasoned coupon
+        // carries no path event, so drain any such coupons that precede this
+        // path-fixed one before settling it.
         self.settle_seasoned_prefix();
+        // Coupons fixed at the previous event pay at this event's date
+        // (contiguous periods: period end == next period start; the final
+        // period's payment lands on the maturity settlement event).
+        let bank = state.get_key(StateKey::BankAccount).unwrap_or(1.0);
+        self.last_bank = bank;
+        self.flush_pending(bank);
         if self.next_event >= self.events.len() || self.redeemed {
             return;
         }
@@ -136,7 +184,12 @@ impl Payoff for TarnPayoff {
 
     fn value(&self, currency: finstack_core::currency::Currency) -> Money {
         let mut pv = self.discounted_pv;
-        if !self.redeemed {
+        if self.pathwise {
+            // The maturity settlement event flushes all pending cashflows;
+            // discount any defensive remainder with the last observed bank
+            // factor rather than dropping it.
+            pv += self.pending / self.last_bank;
+        } else if !self.redeemed {
             if let Some(final_event) = self.events.last() {
                 pv += self.notional * final_event.discount_factor;
             }
@@ -149,6 +202,8 @@ impl Payoff for TarnPayoff {
         self.discounted_pv = 0.0;
         self.next_event = 0;
         self.redeemed = false;
+        self.pending = 0.0;
+        self.last_bank = 1.0;
     }
 }
 
@@ -349,10 +404,25 @@ impl TarnPricer {
             ));
         }
 
+        // Final settlement event at maturity (the last payment date): coupons
+        // fix in advance but pay at the period end, so the simulation must
+        // reach the last payment date for the pathwise bank-account numeraire
+        // B(T_pay) to be observable.
+        let maturity_date = *inst.coupon_dates.last().ok_or_else(|| {
+            finstack_core::Error::Validation(format!(
+                "TARN {} requires coupon dates",
+                inst.id.as_str()
+            ))
+        })?;
+        let maturity_time =
+            inst.day_count
+                .year_fraction(as_of, maturity_date, DayCountContext::default())?;
+        event_times.push(maturity_time);
+
         // Bootstrap a time-dependent θ(t) from the discount curve so the
         // simulated short rate reprices the initial curve (HW1F, not Vasicek).
-        // The grid covers up to the last fixing — no coupon fixes after it and
-        // redemption discounting is deterministic.
+        // The grid covers up to the last payment date so every cashflow is
+        // discounted with the pathwise numeraire.
         let horizon = event_times.last().copied().unwrap_or(0.0);
         let process_params =
             calibrate_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
@@ -370,6 +440,7 @@ impl TarnPricer {
             inst.target_coupon,
             inst.notional.amount(),
             Arc::from(events),
+            true,
         );
         mc.price(|| payoff.clone())
     }
@@ -427,6 +498,7 @@ fn deterministic_estimate(inst: &Tarn, events: &[CouponEvent], num_paths: usize)
         inst.target_coupon,
         inst.notional.amount(),
         Arc::from(events.to_vec()),
+        false,
     );
     payoff.settle_all_seasoned();
     let pv = payoff.value(inst.notional.currency());
@@ -703,10 +775,11 @@ mod tests {
                 needs_path_sample: true,
             },
         ];
-        let mut payoff = TarnPayoff::new(0.06, 0.0, 0.10, 1_000_000.0, Arc::from(events));
+        let mut payoff = TarnPayoff::new(0.06, 0.0, 0.10, 1_000_000.0, Arc::from(events), true);
 
         let mut state = PathState::new(0, 1.0);
         state.set_key(StateKey::ShortRate, 0.01);
+        state.set_key(StateKey::BankAccount, 1.0);
         payoff.on_event(&mut state);
         payoff.on_event(&mut state);
 
@@ -761,7 +834,15 @@ mod tests {
             .price_estimate(&tarn, &market, as_of)
             .expect("price");
 
-        assert!((estimate.mean.amount() - expected).abs() < 1.0);
+        // Pathwise bank-account discounting reproduces the curve DF at σ → 0
+        // only up to the θ(t)-bootstrap discretization residual (a few bp of
+        // notional on this sloped curve), so the bound is wider than the old
+        // deterministic-DF $1 check.
+        assert!(
+            (estimate.mean.amount() - expected).abs() < 500.0,
+            "mc={}, expected={expected}",
+            estimate.mean.amount()
+        );
         let first_coupon_df = market
             .get_discount("USD-OIS")
             .expect("discount")

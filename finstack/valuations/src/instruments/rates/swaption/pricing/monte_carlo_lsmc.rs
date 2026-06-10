@@ -553,23 +553,11 @@ impl SwaptionLsmcPricer {
     /// stochastic discount factor and the swap payoff and bias the
     /// exercise boundary.
     fn accumulate_bank_factors(rate_path: &[f64], time_grid: &TimeGrid) -> Vec<f64> {
-        let num_steps = time_grid.num_steps();
-        let mut bank = Vec::with_capacity(num_steps + 1);
-        bank.push(1.0); // B(t_0) = 1
-        let mut acc = 1.0;
-        // `rate_path` carries one rate per grid point (`num_steps + 1`
-        // entries). Over `[t_step, t_{step+1}]` the integral ∫r ds is
-        // approximated by the trapezoidal rule using BOTH endpoint rates,
-        // `r(t_step)` and `r(t_{step+1})` — the exact-HW1F transition supplies
-        // both. `windows(2)` yields exactly `num_steps` interval pairs.
-        for (step, pair) in rate_path.windows(2).enumerate() {
-            let r_start = pair[0];
-            let r_end = pair[1];
-            let integral = 0.5 * (r_start + r_end) * time_grid.dt(step);
-            acc *= integral.exp();
-            bank.push(acc);
-        }
-        bank
+        // Shared trapezoidal accumulation, also used by the HW1F exotic
+        // MC/LSMC harnesses so every short-rate MC discounts consistently.
+        crate::instruments::rates::exotics_shared::bank_account::accumulate_bank_factors(
+            rate_path, time_grid,
+        )
     }
 
     /// Perform backward induction for swaptions using a time grid.

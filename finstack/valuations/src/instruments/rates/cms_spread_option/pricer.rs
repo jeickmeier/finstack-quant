@@ -87,10 +87,15 @@ impl CmsSpreadOptionPricer {
         let discount_factor =
             relative_df_discount_curve(discount_curve.as_ref(), as_of, inst.payment_date)?;
 
-        let time_to_expiry = inst
-            .day_count
-            .year_fraction(as_of, inst.expiry_date, DayCountContext::default())?
-            .max(0.0);
+        // Seasoned options (expiry already past) have zero time to expiry;
+        // the year fraction is only defined for `as_of <= expiry`.
+        let time_to_expiry = if inst.expiry_date <= as_of {
+            0.0
+        } else {
+            inst.day_count
+                .year_fraction(as_of, inst.expiry_date, DayCountContext::default())?
+                .max(0.0)
+        };
 
         let long_vol = market.get_vol_provider(inst.long_vol_surface_id.as_ref())?;
         let short_vol = market.get_vol_provider(inst.short_vol_surface_id.as_ref())?;
@@ -146,6 +151,30 @@ impl CmsSpreadOptionPricer {
         vol_provider: &dyn VolProvider,
     ) -> Result<CmsSpreadLeg> {
         let tenor_years = tenor.to_years_simple();
+
+        // Seasoned option: both CMS rates fixed at the (past) expiry. Resolve
+        // the leg from the recorded fixing (mirroring the cap/floor pricer) —
+        // never re-project from the live curve, which books phantom P&L. The
+        // rate is known, so there is no convexity adjustment and the payoff
+        // collapses to intrinsic on the observed rates.
+        if inst.expiry_date < as_of {
+            let observed =
+                crate::instruments::rates::exotics_shared::fixings::historical_cms_fixing(
+                    market,
+                    &inst.forward_curve_id,
+                    tenor_years,
+                    inst.expiry_date,
+                )?;
+            return Ok(CmsSpreadLeg {
+                tenor_years,
+                forward_rate: observed,
+                adjusted_forward_rate: observed,
+                convexity_adjustment: 0.0,
+                atm_volatility: 0.0,
+                time_to_expiry: 0.0,
+            });
+        }
+
         let tenor_months = tenor.months().ok_or_else(|| {
             finstack_core::Error::Validation(format!(
                 "CmsSpreadOption tenor {} must be month- or year-based",
@@ -449,5 +478,104 @@ fn clean_volatility_or_atm(vol_provider: &dyn VolProvider, leg: &CmsSpreadLeg, s
         vol.max(MIN_VOL)
     } else {
         leg.atm_volatility.max(MIN_VOL)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[allow(clippy::expect_used, clippy::unwrap_used, dead_code, unused_imports)]
+    mod test_utils {
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/support/test_utils.rs"
+        ));
+    }
+
+    use super::*;
+    use finstack_core::market_data::fixings::cms_fixing_series_id;
+    use finstack_core::market_data::scalars::ScalarTimeSeries;
+    use finstack_core::market_data::surfaces::VolSurface;
+    use finstack_core::types::CurveId;
+    use test_utils::{date, flat_discount_with_tenor};
+
+    fn flat_vol_surface(id: &str, vol: f64) -> VolSurface {
+        let strikes = vec![0.005, 0.02, 0.04, 0.08];
+        let expiries = vec![0.25, 1.0, 5.0, 10.0];
+        let mut builder = VolSurface::builder(CurveId::new(id))
+            .expiries(&expiries)
+            .strikes(&strikes);
+        for _ in 0..expiries.len() {
+            builder = builder.row(&vec![vol; strikes.len()]);
+        }
+        builder.build().expect("vol surface")
+    }
+
+    /// A seasoned CMS spread option (expiry in the past, payment in the
+    /// future) must resolve both legs from the recorded fixings — and a
+    /// missing fixing series must be a hard error, never silent live-curve
+    /// projection.
+    #[test]
+    fn seasoned_spread_option_uses_recorded_fixings() {
+        let expiry = date(2024, 12, 1);
+        let as_of = date(2025, 1, 1);
+        let payment = date(2025, 3, 1);
+
+        let mut inst = CmsSpreadOption::example();
+        inst.expiry_date = expiry;
+        inst.payment_date = payment;
+        inst.strike = 0.0;
+        inst.option_type = CmsSpreadOptionType::Call;
+
+        let market = MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
+            .insert_surface(flat_vol_surface("USD-SWAPTION-VOL-10Y", 0.25))
+            .insert_surface(flat_vol_surface("USD-SWAPTION-VOL-2Y", 0.25));
+
+        // Without the fixing series the seasoned option must hard-error.
+        let err = CmsSpreadOptionPricer::new()
+            .price_internal(&inst, &market, as_of)
+            .expect_err("missing CMS fixing series must be a hard error");
+        assert!(
+            err.to_string().contains("FIXING:CMS-10Y:USD-SOFR-3M"),
+            "error must name the missing series: {err}"
+        );
+
+        // With both fixings recorded, the PV is the discounted intrinsic on
+        // the observed spread.
+        let long_observed = 0.045;
+        let short_observed = 0.040;
+        let market = market
+            .insert_series(
+                ScalarTimeSeries::new(
+                    cms_fixing_series_id("USD-SOFR-3M", 10.0),
+                    vec![(expiry, long_observed)],
+                    None,
+                )
+                .expect("long fixing series"),
+            )
+            .insert_series(
+                ScalarTimeSeries::new(
+                    cms_fixing_series_id("USD-SOFR-3M", 2.0),
+                    vec![(expiry, short_observed)],
+                    None,
+                )
+                .expect("short fixing series"),
+            );
+
+        let pv = CmsSpreadOptionPricer::new()
+            .price_internal(&inst, &market, as_of)
+            .expect("seasoned spread option PV")
+            .amount();
+        let df = market
+            .get_discount("USD-OIS")
+            .expect("discount curve")
+            .df_between_dates(as_of, payment)
+            .expect("df");
+        let expected = (long_observed - short_observed) * df * inst.notional.amount();
+        assert!(
+            (pv - expected).abs() < 0.01,
+            "seasoned spread option must price intrinsic on the recorded \
+             fixings: expected {expected}, got {pv}"
+        );
     }
 }

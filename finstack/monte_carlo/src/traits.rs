@@ -218,9 +218,11 @@ pub enum StateKey {
     MtmPnl = 9,
     /// Credit spread
     CreditSpread = 10,
+    /// Pathwise money-market account `B(t) = exp(∫₀ᵗ r(s) ds)` (numeraire)
+    BankAccount = 11,
 }
 
-const STATE_ARRAY_LEN: usize = 11;
+const STATE_ARRAY_LEN: usize = 12;
 
 /// Resolve a string key to its fixed-slot `StateKey`, if it matches a known key.
 fn resolve_key(key: &str) -> Option<StateKey> {
@@ -236,6 +238,7 @@ fn resolve_key(key: &str) -> Option<StateKey> {
         "npv_previous" => Some(StateKey::NpvPrevious),
         "mtm_pnl" => Some(StateKey::MtmPnl),
         "credit_spread" => Some(StateKey::CreditSpread),
+        "bank_account" => Some(StateKey::BankAccount),
         _ => None,
     }
 }
@@ -421,6 +424,7 @@ impl PathState {
             state_keys::NPV_PREVIOUS,
             state_keys::MTM_PNL,
             "credit_spread",
+            "bank_account",
         ];
         for (i, key_name) in key_names.iter().enumerate().take(STATE_ARRAY_LEN) {
             if self.fixed_set & (1 << i) != 0 {

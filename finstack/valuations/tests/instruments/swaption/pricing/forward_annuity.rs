@@ -176,7 +176,9 @@ fn test_annuity_dispatch_matches_selected_settlement_method() {
         .with_settlement(SwaptionSettlement::Cash)
         .with_cash_settlement_method(CashSettlementMethod::ParYield);
     let par_yield_annuity = par_yield.annuity(disc.as_ref(), as_of, forward).unwrap();
-    let expected_par_yield = par_yield.cash_annuity_par_yield(forward).unwrap();
+    // ParYield is the at-expiry cash annuity discounted from expiry to as_of.
+    let df_expiry = disc.df_between_dates(as_of, par_yield.expiry).unwrap();
+    let expected_par_yield = par_yield.cash_annuity_par_yield(forward).unwrap() * df_expiry;
     assert_approx_eq(
         par_yield_annuity,
         expected_par_yield,
@@ -204,6 +206,36 @@ fn test_annuity_dispatch_matches_selected_settlement_method() {
         expected_zero_coupon,
         1e-12,
         "zero-coupon cash annuity",
+    );
+}
+
+#[test]
+fn test_par_yield_annuity_discounted_from_expiry() {
+    let (as_of, expiry, swap_start, swap_end) = standard_dates();
+    let market = create_flat_market(as_of, 0.05, 0.30);
+    let disc = market.get_discount("USD_OIS").unwrap();
+    let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
+        .with_settlement(SwaptionSettlement::Cash)
+        .with_cash_settlement_method(CashSettlementMethod::ParYield);
+    let forward = swaption.forward_swap_rate(&market, as_of).unwrap();
+
+    let annuity = swaption.annuity(disc.as_ref(), as_of, forward).unwrap();
+    let undiscounted = swaption.cash_annuity_par_yield(forward).unwrap();
+
+    // Positive rates => DF(as_of -> expiry) < 1, so the settled annuity must be
+    // strictly below the undiscounted at-expiry cash annuity.
+    assert!(
+        annuity < undiscounted,
+        "ParYield annuity ({annuity}) should be discounted below the at-expiry cash annuity ({undiscounted})"
+    );
+
+    // On a flat curve the par-yield approximation is close to the ISDA
+    // par/par (true curve) annuity once both are discounted to as_of.
+    let isda = swaption.swap_annuity(disc.as_ref(), as_of).unwrap();
+    let rel_err = (annuity - isda).abs() / isda;
+    assert!(
+        rel_err < 0.02,
+        "ParYield annuity ({annuity}) should approximate ISDA annuity ({isda}) on a flat curve; rel err {rel_err}"
     );
 }
 

@@ -1,5 +1,8 @@
 //! Shared rates pricing utilities.
 
+/// Pathwise money-market account (bank-account numeraire) helpers.
+pub mod bank_account;
+pub use bank_account::{accumulate_bank_factors, bank_step_factor};
 /// Bermudan call provision shared across callable exotic rate products.
 pub mod bermudan_call;
 /// Deterministic coupon / payoff helpers for exotic rate products.
@@ -25,6 +28,9 @@ pub mod hw1f_curve;
 pub use hw1f_curve::{
     calibrate_hw1f_params, initial_short_rate_from_curve, Hw1fTermForward, PeriodForwardCoeffs,
 };
+
+/// Historical CMS (par swap rate) fixing lookups for seasoned CMS trades.
+pub(crate) mod fixings;
 
 /// Exercise-boundary protocol and basis helpers for LSMC-priced rate exotics.
 pub mod exercise;
