@@ -132,6 +132,27 @@ pub struct Autocallable {
     /// returns an error). `None`: no implicit default; treated as zero
     /// continuous dividend yield. Set explicitly for index underlyings.
     pub div_yield_id: Option<CurveId>,
+    /// Initial (strike-set) underlying level S_0 used as the reference for
+    /// barrier and payoff ratios.
+    ///
+    /// `None` (the default) uses the spot at the valuation date, which is only
+    /// correct for a new trade priced on its strike-set date. **Required for
+    /// seasoned trades** (any observation date on or before `as_of`): pricing
+    /// errors if past observation dates exist without it.
+    #[builder(default)]
+    #[serde(default)]
+    pub initial_level: Option<f64>,
+    /// Observed underlying fixings for seasoned trades (date, level pairs).
+    ///
+    /// For a mid-life autocallable, every observation date on or before the
+    /// valuation date must have a matching fixing here; pricing errors
+    /// otherwise. Past fixings are evaluated deterministically (autocall,
+    /// missed memory coupons, discrete knock-in monitoring) and only the
+    /// remaining future observation dates are simulated.
+    #[builder(default)]
+    #[serde(default)]
+    #[schemars(with = "Vec<(String, f64)>")]
+    pub past_fixings: Vec<(Date, f64)>,
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
     #[builder(default)]
@@ -167,6 +188,11 @@ struct AutocallableUnchecked {
     #[serde(default)]
     div_yield_id: Option<CurveId>,
     #[serde(default)]
+    initial_level: Option<f64>,
+    #[serde(default)]
+    #[schemars(with = "Vec<(String, f64)>")]
+    past_fixings: Vec<(Date, f64)>,
+    #[serde(default)]
     pricing_overrides: PricingOverrides,
     attributes: Attributes,
 }
@@ -193,6 +219,8 @@ impl TryFrom<AutocallableUnchecked> for Autocallable {
             spot_id: value.spot_id,
             vol_surface_id: value.vol_surface_id,
             div_yield_id: value.div_yield_id,
+            initial_level: value.initial_level,
+            past_fixings: value.past_fixings,
             pricing_overrides: value.pricing_overrides,
             attributes: value.attributes,
         };
@@ -294,7 +322,31 @@ impl Autocallable {
                 "Autocallable notional amount must be finite".into(),
             ));
         }
+        if let Some(level) = self.initial_level {
+            if !level.is_finite() || level <= 0.0 {
+                return Err(finstack_core::Error::Validation(format!(
+                    "Autocallable initial_level = {} must be finite and positive",
+                    level
+                )));
+            }
+        }
+        for (d, v) in &self.past_fixings {
+            if !v.is_finite() || *v <= 0.0 {
+                return Err(finstack_core::Error::Validation(format!(
+                    "Autocallable past_fixings[{}] = {} must be finite and positive",
+                    d, v
+                )));
+            }
+        }
         Ok(())
+    }
+
+    /// Look up the observed fixing for an observation date, if provided.
+    pub fn fixing_on(&self, date: Date) -> Option<f64> {
+        self.past_fixings
+            .iter()
+            .find(|(d, _)| *d == date)
+            .map(|(_, v)| *v)
     }
 
     /// Create a canonical example autocallable (quarterly observations, simple barriers/coupons).

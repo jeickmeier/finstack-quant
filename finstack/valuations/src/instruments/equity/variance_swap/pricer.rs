@@ -236,8 +236,12 @@ pub(crate) fn annualization_factor(inst: &VarianceSwap) -> f64 {
     } else if let Some(days) = inst.observation_freq.days() {
         match days {
             1 => TRADING_DAYS_PER_YEAR,
-            7 => TRADING_DAYS_PER_YEAR / 7.0,
-            14 => TRADING_DAYS_PER_YEAR / 14.0,
+            // Weekly/bi-weekly schedules step in *calendar* days, so the
+            // observation count per year is 52 / 26 — not 252/7 (= 36) which
+            // mixes a trading-day basis with a calendar-day step and
+            // understates realized variance ~31% (matches the FX sibling).
+            7 => 52.0,
+            14 => 26.0,
             _ => TRADING_DAYS_PER_YEAR / days as f64,
         }
     } else {
@@ -279,8 +283,10 @@ pub(crate) fn annualization_factor_with_policy(
     if let Some(days) = inst.observation_freq.days() {
         return match days {
             1 => tdy_override,
-            7 => tdy_override / 7.0,
-            14 => tdy_override / 14.0,
+            // Calendar-day steps: 52 weekly / 26 bi-weekly observations per
+            // year regardless of the trading-days-per-year policy override.
+            7 => 52.0,
+            14 => 26.0,
             _ => tdy_override / days as f64,
         };
     }
@@ -863,6 +869,34 @@ mod tests {
             "seasoned realized variance must equal V_accrued / t_elapsed: \
              got {time_basis_realized}, expected {expected_time_realized}"
         );
+    }
+
+    /// Weekly/bi-weekly observation schedules step in calendar days, so the
+    /// annualization factor must be the calendar observation count per year
+    /// (52 / 26), matching the FX variance-swap sibling — not 252/7 (= 36) or
+    /// 252/14 (= 18), which understate realized variance ~31%.
+    #[test]
+    fn weekly_and_biweekly_annualization_uses_calendar_observation_counts() {
+        use finstack_core::dates::{Tenor, TenorUnit};
+
+        let mut swap = VarianceSwap::example().expect("example swap");
+
+        swap.observation_freq = Tenor::new(1, TenorUnit::Weeks);
+        assert_eq!(annualization_factor(&swap), 52.0);
+
+        swap.observation_freq = Tenor::new(2, TenorUnit::Weeks);
+        assert_eq!(annualization_factor(&swap), 26.0);
+
+        swap.observation_freq = Tenor::new(1, TenorUnit::Days);
+        assert_eq!(annualization_factor(&swap), 252.0);
+
+        // The policy-aware variant must agree (no TRADING_DAYS_PER_YEAR
+        // override in this market context).
+        let market = MarketContext::new();
+        swap.observation_freq = Tenor::new(7, TenorUnit::Days);
+        assert_eq!(annualization_factor_with_policy(&swap, &market), 52.0);
+        swap.observation_freq = Tenor::new(14, TenorUnit::Days);
+        assert_eq!(annualization_factor_with_policy(&swap, &market), 26.0);
     }
 
     #[test]

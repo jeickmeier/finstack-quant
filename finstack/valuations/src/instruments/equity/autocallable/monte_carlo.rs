@@ -66,6 +66,16 @@ pub struct AutocallablePayoff {
     pub initial_spot: f64,
     /// Discount factor ratios (DF(t_obs) / DF(t_mat)) for correcting early cashflow PV
     pub df_ratios: Vec<f64>,
+    /// Seed for `min_spot_observed` from past (already observed) fixings of a
+    /// seasoned trade. `f64::INFINITY` for a new trade.
+    seed_min_spot: f64,
+    /// Seed for `max_spot_observed` from past fixings. `f64::NEG_INFINITY`
+    /// for a new trade.
+    seed_max_spot: f64,
+    /// Accrued memory ("Phoenix") coupons missed at past observation dates of
+    /// a seasoned trade, paid on a future autocall when `memory_coupons` is
+    /// enabled. Zero for a new trade.
+    prior_memory_coupons: f64,
 
     // State variables (tracked during path simulation)
     /// Index of observation date when autocalled (None if not autocalled)
@@ -165,12 +175,36 @@ impl AutocallablePayoff {
             currency,
             initial_spot,
             df_ratios,
+            seed_min_spot: f64::INFINITY,
+            seed_max_spot: f64::NEG_INFINITY,
+            prior_memory_coupons: 0.0,
             autocalled_at: None,
             next_obs_idx: 0,
             min_spot_observed: f64::INFINITY,
             max_spot_observed: f64::NEG_INFINITY,
             final_spot: 0.0, // Will be set when at maturity
         })
+    }
+
+    /// Seed the payoff with the deterministic state of a seasoned trade.
+    ///
+    /// * `prior_min_spot` / `prior_max_spot` — min/max of the observed past
+    ///   fixings (discrete knock-in monitoring carries across `as_of`).
+    /// * `prior_memory_coupons` — sum of coupons missed at past observation
+    ///   dates, released on a future autocall when memory is enabled.
+    #[must_use]
+    pub fn with_seasoned_state(
+        mut self,
+        prior_min_spot: f64,
+        prior_max_spot: f64,
+        prior_memory_coupons: f64,
+    ) -> Self {
+        self.seed_min_spot = prior_min_spot;
+        self.seed_max_spot = prior_max_spot;
+        self.prior_memory_coupons = prior_memory_coupons;
+        self.min_spot_observed = prior_min_spot;
+        self.max_spot_observed = prior_max_spot;
+        self
     }
 }
 
@@ -246,7 +280,9 @@ impl Payoff for AutocallablePayoff {
             //   product would have autocalled there otherwise), so those
             //   coupons were "remembered" and are now released.
             let coupon: f64 = if self.memory_coupons {
-                self.coupons[..=idx].iter().sum()
+                // Seasoned trades also release coupons missed at past
+                // observation dates (deterministically known at pricing time).
+                self.prior_memory_coupons + self.coupons[..=idx].iter().sum::<f64>()
             } else {
                 self.coupons[idx]
             };
@@ -296,8 +332,11 @@ impl Payoff for AutocallablePayoff {
     fn reset(&mut self) {
         self.autocalled_at = None;
         self.next_obs_idx = 0;
-        self.min_spot_observed = f64::INFINITY;
-        self.max_spot_observed = f64::NEG_INFINITY;
+        // Restore the seeded seasoned state (INFINITY/NEG_INFINITY/0 for a
+        // new trade), not the bare defaults, so every path starts from the
+        // same deterministic past.
+        self.min_spot_observed = self.seed_min_spot;
+        self.max_spot_observed = self.seed_max_spot;
         self.final_spot = 0.0; // Reset to default
     }
 }
