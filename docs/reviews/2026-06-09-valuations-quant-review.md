@@ -127,7 +127,7 @@ Recurring failure patterns:
 - Quanto `fx_rate_id`/`fx_vol_id` quote direction unenforced; shipped example inconsistent (`quanto_option/types.rs:189-215` vs `pricer.rs:67-119`). The drift-adjustment formula itself is correct and parity-tested.
 
 ### Sensitivity unit traps
-- Tranche `calculate_cs01` bumps hazard λ while documented as a 1bp *spread* bump (≈1.67× mislabel at R=40%) — `cds_tranche/pricer/sensitivities.rs:449-481`; registered metric calculators are correct.
+- Tranche `calculate_cs01` bumps hazard λ while documented as a 1bp *spread* bump (≈1.67× mislabel at R=40%) — `cds_tranche/pricer/sensitivities.rs:449-481`; registered metric calculators are correct. Ensure its spread bump only. Make error if par spreads not available.
 - Index CS01 silently falls back from par-spread re-bootstrap to hazard bump on error — `cds_index/pricer.rs:433-447`. Make it an error.
 - `Correlation01` is per-unit-ρ while `Recovery01` is per-1% — 100× internal inconsistency (`cds_tranche/pricer/sensitivities.rs:485-526` vs `metrics/correlation01.rs`).
 - IR-future model convexity adjustment `0.5σ²T₁T₂` has no vol-unit guard (`ir_future/types.rs:454-486`); lognormal vol inflates CA by hundreds×. Document normal-vol contract + sanity bound.
