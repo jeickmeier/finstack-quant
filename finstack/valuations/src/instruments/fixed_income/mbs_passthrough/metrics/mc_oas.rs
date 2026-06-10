@@ -32,11 +32,16 @@
 //! - O'Kane, D. (2008). *Modelling Single-name and Multi-name Credit
 //!   Derivatives*. John Wiley & Sons.
 
+use crate::calibration::hull_white::HullWhiteParams;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
+use crate::instruments::rates::exotics_shared::{
+    calibrate_hw1f_params, initial_short_rate_from_curve,
+};
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::solver::{BrentSolver, Solver};
 use finstack_core::{Error as CoreError, Result};
+use finstack_monte_carlo::process::ou::HullWhite1FParams;
 use finstack_monte_carlo::rng::philox::PhiloxRng;
 use finstack_monte_carlo::traits::RandomStream;
 
@@ -103,22 +108,28 @@ struct RatePath {
 /// Simulate Hull-White 1-factor short rate paths.
 ///
 /// Uses exact discretization (analytical conditional distribution)
-/// for the OU/HW1F process:
+/// for the OU/HW1F process with time-dependent θ(t) fitted to the
+/// initial discount curve:
 /// ```text
-/// r_{t+Δt} = r_t × e^{-κΔt} + θ(1 - e^{-κΔt}) + σ√[(1-e^{-2κΔt})/(2κ)] × Z
+/// r_{t+Δt} = r_t × e^{-κΔt} + θ(t)(1 - e^{-κΔt}) + σ√[(1-e^{-2κΔt})/(2κ)] × Z
 /// ```
 fn simulate_rate_paths(
     initial_rate: f64,
-    kappa: f64,
-    sigma: f64,
-    theta: f64,
+    params: &HullWhite1FParams,
     num_paths: usize,
     num_steps: usize,
     seed: u64,
 ) -> Vec<RatePath> {
     let dt = 1.0 / 12.0; // Monthly steps
+    let kappa = params.kappa;
+    let sigma = params.sigma;
     let exp_kappa_dt = (-kappa * dt).exp();
-    let drift_coeff = theta * (1.0 - exp_kappa_dt);
+
+    // θ(t) is piecewise-constant; precompute the per-step drift term using
+    // the θ value at each step's left endpoint.
+    let drift_coeffs: Vec<f64> = (0..num_steps)
+        .map(|i| params.theta_at_time(i as f64 * dt) * (1.0 - exp_kappa_dt))
+        .collect();
 
     // Conditional std dev of r_{t+Δt} | r_t
     let std_dev = if (kappa * dt).abs() < 1e-8 {
@@ -142,9 +153,9 @@ fn simulate_rate_paths(
 
         let mut r = initial_rate;
 
-        for &z in &normals {
+        for (step, &z) in normals.iter().enumerate() {
             // Exact HW1F step
-            r = r * exp_kappa_dt + drift_coeff + std_dev * z;
+            r = r * exp_kappa_dt + drift_coeffs[step] + std_dev * z;
             rates.push(r);
         }
 
@@ -152,6 +163,37 @@ fn simulate_rate_paths(
     }
 
     paths
+}
+
+/// Extra discounting time (years) from each projection step's grid endpoint
+/// to the pool's actual payment date for that accrual period.
+///
+/// Step `m` (0-based) accrues over the calendar month starting at
+/// `first-of-month(max(as_of, issue_date)) + m months` and ends at grid time
+/// `(m+1)/12`. Agency pools pay with a stated delay (e.g. FNMA on the 25th of
+/// the following month), so the cash actually arrives later than the accrual
+/// month end. Ignoring the delay overstates PV; the extra time is discounted
+/// at the step's short rate + OAS.
+fn payment_delay_extras(
+    mbs: &AgencyMbsPassthrough,
+    as_of: Date,
+    num_steps: usize,
+) -> Result<Vec<f64>> {
+    let dt = 1.0 / 12.0;
+    let effective_start = as_of.max(mbs.issue_date);
+    let start_month = Date::from_calendar_date(effective_start.year(), effective_start.month(), 1)
+        .map_err(|e| CoreError::Validation(e.to_string()))?;
+
+    use finstack_core::dates::DateExt;
+    let mut extras = Vec::with_capacity(num_steps);
+    for m in 0..num_steps {
+        let period_start = start_month.add_months(m as i32);
+        let payment_date = mbs.payment_date_for_accrual_period(period_start)?;
+        let t_pay = (payment_date - as_of).whole_days() as f64 / 365.25;
+        let t_grid_end = (m as f64 + 1.0) * dt;
+        extras.push((t_pay - t_grid_end).max(0.0));
+    }
+    Ok(extras)
 }
 
 /// Numerical safety cap on the adjusted SMM.
@@ -205,6 +247,7 @@ fn price_on_path(
     oas: f64,
     prepay_sensitivity: f64,
     as_of: Date,
+    payment_extras: &[f64],
 ) -> Result<f64> {
     let monthly_coupon_rate = mbs.pass_through_rate / 12.0;
     let monthly_mortgage_rate = mbs.wac / 12.0;
@@ -245,8 +288,11 @@ fn price_on_path(
         // Rate-adjusted SMM
         let smm = rate_adjusted_smm(base_smm, current_rate, base_rate, prepay_sensitivity);
 
-        // Scheduled amortization
-        let remaining = wam.saturating_sub(month + 1).max(1);
+        // Scheduled amortization: `wam` is the remaining WAM at `as_of`, so at
+        // projection step `month` (0-based) there are `wam − month` level
+        // payments left, including the current one (same convention as the
+        // deterministic pricer).
+        let remaining = wam.saturating_sub(month).max(1);
         let scheduled_principal = if remaining <= 1 {
             balance
         } else if monthly_mortgage_rate > 1e-12 {
@@ -272,8 +318,13 @@ fn price_on_path(
         // Total cashflow
         let total_cf = scheduled_principal + prepayment + interest;
 
-        // PV of this month's cashflow
-        pv += total_cf * cumulative_df;
+        // PV of this month's cashflow, discounted to the actual payment date:
+        // the cumulative grid DF covers up to the accrual month end, and the
+        // agency payment delay adds extra discounting at the current short
+        // rate + OAS (matching the deterministic pricer's payment dating).
+        let extra = payment_extras.get(month).copied().unwrap_or(0.0);
+        let delay_df = (-(current_rate + oas) * extra).exp();
+        pv += total_cf * cumulative_df * delay_df;
 
         // Update balance
         balance = (balance - scheduled_principal - prepayment).max(0.0);
@@ -322,41 +373,29 @@ pub(crate) fn calculate_mc_oas(
 ) -> Result<McOasResult> {
     let market_price = market_price_pct / 100.0 * mbs.current_face.amount();
 
-    // Extract initial short rate from discount curve
     let discount_curve = market.get_discount(&mbs.discount_curve_id)?;
-    let initial_rate = {
-        let t = 1.0 / 12.0; // 1-month rate
-        let df = discount_curve.df(t);
-        if df > 0.0 {
-            -df.ln() / t
-        } else {
-            0.03
-        }
-    };
-
-    // θ for HW1F (long-run mean) = implied from the curve at ~5Y
-    let theta = {
-        let t = 5.0;
-        let df = discount_curve.df(t);
-        if df > 0.0 {
-            -df.ln() / t
-        } else {
-            initial_rate
-        }
-    };
-
     let num_steps = config.num_steps.unwrap_or(mbs.wam as usize);
+
+    // Fit the HW1F model to the initial discount curve: r(0) from the curve's
+    // instantaneous forward and a piecewise-constant θ(t) bootstrap, so the
+    // simulated short rate reprices the curve (a constant θ from a single 5Y
+    // zero leaves the model arbitrageable against the input curve).
+    let initial_rate = initial_short_rate_from_curve(discount_curve.as_ref(), as_of)?;
+    let hw_params = HullWhiteParams::new(config.hw_kappa, config.hw_sigma)?;
+    let horizon = num_steps as f64 / 12.0;
+    let hw1f = calibrate_hw1f_params(hw_params, discount_curve.as_ref(), as_of, horizon)?;
 
     // Simulate rate paths
     let paths = simulate_rate_paths(
         initial_rate,
-        config.hw_kappa,
-        config.hw_sigma,
-        theta,
+        &hw1f,
         config.num_paths,
         num_steps,
         config.seed,
     );
+
+    // Per-step payment-delay discounting offsets (actual payment dates).
+    let payment_extras = payment_delay_extras(mbs, as_of, num_steps)?;
 
     // Capture pricing errors raised by price_on_path so they propagate
     // through the f64-only Brent objective rather than being silently coerced
@@ -374,6 +413,7 @@ pub(crate) fn calculate_mc_oas(
                 oas,
                 config.prepay_rate_sensitivity,
                 as_of,
+                &payment_extras,
             ) {
                 Ok(pv) => total += pv,
                 Err(e) => {
@@ -422,6 +462,7 @@ pub(crate) fn calculate_mc_oas(
             oas,
             config.prepay_rate_sensitivity,
             as_of,
+            &payment_extras,
         )?);
     }
 
@@ -502,7 +543,8 @@ mod tests {
 
     #[test]
     fn test_rate_path_simulation() {
-        let paths = simulate_rate_paths(0.04, 0.05, 0.01, 0.04, 100, 120, 42);
+        let params = HullWhite1FParams::new(0.05, 0.01, 0.04);
+        let paths = simulate_rate_paths(0.04, &params, 100, 120, 42);
         assert_eq!(paths.len(), 100);
 
         for path in &paths {
@@ -583,7 +625,7 @@ mod tests {
             let base_smm = mbs.prepayment_model.smm(seasoning).expect("smm");
             let smm = rate_adjusted_smm(base_smm, base_rate, base_rate, 7.0);
 
-            let remaining = wam.saturating_sub(month + 1).max(1);
+            let remaining = wam.saturating_sub(month).max(1);
             let scheduled_principal = if remaining <= 1 {
                 balance
             } else {
@@ -614,7 +656,8 @@ mod tests {
         // And price_on_path itself must run without producing a non-finite PV.
         // Use the MBS issue date so seasoning starts at 0 (fresh pool).
         let as_of = mbs.issue_date;
-        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, as_of).expect("price");
+        let extras = vec![0.0; wam];
+        let pv = price_on_path(&mbs, &path, base_rate, 0.0, 7.0, as_of, &extras).expect("price");
         assert!(
             pv.is_finite() && pv > 0.0,
             "path PV must be finite/positive"
@@ -627,18 +670,33 @@ mod tests {
         let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
         let market = create_test_market(as_of);
 
-        // First, compute the model price at OAS = 0
+        // First, compute the model price at OAS = 0 using the *same*
+        // curve-calibrated θ(t), r(0), and payment-delay discounting that
+        // `calculate_mc_oas` uses internally.
         let config = McOasConfig {
             num_paths: 64, // Fewer paths for speed in test
             ..Default::default()
         };
 
-        let paths = simulate_rate_paths(0.04, config.hw_kappa, config.hw_sigma, 0.04, 64, 360, 42);
+        let curve = market.get_discount(&mbs.discount_curve_id).expect("curve");
+        let initial_rate = initial_short_rate_from_curve(curve.as_ref(), as_of).expect("r0");
+        let hw = HullWhiteParams::new(config.hw_kappa, config.hw_sigma).expect("hw");
+        let hw1f = calibrate_hw1f_params(hw, curve.as_ref(), as_of, 30.0).expect("theta fit");
+        let paths = simulate_rate_paths(initial_rate, &hw1f, 64, 360, config.seed);
+        let extras = payment_delay_extras(&mbs, as_of, 360).expect("extras");
         let total: f64 = paths
             .iter()
             .map(|path| {
-                price_on_path(&mbs, path, 0.04, 0.0, config.prepay_rate_sensitivity, as_of)
-                    .expect("test fixture is well-formed")
+                price_on_path(
+                    &mbs,
+                    path,
+                    initial_rate,
+                    0.0,
+                    config.prepay_rate_sensitivity,
+                    as_of,
+                    &extras,
+                )
+                .expect("test fixture is well-formed")
             })
             .sum();
         let avg_price: f64 = total / 64.0;
@@ -654,6 +712,52 @@ mod tests {
             result.oas.abs() < 0.005,
             "OAS should be near zero at model price, got {}",
             result.oas
+        );
+    }
+
+    /// Finding 14 regression: longer agency payment delay must lower path PV.
+    ///
+    /// FNMA pays on the 25th of the month following accrual (~55-day stated
+    /// delay) while GNMA I pays on the 15th of the accrual month. The same
+    /// cashflows received later must be worth less under positive rates.
+    #[test]
+    fn longer_payment_delay_lowers_path_pv() {
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+        let base_rate = 0.04;
+        let wam = 360usize;
+        let flat_path = RatePath {
+            rates: vec![base_rate; wam + 1],
+        };
+
+        let fnma = create_test_mbs(); // FNMA: pays 25th of following month
+        let mut gnma1 = create_test_mbs();
+        gnma1.agency = AgencyProgram::GnmaI; // pays 15th of accrual month
+
+        let fnma_extras = payment_delay_extras(&fnma, as_of, wam).expect("fnma extras");
+        let gnma1_extras = payment_delay_extras(&gnma1, as_of, wam).expect("gnma extras");
+        assert!(
+            fnma_extras[0] > gnma1_extras[0],
+            "FNMA delay extra {} must exceed GNMA I extra {}",
+            fnma_extras[0],
+            gnma1_extras[0]
+        );
+
+        let pv_fnma = price_on_path(&fnma, &flat_path, base_rate, 0.0, 7.0, as_of, &fnma_extras)
+            .expect("fnma pv");
+        let pv_gnma1 = price_on_path(
+            &gnma1,
+            &flat_path,
+            base_rate,
+            0.0,
+            7.0,
+            as_of,
+            &gnma1_extras,
+        )
+        .expect("gnma pv");
+
+        assert!(
+            pv_fnma < pv_gnma1,
+            "longer payment delay must lower PV: fnma={pv_fnma:.2} gnma1={pv_gnma1:.2}"
         );
     }
 
@@ -765,10 +869,19 @@ mod tests {
             rates: vec![base_rate; wam + 1],
         };
 
-        let fresh_pv =
-            price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, as_of).expect("fresh pv");
-        let seasoned_pv = price_on_path(&seasoned_mbs, &flat_path, base_rate, 0.0, 7.0, as_of)
-            .expect("seasoned pv");
+        let extras = vec![0.0; wam];
+        let fresh_pv = price_on_path(&fresh_mbs, &flat_path, base_rate, 0.0, 7.0, as_of, &extras)
+            .expect("fresh pv");
+        let seasoned_pv = price_on_path(
+            &seasoned_mbs,
+            &flat_path,
+            base_rate,
+            0.0,
+            7.0,
+            as_of,
+            &extras,
+        )
+        .expect("seasoned pv");
 
         // The seasoned pool (60+ months, PSA plateau at 100 PSA ≈ 6% CPR) must
         // price differently from the fresh pool (still on the ramp, CPR < 6%).

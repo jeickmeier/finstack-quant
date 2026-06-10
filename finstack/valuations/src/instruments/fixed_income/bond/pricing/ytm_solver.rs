@@ -269,7 +269,10 @@ impl YtmSolver {
             let years = spec.day_count.year_fraction(
                 as_of,
                 *maturity_date,
-                finstack_core::dates::DayCountContext::default(),
+                finstack_core::dates::DayCountContext {
+                    frequency: Some(spec.frequency),
+                    ..Default::default()
+                },
             )?;
             let fv = face_value.amount();
             if years > 0.0 && fv > 0.0 && target > 0.0 {
@@ -293,14 +296,7 @@ impl YtmSolver {
         }
 
         let initial_guess = if self.config.use_smart_guess {
-            self.calculate_initial_guess(
-                cashflows,
-                as_of,
-                target_price,
-                spec.day_count,
-                spec.notional,
-                spec.coupon_rate,
-            )?
+            self.calculate_initial_guess(cashflows, as_of, target_price, &spec)?
         } else {
             spec.coupon_rate
         };
@@ -370,24 +366,25 @@ impl YtmSolver {
         cashflows: &[(Date, Money)],
         as_of: Date,
         target_price: Money,
-        day_count: DayCount,
-        notional: Money,
-        coupon_rate: f64,
+        spec: &YtmPricingSpec,
     ) -> Result<f64> {
-        let current_yield = coupon_rate * notional.amount() / target_price.amount();
+        let current_yield = spec.coupon_rate * spec.notional.amount() / target_price.amount();
         let maturity = cashflows
             .last()
             .map(|(date, _)| *date)
             .ok_or(finstack_core::InputError::TooFewPoints)?;
-        let years_to_maturity = day_count.year_fraction(
+        let years_to_maturity = spec.day_count.year_fraction(
             as_of,
             maturity,
-            finstack_core::dates::DayCountContext::default(),
+            finstack_core::dates::DayCountContext {
+                frequency: Some(spec.frequency),
+                ..Default::default()
+            },
         )?;
         if years_to_maturity <= 0.0 {
             return Ok(current_yield);
         }
-        let price_pct = target_price.amount() / notional.amount();
+        let price_pct = target_price.amount() / spec.notional.amount();
         let pull_to_par = (1.0 / price_pct - 1.0) / years_to_maturity;
         let initial_guess = current_yield + 0.5 * pull_to_par;
         // Clamp to [-1.0, 10.0] to seed Brent for distressed debt with YTMs up to

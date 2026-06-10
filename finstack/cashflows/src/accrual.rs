@@ -132,6 +132,34 @@ pub struct ExCouponRule {
     pub calendar_id: Option<String>,
 }
 
+impl ExCouponRule {
+    /// Ex-coupon date for a coupon paid on `payment_date`.
+    ///
+    /// From this date (inclusive) until the payment date (exclusive), the bond
+    /// trades ex-coupon: the seller keeps the coupon and accrued interest is
+    /// negative.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `calendar_id` is set but cannot be resolved.
+    pub fn ex_date(&self, payment_date: Date) -> finstack_core::Result<Date> {
+        if let Some(cal_id) = &self.calendar_id {
+            let cal = calendar_by_id(cal_id).ok_or_else(|| {
+                finstack_core::Error::Input(finstack_core::InputError::NotFound {
+                    id: cal_id.clone(),
+                })
+            })?;
+            Ok(advance_business_days(
+                cal,
+                payment_date,
+                -(self.days_before_coupon as i32),
+            ))
+        } else {
+            Ok(payment_date - time::Duration::days(self.days_before_coupon as i64))
+        }
+    }
+}
+
 /// Generic configuration for schedule-driven interest accrual.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct AccrualConfig {
@@ -178,9 +206,10 @@ impl Default for AccrualConfig {
 /// # Returns
 ///
 /// Scalar accrued interest amount in the schedule's currency space. Returns
-/// `0.0` when the schedule has no coupon periods, the `as_of` date is outside
-/// all coupon periods, or the `as_of` date falls inside an active ex-coupon
-/// window.
+/// `0.0` when the schedule has no coupon periods or the `as_of` date is
+/// outside all coupon periods. When the `as_of` date falls inside an active
+/// ex-coupon window the accrued interest is **negative** (the seller keeps
+/// the coupon; the buyer is compensated for the remaining stub).
 ///
 /// # Errors
 ///
@@ -476,47 +505,33 @@ fn build_period_inputs(
 /// # Ex-Coupon Handling
 ///
 /// If an ex-coupon rule is configured and the `as_of` date falls within the
-/// ex-coupon window (between ex-date and payment date), returns `None` to
-/// indicate zero accrued interest.
-///
-/// # Calendar Fallback Warning
-///
-/// When a calendar ID is specified for ex-coupon but the calendar is not found,
-/// the function logs a warning (if the `tracing` feature is enabled) and falls
-/// back to calendar days instead of business days.
+/// ex-coupon window (between ex-date and payment date), the elapsed year
+/// fraction is returned as `elapsed - period` (negative). Market standard
+/// (e.g. UK gilts): the buyer does not receive the imminent coupon, so the
+/// seller compensates the buyer for the remaining stub via **negative
+/// accrued interest**.
 fn find_active_period_and_elapsed<'a>(
     periods: &'a [PeriodInputs],
     as_of: Date,
     dc: DayCount,
     cfg: &AccrualConfig,
 ) -> finstack_core::Result<Option<(&'a PeriodInputs, f64)>> {
-    use time::Duration;
-
     for inputs in periods {
         if inputs.start <= as_of && as_of < inputs.end {
-            // Apply ex-coupon convention if present.
-            if let Some(ref ex) = cfg.ex_coupon {
-                let ex_date = if let Some(cal_id) = &ex.calendar_id {
-                    let cal = calendar_by_id(cal_id).ok_or_else(|| {
-                        finstack_core::Error::Input(finstack_core::InputError::NotFound {
-                            id: cal_id.clone(),
-                        })
-                    })?;
-                    advance_business_days(cal, inputs.end, -(ex.days_before_coupon as i32))
-                } else {
-                    inputs.end - Duration::days(ex.days_before_coupon as i64)
-                };
-
-                if as_of >= ex_date && as_of < inputs.end {
-                    return Ok(None);
-                }
-            }
-
             let dc_ctx = DayCountContext {
                 frequency: cfg.frequency,
                 ..Default::default()
             };
             let elapsed = dc.year_fraction(inputs.start, as_of, dc_ctx)?.max(0.0);
+
+            // Apply ex-coupon convention if present: inside the ex-window the
+            // accrual flips to a negative stub from `as_of` to the period end.
+            if let Some(ref ex) = cfg.ex_coupon {
+                let ex_date = ex.ex_date(inputs.end)?;
+                if as_of >= ex_date && as_of < inputs.end {
+                    return Ok(Some((inputs, elapsed - inputs.total_yf)));
+                }
+            }
 
             return Ok(Some((inputs, elapsed)));
         }
@@ -550,7 +565,7 @@ fn accrue_in_period(
     elapsed_yf: f64,
     method: &AccrualMethod,
 ) -> finstack_core::Result<f64> {
-    if inputs.total_yf <= 0.0 || elapsed_yf < 0.0 {
+    if inputs.total_yf <= 0.0 || elapsed_yf < -inputs.total_yf {
         return Ok(0.0);
     }
 

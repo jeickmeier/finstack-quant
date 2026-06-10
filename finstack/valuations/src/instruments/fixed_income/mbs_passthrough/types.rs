@@ -315,7 +315,9 @@ pub struct AgencyMbsPassthrough {
     #[builder(default)]
     #[serde(default)]
     pub guarantee_fee_rate: f64,
-    /// Weighted average maturity in months.
+    /// Remaining weighted average maturity in months as of the valuation
+    /// date (current WAM, not the original term). Pool age (WALA) for
+    /// seasoning ramps is derived separately from `issue_date`.
     pub wam: u32,
     /// Issue date of the pool.
     #[schemars(with = "String")]

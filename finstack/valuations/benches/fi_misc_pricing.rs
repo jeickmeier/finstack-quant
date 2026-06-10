@@ -261,7 +261,10 @@ fn bench_cmo_waterfall_pv(c: &mut Criterion) {
     for (label, n_tranches) in [("3t", 3_usize), ("5t", 5), ("8t", 8)] {
         let tranches: Vec<CmoTranche> = (0..n_tranches)
             .map(|i| {
-                let coupon = 0.04 + 0.005 * i as f64;
+                // Keep total coupon demand under the ~4% collateral
+                // pass-through so the deal passes interest-coverage
+                // validation at build.
+                let coupon = 0.03 + 0.001 * i as f64;
                 let balance = 10_000_000.0;
                 CmoTranche::sequential(
                     format!("T{}", i).as_str(),

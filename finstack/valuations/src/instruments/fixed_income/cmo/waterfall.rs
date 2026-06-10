@@ -21,6 +21,11 @@ pub struct TrancheAllocation {
     pub prepayment_principal: f64,
     /// Interest allocated
     pub interest: f64,
+    /// Unpaid interest this period (coupon demand minus allocated interest).
+    ///
+    /// Non-zero when the collateral interest is insufficient to cover the
+    /// tranche's coupon (interest-deficient structures).
+    pub interest_shortfall: f64,
     /// Beginning balance
     pub beginning_balance: f64,
     /// Ending balance
@@ -92,16 +97,21 @@ pub fn execute_waterfall_with_pac(
         available_principal,
         0.0,
         available_interest,
+        1.0,
         pac_context,
     )
 }
 
 /// Execute waterfall while preserving scheduled-principal vs prepayment buckets.
+///
+/// `collateral_factor` is the collateral pool factor (current/original
+/// balance) for this period; IO strip notionals amortize with it.
 pub fn execute_waterfall_with_principal_breakdown(
     waterfall: &mut CmoWaterfall,
     scheduled_principal: f64,
     prepayment_principal: f64,
     available_interest: f64,
+    collateral_factor: f64,
     pac_context: Option<&PacContext>,
 ) -> WaterfallPeriodResult {
     let mut remaining_principal = scheduled_principal + prepayment_principal;
@@ -112,19 +122,39 @@ pub fn execute_waterfall_with_principal_breakdown(
     // first) so that on an interest shortfall senior tranches are paid
     // before juniors, matching the principal pass which sorts by priority.
     // Use a stable sort so tranches sharing a priority keep insertion order.
+    // Interest is always capped at what the collateral delivered
+    // (`remaining_interest`); any unmet coupon demand is recorded as a
+    // per-tranche shortfall.
     let mut interest_allocations: HashMap<String, f64> = HashMap::default();
+    let mut interest_shortfalls: HashMap<String, f64> = HashMap::default();
 
     let mut interest_order: Vec<&CmoTranche> = waterfall.tranches.iter().collect();
     interest_order.sort_by_key(|t| t.priority);
 
     for tranche in interest_order {
-        if tranche.is_interest_bearing() && tranche.current_face.amount() > 0.0 {
-            // Interest = balance × coupon / 12
-            let monthly_interest = tranche.current_face.amount() * tranche.coupon / 12.0;
-            let allocated_interest = monthly_interest.min(remaining_interest);
-            remaining_interest -= allocated_interest;
-            interest_allocations.insert(tranche.id.clone(), allocated_interest);
+        if !tranche.is_interest_bearing() {
+            continue;
         }
+        // An IO strip's notional is not a principal balance — it amortizes
+        // with the collateral factor (the IO references a slice of the pool's
+        // interest, which shrinks as the pool pays down).
+        let notional = if tranche.tranche_type == CmoTrancheType::InterestOnly {
+            tranche.original_face.amount() * collateral_factor.clamp(0.0, 1.0)
+        } else {
+            tranche.current_face.amount()
+        };
+        if notional <= 0.0 {
+            continue;
+        }
+        // Interest = notional × coupon / 12
+        let monthly_interest = notional * tranche.coupon / 12.0;
+        let allocated_interest = monthly_interest.min(remaining_interest);
+        remaining_interest -= allocated_interest;
+        interest_allocations.insert(tranche.id.clone(), allocated_interest);
+        interest_shortfalls.insert(
+            tranche.id.clone(),
+            (monthly_interest - allocated_interest).max(0.0),
+        );
     }
 
     // Second pass: distribute principal based on tranche type and priority
@@ -171,6 +201,39 @@ pub fn execute_waterfall_with_principal_breakdown(
         }
     }
 
+    // Broken-structure sweep (finding 16): when the regular allocation leaves
+    // principal undistributed while tranches are still outstanding (e.g. a
+    // broken PAC whose supports are exhausted, leaving the PAC capped at its
+    // schedule), the excess accelerates the remaining tranches beyond their
+    // schedules in priority order, balance-capped. Principal is conserved:
+    // `residual_principal` is non-zero only when every principal-receiving
+    // tranche is fully retired.
+    if remaining_principal > 1e-12 {
+        let mut sweep_order: Vec<&CmoTranche> = waterfall
+            .tranches
+            .iter()
+            .filter(|t| t.receives_principal())
+            .collect();
+        sweep_order.sort_by_key(|t| t.priority);
+        for tranche in sweep_order {
+            if remaining_principal <= 1e-12 {
+                break;
+            }
+            let already = principal_allocations
+                .get(&tranche.id)
+                .copied()
+                .unwrap_or(0.0);
+            let capacity = (tranche.current_face.amount() - already).max(0.0);
+            let extra = capacity.min(remaining_principal);
+            if extra > 0.0 {
+                *principal_allocations
+                    .entry(tranche.id.clone())
+                    .or_insert(0.0) += extra;
+                remaining_principal -= extra;
+            }
+        }
+    }
+
     // Attribute scheduled vs prepayment principal AT SOURCE rather than by
     // draining a single shared counter in priority order. A PAC tranche's
     // collar allocation is scheduled principal by construction (capped by
@@ -206,13 +269,20 @@ pub fn execute_waterfall_with_principal_breakdown(
             .get(&tranche.id)
             .cloned()
             .unwrap_or(0.0);
+        let interest_shortfall = interest_shortfalls.get(&tranche.id).cloned().unwrap_or(0.0);
         let (scheduled_principal, prepayment_principal) = scheduled_attribution
             .get(&tranche.id)
             .cloned()
             .unwrap_or((0.0, 0.0));
 
         let beginning = tranche.current_face.amount();
-        let ending = (beginning - principal).max(0.0);
+        // IO strips receive no principal: their notional amortizes with the
+        // collateral factor instead of via principal payments.
+        let ending = if tranche.tranche_type == CmoTrancheType::InterestOnly {
+            tranche.original_face.amount() * collateral_factor.clamp(0.0, 1.0)
+        } else {
+            (beginning - principal).max(0.0)
+        };
 
         tranche.current_face = Money::new(ending, tranche.current_face.currency());
 
@@ -222,6 +292,7 @@ pub fn execute_waterfall_with_principal_breakdown(
             scheduled_principal,
             prepayment_principal,
             interest,
+            interest_shortfall,
             beginning_balance: beginning,
             ending_balance: ending,
         });
@@ -589,6 +660,84 @@ mod tests {
         assert!((payment_half - 166.67).abs() < 1.0);
     }
 
+    /// Finding 17: when collateral interest cannot cover the tranche coupons,
+    /// the unmet demand is reported per tranche as `interest_shortfall`
+    /// (juniors short first, matching the priority-ordered interest pass).
+    #[test]
+    fn interest_shortfall_reported_per_tranche() {
+        let mut waterfall = create_test_waterfall();
+
+        // Coupon demand: A 40,000×4% + B 30,000×5% + C 30,000×6% = 4,900/yr
+        // ≈ 408.33/mo. Deliver only 200 of interest.
+        let result = execute_waterfall(&mut waterfall, 0.0, 200.0);
+
+        let total_shortfall: f64 = result
+            .allocations
+            .iter()
+            .map(|a| a.interest_shortfall)
+            .sum();
+        let total_interest: f64 = result.allocations.iter().map(|a| a.interest).sum();
+        assert!((total_interest - 200.0).abs() < 1e-9);
+        assert!(
+            (total_shortfall - (4_900.0 / 12.0 - 200.0)).abs() < 1e-6,
+            "total shortfall must equal unmet coupon demand, got {total_shortfall}"
+        );
+
+        // Senior A is paid in full; the most junior C bears the shortfall.
+        let a = result
+            .allocations
+            .iter()
+            .find(|x| x.tranche_id == "A")
+            .expect("A allocation");
+        let c = result
+            .allocations
+            .iter()
+            .find(|x| x.tranche_id == "C")
+            .expect("C allocation");
+        assert!(a.interest_shortfall < 1e-9, "senior tranche paid first");
+        assert!(c.interest_shortfall > 0.0, "junior tranche bears shortfall");
+    }
+
+    /// Finding 17: in the waterfall interest pass an IO strip accrues on its
+    /// factor-adjusted notional and its reported balance amortizes with the
+    /// collateral factor, not with (nonexistent) principal payments.
+    #[test]
+    fn io_interest_and_balance_use_collateral_factor() {
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(100_000.0, Currency::USD), 0.04, 1),
+            CmoTranche::io_strip("IO", Money::new(100_000.0, Currency::USD), 0.04),
+        ];
+        let mut waterfall = CmoWaterfall::new(tranches);
+
+        // Pool at factor 0.5: IO accrues on 50,000, not 100,000.
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            1_000.0,
+            0.0,
+            1_000.0,
+            0.5,
+            None,
+        );
+
+        let io = result
+            .allocations
+            .iter()
+            .find(|x| x.tranche_id == "IO")
+            .expect("IO allocation");
+        // 100,000 × 0.5 × 0.04 / 12 = 166.67
+        assert!(
+            (io.interest - 100_000.0 * 0.5 * 0.04 / 12.0).abs() < 1e-6,
+            "IO interest must accrue on factor-adjusted notional, got {}",
+            io.interest
+        );
+        assert!(
+            (io.ending_balance - 50_000.0).abs() < 1e-9,
+            "IO balance must amortize with the collateral factor, got {}",
+            io.ending_balance
+        );
+        assert!(io.principal.abs() < 1e-12, "IO receives no principal");
+    }
+
     /// Defect (a): a PO strip is NOT senior to all other classes. It is a
     /// principal strip that pays down at its own priority position, not a
     /// pre-loop 100% drain of pool principal.
@@ -695,6 +844,7 @@ mod tests {
             6_000.0,
             3_000.0,
             5_000.0,
+            1.0,
             Some(&pac_context),
         );
 
@@ -715,6 +865,7 @@ mod tests {
             6_000.0,
             3_000.0,
             5_000.0,
+            1.0,
             Some(&pac_context),
         );
 
@@ -794,6 +945,7 @@ mod tests {
             scheduled_pool,
             prepayment_pool,
             0.0, // interest irrelevant here
+            1.0,
             None,
         );
 
@@ -899,6 +1051,7 @@ mod tests {
             scheduled_pool,
             prepayment_pool,
             0.0,
+            1.0,
             Some(&pac_context),
         );
 
@@ -941,6 +1094,84 @@ mod tests {
             "scheduled {} + prepayment {} should equal 12,000",
             result.total_scheduled_principal,
             result.total_prepayment_principal
+        );
+    }
+
+    /// Finding 16 (broken PAC): once the support tranche is exhausted, excess
+    /// principal must accelerate the PAC beyond its schedule (balance-capped)
+    /// instead of being stranded as `residual_principal` while tranches are
+    /// still outstanding — principal must be conserved.
+    #[test]
+    fn broken_pac_excess_principal_accelerates_pac() {
+        use crate::instruments::fixed_income::cmo::tranches::pac_support::PacSchedule;
+        use crate::instruments::fixed_income::cmo::types::PacCollar;
+
+        // PAC 50,000 + a nearly-depleted support of 2,000 at the same priority.
+        let tranches = vec![
+            CmoTranche::pac(
+                "PAC",
+                Money::new(50_000.0, Currency::USD),
+                0.04,
+                1,
+                PacCollar::standard(),
+            ),
+            CmoTranche::sequential("SUP", Money::new(2_000.0, Currency::USD), 0.05, 1),
+        ];
+        let mut waterfall = CmoWaterfall::new(tranches);
+
+        let pac_schedule = PacSchedule {
+            scheduled_payments: vec![4_000.0; 12],
+            collar: PacCollar::standard(),
+        };
+        let pac_context = PacContext {
+            schedule: Some(pac_schedule),
+            period_index: 0,
+            actual_psa: 5.0, // fast prepay, above the 100-300 collar
+        };
+
+        // Fast-prepay pool: 4,000 scheduled + 6,000 prepayment = 10,000 total.
+        // PAC schedule claims 4,000; support absorbs its full 2,000 balance
+        // and is exhausted; the remaining 4,000 must go to the PAC.
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            4_000.0,
+            6_000.0,
+            1_000.0,
+            1.0,
+            Some(&pac_context),
+        );
+
+        let pac = result
+            .allocations
+            .iter()
+            .find(|a| a.tranche_id == "PAC")
+            .expect("PAC allocation");
+        let sup = result
+            .allocations
+            .iter()
+            .find(|a| a.tranche_id == "SUP")
+            .expect("SUP allocation");
+
+        assert!(
+            (sup.principal - 2_000.0).abs() < 1e-9,
+            "support must be fully depleted, got {}",
+            sup.principal
+        );
+        assert!(
+            (pac.principal - 8_000.0).abs() < 1e-9,
+            "broken PAC must absorb the excess beyond schedule (4,000 + 4,000), got {}",
+            pac.principal
+        );
+        // Conservation: every dollar of pool principal reaches a tranche.
+        assert!(
+            (result.total_principal - 10_000.0).abs() < 1e-9,
+            "tranche principal must equal collateral principal, got {}",
+            result.total_principal
+        );
+        assert!(
+            result.residual_principal.abs() < 1e-9,
+            "no residual principal while tranches are outstanding, got {}",
+            result.residual_principal
         );
     }
 
@@ -995,6 +1226,7 @@ mod tests {
             6_000.0, // scheduled
             3_000.0, // prepayment
             5_000.0, // interest
+            1.0,
             Some(&pac_context),
         );
 

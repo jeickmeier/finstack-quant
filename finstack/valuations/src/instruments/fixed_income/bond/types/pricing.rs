@@ -14,6 +14,12 @@ impl Bond {
     /// notional (redemption). Negative notionals (initial draw) and pure PIK
     /// accretion are excluded because they are not discounted receipt flows.
     ///
+    /// When the bond has an ex-coupon convention and `as_of` falls inside the
+    /// ex-coupon window of a coupon, that coupon is excluded: a buyer settling
+    /// in the ex-window does not receive the imminent coupon (market standard,
+    /// e.g. UK gilts). Accrued interest is correspondingly negative in that
+    /// window (see [`crate::cashflow::accrued_interest_amount`]).
+    ///
     /// Internal pricing engines (discount, hazard, spread solvers) should use
     /// this instead of the public [`CashflowProvider::dated_cashflows`] which
     /// now returns the full signed canonical schedule.
@@ -24,17 +30,29 @@ impl Bond {
     ) -> Result<Vec<(finstack_core::dates::Date, finstack_core::money::Money)>> {
         use finstack_core::cashflow::CFKind;
 
+        let ex_coupon = self.accrual_config().ex_coupon;
         let schedule = self.full_cashflow_schedule(curves)?;
-        Ok(schedule
-            .flows
-            .into_iter()
-            .filter(|cf| {
-                cf.date >= as_of
-                    && cf.kind != CFKind::PIK
-                    && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0)
-            })
-            .map(|cf| (cf.date, cf.amount))
-            .collect())
+        let mut flows = Vec::with_capacity(schedule.flows.len());
+        for cf in schedule.flows {
+            let keep = cf.date >= as_of
+                && cf.kind != CFKind::PIK
+                && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0);
+            if !keep {
+                continue;
+            }
+            // Drop interest flows whose ex-date has passed: the buyer as of
+            // `as_of` is not entitled to them.
+            if cf.kind.is_interest_like() {
+                if let Some(rule) = &ex_coupon {
+                    let ex_date = rule.ex_date(cf.date)?;
+                    if as_of >= ex_date && as_of < cf.date {
+                        continue;
+                    }
+                }
+            }
+            flows.push((cf.date, cf.amount));
+        }
+        Ok(flows)
     }
 
     /// Cashflow schedule enriched with discount factors, survival probabilities, and PVs.
@@ -267,5 +285,54 @@ impl Bond {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_core::currency::Currency;
+    use finstack_core::market_data::context::MarketContext;
+    use time::macros::date;
+
+    fn ex_coupon_bond() -> Bond {
+        let mut bond = Bond::fixed(
+            "EX-FLOWS",
+            Money::new(100.0, Currency::USD),
+            0.05,
+            date!(2025 - 01 - 01),
+            date!(2030 - 01 - 01),
+            "USD-OIS",
+        )
+        .expect("valid bond");
+        bond.settlement_convention = Some(super::super::BondSettlementConvention {
+            ex_coupon_days: 7,
+            ..Default::default()
+        });
+        bond
+    }
+
+    #[test]
+    fn pricing_flows_exclude_coupon_inside_ex_window() {
+        let bond = ex_coupon_bond();
+        let coupon_date = date!(2025 - 07 - 01);
+        let market = MarketContext::new();
+
+        // Inside the ex-window (5 days before the coupon): the imminent coupon
+        // is not a buyer flow.
+        let as_of = coupon_date - time::Duration::days(5);
+        let flows = bond.pricing_dated_cashflows(&market, as_of).expect("flows");
+        assert!(
+            !flows.iter().any(|(d, _)| *d == coupon_date),
+            "ex-period coupon must be excluded from buyer flows"
+        );
+
+        // Outside the ex-window (8 days before): the coupon is still a buyer flow.
+        let as_of = coupon_date - time::Duration::days(8);
+        let flows = bond.pricing_dated_cashflows(&market, as_of).expect("flows");
+        assert!(
+            flows.iter().any(|(d, _)| *d == coupon_date),
+            "cum-coupon flows must include the next coupon"
+        );
     }
 }

@@ -47,12 +47,20 @@ impl ZSpreadCs01 for TermLoan {
         })
     }
 
-    fn z_spread_cs01_quoted_dirty(&self) -> Option<f64> {
-        // Match the term-loan quote convention used by DiscountMargin/OAS:
-        // `quoted_clean_price` is a percent of `notional_limit`.
-        self.pricing_overrides
-            .market_quotes
-            .quoted_clean_price
-            .map(|px| px * self.notional_limit.amount() / 100.0)
+    fn z_spread_cs01_quoted_dirty(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
+        // Loan-market quote convention: `quoted_clean_price` is a percent of
+        // the funded outstanding at settlement; the dirty anchor adds accrued.
+        let Some(px) = self.pricing_overrides.market_quotes.quoted_clean_price else {
+            return Ok(None);
+        };
+        let schedule = crate::instruments::fixed_income::term_loan::cashflows::generate_cashflows(
+            self, curves, as_of,
+        )?;
+        super::irr_helpers::quoted_dirty_from_clean_px(self, &schedule, as_of, px)
+            .map(|m| Some(m.amount()))
     }
 }

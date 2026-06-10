@@ -257,6 +257,38 @@ fn test_price_from_ytm_compounded_params_single_flow() {
 }
 
 #[test]
+fn test_price_from_ytm_compounded_params_act_act_isma() {
+    // ACT/ACT (ICMA) requires the coupon frequency in the day-count context.
+    // Regression for the YTM path erroring with MissingFrequencyForActActIsma.
+    let as_of = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    let date1 = Date::from_calendar_date(2025, time::Month::July, 1).unwrap();
+    let date2 = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
+
+    let flows = vec![
+        (date1, Money::new(2.5, Currency::USD)),
+        (date2, Money::new(102.5, Currency::USD)),
+    ];
+
+    let ytm = 0.05;
+    let price = price_from_ytm_compounded_params(
+        DayCount::ActActIsma,
+        Tenor::semi_annual(),
+        &flows,
+        as_of,
+        ytm,
+        YieldCompounding::Street,
+    )
+    .expect("ACT/ACT (ICMA) pricing from yield must succeed");
+
+    // Regular semi-annual periods => t = 0.5 and 1.0 exactly under ISMA.
+    let expected = 2.5 / 1.025 + 102.5 / (1.025_f64 * 1.025);
+    assert!(
+        (price - expected).abs() < 1e-10,
+        "price {price} vs expected {expected}"
+    );
+}
+
+#[test]
 fn test_price_from_ytm_compounded_params_multiple_flows() {
     // Multiple cashflows: $5 in 6 months, $105 in 1 year
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -515,21 +547,22 @@ fn test_fixed_leg_annuity_and_par_rate_discount_helpers_cover_edge_cases() {
 
     let short_schedule = vec![as_of];
     assert_eq!(
-        fixed_leg_annuity(&curve, DayCount::Act365F, &short_schedule).unwrap(),
+        fixed_leg_annuity(&curve, DayCount::Act365F, None, &short_schedule).unwrap(),
         0.0
     );
     assert_eq!(
-        par_rate_and_annuity_from_discount(&curve, DayCount::Act365F, &short_schedule).unwrap(),
+        par_rate_and_annuity_from_discount(&curve, DayCount::Act365F, None, &short_schedule)
+            .unwrap(),
         (0.0, 0.0)
     );
 
     let end = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     let schedule = vec![as_of, end];
-    let annuity = fixed_leg_annuity(&curve, DayCount::Act365F, &schedule).unwrap();
+    let annuity = fixed_leg_annuity(&curve, DayCount::Act365F, None, &schedule).unwrap();
     assert!((annuity - 1.002739726).abs() < 1e-9);
 
     let (par_rate, par_annuity) =
-        par_rate_and_annuity_from_discount(&curve, DayCount::Act365F, &schedule).unwrap();
+        par_rate_and_annuity_from_discount(&curve, DayCount::Act365F, None, &schedule).unwrap();
     assert_eq!(par_rate, 0.0);
     assert!((par_annuity - annuity).abs() < 1e-12);
 }

@@ -158,7 +158,10 @@ pub(crate) fn generate_tranche_cashflows(
             let factor = cf.beginning_balance / original_collateral;
             // We validated ref_id exists at function start, so this should always succeed
             if let Some(io_tranche) = waterfall.get_tranche(ref_id) {
-                let io_payment = allocate_io_cashflow(io_tranche, factor);
+                // Interest conservation: the IO can never receive more than
+                // the collateral interest delivered this period, so
+                // IO + PO PV stays bounded by collateral PV.
+                let io_payment = allocate_io_cashflow(io_tranche, factor).min(cf.interest);
 
                 tranche_cfs.push(TrancheCashflow {
                     payment_date: cf.payment_date,
@@ -167,7 +170,7 @@ pub(crate) fn generate_tranche_cashflows(
                     prepayment_principal: 0.0,
                     interest: io_payment,
                     total: io_payment,
-                    ending_balance: io_tranche.current_face.amount() * factor,
+                    ending_balance: io_tranche.original_face.amount() * factor,
                 });
             }
         } else {
@@ -175,11 +178,13 @@ pub(crate) fn generate_tranche_cashflows(
             // `Some`, so PAC tranches amortize on their collateral-derived
             // schedule/collar via `allocate_pac_support` instead of falling
             // through to balance-limited sequential allocation.
+            let collateral_factor = cf.beginning_balance / original_collateral;
             let result = execute_waterfall_with_principal_breakdown(
                 &mut waterfall,
                 cf.scheduled_principal,
                 cf.prepayment,
                 total_interest,
+                collateral_factor,
                 pac_context.as_ref(),
             );
 
@@ -513,6 +518,88 @@ mod tests {
 
         // IO should have positive value
         assert!(pv.amount() > 0.0);
+    }
+
+    /// Interest conservation (finding 17): the IO strip's interest is capped
+    /// at the collateral interest each period, so IO + PO PV cannot exceed
+    /// the PV of the collateral's total cashflows.
+    #[test]
+    fn io_plus_po_pv_bounded_by_collateral_pv() {
+        let cmo = AgencyCmo::example_io_po().expect("AgencyCmo IO/PO example is valid");
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+        let market = create_test_market(as_of);
+
+        let mut io_cmo = cmo.clone();
+        io_cmo.reference_tranche_id = "IO".to_string();
+        let io_pv = price_cmo(&io_cmo, &market, as_of).expect("IO prices");
+
+        let mut po_cmo = cmo.clone();
+        po_cmo.reference_tranche_id = "PO".to_string();
+        let po_pv = price_cmo(&po_cmo, &market, as_of).expect("PO prices");
+
+        // Collateral PV: discount the pool's total investor cashflows with
+        // the same curve and day count as the tranche pricer.
+        let collateral = resolve_collateral(&cmo).expect("collateral resolves");
+        let collateral_cfs =
+            generate_cashflows(&collateral, as_of, None).expect("collateral cashflows");
+        let curve = market
+            .get_discount(&cmo.discount_curve_id)
+            .expect("discount curve");
+        let dc = curve.day_count();
+        let mut collateral_pv = 0.0;
+        for cf in &collateral_cfs {
+            let years = dc
+                .year_fraction(as_of, cf.payment_date, DayCountContext::default())
+                .expect("year fraction");
+            let total = cf.interest + cf.scheduled_principal + cf.prepayment;
+            collateral_pv += total * curve.df(years);
+        }
+
+        let combined = io_pv.amount() + po_pv.amount();
+        assert!(
+            combined <= collateral_pv * (1.0 + 1e-9) + 1e-6,
+            "IO ({}) + PO ({}) = {combined} must not exceed collateral PV {collateral_pv}",
+            io_pv.amount(),
+            po_pv.amount()
+        );
+    }
+
+    /// The IO strip's notional must amortize with the collateral factor: its
+    /// reported ending balance tracks `original_face × factor` and declines
+    /// as the pool pays down.
+    #[test]
+    fn io_notional_amortizes_with_collateral_factor() {
+        let cmo = AgencyCmo::example_io_po().expect("AgencyCmo IO/PO example is valid");
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+
+        let mut io_cmo = cmo.clone();
+        io_cmo.reference_tranche_id = "IO".to_string();
+        let cfs = generate_tranche_cashflows(&io_cmo, as_of, Some(60)).expect("IO cashflows");
+        assert!(cfs.len() > 12);
+
+        let original = io_cmo
+            .waterfall
+            .get_tranche("IO")
+            .expect("IO tranche")
+            .original_face
+            .amount();
+
+        // Balances strictly decrease (positive prepayment + amortization)
+        // and stay below the unamortized notional after the first period.
+        for window in cfs.windows(2) {
+            assert!(
+                window[1].ending_balance < window[0].ending_balance,
+                "IO notional must amortize with the pool factor: {} -> {}",
+                window[0].ending_balance,
+                window[1].ending_balance
+            );
+        }
+        let last = cfs.last().expect("non-empty");
+        assert!(
+            last.ending_balance < original,
+            "IO ending balance {} must fall below original notional {original}",
+            last.ending_balance
+        );
     }
 
     #[test]

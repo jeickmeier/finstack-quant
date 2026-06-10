@@ -34,11 +34,12 @@
 //! use finstack_core::types::{CurveId, InstrumentId};
 //! use time::Month;
 //!
-//! // Create a sequential CMO structure
+//! // Create a sequential CMO structure (coupon demand must stay within the
+//! // collateral pass-through interest, ~4.0% here after 50bp of fees)
 //! let tranches = vec![
-//!     CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.04, 1),
-//!     CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.045, 2),
-//!     CmoTranche::sequential("Z", Money::new(30_000_000.0, Currency::USD), 0.05, 3),
+//!     CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
+//!     CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.04, 2),
+//!     CmoTranche::sequential("Z", Money::new(30_000_000.0, Currency::USD), 0.045, 3),
 //! ];
 //!
 //! let cmo = AgencyCmo::builder()

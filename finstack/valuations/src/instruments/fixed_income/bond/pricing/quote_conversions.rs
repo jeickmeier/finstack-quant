@@ -150,12 +150,13 @@ pub fn periods_per_year(freq: finstack_core::dates::Tenor) -> finstack_core::Res
 ///
 /// # let disc = DiscountCurve::builder("USD-OIS").base_date(Date::from_calendar_date(2024, time::Month::January, 1).unwrap()).knots([(0.0, 1.0)]).build().unwrap();
 /// # let schedule = vec![Date::from_calendar_date(2024, time::Month::January, 1).unwrap(), Date::from_calendar_date(2025, time::Month::January, 1).unwrap()];
-/// let annuity = fixed_leg_annuity(&disc, DayCount::Act365F, &schedule)?;
+/// let annuity = fixed_leg_annuity(&disc, DayCount::Act365F, None, &schedule)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn fixed_leg_annuity(
     disc: &finstack_core::market_data::term_structures::DiscountCurve,
     dc: finstack_core::dates::DayCount,
+    frequency: Option<finstack_core::dates::Tenor>,
     schedule: &[Date],
 ) -> finstack_core::Result<f64> {
     use finstack_core::dates::DayCountContext;
@@ -164,10 +165,14 @@ pub fn fixed_leg_annuity(
         return Ok(0.0);
     }
 
+    let dc_ctx = DayCountContext {
+        frequency,
+        ..DayCountContext::default()
+    };
     let mut ann = 0.0;
     let mut prev = schedule[0];
     for &d in &schedule[1..] {
-        let alpha = dc.year_fraction(prev, d, DayCountContext::default())?;
+        let alpha = dc.year_fraction(prev, d, dc_ctx)?;
         let p = disc.df_on_date_curve(d)?;
         ann += alpha * p;
         prev = d;
@@ -211,19 +216,20 @@ pub fn fixed_leg_annuity(
 ///
 /// # let disc = DiscountCurve::builder("USD-OIS").base_date(Date::from_calendar_date(2024, time::Month::January, 1).unwrap()).knots([(0.0, 1.0)]).build().unwrap();
 /// # let schedule = vec![Date::from_calendar_date(2024, time::Month::January, 1).unwrap(), Date::from_calendar_date(2025, time::Month::January, 1).unwrap()];
-/// let (par_rate, annuity) = par_rate_and_annuity_from_discount(&disc, DayCount::Act365F, &schedule)?;
+/// let (par_rate, annuity) = par_rate_and_annuity_from_discount(&disc, DayCount::Act365F, None, &schedule)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub fn par_rate_and_annuity_from_discount(
     disc: &finstack_core::market_data::term_structures::DiscountCurve,
     dc: finstack_core::dates::DayCount,
+    frequency: Option<finstack_core::dates::Tenor>,
     schedule: &[Date],
 ) -> finstack_core::Result<(f64, f64)> {
     if schedule.len() < 2 {
         return Ok((0.0, 0.0));
     }
 
-    let ann = fixed_leg_annuity(disc, dc, schedule)?;
+    let ann = fixed_leg_annuity(disc, dc, frequency, schedule)?;
     // Use epsilon check to avoid division by near-zero values that could amplify numerical noise
     if ann.abs() < 1e-12 {
         return Ok((0.0, 0.0));
@@ -242,10 +248,11 @@ pub fn par_rate_and_annuity_from_forward(
     disc: &finstack_core::market_data::term_structures::DiscountCurve,
     fwd: &finstack_core::market_data::term_structures::ForwardCurve,
     fixed_dc: finstack_core::dates::DayCount,
+    fixed_frequency: Option<finstack_core::dates::Tenor>,
     schedule: &[Date],
     float_spread_bp: f64,
 ) -> finstack_core::Result<(f64, f64)> {
-    let ann = fixed_leg_annuity(disc, fixed_dc, schedule)?;
+    let ann = fixed_leg_annuity(disc, fixed_dc, fixed_frequency, schedule)?;
     if ann.abs() < 1e-12 {
         return Ok((0.0, 0.0));
     }
@@ -273,10 +280,11 @@ pub fn asset_swap_forward_components(
     disc: &finstack_core::market_data::term_structures::DiscountCurve,
     fwd: &finstack_core::market_data::term_structures::ForwardCurve,
     fixed_dc: finstack_core::dates::DayCount,
+    fixed_frequency: Option<finstack_core::dates::Tenor>,
     schedule: &[Date],
     float_spread_bp: f64,
 ) -> finstack_core::Result<(f64, f64, f64)> {
-    let fixed_ann = fixed_leg_annuity(disc, fixed_dc, schedule)?;
+    let fixed_ann = fixed_leg_annuity(disc, fixed_dc, fixed_frequency, schedule)?;
     if schedule.len() < 2 {
         return Ok((0.0, fixed_ann, 0.0));
     }
@@ -656,6 +664,13 @@ pub fn price_from_ytm_compounded_params(
 ) -> finstack_core::Result<f64> {
     use finstack_core::math::summation::NeumaierAccumulator;
 
+    // ACT/ACT (ICMA) requires the coupon frequency in the day-count context;
+    // the default context hard-errors for that convention.
+    let dc_ctx = DayCountContext {
+        frequency: Some(freq),
+        ..DayCountContext::default()
+    };
+
     // Schedule-aware first-period length for the TreasuryActual stub: the
     // year-fraction from `as_of` to the first cashflow strictly after `as_of`.
     let treasury_first_period = if matches!(comp, YieldCompounding::TreasuryActual) {
@@ -664,7 +679,7 @@ pub fn price_from_ytm_compounded_params(
             if date <= as_of {
                 continue;
             }
-            let yf = day_count.year_fraction(as_of, date, DayCountContext::default())?;
+            let yf = day_count.year_fraction(as_of, date, dc_ctx)?;
             if yf > 0.0 {
                 first = Some(yf);
                 break;
@@ -680,7 +695,7 @@ pub fn price_from_ytm_compounded_params(
         if date <= as_of {
             continue;
         }
-        let t = day_count.year_fraction(as_of, date, DayCountContext::default())?;
+        let t = day_count.year_fraction(as_of, date, dc_ctx)?;
         if t > 0.0 {
             let df = match (comp, treasury_first_period) {
                 (YieldCompounding::TreasuryActual, Some(first_period_len)) => {
@@ -1399,8 +1414,12 @@ fn par_swap_rate_from_discount(
         ));
     }
 
-    let (par_rate, annuity) =
-        par_rate_and_annuity_from_discount(disc.as_ref(), fixed_leg_day_count, &dates)?;
+    let (par_rate, annuity) = par_rate_and_annuity_from_discount(
+        disc.as_ref(),
+        fixed_leg_day_count,
+        Some(fixed_leg_frequency),
+        &dates,
+    )?;
     if annuity.abs() < 1e-12 {
         return Err(finstack_core::Error::Validation(
             "I-spread proxy par-swap calculation is undefined for near-zero annuity".to_string(),
@@ -1476,6 +1495,7 @@ fn price_from_asw_market(
             disc.as_ref(),
             fwd.as_ref(),
             dc,
+            Some(freq),
             &sched,
             0.0,
         )?)
@@ -1489,7 +1509,7 @@ fn price_from_asw_market(
             (float_pv / fixed_ann, float_ann)
         }
     } else {
-        par_rate_and_annuity_from_discount(disc.as_ref(), dc, &sched)?
+        par_rate_and_annuity_from_discount(disc.as_ref(), dc, Some(freq), &sched)?
     };
     if bond.notional.amount().abs() < 1e-12 {
         return Err(finstack_core::Error::Validation(

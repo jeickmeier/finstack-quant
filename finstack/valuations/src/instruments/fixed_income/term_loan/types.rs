@@ -578,6 +578,21 @@ impl TermLoan {
 
         Ok(as_of.add_weekdays(self.settlement_days as i32))
     }
+
+    /// Accrual configuration for settlement accrued-interest calculations.
+    ///
+    /// Mirrors `Bond::accrual_config`: linear accrual with the loan's coupon
+    /// frequency (required for ACT/ACT ISMA day counts). PIK is excluded
+    /// because capitalized interest accretes to the outstanding balance rather
+    /// than being paid to the seller as cash accrued.
+    pub fn accrual_config(&self) -> crate::cashflow::accrual::AccrualConfig {
+        crate::cashflow::accrual::AccrualConfig {
+            method: crate::cashflow::accrual::AccrualMethod::Linear,
+            ex_coupon: None,
+            include_pik: false,
+            frequency: Some(self.frequency),
+        }
+    }
 }
 
 impl TryFrom<TermLoanSpec> for TermLoan {

@@ -433,14 +433,24 @@ mod bond_market_edge {
             accrued_before
         );
 
-        // At and within ex-coupon: should be zero
-        assert_eq!(
-            accrued_at, 0.0,
-            "Accrued at ex-coupon boundary should be zero"
+        // At and within ex-coupon: negative accrued (seller keeps the coupon,
+        // buyer is compensated for the remaining stub to the coupon date).
+        assert!(
+            accrued_at < 0.0,
+            "Accrued at ex-coupon boundary should be negative: {}",
+            accrued_at
         );
-        assert_eq!(
-            accrued_within, 0.0,
-            "Accrued within ex-coupon window should be zero"
+        assert!(
+            accrued_within < 0.0,
+            "Accrued within ex-coupon window should be negative: {}",
+            accrued_within
+        );
+        // Closer to the coupon date the negative stub shrinks towards zero.
+        assert!(
+            accrued_within > accrued_at,
+            "Negative accrued should shrink towards zero through the ex window: at={} within={}",
+            accrued_at,
+            accrued_within
         );
     }
 

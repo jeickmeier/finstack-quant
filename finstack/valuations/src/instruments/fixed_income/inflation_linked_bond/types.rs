@@ -646,14 +646,18 @@ impl InflationLinkedBond {
             )));
         }
 
-        let reference_date = match self.lag {
-            InflationLag::Months(m) => date.add_months(-(m as i32)),
-            InflationLag::Days(d) => date - Duration::days(d as i64),
-            InflationLag::None => date,
-            _ => date,
+        let current_index = match self.lag {
+            // Months-lag with daily interpolation follows the official RefCPI
+            // formula: anchor on first-of-month CPI(m−L)/CPI(m−L+1) and weight
+            // by (day−1)/D(settlement month). A generic calendar shift +
+            // interpolation mis-weights month-end settlements (day clamping).
+            InflationLag::Months(m) if expected_interp == InflationInterpolation::Linear => {
+                inflation_index.ref_cpi_months_lag(date, m.into())?
+            }
+            InflationLag::Months(m) => inflation_index.value_on(date.add_months(-(m as i32)))?,
+            InflationLag::Days(d) => inflation_index.value_on(date - Duration::days(d as i64))?,
+            _ => inflation_index.value_on(date)?,
         };
-
-        let current_index = inflation_index.value_on(reference_date)?;
 
         if self.base_index <= 0.0 {
             return Err(finstack_core::InputError::NonPositiveValue.into());
@@ -674,19 +678,49 @@ impl InflationLinkedBond {
         date: Date,
         inflation_curve: &InflationCurve,
     ) -> Result<f64> {
-        let reference_date = match self.lag {
-            InflationLag::Months(m) => date.add_months(-(m as i32)),
-            InflationLag::Days(d) => date - Duration::days(d as i64),
-            InflationLag::None => date,
-            _ => date,
+        let current_index = match self.lag {
+            // Same official RefCPI weighting as `index_ratio`: anchor on
+            // first-of-month CPI(m−L)/CPI(m−L+1), weight by (day−1)/D(m).
+            InflationLag::Months(m) if self.daily_interpolated_indexation() => {
+                let (anchor0, anchor1, weight) = Self::ref_cpi_anchors(date, m.into())?;
+                let cpi0 = inflation_curve.cpi_on_date(anchor0)?;
+                let cpi1 = inflation_curve.cpi_on_date(anchor1)?;
+                cpi0 + weight * (cpi1 - cpi0)
+            }
+            InflationLag::Months(m) => inflation_curve.cpi_on_date(date.add_months(-(m as i32)))?,
+            InflationLag::Days(d) => {
+                inflation_curve.cpi_on_date(date - Duration::days(d as i64))?
+            }
+            _ => inflation_curve.cpi_on_date(date)?,
         };
-
-        let current_index = inflation_curve.cpi_on_date(reference_date)?;
 
         if self.base_index <= 0.0 {
             return Err(finstack_core::InputError::NonPositiveValue.into());
         }
         Ok(current_index / self.base_index)
+    }
+
+    /// Whether the indexation method uses daily-interpolated reference CPI
+    /// (the official months-lag RefCPI formula) rather than a step lookup.
+    fn daily_interpolated_indexation(&self) -> bool {
+        match self.indexation_method {
+            IndexationMethod::TIPS | IndexationMethod::Canadian | IndexationMethod::French => true,
+            IndexationMethod::UK => matches!(self.lag, InflationLag::Months(m) if m <= 3),
+            IndexationMethod::Japanese => false,
+        }
+    }
+
+    /// First-of-month anchor dates and interpolation weight for the official
+    /// RefCPI formula: `RefCPI(d) = CPI(m−L) + (day−1)/D(m) × [CPI(m−L+1) − CPI(m−L)]`.
+    fn ref_cpi_anchors(date: Date, lag_months: u32) -> Result<(Date, Date, f64)> {
+        let first_of_month =
+            Date::from_calendar_date(date.year(), date.month(), 1).map_err(|_| {
+                finstack_core::Error::Input(finstack_core::InputError::InvalidDateRange)
+            })?;
+        let anchor0 = first_of_month.add_months(-(lag_months as i32));
+        let anchor1 = anchor0.add_months(1);
+        let weight = (f64::from(date.day()) - 1.0) / f64::from(date.month().length(date.year()));
+        Ok((anchor0, anchor1, weight))
     }
 
     /// Calculate index ratio sourcing inflation data from the market context

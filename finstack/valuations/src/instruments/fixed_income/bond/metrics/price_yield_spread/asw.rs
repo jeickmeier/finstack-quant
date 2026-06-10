@@ -247,6 +247,7 @@ struct AssetSwapForwardInputs<'a> {
     disc: &'a DiscountCurve,
     fwd: &'a ForwardCurve,
     fixed_dc: DayCount,
+    fixed_frequency: Option<Tenor>,
     fixed_schedule: &'a [Date],
     float_dc: DayCount,
     float_schedule: &'a [Date],
@@ -256,7 +257,12 @@ struct AssetSwapForwardInputs<'a> {
 fn asset_swap_forward_components_split(
     inputs: AssetSwapForwardInputs<'_>,
 ) -> finstack_core::Result<(f64, f64, f64)> {
-    let fixed_ann = fixed_leg_annuity(inputs.disc, inputs.fixed_dc, inputs.fixed_schedule)?;
+    let fixed_ann = fixed_leg_annuity(
+        inputs.disc,
+        inputs.fixed_dc,
+        inputs.fixed_frequency,
+        inputs.fixed_schedule,
+    )?;
     let float_schedule = inputs.float_schedule;
     if float_schedule.len() < 2 {
         return Ok((0.0, fixed_ann, 0.0));
@@ -375,7 +381,8 @@ pub fn asw_par_with_forward_config(
     }
 
     let fixed_dc = fixed_leg_day_count.unwrap_or_else(|| bond.cashflow_spec.day_count());
-    let ann = fixed_leg_annuity(disc.as_ref(), fixed_dc, &sched)?;
+    let fixed_freq = Some(bond.cashflow_spec.frequency());
+    let ann = fixed_leg_annuity(disc.as_ref(), fixed_dc, fixed_freq, &sched)?;
     // Use epsilon check to avoid unstable ratios when annuity is degenerate.
     if ann.abs() < 1e-12 {
         return Err(finstack_core::Error::Validation(
@@ -386,6 +393,7 @@ pub fn asw_par_with_forward_config(
         disc.as_ref(),
         fwd.as_ref(),
         fixed_dc,
+        fixed_freq,
         &sched,
         float_spread_bp,
     )?;
@@ -468,7 +476,8 @@ pub fn asw_market_with_forward_config(
         ));
     }
     let fixed_dc = fixed_leg_day_count.unwrap_or_else(|| bond.cashflow_spec.day_count());
-    let ann = fixed_leg_annuity(disc.as_ref(), fixed_dc, &sched)?;
+    let fixed_freq = Some(bond.cashflow_spec.frequency());
+    let ann = fixed_leg_annuity(disc.as_ref(), fixed_dc, fixed_freq, &sched)?;
     if ann.abs() < 1e-12 {
         return Err(finstack_core::Error::Validation(
             "ASW forward market calculation is undefined for near-zero fixed-leg annuity"
@@ -484,6 +493,7 @@ pub fn asw_market_with_forward_config(
         disc.as_ref(),
         fwd.as_ref(),
         fixed_dc,
+        fixed_freq,
         &sched,
         float_spread_bp,
     )?;
@@ -635,6 +645,7 @@ impl MetricCalculator for AssetSwapParCalculator {
                 disc.as_ref(),
                 fwd.as_ref(),
                 dc_fixed,
+                Some(freq),
                 &sched,
                 0.0,
             )?)
@@ -644,7 +655,7 @@ impl MetricCalculator for AssetSwapParCalculator {
         let ann = if let Some((_, _, float_ann)) = forward_components {
             float_ann
         } else {
-            par_rate_and_annuity_from_discount(disc.as_ref(), dc_fixed, &sched)?.1
+            par_rate_and_annuity_from_discount(disc.as_ref(), dc_fixed, Some(freq), &sched)?.1
         };
         if ann.abs() < 1e-12 {
             return Err(finstack_core::Error::Validation(
@@ -660,7 +671,7 @@ impl MetricCalculator for AssetSwapParCalculator {
             Ok((coupon * fixed_ann - float_pv) / float_ann)
         } else {
             let (par_rate, _) =
-                par_rate_and_annuity_from_discount(disc.as_ref(), dc_fixed, &sched)?;
+                par_rate_and_annuity_from_discount(disc.as_ref(), dc_fixed, Some(freq), &sched)?;
             Ok(coupon - par_rate)
         }
     }
@@ -874,6 +885,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                                 disc: disc.as_ref(),
                                 fwd: fwd.as_ref(),
                                 fixed_dc: dc_fixed,
+                                fixed_frequency: Some(freq),
                                 fixed_schedule: &fixed_schedule,
                                 float_dc,
                                 float_schedule: &float_schedule,
@@ -892,6 +904,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                         let (par_rate, ann) = par_rate_and_annuity_from_discount(
                             disc.as_ref(),
                             dc_fixed,
+                            Some(freq),
                             &fixed_schedule,
                         )?;
                         if ann.abs() < 1e-12 {
@@ -934,6 +947,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                 disc.as_ref(),
                 fwd.as_ref(),
                 dc_fixed,
+                Some(freq),
                 &sched,
                 0.0,
             )?)
@@ -947,7 +961,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                 (float_pv / fixed_ann, float_ann)
             }
         } else {
-            par_rate_and_annuity_from_discount(disc.as_ref(), dc_fixed, &sched)?
+            par_rate_and_annuity_from_discount(disc.as_ref(), dc_fixed, Some(freq), &sched)?
         };
         if ann.abs() < 1e-12 {
             return Err(finstack_core::Error::Validation(

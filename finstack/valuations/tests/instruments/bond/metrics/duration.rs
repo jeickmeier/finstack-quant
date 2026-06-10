@@ -44,6 +44,56 @@ fn test_duration_zero_coupon() {
 }
 
 #[test]
+fn test_yield_duration_convexity_act_act_isma() {
+    // ACT/ACT (ICMA) bonds (UK gilts, TIPS convention) must support the full
+    // yield/duration/convexity path. Regression: these calculators used a
+    // default DayCountContext and errored with MissingFrequencyForActActIsma.
+    use finstack_core::dates::DayCount;
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_valuations::instruments::fixed_income::bond::CashflowSpec;
+
+    let as_of = date!(2025 - 01 - 15);
+    let maturity = date!(2030 - 01 - 15);
+    let mut bond = Bond::fixed(
+        "DUR-ISMA",
+        Money::new(100.0, Currency::GBP),
+        0.04,
+        as_of,
+        maturity,
+        "GBP-OIS",
+    )
+    .unwrap();
+    if let CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec {
+        spec.dc = DayCount::ActActIsma;
+    }
+    bond.pricing_overrides =
+        finstack_valuations::instruments::PricingOverrides::default().with_quoted_clean_price(98.0);
+
+    let curve = DiscountCurve::builder("GBP-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, (-(0.045_f64 * 10.0_f64)).exp())])
+        .build()
+        .unwrap();
+    let market = finstack_core::market_data::context::MarketContext::new().insert(curve);
+
+    let res = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Ytm, MetricId::DurationMac, MetricId::Convexity],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("ActActIsma yield/duration/convexity metrics must succeed");
+
+    let ytm = *res.measures.get("ytm").unwrap();
+    let d_mac = *res.measures.get("duration_mac").unwrap();
+    let convexity = *res.measures.get("convexity").unwrap();
+    assert!(ytm > 0.0 && ytm < 0.15, "unreasonable YTM {ytm}");
+    assert!(d_mac > 1.0 && d_mac < 5.5, "unreasonable duration {d_mac}");
+    assert!(convexity > 0.0, "convexity should be positive: {convexity}");
+}
+
+#[test]
 fn test_modified_duration_matches_macaulay_over_yield() {
     // For a simple fixed bond, Duration_mod ≈ Duration_mac / (1 + y/m)
     use finstack_core::dates::DayCount;

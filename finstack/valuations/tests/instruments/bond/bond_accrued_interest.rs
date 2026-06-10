@@ -157,7 +157,9 @@ fn test_accrued_interest_compounded_zero_coupon() {
 
 #[test]
 fn test_accrued_interest_ex_coupon_period() {
-    // Test that ex-coupon dates result in zero accrual
+    // Market standard (e.g. UK gilts): within the ex-coupon window the seller
+    // keeps the coupon and accrued interest is NEGATIVE — the buyer is
+    // compensated for the remaining stub from settlement to the coupon date.
     let mut bond = Bond::fixed(
         "EX_COUPON",
         Money::new(100.0, Currency::USD),
@@ -183,7 +185,52 @@ fn test_accrued_interest_ex_coupon_period() {
         .unwrap();
     let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config()).unwrap();
 
-    assert_eq!(accrued, 0.0, "Should be zero during ex-coupon period");
+    assert!(
+        accrued < 0.0,
+        "Accrued should be negative during ex-coupon period, got {accrued}"
+    );
+    // Semi-annual coupon = 2.50 per 100; remaining stub is 5 days out of the
+    // ~181-day period: accrued ≈ -2.50 × 5/181.
+    let period_days = (coupon_date - make_date(2025, 1, 1)).whole_days() as f64;
+    let expected = -2.5 * 5.0 / period_days;
+    assert!(
+        (accrued - expected).abs() < 0.02,
+        "Expected ~{expected}, got {accrued}"
+    );
+}
+
+#[test]
+fn test_accrued_interest_just_before_ex_coupon_window_positive() {
+    // One day before the ex-date the bond still trades cum-coupon with nearly
+    // a full period of positive accrued interest.
+    let mut bond = Bond::fixed(
+        "CUM_COUPON",
+        Money::new(100.0, Currency::USD),
+        0.05,
+        make_date(2025, 1, 1),
+        make_date(2030, 1, 1),
+        "USD-OIS",
+    )
+    .unwrap();
+    bond.settlement_convention = Some(
+        finstack_valuations::instruments::fixed_income::bond::BondSettlementConvention {
+            ex_coupon_days: 7,
+            ..Default::default()
+        },
+    );
+
+    let coupon_date = make_date(2025, 7, 1);
+    let as_of = coupon_date - time::Duration::days(8); // one day before ex-date
+
+    let schedule = bond
+        .cashflow_schedule(&MarketContext::new(), as_of)
+        .unwrap();
+    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config()).unwrap();
+
+    assert!(
+        accrued > 2.0,
+        "Cum-coupon accrued should be close to the full coupon, got {accrued}"
+    );
 }
 
 #[test]

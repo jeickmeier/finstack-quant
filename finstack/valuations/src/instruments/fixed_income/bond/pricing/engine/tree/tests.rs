@@ -139,7 +139,11 @@ fn test_bond_valuator_with_calls() {
 }
 
 #[test]
-fn test_bond_valuator_maps_call_period_to_listed_endpoint_steps() {
+fn test_bond_valuator_maps_call_window_to_interior_coupon_steps() {
+    // A call window is exercisable throughout [start, end]: the tree must book
+    // exercise opportunities at the endpoints AND every coupon date inside the
+    // window (matching the YTW enumeration). The semi-annual test bond has a
+    // coupon at 2027-07-01 strictly inside the 2027-01-01..2028-01-01 window.
     let bond = create_test_bond();
     let mut json = serde_json::to_value(&bond).expect("Bond serialization should succeed");
     json.as_object_mut()
@@ -164,8 +168,49 @@ fn test_bond_valuator_maps_call_period_to_listed_endpoint_steps() {
 
     let call_steps = valuator.call_vec.iter().filter(|c| c.is_some()).count();
     assert_eq!(
-        call_steps, 2,
-        "call period should map only listed start/end exercise dates, not interior coupon dates"
+        call_steps, 3,
+        "call window should exercise at endpoints plus the interior coupon date"
+    );
+}
+
+#[test]
+fn test_windowed_call_lowers_pv_vs_endpoint_only_exercise() {
+    // More exercise opportunities can only increase the issuer option value,
+    // so the windowed callable PV must be <= the single-endpoint callable PV.
+    let market_context = create_test_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let pricer = TreePricer::new();
+
+    let mut single = create_test_bond();
+    let mut call_put = CallPutSchedule::default();
+    call_put.calls.push(CallPut {
+        start_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+        end_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+        price_pct_of_par: 100.0,
+        make_whole: None,
+    });
+    single.call_put = Some(call_put);
+
+    let mut windowed = create_test_bond();
+    let mut call_put = CallPutSchedule::default();
+    call_put.calls.push(CallPut {
+        start_date: Date::from_calendar_date(2027, Month::January, 1).expect("date"),
+        end_date: Date::from_calendar_date(2029, Month::January, 1).expect("date"),
+        price_pct_of_par: 100.0,
+        make_whole: None,
+    });
+    windowed.call_put = Some(call_put);
+
+    let pv_single = pricer
+        .price_at_oas(&single, &market_context, as_of, 0.0)
+        .expect("single-date callable PV");
+    let pv_windowed = pricer
+        .price_at_oas(&windowed, &market_context, as_of, 0.0)
+        .expect("windowed callable PV");
+
+    assert!(
+        pv_windowed <= pv_single + 1e-9,
+        "windowed callable must not be worth more than endpoint-only: windowed={pv_windowed}, single={pv_single}"
     );
 }
 

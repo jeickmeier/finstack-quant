@@ -238,6 +238,7 @@ impl CmoWaterfall {
     schemars::JsonSchema,
 )]
 #[serde(deny_unknown_fields)]
+#[builder(validate = AgencyCmo::validate_interest_coverage)]
 pub struct AgencyCmo {
     /// Unique instrument identifier.
     pub id: InstrumentId,
@@ -281,11 +282,13 @@ impl AgencyCmo {
     /// Create a canonical example CMO for testing.
     pub fn example() -> finstack_core::Result<Self> {
         use time::macros::date;
-        // Create sequential structure: A (front), B (middle), Z (last)
+        // Create sequential structure: A (front), B (middle), Z (last).
+        // Coupons average 3.95% on a 4.5% WAC pool (4.0% pass-through after
+        // 50bp fees), so the structure is interest-covered.
         let tranches = vec![
-            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.04, 1),
-            CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.045, 2),
-            CmoTranche::sequential("Z", Money::new(30_000_000.0, Currency::USD), 0.05, 3),
+            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.035, 1),
+            CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.04, 2),
+            CmoTranche::sequential("Z", Money::new(30_000_000.0, Currency::USD), 0.045, 3),
         ];
 
         Self::builder()
@@ -314,11 +317,11 @@ impl AgencyCmo {
             CmoTranche::pac(
                 "PAC",
                 Money::new(50_000_000.0, Currency::USD),
-                0.04,
+                0.0375,
                 1,
                 PacCollar::standard(),
             ),
-            CmoTranche::support("SUP", Money::new(50_000_000.0, Currency::USD), 0.05, 2),
+            CmoTranche::support("SUP", Money::new(50_000_000.0, Currency::USD), 0.04, 2),
         ];
 
         Self::builder()
@@ -337,8 +340,9 @@ impl AgencyCmo {
     /// Create an example IO/PO strip structure.
     pub fn example_io_po() -> finstack_core::Result<Self> {
         use time::macros::date;
+        // IO strips the full 3.5% pass-through (4.0% WAC less 50bp fees).
         let tranches = vec![
-            CmoTranche::io_strip("IO", Money::new(100_000_000.0, Currency::USD), 0.04),
+            CmoTranche::io_strip("IO", Money::new(100_000_000.0, Currency::USD), 0.035),
             CmoTranche::po_strip("PO", Money::new(100_000_000.0, Currency::USD)),
         ];
 
@@ -358,6 +362,54 @@ impl AgencyCmo {
     /// Get the reference tranche being valued.
     pub fn reference_tranche(&self) -> Option<&CmoTranche> {
         self.waterfall.get_tranche(&self.reference_tranche_id)
+    }
+
+    /// Validate that the deal's tranche coupon demand does not exceed the
+    /// collateral interest supply at issue (interest conservation).
+    ///
+    /// A structure whose tranches demand more coupon than the collateral
+    /// pass-through delivers is interest-deficient: every period some tranche
+    /// records an interest shortfall. Such deals are rejected at build time.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when annual tranche coupon demand exceeds
+    /// `pass_through_rate × collateral face`.
+    fn validate_interest_coverage(cmo: &AgencyCmo) -> finstack_core::Result<()> {
+        let (pass_through, collateral_face) = match &cmo.collateral {
+            Some(pool) => (pool.pass_through_rate, pool.current_face.amount()),
+            None => {
+                // Mirror the assumed-collateral construction in the pricer.
+                let defaults = crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry()?
+                    .cmo_collateral_defaults();
+                let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
+                let pass_through = wac - defaults.servicing_fee_rate - defaults.guarantee_fee_rate;
+                (pass_through, cmo.waterfall.total_current_face().amount())
+            }
+        };
+
+        let annual_supply = pass_through * collateral_face;
+        let annual_demand: f64 = cmo
+            .waterfall
+            .tranches
+            .iter()
+            .filter(|t| t.is_interest_bearing())
+            .map(|t| t.current_face.amount() * t.coupon)
+            .sum();
+
+        // Relative tolerance so a fully-stripped IO (demand == supply) passes.
+        if annual_demand > annual_supply * (1.0 + 1e-9) + 1e-6 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Interest-deficient CMO {}: annual tranche coupon demand {:.2} exceeds \
+                 collateral interest supply {:.2} (pass-through {:.4} on face {:.2})",
+                cmo.id.as_str(),
+                annual_demand,
+                annual_supply,
+                pass_through,
+                collateral_face
+            )));
+        }
+        Ok(())
     }
 }
 
@@ -481,5 +533,36 @@ mod tests {
         let ref_tranche = cmo.reference_tranche().expect("ref exists");
 
         assert_eq!(ref_tranche.id, "A");
+    }
+
+    /// Finding 17: deals whose tranche coupon demand exceeds the collateral
+    /// pass-through interest are interest-deficient and rejected at build.
+    /// (This was the pre-fix `example()`: Z at 5% on a 4% pass-through pool.)
+    #[test]
+    fn interest_deficient_deal_rejected_at_build() {
+        use time::macros::date;
+        let tranches = vec![
+            CmoTranche::sequential("A", Money::new(40_000_000.0, Currency::USD), 0.04, 1),
+            CmoTranche::sequential("B", Money::new(30_000_000.0, Currency::USD), 0.045, 2),
+            CmoTranche::sequential("Z", Money::new(30_000_000.0, Currency::USD), 0.05, 3),
+        ];
+
+        let result = AgencyCmo::builder()
+            .id(InstrumentId::new("FNR-DEFICIENT"))
+            .deal_name("FNR DEFICIENT".into())
+            .agency(AgencyProgram::Fnma)
+            .issue_date(date!(2024 - 01 - 01))
+            .waterfall(CmoWaterfall::new(tranches))
+            .reference_tranche_id("A".to_string())
+            .collateral_wac(0.045) // pass-through 4.0% < 4.45% demand
+            .collateral_wam(360)
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build();
+
+        let err = result.expect_err("interest-deficient deal must be rejected");
+        assert!(
+            err.to_string().contains("Interest-deficient"),
+            "unexpected error: {err}"
+        );
     }
 }

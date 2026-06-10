@@ -119,7 +119,10 @@ impl MetricCalculator for ConvexityCalculator {
                 .year_fraction(
                     quote_date,
                     date,
-                    finstack_core::dates::DayCountContext::default(),
+                    finstack_core::dates::DayCountContext {
+                        frequency: Some(bond.cashflow_spec.frequency()),
+                        ..Default::default()
+                    },
                 )?
                 .max(0.0);
             let df_second = df_second_derivative(yield_rate, t, comp, freq)?;

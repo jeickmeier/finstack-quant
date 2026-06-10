@@ -74,9 +74,40 @@ pub(super) fn settlement_discount_factor(
         .df_between_dates(as_of, settle)
 }
 
+/// Dirty purchase price implied by a clean price quote (% of outstanding).
+///
+/// Loan market convention (LSTA/LMA): a quoted price applies to the
+/// **funded outstanding balance at settlement**, not the original commitment,
+/// and the buyer additionally pays accrued cash interest:
+///
+/// `dirty = px/100 × outstanding(settlement) + accrued(settlement)`
+///
+/// For amortized or partially-drawn loans, quoting against `notional_limit`
+/// would overstate the purchase price by the repaid/undrawn fraction.
+pub(crate) fn quoted_dirty_from_clean_px(
+    loan: &TermLoan,
+    schedule: &CashFlowSchedule,
+    as_of: Date,
+    px: f64,
+) -> finstack_core::Result<Money> {
+    let settlement = loan.settlement_date(as_of)?;
+    let out_path = schedule.outstanding_by_date()?;
+    let outstanding = outstanding_before(&out_path, settlement, loan.currency);
+    let accrued = crate::cashflow::accrual::accrued_interest_amount(
+        schedule,
+        settlement,
+        &loan.accrual_config(),
+    )?;
+    Ok(Money::new(
+        px / 100.0 * outstanding.amount() + accrued,
+        loan.currency,
+    ))
+}
+
 /// Resolve the target purchase price for quote-derived term-loan yield metrics.
 ///
-/// Uses the quoted clean price when present (already a settlement-date price);
+/// Uses the quoted clean price when present (already a settlement-date price),
+/// converted to a dirty settlement amount via [`quoted_dirty_from_clean_px`];
 /// otherwise forward-values the `as_of` model PV (`context.base_value`) to the
 /// settlement date via `settle_df = DF(as_of → settlement)`. Anchoring the model
 /// PV at `as_of` while dating the IRR price leg at settlement would otherwise
@@ -84,13 +115,18 @@ pub(super) fn settlement_discount_factor(
 /// yield path forward-values for exactly this reason).
 pub(super) fn target_price_from_quote_or_model(
     loan: &TermLoan,
+    schedule: &CashFlowSchedule,
+    as_of: Date,
     base_value: Money,
     settle_df: f64,
-) -> Money {
+) -> finstack_core::Result<Money> {
     if let Some(px) = loan.pricing_overrides.market_quotes.quoted_clean_price {
-        Money::new(px * loan.notional_limit.amount() / 100.0, loan.currency)
+        quoted_dirty_from_clean_px(loan, schedule, as_of, px)
     } else {
-        Money::new(base_value.amount() / settle_df, base_value.currency())
+        Ok(Money::new(
+            base_value.amount() / settle_df,
+            base_value.currency(),
+        ))
     }
 }
 

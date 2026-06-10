@@ -358,6 +358,42 @@ impl InflationIndex {
         Ok(adjusted_value)
     }
 
+    /// Reference CPI for a date under the official months-lag daily
+    /// interpolation rule (US TIPS, Canadian RRB, French OAT€i):
+    ///
+    /// ```text
+    /// RefCPI(d) = CPI(m−L) + (day(d) − 1) / D(m) × [CPI(m−L+1) − CPI(m−L)]
+    /// ```
+    ///
+    /// where `m` is the calendar month of `d`, `L = lag_months`, `D(m)` is the
+    /// number of days in month `m`, and `CPI(·)` are the first-of-month index
+    /// observations. Note the divisor is the length of the **settlement
+    /// month**, not the distance between the lagged anchor observations; a
+    /// generic calendar-time interpolation at `d − L months` gets both the
+    /// weight and the day-clamping behaviour wrong at month ends.
+    ///
+    /// The index's own `lag` is **not** applied here — callers (e.g.
+    /// inflation-linked bonds) own the lag and must use an index with
+    /// `lag == None`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the anchor observations are unavailable or the
+    /// anchor dates cannot be constructed.
+    pub fn ref_cpi_months_lag(&self, date: Date, lag_months: u32) -> Result<f64> {
+        let first_of_month = Date::from_calendar_date(date.year(), date.month(), 1)
+            .map_err(|_| Error::Input(crate::error::InputError::InvalidDateRange))?;
+        let anchor0 = first_of_month.add_months(-(lag_months as i32));
+        let anchor1 = anchor0.add_months(1);
+
+        let cpi0 = self.apply_seasonality(self.series_interp.value_on(anchor0)?, anchor0)?;
+        let cpi1 = self.apply_seasonality(self.series_interp.value_on(anchor1)?, anchor1)?;
+
+        let days_in_month = f64::from(date.month().length(date.year()));
+        let weight = (f64::from(date.day()) - 1.0) / days_in_month;
+        Ok(cpi0 + weight * (cpi1 - cpi0))
+    }
+
     /// Calculate the index ratio `I(settle_date) / I(base_date)`.
     pub fn ratio(&self, base_date: Date, settle_date: Date) -> Result<f64> {
         let base_value = self.value_on(base_date)?;

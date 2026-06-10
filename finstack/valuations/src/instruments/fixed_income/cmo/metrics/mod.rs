@@ -1,19 +1,21 @@
 //! Agency CMO risk metrics.
 //!
-//! CMO-specific metrics including tranche-level OAS, duration,
-//! and scenario analysis.
+//! CMO-specific metrics including tranche-level static Z-spread, duration,
+//! and scenario analysis. A true Monte Carlo OAS (stochastic rates +
+//! rate-dependent prepayment, as in `mbs_passthrough::metrics::mc_oas`) is
+//! deferred; the spread metric exposed here is an honest static Z-spread.
 
-pub(crate) mod oas;
+pub(crate) mod zspread;
 
-pub(crate) use oas::calculate_tranche_oas;
+pub(crate) use zspread::calculate_tranche_zspread;
 
 use crate::instruments::fixed_income::cmo::AgencyCmo;
 use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 
-/// Calculator for tranche option-adjusted spread (OAS).
-pub(crate) struct OasCalculator;
+/// Calculator for the tranche static Z-spread.
+pub(crate) struct ZSpreadCalculator;
 
-impl MetricCalculator for OasCalculator {
+impl MetricCalculator for ZSpreadCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let cmo: &AgencyCmo = context.instrument_as()?;
         let market_price = cmo
@@ -25,9 +27,10 @@ impl MetricCalculator for OasCalculator {
                     id: "cmo.pricing_overrides.quoted_clean_price".to_string(),
                 })
             })?;
+        // Non-convergence propagates as an error (no silent zero spread).
         let result =
-            calculate_tranche_oas(cmo, market_price, context.curves.as_ref(), context.as_of)?;
-        Ok(result.oas)
+            calculate_tranche_zspread(cmo, market_price, context.curves.as_ref(), context.as_of)?;
+        Ok(result.zspread)
     }
 }
 
@@ -38,7 +41,7 @@ pub(crate) fn register_cmo_metrics(registry: &mut MetricRegistry) {
         registry: registry,
         instrument: InstrumentType::AgencyCmo,
         metrics: [
-            (Oas, OasCalculator),
+            (ZSpread, ZSpreadCalculator),
             (Dv01, crate::metrics::UnifiedDv01Calculator::<
                 crate::instruments::AgencyCmo,
             >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),

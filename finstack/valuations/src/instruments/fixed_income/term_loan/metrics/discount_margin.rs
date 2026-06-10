@@ -101,13 +101,18 @@ impl MetricCalculator for DiscountMarginCalculator {
             ));
         }
 
-        // Target price: quoted_clean_price% of par if set, else base PV
-        let target = if let Some(px) = loan.pricing_overrides.market_quotes.quoted_clean_price {
-            // Interpreting as % of notional_limit
-            px * loan.notional_limit.amount() / 100.0
+        // Target price: quoted clean price converted to a dirty settlement
+        // amount (% of outstanding at settlement + accrued) if set, else base PV
+        let quoted_px = loan.pricing_overrides.market_quotes.quoted_clean_price;
+        let target = if let Some(px) = quoted_px {
+            let as_of = context.as_of;
+            let schedule = super::irr_helpers::cached_full_schedule(context)?;
+            let loan: &TermLoan = context.instrument_as()?;
+            super::irr_helpers::quoted_dirty_from_clean_px(loan, &schedule, as_of, px)?.amount()
         } else {
             context.base_value.amount()
         };
+        let loan: &TermLoan = context.instrument_as()?;
 
         // Objective function: PV(dm) - target_price
         // Return NAN on pricing errors so the solver does not converge to a

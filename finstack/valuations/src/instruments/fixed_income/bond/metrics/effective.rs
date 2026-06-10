@@ -318,8 +318,12 @@ mod tests {
             result.duration,
             expected_duration
         );
+        // The calculator's base price is the quote-implied price, while the
+        // reconstruction reprices through the solved OAS; they agree only up
+        // to the OAS-solver residual, which the convexity finite difference
+        // amplifies by 1/shock² (~1.6e5). Tolerance sized accordingly.
         assert!(
-            (result.convexity - expected_convexity).abs() < 1e-9,
+            (result.convexity - expected_convexity).abs() < 1e-6,
             "effective convexity must use the as_of-anchored base price: \
              got {}, expected {}",
             result.convexity,

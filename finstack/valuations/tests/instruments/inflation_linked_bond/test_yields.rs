@@ -40,6 +40,25 @@ fn test_real_yield_at_par() {
 }
 
 #[test]
+fn test_real_yield_act_act_isma_example() {
+    // The canonical TIPS example defaults to ACT/ACT (ICMA); `real_yield` must
+    // not error with MissingFrequencyForActActIsma (regression: YTM path used
+    // a default DayCountContext without the coupon frequency).
+    use finstack_core::dates::DayCount;
+    use finstack_valuations::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
+
+    let ilb = InflationLinkedBond::example();
+    assert_eq!(ilb.day_count, DayCount::ActActIsma);
+
+    let (ctx, _) = market_context_with_index();
+    let as_of = ilb.issue_date;
+    let y = ilb
+        .real_yield(100.0, &ctx, as_of)
+        .expect("real_yield must succeed for ActActIsma TIPS");
+    assert!(y > -0.05 && y < 0.15, "unreasonable real yield {y}");
+}
+
+#[test]
 fn test_real_yield_premium_bond() {
     // Arrange
     let mut ilb = sample_tips();

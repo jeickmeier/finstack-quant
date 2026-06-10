@@ -1895,7 +1895,7 @@
               "type": "number"
             },
             "wam": {
-              "description": "Weighted average maturity in months.",
+              "description": "Remaining weighted average maturity in months as of the valuation\ndate (current WAM, not the original term). Pool age (WALA) for\nseasoning ramps is derived separately from `issue_date`.",
               "format": "uint32",
               "minimum": 0,
               "type": "integer"

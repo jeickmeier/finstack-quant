@@ -312,6 +312,48 @@ fn test_structured_credit_full_metric_suite() {
 }
 
 #[test]
+fn test_prepayment01_default01_nonzero_for_curve_specs() {
+    // Regression: PSA/SDA curve specs ignore the flat `cpr`/`cdr` fields, so
+    // bumping those fields produced identically-zero Prepayment01/Default01.
+    // The calculators now bump `speed_multiplier` for curve-shaped specs.
+    use finstack_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
+
+    let mut sc = StructuredCredit::new_abs(
+        "TEST_ABS_CURVE_BUMPS",
+        create_simple_pool(),
+        create_simple_tranches(),
+        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
+        maturity_date(),
+        "USD-OIS",
+    )
+    .with_payment_calendar("nyse");
+    sc.credit_model.prepayment_spec = PrepaymentModelSpec::psa(1.5);
+    sc.credit_model.default_spec = DefaultModelSpec::sda(1.0);
+
+    let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
+
+    let result = sc
+        .price_with_metrics(
+            &market,
+            test_date(),
+            &[MetricId::Prepayment01, MetricId::Default01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("curve-spec sensitivity metrics should compute");
+
+    let prepayment01 = *result.measures.get("prepayment01").unwrap();
+    let default01 = *result.measures.get("default01").unwrap();
+    assert!(
+        prepayment01.is_finite() && prepayment01.abs() > 1e-6,
+        "Prepayment01 must be non-zero for PSA spec, got {prepayment01}"
+    );
+    assert!(
+        default01.is_finite() && default01.abs() > 1e-6,
+        "Default01 must be non-zero for SDA spec, got {default01}"
+    );
+}
+
+#[test]
 fn test_structured_credit_registry_exposes_clo_warf() {
     let sc = StructuredCredit::new_clo(
         "TEST_CLO_WARF",

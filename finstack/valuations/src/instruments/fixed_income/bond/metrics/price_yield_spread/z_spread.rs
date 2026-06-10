@@ -176,7 +176,14 @@ impl ZSpreadCalculator {
         }
         let dc = bond.cashflow_spec.day_count();
         let years = dc
-            .year_fraction(as_of, bond.maturity, DayCountContext::default())?
+            .year_fraction(
+                as_of,
+                bond.maturity,
+                DayCountContext {
+                    frequency: Some(bond.cashflow_spec.frequency()),
+                    ..Default::default()
+                },
+            )?
             .max(0.0);
 
         // Scale between 1x and 2x base over 0–30y, then clamp.

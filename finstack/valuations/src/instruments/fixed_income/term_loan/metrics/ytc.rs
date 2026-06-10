@@ -49,11 +49,14 @@ impl MetricCalculator for YtcCalculator {
 
         // Resolve scalar fields off `loan` before re-borrowing context for the cache.
         let settle_df = settlement_discount_factor(loan, &context.curves, as_of)?;
-        let target_price = target_price_from_quote_or_model(loan, context.base_value, settle_df);
         let currency = loan.currency;
 
         // Use the cached internal schedule (rebuilt only if absent).
         let schedule = cached_full_schedule(context)?;
+        let target_price = {
+            let loan: &TermLoan = context.instrument_as()?;
+            target_price_from_quote_or_model(loan, &schedule, as_of, context.base_value, settle_df)?
+        };
 
         // Use pre-exercise outstanding (< call.date) for redemption calculation.
         // outstanding_by_date returns balances AFTER each date, so < gives the

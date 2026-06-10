@@ -300,7 +300,7 @@ fn test_bond_floating_value() {
 }
 
 #[test]
-fn test_bond_frn_ex_coupon_accrual_zero_in_window() {
+fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
     use crate::cashflow::primitives::CFKind;
     use time::Duration;
 
@@ -372,7 +372,9 @@ fn test_bond_frn_ex_coupon_accrual_zero_in_window() {
         "Accrued interest should be positive before ex-date"
     );
 
-    // On or inside the ex-coupon window, accrued interest should be zero
+    // On or inside the ex-coupon window, accrued interest is negative: the
+    // buyer forgoes the upcoming coupon but compensates the seller for the
+    // stub from settlement to period end.
     let schedule_ex = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
@@ -383,14 +385,14 @@ fn test_bond_frn_ex_coupon_accrual_zero_in_window() {
     )
     .expect("Accrued interest calculation should succeed on ex-date");
     assert!(
-        ai_ex == 0.0,
-        "Accrued interest in ex-coupon window should be zero, got {}",
+        ai_ex < 0.0,
+        "Accrued interest in ex-coupon window should be negative, got {}",
         ai_ex
     );
 }
 
 #[test]
-fn test_amortizing_bond_ex_coupon_accrual_zero_in_window() {
+fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
     use crate::cashflow::builder::AmortizationSpec;
     use crate::cashflow::primitives::CFKind;
     use time::Duration;
@@ -473,7 +475,9 @@ fn test_amortizing_bond_ex_coupon_accrual_zero_in_window() {
         "Accrued interest should be positive before ex-date for amortizing bond"
     );
 
-    // On or inside the ex-coupon window, accrued interest should be zero
+    // On or inside the ex-coupon window, accrued interest is negative: the
+    // buyer forgoes the upcoming coupon but compensates the seller for the
+    // stub from settlement to period end.
     let schedule_ex = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
@@ -484,8 +488,8 @@ fn test_amortizing_bond_ex_coupon_accrual_zero_in_window() {
     )
     .expect("Accrued interest calculation should succeed on ex-date");
     assert!(
-        ai_ex == 0.0,
-        "Accrued interest in ex-coupon window should be zero for amortizing bond, got {}",
+        ai_ex < 0.0,
+        "Accrued interest in ex-coupon window should be negative for amortizing bond, got {}",
         ai_ex
     );
 }

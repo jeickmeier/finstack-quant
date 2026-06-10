@@ -79,17 +79,24 @@ impl BondValuator {
         end_date: Date,
         as_of: Date,
         maturity: Date,
-        _cashflow_dates: &[Date],
+        cashflow_dates: &[Date],
     ) -> Vec<Date> {
-        // Treat a call/put period as a quoted schedule interval: the start and
-        // end dates are exercise dates, but interior coupon dates are not
-        // invented as additional exercise opportunities unless listed.
-        let mut dates = Vec::new();
-        for date in [start_date, end_date] {
-            if date > as_of && date <= maturity {
-                dates.push(date);
-            }
-        }
+        // A call/put period is an exercise *window*: the option is exercisable
+        // throughout `[start_date, end_date]`. Exercise at the window endpoints
+        // plus every cashflow (coupon) date inside the window, matching the
+        // YTW enumeration in `quote_conversions::solve_ytw_from_flows`.
+        // Endpoint-only exercise materially undervalues the issuer option for
+        // multi-coupon windows.
+        let mut dates: Vec<Date> = [start_date, end_date]
+            .into_iter()
+            .chain(
+                cashflow_dates
+                    .iter()
+                    .copied()
+                    .filter(|d| *d >= start_date && *d <= end_date),
+            )
+            .filter(|date| *date > as_of && *date <= maturity)
+            .collect();
         dates.sort_unstable();
         dates.dedup();
         dates

@@ -22,10 +22,9 @@ pub(crate) struct YtwCalculator;
 impl MetricCalculator for YtwCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         // Snapshot scalar fields off the loan before borrowing the cached schedule.
-        let (currency, maturity, dirty_now, candidate_calls) = {
+        let (currency, maturity, settle_df, candidate_calls) = {
             let loan: &TermLoan = context.instrument_as()?;
             let settle_df = settlement_discount_factor(loan, &context.curves, context.as_of)?;
-            let dirty_now = target_price_from_quote_or_model(loan, context.base_value, settle_df);
             let calls: Vec<_> = if let Some(cs) = &loan.call_schedule {
                 cs.calls
                     .iter()
@@ -42,12 +41,16 @@ impl MetricCalculator for YtwCalculator {
             } else {
                 Vec::new()
             };
-            (loan.currency, loan.maturity, dirty_now, calls)
+            (loan.currency, loan.maturity, settle_df, calls)
         };
         let as_of = context.as_of;
 
         // Use the cached internal schedule (reused across all candidates).
         let schedule = cached_full_schedule(context)?;
+        let dirty_now = {
+            let loan: &TermLoan = context.instrument_as()?;
+            target_price_from_quote_or_model(loan, &schedule, as_of, context.base_value, settle_df)?
+        };
         let out_path = schedule.outstanding_by_date()?;
 
         // Candidate exercises: each exercisable call and final maturity.

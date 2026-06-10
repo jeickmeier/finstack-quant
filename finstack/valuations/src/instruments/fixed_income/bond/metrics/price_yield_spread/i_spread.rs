@@ -176,6 +176,7 @@ impl MetricCalculator for ISpreadCalculator {
             crate::instruments::fixed_income::bond::pricing::quote_conversions::par_rate_and_annuity_from_discount(
                 disc.as_ref(),
                 fixed_leg_day_count,
+                Some(fixed_leg_frequency),
                 &dates,
             )?;
         if annuity.abs() < 1e-12 {

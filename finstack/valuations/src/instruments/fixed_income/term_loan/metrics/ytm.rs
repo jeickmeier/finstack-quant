@@ -9,7 +9,9 @@ use crate::instruments::TermLoan;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_core::money::Money;
 
-use super::irr_helpers::{settlement_discount_factor, target_price_from_quote_or_model};
+use super::irr_helpers::{
+    cached_full_schedule, settlement_discount_factor, target_price_from_quote_or_model,
+};
 
 /// Yield-to-maturity calculator for term loans.
 ///
@@ -19,8 +21,12 @@ pub(crate) struct YtmCalculator;
 
 impl MetricCalculator for YtmCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
-        let loan: &TermLoan = context.instrument_as()?;
         let as_of = context.as_of;
+
+        // Populate the cached full schedule first (mutable context borrow),
+        // then borrow the loan for the remaining read-only work.
+        let schedule = cached_full_schedule(context)?;
+        let loan: &TermLoan = context.instrument_as()?;
 
         // Compute settlement date using loan calendar/business-day conventions.
         let settlement_date = loan.settlement_date(as_of)?;
@@ -36,7 +42,13 @@ impl MetricCalculator for YtmCalculator {
         // The model PV is forward-valued to settlement so the price leg and the
         // discounted future flows share one origin.
         let settle_df = settlement_discount_factor(loan, &context.curves, as_of)?;
-        let target_price = target_price_from_quote_or_model(loan, context.base_value, settle_df);
+        let target_price = target_price_from_quote_or_model(
+            loan,
+            &schedule,
+            as_of,
+            context.base_value,
+            settle_df,
+        )?;
         flows.push((
             settlement_date,
             Money::new(-target_price.amount(), target_price.currency()),

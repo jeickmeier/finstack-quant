@@ -119,6 +119,8 @@ pub fn generate_cashflows(
 
         projected_count += 1;
 
+        // PSA/CDR seasoning ramps key off pool age (WALA), measured from the
+        // issue date.
         let seasoning = mbs.seasoning_months(period_end);
         let raw_smm = mbs.prepayment_model.smm(seasoning)?;
         if !raw_smm.is_finite() || !(0.0..=1.0).contains(&raw_smm) {
@@ -128,7 +130,11 @@ pub fn generate_cashflows(
         }
         let smm = raw_smm;
 
-        let remaining_months = mbs.wam.saturating_sub(seasoning);
+        // `wam` is the *remaining* WAM at the valuation date, so the level-pay
+        // amortization horizon shrinks by one per projected period — not by
+        // the pool's seasoning, which would double-count the age already
+        // netted out of a remaining WAM (matching the MC-OAS pricer).
+        let remaining_months = mbs.wam.saturating_sub(projected_count - 1);
         let remaining_months = if remaining_months == 0 {
             1
         } else {
@@ -443,6 +449,60 @@ mod tests {
             (expected_interest - flat_twelfth).abs() > 1.0,
             "Act/360 31-day month accrual should differ from flat rate/12, \
              got day-counted {expected_interest} vs flat {flat_twelfth}"
+        );
+    }
+
+    /// Finding 15 regression: `wam` is the *remaining* WAM at the valuation
+    /// date. A seasoned pool (issued 60 months before `as_of`) with a
+    /// remaining WAM of 240 must amortize over 240 projected months — not
+    /// `wam − seasoning = 180`, which double-counts the age already netted
+    /// out of a remaining WAM. This matches the MC-OAS projection horizon
+    /// (`wam − projection_step`).
+    #[test]
+    fn seasoned_pool_amortizes_over_remaining_wam_not_wam_minus_seasoning() {
+        let wam: u32 = 240;
+        let mbs = AgencyMbsPassthrough::builder()
+            .id(InstrumentId::new("SEASONED-MBS"))
+            .pool_id("SEASONED-POOL".into())
+            .agency(super::super::AgencyProgram::Fnma)
+            .pool_type(super::super::PoolType::Generic)
+            .original_face(Money::new(1_000_000.0, Currency::USD))
+            .current_face(Money::new(850_000.0, Currency::USD))
+            .current_factor(0.85)
+            .wac(0.045)
+            .pass_through_rate(0.04)
+            .servicing_fee_rate(0.0025)
+            .guarantee_fee_rate(0.0025)
+            .wam(wam)
+            // Issued 5 years (60 months) before the valuation date.
+            .issue_date(Date::from_calendar_date(2019, Month::January, 1).expect("valid"))
+            .maturity(Date::from_calendar_date(2044, Month::January, 1).expect("valid"))
+            // Zero prepayment so the payoff horizon is purely scheduled
+            // level-pay amortization.
+            .prepayment_model(PrepaymentModelSpec::constant_cpr(0.0))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Thirty360)
+            .build()
+            .expect("valid mbs");
+
+        let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
+        assert!(
+            mbs.seasoning_months(as_of) >= 59,
+            "fixture must be seasoned"
+        );
+
+        let cashflows = generate_cashflows(&mbs, as_of, Some(wam + 12)).expect("should generate");
+
+        assert_eq!(
+            cashflows.len(),
+            wam as usize,
+            "zero-prepay pool with remaining WAM {wam} must amortize over exactly {wam} months"
+        );
+        let last = cashflows.last().expect("non-empty");
+        assert!(
+            last.ending_balance.abs() < 0.01,
+            "pool must be fully paid off at the remaining WAM, residual {}",
+            last.ending_balance
         );
     }
 

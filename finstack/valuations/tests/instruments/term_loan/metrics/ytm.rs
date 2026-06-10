@@ -181,3 +181,66 @@ fn test_ytm_uses_quoted_clean_price_when_present() {
         "Lower quoted clean price should increase YTM: base={ytm_base}, quoted={ytm_quoted}"
     );
 }
+
+#[test]
+fn test_ytm_quoted_price_applies_to_outstanding_not_commitment() {
+    // Loan-market convention: a quoted price applies to the funded outstanding
+    // at settlement, not the original commitment. For a heavily amortized loan
+    // quoted at 99, pricing against the full commitment would imply paying far
+    // more than the remaining claim and drive the IRR deeply negative.
+    let as_of = date!(2027 - 01 - 02);
+    let issue = date!(2024 - 01 - 01);
+    let maturity = date!(2030 - 01 - 01);
+    let commitment = 10_000_000.0;
+
+    // Custom amortization: 30% repaid in 2026 → 70% outstanding at as_of.
+    let amort = AmortizationSpec::Custom(vec![(
+        date!(2026 - 01 - 01),
+        Money::new(0.3 * commitment, Currency::USD),
+    )]);
+
+    let mut loan = TermLoan::builder()
+        .id("TL-YTM-AMORT-QUOTE".into())
+        .currency(Currency::USD)
+        .notional_limit(Money::new(commitment, Currency::USD))
+        .issue_date(issue)
+        .maturity(maturity)
+        .rate(RateSpec::Fixed { rate_bp: 500 })
+        .frequency(Tenor::semi_annual())
+        .day_count(DayCount::Act360)
+        .bdc(BusinessDayConvention::ModifiedFollowing)
+        .calendar_id_opt(None)
+        .stub(StubKind::None)
+        .discount_curve_id(CurveId::from("USD-OIS"))
+        .amortization(amort)
+        .coupon_type(CouponType::Cash)
+        .upfront_fee_opt(None)
+        .ddtl_opt(None)
+        .covenants_opt(None)
+        .pricing_overrides(Default::default())
+        .attributes(Default::default())
+        .build()
+        .unwrap();
+    loan.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(99.0);
+
+    let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
+    let market = MarketContext::new().insert(disc_curve);
+
+    let result = loan
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Ytm],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+    let ytm = *result.measures.get("ytm").unwrap();
+
+    // Paying 99% of the 70% outstanding for a 5% coupon claim → yield near the
+    // coupon (within ~150bp). The old commitment-based target (0.99 × 10mm for
+    // a 7mm claim) produced a deeply negative IRR.
+    assert!(
+        (ytm - 0.05).abs() < 0.015,
+        "YTM should be near the coupon when quoted at ~par on outstanding, got {ytm}"
+    );
+}

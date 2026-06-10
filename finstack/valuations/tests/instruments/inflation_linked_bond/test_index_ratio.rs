@@ -88,6 +88,68 @@ fn test_index_ratio_with_8month_lag_uk() {
     assert_approx_eq(ratio, 326.4 / 320.0, REL_TOL, "8-month lag ratio");
 }
 
+/// Monthly US CPI-U (NSA) observations around early 2019, anchored at the
+/// first of each month, as used by the published Treasury Ref CPI tables.
+fn cpi_2019_index() -> finstack_core::market_data::scalars::InflationIndex {
+    let observations = vec![
+        (d(2019, 1, 1), 251.712), // CPI-U Jan 2019
+        (d(2019, 2, 1), 252.776), // CPI-U Feb 2019
+        (d(2019, 3, 1), 254.202), // CPI-U Mar 2019
+        (d(2019, 4, 1), 255.548), // CPI-U Apr 2019
+    ];
+    finstack_core::market_data::scalars::InflationIndex::new(
+        "US-CPI-U",
+        observations,
+        finstack_core::currency::Currency::USD,
+    )
+    .unwrap()
+    .with_interpolation(InflationInterpolation::Linear)
+}
+
+#[test]
+fn test_ref_cpi_mid_month_matches_treasury_golden() {
+    // Official TIPS formula for settlement 2019-04-15 with 3-month lag:
+    // RefCPI = CPI(Jan) + (15−1)/30 × [CPI(Feb) − CPI(Jan)]
+    //        = 251.712 + 14/30 × 1.064 = 252.20853 (Treasury-published value).
+    let index = cpi_2019_index();
+    let ref_cpi = index.ref_cpi_months_lag(d(2019, 4, 15), 3).unwrap();
+    let expected = 251.712 + 14.0 / 30.0 * (252.776 - 251.712);
+    assert_approx_eq(ref_cpi, expected, 1e-12, "mid-month RefCPI");
+    assert!(
+        (ref_cpi - 252.20853).abs() < 5e-6,
+        "Treasury golden: {ref_cpi}"
+    );
+
+    // index_ratio routes through the same formula for TIPS-style bonds.
+    let mut ilb = sample_tips();
+    ilb.lag = InflationLag::Months(3);
+    ilb.base_index = 251.712;
+    let ratio = ilb.index_ratio(d(2019, 4, 15), &index).unwrap();
+    assert_approx_eq(ratio, expected / 251.712, 1e-12, "mid-month index ratio");
+}
+
+#[test]
+fn test_ref_cpi_end_of_month_31_day_month() {
+    // Settlement 2019-05-31 (31-day month): weight = (31−1)/31 against the
+    // Feb/Mar anchors. The previous generic `add_months(-3)` lookup clamped
+    // Feb 31 → Feb 28 and interpolated on the calendar axis, producing a kink
+    // at month ends; the official formula weights by the settlement month.
+    let index = cpi_2019_index();
+    let ref_cpi = index.ref_cpi_months_lag(d(2019, 5, 31), 3).unwrap();
+    let expected = 252.776 + 30.0 / 31.0 * (254.202 - 252.776);
+    assert_approx_eq(ref_cpi, expected, 1e-12, "end-of-month RefCPI");
+
+    // One day later (June 1) the anchors roll to Mar/Apr with weight 0.
+    let ref_cpi_next = index.ref_cpi_months_lag(d(2019, 6, 1), 3).unwrap();
+    assert_approx_eq(ref_cpi_next, 254.202, 1e-12, "first-of-month RefCPI");
+    // Continuity across the month boundary: the jump must be small (one
+    // day's interpolation step), not a day-clamping artifact.
+    assert!(
+        (ref_cpi_next - ref_cpi).abs() < 0.1,
+        "RefCPI discontinuity at month end: {ref_cpi} -> {ref_cpi_next}"
+    );
+}
+
 #[test]
 fn test_index_ratio_no_deflation_protection() {
     // Arrange
@@ -202,17 +264,27 @@ fn test_index_ratio_from_curve() {
 }
 
 #[test]
-fn test_index_ratio_from_curve_at_base_date() {
-    // Arrange: query the curve at its own base date (via lag).
-    // Curve base = 2025-01-02 → query date 2025-04-02 with 3M lag = 2025-01-02 → t=0 → base_cpi
+fn test_index_ratio_from_curve_official_weighting() {
+    // The curve path follows the same official RefCPI weighting as the index
+    // path: first-of-month anchors CPI(m−3)/CPI(m−2) weighted by (day−1)/D(m).
+    // Query 2025-05-15 → anchors 2025-02-01 and 2025-03-01, weight 14/31.
     let mut ilb = sample_tips();
     ilb.base_index = 300.0;
 
     let (_, curve) = market_context_with_curve();
 
-    let ratio = ilb.index_ratio_from_curve(d(2025, 4, 2), &curve).unwrap();
+    let cpi_feb = curve.cpi_on_date(d(2025, 2, 1)).unwrap();
+    let cpi_mar = curve.cpi_on_date(d(2025, 3, 1)).unwrap();
+    let expected_ref_cpi = cpi_feb + 14.0 / 31.0 * (cpi_mar - cpi_feb);
 
-    assert_approx_eq(ratio, 300.0 / 300.0, REL_TOL, "ratio at curve base");
+    let ratio = ilb.index_ratio_from_curve(d(2025, 5, 15), &curve).unwrap();
+
+    assert_approx_eq(
+        ratio,
+        expected_ref_cpi / 300.0,
+        REL_TOL,
+        "curve RefCPI weighting",
+    );
 }
 
 #[test]

@@ -156,6 +156,12 @@ fn psa_to_smm(psa_speed: f64, month: u32) -> f64 {
 
 /// Allocate principal between PAC and support tranches.
 ///
+/// The PAC receives its scheduled amount first; supports absorb the excess
+/// up to their balance. Any leftover is returned unallocated so the waterfall
+/// can cascade it to lower-priority tranches; once *every* non-PAC tranche is
+/// exhausted, the waterfall's broken-structure sweep accelerates the PAC
+/// beyond its schedule (see `execute_waterfall_with_principal_breakdown`).
+///
 /// # Arguments
 ///
 /// * `available_principal` - Total principal available
@@ -180,30 +186,23 @@ pub fn allocate_pac_support(
         return (0.0, 0.0);
     }
 
-    let is_within_collar = actual_psa >= collar.lower_psa && actual_psa <= collar.upper_psa;
+    // In every collar regime the PAC is first paid its schedule (balance- and
+    // availability-capped). Below the lower collar the schedule itself may be
+    // unaffordable; the PAC simply receives whatever is available.
+    let pac_alloc = pac_scheduled.min(pac_balance).min(available_principal);
 
-    if is_within_collar {
-        // PAC gets scheduled, support gets excess
-        let pac_alloc = pac_scheduled.min(pac_balance).min(available_principal);
-        let support_alloc = (available_principal - pac_alloc).min(support_balance);
-        (pac_alloc, support_alloc)
-    } else if actual_psa < collar.lower_psa {
-        // Slow prepay: PAC may not get full schedule, support depletes first
-        // Support should absorb shortfall first
-        let total_needed = pac_scheduled.min(pac_balance);
-        if available_principal >= total_needed {
-            (total_needed, available_principal - total_needed)
-        } else {
-            // Not enough for PAC schedule
-            (available_principal, 0.0)
-        }
-    } else {
-        // Fast prepay (above upper collar): PAC gets scheduled first, support absorbs excess
-        let pac_alloc = pac_scheduled.min(pac_balance).min(available_principal);
-        let remaining = available_principal - pac_alloc;
-        let support_alloc = remaining.min(support_balance);
-        (pac_alloc, support_alloc)
-    }
+    // Supports absorb the excess up to their remaining balance; any leftover
+    // stays with the caller for lower-priority tranches / the broken-PAC sweep.
+    let support_alloc = (available_principal - pac_alloc)
+        .min(support_balance)
+        .max(0.0);
+
+    // Note: the allocation rule is the same in every collar regime — the
+    // PSA-speed effect is already embedded in the size of the collateral
+    // principal stream. The collar parameters are retained for API stability
+    // and diagnostic use (`is_within_collar`).
+    let _ = (actual_psa, collar);
+    (pac_alloc, support_alloc)
 }
 
 /// Check if PAC collar is "broken" (support depleted).

@@ -95,8 +95,12 @@ pub(crate) trait ZSpreadCs01 {
     /// Quoted dirty price (settlement, currency units) used to anchor the
     /// spread solve. Returns `None` to anchor the sensitivity at the model PV
     /// (`z* = 0`).
-    fn z_spread_cs01_quoted_dirty(&self) -> Option<f64> {
-        None
+    fn z_spread_cs01_quoted_dirty(
+        &self,
+        _curves: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_core::Result<Option<f64>> {
+        Ok(None)
     }
 }
 
@@ -180,13 +184,17 @@ fn solve_anchor_spread(cached: &[CachedFlow], compounds_per_year: f64, target: f
 /// present, else `0.0` (model PV).
 fn anchor_spread<I: ZSpreadCs01>(
     instrument: &I,
+    curves: &MarketContext,
+    as_of: Date,
     cached: &[CachedFlow],
     compounds_per_year: f64,
-) -> f64 {
-    match instrument.z_spread_cs01_quoted_dirty() {
-        Some(target) => solve_anchor_spread(cached, compounds_per_year, target),
-        None => 0.0,
-    }
+) -> finstack_core::Result<f64> {
+    Ok(
+        match instrument.z_spread_cs01_quoted_dirty(curves, as_of)? {
+            Some(target) => solve_anchor_spread(cached, compounds_per_year, target),
+            None => 0.0,
+        },
+    )
 }
 
 /// Assign each cached flow to a key-rate bucket by its year fraction.
@@ -278,7 +286,13 @@ where
         let cs01 = if cached.is_empty() {
             0.0
         } else {
-            let base_z = anchor_spread(instrument, &cached, inputs.compounds_per_year);
+            let base_z = anchor_spread(
+                instrument,
+                curves.as_ref(),
+                context.as_of,
+                &cached,
+                inputs.compounds_per_year,
+            )?;
             let dz = bump_bp * 1e-4;
             let pv_up = price_at_spread(&cached, base_z + dz, inputs.compounds_per_year)?;
             let pv_down = price_at_spread(&cached, base_z - dz, inputs.compounds_per_year)?;
@@ -364,7 +378,13 @@ where
             return Ok(0.0);
         }
 
-        let base_z = anchor_spread(instrument, &cached, inputs.compounds_per_year);
+        let base_z = anchor_spread(
+            instrument,
+            curves.as_ref(),
+            context.as_of,
+            &cached,
+            inputs.compounds_per_year,
+        )?;
         let dz = bump_bp * 1e-4;
         let groups = assign_buckets(&cached, &buckets);
 
