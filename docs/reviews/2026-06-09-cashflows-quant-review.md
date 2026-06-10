@@ -1,0 +1,127 @@
+# Quant Review — `finstack-cashflows` + bindings
+
+**Date:** 2026-06-09
+**Scope:** `finstack/cashflows` crate (~13.4k source lines), its core date-generation dependency, downstream valuations consumers of credit models, and the Python/WASM bindings.
+**Method:** Six parallel deep-review agents over the full crate plus bindings; Blockers, the orchestrator double-emission, the accrual basis mismatch, the serde-strictness gap, and the bucketing inconsistency were independently re-verified against source before reporting.
+
+## Verdict on the uncommitted change
+
+The pending diff in `finstack/cashflows/src/accrual.rs` (zero → **negative** accrued interest in the ex-coupon window) is **directionally correct and market-standard** — the linear path yields exactly `−C × (total−elapsed)/total`, matching the UK DMO gilt convention, and the boundary semantics (`as_of >= ex_date && as_of < end`) are right. However, it sharpens a pre-existing structural defect (Major M1 below) that can flip the new negative accrual positive, and the downstream doc in `finstack/valuations/src/instruments/fixed_income/bond/metrics/accrued.rs:12` still describes the old "drops to zero" contract.
+
+## Findings
+
+### Blockers
+
+**B1 — Iterative tenor stepping causes permanent roll-day drift through short months.**
+`finstack/core/src/dates/schedule_gen.rs:131-199` (in core, but it is the engine behind every cashflows schedule via `finstack/cashflows/src/builder/date_generation.rs:135`). Every generator advances one tenor at a time from the previous **clamped** result instead of computing `seed ± k·tenor` from the fixed seed (the QuantLib approach). `add_months` clamps day-of-month, so once a step lands in a short month the roll day collapses for all remaining anchors. Verified example: semiannual bond maturing 2027-08-30 with the default `ShortFront` stub generates Aug-30-27 → Feb-28-27 → **Aug-28-26 → Feb-28-26 → Aug-28-25** — every coupon before the last lands on the 28th instead of the 30th. Worse, `StubKind::None` with a month-end anchor (Aug-31 start, quarterly, 1y) drifts to Aug-28 and then **errors `NonIntegerScheduleTenor`** for a perfectly valid schedule. Wrong coupon dates and accrual fractions for any schedule anchored on day 29/30/31, in both stub directions. No existing test uses an anchor above day 20.
+*Fix:* generate anchor k as a single `add_months(±k·n)` from the unclamped seed; clamp per-anchor only.
+
+**B2 — `StubKind::LongFront` is not implemented; it produces a short front stub.**
+`finstack/core/src/dates/schedule_gen.rs:201-221`. `gen_long_front` collects backward anchors down to the last anchor ≥ start and prepends `start` — the same date set `gen_short_front` produces. The "merge first two periods" step never happens (contrast `gen_long_back:223-241`, which merges correctly). The core test `finstack/core/tests/dates/schedule.rs:203-225` **pins the wrong behavior** — its expected output is identical to the short-front test. Any instrument specified with a long first coupon gets a short first coupon: wrong period count, wrong first-coupon amount.
+*Fix:* drop the earliest regular anchor when a stub exists so the first period spans `start → A_{k−1}`; fix the pinned test.
+
+### Majors
+
+**M1 — Accrual engine mixes two year-fraction bases and rebuilds periods from payment dates.** `finstack/cashflows/src/accrual.rs:418-425`, `:482-485`, `:525-532` (verified). Periods are reconstructed as `[prev payment date, payment date)` from flow dates, but `total_yf` prefers the builder's `accrual_factor` computed over the **true accrual period**, while `elapsed` is a day-count fraction over the payment-date boundaries. With payment lag or BDC-shifted ends, `elapsed/total_yf` exceeds 1.0 before the payment date — accrued interest accrues past the full coupon (SOFR loans with a 2-day lag are standard, current-production instruments). Post-diff, in the ex-window `elapsed − total_yf` can flip **positive**; the guard at `:568` only catches the other direction. *Fix:* carry `accrual_start/accrual_end` onto periods, or compute `elapsed` on the same basis as `total_yf` and clamp the ex-window value to ≤ 0.
+
+**M2 — Orchestrator `skip(1)` assumes `dates[0] == issue`; pre-issue dates cause duplicate or dropped flows.** `finstack/cashflows/src/builder/orchestrator.rs:466`, `:214`, `:429-440`, `finstack/cashflows/src/builder/pipeline.rs:121` (verified; found independently by two reviewers). When any pre-issue principal event exists (a supported, tested feature), `issue` is processed as a regular loop date: issue-dated principal events are emitted **twice** and `outstanding` absorbs their delta twice (corrupting all later coupons and redemption); issue-dated fixed fees are emitted twice; a fixed fee dated strictly *before* issue is silently dropped. *Fix:* iterate `d > issue` explicitly and make init/loop emission mutually exclusive; validate fee dates against `[issue, maturity]`.
+
+**M3 — No historical-fixings support: past resets silently read today's curve.** `finstack/cashflows/src/builder/rate_helpers.rs:410-423`, `finstack/cashflows/src/builder/emission/coupons.rs:358-365, 432-439`. When `reset_date <= curve base date`, time is clamped to `t=0` and the rate is taken from the current curve short end — no fixing store, no warning, no involvement of `FloatingRateFallback::Error`. Any seasoned floating instrument (including a compounded RFR coupon mid-period) gets its realized fixings replaced by today's curve. Guaranteed mis-statement of the current coupon and accrued. *Fix:* add a fixings source consulted for observation dates ≤ base date; at minimum warn or error on clamp.
+
+**M4 — Lockout (rate cut-off) freezes the wrong day: off-by-one vs ISDA 2021 and vs its own docstring.** `finstack/cashflows/src/builder/rate_helpers.rs:557-563` uses `daily_rates[n − lockout − 1]`; the ISDA rate cut-off (and the spec doc at `finstack/cashflows/src/builder/specs/coupon.rs:213-220`) implies `daily_rates[n − lockout]`. The unit test at `rate_helpers.rs:1164-1181` locks in the staler day. Systematic convention breach on every lockout coupon (SOFR FRNs use 2–4 day lockouts). *Caveat:* defensible only under a non-standard reading of "period end"; settle with a provenance-backed golden test. *Fix:* change the index, update tests, add an ISDA-example golden test.
+
+**M5 — Empty overnight window silently yields a 0% compounded index.** `finstack/cashflows/src/builder/rate_helpers.rs:529-535, 549-555` return `0.0` for empty fixings; the emission path then applies spread/floors as if the index fixed at 0%, bypassing the fallback policy. A stub period falling entirely on non-business days (unadjusted BDC, dense holiday calendars) accrues at spread-only with no error. *Fix:* error (or route through the fallback policy with a warning) when the window is non-empty but produces no fixings.
+
+**M6 — EOM convention replaces the effective and termination dates, not just intermediate rolls.** `finstack/core/src/dates/schedule_gen.rs:149-152, 189-191`. With `end_of_month: true` and a mid-month issue (Jan-15), the first schedule date becomes Jan-31 — but the funding flow is still emitted at Jan-15, so 16 days of coupon vanish; `end` is similarly snapped past a mid-month maturity. Market practice (and QuantLib) snaps only intermediate anchors. A core test pins the snap, so this needs a deliberate semantics decision. Zero `end_of_month: true` coverage exists in cashflows tests.
+
+**M7 — Swap presets claim ARRC/ISDA conventions but accrual periods are never business-day adjusted, and no knob exists.** `finstack/cashflows/src/builder/date_generation.rs:135-141` builds without accrual adjustment; only payment dates are adjusted. The `usd_sofr_swap`/`eur_estr_swap`/`gbp_sonia_swap`/`jpy_tona_swap` presets (`finstack/cashflows/src/builder/specs/schedule.rs:205-449`) document conventions where calculation-period ends are adjusted (ISDA 2006 §4.10). `BuildPeriodsParams.adjust_accrual_dates` exists but is unreachable from `ScheduleParams`. Every swap coupon accrues on the wrong day set; OIS observation windows sample wrong days. The `bdc` field doc at `specs/schedule.rs:17-20` claims accrual-end rolling that doesn't happen. *Fix:* plumb an accrual-adjustment flag through `ScheduleParams`, default true for swap presets, false for bonds.
+
+**M8 — First/last coupons of regular schedules mislabeled `CFKind::Stub` in the stable wire format.** `finstack/cashflows/src/builder/date_generation.rs:162-167` + `finstack/cashflows/src/builder/emission/coupons.rs:239-244` (found independently by two reviewers). Membership is positional, not length-based: a vanilla bullet bond emits `Stub, Fixed, …, Fixed, Stub`; a 2-period schedule has zero `Fixed` flows. Consequence: the golden tests at `finstack/cashflows/tests/cashflows/builder/schedule.rs:838-928` filter on `CFKind::Fixed` and their assertion loops are **vacuous** — they currently assert nothing. *Fix:* tag `Stub` only when the period span deviates from the tenor; add `assert!(!coupons.is_empty())` to the goldens.
+
+**M9 — Principal redemption dated on unadjusted maturity while the final coupon pays on the adjusted date.** `finstack/cashflows/src/builder/pipeline.rs:145-159`. A Saturday maturity puts notional redemption on Saturday and the final coupon on Monday — principal discounted to the wrong date (bp-level PV error on the largest flow), and a non-business-day date leaks into the wire format.
+
+**M10 — Zero-count `Tenor` hangs schedule generation.** `Tenor` derives `Deserialize` with no count validation (`finstack/core/src/dates/tenor.rs:149-174`); a JSON payload with `"count": 0` makes `add_tenor` a no-op and every `gen_*` loop spins forever — denial of service in any service wrapping the builder. *Fix:* reject `count == 0` at deserialization/build and cap anchor counts.
+
+**M11 — DataFrame export and PV aggregation bucket boundary flows differently.** `finstack/cashflows/src/builder/dataframe.rs:482-498` is end-**inclusive** (`cf.date <= p.end`); all aggregation paths (`finstack/cashflows/src/aggregation.rs:77-88`) are half-open `[start, end)` (verified). A flow landing exactly on a period boundary (common: month-end payment adjusted by Following) lands in different periods in the two public exports of the same schedule — totals don't reconcile. Related: `pv_by_period` discounts pre-base flows at df ≥ 1 while the DataFrame zeroes them (`aggregation.rs:486-508` vs `dataframe.rs:568-573`).
+
+**M12 — DataFrame balance tracking is wrong under partial period coverage and pre-issue events.** `finstack/cashflows/src/builder/dataframe.rs:488-522`: the outstanding update runs *after* the period-membership `continue`, so flows outside the reporting window never update the balance; and initial-funding detection keys on the **first flow's date** (`:454`), so a pre-issue event makes the real funding flow read as a draw — notional column ≈ 2×. *Fix:* hoist the balance update above the period check; detect funding via `meta.issue_date`.
+
+**M13 — `deny_unknown_fields` missing on all nested inbound spec types.** Verified: only the three top-level types in `finstack/cashflows/src/json.rs:17,43,59` deny unknown fields; `FeeSpec`, `FixedCouponSpec`, `FloatingRateSpec`, `ScheduleParams`, `CashFlowSchedule` etc. silently ignore typos (`"acrual_basis": …` → silent default `PointInTime`). Direct violation of the project's strict-serde invariant; wrong amounts with no error. *Fix:* add the attribute crate-wide (the `alias` attributes remain compatible).
+
+**M14 — Periodic-fee `PointInTime` base is the post-amortization payment-date balance, contradicting its doc and the coupon convention.** `finstack/cashflows/src/builder/specs/fees.rs:49-51` says "period start"; `finstack/cashflows/src/builder/pipeline.rs:162-176` runs fees *after* amortization/PIK, and `finstack/cashflows/src/builder/emission/fees.rs:154-196` reads the live balance. Drawn-base fees understated, undrawn commitment fees overstated by one period's amortization per period. The only test uses constant outstanding so cannot see it.
+
+**M15 (valuations consumer) — Lagged recovery queue never drained at simulation end.** `finstack/valuations/src/instruments/fixed_income/structured_credit/pricing/simulation_engine.rs:443-446, 1741-1797`. Pending recoveries from defaults within `recovery_lag` months of pool exhaustion or final date are silently dropped (the cleanup-call branch was fixed; the two normal termination paths weren't). Losses overstated for any deal with defaults near maturity.
+
+### Moderates (condensed)
+
+- **ACT/ACT ICMA `coupon_period` never populated** in either the accrual engine (`finstack/cashflows/src/accrual.rs:479-525`) or coupon emission (`finstack/cashflows/src/builder/periods.rs:46-56`), although core provides exactly this for irregular coupons. Mis-accrued ICMA stubs — the dominant new-issue case.
+- **NaN/∞ default or prepayment amounts silently liquidate the full balance**: `NaN < 0` is false so validation passes, then `nan.min(outstanding)` returns `outstanding` (`finstack/cashflows/src/builder/specs/default.rs:222-232`, `finstack/cashflows/src/builder/emission/credit.rs:78, 212-216`). Add `is_finite()` checks.
+- **Documented negative-balance guard doesn't exist**: `outstanding_by_date` docs promise an error on over-repayment; `Money::checked_sub` only checks currency (`finstack/cashflows/src/builder/schedule.rs:716-728`).
+- **`add_principal_event` doesn't validate sign/kind consistency** (`finstack/cashflows/src/builder/principal.rs:69-94`) — a natural call with `cash: None` produces a sign-flipped Amortization flow and permanently divergent emission vs replay balances.
+- **Floors/caps applied to the period-compounded rate, not daily fixings** (`finstack/cashflows/src/builder/emission/coupons.rs:601-609`) — ARRC/LSTA daily-floor convention for SOFR loans unsupported and the choice undocumented; understates floored coupons in low-rate regimes.
+- **`reset_freq` conflated with index tenor and day-count frequency** (`emission/coupons.rs:508-531`) — wrong ICMA accrual when payment ≠ reset frequency; monthly-pay/3M-index legs inexpressible.
+- **Term-rate forwards projected over `[fixing, fixing+tenor]`** instead of the deposit period `[accrual_start, accrual_start+tenor]` (`emission/coupons.rs:526-531`) — bias ∝ curve slope × fixing lag, baked into a test.
+- **Overnight fixings sampled on the accrual calendar, not `fixing_calendar_id`** (`emission/coupons.rs:492`) — the field exists and is resolved but unused for sampling.
+- **Negative fixed coupons silently dropped** (gate on amount sign, `emission/coupons.rs:239`) while the floating path correctly emits them — negative-rate fixed legs lose flows.
+- **Duplicate adjusted payment dates silently drop a period**: `period_map.insert(payment_date, …)` last-writer-wins (`finstack/cashflows/src/builder/date_generation.rs:84-90`) — real for daily-tenor/short-stub schedules (found by two reviewers).
+- **`validate_cashflow_schedule_json` rejects schedules the builder itself produces** (pre-issue flows) (`finstack/cashflows/src/json.rs:408-416`) — build-then-validate pipelines fail on delayed-funding structures.
+- **Aggregation docs claim Decimal/rounded summation; implementation is compensated f64** (`finstack/cashflows/src/aggregation.rs:1-13, 232-242`); `Money::new` performs no ISO-4217 rounding on this path. Also non-finite curve output **panics** via `Money::new` in aggregation while the fee path errors and the DataFrame silently emits NaN — three failure modes for one defect.
+- **Unsorted/overlapping periods silently drop flows** in `aggregate_by_period`/`pv_by_period` (cursor never resets, contract undocumented, `aggregation.rs:61-90`); `AtDefaultIntegrated` drops the recovery leg of the second principal flow on a shared date (`aggregation.rs:680-699`).
+- **(valuations consumers)** Structured-credit engine applies scheduled-principal → default → prepay while its comments claim default-first per Intex convention (`simulation_engine.rs:2676-2683`); level-pay uses effective rather than nominal monthly rate (≈2.6% relative payment error vs the correctly-implemented `finstack/valuations/src/instruments/fixed_income/mbs_passthrough/pricer.rs:104`); PSA/SDA seasoning ignores collateral WALA (`simulation_engine.rs:1826`).
+
+### Minors (brief)
+
+- Stale/false docs: `AccrualConfig::frequency` claims an ISDA fallback that is actually a hard error (`accrual.rs:172-177`); stale SDA header in `tests/cashflows/builder/credit_models.rs:11-14`; stale inverse-day-count comment block (`accrual.rs:634-641`).
+- `ExCouponRule::days_before_coupon` unvalidated (`accrual.rs:126-160`); `advance_business_days` week-jump incorrect for hypothetical >5-business-day weeks (`accrual.rs:36-78`).
+- NaN coupon amounts propagate silently through accrual (`accrual.rs:360-470`).
+- Negative `payment_lag_days` accepted silently (`date_generation.rs:56-61`); adjusted short stubs can collapse to zero length silently (`periods.rs:64-71`); zero-lag reset can land after accrual start (`emission/helpers.rs:47-48`).
+- `FloatingRateFallback::FixedRate` unit (decimal) undocumented amid bp-denominated fields (`specs/coupon.rs:264-266`); `gearing > 0` requirement forbids inverse floaters (`rate_helpers.rs:158-161`); non-Act/365 overnight basis silently coerced to 360 (`emission/coupons.rs:591-599`); pre-first-fixing non-business days weighted to the following fixing rather than ISDA preceding (`emission/coupons.rs:451-454`).
+- `cpr`/`cdr` fields silently ignored when curve variants active; `speed_multiplier` unvalidated (`specs/prepayment.rs:176-181`, `specs/default.rs:151-156`).
+- `accrued_on_default` paid at full face (CDS premium convention) — needs a doc warning for bond-claim users (`emission/credit.rs:153-166`); multi-event emission not atomic on validation failure (`emission/credit.rs:61-170`); maturity flow classification inconsistent across amortization specs (`emission/amortization.rs:88-119`).
+- Non-positive periodic fees dropped while negative fixed fees kept (`emission/fees.rs:44-55` vs `compiler.rs:188-191`); `FeeTier::from_bps` maps non-finite thresholds to 0 in release (`specs/fees.rs:93-103`); forward-curve lookup failure silently disables floating decomposition (`dataframe.rs:412-418`); duplicate `PeriodId`s overwrite silently (`aggregation.rs:119,293,335`); no schema version or rounding-context stamp in the wire format (`json.rs:148-155`); compiler errors lack context (`compiler.rs:453-564`).
+
+### Confirmed correct
+
+CPR↔SMM/MDR conversions, the PSA curve, and the rewritten **SDA curve are textbook-correct** — commit `6e9523a50` matches the BMA standard exactly (0.02 %/mo ramp to 0.60% at month 30, plateau to 60, linear decline to 0.03% by 120), verified arithmetically and pinned month-by-month in tests. ISDA compounding/lookback/observation-shift formulas are right, spread is correctly excluded from compounding, payment-lag ordering (adjust then lag) is correct, determinism is solid (every HashMap iteration is followed by sort/dedup), and the crate denies panics. The ex-coupon diff itself is a genuine fix.
+
+### Bindings (Python + WASM)
+
+Numerically clean: both are model thin wrappers — all logic in canonical Rust, Decimal travels as JSON strings (zero precision loss), no panics across FFI, the single f64 boundary (`accrued_interest`) matches the canonical signature and is documented. Findings are governance-level:
+
+- **All five binding names drop the canonical `_json` suffix** (`finstack-py/src/bindings/cashflows/mod.rs:24-100`, `finstack-wasm/src/api/cashflows/mod.rs:12-54`) in undocumented contradiction of the Rust-canonical naming rule and the valuations precedent (`instrument_cashflows_json` keeps it). Rename or record the exception in the contract.
+- **`bond_from_cashflows` is a valuations function surfaced under `finstack.cashflows`** with no machine-readable contract entry — invisible to parity audits.
+- **`[crates.cashflows.modules]` omits five public modules** (`builder`, `aggregation`, `accrual`, `traits`, `primitives`) instead of marking them `missing` like the margin pattern; **no symbol-level pinning** exists, and `exports/cashflows.js` has **zero runtime tests** — a renamed `js_name` would silently export `undefined` while all current checks pass.
+- `core_to_py` flattens everything to `ValueError` (missing curve should be `KeyError` per the project standard); `finstack-wasm/index.d.ts:980` points to a nonexistent file path (`api/cashflows.rs` → `src/api/cashflows/mod.rs`).
+
+## Test gaps (top items)
+
+Coverage systematically avoids exactly where the bugs live:
+
+1. **No test uses a schedule anchor above day 20** (would have caught B1); no EOM (`end_of_month: true` appears nowhere in cashflows tests); no long-stub test (the core LongFront test pins the bug); no leap-year/Feb-29 anchors.
+2. **No ex-coupon test anywhere in the crate** — the pending diff's negative-AI semantics are untested in-crate (calendar vs business-day ex-dates, boundaries, golden values).
+3. No payment-lag accrual test (would expose M1); no boundary tests for `as_of` == coupon/issue/maturity dates.
+4. **No compounded-in-arrears golden vs published indices** (NY Fed SOFR averages/index, BoE SONIA) — flat-curve tests cannot detect the lockout off-by-one (M4) or weighting errors; no SONIA Act/365F basis test; no negative-rate or daily-floor compounding test.
+5. No missing-fixing/seasoned-instrument test (M3); no empty-fixing-window test (M5); no `fixing_calendar ≠ calendar` test.
+6. No pre-issue + at-issue event combination test (M2); no NaN/∞ default-prepay input tests; no build→validate round-trip for pre-issue schedules.
+7. No multi-currency aggregation test; no unknown-field-rejection test (M13); no boundary-date bucketing parity test between DataFrame and aggregation (M11); no amortizing-balance periodic-fee test (M14).
+8. The two coupon golden tests in `tests/cashflows/builder/schedule.rs:838-928` are currently **vacuous** (empty coupon vectors due to M8).
+9. Bindings: no Node/JS facade runtime test for cashflows; no Python↔WASM numerical parity test; Python error-type contract untested.
+10. `emit_default_on`/`emit_prepayment_on` are orphaned public API — zero production callers in the workspace; no pipeline integration test exercises defaults/prepayments alongside scheduled amortization.
+
+## Open Questions or Assumptions
+
+1. **Lockout indexing** (M4): the off-by-one is real under the standard ISDA reading of "Nth business day preceding the period end"; a golden test against a SOFR FRN prospectus accrual schedule would settle it definitively.
+2. **EOM snapping of effective/termination dates** (M6) is pinned by a core test — was that a deliberate semantics choice? As consumed by cashflows it under-accrues.
+3. **Compounded-method ex-div convention**: the diff routes negative fractions into the compounded formula producing the discounted variant of the stub rebate; no convention is documented (gilts use linear).
+4. **Pre-issue principal events**: builder supports them, JSON validator rejects them — which is the intended contract? Resolving this also resolves M2's trigger.
+
+## Brief Summary
+
+The crate's financial mathematics are largely sound where they were recently worked (SDA/PSA curves, ISDA compounding formulas, Decimal coupon arithmetic, determinism), and the pending ex-coupon change is a correct market-standard fix. The serious risk sits one layer down: the core date generator corrupts coupon dates for month-end and long-stub schedules (two Blockers, one with a test pinning the wrong output), the accrual engine mixes year-fraction bases in a way payment-lag instruments will hit immediately, floating legs have no historical-fixings story, and several silent-degradation paths (0% index on empty windows, NaN-driven full liquidation, dropped/duplicated flows around issue dates) violate the fail-loudly bar for production. Reconciliation between the crate's own exports (DataFrame vs aggregation) is broken on boundary dates, and two stated project invariants — strict serde and the documented rounding policy — are not actually enforced. Bindings are numerically trustworthy but contractually under-pinned. Month-end-rolled, long-stub, seasoned-floating, or payment-lag instruments should not go through this crate until B1, B2, M1–M5 are fixed; vanilla mid-month fixed bullets are in good shape.
+
+## Quant Notes
+
+- B1's fix should follow QuantLib's `Schedule` construction: anchors as `seed + k·tenor` from an unclamped seed, EOM applied per-anchor — this also resolves the spurious `NonIntegerScheduleTenor`.
+- For M3/M4, the authoritative references are ISDA 2021 Definitions §7 (compounding/cut-off) and the ARRC SOFR FRN conventions; the NY Fed publishes SOFR averages/index values that make excellent golden fixtures.
+- The SDA verification used the BMA standard curve directly; the month-61 value 0.5905% in the tests is the correct linear-decline arithmetic.
+- M14 (fee base) and M8 (`CFKind::Stub`) both leak into the stable wire format — worth fixing before any schema consumers proliferate, since they're behavioral breaks, not just bugs.
