@@ -1123,10 +1123,11 @@ impl MetricId {
     /// Units: decimal annualized IRR.
     pub const LpIrr: Self = Self(Cow::Borrowed("lp_irr"));
 
-    /// GP (General Partner) internal rate of return.
+    /// Total GP (General Partner) carry paid through the waterfall.
     ///
-    /// Units: decimal annualized IRR.
-    pub const GpIrr: Self = Self(Cow::Borrowed("gp_irr"));
+    /// Units: currency (review finding M11 — formerly misregistered as
+    /// `gp_irr` despite returning a dollar amount).
+    pub const GpCarryTotal: Self = Self(Cow::Borrowed("gp_carry_total"));
 
     /// LP multiple on invested capital.
     ///
@@ -1404,7 +1405,7 @@ impl MetricId {
         MetricId::IndexRatio,
         MetricId::BreakevenInflation,
         MetricId::LpIrr,
-        MetricId::GpIrr,
+        MetricId::GpCarryTotal,
         MetricId::MoicLp,
         MetricId::DpiLp,
         MetricId::TvpiLp,

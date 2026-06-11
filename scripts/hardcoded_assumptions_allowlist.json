@@ -2084,18 +2084,6 @@
       "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
     },
     {
-      "path": "finstack/valuations/src/instruments/equity/real_estate/metrics/sensitivities.rs",
-      "category": "market_convention",
-      "contains": "\"DiscountRateSensitivity: defined for curve-free DCF only (remove discount curve)\"",
-      "reason": "Market-convention plumbing, validation, or canonical constructor label; mutable convention tables live in registries."
-    },
-    {
-      "path": "finstack/valuations/src/instruments/equity/real_estate/pricer.rs",
-      "category": "market_convention",
-      "contains": "\"DCF requires either a discount curve or a discount rate\".into(),",
-      "reason": "Validation or diagnostic text; underlying defaults are supplied by typed inputs or registries."
-    },
-    {
       "path": "finstack/valuations/src/instruments/equity/real_estate/pricer.rs",
       "category": "market_convention",
       "contains": "\"discount_curve and discount_rate cannot both be None after construction\"",

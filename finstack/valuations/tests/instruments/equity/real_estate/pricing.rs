@@ -161,8 +161,10 @@ fn test_real_estate_terminal_growth_applies_to_exit_value() {
     assert!((pv.amount() - expected).abs() < 0.01);
 }
 
+/// Review finding M14: DCF always discounts at the property `discount_rate`;
+/// loading the named curve in the market context must not change the PV.
 #[test]
-fn test_real_estate_dcf_prefers_market_discount_curve_over_flat_discount_rate() {
+fn test_real_estate_dcf_pv_identical_with_and_without_curve() {
     let valuation_date = date(2025, 1, 1);
     let noi1 = date(2026, 1, 1);
 
@@ -172,7 +174,6 @@ fn test_real_estate_dcf_prefers_market_discount_curve_over_flat_discount_rate() 
         .valuation_date(valuation_date)
         .valuation_method(RealEstateValuationMethod::Dcf)
         .noi_schedule(vec![(noi1, 100.0)])
-        // Deliberately set a different flat discount rate; curve should win.
         .discount_rate_opt(Some(0.10))
         .terminal_cap_rate_opt(Some(0.08))
         .day_count(DayCount::Act365F)
@@ -183,20 +184,28 @@ fn test_real_estate_dcf_prefers_market_discount_curve_over_flat_discount_rate() 
 
     let curve_rate = 0.05;
     let disc = build_flat_discount_curve("USD-OIS", valuation_date, curve_rate);
-    let ctx = MarketContext::new().insert(disc);
+    let ctx_curve = MarketContext::new().insert(disc);
+    let ctx_bare = MarketContext::new();
 
-    let pv = asset.value(&ctx, valuation_date).expect("npv");
+    let pv_curve = asset.value(&ctx_curve, valuation_date).expect("npv");
+    let pv_bare = asset.value(&ctx_bare, valuation_date).expect("npv");
+    assert!(
+        (pv_curve.amount() - pv_bare.amount()).abs() < 1e-9,
+        "PV must not depend on curve presence: with={}, without={}",
+        pv_curve.amount(),
+        pv_bare.amount()
+    );
 
+    // And the discount_rate-based PV must reconstruct exactly.
     let t1 = DayCount::Act365F
         .year_fraction(valuation_date, noi1, DayCountContext::default())
         .unwrap();
-    let df = (-curve_rate * t1).exp();
-    let pv_flow = 100.0 * df;
+    let pv_flow = 100.0 / (1.0_f64 + 0.10).powf(t1);
     let terminal_value = 100.0 / 0.08;
-    let pv_terminal = terminal_value * df;
+    let pv_terminal = terminal_value / (1.0_f64 + 0.10).powf(t1);
     let expected = pv_flow + pv_terminal;
 
-    assert!((pv.amount() - expected).abs() < 0.01);
+    assert!((pv_bare.amount() - expected).abs() < 0.01);
 }
 
 #[test]

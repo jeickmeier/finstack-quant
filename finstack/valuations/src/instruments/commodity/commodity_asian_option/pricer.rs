@@ -40,6 +40,11 @@ pub(crate) fn compute_pv(
         .day_count
         .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
 
+    // Reject duplicate / date-mismatched / missing past fixings before they
+    // can silently distort the average or the seasoned effective strike
+    // (review finding M17).
+    inst.validate_realized_fixings(as_of)?;
+
     let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
     let total_fixings = inst.fixing_dates.len();
 
@@ -101,6 +106,18 @@ pub(crate) fn compute_pv(
     }
 
     let future_count = future_forwards.len();
+
+    // With a validated fixing history, every scheduled date is either realized
+    // (<= as_of) or projected (> as_of). A violation here means an internal
+    // bookkeeping bug (e.g. day-count rounding dropped a future fixing), not
+    // bad user input (review finding M17).
+    if hist_count + future_count != total_fixings {
+        return Err(finstack_core::Error::Validation(format!(
+            "CommodityAsianOption '{}' fixing bookkeeping mismatch: {hist_count} realized \
+             + {future_count} projected != {total_fixings} scheduled fixings",
+            inst.id
+        )));
+    }
 
     // All fixings already observed but not yet settled
     if future_count == 0 {
@@ -164,11 +181,27 @@ pub(crate) fn compute_pv(
 /// distribution. We compute the adjusted forward and volatility from the
 /// forward prices directly.
 ///
+/// # Lognormal Moments (Kemna-Vorst drift correction, review finding M16)
+///
+/// Each forward is a martingale under its own delivery measure, so
+/// `ln F_i(t_i) ~ N(ln F_i(0) − σ²t_i/2, σ²t_i)`. For the geometric average
+/// `G = exp((1/m) Σ ln F_i(t_i))`:
+///
+/// ```text
+/// E[ln G]   = ln(geo_mean) − (σ²/2m) Σ t_i
+/// Var[ln G] = (σ²/m²) ΣΣ min(t_i, t_j)
+/// E[G]      = geo_mean · exp(½·Var[ln G] − (σ²/2m) Σ t_i)
+/// ```
+///
+/// Black-76 is then applied with forward `F_G = E[G]`. Using the raw
+/// geometric mean as the forward (no drift correction) overstates `E[G]` by
+/// `exp((σ²/2)(Σt/m − ΣΣmin/m²))` — several percent of an ATM premium.
+///
 /// # Variance Calculation
 ///
 /// Uses the exact variance formula for non-equally-spaced observation times:
 /// ```text
-/// sigma_G^2 = (1/n^2) * sum_i sum_j sigma^2 * min(t_i, t_j)
+/// sigma_G^2 = (1/m^2) * sum_i sum_j sigma^2 * min(t_i, t_j)
 /// ```
 /// This correctly handles irregular fixing schedules (different month lengths,
 /// business day adjustments) unlike the simplified equally-spaced formula.
@@ -199,6 +232,10 @@ fn price_geometric_kv_commodity(
     let vol_adj_sq = var_sum / (n * n);
     let vol_adj = vol_adj_sq.sqrt();
 
+    // Kemna-Vorst mean-log drift: E[ln G] = ln(geo_mean) − (σ²/2m) Σ t_i
+    let sum_t: f64 = future_forwards.iter().map(|(t, _)| *t).sum();
+    let mean_log_drift = -0.5 * sigma * sigma * sum_t / n;
+
     // Time to last fixing
     let t_last = future_forwards
         .iter()
@@ -213,21 +250,22 @@ fn price_geometric_kv_commodity(
         return intrinsic * df;
     }
 
-    // Black-76 style pricing with geometric mean forward
+    // Black-76 with the expected geometric average as the forward:
+    // F_G = E[G] = geo_mean · exp(mean_log_drift + ½·vol_adj_sq).
+    let fwd_g = geo_mean_fwd * (mean_log_drift + 0.5 * vol_adj_sq).exp();
+
     // Use vol_adj_sq directly (it represents total variance) rather than vol_adj * sqrt(t)
     let total_vol = vol_adj_sq.sqrt();
     // d1/d2 intentionally inline: Pre-computed adjusted variance, not decomposable into sigma,t
-    let d1 = ((geo_mean_fwd / strike).ln() + 0.5 * vol_adj_sq) / total_vol;
+    let d1 = ((fwd_g / strike).ln() + 0.5 * vol_adj_sq) / total_vol;
     let d2 = d1 - total_vol;
 
     let price = match option_type {
         OptionType::Call => {
-            geo_mean_fwd * finstack_core::math::norm_cdf(d1)
-                - strike * finstack_core::math::norm_cdf(d2)
+            fwd_g * finstack_core::math::norm_cdf(d1) - strike * finstack_core::math::norm_cdf(d2)
         }
         OptionType::Put => {
-            strike * finstack_core::math::norm_cdf(-d2)
-                - geo_mean_fwd * finstack_core::math::norm_cdf(-d1)
+            strike * finstack_core::math::norm_cdf(-d2) - fwd_g * finstack_core::math::norm_cdf(-d1)
         }
     };
 
@@ -287,17 +325,22 @@ fn price_seasoned_geometric_commodity(
     }
     let vol_adj_sq = var_sum / (m * m); // Var[ln G_fut]
 
-    // X = A · G_fut^(m/n), using the same lognormal model the unseasoned pricer
-    // assumes for G_fut, i.e. ln G_fut ~ N(ln geo_mean_fwd − vol_adj_sq/2, vol_adj_sq).
+    // Kemna-Vorst mean-log drift (review finding M16): each forward is a
+    // martingale under its own measure, so
+    //   E[ln G_fut] = ln(geo_mean_fwd) − (σ²/2m) Σ t_j.
+    let sum_t: f64 = future_forwards.iter().map(|(t, _)| *t).sum();
+    let mean_log_drift = -0.5 * sigma * sigma * sum_t / m;
+
+    // X = A · G_fut^(m/n), with the Kemna-Vorst lognormal law for G_fut:
+    //   ln G_fut ~ N(ln geo_mean_fwd + mean_log_drift, vol_adj_sq).
     // Then, with r = m/n:
     //   Var[ln X] = r² · vol_adj_sq
-    //   E[X]      = A · geo_mean_fwd^r · exp(½ · vol_adj_sq · r · (r − 1))
+    //   E[X]      = A · geo_mean_fwd^r · exp(r · mean_log_drift + ½ · r² · vol_adj_sq)
     let realized_factor = (hist_prod_log / n).exp();
     let ratio = m / n;
     let var_x = ratio * ratio * vol_adj_sq;
-    let fwd_x = realized_factor
-        * geo_mean_fwd.powf(ratio)
-        * (0.5 * vol_adj_sq * ratio * (ratio - 1.0)).exp();
+    let fwd_x =
+        realized_factor * geo_mean_fwd.powf(ratio) * (ratio * mean_log_drift + 0.5 * var_x).exp();
 
     let t_last = future_forwards
         .iter()
@@ -689,6 +732,86 @@ mod tests {
         );
     }
 
+    /// Review finding M17: a scheduled fixing date on/before as_of with no
+    /// realized value must be a hard error, not a silent distortion of the
+    /// effective strike.
+    #[test]
+    fn missing_past_fixing_is_an_error() {
+        let as_of = date(2025, 4, 15);
+        let fixing_dates = vec![
+            date(2025, 1, 31),
+            date(2025, 2, 28),
+            date(2025, 3, 31),
+            date(2025, 4, 30),
+            date(2025, 5, 31),
+        ];
+        let settlement = date(2025, 6, 2);
+
+        let mut option = base_option(fixing_dates, settlement);
+        // 2025-02-28 is missing.
+        option.realized_fixings = vec![(date(2025, 1, 31), 80.0), (date(2025, 3, 31), 78.0)];
+
+        let market = build_commodity_market(as_of, 79.0, 0.25, 0.05);
+        let err = option
+            .value(&market, as_of)
+            .expect_err("missing past fixing must error");
+        assert!(
+            err.to_string().contains("2025-02-28"),
+            "error should name the missing fixing date, got: {err}"
+        );
+    }
+
+    /// Review finding M17: duplicate realized fixings would be double-counted
+    /// by `accumulated_state` and must be rejected.
+    #[test]
+    fn duplicate_realized_fixing_is_an_error() {
+        let as_of = date(2025, 3, 15);
+        let fixing_dates = vec![date(2025, 1, 31), date(2025, 2, 28), date(2025, 4, 30)];
+        let settlement = date(2025, 5, 2);
+
+        let mut option = base_option(fixing_dates, settlement);
+        option.realized_fixings = vec![
+            (date(2025, 1, 31), 80.0),
+            (date(2025, 1, 31), 81.0),
+            (date(2025, 2, 28), 78.0),
+        ];
+
+        let market = build_commodity_market(as_of, 79.0, 0.25, 0.05);
+        let err = option
+            .value(&market, as_of)
+            .expect_err("duplicate fixing must error");
+        assert!(
+            err.to_string().contains("duplicate"),
+            "error should mention the duplicate, got: {err}"
+        );
+    }
+
+    /// Review finding M17: a realized fixing whose date is not on the fixing
+    /// schedule is a date mismatch, not silently-ignorable data.
+    #[test]
+    fn date_mismatched_realized_fixing_is_an_error() {
+        let as_of = date(2025, 3, 15);
+        let fixing_dates = vec![date(2025, 1, 31), date(2025, 2, 28), date(2025, 4, 30)];
+        let settlement = date(2025, 5, 2);
+
+        let mut option = base_option(fixing_dates, settlement);
+        option.realized_fixings = vec![
+            (date(2025, 1, 31), 80.0),
+            // 2025-03-01 is not a scheduled fixing date.
+            (date(2025, 3, 1), 79.5),
+            (date(2025, 2, 28), 78.0),
+        ];
+
+        let market = build_commodity_market(as_of, 79.0, 0.25, 0.05);
+        let err = option
+            .value(&market, as_of)
+            .expect_err("date-mismatched fixing must error");
+        assert!(
+            err.to_string().contains("not a scheduled fixing date"),
+            "error should flag the mismatch, got: {err}"
+        );
+    }
+
     #[test]
     fn test_expired_option_returns_intrinsic() {
         // Use as_of = expiry (not after) to avoid date range issues
@@ -770,6 +893,61 @@ mod tests {
         );
     }
 
+    /// Fresh geometric Asian must match a direct numerical integration of
+    /// `E[df·max(G − K, 0)]` under the Kemna-Vorst lognormal law for the
+    /// geometric average of martingale forwards (review finding M16):
+    /// `ln G ~ N(ln geo_mean − (σ²/2m)Σt_i, (σ²/m²)ΣΣmin(t_i,t_j))`.
+    /// The pre-fix pricer used the raw geometric mean as the Black-76 forward,
+    /// overstating `E[G]` by `exp((σ²/2)(Σt/m − ΣΣmin/m²))`.
+    #[test]
+    fn geometric_kv_matches_lognormal_integration() {
+        let fwds = [(0.25_f64, 80.0_f64), (0.5, 82.0), (0.75, 84.0), (1.0, 86.0)];
+        let (strike, sigma, df) = (83.0_f64, 0.30_f64, 0.97_f64);
+
+        let analytic = price_geometric_kv_commodity(&fwds, strike, sigma, df, OptionType::Call);
+
+        // Kemna-Vorst lognormal moments of G.
+        let m = fwds.len() as f64;
+        let log_sum: f64 = fwds.iter().map(|(_, f)| f.ln()).sum();
+        let geo_mean = (log_sum / m).exp();
+        let mut var_sum = 0.0;
+        for (ti, _) in &fwds {
+            for (tj, _) in &fwds {
+                var_sum += sigma * sigma * ti.min(*tj);
+            }
+        }
+        let v = var_sum / (m * m);
+        let sum_t: f64 = fwds.iter().map(|(t, _)| *t).sum();
+        let mu = geo_mean.ln() - 0.5 * sigma * sigma * sum_t / m;
+        let sd = v.sqrt();
+
+        let dz = 0.0005;
+        let mut z = -8.0;
+        let mut integral = 0.0;
+        while z < 8.0 {
+            let g = (mu + z * sd).exp();
+            let payoff = (g - strike).max(0.0);
+            let phi = (-0.5 * z * z).exp() / (2.0 * std::f64::consts::PI).sqrt();
+            integral += payoff * phi * dz;
+            z += dz;
+        }
+        let numeric = integral * df;
+
+        assert!(
+            (analytic - numeric).abs() < 2e-3 * numeric.max(1.0),
+            "fresh geometric KV analytic ({analytic}) must match lognormal \
+             integration ({numeric})"
+        );
+
+        // Sanity: E[G] must be *below* the raw geometric mean of forwards
+        // (drift dominates the variance convexity for monotone schedules).
+        let e_g = (mu + 0.5 * v).exp();
+        assert!(
+            e_g < geo_mean,
+            "Kemna-Vorst E[G]={e_g} must be below the raw geo mean {geo_mean}"
+        );
+    }
+
     /// Seasoned geometric Asian must reduce to the unseasoned Kemna-Vorst price
     /// when no fixings are realized (m = n, A = 1): the seasoning is continuous,
     /// with no jump in price/hedge as fixings begin to season.
@@ -837,8 +1015,10 @@ mod tests {
         let r = m / n;
 
         // E[df·max(A·G_fut^r − K, 0)] via fine left-Riemann quadrature in z, with
-        // ln G_fut = mu + z·sd so that E[G_fut] = geo_mean_fwd.
-        let mu = geo_mean_fwd.ln() - 0.5 * v;
+        // ln G_fut = mu + z·sd under the Kemna-Vorst law (review finding M16):
+        // mu = ln(geo_mean) − (σ²/2m) Σ t_j.
+        let sum_t: f64 = fwds.iter().map(|(t, _)| *t).sum();
+        let mu = geo_mean_fwd.ln() - 0.5 * sigma * sigma * sum_t / m;
         let sd = v.sqrt();
         let dz = 0.0005;
         let mut z = -8.0;

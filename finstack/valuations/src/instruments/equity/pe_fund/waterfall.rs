@@ -481,6 +481,11 @@ struct AllocationParams<'e> {
     initial_gp_carry: f64,
     lp_distributed_cum_before: f64,
     all_events: &'e [FundEvent],
+    /// Ledger rows persisted before this distribution call. LP IRR and
+    /// preferred-return solves are computed from contributions plus these
+    /// rows' `to_lp` amounts — the LP's actual net receipts — not from gross
+    /// fund events (review finding M10).
+    prior_rows: &'e [AllocationRow],
     allocation_date: Date,
     currency: Currency,
 }
@@ -610,6 +615,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                     initial_gp_carry: gp_carry_cum,
                     lp_distributed_cum_before: lp_distributed_so_far,
                     all_events: events,
+                    prior_rows: ledger_rows,
                     allocation_date: event.date,
                     currency,
                 })?;
@@ -689,6 +695,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                     initial_gp_carry: total_gp_carry,
                     lp_distributed_cum_before: lp_distributed_so_far,
                     all_events: events,
+                    prior_rows: ledger_rows,
                     allocation_date: event.date,
                     currency,
                 })?;
@@ -718,6 +725,13 @@ impl<'a> EquityWaterfallEngine<'a> {
         // Track LP allocated within this distribution call (prior tranches)
         let mut lp_allocated_in_call_so_far: f64 = 0.0;
 
+        // LP-net cashflow history (contributions + ledger to_lp rows) used by
+        // every IRR-based solve in this call (review finding M10). Same-date
+        // allocations from earlier tranches in this call are handled via
+        // `lp_allocated_in_call_so_far`.
+        let lp_history =
+            self.lp_net_history(params.all_events, params.prior_rows, params.allocation_date);
+
         // Precompute holdback percent (0.0 if none or clawback disabled)
         let holdback_pct: f64 = (match &self.spec.clawback {
             Some(c) if c.enable => c.holdback_pct.unwrap_or(0.0),
@@ -746,19 +760,15 @@ impl<'a> EquityWaterfallEngine<'a> {
 
                 Tranche::PreferredIrr { irr } => {
                     // `calculate_preferred_amount` returns the total LP amount needed at
-                    // `allocation_date` to reach `target_irr`, using only events strictly
-                    // before that date.  Earlier tranches within this same distribution
+                    // `allocation_date` to reach `target_irr`, based on the LP-net
+                    // ledger history.  Earlier tranches within this same distribution
                     // (captured in `lp_allocated_in_call_so_far`) are invisible to the
-                    // IRR solve because they haven't been persisted to `all_events` yet.
+                    // IRR solve because they haven't been persisted to the ledger yet.
                     // We subtract that same-date offset so the preferred tier only awards
                     // the incremental cash still needed on top of what the LP already
                     // received from earlier tranches in this distribution call.
-                    let gross_required = self.calculate_preferred_amount(
-                        *irr,
-                        params.all_events,
-                        params.allocation_date,
-                        lp_unreturned,
-                    )?;
+                    let gross_required =
+                        self.calculate_preferred_amount(*irr, &lp_history, params.allocation_date)?;
                     let required = (gross_required - lp_allocated_in_call_so_far).max(0.0);
                     let allocation = remaining_amount.min(required);
                     remaining_amount -= allocation;
@@ -834,30 +844,89 @@ impl<'a> EquityWaterfallEngine<'a> {
                     gp_share,
                     hurdle,
                 } => {
-                    let to_lp = remaining_amount * lp_share;
-                    let to_gp_gross = remaining_amount * gp_share;
-                    let to_gp_paid = to_gp_gross * (1.0 - holdback_pct);
-                    gp_carry_cum += to_gp_gross;
+                    // Gate the promote split on the LP actually reaching the
+                    // tier's hurdle IRR (review finding M9): pay the LP at
+                    // 100% until the hurdle is met, then split at
+                    // lp_share/gp_share, cascading to the next tier once the
+                    // next hurdle is reached.
+                    let Hurdle::Irr { rate: hurdle_rate } = hurdle;
 
-                    let tranche_name = match hurdle {
-                        Hurdle::Irr { rate } => format!(
-                            "Promote {:.1}%+ ({}%/{}%)",
-                            rate * 100.0,
-                            lp_share * 100.0,
-                            gp_share * 100.0
-                        )
-                        .into(),
+                    // 1) 100% to LP until this tier's hurdle IRR is met.
+                    let gross_required = self.calculate_preferred_amount(
+                        *hurdle_rate,
+                        &lp_history,
+                        params.allocation_date,
+                    )?;
+                    let pre_split = (gross_required - lp_allocated_in_call_so_far)
+                        .max(0.0)
+                        .min(remaining_amount);
+                    remaining_amount -= pre_split;
+                    lp_allocated_in_call_so_far += pre_split;
+
+                    // 2) Split at lp/gp shares, capped so the LP does not get
+                    //    pushed past the *next* promote tier's hurdle — any
+                    //    excess cascades to that tier.
+                    let next_hurdle_rate =
+                        self.spec
+                            .tranches
+                            .iter()
+                            .skip(idx + 1)
+                            .find_map(|t| match t {
+                                Tranche::PromoteTier {
+                                    hurdle: Hurdle::Irr { rate },
+                                    ..
+                                } => Some(*rate),
+                                _ => None,
+                            });
+                    let split_amount = match next_hurdle_rate {
+                        Some(next_rate) if *lp_share > 1e-12 => {
+                            let next_required = self.calculate_preferred_amount(
+                                next_rate,
+                                &lp_history,
+                                params.allocation_date,
+                            )?;
+                            let lp_needed = (next_required - lp_allocated_in_call_so_far).max(0.0);
+                            (lp_needed / lp_share).min(remaining_amount)
+                        }
+                        _ => remaining_amount,
                     };
 
-                    remaining_amount = 0.0; // Allocate all remaining
-                    lp_allocated_in_call_so_far += to_lp;
-                    (to_lp, to_gp_paid, tranche_name, gp_carry_cum)
+                    let to_lp_split = split_amount * lp_share;
+                    let to_gp_gross = split_amount * gp_share;
+                    let to_gp_paid = to_gp_gross * (1.0 - holdback_pct);
+                    gp_carry_cum += to_gp_gross;
+                    remaining_amount -= split_amount;
+                    lp_allocated_in_call_so_far += to_lp_split;
+
+                    let tranche_name: Arc<str> = format!(
+                        "Promote {:.1}%+ ({}%/{}%)",
+                        hurdle_rate * 100.0,
+                        lp_share * 100.0,
+                        gp_share * 100.0
+                    )
+                    .into();
+
+                    (
+                        pre_split + to_lp_split,
+                        to_gp_paid,
+                        tranche_name,
+                        gp_carry_cum,
+                    )
                 }
             };
 
-            // Calculate current LP IRR if we have enough data
-            let lp_irr_to_date =
-                self.calculate_lp_irr_to_date(params.all_events, params.allocation_date);
+            // Calculate current LP IRR from the LP-net ledger history plus
+            // what this call has allocated to the LP so far (review finding M10).
+            let lp_irr_to_date = {
+                let mut flows = lp_history.clone();
+                if lp_allocated_in_call_so_far > 1e-9 {
+                    flows.push((
+                        params.allocation_date,
+                        Money::new(lp_allocated_in_call_so_far, params.currency),
+                    ));
+                }
+                self.calculate_lp_irr_to_date(&flows)
+            };
 
             allocations.push(AllocationRow {
                 date: params.allocation_date,
@@ -876,36 +945,62 @@ impl<'a> EquityWaterfallEngine<'a> {
         Ok(allocations)
     }
 
+    /// Build the LP-net cashflow history from contributions and persisted
+    /// ledger `to_lp` rows (review finding M10).
+    ///
+    /// Gross fund events overstate the LP's receipts by the GP carry, which
+    /// inflates the LP IRR and deflates preferred-return entitlements.
+    /// Contributions strictly before `allocation_date` enter as negative
+    /// flows; persisted `to_lp` allocations up to and including
+    /// `allocation_date` enter as positive flows. Allocations from earlier
+    /// tranches within the *current* distribution call are not yet persisted
+    /// and are handled by the caller via `lp_allocated_in_call_so_far`.
+    fn lp_net_history(
+        &self,
+        all_events: &[FundEvent],
+        prior_rows: &[AllocationRow],
+        allocation_date: Date,
+    ) -> Vec<(Date, Money)> {
+        let mut flows: Vec<(Date, Money)> = Vec::new();
+        for event in all_events {
+            if event.kind == FundEventKind::Contribution && event.date < allocation_date {
+                flows.push((
+                    event.date,
+                    Money::new(-event.amount.amount(), event.amount.currency()),
+                ));
+            }
+        }
+        for row in prior_rows {
+            if row.date <= allocation_date && row.to_lp.amount().abs() > 1e-9 {
+                flows.push((row.date, row.to_lp));
+            }
+        }
+        flows.sort_by_key(|(d, _)| *d);
+        flows
+    }
+
     /// Calculate the amount needed for preferred return using robust root finding.
     ///
-    /// Returns the total LP amount required at `current_date` to achieve `target_irr`,
-    /// **not yet accounting for** `lp_already_allocated_same_date`.  The call site
-    /// subtracts that offset before capping against `remaining_amount`, so the preferred
-    /// tier only allocates the incremental cash still needed above what earlier tranches
-    /// in the same distribution have already paid to the LP.
+    /// Returns the total LP amount required at `current_date` to achieve `target_irr`
+    /// given the LP-net cashflow history `lp_flows` (see
+    /// [`lp_net_history`](Self::lp_net_history)), **not yet accounting for**
+    /// same-date allocations from earlier tranches in the current distribution
+    /// call.  The call site subtracts that offset before capping against
+    /// `remaining_amount`, so the tier only allocates the incremental cash
+    /// still needed above what earlier tranches have already paid to the LP.
     fn calculate_preferred_amount(
         &self,
         target_irr: f64,
-        all_events: &[FundEvent],
+        lp_flows: &[(Date, Money)],
         current_date: Date,
-        _lp_unreturned: f64,
     ) -> finstack_core::Result<f64> {
-        // Build LP cashflow history up to current date, including contributions and prior distributions
-        let mut lp_flows = Vec::new();
-
-        for event in all_events {
-            if event.date < current_date {
-                lp_flows.push((event.date, event.signed_amount()));
-            }
-        }
-
         if lp_flows.is_empty() {
             return Ok(0.0); // Need at least one prior flow (contribution)
         }
 
         // Current IRR without additional preferred return
         let base_date = lp_flows[0].0;
-        let current_irr = self.calculate_irr(&lp_flows, base_date).unwrap_or(0.0);
+        let current_irr = self.calculate_irr(lp_flows, base_date).unwrap_or(0.0);
 
         if current_irr >= target_irr {
             return Ok(0.0); // Already at or above target IRR
@@ -917,7 +1012,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                 return f64::INFINITY;
             }
 
-            let mut flows_with_additional = lp_flows.clone();
+            let mut flows_with_additional = lp_flows.to_vec();
             flows_with_additional.push((
                 current_date,
                 Money::new(additional_amount, lp_flows[0].1.currency()),
@@ -929,17 +1024,34 @@ impl<'a> EquityWaterfallEngine<'a> {
             }
         };
 
-        // Use broader bounds - sometimes large distributions needed for high IRR targets
         let total_contributions: f64 = lp_flows
             .iter()
             .filter(|(_, amount)| amount.amount() < 0.0)
             .map(|(_, amount)| amount.amount().abs())
             .sum();
 
-        let max_reasonable = total_contributions * 10.0; // Up to 10x contributions as upper bound
+        // f(0) = current_irr - target_irr < 0 (checked above) and f is
+        // increasing in the additional amount, so expand the upper bound
+        // until the target IRR is bracketed and solve in-bracket. (A plain
+        // guess-based solve fails for large funds: the guess can exceed the
+        // solver's default bracket-search bounds.)
+        let mut hi = total_contributions.max(1.0);
+        let mut f_hi = target_function(hi);
+        for _ in 0..60 {
+            if !f_hi.is_finite() || f_hi >= 0.0 {
+                break;
+            }
+            hi *= 2.0;
+            f_hi = target_function(hi);
+        }
 
         let solver = BrentSolver::new().tolerance(1e-6);
-        match solver.solve(target_function, max_reasonable * 0.5) {
+        let bracketed = if f_hi.is_finite() && f_hi >= 0.0 {
+            solver.solve_in_bracket(target_function, 0.0, hi)
+        } else {
+            Err(finstack_core::InputError::Invalid.into())
+        };
+        match bracketed {
             Ok(amount) => Ok(amount.max(0.0)),
             Err(_) => {
                 // If root finding fails, try to estimate analytically
@@ -1012,20 +1124,15 @@ impl<'a> EquityWaterfallEngine<'a> {
             .map_err(|_| finstack_core::InputError::Invalid.into())
     }
 
-    /// Calculate LP IRR to date.
-    fn calculate_lp_irr_to_date(&self, all_events: &[FundEvent], as_of_date: Date) -> Option<f64> {
-        let lp_flows: Vec<(Date, Money)> = all_events
-            .iter()
-            .filter(|e| e.date <= as_of_date)
-            .map(|e| (e.date, e.signed_amount()))
-            .collect();
-
+    /// Calculate LP IRR to date from an LP-net cashflow history
+    /// (review finding M10).
+    fn calculate_lp_irr_to_date(&self, lp_flows: &[(Date, Money)]) -> Option<f64> {
         if lp_flows.len() < 2 {
             return None;
         }
 
         let base_date = lp_flows[0].0;
-        self.calculate_irr(&lp_flows, base_date).ok()
+        self.calculate_irr(lp_flows, base_date).ok()
     }
 
     /// Apply clawback reconciliation.
@@ -1147,7 +1254,10 @@ impl<'a> EquityWaterfallEngine<'a> {
                     to_gp,
                     lp_unreturned: last_row.lp_unreturned,
                     gp_carry_cum: Money::new(allowed_gp_total, currency),
-                    lp_irr_to_date: self.calculate_lp_irr_to_date(events, settlement_date),
+                    lp_irr_to_date: {
+                        let flows = self.lp_net_history(events, ledger_rows, settlement_date);
+                        self.calculate_lp_irr_to_date(&flows)
+                    },
                     note: Some(Arc::from("Clawback settlement and holdback release")),
                 };
 
@@ -1183,7 +1293,10 @@ impl<'a> EquityWaterfallEngine<'a> {
             to_gp,
             lp_unreturned: last_row.lp_unreturned,
             gp_carry_cum: Money::new(allowed_gp_total, currency),
-            lp_irr_to_date: self.calculate_lp_irr_to_date(events, settlement_date),
+            lp_irr_to_date: {
+                let flows = self.lp_net_history(events, ledger_rows, settlement_date);
+                self.calculate_lp_irr_to_date(&flows)
+            },
             note: Some(Arc::from("Clawback settlement and holdback release")),
         };
 
@@ -1472,6 +1585,176 @@ mod tests {
             .filter(|r| r.tranche.contains("Catch-Up") && r.to_gp.amount() > 0.0)
             .collect();
         assert!(!catchup_rows.is_empty());
+    }
+
+    /// Review finding M9: a promote tier's hurdle must gate the GP split.
+    /// Until the LP-net IRR reaches the hurdle, the tier pays the LP at 100%;
+    /// only the excess is split at lp/gp shares.
+    #[test]
+    fn promote_tier_hurdle_gates_gp_split() {
+        let spec = WaterfallSpec::builder()
+            .return_of_capital()
+            .promote_tier(0.20, 0.8, 0.2)
+            .build()
+            .expect("spec builds");
+
+        let events = vec![
+            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
+            FundEvent::distribution(test_date(2021, 1, 1), Money::new(1400.0, test_currency())),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let ledger = engine.run(&events).expect("runs");
+
+        let total_gp: f64 = ledger.rows.iter().map(|r| r.to_gp.amount()).sum();
+        let total_lp: f64 = ledger.rows.iter().map(|r| r.to_lp.amount()).sum();
+
+        // LP must first be brought to the 20% hurdle IRR at 100%:
+        // entitlement = 1000 · 1.20^t with t = 366/365 (Act/365F, 2020 leap).
+        let t = 366.0 / 365.0;
+        let hurdle_entitlement = 1000.0 * 1.20_f64.powf(t);
+        let expected_gp = 0.2 * (1400.0 - hurdle_entitlement);
+
+        assert!(
+            (total_gp - expected_gp).abs() < 0.1,
+            "GP carry must only apply above the hurdle entitlement: \
+             expected ~{expected_gp}, got {total_gp}"
+        );
+        assert!(
+            total_gp < 0.2 * 400.0 - 1.0,
+            "GP carry {total_gp} must be below the ungated 20% of profit (80)"
+        );
+        assert!((total_lp + total_gp - 1400.0).abs() < 1e-6, "conservation");
+    }
+
+    /// Review finding M9: when the distribution cannot bring the LP to the
+    /// hurdle IRR, the GP receives nothing from the promote tier.
+    #[test]
+    fn promote_tier_below_hurdle_pays_lp_only() {
+        let spec = WaterfallSpec::builder()
+            .return_of_capital()
+            .promote_tier(0.20, 0.8, 0.2)
+            .build()
+            .expect("spec builds");
+
+        let events = vec![
+            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
+            FundEvent::distribution(test_date(2021, 1, 1), Money::new(1100.0, test_currency())),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let ledger = engine.run(&events).expect("runs");
+
+        let total_gp: f64 = ledger.rows.iter().map(|r| r.to_gp.amount()).sum();
+        let total_lp: f64 = ledger.rows.iter().map(|r| r.to_lp.amount()).sum();
+        assert!(
+            total_gp.abs() < 1e-9,
+            "GP must receive nothing below the hurdle, got {total_gp}"
+        );
+        assert!((total_lp - 1100.0).abs() < 1e-6, "LP receives everything");
+    }
+
+    /// Review finding M9: multiple promote tiers cascade — each tier's split
+    /// applies only between its own hurdle and the next tier's hurdle.
+    #[test]
+    fn promote_tiers_cascade_at_next_hurdle() {
+        let spec = WaterfallSpec::builder()
+            .return_of_capital()
+            .promote_tier(0.08, 0.8, 0.2)
+            .promote_tier(0.20, 0.7, 0.3)
+            .build()
+            .expect("spec builds");
+
+        let events = vec![
+            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
+            FundEvent::distribution(test_date(2021, 1, 1), Money::new(2000.0, test_currency())),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let ledger = engine.run(&events).expect("runs");
+
+        let t = 366.0 / 365.0;
+        let entitlement_8 = 1000.0 * 1.08_f64.powf(t);
+        let entitlement_20 = 1000.0 * 1.20_f64.powf(t);
+
+        // Tier 1 (80/20) covers only the band where the LP moves from the 8%
+        // to the 20% entitlement: distribution band = (E20 − E8)/0.8.
+        let tier1_band = (entitlement_20 - entitlement_8) / 0.8;
+        let expected_gp_tier1 = 0.2 * tier1_band;
+        // Tier 2 (70/30) takes everything above.
+        let remaining_after = 2000.0 - 1000.0 - (entitlement_8 - 1000.0) - tier1_band;
+        let expected_gp_tier2 = 0.3 * remaining_after;
+
+        let gp_tier1: f64 = ledger
+            .rows
+            .iter()
+            .filter(|r| r.tranche.contains("Promote 8.0%"))
+            .map(|r| r.to_gp.amount())
+            .sum();
+        let gp_tier2: f64 = ledger
+            .rows
+            .iter()
+            .filter(|r| r.tranche.contains("Promote 20.0%"))
+            .map(|r| r.to_gp.amount())
+            .sum();
+
+        assert!(
+            (gp_tier1 - expected_gp_tier1).abs() < 0.1,
+            "tier-1 GP should be ~{expected_gp_tier1}, got {gp_tier1}"
+        );
+        assert!(
+            (gp_tier2 - expected_gp_tier2).abs() < 0.1,
+            "tier-2 GP should be ~{expected_gp_tier2}, got {gp_tier2}"
+        );
+
+        let total: f64 = ledger
+            .rows
+            .iter()
+            .map(|r| r.to_lp.amount() + r.to_gp.amount())
+            .sum();
+        assert!((total - 2000.0).abs() < 1e-6, "conservation");
+    }
+
+    /// Review finding M10: the ledger's `lp_irr_to_date` must be computed
+    /// from the LP-net history (contributions + ledger `to_lp`), not from
+    /// gross fund events that include GP carry.
+    #[test]
+    fn lp_irr_to_date_uses_ledger_net_flows() {
+        let spec = WaterfallSpec::builder()
+            .return_of_capital()
+            .promote_tier(0.0, 0.8, 0.2)
+            .build()
+            .expect("spec builds");
+
+        let events = vec![
+            FundEvent::contribution(test_date(2020, 1, 1), Money::new(1000.0, test_currency())),
+            FundEvent::distribution(test_date(2021, 1, 1), Money::new(1500.0, test_currency())),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let ledger = engine.run(&events).expect("runs");
+
+        // LP receives 1000 (RoC) + 0.8·500 = 1400 net of GP carry.
+        let total_lp: f64 = ledger.rows.iter().map(|r| r.to_lp.amount()).sum();
+        assert!((total_lp - 1400.0).abs() < 1e-6);
+
+        let t = 366.0 / 365.0;
+        let expected_net_irr = 1.4_f64.powf(1.0 / t) - 1.0;
+        let gross_irr = 1.5_f64.powf(1.0 / t) - 1.0;
+
+        let last_irr = ledger
+            .rows
+            .last()
+            .and_then(|r| r.lp_irr_to_date)
+            .expect("last row has an LP IRR");
+        assert!(
+            (last_irr - expected_net_irr).abs() < 1e-3,
+            "lp_irr_to_date {last_irr} should match the LP-net IRR {expected_net_irr}"
+        );
+        assert!(
+            last_irr < gross_irr - 0.05,
+            "lp_irr_to_date {last_irr} must sit well below the gross-event IRR {gross_irr}"
+        );
     }
 
     #[test]

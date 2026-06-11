@@ -345,7 +345,11 @@ impl HullWhiteTree {
     /// At boundaries (|j| >= j_max), we use drift-adjusted branching that:
     /// 1. Prevents the tree from growing beyond j_max
     /// 2. Accounts for mean reversion to maintain martingale property
-    fn compute_probabilities(
+    ///
+    /// `pub(crate)`: the Black-Karasinski trinomial lattice in
+    /// `short_rate_tree.rs` reuses this geometry — its x = ln r process is the
+    /// same mean-reverting OU dynamics this branching discretizes.
+    pub(crate) fn compute_probabilities(
         kappa: f64,
         dt: f64,
         dx: f64,
@@ -434,7 +438,11 @@ impl HullWhiteTree {
         Ok((p_up, p_mid, p_down))
     }
 
-    fn transition_offsets(j: i32, j_max: usize, probs: (f64, f64, f64)) -> [(i32, f64); 3] {
+    pub(crate) fn transition_offsets(
+        j: i32,
+        j_max: usize,
+        probs: (f64, f64, f64),
+    ) -> [(i32, f64); 3] {
         let (p_up, p_mid, p_down) = probs;
         let j_abs = j.unsigned_abs() as usize;
         if j_abs >= j_max && j_max > 0 {
@@ -452,7 +460,7 @@ impl HullWhiteTree {
         }
     }
 
-    fn transition_index(j: i32, offset: i32, next_j_max: usize) -> Option<usize> {
+    pub(crate) fn transition_index(j: i32, offset: i32, next_j_max: usize) -> Option<usize> {
         let next_j = j + offset;
         let lower = -(next_j_max as i32);
         let upper = next_j_max as i32;

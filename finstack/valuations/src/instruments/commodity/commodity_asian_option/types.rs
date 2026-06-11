@@ -146,6 +146,46 @@ impl CommodityAsianOption {
             .expect("Example CommodityAsianOption with valid constants should never fail")
     }
 
+    /// Validate the realized-fixing history against the fixing schedule.
+    ///
+    /// Errors (review finding M17) when:
+    /// - `realized_fixings` contains duplicate dates (each would be
+    ///   double-counted by [`accumulated_state`](Self::accumulated_state)), or
+    /// - any scheduled `fixing_date <= as_of` has no realized fixing — a
+    ///   missing past fixing silently deflates `hist_sum` and inflates the
+    ///   seasoned effective strike.
+    pub fn validate_realized_fixings(&self, as_of: Date) -> finstack_core::Result<()> {
+        let mut seen: std::collections::BTreeSet<Date> = std::collections::BTreeSet::new();
+        for (d, _) in &self.realized_fixings {
+            if !seen.insert(*d) {
+                return Err(finstack_core::Error::Validation(format!(
+                    "CommodityAsianOption '{}' has duplicate realized fixing for date {d}",
+                    self.id
+                )));
+            }
+            if !self.fixing_dates.contains(d) {
+                return Err(finstack_core::Error::Validation(format!(
+                    "CommodityAsianOption '{}' has a realized fixing for {d}, which is \
+                     not a scheduled fixing date (date mismatch)",
+                    self.id
+                )));
+            }
+        }
+
+        for fixing_date in &self.fixing_dates {
+            if *fixing_date <= as_of && !seen.contains(fixing_date) {
+                return Err(finstack_core::Error::Validation(format!(
+                    "CommodityAsianOption '{}' is missing a realized fixing for past \
+                     fixing date {fixing_date} (as_of {as_of}); every fixing date on or \
+                     before the valuation date must have a realized value",
+                    self.id
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Get the accumulated state (sum, log_sum, count) from realized fixings.
     ///
     /// Only considers fixings that match dates in `fixing_dates` and are on or

@@ -20,7 +20,7 @@ If you want a first-class “deal wrapper” around the asset + financing, use:
 ## Key conventions
 
 - **Discounting**:
-  - If the market contains `discount_curve_id`, the instrument discounts using the curve’s discount factors (so DV01/Theta behave consistently with the rest of `finstack`).
+  - DCF always discounts at the property `discount_rate`; `discount_curve_id` is for risk attribution only. DV01 bumps the risk-free component inside the rate.
   - Otherwise, DCF discounts using **annual discrete compounding**: \( PV = CF / (1 + r)^t \) using `day_count`.
 - **Terminal value (DCF)**:
   - **Explicit sale price** (if `sale_price` is set): terminal proceeds use `sale_price` (gross), realized on `sale_date` if provided (otherwise last NOI date).
@@ -35,7 +35,7 @@ If you want a first-class “deal wrapper” around the asset + financing, use:
 ## Fields you’ll typically set
 
 - **Core**: `noi_schedule`, `valuation_method`, `discount_curve_id`, `day_count`
-- **DCF**: `discount_rate` (only required if the curve is absent), `terminal_cap_rate`, `terminal_growth_rate`
+- **DCF**: `discount_rate` (required), `terminal_cap_rate`, `terminal_growth_rate`
 - **Sale modeling**: `sale_date`, `sale_price`
 - **Transaction**: `purchase_price`, `acquisition_cost` (scalar) and/or `acquisition_costs` (line items), `disposition_cost_pct` and/or `disposition_costs`
 - **Cashflow realism**: `capex_schedule`
@@ -50,7 +50,7 @@ The real estate module registers these custom metric IDs (via `MetricId::custom(
 - `real_estate::unlevered_multiple` (requires `purchase_price` + `terminal_cap_rate`)
 - `real_estate::unlevered_cash_on_cash_first` (requires `purchase_price`)
 - `real_estate::cap_rate_sensitivity` (finite-difference; DirectCap uses `cap_rate`, DCF uses `terminal_cap_rate` when applicable)
-- `real_estate::discount_rate_sensitivity` (finite-difference; defined for curve-free DCF where `discount_rate` is used)
+- `real_estate::discount_rate_sensitivity` (finite-difference bump of `discount_rate`; DCF always discounts at the property rate)
 
 For `LeveredRealEstateEquity`:
 

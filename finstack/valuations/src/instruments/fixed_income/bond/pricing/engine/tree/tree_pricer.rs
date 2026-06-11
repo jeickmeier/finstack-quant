@@ -321,6 +321,7 @@ impl TreePricer {
                     steps: self.config.tree_steps,
                     volatility: self.config.volatility,
                     mean_reversion: None,
+                    compounding: self.config.tree_compounding,
                     ..Default::default()
                 };
                 let mut tree = ShortRateTree::new(tree_config);

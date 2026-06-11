@@ -99,9 +99,9 @@ Curve-calibrated short-rate trees for pricing bonds with embedded options and ca
 | Model | Dynamics | Vol Convention | Negative Rates | Mean Reversion |
 |-------|----------|----------------|----------------|----------------|
 | **Ho-Lee** | `dr = θ(t)dt + σdW` | Normal (bps/yr) | Yes | No |
-| **BDT** | `d(ln r) = [θ(t) − a·ln(r)]dt + σdW` | Lognormal (%) | No | Yes |
+| **BDT / BK** | `d(ln r) = [θ(t) − κ·ln(r)]dt + σdW` | Lognormal (%) | No | Yes (κ ≠ 0) |
 
-Calibration is performed via Arrow-Debreu forward induction to exactly reproduce the input discount curve at every tree step.
+Calibration is performed via Arrow-Debreu forward induction to exactly reproduce the input discount curve at every tree step. For the lognormal model, `κ = 0` calibrates a standard binomial BDT lattice; `κ ≠ 0` calibrates a genuine trinomial Black-Karasinski lattice in `x = ln r` reusing the Hull-White trinomial geometry (spacing `σ√(3dt)`, width cap with edge branch switching, per-node mean-reverting probabilities) with a Brent solve on the per-step additive shift in `x`.
 
 ```rust
 let config = ShortRateTreeConfig {

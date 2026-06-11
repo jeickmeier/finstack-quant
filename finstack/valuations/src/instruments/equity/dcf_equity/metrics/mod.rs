@@ -5,9 +5,22 @@
 //! with the unified DV01 framework used across valuations.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::equity::dcf_equity::DiscountedCashFlow;
-use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
+use crate::instruments::equity::dcf_equity::{pricer, DiscountedCashFlow};
+use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry, RfComponentPriced};
+use finstack_core::dates::Date;
+use finstack_core::market_data::context::MarketContext;
 use finstack_core::Result;
+
+impl RfComponentPriced for DiscountedCashFlow {
+    fn pv_with_rf_bump(
+        &self,
+        _market: &MarketContext,
+        _as_of: Date,
+        bump_at: &dyn Fn(f64) -> f64,
+    ) -> Result<f64> {
+        pricer::pv_with_rf_bump(self, bump_at)
+    }
+}
 
 /// Helper: downcast to [`DiscountedCashFlow`] or return a validation error.
 fn downcast_dcf(context: &MetricContext) -> Result<&DiscountedCashFlow> {
@@ -23,7 +36,7 @@ fn downcast_dcf(context: &MetricContext) -> Result<&DiscountedCashFlow> {
 /// Calculator for Enterprise Value metric.
 ///
 /// Computes EV from PV components directly (before equity bridge / discounts).
-/// Uses market-curve discounting when available, otherwise falls back to WACC.
+/// Always discounts at WACC (review finding M14), matching `compute_pv`.
 struct EnterpriseValueCalculator;
 
 impl MetricCalculator for EnterpriseValueCalculator {
@@ -31,30 +44,9 @@ impl MetricCalculator for EnterpriseValueCalculator {
         let dcf = downcast_dcf(context)?;
         // Compute EV directly from discounted PV components (before equity bridge / discounts).
         let terminal_value = dcf.calculate_terminal_value()?;
-
-        if let Ok(discount_curve) = context.curves.get_discount(&dcf.discount_curve_id) {
-            let pv_explicit: f64 = dcf
-                .flows
-                .iter()
-                .map(|(date, amount)| {
-                    let years = dcf.discount_years(dcf.valuation_date, *date);
-                    amount * discount_curve.df(years)
-                })
-                .sum();
-
-            let pv_terminal = if let Some((terminal_date, _)) = dcf.flows.last() {
-                let years = dcf.discount_years(dcf.valuation_date, *terminal_date);
-                terminal_value * discount_curve.df(years)
-            } else {
-                0.0
-            };
-
-            Ok(pv_explicit + pv_terminal)
-        } else {
-            let pv_explicit = dcf.calculate_pv_explicit_flows();
-            let pv_terminal = dcf.discount_terminal_value(terminal_value)?;
-            Ok(pv_explicit + pv_terminal)
-        }
+        let pv_explicit = dcf.calculate_pv_explicit_flows();
+        let pv_terminal = dcf.discount_terminal_value(terminal_value)?;
+        Ok(pv_explicit + pv_terminal)
     }
 }
 
@@ -73,24 +65,14 @@ impl MetricCalculator for EquityValueCalculator {
 
 /// Calculator for Terminal Value PV metric.
 ///
-/// Uses market-curve discounting when available (same convention as EV metric),
-/// otherwise falls back to WACC discounting.
+/// Always discounts at WACC (review finding M14), matching `compute_pv`.
 struct TerminalValuePVCalculator;
 
 impl MetricCalculator for TerminalValuePVCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let dcf = downcast_dcf(context)?;
         let terminal_value = dcf.calculate_terminal_value()?;
-        if let Ok(discount_curve) = context.curves.get_discount(&dcf.discount_curve_id) {
-            if let Some((terminal_date, _)) = dcf.flows.last() {
-                let years = dcf.discount_years(dcf.valuation_date, *terminal_date);
-                Ok(terminal_value * discount_curve.df(years))
-            } else {
-                Ok(0.0)
-            }
-        } else {
-            dcf.discount_terminal_value(terminal_value)
-        }
+        dcf.discount_terminal_value(terminal_value)
     }
 }
 
@@ -141,18 +123,20 @@ pub(crate) fn register_dcf_metrics(registry: &mut MetricRegistry) {
         registry: registry,
         instrument: InstrumentType::DCF,
         metrics: [
-            // Generic rate risk metrics via unified DV01 calculator
+            // Rate risk via rf-component bump inside the WACC (review finding
+            // M14): DCF always discounts at WACC, so DV01 bumps the additive
+            // risk-free component of the rate rather than a market curve.
             (
                 Dv01,
-                crate::metrics::UnifiedDv01Calculator::<
+                crate::metrics::RfComponentDv01Calculator::<
                     crate::instruments::equity::dcf_equity::DiscountedCashFlow,
-                >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())
+                >::new(crate::metrics::RfDv01Mode::Parallel)
             ),
             (
                 BucketedDv01,
-                crate::metrics::UnifiedDv01Calculator::<
+                crate::metrics::RfComponentDv01Calculator::<
                     crate::instruments::equity::dcf_equity::DiscountedCashFlow,
-                >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())
+                >::new(crate::metrics::RfDv01Mode::Bucketed)
             ),
             (EnterpriseValue, EnterpriseValueCalculator),
             (EquityValue, EquityValueCalculator),

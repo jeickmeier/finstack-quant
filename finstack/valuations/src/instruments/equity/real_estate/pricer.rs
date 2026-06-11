@@ -30,31 +30,67 @@ pub(crate) fn compute_pv(
     Ok(Money::new(value, asset.currency))
 }
 
+/// Asset value with the risk-free component of the discount rate bumped per
+/// tenor (review finding M14).
+///
+/// Appraisal-value and direct-cap valuations carry no discount-rate input,
+/// so they are constant under the bump (zero rf DV01).
+pub(crate) fn pv_with_rf_bump(
+    asset: &RealEstateAsset,
+    as_of: Date,
+    bump_at: &dyn Fn(f64) -> f64,
+) -> finstack_core::Result<f64> {
+    if let Some(appraisal) = &asset.appraisal_value {
+        if appraisal.currency() != asset.currency {
+            return Err(CoreError::Validation(format!(
+                "Appraisal currency {} does not match instrument currency {}",
+                appraisal.currency(),
+                asset.currency
+            )));
+        }
+        return Ok(appraisal.amount());
+    }
+    match asset.valuation_method {
+        super::RealEstateValuationMethod::Dcf => pv_with_rf_bump_dcf(asset, as_of, bump_at),
+        super::RealEstateValuationMethod::DirectCap => compute_npv_direct_cap(asset, as_of),
+    }
+}
+
+/// DCF NPV at the property discount rate.
+///
+/// Always discounts at the asset's own `discount_rate` via `(1 + r)^{-t}`
+/// (review finding M14 — the previous behavior silently switched to
+/// risk-free curve discounting whenever `discount_curve_id` was loaded in
+/// the market context). The PV does not depend on the market context. Rate
+/// sensitivity comes from bumping the risk-free component inside the rate
+/// (see [`pv_with_rf_bump`]).
 pub(crate) fn compute_npv_dcf(
     asset: &RealEstateAsset,
-    market: &MarketContext,
+    _market: &MarketContext,
     as_of: Date,
 ) -> finstack_core::Result<f64> {
-    let discount_curve = market.get_discount(&asset.discount_curve_id).ok();
+    pv_with_rf_bump_dcf(asset, as_of, &|_| 0.0)
+}
 
-    let discount_rate = if discount_curve.is_none() {
-        let rate = asset
-            .discount_rate
-            .ok_or_else(|| CoreError::Validation("Missing discount_rate for DCF".into()))?;
-        if rate <= -1.0 {
-            return Err(CoreError::Validation(
-                "discount_rate must be greater than -100%".into(),
-            ));
-        }
-        Some(rate)
-    } else {
-        None
-    };
-
-    debug_assert!(
-        discount_curve.is_some() || discount_rate.is_some(),
-        "discount_curve and discount_rate cannot both be None after construction"
-    );
+/// DCF NPV with the risk-free component of the discount rate bumped by
+/// `bump_at(t)` (absolute, decimal) at each cashflow tenor `t` in years.
+///
+/// `bump_at = |_| 0.0` reproduces the unbumped NPV exactly. The terminal cap
+/// rate is *not* bumped; it has its own sensitivity metric
+/// (`real_estate::cap_rate_sensitivity`).
+pub(crate) fn pv_with_rf_bump_dcf(
+    asset: &RealEstateAsset,
+    as_of: Date,
+    bump_at: &dyn Fn(f64) -> f64,
+) -> finstack_core::Result<f64> {
+    let rate = asset
+        .discount_rate
+        .ok_or_else(|| CoreError::Validation("Missing discount_rate for DCF".into()))?;
+    if rate <= -1.0 {
+        return Err(CoreError::Validation(
+            "discount_rate must be greater than -100%".into(),
+        ));
+    }
 
     let horizon = if let Some(sale_date) = asset.sale_date {
         if sale_date < as_of {
@@ -85,15 +121,7 @@ pub(crate) fn compute_npv_dcf(
         .iter()
         .map(|(date, amount)| {
             let t = year_fraction(asset, as_of, *date)?;
-            if let Some(curve) = &discount_curve {
-                Ok(amount * curve.df(t))
-            } else if let Some(rate) = discount_rate {
-                Ok(amount / (1.0 + rate).powf(t))
-            } else {
-                Err(CoreError::Validation(
-                    "DCF requires either a discount curve or a discount rate".into(),
-                ))
-            }
+            Ok(amount / (1.0 + rate + bump_at(t)).powf(t))
         })
         .collect::<finstack_core::Result<Vec<f64>>>()?
         .into_iter()
@@ -102,15 +130,7 @@ pub(crate) fn compute_npv_dcf(
     let pv_terminal = match terminal_at_horizon {
         Some((date, amount)) => {
             let t = year_fraction(asset, as_of, date)?;
-            if let Some(curve) = &discount_curve {
-                amount * curve.df(t)
-            } else if let Some(rate) = discount_rate {
-                amount / (1.0 + rate).powf(t)
-            } else {
-                return Err(CoreError::Validation(
-                    "DCF requires either a discount curve or a discount rate".into(),
-                ));
-            }
+            amount / (1.0 + rate + bump_at(t)).powf(t)
         }
         None => 0.0,
     };

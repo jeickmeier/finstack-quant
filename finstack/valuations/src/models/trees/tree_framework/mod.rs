@@ -65,6 +65,7 @@ mod traits;
 mod tests;
 
 pub use evolution::{BarrierSpec, BarrierStyle, EvolutionParams, TreeBranching, TreeParameters};
+pub(crate) use node_state::CachedValues;
 pub use node_state::{BarrierState, BarrierType, NodeState};
 pub use recombining::{
     price_recombining_tree, single_factor_equity_state, two_factor_equity_rates_state,

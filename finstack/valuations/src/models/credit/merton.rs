@@ -238,16 +238,17 @@ impl MertonModel {
     ///
     /// - **Terminal barrier**: PD = N(-DD) (Merton 1974).
     /// - **First-passage barrier**: Black-Cox (1976) closed-form with
-    ///   exponentially growing barrier at rate `g`:
+    ///   exponentially growing barrier `B(t) = B * exp(g * t)`. The distance
+    ///   process `X_t = ln(V_t / B(t))` is Brownian motion with drift
+    ///   `nu = mu - g` (where `mu = r - q - sigma^2/2`) started at
+    ///   `x0 = ln(V/B)`, and the first-passage probability to 0 is
+    ///   (review finding M4):
     ///
-    ///   Let mu = r - q - sigma^2/2, H = B * exp(g * T).
-    ///   d_plus  = (ln(V/H) + mu * T) / (sigma * sqrt(T))
-    ///   d_minus = (ln(V/H) - mu * T) / (sigma * sqrt(T))
-    ///   PD = N(-d_plus) + (V/H)^(-2*mu/sigma^2) * N(-d_minus)
+    ///   PD = N(-(x0 + nu*T) / (sigma*sqrt(T)))
+    ///      + exp(-2*nu*x0 / sigma^2) * N((-x0 + nu*T) / (sigma*sqrt(T)))
     ///
-    /// The first-passage result is clamped to `[0, 1]` because the two-term
-    /// approximation can slightly exceed 1.0 when the risk-neutral drift
-    /// is strongly negative (i.e., sigma >> sqrt(2r)).
+    /// The first-passage result is clamped to `[0, 1]` to absorb
+    /// floating-point overshoot when the drift is strongly negative.
     pub fn default_probability(&self, horizon: f64) -> f64 {
         if let AssetDynamics::CreditGrades {
             barrier_uncertainty,
@@ -276,15 +277,19 @@ impl MertonModel {
                 let sqrt_t = horizon.sqrt();
                 let sigma_sqrt_t = sigma * sqrt_t;
 
-                let h = self.debt_barrier * (barrier_growth_rate * horizon).exp();
-                let log_v_h = (self.asset_value / h).ln();
+                // Reduce to a flat barrier at 0 (review finding M4): the
+                // distance process X_t = ln(V_t / (B e^{g t})) is BM with
+                // drift nu = mu - g started at x0 = ln(V/B). The growing
+                // barrier shifts the *drift*, not the starting distance.
+                let nu = mu - barrier_growth_rate;
+                let x0 = (self.asset_value / self.debt_barrier).ln();
 
-                let d_plus = (log_v_h + mu * horizon) / sigma_sqrt_t;
-                let d_minus = (log_v_h - mu * horizon) / sigma_sqrt_t;
+                let d_plus = (x0 + nu * horizon) / sigma_sqrt_t;
+                let d_minus = (x0 - nu * horizon) / sigma_sqrt_t;
 
-                // Black-Cox reflection term `(V/H)^(-2*mu/sigma^2) * N(-d_minus)`.
-                // The power factor `(V/H)^exponent` overflows to `+inf` for a
-                // large `|exponent|` (e.g. a strongly negative drift, or a low
+                // Black-Cox reflection term `exp(-2*nu*x0/sigma^2) * N(-d_minus)`.
+                // The exponential factor overflows to `+inf` for a large
+                // `|exponent|` (e.g. a strongly negative drift, or a low
                 // vol with a high rate). When `N(-d_minus)` simultaneously
                 // underflows to `0` the naive product is `inf * 0 = NaN`,
                 // which would survive the final `clamp(0, 1)`.
@@ -295,12 +300,12 @@ impl MertonModel {
                 // Guard that case, then evaluate the surviving product in
                 // log-space so a genuinely large term overflows cleanly to
                 // `+inf` (and clamps to `1`) instead of producing a `NaN`.
-                let exponent = -2.0 * mu / (sigma * sigma);
+                let exponent = -2.0 * nu / (sigma * sigma);
                 let nd_minus = norm_cdf(-d_minus);
                 let reflection_term = if nd_minus <= 0.0 {
                     0.0
                 } else {
-                    let log_term = exponent * log_v_h + nd_minus.ln();
+                    let log_term = exponent * x0 + nd_minus.ln();
                     log_term.exp()
                 };
 
@@ -1028,7 +1033,11 @@ impl MertonModel {
                 if let (Some(ref jd), Some((_, mu_j, sigma_j))) = (&jump_data, jump_params) {
                     let jump_step = &jd[step];
                     for &jz in jump_step.jump_normals.iter().take(jump_step.base_count) {
-                        v *= (mu_j - 0.5 * sigma_j * sigma_j + sigma_j * jz).exp();
+                        // Jump multiplier e^J with J ~ N(mu_J, sigma_J^2): mean
+                        // E[e^J] = exp(mu_J + sigma_J^2/2), matching the kappa
+                        // compensator above. No Ito correction belongs on the
+                        // jump itself (review finding M3).
+                        v *= (mu_j + sigma_j * jz).exp();
                     }
                 }
 
@@ -1048,7 +1057,8 @@ impl MertonModel {
                         let jump_step = &jd[step];
                         for &jz in jump_step.jump_normals.iter().take(jump_step.anti_count) {
                             let jz = -jz;
-                            v_anti *= (mu_j - 0.5 * sigma_j * sigma_j + sigma_j * jz).exp();
+                            // Same e^J law as the base path (review finding M3).
+                            v_anti *= (mu_j + sigma_j * jz).exp();
                         }
                     }
 
@@ -1593,6 +1603,79 @@ mod tests {
         );
     }
 
+    /// Black-Cox (1976) growing-barrier regression (review finding M4).
+    ///
+    /// With V=120, B=80, sigma=0.25, r=0.06, q=0.01, g=0.03, T=5:
+    ///   mu = 0.06 - 0.01 - 0.03125 = 0.01875, nu = mu - g = -0.01125,
+    ///   x0 = ln(1.5) = 0.4054651,
+    ///   d_plus  = (x0 + nu*T)/(sigma*sqrt(T)) =  0.624694,
+    ///   d_minus = (x0 - nu*T)/(sigma*sqrt(T)) =  0.825941,
+    ///   PD = N(-0.624694) + e^{0.1459674} * N(-0.825941) = 0.502635.
+    #[test]
+    fn first_passage_growing_barrier_matches_black_cox_1976() {
+        let m = MertonModel::new_with_dynamics(
+            120.0,
+            0.25,
+            80.0,
+            0.06,
+            0.01,
+            BarrierType::FirstPassage {
+                barrier_growth_rate: 0.03,
+            },
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid");
+
+        let pd = m.default_probability(5.0);
+        let expected = 0.502635;
+        assert!(
+            (pd - expected).abs() < 1e-3,
+            "growing-barrier Black-Cox PD should be ~{expected}, got {pd}"
+        );
+    }
+
+    /// A growing barrier B*e^{g t} only shifts the drift of the distance
+    /// process: PD(V, B, sigma, r, q, g) == PD(V, B, sigma, r - g, q, 0)
+    /// exactly. The pre-M4 formula violated this invariance for g != 0.
+    #[test]
+    fn first_passage_growing_barrier_equals_drift_shifted_flat_barrier() {
+        let (v, sigma, b, r, q, g) = (120.0, 0.25, 80.0, 0.06, 0.01, 0.03);
+        let m_growing = MertonModel::new_with_dynamics(
+            v,
+            sigma,
+            b,
+            r,
+            q,
+            BarrierType::FirstPassage {
+                barrier_growth_rate: g,
+            },
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid");
+        let m_shifted = MertonModel::new_with_dynamics(
+            v,
+            sigma,
+            b,
+            r - g,
+            q,
+            BarrierType::FirstPassage {
+                barrier_growth_rate: 0.0,
+            },
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid");
+
+        for horizon in [0.5, 1.0, 3.0, 5.0, 10.0] {
+            let pd_g = m_growing.default_probability(horizon);
+            let pd_s = m_shifted.default_probability(horizon);
+            assert!(
+                (pd_g - pd_s).abs() < 1e-12,
+                "growing-barrier PD must equal drift-shifted flat-barrier PD at T={horizon}: \
+                 {pd_g} vs {pd_s}"
+            );
+        }
+    }
+
     #[test]
     fn implied_spread_monotonic_in_leverage() {
         let low_lev = MertonModel::new(100.0, 0.25, 40.0, 0.04).expect("valid");
@@ -1783,6 +1866,44 @@ mod tests {
         assert!(
             rel_error < 0.02,
             "Mean terminal should converge to E[V(T)] = V\u{2080}\u{00d7}e^(rT) = {expected}, got {mean_terminal}, rel_err={rel_error}"
+        );
+    }
+
+    /// Jump-diffusion martingale check (review finding M3): the compensated
+    /// drift uses kappa = E[e^J] - 1 = exp(mu_J + sigma_J^2/2) - 1, so the
+    /// simulated jump multiplier must be e^J with J ~ N(mu_J, sigma_J^2)
+    /// (mean exp(mu_J + sigma_J^2/2)). With that pairing,
+    /// E[V(T)] = V0 * e^{(r-q)T} holds exactly.
+    #[test]
+    fn simulate_paths_jump_diffusion_mean_converges() {
+        use finstack_core::math::random::Pcg64Rng;
+        let m = MertonModel::new_with_dynamics(
+            100.0,
+            0.20,
+            80.0,
+            0.05,
+            0.0,
+            BarrierType::Terminal,
+            AssetDynamics::JumpDiffusion {
+                jump_intensity: 0.5,
+                jump_mean: -0.05,
+                jump_vol: 0.10,
+            },
+        )
+        .expect("valid");
+        let mut rng = Pcg64Rng::new(42);
+        let paths = m.simulate_paths(50_000, 60, 5.0, &mut rng, true);
+        let mean_terminal: f64 = paths
+            .iter_paths()
+            .map(|p| *p.last().expect("non-empty"))
+            .sum::<f64>()
+            / paths.num_paths as f64;
+        let expected = 100.0 * (0.05_f64 * 5.0).exp();
+        let rel_error = (mean_terminal - expected).abs() / expected;
+        assert!(
+            rel_error < 0.02,
+            "JD mean terminal should converge to E[V(T)] = V0*e^(rT) = {expected}, \
+             got {mean_terminal}, rel_err={rel_error}"
         );
     }
 

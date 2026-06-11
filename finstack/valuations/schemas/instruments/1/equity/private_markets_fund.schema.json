@@ -2030,6 +2030,17 @@
               },
               "description": "Pricing overrides for scenario analysis and model configuration."
             },
+            "unrealized_nav": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Money"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Unrealized net asset value attributable to the LP, stated as of the\nfund's valuation date.\n\nHolder-view residual value (review finding M13): the fund's present\nvalue is the PV of LP cashflows strictly after the valuation date plus\nthis NAV. When `None`, the residual value is zero — a fully realized\nfund prices to ~0."
+            },
             "waterfall_spec": {
               "$ref": "#/$defs/WaterfallSpec",
               "description": "Waterfall specification defining LP/GP allocation tiers."

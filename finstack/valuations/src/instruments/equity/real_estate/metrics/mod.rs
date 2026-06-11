@@ -9,6 +9,22 @@ mod sensitivities;
 
 use crate::metrics::MetricRegistry;
 
+use crate::instruments::equity::real_estate::{pricer, RealEstateAsset};
+use crate::metrics::RfComponentPriced;
+use finstack_core::dates::Date;
+use finstack_core::market_data::context::MarketContext;
+
+impl RfComponentPriced for RealEstateAsset {
+    fn pv_with_rf_bump(
+        &self,
+        _market: &MarketContext,
+        as_of: Date,
+        bump_at: &dyn Fn(f64) -> f64,
+    ) -> finstack_core::Result<f64> {
+        pricer::pv_with_rf_bump(self, as_of, bump_at)
+    }
+}
+
 /// Register real estate asset metrics with the registry.
 pub(crate) fn register_real_estate_metrics(registry: &mut MetricRegistry) {
     use crate::pricer::InstrumentType;
@@ -16,12 +32,16 @@ pub(crate) fn register_real_estate_metrics(registry: &mut MetricRegistry) {
         registry: registry,
         instrument: InstrumentType::RealEstateAsset,
         metrics: [
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
+            // Rate risk via rf-component bump inside the property discount
+            // rate (review finding M14): the asset always discounts at its
+            // own rate, so DV01 bumps the additive risk-free component of
+            // that rate rather than a market curve.
+            (Dv01, crate::metrics::RfComponentDv01Calculator::<
                 crate::instruments::RealEstateAsset,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
+            >::new(crate::metrics::RfDv01Mode::Parallel)),
+            (BucketedDv01, crate::metrics::RfComponentDv01Calculator::<
                 crate::instruments::RealEstateAsset,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            >::new(crate::metrics::RfDv01Mode::Bucketed)),
         ]
     };
 

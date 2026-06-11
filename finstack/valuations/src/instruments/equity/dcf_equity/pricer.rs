@@ -13,68 +13,68 @@ pub(crate) struct DcfPricer;
 
 /// Compute the DCF equity present value.
 ///
-/// # Discounting basis (two distinct rates, by design)
+/// # Discounting basis
 ///
-/// This model deliberately uses two separate rates:
-/// - **Discount rate** — explicit cash flows *and* the terminal value are
-///   present-valued with the market discount curve named by
-///   [`DiscountedCashFlow::discount_curve_id`] when that curve is loaded in
-///   `market`. This is what gives the instrument its rate sensitivity; the
-///   `Dv01`/`BucketedDv01`/`EnterpriseValue` metrics bump exactly this curve.
-///   When the curve is **not** loaded, discounting falls back to the
-///   instrument's own `wacc` via `(1 + wacc)^t`.
-/// - **Terminal cap rate** — the terminal value itself is *capitalized* at
-///   `wacc` inside [`DiscountedCashFlow::calculate_terminal_value`] (the
-///   Gordon/H-model `1 / (wacc - g)` factor), independent of the discount rate.
+/// Explicit cash flows and the terminal value always discount at the
+/// instrument's own `wacc` via `(1 + wacc)^{-t}` (review finding M14 — the
+/// previous behavior silently switched to risk-free curve discounting when
+/// the named curve happened to be loaded, changing the PV of risky cash
+/// flows with no spread adjustment). The PV is identical whether or not
+/// [`DiscountedCashFlow::discount_curve_id`] is loaded in `market`.
 ///
-/// Pairing a WACC cap rate with curve discounting is intentional: the exit value
-/// is a long-run, growth-adjusted multiple (WACC-based), while the path back to
-/// today is discounted at observable market rates. Consequently the PV moves with
-/// the loaded curve. The metric calculators in `metrics/mod.rs` mirror this exact
-/// convention so the reported PV and its sensitivities stay consistent.
+/// Rate sensitivity comes from the risk-free component embedded in the WACC
+/// (`wacc = rf + risk_premium`): the `Dv01`/`BucketedDv01` metrics bump that
+/// rf component inside the rate (see
+/// [`pv_with_rf_bump`]), not the discounting regime.
 pub(crate) fn compute_pv(
     dcf: &DiscountedCashFlow,
-    market: &MarketContext,
+    _market: &MarketContext,
     _as_of: Date,
 ) -> finstack_core::Result<Money> {
     // DCF is anchored to `dcf.valuation_date`; the trait-level `as_of` is
     // intentionally ignored to keep discount timing deterministic for a
     // configured valuation scenario.
-    // Validate terminal value constraints upfront via calculate_terminal_value().
-    // This catches WACC <= growth for Gordon Growth and H-Model.
-    let terminal_value = dcf.calculate_terminal_value()?;
-    let bridge_amount = dcf.effective_net_debt();
-
-    let enterprise_value = if let Ok(discount_curve) = market.get_discount(&dcf.discount_curve_id) {
-        let pv_explicit: f64 = dcf
-            .flows
-            .iter()
-            .map(|(date, amount)| {
-                let years = dcf.discount_years(dcf.valuation_date, *date);
-                let df = discount_curve.df(years);
-                amount * df
-            })
-            .sum();
-
-        let pv_terminal = if let Some((terminal_date, _)) = dcf.flows.last() {
-            let years = dcf.discount_years(dcf.valuation_date, *terminal_date);
-            let df = discount_curve.df(years);
-            terminal_value * df
-        } else {
-            0.0
-        };
-
-        pv_explicit + pv_terminal
-    } else {
-        let pv_explicit = dcf.calculate_pv_explicit_flows();
-        let pv_terminal = dcf.discount_terminal_value(terminal_value)?;
-        pv_explicit + pv_terminal
-    };
-
-    let equity_value = enterprise_value - bridge_amount;
-    let equity_value = dcf.apply_valuation_discounts(equity_value)?;
-
+    let equity_value = pv_with_rf_bump(dcf, &|_| 0.0)?;
     Ok(Money::new(equity_value, dcf.currency))
+}
+
+/// Equity PV with the risk-free component of the WACC bumped by `bump_at(t)`
+/// (absolute, decimal) at each cashflow tenor `t` in years.
+///
+/// The bump applies everywhere the WACC appears: per-flow discounting, the
+/// terminal-value capitalization (Gordon/H-model `1/(wacc − g)`), and the
+/// terminal discounting — which is the analytic `∂PV/∂rf` under the additive
+/// decomposition `wacc = rf + risk_premium`. `bump_at = |_| 0.0` reproduces
+/// the unbumped PV exactly.
+pub(crate) fn pv_with_rf_bump(
+    dcf: &DiscountedCashFlow,
+    bump_at: &dyn Fn(f64) -> f64,
+) -> finstack_core::Result<f64> {
+    let (terminal_date, _) = *dcf.flows.last().ok_or_else(|| {
+        finstack_core::Error::Validation(
+            "DCF has no explicit flows; cannot compute terminal value".into(),
+        )
+    })?;
+    let t_term = dcf.discount_years(dcf.valuation_date, terminal_date);
+    let bump_term = bump_at(t_term);
+
+    // Terminal value capitalized at the bumped WACC (validates WACC > g).
+    let mut dcf_term = dcf.clone();
+    dcf_term.wacc = dcf.wacc + bump_term;
+    let terminal_value = dcf_term.calculate_terminal_value()?;
+    let pv_terminal = terminal_value / (1.0 + dcf.wacc + bump_term).powf(t_term);
+
+    let pv_explicit: f64 = dcf
+        .flows
+        .iter()
+        .map(|(date, amount)| {
+            let t = dcf.discount_years(dcf.valuation_date, *date);
+            amount / (1.0 + dcf.wacc + bump_at(t)).powf(t)
+        })
+        .sum();
+
+    let equity_value = pv_explicit + pv_terminal - dcf.effective_net_debt();
+    dcf.apply_valuation_discounts(equity_value)
 }
 
 impl Pricer for DcfPricer {

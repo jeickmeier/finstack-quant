@@ -68,7 +68,7 @@
 //!
 //! let process = CheyetteRoughVolProcess::new(params);
 //! assert_eq!(process.dim(), 2);
-//! assert_eq!(process.num_factors(), 2);
+//! assert_eq!(process.num_factors(), 3);
 //! ```
 
 use super::super::paths::ProcessParams;
@@ -241,9 +241,10 @@ impl CheyetteRoughVolParams {
 /// State: \[x, y\] where x is the rate deviation from the initial forward
 /// curve and y is the accumulated variance state.
 ///
-/// Factors: 2 — one independent standard normal for the uncorrelated rate
-/// component and one fBM increment supplied by the engine's fractional noise
-/// integration.
+/// Factors: 3 — one independent standard normal for the uncorrelated rate
+/// component, one Riemann-Liouville Volterra increment `ΔỸ`, and one
+/// unit-variance driving Brownian normal `Z̃` (the rate–vol correlation
+/// target), both supplied by the engine's fractional noise integration.
 ///
 /// The short rate is reconstructed as r(t) = x(t) + φ(t) and written to
 /// [`state_keys::SHORT_RATE`] in [`populate_path_state`](StochasticProcess::populate_path_state).
@@ -287,7 +288,10 @@ impl StochasticProcess for CheyetteRoughVolProcess {
     }
 
     fn num_factors(&self) -> usize {
-        2 // z[0] = independent normal (uncorrelated rate), z[1] = fBM increment
+        // z[0] = independent normal (uncorrelated rate),
+        // z[1] = RL Volterra increment ΔỸ,
+        // z[2] = unit-variance driving Brownian normal Z̃
+        3
     }
 
     /// Formal no-op: actual drift is applied by the Cheyette rough vol discretization.
@@ -620,7 +624,7 @@ mod tests {
         let process = CheyetteRoughVolProcess::new(params);
 
         assert_eq!(process.dim(), 2);
-        assert_eq!(process.num_factors(), 2);
+        assert_eq!(process.num_factors(), 3);
     }
 
     #[test]

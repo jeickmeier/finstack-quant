@@ -169,21 +169,13 @@ impl Default for DiscountRateSensitivity {
 }
 
 impl DiscountRateSensitivity {
-    fn ensure_curve_free_dcf(
-        ctx: &MetricContext,
-        a: &RealEstateAsset,
-    ) -> finstack_core::Result<()> {
+    /// DCF valuations always discount at `discount_rate` (review finding
+    /// M14), so the only precondition is that the rate is set.
+    fn ensure_dcf_rate_present(a: &RealEstateAsset) -> finstack_core::Result<()> {
         if a.valuation_method
             != crate::instruments::equity::real_estate::RealEstateValuationMethod::Dcf
         {
             return Ok(());
-        }
-
-        if ctx.curves.get_discount(&a.discount_curve_id).is_ok() {
-            return Err(CoreError::Validation(
-                "DiscountRateSensitivity: defined for curve-free DCF only (remove discount curve)"
-                    .into(),
-            ));
         }
         if a.discount_rate.is_none() {
             return Err(CoreError::Validation(
@@ -237,7 +229,7 @@ impl MetricCalculator for DiscountRateSensitivity {
                     "DiscountRateSensitivity: not applicable for non-DCF valuation".into(),
                 ));
             }
-            Self::ensure_curve_free_dcf(context, asset)?;
+            Self::ensure_dcf_rate_present(asset)?;
             let v_up = Self::eval_asset(context, asset, self.bump_abs)?;
             let v_dn = Self::eval_asset(context, asset, -self.bump_abs)?;
             return Ok((v_up - v_dn) / (2.0 * self.bump_abs));
@@ -255,7 +247,7 @@ impl MetricCalculator for DiscountRateSensitivity {
                     "DiscountRateSensitivity: not applicable for non-DCF valuation".into(),
                 ));
             }
-            Self::ensure_curve_free_dcf(context, &levered.asset)?;
+            Self::ensure_dcf_rate_present(&levered.asset)?;
 
             let mut up = levered.clone();
             let r = up

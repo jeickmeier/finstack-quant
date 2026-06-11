@@ -14,7 +14,7 @@
 - Standard DCF formula: present value of projected FCFs plus discounted terminal value minus equity bridge adjustments.
 - Terminal value options: Gordon Growth, Exit Multiple, and H-Model (Damodaran linear growth fade).
 - Mid-year convention: discounts flows at `(t - 0.5)` instead of `t`, reflecting mid-period cash arrival.
-- Year fractions use an ACT/365.25 basis; discounting uses deterministic WACC or supplied curve.
+- Year fractions use an ACT/365.25 basis; discounting always uses the deterministic WACC (the named curve is for risk attribution only).
 - Valuation discounts applied multiplicatively: `FMV = Equity × (1 - DLOC) × (1 - DLOM)`.
 - Dilution via treasury stock method: in-the-money securities increase diluted share count.
 
@@ -139,7 +139,7 @@ Equity = EV - Total Debt + Cash - Preferred Equity
 
 ## Pricing Methodology
 
-- Discounts explicit free cashflows and terminal value using WACC/discount curve on ACT/365.25 basis.
+- Discounts explicit free cashflows and terminal value at WACC on ACT/365.25 basis; DV01 bumps the risk-free component inside the WACC.
 - Mid-year convention (optional): discounts at `(t - 0.5)` years.
 - Terminal value via Gordon Growth, Exit Multiple, or H-Model, discounted to valuation date.
 - Equity value = Enterprise Value − Bridge Amount; then DLOC/DLOM discounts applied.

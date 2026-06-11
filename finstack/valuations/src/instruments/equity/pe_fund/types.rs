@@ -43,6 +43,16 @@ pub struct PrivateMarketsFund {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discount_curve_id: Option<CurveId>,
+    /// Unrealized net asset value attributable to the LP, stated as of the
+    /// fund's valuation date.
+    ///
+    /// Holder-view residual value (review finding M13): the fund's present
+    /// value is the PV of LP cashflows strictly after the valuation date plus
+    /// this NAV. When `None`, the residual value is zero — a fully realized
+    /// fund prices to ~0.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unrealized_nav: Option<Money>,
     /// Pricing overrides for scenario analysis and model configuration.
     #[serde(default)]
     #[builder(default)]
@@ -67,6 +77,7 @@ impl PrivateMarketsFund {
             waterfall_spec,
             events,
             discount_curve_id: None,
+            unrealized_nav: None,
             pricing_overrides: crate::instruments::PricingOverrides::default(),
             attributes: Attributes::new(),
         }
@@ -118,6 +129,12 @@ impl PrivateMarketsFund {
         self
     }
 
+    /// Set the unrealized NAV attributable to the LP as of the valuation date.
+    pub fn with_unrealized_nav(mut self, unrealized_nav: Money) -> Self {
+        self.unrealized_nav = Some(unrealized_nav);
+        self
+    }
+
     /// Run the waterfall allocation engine on all fund events.
     pub fn run_waterfall(&self) -> finstack_core::Result<AllocationLedger> {
         pricer::run_waterfall(self)
@@ -136,8 +153,8 @@ impl Instrument for PrivateMarketsFund {
 
     // === Pricing Methods ===
 
-    fn base_value(&self, curves: &MarketContext, _as_of: Date) -> finstack_core::Result<Money> {
-        pricer::compute_pv(self, curves)
+    fn base_value(&self, curves: &MarketContext, as_of: Date) -> finstack_core::Result<Money> {
+        pricer::compute_pv(self, curves, as_of)
     }
 
     fn resolve_pricing_as_of(&self, market: &MarketContext, requested: Date) -> Date {

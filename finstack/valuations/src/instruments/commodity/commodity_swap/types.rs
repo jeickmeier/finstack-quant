@@ -102,6 +102,16 @@ pub struct CommoditySwap {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_lag_days: Option<i32>,
+    /// Realized floating-index fixings as `(date, price)` pairs.
+    ///
+    /// Floating-leg observations with date strictly before the valuation date
+    /// read from this store; a missing past fixing is an error — no silent
+    /// substitution of today's spot (review finding M15). Observations on or
+    /// after the valuation date project from the price curve.
+    #[builder(default)]
+    #[serde(default)]
+    #[schemars(with = "Vec<(String, f64)>")]
+    pub realized_fixings: Vec<(Date, f64)>,
     /// Attributes for tagging and selection.
     #[serde(default)]
     #[builder(default)]
@@ -140,6 +150,8 @@ impl<'de> serde::Deserialize<'de> for CommoditySwap {
             #[serde(default)]
             index_lag_days: Option<i32>,
             #[serde(default)]
+            realized_fixings: Vec<(Date, f64)>,
+            #[serde(default)]
             pricing_overrides: crate::instruments::PricingOverrides,
             attributes: Attributes,
         }
@@ -162,6 +174,7 @@ impl<'de> serde::Deserialize<'de> for CommoditySwap {
             bdc: helper.bdc,
             discount_curve_id: helper.discount_curve_id,
             index_lag_days: helper.index_lag_days,
+            realized_fixings: helper.realized_fixings,
             pricing_overrides: helper.pricing_overrides,
             attributes: helper.attributes,
         })
@@ -285,18 +298,19 @@ impl CommoditySwap {
     /// valid holiday calendar, exchange holidays are also excluded from the
     /// average. Otherwise, only weekends are filtered.
     ///
-    /// # Note on PriceCurve Evaluation
+    /// # Past vs future observations (review finding M15)
     ///
-    /// This method uses `price_on_date(date)` to respect the curve's day count
-    /// convention rather than hard-coding Act365F. If the *whole* observation
-    /// window precedes the curve's base date, the curve's spot price is used.
-    /// A curve-lookup failure for an observation date that is *inside* the
-    /// window is propagated as an error (W-11) — silently substituting spot
-    /// there would hide a misconfigured curve and corrupt the average.
+    /// Observation dates strictly before `as_of` read from
+    /// [`realized_fixings`](Self::realized_fixings); a missing past fixing is
+    /// an `Error::Validation` naming the date — silently substituting today's
+    /// spot would mis-mark every seasoned averaging period. Observation dates
+    /// on or after `as_of` project from the curve via `price_on_date(date)`
+    /// (respecting the curve's day count convention); a curve-lookup failure
+    /// inside the window is propagated as an error (W-11).
     fn expected_period_price(
         &self,
         price_curve: &finstack_core::market_data::term_structures::PriceCurve,
-        _as_of: Date,
+        as_of: Date,
         period_start: Date,
         period_end: Date,
     ) -> Result<f64> {
@@ -324,21 +338,32 @@ impl CommoditySwap {
             true
         };
 
-        // For past periods (both obs dates <= curve base), use spot price
-        let curve_base = price_curve.base_date();
-        if obs_end <= curve_base {
-            return Ok(price_curve.spot_price());
+        // Realized-fixing lookup for past observation dates, with duplicate
+        // rejection (a duplicate would silently skew the average).
+        let mut fixings: std::collections::BTreeMap<Date, f64> = std::collections::BTreeMap::new();
+        for (d, v) in &self.realized_fixings {
+            if fixings.insert(*d, *v).is_some() {
+                return Err(finstack_core::Error::Validation(format!(
+                    "CommoditySwap '{}' has duplicate realized fixing for date {d}",
+                    self.id.as_str()
+                )));
+            }
         }
 
-        // Curve-aware price lookup. A curve-lookup failure (e.g. the
-        // observation date precedes the curve base, meaning the curve does not
-        // cover this averaging window) is propagated as an error rather than
-        // silently substituting the curve spot (W-11): mixing spot into the
-        // average would hide a misconfigured curve and corrupt the result.
-        // Fully-past periods are already handled by the `obs_end <= curve_base`
-        // early return above, so reaching here with a pre-base date means the
-        // period genuinely straddles the curve base.
-        let get_price = |date: Date| -> Result<f64> { price_curve.price_on_date(date) };
+        let get_price = |date: Date| -> Result<f64> {
+            if date < as_of {
+                fixings.get(&date).copied().ok_or_else(|| {
+                    finstack_core::Error::Validation(format!(
+                        "CommoditySwap '{}' is missing a realized fixing for past \
+                         observation date {date} (as_of {as_of}); past floating-leg \
+                         observations must be supplied via realized_fixings",
+                        self.id.as_str()
+                    ))
+                })
+            } else {
+                price_curve.price_on_date(date)
+            }
+        };
 
         // Market standard: daily business day sampling for all periods.
         // Compensated (Neumaier) summation keeps the average accurate over a
@@ -898,6 +923,154 @@ mod tests {
             "on a flat curve with fixed == flat price the swap NPV must be ~0, \
              got {npv}; a non-zero value indicates summation error in the \
              daily floating-leg average"
+        );
+    }
+
+    /// Helper: every business day (weekend-filtered) in `[start, end]`.
+    fn business_days(start: Date, end: Date) -> Vec<Date> {
+        let mut days = Vec::new();
+        let mut current = start;
+        while current <= end {
+            let wd = current.weekday();
+            if wd != time::Weekday::Saturday && wd != time::Weekday::Sunday {
+                days.push(current);
+            }
+            current += time::Duration::days(1);
+        }
+        days
+    }
+
+    fn seasoned_swap(realized_fixings: Vec<(Date, f64)>) -> CommoditySwap {
+        CommoditySwap::builder()
+            .id(InstrumentId::new("SEASONED-SWAP"))
+            .underlying(CommodityUnderlyingParams::new(
+                "Energy",
+                "NG",
+                "MMBTU",
+                Currency::USD,
+            ))
+            .quantity(10000.0)
+            .fixed_price(rust_decimal::Decimal::try_from(3.50).expect("decimal"))
+            .floating_index_id(CurveId::new("NG-SPOT-AVG"))
+            .side(PayReceive::Pay)
+            .start_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
+            .maturity(Date::from_calendar_date(2025, Month::June, 30).expect("date"))
+            .frequency(Tenor::new(1, finstack_core::dates::TenorUnit::Months))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .realized_fixings(realized_fixings)
+            .build()
+            .expect("should build")
+    }
+
+    /// Review finding M15: past floating-leg observations read from the
+    /// realized-fixings store. With flat fixings equal to a flat curve and a
+    /// matching fixed price, the seasoned swap marks to ~0.
+    #[test]
+    fn m15_seasoned_swap_uses_realized_fixings() {
+        // Mid-February valuation: the Jan 31 payment has settled; the live
+        // Feb period straddles as_of and needs realized fixings.
+        let as_of = Date::from_calendar_date(2025, Month::February, 14).expect("date");
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+
+        let fixings: Vec<(Date, f64)> = business_days(start, as_of)
+            .into_iter()
+            .map(|d| (d, 3.50))
+            .collect();
+        let swap = seasoned_swap(fixings);
+
+        let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+            .base_date(as_of)
+            .spot_price(3.50)
+            .knots([(0.0, 3.50), (2.0, 3.50)])
+            .build()
+            .expect("price curve");
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (2.0, 0.90)])
+            .build()
+            .expect("discount curve");
+        let market = MarketContext::new().insert(disc).insert(price_curve);
+
+        let npv = swap.value(&market, as_of).expect("should price").amount();
+        assert!(
+            npv.abs() < 1e-6,
+            "flat fixings + flat curve at the fixed price must mark to ~0, got {npv}"
+        );
+    }
+
+    /// Review finding M15: a missing past fixing is an error naming the
+    /// missing date — never silently substituted with spot.
+    #[test]
+    fn m15_missing_past_fixing_errors() {
+        let as_of = Date::from_calendar_date(2025, Month::February, 14).expect("date");
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+
+        // Drop one mid-window business day from the fixings.
+        let missing = Date::from_calendar_date(2025, Month::February, 5).expect("date");
+        let fixings: Vec<(Date, f64)> = business_days(start, as_of)
+            .into_iter()
+            .filter(|d| *d != missing)
+            .map(|d| (d, 3.50))
+            .collect();
+        let swap = seasoned_swap(fixings);
+
+        let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+            .base_date(as_of)
+            .spot_price(3.50)
+            .knots([(0.0, 3.50), (2.0, 3.50)])
+            .build()
+            .expect("price curve");
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (2.0, 0.90)])
+            .build()
+            .expect("discount curve");
+        let market = MarketContext::new().insert(disc).insert(price_curve);
+
+        let err = swap
+            .value(&market, as_of)
+            .expect_err("missing past fixing must error");
+        assert!(
+            err.to_string().contains("2025-02-05"),
+            "error should name the missing date, got: {err}"
+        );
+    }
+
+    /// Review finding M15: duplicate realized fixing dates are rejected.
+    #[test]
+    fn m15_duplicate_fixing_errors() {
+        let as_of = Date::from_calendar_date(2025, Month::February, 14).expect("date");
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+
+        let mut fixings: Vec<(Date, f64)> = business_days(start, as_of)
+            .into_iter()
+            .map(|d| (d, 3.50))
+            .collect();
+        fixings.push((
+            Date::from_calendar_date(2025, Month::February, 5).expect("date"),
+            3.60,
+        ));
+        let swap = seasoned_swap(fixings);
+
+        let price_curve = PriceCurve::builder("NG-SPOT-AVG")
+            .base_date(as_of)
+            .spot_price(3.50)
+            .knots([(0.0, 3.50), (2.0, 3.50)])
+            .build()
+            .expect("price curve");
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (2.0, 0.90)])
+            .build()
+            .expect("discount curve");
+        let market = MarketContext::new().insert(disc).insert(price_curve);
+
+        let err = swap
+            .value(&market, as_of)
+            .expect_err("duplicate fixing must error");
+        assert!(
+            err.to_string().contains("duplicate realized fixing"),
+            "error should mention the duplicate, got: {err}"
         );
     }
 

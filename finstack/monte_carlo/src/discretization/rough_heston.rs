@@ -12,26 +12,40 @@
 //! Because the variance at each time step depends on the *entire* history of
 //! shocks and variance values, a standard one-step Euler scheme cannot be
 //! applied.  This discretization computes the Volterra integral at every step
-//! by summing over all previous steps — an O(n²) algorithm per path.  This is
-//! the simplest correct scheme; geometric-binning optimizations can be added
-//! later. Construction logs a warning for grids above 200 steps because the
+//! by summing over all previous steps — an O(n²) algorithm per path.
+//! Construction logs a warning for grids above 200 steps because the
 //! quadratic Volterra cost can dominate large production runs.
+//!
+//! # Kernel Weights (review finding M8)
+//!
+//! The singular kernel `(t − s)^{α−1}` is handled with hybrid-scheme weights
+//! (Bennedsen-Lunde-Pakkanen style), with the drift and noise components of
+//! each historical step weighted separately:
+//!
+//! - **Drift** (all intervals, exact): the per-interval kernel integral
+//!   `∫_{t_j}^{t_{j+1}} (t_next − s)^{α−1} ds = [(t_next − t_j)^α − (t_next − t_{j+1})^α] / α`
+//!   multiplies the drift rate `κ(θ − V_j)`.
+//! - **Noise, far field** (`j < step`): the same per-interval average kernel
+//!   `[(t_next − t_j)^α − (t_next − t_{j+1})^α] / (α·Δt_j)` multiplies the
+//!   stored noise increment — exact in expectation, accurate away from the
+//!   singularity.
+//! - **Noise, near field** (`j == step`, the singular last interval): the
+//!   variance-exact weight `Δt^{α−1}/√(2α−1)`, i.e.
+//!   `√(∫₀^{Δt} s^{2(α−1)} ds / Δt)`, so the contribution
+//!   `σᵥ√V·∫ K dW̃` has the exact second moment. A midpoint kernel
+//!   `(Δt/2)^{α−1}` underweights this singular interval by a factor
+//!   `2^{1−α}√(2α−1)` (≈ 40% of the noise standard deviation at H = 0.1).
 //!
 //! # Work Buffer Layout
 //!
-//! The `work` buffer is used to store the per-step Volterra integrands so that
-//! the sum can be evaluated at each new time step:
+//! The `work` buffer stores the drift and noise components of the Volterra
+//! integrand separately so they can be weighted independently:
 //!
 //! | Offset | Content |
 //! |--------|---------|
-//! | `0 .. num_steps` | `f_j` — Volterra integrand at step j |
-//! | `num_steps` | Step counter (as `f64`) |
-//!
-//! The integrand at step j is:
-//!
-//! ```text
-//! f_j = κ(θ − V_j) Δt_j + σᵥ √(max(V_j, 0)) Z̃_j √Δt_j
-//! ```
+//! | `0 .. num_steps` | `a_j = κ(θ − V_j)` — drift rate at step j |
+//! | `num_steps .. 2·num_steps` | `n_j = σᵥ √(max(V_j, 0)) Z̃_j √Δt_j` — noise increment at step j |
+//! | `2·num_steps` | Step counter (as `f64`) |
 //!
 //! # Noise Layout
 //!
@@ -73,8 +87,10 @@ use super::super::traits::Discretization;
 /// Hybrid Euler–Maruyama discretization for the rough Heston model.
 ///
 /// At each time step the Volterra integral is evaluated by summing over all
-/// previous steps with the singular kernel `(t − s)^{α−1} / Γ(α)`.  This is
-/// O(n²) per path but exact (no binning approximation).
+/// previous steps with the singular kernel `(t − s)^{α−1} / Γ(α)`, using
+/// exact per-interval kernel integrals for the drift and a variance-exact
+/// near-field weight for the singular last-interval noise term (see the
+/// [module-level documentation](self)). This is O(n²) per path.
 /// Grids above 200 steps log a construction-time warning to make this cost
 /// visible before the simulation starts.
 ///
@@ -164,39 +180,51 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         // (see `run_path_loop` in engine/simulation.rs), so the step
         // counter starts at 0.0 cleanly without resorting to `t < ε`
         // heuristics to detect path boundaries.
-        let step = work[self.num_steps] as usize;
+        let n = self.num_steps;
+        let step = work[2 * n] as usize;
 
         let v_current = x[1].max(0.0);
         let z_vol = z[1]; // Standard normal for variance noise
         let dw_tilde = z_vol * dt.sqrt();
 
-        // ── Store Volterra integrand for this step ─────────────────────
+        // ── Store drift and noise components for this step ─────────────
         //
-        //   f_j = κ(θ − V_j) Δt_j + σᵥ √V_j dW̃_j
+        //   a_j = κ(θ − V_j)            (drift rate, weighted by ∫K ds)
+        //   n_j = σᵥ √V_j dW̃_j          (noise increment)
         //
-        work[step] = p.kappa * (p.theta - v_current) * dt + p.sigma_v * v_current.sqrt() * dw_tilde;
+        work[step] = p.kappa * (p.theta - v_current);
+        work[n + step] = p.sigma_v * v_current.sqrt() * dw_tilde;
 
         // ── Evaluate Volterra integral to obtain V_{next} ──────────────
         //
-        //   V_{next} = v₀ + (1/Γ(α)) Σ_{j=0}^{step} (t_next − t_j_mid)^{α−1} f_j
+        //   V_{next} = v₀ + (1/Γ(α)) Σ_{j=0}^{step} [a_j·∫_{t_j}^{t_{j+1}}K ds
+        //                                            + w_j·n_j]
         //
-        // The kernel is evaluated at the midpoint of each historical interval
-        // to reduce discretization bias.
+        // with K(s) = (t_next − s)^{α−1}. The drift uses the exact
+        // per-interval kernel integral; far-field noise uses the interval-
+        // average kernel; the singular last interval uses the variance-exact
+        // near-field weight Δt^{α−1}/√(2α−1) (review finding M8).
         let t_next = t + dt;
-        let alpha_m1 = self.alpha - 1.0;
+        let alpha = self.alpha;
+        let alpha_m1 = alpha - 1.0;
         let mut volterra_sum = 0.0;
-        for ((&f_j, &t_j), &dt_j) in work[..=step]
-            .iter()
-            .zip(&self.times[..=step])
-            .zip(&self.dt_grid[..=step])
-        {
-            let t_j_mid = t_j + 0.5 * dt_j;
-            let lag = t_next - t_j_mid;
-            // Kernel: (t_next − t_j_mid)^{α−1}.
-            // Since α ∈ (0.5, 1.0), α−1 ∈ (−0.5, 0.0) so the kernel is singular
-            // near lag = 0.  A guard prevents division by zero.
-            let kernel = if lag > 1e-15 { lag.powf(alpha_m1) } else { 0.0 };
-            volterra_sum += kernel * f_j;
+        for (j, &dt_j) in self.dt_grid[..=step].iter().enumerate() {
+            let a = t_next - self.times[j]; // lag to interval start (> 0)
+            let b = (t_next - self.times[j + 1]).max(0.0); // lag to interval end
+                                                           // Exact ∫_{t_j}^{t_{j+1}} (t_next − s)^{α−1} ds.
+            let kernel_int = (a.powf(alpha) - b.powf(alpha)) / alpha;
+
+            // Drift: exact kernel integral against the constant drift rate.
+            volterra_sum += work[j] * kernel_int;
+
+            // Noise: average kernel weight in the far field; variance-exact
+            // weight on the singular last interval.
+            let noise_weight = if j == step {
+                dt_j.powf(alpha_m1) / (2.0 * alpha - 1.0).sqrt()
+            } else {
+                kernel_int / dt_j
+            };
+            volterra_sum += work[n + j] * noise_weight;
         }
         let v_next = (p.v0 + self.inv_gamma_alpha * volterra_sum).max(0.0);
 
@@ -211,11 +239,11 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         x[1] = v_next;
 
         // ── Increment step counter ─────────────────────────────────────
-        work[self.num_steps] = (step + 1) as f64;
+        work[2 * n] = (step + 1) as f64;
     }
 
     fn work_size(&self, _process: &RoughHestonProcess) -> usize {
-        self.num_steps + 1 // history array + step counter
+        2 * self.num_steps + 1 // drift rates + noise increments + step counter
     }
 }
 
@@ -304,16 +332,18 @@ mod tests {
 
         disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
 
-        // Manually compute expected variance
+        // Manually compute expected variance (M8 hybrid weights):
+        // drift gets the exact kernel integral ∫₀^dt s^{α−1} ds = dt^α / α,
+        // the singular last-interval noise gets the variance-exact weight
+        // dt^{α−1} / √(2α−1).
         let dw_tilde = z_vol * dt.sqrt();
-        let f_0 = p.kappa * (p.theta - v0) * dt + p.sigma_v * v0.sqrt() * dw_tilde;
-        let t_mid = 0.5 * dt;
-        let t_next = dt;
-        let lag = t_next - t_mid;
-        let alpha_m1 = alpha - 1.0;
-        let kernel = lag.powf(alpha_m1);
+        let drift_rate = p.kappa * (p.theta - v0);
+        let noise = p.sigma_v * v0.sqrt() * dw_tilde;
+        let kernel_int = dt.powf(alpha) / alpha;
+        let noise_weight = dt.powf(alpha - 1.0) / (2.0 * alpha - 1.0).sqrt();
         let inv_gamma = 1.0 / finstack_core::math::ln_gamma(alpha).exp();
-        let expected_v = (v0 + inv_gamma * kernel * f_0).max(0.0);
+        let expected_v =
+            (v0 + inv_gamma * (drift_rate * kernel_int + noise * noise_weight)).max(0.0);
 
         assert!(
             (x[1] - expected_v).abs() < 1e-12,
@@ -355,7 +385,7 @@ mod tests {
         }
 
         // Step counter should equal n
-        let step_count = work[n] as usize;
+        let step_count = work[2 * n] as usize;
         assert_eq!(step_count, n, "Step counter should track executed steps");
 
         // Variance should differ from v0 after accumulating history
@@ -391,7 +421,7 @@ mod tests {
                 &mut work,
             );
         }
-        let step_after_p1 = work[n] as usize;
+        let step_after_p1 = work[2 * n] as usize;
         assert_eq!(step_after_p1, n);
 
         // Start path 2 — engine resets the work buffer.
@@ -404,7 +434,8 @@ mod tests {
 
         // Step counter should be 1 (zeroed then incremented).
         assert_eq!(
-            work[n] as usize, 1,
+            work[2 * n] as usize,
+            1,
             "Step counter should reset for new path"
         );
     }
@@ -417,7 +448,205 @@ mod tests {
         let times = uniform_grid(50, 1.0);
         let disc = RoughHestonHybrid::new(&times, 0.1).expect("valid");
 
-        assert_eq!(disc.work_size(&process), 51); // 50 history slots + 1 counter
+        // 50 drift-rate slots + 50 noise slots + 1 counter
+        assert_eq!(disc.work_size(&process), 101);
+    }
+
+    // -- M8 kernel weights ----------------------------------------------------
+
+    /// The singular last-interval noise weight must be variance-exact:
+    /// the one-step noise contribution to V is `(1/Γ(α))·σᵥ√v₀·∫₀^Δt s^{α−1} dW`,
+    /// whose standard deviation per unit normal is
+    /// `(1/Γ(α))·σᵥ√v₀·√(Δt^{2α−1}/(2α−1))` (review finding M8). A midpoint
+    /// kernel `(Δt/2)^{α−1}·√Δt` understates this by `2^{1−α}√(2α−1)`.
+    #[test]
+    fn near_field_noise_weight_is_variance_exact() {
+        let process = make_process();
+        let p = process.params();
+        let h = p.hurst.value();
+        let alpha = h + 0.5;
+        let dt = 0.01_f64;
+        let times = vec![0.0, dt];
+        let disc = RoughHestonHybrid::new(&times, h).expect("valid");
+
+        // V_1 with z_vol = 1 minus V_1 with z_vol = 0 isolates the noise term.
+        let run = |z_vol: f64| -> f64 {
+            let mut x = vec![100.0, p.v0];
+            let z = vec![0.0, z_vol];
+            let mut work = vec![0.0; disc.work_size(&process)];
+            disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
+            x[1]
+        };
+        let noise_per_unit_z = run(1.0) - run(0.0);
+
+        let inv_gamma = 1.0 / finstack_core::math::ln_gamma(alpha).exp();
+        let exact = inv_gamma
+            * p.sigma_v
+            * p.v0.sqrt()
+            * (dt.powf(2.0 * alpha - 1.0) / (2.0 * alpha - 1.0)).sqrt();
+        assert!(
+            (noise_per_unit_z - exact).abs() < 1e-14,
+            "one-step noise contribution per unit normal must equal the \
+             exact kernel L² norm: got {noise_per_unit_z}, exact {exact}"
+        );
+
+        // And it must exceed the midpoint-kernel weight it replaces.
+        let midpoint =
+            inv_gamma * p.sigma_v * p.v0.sqrt() * (0.5 * dt).powf(alpha - 1.0) * dt.sqrt();
+        assert!(
+            noise_per_unit_z > midpoint,
+            "exact near-field weight ({noise_per_unit_z}) must exceed the \
+             midpoint approximation ({midpoint})"
+        );
+    }
+
+    /// MC mean of the variance process vs an independent fine-grid
+    /// product-integration solution of the fractional mean ODE
+    /// `E[V_t] = v₀ + (1/Γ(α)) ∫₀ᵗ (t−s)^{α−1} κ(θ − E[V_s]) ds`.
+    /// The drift is linear in V, so the MC mean must track this deterministic
+    /// solution; the noise terms have zero mean by construction.
+    #[test]
+    fn variance_mean_matches_fractional_riccati_mean() {
+        use super::super::super::rng::philox::PhiloxRng;
+        use super::super::super::traits::RandomStream;
+        use finstack_core::math::fractional::HurstExponent;
+
+        // Milder parameters keep the V ≥ 0 floor mostly inactive so the
+        // linear mean ODE is the right reference.
+        let h = 0.25_f64;
+        let (r, q, kappa, theta, sigma_v, rho, v0) =
+            (0.0, 0.0, 2.0_f64, 0.06_f64, 0.15_f64, -0.5, 0.03_f64);
+        let hurst = HurstExponent::new(h).expect("valid hurst");
+        let params =
+            RoughHestonParams::new(r, q, hurst, kappa, theta, sigma_v, rho, v0).expect("valid");
+        let process = RoughHestonProcess::new(params);
+
+        let t_end = 1.0_f64;
+        let n = 50usize;
+        let times = uniform_grid(n, t_end);
+        let disc = RoughHestonHybrid::new(&times, h).expect("valid");
+
+        // MC mean of V_T.
+        let num_paths = 20_000usize;
+        let mut rng = PhiloxRng::new(98765);
+        let mut normals = vec![0.0; 2 * n];
+        let mut sum_v = 0.0;
+        for _ in 0..num_paths {
+            rng.fill_std_normals(&mut normals);
+            let mut x = vec![100.0, v0];
+            let mut work = vec![0.0; disc.work_size(&process)];
+            for k in 0..n {
+                let z = [normals[2 * k], normals[2 * k + 1]];
+                disc.step(
+                    &process,
+                    times[k],
+                    times[k + 1] - times[k],
+                    &mut x,
+                    &z,
+                    &mut work,
+                );
+            }
+            sum_v += x[1];
+        }
+        let mc_mean = sum_v / num_paths as f64;
+
+        // Independent reference: product integration of the mean ODE on a
+        // 40× finer grid, with exact per-interval kernel integrals.
+        let alpha = h + 0.5;
+        let inv_gamma = 1.0 / finstack_core::math::ln_gamma(alpha).exp();
+        let m = 2_000usize;
+        let dtf = t_end / m as f64;
+        let mut mean_v = vec![v0; m + 1];
+        for k in 1..=m {
+            let t_k = k as f64 * dtf;
+            let mut sum = 0.0;
+            for (j, &mean_v_j) in mean_v.iter().enumerate().take(k) {
+                let a = t_k - j as f64 * dtf;
+                let b = t_k - (j + 1) as f64 * dtf;
+                let kernel_int = (a.powf(alpha) - b.powf(alpha)) / alpha;
+                sum += kappa * (theta - mean_v_j) * kernel_int;
+            }
+            mean_v[k] = v0 + inv_gamma * sum;
+        }
+        let reference = mean_v[m];
+
+        let rel = (mc_mean - reference).abs() / reference;
+        assert!(
+            rel < 2e-2,
+            "MC E[V_T]={mc_mean} must match the fractional mean ODE \
+             solution {reference} (rel err {rel})"
+        );
+    }
+
+    /// MC ATM call price vs the (post-B1/M7) rough-Heston Fourier pricer.
+    #[test]
+    #[ignore = "slow: covered by mise rust-test-slow"]
+    fn mc_atm_price_matches_fourier_pricer() {
+        use super::super::super::rng::philox::PhiloxRng;
+        use super::super::super::traits::RandomStream;
+        use finstack_core::math::fractional::HurstExponent;
+        use finstack_core::math::volatility::rough_heston::RoughHestonFourierParams;
+
+        let h = 0.1_f64;
+        let (r, q, kappa, theta, sigma_v, rho, v0) =
+            (0.0, 0.0, 2.0_f64, 0.04_f64, 0.3_f64, -0.7, 0.04_f64);
+        let (s0, strike, t_end) = (100.0_f64, 100.0_f64, 0.5_f64);
+
+        let fourier = RoughHestonFourierParams::new(v0, kappa, theta, sigma_v, rho, h)
+            .expect("valid fourier params");
+        let reference = fourier.price_european(s0, strike, r, q, t_end, true);
+        assert!(reference.is_finite() && reference > 0.0);
+
+        let hurst = HurstExponent::new(h).expect("valid hurst");
+        let params =
+            RoughHestonParams::new(r, q, hurst, kappa, theta, sigma_v, rho, v0).expect("valid");
+        let process = RoughHestonProcess::new(params);
+
+        // The Euler scheme for rough Heston converges slowly in the step
+        // count at small H; check both that the error shrinks under grid
+        // refinement and that the fine grid lands within tolerance.
+        let num_paths = 100_000usize;
+        let mut rel_errs = Vec::new();
+        for &n in &[50usize, 200] {
+            let times = uniform_grid(n, t_end);
+            let disc = RoughHestonHybrid::new(&times, h).expect("valid");
+
+            let mut rng = PhiloxRng::new(192837);
+            let mut normals = vec![0.0; 2 * n];
+            let mut sum_payoff = 0.0;
+            for _ in 0..num_paths {
+                rng.fill_std_normals(&mut normals);
+                let mut x = vec![s0, v0];
+                let mut work = vec![0.0; disc.work_size(&process)];
+                for k in 0..n {
+                    let z = [normals[2 * k], normals[2 * k + 1]];
+                    disc.step(
+                        &process,
+                        times[k],
+                        times[k + 1] - times[k],
+                        &mut x,
+                        &z,
+                        &mut work,
+                    );
+                }
+                sum_payoff += (x[0] - strike).max(0.0);
+            }
+            let mc_price = (sum_payoff / num_paths as f64) * (-r * t_end).exp();
+            rel_errs.push((mc_price - reference).abs() / reference);
+        }
+
+        assert!(
+            rel_errs[1] < rel_errs[0],
+            "MC error must shrink under step refinement: n=50 → {}, n=200 → {}",
+            rel_errs[0],
+            rel_errs[1]
+        );
+        assert!(
+            rel_errs[1] < 3e-2,
+            "MC ATM call must match Fourier price {reference} within 3% at \
+             n=200 (rel err {})",
+            rel_errs[1]
+        );
     }
 
     // -- Spot positivity under stress ---------------------------------------

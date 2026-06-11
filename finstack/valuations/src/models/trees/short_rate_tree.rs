@@ -55,9 +55,10 @@ use finstack_core::types::CurveId;
 use finstack_core::HashMap;
 use finstack_core::{Error, Result};
 
+use super::hull_white_tree::HullWhiteTree;
 use super::tree_framework::{
-    price_recombining_tree, state_keys, RecombiningInputs, TreeBranching, TreeGreeks, TreeModel,
-    TreeValuator,
+    price_recombining_tree, state_keys, CachedValues, NodeState, RecombiningInputs, TreeBranching,
+    TreeGreeks, TreeModel, TreeValuator,
 };
 
 /// Default normal (absolute) volatility for Ho-Lee model.
@@ -131,6 +132,29 @@ impl TreeCompounding {
         }
     }
 
+    /// Invert [`df`](Self::df): the per-step rate under this convention that
+    /// reproduces the given discount factor over `dt`.
+    ///
+    /// Returns `rate` such that `self.df(rate, dt) = df`. For `dt ≈ 0` or a
+    /// non-positive `df` the continuous-equivalent fallback is used.
+    #[inline]
+    pub fn rate_from_df(self, df: f64, dt: f64) -> f64 {
+        if dt.abs() < f64::EPSILON || df <= 0.0 {
+            tracing::warn!(
+                "TreeCompounding::rate_from_df: degenerate input df={df:.6e}, dt={dt}, \
+                 convention={self:?}; returning 0"
+            );
+            return 0.0;
+        }
+        match self {
+            Self::Continuous => -df.ln() / dt,
+            Self::Simple => (1.0 / df - 1.0) / dt,
+            Self::SemiAnnual => 2.0 * (df.powf(-1.0 / (2.0 * dt)) - 1.0),
+            Self::Quarterly => 4.0 * (df.powf(-1.0 / (4.0 * dt)) - 1.0),
+            Self::Monthly => 12.0 * (df.powf(-1.0 / (12.0 * dt)) - 1.0),
+        }
+    }
+
     /// Convert a rate under this convention to the equivalent continuous rate.
     ///
     /// Returns `r_cont` such that `exp(-r_cont * dt) = self.df(rate, dt)`.
@@ -159,7 +183,7 @@ impl TreeCompounding {
 /// | Model | Vol Type | Negative Rates | Mean Reversion | Use Case |
 /// |-------|----------|----------------|----------------|----------|
 /// | Ho-Lee | Normal | ✅ Yes | ❌ No | Low/negative rate environments |
-/// | BDT | Lognormal | ❌ No | Not currently applied | Traditional positive rate environments |
+/// | BDT/BK | Lognormal | ❌ No | ✅ Yes (κ ≠ 0 → trinomial BK lattice) | Traditional positive rate environments |
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShortRateModel {
     /// Ho-Lee model: Gaussian/normal short rates.
@@ -197,9 +221,11 @@ pub enum ShortRateModel {
     ///
     /// ## Properties
     /// - ❌ Cannot handle negative rates (rates stay positive)
-    /// - When `κ = 0`: standard BDT with constant lognormal volatility
-    /// - When `κ > 0`: Black-Karasinski extension; rate dispersion is
-    ///   tightened via the integrated variance `σ²(1-e^{-2κΔt})/(2κ)`
+    /// - When `κ = 0`: standard BDT with constant lognormal volatility on a
+    ///   binomial lattice
+    /// - When `κ > 0`: Black-Karasinski on a trinomial lattice in x = ln r
+    ///   (Hull-White geometry with edge branch switching); terminal log-rate
+    ///   dispersion tightens toward `σ√((1-e^{-2κT})/(2κ))`
     /// - Lognormal distribution matches cap/floor market conventions
     ///
     /// ## Typical Volatility Range
@@ -274,9 +300,10 @@ pub struct ShortRateTreeConfig {
     /// Controls how quickly rates revert to the long-term mean.
     /// - Typical values: 0.01-0.10 (1-10% per year)
     /// - Higher values = faster reversion, less rate dispersion
-    /// - Ho-Lee/Hull-White: explicit mean reversion in the drift
-    /// - BDT/Black-Karasinski: tightens the per-step lognormal spread
-    ///   via integrated variance; 0 recovers standard BDT
+    /// - Ho-Lee: not supported (breaks lattice recombination); use
+    ///   `HullWhiteTree` for mean-reverting normal models
+    /// - BDT/Black-Karasinski: κ = 0 calibrates standard binomial BDT;
+    ///   κ > 0 calibrates a trinomial Black-Karasinski lattice in x = ln r
     pub mean_reversion: Option<f64>,
 
     /// Tree branching type (binomial or trinomial).
@@ -343,7 +370,9 @@ impl ShortRateTreeConfig {
     ///
     /// * `steps` - Number of tree steps (50-200 typical)
     /// * `lognormal_vol` - Lognormal volatility (e.g., 0.20 = 20%/yr)
-    /// * `mean_reversion` - Mean reversion speed (0.0 = standard BDT, 0.03 = Bloomberg default)
+    /// * `mean_reversion` - Mean reversion speed; `0.0` calibrates standard
+    ///   binomial BDT, any positive value calibrates a trinomial
+    ///   Black-Karasinski lattice in x = ln r
     ///
     /// # Examples
     ///
@@ -381,7 +410,7 @@ impl ShortRateTreeConfig {
     /// Create BDT configuration with default lognormal volatility (20%).
     ///
     /// Suitable for developed market government bonds with positive rates.
-    /// Uses the current non-mean-reverting binomial BDT calibration.
+    /// Uses the non-mean-reverting (κ = 0) binomial BDT calibration.
     pub fn default_bdt(steps: usize) -> Self {
         Self::bdt(steps, DEFAULT_LOGNORMAL_VOL, 0.0)
     }
@@ -484,6 +513,22 @@ impl CalibrationResult {
     }
 }
 
+/// Calibrated Black-Karasinski trinomial lattice data (κ ≠ 0).
+///
+/// The lattice lives in x = ln r with Hull-White trinomial geometry: node
+/// spacing `dx = σ√(3Δt)`, width capped at `j_max` with branch switching at
+/// the edges, and per-node mean-reverting transition probabilities. The
+/// short rate at node (i, j) is `r = exp(a_i + (j − j_max_i)·dx)` where the
+/// per-step additive shift `a_i` is calibrated to the discount curve via
+/// Arrow-Debreu forward induction (review finding M5).
+#[derive(Debug, Clone)]
+struct BkTrinomialLattice {
+    /// Width cap on |j| (Hull-White branch-switching boundary)
+    j_max: usize,
+    /// Per-step per-node transition probabilities `(p_up, p_mid, p_down)`
+    probs: Vec<Vec<(f64, f64, f64)>>,
+}
+
 /// Short-rate tree for valuing bonds with embedded options
 #[derive(Debug, Clone)]
 pub struct ShortRateTree {
@@ -498,6 +543,8 @@ pub struct ShortRateTree {
     calibration_curve_id: CurveId,
     /// Calibration quality metrics (populated after calibration).
     calibration_quality: Option<CalibrationResult>,
+    /// Trinomial Black-Karasinski lattice (set when BDT model has κ ≠ 0).
+    bk_trinomial: Option<BkTrinomialLattice>,
 }
 
 impl ShortRateTree {
@@ -510,6 +557,7 @@ impl ShortRateTree {
             time_steps: Vec::new(),
             calibration_curve_id: CurveId::new(""),
             calibration_quality: None,
+            bk_trinomial: None,
         }
     }
 
@@ -549,7 +597,8 @@ impl ShortRateTree {
     ///
     /// * `steps` - Number of tree steps (50-200 typical)
     /// * `lognormal_vol` - Lognormal volatility (e.g., 0.20 = 20%/yr)
-    /// * `mean_reversion` - Must be zero for the current non-mean-reverting BDT calibration
+    /// * `mean_reversion` - `0.0` for standard binomial BDT; positive values
+    ///   calibrate a trinomial Black-Karasinski lattice in x = ln r
     ///
     /// # Examples
     ///
@@ -603,10 +652,26 @@ impl ShortRateTree {
         // Initialize data structures
         let mut rates = vec![Vec::new(); self.config.steps + 1];
         self.probs = vec![(0.5, 0.5); self.config.steps]; // Default to equal probabilities
+        self.bk_trinomial = None;
 
         match self.config.model {
             ShortRateModel::HoLee => self.calibrate_ho_lee(&mut rates, discount_curve, dt)?,
-            ShortRateModel::BlackDermanToy => self.calibrate_bdt(&mut rates, discount_curve, dt)?,
+            ShortRateModel::BlackDermanToy => {
+                let kappa = self.config.mean_reversion.unwrap_or(0.0);
+                if kappa < 0.0 {
+                    return Err(Error::Validation(format!(
+                        "Black-Karasinski mean reversion must be non-negative, got {kappa}"
+                    )));
+                }
+                if kappa.abs() < 1e-12 {
+                    // κ = 0: standard binomial BDT calibration.
+                    self.calibrate_bdt(&mut rates, discount_curve, dt)?;
+                } else {
+                    // κ ≠ 0: genuine trinomial Black-Karasinski lattice in
+                    // x = ln r (review finding M5).
+                    self.calibrate_bk_trinomial(&mut rates, discount_curve, dt, kappa)?;
+                }
+            }
         }
 
         self.rates = Arc::new(rates);
@@ -645,12 +710,16 @@ impl ShortRateTree {
         }
 
         let sigma = self.config.volatility;
+        // Calibration must use the same per-node discount convention as
+        // pricing (review finding M6): a tree calibrated with continuous
+        // `exp(-r*dt)` but priced with e.g. simple `1/(1+r*dt)` silently
+        // fails to reprice the curve.
+        let comp = self.config.compounding;
 
-        // Initialize first step with current short rate
-        // r0 should match P(0, T1) = exp(-r0 * T1)
-        // r0 = -ln(P(0, T1)) / T1
+        // Initialize first step with current short rate: r0 satisfies
+        // comp.df(r0, T1) = P(0, T1) under the configured convention.
         let r0 = if self.time_steps[1] > 0.0 {
-            -discount_curve.df(self.time_steps[1]).ln() / self.time_steps[1]
+            comp.rate_from_df(discount_curve.df(self.time_steps[1]), self.time_steps[1])
         } else {
             0.03 // Fallback rate
         };
@@ -683,7 +752,7 @@ impl ShortRateTree {
 
             for (i, &current_rate) in rates[step].iter().enumerate() {
                 let q = state_prices[i];
-                let df = (-current_rate * dt).exp();
+                let df = comp.df(current_rate, dt);
 
                 // Up move (to i+1)
                 let r_up_base = current_rate + sigma * dt.sqrt();
@@ -702,25 +771,52 @@ impl ShortRateTree {
 
             // 2. Solve for theta (drift adjustment to match discount curve)
             //
-            // Ho-Lee calibration: r_next[j] = r_base[j] + θ
-            // Discount factor: exp(-r_next[j] * dt) = exp(-(r_base[j] + θ) * dt)
-            //                = exp(-r_base[j]*dt) * exp(-θ*dt)
-            // Model price: P_model = Σ Q_next[j] * exp(-r_next[j] * dt)
-            //            = exp(-θ*dt) * Σ Q_next[j] * exp(-r_base[j]*dt)
-            //            = exp(-θ*dt) * P_model_base
-            // Target: P_target = exp(-θ*dt) * P_model_base
-            // ⇒ θ = -ln(P_target / P_model_base) / dt
+            // Ho-Lee calibration: r_next[j] = r_base[j] + θ. The model ZCB
+            // price Σ Q_next[j] · df(r_base[j] + θ, dt) must equal P_target.
+            //
+            // Under continuous compounding the θ-dependence factors out:
+            // df(r+θ) = exp(-θ·dt)·df(r) ⇒ θ = -ln(P_target/P_model_base)/dt,
+            // which is exact. Other conventions do not factor (review finding
+            // M6), so θ is root-found with that closed form as the initial
+            // guess.
             let theta = if next_next_time > 0.0 {
                 let p_target = discount_curve.df(next_next_time);
                 let mut p_model_base = 0.0;
+                let mut p_model_base_cont = 0.0;
                 for (j, &q_next) in next_state_prices.iter().enumerate() {
                     let r_base = next_rates_base[j];
                     // Discount from t_{i+2} to t_{i+1} using r_{i+1}
-                    p_model_base += q_next * (-r_base * dt).exp();
+                    p_model_base += q_next * comp.df(r_base, dt);
+                    p_model_base_cont += q_next * (-r_base * dt).exp();
                 }
 
                 if p_model_base > 0.0 && p_target > 0.0 {
-                    -(p_target / p_model_base).ln() / dt
+                    let theta_cont = if p_model_base_cont > 0.0 {
+                        -(p_target / p_model_base_cont).ln() / dt
+                    } else {
+                        0.0
+                    };
+                    if comp == TreeCompounding::Continuous {
+                        theta_cont
+                    } else {
+                        use finstack_core::math::{BrentSolver, Solver};
+                        let objective = |theta: f64| -> f64 {
+                            let mut p_model = 0.0;
+                            for (j, &q_next) in next_state_prices.iter().enumerate() {
+                                p_model += q_next * comp.df(next_rates_base[j] + theta, dt);
+                            }
+                            p_model - p_target
+                        };
+                        match BrentSolver::new().solve(objective, theta_cont) {
+                            Ok(t) => t,
+                            Err(e) => {
+                                return Err(Error::Validation(format!(
+                                    "Ho-Lee calibration: failed to solve drift theta at \
+                                     step {step} under {comp:?} compounding: {e}"
+                                )));
+                            }
+                        }
+                    }
                 } else {
                     0.0
                 }
@@ -750,7 +846,7 @@ impl ShortRateTree {
                 let next_nodes = step + 2;
                 next_q[..next_nodes].fill(0.0);
                 for (i, &rate_i) in rates_step.iter().enumerate() {
-                    let df_i = (-rate_i * dt).exp();
+                    let df_i = comp.df(rate_i, dt);
                     if i + 1 < next_nodes {
                         next_q[i + 1] += q[i] * df_i * 0.5;
                     }
@@ -789,7 +885,7 @@ impl ShortRateTree {
         const MIN_NODE_DISCOUNT_FACTOR: f64 = 1.0e-30;
         for (step, rates_step) in rates.iter().enumerate() {
             for (node, &rate) in rates_step.iter().enumerate() {
-                let node_df = (-rate * dt).exp();
+                let node_df = comp.df(rate, dt);
                 // `contains` is `false` for a `NaN` node_df, so the negation
                 // correctly flags non-finite values as pathological too.
                 let df_in_range =
@@ -822,14 +918,15 @@ impl ShortRateTree {
         Ok(())
     }
 
-    /// Calibrate Black-Derman-Toy / Black-Karasinski model using state-price recursion.
+    /// Calibrate the standard (κ = 0) Black-Derman-Toy model using
+    /// state-price recursion on a binomial lattice with constant lognormal
+    /// volatility.
     ///
-    /// When `mean_reversion` is zero, this is standard BDT with constant lognormal
-    /// volatility. When positive, it extends to Black-Karasinski: the per-step
-    /// lognormal spread uses the integrated variance `σ² (1 - e^{-2κΔt}) / (2κ)`
-    /// instead of `σ²Δt`, tightening the rate distribution at longer horizons.
-    ///
-    /// Bloomberg's OAS1 "L=Lognormal" model defaults to κ = 0.03.
+    /// Mean-reverting Black-Karasinski (κ ≠ 0) is handled by
+    /// [`calibrate_bk_trinomial`](Self::calibrate_bk_trinomial), which builds
+    /// a genuine trinomial lattice in x = ln r — a binomial lattice cannot
+    /// represent the rate-dependent drift `−κ·ln r` while staying
+    /// recombining (review finding M5).
     ///
     /// # Errors
     ///
@@ -846,17 +943,12 @@ impl ShortRateTree {
         use finstack_core::math::{BrentSolver, Solver};
 
         let sigma = self.config.volatility;
-        let kappa = self.config.mean_reversion.unwrap_or(0.0);
         let solver = BrentSolver::new();
 
-        // Black-Karasinski / BDT: lognormal rates with optional mean reversion.
-        // The up multiplier uses the integrated lognormal standard deviation
-        // per step. For κ = 0 this reduces to σ√dt (standard BDT).
-        let step_vol = if kappa.abs() < 1e-12 {
-            sigma * dt.sqrt()
-        } else {
-            sigma * ((1.0 - (-2.0 * kappa * dt).exp()) / (2.0 * kappa)).sqrt()
-        };
+        // Standard BDT (κ = 0): constant lognormal volatility, per-step
+        // log-spread σ√dt. κ ≠ 0 never reaches this path — calibrate()
+        // routes it to the trinomial Black-Karasinski lattice.
+        let step_vol = sigma * dt.sqrt();
         let u = step_vol.exp();
         let p = 0.5;
 
@@ -1120,6 +1212,182 @@ impl ShortRateTree {
         Ok(())
     }
 
+    /// Calibrate a mean-reverting Black-Karasinski model on a trinomial
+    /// lattice in x = ln r (review finding M5).
+    ///
+    /// # Model
+    ///
+    /// ```text
+    /// d(ln r) = [θ(t) − κ·ln r] dt + σ dW
+    /// ```
+    ///
+    /// Writing `x = ln r − a(t)`, the residual `dx = −κx dt + σ dW` is the
+    /// same mean-reverting OU process the Hull-White trinomial discretizes,
+    /// so the lattice reuses that geometry: spacing `dx = σ√(3Δt)`, width cap
+    /// `j_max` with Hull & White (1994) branch switching at the edges, and
+    /// per-node probabilities matching the conditional mean `−jκΔt·dx` and
+    /// variance `σ²Δt`. The per-step shift `a_i` is calibrated by forward
+    /// induction on Arrow-Debreu prices with a Brent solve (the rate enters
+    /// the discount factor as `exp(a_i + x_j)`, so no closed form exists).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if a target discount factor is
+    /// non-positive, a drift solve fails, or the calibrated lattice fails to
+    /// reprice the curve within tolerance.
+    fn calibrate_bk_trinomial(
+        &mut self,
+        rates: &mut [Vec<f64>],
+        discount_curve: &dyn Discounting,
+        dt: f64,
+        kappa: f64,
+    ) -> Result<()> {
+        use finstack_core::math::{BrentSolver, Solver};
+
+        let sigma = self.config.volatility;
+        let comp = self.config.compounding;
+        let steps = self.config.steps;
+
+        // Trinomial spacing in x = ln r: matches per-step variance σ²Δt.
+        let dx = sigma * (3.0 * dt).sqrt();
+        // Hull-White width cap keeping branch probabilities positive.
+        let j_max = ((0.184 / (kappa * dt)).ceil() as usize).max(1);
+
+        let mut alpha = vec![0.0; steps + 1];
+        let mut probs: Vec<Vec<(f64, f64, f64)>> = Vec::with_capacity(steps);
+        let mut state_prices: Vec<f64> = vec![1.0];
+
+        let mut max_error_bps = 0.0_f64;
+        let mut max_error_step = 0_usize;
+
+        for step in 0..steps {
+            let curr_j_max = step.min(j_max);
+            let next_j_max = (step + 1).min(j_max);
+            let num_nodes = 2 * curr_j_max + 1;
+
+            let mut step_probs = Vec::with_capacity(num_nodes);
+            for j in 0..num_nodes {
+                let j_signed = j as i32 - curr_j_max as i32;
+                step_probs.push(HullWhiteTree::compute_probabilities(
+                    kappa, dt, dx, j_signed, j_max,
+                )?);
+            }
+
+            let t_next = self.time_steps[step + 1];
+            let target_df = discount_curve.df(t_next);
+            if target_df <= 0.0 {
+                return Err(Error::Validation(format!(
+                    "Black-Karasinski calibration: non-positive discount factor \
+                     {target_df} at time {t_next}"
+                )));
+            }
+
+            // Solve the additive x-shift a so the lattice reprices P(0, t_next):
+            //   Σ_j Q_j · df(exp(a + x_j), Δt) = target_df
+            let q = &state_prices;
+            let objective = |a: f64| -> f64 {
+                let mut model_df = 0.0;
+                for (j, &qj) in q.iter().enumerate() {
+                    let x_j = (j as i32 - curr_j_max as i32) as f64 * dx;
+                    model_df += qj * comp.df((a + x_j).exp(), dt);
+                }
+                model_df - target_df
+            };
+            // Initial guess: log of the period forward rate.
+            let prev_df = discount_curve.df(self.time_steps[step]);
+            let fwd = if prev_df > 0.0 && target_df > 0.0 {
+                comp.rate_from_df(target_df / prev_df, dt)
+            } else {
+                0.03
+            };
+            let guess = fwd.max(1e-8).ln();
+            let a = BrentSolver::new().solve(objective, guess).map_err(|e| {
+                Error::Validation(format!(
+                    "Black-Karasinski calibration: drift solve failed at step {step}: {e}"
+                ))
+            })?;
+            alpha[step] = a;
+
+            rates[step] = (0..num_nodes)
+                .map(|j| {
+                    let x_j = (j as i32 - curr_j_max as i32) as f64 * dx;
+                    (a + x_j).exp()
+                })
+                .collect();
+
+            // Forward-induce Arrow-Debreu prices to the next step.
+            let mut next_q = vec![0.0; 2 * next_j_max + 1];
+            // Branch switching only applies once the lattice has reached its
+            // cap (curr and next widths equal); while still growing, all
+            // nodes branch normally.
+            let boundary_j_max = if curr_j_max == next_j_max {
+                curr_j_max
+            } else {
+                usize::MAX
+            };
+            for (j, &qj) in q.iter().enumerate() {
+                let j_signed = j as i32 - curr_j_max as i32;
+                let r_j = (a + j_signed as f64 * dx).exp();
+                let contribution = qj * comp.df(r_j, dt);
+                for (offset, probability) in
+                    HullWhiteTree::transition_offsets(j_signed, boundary_j_max, step_probs[j])
+                {
+                    if let Some(idx) = HullWhiteTree::transition_index(j_signed, offset, next_j_max)
+                    {
+                        if idx < next_q.len() {
+                            next_q[idx] += contribution * probability;
+                        }
+                    }
+                }
+            }
+
+            let model_df: f64 = next_q.iter().sum();
+            let error_bps = ((model_df - target_df) / target_df).abs() * 10_000.0;
+            if error_bps > max_error_bps {
+                max_error_bps = error_bps;
+                max_error_step = step;
+            }
+
+            probs.push(step_probs);
+            state_prices = next_q;
+        }
+
+        // Terminal row: no interval beyond maturity to calibrate; extend the
+        // last drift for accessor consistency (never used for discounting).
+        if steps > 0 {
+            alpha[steps] = alpha[steps - 1];
+        }
+        let term_j_max = steps.min(j_max);
+        rates[steps] = (0..=(2 * term_j_max))
+            .map(|j| {
+                let x_j = (j as i32 - term_j_max as i32) as f64 * dx;
+                (alpha[steps] + x_j).exp()
+            })
+            .collect();
+
+        // Same hard repricing gate philosophy as BDT: a well-posed lattice
+        // calibrates to float noise; anything materially off must not escape.
+        const MAX_CALIBRATION_ERROR_BPS: f64 = 25.0;
+        let converged = max_error_bps.is_finite() && max_error_bps <= MAX_CALIBRATION_ERROR_BPS;
+        self.calibration_quality = Some(CalibrationResult {
+            max_error_bps,
+            max_error_step,
+            fallback_count: 0,
+            converged,
+        });
+        if !converged {
+            return Err(Error::Validation(format!(
+                "Black-Karasinski calibration failed to reprice the discount \
+                 curve: max error {max_error_bps:.2} bp at step {max_error_step} \
+                 exceeds the {MAX_CALIBRATION_ERROR_BPS:.1} bp tolerance"
+            )));
+        }
+
+        self.bk_trinomial = Some(BkTrinomialLattice { j_max, probs });
+
+        Ok(())
+    }
+
     /// Get the short rate at a specific node.
     ///
     /// # Node Ordering
@@ -1129,7 +1397,8 @@ impl ShortRateTree {
     /// | Model | Node 0 | Node N |
     /// |-------|--------|--------|
     /// | Ho-Lee | **lowest** rate | **highest** rate |
-    /// | BDT | **highest** rate (`α·u^(n-1)`) | **lowest** rate (`α·u^(-(n-1))`) |
+    /// | BDT (κ = 0, binomial) | **highest** rate (`α·u^(n-1)`) | **lowest** rate (`α·u^(-(n-1))`) |
+    /// | BK (κ ≠ 0, trinomial) | **lowest** rate (j = −j_max) | **highest** rate (j = +j_max) |
     pub fn rate_at_node(&self, step: usize, node: usize) -> Result<f64> {
         if step >= self.rates.len() || node >= self.rates[step].len() {
             return Err(Error::internal(format!(
@@ -1175,6 +1444,24 @@ impl ShortRateTree {
             )));
         }
 
+        // Black-Karasinski trinomial lattice: width grows 2·step+1 until the
+        // j_max cap, then stays at 2·j_max+1.
+        if let Some(lattice) = &self.bk_trinomial {
+            for (step, rates_at_step) in self.rates.iter().enumerate() {
+                let expected = 2 * step.min(lattice.j_max) + 1;
+                if rates_at_step.len() != expected {
+                    return Err(Error::internal(format!(
+                        "Black-Karasinski lattice geometry mismatch: step {} expected {} \
+                         nodes, got {}",
+                        step,
+                        expected,
+                        rates_at_step.len()
+                    )));
+                }
+            }
+            return Ok(());
+        }
+
         for (step, rates_at_step) in self.rates.iter().enumerate() {
             let expected = Self::expected_nodes_at_step(self.config.branching, step);
             if rates_at_step.len() != expected {
@@ -1189,6 +1476,101 @@ impl ShortRateTree {
         }
 
         Ok(())
+    }
+
+    /// Backward induction over the Black-Karasinski trinomial lattice.
+    ///
+    /// Honors the per-node transition probabilities, the Hull & White edge
+    /// branch switching, and the configured per-node compounding. The OAS is
+    /// applied as a parallel shift (in bp) to the node short rate before
+    /// discounting, matching the recombining-engine convention.
+    fn price_bk_trinomial<V: TreeValuator>(
+        &self,
+        lattice: &BkTrinomialLattice,
+        initial_vars: &HashMap<&'static str, f64>,
+        time_to_maturity: f64,
+        market_context: &MarketContext,
+        valuator: &V,
+        oas: f64,
+    ) -> Result<f64> {
+        let steps = self.config.steps;
+        let dt = time_to_maturity / steps as f64;
+        let comp = self.config.compounding;
+        let oas_shift = oas / 10_000.0;
+        let j_max = lattice.j_max;
+
+        let cached_hazard = initial_vars.get(state_keys::HAZARD_RATE).copied();
+        let cached_spot = initial_vars.get(state_keys::SPOT).copied();
+        let cached_df = initial_vars.get(state_keys::DF).copied();
+        let cached_for = |rate: f64| -> CachedValues {
+            CachedValues {
+                spot: cached_spot,
+                interest_rate: Some(rate),
+                hazard_rate: cached_hazard,
+                df: cached_df,
+            }
+        };
+
+        // Terminal payoffs.
+        let mut values: Vec<f64> = Vec::with_capacity(self.rates[steps].len());
+        for &r in self.rates[steps].iter() {
+            let state = NodeState::with_cached(
+                steps,
+                time_to_maturity,
+                initial_vars,
+                market_context,
+                cached_for(r + oas_shift),
+            );
+            values.push(valuator.value_at_maturity(&state)?);
+        }
+
+        // Backward induction with per-node probabilities.
+        let mut scratch: Vec<f64> = Vec::new();
+        for step in (0..steps).rev() {
+            let curr_j_max = step.min(j_max);
+            let next_j_max = (step + 1).min(j_max);
+            let num_nodes = 2 * curr_j_max + 1;
+            let boundary_j_max = if curr_j_max == next_j_max {
+                curr_j_max
+            } else {
+                usize::MAX
+            };
+            let time_t = step as f64 * dt;
+
+            scratch.clear();
+            for j in 0..num_nodes {
+                let j_signed = j as i32 - curr_j_max as i32;
+                let node_probs = lattice.probs[step][j];
+
+                let mut expected_value = 0.0;
+                for (offset, probability) in
+                    HullWhiteTree::transition_offsets(j_signed, boundary_j_max, node_probs)
+                {
+                    if let Some(idx) = HullWhiteTree::transition_index(j_signed, offset, next_j_max)
+                    {
+                        if idx < values.len() {
+                            expected_value += probability * values[idx];
+                        }
+                    }
+                }
+
+                let r = self.rates[step][j] + oas_shift;
+                let continuation = expected_value * comp.df(r, dt);
+                let state = NodeState::with_cached(
+                    step,
+                    time_t,
+                    initial_vars,
+                    market_context,
+                    cached_for(r),
+                );
+                scratch.push(valuator.value_at_node(&state, continuation, dt)?);
+            }
+            std::mem::swap(&mut values, &mut scratch);
+        }
+
+        values.first().copied().ok_or_else(|| {
+            Error::internal("Black-Karasinski backward induction produced no root value")
+        })
     }
 }
 
@@ -1219,6 +1601,21 @@ impl TreeModel for ShortRateTree {
 
         // Get OAS from initial variables (default to 0)
         let oas = initial_vars.get("oas").copied().unwrap_or(0.0);
+
+        // Black-Karasinski trinomial lattice: per-node probabilities and
+        // capped width with branch switching cannot be expressed through the
+        // constant-probability recombining engine, so it has a dedicated
+        // backward induction.
+        if let Some(lattice) = &self.bk_trinomial {
+            return self.price_bk_trinomial(
+                lattice,
+                &initial_vars,
+                time_to_maturity,
+                market_context,
+                valuator,
+                oas,
+            );
+        }
 
         // Create custom state generator that uses pre-calibrated rates
         // Clone rates (cheap Arc clone) to avoid lifetime issues with closures
@@ -1539,6 +1936,73 @@ mod tests {
         );
     }
 
+    /// Review finding M6: calibration must honor `config.compounding`. A
+    /// Ho-Lee tree configured with non-continuous compounding must reprice
+    /// the calibration curve to <0.1 bp, because `price()` discounts with the
+    /// same convention.
+    #[test]
+    fn ho_lee_noncontinuous_compounding_reprices_curve() {
+        for compounding in [
+            TreeCompounding::Simple,
+            TreeCompounding::SemiAnnual,
+            TreeCompounding::Quarterly,
+            TreeCompounding::Monthly,
+        ] {
+            let steps = 24;
+            let maturity = 2.0;
+            let config = ShortRateTreeConfig::ho_lee(steps, 0.012).with_compounding(compounding);
+            let mut tree = ShortRateTree::new(config);
+            let curve = create_test_curve();
+            tree.calibrate(&test_curve_id(), &curve, maturity)
+                .expect("Ho-Lee calibration under non-continuous compounding");
+
+            let quality = tree.calibration_result().expect("quality");
+            assert!(
+                quality.converged && quality.max_error_bps < 0.1,
+                "{compounding:?}: calibration must reprice the curve to <0.1bp, \
+                 got {quality:?}"
+            );
+
+            let market = MarketContext::new();
+            let actual = tree
+                .price(
+                    HashMap::<&'static str, f64>::default(),
+                    maturity,
+                    &market,
+                    &ConstantValuator,
+                )
+                .expect("zero-coupon price");
+            let expected = curve.df(maturity);
+            assert!(
+                ((actual - expected) / expected).abs() * 10_000.0 < 0.1,
+                "{compounding:?}: zero coupon must reprice to <0.1bp: \
+                 actual={actual}, expected={expected}"
+            );
+        }
+    }
+
+    /// Review finding M6: `rate_from_df` inverts `df` for every convention.
+    #[test]
+    fn tree_compounding_rate_from_df_inverts_df() {
+        for compounding in [
+            TreeCompounding::Continuous,
+            TreeCompounding::Simple,
+            TreeCompounding::SemiAnnual,
+            TreeCompounding::Quarterly,
+            TreeCompounding::Monthly,
+        ] {
+            for rate in [-0.01, 0.0, 0.025, 0.10] {
+                let dt = 0.25;
+                let df = compounding.df(rate, dt);
+                let recovered = compounding.rate_from_df(df, dt);
+                assert!(
+                    (recovered - rate).abs() < 1e-12,
+                    "{compounding:?}: rate_from_df(df({rate})) = {recovered}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn ho_lee_calibration_flags_pathologically_extreme_node_discount_factors() {
         // P0/item-8: Ho-Lee correctly admits negative rates, but with an
@@ -1692,29 +2156,99 @@ mod tests {
         );
     }
 
+    /// Terminal probability distribution over the BK trinomial lattice
+    /// (transition-probability measure, no discounting). Returns the node
+    /// probabilities and the terminal x-values `x = ln r − a_N`.
+    fn bk_terminal_x_distribution(tree: &ShortRateTree) -> (Vec<f64>, Vec<f64>) {
+        let lattice = tree.bk_trinomial.as_ref().expect("BK trinomial lattice");
+        let steps = tree.config.steps;
+        let j_max = lattice.j_max;
+        let dt = tree.time_steps[1] - tree.time_steps[0];
+        let dx = tree.config.volatility * (3.0 * dt).sqrt();
+
+        let mut dist = vec![1.0];
+        for step in 0..steps {
+            let curr_j_max = step.min(j_max);
+            let next_j_max = (step + 1).min(j_max);
+            let boundary = if curr_j_max == next_j_max {
+                curr_j_max
+            } else {
+                usize::MAX
+            };
+            let mut next = vec![0.0; 2 * next_j_max + 1];
+            for (j, &pj) in dist.iter().enumerate() {
+                let j_signed = j as i32 - curr_j_max as i32;
+                for (offset, p) in
+                    HullWhiteTree::transition_offsets(j_signed, boundary, lattice.probs[step][j])
+                {
+                    if let Some(idx) = HullWhiteTree::transition_index(j_signed, offset, next_j_max)
+                    {
+                        next[idx] += pj * p;
+                    }
+                }
+            }
+            dist = next;
+        }
+
+        let term_j_max = steps.min(j_max);
+        let xs: Vec<f64> = (0..dist.len())
+            .map(|j| (j as i32 - term_j_max as i32) as f64 * dx)
+            .collect();
+        (xs, dist)
+    }
+
+    fn weighted_std(values: &[f64], weights: &[f64]) -> f64 {
+        let total: f64 = weights.iter().sum();
+        let mean: f64 = values.iter().zip(weights).map(|(v, w)| v * w).sum::<f64>() / total;
+        let var: f64 = values
+            .iter()
+            .zip(weights)
+            .map(|(v, w)| w * (v - mean) * (v - mean))
+            .sum::<f64>()
+            / total;
+        var.sqrt()
+    }
+
+    /// Review finding M5: with κ ≠ 0 the BDT model routes to a genuine
+    /// trinomial Black-Karasinski lattice that still reprices the curve and
+    /// tightens the (probability-weighted) terminal log-rate dispersion
+    /// relative to κ = 0.
     #[test]
     fn test_bdt_mean_reversion_calibrates_and_tightens_rate_dispersion() {
-        let steps = 10;
+        let steps = 50;
         let mut tree_no_mr = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, 0.20, 0.0));
         let mut tree_mr = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, 0.20, 0.05));
         let curve = create_test_curve();
 
         let cid = test_curve_id();
         tree_no_mr.calibrate(&cid, &curve, 2.0).expect("BDT(κ=0)");
-        tree_mr.calibrate(&cid, &curve, 2.0).expect("BDT(κ=0.05)");
+        tree_mr.calibrate(&cid, &curve, 2.0).expect("BK(κ=0.05)");
 
         let quality = tree_mr.calibration_result().expect("quality");
         assert!(
             quality.is_acceptable(),
-            "BDT(κ=0.05) calibration: max_error={:.2}bp",
+            "BK(κ=0.05) calibration: max_error={:.2}bp",
             quality.max_error_bps
         );
 
-        let max_rate_no_mr = tree_no_mr.rate_at_node(steps, 0).expect("top node no MR");
-        let max_rate_mr = tree_mr.rate_at_node(steps, 0).expect("top node MR");
+        // Probability-weighted terminal ln-rate dispersion: κ > 0 tightens it.
+        // Binomial κ=0 tree: terminal distribution is Binomial(steps, 1/2).
+        let ln_rates_no_mr: Vec<f64> = tree_no_mr.rates[steps].iter().map(|r| r.ln()).collect();
+        let mut binom_weights = vec![0.0_f64; steps + 1];
+        let mut c = 1.0_f64;
+        for (k, w) in binom_weights.iter_mut().enumerate() {
+            *w = c * 0.5_f64.powi(steps as i32);
+            c = c * (steps - k) as f64 / (k + 1) as f64;
+        }
+        let std_no_mr = weighted_std(&ln_rates_no_mr, &binom_weights);
+
+        let (xs_mr, dist_mr) = bk_terminal_x_distribution(&tree_mr);
+        let std_mr = weighted_std(&xs_mr, &dist_mr);
+
         assert!(
-            max_rate_mr < max_rate_no_mr,
-            "mean reversion should tighten rate dispersion: no_mr_max={max_rate_no_mr:.6}, mr_max={max_rate_mr:.6}"
+            std_mr < std_no_mr,
+            "mean reversion should tighten terminal log-rate dispersion: \
+             no_mr={std_no_mr:.6}, mr={std_mr:.6}"
         );
 
         let market = MarketContext::new();
@@ -1729,7 +2263,123 @@ mod tests {
         let target = curve.df(2.0);
         assert!(
             (zcb - target).abs() < 1e-6,
-            "BDT(κ=0.05) should still price ZCBs to curve: got={zcb:.8}, target={target:.8}"
+            "BK(κ=0.05) should still price ZCBs to curve: got={zcb:.8}, target={target:.8}"
+        );
+    }
+
+    /// Review finding M5: the BK trinomial lattice reprices the calibration
+    /// curve to <0.1 bp, both via Arrow-Debreu state prices and via the
+    /// dedicated backward induction in `price()`.
+    #[test]
+    fn bk_trinomial_reprices_curve_to_a_tenth_bp() {
+        let steps = 200;
+        let maturity = 5.0;
+        let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, 0.20, 0.03));
+        let curve = create_test_curve();
+        tree.calibrate(&test_curve_id(), &curve, maturity)
+            .expect("BK calibration");
+
+        let quality = tree.calibration_result().expect("quality");
+        assert!(
+            quality.converged && quality.max_error_bps < 0.1,
+            "BK calibration must reprice the curve to <0.1bp, got {quality:?}"
+        );
+
+        let market = MarketContext::new();
+        let zcb = tree
+            .price(
+                HashMap::<&'static str, f64>::default(),
+                maturity,
+                &market,
+                &ConstantValuator,
+            )
+            .expect("ZCB price");
+        let target = curve.df(maturity);
+        let error_bps = ((zcb - target) / target).abs() * 10_000.0;
+        assert!(
+            error_bps < 0.1,
+            "BK backward induction must reprice ZCB to <0.1bp: \
+             got={zcb:.8}, target={target:.8} ({error_bps:.4}bp)"
+        );
+    }
+
+    /// Review finding M5: as Δt → 0 the terminal log-rate dispersion of the
+    /// BK lattice approaches the OU limit `σ√((1−e^{−2κT})/(2κ))` — about
+    /// 13% below σ√T at κ = 0.03, T = 10y — instead of growing like σ√T.
+    #[test]
+    fn bk_terminal_log_rate_dispersion_matches_ou_limit() {
+        let steps = 400;
+        let maturity = 10.0;
+        let sigma = 0.20;
+        let kappa = 0.03;
+        let curve = create_flat_curve(0.04);
+
+        let mut tree = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, sigma, kappa));
+        tree.calibrate(&test_curve_id(), &curve, maturity)
+            .expect("BK calibration");
+
+        let (xs, dist) = bk_terminal_x_distribution(&tree);
+        let std_x = weighted_std(&xs, &dist);
+
+        let target = sigma * ((1.0 - (-2.0 * kappa * maturity).exp()) / (2.0 * kappa)).sqrt();
+        let no_mr = sigma * maturity.sqrt();
+
+        assert!(
+            ((std_x - target) / target).abs() < 0.02,
+            "terminal log-rate dispersion should match the OU limit: \
+             got {std_x:.6}, target {target:.6} (σ√T = {no_mr:.6})"
+        );
+        assert!(
+            std_x < 0.95 * no_mr,
+            "dispersion must be materially below the κ=0 value σ√T: \
+             got {std_x:.6} vs σ√T = {no_mr:.6}"
+        );
+    }
+
+    /// Review finding M5: as κ → 0 the trinomial BK lattice converges to the
+    /// binomial BDT lattice (same continuous model).
+    #[test]
+    fn bk_kappa_to_zero_converges_to_bdt() {
+        let steps = 200;
+        let maturity = 5.0;
+        let sigma = 0.20;
+        let curve = create_flat_curve(0.04);
+        let cid = test_curve_id();
+        let market = MarketContext::new().insert(curve.clone());
+        let valuator = RateCallValuator { strike: 0.04 };
+        let vars = HashMap::<&'static str, f64>::default();
+
+        let mut bdt = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, sigma, 0.0));
+        bdt.calibrate(&cid, &curve, maturity).expect("BDT(κ=0)");
+        let price_bdt = bdt
+            .price(vars.clone(), maturity, &market, &valuator)
+            .expect("BDT price");
+
+        let mut bk = ShortRateTree::new(ShortRateTreeConfig::bdt(steps, sigma, 1e-4));
+        bk.calibrate(&cid, &curve, maturity).expect("BK(κ→0)");
+        assert!(bk.bk_trinomial.is_some(), "κ=1e-4 must route to BK lattice");
+        let price_bk = bk
+            .price(vars, maturity, &market, &valuator)
+            .expect("BK price");
+
+        // Tiny terminal dispersion check: at κ→0 the OU limit is σ√T.
+        let (xs, dist) = bk_terminal_x_distribution(&bk);
+        let std_x = weighted_std(&xs, &dist);
+        let target = sigma * maturity.sqrt();
+        assert!(
+            ((std_x - target) / target).abs() < 0.01,
+            "κ→0 dispersion should approach σ√T: got {std_x:.6}, target {target:.6}"
+        );
+
+        assert!(
+            price_bdt > 0.0 && price_bk > 0.0,
+            "rate-call prices must be positive: bdt={price_bdt}, bk={price_bk}"
+        );
+        let rel = ((price_bk - price_bdt) / price_bdt).abs();
+        assert!(
+            rel < 0.05,
+            "κ→0 BK lattice should converge to BDT: bdt={price_bdt:.8}, \
+             bk={price_bk:.8} (rel diff {rel:.4})"
         );
     }
 

@@ -5936,6 +5936,25 @@
                   "format": "double",
                   "type": "number"
                 },
+                "realized_fixings": {
+                  "default": [],
+                  "description": "Realized floating-index fixings as `(date, price)` pairs.\n\nFloating-leg observations with date strictly before the valuation date\nread from this store; a missing past fixing is an error — no silent\nsubstitution of today's spot (review finding M15). Observations on or\nafter the valuation date project from the price curve.",
+                  "items": {
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "prefixItems": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "format": "double",
+                        "type": "number"
+                      }
+                    ],
+                    "type": "array"
+                  },
+                  "type": "array"
+                },
                 "side": {
                   "$ref": "#/$defs/PayReceive",
                   "description": "Direction of the swap: Pay means paying the fixed price leg,\nReceive means receiving the fixed price leg."
@@ -15911,6 +15930,17 @@
                     "ytm_bump_decimal": null
                   },
                   "description": "Pricing overrides for scenario analysis and model configuration."
+                },
+                "unrealized_nav": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Money"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Unrealized net asset value attributable to the LP, stated as of the\nfund's valuation date.\n\nHolder-view residual value (review finding M13): the fund's present\nvalue is the PV of LP cashflows strictly after the valuation date plus\nthis NAV. When `None`, the residual value is zero — a fully realized\nfund prices to ~0."
                 },
                 "waterfall_spec": {
                   "$ref": "#/$defs/WaterfallSpec",

@@ -36,53 +36,39 @@ impl MetricCalculator for LpIrrCalculator {
     }
 }
 
-/// GP Internal Rate of Return calculator.
-pub struct GpIrrCalculator;
+/// Total GP carry paid through the waterfall, in currency units.
+///
+/// A GP IRR is not well-defined here (the GP has no initial investment in
+/// the carry stream), so this metric reports the total carry dollars instead
+/// and is registered as `gp_carry_total` (review finding M11).
+pub struct GpCarryTotalCalculator;
 
-impl MetricCalculator for GpIrrCalculator {
+impl MetricCalculator for GpCarryTotalCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let pe: &PrivateMarketsFund = context.instrument_as()?;
         let ledger = pe.run_waterfall()?;
 
-        // Extract GP cashflows (carry distributions)
-        let mut gp_flows = Vec::new();
-        let mut gp_flows_by_date: indexmap::IndexMap<Date, Money> = indexmap::IndexMap::new();
-
-        for row in &ledger.rows {
-            if row.to_gp.amount().abs() > 1e-6 {
-                let existing = gp_flows_by_date
-                    .get(&row.date)
-                    .copied()
-                    .unwrap_or_else(|| Money::new(0.0, row.to_gp.currency()));
-
-                if let Ok(new_amount) = existing.checked_add(row.to_gp) {
-                    gp_flows_by_date.insert(row.date, new_amount);
-                }
-            }
-        }
-
-        for (date, amount) in gp_flows_by_date {
-            gp_flows.push((date, amount));
-        }
-
-        if gp_flows.is_empty() {
-            return Ok(0.0); // No GP distributions
-        }
-
-        // GP has no initial investment, so IRR is based on distributions only
-        // For GP, we calculate the return on carry basis (not meaningful as traditional IRR)
-        // Return total GP carry as a percentage of total fund proceeds
-        let total_gp_carry: f64 = gp_flows.iter().map(|(_, amount)| amount.amount()).sum();
+        let total_gp_carry: f64 = ledger
+            .rows
+            .iter()
+            .filter(|r| r.date <= context.as_of)
+            .map(|r| r.to_gp.amount())
+            .sum();
         Ok(total_gp_carry)
     }
 }
 
 /// Multiple on Invested Capital (MOIC) for LP calculator.
+///
+/// Realized LP multiple: ledger `to_lp` distributions over contributions.
+/// Gross fund events would overstate the LP multiple by the GP carry
+/// (review finding M12).
 pub struct MoicLpCalculator;
 
 impl MetricCalculator for MoicLpCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let pe: &PrivateMarketsFund = context.instrument_as()?;
+        let ledger = pe.run_waterfall()?;
 
         let total_contributions: f64 = pe
             .events
@@ -94,24 +80,18 @@ impl MetricCalculator for MoicLpCalculator {
             .map(|e| e.amount.amount())
             .sum();
 
-        let total_distributions: f64 = pe
-            .events
+        let total_lp_distributions: f64 = ledger
+            .rows
             .iter()
-            .filter(|e| {
-                matches!(
-                    e.kind,
-                    crate::instruments::equity::pe_fund::FundEventKind::Distribution
-                        | crate::instruments::equity::pe_fund::FundEventKind::Proceeds
-                ) && e.date <= context.as_of
-            })
-            .map(|e| e.amount.amount())
+            .filter(|r| r.date <= context.as_of)
+            .map(|r| r.to_lp.amount())
             .sum();
 
         if total_contributions <= 1e-6 {
             return Ok(0.0);
         }
 
-        Ok(total_distributions / total_contributions)
+        Ok(total_lp_distributions / total_contributions)
     }
 }
 
@@ -275,7 +255,7 @@ pub(crate) fn register_private_markets_fund_metrics(registry: &mut MetricRegistr
         instrument: InstrumentType::PrivateMarketsFund,
         metrics: [
             (LpIrr, LpIrrCalculator),
-            (GpIrr, GpIrrCalculator),
+            (GpCarryTotal, GpCarryTotalCalculator),
             (MoicLp, MoicLpCalculator),
             (DpiLp, DpiLpCalculator),
             (TvpiLp, TvpiLpCalculator),
@@ -369,8 +349,11 @@ mod tests {
 
     #[test]
     fn test_moic_calculation() {
+        // 100% LP promote tier so the full distribution reaches the LP and
+        // the ledger-basis MOIC (review finding M12) equals the naive 2x.
         let spec = WaterfallSpec::builder()
             .return_of_capital()
+            .promote_tier(0.0, 1.0, 0.0)
             .build()
             .expect("should succeed");
 
@@ -401,5 +384,61 @@ mod tests {
             .calculate(&mut context)
             .expect("should succeed");
         assert!((moic - 2.0).abs() < 1e-6); // 2x multiple
+    }
+
+    /// Holder-view PV (review finding M13): a fully realized fund has
+    /// base_value ≈ 0, so TVPI collapses to DPI and LpIrr equals the
+    /// realized IRR.
+    #[test]
+    fn fully_realized_fund_tvpi_equals_dpi_and_lp_irr_is_realized() {
+        let spec = WaterfallSpec::builder()
+            .return_of_capital()
+            .promote_tier(0.0, 1.0, 0.0)
+            .build()
+            .expect("should succeed");
+
+        let events = vec![
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::new(1000000.0, test_currency()),
+            ),
+            FundEvent::distribution(
+                test_date(2025, 1, 1),
+                Money::new(2000000.0, test_currency()),
+            ),
+        ];
+
+        let pe = PrivateMarketsFund::new("TEST", test_currency(), spec, events);
+
+        let curves = finstack_core::market_data::context::MarketContext::new();
+        // base_value ≈ 0 for a fully realized fund under holder-view PV.
+        let base_value = Money::new(0.0, test_currency());
+        let mut context = MetricContext::new(
+            std::sync::Arc::new(pe),
+            std::sync::Arc::new(curves),
+            test_date(2025, 1, 1),
+            base_value,
+            MetricContext::default_config(),
+        );
+
+        let tvpi = TvpiLpCalculator
+            .calculate(&mut context)
+            .expect("should succeed");
+        let dpi = DpiLpCalculator
+            .calculate(&mut context)
+            .expect("should succeed");
+        assert!(
+            (tvpi - dpi).abs() < 1e-9,
+            "TVPI ({tvpi}) should equal DPI ({dpi}) when residual NAV is 0"
+        );
+
+        let lp_irr = LpIrrCalculator
+            .calculate(&mut context)
+            .expect("should succeed");
+        // Realized IRR: 2x over 5 years ≈ 14.87%.
+        assert!(
+            (lp_irr - 0.1487).abs() < 0.01,
+            "LpIrr should equal the realized IRR, got {lp_irr}"
+        );
     }
 }

@@ -8,5 +8,6 @@ pub(crate) mod dv01;
 pub(crate) mod fd_greeks;
 pub(crate) mod fx01;
 pub(crate) mod option_greeks;
+pub(crate) mod rf_component_dv01;
 pub(crate) mod theta;
 pub(crate) mod vega;

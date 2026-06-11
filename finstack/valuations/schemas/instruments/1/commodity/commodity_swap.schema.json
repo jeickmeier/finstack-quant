@@ -1781,6 +1781,25 @@
               "format": "double",
               "type": "number"
             },
+            "realized_fixings": {
+              "default": [],
+              "description": "Realized floating-index fixings as `(date, price)` pairs.\n\nFloating-leg observations with date strictly before the valuation date\nread from this store; a missing past fixing is an error — no silent\nsubstitution of today's spot (review finding M15). Observations on or\nafter the valuation date project from the price curve.",
+              "items": {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "format": "double",
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              "type": "array"
+            },
             "side": {
               "$ref": "#/$defs/PayReceive",
               "description": "Direction of the swap: Pay means paying the fixed price leg,\nReceive means receiving the fixed price leg."

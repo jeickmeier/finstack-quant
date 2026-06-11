@@ -227,15 +227,13 @@ pub struct DiscountedCashFlow {
     /// Valuation date (as-of date for the DCF).
     #[schemars(with = "String")]
     pub valuation_date: Date,
-    /// Discount curve used to present-value the explicit cash flows and the
-    /// terminal value.
+    /// Discount curve identifier, used for risk attribution only.
     ///
-    /// When this curve is loaded in the market context it acts as the discount
-    /// rate — which is what gives the DCF its rate sensitivity (DV01). When the
-    /// curve is absent, discounting falls back to [`wacc`](Self::wacc). The
-    /// terminal value is always *capitalized* at `wacc` (see
-    /// [`calculate_terminal_value`](Self::calculate_terminal_value)); the cap
-    /// rate and the discount rate are intentionally distinct.
+    /// Discounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`
+    /// regardless of whether this curve is loaded (review finding M14 — the
+    /// previous behavior silently switched risky flows to risk-free curve
+    /// discounting). Rate sensitivity (`Dv01`/`BucketedDv01`) bumps the
+    /// risk-free component inside the WACC instead.
     pub discount_curve_id: CurveId,
     /// Mid-year discounting convention (default: `false` = end-of-year).
     ///
@@ -1013,48 +1011,33 @@ mod tests {
         MarketContext::new().insert(curve)
     }
 
+    /// Review finding M14: the PV must always discount at WACC; loading the
+    /// named curve in the market context must not change the valuation.
     #[test]
-    fn curve_present_discounts_at_curve_not_wacc() {
+    fn pv_identical_with_and_without_curve_loaded() {
         let as_of =
             Date::from_calendar_date(2025, Month::January, 1).expect("valid valuation date");
         let mut dcf = build_simple_dcf_gordon();
         dcf.valuation_date = as_of;
 
-        // Curve at 5% is below the 10% WACC, so present-valuing on the curve must
-        // yield a strictly higher value than the WACC fallback. This pins the
-        // curve-present path and proves the loaded curve is the discount rate.
         let market_curve = build_market_with_flat_curve(as_of, &dcf.discount_curve_id, 0.05);
-        let pv_curve = dcf.value(&market_curve, as_of).expect("curve pv");
-        let pv_wacc = dcf
+        let pv_curve = dcf.value(&market_curve, as_of).expect("pv with curve");
+        let pv_no_curve = dcf
             .value(&MarketContext::new(), as_of)
-            .expect("wacc fallback pv");
+            .expect("pv without curve");
 
         assert!(
-            pv_curve.amount() > pv_wacc.amount(),
-            "curve(5%) discounting should exceed WACC(10%) fallback: curve={}, wacc={}",
+            (pv_curve.amount() - pv_no_curve.amount()).abs() < 1e-9,
+            "PV must not depend on whether the curve is loaded: with={}, without={}",
             pv_curve.amount(),
-            pv_wacc.amount()
+            pv_no_curve.amount()
         );
 
-        // The pricer path must reconstruct exactly from the same curve discount
-        // factors: terminal value is capitalized at WACC, then discounted on the
-        // curve along with the explicit flows.
-        let curve = market_curve
-            .get_discount(&dcf.discount_curve_id)
-            .expect("curve loaded");
+        // And the WACC discounting must reconstruct exactly.
         let tv = dcf.calculate_terminal_value().expect("terminal value");
-        let mut expected_ev = 0.0;
-        for (date, amount) in &dcf.flows {
-            let years = dcf.discount_years(dcf.valuation_date, *date);
-            expected_ev += amount * curve.df(years);
-        }
-        if let Some((tdate, _)) = dcf.flows.last() {
-            let years = dcf.discount_years(dcf.valuation_date, *tdate);
-            expected_ev += tv * curve.df(years);
-        }
-        // `build_simple_dcf_gordon` has zero net debt and no bridge/discounts, so
-        // equity value equals enterprise value.
-        assert!((pv_curve.amount() - expected_ev).abs() < 1e-6);
+        let expected = dcf.calculate_pv_explicit_flows()
+            + dcf.discount_terminal_value(tv).expect("terminal pv");
+        assert!((pv_no_curve.amount() - expected).abs() < 1e-6);
     }
 
     fn build_metric_context(
@@ -1117,11 +1100,69 @@ mod tests {
             .get(&MetricId::Dv01)
             .expect("Dv01 metric should be present");
 
-        // Higher rates should reduce PV, so DV01 (PV_up - PV_base) should be <= 0
+        // Higher rates should reduce PV, so DV01 should be strictly negative.
         assert!(
-            dv01 <= 0.0,
-            "DCF DV01 should be non-positive (PV decreases when rates increase), got {}",
+            dv01 < 0.0,
+            "DCF DV01 should be negative (PV decreases when rates increase), got {}",
             dv01
+        );
+
+        // Review finding M14: DV01 bumps the rf component inside the WACC,
+        // so it must equal the analytic dPV/d(rf) per 1bp. For the simple
+        // one-flow Gordon DCF: PV(w) = F/(1+w)^t + F(1+g)/((w-g)(1+w)^t).
+        let f = 100.0;
+        let g = 0.02;
+        let w = 0.10;
+        let t = {
+            let mut d = build_simple_dcf_gordon();
+            d.valuation_date = as_of;
+            d.discount_years(d.valuation_date, d.flows[0].0)
+        };
+        let pv = |w: f64| (f + f * (1.0 + g) / (w - g)) / (1.0 + w).powf(t);
+        let h = 1e-7;
+        let analytic_per_bp = (pv(w + h) - pv(w - h)) / (2.0 * h) / 10_000.0;
+        assert!(
+            (dv01 - analytic_per_bp).abs() < 1e-4 * analytic_per_bp.abs(),
+            "DV01 ({dv01}) should equal analytic dPV/drf per bp ({analytic_per_bp})"
+        );
+
+        // And it must not depend on whether the curve is loaded.
+        let mut dcf2 = build_simple_dcf_gordon();
+        dcf2.valuation_date = as_of;
+        let mut mctx_no_curve = build_metric_context(dcf2, MarketContext::new(), as_of);
+        let results_no_curve = registry
+            .compute(&[MetricId::Dv01], &mut mctx_no_curve)
+            .expect("Dv01 should compute without curve");
+        let dv01_no_curve = *results_no_curve.get(&MetricId::Dv01).expect("Dv01 present");
+        assert!(
+            (dv01 - dv01_no_curve).abs() < 1e-9,
+            "DV01 must not depend on curve presence: with={dv01}, without={dv01_no_curve}"
+        );
+    }
+
+    /// Bucketed rf DV01 must sum to the parallel rf DV01 (the triangular
+    /// tenor weights partition unity).
+    #[test]
+    fn dcf_bucketed_dv01_sums_to_parallel() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let mut dcf = build_simple_dcf_gordon();
+        dcf.valuation_date = as_of;
+
+        let mut mctx = build_metric_context(dcf, MarketContext::new(), as_of);
+        let mut registry = crate::metrics::standard_registry().clone();
+        crate::instruments::equity::dcf_equity::metrics::register_dcf_metrics(&mut registry);
+
+        let results = registry
+            .compute(&[MetricId::Dv01, MetricId::BucketedDv01], &mut mctx)
+            .expect("metrics should compute");
+
+        let dv01 = *results.get(&MetricId::Dv01).expect("Dv01 present");
+        let bucketed = *results
+            .get(&MetricId::BucketedDv01)
+            .expect("BucketedDv01 present");
+        assert!(
+            (dv01 - bucketed).abs() < 1e-6 * dv01.abs().max(1.0),
+            "bucketed total ({bucketed}) should equal parallel DV01 ({dv01})"
         );
     }
 
@@ -1562,8 +1603,10 @@ mod tests {
         );
     }
 
+    /// Review finding M14: the terminal value PV metric discounts at WACC
+    /// even when the named curve is loaded.
     #[test]
-    fn terminal_value_pv_metric_uses_curve_when_present() {
+    fn terminal_value_pv_metric_uses_wacc_even_with_curve_present() {
         let as_of = Date::from_calendar_date(2025, Month::January, 1)
             .expect("valid test date for terminal value pv metric");
         let mut dcf = build_simple_dcf_gordon();
@@ -1571,13 +1614,9 @@ mod tests {
 
         let market = build_market_with_flat_curve(as_of, &dcf.discount_curve_id, 0.05);
         let terminal_value = dcf.calculate_terminal_value().expect("terminal value");
-        let (terminal_date, _) = dcf.flows.last().expect("at least one flow");
-        let years = dcf.discount_years(dcf.valuation_date, *terminal_date);
-        let curve_df = market
-            .get_discount(&dcf.discount_curve_id)
-            .expect("discount curve available")
-            .df(years);
-        let expected_pv_terminal = terminal_value * curve_df;
+        let expected_pv_terminal = dcf
+            .discount_terminal_value(terminal_value)
+            .expect("wacc-discounted terminal value");
 
         let mut mctx = build_metric_context(dcf, market, as_of);
         let mut registry = crate::metrics::standard_registry().clone();

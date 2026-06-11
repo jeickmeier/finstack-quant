@@ -151,7 +151,12 @@ pub struct RealEstateAsset {
     pub appraisal_value: Option<Money>,
     /// Day count convention for year fractions.
     pub day_count: DayCount,
-    /// Discount curve identifier (for risk attribution).
+    /// Discount curve identifier, used for risk attribution only.
+    ///
+    /// DCF valuation always discounts at [`discount_rate`](Self::discount_rate)
+    /// regardless of whether this curve is loaded (review finding M14); rate
+    /// sensitivity (`Dv01`/`BucketedDv01`) bumps the risk-free component
+    /// inside the rate.
     pub discount_curve_id: CurveId,
     /// Attributes for tagging and scenarios.
     #[builder(default)]
@@ -268,9 +273,9 @@ impl RealEstateAsset {
     /// - `disposition_cost_pct` is set but outside `[0.0, 1.0)`
     /// - `valuation_method == DirectCap` but neither `cap_rate` nor a way to
     ///   derive cap (sale_price + NOI) is set
-    /// - `valuation_method == Dcf` but neither `discount_rate` nor a curve-based
-    ///   discount is available (cannot detect the latter at construction; only
-    ///   the discount_rate-set case is checked here)
+    /// - `valuation_method == Dcf` without `discount_rate` (unless an
+    ///   `appraisal_value` short-circuits pricing) — DCF always discounts at
+    ///   the property rate (review finding M14)
     /// - `sale_date` (when set) is on or before `valuation_date`
     pub fn validate(&self) -> finstack_core::Result<()> {
         if self.noi_schedule.is_empty() {
@@ -370,6 +375,18 @@ impl RealEstateAsset {
         {
             return Err(finstack_core::Error::Validation(format!(
                 "RealEstateAsset '{}' uses DirectCap method but cap_rate is not set",
+                self.id.as_str()
+            )));
+        }
+        // DCF always discounts at the property rate (review finding M14), so
+        // the rate is required unless an appraisal value short-circuits
+        // pricing entirely.
+        if matches!(self.valuation_method, RealEstateValuationMethod::Dcf)
+            && self.appraisal_value.is_none()
+            && self.discount_rate.is_none()
+        {
+            return Err(finstack_core::Error::Validation(format!(
+                "RealEstateAsset '{}' uses Dcf method but discount_rate is not set",
                 self.id.as_str()
             )));
         }

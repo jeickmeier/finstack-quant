@@ -31,8 +31,9 @@ use finstack_monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_monte_carlo::process::cheyette_rough::{
     CheyetteRoughVolParams, CheyetteRoughVolProcess,
 };
-use finstack_monte_carlo::rng::fbm::create_fbm_generator;
+use finstack_monte_carlo::rng::fbm::FractionalNoiseGenerator;
 use finstack_monte_carlo::rng::philox::PhiloxRng;
+use finstack_monte_carlo::rng::volterra::RiemannLiouvilleVolterra;
 use finstack_monte_carlo::time_grid::TimeGrid;
 use finstack_monte_carlo::traits::{Discretization, RandomStream};
 
@@ -389,10 +390,13 @@ impl BermudanSwaptionCheyetteRoughPricer {
             return Ok((Money::new(0.0, currency), 0.0));
         }
 
-        // Create fBM generator for rough vol
-        let fbm_gen = create_fbm_generator(&times, hurst_val).map_err(|e| {
+        // Riemann-Liouville Volterra generator for the rough-vol driver
+        // (review finding M2): the BLP hybrid scheme draws 2 normals per step
+        // and exposes the driving Brownian normals the rate leg correlates
+        // against.
+        let fbm_gen = RiemannLiouvilleVolterra::new(ttm, num_steps, hurst_val).map_err(|e| {
             PricingError::model_failure_with_context(
-                format!("Failed to create fBM generator: {e}"),
+                format!("Failed to create RL Volterra generator: {e}"),
                 PricingErrorContext::default(),
             )
         })?;
@@ -421,13 +425,16 @@ impl BermudanSwaptionCheyetteRoughPricer {
             let mut rng = base_rng.substream(path_id as u64);
             let mut x = vec![0.0, 0.0]; // [x, y] initial state
             let mut work = vec![0.0; work_size];
-            let mut z = vec![0.0; 2]; // 2 factors
+            let mut z = vec![0.0; 3]; // [z_indep, ΔỸ, Z̃] — 3 factors
 
-            // Generate fBM increments for this path
-            let mut fbm_normals = vec![0.0; num_steps];
+            // Generate RL Volterra increments for this path, plus the driving
+            // Brownian normals the rate shock correlates against (M2).
+            let mut fbm_normals = vec![0.0; num_steps * fbm_gen.normals_per_step()];
             rng.fill_std_normals(&mut fbm_normals);
             let mut fbm_increments = vec![0.0; num_steps];
             fbm_gen.generate(&fbm_normals, &mut fbm_increments);
+            let mut driving_normals = vec![0.0; num_steps];
+            fbm_gen.driving_normals_into(&fbm_normals, &mut driving_normals);
 
             // Track which exercise index we're on
             let mut ex_ptr = 0;
@@ -442,9 +449,11 @@ impl BermudanSwaptionCheyetteRoughPricer {
                 // Short rate BEFORE the Euler step (for trapezoidal discounting)
                 let r_before = x[0] + params.phi(t);
 
-                // Fill z[0] with independent normal, z[1] with fBM increment
+                // z[0] = independent normal, z[1] = RL Volterra increment ΔỸ,
+                // z[2] = unit-variance driving Brownian normal Z̃
                 rng.fill_std_normals(&mut z[..1]);
                 z[1] = fbm_increment;
+                z[2] = driving_normals[step];
 
                 // Euler step
                 euler.step(&process, t, step_dt, &mut x, &z, &mut work);
