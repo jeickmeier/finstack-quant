@@ -58,23 +58,93 @@ pub(crate) fn qe_conditional_moments(
     (m, s2)
 }
 
-/// One QE step of a CIR-type variance process.
+/// Distribution regime of one QE variance step (Andersen 2008, §3.2).
 ///
-/// Given current variance `v_t`, mean-reversion parameters `(κ, θ)`,
-/// vol-of-variance `σ`, step size `Δt`, a standard normal shock `z`, and
-/// the user-facing ψ threshold `psi_c`, returns a non-negative `v_{t+Δt}`
-/// using Andersen (2008)'s Case A / Case B switch with the safeguards
-/// described in [`PSI_CLAMP_MAX`] and [`QE_SMALL_MEAN_EPS`].
+/// Exposing the regime (rather than only the sampled draw) lets the spot leg
+/// compute the exact conditional moment-generating function
+/// `M(A) = E[exp(A·v_{t+Δt}) | v_t]` needed for the martingale-exact `K0*`
+/// correction (Andersen 2008, §4.2 / Prop. 8).
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum QeRegime {
+    /// Case A (ψ ≤ ψ_c): `v_{t+Δt} = a (b + Z)²` with `b² = b_squared`.
+    Quadratic {
+        /// Scale `a = m / (1 + b²)`.
+        a: f64,
+        /// Squared offset `b²`.
+        b_squared: f64,
+    },
+    /// Case B (ψ > ψ_c): mixture of an atom at 0 (probability `p`) and an
+    /// exponential with rate `beta`. The degenerate near-zero-mean safeguard
+    /// is represented as `p = 1` (the draw is always 0).
+    Exponential {
+        /// Probability mass at zero.
+        p: f64,
+        /// Exponential rate of the positive component.
+        beta: f64,
+    },
+}
+
+impl QeRegime {
+    /// Sample `v_{t+Δt}` from this regime given a standard normal shock `z`.
+    #[inline]
+    pub(crate) fn sample(&self, z: f64) -> f64 {
+        match *self {
+            QeRegime::Quadratic { a, b_squared } => (a * (z + b_squared.sqrt()).powi(2)).max(0.0),
+            QeRegime::Exponential { p, beta } => {
+                let u = norm_cdf(z);
+                // Collapse the `u <= p` and `|u - p| < EPS` branches into one
+                // so that numerically-near-boundary samples map to zero
+                // without a spurious division.
+                if u <= p || (u - p).abs() < f64::EPSILON {
+                    0.0
+                } else {
+                    (((1.0 - p) / (u - p)).ln() / beta).max(0.0)
+                }
+            }
+        }
+    }
+
+    /// Exact conditional moment-generating function
+    /// `M(A) = E[exp(A·v_{t+Δt}) | v_t]` of the QE draw (Andersen 2008,
+    /// Prop. 8). Returns `None` when `A` is outside the regime's domain of
+    /// finiteness (`2·A·a ≥ 1` for Case A, `A ≥ β` for Case B).
+    #[inline]
+    pub(crate) fn exp_moment(&self, a_coeff: f64) -> Option<f64> {
+        match *self {
+            QeRegime::Quadratic { a, b_squared } => {
+                let denom = 1.0 - 2.0 * a_coeff * a;
+                if denom <= 0.0 {
+                    return None;
+                }
+                let m = (a_coeff * a * b_squared / denom).exp() / denom.sqrt();
+                m.is_finite().then_some(m)
+            }
+            QeRegime::Exponential { p, beta } => {
+                if p >= 1.0 {
+                    // Degenerate atom at zero: E[exp(A·0)] = 1.
+                    return Some(1.0);
+                }
+                if a_coeff >= beta {
+                    return None;
+                }
+                let m = p + beta * (1.0 - p) / (beta - a_coeff);
+                m.is_finite().then_some(m)
+            }
+        }
+    }
+}
+
+/// Compute the QE regime (Case A / Case B with safeguards) for one variance
+/// step, without sampling.
 #[inline]
-pub(crate) fn qe_step_variance(
+pub(crate) fn qe_regime(
     v_t: f64,
     kappa: f64,
     theta: f64,
     sigma: f64,
     dt: f64,
-    z: f64,
     psi_c: f64,
-) -> f64 {
+) -> QeRegime {
     let v_t = v_t.max(0.0);
     let (m, s2) = qe_conditional_moments(v_t, kappa, theta, sigma, dt);
 
@@ -92,30 +162,35 @@ pub(crate) fn qe_step_variance(
     if psi <= psi_c {
         let b_squared = 2.0 / psi - 1.0 + (2.0 / psi * (2.0 / psi - 1.0)).sqrt();
         let a = m / (1.0 + b_squared);
-        let v_next = a * (z + b_squared.sqrt()).powi(2);
-        v_next.max(0.0)
+        QeRegime::Quadratic { a, b_squared }
+    } else if m <= QE_SMALL_MEAN_EPS {
+        // Degenerate: the draw is always zero.
+        QeRegime::Exponential { p: 1.0, beta: 1.0 }
     } else {
-        // Case B: exponential/uniform mixture. The ψ switch above forces
-        // this branch when m is near zero, so retain an explicit guard in
-        // case callers pass exotic parameters.
-        if m <= QE_SMALL_MEAN_EPS {
-            return 0.0;
-        }
-
         let p = (psi - 1.0) / (psi + 1.0);
         let beta = (1.0 - p) / m;
-        let u = norm_cdf(z);
-
-        // Collapse the `u <= p` and `|u - p| < EPS` branches into one so
-        // that numerically-near-boundary samples map to zero without a
-        // spurious division.
-        if u <= p || (u - p).abs() < f64::EPSILON {
-            0.0
-        } else {
-            let v_next = ((1.0 - p) / (u - p)).ln() / beta;
-            v_next.max(0.0)
-        }
+        QeRegime::Exponential { p, beta }
     }
+}
+
+/// One QE step of a CIR-type variance process.
+///
+/// Given current variance `v_t`, mean-reversion parameters `(κ, θ)`,
+/// vol-of-variance `σ`, step size `Δt`, a standard normal shock `z`, and
+/// the user-facing ψ threshold `psi_c`, returns a non-negative `v_{t+Δt}`
+/// using Andersen (2008)'s Case A / Case B switch with the safeguards
+/// described in [`PSI_CLAMP_MAX`] and [`QE_SMALL_MEAN_EPS`].
+#[inline]
+pub(crate) fn qe_step_variance(
+    v_t: f64,
+    kappa: f64,
+    theta: f64,
+    sigma: f64,
+    dt: f64,
+    z: f64,
+    psi_c: f64,
+) -> f64 {
+    qe_regime(v_t, kappa, theta, sigma, dt, psi_c).sample(z)
 }
 
 #[cfg(test)]

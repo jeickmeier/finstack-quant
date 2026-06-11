@@ -32,11 +32,25 @@
 
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::models::closed_form::barrier::{
-    barrier_call_continuous, barrier_put_continuous, barrier_touch_probability, BarrierParams,
-    BarrierType as AnalyticalBarrierType,
+    barrier_call_continuous, barrier_put_continuous, barrier_rebate, barrier_touch_probability,
+    BarrierParams, BarrierType as AnalyticalBarrierType, RebateTiming,
 };
 use crate::models::closed_form::vanilla::bs_price;
 use crate::models::volatility::black::d1_d2;
+
+/// Optional rebate leg priced alongside the barrier payoff in the
+/// Vanna-Volga finite-difference greeks.
+///
+/// The base BS leg (`bs_barrier_price_per_unit` in the pricer) includes the
+/// rebate; the FD vega/vanna/volga matched by the 3×3 system must cover the
+/// same payoff or the smile correction hedges a different instrument.
+#[derive(Debug, Clone, Copy)]
+pub struct VvRebate {
+    /// Rebate amount per unit notional.
+    pub amount: f64,
+    /// Rebate payment timing convention.
+    pub timing: RebateTiming,
+}
 
 /// Survival-probability weight for the Vanna-Volga barrier correction.
 ///
@@ -144,17 +158,40 @@ fn bs_volga(spot: f64, strike: f64, r_d: f64, r_f: f64, vol: f64, t: f64) -> f64
     vega * d1 * d2 / vol
 }
 
-/// Compute barrier option price using BS model at a given vol.
+/// Compute barrier option price using BS model at a given vol, including the
+/// optional rebate leg so FD greeks cover the same payoff as the base leg.
 fn barrier_bs_price(
     params: &BarrierParams,
     barrier_type: AnalyticalBarrierType,
     is_call: bool,
+    rebate: Option<VvRebate>,
 ) -> f64 {
-    if is_call {
+    let option_leg = if is_call {
         barrier_call_continuous(params, barrier_type)
     } else {
         barrier_put_continuous(params, barrier_type)
-    }
+    };
+    let rebate_leg = rebate
+        .map(|r| barrier_rebate(params, r.amount, barrier_type, r.timing))
+        .unwrap_or(0.0);
+    option_leg + rebate_leg
+}
+
+/// Finite-difference bump sizes for the barrier FD greeks, guarded so the
+/// bumped scenarios stay in the same regime as the base point:
+///
+/// - the vol bump shrinks near zero vol so `vol - h_vol` cannot go negative
+///   (a negative vol input would silently price garbage);
+/// - the spot bump is capped at half the distance to the barrier so
+///   `spot ± h_spot` cannot cross it — an FD straddling the barrier mixes
+///   knocked and alive regimes and produces a meaningless cross-derivative.
+fn fd_bumps(params: &BarrierParams) -> (f64, f64) {
+    let h_vol = 0.001_f64.min(0.5 * params.vol).max(1e-8);
+    let barrier_dist = (params.spot - params.barrier).abs();
+    let h_spot = (params.spot * 0.001)
+        .min(0.5 * barrier_dist)
+        .max(params.spot * 1e-7);
+    (h_spot, h_vol)
 }
 
 /// Compute barrier vanna via central finite differences on the BS barrier formula.
@@ -167,9 +204,9 @@ fn barrier_vanna_fd(
     params: &BarrierParams,
     barrier_type: AnalyticalBarrierType,
     is_call: bool,
+    rebate: Option<VvRebate>,
 ) -> f64 {
-    let h_spot = params.spot * 0.001; // 0.1% spot bump
-    let h_vol = 0.001; // 10bp vol bump
+    let (h_spot, h_vol) = fd_bumps(params);
 
     let p = |s: f64, v: f64| -> f64 {
         let bumped = BarrierParams {
@@ -177,7 +214,7 @@ fn barrier_vanna_fd(
             vol: v,
             ..*params
         };
-        barrier_bs_price(&bumped, barrier_type, is_call)
+        barrier_bs_price(&bumped, barrier_type, is_call, rebate)
     };
 
     let ppp = p(params.spot + h_spot, params.vol + h_vol);
@@ -195,8 +232,9 @@ fn barrier_volga_fd(
     params: &BarrierParams,
     barrier_type: AnalyticalBarrierType,
     is_call: bool,
+    rebate: Option<VvRebate>,
 ) -> f64 {
-    let h_vol = 0.001; // 10bp vol bump
+    let (_, h_vol) = fd_bumps(params);
 
     let bump_vol = |dv: f64| -> BarrierParams {
         BarrierParams {
@@ -205,9 +243,9 @@ fn barrier_volga_fd(
         }
     };
 
-    let p_base = barrier_bs_price(params, barrier_type, is_call);
-    let p_up = barrier_bs_price(&bump_vol(h_vol), barrier_type, is_call);
-    let p_down = barrier_bs_price(&bump_vol(-h_vol), barrier_type, is_call);
+    let p_base = barrier_bs_price(params, barrier_type, is_call, rebate);
+    let p_up = barrier_bs_price(&bump_vol(h_vol), barrier_type, is_call, rebate);
+    let p_down = barrier_bs_price(&bump_vol(-h_vol), barrier_type, is_call, rebate);
 
     (p_up - 2.0 * p_base + p_down) / (h_vol * h_vol)
 }
@@ -219,8 +257,9 @@ fn barrier_vega_fd(
     params: &BarrierParams,
     barrier_type: AnalyticalBarrierType,
     is_call: bool,
+    rebate: Option<VvRebate>,
 ) -> f64 {
-    let h_vol = 0.001;
+    let (_, h_vol) = fd_bumps(params);
 
     let bump_vol = |dv: f64| -> BarrierParams {
         BarrierParams {
@@ -229,60 +268,45 @@ fn barrier_vega_fd(
         }
     };
 
-    let p_up = barrier_bs_price(&bump_vol(h_vol), barrier_type, is_call);
-    let p_down = barrier_bs_price(&bump_vol(-h_vol), barrier_type, is_call);
+    let p_up = barrier_bs_price(&bump_vol(h_vol), barrier_type, is_call, rebate);
+    let p_down = barrier_bs_price(&bump_vol(-h_vol), barrier_type, is_call, rebate);
 
     (p_up - p_down) / (2.0 * h_vol)
 }
 
-/// Apply Vanna-Volga correction to a barrier option price.
+/// Target vega/vanna/volga to be replicated by the three-pillar portfolio.
+#[derive(Debug, Clone, Copy)]
+struct VvTargetGreeks {
+    /// Target vega (∂P/∂σ).
+    vega: f64,
+    /// Target vanna (∂²P/∂S∂σ).
+    vanna: f64,
+    /// Target volga (∂²P/∂σ²).
+    volga: f64,
+}
+
+/// Solve the Vanna-Volga 3×3 system and return the smile cost `Σ pᵢ·costᵢ`
+/// for a target instrument with the given vega/vanna/volga.
 ///
-/// This implements the full Vanna-Volga method which solves for weights that
-/// match the vega, vanna, and volga of the barrier option to a portfolio of
-/// three vanilla options at market strikes (25Δ put, ATM, 25Δ call).
-///
-/// # Arguments
-///
-/// * `bs_barrier_price` - The BS barrier price computed at ATM vol
-/// * `spot` - Current FX spot rate
-/// * `barrier` - Barrier level
-/// * `strike` - Option strike
-/// * `r_d` - Domestic risk-free rate
-/// * `r_f` - Foreign risk-free rate
-/// * `t` - Time to expiry in years
-/// * `quotes` - Market volatility quotes at the three pillar strikes
-/// * `is_call` - Whether the option is a call
-/// * `barrier_type` - The analytical barrier type
-///
-/// # Returns
-///
-/// The Vanna-Volga adjusted barrier price.
-pub fn vanna_volga_barrier_adjustment(
-    bs_barrier_price: f64,
-    params: &BarrierParams,
+/// The weights `p₁, p₂, p₃` replicate the target's vega, vanna and volga with
+/// the three pillar vanillas (25Δ put, ATM, 25Δ call), all valued at the ATM
+/// vol; the cost of each pillar is its market-vs-ATM price difference.
+/// Returns `0.0` (no adjustment) when the system is singular (degenerate
+/// smile).
+fn vv_smile_cost(
+    spot: f64,
+    r_d: f64,
+    r_f: f64,
+    t: f64,
     quotes: &VannaVolgaQuotes,
-    is_call: bool,
-    barrier_type: AnalyticalBarrierType,
+    target: VvTargetGreeks,
 ) -> f64 {
-    let BarrierParams {
-        spot,
-        strike: _,
-        barrier: _,
-        time: t,
-        rate: r_d,
-        div_yield: r_f,
-        vol: _,
-    } = *params;
-
-    if t <= 0.0 {
-        return bs_barrier_price;
-    }
-
+    let VvTargetGreeks {
+        vega: vega_target,
+        vanna: vanna_target,
+        volga: volga_target,
+    } = target;
     let sigma_atm = quotes.vol_atm;
-    let atm_params = BarrierParams {
-        vol: sigma_atm,
-        ..*params
-    };
 
     // Step 1: Compute vanilla costs for the three pillar instruments
     // Cost_i = C_i(σ_i) - C_i(σ_ATM) for each pillar strike
@@ -312,74 +336,202 @@ pub fn vanna_volga_barrier_adjustment(
     let volga_2 = bs_volga(spot, k2, r_d, r_f, sigma_atm, t);
     let volga_3 = bs_volga(spot, k3, r_d, r_f, sigma_atm, t);
 
-    // Step 3: Compute vega, vanna, volga of the barrier option via FD
-    let vega_barrier = barrier_vega_fd(&atm_params, barrier_type, is_call);
-    let vanna_barrier = barrier_vanna_fd(&atm_params, barrier_type, is_call);
-    let volga_barrier = barrier_volga_fd(&atm_params, barrier_type, is_call);
-
-    // Step 4: Solve the 3×3 linear system for weights p₁, p₂, p₃:
-    //   p₁ × vega₁ + p₂ × vega₂ + p₃ × vega₃ = vega_barrier
-    //   p₁ × vanna₁ + p₂ × vanna₂ + p₃ × vanna₃ = vanna_barrier
-    //   p₁ × volga₁ + p₂ × volga₂ + p₃ × volga₃ = volga_barrier
+    // Step 3: Solve the 3×3 linear system for weights p₁, p₂, p₃:
+    //   p₁ × vega₁ + p₂ × vega₂ + p₃ × vega₃ = vega_target
+    //   p₁ × vanna₁ + p₂ × vanna₂ + p₃ × vanna₃ = vanna_target
+    //   p₁ × volga₁ + p₂ × volga₂ + p₃ × volga₃ = volga_target
     //
     // We solve this via Cramer's rule for the 3×3 system.
     let det = determinant_3x3(
         vega_1, vega_2, vega_3, vanna_1, vanna_2, vanna_3, volga_1, volga_2, volga_3,
     );
 
-    // If the system is singular (degenerate smile), return BS price
+    // If the system is singular (degenerate smile), apply no adjustment.
     if det.abs() < 1e-30 {
-        return bs_barrier_price;
+        return 0.0;
     }
 
     let p1 = determinant_3x3(
-        vega_barrier,
+        vega_target,
         vega_2,
         vega_3,
-        vanna_barrier,
+        vanna_target,
         vanna_2,
         vanna_3,
-        volga_barrier,
+        volga_target,
         volga_2,
         volga_3,
     ) / det;
 
     let p2 = determinant_3x3(
         vega_1,
-        vega_barrier,
+        vega_target,
         vega_3,
         vanna_1,
-        vanna_barrier,
+        vanna_target,
         vanna_3,
         volga_1,
-        volga_barrier,
+        volga_target,
         volga_3,
     ) / det;
 
     let p3 = determinant_3x3(
         vega_1,
         vega_2,
-        vega_barrier,
+        vega_target,
         vanna_1,
         vanna_2,
-        vanna_barrier,
+        vanna_target,
         volga_1,
         volga_2,
-        volga_barrier,
+        volga_target,
     ) / det;
 
-    // Step 5: smile-cost portfolio, Σ pᵢ × costᵢ.
-    let smile_cost = p1 * cost_1 + p2 * cost_2 + p3 * cost_3;
+    // Smile-cost portfolio, Σ pᵢ × costᵢ.
+    p1 * cost_1 + p2 * cost_2 + p3 * cost_3
+}
 
-    // Step 6: weight by the survival probability. For a barrier option the
-    // Vanna-Volga correction must vanish as the barrier becomes certain to
-    // knock out (or, for a knock-in, certain not to activate): a dead option
-    // carries no vanna/volga and therefore no smile cost. Omitting this weight
-    // over-applies the smile correction near the barrier.
-    let survival_weight = vv_survival_weight(&atm_params, barrier_type, sigma_atm);
-    let vv_adjustment = survival_weight * smile_cost;
+/// Vanna-Volga price of a **vanilla** FX option.
+///
+/// Base leg is the Black-Scholes vanilla at the **ATM** vol; the smile cost
+/// (same 3×3 pillar replication as the barrier method) is added with weight 1
+/// — a vanilla has no knock-out attenuation. This is the reference leg used
+/// to price knock-in barriers via in–out parity.
+///
+/// Only `spot`, `strike`, `time`, `rate` and `div_yield` of `params` are
+/// used; the ambient `vol` is ignored in favour of `quotes.vol_atm`.
+pub fn vanna_volga_vanilla_adjustment(
+    params: &BarrierParams,
+    quotes: &VannaVolgaQuotes,
+    is_call: bool,
+) -> f64 {
+    let BarrierParams {
+        spot,
+        strike,
+        time: t,
+        rate: r_d,
+        div_yield: r_f,
+        ..
+    } = *params;
 
-    bs_barrier_price + vv_adjustment
+    let sigma_atm = quotes.vol_atm;
+    let option_type = if is_call {
+        OptionType::Call
+    } else {
+        OptionType::Put
+    };
+    let base = bs_price(spot, strike, r_d, r_f, sigma_atm, t, option_type);
+    if t <= 0.0 {
+        return base;
+    }
+
+    // Analytic BS greeks of the vanilla at ATM vol (call/put share vega,
+    // vanna and volga).
+    let target = VvTargetGreeks {
+        vega: bs_vega(spot, strike, r_d, r_f, sigma_atm, t),
+        vanna: bs_vanna(spot, strike, r_d, r_f, sigma_atm, t),
+        volga: bs_volga(spot, strike, r_d, r_f, sigma_atm, t),
+    };
+
+    base + vv_smile_cost(spot, r_d, r_f, t, quotes, target)
+}
+
+/// Vanna-Volga price of an FX barrier option (per unit notional).
+///
+/// The base Black-Scholes leg — barrier payoff plus optional rebate — is
+/// valued at the **ATM** volatility `quotes.vol_atm` (the ambient `params.vol`
+/// is ignored): the Vanna-Volga construction prices everything off the ATM
+/// leg and lets the 3×3 pillar replication carry the smile, so building the
+/// base leg at the strike vol would double-count the smile.
+///
+/// - **Knock-out** (`UpOut`/`DownOut`): `BS(σ_ATM)` plus the smile cost of
+///   the barrier's FD vega/vanna/volga, attenuated by the no-touch survival
+///   probability (Wystup 2006, §3).
+/// - **Knock-in** (`UpIn`/`DownIn`): priced via in–out parity,
+///   `VV(KI) = VV(vanilla) − VV(paired KO)`, with the rebate handled
+///   per-leg: the knock-in rebate (paid at expiry when the barrier is never
+///   touched) is valued at the ATM vol and added to the parity result, while
+///   the paired knock-out option leg carries no rebate. Pricing a KI
+///   directly with survival-weighted attenuation mis-states the smile cost
+///   because a knock-in's smile exposure *grows* with touch probability.
+///
+/// # Arguments
+///
+/// * `params` - Spot/strike/barrier/time/rates; `vol` is ignored (ATM is used)
+/// * `quotes` - Market volatility quotes at the three pillar strikes
+/// * `is_call` - Whether the option is a call
+/// * `barrier_type` - The analytical barrier type
+/// * `rebate` - Optional rebate leg, priced with the same conventions as the
+///   base BS leg
+///
+/// # Returns
+///
+/// The Vanna-Volga barrier price per unit notional.
+pub fn vanna_volga_barrier_price(
+    params: &BarrierParams,
+    quotes: &VannaVolgaQuotes,
+    is_call: bool,
+    barrier_type: AnalyticalBarrierType,
+    rebate: Option<VvRebate>,
+) -> f64 {
+    let sigma_atm = quotes.vol_atm;
+    let atm_params = BarrierParams {
+        vol: sigma_atm,
+        ..*params
+    };
+
+    match barrier_type {
+        AnalyticalBarrierType::UpOut | AnalyticalBarrierType::DownOut => {
+            // Base BS leg (option + rebate) at ATM vol.
+            let bs_barrier_price = barrier_bs_price(&atm_params, barrier_type, is_call, rebate);
+            if atm_params.time <= 0.0 {
+                return bs_barrier_price;
+            }
+
+            // FD vega/vanna/volga of the barrier (including any rebate leg,
+            // matching the base BS price).
+            let target = VvTargetGreeks {
+                vega: barrier_vega_fd(&atm_params, barrier_type, is_call, rebate),
+                vanna: barrier_vanna_fd(&atm_params, barrier_type, is_call, rebate),
+                volga: barrier_volga_fd(&atm_params, barrier_type, is_call, rebate),
+            };
+
+            let smile_cost = vv_smile_cost(
+                atm_params.spot,
+                atm_params.rate,
+                atm_params.div_yield,
+                atm_params.time,
+                quotes,
+                target,
+            );
+
+            // Weight by the survival probability. The Vanna-Volga correction
+            // must vanish as the knock-out becomes certain: a dead option
+            // carries no vanna/volga and therefore no smile cost. Omitting
+            // this weight over-applies the smile correction near the barrier.
+            let survival_weight = vv_survival_weight(&atm_params, barrier_type, sigma_atm);
+            bs_barrier_price + survival_weight * smile_cost
+        }
+        AnalyticalBarrierType::UpIn | AnalyticalBarrierType::DownIn => {
+            // In–out parity on the option leg: KI = vanilla − paired KO.
+            let ko_type = if matches!(barrier_type, AnalyticalBarrierType::UpIn) {
+                AnalyticalBarrierType::UpOut
+            } else {
+                AnalyticalBarrierType::DownOut
+            };
+            let vv_vanilla = vanna_volga_vanilla_adjustment(&atm_params, quotes, is_call);
+            let vv_ko = vanna_volga_barrier_price(&atm_params, quotes, is_call, ko_type, None);
+
+            // Per-leg rebate: a knock-in rebate pays when the barrier is
+            // never touched, which is not part of the parity identity; value
+            // it at the ATM vol alongside the base legs.
+            let rebate_leg = rebate
+                .map(|r| barrier_rebate(&atm_params, r.amount, barrier_type, r.timing))
+                .unwrap_or(0.0);
+
+            vv_vanilla - vv_ko + rebate_leg
+        }
+    }
 }
 
 /// Compute 3×3 determinant.
@@ -430,10 +582,9 @@ mod tests {
 
         let barrier_type = AnalyticalBarrierType::UpOut;
         let params = BarrierParams::new(spot, strike, barrier, t, r_d, r_f, vol);
-        let bs_price = barrier_bs_price(&params, barrier_type, true);
+        let bs_price = barrier_bs_price(&params, barrier_type, true, None);
 
-        let vv_price =
-            vanna_volga_barrier_adjustment(bs_price, &params, &quotes, true, barrier_type);
+        let vv_price = vanna_volga_barrier_price(&params, &quotes, true, barrier_type, None);
 
         // With flat vol, VV price should equal BS price
         let diff = (vv_price - bs_price).abs();
@@ -465,10 +616,8 @@ mod tests {
 
         let barrier_type = AnalyticalBarrierType::UpOut;
         let params = BarrierParams::new(spot, strike, barrier, t, r_d, r_f, quotes.vol_atm);
-        let bs_price = barrier_bs_price(&params, barrier_type, true);
 
-        let vv_price =
-            vanna_volga_barrier_adjustment(bs_price, &params, &quotes, true, barrier_type);
+        let vv_price = vanna_volga_barrier_price(&params, &quotes, true, barrier_type, None);
 
         assert!(
             vv_price >= -1e-10,
@@ -502,10 +651,9 @@ mod tests {
 
         let barrier_type = AnalyticalBarrierType::UpOut;
         let params = BarrierParams::new(spot, strike, barrier, t, r_d, r_f, quotes.vol_atm);
-        let bs_price = barrier_bs_price(&params, barrier_type, true);
+        let bs_price = barrier_bs_price(&params, barrier_type, true, None);
 
-        let vv_price =
-            vanna_volga_barrier_adjustment(bs_price, &params, &quotes, true, barrier_type);
+        let vv_price = vanna_volga_barrier_price(&params, &quotes, true, barrier_type, None);
 
         let adjustment = (vv_price - bs_price).abs();
         assert!(
@@ -547,9 +695,8 @@ mod tests {
             survival_near < 1e-3,
             "fixture must make knock-out near-certain (survival≈0), got {survival_near}"
         );
-        let bs_near = barrier_bs_price(&params_near, barrier_type, true);
-        let vv_near =
-            vanna_volga_barrier_adjustment(bs_near, &params_near, &quotes, true, barrier_type);
+        let bs_near = barrier_bs_price(&params_near, barrier_type, true, None);
+        let vv_near = vanna_volga_barrier_price(&params_near, &quotes, true, barrier_type, None);
         assert!(
             (vv_near - bs_near).abs() < 1e-3,
             "VV correction must vanish as knock-out becomes certain: \
@@ -562,9 +709,8 @@ mod tests {
         // smile or zero greeks).
         let barrier_far = 1.60;
         let params_far = BarrierParams::new(spot, 1.10, barrier_far, t, r_d, r_f, vol);
-        let bs_far = barrier_bs_price(&params_far, barrier_type, true);
-        let vv_far =
-            vanna_volga_barrier_adjustment(bs_far, &params_far, &quotes, true, barrier_type);
+        let bs_far = barrier_bs_price(&params_far, barrier_type, true, None);
+        let vv_far = vanna_volga_barrier_price(&params_far, &quotes, true, barrier_type, None);
         assert!(
             (vv_far - bs_far).abs() > (vv_near - bs_near).abs() + 1e-6,
             "distant barrier (higher survival) must carry a larger VV correction: \
@@ -595,12 +741,148 @@ mod tests {
 
         let barrier_type = AnalyticalBarrierType::DownOut;
         let params = BarrierParams::new(spot, strike, barrier, t, r_d, r_f, quotes.vol_atm);
-        let bs_price = barrier_bs_price(&params, barrier_type, false);
 
-        let vv_price =
-            vanna_volga_barrier_adjustment(bs_price, &params, &quotes, false, barrier_type);
+        let vv_price = vanna_volga_barrier_price(&params, &quotes, false, barrier_type, None);
 
         assert!(vv_price.is_finite(), "VV price should be finite for puts");
+    }
+
+    /// In–out parity on a smiled surface: `VV(KO) + VV(KI) = VV(vanilla)`
+    /// must hold exactly for both up and down barriers (option legs only —
+    /// no rebates), because the knock-in is priced via parity off the
+    /// ATM-based vanilla and paired knock-out legs.
+    #[test]
+    fn test_vv_in_out_parity_on_smiled_surface() {
+        let spot = 1.10;
+        let strike = 1.10;
+        let r_d = 0.05;
+        let r_f = 0.03;
+        let t = 0.5;
+
+        let quotes = VannaVolgaQuotes {
+            vol_25d_put: 0.14, // pronounced smile
+            vol_atm: 0.10,
+            vol_25d_call: 0.12,
+            strike_25d_put: 1.02,
+            strike_atm: 1.10,
+            strike_25d_call: 1.18,
+        };
+
+        let cases = [
+            (
+                1.25,
+                AnalyticalBarrierType::UpOut,
+                AnalyticalBarrierType::UpIn,
+                true,
+            ),
+            (
+                1.25,
+                AnalyticalBarrierType::UpOut,
+                AnalyticalBarrierType::UpIn,
+                false,
+            ),
+            (
+                0.95,
+                AnalyticalBarrierType::DownOut,
+                AnalyticalBarrierType::DownIn,
+                true,
+            ),
+            (
+                0.95,
+                AnalyticalBarrierType::DownOut,
+                AnalyticalBarrierType::DownIn,
+                false,
+            ),
+        ];
+
+        for (barrier, ko, ki, is_call) in cases {
+            let params = BarrierParams::new(spot, strike, barrier, t, r_d, r_f, quotes.vol_atm);
+            let vv_ko = vanna_volga_barrier_price(&params, &quotes, is_call, ko, None);
+            let vv_ki = vanna_volga_barrier_price(&params, &quotes, is_call, ki, None);
+            let vv_vanilla = vanna_volga_vanilla_adjustment(&params, &quotes, is_call);
+
+            let gap = (vv_ko + vv_ki - vv_vanilla).abs();
+            assert!(
+                gap < 1e-12,
+                "in-out parity violated for {ko:?}/{ki:?} is_call={is_call}: \
+                 KO={vv_ko} KI={vv_ki} vanilla={vv_vanilla} gap={gap}"
+            );
+        }
+    }
+
+    /// Flat smile: every VV leg collapses to its Black-Scholes counterpart,
+    /// including the knock-in priced via parity (the BS barrier formulas
+    /// satisfy in–out parity analytically).
+    #[test]
+    fn test_vv_knock_in_flat_smile_equals_bs() {
+        let spot = 1.10;
+        let strike = 1.10;
+        let r_d = 0.05;
+        let r_f = 0.03;
+        let t = 0.5;
+        let vol = 0.10;
+
+        let quotes = VannaVolgaQuotes {
+            vol_25d_put: vol,
+            vol_atm: vol,
+            vol_25d_call: vol,
+            strike_25d_put: 1.05,
+            strike_atm: 1.10,
+            strike_25d_call: 1.15,
+        };
+
+        let cases = [
+            (1.25, AnalyticalBarrierType::UpIn, true),
+            (0.95, AnalyticalBarrierType::DownIn, false),
+        ];
+
+        for (barrier, barrier_type, is_call) in cases {
+            let params = BarrierParams::new(spot, strike, barrier, t, r_d, r_f, vol);
+            let bs = barrier_bs_price(&params, barrier_type, is_call, None);
+            let vv = vanna_volga_barrier_price(&params, &quotes, is_call, barrier_type, None);
+            let diff = (vv - bs).abs();
+            assert!(
+                diff < 1e-9,
+                "flat-smile VV knock-in must equal BS for {barrier_type:?} \
+                 is_call={is_call}: vv={vv} bs={bs} diff={diff}"
+            );
+        }
+    }
+
+    /// The vanilla VV leg with a flat smile equals the plain BS vanilla.
+    #[test]
+    fn test_vv_vanilla_flat_smile_equals_bs() {
+        let spot = 1.10;
+        let strike = 1.08;
+        let r_d = 0.05;
+        let r_f = 0.03;
+        let t = 0.5;
+        let vol = 0.10;
+
+        let quotes = VannaVolgaQuotes {
+            vol_25d_put: vol,
+            vol_atm: vol,
+            vol_25d_call: vol,
+            strike_25d_put: 1.05,
+            strike_atm: 1.10,
+            strike_25d_call: 1.15,
+        };
+
+        // Barrier field is unused by the vanilla leg.
+        let params = BarrierParams::new(spot, strike, 1.50, t, r_d, r_f, vol);
+        for is_call in [true, false] {
+            let vv = vanna_volga_vanilla_adjustment(&params, &quotes, is_call);
+            let option_type = if is_call {
+                OptionType::Call
+            } else {
+                OptionType::Put
+            };
+            let bs = bs_price(spot, strike, r_d, r_f, vol, t, option_type);
+            assert!(
+                (vv - bs).abs() < 1e-12,
+                "flat-smile VV vanilla must equal BS: vv={vv} bs={bs}"
+            );
+        }
     }
 
     /// Verify that BS greeks (vanna, volga) are computed correctly for a vanilla option

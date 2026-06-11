@@ -224,6 +224,7 @@ fn lmm_single_exercise_matches_numeraire_correct_reference() {
         basis_degree: 2,
         antithetic: false,
         min_steps_between_exercises: LMM_MIN_STEPS,
+        oos_lsmc: false,
         enforce_calibration: false,
     };
 
@@ -283,6 +284,7 @@ fn lmm_bermudan_respects_coterminal_lower_bound() {
         basis_degree: 2,
         antithetic: true,
         min_steps_between_exercises: LMM_MIN_STEPS,
+        oos_lsmc: false,
         enforce_calibration: false,
     };
 

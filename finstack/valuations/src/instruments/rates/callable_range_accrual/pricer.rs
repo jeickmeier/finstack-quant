@@ -260,7 +260,9 @@ impl CallableRangeAccrualPricer {
             fallback: Some(self.hw_params),
             context: context_label.as_str(),
         };
-        resolve_hw1f_params(&req, market)
+        // Provenance (`hw1f_param_source`) is stamped by the resolver's
+        // structured logs under the instrument context label.
+        resolve_hw1f_params(&req, market).map(|(params, _source)| params)
     }
 
     fn effective_config(&self, inst: &CallableRangeAccrual) -> RateExoticMcConfig {
@@ -345,8 +347,6 @@ impl CallableRangeAccrualPricer {
             r0,
             event_times: schedule.event_times,
             exercise_times: schedule.exercise_times,
-            call_prices: schedule.call_prices,
-            notional: inst.range_accrual.notional.amount(),
             config,
             currency: inst.range_accrual.notional.currency(),
         };

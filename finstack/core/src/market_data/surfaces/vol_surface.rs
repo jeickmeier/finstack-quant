@@ -95,6 +95,35 @@ impl std::fmt::Display for VolSurfaceAxis {
     }
 }
 
+/// Quoting convention of the volatilities stored on a [`VolSurface`].
+///
+/// The same `vol_surface_id` channel is read by consumers with very different
+/// expectations: rates calibrations typically read normal (Bachelier, absolute)
+/// vols on an `expiry × tenor` ATM matrix, while equity/FX/swaption smile
+/// consumers read Black (lognormal, relative) vols on `expiry × strike`. The
+/// stored numbers are an order of magnitude apart (e.g. 0.008 normal vs 0.20
+/// Black), so misreading one as the other silently mis-prices. Tagging the
+/// quote type lets consumers enforce their convention via
+/// [`VolSurface::require_quote_type`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum VolQuoteType {
+    /// Black (lognormal) implied volatility, relative units (the default).
+    #[default]
+    BlackLognormal,
+    /// Normal (Bachelier) implied volatility, absolute rate units.
+    Normal,
+}
+
+impl std::fmt::Display for VolQuoteType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BlackLognormal => write!(f, "black_lognormal"),
+            Self::Normal => write!(f, "normal"),
+        }
+    }
+}
+
 /// Interpolation contract for vol surfaces.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -137,6 +166,7 @@ pub struct VolSurface {
     expiries: Box<[f64]>,
     strikes: Box<[f64]>,
     secondary_axis: VolSurfaceAxis,
+    quote_type: VolQuoteType,
     interpolation_mode: VolInterpolationMode,
     /// Row-major storage: vols[expiry_idx * n_strikes + strike_idx]
     vols: Box<[f64]>,
@@ -155,6 +185,9 @@ struct RawVolSurface {
     /// Semantic meaning of the secondary axis. Defaults to strike for older payloads.
     #[serde(default)]
     pub secondary_axis: VolSurfaceAxis,
+    /// Quote convention. Defaults to Black/lognormal for older payloads.
+    #[serde(default)]
+    pub quote_type: VolQuoteType,
     /// Interpolation contract. Defaults to direct vol interpolation for older payloads.
     #[serde(default)]
     pub interpolation_mode: VolInterpolationMode,
@@ -169,6 +202,7 @@ impl From<VolSurface> for RawVolSurface {
             expiries: surface.expiries.to_vec(),
             strikes: surface.strikes.to_vec(),
             secondary_axis: surface.secondary_axis,
+            quote_type: surface.quote_type,
             interpolation_mode: surface.interpolation_mode,
             vols_row_major: surface.vols.into_vec(),
         }
@@ -186,6 +220,7 @@ impl TryFrom<RawVolSurface> for VolSurface {
             &state.vols_row_major,
         )?
         .with_secondary_axis(state.secondary_axis)
+        .with_quote_type(state.quote_type)
         .with_interpolation_mode(state.interpolation_mode))
     }
 }
@@ -229,6 +264,7 @@ impl VolSurface {
             expiries: Vec::new(),
             strikes: Vec::new(),
             secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
             interpolation_mode: VolInterpolationMode::Vol,
             vols: Vec::new(),
         }
@@ -365,6 +401,11 @@ impl VolSurface {
         self.secondary_axis
     }
 
+    /// Quoting convention of the stored volatilities.
+    pub fn quote_type(&self) -> VolQuoteType {
+        self.quote_type
+    }
+
     /// Interpolation contract used when evaluating between grid points.
     pub fn interpolation_mode(&self) -> VolInterpolationMode {
         self.interpolation_mode
@@ -374,6 +415,13 @@ impl VolSurface {
     #[must_use]
     pub fn with_secondary_axis(mut self, secondary_axis: VolSurfaceAxis) -> Self {
         self.secondary_axis = secondary_axis;
+        self
+    }
+
+    /// Return a copy of this surface with an explicit quote-type contract.
+    #[must_use]
+    pub fn with_quote_type(mut self, quote_type: VolQuoteType) -> Self {
+        self.quote_type = quote_type;
         self
     }
 
@@ -397,6 +445,23 @@ impl VolSurface {
         Err(Error::Validation(format!(
             "Vol surface '{}' uses secondary axis '{}' but caller expected '{}'",
             self.id, self.secondary_axis, expected
+        )))
+    }
+
+    /// Require the quoting convention before a caller uses the surface.
+    ///
+    /// Consumers that interpret the stored values under a specific convention
+    /// (normal/Bachelier vs Black/lognormal) should call this at the read site
+    /// so a mis-tagged or mis-wired surface fails loudly instead of silently
+    /// mis-pricing by an order of magnitude.
+    pub fn require_quote_type(&self, expected: VolQuoteType) -> crate::Result<()> {
+        if self.quote_type == expected {
+            return Ok(());
+        }
+
+        Err(Error::Validation(format!(
+            "Vol surface '{}' stores '{}' quotes but caller expected '{}'",
+            self.id, self.quote_type, expected
         )))
     }
 
@@ -471,12 +536,17 @@ impl VolSurface {
         let mut bumped_vols = self.vols.clone();
         bumped_vols[idx] = bumped_vol;
 
-        // Rebuild surface with same ID and grid
-        Self::from_grid(
+        // Rebuild surface with same ID, grid, and metadata contracts.
+        Self::from_grid_opts(
             self.id.as_str(),
             &self.expiries,
             &self.strikes,
             &bumped_vols,
+            VolGridOpts {
+                secondary_axis: self.secondary_axis,
+                quote_type: self.quote_type,
+                interpolation_mode: self.interpolation_mode,
+            },
         )
     }
 
@@ -547,6 +617,7 @@ impl VolSurface {
                 expiries: self.expiries.clone(),
                 strikes: self.strikes.clone(),
                 secondary_axis: self.secondary_axis,
+                quote_type: self.quote_type,
                 interpolation_mode: self.interpolation_mode,
                 vols: self.vols.clone(),
             };
@@ -560,6 +631,7 @@ impl VolSurface {
             expiries: self.expiries.clone(),
             strikes: self.strikes.clone(),
             secondary_axis: self.secondary_axis,
+            quote_type: self.quote_type,
             interpolation_mode: self.interpolation_mode,
             vols: scaled_vols,
         }
@@ -603,6 +675,7 @@ impl Bumpable for VolSurface {
             expiries: self.expiries.clone(),
             strikes: self.strikes.clone(),
             secondary_axis: self.secondary_axis,
+            quote_type: self.quote_type,
             interpolation_mode: self.interpolation_mode,
             vols: bumped_vols,
         })
@@ -621,7 +694,10 @@ impl VolSurface {
         let (n_expiries, n_strikes) = self.grid_shape();
         let mut builder = VolSurface::builder(self.id.clone())
             .expiries(self.expiries())
-            .strikes(self.strikes());
+            .strikes(self.strikes())
+            .secondary_axis(self.secondary_axis)
+            .quote_type(self.quote_type)
+            .interpolation_mode(self.interpolation_mode);
 
         for (ei, &expiry) in self.expiries.iter().enumerate().take(n_expiries) {
             let mut row = Vec::with_capacity(n_strikes);
@@ -829,6 +905,7 @@ pub struct VolSurfaceBuilder {
     expiries: Vec<f64>,
     strikes: Vec<f64>,
     secondary_axis: VolSurfaceAxis,
+    quote_type: VolQuoteType,
     interpolation_mode: VolInterpolationMode,
     vols: Vec<Vec<f64>>, // row-major expiries
 }
@@ -848,6 +925,12 @@ impl VolSurfaceBuilder {
     /// Set the semantic meaning of the secondary axis.
     pub fn secondary_axis(mut self, axis: VolSurfaceAxis) -> Self {
         self.secondary_axis = axis;
+        self
+    }
+
+    /// Set the quoting convention of the stored volatilities.
+    pub fn quote_type(mut self, quote_type: VolQuoteType) -> Self {
+        self.quote_type = quote_type;
         self
     }
 
@@ -895,6 +978,7 @@ impl VolSurfaceBuilder {
             expiries: self.expiries.into_boxed_slice(),
             strikes: self.strikes.into_boxed_slice(),
             secondary_axis: self.secondary_axis,
+            quote_type: self.quote_type,
             interpolation_mode: self.interpolation_mode,
             vols: flat.into_boxed_slice(),
         })
@@ -909,17 +993,27 @@ impl VolSurfaceBuilder {
 pub struct VolGridOpts {
     /// Semantic meaning of the secondary axis (strike vs tenor).
     pub secondary_axis: VolSurfaceAxis,
+    /// Quoting convention of the stored volatilities.
+    pub quote_type: VolQuoteType,
     /// Interpolation contract (direct vol vs total-variance).
     pub interpolation_mode: VolInterpolationMode,
 }
 
 impl VolGridOpts {
-    /// Shorthand constructor.
+    /// Shorthand constructor (quote type defaults to Black/lognormal).
     pub fn new(secondary_axis: VolSurfaceAxis, interpolation_mode: VolInterpolationMode) -> Self {
         Self {
             secondary_axis,
+            quote_type: VolQuoteType::default(),
             interpolation_mode,
         }
+    }
+
+    /// Set the quoting convention.
+    #[must_use]
+    pub fn with_quote_type(mut self, quote_type: VolQuoteType) -> Self {
+        self.quote_type = quote_type;
+        self
     }
 }
 
@@ -955,6 +1049,7 @@ impl VolSurface {
             expiries: expiries.to_vec().into_boxed_slice(),
             strikes: strikes.to_vec().into_boxed_slice(),
             secondary_axis: opts.secondary_axis,
+            quote_type: opts.quote_type,
             interpolation_mode: opts.interpolation_mode,
             vols: vols_row_major.to_vec().into_boxed_slice(),
         })
@@ -1288,6 +1383,60 @@ mod tests {
             .row(&[0.2, 0.2])
             .build();
         assert!(bad2.is_err());
+    }
+
+    #[test]
+    fn quote_type_serde_round_trips_and_defaults_to_black() {
+        // Round trip: an explicit Normal tag must survive serde.
+        let normal = flat_surface().with_quote_type(VolQuoteType::Normal);
+        let json = serde_json::to_string(&normal).expect("serialize");
+        let back: VolSurface = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back.quote_type(), VolQuoteType::Normal);
+
+        // Back-compat: older payloads without the field default to Black/lognormal.
+        let legacy = r#"{
+            "id": "EQ-LEGACY",
+            "expiries": [1.0, 2.0],
+            "strikes": [90.0, 100.0],
+            "vols_row_major": [0.2, 0.2, 0.2, 0.2]
+        }"#;
+        let surface: VolSurface = serde_json::from_str(legacy).expect("legacy deserialize");
+        assert_eq!(surface.quote_type(), VolQuoteType::BlackLognormal);
+    }
+
+    #[test]
+    fn require_quote_type_enforces_convention() {
+        let vs = flat_surface();
+        assert!(vs.require_quote_type(VolQuoteType::BlackLognormal).is_ok());
+        let err = vs
+            .require_quote_type(VolQuoteType::Normal)
+            .expect_err("mismatched quote type must error");
+        assert!(format!("{err}").contains("quote"), "got: {err}");
+    }
+
+    #[test]
+    fn metadata_contracts_survive_bumps_and_scaling() {
+        let vs = flat_surface()
+            .with_quote_type(VolQuoteType::Normal)
+            .with_secondary_axis(VolSurfaceAxis::Tenor)
+            .with_interpolation_mode(VolInterpolationMode::TotalVariance);
+
+        let bumped = vs.bump_point(1.5, 100.0, 0.01).expect("bump");
+        assert_eq!(bumped.quote_type(), VolQuoteType::Normal);
+        assert_eq!(bumped.secondary_axis(), VolSurfaceAxis::Tenor);
+        assert_eq!(
+            bumped.interpolation_mode(),
+            VolInterpolationMode::TotalVariance
+        );
+
+        let scaled = vs.scaled(1.1);
+        assert_eq!(scaled.quote_type(), VolQuoteType::Normal);
+
+        let bucket = vs
+            .apply_bucket_bump(None, None, 1.0)
+            .expect("bucket bump should succeed");
+        assert_eq!(bucket.quote_type(), VolQuoteType::Normal);
+        assert_eq!(bucket.secondary_axis(), VolSurfaceAxis::Tenor);
     }
 
     #[test]

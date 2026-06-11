@@ -491,9 +491,11 @@ impl BootstrapTarget for HazardCurveTarget {
             .recovery_rate(self.params.recovery_rate)
             .knots(knots.to_vec())
             // Par spread interpolation is for *reporting* quoted spreads on the calibrated curve.
-            // Positivity / no-arbitrage for survival is enforced via λ>=0 and the curve's
-            // log-linear survival interpolation (in finstack_core).
+            // Positivity / no-arbitrage for survival is enforced via λ>=0; the survival
+            // interpolation style between pillars comes from `params.interpolation`
+            // (default LogLinear, i.e. piecewise-constant hazard).
             .par_interp(self.params.par_interp)
+            .interp(self.params.interpolation)
             .build()
     }
 

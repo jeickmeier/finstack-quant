@@ -289,6 +289,131 @@ fn rbergomi_accepts_out_of_window_discrete_dividend() {
     );
 }
 
+/// The rBergomi MC pricer reports a Monte Carlo standard error in the
+/// `mc_stderr` measure, and the stderr shrinks as the path count grows
+/// (∝ 1/√N, asserted with slack for sampling noise).
+#[test]
+fn rbergomi_reports_mc_stderr_that_shrinks_with_paths() {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+    let spot = 100.0;
+    let strike = 100.0;
+
+    let market = rbergomi_market(as_of, spot, 0.20, 0.0, 1.9, 0.1, -0.9);
+    let registry = standard_registry();
+
+    let stderr_for = |mc_paths: usize| -> f64 {
+        let mut call = create_call(as_of, expiry, strike);
+        call.pricing_overrides.model_config.mc_paths = Some(mc_paths);
+        let result = registry
+            .price_with_metrics(
+                &call,
+                ModelKey::MonteCarloRoughBergomi,
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default(),
+            )
+            .expect("rBergomi pricing should succeed");
+        *result
+            .measures
+            .get(&finstack_valuations::metrics::MetricId::custom("mc_stderr"))
+            .expect("mc_stderr measure should be present")
+    };
+
+    let stderr_small = stderr_for(4_000);
+    let stderr_large = stderr_for(16_000);
+
+    assert!(
+        stderr_small > 0.0 && stderr_large > 0.0,
+        "mc_stderr must be positive: {stderr_small}, {stderr_large}"
+    );
+    // 4x paths ⇒ ~2x smaller stderr; allow generous slack.
+    assert!(
+        stderr_large < stderr_small * 0.75,
+        "mc_stderr should shrink with path count: {stderr_small} -> {stderr_large}"
+    );
+}
+
+/// Missing `RBERGOMI_*` scalars must hard-error: production rBergomi pricing
+/// requires explicit calibrated parameters and must not silently fall back to
+/// representative defaults.
+#[test]
+fn rbergomi_missing_scalars_error() {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+
+    // Standard market WITHOUT the RBERGOMI_* scalars.
+    let market = build_standard_market(as_of, 100.0, 0.20, 0.0, 0.0);
+
+    let mut call = create_call(as_of, expiry, 100.0);
+    call.pricing_overrides.model_config.mc_paths = Some(500);
+
+    let registry = standard_registry();
+    let result = registry.price_with_metrics(
+        &call,
+        ModelKey::MonteCarloRoughBergomi,
+        &market,
+        as_of,
+        &[],
+        PricingOptions::default(),
+    );
+
+    assert!(
+        result.is_err(),
+        "rBergomi MC must return Err when RBERGOMI_* scalars are missing"
+    );
+    let msg = result.unwrap_err().to_string();
+    assert!(
+        msg.contains("RBERGOMI_ETA"),
+        "error should name the missing scalar, got: {msg}"
+    );
+}
+
+/// On a flat vol surface the ATM-strip ξ₀ construction must collapse to the
+/// flat forward variance curve σ², so pricing with the surface and pricing
+/// with a flat `implied_volatility` override at the same σ must agree to
+/// floating-point rounding (same seed, ξ₀ identical up to total-variance
+/// differencing round-off).
+#[test]
+fn rbergomi_flat_surface_matches_flat_override() {
+    let as_of = date!(2024 - 01 - 01);
+    let expiry = date!(2025 - 01 - 01);
+    let spot = 100.0;
+    let strike = 100.0;
+    let vol = 0.20;
+
+    let market = rbergomi_market(as_of, spot, vol, 0.02, 1.5, 0.1, -0.7);
+    let registry = standard_registry();
+
+    let price_with = |override_vol: Option<f64>| -> f64 {
+        let mut call = create_call(as_of, expiry, strike);
+        call.pricing_overrides.model_config.mc_paths = Some(20_000);
+        call.pricing_overrides.market_quotes.implied_volatility = override_vol;
+        registry
+            .price_with_metrics(
+                &call,
+                ModelKey::MonteCarloRoughBergomi,
+                &market,
+                as_of,
+                &[],
+                PricingOptions::default(),
+            )
+            .expect("rBergomi pricing should succeed")
+            .value
+            .amount()
+    };
+
+    let pv_surface = price_with(None);
+    let pv_override = price_with(Some(vol));
+
+    let rel = (pv_surface - pv_override).abs() / pv_override.abs();
+    assert!(
+        rel < 1e-12,
+        "flat-surface xi0 must equal flat-override xi0: {pv_surface} vs {pv_override} (rel {rel})"
+    );
+}
+
 /// The notional scales the rBergomi PV linearly.
 #[test]
 fn rbergomi_price_scales_with_notional() {

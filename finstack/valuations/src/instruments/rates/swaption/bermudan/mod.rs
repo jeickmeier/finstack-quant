@@ -74,6 +74,20 @@ impl CalibratedHullWhiteModel {
         disc: &dyn Discounting,
         ttm: f64,
     ) -> std::result::Result<Self, PricingError> {
+        Self::calibrate_with_times(params, steps, disc, ttm, &[])
+    }
+
+    /// Calibrate a Hull-White tree model whose grid passes exactly through
+    /// the supplied mandatory times (e.g. Bermudan exercise dates), so
+    /// exercise decisions land on grid points instead of nearest-step
+    /// approximations.
+    pub fn calibrate_with_times(
+        params: HullWhiteParams,
+        steps: usize,
+        disc: &dyn Discounting,
+        ttm: f64,
+        mandatory_times: &[f64],
+    ) -> std::result::Result<Self, PricingError> {
         if steps == 0 {
             return Err(PricingError::model_failure_with_context(
                 "Tree steps must be positive".to_string(),
@@ -81,9 +95,13 @@ impl CalibratedHullWhiteModel {
             ));
         }
         let config = params.tree_config(steps);
-        let tree = HullWhiteTree::calibrate(config, disc, ttm).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let tree = HullWhiteTree::calibrate_with_times(config, disc, ttm, mandatory_times)
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
         Ok(Self {
             tree: Arc::new(tree),
         })
@@ -306,7 +324,13 @@ impl BermudanSwaptionPricer {
                             PricingErrorContext::default(),
                         )
                     })?;
-            (valuator.price(), true)
+            let pv = valuator.price().map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+            (pv, true)
         } else {
             // Calibrate new model (O(Steps × Time) per instrument)
             if self.config.hw_params.is_uncalibrated_default() {
@@ -329,11 +353,20 @@ impl BermudanSwaptionPricer {
                     "Pricing Bermudan swaption with uncalibrated HullWhiteParams::default(); calibrate to co-terminal swaptions for production use"
                 );
             }
-            let model = CalibratedHullWhiteModel::calibrate(
+            // Thread exercise dates into the tree grid so Bermudan exercise
+            // decisions land exactly on grid points.
+            let exercise_times = swaption.exercise_times(as_of).map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+            let model = CalibratedHullWhiteModel::calibrate_with_times(
                 self.config.hw_params,
                 self.config.tree_steps,
                 disc.as_ref(),
                 ttm,
+                &exercise_times,
             )?;
 
             let valuator =
@@ -345,7 +378,13 @@ impl BermudanSwaptionPricer {
                         )
                     },
                 )?;
-            (valuator.price(), false)
+            let pv = valuator.price().map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+            (pv, false)
         };
 
         let mut result = ValuationResult::stamped(

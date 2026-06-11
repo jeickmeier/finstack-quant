@@ -148,8 +148,17 @@ fn tree_floating_note_pv(
         .year_fraction(as_of, maturity, ctx)
         .expect("maturity year fraction");
 
+    // Thread the in-advance fixing times through the tree grid so each
+    // coupon's fixing lands exactly on a node level.
+    let fixing_times: Vec<f64> = tarn
+        .coupon_dates
+        .iter()
+        .filter(|&&d| d > as_of)
+        .map(|&d| dc.year_fraction(as_of, d, ctx).expect("fixing time"))
+        .collect();
     let config = HullWhiteTreeConfig::new(hw.kappa, hw.sigma, tree_steps);
-    let tree = HullWhiteTree::calibrate(config, discount_curve, horizon).expect("tree calibrate");
+    let tree = HullWhiteTree::calibrate_with_times(config, discount_curve, horizon, &fixing_times)
+        .expect("tree calibrate");
 
     let mut pv = 0.0_f64;
     for period in tarn.coupon_dates.windows(2) {
@@ -165,7 +174,12 @@ fn tree_floating_note_pv(
             .year_fraction(as_of, start, ctx)
             .expect("t_start")
             .max(0.0);
-        let fix_step = tree.time_to_step(t_fix);
+        let fix_step = if t_fix > 0.0 {
+            tree.step_at_time(t_fix)
+                .expect("fixing time threaded as mandatory grid date")
+        } else {
+            0
+        };
 
         // State-price-weighted (tₛ-forward-measure) expectation of the coupon.
         let mut q_sum = 0.0_f64;

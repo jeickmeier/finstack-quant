@@ -128,7 +128,9 @@ fn test_tree_backward_induction_unit_payoff() {
 
     // Unit payoff at all terminal nodes should give approximately the discount factor
     let terminal = vec![1.0; tree.num_nodes(20)];
-    let value = tree.backward_induction(&terminal, |_, _, cont| cont);
+    let value = tree
+        .backward_induction(&terminal, |_, _, cont| cont)
+        .expect("terminal values sized to final step");
 
     let target_df = curve.df(1.0);
     assert!(
@@ -148,7 +150,9 @@ fn test_tree_backward_induction_zero_payoff() {
 
     // Zero payoff should give zero value
     let terminal = vec![0.0; tree.num_nodes(20)];
-    let value = tree.backward_induction(&terminal, |_, _, cont| cont);
+    let value = tree
+        .backward_induction(&terminal, |_, _, cont| cont)
+        .expect("terminal values sized to final step");
 
     assert!(value.abs() < 1e-10, "Zero payoff should give zero value");
 }

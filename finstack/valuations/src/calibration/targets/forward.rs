@@ -10,6 +10,7 @@ use crate::calibration::targets::util::{
 };
 use crate::calibration::CalibrationReport;
 use crate::market::quotes::market_quote::MarketQuote;
+use crate::market::quotes::rates::RateQuote;
 use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, DayCount};
 use finstack_core::market_data::context::MarketContext;
@@ -27,8 +28,6 @@ pub(crate) struct ForwardCurveTargetParams {
     pub(crate) currency: Currency,
     /// Unique identifier for the forward curve being calibrated.
     pub(crate) fwd_curve_id: CurveId,
-    /// Identifier for the discount curve used for PV calculation.
-    pub(crate) discount_curve_id: CurveId,
     /// Tenor associated with the forward rates (e.g. 3M, 6M).
     pub(crate) tenor_years: f64,
     /// Numerical interpolation style used during the solving process.
@@ -53,8 +52,6 @@ pub(crate) struct ForwardCurveTarget {
     pub(crate) currency: Currency,
     /// Identifier for the forward curve being built.
     pub(crate) fwd_curve_id: CurveId,
-    /// Identifier for the discount curve to use.
-    pub(crate) discount_curve_id: CurveId,
     /// Tenor in years for the forward curve.
     pub(crate) tenor_years: f64,
     /// Interpolation style for solving.
@@ -75,7 +72,6 @@ impl ForwardCurveTarget {
             base_date: params.base_date,
             currency: params.currency,
             fwd_curve_id: params.fwd_curve_id,
-            discount_curve_id: params.discount_curve_id,
             tenor_years: params.tenor_years,
             solve_interp: params.solve_interp,
             config: params.config,
@@ -114,7 +110,6 @@ impl ForwardCurveTarget {
             base_date: params.base_date,
             currency: params.currency,
             fwd_curve_id: params.curve_id.clone(),
-            discount_curve_id: params.discount_curve_id.clone(),
             tenor_years: params.tenor_years,
             solve_interp: params.interpolation,
             config: config.clone(),
@@ -207,11 +202,20 @@ impl BootstrapTarget for ForwardCurveTarget {
                 )));
             }
         };
+        // A deposit prices off the discount curve only, so its PV cannot
+        // constrain the forward knot at its pillar (the bootstrap objective
+        // would be constant in the knot). In a projection-curve calibration a
+        // deposit quote on the index *is* the index forward at its pillar:
+        // pin the interpolated forward to the quoted rate. The residual is
+        // linear in the knot, so the solve is exact.
+        if let RateQuote::Deposit { rate, .. } = pq.quote.as_ref() {
+            return Ok(curve.rate(pq.pillar_time) - rate);
+        }
         self.scratch
             .with_curve(curve, |ctx| pq.instrument.value_raw(ctx, self.base_date))
     }
 
-    fn initial_guess(&self, quote: &Self::Quote, previous_knots: &[(f64, f64)]) -> Result<f64> {
+    fn initial_guess(&self, quote: &Self::Quote, _previous_knots: &[(f64, f64)]) -> Result<f64> {
         let pq = match quote {
             crate::calibration::prepared::CalibrationQuote::Rates(pq) => pq,
             other => {
@@ -222,9 +226,8 @@ impl BootstrapTarget for ForwardCurveTarget {
             }
         };
         let q = pq.quote.as_ref();
-        use crate::market::quotes::rates::RateQuote;
         match q {
-            RateQuote::Fra { rate, .. } => Ok(*rate),
+            RateQuote::Deposit { rate, .. } | RateQuote::Fra { rate, .. } => Ok(*rate),
             RateQuote::Futures {
                 price,
                 convexity_adjustment,
@@ -246,24 +249,6 @@ impl BootstrapTarget for ForwardCurveTarget {
                 }
             }
             RateQuote::Swap { rate, .. } => Ok(*rate),
-            _ => {
-                let pillar_t = pq.pillar_time;
-                let g = previous_knots.last().map(|(_, fwd)| *fwd).or_else(|| {
-                    // Fallback to the discount curve's zero rate at this quote's pillar time.
-                    self.scratch
-                        .base()
-                        .get_discount(self.discount_curve_id.as_ref())
-                        .ok()
-                        .map(|disc_curve| disc_curve.zero(pillar_t.max(1.0 / 12.0)))
-                });
-                g.ok_or_else(|| finstack_core::Error::Calibration {
-                    message: format!(
-                        "Unable to derive initial forward rate guess for {} at t={pillar_t:.6}",
-                        self.fwd_curve_id
-                    ),
-                    category: "bootstrapping".to_string(),
-                })
-            }
         }
     }
 
@@ -389,7 +374,6 @@ mod tests {
         let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let currency = Currency::USD;
         let fwd_curve_id = CurveId::new("fwd");
-        let discount_curve_id = CurveId::new("disc");
 
         let mk_target = |tolerance: f64| {
             let base_context = MarketContext::new();
@@ -402,7 +386,6 @@ mod tests {
                 base_date,
                 currency,
                 fwd_curve_id: fwd_curve_id.clone(),
-                discount_curve_id: discount_curve_id.clone(),
                 tenor_years: 1.0,
                 solve_interp: InterpStyle::Linear,
                 config,
@@ -433,7 +416,6 @@ mod tests {
             base_date,
             currency: Currency::USD,
             fwd_curve_id: CurveId::new("fwd"),
-            discount_curve_id: CurveId::new("disc"),
             tenor_years: 1.0,
             solve_interp: InterpStyle::Linear,
             config: CalibrationConfig::default(),
@@ -466,7 +448,6 @@ mod tests {
             base_date,
             currency: Currency::USD,
             fwd_curve_id: CurveId::new("fwd"),
-            discount_curve_id: CurveId::new("disc"),
             tenor_years: 1.0,
             solve_interp: InterpStyle::Linear,
             config: CalibrationConfig::default(),

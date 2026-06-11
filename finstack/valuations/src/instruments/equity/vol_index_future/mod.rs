@@ -13,14 +13,18 @@
 //!
 //! # Pricing
 //!
-//! VIX futures are priced relative to the forward volatility curve:
+//! VIX futures are marked relative to the forward volatility curve:
 //! ```text
-//! NPV = (Quoted_Price - Forward_Vol) × Multiplier × Contracts × Position_Sign
+//! NPV = (Forward_Vol - Quoted_Price) × Multiplier × Contracts × Position_Sign
 //! ```
+//! (a long gains when the forward mark rises above the entry price; the MTM
+//! is undiscounted because the position is daily margined).
 //!
 //! Unlike equity or commodity futures, VIX futures:
 //! - Do not require cost-of-carry adjustments
-//! - Do not need convexity adjustments
+//! - Need no convexity adjustment **when the vol index curve is built from
+//!   directly-quoted futures/forward vol levels** (see
+//!   [`types`](self) module docs for the variance-derived caveat)
 //! - Are directly linked to the volatility term structure
 //!
 //! # Term Structure

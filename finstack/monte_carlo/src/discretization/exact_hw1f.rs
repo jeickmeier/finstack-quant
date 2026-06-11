@@ -10,7 +10,7 @@
 //!
 //! # Exact Solution
 //!
-//! For piecewise-constant θ over [t, t+Δt]:
+//! For θ constant over [t, t+Δt]:
 //!
 //! ```text
 //! r_{t+Δt} = r_t e^{-κΔt} + θ(1 - e^{-κΔt}) + σ√[(1-e^{-2κΔt})/(2κ)] Z
@@ -18,8 +18,10 @@
 //!
 //! where Z ~ N(0, 1).
 //!
-//! This is an exact solution (no discretization error), providing the best
-//! accuracy for HW1F simulation.
+//! When a simulation step straddles one or more θ knots, the step uses the
+//! time-averaged θ over [t, t+Δt] (exact integral of the piecewise-constant
+//! curve). This keeps the conditional distribution exact within each θ
+//! segment and reduces the cross-knot bias from O(Δt) to O(Δt²).
 
 use super::super::process::ou::HullWhite1FProcess;
 use super::super::traits::Discretization;
@@ -67,7 +69,11 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
         let params = process.params();
         let kappa = params.kappa;
         let sigma = params.sigma;
-        let theta = process.theta_at_time(t);
+        // Time-averaged θ over [t, t+dt]: sampling θ at the step start would
+        // carry an O(dt) local bias whenever the step straddles a θ knot
+        // (common on event-aligned grids); averaging the piecewise-constant
+        // θ across the step reduces this to O(dt²).
+        let theta = process.theta_average(t, dt);
 
         // Compute exact conditional mean and standard deviation
         let exp_kappa_dt = (-kappa * dt).exp();
@@ -178,5 +184,37 @@ mod tests {
 
         // Should move toward different means
         assert!(x2[0] > x1[0]);
+    }
+
+    /// A step straddling a θ knot must use the time-averaged θ over the
+    /// step, not the left-endpoint value (which carries an O(dt) bias).
+    #[test]
+    fn test_exact_hw1f_theta_averaged_across_knot() {
+        let params = HullWhite1FParams::with_time_dependent_theta(
+            0.1,
+            0.01,
+            vec![0.02, 0.04],
+            vec![0.0, 0.5],
+        );
+        let process = HullWhite1FProcess::new(params);
+        let disc = ExactHullWhite1F::new();
+
+        // Step [0.4, 0.6] straddles the knot at 0.5: half at θ=0.02, half at
+        // θ=0.04 ⇒ θ̄ = 0.03.
+        let t: f64 = 0.4;
+        let dt: f64 = 0.2;
+        let mut x = vec![0.03];
+        let z = vec![0.0];
+        let mut work = vec![0.0; disc.work_size(&process)];
+        disc.step(&process, t, dt, &mut x, &z, &mut work);
+
+        let theta_bar = 0.03;
+        let expected: f64 =
+            0.03 * (-0.1_f64 * dt).exp() + theta_bar * (1.0 - (-0.1_f64 * dt).exp());
+        assert!(
+            (x[0] - expected).abs() < 1e-12,
+            "step across θ knot should use the averaged θ: got {}, expected {expected}",
+            x[0]
+        );
     }
 }

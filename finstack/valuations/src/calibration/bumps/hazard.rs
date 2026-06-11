@@ -125,7 +125,9 @@ fn recalibrate_from_par_spreads(
         recovery_rate: request.recovery_rate,
         notional: 1.0,
         method: CalibrationMethod::Bootstrap,
-        interpolation: Default::default(),
+        // Preserve the base curve's survival interpolation style so the
+        // bumped curve is built with the same convention.
+        interpolation: request.hazard.survival_interp_style(),
         par_interp: ParInterp::Linear,
         doc_clause: Some(request.doc_clause.as_str().to_string()),
         cds_valuation_convention: request.cds_valuation_convention,

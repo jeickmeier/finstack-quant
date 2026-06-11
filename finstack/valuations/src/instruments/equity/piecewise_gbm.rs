@@ -38,9 +38,16 @@ pub(crate) struct PiecewiseGbmProcess {
 
 impl PiecewiseGbmProcess {
     /// Index of the interval whose parameters apply at time `t`.
+    ///
+    /// Intervals are half-open `[times[i-1], times[i])`, so an exact boundary
+    /// hit `t == times[k]` belongs to the interval *starting* at `times[k]`
+    /// (index `k+1`), not the one ending there. `partition_point(time <= t)`
+    /// returns the first index with `times[idx] > t`, which is exactly that
+    /// interval; the clamp keeps `t` at/after the final boundary in the last
+    /// interval (flat extrapolation).
     #[inline]
     fn interval(&self, t: f64) -> usize {
-        let idx = self.times.partition_point(|&time| time < t);
+        let idx = self.times.partition_point(|&time| time <= t);
         idx.min(self.times.len() - 1)
     }
 }
@@ -230,4 +237,62 @@ pub(crate) fn bootstrap_forward_gbm(
         qs,
         sigmas,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn three_interval_process() -> PiecewiseGbmProcess {
+        PiecewiseGbmProcess {
+            times: vec![1.0, 2.0, 3.0],
+            rs: vec![0.01, 0.02, 0.03],
+            qs: vec![0.0, 0.0, 0.0],
+            sigmas: vec![0.10, 0.20, 0.30],
+        }
+    }
+
+    /// Interval convention is half-open `[times[i-1], times[i])`: an exact
+    /// boundary hit must select the interval STARTING at that boundary.
+    #[test]
+    fn interval_boundary_belongs_to_next_interval() {
+        let p = three_interval_process();
+
+        // Interior points.
+        assert_eq!(p.interval(0.0), 0);
+        assert_eq!(p.interval(0.5), 0);
+        assert_eq!(p.interval(1.5), 1);
+        assert_eq!(p.interval(2.5), 2);
+
+        // Exact boundaries: t == times[k] starts interval k+1.
+        assert_eq!(p.interval(1.0), 1, "t=1.0 is the start of [1,2)");
+        assert_eq!(p.interval(2.0), 2, "t=2.0 is the start of [2,3)");
+
+        // Final boundary and beyond clamp to the last interval.
+        assert_eq!(p.interval(3.0), 2);
+        assert_eq!(p.interval(10.0), 2);
+    }
+
+    /// The discretization step at an exact boundary must use the parameters of
+    /// the interval starting there (e.g. σ of [1,2), not σ of [0,1)).
+    #[test]
+    fn step_at_boundary_uses_next_interval_params() {
+        let p = three_interval_process();
+        let disc = PiecewiseExactGbm::new();
+
+        let dt = 0.25;
+        let z = [0.0_f64];
+        let mut work: [f64; 0] = [];
+
+        // Drift-only step (z = 0) starting exactly at t = 1.0 must use
+        // r = 0.02, sigma = 0.20 (interval [1, 2)).
+        let mut x = [100.0_f64];
+        disc.step(&p, 1.0, dt, &mut x, &z, &mut work);
+        let expected = 100.0 * ((0.02 - 0.5 * 0.20 * 0.20) * dt).exp();
+        assert!(
+            (x[0] - expected).abs() < 1e-12,
+            "boundary step must use interval-[1,2) params: got {}, expected {expected}",
+            x[0]
+        );
+    }
 }

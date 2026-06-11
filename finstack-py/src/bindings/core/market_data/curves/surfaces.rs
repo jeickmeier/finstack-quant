@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 
 use super::helpers::{
     parse_day_count, parse_extrapolation, parse_interp_style, parse_vol_interpolation_mode,
-    parse_vol_surface_axis,
+    parse_vol_quote_type, parse_vol_surface_axis,
 };
 use crate::bindings::core::dates::utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
@@ -47,7 +47,7 @@ impl PyVolSurface {
 impl PyVolSurface {
     /// Construct a vol surface from row-major grid data.
     #[new]
-    #[pyo3(signature = (id, expiries, strikes, vols_row_major, secondary_axis="strike", interpolation_mode="vol"))]
+    #[pyo3(signature = (id, expiries, strikes, vols_row_major, secondary_axis="strike", interpolation_mode="vol", quote_type="black_lognormal"))]
     fn new(
         id: &str,
         expiries: Vec<f64>,
@@ -55,9 +55,11 @@ impl PyVolSurface {
         vols_row_major: Vec<f64>,
         secondary_axis: &str,
         interpolation_mode: &str,
+        quote_type: &str,
     ) -> PyResult<Self> {
         let axis = parse_vol_surface_axis(secondary_axis)?;
         let mode = parse_vol_interpolation_mode(interpolation_mode)?;
+        let quote = parse_vol_quote_type(quote_type)?;
         let surface = VolSurface::from_grid_opts(
             id,
             &expiries,
@@ -65,6 +67,7 @@ impl PyVolSurface {
             &vols_row_major,
             VolGridOpts {
                 secondary_axis: axis,
+                quote_type: quote,
                 interpolation_mode: mode,
             },
         )
@@ -109,6 +112,12 @@ impl PyVolSurface {
     #[getter]
     fn secondary_axis(&self) -> String {
         self.inner.secondary_axis().to_string()
+    }
+
+    /// Quoting convention of the stored volatilities.
+    #[getter]
+    fn quote_type(&self) -> String {
+        self.inner.quote_type().to_string()
     }
 
     /// Interpolation contract used between grid points.

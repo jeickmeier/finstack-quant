@@ -1694,7 +1694,7 @@
             "bdc": {
               "$ref": "#/$defs/BusinessDayConvention",
               "default": "modified_following",
-              "description": "Business day convention for date adjustments."
+              "description": "Business day convention for payment-schedule date adjustments.\n\nOnly applied when `calendar_id` is set and resolves to a registered\nholiday calendar; without a calendar the schedule dates are left\nunadjusted."
             },
             "calendar_id": {
               "anyOf": [
@@ -1740,7 +1740,7 @@
               "description": "Unique instrument identifier."
             },
             "index_lag_days": {
-              "description": "Optional index lag in days (for averaging period).",
+              "description": "Optional index lag in **calendar days**: the floating-leg averaging\nwindow is shifted back by exactly this many calendar days (no\nbusiness-day adjustment of the shifted window endpoints).",
               "format": "int32",
               "type": [
                 "integer",

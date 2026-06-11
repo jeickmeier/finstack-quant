@@ -131,6 +131,9 @@ pub struct HazardCurve {
     par_spreads_bp: Box<[f64]>,
     /// Default interpolation for par spreads
     par_interp: ParInterp,
+    /// Interpolation style for survival probabilities between pillars
+    /// (LogLinear ⇒ piecewise-constant hazard).
+    survival_interp_style: InterpStyle,
     /// Interpolator for survival probabilities
     interp: Interp,
     /// Opaque FX policy stamp; see [`super::DiscountCurve::fx_policy`].
@@ -162,6 +165,9 @@ struct RawHazardCurve {
     /// Par interpolation method
     #[serde(default = "default_par_interp")]
     pub par_interp: ParInterp,
+    /// Survival-probability interpolation style between pillars
+    #[serde(default = "default_survival_interp")]
+    pub survival_interp: InterpStyle,
     /// Opaque FX policy stamp; see [`super::DiscountCurve::fx_policy`].
     #[serde(default)]
     pub fx_policy: Option<String>,
@@ -169,6 +175,10 @@ struct RawHazardCurve {
 
 fn default_par_interp() -> ParInterp {
     ParInterp::Linear
+}
+
+fn default_survival_interp() -> InterpStyle {
+    InterpStyle::LogLinear
 }
 
 impl From<HazardCurve> for RawHazardCurve {
@@ -199,6 +209,7 @@ impl From<HazardCurve> for RawHazardCurve {
             day_count: curve.day_count,
             par_points,
             par_interp: curve.par_interp,
+            survival_interp: curve.survival_interp_style,
             fx_policy: curve.fx_policy,
         }
     }
@@ -215,6 +226,7 @@ impl TryFrom<RawHazardCurve> for HazardCurve {
             .knots(state.points.knot_points)
             .par_spreads(state.par_points)
             .par_interp(state.par_interp)
+            .interp(state.survival_interp)
             .issuer_opt(state.issuer)
             .seniority_opt(state.seniority)
             .currency_opt(state.currency)
@@ -241,6 +253,7 @@ impl HazardCurve {
             day_count: DayCount::Act365F,
             par_points: Vec::new(),
             par_interp: ParInterp::Linear,
+            survival_interp: InterpStyle::LogLinear,
             max_hazard_rate: 10.0,
             fx_policy: None,
         }
@@ -414,6 +427,12 @@ impl HazardCurve {
             .map(|(&t, &spread)| (t, spread))
     }
 
+    /// Interpolation style used for survival probabilities between pillars.
+    #[must_use]
+    pub fn survival_interp_style(&self) -> InterpStyle {
+        self.survival_interp_style
+    }
+
     /// Get the default interpolation method for par spreads.
     pub fn par_interp(&self) -> ParInterp {
         self.par_interp
@@ -462,6 +481,7 @@ impl HazardCurve {
             par_tenors: self.par_tenors.clone(),
             par_spreads_bp: self.par_spreads_bp.clone(),
             par_interp: self.par_interp,
+            survival_interp_style: self.survival_interp_style,
             interp: self.interp.clone(),
             fx_policy: self.fx_policy.clone(),
         })
@@ -475,6 +495,7 @@ impl HazardCurve {
             .recovery_rate(self.recovery_rate)
             .day_count(self.day_count)
             .par_interp(self.par_interp)
+            .interp(self.survival_interp_style)
             .issuer_opt(self.issuer.clone())
             .seniority_opt(self.seniority)
             .currency_opt(self.currency)
@@ -485,7 +506,7 @@ impl HazardCurve {
 
     /// Recompute the survival-probability interpolator from current knots/lambdas.
     fn rebuild_interp(&mut self) -> crate::Result<()> {
-        use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
+        use crate::math::interp::ExtrapolationPolicy;
 
         let mut interp_knots = Vec::with_capacity(self.knots.len() + 1);
         let mut interp_sp = Vec::with_capacity(self.knots.len() + 1);
@@ -506,7 +527,7 @@ impl HazardCurve {
         }
 
         self.interp = super::common::build_interp(
-            InterpStyle::LogLinear,
+            self.survival_interp_style,
             interp_knots.into_boxed_slice(),
             interp_sp.into_boxed_slice(),
             ExtrapolationPolicy::FlatForward,
@@ -758,6 +779,8 @@ pub struct HazardCurveBuilder {
     day_count: DayCount,
     par_points: Vec<(f64, f64)>, // (t, spread_bp)
     par_interp: ParInterp,
+    /// Survival-probability interpolation style (default LogLinear).
+    survival_interp: InterpStyle,
     /// Maximum allowed hazard rate (default 10.0).
     /// Rates above this trigger an error in `build()`.
     max_hazard_rate: f64,
@@ -814,6 +837,16 @@ impl HazardCurveBuilder {
     /// Set the interpolation method for par spreads.
     pub fn par_interp(mut self, method: ParInterp) -> Self {
         self.par_interp = method;
+        self
+    }
+
+    /// Set the interpolation style for survival probabilities between
+    /// pillars. The default [`InterpStyle::LogLinear`] is the market
+    /// standard and corresponds to a piecewise-constant hazard rate
+    /// (consistent with the stored λ knots); other styles reshape S(t)
+    /// between pillars while preserving the pillar values.
+    pub fn interp(mut self, style: InterpStyle) -> Self {
+        self.survival_interp = style;
         self
     }
 
@@ -968,10 +1001,11 @@ impl HazardCurveBuilder {
             prev_lambda = Some(lambda);
         }
 
-        // Build interpolator: LogLinear style implies constant hazard rate
-        // Extrapolate with FlatForward (constant hazard rate at tail)
+        // Build interpolator over survival probabilities. The default
+        // LogLinear style implies a piecewise-constant hazard rate.
+        // Extrapolate with FlatForward (constant hazard rate at tail).
         let interp = super::common::build_interp(
-            InterpStyle::LogLinear,
+            self.survival_interp,
             interp_kvec.into_boxed_slice(),
             interp_svec.into_boxed_slice(),
             ExtrapolationPolicy::FlatForward,
@@ -990,6 +1024,7 @@ impl HazardCurveBuilder {
             par_tenors: p_ten.into_boxed_slice(),
             par_spreads_bp: p_spd.into_boxed_slice(),
             par_interp: self.par_interp,
+            survival_interp_style: self.survival_interp,
             interp,
             fx_policy: self.fx_policy,
         })
@@ -1003,6 +1038,43 @@ impl HazardCurveBuilder {
 mod tests {
     use super::*;
     use time::Month;
+    /// The builder's `interp` style must be wired to the survival
+    /// interpolator: Linear and LogLinear curves share pillar values but
+    /// differ strictly between pillars.
+    #[test]
+    fn survival_interp_style_is_wired() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+        let knots = [(1.0, 0.02), (5.0, 0.08)];
+        let log_linear = HazardCurve::builder("LL")
+            .base_date(base)
+            .knots(knots)
+            .build()
+            .expect("log-linear build");
+        let linear = HazardCurve::builder("LIN")
+            .base_date(base)
+            .knots(knots)
+            .interp(crate::math::interp::InterpStyle::Linear)
+            .build()
+            .expect("linear build");
+
+        // Pillar values agree.
+        for t in [1.0, 5.0] {
+            assert!(
+                (log_linear.sp(t) - linear.sp(t)).abs() < 1e-12,
+                "pillar survival at t={t} must match across styles"
+            );
+        }
+        // Mid-pillar values differ (linear in S vs log-linear in S).
+        let mid = 3.0;
+        assert!(
+            (log_linear.sp(mid) - linear.sp(mid)).abs() > 1e-6,
+            "survival interpolation style must affect mid-pillar values: \
+             log-linear {} vs linear {}",
+            log_linear.sp(mid),
+            linear.sp(mid)
+        );
+    }
+
     #[test]
     fn survival_monotone_decreasing() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");

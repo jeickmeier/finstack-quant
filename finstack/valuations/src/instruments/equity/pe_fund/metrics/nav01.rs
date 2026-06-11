@@ -1,13 +1,16 @@
 //! NAV01 calculator for PrivateMarketsFund.
 //!
 //! Computes NAV01 (residual NAV sensitivity) using finite differences.
-//! NAV01 measures the change in PV for a 1% change in residual NAV.
+//! NAV01 is the derivative dPV/dx of LP value with respect to the
+//! proportional scaling x of distribution/proceeds events (per unit scale),
+//! consistent with the workspace Dv01 convention.
 //!
 //! # Formula
 //! ```text
-//! NAV01 = (PV(events scaled * 1.01) - PV(events scaled * 0.99)) / (2 * bump_size)
+//! NAV01 = (PV(events scaled * (1 + h)) - PV(events scaled * (1 - h))) / (2h)
 //! ```
-//! Where bump_size is 1% (0.01).
+//! Where the FD bump h is 1% (0.01); dividing by the bump yields the
+//! derivative, not a per-1% PV change.
 //!
 //! # Note
 //! Residual NAV is the output of the waterfall calculation (`lp_unreturned`).
@@ -68,7 +71,7 @@ impl MetricCalculator for Nav01Calculator {
         let pv_down = fund_down.value(context.curves.as_ref(), as_of)?.amount();
 
         // NAV01 = (PV_up - PV_down) / (2 * bump_size)
-        // Result is per 1% change in NAV (via event scaling)
+        // Result is the derivative dPV/dx per unit event scale (Dv01 convention)
         let nav01 = (pv_up - pv_down) / (2.0 * NAV_BUMP_PCT);
 
         Ok(nav01)

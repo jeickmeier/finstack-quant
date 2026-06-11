@@ -218,15 +218,6 @@ Recurring failure patterns:
 3. Dollar-roll and call-window behaviors are pinned by tests and may be deliberate simplifications — but each contradicts its own module documentation.
 4. Reviews were read-only; no test executions. Numerical claims verified by derivation/recomputation.
 
-## Residual Risk / Not Reviewed
-
-- Rates: `repo/`, `swaption` LMM/Cheyette-rough pricers, swaption/IRS/inflation metrics submodules, `exotics_shared` HW1F calibration/LSMC internals.
-- Credit: `correlation/copula/multi_factor.rs`, `random_factor_loading.rs`, `models/credit/merton.rs`, tranche `recovery01`/`tail_dependence` internals, `calibration/solver/bootstrap.rs` internals.
-- Fixed income: `bond/pricing/engine/merton_mc.rs`, revolving-credit MC internals, core schedule-generation internals.
-- Securitized: `stochastic/default/{copula_based,intensity_process,factor_correlated}.rs`, `stochastic/metrics` internals, `pricing/diversion.rs`, pool metrics (`warf`/`was`).
-- FX/EQ/commodity: commodity swap/swaption/asian, vol_index futures/options, Heston/rough-Bergomi/rough-Heston MC pricers, dcf_equity, pe_fund, real_estate, vanna-volga internals, per-instrument metrics submodules.
-- Models: `calibration/hull_white.rs` (102KB), short-rate tree internals, Heston COS beyond outline.
-- Bindings: `valuations/correlation` bindings (both hosts), envelope TypedDict internals.
 
 ## Recommended Regression Additions (highest leverage)
 

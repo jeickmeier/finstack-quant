@@ -18,7 +18,7 @@
 //! let model = MertonModel::new(100.0, 0.20, 80.0, 0.05).unwrap();
 //! let dd = model.distance_to_default(1.0);
 //! let pd = model.default_probability(1.0);
-//! let spread = model.implied_spread(5.0, 0.40);
+//! let spread = model.implied_spread(5.0, 0.40).unwrap();
 //! ```
 
 use finstack_core::market_data::term_structures::HazardCurve;
@@ -324,11 +324,27 @@ impl MertonModel {
     ///
     /// where PD is the default probability over horizon T and R is the
     /// assumed recovery rate (fraction of face value recovered at default).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `horizon <= 0` (the spread is undefined
+    /// at zero horizon) or `recovery` is outside `[0, 1]` (an out-of-range
+    /// recovery can make `1 - PD·LGD` non-positive, yielding NaN).
     #[inline]
-    pub fn implied_spread(&self, horizon: f64, recovery: f64) -> f64 {
+    pub fn implied_spread(&self, horizon: f64, recovery: f64) -> Result<f64> {
+        if !(horizon.is_finite() && horizon > 0.0) {
+            return Err(Error::Validation(format!(
+                "implied_spread: horizon must be > 0, got {horizon}"
+            )));
+        }
+        if !(0.0..=1.0).contains(&recovery) {
+            return Err(Error::Validation(format!(
+                "implied_spread: recovery must be in [0, 1], got {recovery}"
+            )));
+        }
         let pd = self.default_probability(horizon);
         let lgd = 1.0 - recovery;
-        -(1.0 - pd * lgd).ln() / horizon
+        Ok(-(1.0 - pd * lgd).ln() / horizon)
     }
 
     // -----------------------------------------------------------------------
@@ -554,6 +570,11 @@ impl MertonModel {
     ) -> Result<Self> {
         if total_debt <= 0.0 || maturity <= 0.0 || asset_value <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
+        }
+        if !(0.0..=1.0).contains(&recovery) {
+            return Err(Error::Validation(format!(
+                "from_cds_spread: recovery must be in [0, 1], got {recovery}"
+            )));
         }
 
         let target_spread = cds_spread_bp / 10_000.0;
@@ -929,17 +950,27 @@ impl MertonModel {
     /// Supports GBM and jump-diffusion dynamics. Optionally uses antithetic
     /// variates to reduce variance.
     ///
+    /// `CreditGrades` dynamics simulate the *asset value* as plain GBM: the
+    /// CreditGrades stochastic barrier only enters the analytic
+    /// default-probability formulas, not the simulated paths. Callers needing
+    /// pathwise CreditGrades default times must layer the barrier on top.
+    ///
     /// # Arguments
     ///
     /// * `num_paths` - Number of paths to simulate
-    /// * `num_steps` - Number of time steps per path
-    /// * `horizon` - Time horizon T in years
+    /// * `num_steps` - Number of time steps per path (must be >= 1)
+    /// * `horizon` - Time horizon T in years (must be > 0)
     /// * `rng` - Random number generator (trait object)
     /// * `antithetic` - If true, use antithetic variates for variance reduction
     ///
     /// # Returns
     ///
     /// [`SimulatedPaths`] containing the time grid and all simulated asset paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `num_steps == 0` (the time grid would be
+    /// degenerate with `dt = inf`) or `horizon <= 0`.
     pub fn simulate_paths(
         &self,
         num_paths: usize,
@@ -947,7 +978,17 @@ impl MertonModel {
         horizon: f64,
         rng: &mut dyn RandomNumberGenerator,
         antithetic: bool,
-    ) -> SimulatedPaths {
+    ) -> Result<SimulatedPaths> {
+        if num_steps == 0 {
+            return Err(Error::Validation(
+                "simulate_paths: num_steps must be >= 1".into(),
+            ));
+        }
+        if !(horizon.is_finite() && horizon > 0.0) {
+            return Err(Error::Validation(format!(
+                "simulate_paths: horizon must be > 0, got {horizon}"
+            )));
+        }
         let dt = horizon / num_steps as f64;
         let sqrt_dt = dt.sqrt();
 
@@ -1070,12 +1111,12 @@ impl MertonModel {
         // Trim to exact num_paths in case antithetic generated one extra
         all_paths.truncate(num_paths * values_per_path);
 
-        SimulatedPaths {
+        Ok(SimulatedPaths {
             times,
             asset_values: all_paths,
             num_paths,
             num_steps,
-        }
+        })
     }
 }
 
@@ -1148,7 +1189,7 @@ mod tests {
     #[test]
     fn implied_spread_positive_for_risky_firm() {
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
-        let spread = m.implied_spread(5.0, 0.40);
+        let spread = m.implied_spread(5.0, 0.40).expect("spread");
         assert!(spread > 0.0, "Spread should be positive");
         assert!(spread < 0.20, "Spread should be reasonable, got {spread}");
     }
@@ -1159,6 +1200,29 @@ mod tests {
         assert!(MertonModel::new(-1.0, 0.20, 80.0, 0.05).is_err());
         assert!(MertonModel::new(100.0, -0.20, 80.0, 0.05).is_err());
         assert!(MertonModel::new(100.0, 0.20, 0.0, 0.05).is_err());
+    }
+
+    #[test]
+    fn implied_spread_rejects_invalid_inputs() {
+        let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
+        assert!(m.implied_spread(0.0, 0.40).is_err(), "horizon = 0");
+        assert!(m.implied_spread(-1.0, 0.40).is_err(), "horizon < 0");
+        assert!(m.implied_spread(5.0, -0.1).is_err(), "recovery < 0");
+        assert!(m.implied_spread(5.0, 1.1).is_err(), "recovery > 1");
+    }
+
+    #[test]
+    fn from_cds_spread_rejects_out_of_range_recovery() {
+        assert!(MertonModel::from_cds_spread(150.0, -0.1, 80.0, 0.04, 5.0, 100.0, 0.0).is_err());
+        assert!(MertonModel::from_cds_spread(150.0, 1.5, 80.0, 0.04, 5.0, 100.0, 0.0).is_err());
+    }
+
+    #[test]
+    fn simulate_paths_rejects_degenerate_grid() {
+        let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
+        let mut rng = finstack_core::math::random::Pcg64Rng::new(42);
+        assert!(m.simulate_paths(10, 0, 5.0, &mut rng, false).is_err());
+        assert!(m.simulate_paths(10, 60, 0.0, &mut rng, false).is_err());
     }
 
     #[test]
@@ -1199,7 +1263,7 @@ mod tests {
     #[test]
     fn from_cds_spread_roundtrips() {
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).expect("valid");
-        let spread = m.implied_spread(5.0, 0.40);
+        let spread = m.implied_spread(5.0, 0.40).expect("spread");
         let spread_bp = spread * 10_000.0;
         let m2 = MertonModel::from_cds_spread(spread_bp, 0.40, 80.0, 0.04, 5.0, 100.0, 0.0)
             .expect("cds cal");
@@ -1227,7 +1291,7 @@ mod tests {
             AssetDynamics::GeometricBrownian,
         )
         .expect("valid");
-        let spread = m_known.implied_spread(5.0, 0.40);
+        let spread = m_known.implied_spread(5.0, 0.40).expect("spread");
         let spread_bp = spread * 10_000.0;
 
         let m_cal = MertonModel::from_cds_spread(spread_bp, 0.40, 80.0, 0.04, 5.0, 100.0, q)
@@ -1682,9 +1746,9 @@ mod tests {
         let mid_lev = MertonModel::new(100.0, 0.25, 70.0, 0.04).expect("valid");
         let high_lev = MertonModel::new(100.0, 0.25, 95.0, 0.04).expect("valid");
 
-        let s_low = low_lev.implied_spread(5.0, 0.40);
-        let s_mid = mid_lev.implied_spread(5.0, 0.40);
-        let s_high = high_lev.implied_spread(5.0, 0.40);
+        let s_low = low_lev.implied_spread(5.0, 0.40).expect("spread");
+        let s_mid = mid_lev.implied_spread(5.0, 0.40).expect("spread");
+        let s_high = high_lev.implied_spread(5.0, 0.40).expect("spread");
 
         assert!(
             s_low < s_mid && s_mid < s_high,
@@ -1841,8 +1905,12 @@ mod tests {
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
         let mut rng1 = Pcg64Rng::new(42);
         let mut rng2 = Pcg64Rng::new(42);
-        let paths1 = m.simulate_paths(10, 60, 5.0, &mut rng1, false);
-        let paths2 = m.simulate_paths(10, 60, 5.0, &mut rng2, false);
+        let paths1 = m
+            .simulate_paths(10, 60, 5.0, &mut rng1, false)
+            .expect("paths");
+        let paths2 = m
+            .simulate_paths(10, 60, 5.0, &mut rng2, false)
+            .expect("paths");
         assert_eq!(
             paths1.path(0),
             paths2.path(0),
@@ -1855,7 +1923,9 @@ mod tests {
         use finstack_core::math::random::Pcg64Rng;
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
         let mut rng = Pcg64Rng::new(42);
-        let paths = m.simulate_paths(50_000, 60, 5.0, &mut rng, true);
+        let paths = m
+            .simulate_paths(50_000, 60, 5.0, &mut rng, true)
+            .expect("paths");
         let mean_terminal: f64 = paths
             .iter_paths()
             .map(|p| *p.last().expect("non-empty"))
@@ -1892,7 +1962,9 @@ mod tests {
         )
         .expect("valid");
         let mut rng = Pcg64Rng::new(42);
-        let paths = m.simulate_paths(50_000, 60, 5.0, &mut rng, true);
+        let paths = m
+            .simulate_paths(50_000, 60, 5.0, &mut rng, true)
+            .expect("paths");
         let mean_terminal: f64 = paths
             .iter_paths()
             .map(|p| *p.last().expect("non-empty"))
@@ -1912,7 +1984,9 @@ mod tests {
         use finstack_core::math::random::Pcg64Rng;
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
         let mut rng = Pcg64Rng::new(42);
-        let paths = m.simulate_paths(100, 60, 5.0, &mut rng, false);
+        let paths = m
+            .simulate_paths(100, 60, 5.0, &mut rng, false)
+            .expect("paths");
         assert_eq!(paths.num_paths, 100);
         assert_eq!(paths.num_steps, 60);
         assert_eq!(paths.times.len(), 61); // includes t=0
@@ -1952,8 +2026,12 @@ mod tests {
         .expect("valid");
         let mut rng1 = Pcg64Rng::new(42);
         let mut rng2 = Pcg64Rng::new(42);
-        let paths_gbm = m_gbm.simulate_paths(100, 60, 5.0, &mut rng1, false);
-        let paths_jd = m_jd.simulate_paths(100, 60, 5.0, &mut rng2, false);
+        let paths_gbm = m_gbm
+            .simulate_paths(100, 60, 5.0, &mut rng1, false)
+            .expect("paths");
+        let paths_jd = m_jd
+            .simulate_paths(100, 60, 5.0, &mut rng2, false)
+            .expect("paths");
         // JD paths should differ from GBM (different drift compensation + jumps)
         let gbm_terminal: f64 = paths_gbm
             .iter_paths()

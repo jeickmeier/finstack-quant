@@ -50,12 +50,10 @@ pub(crate) fn pv_with_rf_bump(
     dcf: &DiscountedCashFlow,
     bump_at: &dyn Fn(f64) -> f64,
 ) -> finstack_core::Result<f64> {
-    let (terminal_date, _) = *dcf.flows.last().ok_or_else(|| {
-        finstack_core::Error::Validation(
-            "DCF has no explicit flows; cannot compute terminal value".into(),
-        )
-    })?;
-    let t_term = dcf.discount_years(dcf.valuation_date, terminal_date);
+    // Terminal tenor: ExitMultiple discounts at the full horizon t_n (a
+    // point-in-time sale price); Gordon/H-model keep the mid-year-adjusted
+    // tenor (flow-stream proxies). See `terminal_discount_years`.
+    let t_term = dcf.terminal_discount_years()?;
     let bump_term = bump_at(t_term);
 
     // Terminal value capitalized at the bumped WACC (validates WACC > g).

@@ -575,15 +575,42 @@ impl DiscountedCashFlow {
 
     /// Discount terminal value to present value using WACC.
     ///
+    /// # Mid-year convention
+    ///
+    /// Gordon-growth and H-model terminal values are flow-stream proxies
+    /// (capitalized perpetuities of cash flows arriving throughout each
+    /// year), so they inherit the mid-year −0.5 shift when
+    /// [`mid_year_convention`](Self::mid_year_convention) is enabled. An
+    /// `ExitMultiple` terminal value is a *point-in-time* sale price realized
+    /// at the horizon date `t_n`, so it always discounts at the full `t_n`
+    /// regardless of the mid-year convention.
+    ///
     /// Returns `Err` if flows are empty.
     pub fn discount_terminal_value(&self, terminal_value: f64) -> finstack_core::Result<f64> {
+        let years = self.terminal_discount_years()?;
+        Ok(terminal_value / (1.0 + self.wacc).powf(years))
+    }
+
+    /// Discounting tenor (in years) for the terminal value.
+    ///
+    /// `ExitMultiple` discounts at the full horizon `t_n` (point-in-time sale
+    /// proceeds); Gordon-growth and H-model use the mid-year-adjusted tenor
+    /// (flow-stream proxies). See [`Self::discount_terminal_value`].
+    ///
+    /// Returns `Err` if flows are empty.
+    pub(crate) fn terminal_discount_years(&self) -> finstack_core::Result<f64> {
         let (terminal_date, _) = self.flows.last().ok_or_else(|| {
             CoreError::Validation(
                 "DCF has no explicit flows; cannot discount terminal value".into(),
             )
         })?;
-        let years = self.discount_years(self.valuation_date, *terminal_date);
-        Ok(terminal_value / (1.0 + self.wacc).powf(years))
+        Ok(
+            if matches!(self.terminal_value, TerminalValueSpec::ExitMultiple { .. }) {
+                self.year_fraction(self.valuation_date, *terminal_date)
+            } else {
+                self.discount_years(self.valuation_date, *terminal_date)
+            },
+        )
     }
 
     /// Effective net debt amount for the EV-to-equity bridge.
@@ -1242,6 +1269,52 @@ mod tests {
             ratio,
             expected_ratio,
             diff
+        );
+    }
+
+    #[test]
+    fn exit_multiple_terminal_value_ignores_mid_year_shift() {
+        // An ExitMultiple TV is point-in-time sale proceeds at t_n, so its
+        // discounting tenor must be the full t_n regardless of the mid-year
+        // convention; Gordon-growth (a flow-stream proxy) keeps the shift.
+        let mut dcf_exit = build_simple_dcf_gordon();
+        dcf_exit.terminal_value = TerminalValueSpec::ExitMultiple {
+            terminal_metric: 500.0,
+            multiple: 8.0,
+        };
+        let mut dcf_exit_mid = dcf_exit.clone();
+        dcf_exit_mid.mid_year_convention = true;
+
+        let pv_end = dcf_exit
+            .discount_terminal_value(4_000.0)
+            .expect("exit TV pv");
+        let pv_mid = dcf_exit_mid
+            .discount_terminal_value(4_000.0)
+            .expect("exit TV pv (mid-year)");
+        assert!(
+            (pv_end - pv_mid).abs() < 1e-12,
+            "ExitMultiple TV must discount at full t_n under mid-year: {pv_end} vs {pv_mid}"
+        );
+
+        // Gordon-growth TV keeps the mid-year shift (discounts at t_n − ½).
+        let dcf_gordon = build_simple_dcf_gordon();
+        let mut dcf_gordon_mid = dcf_gordon.clone();
+        dcf_gordon_mid.mid_year_convention = true;
+        let pv_g_end = dcf_gordon
+            .discount_terminal_value(4_000.0)
+            .expect("gordon TV pv");
+        let pv_g_mid = dcf_gordon_mid
+            .discount_terminal_value(4_000.0)
+            .expect("gordon TV pv (mid-year)");
+        assert!(
+            pv_g_mid > pv_g_end,
+            "Gordon TV must keep the mid-year shift: {pv_g_mid} vs {pv_g_end}"
+        );
+        let expected_ratio = (1.0 + dcf_gordon.wacc).powf(0.5);
+        let ratio = pv_g_mid / pv_g_end;
+        assert!(
+            (ratio - expected_ratio).abs() < 1e-12,
+            "Gordon mid-year TV ratio {ratio} should be (1+wacc)^0.5 = {expected_ratio}"
         );
     }
 

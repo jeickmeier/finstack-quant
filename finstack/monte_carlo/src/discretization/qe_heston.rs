@@ -7,7 +7,9 @@
 
 use super::super::process::heston::HestonProcess;
 use super::super::traits::Discretization;
-use super::qe_common::{qe_step_variance, KAPPA_DT_EXPANSION_EPS};
+#[cfg(test)]
+use super::qe_common::qe_step_variance;
+use super::qe_common::{qe_regime, KAPPA_DT_EXPANSION_EPS};
 
 /// Integrated variance approximation method.
 ///
@@ -137,6 +139,10 @@ impl QeHeston {
     /// Thin wrapper around [`qe_step_variance`] that plugs in the instance's
     /// ψ threshold. See [`super::qe_common`] for the algorithm, references,
     /// and the numerical safeguards that are shared with `QeCir`.
+    /// (Production stepping goes through [`qe_regime`] directly so the spot
+    /// leg can reuse the regime for the K0* correction; this wrapper remains
+    /// for tests.)
+    #[cfg(test)]
     #[inline]
     fn step_variance(
         &self,
@@ -190,16 +196,35 @@ impl QeHeston {
     /// # References
     /// - Andersen, L. (2008). "Simple and efficient simulation of the Heston
     ///   stochastic volatility model." *J. Comp. Finance*, 11(3).
+    ///
+    /// (Production stepping uses [`Self::int_var_coeffs`] directly; this
+    /// helper remains for tests of the integrated-variance approximations.)
+    #[cfg(test)]
     #[inline]
     fn integrated_variance(&self, v_t: f64, v_next: f64, dt: f64, kappa: f64, theta: f64) -> f64 {
+        let (c0, c1, c2) = self.int_var_coeffs(dt, kappa, theta);
+        c0 + c1 * v_t + c2 * v_next
+    }
+
+    /// Affine coefficients `(c0, c1, c2)` of the integrated-variance
+    /// approximation `∫_t^{t+Δt} v_s ds ≈ c0 + c1·v_t + c2·v_{t+Δt}`.
+    ///
+    /// Both supported methods are affine in `(v_t, v_{t+Δt})`, which is what
+    /// makes the closed-form `K0*` martingale correction possible:
+    ///
+    /// - Trapezoidal: `(0, Δt/2, Δt/2)` (Andersen's γ1 = γ2 = ½).
+    /// - Mean-reversion-adjusted: `c1 = c2 = (1 − e^{−κΔt})/(2κ)`,
+    ///   `c0 = θΔt − 2θ·c1`.
+    #[inline]
+    fn int_var_coeffs(&self, dt: f64, kappa: f64, theta: f64) -> (f64, f64, f64) {
         match self.int_var_method {
-            IntegratedVarianceMethod::Trapezoidal => (v_t + v_next) / 2.0 * dt,
+            IntegratedVarianceMethod::Trapezoidal => (0.0, 0.5 * dt, 0.5 * dt),
             IntegratedVarianceMethod::MeanReversionAdjusted => {
                 if (kappa * dt).abs() < KAPPA_DT_EXPANSION_EPS {
-                    (v_t + v_next) / 2.0 * dt
+                    (0.0, 0.5 * dt, 0.5 * dt)
                 } else {
-                    let exp_term = (-kappa * dt).exp();
-                    theta * dt + (v_t + v_next - 2.0 * theta) * (1.0 - exp_term) / (2.0 * kappa)
+                    let c1 = (1.0 - (-kappa * dt).exp()) / (2.0 * kappa);
+                    (theta * dt - 2.0 * theta * c1, c1, c1)
                 }
             }
         }
@@ -227,25 +252,71 @@ impl Discretization<HestonProcess> for QeHeston {
         let s_t = x[0];
         let v_t = x[1].max(0.0);
 
-        // Step 1: Evolve variance using QE scheme
+        // Step 1: Evolve variance using QE scheme. The regime is kept so the
+        // spot leg can form the exact conditional MGF of v_{t+Δt} for the
+        // martingale-exact K0* correction (Andersen 2008, §4.2).
         let z_v = z[1]; // Independent shock for variance
-        let v_next = self.step_variance(v_t, params.kappa, params.theta, params.sigma_v, dt, z_v);
+        let regime = qe_regime(
+            v_t,
+            params.kappa,
+            params.theta,
+            params.sigma_v,
+            dt,
+            self.psi_c,
+        );
+        let v_next = regime.sample(z_v);
 
-        // Step 2: Evolve the spot with a martingale-corrected QE-M style update.
+        // Step 2: Evolve the spot. With the affine integrated-variance
+        // approximation ∫v ≈ c0 + c1·v_t + c2·v_{t+Δt}, the log-return is
+        //
+        //   Δln S = (r−q)Δt + C + B·v_t + A_pre·v_{t+Δt}
+        //           + √((1−ρ²)·∫v)·Z
+        //
+        // with C = −½c0 + (ρ/σ_v)·κ·c0 − (ρ/σ_v)·κθΔt,
+        //      B = −½c1 + (ρ/σ_v)(κc1 − 1),
+        //      A_pre = −½c2 + (ρ/σ_v)(κc2 + 1).
+        //
+        // Plain QE replaces (C + B·v_t) by the analytic Itô compensation,
+        // which is only asymptotically a martingale and drifts at high
+        // σ_v/|ρ|. Andersen's K0* makes the step exactly martingale:
+        //
+        //   K0* = −ln M(A) − ½(1−ρ²)(c0 + c1·v_t),
+        //   A   = A_pre + ½(1−ρ²)c2,
+        //   M(A) = E[exp(A·v_{t+Δt}) | v_t]   (closed form per QE regime)
+        //
+        // so that E[S_{t+Δt} | S_t, v_t] = S_t·e^{(r−q)Δt} holds exactly.
+        // When M(A) is not finite (A outside the regime's domain) or σ_v is
+        // degenerate, the analytic drift is used as a fallback.
         let rho = params.rho.clamp(-1.0, 1.0);
-        let int_var = self
-            .integrated_variance(v_t, v_next, dt, params.kappa, params.theta)
-            .max(0.0);
-        let drift = (params.r - params.q) * dt - 0.5 * int_var;
-        let variance_correction = if params.sigma_v.abs() > 1e-10 {
-            rho / params.sigma_v
-                * (v_next - v_t - params.kappa * params.theta * dt + params.kappa * int_var)
-        } else {
-            0.0
-        };
-        let orthogonal_diffusion = (1.0 - rho * rho).max(0.0).sqrt() * int_var.sqrt() * z[0];
+        let (c0, c1, c2) = self.int_var_coeffs(dt, params.kappa, params.theta);
+        let int_var = (c0 + c1 * v_t + c2 * v_next).max(0.0);
+        let one_minus_rho2 = (1.0 - rho * rho).max(0.0);
+        let orthogonal_diffusion = one_minus_rho2.sqrt() * int_var.sqrt() * z[0];
 
-        let s_next = s_t * (drift + variance_correction + orthogonal_diffusion).exp();
+        let log_increment = if params.sigma_v.abs() > 1e-10 {
+            let rho_over_sigma = rho / params.sigma_v;
+            let a_pre = -0.5 * c2 + rho_over_sigma * (params.kappa * c2 + 1.0);
+            let a_coeff = a_pre + 0.5 * one_minus_rho2 * c2;
+            match regime.exp_moment(a_coeff) {
+                Some(mgf) if mgf > 0.0 => {
+                    // Martingale-exact K0* path.
+                    let k0_star = -mgf.ln() - 0.5 * one_minus_rho2 * (c0 + c1 * v_t);
+                    (params.r - params.q) * dt + k0_star + a_pre * v_next + orthogonal_diffusion
+                }
+                _ => {
+                    // Fallback: analytic Itô-compensated drift (plain QE).
+                    let drift = (params.r - params.q) * dt - 0.5 * int_var;
+                    let variance_correction = rho_over_sigma
+                        * (v_next - v_t - params.kappa * params.theta * dt
+                            + params.kappa * int_var);
+                    drift + variance_correction + orthogonal_diffusion
+                }
+            }
+        } else {
+            (params.r - params.q) * dt - 0.5 * int_var + orthogonal_diffusion
+        };
+
+        let s_next = s_t * log_increment.exp();
 
         // Update state
         x[0] = s_next;
@@ -487,32 +558,128 @@ mod tests {
     }
 
     #[test]
-    fn test_qe_heston_spot_update_includes_variance_correction_term() {
+    fn test_qe_heston_spot_update_uses_k0_star_correction() {
         let heston =
             HestonProcess::with_params(0.03, 0.01, 1.7, 0.04, 0.6, -0.4, 0.05).expect("valid");
         let qe = QeHeston::new();
+        let dt = 0.1;
         let mut x = vec![100.0, 0.05];
         let z = vec![0.3, -0.2];
         let mut work = vec![];
 
+        // Reconstruct the expected Andersen §4.2 K0* update independently.
         let params = heston.params();
         let s_t = x[0];
         let v_t = x[1];
-        let v_next = qe.step_variance(v_t, params.kappa, params.theta, params.sigma_v, 0.1, z[1]);
-        let int_var = qe.integrated_variance(v_t, v_next, 0.1, params.kappa, params.theta);
-        let expected_log_return = (params.r - params.q) * 0.1 - 0.5 * int_var
-            + params.rho / params.sigma_v
-                * (v_next - v_t - params.kappa * params.theta * 0.1 + params.kappa * int_var)
-            + (1.0 - params.rho * params.rho).sqrt() * int_var.sqrt() * z[0];
+        let regime = qe_regime(v_t, params.kappa, params.theta, params.sigma_v, dt, 1.5);
+        let v_next = regime.sample(z[1]);
+        let (c0, c1, c2) = (0.0, 0.5 * dt, 0.5 * dt); // trapezoidal γ1=γ2=½
+        let int_var = c0 + c1 * v_t + c2 * v_next;
+        let rho = params.rho;
+        let one_minus_rho2 = 1.0 - rho * rho;
+        let a_pre = -0.5 * c2 + rho / params.sigma_v * (params.kappa * c2 + 1.0);
+        let a_coeff = a_pre + 0.5 * one_minus_rho2 * c2;
+        let mgf = regime.exp_moment(a_coeff).expect("finite MGF");
+        let k0_star = -mgf.ln() - 0.5 * one_minus_rho2 * (c0 + c1 * v_t);
+        let expected_log_return = (params.r - params.q) * dt
+            + k0_star
+            + a_pre * v_next
+            + one_minus_rho2.sqrt() * int_var.sqrt() * z[0];
         let expected_spot = s_t * expected_log_return.exp();
 
-        qe.step(&heston, 0.0, 0.1, &mut x, &z, &mut work);
+        qe.step(&heston, 0.0, dt, &mut x, &z, &mut work);
 
         assert!(
             (x[0] - expected_spot).abs() < 1e-12,
             "expected spot {} but got {}",
             expected_spot,
             x[0]
+        );
+    }
+
+    /// One-step exact martingale property of the K0* correction: for a fixed
+    /// `v_t`, `E[S_{t+Δt}/S_t] = e^{(r−q)Δt}` holds exactly (up to MC noise)
+    /// even at a coarse Δt with high σ_v and strong ρ — the regime where the
+    /// plain Itô-compensated QE drift is visibly biased.
+    #[test]
+    fn k0_star_one_step_martingale() {
+        use crate::rng::philox::PhiloxRng;
+        use crate::traits::RandomStream;
+
+        let heston =
+            HestonProcess::with_params(0.05, 0.0, 0.5, 0.04, 1.0, -0.9, 0.04).expect("valid");
+        let qe = QeHeston::new();
+        let dt = 0.25; // coarse quarterly step
+        let params = heston.params();
+
+        let mut rng = PhiloxRng::new(0xA11D_0001);
+        let n = 400_000usize;
+        let mut zs = vec![0.0; 2 * n];
+        rng.fill_std_normals(&mut zs);
+
+        let mut sum = 0.0;
+        let mut sum_sq = 0.0;
+        let mut work = vec![];
+        for i in 0..n {
+            let mut x = vec![1.0, 0.04];
+            let z = [zs[2 * i], zs[2 * i + 1]];
+            qe.step(&heston, 0.0, dt, &mut x, &z, &mut work);
+            sum += x[0];
+            sum_sq += x[0] * x[0];
+        }
+        let npf = n as f64;
+        let mean = sum / npf;
+        let var = (sum_sq / npf - mean * mean).max(0.0);
+        let se = (var / npf).sqrt();
+        let target = ((params.r - params.q) * dt).exp();
+        assert!(
+            (mean - target).abs() < 4.0 * se,
+            "one-step E[S]={mean} must equal {target} within 4·SE={:.2e}",
+            4.0 * se
+        );
+    }
+
+    /// Multi-step martingale test (Andersen §4.2): `E[S_T] = S_0·e^{(r−q)T}`
+    /// within MC error at high σ_v and strong negative ρ, where plain QE
+    /// (analytic drift, no K0*) drifts measurably.
+    #[test]
+    fn k0_star_multi_step_martingale_at_high_vol_of_vol() {
+        use crate::rng::philox::PhiloxRng;
+        use crate::traits::RandomStream;
+
+        let r = 0.05;
+        let heston = HestonProcess::with_params(r, 0.0, 0.5, 0.04, 1.0, -0.9, 0.04).expect("valid");
+        let qe = QeHeston::new();
+        let t_end = 1.0;
+        let n_steps = 12usize; // coarse monthly grid
+        let dt = t_end / n_steps as f64;
+
+        let mut rng = PhiloxRng::new(0xA11D_0002);
+        let n_paths = 200_000usize;
+        let mut zs = vec![0.0; 2 * n_steps];
+
+        let mut sum = 0.0;
+        let mut sum_sq = 0.0;
+        let mut work = vec![];
+        for _ in 0..n_paths {
+            rng.fill_std_normals(&mut zs);
+            let mut x = vec![1.0, 0.04];
+            for k in 0..n_steps {
+                let z = [zs[2 * k], zs[2 * k + 1]];
+                qe.step(&heston, k as f64 * dt, dt, &mut x, &z, &mut work);
+            }
+            sum += x[0];
+            sum_sq += x[0] * x[0];
+        }
+        let npf = n_paths as f64;
+        let mean = sum / npf;
+        let var = (sum_sq / npf - mean * mean).max(0.0);
+        let se = (var / npf).sqrt();
+        let target = (r * t_end).exp();
+        assert!(
+            (mean - target).abs() < 4.0 * se,
+            "E[S_T]={mean} must equal S_0·e^{{rT}}={target} within 4·SE={:.2e}",
+            4.0 * se
         );
     }
 

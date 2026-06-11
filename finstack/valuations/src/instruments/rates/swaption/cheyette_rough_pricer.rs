@@ -34,7 +34,6 @@ use finstack_monte_carlo::process::cheyette_rough::{
 use finstack_monte_carlo::rng::fbm::FractionalNoiseGenerator;
 use finstack_monte_carlo::rng::philox::PhiloxRng;
 use finstack_monte_carlo::rng::volterra::RiemannLiouvilleVolterra;
-use finstack_monte_carlo::time_grid::TimeGrid;
 use finstack_monte_carlo::traits::{Discretization, RandomStream};
 
 /// Configuration for the Cheyette rough vol Bermudan swaption pricer.
@@ -46,6 +45,15 @@ pub struct CheyetteRoughConfig {
     pub num_steps: usize,
     /// Polynomial degree for LSMC regression basis.
     pub basis_degree: usize,
+    /// Split-sample (out-of-sample) LSMC pricing.
+    ///
+    /// When `true`, paths are partitioned by index parity: even-indexed paths
+    /// fit the continuation-value regression, odd-indexed paths are priced
+    /// under that fitted policy. This removes the positive in-sample bias of
+    /// plain Longstaff-Schwartz at the cost of roughly √2× more standard
+    /// error (only half the paths drive the estimate). Mirrors
+    /// `RateExoticMcConfig::oos_lsmc` on the HW1F exotic harness.
+    pub oos_lsmc: bool,
     /// When true, refuse to price with hardcoded uncalibrated model parameters.
     ///
     /// The pricer registry (`finstack_valuations::pricer::exotics`) sets this
@@ -69,6 +77,7 @@ impl Default for CheyetteRoughConfig {
             num_paths: defaults.num_paths,
             num_steps: defaults.num_steps,
             basis_degree: defaults.basis_degree,
+            oos_lsmc: false,
             enforce_calibration: false,
         }
     }
@@ -114,6 +123,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let num_points = 50;
         let dt = maturity / num_points as f64;
         let mut points = Vec::with_capacity(num_points + 1);
+        let mut fallback_count = 0_usize;
 
         for i in 0..=num_points {
             let t = i as f64 * dt;
@@ -124,11 +134,22 @@ impl BermudanSwaptionCheyetteRoughPricer {
             let fwd = if df_minus > 1e-15 && df_plus > 1e-15 {
                 -(df_plus.ln() - df_minus.ln()) / (2.0 * eps)
             } else {
+                fallback_count += 1;
                 0.03 // fallback
             };
             // For t=0 use a slightly positive time to ensure strictly increasing
             let time = if i == 0 { 0.0 } else { t };
             points.push((time, fwd.max(-0.01))); // floor at -1%
+        }
+
+        if fallback_count > 0 {
+            tracing::warn!(
+                fallback_count,
+                maturity,
+                "build_phi_points: non-positive discount factors on the curve; \
+                 substituted a flat 3% instantaneous forward for the affected \
+                 phi(t) points. Check market data quality."
+            );
         }
 
         points
@@ -320,17 +341,43 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let phi_points = Self::build_phi_points(disc.as_ref(), swap_end_time);
 
         // Get base vol from vol surface (use ATM vol at midpoint expiry)
-        let base_vol = market
-            .get_surface(swaption.vol_surface_id.as_str())
-            .map(|surf| {
+        let base_vol = match market.get_surface(swaption.vol_surface_id.as_str()) {
+            Ok(surf) => {
+                // The conversion below treats the read as a BLACK (lognormal)
+                // vol on an expiry × strike grid; reject mis-tagged surfaces
+                // (e.g. normal ATM tenor matrices) instead of misreading them.
+                surf.require_secondary_axis(
+                    finstack_core::market_data::surfaces::VolSurfaceAxis::Strike,
+                )
+                .and_then(|()| {
+                    surf.require_quote_type(
+                        finstack_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+                    )
+                })
+                .map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?;
                 let mid_t = exercise_times.first().copied().unwrap_or(1.0);
                 // Convert Black vol to short-rate vol (approximate: divide by sqrt(T))
                 let black_vol = surf.value_clamped(mid_t, strike);
                 // Short rate vol is roughly Black vol * forward rate
                 let fwd_rate = phi_points.last().map(|&(_, r)| r).unwrap_or(0.03);
                 (black_vol * fwd_rate).max(0.001)
-            })
-            .unwrap_or(0.005); // 50bps default base vol
+            }
+            Err(_) => {
+                tracing::warn!(
+                    swaption_id = swaption.id.as_str(),
+                    vol_surface_id = swaption.vol_surface_id.as_str(),
+                    "Cheyette rough-vol pricer: vol surface not found; falling \
+                     back to a 50bp base short-rate vol. The resulting price is \
+                     not surface-consistent."
+                );
+                0.005 // 50bps default base vol
+            }
+        };
 
         // Cheyette model parameters (uncalibrated defaults)
         let kappa = 0.03;
@@ -354,46 +401,65 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let process = CheyetteRoughVolProcess::new(params.clone());
         let euler = CheyetteRoughEuler::new(hurst);
 
-        // Build uniform time grid
-        let num_steps = self.config.num_steps;
-        let dt = ttm / num_steps as f64;
-        let times: Vec<f64> = (0..=num_steps).map(|i| i as f64 * dt).collect();
-
-        let time_grid = TimeGrid::from_times(times.clone()).map_err(|e| {
-            PricingError::model_failure_with_context(
-                format!("Failed to build time grid: {e}"),
-                PricingErrorContext::default(),
-            )
-        })?;
-
-        // Map exercise times to grid step indices
-        let exercise_step_indices: Vec<usize> = exercise_times
+        // Exercise-aligned simulation grid: every exercise date lands exactly
+        // on a grid node (shared with the HW1F exotic harness). The previous
+        // uniform grid snapped exercise dates to the nearest node — moving
+        // them by up to half a step (~12 days at 100 steps over 6y) and, on
+        // collisions, silently recording end-of-path state as exercise data.
+        let live_exercise_times: Vec<f64> = exercise_times
             .iter()
-            .filter_map(|&ex_t| {
-                if ex_t <= 0.0 || ex_t > ttm {
-                    return None;
-                }
-                let mut best_idx = 0;
-                let mut best_dist = f64::MAX;
-                for (idx, &t) in times.iter().enumerate() {
-                    let d = (t - ex_t).abs();
-                    if d < best_dist {
-                        best_dist = d;
-                        best_idx = idx;
-                    }
-                }
-                Some(best_idx)
-            })
+            .copied()
+            .filter(|&t| t > 0.0 && t <= ttm + 1e-12)
+            .map(|t| t.min(ttm))
             .collect();
-
-        if exercise_step_indices.is_empty() {
+        if live_exercise_times.is_empty() {
             return Ok((Money::new(0.0, currency), 0.0));
         }
+
+        // Sub-steps between exercise dates sized so the total step count
+        // tracks `config.num_steps` (the event-aligned builder also enforces
+        // ~monthly steps as a floor).
+        let min_steps_between = (self.config.num_steps / (live_exercise_times.len() + 1)).max(1);
+        let (time_grid, exercise_step_indices) =
+            crate::instruments::rates::exotics_shared::hw1f_mc::build_event_aligned_grid(
+                &live_exercise_times,
+                ttm,
+                min_steps_between,
+            )
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    format!("Failed to build exercise-aligned time grid: {e}"),
+                    PricingErrorContext::default(),
+                )
+            })?;
+
+        // Each exercise date must map to its own grid step; a collision would
+        // silently attribute one date's state to another.
+        for pair in exercise_step_indices.windows(2) {
+            if pair[1] <= pair[0] {
+                return Err(PricingError::model_failure_with_context(
+                    format!(
+                        "exercise dates collide on the simulation grid \
+                         (step indices {} and {})",
+                        pair[0], pair[1]
+                    ),
+                    PricingErrorContext::default(),
+                ));
+            }
+        }
+
+        let num_steps = time_grid.num_steps();
 
         // Riemann-Liouville Volterra generator for the rough-vol driver
         // (review finding M2): the BLP hybrid scheme draws 2 normals per step
         // and exposes the driving Brownian normals the rate leg correlates
         // against.
+        //
+        // The generator assumes a uniform grid; the exercise-aligned grid has
+        // near-uniform steps (segment dt's differ from `ttm / num_steps` only
+        // when the exercise schedule is irregular), so the increments use the
+        // average dt. For regular (annual/semi-annual) schedules the segment
+        // dt's coincide and the increments are exact.
         let fbm_gen = RiemannLiouvilleVolterra::new(ttm, num_steps, hurst_val).map_err(|e| {
             PricingError::model_failure_with_context(
                 format!("Failed to create RL Volterra generator: {e}"),
@@ -466,7 +532,10 @@ impl BermudanSwaptionCheyetteRoughPricer {
                 let r_avg = 0.5 * (r_before + r_after);
                 cum_df *= (-r_avg * step_dt).exp();
 
-                // Record state and discount factor at exercise dates
+                // Record state and discount factor at exercise dates. The
+                // grid is exercise-aligned and the indices are validated
+                // strictly increasing, so every exercise date is recorded
+                // exactly once — no terminal-state backfill is needed.
                 if ex_ptr < num_exercises && step + 1 == exercise_step_indices[ex_ptr] {
                     states_at_exercise[ex_ptr].push((x[0], x[1]));
                     df_at_exercise[ex_ptr].push(cum_df);
@@ -474,12 +543,10 @@ impl BermudanSwaptionCheyetteRoughPricer {
                 }
             }
 
-            // Fill any remaining exercise dates (in case of grid alignment issues)
-            while ex_ptr < num_exercises {
-                states_at_exercise[ex_ptr].push((x[0], x[1]));
-                df_at_exercise[ex_ptr].push(cum_df);
-                ex_ptr += 1;
-            }
+            debug_assert_eq!(
+                ex_ptr, num_exercises,
+                "exercise-aligned grid must visit every exercise date"
+            );
         }
 
         // --- Phase 2: LSMC backward induction ---
@@ -489,9 +556,31 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let mut cashflow = vec![0.0_f64; num_paths];
         let mut cashflow_ex_idx = vec![num_exercises - 1; num_paths];
 
+        // Split-sample partition (see `CheyetteRoughConfig::oos_lsmc`):
+        // even-indexed paths fit the regression, odd-indexed paths are priced
+        // under that fitted policy. When off, every path is both.
+        let oos = self.config.oos_lsmc;
+        let is_train = |p: usize| !oos || p.is_multiple_of(2);
+        let is_price = |p: usize| !oos || !p.is_multiple_of(2);
+
+        // Polynomial basis on the Cheyette state: [1, x, y, x^2, x*y, y^2, x^3]
+        let basis_degree = self.config.basis_degree;
+        let make_basis = |x_val: f64, y_val: f64| -> Vec<f64> {
+            let mut b = vec![1.0, x_val, y_val];
+            if basis_degree >= 2 {
+                b.push(x_val * x_val);
+                b.push(x_val * y_val);
+                b.push(y_val * y_val);
+            }
+            if basis_degree >= 3 {
+                b.push(x_val * x_val * x_val);
+            }
+            b
+        };
+
         for ex_idx in (0..num_exercises).rev() {
             let step = exercise_step_indices[ex_idx];
-            let ex_time = times[step];
+            let ex_time = time_grid.time(step);
             let swap_value_inputs = SwapValueInputs {
                 exercise_time: ex_time,
                 swap_end_time,
@@ -534,25 +623,19 @@ impl BermudanSwaptionCheyetteRoughPricer {
                 // The continuation value must be discounted from the future
                 // exercise date back to the current exercise date
                 // (Longstaff-Schwartz 2001, §2 eq. 4).
+                // Collect ITM train paths for regression. In split-sample
+                // mode only train paths feed the fit; the fitted rule is
+                // applied to every ITM path below so price paths get it
+                // out-of-sample.
                 let mut itm_indices = Vec::new();
                 let mut itm_basis = Vec::new();
                 let mut itm_continuation = Vec::new();
 
                 for (i, &ev) in exercise_values.iter().enumerate() {
-                    if ev > 0.0 {
+                    if ev > 0.0 && is_train(i) {
                         itm_indices.push(i);
                         let (x_val, y_val) = basis_inputs[i];
-                        // Polynomial basis: [1, x, y, x^2, x*y, y^2]
-                        let mut b = vec![1.0, x_val, y_val];
-                        if self.config.basis_degree >= 2 {
-                            b.push(x_val * x_val);
-                            b.push(x_val * y_val);
-                            b.push(y_val * y_val);
-                        }
-                        if self.config.basis_degree >= 3 {
-                            b.push(x_val * x_val * x_val);
-                        }
-                        itm_basis.push(b);
+                        itm_basis.push(make_basis(x_val, y_val));
 
                         // Discount the future cashflow from its exercise date
                         // back to the current exercise date:
@@ -572,7 +655,10 @@ impl BermudanSwaptionCheyetteRoughPricer {
                 let num_basis_cols = itm_basis.first().map_or(0, |b| b.len());
 
                 if itm_indices.len() > num_basis_cols + 3 {
-                    // Solve least-squares regression
+                    // Solve least-squares regression. A regression failure is
+                    // a hard error (matching the HW1F LSMC harness) rather
+                    // than a silent skip that would leave biased continuation
+                    // values.
                     let mut a_matrix = vec![0.0; itm_indices.len() * num_basis_cols];
                     for (row, basis) in itm_basis.iter().enumerate() {
                         for (col, &val) in basis.iter().enumerate() {
@@ -580,28 +666,39 @@ impl BermudanSwaptionCheyetteRoughPricer {
                         }
                     }
 
-                    if let Ok(coeffs) = solve_least_squares(
+                    let coeffs = solve_least_squares(
                         &a_matrix,
                         &itm_continuation,
                         itm_indices.len(),
                         num_basis_cols,
-                    ) {
-                        // Exercise vs continuation decision
-                        for (local_idx, &global_idx) in itm_indices.iter().enumerate() {
-                            let mut cont_value = 0.0;
-                            for (c, &coeff) in coeffs.iter().enumerate() {
-                                cont_value += coeff * itm_basis[local_idx][c];
-                            }
-                            let ev = exercise_values[global_idx];
-                            if ev > cont_value {
-                                cashflow[global_idx] = ev;
-                                cashflow_ex_idx[global_idx] = ex_idx;
-                            }
+                    )
+                    .map_err(|e| {
+                        PricingError::model_failure_with_context(
+                            format!("LSMC continuation regression failed: {e}"),
+                            PricingErrorContext::default(),
+                        )
+                    })?;
+                    // Exercise vs continuation decision for every ITM path
+                    // (train and price).
+                    for (i, &ev) in exercise_values.iter().enumerate() {
+                        if ev <= 0.0 {
+                            continue;
+                        }
+                        let (x_val, y_val) = basis_inputs[i];
+                        let basis = make_basis(x_val, y_val);
+                        let cont_value: f64 =
+                            basis.iter().zip(coeffs.iter()).map(|(b, c)| b * c).sum();
+                        if ev > cont_value {
+                            cashflow[i] = ev;
+                            cashflow_ex_idx[i] = ex_idx;
                         }
                     }
                 } else {
-                    // Too few ITM paths: exercise if positive
-                    for &idx in &itm_indices {
+                    // Too few ITM train paths: exercise if positive
+                    for (idx, &ev) in exercise_values.iter().enumerate() {
+                        if ev <= 0.0 {
+                            continue;
+                        }
                         // Compare discounted continuation
                         let future_ex = cashflow_ex_idx[idx];
                         let df_current = df_at_exercise[ex_idx][idx];
@@ -611,8 +708,8 @@ impl BermudanSwaptionCheyetteRoughPricer {
                         } else {
                             cashflow[idx]
                         };
-                        if exercise_values[idx] > discounted_cf {
-                            cashflow[idx] = exercise_values[idx];
+                        if ev > discounted_cf {
+                            cashflow[idx] = ev;
                             cashflow_ex_idx[idx] = ex_idx;
                         }
                     }
@@ -622,9 +719,14 @@ impl BermudanSwaptionCheyetteRoughPricer {
 
         // --- Phase 3: Average discounted cashflows ---
         // Each cashflow[i] is at the exercise date cashflow_ex_idx[i].
-        // Discount it to time 0 using df_at_exercise for that date.
+        // Discount it to time 0 using df_at_exercise for that date. In
+        // split-sample mode, only the pricing half (out-of-sample under the
+        // train-fitted policy) contributes to the reported estimate.
         let mut stats = OnlineStats::new();
         for (i, &cf) in cashflow.iter().enumerate() {
+            if !is_price(i) {
+                continue;
+            }
             let ex = cashflow_ex_idx[i];
             let df_to_zero = df_at_exercise[ex][i];
             stats.update(cf * df_to_zero);
@@ -808,6 +910,29 @@ mod tests {
             shocked > base,
             "payer swap value should rise under a positive rate shock: \
              base={base}, shocked={shocked}"
+        );
+    }
+
+    /// Exercise dates must land exactly on grid nodes (no nearest-node
+    /// snapping), with strictly increasing step indices. Irregular dates that
+    /// the old uniform 100-step grid would have moved by days are exact here.
+    #[test]
+    fn exercise_dates_land_exactly_on_grid_nodes() {
+        use crate::instruments::rates::exotics_shared::hw1f_mc::build_event_aligned_grid;
+
+        let exercise_times = [1.37, 2.000_001, 3.5];
+        let (grid, indices) = build_event_aligned_grid(&exercise_times, 5.0, 10).expect("grid");
+        for (k, &idx) in indices.iter().enumerate() {
+            assert!(
+                (grid.time(idx) - exercise_times[k]).abs() < 1e-9,
+                "exercise {} should land exactly on a node, got {}",
+                exercise_times[k],
+                grid.time(idx)
+            );
+        }
+        assert!(
+            indices.windows(2).all(|w| w[1] > w[0]),
+            "exercise step indices must be strictly increasing: {indices:?}"
         );
     }
 

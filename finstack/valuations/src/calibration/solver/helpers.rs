@@ -106,6 +106,70 @@ impl BracketDiagnostics {
     }
 }
 
+/// Certify that a below-tolerance candidate `x` is a genuine zero *crossing*
+/// by probing the objective at `x ± δ` (clamped to the scan bounds).
+///
+/// A converged candidate can legitimately lack sign-change evidence: a secant
+/// iteration converging monotonically from one side of a simple root never
+/// produces opposite-sign iterates, and a grid point landing below tolerance
+/// may sit between two same-sign scan neighbours. For a simple root the
+/// objective straddles zero across `x`; for the W-40 defect case — a tangent
+/// `|f|`-minimum that satisfies the tolerance without crossing — both probes
+/// respond with the same sign and certification fails, leaving the candidate
+/// flagged approximate for the caller's opt-in gate.
+///
+/// The probe escalates δ by decades because real bootstrap objectives can be
+/// locally *flat* around a machine-precision root (curve construction and
+/// repricing quantize below ~1e-7 in knot space), which would make a single
+/// fixed-δ probe read `f(x ± δ) == f(x)` and mis-flag a genuine root. δ stops
+/// escalating once both probes respond (`f != f(x)`): at that scale the sign
+/// pattern is conclusive.
+///
+/// Costs a handful of extra objective evaluations, and only on the
+/// no-sign-change-evidence paths. Returns `false` (uncertified) when the
+/// probes collapse onto `x` (candidate at a scan bound), never respond, or
+/// respond without straddling zero.
+fn certify_root_by_local_sign_change(
+    objective: &dyn Fn(f64) -> f64,
+    x: f64,
+    fx: f64,
+    diag: &mut BracketDiagnostics,
+) -> bool {
+    let (lo, hi) = diag.scan_bounds;
+    let mut delta = (1e-6 * x.abs()).max(1e-9);
+    let max_delta = 0.5 * (hi - lo).abs();
+    for _ in 0..8 {
+        if delta > max_delta {
+            return false;
+        }
+        let x_lo = (x - delta).max(lo);
+        let x_hi = (x + delta).min(hi);
+        if x_lo >= x || x_hi <= x {
+            return false;
+        }
+        let f_lo = objective(x_lo);
+        diag.update(x_lo, f_lo);
+        let f_hi = objective(x_hi);
+        diag.update(x_hi, f_hi);
+        if opposite_signs(f_lo, f_hi) {
+            return true;
+        }
+        // Both sides responded at this scale and still share a sign: the
+        // candidate is a non-crossing |f|-minimum, not a root. "Responded"
+        // means an exact (bitwise) change — any movement off the quantized
+        // plateau counts.
+        if f_lo.is_finite()
+            && f_hi.is_finite()
+            && f_lo.to_bits() != fx.to_bits()
+            && f_hi.to_bits() != fx.to_bits()
+        {
+            return false;
+        }
+        delta *= 10.0;
+    }
+    false
+}
+
 /// Minimum scan-grid size enforced in debug builds.
 ///
 /// The geometric bracket-expansion fallback was removed in favour of letting
@@ -142,15 +206,19 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
 
     let v0 = objective(initial);
     diag.update(initial, v0);
-    if v0.is_finite() && v0.abs() < tol {
-        diag.bracket_found = true;
-        return Ok((Some(initial), diag));
-    }
     if v0.is_finite() && v0.abs() < OBJECTIVE_VALID_ABS_MAX {
         valid_points.push((initial, v0));
     }
 
     for &point in scan_points {
+        // The initial guess is typically also a scan-grid point (callers seed
+        // the grid with it); reuse the already-computed f(initial) instead of
+        // re-pricing — one objective evaluation (e.g. a full CDS repricing)
+        // saved per pillar. Tolerance matches the grid dedup in
+        // `normalize_scan_points`.
+        if (point - initial).abs() < 1e-12 {
+            continue;
+        }
         let value = objective(point);
         diag.update(point, value);
 
@@ -169,20 +237,20 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
     valid_points.sort_by(|a, b| a.0.total_cmp(&b.0));
     type Bracket = ((f64, f64), (f64, f64), f64); // ((x0,f0),(x1,f1),score)
     let mut best_bracket: Option<Bracket> = None;
+    // Whether ANY adjacent pair of valid evaluations straddles zero — i.e. the
+    // objective provably crosses zero somewhere in the scanned domain. This is
+    // the evidence required to treat a below-tolerance candidate as a genuine
+    // root rather than a positive (or negative) |f|-minimum that never crosses.
+    // An exact `f == 0.0` evaluation is itself conclusive root evidence
+    // (`opposite_signs` deliberately excludes zeros from straddle detection).
+    let mut sign_change_observed = valid_points.iter().any(|&(_, f)| f == 0.0);
     for w in valid_points.windows(2) {
         let (x0, f0) = w[0];
         let (x1, f1) = w[1];
-        if f0.abs() < tol {
-            diag.bracket_found = true;
-            return Ok((Some(x0), diag));
-        }
-        if f1.abs() < tol {
-            diag.bracket_found = true;
-            return Ok((Some(x1), diag));
-        }
         if !opposite_signs(f0, f1) {
             continue;
         }
+        sign_change_observed = true;
         let mid = 0.5 * (x0 + x1);
         let score = (mid - initial).abs();
         let replace = match &best_bracket {
@@ -191,6 +259,20 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
         };
         if replace {
             best_bracket = Some(((x0, f0), (x1, f1), score));
+        }
+    }
+
+    // Early hit: the initial guess or a scan-grid point already satisfies the
+    // f-space tolerance. Return the best such point. It counts as a sign-change
+    // root only when the grid evidences a zero crossing (`sign_change_observed`);
+    // otherwise it is a below-tolerance |f|-minimum and is flagged approximate
+    // via `is_sign_change_bracket = false` for the caller's opt-in gate.
+    if let (Some(best_point), Some(best_value)) = (diag.best_point, diag.best_value) {
+        if best_value.is_finite() && best_value.abs() < tol {
+            diag.bracket_found = true;
+            diag.is_sign_change_bracket = sign_change_observed
+                || certify_root_by_local_sign_change(objective, best_point, best_value, &mut diag);
+            return Ok((Some(best_point), diag));
         }
     }
 
@@ -243,9 +325,16 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
                 }
             };
 
+            // Whether any pair of secant iterates straddles zero. If so, the
+            // objective provably crosses zero between them and a converged
+            // candidate is a genuine sign-change root (the bracket simply was
+            // not in the scan grid).
+            let mut secant_crossed = false;
             for _ in 0..iters {
                 if fx.is_finite() && fx.abs() < tol {
                     diag.bracket_found = true;
+                    diag.is_sign_change_bracket = secant_crossed
+                        || certify_root_by_local_sign_change(objective, x, fx, &mut diag);
                     return Ok((Some(x), diag));
                 }
                 if !fx.is_finite() || fx.abs() >= OBJECTIVE_VALID_ABS_MAX {
@@ -265,6 +354,9 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
 
                 let f_next = objective(x_next);
                 diag.update(x_next, f_next);
+                if f_next.is_finite() && opposite_signs(fx, f_next) {
+                    secant_crossed = true;
+                }
 
                 // Slide the window forward.
                 x_prev = x;
@@ -284,8 +376,9 @@ pub(crate) fn bracket_solve_1d_with_diagnostics(
 
     // Market-standard: bracket is valid; converge primarily on f-space (|f| < tol).
     // We prefer a simple bisection on the bracket to guarantee reduction in |f|
-    // for well-behaved monotone objectives. If midpoints become invalid/penalized,
-    // we fall back to Brent+Newton.
+    // for well-behaved monotone objectives. If midpoints become invalid/penalized
+    // or bisection runs out of iterations, we fall back to bounded false-position
+    // updates inside the last-known-good bracket (below).
     //
     // X-space early-break: when the bracket width collapses to machine precision
     // bisection cannot further improve the candidate, but the false-position
@@ -502,6 +595,36 @@ mod tests {
         }
     }
 
+    /// The initial guess is also pushed into the scan grid by
+    /// `normalize_scan_points`; the solver must reuse f(initial) instead of
+    /// re-evaluating the duplicate grid point (one repricing saved per pillar).
+    #[test]
+    fn initial_guess_not_evaluated_twice() {
+        use std::cell::RefCell;
+
+        let evals = RefCell::new(Vec::new());
+        let f = |x: f64| {
+            evals.borrow_mut().push(x);
+            x - 0.5
+        };
+        let initial = 0.3;
+        // Grid contains the initial guess exactly, as normalize_scan_points produces.
+        let scan = dense_scan(0.0, 1.0, &[initial]);
+        let (root, _) =
+            bracket_solve_1d_with_diagnostics(&f, initial, &scan, 1e-12, 100).expect("solver");
+        assert!(root.is_some());
+
+        let initial_evals = evals
+            .borrow()
+            .iter()
+            .filter(|&&x| (x - initial).abs() < 1e-12)
+            .count();
+        assert_eq!(
+            initial_evals, 1,
+            "f(initial) must be evaluated exactly once, not re-priced as a scan point"
+        );
+    }
+
     #[test]
     fn test_bracket_diagnostics_no_bracket() {
         // f(x) = x^2 + 1 has no real root
@@ -600,6 +723,76 @@ mod tests {
             !diag.is_sign_change_bracket,
             "an identically-zero objective has NO sign-change bracket; \
              signed-zero (-0.0 vs +0.0) must not be mistaken for a straddle"
+        );
+    }
+
+    /// A genuinely converged root with no grid/iterate sign-change evidence
+    /// (valid scan points all one-sided because the other side is penalized)
+    /// must be certified exact via the local ±δ sign-change probe — not left
+    /// flagged approximate, which would hard-fail strict targets through the
+    /// `allow_approximate_knots` gate despite a machine-precision residual.
+    #[test]
+    fn converged_root_without_grid_straddle_is_certified_exact() {
+        // Root at 0.5; everything below 0.4995 is penalized, so all *valid*
+        // grid points sit on the positive side — no straddle in the scan.
+        let f = |x: f64| if x < 0.4995 { PENALTY } else { x - 0.5 };
+        let scan = vec![0.499, 0.55, 0.7, 0.85, 1.0, 1.15, 1.3, 1.45, 1.6, 2.0];
+        // Initial guess is already at the root to machine precision (the
+        // re-bootstrap-under-bump pattern, e.g. dv01 curve rebuilds).
+        let initial = 0.5 + 1e-14;
+        let (root, diag) =
+            bracket_solve_1d_with_diagnostics(&f, initial, &scan, 1e-12, 100).expect("solver");
+        let r = root.expect("converged root must be returned");
+        assert!((r - 0.5).abs() < 1e-9, "unexpected root {r}");
+        assert!(
+            diag.is_sign_change_bracket,
+            "a converged candidate certified by the local sign-change probe \
+             must be reported as an exact root, not an approximate knot"
+        );
+    }
+
+    /// A locally *quantized* objective (flat plateaus around the root, the
+    /// dv01 re-bootstrap pattern observed on deposit pillars) must still be
+    /// certified: the probe escalates δ until the objective responds.
+    #[test]
+    fn quantized_flat_objective_root_is_certified_via_probe_escalation() {
+        // f is x − 0.5 quantized to 1e-4 plateaus, offset so the plateau value
+        // at the root is a tiny non-zero residual (avoids the f == 0.0
+        // conclusive-root shortcut and forces the certification probe).
+        let q = 1e-4;
+        let f = move |x: f64| {
+            if x < 0.499 {
+                PENALTY
+            } else {
+                ((x - 0.5) / q).round() * q + 3.7e-13
+            }
+        };
+        // Valid grid points all on the positive side (one-sided evidence);
+        // 0.45 is penalized, so it widens the scan bounds without providing
+        // sign-change evidence.
+        let scan = vec![0.45, 0.55, 0.7, 0.85, 1.0, 1.15, 1.3, 1.45, 1.6, 2.0];
+        let initial = 0.5 + 1e-14;
+        let (root, diag) =
+            bracket_solve_1d_with_diagnostics(&f, initial, &scan, 1e-12, 100).expect("solver");
+        assert!(root.is_some(), "below-tolerance plateau root returned");
+        assert!(
+            diag.is_sign_change_bracket,
+            "probe escalation must certify a quantized-flat genuine root"
+        );
+    }
+
+    /// The W-40 defect case — a tangent |f|-minimum satisfying the tolerance
+    /// without crossing zero — must NOT be certified by the local probe.
+    #[test]
+    fn tangent_minimum_below_tolerance_stays_approximate() {
+        let f = |x: f64| (x - 0.5) * (x - 0.5) + 1e-9;
+        let scan = dense_scan(0.0, 1.0, &[0.5]);
+        let (root, diag) =
+            bracket_solve_1d_with_diagnostics(&f, 0.5, &scan, 1e-3, 100).expect("solver");
+        assert!(root.is_some(), "below-tolerance minimum is still returned");
+        assert!(
+            !diag.is_sign_change_bracket,
+            "a non-crossing |f|-minimum must remain flagged approximate"
         );
     }
 

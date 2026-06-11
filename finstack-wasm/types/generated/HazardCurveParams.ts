@@ -45,15 +45,18 @@ notional: number,
  */
 method: CalibrationMethod,
 /**
- * Interpolation style for the curve.
+ * Interpolation style for survival probabilities between pillars.
+ *
+ * Defaults to log-linear (piecewise-constant hazard), the market
+ * standard for credit curves.
  */
 interpolation: string,
 /**
  * Interpolation method for par spreads reported by the calibrated curve.
  *
  * Note: this is used for *quoting/interpolation of stored par spreads* and does not affect
- * survival no-arbitrage, which is enforced via non-negative hazards and the curve's
- * internal log-linear survival interpolation.
+ * survival no-arbitrage, which is enforced via non-negative hazards together with the
+ * survival interpolation selected by `interpolation` (log-linear by default).
  */
 par_interp: string,
 /**

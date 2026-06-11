@@ -261,7 +261,9 @@ impl TarnPricer {
             fallback: Some(self.hw_params),
             context: context_label.as_str(),
         };
-        resolve_hw1f_params(&req, market)
+        // Provenance (`hw1f_param_source`) is stamped by the resolver's
+        // structured logs under the instrument context label.
+        resolve_hw1f_params(&req, market).map(|(params, _source)| params)
     }
 
     fn effective_config(&self, inst: &Tarn) -> RateExoticMcConfig {

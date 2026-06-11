@@ -529,7 +529,7 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
 
 #[cfg(feature = "fx-vanna-volga")]
 use crate::instruments::fx::fx_barrier_option::vanna_volga::{
-    vanna_volga_barrier_adjustment, VannaVolgaQuotes,
+    vanna_volga_barrier_price, VannaVolgaQuotes,
 };
 
 /// Internal FX barrier option Vanna-Volga pricer.
@@ -637,7 +637,7 @@ impl FxBarrierOptionVannaVolgaPricer {
             ));
         }
 
-        let (_, r_dom, r_for, sigma, _) = collect_fx_barrier_inputs(fx_barrier, market, as_of)
+        let (_, r_dom, r_for, _sigma, _) = collect_fx_barrier_inputs(fx_barrier, market, as_of)
             .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
@@ -648,19 +648,11 @@ impl FxBarrierOptionVannaVolgaPricer {
         let analytical_barrier_type = map_barrier_type(fx_barrier.barrier_type);
         let is_call = matches!(fx_barrier.option_type, crate::instruments::OptionType::Call);
 
-        // Compute BS barrier price at ATM vol
-        let bs_price = bs_barrier_price_per_unit(
-            fx_barrier,
-            fx_spot,
-            r_dom,
-            r_for,
-            sigma,
-            t,
-            analytical_barrier_type,
-        );
-
-        // Apply Vanna-Volga correction with resolved smile quotes — fails loudly
-        // when no quotes are bound, rather than silently collapsing to BS.
+        // Resolve smile quotes first — fails loudly when no quotes are bound,
+        // rather than silently collapsing to BS. The Vanna-Volga base BS leg
+        // is rebuilt internally at `quotes.vol_atm`: the ambient strike vol
+        // `sigma` would double-count the smile the 3×3 replication carries.
+        // (The non-VV analytical pricer keeps pricing at the strike vol.)
         let quotes = self.resolve_quotes(fx_barrier)?;
         let vv_params = BarrierParams::new(
             fx_spot,
@@ -669,14 +661,22 @@ impl FxBarrierOptionVannaVolgaPricer {
             t,
             r_dom,
             r_for,
-            sigma,
+            quotes.vol_atm,
         );
-        let vv_price = vanna_volga_barrier_adjustment(
-            bs_price,
+        // Rebate leg priced alongside the option leg so the VV FD greeks
+        // cover the same payoff as the base BS leg.
+        let vv_rebate = fx_barrier.rebate.map(|amount| {
+            crate::instruments::fx::fx_barrier_option::vanna_volga::VvRebate {
+                amount,
+                timing: fx_barrier.rebate_timing,
+            }
+        });
+        let vv_price = vanna_volga_barrier_price(
             &vv_params,
             &quotes,
             is_call,
             analytical_barrier_type,
+            vv_rebate,
         );
 
         Ok(Money::new(

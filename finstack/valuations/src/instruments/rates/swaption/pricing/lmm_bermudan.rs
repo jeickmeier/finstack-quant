@@ -51,6 +51,15 @@ pub struct LmmBermudanConfig {
     pub antithetic: bool,
     /// Minimum simulation steps between exercise dates.
     pub min_steps_between_exercises: usize,
+    /// Split-sample (out-of-sample) LSMC pricing.
+    ///
+    /// When `true`, raw shock streams are partitioned by parity: even-indexed
+    /// streams fit the continuation-value regression, odd-indexed streams are
+    /// priced under that fitted policy. This removes the positive in-sample
+    /// bias of plain Longstaff-Schwartz at the cost of roughly √2× more
+    /// standard error (only half the paths drive the estimate). Mirrors
+    /// `RateExoticMcConfig::oos_lsmc` on the HW1F exotic harness.
+    pub oos_lsmc: bool,
     /// When true, refuse to price with the uncalibrated structural defaults.
     ///
     /// The pricer registry (`finstack_valuations::pricer::exotics`) sets this
@@ -78,6 +87,7 @@ impl Default for LmmBermudanConfig {
             basis_degree: defaults.basis_degree,
             antithetic: defaults.antithetic,
             min_steps_between_exercises: defaults.min_steps_between_exercises,
+            oos_lsmc: false,
             enforce_calibration: false,
         }
     }
@@ -144,7 +154,9 @@ pub fn price_bermudan_lmm(
     let process = LmmProcess::new(params.clone());
     let disc = LmmPredictorCorrector::new();
 
-    // Build time grid aligned to exercise dates and forward fixing dates
+    // Build time grid aligned to exercise dates and the final maturity
+    // (forward fixing dates are NOT inserted as grid nodes; exercise dates
+    // are snapped to the nearest node of the sub-divided grid).
     let maturity = *params
         .tenors
         .last()
@@ -225,6 +237,32 @@ pub fn price_bermudan_lmm(
     // time-0 price with a single `× P(0, T_N)`.
     let mut cashflow = vec![0.0_f64; total_paths];
 
+    // Split-sample partition (see `LmmBermudanConfig::oos_lsmc`). Path `p`
+    // belongs to raw stream `p / multiplicity`; partitioning by stream parity
+    // keeps each antithetic pair together and gives a deterministic,
+    // seed-stable train/price split. When `oos_lsmc` is off, every path is
+    // both train and price (classic in-sample Longstaff-Schwartz).
+    let multiplicity = if config.antithetic { 2 } else { 1 };
+    let oos = config.oos_lsmc;
+    let is_train = |p: usize| !oos || (p / multiplicity).is_multiple_of(2);
+    let is_price = |p: usize| !oos || !(p / multiplicity).is_multiple_of(2);
+
+    // Polynomial basis: [1, S, A, S^2, S*A, S^3, ...]
+    let make_basis = |sr: f64, ann: f64| -> Vec<f64> {
+        let mut b = Vec::with_capacity(config.basis_degree + 3);
+        b.push(1.0);
+        b.push(sr);
+        b.push(ann);
+        if config.basis_degree >= 2 {
+            b.push(sr * sr);
+            b.push(sr * ann);
+        }
+        if config.basis_degree >= 3 {
+            b.push(sr * sr * sr);
+        }
+        b
+    };
+
     // Iterate backward through exercise dates
     for ex_idx in (0..exercise_step_indices.len()).rev() {
         let step = exercise_step_indices[ex_idx];
@@ -238,7 +276,7 @@ pub fn price_bermudan_lmm(
         // A forward `j` is alive while its fixing date `T_j >= t`. The
         // co-terminal swap entered on exercise at `T_k` covers exactly the
         // periods `[T_{first_alive}, T_N]`.
-        let first_alive = params.tenors[..n].partition_point(|&tenor| tenor < t_exercise);
+        let first_alive = first_alive_forward(&params.tenors[..n], t_exercise);
 
         for path in &all_paths {
             let forwards = &path[step];
@@ -299,34 +337,26 @@ pub fn price_bermudan_lmm(
             // way, so exercise vs continuation is compared in a single
             // consistent accounting unit.
 
-            // Collect ITM paths for regression
+            // Collect ITM train paths for regression. In split-sample mode
+            // only train paths feed the fit; the fitted rule is applied to
+            // every ITM path below so price paths get it out-of-sample.
             let mut itm_indices = Vec::new();
             let mut itm_basis = Vec::new();
             let mut itm_continuation = Vec::new();
 
             for (i, &ev) in exercise_values.iter().enumerate() {
-                if ev > 0.0 {
+                if ev > 0.0 && is_train(i) {
                     itm_indices.push(i);
                     let (sr, ann) = basis_inputs[i];
-                    // Polynomial basis: [1, S, A, S^2, S*A, A^2, ...]
-                    let mut b = Vec::with_capacity(config.basis_degree + 3);
-                    b.push(1.0);
-                    b.push(sr);
-                    b.push(ann);
-                    if config.basis_degree >= 2 {
-                        b.push(sr * sr);
-                        b.push(sr * ann);
-                    }
-                    if config.basis_degree >= 3 {
-                        b.push(sr * sr * sr);
-                    }
-                    itm_basis.push(b);
+                    itm_basis.push(make_basis(sr, ann));
                     itm_continuation.push(cashflow[i]);
                 }
             }
 
             if itm_indices.len() > config.basis_degree + 3 {
-                // Solve least-squares regression
+                // Solve least-squares regression. A regression failure is a
+                // hard error (matching the HW1F LSMC harness) rather than a
+                // silent skip that would leave biased continuation values.
                 let num_basis = itm_basis.first().map_or(0, |b| b.len());
                 let mut a_matrix = vec![0.0; itm_indices.len() * num_basis];
                 for (row, basis) in itm_basis.iter().enumerate() {
@@ -335,27 +365,30 @@ pub fn price_bermudan_lmm(
                     }
                 }
 
-                if let Ok(coeffs) =
-                    solve_least_squares(&a_matrix, &itm_continuation, itm_indices.len(), num_basis)
-                {
-                    // For ITM paths, decide exercise vs continuation
-                    for (local_idx, &global_idx) in itm_indices.iter().enumerate() {
-                        let mut cont_value = 0.0;
-                        for (c, &coeff) in coeffs.iter().enumerate() {
-                            cont_value += coeff * itm_basis[local_idx][c];
-                        }
-                        let ev = exercise_values[global_idx];
-                        if ev > cont_value {
-                            cashflow[global_idx] = ev;
-                        }
-                        // else keep existing cashflow (continuation)
+                let coeffs = solve_least_squares(
+                    &a_matrix,
+                    &itm_continuation,
+                    itm_indices.len(),
+                    num_basis,
+                )?;
+                // Apply the fitted rule to every ITM path (train and price).
+                for (i, &ev) in exercise_values.iter().enumerate() {
+                    if ev <= 0.0 {
+                        continue;
                     }
+                    let (sr, ann) = basis_inputs[i];
+                    let basis = make_basis(sr, ann);
+                    let cont_value: f64 = basis.iter().zip(coeffs.iter()).map(|(b, c)| b * c).sum();
+                    if ev > cont_value {
+                        cashflow[i] = ev;
+                    }
+                    // else keep existing cashflow (continuation)
                 }
             } else {
-                // Too few ITM paths for regression: exercise if positive
-                for &idx in &itm_indices {
-                    if exercise_values[idx] > cashflow[idx] {
-                        cashflow[idx] = exercise_values[idx];
+                // Too few ITM train paths for regression: exercise if positive
+                for (i, &ev) in exercise_values.iter().enumerate() {
+                    if ev > 0.0 && ev > cashflow[i] {
+                        cashflow[i] = ev;
                     }
                 }
             }
@@ -369,14 +402,24 @@ pub fn price_bermudan_lmm(
     // `V(0) = P(0, T_N) · E^{T_N}[ payoff / P(t, T_N) ]` then recovers the
     // present value with a single multiplication by the constant
     // `discount_factor_terminal = P(0, T_N)`.
+    // Antithetic legs share a stream and are negatively correlated, so they
+    // are not i.i.d. samples: each adjacent (original, antithetic) pair is
+    // averaged into one sample so the reported stderr reflects the pair
+    // variance rather than understating it. In split-sample mode, only the
+    // pricing half contributes to the reported estimate.
     let mut stats = OnlineStats::new();
-    for &cf in &cashflow {
-        stats.update(cf * discount_factor_terminal);
+    for (pair_idx, chunk) in cashflow.chunks(multiplicity).enumerate() {
+        if !is_price(pair_idx * multiplicity) {
+            continue;
+        }
+        let pair_avg = chunk.iter().sum::<f64>() / chunk.len() as f64;
+        stats.update(pair_avg * discount_factor_terminal);
     }
 
+    let aggregated_paths = stats.count() * multiplicity;
     let mean = stats.mean();
-    let stderr = if total_paths > 1 {
-        stats.std_dev() / (total_paths as f64).sqrt()
+    let stderr = if stats.count() > 1 {
+        stats.std_dev() / (stats.count() as f64).sqrt()
     } else {
         0.0
     };
@@ -390,8 +433,8 @@ pub fn price_bermudan_lmm(
             finstack_core::money::Money::new(ci_lo, currency),
             finstack_core::money::Money::new(ci_hi, currency),
         ),
-        num_paths: total_paths,
-        num_simulated_paths: total_paths,
+        num_paths: aggregated_paths,
+        num_simulated_paths: aggregated_paths,
         std_dev: Some(stats.std_dev()),
         median: None,
         percentile_25: None,
@@ -499,6 +542,18 @@ fn compute_swap_rate_and_annuity(
     (swap_rate, annuity)
 }
 
+/// Index of the first forward still *alive* at time `t`.
+///
+/// A forward `j` is alive while its fixing date satisfies `T_j >= t`, up to
+/// a small tolerance: tenors that sit a floating-point rounding error below
+/// `t` (e.g. a schedule date reconstructed via repeated `+= period` that
+/// lands at `t − 1e-12`) are treated as alive rather than expired. Without
+/// the snap, such a perturbation silently drops the first swap period from
+/// the co-terminal swap.
+pub(crate) fn first_alive_forward(tenors: &[f64], t: f64) -> usize {
+    tenors.partition_point(|&tenor| tenor + 1e-8 < t)
+}
+
 /// Pathwise terminal-measure numéraire `P(t, T_N)` at time `t`.
 ///
 /// Under the LMM terminal measure the numéraire is the zero-coupon bond
@@ -516,7 +571,7 @@ fn compute_swap_rate_and_annuity(
 fn pathwise_terminal_numeraire(forwards: &[f64], params: &LmmParams, t: f64) -> f64 {
     let n = params.num_forwards;
     // First alive forward: the first index with tenor T_j >= t.
-    let first_alive = params.tenors[..n].partition_point(|&tenor| tenor < t);
+    let first_alive = first_alive_forward(&params.tenors[..n], t);
     let mut numeraire = 1.0;
     for (fwd, tau) in forwards[first_alive..n]
         .iter()
@@ -568,6 +623,22 @@ mod tests {
     }
 
     #[test]
+    fn first_alive_forward_snaps_rounding_error_tenors() {
+        let tenors = [0.0, 1.0, 2.0, 3.0];
+        // Exact hit: T_1 == t → alive (T_j >= t).
+        assert_eq!(first_alive_forward(&tenors, 1.0), 1);
+        // Tenor perturbed a rounding error BELOW t must still count as alive.
+        let tenors_perturbed = [0.0, 1.0 - 1e-12, 2.0, 3.0];
+        assert_eq!(
+            first_alive_forward(&tenors_perturbed, 1.0),
+            1,
+            "a 1e-12 perturbation must not expire the first forward"
+        );
+        // Genuinely expired tenor is excluded.
+        assert_eq!(first_alive_forward(&tenors, 1.5), 2);
+    }
+
+    #[test]
     fn test_exercise_aligned_grid() {
         let exercise_times = vec![1.0, 2.0, 3.0];
         let (grid, indices) = build_exercise_aligned_grid(&exercise_times, 4.0, 4).expect("ok");
@@ -596,6 +667,7 @@ mod tests {
             basis_degree: 2,
             antithetic: true,
             min_steps_between_exercises: 4,
+            oos_lsmc: false,
             enforce_calibration: false,
         };
 
@@ -631,6 +703,7 @@ mod tests {
             basis_degree: 2,
             antithetic: true,
             min_steps_between_exercises: 4,
+            oos_lsmc: false,
             enforce_calibration: false,
         };
 
@@ -665,6 +738,62 @@ mod tests {
         assert!(
             berm_val >= euro_val - tolerance,
             "Bermudan ({berm_val:.2}) should be >= European ({euro_val:.2}) within MC noise"
+        );
+    }
+
+    /// Split-sample (out-of-sample) LSMC aggregates over the pricing half
+    /// only and stays consistent with the in-sample estimate within MC noise.
+    #[test]
+    fn test_bermudan_oos_lsmc_uses_pricing_half() {
+        let params = test_lmm_params();
+        let exercise_times = vec![1.0, 2.0, 3.0];
+        let strike = 0.025;
+        let df_terminal = (-0.03 * 4.0_f64).exp();
+        let base = LmmBermudanConfig {
+            num_paths: 8_000,
+            seed: 123,
+            basis_degree: 2,
+            antithetic: false,
+            min_steps_between_exercises: 4,
+            oos_lsmc: false,
+            enforce_calibration: false,
+        };
+        let oos = LmmBermudanConfig {
+            oos_lsmc: true,
+            ..base.clone()
+        };
+
+        let in_sample = price_bermudan_lmm(
+            &params,
+            &exercise_times,
+            strike,
+            true,
+            1_000_000.0,
+            df_terminal,
+            Currency::USD,
+            &base,
+        )
+        .expect("in-sample ok");
+        let out_sample = price_bermudan_lmm(
+            &params,
+            &exercise_times,
+            strike,
+            true,
+            1_000_000.0,
+            df_terminal,
+            Currency::USD,
+            &oos,
+        )
+        .expect("oos ok");
+
+        assert_eq!(in_sample.num_paths, 8_000);
+        assert_eq!(out_sample.num_paths, 4_000, "OOS prices on half the paths");
+        let tol = 4.0 * (in_sample.stderr + out_sample.stderr);
+        assert!(
+            (in_sample.mean.amount() - out_sample.mean.amount()).abs() <= tol,
+            "in-sample {} and OOS {} should agree within MC noise {tol}",
+            in_sample.mean.amount(),
+            out_sample.mean.amount()
         );
     }
 }

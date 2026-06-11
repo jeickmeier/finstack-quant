@@ -8,7 +8,7 @@ use crate::instruments::common_impl::validation;
 use finstack_core::config::{results_meta, FinstackConfig, ResultsMeta};
 use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, DayCount};
-use finstack_core::math::solver::{BrentSolver, Solver};
+use finstack_core::math::solver::BrentSolver;
 use finstack_core::money::Money;
 
 use finstack_core::HashMap;
@@ -830,7 +830,8 @@ impl<'a> EquityWaterfallEngine<'a> {
                     // an on-balance line item here; it is implicitly released
                     // to GP at periodic clawback settlement, where
                     // `apply_clawback` reconciles via
-                    //   delta_gp = (target_share × profit) − Σ ledger.to_gp
+                    //   delta_gp = allowed_gp_total(as_of) − Σ ledger.to_gp
+                    // (allowed = from-scratch no-holdback waterfall replay)
                     // and pays the difference (positive δ → GP receives the
                     // accumulated holdback; negative δ → clawback from GP).
                     let to_gp_paid = to_gp_gross * (1.0 - holdback_pct);
@@ -998,18 +999,35 @@ impl<'a> EquityWaterfallEngine<'a> {
             return Ok(0.0); // Need at least one prior flow (contribution)
         }
 
-        // Current IRR without additional preferred return
+        // Current IRR without additional preferred return. An IRR-to-date can
+        // be legitimately *undefined* early in a fund's life — a single
+        // contribution (too few flows) or an all-negative history (no NPV
+        // sign change) — which is economically "below any hurdle", so the
+        // tier proceeds to solve for the required amount. Genuine input
+        // errors (e.g. day-count failures) propagate instead of being
+        // silently treated as a 0% IRR.
         let base_date = lp_flows[0].0;
-        let current_irr = self.calculate_irr(lp_flows, base_date).unwrap_or(0.0);
+        let current_irr = match self.calculate_irr(lp_flows, base_date) {
+            Ok(irr) => irr,
+            Err(finstack_core::Error::Input(finstack_core::InputError::TooFewPoints))
+            | Err(finstack_core::Error::Validation(_)) => f64::NEG_INFINITY,
+            Err(e) => return Err(e),
+        };
 
         if current_irr >= target_irr {
             return Ok(0.0); // Already at or above target IRR
         }
 
+        // Large finite penalty for invalid candidate amounts inside the Brent
+        // objective. `f64::INFINITY` poisons Brent's secant/inverse-quadratic
+        // interpolation steps (inf - inf = NaN); a large finite value keeps
+        // the bracket logic working while still repelling the solver.
+        const IRR_OBJECTIVE_PENALTY: f64 = 1.0e6;
+
         // Use root finding to determine required additional distribution amount
         let target_function = |additional_amount: f64| -> f64 {
             if additional_amount < 0.0 {
-                return f64::INFINITY;
+                return IRR_OBJECTIVE_PENALTY;
             }
 
             let mut flows_with_additional = lp_flows.to_vec();
@@ -1020,7 +1038,7 @@ impl<'a> EquityWaterfallEngine<'a> {
 
             match self.calculate_irr(&flows_with_additional, base_date) {
                 Ok(irr) => irr - target_irr,
-                Err(_) => f64::INFINITY, // Invalid IRR
+                Err(_) => IRR_OBJECTIVE_PENALTY, // Invalid IRR
             }
         };
 
@@ -1059,15 +1077,13 @@ impl<'a> EquityWaterfallEngine<'a> {
                 // then: target_amount = contribution * (1 + target_irr)^t
                 if lp_flows.len() == 1 {
                     let contrib_amount = lp_flows[0].1.amount().abs();
-                    let years = self
-                        .spec
-                        .irr_basis
-                        .year_fraction(
-                            base_date,
-                            current_date,
-                            finstack_core::dates::DayCountContext::default(),
-                        )
-                        .unwrap_or(1.0);
+                    // Day-count failures are real input errors; propagate
+                    // instead of silently assuming a 1-year horizon.
+                    let years = self.spec.irr_basis.year_fraction(
+                        base_date,
+                        current_date,
+                        finstack_core::dates::DayCountContext::default(),
+                    )?;
                     let required_total = contrib_amount * (1.0 + target_irr).powf(years);
                     let already_received = total_contributions - contrib_amount; // Net distributions so far
                     Ok((required_total - already_received).max(0.0))
@@ -1081,47 +1097,25 @@ impl<'a> EquityWaterfallEngine<'a> {
         }
     }
 
-    /// Calculate IRR for LP cashflows using Brent's method.
+    /// Calculate IRR for LP cashflows.
+    ///
+    /// Delegates to the standalone [`super::metrics::calculate_irr`] routine
+    /// (same `(1 + r)^{-t}` discounting, day-count error propagation, and
+    /// multiple-root guard) using the waterfall's `irr_basis`.
+    ///
+    /// `base_date` must be the date of the first flow — the shared routine
+    /// anchors year fractions there.
     fn calculate_irr(
         &self,
         flows: &[(Date, Money)],
         base_date: Date,
     ) -> finstack_core::Result<f64> {
-        if flows.len() < 2 {
-            return Err(finstack_core::InputError::TooFewPoints.into());
-        }
-
-        let npv_function = |rate: f64| -> f64 {
-            let mut npv = 0.0;
-            for (date, amount) in flows {
-                let t = self
-                    .spec
-                    .irr_basis
-                    .year_fraction(
-                        base_date,
-                        *date,
-                        finstack_core::dates::DayCountContext::default(),
-                    )
-                    .unwrap_or(0.0);
-                // Discount factor `(1 + r)^{-t}`. The expression is already
-                // continuous at `r = 0` (`1.0^{-t} = 1.0`), so no zero-rate
-                // special-case is required — and using the closed form
-                // unconditionally keeps this routine consistent with the
-                // standalone IRR routine in `metrics::calculate_irr`.
-                let df = (1.0 + rate).powf(-t);
-                npv += amount.amount() * df;
-            }
-            npv
-        };
-
-        // Use BrentSolver to find IRR (rate where NPV = 0)
-        let solver = BrentSolver::new()
-            .tolerance(1e-12)
-            .initial_bracket_size(Some(0.5)); // Start with reasonable IRR range
-
-        solver
-            .solve(npv_function, 0.1)
-            .map_err(|_| finstack_core::InputError::Invalid.into())
+        debug_assert!(
+            flows.first().is_none_or(|(d, _)| *d == base_date),
+            "waterfall IRR base_date must be the first flow's date"
+        );
+        let _ = base_date;
+        super::metrics::calculate_irr(flows, self.spec.irr_basis)
     }
 
     /// Calculate LP IRR to date from an LP-net cashflow history
@@ -1133,6 +1127,67 @@ impl<'a> EquityWaterfallEngine<'a> {
 
         let base_date = lp_flows[0].0;
         self.calculate_irr(lp_flows, base_date).ok()
+    }
+
+    /// GP entitlement as of `as_of` under the fund's actual waterfall
+    /// economics (review finding: clawback assumed full-catch-up economics).
+    ///
+    /// Replays a from-scratch waterfall over the fund's *lifetime* economics
+    /// to `as_of`: every contribution at its actual date (so IRR hurdles see
+    /// the true capital timing) plus one lump-sum distribution at `as_of`
+    /// equal to all distributions/proceeds to date. The replay runs with
+    /// clawback/holdback disabled at fund level (clawback is a fund-level
+    /// lifetime test, also for American deal-by-deal funds), and the gross GP
+    /// allocations are summed. This respects
+    /// [`CatchUpMode::Full`]/[`CatchUpMode::Partial`], the presence or
+    /// absence of a [`Tranche::CatchUp`] tranche, and promote-tier hurdles —
+    /// i.e. it equals "what a from-scratch waterfall would have paid the
+    /// GP", rather than `profit_total × first_promote_tier.gp_share` (which
+    /// over-releases to the GP under partial or missing catch-up).
+    fn allowed_gp_total_as_of(
+        &self,
+        events: &[FundEvent],
+        as_of: Date,
+    ) -> finstack_core::Result<f64> {
+        let mut synthetic: Vec<FundEvent> = events
+            .iter()
+            .filter(|e| e.kind == FundEventKind::Contribution && e.date <= as_of)
+            .cloned()
+            .collect();
+
+        let total_distributions: f64 = events
+            .iter()
+            .filter(|e| {
+                (e.kind == FundEventKind::Distribution || e.kind == FundEventKind::Proceeds)
+                    && e.date <= as_of
+            })
+            .map(|e| e.amount.amount())
+            .sum();
+        if total_distributions <= 0.0 {
+            return Ok(0.0);
+        }
+
+        let Some(currency) = events.first().map(|e| e.amount.currency()) else {
+            return Ok(0.0);
+        };
+        synthetic.push(FundEvent::distribution(
+            as_of,
+            Money::new(total_distributions, currency),
+        ));
+
+        // Clawback disabled in the replay: no holdback (rows carry gross GP
+        // amounts) and no recursive settlement rows.
+        let mut replay_spec = self.spec.clone();
+        replay_spec.clawback = None;
+        let replay_engine = EquityWaterfallEngine {
+            spec: &replay_spec,
+            periods: None,
+        };
+
+        let mut replay_rows = Vec::new();
+        replay_engine.run_european(&synthetic, &mut replay_rows)?;
+
+        Ok(replay_rows.iter().map(|r| r.to_gp.amount()).sum())
     }
 
     /// Apply clawback reconciliation.
@@ -1147,39 +1202,11 @@ impl<'a> EquityWaterfallEngine<'a> {
             None => return Ok(()),
         };
 
-        // Determine target GP share from first promote tier if present
-        let target_gp_share: f64 = self
-            .spec
-            .tranches
-            .iter()
-            .find_map(|t| match t {
-                Tranche::PromoteTier { gp_share, .. } => Some(*gp_share),
-                _ => None,
-            })
-            .unwrap_or(0.0);
-
-        let totals_as_of = |as_of: Date| -> (f64, f64, f64) {
-            let total_contributions: f64 = events
-                .iter()
-                .filter(|e| e.kind == FundEventKind::Contribution && e.date <= as_of)
-                .map(|e| e.amount.amount())
-                .sum();
-            let total_distributions: f64 = events
-                .iter()
-                .filter(|e| {
-                    (e.kind == FundEventKind::Distribution || e.kind == FundEventKind::Proceeds)
-                        && e.date <= as_of
-                })
-                .map(|e| e.amount.amount())
-                .sum();
-            let profit_total = (total_distributions - total_contributions).max(0.0);
-            let allowed_gp_total = (profit_total * target_gp_share).max(0.0);
-            let paid_gp_total: f64 = ledger_rows
-                .iter()
+        let paid_gp_as_of = |rows: &[AllocationRow], as_of: Date| -> f64 {
+            rows.iter()
                 .filter(|r| r.date <= as_of)
                 .map(|r| r.to_gp.amount())
-                .sum();
-            (allowed_gp_total, paid_gp_total, profit_total)
+                .sum()
         };
 
         if matches!(clawback_spec.settle_on, ClawbackSettle::Periodic) {
@@ -1200,27 +1227,8 @@ impl<'a> EquityWaterfallEngine<'a> {
                     continue;
                 }
 
-                // Compute totals inline to avoid borrow conflict with the closure
-                let total_contributions: f64 = events
-                    .iter()
-                    .filter(|e| e.kind == FundEventKind::Contribution && e.date <= settlement_date)
-                    .map(|e| e.amount.amount())
-                    .sum();
-                let total_distributions: f64 = events
-                    .iter()
-                    .filter(|e| {
-                        (e.kind == FundEventKind::Distribution || e.kind == FundEventKind::Proceeds)
-                            && e.date <= settlement_date
-                    })
-                    .map(|e| e.amount.amount())
-                    .sum();
-                let profit_total = (total_distributions - total_contributions).max(0.0);
-                let allowed_gp_total = (profit_total * target_gp_share).max(0.0);
-                let paid_gp_total: f64 = ledger_rows
-                    .iter()
-                    .filter(|r| r.date <= settlement_date)
-                    .map(|r| r.to_gp.amount())
-                    .sum();
+                let allowed_gp_total = self.allowed_gp_total_as_of(events, settlement_date)?;
+                let paid_gp_total = paid_gp_as_of(ledger_rows, settlement_date);
 
                 let delta_gp: f64 = allowed_gp_total - paid_gp_total;
                 if delta_gp.abs() <= 1e-9 {
@@ -1273,7 +1281,8 @@ impl<'a> EquityWaterfallEngine<'a> {
         };
 
         let settlement_date = last_event_date;
-        let (allowed_gp_total, paid_gp_total, _) = totals_as_of(settlement_date);
+        let allowed_gp_total = self.allowed_gp_total_as_of(events, settlement_date)?;
+        let paid_gp_total = paid_gp_as_of(ledger_rows, settlement_date);
         let delta_gp: f64 = allowed_gp_total - paid_gp_total;
 
         if delta_gp.abs() <= 1e-9 {
@@ -1788,6 +1797,115 @@ mod tests {
         assert!(last.to_gp.amount() < 0.0);
         // In this scenario, first promote paid GP 10; final profit is 0 so GP should return ~10
         assert!((last.to_gp.amount() + 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn clawback_no_catchup_does_not_over_release() {
+        // No catch-up tranche: GP entitlement on lifetime profit is the
+        // promote share of profit *above the preferred return*, not
+        // profit × gp_share. The old formula released 10 (= 50 × 0.2); the
+        // catch-up-aware replay releases only (50 − pref) × 0.2.
+        let claw = ClawbackSpec {
+            enable: true,
+            holdback_pct: Some(1.0), // all carry held back until settlement
+            settle_on: ClawbackSettle::FundEnd,
+        };
+
+        let spec = WaterfallSpec::builder()
+            .style(WaterfallStyle::European)
+            .return_of_capital()
+            .preferred_irr(0.08)
+            .promote_tier(0.0, 0.8, 0.2)
+            .clawback(claw)
+            .build()
+            .expect("spec");
+
+        let events = vec![
+            FundEvent::contribution(test_date(2020, 1, 1), Money::new(100.0, test_currency())),
+            FundEvent::distribution(test_date(2022, 1, 1), Money::new(150.0, test_currency())),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let ledger = engine.run(&events).expect("run");
+
+        let settlement = ledger
+            .rows
+            .iter()
+            .find(|r| r.tranche.contains("Clawback Settlement"))
+            .expect("settlement row");
+
+        // Act365F tenor 2020-01-01 → 2022-01-01 is 731/365 years.
+        let t = 731.0 / 365.0;
+        let pref = 100.0 * (1.08_f64).powf(t) - 100.0;
+        let expected_gp = (50.0 - pref) * 0.2;
+        assert!(
+            (settlement.to_gp.amount() - expected_gp).abs() < 1e-3,
+            "settlement {} should equal promote share above pref {expected_gp}",
+            settlement.to_gp.amount()
+        );
+        assert!(
+            settlement.to_gp.amount() < 10.0 - 1e-6,
+            "must not over-release to the GP at profit × gp_share (10): {}",
+            settlement.to_gp.amount()
+        );
+    }
+
+    #[test]
+    fn clawback_partial_catchup_does_not_over_release() {
+        // Partial catch-up caps the GP's catch-up take at gp_share of each
+        // dollar, so lifetime GP entitlement is below the full-catch-up
+        // profit × promote-share figure the old settlement formula used.
+        let claw = ClawbackSpec {
+            enable: true,
+            holdback_pct: Some(1.0),
+            settle_on: ClawbackSettle::FundEnd,
+        };
+
+        let spec = WaterfallSpec::builder()
+            .style(WaterfallStyle::European)
+            .return_of_capital()
+            .preferred_irr(0.08)
+            .catchup(0.5)
+            .promote_tier(0.0, 0.8, 0.2)
+            .catchup_mode(CatchUpMode::Partial)
+            .clawback(claw)
+            .build()
+            .expect("spec");
+
+        let events = vec![
+            FundEvent::contribution(test_date(2020, 1, 1), Money::new(100.0, test_currency())),
+            FundEvent::distribution(test_date(2022, 1, 1), Money::new(120.0, test_currency())),
+        ];
+
+        let engine = EquityWaterfallEngine::new(&spec);
+        let ledger = engine.run(&events).expect("run");
+
+        let settlement = ledger
+            .rows
+            .iter()
+            .find(|r| r.tranche.contains("Clawback Settlement"))
+            .expect("settlement row");
+
+        // Replay economics: RoC 100 → pref P = 100·1.08^t − 100 → catch-up
+        // takes min(0.5 × remaining, needed) → promote splits the rest 80/20.
+        let t = 731.0 / 365.0;
+        let pref = 100.0 * (1.08_f64).powf(t) - 100.0;
+        let remaining = 20.0 - pref;
+        let needed = 0.25 * pref; // (0.2·P)/(1 − 0.2)
+        let catchup_gp = (0.5 * remaining).min(needed);
+        let promote_gp = (remaining - catchup_gp) * 0.2;
+        let expected_gp = catchup_gp + promote_gp;
+        assert!(
+            (settlement.to_gp.amount() - expected_gp).abs() < 1e-3,
+            "settlement {} should equal partial-catch-up entitlement {expected_gp}",
+            settlement.to_gp.amount()
+        );
+        // Old formula: profit × first promote gp_share = 20 × 0.2 = 4.0.
+        assert!(
+            settlement.to_gp.amount() < 4.0 - 1e-6,
+            "must not over-release at full-catch-up economics (4.0): {}",
+            settlement.to_gp.amount()
+        );
     }
 
     #[test]

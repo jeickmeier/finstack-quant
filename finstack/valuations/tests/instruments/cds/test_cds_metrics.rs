@@ -137,13 +137,29 @@ fn bump_quote_calibrated_discount(
             curve_day_count: Some(curve.day_count()),
         },
     };
-    bump_discount_curve(
-        &quotes,
-        &params,
-        &market.clone().insert_series(fixings),
-        &BumpRequest::Parallel(bump_bp),
-    )
-    .unwrap()
+    // Mirror the production delta-overlay semantics: re-bootstrap both the
+    // bumped and the unbumped quote sets and apply only their df ratio to the
+    // stored curve, preserving the stored base shape.
+    let ctx = market.clone().insert_series(fixings);
+    let bumped =
+        bump_discount_curve(&quotes, &params, &ctx, &BumpRequest::Parallel(bump_bp)).unwrap();
+    let unbumped =
+        bump_discount_curve(&quotes, &params, &ctx, &BumpRequest::Parallel(0.0)).unwrap();
+    let overlaid: Vec<(f64, f64)> = curve
+        .knots()
+        .iter()
+        .zip(curve.dfs())
+        .map(|(&t, &df)| (t, df * bumped.df(t) / unbumped.df(t)))
+        .collect();
+    DiscountCurve::builder(curve.id().clone())
+        .base_date(curve.base_date())
+        .day_count(curve.day_count())
+        .knots(overlaid)
+        .interp(curve.interp_style())
+        .extrapolation(curve.extrapolation())
+        .rate_calibration(calibration.clone())
+        .build()
+        .unwrap()
 }
 
 fn build_test_hazard(hz: f64, rec: f64, base: Date, id: &str) -> HazardCurve {

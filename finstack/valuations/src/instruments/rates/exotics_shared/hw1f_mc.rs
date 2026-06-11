@@ -102,8 +102,9 @@ impl RateExoticHw1fMcPricer {
         let mut work = vec![0.0; work_size];
         let mut z = [0.0_f64; 1];
 
+        let multiplicity = if self.config.antithetic { 2 } else { 1 };
         for path_id in 0..raw_paths {
-            let multiplicity = if self.config.antithetic { 2 } else { 1 };
+            let mut pair_sum = 0.0_f64;
             for anti in 0..multiplicity {
                 let mut rng = base_rng.substream(path_id as u64);
                 let mut r = self.r0;
@@ -146,12 +147,17 @@ impl RateExoticHw1fMcPricer {
                     }
                 }
 
-                let pv = payoff.value(self.currency).amount();
-                stats.update(pv);
+                pair_sum += payoff.value(self.currency).amount();
             }
+            // Antithetic legs share a stream and are negatively correlated,
+            // so they are not i.i.d. samples: average each (original,
+            // antithetic) pair into one sample so the reported stderr
+            // reflects the pair variance rather than understating it.
+            stats.update(pair_sum / multiplicity as f64);
         }
 
         let n = stats.count().max(1) as f64;
+        let simulated_paths = stats.count() * multiplicity;
         let mean = stats.mean();
         let stderr = stats.std_dev() / n.sqrt();
         let lo = mean - 1.96 * stderr;
@@ -163,8 +169,8 @@ impl RateExoticHw1fMcPricer {
                 finstack_core::money::Money::new(lo, self.currency),
                 finstack_core::money::Money::new(hi, self.currency),
             ),
-            num_paths: stats.count(),
-            num_simulated_paths: stats.count(),
+            num_paths: simulated_paths,
+            num_simulated_paths: simulated_paths,
             std_dev: Some(stats.std_dev()),
             median: None,
             percentile_25: None,
@@ -181,8 +187,9 @@ impl RateExoticHw1fMcPricer {
 ///
 /// The grid inserts `min_steps_between_events` sub-steps between consecutive
 /// events (or more, proportional to the gap), so each event time lies on a
-/// node of the returned [`TimeGrid`].
-pub(super) fn build_event_aligned_grid(
+/// node of the returned [`TimeGrid`]. Shared with the Cheyette rough-vol
+/// Bermudan pricer, which needs the same exact event/exercise alignment.
+pub(crate) fn build_event_aligned_grid(
     event_times: &[f64],
     maturity: f64,
     min_steps_between: usize,
@@ -318,5 +325,34 @@ mod tests {
     #[test]
     fn non_monotone_events_error() {
         assert!(build_event_aligned_grid(&[1.0, 0.5], 1.0, 4).is_err());
+    }
+
+    /// Antithetic pairs must be aggregated as one sample each. For a payoff
+    /// monotone in the shocks (a pathwise-discounted ZCB), antithetic
+    /// variates reduce variance, so the pair-averaged stderr must come in at
+    /// or below the plain i.i.d. stderr at the same effective path count.
+    #[test]
+    fn antithetic_pair_stderr_below_iid() {
+        let r0 = 0.03;
+        let make = |antithetic: bool| RateExoticHw1fMcPricer {
+            process_params: HullWhite1FParams::new(0.05, 0.01, r0),
+            r0,
+            event_times: vec![1.0],
+            config: RateExoticMcConfig {
+                num_paths: 4_000,
+                antithetic,
+                ..Default::default()
+            },
+            currency: Currency::USD,
+        };
+        let anti = make(true).price(PathwiseZcbPayoff::default).expect("ok");
+        let iid = make(false).price(PathwiseZcbPayoff::default).expect("ok");
+        assert_eq!(anti.num_paths, 4_000);
+        assert!(
+            anti.stderr <= iid.stderr,
+            "antithetic pair stderr {} should not exceed i.i.d. stderr {}",
+            anti.stderr,
+            iid.stderr
+        );
     }
 }

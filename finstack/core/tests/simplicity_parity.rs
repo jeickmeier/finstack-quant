@@ -21,7 +21,7 @@ use finstack_core::cashflow::{xirr, xirr_with_daycount_ctx};
 use finstack_core::currency::Currency;
 use finstack_core::dates::{Date, DayCount, DayCountContext};
 use finstack_core::market_data::surfaces::{
-    VolGridOpts, VolInterpolationMode, VolSurface, VolSurfaceAxis,
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
 };
 use finstack_core::market_data::term_structures::{DiscountCurve, ValidationMode};
 use finstack_core::math::interp::InterpStyle;
@@ -169,12 +169,14 @@ fn from_grid_opts_preserves_axis_and_interpolation_mode() {
         &vols,
         VolGridOpts {
             secondary_axis: VolSurfaceAxis::Tenor,
+            quote_type: VolQuoteType::Normal,
             interpolation_mode: VolInterpolationMode::TotalVariance,
         },
     )
     .unwrap();
 
     assert_eq!(surface.secondary_axis(), VolSurfaceAxis::Tenor);
+    assert_eq!(surface.quote_type(), VolQuoteType::Normal);
     assert_eq!(
         surface.interpolation_mode(),
         VolInterpolationMode::TotalVariance

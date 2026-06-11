@@ -32,7 +32,7 @@
             },
             "BermudanCallProvision": {
               "additionalProperties": false,
-              "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Used by Callable Range Accrual,\nPRDC, and callable Snowball notes.\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `call_price`: Fraction of notional returned at exercise (1.0 = par).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
+              "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `call_price`: Fraction of notional returned at exercise (1.0 = par).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
               "properties": {
                 "call_dates": {
                   "description": "Dates on which the issuer can call (must be sorted ascending).",

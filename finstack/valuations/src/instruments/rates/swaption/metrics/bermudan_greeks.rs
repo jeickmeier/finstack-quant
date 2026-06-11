@@ -130,7 +130,7 @@ impl BermudanDeltaCalculator {
             ttm,
         )?;
         let valuator = BermudanSwaptionTreeValuator::new(swaption, &model, disc, as_of)?;
-        Ok(valuator.price())
+        valuator.price()
     }
 }
 
@@ -251,7 +251,7 @@ impl BermudanVegaCalculator {
             ttm,
         )?;
         let valuator = BermudanSwaptionTreeValuator::new(swaption, &model, disc, as_of)?;
-        Ok(valuator.price())
+        valuator.price()
     }
 }
 
@@ -361,7 +361,7 @@ impl BermudanGammaCalculator {
             ttm,
         )?;
         let valuator = BermudanSwaptionTreeValuator::new(swaption, &model, disc, as_of)?;
-        Ok(valuator.price())
+        valuator.price()
     }
 }
 

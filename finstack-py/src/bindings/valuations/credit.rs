@@ -74,8 +74,10 @@ impl PyMertonModel {
         self.inner.default_probability(horizon)
     }
 
-    fn implied_spread(&self, horizon: f64, recovery: f64) -> f64 {
-        self.inner.implied_spread(horizon, recovery)
+    fn implied_spread(&self, horizon: f64, recovery: f64) -> PyResult<f64> {
+        self.inner
+            .implied_spread(horizon, recovery)
+            .map_err(display_to_py)
     }
 }
 

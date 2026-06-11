@@ -456,16 +456,19 @@ pub struct HazardCurveParams {
     /// Calibration method to use.
     #[serde(default)]
     pub method: CalibrationMethod,
-    /// Interpolation style for the curve.
-    #[serde(default = "default_interp_linear")]
+    /// Interpolation style for survival probabilities between pillars.
+    ///
+    /// Defaults to log-linear (piecewise-constant hazard), the market
+    /// standard for credit curves.
+    #[serde(default = "default_interp_log_linear")]
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub interpolation: InterpStyle,
 
     /// Interpolation method for par spreads reported by the calibrated curve.
     ///
     /// Note: this is used for *quoting/interpolation of stored par spreads* and does not affect
-    /// survival no-arbitrage, which is enforced via non-negative hazards and the curve's
-    /// internal log-linear survival interpolation.
+    /// survival no-arbitrage, which is enforced via non-negative hazards together with the
+    /// survival interpolation selected by `interpolation` (log-linear by default).
     #[serde(default = "default_par_interp_linear")]
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub par_interp: ParInterp,
@@ -965,6 +968,10 @@ pub enum SabrInterpolationMethod {
 // Defaults
 fn default_interp_linear() -> InterpStyle {
     InterpStyle::Linear
+}
+
+fn default_interp_log_linear() -> InterpStyle {
+    InterpStyle::LogLinear
 }
 
 fn default_par_interp_linear() -> ParInterp {

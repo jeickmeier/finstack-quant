@@ -1,7 +1,7 @@
 //! Shared curve binding helpers.
 
 use finstack_core::dates::DayCount;
-use finstack_core::market_data::surfaces::{VolInterpolationMode, VolSurfaceAxis};
+use finstack_core::market_data::surfaces::{VolInterpolationMode, VolQuoteType, VolSurfaceAxis};
 use finstack_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use pyo3::prelude::*;
 
@@ -33,6 +33,17 @@ pub(super) fn parse_vol_surface_axis(s: &str) -> PyResult<VolSurfaceAxis> {
         "tenor" => Ok(VolSurfaceAxis::Tenor),
         _ => Err(crate::errors::value_error(format!(
             "Invalid vol surface axis {s:?}: expected 'strike' or 'tenor'",
+        ))),
+    }
+}
+
+/// Parse a [`VolQuoteType`] from a Python string.
+pub(super) fn parse_vol_quote_type(s: &str) -> PyResult<VolQuoteType> {
+    match s {
+        "black_lognormal" => Ok(VolQuoteType::BlackLognormal),
+        "normal" => Ok(VolQuoteType::Normal),
+        _ => Err(crate::errors::value_error(format!(
+            "Invalid vol quote type {s:?}: expected 'black_lognormal' or 'normal'",
         ))),
     }
 }

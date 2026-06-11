@@ -278,9 +278,24 @@ impl TreePricer {
                     max_nodes: None,
                     compounding: self.config.tree_compounding,
                 };
-                let hw_tree =
-                    HullWhiteTree::calibrate(hw_config, discount_curve.as_ref(), time_to_maturity)?;
-                Ok(valuator.price_with_hw_tree(&hw_tree, continuous_oas_bp))
+                // Thread coupon and call/put dates into the tree grid so
+                // exercise decisions and cashflows land exactly on nodes,
+                // and build the valuator on the tree's (non-uniform) grid.
+                let mandatory =
+                    BondValuator::mandatory_grid_times(tree_bond, market_context, as_of)?;
+                let hw_tree = HullWhiteTree::calibrate_with_times(
+                    hw_config,
+                    discount_curve.as_ref(),
+                    time_to_maturity,
+                    &mandatory,
+                )?;
+                let hw_valuator = BondValuator::new_with_time_steps(
+                    tree_bond.clone(),
+                    market_context,
+                    as_of,
+                    hw_tree.time_grid().to_vec(),
+                )?;
+                hw_valuator.price_with_hw_tree(&hw_tree, continuous_oas_bp)
             }
             TreeModelChoice::BlackDermanToy {
                 mean_reversion,
@@ -492,10 +507,14 @@ impl TreePricer {
                         max_nodes: None,
                         compounding: self.config.tree_compounding,
                     };
-                    hw_tree = Some(HullWhiteTree::calibrate(
+                    // Grid through coupon and call/put dates (per-step dt).
+                    let mandatory =
+                        BondValuator::mandatory_grid_times(tree_bond, market_context, quote_date)?;
+                    hw_tree = Some(HullWhiteTree::calibrate_with_times(
                         hw_config,
                         discount_curve.as_ref(),
                         time_to_maturity,
+                        &mandatory,
                     )?);
                 }
                 TreeModelChoice::HoLee | TreeModelChoice::HullWhiteCalibratedToSwaptions { .. } => {
@@ -538,13 +557,24 @@ impl TreePricer {
             }
         }
 
-        let valuator = BondValuator::new(
-            tree_bond.clone(),
-            market_context,
-            quote_date,
-            time_to_maturity,
-            valuation_steps,
-        )?;
+        // The HW path prices on the tree's (possibly non-uniform) grid; all
+        // other models use the uniform grid implied by `valuation_steps`.
+        let valuator = if let Some(ref tree) = hw_tree {
+            BondValuator::new_with_time_steps(
+                tree_bond.clone(),
+                market_context,
+                quote_date,
+                tree.time_grid().to_vec(),
+            )?
+        } else {
+            BondValuator::new(
+                tree_bond.clone(),
+                market_context,
+                quote_date,
+                time_to_maturity,
+                valuation_steps,
+            )?
+        };
 
         // Get initial short rate for state variables (needed by short-rate tree)
         let initial_rate = if let Some(tree) = sr_tree.as_ref() {
@@ -588,8 +618,10 @@ impl TreePricer {
                 }
             } else if let Some(ref tree) = hw_tree {
                 // Hull-White trinomial tree: OAS applied inside backward induction
-                let model_price = valuator.price_with_hw_tree(tree, oas);
-                model_price - dirty_target
+                match valuator.price_with_hw_tree(tree, oas) {
+                    Ok(model_price) => model_price - dirty_target,
+                    Err(e) => record_error(e),
+                }
             } else {
                 let mut vars = HashMap::<&'static str, f64>::default();
                 vars.insert(short_rate_keys::SHORT_RATE, initial_rate);

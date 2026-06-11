@@ -74,7 +74,7 @@ pub fn merton_implied_spread(
     recovery: f64,
 ) -> Result<f64, JsValue> {
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
-    Ok(model.implied_spread(horizon, recovery))
+    model.implied_spread(horizon, recovery).map_err(to_js_err)
 }
 
 /// Evaluate a `DynamicRecoverySpec` JSON payload at a given accreted
@@ -212,7 +212,7 @@ mod tests {
         let json = merton_model_json(100.0, 0.20, 80.0, 0.05).expect("merton json");
         let spread_wasm = merton_implied_spread(&json, 5.0, 0.40).expect("spread");
         let model = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("merton");
-        let spread_native = model.implied_spread(5.0, 0.40);
+        let spread_native = model.implied_spread(5.0, 0.40).expect("spread");
         assert!(
             (spread_wasm - spread_native).abs() < 1e-12,
             "WASM spread ({spread_wasm}) must match native ({spread_native})"

@@ -81,7 +81,7 @@
             "recovery_rate": 0.4,
             "notional": 1.0,
             "method": "Bootstrap",
-            "interpolation": "linear",
+            "interpolation": "log_linear",
             "par_interp": "Linear",
             "doc_clause": "isda_na"
           }

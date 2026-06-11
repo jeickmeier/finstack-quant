@@ -1095,7 +1095,14 @@ impl ShortRateTree {
                 );
             }
 
-            // Build next step rates using calibrated alpha
+            // Build next step rates using calibrated alpha.
+            //
+            // Terminal row note (same convention as Ho-Lee and BK): the final
+            // iteration populates rates[N] for lattice geometry and accessor
+            // consistency, but that row's alpha is the one solved for the last
+            // pre-maturity interval — there is no interval beyond maturity to
+            // drift-calibrate, and backward induction never uses rates[N] for
+            // discounting because pricing stops at maturity.
             let next_nodes = num_nodes + 1;
             let mut next_rates = vec![0.0; next_nodes];
             let mut next_state_prices = vec![0.0; next_nodes];
@@ -1704,8 +1711,11 @@ impl TreeModel for ShortRateTree {
             rho: 0.0,
         };
 
-        // Default: 1% vol bump (100 bp for normal, 1 percentage-point for lognormal)
-        let vol_bump = bump_size.unwrap_or(0.01);
+        // Default: relative 10% of the calibrated vol, floored at 1 bp. A
+        // fixed absolute 0.01 bump was a 100% relative bump for a typical
+        // normal σ = 1% short-rate vol, which badly distorts the FD vega.
+        // Vega is still reported per 1% (absolute) vol move below.
+        let vol_bump = bump_size.unwrap_or((0.1 * self.config.volatility).max(1e-4));
         let curve_id = &self.calibration_curve_id;
 
         // Vega and theta require recalibrating fresh trees against the discount
@@ -2435,6 +2445,46 @@ mod tests {
             "vega should be per 1 percentage-point vol move: got={}, expected={}",
             greeks.vega,
             expected
+        );
+    }
+
+    #[test]
+    fn short_rate_tree_default_vol_bump_is_relative() {
+        // The default bump must be 10% of the calibrated vol (floored at
+        // 1 bp), not a fixed absolute 0.01 — for low-vol configs the fixed
+        // bump was a ~100% relative shock that distorted the FD vega.
+        let steps = 10;
+        let maturity = 2.0;
+        let sigma = 0.20;
+        let curve = create_test_curve();
+        let curve_id = test_curve_id();
+        let market = MarketContext::new().insert(curve.clone());
+        let valuator = RateCallValuator { strike: 0.03 };
+        let initial_vars = HashMap::<&'static str, f64>::default();
+
+        let config = ShortRateTreeConfig::bdt(steps, sigma, 0.0);
+        let mut tree = ShortRateTree::new(config);
+        tree.calibrate(&curve_id, &curve, maturity)
+            .expect("base calibration");
+
+        let default_greeks = tree
+            .calculate_greeks(initial_vars.clone(), maturity, &market, &valuator, None)
+            .expect("default-bump greeks");
+        let explicit_greeks = tree
+            .calculate_greeks(
+                initial_vars,
+                maturity,
+                &market,
+                &valuator,
+                Some((0.1 * sigma).max(1e-4)),
+            )
+            .expect("explicit-bump greeks");
+
+        assert!(
+            (default_greeks.vega - explicit_greeks.vega).abs() < 1e-12,
+            "default bump should equal max(0.1·σ, 1bp): default vega={}, explicit vega={}",
+            default_greeks.vega,
+            explicit_greeks.vega
         );
     }
 

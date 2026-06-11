@@ -3,7 +3,7 @@
 use crate::instruments::equity::pe_fund::PrivateMarketsFund;
 use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 use finstack_core::dates::{Date, DayCount};
-use finstack_core::math::solver::{BrentSolver, Solver};
+use finstack_core::math::solver::BrentSolver;
 use finstack_core::money::Money;
 
 /// LP Internal Rate of Return calculator.
@@ -183,7 +183,32 @@ impl MetricCalculator for CarryAccruedCalculator {
     }
 }
 
+/// IRR search domain: -99.99% (total loss) to +1000%.
+const IRR_SCAN_LO: f64 = -0.9999;
+const IRR_SCAN_HI: f64 = 10.0;
+/// Number of scan intervals used to bracket NPV sign changes.
+const IRR_SCAN_POINTS: usize = 400;
+
 /// Helper function to calculate IRR using robust root finding.
+///
+/// Cashflow times are measured with `day_count` from the first flow's date.
+/// NPV uses the closed-form discount factor `(1 + r)^{-t}`, which is
+/// well-defined and continuous at `r = 0` (`1.0^{-t} = 1.0`), so no zero-rate
+/// special case is needed; the waterfall IRR routine
+/// (`WaterfallSpec::calculate_irr`) delegates here so both stay consistent.
+///
+/// # Errors
+///
+/// - Fewer than two cashflows.
+/// - Day-count failure on any cashflow date (propagated instead of silently
+///   treating the flow as occurring at `t = 0`).
+/// - NPV has no sign change on the scan domain `[-99.99%, 1000%]` (the IRR is
+///   undefined for the cashflow profile), or the in-bracket solve fails.
+///
+/// When NPV changes sign more than once on the scan domain (possible for
+/// non-conventional cashflow profiles with multiple sign flips), the root in
+/// the bracket closest to `r = 0` is returned and a warning is emitted, since
+/// "the" IRR is ambiguous in that case.
 pub fn calculate_irr(flows: &[(Date, Money)], day_count: DayCount) -> finstack_core::Result<f64> {
     if flows.len() < 2 {
         return Err(finstack_core::InputError::TooFewPoints.into());
@@ -191,35 +216,86 @@ pub fn calculate_irr(flows: &[(Date, Money)], day_count: DayCount) -> finstack_c
 
     let base_date = flows[0].0;
 
-    let npv_function = |rate: f64| -> f64 {
-        let mut npv = 0.0;
-        for (date, amount) in flows {
-            let t = day_count
+    // Precompute (t, amount) pairs, propagating day-count failures.
+    let timed_flows = flows
+        .iter()
+        .map(|(date, amount)| {
+            day_count
                 .year_fraction(
                     base_date,
                     *date,
                     finstack_core::dates::DayCountContext::default(),
                 )
-                .unwrap_or(0.0);
-            // Discount factor `(1 + r)^{-t}`. This expression is well-defined
-            // and continuous at `r = 0` — it evaluates to exactly `1.0^{-t} =
-            // 1.0` — so no special-case is needed. Using the same closed form
-            // at every rate keeps this routine consistent with the waterfall's
-            // IRR routine (`WaterfallSpec::calculate_irr`), which also discounts
-            // with `(1 + r)^{-t}` and treats `r = 0` as the `1.0` limit.
-            let df = (1.0 + rate).powf(-t);
-            npv += amount.amount() * df;
-        }
-        npv
+                .map(|t| (t, amount.amount()))
+        })
+        .collect::<finstack_core::Result<Vec<(f64, f64)>>>()?;
+
+    let npv_function = |rate: f64| -> f64 {
+        timed_flows
+            .iter()
+            .map(|&(t, amount)| amount * (1.0 + rate).powf(-t))
+            .sum()
     };
 
-    // Use BrentSolver with reasonable bounds for PE returns
-    let solver = BrentSolver::new()
-        .tolerance(1e-12)
-        .initial_bracket_size(Some(1.0)); // Start with reasonable IRR range
+    // Scan the domain for sign-change brackets before solving. This guards
+    // against the multiple-root ambiguity of IRR (NPV polynomials can cross
+    // zero more than once for non-conventional cashflows) and against
+    // guess-based bracket searches wandering outside the economically
+    // meaningful range.
+    let step = (IRR_SCAN_HI - IRR_SCAN_LO) / IRR_SCAN_POINTS as f64;
+    let mut brackets: Vec<(f64, f64)> = Vec::new();
+    let mut prev_r = IRR_SCAN_LO;
+    let mut prev_f = npv_function(prev_r);
+    if prev_f == 0.0 {
+        return Ok(prev_r);
+    }
+    for i in 1..=IRR_SCAN_POINTS {
+        let r = IRR_SCAN_LO + step * i as f64;
+        let f = npv_function(r);
+        if f == 0.0 {
+            return Ok(r);
+        }
+        if prev_f.is_finite() && f.is_finite() && prev_f * f < 0.0 {
+            brackets.push((prev_r, r));
+        }
+        prev_r = r;
+        prev_f = f;
+    }
 
+    let (lo, hi) = match brackets.as_slice() {
+        [] => {
+            return Err(finstack_core::Error::Validation(format!(
+                "IRR is undefined: NPV has no sign change for rates in \
+                 [{IRR_SCAN_LO}, {IRR_SCAN_HI}]"
+            )));
+        }
+        [only] => *only,
+        multiple => {
+            // Ambiguous IRR: pick the root bracket closest to r = 0 (the
+            // economically conventional choice) and surface the ambiguity.
+            tracing::warn!(
+                num_brackets = multiple.len(),
+                "IRR: NPV changes sign more than once on [{IRR_SCAN_LO}, {IRR_SCAN_HI}]; \
+                 the IRR is ambiguous — returning the root closest to 0"
+            );
+            multiple
+                .iter()
+                .copied()
+                .min_by(|a, b| {
+                    let mid_a = (a.0 + a.1) / 2.0;
+                    let mid_b = (b.0 + b.1) / 2.0;
+                    mid_a
+                        .abs()
+                        .partial_cmp(&mid_b.abs())
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .unwrap_or((IRR_SCAN_LO, IRR_SCAN_HI))
+        }
+    };
+
+    let solver = BrentSolver::new().tolerance(1e-12);
     solver
-        .solve(npv_function, 0.15) // Start with 15% initial guess for PE returns
+        .solve_in_bracket(npv_function, lo, hi)
         .map_err(|_| finstack_core::InputError::Invalid.into())
 }
 

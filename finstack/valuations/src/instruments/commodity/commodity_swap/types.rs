@@ -92,13 +92,19 @@ pub struct CommoditySwap {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calendar_id: Option<CalendarId>,
-    /// Business day convention for date adjustments.
+    /// Business day convention for payment-schedule date adjustments.
+    ///
+    /// Only applied when `calendar_id` is set and resolves to a registered
+    /// holiday calendar; without a calendar the schedule dates are left
+    /// unadjusted.
     #[builder(default = BusinessDayConvention::ModifiedFollowing)]
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
     pub bdc: BusinessDayConvention,
     /// Discount curve ID.
     pub discount_curve_id: CurveId,
-    /// Optional index lag in days (for averaging period).
+    /// Optional index lag in **calendar days**: the floating-leg averaging
+    /// window is shifted back by exactly this many calendar days (no
+    /// business-day adjustment of the shifted window endpoints).
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_lag_days: Option<i32>,
@@ -254,6 +260,7 @@ impl CommoditySwap {
 
         let mut pv = 0.0;
         let mut prev_period_end = self.start_date;
+        let last_payment = schedule.last().copied();
 
         for payment_date in schedule {
             if payment_date < as_of {
@@ -265,9 +272,16 @@ impl CommoditySwap {
             let period_start = prev_period_end;
             let period_end = payment_date;
 
-            // Get expected average price for this period
-            let forward_price =
-                self.expected_period_price(&price_curve, as_of, period_start, period_end)?;
+            // Get expected average price for this period. Windows are
+            // half-open; the final period observes the maturity date too.
+            let include_end = Some(payment_date) == last_payment;
+            let forward_price = self.expected_period_price(
+                &price_curve,
+                as_of,
+                period_start,
+                period_end,
+                include_end,
+            )?;
 
             let df = disc.df_between_dates(as_of, payment_date)?;
             let period_value = self.quantity * forward_price;
@@ -307,12 +321,19 @@ impl CommoditySwap {
     /// on or after `as_of` project from the curve via `price_on_date(date)`
     /// (respecting the curve's day count convention); a curve-lookup failure
     /// inside the window is propagated as an error (W-11).
-    fn expected_period_price(
+    ///
+    /// # Window convention
+    ///
+    /// Windows are half-open `[period_start, period_end)` so a payment date
+    /// is never observed by two adjacent periods; the final period passes
+    /// `include_end = true` so the swap maturity is observed exactly once.
+    pub(crate) fn expected_period_price(
         &self,
         price_curve: &finstack_core::market_data::term_structures::PriceCurve,
         as_of: Date,
         period_start: Date,
         period_end: Date,
+        include_end: bool,
     ) -> Result<f64> {
         // Apply index lag if specified (shift observation window backwards)
         let lag_days = self.index_lag_days.unwrap_or(0);
@@ -365,30 +386,15 @@ impl CommoditySwap {
             }
         };
 
-        // Market standard: daily business day sampling for all periods.
-        // Compensated (Neumaier) summation keeps the average accurate over a
-        // long observation window (W-11) — a multi-month period can sum many
-        // hundreds of daily observations.
-        let mut sum = finstack_core::math::NeumaierAccumulator::new();
-        let mut count = 0u64;
-        let mut current = obs_start;
-
-        while current <= obs_end {
-            if is_business_day(current) {
-                sum.add(get_price(current)?);
-                count += 1;
-            }
-            current += time::Duration::days(1);
-        }
-
-        // Ensure we have at least one observation
-        if count == 0 {
-            // Fallback: use midpoint if no business days found (shouldn't happen in practice)
-            let mid = obs_start + (obs_end - obs_start) / 2;
-            return get_price(mid);
-        }
-
-        Ok(sum.total() / count as f64)
+        // Market standard: daily business day sampling for all periods, over
+        // half-open windows shared with the commodity swaption.
+        crate::instruments::commodity::averaging::business_day_average_price(
+            get_price,
+            is_business_day,
+            obs_start,
+            obs_end,
+            include_end,
+        )
     }
 
     /// Generate the payment schedule for this swap.
@@ -474,11 +480,19 @@ impl CommoditySwap {
         let price_curve = market.get_price_curve(self.floating_index_id.as_str())?;
         let mut prev_period_end = self.start_date;
         let mut flows = Vec::new();
-        for payment_date in self.payment_schedule(as_of)? {
+        let schedule = self.payment_schedule(as_of)?;
+        let last_payment = schedule.last().copied();
+        for payment_date in schedule {
             let period_start = prev_period_end;
             let period_end = payment_date;
-            let forward_price =
-                self.expected_period_price(&price_curve, as_of, period_start, period_end)?;
+            let include_end = Some(payment_date) == last_payment;
+            let forward_price = self.expected_period_price(
+                &price_curve,
+                as_of,
+                period_start,
+                period_end,
+                include_end,
+            )?;
             let signed_amount = match self.side {
                 PayReceive::Pay => self.quantity * forward_price,
                 PayReceive::Receive => -self.quantity * forward_price,

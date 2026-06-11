@@ -30,7 +30,7 @@
 //!
 //! // Create valuator and price
 //! let valuator = BermudanSwaptionTreeValuator::new(&swaption, &model, discount_curve, as_of).unwrap();
-//! let price = valuator.price();
+//! let price = valuator.price().unwrap();
 //! ```
 #[allow(dead_code)] // Public API items may be used by external bindings or tests
 use crate::instruments::common_impl::parameters::OptionType;
@@ -161,7 +161,11 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
     /// # Returns
     ///
     /// Present value of the Bermudan swaption at valuation date.
-    pub fn price(&self) -> f64 {
+    ///
+    /// # Errors
+    ///
+    /// Propagates tree backward-induction validation failures.
+    pub fn price(&self) -> Result<f64> {
         let n = self.tree().num_steps();
 
         // Terminal values: exercise value at last step if it's an exercise date
@@ -273,12 +277,9 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
     ///
     /// Uses a forward pass tracking survival probabilities through the tree,
     /// deducting mass at nodes where optimal exercise occurs.
-    #[allow(clippy::needless_range_loop)] // Index j used for multiple array accesses and method calls
     pub fn exercise_probabilities(&self) -> Vec<(f64, f64)> {
         let n = self.tree().num_steps();
-
-        // Helper to get j_max from num_nodes: num_nodes = 2*j_max + 1
-        let j_max_at = |step: usize| (self.tree().num_nodes(step) - 1) / 2;
+        let comp = self.tree().config().compounding;
 
         // 1. Backward pass: compute continuation values at each node
         let mut cont_values: Vec<f64> = (0..self.tree().num_nodes(n))
@@ -297,35 +298,18 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
 
         for step in (0..n).rev() {
             let num_curr = self.tree().num_nodes(step);
-            let _num_next = cont_values.len();
-            let j_max_curr = j_max_at(step);
-            let j_max_next = j_max_at(step + 1);
-            let dt = self.tree().dt();
+            let dt = self.tree().dt_at_step(step);
 
             // Compute continuation values first (before exercise decision)
             let continuations: Vec<f64> = (0..num_curr)
                 .map(|j| {
                     let r_j = self.tree().rate_at_node(step, j);
                     let (p_up, p_mid, p_down) = self.tree().probabilities(step, j);
-                    let j_signed = j as i32 - j_max_curr as i32;
-                    let next_mid = (j_signed + j_max_next as i32) as usize;
-                    let v_up = cont_values
-                        .get(next_mid + 1)
-                        .or(cont_values.last())
-                        .copied()
-                        .unwrap_or(0.0);
-                    let v_mid = cont_values
-                        .get(next_mid)
-                        .or(cont_values.last())
-                        .copied()
-                        .unwrap_or(0.0);
-                    let v_down = if next_mid > 0 {
-                        cont_values[next_mid - 1]
-                    } else {
-                        cont_values[0]
-                    };
-                    let expected = p_up * v_up + p_mid * v_mid + p_down * v_down;
-                    expected * (-r_j * dt).exp()
+                    let center = self.tree().branch_center(step, j);
+                    let expected = p_up * cont_values[center + 1]
+                        + p_mid * cont_values[center]
+                        + p_down * cont_values[center - 1];
+                    expected * comp.df(r_j, dt)
                 })
                 .collect();
 
@@ -381,8 +365,6 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
 
             if step < n {
                 let num_next = self.tree().num_nodes(step + 1);
-                let j_max_curr = j_max_at(step);
-                let j_max_next = j_max_at(step + 1);
                 let mut next_survival = vec![0.0; num_next];
 
                 for (j, &surv) in survival.iter().enumerate().take(num_curr) {
@@ -390,14 +372,11 @@ impl<'a> BermudanSwaptionTreeValuator<'a> {
                         continue;
                     }
                     let (p_up, p_mid, p_down) = self.tree().probabilities(step, j);
-                    let j_signed = j as i32 - j_max_curr as i32;
-                    let next_mid = ((j_signed + j_max_next as i32) as usize).min(num_next - 1);
-                    let next_up = (next_mid + 1).min(num_next - 1);
-                    let next_down = next_mid.saturating_sub(1);
+                    let center = self.tree().branch_center(step, j);
 
-                    next_survival[next_up] += surv * p_up;
-                    next_survival[next_mid] += surv * p_mid;
-                    next_survival[next_down] += surv * p_down;
+                    next_survival[center + 1] += surv * p_up;
+                    next_survival[center] += surv * p_mid;
+                    next_survival[center - 1] += surv * p_down;
                 }
                 survival = next_survival;
             }
@@ -545,12 +524,49 @@ mod tests {
         let valuator = BermudanSwaptionTreeValuator::new(&swaption, &model, &curve, as_of)
             .expect("Valuator creation should succeed");
 
-        let price = valuator.price();
+        let price = valuator.price().expect("pricing should succeed");
 
         // Price should be non-negative (it's an option)
         assert!(
             price >= 0.0,
             "Bermudan swaption price should be non-negative"
         );
+    }
+
+    #[test]
+    fn exercise_dates_land_exactly_on_tree_grid() {
+        let curve = test_discount_curve();
+        let swaption = test_bermudan_swaption();
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
+
+        let ttm = swaption.time_to_maturity(as_of).expect("Valid ttm");
+        let exercise_times = swaption.exercise_times(as_of).expect("exercise times");
+        let model = CalibratedHullWhiteModel::calibrate_with_times(
+            HullWhiteParams::new(0.03, 0.01).expect("valid HW params"),
+            50,
+            &curve,
+            ttm,
+            &exercise_times,
+        )
+        .expect("Calibration should succeed");
+
+        // Every exercise time must coincide exactly with a tree grid point.
+        let tree = model.tree();
+        for &t in &exercise_times {
+            let step = tree
+                .step_at_time(t)
+                .expect("exercise time must land on the grid");
+            assert!(
+                (tree.time_at_step(step) - t).abs() <= 1e-9,
+                "exercise time {t} should land exactly on grid point {}",
+                tree.time_at_step(step)
+            );
+        }
+
+        // The valuator must price on the exercise-aligned grid.
+        let valuator = BermudanSwaptionTreeValuator::new(&swaption, &model, &curve, as_of)
+            .expect("Valuator creation should succeed");
+        let price = valuator.price().expect("pricing should succeed");
+        assert!(price >= 0.0);
     }
 }

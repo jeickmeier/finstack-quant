@@ -165,13 +165,23 @@ impl SwaptionHullWhitePricer {
             fallback: None,
             context: context_label.as_str(),
         };
-        let hw_params = resolve_hw1f_params(&req, market).map_err(|e| {
+        // Provenance (`hw1f_param_source`) is stamped by the resolver's
+        // structured logs under the instrument context label.
+        let (hw_params, _hw1f_param_source) = resolve_hw1f_params(&req, market).map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
-        // Build and calibrate HW tree
+        // Build and calibrate HW tree with the expiry threaded as a
+        // mandatory grid date so the exercise decision lands exactly on a
+        // grid point.
         let config = HullWhiteTreeConfig::new(hw_params.kappa, hw_params.sigma, self.tree_steps);
-        let tree = HullWhiteTree::calibrate(config, disc.as_ref(), swap_end_time).map_err(|e| {
+        let tree = HullWhiteTree::calibrate_with_times(
+            config,
+            disc.as_ref(),
+            swap_end_time,
+            &[time_to_expiry],
+        )
+        .map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
@@ -244,8 +254,11 @@ impl SwaptionHullWhitePricer {
 
         let notional = swaption.notional.amount();
 
-        // Map expiry to tree step
-        let exercise_step = tree.time_to_step(time_to_expiry);
+        // Map expiry to its exact tree step (guaranteed by the mandatory
+        // date threaded into calibration above).
+        let exercise_step = tree.step_at_time(time_to_expiry).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
 
         let n = tree.num_steps();
 
@@ -253,53 +266,60 @@ impl SwaptionHullWhitePricer {
         let terminal: Vec<f64> = vec![0.0; tree.num_nodes(n)];
 
         // Backward induction with exercise at expiry step only
-        let pv = tree.backward_induction(&terminal, |step, node_idx, continuation| {
-            if step == exercise_step {
-                let t = tree.time_at_step(step);
+        let pv = tree
+            .backward_induction(&terminal, |step, node_idx, continuation| {
+                if step == exercise_step {
+                    let t = tree.time_at_step(step);
 
-                // Find remaining payments after this time
-                let start_idx = payment_times.partition_point(|&pt| pt <= t);
-                if start_idx >= payment_times.len() {
-                    return continuation;
+                    // Find remaining payments after this time
+                    let start_idx = payment_times.partition_point(|&pt| pt <= t);
+                    if start_idx >= payment_times.len() {
+                        return continuation;
+                    }
+
+                    let remaining_payment_times = &payment_times[start_idx..];
+                    let remaining_accruals = &accrual_fractions[start_idx..];
+
+                    let swap_start = swap_start_time.max(t);
+                    let swap_rate = tree.forward_swap_rate(
+                        step,
+                        node_idx,
+                        swap_start,
+                        swap_end_time,
+                        remaining_payment_times,
+                        remaining_accruals,
+                        disc.as_ref(),
+                    );
+
+                    let annuity = tree.annuity(
+                        step,
+                        node_idx,
+                        remaining_payment_times,
+                        remaining_accruals,
+                        disc.as_ref(),
+                    );
+
+                    let intrinsic = match swaption.option_type {
+                        OptionType::Call => (swap_rate - strike).max(0.0),
+                        OptionType::Put => (strike - swap_rate).max(0.0),
+                    };
+
+                    let exercise_value = intrinsic * annuity * notional;
+
+                    // European: take max of continuation and exercise at the single
+                    // exercise date (for a well-calibrated tree these should be close,
+                    // but max handles numerical edge cases).
+                    continuation.max(exercise_value)
+                } else {
+                    continuation
                 }
-
-                let remaining_payment_times = &payment_times[start_idx..];
-                let remaining_accruals = &accrual_fractions[start_idx..];
-
-                let swap_start = swap_start_time.max(t);
-                let swap_rate = tree.forward_swap_rate(
-                    step,
-                    node_idx,
-                    swap_start,
-                    swap_end_time,
-                    remaining_payment_times,
-                    remaining_accruals,
-                    disc.as_ref(),
-                );
-
-                let annuity = tree.annuity(
-                    step,
-                    node_idx,
-                    remaining_payment_times,
-                    remaining_accruals,
-                    disc.as_ref(),
-                );
-
-                let intrinsic = match swaption.option_type {
-                    OptionType::Call => (swap_rate - strike).max(0.0),
-                    OptionType::Put => (strike - swap_rate).max(0.0),
-                };
-
-                let exercise_value = intrinsic * annuity * notional;
-
-                // European: take max of continuation and exercise at the single
-                // exercise date (for a well-calibrated tree these should be close,
-                // but max handles numerical edge cases).
-                continuation.max(exercise_value)
-            } else {
-                continuation
-            }
-        });
+            })
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
 
         Ok(ValuationResult::stamped(
             swaption.id.as_str(),
@@ -427,9 +447,13 @@ mod tests {
         use finstack_core::types::CurveId;
 
         let (as_of, swaption, market) = example_single_curve();
+        // The HW1F swaption calibration reads an expiry × TENOR matrix of
+        // NORMAL vols; the surface must be tagged accordingly.
         let surface = VolSurface::builder(swaption.vol_surface_id.clone())
             .expiries(&[0.5, 1.0, 2.0])
             .strikes(&[1.0, 2.0, 5.0])
+            .secondary_axis(finstack_core::market_data::surfaces::VolSurfaceAxis::Tenor)
+            .quote_type(finstack_core::market_data::surfaces::VolQuoteType::Normal)
             .row(&[0.020, 0.022, 0.024])
             .row(&[0.022, 0.024, 0.026])
             .row(&[0.024, 0.026, 0.028])

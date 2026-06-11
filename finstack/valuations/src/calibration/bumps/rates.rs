@@ -54,6 +54,16 @@ pub fn bump_discount_curve(
 }
 
 /// Bump a discount curve by shocking its stored market-rate calibration quotes.
+///
+/// The re-bootstrapped curves are applied as a *delta overlay* on the stored
+/// curve: both the bumped and the unbumped quote sets are bootstrapped, and
+/// only their discount-factor ratio is applied to the stored knots. Stored
+/// curves transcribed from an external source (e.g. Bloomberg screen
+/// fixtures) are not necessarily the exact bootstrap solution of their stored
+/// quotes; repricing risk directly off a re-bootstrapped curve would shift
+/// the base level and contaminate the sensitivity with a base-shape change.
+/// For self-consistent curves the unbumped re-bootstrap reproduces the stored
+/// curve and the overlay is exact.
 pub(crate) fn bump_discount_curve_from_rate_calibration(
     curve: &DiscountCurve,
     calibration: &DiscountCurveRateCalibration,
@@ -115,7 +125,34 @@ pub(crate) fn bump_discount_curve_from_rate_calibration(
         },
     };
 
-    bump_discount_curve(&quotes, &params, &base_context, bump)
+    let bumped = bump_discount_curve(&quotes, &params, &base_context, bump)?;
+    let unbumped =
+        bump_discount_curve(&quotes, &params, &base_context, &BumpRequest::Parallel(0.0))?;
+
+    let overlaid: Vec<(f64, f64)> = curve
+        .knots()
+        .iter()
+        .zip(curve.dfs())
+        .map(|(&t, &df)| {
+            let base_df = unbumped.df(t);
+            let ratio = if base_df > 0.0 {
+                bumped.df(t) / base_df
+            } else {
+                1.0
+            };
+            (t, df * ratio)
+        })
+        .collect();
+
+    DiscountCurve::builder(curve.id().clone())
+        .base_date(curve.base_date())
+        .day_count(curve.day_count())
+        .knots(overlaid)
+        .interp(curve.interp_style())
+        .extrapolation(curve.extrapolation())
+        .min_forward_tenor(curve.min_forward_tenor())
+        .rate_calibration(calibration.clone())
+        .build()
 }
 
 /// Bump a forward curve by shocking its stored market-rate calibration quotes
@@ -126,6 +163,11 @@ pub(crate) fn bump_discount_curve_from_rate_calibration(
 /// together). The helper does not support [`ForwardCurveRateQuote::Basis`]
 /// quotes; callers handling basis-tenor calibrations must rebuild the forward
 /// curve explicitly.
+///
+/// Like [`bump_discount_curve_from_rate_calibration`], the re-bootstrap is
+/// applied as a delta overlay on the stored curve: the bumped and unbumped
+/// bootstraps are both solved and only their forward-rate difference is added
+/// to the stored knots, so transcribed curves keep their base shape.
 pub(crate) fn bump_forward_curve_from_rate_calibration(
     curve: &ForwardCurve,
     calibration: &ForwardCurveRateCalibration,
@@ -173,10 +215,6 @@ pub(crate) fn bump_forward_curve_from_rate_calibration(
         quotes.push(rate_quote);
     }
 
-    let bumped_quotes = apply_bump_to_rate_quotes(quotes, bump, curve.base_date());
-    let market_quotes: Vec<MarketQuote> =
-        bumped_quotes.into_iter().map(MarketQuote::Rates).collect();
-
     let params = ForwardCurveParams {
         curve_id: curve.id().clone(),
         currency: calibration.currency,
@@ -190,12 +228,47 @@ pub(crate) fn bump_forward_curve_from_rate_calibration(
             curve_day_count: Some(curve.day_count()),
         },
     };
-    let step = StepParams::Forward(params);
+
+    let bumped = rebootstrap_forward_curve(curve, quotes.clone(), &params, context, Some(bump))?;
+    let unbumped = rebootstrap_forward_curve(curve, quotes, &params, context, None)?;
+
+    let overlaid: Vec<(f64, f64)> = curve
+        .knots()
+        .iter()
+        .zip(curve.forwards())
+        .map(|(&t, &fwd)| (t, fwd + bumped.rate(t) - unbumped.rate(t)))
+        .collect();
+
+    ForwardCurve::builder(curve.id().clone(), curve.tenor())
+        .base_date(curve.base_date())
+        .reset_lag(curve.reset_lag())
+        .day_count(curve.day_count())
+        .knots(overlaid)
+        .interp(curve.interp_style())
+        .extrapolation(curve.extrapolation())
+        .rate_calibration(calibration.clone())
+        .build()
+}
+
+/// Bootstrap a forward curve from (optionally bumped) rate quotes using the
+/// stored curve's conventions.
+fn rebootstrap_forward_curve(
+    curve: &ForwardCurve,
+    quotes: Vec<RateQuote>,
+    params: &ForwardCurveParams,
+    context: &MarketContext,
+    bump: Option<&BumpRequest>,
+) -> finstack_core::Result<ForwardCurve> {
+    let quotes = match bump {
+        Some(bump) => apply_bump_to_rate_quotes(quotes, bump, curve.base_date()),
+        None => quotes,
+    };
+    let market_quotes: Vec<MarketQuote> = quotes.into_iter().map(MarketQuote::Rates).collect();
+    let step = StepParams::Forward(params.clone());
     let cfg = CalibrationConfig::default();
     let (ctx, _report) =
         step_runtime::execute_params_and_apply(&step, &market_quotes, context, &cfg)?;
-
-    Ok(ctx.get_forward(curve.id().as_str())?.as_ref().clone())
+    Ok(ctx.get_forward(params.curve_id.as_str())?.as_ref().clone())
 }
 
 /// Re-bootstrap both a discount curve and its dependent forward curve from

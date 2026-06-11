@@ -1,13 +1,15 @@
 //! Hurdle01 calculator for PrivateMarketsFund.
 //!
 //! Computes Hurdle01 (hurdle rate sensitivity) using finite differences.
-//! Hurdle01 measures the change in PV for a 1bp (0.0001) change in hurdle IRR rate.
+//! Hurdle01 is the derivative dPV/dh of LP value with respect to the hurdle
+//! IRR rate (per unit rate), consistent with the workspace Dv01 convention.
 //!
 //! # Formula
 //! ```text
-//! Hurdle01 = (PV(hurdle_rate + 1bp) - PV(hurdle_rate - 1bp)) / (2 * bump_size)
+//! Hurdle01 = (PV(hurdle_rate + h) - PV(hurdle_rate - h)) / (2h)
 //! ```
-//! Where bump_size is 1bp (0.0001).
+//! Where the FD bump h is 1bp (0.0001); dividing by the bump yields the
+//! derivative, not a per-1bp PV change.
 //!
 //! # Note
 //!
@@ -76,7 +78,7 @@ impl MetricCalculator for Hurdle01Calculator {
 
         // Hurdle01 = (PV_up - PV_down) / (2 * bump_size)
         // Higher hurdle typically benefits LPs (more preferred return before GP carry)
-        // Result is per 1bp change in hurdle rate
+        // Result is the derivative dPV/dh per unit hurdle rate (Dv01 convention)
         let hurdle01 = (pv_up - pv_down) / (2.0 * HURDLE_BUMP);
 
         Ok(hurdle01)

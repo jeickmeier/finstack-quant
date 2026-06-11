@@ -2274,7 +2274,7 @@
             },
             "BermudanCallProvision": {
               "additionalProperties": false,
-              "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Used by Callable Range Accrual,\nPRDC, and callable Snowball notes.\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `call_price`: Fraction of notional returned at exercise (1.0 = par).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
+              "description": "Bermudan call provision for callable exotics.\n\nAllows the issuer to terminate the note on specified call dates\nat a specified call price (typically par). Currently consumed by the\nCallable Range Accrual note (PRDC is not implemented, and the Snowball\npricer rejects callable provisions).\n\n# Fields\n\n- `call_dates`: Sorted ascending dates on which the issuer may call.\n- `call_price`: Fraction of notional returned at exercise (1.0 = par).\n- `lockout_periods`: Number of initial coupon periods during which\n  the call right cannot be exercised.",
               "properties": {
                 "call_dates": {
                   "description": "Dates on which the issuer can call (must be sorted ascending).",
@@ -5849,7 +5849,7 @@
                 "bdc": {
                   "$ref": "#/$defs/BusinessDayConvention",
                   "default": "modified_following",
-                  "description": "Business day convention for date adjustments."
+                  "description": "Business day convention for payment-schedule date adjustments.\n\nOnly applied when `calendar_id` is set and resolves to a registered\nholiday calendar; without a calendar the schedule dates are left\nunadjusted."
                 },
                 "calendar_id": {
                   "anyOf": [
@@ -5895,7 +5895,7 @@
                   "description": "Unique instrument identifier."
                 },
                 "index_lag_days": {
-                  "description": "Optional index lag in days (for averaging period).",
+                  "description": "Optional index lag in **calendar days**: the floating-leg averaging\nwindow is shifted back by exactly this many calendar days (no\nbusiness-day adjustment of the shifted window endpoints).",
                   "format": "int32",
                   "type": [
                     "integer",
@@ -19932,10 +19932,10 @@
                 },
                 "discount_curve_id": {
                   "$ref": "#/$defs/Id",
-                  "description": "Discount curve identifier for present value calculations."
+                  "description": "Discount curve identifier. **Unused in PV**: the future is daily\nmargined so the mark-to-market is undiscounted, and no Dv01 is\nregistered. Retained for market-data identification/scenario plumbing."
                 },
                 "expiry": {
-                  "description": "Future expiry date (typically 30 days before VIX settlement).",
+                  "description": "Future expiry date. For VIX futures this is the final settlement day\nitself (the Wednesday ~30 days before the expiry of the SPX options\nused in the settlement calculation), not a date 30 days before\nsettlement.",
                   "type": "string"
                 },
                 "id": {
@@ -19981,7 +19981,7 @@
                   "type": "number"
                 },
                 "settlement_date": {
-                  "description": "Settlement date (SOQ calculation date).",
+                  "description": "Final settlement date — the morning Special Opening Quotation (SOQ)\nof the index is computed on this date (same day as `expiry` for VIX).",
                   "type": "string"
                 },
                 "vol_index_curve_id": {

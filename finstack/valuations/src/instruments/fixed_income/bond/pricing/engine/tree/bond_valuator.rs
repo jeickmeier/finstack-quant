@@ -1,7 +1,6 @@
 use super::super::super::super::types::Bond;
 use super::TreePricer;
 use crate::models::trees::hull_white_tree::HullWhiteTree;
-use crate::models::trees::tree_framework::map_date_to_step;
 use crate::models::{NodeState, TreeValuator};
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
@@ -74,6 +73,92 @@ pub struct BondValuator {
 }
 
 impl BondValuator {
+    /// Nearest grid step to a time (year fraction), clamped to the grid.
+    fn nearest_step(time_steps: &[f64], t: f64) -> usize {
+        let n = time_steps.len() - 1;
+        if t <= time_steps[0] {
+            return 0;
+        }
+        if t >= time_steps[n] {
+            return n;
+        }
+        let upper = time_steps.partition_point(|&g| g <= t);
+        let lower = upper - 1;
+        if (t - time_steps[lower]) <= (time_steps[upper] - t) {
+            lower
+        } else {
+            upper
+        }
+    }
+
+    /// Continuous (fractional) grid position of a time, clamped to
+    /// `[0, n]`. The integer part is the lower bracketing step; the
+    /// fractional part is the position within that interval.
+    fn fractional_step(time_steps: &[f64], t: f64) -> f64 {
+        let n = time_steps.len() - 1;
+        if t <= time_steps[0] {
+            return 0.0;
+        }
+        if t >= time_steps[n] {
+            return n as f64;
+        }
+        let upper = time_steps.partition_point(|&g| g <= t);
+        let lower = upper - 1;
+        let segment = time_steps[upper] - time_steps[lower];
+        lower as f64
+            + if segment > 0.0 {
+                (t - time_steps[lower]) / segment
+            } else {
+                0.0
+            }
+    }
+
+    /// Collect the bond's mandatory tree-grid times (year fractions from
+    /// `as_of`): all future cashflow dates plus every call/put exercise
+    /// date. Used to calibrate a Hull-White tree whose grid passes exactly
+    /// through coupon and exercise events.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` when the discount curve is missing or day-count
+    /// computation fails.
+    pub(crate) fn mandatory_grid_times(
+        bond: &Bond,
+        market_context: &MarketContext,
+        as_of: Date,
+    ) -> Result<Vec<f64>> {
+        let discount_curve = market_context.get_discount(&bond.discount_curve_id)?;
+        let dc_curve = discount_curve.day_count();
+        let flows = bond.pricing_dated_cashflows(market_context, as_of)?;
+        let cashflow_dates: Vec<Date> = flows.iter().map(|(date, _)| *date).collect();
+
+        let mut dates: Vec<Date> = cashflow_dates
+            .iter()
+            .copied()
+            .filter(|d| *d > as_of)
+            .collect();
+        if let Some(ref call_put) = bond.call_put {
+            for opt in call_put.calls.iter().chain(call_put.puts.iter()) {
+                dates.extend(Self::exercise_dates_for_period(
+                    opt.start_date,
+                    opt.end_date,
+                    as_of,
+                    bond.maturity,
+                    &cashflow_dates,
+                ));
+            }
+        }
+        dates.sort_unstable();
+        dates.dedup();
+
+        dates
+            .into_iter()
+            .map(|d| {
+                dc_curve.year_fraction(as_of, d, finstack_core::dates::DayCountContext::default())
+            })
+            .collect()
+    }
+
     fn exercise_dates_for_period(
         start_date: Date,
         end_date: Date,
@@ -188,11 +273,39 @@ impl BondValuator {
         time_to_maturity: f64,
         tree_steps: usize,
     ) -> Result<Self> {
-        use crate::cashflow::primitives::CFKind;
-
         let dt = time_to_maturity / tree_steps as f64;
         let time_steps: Vec<f64> = (0..=tree_steps).map(|i| i as f64 * dt).collect();
-        let num_steps = tree_steps + 1; // Include step 0
+        Self::new_with_time_steps(bond, market_context, as_of, time_steps)
+    }
+
+    /// Create a bond valuator on an explicit (possibly non-uniform) time
+    /// grid, e.g. the grid of a [`HullWhiteTree`] calibrated through
+    /// mandatory call/coupon dates.
+    ///
+    /// `time_steps` must be a strictly increasing grid starting at `0.0`
+    /// whose last entry is the time to maturity. Cashflows and exercise
+    /// dates are mapped onto this grid by nearest-point lookup, with
+    /// discount-factor timing corrections preserving each flow's PV.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` when the grid is invalid, curves are missing, or
+    /// schedule/day-count computation fails.
+    pub fn new_with_time_steps(
+        bond: Bond,
+        market_context: &MarketContext,
+        as_of: Date,
+        time_steps: Vec<f64>,
+    ) -> Result<Self> {
+        use crate::cashflow::primitives::CFKind;
+
+        if time_steps.len() < 2 || !time_steps.windows(2).all(|w| w[1] > w[0]) {
+            return Err(finstack_core::Error::Validation(
+                "BondValuator time grid must be strictly increasing with at least 2 points"
+                    .to_string(),
+            ));
+        }
+        let num_steps = time_steps.len();
 
         let curves = market_context;
         let discount_curve = market_context.get_discount(&bond.discount_curve_id)?;
@@ -222,6 +335,14 @@ impl BondValuator {
 
         for step in 0..num_steps {
             let step_time = time_steps[step];
+            // Half the distance to the next grid point (or the previous one
+            // at the final step): an amortization belongs to this step when
+            // it is closer to it than to the next.
+            let half_step = if step + 1 < num_steps {
+                (time_steps[step + 1] - step_time) / 2.0
+            } else {
+                (step_time - time_steps[step - 1]) / 2.0
+            };
 
             // Process any amortization events that occur at or before this step time
             while amort_idx < amort_events.len() {
@@ -234,7 +355,7 @@ impl BondValuator {
                     finstack_core::dates::DayCountContext::default(),
                 )?;
 
-                if amort_time <= step_time + dt / 2.0 {
+                if amort_time <= step_time + half_step {
                     // This amortization has occurred by this step
                     cumulative_amort += amort_amt;
                     amort_idx += 1;
@@ -281,17 +402,15 @@ impl BondValuator {
                     *date,
                     finstack_core::dates::DayCountContext::default(),
                 )?;
-                let raw = (time_frac / time_to_maturity) * tree_steps as f64;
-
-                // Ensure we don't go out of bounds
-                let raw_clamped = raw.clamp(0.0, tree_steps as f64);
+                // Continuous (fractional) grid position of the cashflow,
+                // clamped to the grid.
+                let raw_clamped = Self::fractional_step(&time_steps, time_frac);
 
                 // When a cashflow date matches an exercise date, snap to the
                 // exercise step to prevent timing mismatches between coupon
                 // receipt and exercise decision.
                 if exercise_dates.contains(date) {
-                    let step = map_date_to_step(as_of, *date, bond.maturity, tree_steps, dc_curve)
-                        .clamp(1, num_steps - 1);
+                    let step = Self::nearest_step(&time_steps, time_frac).clamp(1, num_steps - 1);
                     cashflow_vec[step] += Self::value_at_step_time(
                         amount.amount(),
                         time_frac,
@@ -365,8 +484,7 @@ impl BondValuator {
                         finstack_core::dates::DayCountContext::default(),
                     )?;
                     let step =
-                        map_date_to_step(as_of, exercise_date, bond.maturity, tree_steps, dc_curve)
-                            .clamp(1, num_steps - 1);
+                        Self::nearest_step(&time_steps, exercise_time).clamp(1, num_steps - 1);
                     let outstanding = outstanding_principal_vec[step];
                     let floor_price = outstanding * (call.price_pct_of_par / 100.0);
                     let clean_call_price = if let Some(spec) = &call.make_whole {
@@ -413,8 +531,7 @@ impl BondValuator {
                         finstack_core::dates::DayCountContext::default(),
                     )?;
                     let step =
-                        map_date_to_step(as_of, exercise_date, bond.maturity, tree_steps, dc_curve)
-                            .clamp(1, num_steps - 1);
+                        Self::nearest_step(&time_steps, exercise_time).clamp(1, num_steps - 1);
                     // Use outstanding principal at exercise step, not original notional
                     let outstanding = outstanding_principal_vec[step];
                     let clean_put_price = outstanding * (put.price_pct_of_par / 100.0);
@@ -516,21 +633,23 @@ impl BondValuator {
     /// # Returns
     ///
     /// Model dirty price of the bond.
-    pub(crate) fn price_with_hw_tree(&self, hw_tree: &HullWhiteTree, oas_bp: f64) -> f64 {
-        let dt = hw_tree.dt();
+    ///
+    /// # Errors
+    ///
+    /// Propagates tree backward-induction validation failures.
+    pub(crate) fn price_with_hw_tree(&self, hw_tree: &HullWhiteTree, oas_bp: f64) -> Result<f64> {
         let final_step = hw_tree.num_steps();
         let comp = hw_tree.config().compounding;
-
-        // Pre-compute OAS discount factor using the tree's compounding convention
-        let oas_discount = comp.df(oas_bp / 10_000.0, dt);
+        let oas_rate = oas_bp / 10_000.0;
 
         let terminal_cf = self.cashflow_at(final_step);
         let terminal_values = vec![terminal_cf; hw_tree.num_nodes(final_step)];
 
         hw_tree.backward_induction(&terminal_values, |step, _node_idx, continuation| {
             // The HW tree's backward_induction already discounts by the short
-            // rate r(step, node). Apply the OAS as additional discounting.
-            let oas_adjusted = continuation * oas_discount;
+            // rate r(step, node). Apply the OAS as additional discounting
+            // over this step's (possibly non-uniform) interval.
+            let oas_adjusted = continuation * comp.df(oas_rate, hw_tree.dt_at_step(step));
 
             let coupon = self.cashflow_at(step);
             let mut principal_value = oas_adjusted;
@@ -657,6 +776,7 @@ const _: () = {
 mod tests {
     use super::*;
     use crate::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec};
+    use crate::models::trees::tree_framework::map_date_to_step;
     use finstack_core::currency::Currency;
     use finstack_core::dates::{DayCount, DayCountContext, Tenor};
     use finstack_core::market_data::context::MarketContext;

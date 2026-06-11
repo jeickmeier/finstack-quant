@@ -224,28 +224,36 @@ impl CommoditySwaption {
 
     /// Compute the forward swap rate from the commodity forward curve.
     ///
-    /// The forward swap rate is the **annuity-weighted** average of forward
-    /// commodity prices observed **on each swap payment date**:
+    /// The forward swap rate is the **annuity-weighted** average of the
+    /// **period-average** forward prices over each settlement period:
     /// ```text
-    /// F_swap = Σ (F_i · DF_i) / Σ DF_i
+    /// F_swap = Σ (F̄_i · DF_i) / Σ DF_i
     /// ```
-    /// where `F_i = F(payment_date_i)` and `DF_i = DF(as_of, payment_date_i)`.
+    /// where `F̄_i` is the business-day average of the forward curve over the
+    /// half-open period `[T_{i-1}, T_i)` (the final period also observes the
+    /// swap end date) — exactly the quantity the underlying
+    /// [`super::super::commodity_swap::CommoditySwap`] floating leg settles on
+    /// — and `DF_i = DF(as_of, payment_date_i)`.
     ///
-    /// The forward price and the discount factor must be evaluated on the
-    /// **same** date — the payment date. Reading the forward at the period
-    /// *midpoint* while discounting to the period *end* biases the swap rate by
-    /// the intra-period carry on a sloped (contango/backwardation) forward
-    /// curve (W-02). On a flat curve the two are identical.
+    /// Sampling `F(payment_date_i)` instead of the period average moves the
+    /// swaption by ~half a period of carry per period on a sloped
+    /// (contango/backwardation) curve, because the underlying floats on the
+    /// business-day average, not the end-of-period print. On a flat curve the
+    /// two coincide.
     ///
     /// This is the fair fixed price consistent with the `annuity · Black76`
     /// pricing identity: the swaption is priced as `annuity · Black76(F_swap, K)`
     /// where `annuity = Σ DF_i`, so the fair swap rate must be averaged with
-    /// the same `DF_i` weights. The underlying [`super::super::commodity_swap::CommoditySwap`]
-    /// pays `quantity × price` per period with **no** year-fraction accrual,
-    /// so the weights carry no `τ_i` factor (review finding B3). The rate
-    /// reduces to the equal-weighted mean when `DF_i` is constant across
-    /// periods. If the annuity denominator is zero (degenerate schedule), the
-    /// equal-weighted mean is returned.
+    /// the same `DF_i` weights. The underlying swap pays `quantity × price`
+    /// per period with **no** year-fraction accrual, so the weights carry no
+    /// `τ_i` factor (review finding B3). The rate reduces to the
+    /// equal-weighted mean when `DF_i` is constant across periods. If the
+    /// annuity denominator is zero (degenerate schedule), the equal-weighted
+    /// mean is returned.
+    ///
+    /// A forward-curve coverage failure on any observation date is propagated
+    /// as a hard error — never silently substituted with spot (W-11 policy,
+    /// matching the underlying swap).
     pub fn forward_swap_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
@@ -257,16 +265,44 @@ impl CommoditySwaption {
             ));
         }
 
+        // Business-day filter consistent with the underlying swap's
+        // averaging: weekends out, plus exchange holidays when a calendar
+        // is configured.
+        let calendar = self
+            .calendar_id
+            .as_deref()
+            .and_then(|id| CalendarRegistry::global().resolve_str(id));
+        let is_business_day = |date: Date| -> bool {
+            let wd = date.weekday();
+            if wd == time::Weekday::Saturday || wd == time::Weekday::Sunday {
+                return false;
+            }
+            if let Some(cal) = &calendar {
+                return cal.is_business_day(date);
+            }
+            true
+        };
+        // The swap underlying a swaption is forward-starting (swap_start ≥
+        // expiry ≥ as_of), so every observation projects from the curve;
+        // coverage failures propagate (W-11).
+        let get_price = |date: Date| -> Result<f64> { price_curve.price_on_date(date) };
+
+        let last_payment = schedule.last().copied();
+        let mut prev_period_end = self.swap_start;
         let mut sum_fwd = 0.0;
         let mut weighted_fwd = 0.0;
         let mut weight_total = 0.0;
         for &payment_date in &schedule {
-            // Read the forward on the payment date — the same date the period
-            // settles and is discounted to — so the swap rate is not biased by
-            // intra-period carry on a sloped curve (W-02).
-            let fwd = price_curve
-                .price_on_date(payment_date)
-                .unwrap_or_else(|_| price_curve.spot_price());
+            // Period-average forward over the half-open settlement window —
+            // the same average the underlying floating leg settles on.
+            let include_end = Some(payment_date) == last_payment;
+            let fwd = super::super::averaging::business_day_average_price(
+                get_price,
+                is_business_day,
+                prev_period_end,
+                payment_date,
+                include_end,
+            )?;
 
             // Annuity weight DF_i — identical to the per-period term
             // accumulated in `annuity()`.
@@ -275,6 +311,7 @@ impl CommoditySwaption {
             sum_fwd += fwd;
             weighted_fwd += fwd * weight;
             weight_total += weight;
+            prev_period_end = payment_date;
         }
 
         // Guard against a zero (or negative) annuity denominator: fall back to
@@ -767,17 +804,21 @@ mod tests {
         assert_eq!(swaption.fixed_price, deserialized.fixed_price);
     }
 
-    /// W-02: `forward_swap_rate` must read the forward on each swap payment
-    /// date, not the period midpoint. On a sloped (contango) forward curve the
-    /// midpoint forward is lower than the payment-date forward, so the buggy
-    /// midpoint lookup biases the swap rate downward by the intra-period carry.
+    /// W-02 / M-commodity-averaging: `forward_swap_rate` must use the
+    /// **period-average** forward over each half-open settlement window —
+    /// the same business-day average the underlying floating leg settles on
+    /// — not a single end-of-period (payment-date) print. On a sloped
+    /// (contango) forward curve the payment-date forward exceeds the period
+    /// average by ~half a period of carry, so sampling the payment date
+    /// biases the swap rate upward.
     ///
-    /// This test builds a steep linear contango curve and asserts the computed
-    /// forward swap rate equals the annuity-weighted average of *payment-date*
-    /// forwards — and that it differs measurably from the *midpoint*-weighted
-    /// average that the pre-fix code produced.
+    /// This test builds a steep linear contango curve and asserts the
+    /// computed forward swap rate equals an independently reconstructed
+    /// annuity-weighted average of business-day period averages — and that
+    /// it differs measurably from the payment-date-sampled average the
+    /// pre-fix code produced.
     #[test]
-    fn w02_forward_swap_rate_reads_payment_date_not_midpoint() {
+    fn w02_forward_swap_rate_uses_period_average_not_payment_date() {
         use finstack_core::dates::TenorUnit;
         use finstack_core::market_data::term_structures::{DiscountCurve, PriceCurve};
         use finstack_core::types::CurveId;
@@ -836,41 +877,155 @@ mod tests {
         let pc = market.get_price_curve("NG-FORWARD").expect("price curve");
         let dc = market.get_discount("USD-OIS").expect("discount");
 
+        let is_weekday = |d: Date| -> bool {
+            let wd = d.weekday();
+            wd != time::Weekday::Saturday && wd != time::Weekday::Sunday
+        };
+
+        let last_pay = *schedule.last().expect("non-empty schedule");
         let mut prev = swaption.swap_start;
+        let mut avg_weighted = 0.0;
         let mut pay_weighted = 0.0;
-        let mut mid_weighted = 0.0;
         let mut weight_total = 0.0;
         for &pay in &schedule {
             // Annuity weight is DF only (B3): the underlying swap pays
             // quantity × price per period with no year-fraction accrual.
             let weight = dc.df_between_dates(as_of, pay).expect("df");
             let fwd_pay = pc.price_on_date(pay).expect("fwd at payment date");
-            let mid = prev + (pay - prev) / 2;
-            let fwd_mid = pc.price_on_date(mid).expect("fwd at midpoint");
+
+            // Independent business-day average over the half-open window
+            // [prev, pay), with the final period also observing `pay`.
+            let mut sum = 0.0;
+            let mut count = 0u64;
+            let mut cur = prev;
+            while cur < pay {
+                if is_weekday(cur) {
+                    sum += pc.price_on_date(cur).expect("fwd inside window");
+                    count += 1;
+                }
+                cur += time::Duration::days(1);
+            }
+            if pay == last_pay && is_weekday(pay) {
+                sum += fwd_pay;
+                count += 1;
+            }
+            let fwd_avg = sum / count as f64;
+
+            avg_weighted += fwd_avg * weight;
             pay_weighted += fwd_pay * weight;
-            mid_weighted += fwd_mid * weight;
             weight_total += weight;
             prev = pay;
         }
-        let expected_payment = pay_weighted / weight_total;
-        let buggy_midpoint = mid_weighted / weight_total;
+        let expected_average = avg_weighted / weight_total;
+        let buggy_payment_date = pay_weighted / weight_total;
 
         assert!(
-            (actual - expected_payment).abs() < 1e-12,
-            "forward_swap_rate {actual} must equal the payment-date-weighted \
-             average {expected_payment}"
+            (actual - expected_average).abs() < 1e-10,
+            "forward_swap_rate {actual} must equal the period-average-weighted \
+             rate {expected_average}"
         );
-        // Sanity: contango means the payment-date rate exceeds the midpoint
-        // rate, so the fix changes the result measurably.
+        // Sanity: contango means the payment-date print exceeds the period
+        // average, so the fix changes the result measurably.
         assert!(
-            (expected_payment - buggy_midpoint).abs() > 1e-3,
-            "test setup is degenerate: payment-date ({expected_payment}) and \
-             midpoint ({buggy_midpoint}) rates must differ on a sloped curve"
+            (expected_average - buggy_payment_date).abs() > 1e-3,
+            "test setup is degenerate: period-average ({expected_average}) and \
+             payment-date ({buggy_payment_date}) rates must differ on a sloped curve"
         );
         assert!(
-            (actual - buggy_midpoint).abs() > 1e-3,
-            "forward_swap_rate {actual} must NOT equal the buggy midpoint-\
-             weighted average {buggy_midpoint}"
+            (actual - buggy_payment_date).abs() > 1e-3,
+            "forward_swap_rate {actual} must NOT equal the payment-date-\
+             sampled average {buggy_payment_date}"
+        );
+    }
+
+    /// Par consistency with the underlying swap: at zero vol, an ITM call
+    /// swaption (right to pay fixed) on a sloped curve must price to the PV
+    /// of the underlying pay-fixed swap, because both now settle on the
+    /// same half-open business-day period averages. Mismatched averaging
+    /// conventions (payment-date sampling vs period averages, or closed vs
+    /// half-open windows) break this identity on a sloped curve.
+    #[test]
+    fn zero_vol_itm_swaption_matches_underlying_swap_pv_on_sloped_curve() {
+        use finstack_core::dates::TenorUnit;
+        use finstack_core::market_data::term_structures::{DiscountCurve, PriceCurve};
+        use time::Month;
+
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+
+        // Sloped contango curve so averaging conventions matter.
+        let price_curve = PriceCurve::builder("NG-FORWARD")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .spot_price(3.00)
+            .knots([(0.0, 3.00), (1.0, 4.00), (2.0, 5.00)])
+            .interp(finstack_core::math::interp::InterpStyle::Linear)
+            .build()
+            .expect("price curve");
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, 0.94)])
+            .build()
+            .expect("discount curve");
+        let market = MarketContext::new().insert(disc).insert(price_curve);
+
+        let swap_start = Date::from_calendar_date(2025, Month::July, 1).expect("valid date");
+        let swap_end = Date::from_calendar_date(2026, Month::July, 1).expect("valid date");
+        let strike = 2.0; // deep ITM for a call (pay-fixed) in contango
+
+        let mut swaption = CommoditySwaption::builder()
+            .id(InstrumentId::new("NG-SWAPTION-PAR"))
+            .underlying(CommodityUnderlyingParams::new(
+                "Energy",
+                "NG",
+                "MMBTU",
+                Currency::USD,
+            ))
+            .option_type(OptionType::Call)
+            .expiry(Date::from_calendar_date(2025, Month::June, 1).expect("valid date"))
+            .swap_start(swap_start)
+            .swap_end(swap_end)
+            .swap_frequency(Tenor::new(1, TenorUnit::Months))
+            .fixed_price(strike)
+            .notional(10_000.0)
+            .forward_curve_id(CurveId::new("NG-FORWARD"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .vol_surface_id(CurveId::new("NG-VOL"))
+            .build()
+            .expect("swaption");
+        swaption.pricing_overrides.market_quotes.implied_volatility = Some(0.0);
+
+        let swaption_pv = swaption
+            .value(&market, as_of)
+            .expect("swaption pricing")
+            .amount();
+
+        // Underlying pay-fixed swap with the same schedule parameters.
+        let swap = super::super::super::commodity_swap::CommoditySwap::builder()
+            .id(InstrumentId::new("NG-SWAP-PAR"))
+            .underlying(CommodityUnderlyingParams::new(
+                "Energy",
+                "NG",
+                "MMBTU",
+                Currency::USD,
+            ))
+            .quantity(10_000.0)
+            .fixed_price(rust_decimal::Decimal::try_from(strike).expect("decimal"))
+            .floating_index_id(CurveId::new("NG-FORWARD"))
+            .side(crate::instruments::PayReceive::Pay)
+            .start_date(swap_start)
+            .maturity(swap_end)
+            .frequency(Tenor::new(1, TenorUnit::Months))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .build()
+            .expect("swap");
+        let swap_pv = swap.value(&market, as_of).expect("swap pricing").amount();
+
+        let rel = (swaption_pv - swap_pv).abs() / swap_pv.abs();
+        assert!(
+            rel < 1e-6,
+            "zero-vol ITM swaption PV ({swaption_pv}) must match the \
+             underlying swap PV ({swap_pv}); rel err {rel}"
         );
     }
 

@@ -5,8 +5,10 @@
 //!
 //! Exposed metrics:
 //! - DeltaVol (exposure to underlying volatility index level)
-//! - DV01 (interest rate sensitivity - minimal for vol futures)
-//! - Theta (time decay)
+//!
+//! No Dv01 is registered: vol-index futures are daily-margined, so the
+//! mark-to-market PV is undiscounted and carries no direct discount-curve
+//! sensitivity.
 
 mod delta_vol;
 
@@ -23,14 +25,4 @@ pub(crate) fn register_vol_index_future_metrics(registry: &mut MetricRegistry) {
         Arc::new(delta_vol::DeltaVolCalculator),
         &[InstrumentType::VolatilityIndexFuture],
     );
-
-    crate::register_metrics! {
-        registry: registry,
-        instrument: InstrumentType::VolatilityIndexFuture,
-        metrics: [
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::equity::vol_index_future::VolatilityIndexFuture,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
-        ]
-    }
 }

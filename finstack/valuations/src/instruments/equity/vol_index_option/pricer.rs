@@ -38,7 +38,15 @@ pub(crate) fn compute_pv_raw(
             OptionType::Call => (forward - option.strike).max(0.0),
             OptionType::Put => (option.strike - forward).max(0.0),
         };
-        return Ok(intrinsic * option.contract_specs.multiplier * option.num_contracts());
+        // Settlement discounting, consistent with the t > 0 branch. At
+        // expiry `df = 1`; for an already-expired option the unsettled
+        // intrinsic is carried undiscounted (no backwards discounting).
+        let df = if option.expiry >= as_of {
+            disc.df_between_dates(as_of, option.expiry)?
+        } else {
+            1.0
+        };
+        return Ok(intrinsic * option.contract_specs.multiplier * option.num_contracts() * df);
     }
 
     let forward = vol_curve.forward_level(t);
@@ -125,11 +133,36 @@ pub(crate) fn delta(
 
     if t <= 0.0 {
         let forward = vol_curve.spot_level();
-        let itm = match option.option_type {
-            OptionType::Call => forward > option.strike,
-            OptionType::Put => forward < option.strike,
+        // Expiry-edge delta per index point: ±1 when ITM (put ITM → −1),
+        // zero otherwise — the t → 0 limit of the Black-76 branch below.
+        // Scale by multiplier × num_contracts × df exactly like the t > 0
+        // branch; returning a bare ±1/0 here would mis-scale the position
+        // delta by orders of magnitude and drop the put's sign.
+        let delta_per_point = match option.option_type {
+            OptionType::Call => {
+                if forward > option.strike {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            OptionType::Put => {
+                if forward < option.strike {
+                    -1.0
+                } else {
+                    0.0
+                }
+            }
         };
-        return Ok(if itm { 1.0 } else { 0.0 });
+        let df = if option.expiry >= as_of {
+            disc.df_between_dates(as_of, option.expiry)?
+        } else {
+            1.0
+        };
+        return Ok(delta_per_point
+            * option.contract_specs.multiplier
+            * option.num_contracts()
+            * df);
     }
 
     let forward = vol_curve.forward_level(t);
@@ -361,6 +394,56 @@ mod tests {
             (option_forward - future_forward).abs() < 1e-10,
             "VIX option and VIX future must price off the same curve forward: \
              option={option_forward} future={future_forward}"
+        );
+    }
+
+    /// Expiry-edge delta: an ITM put at expiry must report −1 per index
+    /// point, scaled by multiplier × num_contracts × df — not a bare +1.
+    /// The spot VIX level (18.0) is below the strike (20.0), so the put is
+    /// ITM and the call is OTM.
+    #[test]
+    fn expired_itm_put_delta_has_negative_sign_and_position_scaling() {
+        let market = setup_market();
+        let expiry = date!(2025 - 03 - 19);
+
+        let mut put = sample_option();
+        put.option_type = OptionType::Put;
+
+        let d = delta(&put, &market, expiry).expect("expired put delta");
+        // df(expiry, expiry) = 1, so the expected delta is the full
+        // per-point scale with a negative sign.
+        let scale = put.contract_specs.multiplier * put.num_contracts();
+        assert!(
+            (d - (-scale)).abs() < 1e-9,
+            "expired ITM put delta must be -multiplier×num_contracts ({}), got {d}",
+            -scale
+        );
+
+        // The ITM-put scenario makes the call OTM: delta must be exactly 0.
+        let call = sample_option();
+        let d_call = delta(&call, &market, expiry).expect("expired call delta");
+        assert!(
+            d_call.abs() < 1e-12,
+            "expired OTM call delta must be 0, got {d_call}"
+        );
+    }
+
+    /// Expiry-edge PV: the intrinsic settlement branch carries the same
+    /// multiplier × num_contracts × df scaling as the live branch.
+    #[test]
+    fn expired_itm_put_pv_is_discounted_intrinsic() {
+        let market = setup_market();
+        let expiry = date!(2025 - 03 - 19);
+
+        let mut put = sample_option();
+        put.option_type = OptionType::Put;
+
+        let pv = compute_pv_raw(&put, &market, expiry).expect("expired put pv");
+        // Spot 18.0, strike 20.0 → intrinsic 2.0 per point; df = 1 at expiry.
+        let expected = 2.0 * put.contract_specs.multiplier * put.num_contracts();
+        assert!(
+            (pv - expected).abs() < 1e-9,
+            "expired ITM put PV must be intrinsic × scale ({expected}), got {pv}"
         );
     }
 

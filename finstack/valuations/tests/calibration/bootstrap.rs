@@ -175,7 +175,7 @@ fn run_hazard_plan(
                 recovery_rate: 0.40,
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
-                interpolation: Default::default(),
+                interpolation: finstack_core::math::interp::InterpStyle::LogLinear,
                 par_interp: finstack_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,

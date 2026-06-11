@@ -124,5 +124,5 @@ pub use delta_vol_surface::FxDeltaVolSurfaceBuilder;
 pub use fx_delta_vol_surface::FxDeltaVolSurface;
 pub use vol_cube::{VolCube, VolCubeBuilder};
 pub use vol_surface::{
-    VolGridOpts, VolInterpolationMode, VolSurface, VolSurfaceAxis, VolSurfaceBuilder,
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis, VolSurfaceBuilder,
 };

@@ -257,7 +257,7 @@ fn hazard_envelope(
                         recovery_rate: 0.40,
                         notional: 1.0,
                         method,
-                        interpolation: Default::default(),
+                        interpolation: finstack_core::math::interp::InterpStyle::LogLinear,
                         par_interp: Default::default(),
                         doc_clause: None,
                         cds_valuation_convention: None,

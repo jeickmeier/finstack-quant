@@ -1652,10 +1652,10 @@
             },
             "discount_curve_id": {
               "$ref": "#/$defs/Id",
-              "description": "Discount curve identifier for present value calculations."
+              "description": "Discount curve identifier. **Unused in PV**: the future is daily\nmargined so the mark-to-market is undiscounted, and no Dv01 is\nregistered. Retained for market-data identification/scenario plumbing."
             },
             "expiry": {
-              "description": "Future expiry date (typically 30 days before VIX settlement).",
+              "description": "Future expiry date. For VIX futures this is the final settlement day\nitself (the Wednesday ~30 days before the expiry of the SPX options\nused in the settlement calculation), not a date 30 days before\nsettlement.",
               "type": "string"
             },
             "id": {
@@ -1701,7 +1701,7 @@
               "type": "number"
             },
             "settlement_date": {
-              "description": "Settlement date (SOQ calculation date).",
+              "description": "Final settlement date — the morning Special Opening Quotation (SOQ)\nof the index is computed on this date (same day as `expiry` for VIX).",
               "type": "string"
             },
             "vol_index_curve_id": {

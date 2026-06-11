@@ -1,13 +1,15 @@
 //! Carry01 calculator for PrivateMarketsFund.
 //!
 //! Computes Carry01 (GP carry sensitivity) using finite differences.
-//! Carry01 measures the change in PV for a 1bp (0.0001 = 0.01%) change in GP share.
+//! Carry01 is the derivative dPV/ds of LP value with respect to the GP share
+//! (per unit share), consistent with the workspace Dv01 convention.
 //!
 //! # Formula
 //! ```text
-//! Carry01 = (PV(GP_share + 1bp) - PV(GP_share - 1bp)) / (2 * bump_size)
+//! Carry01 = (PV(GP_share + h) - PV(GP_share - h)) / (2h)
 //! ```
-//! Where bump_size is 1bp (0.0001) for GP share changes.
+//! Where the FD bump h is 1bp (0.0001); dividing by the bump yields the
+//! derivative, not a per-1bp PV change.
 //!
 //! # Note
 //! GP carry is determined by the waterfall allocation (promote tiers, catch-up).
@@ -83,7 +85,7 @@ impl MetricCalculator for Carry01Calculator {
 
         // Carry01 = (PV_up - PV_down) / (2 * bump_size)
         // Higher GP carry means less for LPs, so PV_up < PV_down typically
-        // Result is per 1bp change in GP share
+        // Result is the derivative dPV/ds per unit GP share (Dv01 convention)
         let carry01 = (pv_up - pv_down) / (2.0 * CARRY_BUMP);
 
         Ok(carry01)

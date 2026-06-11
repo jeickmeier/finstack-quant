@@ -382,42 +382,41 @@ fn test_mean_reversion_reduces_rate_dispersion() {
     let steps = 50;
     let ttm = 10.0;
 
-    // Ho-Lee (no mean reversion) via ShortRateTree
-    let config_no_mr = ShortRateTreeConfig {
-        steps,
-        volatility: 0.01,
-        mean_reversion: None,
-        ..Default::default()
+    // The Hull-White lattice no longer truncates its node range at a hard
+    // j_max boundary: mean reversion is expressed through the branching
+    // drift, so outer nodes exist but carry negligible probability mass.
+    // Dispersion is therefore measured as the state-price-weighted standard
+    // deviation of terminal rates, which mean reversion must reduce.
+    let terminal_rate_std = |kappa: f64| -> f64 {
+        let config = HullWhiteTreeConfig {
+            kappa,
+            sigma: 0.01,
+            steps,
+            ..Default::default()
+        };
+        let tree = HullWhiteTree::calibrate(config, &curve, ttm).unwrap();
+        let last_step = tree.num_steps();
+        let mut q_sum = 0.0;
+        let mut mean = 0.0;
+        let mut second = 0.0;
+        for node in 0..tree.num_nodes(last_step) {
+            let q = tree.state_price(last_step, node);
+            let r = tree.rate_at_node(last_step, node);
+            q_sum += q;
+            mean += q * r;
+            second += q * r * r;
+        }
+        mean /= q_sum;
+        (second / q_sum - mean * mean).max(0.0).sqrt()
     };
-    let mut tree_no_mr = ShortRateTree::new(config_no_mr);
-    tree_no_mr
-        .calibrate(&CurveId::new("USD-OIS"), &curve, ttm)
-        .unwrap();
 
-    // Hull-White with mean reversion
-    let hw_config = HullWhiteTreeConfig {
-        kappa: 0.05,
-        sigma: 0.01,
-        steps,
-        ..Default::default()
-    };
-    let tree_mr = HullWhiteTree::calibrate(hw_config, &curve, ttm).unwrap();
-
-    // Compare rate spread at terminal step
-    let last_step = steps;
-    let r_max_no_mr = tree_no_mr.rate_at_node(last_step, last_step).unwrap();
-    let r_min_no_mr = tree_no_mr.rate_at_node(last_step, 0).unwrap();
-    let spread_no_mr = r_max_no_mr - r_min_no_mr;
-
-    let hw_nodes = tree_mr.num_nodes(last_step);
-    let r_max_mr = tree_mr.rate_at_node(last_step, hw_nodes - 1);
-    let r_min_mr = tree_mr.rate_at_node(last_step, 0);
-    let spread_mr = r_max_mr - r_min_mr;
+    let std_low_mr = terminal_rate_std(0.001);
+    let std_high_mr = terminal_rate_std(0.05);
 
     assert!(
-        spread_mr < spread_no_mr,
-        "Mean reversion should tighten rate dispersion: MR spread={:.6}, no-MR spread={:.6}",
-        spread_mr,
-        spread_no_mr,
+        std_high_mr < std_low_mr,
+        "Mean reversion should tighten rate dispersion: high-MR std={:.6}, low-MR std={:.6}",
+        std_high_mr,
+        std_low_mr,
     );
 }

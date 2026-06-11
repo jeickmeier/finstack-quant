@@ -639,6 +639,8 @@ class VolSurface:
         Semantic meaning of the second axis: ``"strike"`` or ``"tenor"``.
     interpolation_mode : str
         Interpolation contract: ``"vol"`` or ``"total_variance"``.
+    quote_type : str
+        Quoting convention: ``"black_lognormal"`` or ``"normal"``.
 
     Raises
     ------
@@ -654,6 +656,7 @@ class VolSurface:
         vols_row_major: list[float],
         secondary_axis: str = "strike",
         interpolation_mode: str = "vol",
+        quote_type: str = "black_lognormal",
     ) -> None: ...
     def value_checked(self, expiry: float, strike: float) -> float:
         """Interpolated surface value with explicit bounds checking."""
@@ -671,6 +674,8 @@ class VolSurface:
     def strikes(self) -> list[float]: ...
     @property
     def secondary_axis(self) -> str: ...
+    @property
+    def quote_type(self) -> str: ...
     @property
     def interpolation_mode(self) -> str: ...
     @property

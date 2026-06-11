@@ -133,38 +133,59 @@ impl HullWhiteTreeConfig {
 
 /// Calibrated Hull-White trinomial tree.
 ///
-/// The tree is built and calibrated via [`HullWhiteTree::calibrate`]. After
-/// calibration, it can compute bond prices, forward swap rates, and annuities
-/// at any node.
+/// The tree is built and calibrated via [`HullWhiteTree::calibrate`] (uniform
+/// grid) or [`HullWhiteTree::calibrate_with_times`] (grid refined to pass
+/// exactly through caller-supplied mandatory dates such as exercise or coupon
+/// times). After calibration, it can compute bond prices, forward swap rates,
+/// and annuities at any node.
 ///
 /// # Node Indexing
 ///
-/// At step `i`, there are `2*j_max + 1` nodes where `j_max = min(i, max_j)`.
-/// Nodes are indexed from `0` to `2*j_max`, with the central node at index `j_max`.
+/// Each level `i` covers a contiguous signed-index range
+/// `[j_min(i), j_min(i) + width(i) - 1]`. Nodes are addressed by their array
+/// index `idx` in `0..width(i)`, with signed index `j = j_min(i) + idx`.
 ///
-/// The x-value at node (i, j) is: `x[i][j] = (j - j_max) * dx`
+/// The x-value at node (i, idx) is: `x = j * dx(i)` where `dx(i) = σ√(3·dt_{i-1})`
+/// is the level spacing implied by the preceding step's size.
 ///
-/// The short rate at node (i, j) is: `r[i][j] = x[i][j] + alpha[i]`
+/// The short rate at node (i, idx) is: `r = x + alpha[i]`
+///
+/// # Branching
+///
+/// Each node stores its central child (array index at the next level) plus
+/// trinomial probabilities matched to the conditional mean `x·(1 − κ·dt_i)`
+/// and variance `σ²·dt_i` of the mean-reverting x-process. The central child
+/// is chosen as the next-level node closest to the conditional mean, so the
+/// lattice self-limits its width once mean reversion pulls strongly enough —
+/// no explicit boundary-branching switch is needed.
 #[derive(Debug, Clone)]
 pub struct HullWhiteTree {
     /// Configuration parameters
     config: HullWhiteTreeConfig,
-    /// Time grid (year fractions from t=0)
+    /// Time grid (year fractions from t=0), `n+1` entries
     time_grid: Vec<f64>,
-    /// Time step size
-    dt: f64,
-    /// x-space step size (dx = σ√(3dt))
-    dx: f64,
-    /// Maximum j index for x-nodes
-    j_max: usize,
+    /// Per-step time sizes: `dts[i] = time_grid[i+1] - time_grid[i]`, `n` entries
+    dts: Vec<f64>,
+    /// Per-level x-spacing: `dxs[i] = σ√(3·dts[i-1])` (`dxs[0] = dxs[1]`), `n+1` entries
+    dxs: Vec<f64>,
+    /// Lowest signed node index at each level, `n+1` entries
+    j_mins: Vec<i32>,
+    /// Number of nodes at each level, `n+1` entries
+    widths: Vec<usize>,
     /// α(t) drift parameter at each time step (calibrated to yield curve)
     alpha: Vec<f64>,
-    /// Transition probabilities: (p_up, p_mid, p_down) for each step
-    /// Indexed by step, then by node j
-    probs: Vec<Vec<(f64, f64, f64)>>,
+    /// Per-step, per-node branching geometry, `n` entries
+    branches: Vec<Vec<NodeBranch>>,
     /// Arrow-Debreu state prices Q(t,j) for verification
     state_prices: Vec<Vec<f64>>,
 }
+
+/// Absolute tolerance used to match mandatory times against grid points.
+const GRID_TIME_TOLERANCE: f64 = 1e-9;
+
+/// Branch geometry per node: (central child array index at the next level,
+/// (p_up, p_mid, p_down)).
+type NodeBranch = (usize, (f64, f64, f64));
 
 impl HullWhiteTree {
     /// Build and calibrate a Hull-White tree to match the discount curve.
@@ -202,13 +223,50 @@ impl HullWhiteTree {
         discount_curve: &dyn Discounting,
         time_to_maturity: f64,
     ) -> Result<Self> {
+        Self::calibrate_with_times(config, discount_curve, time_to_maturity, &[])
+    }
+
+    /// Build and calibrate a Hull-White tree whose time grid passes exactly
+    /// through caller-supplied mandatory times.
+    ///
+    /// The grid is built segment-by-segment between consecutive mandatory
+    /// times (exercise dates, coupon dates, fixing dates, ...), with each
+    /// segment subdivided so the total step count stays close to
+    /// `config.steps` while every mandatory time lands exactly on a grid
+    /// point. Steps therefore have per-step sizes `dt_i`, and each level
+    /// uses spacing `dx_i = σ√(3·dt_{i-1})`.
+    ///
+    /// With an empty `mandatory_times`, this degenerates to the uniform grid
+    /// built by [`HullWhiteTree::calibrate`].
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Tree configuration (κ, σ, target steps)
+    /// * `discount_curve` - Initial yield curve for calibration
+    /// * `time_to_maturity` - Total tree horizon in years
+    /// * `mandatory_times` - Times (year fractions) that must coincide with
+    ///   grid points; entries outside `(0, time_to_maturity)` are ignored
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_core::Error::Validation`] if the configuration is
+    /// invalid, `time_to_maturity` is not a finite positive number, a
+    /// mandatory time is not finite, or calibration produces invalid
+    /// transition probabilities.
+    pub fn calibrate_with_times(
+        config: HullWhiteTreeConfig,
+        discount_curve: &dyn Discounting,
+        time_to_maturity: f64,
+        mandatory_times: &[f64],
+    ) -> Result<Self> {
         config.validate()?;
 
         // Validate the tree horizon up front. Without this check a
         // non-positive `time_to_maturity` yields `dt <= 0`, and the failure
-        // only surfaces deep inside `compute_probabilities` as the misleading
-        // "probabilities require finite, positive inputs". The `is_finite`
-        // check runs first so the subsequent `> 0.0` cannot see a `NaN`.
+        // only surfaces deep inside the probability computation as the
+        // misleading "probabilities require finite, positive inputs". The
+        // `is_finite` check runs first so the subsequent `> 0.0` cannot see
+        // a `NaN`.
         let horizon_ok = time_to_maturity.is_finite() && time_to_maturity > 0.0;
         if !horizon_ok {
             return Err(finstack_core::Error::Validation(format!(
@@ -217,128 +275,244 @@ impl HullWhiteTree {
             )));
         }
 
-        let dt = time_to_maturity / config.steps as f64;
-        // Standard trinomial spacing: dx = σ√(3dt) ensures variance matching
-        let dx = config.sigma * (3.0 * dt).sqrt();
+        let time_grid = Self::build_time_grid(config.steps, time_to_maturity, mandatory_times)?;
+        let n = time_grid.len() - 1;
 
-        // Maximum j value (tree width limit based on mean reversion)
-        //
-        // For mean-reverting processes, the tree width is bounded to prevent
-        // probabilities from becoming negative or unstable at extreme nodes.
-        //
-        // The theoretical limit j_max is derived from the requirement that the
-        // standard trinomial probabilities remain positive. For Hull-White:
-        //
-        //   p_up = 1/6 + (j²M² + jM)/2
-        //   p_mid = 2/3 - j²M²
-        //   p_down = 1/6 + (j²M² - jM)/2
-        //
-        // where M = κ·dt. For p_mid > 0, we need: j²M² < 2/3
-        // Solving: |j| < √(2/3) / M = 0.816 / (κ·dt)
-        //
-        // The constant 0.184 ≈ 1 - 0.816 provides a conservative margin
-        // to ensure probabilities remain well-behaved.
-        //
-        // Reference: Hull & White (1994), "Numerical Procedures for Implementing
-        // Term Structure Models I: Single-Factor Models"
-        let j_max_theoretical = (0.184 / (config.kappa * dt)).ceil() as usize;
-        let j_max = config
-            .max_nodes
-            .map(|m| (m - 1) / 2)
-            .unwrap_or(j_max_theoretical)
-            .max(1);
+        let dts: Vec<f64> = time_grid.windows(2).map(|w| w[1] - w[0]).collect();
+        // Level spacing: dx_i = σ√(3·dt_{i-1}) matches the variance of the
+        // step *arriving* at level i. Level 0 has a single node at x = 0, so
+        // its spacing is irrelevant; mirror dx_1 for accessor consistency.
+        let mut dxs = Vec::with_capacity(n + 1);
+        dxs.push(config.sigma * (3.0 * dts[0]).sqrt());
+        for &dt_i in &dts {
+            dxs.push(config.sigma * (3.0 * dt_i).sqrt());
+        }
 
-        // Build time grid
-        let time_grid: Vec<f64> = (0..=config.steps).map(|i| i as f64 * dt).collect();
+        // Optional hard cap on level width from `max_nodes`: signed index
+        // |j| ≤ j_cap. Central children are clamped to keep all three
+        // branches inside the cap; if the cap is too tight the resulting
+        // probabilities go negative and calibration fails loudly below.
+        let j_cap: Option<i32> = config.max_nodes.map(|m| ((m.max(3) - 1) / 2) as i32);
 
-        // Initialize alpha and state prices
-        let mut alpha = vec![0.0; config.steps + 1];
-        let mut state_prices = Vec::with_capacity(config.steps + 1);
-        let mut probs = Vec::with_capacity(config.steps);
+        let mut j_mins: Vec<i32> = vec![0];
+        let mut widths: Vec<usize> = vec![1];
+        let mut alpha = vec![0.0; n + 1];
+        let mut branches: Vec<Vec<NodeBranch>> = Vec::with_capacity(n);
+        let mut state_prices: Vec<Vec<f64>> = Vec::with_capacity(n + 1);
 
         // Initial state: single node at t=0 with Q(0,0) = 1
         state_prices.push(vec![1.0]);
 
-        // Forward induction: calibrate α(t) at each step.
+        // Forward induction: build branching geometry, calibrate α(t) for
+        // each interval [t_step, t_{step+1}], and roll state prices forward.
         //
         // The α solved at iteration `step` is the drift adjustment for the
-        // interval [t_step, t_{step+1}] (it matches P(0, t_{step+1}) given the
-        // state prices at t_step), so it must be stored at `alpha[step]` —
-        // the index `forward_state_prices` and `backward_induction` use to
-        // discount that interval. Storing it at `alpha[step+1]` shifted the
-        // whole drift schedule by one step and left the tree unable to
-        // reprice any non-flat curve (review finding B4).
-        for step in 0..config.steps {
-            let _t = time_grid[step];
-            let t_next = time_grid[step + 1];
+        // interval [t_step, t_{step+1}] (it matches P(0, t_{step+1}) given
+        // the state prices at t_step), so it is stored at `alpha[step]` —
+        // the index `backward_induction` uses to discount that interval
+        // (review finding B4).
+        for step in 0..n {
+            let dt_i = dts[step];
+            let dx_curr = dxs[step];
+            let dx_next = dxs[step + 1];
+            let variance = config.sigma * config.sigma * dt_i;
 
-            // Number of nodes at current and next step
-            let curr_j_max = step.min(j_max);
-            let next_j_max = (step + 1).min(j_max);
-
-            // Compute transition probabilities for this step
-            let mut step_probs = Vec::with_capacity(2 * curr_j_max + 1);
-            for j in 0..=(2 * curr_j_max) {
-                let j_signed = j as i32 - curr_j_max as i32;
-                let p = Self::compute_probabilities(config.kappa, dt, dx, j_signed, j_max)?;
-                step_probs.push(p);
+            // Pass 1: central child (signed index at next level) per node.
+            // The conditional mean of x over the step is x·(1 − κ·dt_i);
+            // branch around the closest next-level node.
+            let width = widths[step];
+            let j_min = j_mins[step];
+            let mut centers = Vec::with_capacity(width);
+            for idx in 0..width {
+                let j = j_min + idx as i32;
+                let x = j as f64 * dx_curr;
+                let m_target = x * (1.0 - config.kappa * dt_i);
+                let mut k = (m_target / dx_next).round() as i32;
+                if let Some(cap) = j_cap {
+                    k = k.clamp(-(cap - 1), cap - 1);
+                }
+                centers.push(k);
             }
-            probs.push(step_probs);
+
+            let next_j_min = centers.iter().copied().min().unwrap_or(0) - 1;
+            let next_j_max = centers.iter().copied().max().unwrap_or(0) + 1;
+            let next_width = (next_j_max - next_j_min + 1) as usize;
+
+            // Pass 2: probabilities matched to the conditional mean and
+            // variance around each central child.
+            let mut step_branches = Vec::with_capacity(width);
+            for (idx, &k) in centers.iter().enumerate() {
+                let j = j_min + idx as i32;
+                let x = j as f64 * dx_curr;
+                let m_target = x * (1.0 - config.kappa * dt_i);
+                let eta = m_target - k as f64 * dx_next;
+                let probs = Self::branch_probabilities(eta, variance, dx_next, j)?;
+                step_branches.push(((k - next_j_min) as usize, probs));
+            }
 
             // Calibrate α for the interval [t_step, t_next] to match the
             // discount factor at t_next.
-            let target_df = discount_curve.df(t_next);
+            let target_df = discount_curve.df(time_grid[step + 1]);
             alpha[step] = Self::calibrate_alpha(
                 &state_prices[step],
-                &probs[step],
-                dx,
-                dt,
-                curr_j_max,
-                next_j_max,
+                j_min,
+                dx_curr,
+                dt_i,
                 target_df,
                 config.compounding,
             )?;
 
-            // Compute state prices for next step
-            let next_state_prices = Self::forward_state_prices(
-                &state_prices[step],
-                &probs[step],
-                &alpha,
-                step,
-                dx,
-                dt,
-                curr_j_max,
-                next_j_max,
-                config.compounding,
-            );
-            state_prices.push(next_state_prices);
+            // Roll Arrow-Debreu state prices forward through the branches.
+            let mut next_q = vec![0.0; next_width];
+            for (idx, &(center, (p_up, p_mid, p_down))) in step_branches.iter().enumerate() {
+                let j = j_min + idx as i32;
+                let r_j = j as f64 * dx_curr + alpha[step];
+                let contribution = state_prices[step][idx] * config.compounding.df(r_j, dt_i);
+                next_q[center + 1] += contribution * p_up;
+                next_q[center] += contribution * p_mid;
+                next_q[center - 1] += contribution * p_down;
+            }
+
+            branches.push(step_branches);
+            state_prices.push(next_q);
+            j_mins.push(next_j_min);
+            widths.push(next_width);
         }
 
         // Terminal row: no interval [t_N, t_{N+1}] exists to calibrate, so
         // extend the last solved drift for accessors that read rates at the
         // final step.
-        if config.steps > 0 {
-            alpha[config.steps] = alpha[config.steps - 1];
+        if n > 0 {
+            alpha[n] = alpha[n - 1];
         }
 
         Ok(Self {
             config,
             time_grid,
-            dt,
-            dx,
-            j_max,
+            dts,
+            dxs,
+            j_mins,
+            widths,
             alpha,
-            probs,
+            branches,
             state_prices,
         })
+    }
+
+    /// Build a time grid from `0` to `time_to_maturity` that passes exactly
+    /// through every mandatory time, targeting ~`steps` total steps.
+    ///
+    /// Each segment between consecutive anchors is subdivided uniformly with
+    /// the number of substeps chosen so the local step size stays close to
+    /// the global target `time_to_maturity / steps`.
+    fn build_time_grid(
+        steps: usize,
+        time_to_maturity: f64,
+        mandatory_times: &[f64],
+    ) -> Result<Vec<f64>> {
+        for &t in mandatory_times {
+            if !t.is_finite() {
+                return Err(Error::Validation(format!(
+                    "Hull-White tree mandatory times must be finite, got {t}"
+                )));
+            }
+        }
+
+        let mut anchors: Vec<f64> = mandatory_times
+            .iter()
+            .copied()
+            .filter(|&t| t > GRID_TIME_TOLERANCE && t < time_to_maturity - GRID_TIME_TOLERANCE)
+            .collect();
+        anchors.sort_by(|a, b| a.total_cmp(b));
+        anchors.dedup_by(|a, b| (*a - *b).abs() <= GRID_TIME_TOLERANCE);
+        anchors.push(time_to_maturity);
+
+        let target_dt = time_to_maturity / steps as f64;
+        let mut grid = Vec::with_capacity(steps + anchors.len() + 1);
+        grid.push(0.0);
+        let mut prev = 0.0;
+        for &anchor in &anchors {
+            let segment = anchor - prev;
+            let substeps = ((segment / target_dt).round() as usize).max(1);
+            for i in 1..=substeps {
+                grid.push(prev + segment * i as f64 / substeps as f64);
+            }
+            // Force the anchor to land exactly (no floating-point drift).
+            if let Some(last) = grid.last_mut() {
+                *last = anchor;
+            }
+            prev = anchor;
+        }
+        Ok(grid)
+    }
+
+    /// Trinomial probabilities matched to a conditional mean offset `eta`
+    /// (distance from the central child, in rate units) and conditional
+    /// variance `variance`, on a next-level spacing `dx`.
+    ///
+    /// ```text
+    /// p_up   = (variance + eta²)/(2dx²) + eta/(2dx)
+    /// p_mid  = 1 − (variance + eta²)/dx²
+    /// p_down = (variance + eta²)/(2dx²) − eta/(2dx)
+    /// ```
+    ///
+    /// With `dx² = 3·variance` and `eta = 0` this reduces to the canonical
+    /// (1/6, 2/3, 1/6) interior branching.
+    fn branch_probabilities(eta: f64, variance: f64, dx: f64, j: i32) -> Result<(f64, f64, f64)> {
+        if !eta.is_finite() || !variance.is_finite() || !dx.is_finite() || dx <= 0.0 {
+            return Err(Error::Validation(
+                "Hull-White probabilities require finite, positive inputs".to_string(),
+            ));
+        }
+
+        let a = (variance + eta * eta) / (dx * dx);
+        let b = eta / dx;
+        let mut p_up = (a + b) / 2.0;
+        let mut p_mid = 1.0 - a;
+        let mut p_down = (a - b) / 2.0;
+
+        // Ensure probabilities are valid (handle numerical edge cases)
+        if p_up < 0.0
+            || p_mid < 0.0
+            || p_down < 0.0
+            || !p_up.is_finite()
+            || !p_mid.is_finite()
+            || !p_down.is_finite()
+        {
+            return Err(Error::Validation(format!(
+                "Hull-White probabilities invalid at j={j} (p_up={p_up}, p_mid={p_mid}, p_down={p_down})"
+            )));
+        }
+
+        // Normalize to ensure sum = 1
+        let sum = p_up + p_mid + p_down;
+        if sum > 0.0 && sum.is_finite() {
+            p_up /= sum;
+            p_mid /= sum;
+            p_down /= sum;
+        } else {
+            return Err(Error::Validation(
+                "Hull-White probabilities did not sum to a finite value".to_string(),
+            ));
+        }
+
+        let normalized_sum = p_up + p_mid + p_down;
+        if (normalized_sum - 1.0).abs() > 1.0e-9 {
+            return Err(Error::Validation(format!(
+                "Hull-White probabilities failed the sum-to-one invariant at \
+                 j={j}: p_up={p_up}, p_mid={p_mid}, p_down={p_down} (sum={normalized_sum})"
+            )));
+        }
+
+        Ok((p_up, p_mid, p_down))
     }
 
     /// Compute trinomial transition probabilities for node j.
     ///
     /// For the Hull-White model with mean reversion κ:
-    /// - p_up = 1/6 + (j²M² + jM)/2
+    /// - p_up = 1/6 + (j²M² - jM)/2
     /// - p_mid = 2/3 - j²M²
-    /// - p_down = 1/6 + (j²M² - jM)/2
+    /// - p_down = 1/6 + (j²M² + jM)/2
     ///
     /// where M = κ·dt
     ///
@@ -471,7 +645,8 @@ impl HullWhiteTree {
         }
     }
 
-    /// Calibrate α at next step to match target discount factor.
+    /// Calibrate α for the interval starting at the current level to match
+    /// the target discount factor.
     ///
     /// For continuous compounding, the closed-form solution is used:
     ///   `exp(-α*dt) * Σ Q(t,j) * exp(-x(t,j)*dt) = target_df`
@@ -480,26 +655,21 @@ impl HullWhiteTree {
     /// For periodic compounding, a numerical root-find is used since α
     /// enters nonlinearly into the per-node discount factor
     /// `comp.df(x_j + α, dt)`.
-    #[allow(clippy::too_many_arguments)]
     fn calibrate_alpha(
         curr_state_prices: &[f64],
-        curr_probs: &[(f64, f64, f64)],
+        j_min: i32,
         dx: f64,
         dt: f64,
-        curr_j_max: usize,
-        _next_j_max: usize,
         target_df: f64,
         compounding: TreeCompounding,
     ) -> Result<f64> {
         match compounding {
             TreeCompounding::Continuous => {
                 let mut weighted_sum = 0.0;
-                for j in 0..curr_state_prices.len() {
-                    let j_signed = j as i32 - curr_j_max as i32;
-                    let x_j = j_signed as f64 * dx;
-                    let (p_up, p_mid, p_down) = curr_probs[j];
-                    let base_discount = (-x_j * dt).exp();
-                    weighted_sum += curr_state_prices[j] * base_discount * (p_up + p_mid + p_down);
+                for (idx, &q) in curr_state_prices.iter().enumerate() {
+                    let j = j_min + idx as i32;
+                    let x_j = j as f64 * dx;
+                    weighted_sum += q * (-x_j * dt).exp();
                 }
                 if weighted_sum <= 0.0 {
                     return Err(Error::Validation(
@@ -512,14 +682,10 @@ impl HullWhiteTree {
                 use finstack_core::math::solver::{BrentSolver, Solver};
                 let objective = |alpha: f64| -> f64 {
                     let mut model_df = 0.0;
-                    for j in 0..curr_state_prices.len() {
-                        let j_signed = j as i32 - curr_j_max as i32;
-                        let x_j = j_signed as f64 * dx;
-                        let r_j = x_j + alpha;
-                        let (p_up, p_mid, p_down) = curr_probs[j];
-                        model_df += curr_state_prices[j]
-                            * compounding.df(r_j, dt)
-                            * (p_up + p_mid + p_down);
+                    for (idx, &q) in curr_state_prices.iter().enumerate() {
+                        let j = j_min + idx as i32;
+                        let x_j = j as f64 * dx;
+                        model_df += q * compounding.df(x_j + alpha, dt);
                     }
                     model_df - target_df
                 };
@@ -535,48 +701,6 @@ impl HullWhiteTree {
         }
     }
 
-    /// Compute state prices for next time step.
-    #[allow(clippy::too_many_arguments)]
-    fn forward_state_prices(
-        curr_state_prices: &[f64],
-        curr_probs: &[(f64, f64, f64)],
-        alpha: &[f64],
-        step: usize,
-        dx: f64,
-        dt: f64,
-        curr_j_max: usize,
-        next_j_max: usize,
-        compounding: TreeCompounding,
-    ) -> Vec<f64> {
-        let num_next_nodes = 2 * next_j_max + 1;
-        let mut next_prices = vec![0.0; num_next_nodes];
-
-        for j in 0..curr_state_prices.len() {
-            let j_signed = j as i32 - curr_j_max as i32;
-            let x_j = j_signed as f64 * dx;
-            let r_j = x_j + alpha[step];
-
-            let probs = curr_probs[j];
-            let discount = compounding.df(r_j, dt);
-            let q_contribution = curr_state_prices[j] * discount;
-
-            let boundary_j_max = if curr_j_max == next_j_max {
-                curr_j_max
-            } else {
-                usize::MAX
-            };
-            for (offset, probability) in Self::transition_offsets(j_signed, boundary_j_max, probs) {
-                if let Some(next_idx) = Self::transition_index(j_signed, offset, next_j_max) {
-                    if next_idx < num_next_nodes {
-                        next_prices[next_idx] += q_contribution * probability;
-                    }
-                }
-            }
-        }
-
-        next_prices
-    }
-
     // ========================================================================
     // Accessor Methods
     // ========================================================================
@@ -588,7 +712,7 @@ impl HullWhiteTree {
 
     /// Get number of time steps.
     pub fn num_steps(&self) -> usize {
-        self.config.steps
+        self.time_grid.len() - 1
     }
 
     /// Get time at step i.
@@ -596,22 +720,33 @@ impl HullWhiteTree {
         self.time_grid.get(step).copied().unwrap_or(0.0)
     }
 
-    /// Get time step size.
-    pub fn dt(&self) -> f64 {
-        self.dt
+    /// Get the full time grid (year fractions from t=0), `num_steps() + 1`
+    /// entries.
+    pub fn time_grid(&self) -> &[f64] {
+        &self.time_grid
+    }
+
+    /// Get the time step size of the interval `[t_step, t_{step+1}]`.
+    ///
+    /// Out-of-range steps return the last interval's size.
+    pub fn dt_at_step(&self, step: usize) -> f64 {
+        self.dts
+            .get(step)
+            .or(self.dts.last())
+            .copied()
+            .unwrap_or(0.0)
     }
 
     /// Get number of nodes at a given step.
     pub fn num_nodes(&self, step: usize) -> usize {
-        let j_max = step.min(self.j_max);
-        2 * j_max + 1
+        self.widths.get(step).copied().unwrap_or(0)
     }
 
     /// Get short rate r(t,j) at node (step, node_idx).
     pub fn rate_at_node(&self, step: usize, node_idx: usize) -> f64 {
-        let j_max = step.min(self.j_max);
-        let j_signed = node_idx as i32 - j_max as i32;
-        let x_j = j_signed as f64 * self.dx;
+        let j_min = self.j_mins.get(step).copied().unwrap_or(0);
+        let dx = self.dxs.get(step).copied().unwrap_or(0.0);
+        let x_j = (j_min + node_idx as i32) as f64 * dx;
         x_j + self.alpha.get(step).copied().unwrap_or(0.0)
     }
 
@@ -619,11 +754,24 @@ impl HullWhiteTree {
     ///
     /// Returns (p_up, p_mid, p_down).
     pub fn probabilities(&self, step: usize, node_idx: usize) -> (f64, f64, f64) {
-        self.probs
+        self.branches
             .get(step)
             .and_then(|p| p.get(node_idx))
-            .copied()
+            .map(|&(_, probs)| probs)
             .unwrap_or((1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0))
+    }
+
+    /// Get the central child of node (step, node_idx) as an array index at
+    /// level `step + 1`.
+    ///
+    /// The up/down children are `center + 1` / `center - 1`. Out-of-range
+    /// queries return 0.
+    pub fn branch_center(&self, step: usize, node_idx: usize) -> usize {
+        self.branches
+            .get(step)
+            .and_then(|p| p.get(node_idx))
+            .map(|&(center, _)| center)
+            .unwrap_or(0)
     }
 
     /// Get state price Q(t,j) at node (step, node_idx).
@@ -691,9 +839,19 @@ impl HullWhiteTree {
 
         // Forward rate at t=0 for maturity t
         let f_0_t = if t > 0.0 {
-            discount_curve
-                .instantaneous_forward(t)
-                .unwrap_or_else(|_| -p_0_t.ln() / t)
+            discount_curve.instantaneous_forward(t).unwrap_or_else(|e| {
+                // Fall back to the average zero rate -ln P(0,t)/t. This keeps
+                // the f64 signature (bond_price is called inside f64-returning
+                // backward-induction closures) but the substitution is no
+                // longer silent.
+                tracing::warn!(
+                    time = t,
+                    error = %e,
+                    "HullWhiteTree::bond_price: instantaneous forward unavailable; \
+                     falling back to average zero rate -ln P(0,t)/t"
+                );
+                -p_0_t.ln() / t
+            })
         } else {
             self.alpha[0]
         };
@@ -817,52 +975,61 @@ impl HullWhiteTree {
     ///
     /// The `intermediate_value_fn` takes (step, node_idx, continuation_value) and returns
     /// the adjusted value (e.g., max(continuation, exercise_value) for Bermudan options).
-    pub fn backward_induction<F>(&self, terminal_values: &[f64], intermediate_value_fn: F) -> f64
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `terminal_values.len()` does not match
+    /// the number of nodes at the final step (`num_nodes(steps)`).
+    pub fn backward_induction<F>(
+        &self,
+        terminal_values: &[f64],
+        intermediate_value_fn: F,
+    ) -> finstack_core::Result<f64>
     where
         F: Fn(usize, usize, f64) -> f64,
     {
-        let n = self.config.steps;
+        let n = self.num_steps();
 
-        // Start with terminal values
-        let mut values = terminal_values.to_vec();
+        let expected = self.num_nodes(n);
+        if terminal_values.len() != expected {
+            return Err(finstack_core::Error::Validation(format!(
+                "HullWhiteTree::backward_induction: terminal_values has {} entries but the \
+                 final step has {} nodes",
+                terminal_values.len(),
+                expected
+            )));
+        }
 
-        // Reuse scratch buffer across steps to avoid per-step allocation
-        let max_nodes = self.num_nodes(n);
+        // Reuse two scratch buffers across steps to avoid per-step
+        // allocation. Both are sized to the widest level: the buffers swap
+        // every step, and interior levels can be wider than the terminal
+        // level when mean reversion contracts the lattice near maturity.
+        let max_nodes = self.widths.iter().copied().max().unwrap_or(1);
+        let mut values = vec![0.0; max_nodes];
+        values[..terminal_values.len()].copy_from_slice(terminal_values);
         let mut scratch = vec![0.0; max_nodes];
         let comp = self.config.compounding;
 
         // Backward induction
         for step in (0..n).rev() {
             let num_nodes = self.num_nodes(step);
-            let num_next_nodes = self.num_nodes(step + 1);
-            let j_max_curr = step.min(self.j_max);
-            let j_max_next = (step + 1).min(self.j_max);
-
+            let dt_i = self.dts[step];
             let alpha_step = self.alpha.get(step).copied().unwrap_or(0.0);
+            let j_min = self.j_mins[step];
+            let dx = self.dxs[step];
+            let step_branches = &self.branches[step];
 
-            for (j, scratch_j) in scratch.iter_mut().enumerate().take(num_nodes) {
-                let j_signed = j as i32 - j_max_curr as i32;
-                let r_j = j_signed as f64 * self.dx + alpha_step;
-                let probs = self.probabilities(step, j);
+            for (idx, scratch_j) in scratch.iter_mut().enumerate().take(num_nodes) {
+                let j = j_min + idx as i32;
+                let r_j = j as f64 * dx + alpha_step;
+                let (center, (p_up, p_mid, p_down)) = step_branches[idx];
 
-                let mut expected_value = 0.0;
-                let boundary_j_max = if j_max_curr == j_max_next {
-                    j_max_curr
-                } else {
-                    usize::MAX
-                };
-                for (offset, probability) in
-                    Self::transition_offsets(j_signed, boundary_j_max, probs)
-                {
-                    if let Some(next_idx) = Self::transition_index(j_signed, offset, j_max_next) {
-                        if next_idx < num_next_nodes {
-                            expected_value += probability * values[next_idx];
-                        }
-                    }
-                }
-                let discounted = expected_value * comp.df(r_j, self.dt);
+                let expected_value = p_up * values[center + 1]
+                    + p_mid * values[center]
+                    + p_down * values[center - 1];
+                let discounted = expected_value * comp.df(r_j, dt_i);
 
-                *scratch_j = intermediate_value_fn(step, j, discounted);
+                *scratch_j = intermediate_value_fn(step, idx, discounted);
             }
 
             // Swap buffers instead of allocating new Vec
@@ -870,16 +1037,52 @@ impl HullWhiteTree {
         }
 
         // Return value at root node
-        values.first().copied().unwrap_or(0.0)
+        Ok(values.first().copied().unwrap_or(0.0))
     }
 
     /// Map a time (year fraction) to the nearest tree step.
+    ///
+    /// Mandatory times supplied to [`HullWhiteTree::calibrate_with_times`]
+    /// land exactly on grid points, so for those the nearest step is exact.
+    /// Use [`HullWhiteTree::step_at_time`] when an exact match is required.
     pub fn time_to_step(&self, time: f64) -> usize {
         if time <= 0.0 {
             return 0;
         }
-        let step = (time / self.dt).round() as usize;
-        step.min(self.config.steps)
+        let n = self.num_steps();
+        if time >= self.time_grid[n] {
+            return n;
+        }
+        // First grid point strictly greater than `time`.
+        let upper = self.time_grid.partition_point(|&t| t <= time);
+        debug_assert!(upper >= 1 && upper <= n);
+        let lower = upper - 1;
+        if (time - self.time_grid[lower]).abs() <= (self.time_grid[upper] - time).abs() {
+            lower
+        } else {
+            upper
+        }
+    }
+
+    /// Map a time (year fraction) to the tree step whose grid point matches
+    /// it exactly (within a small absolute tolerance).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when no grid point matches — i.e. the time
+    /// was not supplied as a mandatory time during calibration and does not
+    /// happen to coincide with the grid.
+    pub fn step_at_time(&self, time: f64) -> Result<usize> {
+        let step = self.time_to_step(time);
+        let grid_time = self.time_at_step(step);
+        if (grid_time - time).abs() <= GRID_TIME_TOLERANCE.max(1e-12 * time.abs()) {
+            Ok(step)
+        } else {
+            Err(Error::Validation(format!(
+                "Hull-White tree has no grid point at t={time} (nearest is t={grid_time}); \
+                 pass it as a mandatory time to calibrate_with_times"
+            )))
+        }
     }
 }
 
@@ -994,7 +1197,9 @@ mod tests {
         // Backward induction of a unit payoff must also recover the curve.
         let final_step = tree.num_steps();
         let terminal = vec![1.0; tree.num_nodes(final_step)];
-        let value = tree.backward_induction(&terminal, |_, _, cont| cont);
+        let value = tree
+            .backward_induction(&terminal, |_, _, cont| cont)
+            .expect("terminal values sized to final step");
         let target_df = steep_curve.df(10.0);
         let error_bps = ((value - target_df) / target_df).abs() * 10000.0;
         assert!(
@@ -1113,7 +1318,9 @@ mod tests {
 
         // Zero payoff should give zero value
         let terminal = vec![0.0; tree.num_nodes(10)];
-        let value = tree.backward_induction(&terminal, |_, _, cont| cont);
+        let value = tree
+            .backward_induction(&terminal, |_, _, cont| cont)
+            .expect("terminal values sized to final step");
 
         assert!(value.abs() < 1e-10, "Zero payoff should give zero value");
     }
@@ -1130,7 +1337,9 @@ mod tests {
 
         // Unit payoff at all nodes should give approximately the discount factor
         let terminal = vec![1.0; tree.num_nodes(final_step)];
-        let value = tree.backward_induction(&terminal, |_, _, cont| cont);
+        let value = tree
+            .backward_induction(&terminal, |_, _, cont| cont)
+            .expect("terminal values sized to final step");
 
         let target_df = curve.df(1.0);
         let error = (value - target_df).abs();
@@ -1144,6 +1353,26 @@ mod tests {
             target_df,
             error_bps
         );
+    }
+
+    #[test]
+    fn backward_induction_rejects_mis_sized_terminal_values() {
+        let config = HullWhiteTreeConfig::new(0.03, 0.01, 50);
+        let curve = test_discount_curve();
+        let tree =
+            HullWhiteTree::calibrate(config, &curve, 1.0).expect("Calibration should succeed");
+
+        let expected = tree.num_nodes(tree.num_steps());
+        for bad_len in [0, expected - 1, expected + 1] {
+            let terminal = vec![1.0; bad_len];
+            let err = tree
+                .backward_induction(&terminal, |_, _, cont| cont)
+                .expect_err("mis-sized terminal values must be rejected");
+            assert!(
+                err.to_string().contains("terminal_values"),
+                "error should name terminal_values: {err}"
+            );
+        }
     }
 
     #[test]
@@ -1209,21 +1438,24 @@ mod tests {
 
     #[test]
     fn test_high_kappa_boundary_nodes_hit() {
-        // High mean reversion forces boundary nodes to be exercised.
-        // j_max = ceil(0.184 / (kappa * dt)). With kappa=0.15, steps=100, T=5:
-        // dt = 0.05, j_max = ceil(0.184 / 0.0075) = 25. At step 100, tree
-        // would extend to j=100 but is capped at j=25, so boundaries are active.
+        // High mean reversion must contain the lattice width: branching
+        // centers on the conditional mean x·(1 − κ·dt), so once |j|·κ·dt
+        // exceeds 0.5 the central child rounds inward and growth stops at
+        // roughly j ≈ 0.5/(κ·dt). With κ=0.15, steps=100, T=5 (dt=0.05),
+        // that bound is j ≈ 67 (width ≈ 135) versus the uncontained 201.
         let config = HullWhiteTreeConfig::new(0.15, 0.01, 100);
         let curve = test_discount_curve();
 
         let tree =
             HullWhiteTree::calibrate(config, &curve, 5.0).expect("Calibration should succeed");
 
-        // Verify boundary is actually hit: j_max should be small
+        // Verify mean reversion actually limits the width well below the
+        // uncontained 2·steps + 1 node count.
+        let final_width = tree.num_nodes(tree.num_steps());
         assert!(
-            tree.j_max < 50,
-            "j_max={} should be < 50 to exercise boundary code",
-            tree.j_max
+            final_width < 150,
+            "final width {} should be mean-reversion-contained (< 150)",
+            final_width
         );
 
         // State prices should still approximately match discount factors
@@ -1248,7 +1480,9 @@ mod tests {
         // Unit payoff backward induction should still approximately recover df
         let final_step = tree.num_steps();
         let terminal = vec![1.0; tree.num_nodes(final_step)];
-        let value = tree.backward_induction(&terminal, |_, _, cont| cont);
+        let value = tree
+            .backward_induction(&terminal, |_, _, cont| cont)
+            .expect("terminal values sized to final step");
         let target_df = curve.df(5.0);
         let error_bps = ((value - target_df) / target_df).abs() * 10000.0;
         assert!(
@@ -1257,6 +1491,122 @@ mod tests {
             error_bps,
             value,
             target_df
+        );
+    }
+
+    #[test]
+    fn calibrate_with_times_places_mandatory_dates_on_grid() {
+        let curve = test_discount_curve();
+        let config = HullWhiteTreeConfig::new(0.03, 0.01, 100);
+        // Irregular exercise dates that a uniform 100-step grid over 5y
+        // (dt = 0.05) cannot represent exactly.
+        let mandatory = [0.7123, 1.234, 2.5, 3.99];
+        let tree = HullWhiteTree::calibrate_with_times(config, &curve, 5.0, &mandatory)
+            .expect("Calibration should succeed");
+
+        for &t in &mandatory {
+            let step = tree
+                .step_at_time(t)
+                .expect("mandatory time must land exactly on a grid point");
+            assert!(
+                (tree.time_at_step(step) - t).abs() <= 1e-9,
+                "grid point {} should equal mandatory time {}",
+                tree.time_at_step(step),
+                t
+            );
+        }
+
+        // Total step count stays close to the target.
+        let n = tree.num_steps();
+        assert!(
+            (95..=110).contains(&n),
+            "step count {} should stay near the 100-step target",
+            n
+        );
+
+        // An off-grid time still maps to the nearest step but is rejected by
+        // the exact lookup.
+        assert!(tree.step_at_time(0.7).is_err());
+    }
+
+    #[test]
+    fn calibrate_with_times_empty_matches_uniform_calibrate() {
+        let curve = test_discount_curve();
+        let config = HullWhiteTreeConfig::new(0.03, 0.01, 100);
+        let uniform = HullWhiteTree::calibrate(config.clone(), &curve, 5.0).expect("uniform");
+        let with_empty =
+            HullWhiteTree::calibrate_with_times(config, &curve, 5.0, &[]).expect("empty mandatory");
+
+        assert_eq!(uniform.num_steps(), with_empty.num_steps());
+        for step in 0..=uniform.num_steps() {
+            assert_eq!(uniform.num_nodes(step), with_empty.num_nodes(step));
+            assert!((uniform.time_at_step(step) - with_empty.time_at_step(step)).abs() < 1e-15);
+        }
+
+        let final_step = uniform.num_steps();
+        let terminal = vec![1.0; uniform.num_nodes(final_step)];
+        let v_uniform = uniform
+            .backward_induction(&terminal, |_, _, cont| cont)
+            .expect("uniform induction");
+        let v_empty = with_empty
+            .backward_induction(&terminal, |_, _, cont| cont)
+            .expect("empty-mandatory induction");
+        assert!((v_uniform - v_empty).abs() < 1e-15);
+    }
+
+    #[test]
+    fn steep_curve_recalibration_with_mandatory_pillars_stays_tight() {
+        // Per-step dt regression: a non-uniform grid through every curve
+        // pillar must still reprice the steep input curve to < 0.1 bp at
+        // every pillar, both via state prices and backward induction.
+        let steep_curve = DiscountCurve::builder("USD-OIS-STEEP")
+            .base_date(
+                finstack_core::dates::Date::from_calendar_date(2025, Month::January, 1)
+                    .expect("Valid date"),
+            )
+            .knots([
+                (0.0, 1.0),
+                (0.5, (-0.012_f64 * 0.5).exp()),
+                (1.0, (-0.018_f64 * 1.0).exp()),
+                (2.0, (-0.030_f64 * 2.0).exp()),
+                (5.0, (-0.048_f64 * 5.0).exp()),
+                (10.0, (-0.060_f64 * 10.0).exp()),
+            ])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("Valid curve");
+
+        let config = HullWhiteTreeConfig::new(0.03, 0.01, 200);
+        let pillars = [0.5, 1.0, 2.0, 5.0];
+        let tree = HullWhiteTree::calibrate_with_times(config, &steep_curve, 10.0, &pillars)
+            .expect("Calibration should succeed");
+
+        for &t in &pillars {
+            let step = tree.step_at_time(t).expect("pillar on grid");
+            let target_df = steep_curve.df(t);
+            let sum_q: f64 = (0..tree.num_nodes(step))
+                .map(|j| tree.state_price(step, j))
+                .sum();
+            let error_bps = ((sum_q - target_df) / target_df).abs() * 10000.0;
+            assert!(
+                error_bps < 0.1,
+                "Steep-curve per-step-dt calibration error {:.4} bps at pillar t={:.2}",
+                error_bps,
+                t
+            );
+        }
+
+        let final_step = tree.num_steps();
+        let terminal = vec![1.0; tree.num_nodes(final_step)];
+        let value = tree
+            .backward_induction(&terminal, |_, _, cont| cont)
+            .expect("terminal values sized to final step");
+        let target_df = steep_curve.df(10.0);
+        let error_bps = ((value - target_df) / target_df).abs() * 10000.0;
+        assert!(
+            error_bps < 0.1,
+            "Steep-curve per-step-dt backward induction error {:.4} bps",
+            error_bps
         );
     }
 }

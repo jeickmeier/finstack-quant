@@ -125,7 +125,7 @@ fn test_bermudan_price_positive() {
     let valuator = BermudanSwaptionTreeValuator::new(&swaption, &model, &curve, as_of)
         .expect("Valid valuator");
 
-    let price = valuator.price();
+    let price = valuator.price().expect("pricing should succeed");
 
     // Price should be non-negative
     assert!(
@@ -162,8 +162,8 @@ fn test_bermudan_payer_vs_receiver() {
     let receiver_valuator = BermudanSwaptionTreeValuator::new(&receiver, &model, &curve, as_of)
         .expect("Valid valuator");
 
-    let payer_price = payer_valuator.price();
-    let receiver_price = receiver_valuator.price();
+    let payer_price = payer_valuator.price().expect("pricing should succeed");
+    let receiver_price = receiver_valuator.price().expect("pricing should succeed");
 
     // Both should be positive
     assert!(payer_price >= 0.0, "Payer price should be non-negative");
@@ -202,13 +202,16 @@ fn test_bermudan_strike_sensitivity() {
 
     let low_price = BermudanSwaptionTreeValuator::new(&low_strike, &model, &curve, as_of)
         .expect("Valid valuator")
-        .price();
+        .price()
+        .expect("pricing should succeed");
     let atm_price = BermudanSwaptionTreeValuator::new(&atm_strike, &model, &curve, as_of)
         .expect("Valid valuator")
-        .price();
+        .price()
+        .expect("pricing should succeed");
     let high_price = BermudanSwaptionTreeValuator::new(&high_strike, &model, &curve, as_of)
         .expect("Valid valuator")
-        .price();
+        .price()
+        .expect("pricing should succeed");
 
     // For a payer swaption: lower strike = higher value
     assert!(
@@ -253,10 +256,12 @@ fn test_bermudan_more_exercise_dates_higher_value() {
 
     let early_price = BermudanSwaptionTreeValuator::new(&early_swaption, &model, &curve, as_of)
         .expect("Valid valuator")
-        .price();
+        .price()
+        .expect("pricing should succeed");
     let late_price = BermudanSwaptionTreeValuator::new(&late_swaption, &model, &curve, as_of)
         .expect("Valid valuator")
-        .price();
+        .price()
+        .expect("pricing should succeed");
 
     // More exercise opportunities should generally be worth more or equal
     // (this depends on the exact market conditions, but typically holds)

@@ -56,6 +56,8 @@
 //! - [`CommoditySwap`] for fixed-float swaps
 //! - [`CommodityOption`] for commodity options
 
+/// Shared business-day averaging helpers for floating legs.
+pub(crate) mod averaging;
 /// Commodity Asian option module.
 pub mod commodity_asian_option;
 /// Commodity forward module.

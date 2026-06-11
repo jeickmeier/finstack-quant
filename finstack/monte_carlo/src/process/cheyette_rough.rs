@@ -13,8 +13,17 @@
 //! dx(t) = [y(t) − κ·x(t)] dt + σ(t)·dW(t)
 //! dy(t) = [σ(t)² − 2κ·y(t)] dt
 //!
-//! σ(t)  = σ₀(t) · exp(η·W̃_H(t) − ½·η²·t^{2H})
+//! σ(t)  = σ₀(t) · exp(½·η·W̃_H(t) − ¼·η²·t^{2H})
 //! ```
+//!
+//! The vol-of-vol convention follows rBergomi **variance-lognormal**
+//! semantics: the instantaneous variance `V(t) = σ(t)²
+//! = σ₀(t)²·exp(η·W̃_H(t) − ½·η²·t^{2H})` is lognormal with full
+//! compensation, so `E[σ²(t)] = σ₀²(t)` for every `t` and `η` is directly
+//! comparable to the rBergomi vol-of-vol. (The previous σ-lognormal
+//! convention `σ = σ₀·exp(η·W̃ − ½η²t^{2H})` compensated the *vol* level
+//! instead, inflating `E[σ²]` by `exp(η²·t^{2H})` — ≈22× at η=1.5, t=5y,
+//! H=0.1.)
 //!
 //! where:
 //! - **x(t)**: Rate state variable (deviation from initial forward curve)

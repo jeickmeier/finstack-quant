@@ -13,6 +13,11 @@
 //!    the resolver returns those market-consistent parameters.
 //! 4. `HullWhiteParams::default()` when neither overrides nor calibrated market
 //!    scalars are available, with a `tracing::warn!` log.
+//!
+//! The resolver returns the winning [`Hw1fParamSource`] alongside the
+//! parameters so callers can stamp provenance, and rejects *partial* inputs
+//! (exactly one of κ/σ supplied as an override or found as a calibrated
+//! scalar) instead of silently falling through.
 
 use crate::calibration::hull_white::{
     calibrate_hull_white_to_swaptions, capfloor_hw1f_scalar_keys,
@@ -22,6 +27,37 @@ use crate::calibration::hull_white::{
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::scalars::MarketScalar;
 use finstack_core::Result;
+
+/// Where the resolved HW1F parameters came from.
+///
+/// Returned alongside the parameters by [`resolve_hw1f_params`] so pricers can
+/// stamp the provenance (`hw1f_param_source`) into logs/diagnostics instead of
+/// silently proceeding on uncalibrated defaults.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Hw1fParamSource {
+    /// Both κ and σ supplied via `PricingOverrides.model_config`.
+    Override,
+    /// Calibrated at pricing time from a volatility surface.
+    CalibratedSurface,
+    /// Pre-calibrated κ/σ read from the `MarketContext` scalar store.
+    MarketScalars,
+    /// Neither overrides, surface, nor scalars were available: the pricer's
+    /// constructor fallback or `HullWhiteParams::default()` was used.
+    DefaultFallback,
+}
+
+impl Hw1fParamSource {
+    /// Stable string form for logging / metadata stamping (`hw1f_param_source`).
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Override => "override",
+            Self::CalibratedSurface => "calibrated_surface",
+            Self::MarketScalars => "market_scalars",
+            Self::DefaultFallback => "default_fallback",
+        }
+    }
+}
 
 /// Which calibration flavour populated the [`MarketContext`] scalars.
 ///
@@ -189,6 +225,12 @@ fn resolve_swaption_surface_params(
         Ok(surface) => surface,
         Err(_) => return Ok(None),
     };
+    // The swaption calibration interprets the grid as expiry × swap-tenor with
+    // NORMAL (Bachelier) vols (`is_normal_vol: true` below). A surface tagged
+    // as strike-axis or Black-quoted would be silently misread, so enforce the
+    // contract instead of guessing.
+    surface.require_secondary_axis(finstack_core::market_data::surfaces::VolSurfaceAxis::Tenor)?;
+    surface.require_quote_type(finstack_core::market_data::surfaces::VolQuoteType::Normal)?;
     let discount = match market.get_discount(curve_id) {
         Ok(discount) => discount,
         Err(_) => return Ok(None),
@@ -223,21 +265,45 @@ fn resolve_swaption_surface_params(
 
 /// Resolve HW1F parameters following the documented precedence.
 ///
+/// Returns the parameters together with their [`Hw1fParamSource`] so callers
+/// can stamp the provenance (`hw1f_param_source`).
+///
 /// Never returns an error for the "no overrides + no calibrated scalars" case;
-/// instead emits a `tracing::warn!` and returns `HullWhiteParams::default()`.
-/// An error is only returned when overrides are malformed.
+/// instead emits a `tracing::warn!` and returns `HullWhiteParams::default()`
+/// tagged [`Hw1fParamSource::DefaultFallback`].
+///
+/// Errors when:
+/// - overrides are malformed (non-positive / non-finite values), or
+/// - a *partial* override pair is supplied (exactly one of `hw1f_kappa` /
+///   `hw1f_sigma`), or
+/// - a *partial* calibrated scalar pair is found in the `MarketContext` and no
+///   higher-precedence source resolves. Partial inputs almost certainly
+///   indicate a wiring bug; silently discarding half a parameter set and
+///   proceeding on defaults hides it.
 ///
 /// `market` is consulted for pre-calibrated κ/σ scalars (precedence step 2)
 /// when no explicit overrides are supplied.
 pub fn resolve_hw1f_params(
     req: &Hw1fResolveRequest<'_>,
     market: &MarketContext,
-) -> Result<HullWhiteParams> {
+) -> Result<(HullWhiteParams, Hw1fParamSource)> {
     let override_obj = req.overrides.and_then(|v| v.as_object());
     let override_kappa = override_positive_f64(override_obj, "hw1f_kappa")?;
     let override_sigma = override_positive_f64(override_obj, "hw1f_sigma")?;
-    if let (Some(k), Some(s)) = (override_kappa, override_sigma) {
-        return HullWhiteParams::new(k, s);
+    match (override_kappa, override_sigma) {
+        (Some(k), Some(s)) => {
+            return HullWhiteParams::new(k, s).map(|p| (p, Hw1fParamSource::Override));
+        }
+        (None, None) => {}
+        // Partial override: exactly one of κ/σ supplied. Reject instead of
+        // silently discarding the supplied value and falling through.
+        (k, s) => {
+            return Err(finstack_core::Error::Validation(format!(
+                "{}: partial HW1F override (hw1f_kappa={k:?}, hw1f_sigma={s:?}); \
+                 supply both hw1f_kappa and hw1f_sigma or neither",
+                req.context
+            )));
+        }
     }
 
     // Pre-calibrated parameters from the MarketContext scalar store.
@@ -262,22 +328,37 @@ pub fn resolve_hw1f_params(
             curve_id = req.curve_id,
             kappa = surface_params.kappa,
             sigma = surface_params.sigma,
+            hw1f_param_source = Hw1fParamSource::CalibratedSurface.as_str(),
             "resolved HW1F parameters from volatility surface"
         );
-        return Ok(surface_params);
+        return Ok((surface_params, Hw1fParamSource::CalibratedSurface));
     }
 
     // (3) Pre-calibrated parameters from the MarketContext scalar store.
-    if let (Some(k), Some(s)) = (kappa, sigma) {
-        tracing::debug!(
-            target = "finstack.exotic_rates",
-            context = req.context,
-            curve_id = req.curve_id,
-            kappa = k,
-            sigma = s,
-            "resolved HW1F parameters from calibrated MarketContext scalars"
-        );
-        return HullWhiteParams::new(k, s);
+    match (kappa, sigma) {
+        (Some(k), Some(s)) => {
+            tracing::debug!(
+                target = "finstack.exotic_rates",
+                context = req.context,
+                curve_id = req.curve_id,
+                kappa = k,
+                sigma = s,
+                hw1f_param_source = Hw1fParamSource::MarketScalars.as_str(),
+                "resolved HW1F parameters from calibrated MarketContext scalars"
+            );
+            return HullWhiteParams::new(k, s).map(|p| (p, Hw1fParamSource::MarketScalars));
+        }
+        (None, None) => {}
+        // Partial calibrated pair: exactly one of the κ/σ scalars exists under
+        // this flavour's keys. A prior calibration step wrote half a parameter
+        // set — reject instead of silently proceeding on defaults.
+        (k, s) => {
+            return Err(finstack_core::Error::Validation(format!(
+                "{}: partial calibrated HW1F scalars for curve '{}' \
+                 ({kappa_key}={k:?}, {sigma_key}={s:?}); both must be present",
+                req.context, req.curve_id
+            )));
+        }
     }
 
     // (4) Genuine fallback: no overrides, no surface, no calibrated scalars.
@@ -286,9 +367,10 @@ pub fn resolve_hw1f_params(
         context = req.context,
         kappa = defaults.kappa,
         sigma = defaults.sigma,
+        hw1f_param_source = Hw1fParamSource::DefaultFallback.as_str(),
         "no HW1F overrides, volatility surface, or calibrated market scalars found; using fallback parameters"
     );
-    Ok(defaults)
+    Ok((defaults, Hw1fParamSource::DefaultFallback))
 }
 
 #[cfg(test)]
@@ -321,18 +403,19 @@ mod tests {
     #[test]
     fn overrides_are_used_when_present() {
         let overrides = json!({ "hw1f_kappa": 0.05, "hw1f_sigma": 0.012 });
-        let params = resolve_hw1f_params(
+        let (params, source) = resolve_hw1f_params(
             &req("USD-OIS", Hw1fCalibrationFlavor::Swaption, Some(&overrides)),
             &empty_market(),
         )
         .expect("ok");
         assert!((params.kappa - 0.05).abs() < 1e-12);
         assert!((params.sigma - 0.012).abs() < 1e-12);
+        assert_eq!(source, Hw1fParamSource::Override);
     }
 
     #[test]
     fn defaults_when_nothing_provided() {
-        let params = resolve_hw1f_params(
+        let (params, source) = resolve_hw1f_params(
             &req("USD-OIS", Hw1fCalibrationFlavor::Swaption, None),
             &empty_market(),
         )
@@ -340,6 +423,7 @@ mod tests {
         let default = HullWhiteParams::default();
         assert!((params.kappa - default.kappa).abs() < 1e-12);
         assert!((params.sigma - default.sigma).abs() < 1e-12);
+        assert_eq!(source, Hw1fParamSource::DefaultFallback);
     }
 
     #[test]
@@ -368,16 +452,18 @@ mod tests {
     }
 
     #[test]
-    fn partial_override_falls_through_to_default() {
+    fn partial_override_is_rejected() {
         let overrides = json!({ "hw1f_kappa": 0.07 });
-        let params = resolve_hw1f_params(
+        let err = resolve_hw1f_params(
             &req("USD-OIS", Hw1fCalibrationFlavor::Swaption, Some(&overrides)),
             &empty_market(),
         )
-        .expect("ok");
-        let default = HullWhiteParams::default();
-        assert!((params.kappa - default.kappa).abs() < 1e-12);
-        assert!((params.sigma - default.sigma).abs() < 1e-12);
+        .expect_err("partial override must be a hard error");
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("partial HW1F override"),
+            "unexpected error: {msg}"
+        );
     }
 
     #[test]
@@ -386,13 +472,14 @@ mod tests {
         let market = empty_market()
             .insert_price(&kappa_key, MarketScalar::Unitless(0.08))
             .insert_price(&sigma_key, MarketScalar::Unitless(0.015));
-        let params = resolve_hw1f_params(
+        let (params, source) = resolve_hw1f_params(
             &req("USD-OIS", Hw1fCalibrationFlavor::Swaption, None),
             &market,
         )
         .expect("ok");
         assert!((params.kappa - 0.08).abs() < 1e-12);
         assert!((params.sigma - 0.015).abs() < 1e-12);
+        assert_eq!(source, Hw1fParamSource::MarketScalars);
     }
 
     #[test]
@@ -401,13 +488,14 @@ mod tests {
         let market = empty_market()
             .insert_price(&kappa_key, MarketScalar::Unitless(0.06))
             .insert_price(&sigma_key, MarketScalar::Unitless(0.009));
-        let params = resolve_hw1f_params(
+        let (params, source) = resolve_hw1f_params(
             &req("USD-OIS", Hw1fCalibrationFlavor::CapFloor, None),
             &market,
         )
         .expect("ok");
         assert!((params.kappa - 0.06).abs() < 1e-12);
         assert!((params.sigma - 0.009).abs() < 1e-12);
+        assert_eq!(source, Hw1fParamSource::MarketScalars);
     }
 
     #[test]
@@ -447,10 +535,11 @@ mod tests {
             context: "surface-test",
         };
 
-        let params = resolve_hw1f_params(&request, &market).expect("params");
+        let (params, source) = resolve_hw1f_params(&request, &market).expect("params");
 
         assert!((params.kappa - kappa).abs() < 1e-12);
         assert!((params.sigma - target_sigma).abs() < 1e-12);
+        assert_eq!(source, Hw1fParamSource::CalibratedSurface);
     }
 
     #[test]
@@ -487,9 +576,10 @@ mod tests {
             context: "surface-test",
         };
 
-        let params = resolve_hw1f_params(&request, &market).expect("params");
+        let (params, source) = resolve_hw1f_params(&request, &market).expect("params");
 
         assert!((params.sigma - base_sigma * 1.25).abs() < 1e-12);
+        assert_eq!(source, Hw1fParamSource::CalibratedSurface);
     }
 
     #[test]
@@ -499,13 +589,14 @@ mod tests {
             .insert_price(&kappa_key, MarketScalar::Unitless(0.08))
             .insert_price(&sigma_key, MarketScalar::Unitless(0.015));
         let overrides = json!({ "hw1f_kappa": 0.04, "hw1f_sigma": 0.011 });
-        let params = resolve_hw1f_params(
+        let (params, source) = resolve_hw1f_params(
             &req("USD-OIS", Hw1fCalibrationFlavor::Swaption, Some(&overrides)),
             &market,
         )
         .expect("ok");
         assert!((params.kappa - 0.04).abs() < 1e-12);
         assert!((params.sigma - 0.011).abs() < 1e-12);
+        assert_eq!(source, Hw1fParamSource::Override);
     }
 
     #[test]
@@ -515,7 +606,7 @@ mod tests {
         let market = empty_market()
             .insert_price(&kappa_key, MarketScalar::Unitless(0.08))
             .insert_price(&sigma_key, MarketScalar::Unitless(0.015));
-        let params = resolve_hw1f_params(
+        let (params, source) = resolve_hw1f_params(
             &req("USD-OIS", Hw1fCalibrationFlavor::CapFloor, None),
             &market,
         )
@@ -523,19 +614,22 @@ mod tests {
         let default = HullWhiteParams::default();
         assert!((params.kappa - default.kappa).abs() < 1e-12);
         assert!((params.sigma - default.sigma).abs() < 1e-12);
+        assert_eq!(source, Hw1fParamSource::DefaultFallback);
     }
 
     #[test]
-    fn partial_calibrated_scalars_fall_through_to_default() {
+    fn partial_calibrated_scalars_are_rejected() {
         let (kappa_key, _sigma_key) = hw1f_scalar_keys("USD-OIS");
         let market = empty_market().insert_price(&kappa_key, MarketScalar::Unitless(0.08));
-        let params = resolve_hw1f_params(
+        let err = resolve_hw1f_params(
             &req("USD-OIS", Hw1fCalibrationFlavor::Swaption, None),
             &market,
         )
-        .expect("ok");
-        let default = HullWhiteParams::default();
-        assert!((params.kappa - default.kappa).abs() < 1e-12);
-        assert!((params.sigma - default.sigma).abs() < 1e-12);
+        .expect_err("partial calibrated scalar pair must be a hard error");
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("partial calibrated HW1F scalars"),
+            "unexpected error: {msg}"
+        );
     }
 }

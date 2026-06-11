@@ -42,6 +42,28 @@ pub trait ExerciseBoundaryPayoff: Payoff {
     fn is_path_inactive(&self) -> bool {
         false
     }
+
+    /// Time-0 pathwise PV of the cashflows occurring strictly **after** the
+    /// specified exercise date (same pathwise-numeraire discounting as
+    /// [`Payoff::value`]).
+    ///
+    /// The LSMC harness uses this to decompose the pathwise value into a
+    /// pre-exercise component (coupons already paid, kept regardless of the
+    /// exercise decision) and a post-exercise component (regressed against
+    /// the continuation basis and replaced by the call amount on exercise).
+    ///
+    /// The harness calls this once per exercise-date index after the full
+    /// forward pass, so implementations may rely on complete path state.
+    ///
+    /// The default returns the full [`Payoff::value`], which is exact for
+    /// bullet payoffs (a single cashflow at maturity, after every exercise
+    /// date). Payoffs with intermediate coupons MUST override this so that
+    /// coupons paid before an exercise date are neither fed into the
+    /// continuation regression nor dropped when the issuer calls.
+    fn value_after(&self, exercise_idx: usize, currency: Currency) -> Money {
+        let _ = exercise_idx;
+        self.value(currency)
+    }
 }
 
 /// Standard degree-2 regression basis `[1, r, r², t·r]`.

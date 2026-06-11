@@ -140,7 +140,7 @@ use finstack_valuations::models::credit::toggle_exercise::{
 let model = MertonModel::new(100.0, 0.20, 80.0, 0.05)?;
 let dd = model.distance_to_default(1.0);    // ~1.27
 let pd = model.default_probability(1.0);     // ~10.3%
-let spread = model.implied_spread(5.0, 0.40); // implied credit spread
+let spread = model.implied_spread(5.0, 0.40)?; // implied credit spread
 
 // --- Calibrate from equity observables (KMV) ---
 let model = MertonModel::from_equity(

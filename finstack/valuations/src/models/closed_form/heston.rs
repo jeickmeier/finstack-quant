@@ -170,6 +170,33 @@ impl HestonParams {
         Ok(params)
     }
 
+    /// Deterministic average variance over `[0, t]`:
+    ///
+    /// ```text
+    /// v̄(t) = θ + (v₀ − θ)·(1 − e^{−κt}) / (κt)
+    /// ```
+    ///
+    /// the time-average of the variance ODE `E[v_s] = θ + (v₀−θ)e^{−κs}`.
+    /// This is the correct effective variance for a Black-Scholes proxy of a
+    /// maturity-`t` option: using `v₀` ignores the mean reversion toward `θ`
+    /// and badly mis-states long-dated fallback prices when `v₀ ≠ θ`.
+    ///
+    /// Uses a Taylor branch for `κt → 0` where the closed form is `0/0`
+    /// (`(1 − e^{−x})/x = 1 − x/2 + x²/6 − …`). For `t ≤ 0` it returns `v₀`.
+    #[must_use]
+    pub fn deterministic_avg_variance(&self, t: f64) -> f64 {
+        if t <= 0.0 {
+            return self.v0;
+        }
+        let kt = self.kappa * t;
+        let decay_avg = if kt.abs() < 1e-6 {
+            1.0 - 0.5 * kt + kt * kt / 6.0
+        } else {
+            (1.0 - (-kt).exp()) / kt
+        };
+        self.theta + (self.v0 - self.theta) * decay_avg
+    }
+
     /// Build `HestonParams` for a given (r, q) pair, sourcing
     /// (κ, θ, σᵥ, ρ, v₀) from the market context's named scalars
     /// (`HESTON_KAPPA`, `HESTON_THETA`, `HESTON_SIGMA_V`, `HESTON_RHO`,
@@ -358,9 +385,29 @@ impl HestonFourierSettings {
     /// | T < 0.25 | 150   | 150    | 16       |
     /// | T < 1.0  | 100   | 100    | 16       |
     /// | T >= 1.0 | 80    | 80     | 16       |
+    ///
+    /// The buckets are tuned for a typical initial variance v0 ≈ 0.04
+    /// (20% vol). For low-variance regimes prefer
+    /// [`HestonFourierSettings::for_maturity_with_variance`], which widens
+    /// `u_max` when `v0` is small.
     #[must_use]
     pub fn for_maturity(time: f64) -> Self {
-        if time < 0.05 {
+        Self::for_maturity_with_variance(time, HESTON_REFERENCE_V0)
+    }
+
+    /// Create settings adapted to both maturity and initial variance.
+    ///
+    /// The Heston characteristic function decays on a `u`-scale proportional
+    /// to `1/√(v0·T)`. The [`HestonFourierSettings::for_maturity`] buckets
+    /// already widen the grid for small `T` assuming v0 ≈ 0.04 (20% vol);
+    /// when `v0` itself is small the integrand tail extends past the bucket
+    /// `u_max` and the truncated Gil-Pelaez integral loses mass. This variant
+    /// scales `u_max` (and `panels`, to preserve node density) by
+    /// `√(v0_ref / v0)`, capped to keep the grid bounded; the existing tail
+    /// diagnostic remains as a safety net.
+    #[must_use]
+    pub fn for_maturity_with_variance(time: f64, v0: f64) -> Self {
+        let mut settings = if time < 0.05 {
             Self {
                 u_max: 200.0,
                 panels: 200,
@@ -383,9 +430,31 @@ impl HestonFourierSettings {
                 gl_order: 16,
                 phi_eps: 1e-8,
             }
+        };
+
+        if v0.is_finite() && v0 > 0.0 && v0 < HESTON_REFERENCE_V0 {
+            let scale = (HESTON_REFERENCE_V0 / v0)
+                .sqrt()
+                .min(HESTON_UMAX_MAX_VARIANCE_SCALE);
+            settings.u_max *= scale;
+            // Keep the per-unit-u node density unchanged so the wider grid
+            // does not get coarser.
+            settings.panels = ((settings.panels as f64) * scale).ceil() as usize;
         }
+        settings
     }
 }
+
+/// Reference initial variance the [`HestonFourierSettings::for_maturity`]
+/// buckets are tuned for (20% vol).
+const HESTON_REFERENCE_V0: f64 = 0.04;
+
+/// Cap on the variance-driven `u_max` scale factor in
+/// [`HestonFourierSettings::for_maturity_with_variance`]. A factor of 8
+/// covers initial variances down to `0.04 / 64 = 6.25e-4` (2.5% vol) at full
+/// fidelity; below that the tail diagnostic still flags any residual
+/// mis-truncation.
+const HESTON_UMAX_MAX_VARIANCE_SCALE: f64 = 8.0;
 
 /// Cached Heston Fourier data for pricing multiple strikes with shared parameters.
 ///
@@ -413,10 +482,13 @@ pub struct HestonStripPricer {
 /// the cached strip integral is deemed unreliable and pricing falls back to BS.
 ///
 /// A Heston characteristic function that overflows at a node makes
-/// [`heston_pj_characteristic_function`] return exactly `Complex::ZERO`. A few
-/// such nodes (typically in the tail, where the integrand is already tiny) are
-/// harmless, but when a large fraction of nodes are corrupted the Gil-Pelaez
-/// integral silently loses mass and yields a plausible-but-wrong probability.
+/// [`heston_pj_characteristic_function`] return a zeroed value with
+/// [`HestonCfStatus::Overflow`]. A few such nodes (typically in the tail,
+/// where the integrand is already tiny) are harmless, but when a large
+/// fraction of nodes are corrupted the Gil-Pelaez integral silently loses
+/// mass and yields a plausible-but-wrong probability. Legitimate
+/// [`HestonCfStatus::Underflow`] nodes (well-formed inputs, |ψ| → 0) are
+/// *not* corruption and do not count toward this threshold.
 const HESTON_STRIP_MAX_CORRUPT_FRACTION: f64 = 0.05;
 
 impl HestonStripPricer {
@@ -437,12 +509,14 @@ impl HestonStripPricer {
         let mut psi2_over_iphi = Vec::with_capacity(grid.len());
 
         // Count interior nodes (φ away from the singularity) and how many of
-        // them returned a non-finite / overflow-zeroed characteristic function.
-        // `heston_pj_characteristic_function` signals overflow by returning
-        // exactly `Complex::ZERO`, so a zero psi at a genuine φ is treated as a
-        // corrupted node.
+        // them returned an **overflow**-corrupted characteristic function.
+        // Legitimate underflow (well-formed inputs, |ψ| → 0 in the decayed
+        // tail) contributes exactly zero to the integral and must not count
+        // toward corruption — long-dated / high-κθ surfaces underflow over
+        // much of the grid without any loss of pricing accuracy.
         let mut interior_nodes = 0_usize;
         let mut corrupted_nodes = 0_usize;
+        let mut ok_nodes = 0_usize;
 
         for (phi, _) in &grid {
             if phi.abs() < settings.phi_eps {
@@ -453,30 +527,31 @@ impl HestonStripPricer {
 
             interior_nodes += 1;
             let denom = i * *phi;
-            let psi1 = heston_pj_characteristic_function(1, *phi, time, log_spot, params);
-            let psi2 = heston_pj_characteristic_function(2, *phi, time, log_spot, params);
+            let (psi1, status1) =
+                heston_pj_characteristic_function(1, *phi, time, log_spot, params);
+            let (psi2, status2) =
+                heston_pj_characteristic_function(2, *phi, time, log_spot, params);
 
-            let psi1_ok = psi1.is_finite() && psi1.norm_sqr() > 0.0;
-            let psi2_ok = psi2.is_finite() && psi2.norm_sqr() > 0.0;
-            if !psi1_ok || !psi2_ok {
+            if status1 == HestonCfStatus::Overflow || status2 == HestonCfStatus::Overflow {
                 corrupted_nodes += 1;
             }
+            if status1 == HestonCfStatus::Ok && status2 == HestonCfStatus::Ok {
+                ok_nodes += 1;
+            }
 
-            psi1_over_iphi.push(if psi1.is_finite() {
-                psi1 / denom
-            } else {
-                Complex::new(0.0, 0.0)
-            });
-            psi2_over_iphi.push(if psi2.is_finite() {
-                psi2 / denom
-            } else {
-                Complex::new(0.0, 0.0)
-            });
+            psi1_over_iphi.push(psi1 / denom);
+            psi2_over_iphi.push(psi2 / denom);
         }
 
+        // Corrupted when too many nodes overflowed, or when *no* node carried
+        // information at all (every interior node zeroed): the Gil-Pelaez
+        // integral then degenerates to the 0.5 baseline and the resulting
+        // price is plausible-but-wrong. Partial underflow (decayed tail) is
+        // legitimate and does not count.
         let integrand_corrupted = interior_nodes > 0
-            && (corrupted_nodes as f64) / (interior_nodes as f64)
-                > HESTON_STRIP_MAX_CORRUPT_FRACTION;
+            && ((corrupted_nodes as f64) / (interior_nodes as f64)
+                > HESTON_STRIP_MAX_CORRUPT_FRACTION
+                || ok_nodes == 0);
 
         Some(Self {
             spot,
@@ -543,7 +618,7 @@ impl HestonStripPricer {
                 self.time,
                 self.params.r,
                 self.params.q,
-                self.params.v0.sqrt(),
+                self.params.deterministic_avg_variance(self.time).sqrt(),
             );
         }
 
@@ -583,7 +658,7 @@ impl HestonStripPricer {
                 self.time,
                 self.params.r,
                 self.params.q,
-                self.params.v0.sqrt(),
+                self.params.deterministic_avg_variance(self.time).sqrt(),
             );
         }
 
@@ -712,6 +787,31 @@ fn composite_gauss_legendre_grid(
     Some(grid)
 }
 
+/// Status of a Heston characteristic-function evaluation at one φ node.
+///
+/// Distinguishes the two ways ψ_j(φ) can come back as `Complex::ZERO`:
+///
+/// - **Overflow**: an intermediate quantity was non-finite or the exponent
+///   exceeded the overflow guard — the value is *corrupt* and the node must
+///   count toward the corruption diagnostic.
+/// - **Underflow**: every intermediate was well-formed but |ψ| underflowed to
+///   zero (deep in the decayed tail). Contributing exactly 0 to the
+///   Gil-Pelaez integral is the *correct* value there, so such nodes must
+///   not trip the corruption fallback.
+///
+/// Conflating the two made long-dated / high-κθ surfaces (where the CF
+/// legitimately underflows over much of the grid) needlessly fall back to a
+/// Black-Scholes price.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HestonCfStatus {
+    /// Finite, non-zero value.
+    Ok,
+    /// Well-formed inputs; |ψ| underflowed to exactly zero (legitimate).
+    Underflow,
+    /// Non-finite intermediate or exponent guard hit; value zeroed (corrupt).
+    Overflow,
+}
+
 /// Heston probability characteristic function ψ_j(φ) for j ∈ {1, 2}.
 ///
 /// Uses the "Little Heston Trap" formulation from Albrecher et al. (2007)
@@ -731,7 +831,9 @@ fn composite_gauss_legendre_grid(
 ///
 /// # Returns
 ///
-/// Complex value of ψ_j(φ)
+/// `(ψ_j(φ), status)`: the complex value (zeroed on overflow/underflow) and a
+/// [`HestonCfStatus`] telling the caller whether a zero is legitimate
+/// underflow or corruption.
 ///
 /// # References
 ///
@@ -742,7 +844,7 @@ fn heston_pj_characteristic_function(
     time: f64,
     log_spot: f64,
     params: &HestonParams,
-) -> Complex<f64> {
+) -> (Complex<f64>, HestonCfStatus) {
     let kappa = params.kappa;
     let theta = params.theta;
     let sigma = params.sigma_v;
@@ -776,17 +878,17 @@ fn heston_pj_characteristic_function(
     let g_denom = b_minus_rsi + d;
     let g_denom_limit = HESTON_G_DENOM_EPS * (1.0 + b_minus_rsi.norm() + d.norm());
     if !g_denom.is_finite() || g_denom.norm() <= g_denom_limit {
-        return zero;
+        return (zero, HestonCfStatus::Overflow);
     }
     let g_minus = (b_minus_rsi - d) / g_denom;
     if !g_minus.is_finite() {
-        return zero;
+        return (zero, HestonCfStatus::Overflow);
     }
 
     // exp(-d*T) — bounded, avoids the overflow of exp(+dT)
     let exp_minus_dt = (-d * time).exp();
     if !exp_minus_dt.is_finite() {
-        return zero;
+        return (zero, HestonCfStatus::Overflow);
     }
 
     let one = Complex::new(1.0, 0.0);
@@ -803,21 +905,26 @@ fn heston_pj_characteristic_function(
     let d_val =
         (b_minus_rsi - d) / sigma_sq * (one - exp_minus_dt) / (one - g_minus * exp_minus_dt);
     if !c.is_finite() || !d_val.is_finite() {
-        return zero;
+        return (zero, HestonCfStatus::Overflow);
     }
 
     // ψ_j(φ) = exp(C + D*v0 + i*φ*ln(S))
     let exponent = c + d_val * v0 + i * phi * log_spot;
     if !exponent.is_finite() || exponent.re > HESTON_EXPONENT_REAL_LIMIT {
-        return zero;
+        return (zero, HestonCfStatus::Overflow);
     }
 
     let psi = exponent.exp();
-    if psi.is_finite() {
-        psi
-    } else {
-        zero
+    if !psi.is_finite() {
+        return (zero, HestonCfStatus::Overflow);
     }
+    if psi.norm_sqr() == 0.0 {
+        // Inputs were well-formed and the exponent finite: |ψ| genuinely
+        // underflowed to zero in the decayed tail. Contributing 0 to the
+        // integral is correct — not a corrupted node.
+        return (zero, HestonCfStatus::Underflow);
+    }
+    (psi, HestonCfStatus::Ok)
 }
 
 /// Fraction of the upper integration range whose absolute integrand mass is
@@ -892,7 +999,7 @@ fn heston_pj_with_diagnostics(
             if phi.abs() < settings.phi_eps {
                 return 0.0;
             }
-            let psi = heston_pj_characteristic_function(j, phi, time, log_spot, params);
+            let (psi, _status) = heston_pj_characteristic_function(j, phi, time, log_spot, params);
             let exp_term = (-i * phi * log_strike).exp();
             (exp_term * psi / (i * phi)).re
         };
@@ -925,6 +1032,7 @@ fn heston_pj_with_diagnostics(
     let mut tail_abs_mass = 0.0;
     let mut interior_nodes = 0_usize;
     let mut corrupted_nodes = 0_usize;
+    let mut ok_nodes = 0_usize;
 
     for (phi, weight) in &grid {
         // Handle singularity at φ=0.
@@ -933,11 +1041,15 @@ fn heston_pj_with_diagnostics(
         }
         interior_nodes += 1;
 
-        let psi = heston_pj_characteristic_function(j, *phi, time, log_spot, params);
-        // `heston_pj_characteristic_function` signals overflow by returning
-        // exactly `Complex::ZERO`; a zero psi at a genuine φ is a corrupted node.
-        if !(psi.is_finite() && psi.norm_sqr() > 0.0) {
+        let (psi, status) = heston_pj_characteristic_function(j, *phi, time, log_spot, params);
+        // Only **overflow**-corrupted nodes count toward the corruption
+        // fraction; legitimate underflow (|ψ| → 0 with well-formed inputs)
+        // contributes a correct zero to the integral.
+        if status == HestonCfStatus::Overflow {
             corrupted_nodes += 1;
+        }
+        if status == HestonCfStatus::Ok {
+            ok_nodes += 1;
         }
 
         let exp_term = (-i * *phi * log_strike).exp();
@@ -950,8 +1062,12 @@ fn heston_pj_with_diagnostics(
         }
     }
 
+    // Corrupted when too many nodes overflowed, or when *no* node carried
+    // information at all (every interior node zeroed): the integral then
+    // degenerates to the 0.5 baseline. Partial underflow is legitimate.
     let corrupted = interior_nodes > 0
-        && (corrupted_nodes as f64) / (interior_nodes as f64) > HESTON_STRIP_MAX_CORRUPT_FRACTION;
+        && ((corrupted_nodes as f64) / (interior_nodes as f64) > HESTON_STRIP_MAX_CORRUPT_FRACTION
+            || ok_nodes == 0);
 
     let raw_probability = 0.5 + integral / PI;
     HestonPjDiagnostics {
@@ -1001,10 +1117,11 @@ fn heston_pj(
 ///
 /// # Integration Settings
 ///
-/// Uses [`HestonFourierSettings::for_maturity`] to adapt the integration grid
-/// to the option's time to maturity. Short-dated options use finer grids to
-/// handle the more rapidly oscillating characteristic function. For custom
-/// control, use [`heston_call_price_fourier_with_settings`].
+/// Uses [`HestonFourierSettings::for_maturity_with_variance`] to adapt the
+/// integration grid to the option's time to maturity and initial variance.
+/// Short-dated and low-variance options use wider/finer grids to handle the
+/// slower-decaying characteristic function. For custom control, use
+/// [`heston_call_price_fourier_with_settings`].
 ///
 /// # Example
 ///
@@ -1034,7 +1151,7 @@ pub fn heston_call_price_fourier(spot: f64, strike: f64, time: f64, params: &Hes
         strike,
         time,
         params,
-        &HestonFourierSettings::for_maturity(time),
+        &HestonFourierSettings::for_maturity_with_variance(time, params.v0),
     )
 }
 
@@ -1052,7 +1169,7 @@ pub fn heston_call_prices_fourier(
         strikes,
         time,
         params,
-        &HestonFourierSettings::for_maturity(time),
+        &HestonFourierSettings::for_maturity_with_variance(time, params.v0),
     )
 }
 
@@ -1073,11 +1190,10 @@ pub fn heston_call_prices_fourier_with_settings(
     }
 
     if params.sigma_v < 1e-10 {
+        let avg_vol = params.deterministic_avg_variance(time).sqrt();
         return strikes
             .iter()
-            .map(|&strike| {
-                black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt())
-            })
+            .map(|&strike| black_scholes_call(spot, strike, time, params.r, params.q, avg_vol))
             .collect();
     }
 
@@ -1107,7 +1223,7 @@ pub fn heston_put_prices_fourier(
         strikes,
         time,
         params,
-        &HestonFourierSettings::for_maturity(time),
+        &HestonFourierSettings::for_maturity_with_variance(time, params.v0),
     )
 }
 
@@ -1156,10 +1272,18 @@ pub fn heston_call_price_fourier_with_settings(
         return (spot - strike).max(0.0);
     }
 
-    // Special case: very small vol-of-vol approaches Black-Scholes
-    // This avoids numerical issues when sigma_v is tiny
+    // Special case: very small vol-of-vol approaches Black-Scholes with the
+    // deterministic average variance v̄(T) (σ_v → 0 collapses the variance to
+    // its deterministic mean-reverting path).
     if params.sigma_v < 1e-10 {
-        return black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+        return black_scholes_call(
+            spot,
+            strike,
+            time,
+            params.r,
+            params.q,
+            params.deterministic_avg_variance(time).sqrt(),
+        );
     }
 
     // Compute P1 and P2 via Fourier inversion, with diagnostics.
@@ -1167,9 +1291,10 @@ pub fn heston_call_price_fourier_with_settings(
     let d2 = heston_pj_with_diagnostics(2, spot, strike, time, params, settings);
 
     // Audit item 5: characteristic-function overflow corruption fallback.
-    // `heston_pj_characteristic_function` returns `Complex::ZERO` on overflow;
-    // when a large fraction of integration nodes are zeroed the Gil-Pelaez
-    // integral silently loses mass and yields a plausible-but-wrong probability.
+    // `heston_pj_characteristic_function` reports `HestonCfStatus::Overflow`
+    // for ill-formed nodes (legitimate underflow is excluded); when a large
+    // fraction of integration nodes overflowed the Gil-Pelaez integral
+    // silently loses mass and yields a plausible-but-wrong probability.
     // The strip pricer already detects this and falls back to Black-Scholes —
     // the scalar path must do the same rather than integrating zeros into a
     // finite-but-wrong price.
@@ -1185,9 +1310,16 @@ pub fn heston_call_price_fourier_with_settings(
             v0 = params.v0,
             "Heston scalar Fourier integrand corrupted (characteristic function \
              overflowed on too many integration nodes); falling back to a \
-             Black-Scholes price at sqrt(v0)"
+             Black-Scholes price at the deterministic average vol sqrt(v_bar(T))"
         );
-        return black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+        return black_scholes_call(
+            spot,
+            strike,
+            time,
+            params.r,
+            params.q,
+            params.deterministic_avg_variance(time).sqrt(),
+        );
     }
 
     // Audit item 4: truncation-tail diagnostic. The Gil-Pelaez integral is
@@ -1211,7 +1343,8 @@ pub fn heston_call_price_fourier_with_settings(
             "Heston Gil-Pelaez integral truncated at u_max with a non-negligible \
              residual tail (or a pre-clamp probability outside [0,1]); the price \
              may be mis-truncated — consider a larger u_max (e.g. \
-             HestonFourierSettings::for_maturity for short maturities)"
+             HestonFourierSettings::for_maturity_with_variance for short \
+             maturities or low initial variance)"
         );
     }
 
@@ -1221,11 +1354,19 @@ pub fn heston_call_price_fourier_with_settings(
 
     // Defensive fallback: if the Fourier integration produced a non-finite result
     // (extreme parameters, characteristic-function overflow across the integration
-    // range), degrade gracefully to a Black-Scholes price at the integrated vol
-    // sqrt(v0). This avoids silent zero/NaN prices for deep-OTM/short-dated edge
-    // cases where the per-phi `return zero` paths dominate the integrand.
+    // range), degrade gracefully to a Black-Scholes price at the deterministic
+    // average vol sqrt(v_bar(T)). This avoids silent zero/NaN prices for
+    // deep-OTM/short-dated edge cases where the per-phi overflow paths dominate
+    // the integrand.
     if !call_price.is_finite() {
-        return black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+        return black_scholes_call(
+            spot,
+            strike,
+            time,
+            params.r,
+            params.q,
+            params.deterministic_avg_variance(time).sqrt(),
+        );
     }
 
     // Clamp to non-negative (numerical errors can cause tiny negatives for deep OTM)
@@ -1255,7 +1396,7 @@ pub fn heston_put_price_fourier(spot: f64, strike: f64, time: f64, params: &Hest
         strike,
         time,
         params,
-        &HestonFourierSettings::for_maturity(time),
+        &HestonFourierSettings::for_maturity_with_variance(time, params.v0),
     )
 }
 
@@ -1282,7 +1423,14 @@ pub fn heston_put_price_fourier_with_settings(
     if !put_price.is_finite() {
         // Mirror the call-side fallback so put pricing degrades to BS rather than
         // returning zero on extreme parameters.
-        let bs_call = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+        let bs_call = black_scholes_call(
+            spot,
+            strike,
+            time,
+            params.r,
+            params.q,
+            params.deterministic_avg_variance(time).sqrt(),
+        );
         return (bs_call - forward + discount_k).max(0.0);
     }
     put_price.max(0.0)
@@ -1404,7 +1552,8 @@ mod tests {
 
         // At φ=0, ψ_j(0) should equal 1 (or very close)
         for j in [1u8, 2u8] {
-            let psi = heston_pj_characteristic_function(j, 1e-10, 1.0, log_spot, &params);
+            let (psi, _status) =
+                heston_pj_characteristic_function(j, 1e-10, 1.0, log_spot, &params);
             assert!(
                 (psi.re - 1.0).abs() < 0.01,
                 "ψ_{}(0) real part should be ~1, got {}",
@@ -1909,7 +2058,14 @@ mod tests {
         );
 
         let strip_price = pricer.price_call(strike);
-        let bs = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+        let bs = black_scholes_call(
+            spot,
+            strike,
+            time,
+            params.r,
+            params.q,
+            params.deterministic_avg_variance(time).sqrt(),
+        );
 
         // The strip price must equal the BS fallback exactly (same code path),
         // not a finite-but-wrong value from the corrupted Fourier integral.
@@ -1945,11 +2101,118 @@ mod tests {
     #[test]
     fn test_characteristic_function_handles_extreme_inputs() {
         let params = HestonParams::new(0.05, 0.0, 0.1, 0.04, 1.0, 0.9, 0.04).expect("valid");
-        let psi = heston_pj_characteristic_function(1, 0.0, 1.0, 100.0_f64.ln(), &params);
+        let (psi, _status) =
+            heston_pj_characteristic_function(1, 0.0, 1.0, 100.0_f64.ln(), &params);
         assert!(
             psi.is_finite(),
             "characteristic function should stay finite"
         );
+    }
+
+    /// M-heston-cf: legitimate CF **underflow** must not be conflated with
+    /// overflow corruption. A long-dated, high-κθ surface (T=15y, κθ=0.27,
+    /// σᵥ=0.2) underflows |ψ| to zero over much of the grid with perfectly
+    /// well-formed inputs; the corruption diagnostic must stay clear and the
+    /// Fourier price must NOT collapse to the Black-Scholes fallback.
+    #[test]
+    fn long_dated_high_kappa_theta_does_not_fall_back_to_bs() {
+        // κθ = 3.0 × 0.09 = 0.27.
+        let params = HestonParams::new(0.03, 0.0, 3.0, 0.09, 0.2, -0.6, 0.04).expect("valid");
+        let spot = 100.0;
+        let strike = 100.0;
+        let time = 15.0;
+        let settings = HestonFourierSettings::for_maturity_with_variance(time, params.v0);
+
+        // Neither Gil-Pelaez probability may be flagged corrupted.
+        for j in [1u8, 2u8] {
+            let diag = heston_pj_with_diagnostics(j, spot, strike, time, &params, &settings);
+            assert!(
+                !diag.corrupted,
+                "P{j} flagged corrupted on a legitimately-underflowing long-dated \
+                 surface (underflow misclassified as overflow)"
+            );
+        }
+
+        // And the price must be a genuine Heston Fourier price, not the BS
+        // fallback at either v0 or v_bar(T).
+        let price = heston_call_price_fourier_with_settings(spot, strike, time, &params, &settings);
+        let bs_v0 = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+        let bs_vbar = black_scholes_call(
+            spot,
+            strike,
+            time,
+            params.r,
+            params.q,
+            params.deterministic_avg_variance(time).sqrt(),
+        );
+        assert!(price.is_finite() && price > 0.0);
+        assert!(
+            (price - bs_v0).abs() > 1e-6 && (price - bs_vbar).abs() > 1e-6,
+            "long-dated high-κθ Heston price ({price}) must differ from the BS \
+             fallbacks (v0: {bs_v0}, v_bar: {bs_vbar}) — it should be a real \
+             Fourier price, not a fallback"
+        );
+    }
+
+    /// M-heston-cf: the BS fallback must use the deterministic average
+    /// variance v̄(T), not v₀. With v0=0.01, θ=0.09, κ=2, T=1 the two differ
+    /// by a factor ~5.5 in variance; forcing the σᵥ→0 BS branch must
+    /// reproduce BS at √v̄(T).
+    #[test]
+    fn bs_fallback_uses_deterministic_avg_variance_not_v0() {
+        let params = HestonParams::new(0.05, 0.0, 2.0, 0.09, 1e-12, -0.5, 0.01).expect("valid");
+        let spot = 100.0;
+        let strike = 100.0;
+        let time = 1.0;
+
+        // Closed-form check of v_bar itself.
+        let kt: f64 = 2.0;
+        let expected_vbar = 0.09 + (0.01 - 0.09) * (1.0 - (-kt).exp()) / kt;
+        let vbar = params.deterministic_avg_variance(time);
+        assert!(
+            (vbar - expected_vbar).abs() < 1e-14,
+            "v_bar(T) mismatch: got {vbar}, expected {expected_vbar}"
+        );
+
+        // σᵥ < 1e-10 forces the BS branch; it must price at √v̄, not √v₀.
+        let price = heston_call_price_fourier(spot, strike, time, &params);
+        let bs_vbar = black_scholes_call(spot, strike, time, params.r, params.q, vbar.sqrt());
+        let bs_v0 = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+        assert!(
+            (price - bs_vbar).abs() < 1e-12,
+            "BS fallback must use v_bar: got {price}, expected {bs_vbar}"
+        );
+        assert!(
+            (price - bs_v0).abs() > 1e-3,
+            "BS fallback must NOT use v0 ({bs_v0}); got {price}"
+        );
+    }
+
+    /// κ→0 Taylor branch of the deterministic average variance: v̄(t) → v₀ +
+    /// (v₀−θ) corrections vanish smoothly, matching the closed form just
+    /// above the switch point.
+    #[test]
+    fn deterministic_avg_variance_taylor_branch_is_continuous() {
+        let t = 1.0;
+        let mk = |kappa: f64| HestonParams {
+            r: 0.0,
+            q: 0.0,
+            kappa,
+            theta: 0.09,
+            sigma_v: 0.3,
+            rho: -0.5,
+            v0: 0.01,
+        };
+        // Just below and just above the 1e-6 κt switch. The two κ values
+        // genuinely differ, so allow the O(κt·(v0−θ)) ≈ 1e-8 physical gap.
+        let below = mk(0.9e-6).deterministic_avg_variance(t);
+        let above = mk(1.1e-6).deterministic_avg_variance(t);
+        assert!(
+            (below - above).abs() < 5e-8,
+            "Taylor/closed-form branches must agree at the switch: {below} vs {above}"
+        );
+        // κt → 0 limit is v0.
+        assert!((below - 0.01).abs() < 1e-6);
     }
 
     /// Audit item 6: `From<monte_carlo::HestonParams>` bypassed
@@ -2016,7 +2279,14 @@ mod tests {
 
         let scalar_price =
             heston_call_price_fourier_with_settings(spot, strike, time, &params, &settings);
-        let bs = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
+        let bs = black_scholes_call(
+            spot,
+            strike,
+            time,
+            params.r,
+            params.q,
+            params.deterministic_avg_variance(time).sqrt(),
+        );
 
         // The corrupted scalar path must return the BS fallback exactly, the
         // same way the strip pricer does — not a finite-but-wrong number from
@@ -2091,6 +2361,45 @@ mod tests {
             diag_fine.tail_estimate < 1e-3,
             "well-resolved integral must have a small truncation tail, got {}",
             diag_fine.tail_estimate
+        );
+    }
+
+    /// Low-variance regimes must widen `u_max` so the truncated Gil-Pelaez
+    /// integral keeps its tail mass.
+    ///
+    /// With v0 = 0.0016 (4% vol) at T = 2y, `v0·T` is far below the regime the
+    /// maturity buckets assume; the variance-aware settings must price within
+    /// tolerance of a brute-force high-`u_max` reference, and must not leave a
+    /// non-negligible truncation tail.
+    #[test]
+    fn low_variance_settings_match_high_umax_reference() {
+        let v0 = 0.0016; // 4% vol
+        let params = HestonParams::new(0.02, 0.0, 1.5, 0.0016, 0.2, -0.5, v0).expect("valid");
+        let (spot, strike, time) = (100.0, 105.0, 2.0);
+
+        let settings = HestonFourierSettings::for_maturity_with_variance(time, v0);
+        assert!(
+            settings.u_max > HestonFourierSettings::for_maturity(time).u_max,
+            "low v0 must widen u_max beyond the maturity-bucket default"
+        );
+
+        let reference = HestonFourierSettings::new(2000.0, 2000, 16, 1e-8).expect("valid");
+        let price = heston_call_price_fourier_with_settings(spot, strike, time, &params, &settings);
+        let ref_price =
+            heston_call_price_fourier_with_settings(spot, strike, time, &params, &reference);
+
+        assert!(
+            (price - ref_price).abs() < 1e-6 * spot,
+            "variance-aware settings ({price:.8}) must match high-u_max reference \
+             ({ref_price:.8})"
+        );
+
+        // The widened grid must also leave a negligible truncation tail.
+        let diag = heston_pj_with_diagnostics(1, spot, strike, time, &params, &settings);
+        assert!(
+            diag.tail_estimate < HESTON_TAIL_DIAGNOSTIC_THRESHOLD,
+            "variance-aware settings must not trip the tail diagnostic, got {}",
+            diag.tail_estimate
         );
     }
 }

@@ -111,7 +111,6 @@ impl MetricCalculator for EquitySharesCalculator {
 /// Includes:
 /// - Parallel DV01 (`MetricId::Dv01`)
 /// - Bucketed DV01 (`MetricId::BucketedDv01`)
-/// - Theta (`MetricId::Theta`)
 /// - Enterprise value (`MetricId::EnterpriseValue`)
 /// - Equity value (`MetricId::EquityValue`)
 /// - Terminal value PV (`MetricId::TerminalValuePV`)

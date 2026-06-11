@@ -42,7 +42,11 @@
 //!
 //! For displaced (shifted-lognormal) dynamics the same identity holds with
 //! `F_i → F_i + d_i` and `S → S + d`, which is the basket level the
-//! shifted-lognormal swap rate diffuses.
+//! shifted-lognormal swap rate diffuses. The market surface quotes the
+//! *Black lognormal* vol on `S`, while `base_vol · R` is the lognormal vol
+//! of the shifted level `S + d`; matching the at-the-money absolute
+//! volatility `σ_Black · S = σ_displaced · (S + d)` gives the conversion
+//! `σ_displaced = σ_Black · S / (S + d)` applied before the `1/R` division.
 //!
 //! # References
 //!
@@ -88,13 +92,33 @@ pub(crate) struct LmmBaseVolCalibration {
     pub implied_swaption_vol: f64,
 }
 
+/// Rebonato decomposition of the co-terminal swap: shape factor plus the
+/// basket levels needed to convert between Black and displaced vols.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RebonatoFactors {
+    /// Shape factor `R` linking `base_vol` to the *displaced* swaption vol.
+    pub shape_factor: f64,
+    /// Unshifted forward swap rate `S = Σ w_i F_i`.
+    pub swap_rate: f64,
+    /// Shifted basket level `S + d = Σ w_i (F_i + d_i)`.
+    pub shifted_level: f64,
+}
+
 /// Rebonato shape factor `R` linking `base_vol` to the co-terminal European
-/// swaption Black vol: `σ_swaption = base_vol · R`.
+/// swaption vol on the shifted level: `σ_displaced = base_vol · R`.
 ///
 /// Returns `None` when the swap is degenerate (no live forwards, zero
-/// annuity, or a non-positive basket level) — the caller then falls back to
-/// the raw surface vol.
+/// annuity, or a non-positive basket level).
+///
+/// Production callers use [`rebonato_factors`] directly; this thin wrapper
+/// is retained for tests that only need the shape factor.
+#[cfg(test)]
 pub(crate) fn rebonato_shape_factor(slice: &CoTerminalSlice<'_>) -> Option<f64> {
+    rebonato_factors(slice).map(|f| f.shape_factor)
+}
+
+/// Full Rebonato decomposition; see [`RebonatoFactors`].
+pub(crate) fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFactors> {
     let n = slice.accrual_factors.len();
     let first = slice.first_alive;
     if first >= n || slice.tenors.len() != n + 1 {
@@ -126,12 +150,16 @@ pub(crate) fn rebonato_shape_factor(slice: &CoTerminalSlice<'_>) -> Option<f64> 
 
     // Shifted basket level S + d = Σ w_j (F_j + d_j), weights w_j = τ_j DF_{j+1}/A.
     // The displaced-lognormal swap rate diffuses about this shifted level.
+    // The unshifted swap rate S = Σ w_j F_j is carried alongside for the
+    // Black → displaced vol conversion.
     let mut weights = vec![0.0_f64; live];
     let mut basket = 0.0_f64;
+    let mut swap_rate = 0.0_f64;
     for k in 0..live {
         let idx = first + k;
         let w = slice.accrual_factors[idx] * df[k + 1] / annuity;
         weights[k] = w;
+        swap_rate += w * slice.initial_forwards[idx];
         basket += w * (slice.initial_forwards[idx] + slice.displacements[idx]);
     }
     if !(basket.is_finite()) || basket <= 1e-12 {
@@ -156,14 +184,24 @@ pub(crate) fn rebonato_shape_factor(slice: &CoTerminalSlice<'_>) -> Option<f64> 
     if !(r_sq.is_finite()) || r_sq <= 0.0 {
         return None;
     }
-    Some(r_sq.sqrt())
+    Some(RebonatoFactors {
+        shape_factor: r_sq.sqrt(),
+        swap_rate,
+        shifted_level: basket,
+    })
 }
 
 /// Calibrate the LMM `base_vol` so the co-terminal European swaption reprices
-/// to the market Black vol `market_swaption_vol`.
+/// to the market **Black lognormal** vol `market_swaption_vol`.
+///
+/// The Black vol quotes lognormal dynamics on the unshifted swap rate `S`,
+/// while `base_vol · R` is the lognormal vol of the shifted level `S + d`.
+/// The Black vol is first converted to displaced dynamics by the ATM
+/// absolute-volatility match `σ_displaced = σ_Black · S / (S + d)` and then
+/// divided by `R`. With zero displacement the conversion is the identity.
 ///
 /// Returns `None` when the Rebonato shape factor cannot be formed (degenerate
-/// swap), signalling the caller to fall back to the uncalibrated raw vol.
+/// swap, non-positive swap rate, or non-positive shifted level).
 pub(crate) fn calibrate_base_vol(
     slice: &CoTerminalSlice<'_>,
     market_swaption_vol: f64,
@@ -171,15 +209,19 @@ pub(crate) fn calibrate_base_vol(
     if !market_swaption_vol.is_finite() || market_swaption_vol <= 0.0 {
         return None;
     }
-    let shape_factor = rebonato_shape_factor(slice)?;
-    if shape_factor <= 1e-12 {
+    let factors = rebonato_factors(slice)?;
+    let shape_factor = factors.shape_factor;
+    if shape_factor <= 1e-12 || factors.swap_rate <= 1e-12 {
         return None;
     }
-    let base_vol = market_swaption_vol / shape_factor;
+    let displaced_vol = market_swaption_vol * factors.swap_rate / factors.shifted_level;
+    let base_vol = displaced_vol / shape_factor;
     Some(LmmBaseVolCalibration {
         base_vol,
         shape_factor,
-        implied_swaption_vol: base_vol * shape_factor,
+        // Convert back to the Black quote convention so the diagnostic
+        // round-trips to the market target.
+        implied_swaption_vol: base_vol * shape_factor * factors.shifted_level / factors.swap_rate,
     })
 }
 
@@ -296,6 +338,52 @@ mod tests {
         };
         assert!(super::calibrate_base_vol(&live_slice, 0.0).is_none());
         assert!(super::calibrate_base_vol(&live_slice, -0.1).is_none());
+    }
+
+    #[test]
+    fn displaced_calibration_rescales_black_vol_by_s_over_s_plus_d() {
+        // The market Black vol quotes lognormal dynamics on S; displaced
+        // dynamics diffuse S + d. The calibrated base_vol must absorb the
+        // S/(S+d) conversion, and the implied (Black-convention) swaption
+        // vol must still round-trip to the market target.
+        let tenors = vec![0.0, 1.0, 2.0, 3.0, 4.0];
+        let accruals = vec![1.0; 4];
+        let forwards = vec![0.01, 0.012, 0.014, 0.016];
+        let shapes = loading_shapes(4, 0.4);
+        let shifted = vec![0.02; 4];
+        let slice = CoTerminalSlice {
+            tenors: &tenors,
+            accrual_factors: &accruals,
+            initial_forwards: &forwards,
+            displacements: &shifted,
+            loading_shapes: &shapes,
+            first_alive: 0,
+        };
+        let market_vol = 0.30;
+        let cal = super::calibrate_base_vol(&slice, market_vol).expect("calibration");
+        let factors = rebonato_factors(&slice).expect("factors");
+
+        // base_vol = sigma_Black * S/(S+d) / R, materially below sigma/R.
+        let expected_base =
+            market_vol * factors.swap_rate / factors.shifted_level / factors.shape_factor;
+        assert!(
+            (cal.base_vol - expected_base).abs() < 1e-14,
+            "base_vol {} != expected {expected_base}",
+            cal.base_vol
+        );
+        let unscaled_base = market_vol / factors.shape_factor;
+        assert!(
+            (cal.base_vol - unscaled_base).abs() > 1e-3,
+            "S/(S+d) rescaling must materially change base_vol \
+             (got {}, unscaled {unscaled_base})",
+            cal.base_vol
+        );
+        // The Black-convention implied vol still round-trips.
+        assert!(
+            (cal.implied_swaption_vol - market_vol).abs() < 1e-12,
+            "implied Black vol {} should round-trip market {market_vol}",
+            cal.implied_swaption_vol
+        );
     }
 
     #[test]

@@ -338,11 +338,20 @@ fn record_iteration(
 /// and credit curves where causality (independence of knots at earlier times)
 /// is preserved.
 ///
-/// The algorithm uses a hybrid bracketing-plus-polishing approach:
-/// 1. **Scan**: Evaluates the objective on a grid to find a sign-change bracket.
-/// 2. **Bracket**: If no bracket is found, fall back to initial guess or best point.
-/// 3. **Solve**: Use Brent's method (bracketing) for robustness followed by optional
-///    Newton-Raphson polishing for high-precision convergence in f-space.
+/// The algorithm uses a scan-then-bracket approach (see
+/// [`bracket_solve_1d_with_diagnostics`](super::helpers)):
+/// 1. **Scan**: Evaluates the objective on a caller-supplied grid to find a
+///    sign-change bracket (the bracket whose midpoint is closest to the
+///    initial guess wins).
+/// 2. **Bisection**: Halves the bracket until `|f| < tol` or the bracket
+///    width collapses to machine precision.
+/// 3. **False-position polish**: Bounded false-position (regula falsi)
+///    updates inside the bracket for f-space convergence when bisection
+///    stalls on penalized midpoints or runs out of iterations.
+/// 4. **No-bracket fallback**: A bounded secant iteration from the best
+///    observed point; results from this path carry
+///    `is_sign_change_bracket = false` and are gated by
+///    [`BootstrapTarget::allow_approximate_knots`].
 pub(crate) struct SequentialBootstrapper;
 
 impl SequentialBootstrapper {
@@ -535,9 +544,19 @@ impl SequentialBootstrapper {
         // bracket (two scan-grid points with opposite signs). This covers:
         //   - `tentative = None` → `resolve_no_bracket` accepted a local |f|-minimum
         //   - `tentative = Some` but found via secant/best-point (no sign change)
+        //
+        // Gate-bypass fix: a `Some` candidate without a sign-change bracket (no-bracket
+        // secant fallback or scan-grid |f|-minimum hit) must pass the SAME opt-in gate
+        // as the `None` path. Previously it committed unconditionally with only the
+        // metadata flag, so identical economics got opposite outcomes depending on
+        // whether the secant landed just below or just above the solver tolerance.
         let (solved_value, is_approximate) = match tentative {
-            Some(root) => (root, !diag.is_sign_change_bracket),
-            None => resolve_no_bracket(NoBracketContext {
+            Some(root) if diag.is_sign_change_bracket => (root, false),
+            Some(root) if target.allow_approximate_knots() => (root, true),
+            // `Some` without a bracket and without the opt-in, or `None`: resolve
+            // through the shared no-bracket policy (hard error unless a genuinely
+            // bracketed best point exists within tolerance).
+            Some(_) | None => resolve_no_bracket(NoBracketContext {
                 time,
                 quote,
                 diag: &diag,
@@ -613,8 +632,20 @@ where
 
             match (resid_up, resid_dn) {
                 (Ok(r_up), Ok(r_dn)) => (r_up - r_dn) / (2.0 * h),
+                // One-sided fallbacks when a bumped curve fails to build/price:
+                // fall back to a first-order difference against the base residual.
                 (Ok(r_up), Err(_)) => (r_up - resid) / h,
-                _ => 0.0,
+                (Err(_), Ok(r_dn)) => (resid - r_dn) / h,
+                (Err(e_up), Err(e_dn)) => {
+                    tracing::warn!(
+                        knot_time = t,
+                        %e_up,
+                        %e_dn,
+                        "bootstrap diagnostics: both up/down FD bumps failed; \
+                         reporting zero sensitivity for this knot"
+                    );
+                    0.0
+                }
             }
         } else {
             0.0
@@ -1028,6 +1059,142 @@ mod w40_tests {
             }
             other => panic!("expected a Calibration error, got: {other:?}"),
         }
+    }
+
+    /// Gate-bypass regression: a no-bracket candidate returned on the solver's
+    /// `Some` path (here: a scan-grid point with `|f| < solver_tol` but NO
+    /// sign-change bracket) must be a HARD failure for targets that do not opt
+    /// into approximate knots — identical to the `None` path policy.
+    ///
+    /// Pre-fix: the knot committed with only the `approximate_knots` metadata
+    /// flag, so identical economics got opposite outcomes depending on whether
+    /// the candidate landed just below or just above the solver tolerance.
+    #[test]
+    fn no_bracket_some_path_is_hard_failure_without_opt_in() {
+        let target = NonMonotoneNoBracketTarget;
+        let tolerance = 1e-4;
+        // |f_min| = eps < solver tolerance at x=root: the scan hit returns
+        // `Some(root)` with `is_sign_change_bracket = false`.
+        let eps = tolerance * 0.4;
+        let q = NonMonotoneNoBracketQuote {
+            t: 1.0,
+            root: 0.5,
+            eps,
+        };
+        let cfg = crate::calibration::CalibrationConfig {
+            solver: crate::calibration::solver::SolverConfig::brent_default()
+                .with_tolerance(tolerance)
+                .with_max_iterations(200),
+            ..crate::calibration::CalibrationConfig::default()
+        };
+
+        let err = SequentialBootstrapper::bootstrap(
+            &target,
+            &[q],
+            vec![(0.0, 0.0)],
+            &cfg,
+            Some(tolerance),
+            None,
+        )
+        .expect_err(
+            "a no-bracket Some-path knot must be a hard failure when the target \
+             does not opt into approximate knots",
+        );
+        match err {
+            finstack_core::Error::Calibration { message, category } => {
+                assert_eq!(category, "bootstrapping");
+                assert!(
+                    message.contains("sign-change root"),
+                    "error must explain the no-bracket failure mode; got: {message}"
+                );
+            }
+            other => panic!("expected a Calibration error, got: {other:?}"),
+        }
+    }
+
+    /// Same target/quote economics as
+    /// [`no_bracket_some_path_is_hard_failure_without_opt_in`], but the target
+    /// opts into approximate knots: the knot must commit AND be flagged in the
+    /// report's `approximate_knots` metadata.
+    struct NonMonotoneNoBracketOptInTarget;
+
+    impl BootstrapTarget for NonMonotoneNoBracketOptInTarget {
+        type Quote = NonMonotoneNoBracketQuote;
+        type Curve = f64;
+
+        fn quote_time(&self, quote: &Self::Quote) -> finstack_core::Result<f64> {
+            NonMonotoneNoBracketTarget.quote_time(quote)
+        }
+
+        fn build_curve(&self, knots: &[(f64, f64)]) -> finstack_core::Result<Self::Curve> {
+            NonMonotoneNoBracketTarget.build_curve(knots)
+        }
+
+        fn calculate_residual(
+            &self,
+            curve: &Self::Curve,
+            quote: &Self::Quote,
+        ) -> finstack_core::Result<f64> {
+            NonMonotoneNoBracketTarget.calculate_residual(curve, quote)
+        }
+
+        fn initial_guess(
+            &self,
+            quote: &Self::Quote,
+            previous_knots: &[(f64, f64)],
+        ) -> finstack_core::Result<f64> {
+            NonMonotoneNoBracketTarget.initial_guess(quote, previous_knots)
+        }
+
+        fn scan_points(
+            &self,
+            quote: &Self::Quote,
+            initial_guess: f64,
+        ) -> finstack_core::Result<Vec<f64>> {
+            NonMonotoneNoBracketTarget.scan_points(quote, initial_guess)
+        }
+
+        fn allow_approximate_knots(&self) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn no_bracket_some_path_commits_as_approximate_with_opt_in() {
+        let target = NonMonotoneNoBracketOptInTarget;
+        let tolerance = 1e-4;
+        let eps = tolerance * 0.4;
+        let q = NonMonotoneNoBracketQuote {
+            t: 1.0,
+            root: 0.5,
+            eps,
+        };
+        let cfg = crate::calibration::CalibrationConfig {
+            solver: crate::calibration::solver::SolverConfig::brent_default()
+                .with_tolerance(tolerance)
+                .with_max_iterations(200),
+            ..crate::calibration::CalibrationConfig::default()
+        };
+
+        let (curve, report) = SequentialBootstrapper::bootstrap(
+            &target,
+            &[q],
+            vec![(0.0, 0.0)],
+            &cfg,
+            Some(tolerance),
+            None,
+        )
+        .expect("opt-in target must accept the best-effort knot");
+
+        assert!(
+            (curve - 0.5).abs() < 1e-6,
+            "knot should commit at the |f|-minimum; got {curve}"
+        );
+        assert!(
+            report.metadata.contains_key("approximate_knots"),
+            "opt-in approximate knot must be flagged in report metadata; keys: {:?}",
+            report.metadata.keys().collect::<Vec<_>>()
+        );
     }
 }
 

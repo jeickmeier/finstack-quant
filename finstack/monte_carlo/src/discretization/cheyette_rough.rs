@@ -39,10 +39,15 @@
 //! # Euler Steps (left-point scheme, review finding M1)
 //!
 //! ```text
-//! σ(t) = σ₀(t) · exp(η · Ỹ(t) − ½ · η² · t^{2H})
+//! σ(t) = σ₀(t) · exp(½·η · Ỹ(t) − ¼ · η² · t^{2H})
 //! x(t+dt) = x(t) + [y(t) − κ·x(t)] · dt + σ(t) · √dt · Z_corr
 //! y(t+dt) = y(t) + [σ(t)² − 2κ·y(t)] · dt
 //! ```
+//!
+//! The σ reconstruction uses rBergomi **variance-lognormal** semantics: the
+//! variance `V(t) = σ(t)² = σ₀²·exp(η·Ỹ(t) − ½η²·t^{2H})` is lognormal with
+//! full compensation, so `E[σ²(t)] = σ₀²(t)` (see the
+//! [process module docs](super::super::process::cheyette_rough)).
 //!
 //! The volatility is evaluated at the **left endpoint**: `Ỹ(t)` is the
 //! Volterra level accumulated strictly before this step, so `σ(t)` is
@@ -125,8 +130,9 @@ impl Discretization<CheyetteRoughVolProcess> for CheyetteRoughEuler {
         let z_drive = z[2]; // Unit-variance driving Brownian normal Z̃ = ΔW̃/√dt
 
         // Reconstruct the LEFT-endpoint volatility from the Volterra level
-        // accumulated *up to* time t (work[0] = Ỹ_t, before this step's ΔỸ):
-        //   σ(t) = σ₀(t) · exp(η Ỹ_t − ½ η² t^{2H})
+        // accumulated *up to* time t (work[0] = Ỹ_t, before this step's ΔỸ),
+        // using rBergomi variance-lognormal semantics (E[σ²(t)] = σ₀²(t)):
+        //   σ(t) = σ₀(t) · exp(½ η Ỹ_t − ¼ η² t^{2H})
         //
         // The left endpoint is essential (review finding M1): σ(t) is built
         // from driving normals strictly before this step, so it is
@@ -137,7 +143,7 @@ impl Discretization<CheyetteRoughVolProcess> for CheyetteRoughEuler {
         let two_h = 2.0 * h;
         let y_t = work[0];
         let sigma_base = p.sigma_base_value(t);
-        let exponent = eta * y_t - 0.5 * eta * eta * t.powf(two_h);
+        let exponent = 0.5 * eta * y_t - 0.25 * eta * eta * t.powf(two_h);
         let sigma_t = (sigma_base * exponent.exp()).max(0.0);
 
         // Correlate the rate noise with the Volterra *driver* (review finding
@@ -234,11 +240,11 @@ mod tests {
 
         disc.step(&process, t, dt, &mut x, &z, &mut work);
 
-        // Manually compute expected result (left-point scheme):
-        // σ(t) from Ỹ_t (before adding ΔỸ), base vol and compensator at t.
+        // Manually compute expected result (left-point scheme, variance-
+        // lognormal convention): σ(t) from Ỹ_t (before adding ΔỸ).
         let two_h = 2.0 * h;
         let sigma_base = p.sigma_base_value(t);
-        let exponent = eta * y_accum - 0.5 * eta * eta * t.powf(two_h);
+        let exponent = 0.5 * eta * y_accum - 0.25 * eta * eta * t.powf(two_h);
         let sigma_t = (sigma_base * exponent.exp()).max(0.0);
 
         // Correlation against the unit-variance driving normal.
@@ -275,9 +281,10 @@ mod tests {
         let t = 0.5_f64;
         let w_h = 0.03_f64;
 
-        // σ(t) = σ₀(t) · exp(η · Ỹ_t − ½ · η² · t^{2H})
+        // Variance-lognormal convention:
+        // σ(t) = σ₀(t) · exp(½·η · Ỹ_t − ¼ · η² · t^{2H})
         let two_h = 2.0 * h;
-        let exponent = eta * w_h - 0.5 * eta * eta * t.powf(two_h);
+        let exponent = 0.5 * eta * w_h - 0.25 * eta * eta * t.powf(two_h);
         let sigma = sigma_base_val * exponent.exp();
 
         // With positive w_h, sigma should be above the base
@@ -287,12 +294,23 @@ mod tests {
         );
 
         // With zero accumulation, sigma should be below base due to convexity correction
-        let exponent_zero = -0.5 * eta * eta * t.powf(two_h);
+        let exponent_zero = -0.25 * eta * eta * t.powf(two_h);
         let sigma_zero = sigma_base_val * exponent_zero.exp();
         assert!(sigma_zero > 0.0);
         assert!(
             sigma_zero < sigma_base_val,
             "Sigma should be below base level due to convexity correction"
+        );
+
+        // The implied variance V = σ² is lognormal with full compensation:
+        // V = σ₀²·exp(η·Ỹ − ½η²·t^{2H}). Squaring the reconstruction must
+        // reproduce exactly that law's exponent.
+        let v = sigma * sigma;
+        let v_expected =
+            sigma_base_val * sigma_base_val * (eta * w_h - 0.5 * eta * eta * t.powf(two_h)).exp();
+        assert!(
+            (v - v_expected).abs() < 1e-18,
+            "σ² must follow the variance-lognormal law: {v} vs {v_expected}"
         );
     }
 
@@ -445,6 +463,64 @@ mod tests {
         }
     }
 
+    /// Variance-lognormal compensation: `E[σ²(t)] = σ₀²(t)` under simulation.
+    ///
+    /// The σ reconstruction `σ = σ₀·exp(½η·Ỹ − ¼η²·t^{2H})` makes the
+    /// variance lognormal with full compensation, so the simulated mean of
+    /// σ²(t) must pin to σ₀² at every grid time. The pre-fix σ-lognormal
+    /// convention inflates `E[σ²(t)]` by `exp(η²·t^{2H})` — a factor of
+    /// ≈2.6 at t=1, η=1.5, H=0.1 — far beyond the MC tolerance here.
+    #[test]
+    fn simulated_variance_mean_pins_to_base_variance() {
+        use super::super::super::rng::fbm::FractionalNoiseGenerator;
+        use super::super::super::rng::philox::PhiloxRng;
+        use super::super::super::rng::volterra::RiemannLiouvilleVolterra;
+        use super::super::super::traits::RandomStream;
+
+        let h = 0.1_f64;
+        let eta = 1.5_f64;
+        let sigma0 = 0.005_f64;
+        let t_end = 1.0_f64;
+        let n = 50usize;
+
+        let gen = RiemannLiouvilleVolterra::new(t_end, n, h).expect("valid generator");
+        let dt = gen.dt();
+        let mut rng = PhiloxRng::new(24680);
+
+        let num_paths = 200_000usize;
+        let mut vol_normals = vec![0.0; 2 * n];
+        let mut increments = vec![0.0; n];
+
+        // Accumulate σ²(t_k) across paths at a few pinned grid times.
+        let check_steps = [10usize, 25, 49];
+        let mut sums = [0.0_f64; 3];
+        for _ in 0..num_paths {
+            rng.fill_std_normals(&mut vol_normals);
+            gen.generate(&vol_normals, &mut increments);
+
+            let mut y_accum = 0.0;
+            for (k, &incr) in increments.iter().enumerate() {
+                y_accum += incr;
+                let t_next = (k + 1) as f64 * dt;
+                if let Some(pos) = check_steps.iter().position(|&s| s == k) {
+                    // σ at the node t_{k+1}, from the accumulated level Ỹ.
+                    let exponent = 0.5 * eta * y_accum - 0.25 * eta * eta * t_next.powf(2.0 * h);
+                    let sigma_t = sigma0 * exponent.exp();
+                    sums[pos] += sigma_t * sigma_t;
+                }
+            }
+        }
+
+        for (pos, &step) in check_steps.iter().enumerate() {
+            let mean_var = sums[pos] / num_paths as f64;
+            let ratio = mean_var / (sigma0 * sigma0);
+            assert!(
+                (ratio - 1.0).abs() < 0.05,
+                "E[σ²(t)] must pin to σ₀² at step {step}: ratio {ratio}"
+            );
+        }
+    }
+
     /// The martingale part of x must have zero mean (review findings M1+M2).
     ///
     /// The stochastic increment of x over a step is `σ(t_k)·√dt·Z_corr_k`.
@@ -500,8 +576,8 @@ mod tests {
             for k in 0..n {
                 let t = k as f64 * dt;
                 // Recompute σ(t_k) exactly as the discretization does, from
-                // the pre-step Volterra level.
-                let exponent = eta * work[0] - 0.5 * eta * eta * t.powf(2.0 * h);
+                // the pre-step Volterra level (variance-lognormal convention).
+                let exponent = 0.5 * eta * work[0] - 0.25 * eta * eta * t.powf(2.0 * h);
                 let sigma_t = (p.sigma_base_value(t) * exponent.exp()).max(0.0);
                 // ρ = 1 ⇒ Z_corr = Z̃ (driving normal).
                 m_t += sigma_t * dt.sqrt() * driving[k];

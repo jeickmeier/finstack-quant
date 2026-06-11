@@ -104,6 +104,34 @@ impl HullWhite1FParams {
         // If t < first breakpoint, use first value
         self.theta_curve[0]
     }
+
+    /// Time-average of the piecewise-constant θ over `[t, t + dt]`.
+    ///
+    /// Integrates θ exactly across any knot boundaries inside the step and
+    /// divides by `dt`. Sampling θ at the step start instead introduces an
+    /// O(dt) local bias whenever a simulation step straddles a θ knot (e.g.
+    /// on event-aligned grids whose nodes are not θ breakpoints); using the
+    /// step-average reduces this to O(dt²).
+    pub fn theta_average(&self, t: f64, dt: f64) -> f64 {
+        if dt <= 0.0 {
+            return self.theta_at_time(t);
+        }
+        let t_end = t + dt;
+        let mut integral = 0.0;
+        let mut seg_start = t;
+        for &knot in &self.theta_times {
+            if knot <= seg_start {
+                continue;
+            }
+            if knot >= t_end {
+                break;
+            }
+            integral += self.theta_at_time(seg_start) * (knot - seg_start);
+            seg_start = knot;
+        }
+        integral += self.theta_at_time(seg_start) * (t_end - seg_start);
+        integral / dt
+    }
 }
 
 /// Hull-White 1-factor short rate process.
@@ -150,6 +178,12 @@ impl HullWhite1FProcess {
     /// Get θ(t) at a given time.
     pub fn theta_at_time(&self, t: f64) -> f64 {
         self.params.theta_at_time(t)
+    }
+
+    /// Time-average of θ over `[t, t + dt]` (see
+    /// [`HullWhite1FParams::theta_average`]).
+    pub fn theta_average(&self, t: f64, dt: f64) -> f64 {
+        self.params.theta_average(t, dt)
     }
 }
 

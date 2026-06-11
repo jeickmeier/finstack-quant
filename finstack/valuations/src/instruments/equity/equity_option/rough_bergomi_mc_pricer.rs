@@ -27,13 +27,18 @@ use finstack_core::money::Money;
 /// V_t = xi_0(t) * exp(eta * W_H(t) - 0.5 * eta^2 * t^{2H})
 /// ```
 ///
-/// Model parameters are read from market scalars:
+/// Model parameters are read from market scalars (all required — no
+/// defaults):
 ///
-/// | Scalar Key | Default | Description |
-/// |---|---|---|
-/// | `RBERGOMI_ETA` | 1.9 | Vol-of-vol scaling |
-/// | `RBERGOMI_HURST` | 0.07 | Hurst exponent |
-/// | `RBERGOMI_RHO` | -0.9 | Spot-vol correlation |
+/// | Scalar Key | Description |
+/// |---|---|
+/// | `RBERGOMI_ETA` | Vol-of-vol scaling |
+/// | `RBERGOMI_HURST` | Hurst exponent |
+/// | `RBERGOMI_RHO` | Spot-vol correlation |
+///
+/// The forward variance curve ξ₀(t) is built from the ATM-forward implied
+/// vol term structure of the option's vol surface (total-variance
+/// differencing across the surface's expiry strip).
 pub(crate) struct EquityOptionRoughBergomiMcPricer {
     /// Number of Monte Carlo paths.
     num_paths: usize,
@@ -61,9 +66,102 @@ impl Default for EquityOptionRoughBergomiMcPricer {
     }
 }
 
-/// Extract a unitless scalar from market data, falling back to a default.
-fn get_scalar(market: &MarketContext, key: &str, default: f64) -> f64 {
-    crate::instruments::common_impl::helpers::get_unitless_scalar(market, key, default)
+/// Bundle of rough-Bergomi parameters resolved from a market context.
+///
+/// Mirrors `RoughHestonScalars` (rough_heston_market.rs): production pricing
+/// requires explicit calibrated scalars so missing model calibration cannot
+/// silently fall back to representative defaults.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RoughBergomiScalars {
+    /// Vol-of-vol scaling (η).
+    pub eta: f64,
+    /// Hurst exponent (H).
+    pub hurst: f64,
+    /// Spot/vol correlation (ρ).
+    pub rho: f64,
+}
+
+impl RoughBergomiScalars {
+    /// Read rough-Bergomi scalars from the market, erroring when any
+    /// `RBERGOMI_*` scalar is missing or is not unitless. No numerical
+    /// validation is done here; downstream constructors
+    /// (`RoughBergomiParams::new`, `HurstExponent::new`) enforce invariants.
+    pub(crate) fn from_market_strict(market: &MarketContext) -> finstack_core::Result<Self> {
+        use crate::instruments::common_impl::helpers::get_unitless_scalar_strict;
+        Ok(Self {
+            eta: get_unitless_scalar_strict(market, "RBERGOMI_ETA", "rough Bergomi")?,
+            hurst: get_unitless_scalar_strict(market, "RBERGOMI_HURST", "rough Bergomi")?,
+            rho: get_unitless_scalar_strict(market, "RBERGOMI_RHO", "rough Bergomi")?,
+        })
+    }
+}
+
+/// Build the forward variance curve ξ₀(t) from the ATM-forward implied vol
+/// term structure of the option's vol surface.
+///
+/// The surface is sampled at the ATM-forward strike `K(u) = S·e^{(r−q)u}`
+/// across its expiry strip (clipped to the option maturity `t`, with `t`
+/// itself always included). Total variances `w(u) = σ²(u, K(u))·u` are
+/// differenced into per-interval forward variances
+/// `ξ_i = (w_{i} − w_{i−1})/(u_i − u_{i−1})`, each placed at the interval
+/// midpoint. A flat surface therefore reproduces `ForwardVarianceCurve::flat(σ²)`
+/// exactly.
+///
+/// When the instrument carries an `implied_volatility` override, that flat σ
+/// wins (standard revaluation convention) and ξ₀ = σ² flat.
+fn build_xi0_from_surface(
+    market: &MarketContext,
+    equity_option: &EquityOption,
+    spot: f64,
+    r: f64,
+    q: f64,
+    t: f64,
+) -> finstack_core::Result<finstack_core::market_data::term_structures::ForwardVarianceCurve> {
+    use finstack_core::market_data::term_structures::ForwardVarianceCurve;
+
+    if let Some(iv) = equity_option
+        .pricing_overrides
+        .market_quotes
+        .implied_volatility
+    {
+        return ForwardVarianceCurve::flat(iv * iv);
+    }
+
+    let surface = market.get_surface(equity_option.vol_surface_id.as_str())?;
+
+    // Maturity strip: surface expiries strictly inside (0, t), plus t itself.
+    let mut strip: Vec<f64> = surface
+        .expiries()
+        .iter()
+        .copied()
+        .filter(|&u| u > 1e-12 && u < t - 1e-12)
+        .collect();
+    strip.push(t);
+
+    // Total variances at the ATM-forward strike, then forward-variance
+    // differencing over consecutive intervals (starting from w(0) = 0).
+    let mut points = Vec::with_capacity(strip.len());
+    let mut prev_u = 0.0;
+    let mut prev_w = 0.0;
+    for &u in &strip {
+        let atm_forward = spot * ((r - q) * u).exp();
+        let sigma_u = surface.value_clamped(u, atm_forward);
+        let w = sigma_u * sigma_u * u;
+        let xi = (w - prev_w) / (u - prev_u);
+        if !xi.is_finite() || xi <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "rough Bergomi xi0 strip: non-positive forward variance {xi} over \
+                 ({prev_u}, {u}) from surface '{}' — ATM total variance must be \
+                 increasing in maturity (no calendar arbitrage)",
+                equity_option.vol_surface_id
+            )));
+        }
+        points.push(((prev_u + u) / 2.0, xi));
+        prev_u = u;
+        prev_w = w;
+    }
+
+    ForwardVarianceCurve::from_points(&points)
 }
 
 /// Run the fractional MC simulation loop for a concrete payoff type.
@@ -80,7 +178,8 @@ fn simulate_rbergomi<F: finstack_monte_carlo::traits::Payoff>(
     fbm_gen: &finstack_monte_carlo::rng::volterra::RiemannLiouvilleVolterra,
     num_steps: usize,
     err_ctx: crate::pricer::PricingErrorContext,
-) -> std::result::Result<f64, PricingError> {
+) -> std::result::Result<(f64, f64), PricingError> {
+    use finstack_monte_carlo::online_stats::OnlineStats;
     use finstack_monte_carlo::rng::fbm::FractionalNoiseGenerator;
     use finstack_monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
 
@@ -100,7 +199,7 @@ fn simulate_rbergomi<F: finstack_monte_carlo::traits::Payoff>(
     let fbm_z_index = 1;
     let drive_z_index = 2;
 
-    let mut sum = 0.0;
+    let mut stats = OnlineStats::new();
 
     for _ in 0..num_paths {
         // Generate Riemann-Liouville Volterra increments for this path, plus
@@ -129,10 +228,11 @@ fn simulate_rbergomi<F: finstack_monte_carlo::traits::Payoff>(
         )
         .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
 
-        sum += pv;
+        stats.update(pv);
     }
 
-    Ok(sum / num_paths as f64)
+    let stderr = stats.stderr();
+    Ok((stats.mean(), if stderr.is_finite() { stderr } else { 0.0 }))
 }
 
 impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
@@ -202,7 +302,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
                     .model(crate::pricer::ModelKey::MonteCarloRoughBergomi),
             )
         })?;
-        let (spot, r, q, sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
+        let (spot, r, q, t) = (inputs.spot, inputs.r, inputs.q, inputs.t_vol);
 
         if t <= 0.0 {
             let intrinsic = match equity_option.option_type {
@@ -219,18 +319,17 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
             ));
         }
 
-        // Fetch rBergomi parameters
-        let eta = get_scalar(market, "RBERGOMI_ETA", 1.9);
-        let hurst = get_scalar(market, "RBERGOMI_HURST", 0.07);
-        let rho = get_scalar(market, "RBERGOMI_RHO", -0.9);
-
         let err_ctx = crate::pricer::PricingErrorContext::from_instrument(equity_option)
             .model(crate::pricer::ModelKey::MonteCarloRoughBergomi);
 
-        // Build a flat forward variance curve from the implied vol
-        let xi =
-            finstack_core::market_data::term_structures::ForwardVarianceCurve::flat(sigma * sigma)
+        // Fetch rBergomi parameters — all required, no silent defaults.
+        let RoughBergomiScalars { eta, hurst, rho } =
+            RoughBergomiScalars::from_market_strict(market)
                 .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
+
+        // Build ξ₀(t) from the ATM-forward implied vol term structure.
+        let xi = build_xi0_from_surface(market, equity_option, spot, r, q, t)
+            .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
 
         let hurst_exp = finstack_core::math::fractional::HurstExponent::new(hurst)
             .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
@@ -279,7 +378,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
         )
         .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
 
-        let mean_pv = match equity_option.option_type {
+        let (mean_pv, stderr_undisc) = match equity_option.option_type {
             OptionType::Call => {
                 let payoff = finstack_monte_carlo::payoff::vanilla::EuropeanCall::new(
                     equity_option.strike,
@@ -323,13 +422,17 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
         };
 
         // Vanilla payoffs from `simulate_path_fractional` are undiscounted
-        // terminal payoffs; discount the path mean to present value, matching
-        // the Heston and rough-Heston MC pricers.
-        let pv = Money::new(mean_pv * (-r * t).exp(), ccy);
-        Ok(crate::results::ValuationResult::stamped(
-            equity_option.id(),
-            as_of,
-            pv,
-        ))
+        // terminal payoffs; discount the path mean (and stderr) to present
+        // value, matching the Heston and rough-Heston MC pricers.
+        let df = (-r * t).exp();
+        let pv = Money::new(mean_pv * df, ccy);
+        let mut result = crate::results::ValuationResult::stamped(equity_option.id(), as_of, pv);
+        let stderr = stderr_undisc * df;
+        if stderr > 0.0 {
+            result
+                .measures
+                .insert(crate::metrics::MetricId::custom("mc_stderr"), stderr);
+        }
+        Ok(result)
     }
 }

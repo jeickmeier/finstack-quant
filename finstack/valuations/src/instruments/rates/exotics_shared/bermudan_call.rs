@@ -5,8 +5,9 @@ use finstack_core::dates::Date;
 /// Bermudan call provision for callable exotics.
 ///
 /// Allows the issuer to terminate the note on specified call dates
-/// at a specified call price (typically par). Used by Callable Range Accrual,
-/// PRDC, and callable Snowball notes.
+/// at a specified call price (typically par). Currently consumed by the
+/// Callable Range Accrual note (PRDC is not implemented, and the Snowball
+/// pricer rejects callable provisions).
 ///
 /// # Fields
 ///

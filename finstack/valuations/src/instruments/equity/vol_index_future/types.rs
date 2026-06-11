@@ -24,12 +24,16 @@
 //! - Position_Sign = +1 for long, -1 for short
 //!
 //! This is standard futures mark-to-market: a long gains when the forward mark
-//! rises above its entry price (matching [`EquityIndexFuture`]).
+//! rises above its entry price (matching [`EquityIndexFuture`]). The MTM is
+//! undiscounted because the position is daily margined.
 //!
 //! [`EquityIndexFuture`]: crate::instruments::equity::EquityIndexFuture
 //!
-//! Unlike interest rate futures, VIX futures do not require convexity
-//! adjustments because the underlying is already a volatility measure.
+//! No convexity adjustment is applied. This is exact only when the vol index
+//! curve is built directly from quoted futures/forward vol levels (the curve
+//! IS the futures strip). If the curve were instead derived from
+//! variance-swap or option-implied *variance* levels, a futures-vs-forward
+//! convexity (concavity in variance) adjustment would be required.
 //!
 //! # References
 //!
@@ -96,10 +100,14 @@ pub struct VolatilityIndexFuture {
     /// `notional.amount() / (multiplier × quoted_price)` to represent
     /// the number of contracts.
     pub notional: Money,
-    /// Future expiry date (typically 30 days before VIX settlement).
+    /// Future expiry date. For VIX futures this is the final settlement day
+    /// itself (the Wednesday ~30 days before the expiry of the SPX options
+    /// used in the settlement calculation), not a date 30 days before
+    /// settlement.
     #[schemars(with = "String")]
     pub expiry: Date,
-    /// Settlement date (SOQ calculation date).
+    /// Final settlement date — the morning Special Opening Quotation (SOQ)
+    /// of the index is computed on this date (same day as `expiry` for VIX).
     #[schemars(with = "String")]
     pub settlement_date: Date,
     /// Quoted future price (index points, e.g., 21.50).
@@ -110,7 +118,9 @@ pub struct VolatilityIndexFuture {
     #[builder(default)]
     #[serde(default)]
     pub contract_specs: VolIndexContractSpecs,
-    /// Discount curve identifier for present value calculations.
+    /// Discount curve identifier. **Unused in PV**: the future is daily
+    /// margined so the mark-to-market is undiscounted, and no Dv01 is
+    /// registered. Retained for market-data identification/scenario plumbing.
     pub discount_curve_id: CurveId,
     /// Volatility index forward curve identifier.
     pub vol_index_curve_id: CurveId,
@@ -287,11 +297,10 @@ impl crate::instruments::common_impl::traits::CurveDependencies for VolatilityIn
     fn curve_dependencies(
         &self,
     ) -> finstack_core::Result<crate::instruments::common_impl::traits::InstrumentCurves> {
-        // Only include discount curve for DV01 calculations
-        // Vol index curve sensitivity is handled separately via delta_vol
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
+        // Daily-margined future: PV is undiscounted and no Dv01 is
+        // registered, so there is no discount-curve dependency to report.
+        // Vol index curve sensitivity is handled separately via delta_vol.
+        crate::instruments::common_impl::traits::InstrumentCurves::builder().build()
     }
 }
 
