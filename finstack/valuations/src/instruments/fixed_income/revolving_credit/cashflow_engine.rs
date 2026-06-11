@@ -71,6 +71,55 @@ pub struct ThreeFactorPathData {
     /// Payment dates aligned with trajectories
     #[schemars(with = "Vec<String>")]
     pub payment_dates: Vec<Date>,
+    /// Whether `short_rate_path` was simulated by a stochastic rate process
+    /// (Hull-White with σ > 0). When true the pricer discounts pathwise on
+    /// the simulated bank account; when false the static discount curve is
+    /// used (deterministic-forward or fixed-rate modes).
+    #[serde(default)]
+    pub stochastic_rates: bool,
+}
+
+impl ThreeFactorPathData {
+    /// Validate the structural invariants of the path data.
+    ///
+    /// All four trajectories must be aligned 1:1 with `payment_dates`, there
+    /// must be at least two points (a single point cannot define a period),
+    /// and `time_points` must be strictly increasing. Downstream consumers
+    /// index these vectors in lockstep — a length mismatch previously
+    /// panicked deep inside the cashflow engine instead of returning an
+    /// error.
+    pub fn validate(&self) -> Result<()> {
+        let n = self.payment_dates.len();
+        if n < 2 {
+            return Err(finstack_core::Error::Validation(format!(
+                "ThreeFactorPathData requires at least 2 payment dates, got {n}"
+            )));
+        }
+        let lens = [
+            ("utilization_path", self.utilization_path.len()),
+            ("short_rate_path", self.short_rate_path.len()),
+            ("credit_spread_path", self.credit_spread_path.len()),
+            ("time_points", self.time_points.len()),
+        ];
+        for (name, len) in lens {
+            if len != n {
+                return Err(finstack_core::Error::Validation(format!(
+                    "ThreeFactorPathData {name} length ({len}) must match payment_dates ({n})"
+                )));
+            }
+        }
+        if self
+            .time_points
+            .windows(2)
+            .any(|w| !w[0].is_finite() || !w[1].is_finite() || w[1] <= w[0])
+        {
+            return Err(finstack_core::Error::Validation(
+                "ThreeFactorPathData time_points must be finite and strictly increasing"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Enhanced cashflow schedule with embedded 3-factor path data.
@@ -176,6 +225,7 @@ impl<'a> CashflowEngine<'a> {
         &self,
         path_data: ThreeFactorPathData,
     ) -> Result<PathAwareCashflowSchedule> {
+        path_data.validate()?;
         let schedule = self.build_path_schedule(&path_data)?;
         Ok(PathAwareCashflowSchedule {
             schedule,
@@ -198,17 +248,33 @@ impl<'a> CashflowEngine<'a> {
             }
         };
 
+        // Events dated on the commitment date are rejected outright: the
+        // initial position on the commitment date is defined by
+        // `drawn_amount` alone. The previous "dedup" special case skipped
+        // the initial-draw outflow when a commitment-date draw event existed,
+        // but the period balance replay and the terminal repayment still
+        // added the event on top of `drawn_amount` — interest accrued on 2X
+        // and 2X was repaid at maturity. One canonical semantic: encode the
+        // initial draw in `drawn_amount`, date all events strictly after the
+        // commitment date.
+        if let Some(event) = draw_repay_events
+            .iter()
+            .find(|e| e.date <= self.facility.commitment_date)
+        {
+            return Err(finstack_core::Error::Validation(format!(
+                "RevolvingCredit draw/repay event dated {} is on or before the commitment date \
+                 ({}); the position at commitment is defined by drawn_amount — date events \
+                 strictly after the commitment date",
+                event.date, self.facility.commitment_date
+            )));
+        }
+
         let mut flows = Vec::new();
         let rc = RoundingContext::default();
         let ccy = self.facility.commitment_amount.currency();
 
         // Add initial draw at commitment_date (from lender perspective: negative cashflow)
-        // Avoid double-counting if a deterministic draw event already exists on the commitment_date
-        let has_commitment_draw_event = draw_repay_events
-            .iter()
-            .any(|e| e.is_draw && e.date == self.facility.commitment_date);
         if self.facility.commitment_date > self.as_of
-            && !has_commitment_draw_event
             && !rc.is_effectively_zero(self.facility.drawn_amount.amount(), ZeroKind::Money(ccy))
         {
             flows.push(CashFlow {
@@ -262,18 +328,24 @@ impl<'a> CashflowEngine<'a> {
             timeline.sort();
             timeline.dedup();
 
-            // Track balance through sub-periods
+            // Track balance through sub-periods. The replay routes every
+            // event through `apply_draw_repay_event` so limit validation
+            // (draw ≤ commitment, repay ≤ balance) also covers events dated
+            // exactly on a period boundary — the in-period loop below only
+            // sees strictly-interior events, so boundary-dated events would
+            // otherwise bypass validation and let the balance exceed the
+            // commitment (negative undrawn fees).
             let mut current_balance = if i == 0 {
                 self.facility.drawn_amount
             } else {
                 let mut balance = self.facility.drawn_amount;
                 for event in draw_repay_events.iter() {
                     if event.date <= period_start {
-                        balance = if event.is_draw {
-                            balance.checked_add(event.amount)?
-                        } else {
-                            balance.checked_sub(event.amount)?
-                        };
+                        balance = super::utils::apply_draw_repay_event(
+                            balance,
+                            event,
+                            self.facility.commitment_amount,
+                        )?;
                     }
                 }
                 balance
@@ -528,26 +600,27 @@ impl<'a> CashflowEngine<'a> {
             }
         }
 
-        // Add terminal repayment
+        // Add terminal repayment. Same validated replay as the period
+        // balances — maturity-dated events are boundary events too.
         let mut final_balance = self.facility.drawn_amount;
         for event in draw_repay_events.iter() {
             if event.date < self.facility.maturity {
-                final_balance = if event.is_draw {
-                    final_balance.checked_add(event.amount)?
-                } else {
-                    final_balance.checked_sub(event.amount)?
-                };
+                final_balance = super::utils::apply_draw_repay_event(
+                    final_balance,
+                    event,
+                    self.facility.commitment_amount,
+                )?;
             }
         }
 
         let mut final_balance_for_terminal = final_balance;
         for event in draw_repay_events.iter() {
             if event.date == self.facility.maturity {
-                final_balance_for_terminal = if event.is_draw {
-                    final_balance_for_terminal.checked_add(event.amount)?
-                } else {
-                    final_balance_for_terminal.checked_sub(event.amount)?
-                };
+                final_balance_for_terminal = super::utils::apply_draw_repay_event(
+                    final_balance_for_terminal,
+                    event,
+                    self.facility.commitment_amount,
+                )?;
             }
         }
 

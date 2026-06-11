@@ -479,3 +479,148 @@ fn parity_orchestrator_dcf_matches_standalone() {
         orchestrated.equity_value.amount()
     );
 }
+
+// --- Quant review fixes: terminal-flow annualization, discounting basis ---
+
+/// Quarterly grid + Gordon Growth: the terminal flow must be annualized as
+/// the trailing sum of the final year's quarters, so the TV matches the
+/// hand-computed Gordon value on the annual flow.
+#[test]
+fn quarterly_gordon_terminal_value_uses_annualized_flow() {
+    let model = make_simple_dcf_model(); // quarterly UFCF: 100k,110k,120k,130k
+
+    let result = evaluate_dcf_with_market(
+        &model,
+        0.10,
+        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        "ufcf",
+        Some(0.0),
+        &DcfOptions::default(),
+        None,
+    )
+    .expect("DCF evaluation");
+
+    let dcf = result.dcf_instrument.expect("instrument");
+    let annual_flow = 100_000.0 + 110_000.0 + 120_000.0 + 130_000.0;
+    assert_eq!(dcf.terminal_flow_override, Some(annual_flow));
+
+    let tv = dcf.calculate_terminal_value().expect("terminal value");
+    let expected_tv = annual_flow * 1.02 / (0.10 - 0.02);
+    assert!(
+        (tv - expected_tv).abs() < 1e-6,
+        "quarterly-grid TV must capitalize the trailing annual flow: expected {expected_tv}, got {tv}"
+    );
+}
+
+/// Annual grid: terminal value behavior is unchanged (last flow used as-is).
+#[test]
+fn annual_gordon_terminal_value_unchanged() {
+    let model = ModelBuilder::new("annual-dcf")
+        .periods("2025..2027", None)
+        .expect("valid periods")
+        .value(
+            "ufcf",
+            &[
+                (PeriodId::annual(2025), AmountOrScalar::scalar(400_000.0)),
+                (PeriodId::annual(2026), AmountOrScalar::scalar(440_000.0)),
+                (PeriodId::annual(2027), AmountOrScalar::scalar(480_000.0)),
+            ],
+        )
+        .with_meta("currency", serde_json::json!("USD"))
+        .build()
+        .expect("valid model");
+
+    let result = evaluate_dcf_with_market(
+        &model,
+        0.10,
+        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        "ufcf",
+        Some(0.0),
+        &DcfOptions::default(),
+        None,
+    )
+    .expect("DCF evaluation");
+
+    let dcf = result.dcf_instrument.expect("instrument");
+    assert_eq!(dcf.terminal_flow_override, None);
+
+    let tv = dcf.calculate_terminal_value().expect("terminal value");
+    let expected_tv = 480_000.0 * 1.02 / (0.10 - 0.02);
+    assert!((tv - expected_tv).abs() < 1e-6);
+}
+
+/// A "USD-DISCOUNT" market curve must not change the discounting basis:
+/// all components stay on WACC and equity = EV - net debt holds exactly.
+#[test]
+fn usd_discount_curve_does_not_mix_discounting_bases() {
+    let model = make_simple_dcf_model();
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+
+    let usd_discount = DiscountCurve::builder("USD-DISCOUNT")
+        .base_date(base_date)
+        .knots([(0.0, 1.0), (5.0, 0.8)])
+        .build()
+        .expect("curve");
+    let market = MarketContext::new().insert(usd_discount);
+
+    let net_debt = 50_000.0;
+    let with_market = evaluate_dcf_with_market(
+        &model,
+        0.10,
+        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        "ufcf",
+        Some(net_debt),
+        &DcfOptions::default(),
+        Some(&market),
+    )
+    .expect("DCF with market");
+
+    let without_market = evaluate_dcf_with_market(
+        &model,
+        0.10,
+        TerminalValueSpec::GordonGrowth { growth_rate: 0.02 },
+        "ufcf",
+        Some(net_debt),
+        &DcfOptions::default(),
+        None,
+    )
+    .expect("DCF without market");
+
+    // Internal consistency of the envelope: equity = EV - net debt.
+    assert!(
+        (with_market.equity_value.amount()
+            - (with_market.enterprise_value.amount() - with_market.net_debt.amount()))
+        .abs()
+            < 1e-6,
+        "equity must reconcile to EV - net debt with a market curve loaded"
+    );
+
+    // Loading a conventionally-named curve must not change the valuation.
+    assert!(
+        (with_market.equity_value.amount() - without_market.equity_value.amount()).abs() < 1e-6,
+        "a USD-DISCOUNT market curve must not alter the WACC discounting basis"
+    );
+
+    // The instrument no longer references the conventional curve name by default.
+    let dcf = with_market.dcf_instrument.expect("instrument");
+    assert_ne!(dcf.discount_curve_id.as_str(), "USD-DISCOUNT");
+}
+
+/// NaN terminal-value parameters must error instead of producing NaN values.
+#[test]
+fn nan_terminal_value_parameters_error() {
+    let model = make_simple_dcf_model();
+
+    let result = evaluate_dcf_with_market(
+        &model,
+        0.10,
+        TerminalValueSpec::GordonGrowth {
+            growth_rate: f64::NAN,
+        },
+        "ufcf",
+        Some(0.0),
+        &DcfOptions::default(),
+        None,
+    );
+    assert!(result.is_err(), "NaN growth_rate must fail closed");
+}

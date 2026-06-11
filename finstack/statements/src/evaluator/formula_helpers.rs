@@ -66,10 +66,18 @@ pub(crate) fn collect_historical_values_sorted(
         return Ok(cached);
     }
 
+    // Only periods at or before the context's evaluation period are visible.
+    // Lagged evaluation builds contexts for past periods over the full
+    // historical map, so without this filter nested aggregates (e.g.
+    // `lag(rolling_mean(x, 4), 2)`) would window data after the lagged
+    // evaluation point — a silent look-ahead bias.
     let sorted_periods =
         if let Some((component, instrument_or_total)) = decode_cs_reference(node_name) {
             let mut sorted_periods = BTreeMap::new();
             for period in context.historical_capital_structure_cashflows.keys() {
+                if *period > context.period_id {
+                    continue;
+                }
                 if let Ok(value) =
                     context.get_historical_cs_value(component, instrument_or_total, period)
                 {
@@ -83,6 +91,9 @@ pub(crate) fn collect_historical_values_sorted(
         } else {
             let mut sorted_periods = BTreeMap::new();
             for (period, values) in context.historical_results.iter() {
+                if *period > context.period_id {
+                    continue;
+                }
                 if let Some(value) = values.get(node_name) {
                     sorted_periods.insert(*period, *value);
                 }

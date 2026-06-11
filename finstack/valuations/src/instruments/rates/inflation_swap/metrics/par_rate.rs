@@ -9,6 +9,6 @@ pub(crate) struct ParRateCalculator;
 impl MetricCalculator for ParRateCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let swap: &InflationSwap = context.instrument_as()?;
-        swap.par_rate(context.curves.as_ref())
+        swap.par_rate(context.curves.as_ref(), context.as_of)
     }
 }

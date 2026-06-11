@@ -224,8 +224,8 @@ pub use sensitivities::theta::collect_cashflows_in_period;
 // without creating public breakage surface.
 pub(crate) use core::finite_difference::{
     bump_discount_curve_parallel, bump_scalar_price, bump_sizes, central_diff_by_half_bump,
-    central_diff_scalar_relative, replace_scalar_value, scalar_numeric_value,
-    scaled_central_diff_by_width, VOL_POINTS_PER_ABSOLUTE_VOL,
+    central_diff_by_width, central_diff_scalar_relative, replace_scalar_value,
+    scalar_numeric_value, scaled_central_diff_by_width, VOL_POINTS_PER_ABSOLUTE_VOL,
 };
 pub(crate) use sensitivities::config::from_finstack_config_or_default as resolve_sensitivities_config;
 pub(crate) use sensitivities::cross_factor::{

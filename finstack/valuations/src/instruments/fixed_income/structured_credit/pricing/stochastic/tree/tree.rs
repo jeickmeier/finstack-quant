@@ -151,8 +151,9 @@ impl ScenarioTree {
                         dt,
                         per_step_position_var,
                     );
+                    let node_t = (period + 1) as f64 * dt;
                     let smm = self.conditional_smm_stateless(&factors, burnout_factor);
-                    let mdr = self.conditional_mdr_stateless(&factors);
+                    let mdr = self.conditional_mdr_stateless(&factors, node_t);
                     let recovery = self.conditional_recovery(&factors);
                     // Moment-matched trinomial probabilities (zero drift, dx = 1):
                     //   p_down = p_up = σ²dt/2,  p_mid = 1 - σ²dt
@@ -333,9 +334,12 @@ impl ScenarioTree {
         // Get correlation from configuration
         let prepay_factor_loading = self.config.correlation.prepay_factor_loading();
 
-        // Conditional SMM using factor model
-        // Log-normal factor adjustment for non-negative rates
-        let smm = base_smm * (prepay_factor_loading * factor).exp();
+        // Conditional SMM using factor model (canonical convention: low
+        // factor = stress, so the loading multiplies −Z). The prepay loading
+        // is typically negative (prepays anti-correlate with defaults), so
+        // prepayments fall when Z falls — fewer refinancings in stress.
+        // Log-normal factor adjustment for non-negative rates.
+        let smm = base_smm * (-prepay_factor_loading * factor).exp();
 
         // Apply burnout
         let smm_with_burnout = smm * burnout_factor;
@@ -344,17 +348,59 @@ impl ScenarioTree {
         smm_with_burnout.clamp(0.0, 0.50)
     }
 
+    /// Credit-side factor: `TwoFactor` mode generates `[prepay, credit]`, so
+    /// defaults/recoveries must read index 1 (previously they read the
+    /// prepay factor, leaving `credit_vol`/`correlation` dead). Single- and
+    /// multi-factor modes carry one factor at index 0.
+    fn credit_factor(factors: &[f64]) -> f64 {
+        factors
+            .get(1)
+            .or_else(|| factors.first())
+            .copied()
+            .unwrap_or(0.0)
+    }
+
+    /// Standard deviation of the credit factor at lattice time `t` (years).
+    ///
+    /// The lattice level `z` is Brownian (`z ~ N(0, t)`); the credit factor
+    /// scales it by the spec volatility (and, in `TwoFactor` mode, the
+    /// prepay/credit correlation from the Cholesky construction).
+    fn credit_factor_std(&self, t: f64) -> f64 {
+        let sqrt_t = t.max(0.0).sqrt();
+        match &self.config.factor_spec {
+            LatentFactorSpec::SingleFactor { volatility, .. } => volatility * sqrt_t,
+            LatentFactorSpec::TwoFactor {
+                credit_vol,
+                correlation,
+                ..
+            } => credit_vol * correlation.abs() * sqrt_t,
+            LatentFactorSpec::MultiFactor { volatilities, .. } => {
+                volatilities.first().copied().unwrap_or(1.0) * sqrt_t
+            }
+        }
+    }
+
     /// Compute conditional MDR given factor realizations (stateless version).
-    fn conditional_mdr_stateless(&self, factors: &[f64]) -> f64 {
-        let factor = factors.first().copied().unwrap_or(0.0);
+    ///
+    /// `t` is the node's lattice time in years, used to size the lognormal
+    /// compensator.
+    fn conditional_mdr_stateless(&self, factors: &[f64], t: f64) -> f64 {
+        let factor = Self::credit_factor(factors);
         let base_mdr = self.config.default_spec.base_mdr();
 
         // Get correlation from configuration
         let default_factor_loading = self.config.correlation.default_factor_loading();
 
-        // Conditional MDR using factor model
-        // Log-normal factor adjustment for non-negative rates
-        let mdr = base_mdr * (default_factor_loading * factor).exp();
+        // Conditional MDR using factor model (canonical convention: low
+        // factor = stress, so the positive loading multiplies −Z and
+        // defaults rise when Z falls). Log-normal factor adjustment for
+        // non-negative rates, with the −½·Var(loading·factor) compensator so
+        // the shock has unit mean and the probability-weighted lattice MDR
+        // matches the base curve (same fix as the intensity/hazard-curve
+        // exp-shock models).
+        let exponent_std = default_factor_loading * self.credit_factor_std(t);
+        let mdr =
+            base_mdr * (-default_factor_loading * factor - 0.5 * exponent_std * exponent_std).exp();
 
         // Clamp to valid range
         mdr.clamp(0.0, 0.50)
@@ -369,8 +415,10 @@ impl ScenarioTree {
                 recovery_volatility,
                 factor_correlation,
             } => {
-                let factor = factors.first().copied().unwrap_or(0.0);
-                // Recovery moves with factor (typically negative correlation)
+                let factor = Self::credit_factor(factors);
+                // Canonical convention: low factor = stress. A positive
+                // factor_correlation makes recovery fall when Z falls, so
+                // defaults (high in stress) and recoveries co-move negatively.
                 let recovery = mean_recovery + factor_correlation * recovery_volatility * factor;
                 recovery.clamp(0.0, 1.0)
             }
@@ -655,6 +703,119 @@ mod tests {
         assert!(
             tree.unexpected_loss().is_err(),
             "recombining-tree unexpected loss must error"
+        );
+    }
+
+    /// M2.13 — canonical sign convention invariant for the tree engine: on
+    /// the shipped RMBS/CLO configs, defaults and recoveries must co-move
+    /// NEGATIVELY across factor realizations (low factor = stress ⇒ high MDR
+    /// and low recovery), and prepayments must fall in stress.
+    #[test]
+    fn tree_defaults_and_recoveries_co_move_negatively() {
+        fn pearson(xs: &[f64], ys: &[f64]) -> f64 {
+            let n = xs.len() as f64;
+            let mean_x = xs.iter().sum::<f64>() / n;
+            let mean_y = ys.iter().sum::<f64>() / n;
+            let mut cov = 0.0;
+            let mut var_x = 0.0;
+            let mut var_y = 0.0;
+            for (x, y) in xs.iter().zip(ys) {
+                cov += (x - mean_x) * (y - mean_y);
+                var_x += (x - mean_x).powi(2);
+                var_y += (y - mean_y).powi(2);
+            }
+            cov / (var_x.sqrt() * var_y.sqrt()).max(f64::MIN_POSITIVE)
+        }
+
+        for (label, config) in [
+            ("rmbs", ScenarioTreeConfig::rmbs_standard(2.0, 0.045)),
+            ("clo", ScenarioTreeConfig::clo_standard(2.0)),
+        ] {
+            let tree = ScenarioTree::build(&config).expect("tree build");
+            let zs = [-2.0, -1.0, 0.0, 1.0, 2.0];
+            let mdrs: Vec<f64> = zs
+                .iter()
+                .map(|&z| tree.conditional_mdr_stateless(&[z], 1.0))
+                .collect();
+            let recoveries: Vec<f64> = zs
+                .iter()
+                .map(|&z| tree.conditional_recovery(&[z]))
+                .collect();
+            let smms: Vec<f64> = zs
+                .iter()
+                .map(|&z| tree.conditional_smm_stateless(&[z], 1.0))
+                .collect();
+
+            let corr = pearson(&mdrs, &recoveries);
+            assert!(
+                corr < 0.0,
+                "{label}: corr(MDR, recovery) must be negative, got {corr} \
+                 (mdrs {mdrs:?}, recoveries {recoveries:?})"
+            );
+            assert!(
+                mdrs[0] > mdrs[4],
+                "{label}: stress (low factor) must raise defaults"
+            );
+            assert!(
+                smms[0] < smms[4],
+                "{label}: stress (low factor) must depress prepayments"
+            );
+        }
+    }
+
+    /// TwoFactor mode: defaults/recoveries must consume the CREDIT factor
+    /// (index 1), so `credit_vol` and the prepay/credit `correlation`
+    /// actually move tree losses. Previously they read `factors.first()`
+    /// (the prepay factor) and both parameters were dead.
+    #[test]
+    fn test_two_factor_credit_vol_and_correlation_move_tree_losses() {
+        use crate::correlation::factor_model::LatentFactorSpec;
+        use crate::correlation::recovery::RecoverySpec;
+
+        fn build(credit_vol: f64, correlation: f64) -> ScenarioTree {
+            let mut config = ScenarioTreeConfig::new(12, 1.0, BranchingSpec::fixed(3))
+                .with_factor_spec(LatentFactorSpec::two_factor(0.20, credit_vol, correlation));
+            config.recovery_spec = RecoverySpec::MarketCorrelated {
+                mean_recovery: 0.40,
+                recovery_volatility: 0.30,
+                factor_correlation: 0.50,
+            };
+            ScenarioTree::build(&config).expect("tree build")
+        }
+
+        fn mean_terminal_loss(tree: &ScenarioTree) -> f64 {
+            let mut total_prob = 0.0;
+            let mut loss = 0.0;
+            for node in tree.terminal_nodes() {
+                loss += node.cumulative_probability * node.cumulative_losses;
+                total_prob += node.cumulative_probability;
+            }
+            loss / total_prob.max(f64::MIN_POSITIVE)
+        }
+
+        let base = build(0.25, -0.30);
+        let high_vol = build(0.75, -0.30);
+        let flipped_corr = build(0.25, 0.30);
+
+        // The credit factor must reach the per-node MDR: changing credit_vol
+        // or the prepay/credit correlation must change tree losses.
+        let base_loss = mean_terminal_loss(&base);
+        assert!(
+            (mean_terminal_loss(&high_vol) - base_loss).abs() > 1e-12,
+            "credit_vol must move tree losses (dead credit factor?)"
+        );
+        assert!(
+            (mean_terminal_loss(&flipped_corr) - base_loss).abs() > 1e-12,
+            "prepay/credit correlation must move tree losses (dead credit factor?)"
+        );
+
+        // And the credit factor itself must scale with both parameters at a
+        // displaced node: factors = [z·prepay_vol, ρ·z·credit_vol].
+        let factors = base.generate_factors_stateless(3, 1.0 / 12.0, 0.20 * 0.20 / 12.0);
+        assert_eq!(factors.len(), 2, "TwoFactor must emit two factors");
+        assert!(
+            (factors[1] - (-0.30) * (factors[0] / 0.20) * 0.25).abs() < 1e-12,
+            "credit factor must be ρ·z·credit_vol"
         );
     }
 

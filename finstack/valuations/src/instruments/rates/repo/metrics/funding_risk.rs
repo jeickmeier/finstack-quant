@@ -1,7 +1,10 @@
 //! Funding risk metric for `Repo`.
 //!
-//! Approximates the sensitivity of the repo PV to a +1bp change in the
-//! instrument's repo rate parameter.
+//! Sensitivity of the repo PV to a +1bp change in the instrument's repo rate
+//! parameter, reported as `ΔPV = PV(rate + 1bp) − PV(rate)` — the workspace
+//! dPV/dy convention shared with Dv01. From the cash lender's perspective a
+//! higher repo rate raises the repurchase payment, so FundingRisk is
+//! typically **positive** for a lender (and negative for a reverse repo).
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -20,6 +23,7 @@ impl MetricCalculator for FundingRiskCalculator {
         repo_bumped.repo_rate +=
             Decimal::try_from(ONE_BP).map_err(|_| finstack_core::InputError::ConversionOverflow)?;
         let bumped_pv = repo_bumped.value(&context.curves, context.as_of)?.amount();
-        Ok(base_pv - bumped_pv)
+        // dPV/dy convention: ΔPV for a +1bp bump (NOT the negated change).
+        Ok(bumped_pv - base_pv)
     }
 }

@@ -252,8 +252,9 @@ fn backtest_forecast<'py>(
 ///
 /// Returns
 /// -------
-/// tuple[float, str]
-///     (solved_driver_value, updated_model_json).
+/// tuple[float, str | None]
+///     ``(solved_driver_value, updated_model_json)``. The updated model
+///     JSON is ``None`` when ``update_model`` is ``False``.
 #[pyfunction]
 #[pyo3(signature = (model, target_node, target_period, target_value, driver_node, driver_period, update_model=true, bounds=None))]
 #[allow(clippy::too_many_arguments)]
@@ -267,7 +268,7 @@ fn goal_seek(
     driver_period: &str,
     update_model: bool,
     bounds: Option<(f64, f64)>,
-) -> PyResult<(f64, String)> {
+) -> PyResult<(f64, Option<String>)> {
     let mut model = extract_model_ref(model)?.into_owned();
     let tp: finstack_core::dates::PeriodId = target_period.parse().map_err(display_to_py)?;
     let dp: finstack_core::dates::PeriodId = driver_period.parse().map_err(display_to_py)?;
@@ -288,9 +289,9 @@ fn goal_seek(
         .map_err(display_to_py)?;
 
         let updated_json = if update_model {
-            serde_json::to_string(&model).map_err(display_to_py)?
+            Some(serde_json::to_string(&model).map_err(display_to_py)?)
         } else {
-            String::new()
+            None
         };
         Ok((result, updated_json))
     })
@@ -866,24 +867,8 @@ fn run_checks(
     let spec: finstack_statements::checks::CheckSuiteSpec =
         serde_json::from_str(suite_spec_json).map_err(display_to_py)?;
 
-    let mut suite = spec.resolve().map_err(display_to_py)?;
-
-    if !spec.formula_checks.is_empty() {
-        let mut fc_builder = finstack_statements::checks::CheckSuite::builder("_formula_checks");
-        for fc_spec in &spec.formula_checks {
-            fc_builder =
-                fc_builder.add_check(finstack_statements_analytics::analysis::FormulaCheck {
-                    id: fc_spec.id.clone(),
-                    name: fc_spec.name.clone(),
-                    category: fc_spec.category,
-                    severity: fc_spec.severity,
-                    formula: fc_spec.formula.clone(),
-                    message_template: fc_spec.message_template.clone(),
-                    tolerance: fc_spec.tolerance,
-                });
-        }
-        suite = suite.merge(fc_builder.build());
-    }
+    let suite = finstack_statements_analytics::analysis::resolve_check_suite(&spec)
+        .map_err(display_to_py)?;
 
     let eval_result;
     let results_ref: &finstack_statements::evaluator::StatementResult = match results {

@@ -9,6 +9,16 @@
 //! - **Reversion methods**: Immediate or linear blending from forecast to
 //!   historical
 //!
+//! # Scope: no collective (pooled) assessment
+//!
+//! ASC 326-20-30-2 requires measuring expected credit losses on a
+//! collective (pool) basis when financial assets share similar risk
+//! characteristics. This module prices each [`Exposure`] individually;
+//! grouping exposures into pools with shared parameters (PD/LGD segments,
+//! pooled loss rates) is the **caller's responsibility** — e.g. by mapping
+//! each pool to a representative exposure or by aggregating per-exposure
+//! results along `Exposure::segments`.
+//!
 //! # References
 //!
 //! - ASC 326-20 -- Financial Instruments: Credit Losses
@@ -38,18 +48,31 @@ pub enum ReversionMethod {
 }
 
 /// CECL calculation methodology.
+///
+/// Only [`CeclMethodology::PdLgdEad`] is implemented; [`CeclEngine::new`]
+/// rejects the other methodologies rather than silently falling back to the
+/// PD-LGD-EAD formula. The unimplemented variants are retained for serde
+/// wire stability.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CeclMethodology {
     /// PD-LGD-EAD approach (same formula as IFRS 9, always lifetime).
     PdLgdEad,
     /// Weighted Average Remaining Maturity method.
+    ///
+    /// **Not yet implemented** — [`CeclEngine::new`] returns a validation
+    /// error. (A real WARM implementation must not reuse the EIR
+    /// discounting of the PD-LGD-EAD path.)
     Warm,
     /// Vintage/cohort analysis.
+    ///
+    /// **Not yet implemented** — [`CeclEngine::new`] returns a validation
+    /// error.
     Vintage,
 }
 
 /// Configuration for CECL (US GAAP ASC 326) calculation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CeclConfig {
     /// Time bucket width in years (same as IFRS 9). Default: 0.25.
     pub bucket_width_years: f64,
@@ -143,11 +166,31 @@ pub struct CeclEngine<'a> {
 
 impl<'a> CeclEngine<'a> {
     /// Create a new CECL engine.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] when the configuration is invalid, when
+    /// `pd_sources` is empty, when the `pd_sources` scenario weights are not
+    /// finite, non-negative, and summing to 1.0, or when the configured
+    /// methodology is not [`CeclMethodology::PdLgdEad`] (the only one
+    /// implemented).
     pub fn new(
         config: CeclConfig,
         pd_sources: Vec<(&'a MacroScenario, &'a dyn PdTermStructure)>,
     ) -> Result<Self> {
         config.validate()?;
+        if config.methodology != CeclMethodology::PdLgdEad {
+            return Err(Error::Validation(format!(
+                "CECL methodology {:?} is not implemented; only PdLgdEad is supported",
+                config.methodology
+            )));
+        }
+        if pd_sources.is_empty() {
+            return Err(Error::Validation(
+                "At least one PD source is required for CeclEngine".to_string(),
+            ));
+        }
+        super::engine::validate_scenario_weights(pd_sources.iter().map(|(scenario, _)| *scenario))?;
         Ok(Self { config, pd_sources })
     }
 
@@ -195,7 +238,7 @@ impl<'a> CeclEngine<'a> {
 
                 let lgd = scenario.lgd_override.unwrap_or(exposure.lgd);
                 let df = 1.0 / (1.0 + exposure.eir).powf(t_mid);
-                scenario_ecl += uncond_mpd * lgd * exposure.ead * df;
+                scenario_ecl += uncond_mpd * lgd * exposure.ead_at(t_mid) * df;
             }
             weighted_ecl += scenario.weight * scenario_ecl;
         }
@@ -324,6 +367,7 @@ mod tests {
             qualitative_flags: QualitativeFlags::default(),
             consecutive_performing_periods: 0,
             previous_stage: None,
+            ead_schedule: None,
         }
     }
 

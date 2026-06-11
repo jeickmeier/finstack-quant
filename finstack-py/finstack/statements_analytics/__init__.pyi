@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from finstack.statements import FinancialModelSpec, StatementResult
+from finstack.core.market_data import MarketContext
+
 __all__ = [
     "run_sensitivity",
     "generate_tornado_entries",
@@ -16,6 +19,7 @@ __all__ = [
     "run_corporate_analysis",
     "pl_summary_report",
     "credit_assessment_report",
+    "DependencyTracer",
     "direct_dependencies",
     "all_dependencies",
     "dependents",
@@ -52,6 +56,7 @@ __all__ = [
     "add_vintage_buildup",
     # Roll-forward template
     "add_roll_forward",
+    "add_roll_forward_with_opening",
     # Real-estate template
     "SimpleLeaseSpec",
     "RentStepSpec",
@@ -70,11 +75,11 @@ __all__ = [
     "add_property_operating_statement",
 ]
 
-def run_sensitivity(model_json: str, config_json: str) -> str:
-    """Run sensitivity analysis on a financial model (JSON in/out).
+def run_sensitivity(model: FinancialModelSpec | str, config_json: str) -> str:
+    """Run sensitivity analysis on a financial model.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         config_json: JSON-serialized ``SensitivityConfig``.
 
     Returns:
@@ -107,12 +112,16 @@ def generate_tornado_entries(
     """
     ...
 
-def run_variance(base_json: str, comparison_json: str, config_json: str) -> str:
-    """Run variance analysis comparing two statement results (JSON in/out).
+def run_variance(
+    base: StatementResult | str,
+    comparison: StatementResult | str,
+    config_json: str,
+) -> str:
+    """Run variance analysis comparing two statement results.
 
     Args:
-        base_json: JSON-serialized baseline ``StatementResult``.
-        comparison_json: JSON-serialized comparison ``StatementResult``.
+        base: Baseline ``StatementResult`` object or JSON string.
+        comparison: Comparison ``StatementResult`` object or JSON string.
         config_json: JSON-serialized ``VarianceConfig``.
 
     Returns:
@@ -124,11 +133,11 @@ def run_variance(base_json: str, comparison_json: str, config_json: str) -> str:
     """
     ...
 
-def evaluate_scenario_set(model_json: str, scenario_set_json: str) -> str:
-    """Evaluate every scenario in a scenario set against a model (JSON in/out).
+def evaluate_scenario_set(model: FinancialModelSpec | str, scenario_set_json: str) -> str:
+    """Evaluate every scenario in a scenario set against a model.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         scenario_set_json: JSON-serialized ``ScenarioSet``.
 
     Returns:
@@ -140,11 +149,11 @@ def evaluate_scenario_set(model_json: str, scenario_set_json: str) -> str:
     """
     ...
 
-def run_monte_carlo(model_json: str, config_json: str) -> str:
-    """Run Monte Carlo simulation on a financial model (JSON in/out).
+def run_monte_carlo(model: FinancialModelSpec | str, config_json: str) -> str:
+    """Run Monte Carlo simulation on a financial model.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         config_json: JSON-serialized ``MonteCarloConfig`` (``n_paths``, ``seed``, optional ``percentiles`` and ``include_path_data``).
 
     Returns:
@@ -174,7 +183,7 @@ def backtest_forecast(actual: list[float], forecast: list[float]) -> dict[str, f
     ...
 
 def goal_seek(
-    model_json: str,
+    model: FinancialModelSpec | str,
     target_node: str,
     target_period: str,
     target_value: float,
@@ -182,11 +191,11 @@ def goal_seek(
     driver_period: str,
     update_model: bool = True,
     bounds: tuple[float, float] | None = None,
-) -> tuple[float, str]:
+) -> tuple[float, str | None]:
     """Find the driver value that makes a target node hit a target value.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         target_node: Node optimized toward ``target_value``.
         target_period: Period string for the target (e.g. ``"2025Q4"``).
         target_value: Desired value for the target node.
@@ -196,7 +205,8 @@ def goal_seek(
         bounds: Optional ``(lo, hi)`` search bounds for bisection.
 
     Returns:
-        ``(solved_driver_value, updated_model_json)``.
+        ``(solved_driver_value, updated_model_json)``. The updated model JSON
+        is ``None`` when ``update_model`` is ``False``.
 
     Example:
         >>> from finstack.statements_analytics import goal_seek
@@ -205,7 +215,7 @@ def goal_seek(
     ...
 
 def evaluate_dcf(
-    model_json: str,
+    model: FinancialModelSpec | str,
     wacc: float,
     terminal_value_json: str,
     ufcf_node: str = "ufcf",
@@ -214,12 +224,12 @@ def evaluate_dcf(
     shares_outstanding: float | None = None,
     equity_bridge_json: str | None = None,
     valuation_discounts_json: str | None = None,
-    market_json: str | None = None,
+    market: MarketContext | str | None = None,
 ) -> dict[str, float | str]:
     """Evaluate DCF valuation on a financial model.
 
     Args:
-        model_json: JSON ``FinancialModelSpec`` (metadata must include ``currency``).
+        model: ``FinancialModelSpec`` object or JSON string (metadata must include ``currency``).
         wacc: Weighted average cost of capital as a decimal (``0.10`` = 10%).
         terminal_value_json: JSON ``TerminalValueSpec`` (tagged enum).
         ufcf_node: Node ID for unlevered free cash flow.
@@ -228,7 +238,7 @@ def evaluate_dcf(
         shares_outstanding: Optional basic shares for per-share equity value.
         equity_bridge_json: Optional JSON ``EquityBridge``.
         valuation_discounts_json: Optional JSON ``ValuationDiscounts`` (DLOM, DLOC).
-        market_json: Optional JSON ``MarketContext`` for curve-based discounting.
+        market: Optional ``MarketContext`` object or JSON string for curve-based discounting.
 
     Returns:
         Dict with ``equity_value``, ``equity_currency``, ``enterprise_value``, ``net_debt``,
@@ -243,27 +253,28 @@ def evaluate_dcf(
     ...
 
 def run_corporate_analysis(
-    model_json: str,
+    model: FinancialModelSpec | str,
     wacc: float | None = None,
     terminal_value_json: str | None = None,
     net_debt_override: float | None = None,
     coverage_node: str = "ebitda",
-    market_json: str | None = None,
+    market: MarketContext | str | None = None,
     as_of: str | None = None,
 ) -> dict[str, Any]:
     """Run statements plus optional DCF equity and credit context.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         wacc: If set, enables DCF at this discount rate (decimal).
         terminal_value_json: Required JSON ``TerminalValueSpec`` when ``wacc`` is set.
         net_debt_override: Optional flat net debt for the equity bridge.
         coverage_node: Node for DSCR / interest coverage (default ``ebitda``).
-        market_json: Optional JSON ``MarketContext``.
+        market: Optional ``MarketContext`` object or JSON string.
         as_of: Optional ISO 8601 valuation date string.
 
     Returns:
         Dict with ``statement_json``, optional ``equity`` scalars, and ``credit`` (instrument_id → metrics JSON).
+        The credit metrics include ``skipped_periods`` for periods dropped from min/max stats.
 
     Example:
         >>> from finstack.statements_analytics import run_corporate_analysis
@@ -272,14 +283,14 @@ def run_corporate_analysis(
     ...
 
 def pl_summary_report(
-    results_json: str,
+    results: StatementResult | str,
     line_items: list[str],
     periods: list[str],
 ) -> str:
     """Render a P&L summary report as formatted text.
 
     Args:
-        results_json: JSON-serialized ``StatementResult``.
+        results: ``StatementResult`` object or JSON string.
         line_items: Node IDs to include as rows.
         periods: Period strings for columns (e.g. ``["2025Q1", "2025Q2"]``).
 
@@ -292,11 +303,11 @@ def pl_summary_report(
     """
     ...
 
-def credit_assessment_report(results_json: str, as_of: str) -> str:
+def credit_assessment_report(results: StatementResult | str, as_of: str) -> str:
     """Render a credit assessment report as formatted text.
 
     Args:
-        results_json: JSON-serialized ``StatementResult``.
+        results: ``StatementResult`` object or JSON string.
         as_of: Period string for the as-of date (e.g. ``"2025Q1"``).
 
     Returns:
@@ -319,12 +330,12 @@ class DependencyTracer:
         >>> tree = DependencyTracer(model_json).dependency_tree("ebitda")
     """
 
-    def __init__(self, model: Any) -> None: ...
+    def __init__(self, model: FinancialModelSpec | str) -> None: ...
     def dependency_tree(self, node_id: str) -> str:
         """Return an ASCII dependency tree for ``node_id``."""
         ...
 
-    def dependency_tree_detailed(self, results: Any, node_id: str, period: str) -> str:
+    def dependency_tree_detailed(self, results: StatementResult | str, node_id: str, period: str) -> str:
         """Return an ASCII dependency tree annotated with values for one period."""
         ...
 
@@ -332,11 +343,11 @@ class DependencyTracer:
     def all_dependencies(self, node_id: str) -> list[str]: ...
     def dependents(self, node_id: str) -> list[str]: ...
 
-def direct_dependencies(model_json: str, node_id: str) -> list[str]:
+def direct_dependencies(model: FinancialModelSpec | str, node_id: str) -> list[str]:
     """List immediate dependencies of a node.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         node_id: Node whose direct dependencies are listed.
 
     Returns:
@@ -348,11 +359,11 @@ def direct_dependencies(model_json: str, node_id: str) -> list[str]:
     """
     ...
 
-def all_dependencies(model_json: str, node_id: str) -> list[str]:
+def all_dependencies(model: FinancialModelSpec | str, node_id: str) -> list[str]:
     """List all transitive dependencies of a node in dependency order.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         node_id: Root node for the dependency walk.
 
     Returns:
@@ -364,11 +375,11 @@ def all_dependencies(model_json: str, node_id: str) -> list[str]:
     """
     ...
 
-def dependents(model_json: str, node_id: str) -> list[str]:
+def dependents(model: FinancialModelSpec | str, node_id: str) -> list[str]:
     """List nodes that depend on the given node (reverse dependencies).
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         node_id: Node whose dependents are listed.
 
     Returns:
@@ -381,16 +392,16 @@ def dependents(model_json: str, node_id: str) -> list[str]:
     ...
 
 def explain_formula(
-    model_json: str,
-    results_json: str,
+    model: FinancialModelSpec | str,
+    results: StatementResult | str,
     node_id: str,
     period: str,
 ) -> dict[str, Any]:
     """Structured formula explanation for a node and period.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
-        results_json: JSON-serialized ``StatementResult``.
+        model: ``FinancialModelSpec`` object or JSON string.
+        results: ``StatementResult`` object or JSON string.
         node_id: Node to explain.
         period: Period string.
 
@@ -405,16 +416,16 @@ def explain_formula(
     ...
 
 def explain_formula_text(
-    model_json: str,
-    results_json: str,
+    model: FinancialModelSpec | str,
+    results: StatementResult | str,
     node_id: str,
     period: str,
 ) -> str:
     """Human-readable multi-line formula explanation.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
-        results_json: JSON-serialized ``StatementResult``.
+        model: ``FinancialModelSpec`` object or JSON string.
+        results: ``StatementResult`` object or JSON string.
         node_id: Node to explain.
         period: Period string.
 
@@ -427,15 +438,21 @@ def explain_formula_text(
     """
     ...
 
-def run_checks(model_json: str, suite_spec_json: str) -> str:
+def run_checks(
+    model: FinancialModelSpec | str,
+    suite_spec_json: str,
+    results: StatementResult | str | None = None,
+) -> str:
     """Run checks from a suite spec against a model (JSON in/out).
 
     Resolves both built-in and formula checks, evaluates the model,
     and returns a full check report.
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         suite_spec_json: JSON-serialized ``CheckSuiteSpec``.
+        results: Optional pre-computed ``StatementResult`` (object or JSON);
+            skips re-evaluation when provided.
 
     Returns:
         JSON-serialized ``CheckReport``.
@@ -446,12 +463,18 @@ def run_checks(model_json: str, suite_spec_json: str) -> str:
     """
     ...
 
-def run_three_statement_checks(model_json: str, mapping_json: str) -> str:
+def run_three_statement_checks(
+    model: FinancialModelSpec | str,
+    mapping_json: str,
+    results: StatementResult | str | None = None,
+) -> str:
     """Run three-statement checks using a node mapping (JSON in/out).
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         mapping_json: JSON-serialized ``ThreeStatementMapping``.
+        results: Optional pre-computed ``StatementResult`` (object or JSON);
+            skips re-evaluation when provided.
 
     Returns:
         JSON-serialized ``CheckReport``.
@@ -462,12 +485,18 @@ def run_three_statement_checks(model_json: str, mapping_json: str) -> str:
     """
     ...
 
-def run_credit_underwriting_checks(model_json: str, mapping_json: str) -> str:
+def run_credit_underwriting_checks(
+    model: FinancialModelSpec | str,
+    mapping_json: str,
+    results: StatementResult | str | None = None,
+) -> str:
     """Run credit underwriting checks using a node mapping (JSON in/out).
 
     Args:
-        model_json: JSON-serialized ``FinancialModelSpec``.
+        model: ``FinancialModelSpec`` object or JSON string.
         mapping_json: JSON-serialized ``CreditMapping``.
+        results: Optional pre-computed ``StatementResult`` (object or JSON);
+            skips re-evaluation when provided.
 
     Returns:
         JSON-serialized ``CheckReport``.
@@ -533,14 +562,14 @@ class Exposure:
         remaining_maturity: float,
         current_pd: float,
         origination_pd: float,
-        dpd: int = 0,
+        dpd: int | None = None,
     ) -> None: ...
 
 def classify_stage(
     exposure: Exposure,
-    pd_delta_stage2: float = 0.01,
-    dpd_30_trigger: bool = True,
-    dpd_90_trigger: bool = True,
+    pd_delta_stage2: float | None = None,
+    dpd_30_trigger: bool | None = None,
+    dpd_90_trigger: bool | None = None,
 ) -> tuple[str, str]:
     """Classify an exposure into an IFRS 9 stage.
 
@@ -562,19 +591,26 @@ def compute_ecl(
     lgd: float,
     eir: float,
     max_horizon_years: float,
-    bucket_width_years: float = 0.25,
+    bucket_width_years: float | None = None,
     stage: str = "stage1",
+    ead_schedule: list[tuple[float, float]] | None = None,
+    stage3_time_to_recovery_years: float | None = None,
 ) -> float:
     """Compute single-scenario ECL for one exposure.
 
     Args:
         ead: Exposure at default.
-        pd_schedule: ``[(time_years, cumulative_pd), ...]`` knots.
+        pd_schedule: ``[(time_years, cumulative_pd), ...]`` knots. A
+            ``(0.0, 0.0)`` knot is inserted automatically if not present.
         lgd: Loss given default (decimal).
         eir: Effective interest rate (decimal).
         max_horizon_years: Remaining maturity cap.
-        bucket_width_years: Time-bucket width (e.g. ``0.25`` for quarterly).
+        bucket_width_years: Time-bucket width (default ``0.25`` for quarterly).
         stage: ``"stage1"``, ``"stage2"``, or ``"stage3"``.
+        ead_schedule: Optional EAD amortization profile as
+            ``[(time_years, ead), ...]`` knots.
+        stage3_time_to_recovery_years: Stage 3 discounting horizon to expected
+            recovery, in years.
 
     Returns:
         ECL amount in the exposure's base currency.
@@ -588,16 +624,24 @@ def compute_ecl_weighted(
     eir: float,
     max_horizon: float,
     stage: str = "stage1",
+    ead_schedule: list[tuple[float, float]] | None = None,
+    stage3_time_to_recovery_years: float | None = None,
 ) -> float:
     """Compute probability-weighted ECL across macro scenarios.
 
     Args:
         ead: Exposure at default.
         scenarios: List of ``(weight, pd_schedule)``. Weights must sum to 1.0.
+            A ``(0.0, 0.0)`` knot is inserted automatically into each schedule
+            if not present (same convention as ``compute_ecl``).
         lgd: Loss given default (decimal).
         eir: Effective interest rate (decimal).
         max_horizon: Remaining maturity cap (years).
         stage: ``"stage1"``, ``"stage2"``, or ``"stage3"``.
+        ead_schedule: Optional EAD amortization profile as
+            ``[(time_years, ead), ...]`` knots.
+        stage3_time_to_recovery_years: Stage 3 discounting horizon to expected
+            recovery, in years.
 
     Returns:
         Probability-weighted ECL amount.
@@ -617,7 +661,12 @@ def z_score(value: float, peer_values: list[float]) -> float | None:
     ...
 
 def peer_stats(peer_values: list[float]) -> dict[str, float]:
-    """Descriptive statistics for a peer distribution."""
+    """Descriptive statistics for a peer distribution.
+
+    Returns a dict with keys ``mean``, ``median``, ``q1``, ``q3``, ``iqr``,
+    ``std_dev``, ``min``, ``max``, ``count`` (mirroring the Rust ``PeerStats``
+    field names), or an empty dict when ``peer_values`` is empty.
+    """
     ...
 
 def regression_fair_value(
@@ -637,11 +686,19 @@ def compute_multiple(
     ...
 
 def score_relative_value(
-    subject_metrics: dict[str, float],
-    peer_metrics: list[dict[str, float]],
+    subject_metrics: dict[str, float | None],
+    peer_metrics: list[dict[str, float | None]],
     dimensions: list[tuple[str, float] | dict[str, Any]],
 ) -> dict[str, Any]:
-    """Composite relative-value score across weighted univariate or regression dimensions."""
+    """Composite relative-value score across weighted univariate or regression dimensions.
+
+    Dimensions are ``(metric_name, weight)`` tuples or dicts with keys
+    ``label``, ``y``, optional ``x`` (one selector or a list), optional
+    ``direction`` (``"higher_is_cheap"`` (default) or ``"higher_is_rich"``),
+    and ``weight``. Metric selectors are metric names or
+    ``"multiple:<id>"`` (e.g. ``"multiple:ev_ebitda"``) for canonical
+    valuation multiples. Positive composite = cheap, negative = rich.
+    """
     ...
 
 # ---------------------------------------------------------------------------
@@ -673,18 +730,26 @@ class ScorecardMetric:
     def from_json(json: str) -> ScorecardMetric: ...
 
 class ScorecardConfig:
-    """Configuration for credit scorecard analysis."""
+    """Configuration for credit scorecard analysis.
+
+    ``period`` optionally pins the rated period (e.g. ``"2025Q4"``); when
+    ``None`` the scorecard rates the last actual period in the model if any
+    exists, otherwise the last model period.
+    """
 
     def __init__(
         self,
         rating_scale: str = "S&P",
         metrics: list[ScorecardMetric] = ...,
         min_rating: str | None = None,
+        period: str | None = None,
     ) -> None: ...
     @property
     def rating_scale(self) -> str: ...
     @property
     def min_rating(self) -> str | None: ...
+    @property
+    def period(self) -> str | None: ...
     @property
     def metrics(self) -> list[ScorecardMetric]: ...
     def validate(self) -> None: ...
@@ -693,7 +758,11 @@ class ScorecardConfig:
     def from_json(json: str) -> ScorecardConfig: ...
 
 class ScorecardReport:
-    """Report produced by ``CreditScorecardExtension.execute``."""
+    """Report produced by ``CreditScorecardExtension.execute``.
+
+    ``data_json()`` includes the rated ``period``, the ``partial`` flag, and
+    ``weight_coverage`` alongside the per-metric scores and rating.
+    """
 
     @property
     def status(self) -> str: ...
@@ -716,7 +785,7 @@ class CreditScorecardExtension:
     def with_config(config: ScorecardConfig) -> CreditScorecardExtension: ...
     def set_config(self, config: ScorecardConfig) -> None: ...
     def config(self) -> ScorecardConfig | None: ...
-    def execute(self, model: Any, results: Any) -> ScorecardReport: ...
+    def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> ScorecardReport: ...
 
 def validate_scorecard_config(config: ScorecardConfig) -> None:
     """Validate a scorecard configuration without executing."""
@@ -802,14 +871,14 @@ class CorkscrewExtension:
     def with_config(config: CorkscrewConfig) -> CorkscrewExtension: ...
     def set_config(self, config: CorkscrewConfig) -> None: ...
     def config(self) -> CorkscrewConfig | None: ...
-    def execute(self, model: Any, results: Any) -> CorkscrewReport: ...
+    def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> CorkscrewReport: ...
 
 # ---------------------------------------------------------------------------
 # Vintage template
 # ---------------------------------------------------------------------------
 
 def add_vintage_buildup(
-    model: Any,
+    model: FinancialModelSpec | str,
     name: str,
     new_volume_node: str,
     decay_curve: list[float],
@@ -826,7 +895,7 @@ def add_vintage_buildup(
 # ---------------------------------------------------------------------------
 
 def add_roll_forward(
-    model: Any,
+    model: FinancialModelSpec | str,
     name: str,
     increases: list[str],
     decreases: list[str],
@@ -834,7 +903,23 @@ def add_roll_forward(
     """Apply the roll-forward template (Beginning + Increases - Decreases = Ending) to a model spec.
 
     Returns a JSON-serialized ``FinancialModelSpec`` with ``{name}_beg`` and
-    ``{name}_end`` nodes added.
+    ``{name}_end`` nodes added. The first period opens at zero; use
+    ``add_roll_forward_with_opening`` for an explicit opening balance.
+    """
+    ...
+
+def add_roll_forward_with_opening(
+    model: FinancialModelSpec | str,
+    name: str,
+    increases: list[str],
+    decreases: list[str],
+    opening: float,
+) -> str:
+    """Apply the roll-forward template with an explicit first-period opening balance.
+
+    Same as ``add_roll_forward`` except the first period's beginning balance
+    is ``opening`` instead of zero. Returns a JSON-serialized
+    ``FinancialModelSpec``.
     """
     ...
 
@@ -1053,7 +1138,7 @@ class PropertyTemplateNodes:
     def from_json(json: str) -> PropertyTemplateNodes: ...
 
 def add_noi_buildup(
-    model: Any,
+    model: FinancialModelSpec | str,
     total_revenue_node: str,
     revenue_nodes: list[str],
     total_expenses_node: str,
@@ -1064,7 +1149,7 @@ def add_noi_buildup(
     ...
 
 def add_ncf_buildup(
-    model: Any,
+    model: FinancialModelSpec | str,
     noi_node: str,
     capex_nodes: list[str],
     ncf_node: str,
@@ -1073,7 +1158,7 @@ def add_ncf_buildup(
     ...
 
 def add_rent_roll(
-    model: Any,
+    model: FinancialModelSpec | str,
     leases: list[LeaseSpec],
     nodes: RentRollOutputNodes | None = None,
 ) -> str:
@@ -1081,7 +1166,7 @@ def add_rent_roll(
     ...
 
 def add_rent_roll_rental_revenue(
-    model: Any,
+    model: FinancialModelSpec | str,
     leases: list[SimpleLeaseSpec],
     total_rent_node: str,
 ) -> str:
@@ -1089,7 +1174,7 @@ def add_rent_roll_rental_revenue(
     ...
 
 def add_property_operating_statement(
-    model: Any,
+    model: FinancialModelSpec | str,
     leases: list[LeaseSpec],
     other_income_nodes: list[str] = ...,
     opex_nodes: list[str] = ...,

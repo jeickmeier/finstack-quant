@@ -10,6 +10,14 @@
 //! This module applies a near-expiry threshold (`EXPIRY_THRESHOLD`) to return zero
 //! for options within ~1 business day of expiry, where gamma is mathematically
 //! undefined for vanilla options.
+//!
+//! # Cash-settled (ParYield) limitation — frozen annuity
+//!
+//! As with delta, the annuity is treated as a constant. For cash-settled
+//! ParYield swaptions the cash annuity `A(F)` depends on the forward swap
+//! rate, so the true gamma carries additional `A'(F)` / `A''(F)` terms that
+//! this analytic calculator drops (frozen-annuity approximation). Use
+//! bump-and-revalue greeks where those terms matter.
 
 use crate::instruments::rates::swaption::{Swaption, VolatilityModel};
 use crate::metrics::{MetricCalculator, MetricContext};

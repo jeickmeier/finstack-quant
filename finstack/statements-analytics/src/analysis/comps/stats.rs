@@ -26,27 +26,34 @@ pub struct PeerStats {
     pub q1: f64,
     /// 75th percentile.
     pub q3: f64,
+    /// Interquartile range (`q3 - q1`).
+    pub iqr: f64,
 }
 
 /// Compute descriptive statistics on a slice of values.
 ///
-/// Returns `None` if the slice is empty. The slice is not modified;
+/// Non-finite inputs (NaN, ±inf) are filtered out before computation so a
+/// single bad observation cannot poison the mean and standard deviation;
+/// `count` reflects the number of finite observations used.
+///
+/// Returns `None` if no finite values remain. The slice is not modified;
 /// an internal sorted copy is used for percentile computations.
 pub fn peer_stats(values: &[f64]) -> Option<PeerStats> {
-    if values.is_empty() {
+    let finite: Vec<f64> = values.iter().copied().filter(|v| v.is_finite()).collect();
+    if finite.is_empty() {
         return None;
     }
-    let mut sorted = values.to_vec();
+    let mut sorted = finite.clone();
     sorted.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     let n = sorted.len();
-    let m = mean(values);
+    let m = mean(&finite);
     let median = percentile_sorted(&sorted, 0.50);
     let q1 = percentile_sorted(&sorted, 0.25);
     let q3 = percentile_sorted(&sorted, 0.75);
 
     let mut os = OnlineStats::new();
-    for &v in values {
+    for &v in &finite {
         os.update(v);
     }
 
@@ -59,33 +66,54 @@ pub fn peer_stats(values: &[f64]) -> Option<PeerStats> {
         max: sorted[n - 1],
         q1,
         q3,
+        iqr: q3 - q1,
     })
 }
 
-/// Percentile rank of `value` within a peer set (0.0 = cheapest, 1.0 = richest).
+/// Percentile rank of `value` within a peer set (0.0 = lowest, 1.0 = highest).
+///
+/// Whether a high rank means rich or cheap depends on the metric's sign
+/// convention (spread-like: high = cheap; multiple-like: high = rich).
 ///
 /// Uses the "percentage of values less than or equal" convention.
-/// The input `values` slice need not be sorted.
+/// The input `values` slice need not be sorted. Non-finite peer values
+/// are ignored.
 ///
-/// Returns `None` if `values` is empty.
+/// Returns `None` if no finite peer values remain or `value` is non-finite.
 pub fn percentile_rank(values: &[f64], value: f64) -> Option<f64> {
-    if values.is_empty() {
+    if !value.is_finite() {
         return None;
     }
-    let count_le = values.iter().filter(|&&v| v <= value).count();
-    Some(count_le as f64 / values.len() as f64)
+    let total = values.iter().filter(|v| v.is_finite()).count();
+    if total == 0 {
+        return None;
+    }
+    let count_le = values
+        .iter()
+        .filter(|&&v| v.is_finite() && v <= value)
+        .count();
+    Some(count_le as f64 / total as f64)
 }
 
 /// Z-score of `value` relative to the peer distribution.
 ///
-/// Returns `None` if fewer than 2 values or standard deviation is zero.
+/// Non-finite peer values are ignored so they cannot poison the mean
+/// and standard deviation.
+///
+/// Returns `None` if fewer than 2 finite values, standard deviation is
+/// zero, or `value` is non-finite.
 pub fn z_score(values: &[f64], value: f64) -> Option<f64> {
-    if values.len() < 2 {
+    if !value.is_finite() {
         return None;
     }
     let mut os = OnlineStats::new();
     for &v in values {
-        os.update(v);
+        if v.is_finite() {
+            os.update(v);
+        }
+    }
+    if os.count() < 2 {
+        return None;
     }
     let sd = os.std_dev();
     if sd < 1e-15 {

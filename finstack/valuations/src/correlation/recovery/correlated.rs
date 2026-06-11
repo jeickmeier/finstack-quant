@@ -23,17 +23,19 @@
 //!
 //! # Sign Convention
 //!
-//! The sign of `Z` is caller-defined. With the crate's preset calibrations
-//! (`ρ_R < 0`), negative factor realizations increase recovery and positive
-//! realizations decrease it. Callers that want the opposite mapping should
-//! either negate the factor they pass in or choose a positive `ρ_R`.
+//! The crate-wide canonical convention is "low latent factor = stress": the
+//! copula default models concentrate defaults at `Z < 0`. The preset
+//! calibrations therefore use `ρ_R > 0`, so negative (stress) factor
+//! realizations DECREASE recovery and defaults/recoveries co-move
+//! negatively. Callers that want the opposite mapping should either negate
+//! the factor they pass in or choose a negative `ρ_R`.
 //!
 //! # Calibration
 //!
 //! Typical market calibration from CDX equity tranche:
 //! - Mean recovery: 40%
 //! - Recovery volatility: 20-30%
-//! - Factor correlation: -30% to -50%
+//! - Factor correlation: +30% to +50% (canonical low-factor-stress convention)
 //!
 //! # References
 //!
@@ -68,7 +70,8 @@ pub struct CorrelatedRecovery {
     mean_recovery: f64,
     /// Recovery volatility (standard deviation)
     recovery_volatility: f64,
-    /// Correlation with systematic factor (typically negative)
+    /// Correlation with the systematic factor (typically positive under the
+    /// canonical low-factor-stress convention: recovery falls in stress)
     factor_correlation: f64,
     /// Minimum recovery (floor)
     min_recovery: f64,
@@ -87,7 +90,7 @@ impl CorrelatedRecovery {
     /// # Arguments
     /// * `mean` - Mean recovery rate, clamped to [0.05, 0.95]. Typical: 0.40
     /// * `vol` - Recovery volatility, clamped to [0.0, 0.50]. Typical: 0.20-0.30
-    /// * `corr` - Correlation with market factor, clamped to [-1.0, 1.0]. Typical: -0.30 to -0.50
+    /// * `corr` - Correlation with market factor, clamped to [-1.0, 1.0]. Typical: +0.30 to +0.50
     ///
     /// # Returns
     ///
@@ -98,7 +101,7 @@ impl CorrelatedRecovery {
     /// ```rust
     /// use finstack_valuations::correlation::{CorrelatedRecovery, RecoveryModel};
     ///
-    /// let model = CorrelatedRecovery::new(0.40, 0.25, -0.40);
+    /// let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
     /// let mean_at_zero = model.conditional_recovery(0.0);
     ///
     /// assert!((mean_at_zero - 0.40).abs() < 1e-12);
@@ -145,14 +148,15 @@ impl CorrelatedRecovery {
     /// Parameters:
     /// - Mean: 40%
     /// - Vol: 25%
-    /// - Correlation: -40%
+    /// - Correlation: +40% (recovery falls in stress under the canonical
+    ///   low-factor-stress convention)
     ///
     /// # Returns
     ///
     /// The default stochastic-recovery calibration used by this crate.
     #[must_use]
     pub fn market_standard() -> Self {
-        Self::new(0.40, 0.25, -0.40)
+        Self::new(0.40, 0.25, 0.40)
     }
 
     /// Conservative calibration with higher vol and correlation.
@@ -160,14 +164,14 @@ impl CorrelatedRecovery {
     /// Parameters:
     /// - Mean: 40%
     /// - Vol: 30%
-    /// - Correlation: -50%
+    /// - Correlation: +50%
     ///
     /// # Returns
     ///
     /// A higher-volatility, more factor-sensitive stochastic-recovery calibration.
     #[must_use]
     pub fn conservative() -> Self {
-        Self::new(0.40, 0.30, -0.50)
+        Self::new(0.40, 0.30, 0.50)
     }
 
     /// Get the target recovery at `Z = 0` (location parameter).
@@ -274,23 +278,25 @@ mod tests {
 
     #[test]
     fn test_correlated_recovery_creation() {
-        let model = CorrelatedRecovery::new(0.40, 0.25, -0.40);
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
         assert!((model.mean() - 0.40).abs() < 1e-10);
         assert!((model.volatility() - 0.25).abs() < 1e-10);
-        assert!((model.correlation() - (-0.40)).abs() < 1e-10);
+        assert!((model.correlation() - 0.40).abs() < 1e-10);
     }
 
     #[test]
     fn test_conditional_recovery_in_stress() {
         let model = CorrelatedRecovery::market_standard();
 
+        // Canonical convention: low latent factor = stress, so Z = -2 is a
+        // stress scenario and recovery must FALL below R(0).
         let stress_recovery = model.conditional_recovery(-2.0);
 
         // Compare against R(0) (mean location), which is the reference
         // unaffected by the Jensen correction.
         assert!(
-            stress_recovery > model.mean(),
-            "Stress with negative recovery correlation should raise recovery above R(0) in this sign convention"
+            stress_recovery < model.mean(),
+            "Stress (low factor) must depress recovery below R(0) so defaults and recoveries co-move negatively"
         );
     }
 
@@ -302,11 +308,11 @@ mod tests {
         let r_zero = model.conditional_recovery(0.0);
         let r_pos = model.conditional_recovery(2.0);
 
-        // With negative correlation:
-        // - Negative Z gives higher recovery
-        // - Positive Z gives lower recovery
-        assert!(r_neg > r_zero, "Neg Z should give higher recovery");
-        assert!(r_pos < r_zero, "Pos Z should give lower recovery");
+        // With positive correlation (canonical convention):
+        // - Negative Z (stress) gives lower recovery
+        // - Positive Z (benign) gives higher recovery
+        assert!(r_neg < r_zero, "Neg Z (stress) should give lower recovery");
+        assert!(r_pos > r_zero, "Pos Z (benign) should give higher recovery");
     }
 
     #[test]
@@ -360,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_recovery_bounded() {
-        let model = CorrelatedRecovery::new(0.40, 0.30, -0.50);
+        let model = CorrelatedRecovery::new(0.40, 0.30, 0.50);
 
         // Even with extreme factors, recovery should be bounded
         let extreme_neg = model.conditional_recovery(-10.0);
@@ -395,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_zero_volatility_is_constant() {
-        let model = CorrelatedRecovery::new(0.40, 0.0, -0.40);
+        let model = CorrelatedRecovery::new(0.40, 0.0, 0.40);
 
         // With zero volatility, should behave like constant
         let r_neg = model.conditional_recovery(-2.0);
@@ -447,7 +453,7 @@ mod tests {
         // Conservative should have higher vol
         assert!(conservative.volatility() > standard.volatility());
 
-        // Conservative should have stronger negative correlation
-        assert!(conservative.correlation() < standard.correlation());
+        // Conservative should have stronger (positive) factor correlation
+        assert!(conservative.correlation() > standard.correlation());
     }
 }

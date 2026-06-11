@@ -194,14 +194,17 @@ impl Bond {
                 let freq = (1.0 / spec.freq.to_years_simple()).round() as usize;
                 (rate, spec.coupon_type, freq)
             }
-            CashflowSpec::Amortizing { base, .. } => match base.as_ref() {
-                CashflowSpec::Fixed(spec) => {
-                    let rate = spec.rate.to_f64().unwrap_or(0.0);
-                    let freq = (1.0 / spec.freq.to_years_simple()).round() as usize;
-                    (rate, spec.coupon_type, freq)
-                }
-                _ => return Err(finstack_core::InputError::Invalid.into()),
-            },
+            // The Merton MC engine simulates a constant notional with full
+            // bullet redemption at maturity; silently extracting the base
+            // coupon (the previous behavior) priced amortizers as bullets.
+            CashflowSpec::Amortizing { .. } => {
+                return Err(finstack_core::Error::Validation(format!(
+                    "Merton MC pricing does not support amortizing bonds (bond '{}'): the \
+                     engine assumes constant notional with bullet redemption at maturity; \
+                     the amortization schedule would be ignored",
+                    self.id
+                )));
+            }
         };
 
         let maturity_years = self.cashflow_spec.day_count().year_fraction(

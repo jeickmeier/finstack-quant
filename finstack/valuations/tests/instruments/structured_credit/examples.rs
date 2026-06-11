@@ -121,21 +121,22 @@ mod tests {
         pool.assets.push(loan2);
         pool.assets.push(bond1);
 
-        // Calculate WAS - now correctly uses spread only!
+        // Calculate WAS - spread component only, over assets that carry one.
         let was = pool.weighted_avg_spread();
 
-        // Expected WAS calculation:
+        // Expected WAS calculation (market convention):
         // Loan1: 10M × 425bps = 4,250M·bps
         // Loan2: 15M × 475bps = 7,125M·bps
-        // Bond1: 5M × 900bps = 4,500M·bps (fallback to rate × 10000)
-        // Total: (4,250 + 7,125 + 4,500) / 30M = 15,875 / 30 = 529.17 bps
+        // Bond1: fixed-rate with no explicit spread → EXCLUDED (no
+        //        rate × 10⁴ fallback; the all-in coupon is not a spread)
+        // Total: (4,250 + 7,125) / 25M = 11,375 / 25 = 455.0 bps
 
-        assert!((was - 529.17).abs() < 0.01);
+        assert!((was - 455.0).abs() < 0.01);
 
         // Verify individual spread access
         assert_eq!(pool.assets[0].spread_bps(), 425.0);
         assert_eq!(pool.assets[1].spread_bps(), 475.0);
-        assert_eq!(pool.assets[2].spread_bps(), 900.0); // Derived from rate
+        assert_eq!(pool.assets[2].spread_bps(), 900.0); // Accessor still falls back to rate
     }
 
     #[test]

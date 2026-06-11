@@ -602,10 +602,13 @@ impl ScenarioResults {
                     if let Some(results) = self.scenarios.get(*scenario_name) {
                         let value = results.get(metric, &period);
 
+                        // Percent change is undefined on a (near-)zero
+                        // baseline; emit a null instead of a misleading 0%
+                        // (consistent with `VarianceRow::pct_var` semantics).
                         let pct = match (baseline_value, value) {
                             (Some(base), Some(v)) => {
                                 if base.abs() < ZERO_TOLERANCE {
-                                    Some(0.0)
+                                    None
                                 } else {
                                     Some((v - base) / base)
                                 }

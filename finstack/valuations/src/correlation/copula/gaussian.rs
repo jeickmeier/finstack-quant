@@ -188,15 +188,14 @@ impl Copula for GaussianCopula {
         };
         let z = *z;
 
-        // Near-zero correlation: fall back to the unconditional PD. This is a
-        // safe approximation because the clamped general formula would still
-        // produce values ε-close to Φ(c) for ρ ≪ 1, and sidestepping the
-        // smoothing avoids a spurious factor dependence at the floor.
-        if correlation <= MIN_CORRELATION {
-            return norm_cdf(default_threshold);
-        }
-
         // General formula with smoothing and CDF-argument clipping. The
+        // correlation clamp handles BOTH boundaries: below MIN_CORRELATION the
+        // formula is evaluated at the floor (flat in ρ but continuous in both
+        // ρ and z). Do NOT early-return the unconditional Φ(c) for ρ ≤ floor —
+        // that branch dropped the √ρ·z term entirely and created a jump of up
+        // to ~Φ(c) − Φ((c − √0.01·z)/√0.99) (≈ 2% absolute PD for |z| = 2) as
+        // ρ crossed the floor, which correlation finite differences picked up
+        // as a spurious sensitivity. The
         // smoothing clamp (0.99) plus CDF_CLIP gives a stable near-indicator
         // limit as ρ → 1 — do NOT short-circuit to Φ(c − z), which is off by
         // roughly 20 orders of magnitude in the tail.
@@ -208,6 +207,19 @@ impl Copula for GaussianCopula {
         let conditional_threshold = (default_threshold - sqrt_rho * z) / sqrt_1mr;
 
         norm_cdf(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
+    }
+
+    fn conditional_default_prob_given_systematic_and_mixing(
+        &self,
+        default_threshold: f64,
+        systematic: f64,
+        mixing: f64,
+        correlation: f64,
+    ) -> f64 {
+        // The Gaussian copula has no mixing variable (`sample_mixing` returns
+        // 1.0); the (Z, W) conditional reduces to the plain Z conditional.
+        let _ = mixing;
+        self.conditional_default_prob(default_threshold, &[systematic], correlation)
     }
 
     fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
@@ -409,20 +421,37 @@ mod tests {
 
     #[test]
     fn test_low_correlation_branch_matches_smoothing_floor() {
+        // Continuity at the MIN_CORRELATION floor: values below, at, and just
+        // above the floor must agree (the clamp is flat below the floor and
+        // the general formula is continuous in ρ above it). The previous
+        // early-return of the unconditional Φ(c) for ρ ≤ floor dropped the
+        // √ρ·z term and jumped by ~2% absolute PD at |z| = 2.
         let copula = GaussianCopula::new();
         let pd = 0.05;
         let threshold = standard_normal_inv_cdf(pd);
 
-        let prob_below_floor = copula.conditional_default_prob(threshold, &[1.0], 0.005);
-        let prob_at_floor = copula.conditional_default_prob(threshold, &[1.0], MIN_CORRELATION);
+        for &z in &[-2.0_f64, 0.0, 1.0, 2.0] {
+            let prob_below_floor = copula.conditional_default_prob(threshold, &[z], 0.005);
+            let prob_at_floor = copula.conditional_default_prob(threshold, &[z], MIN_CORRELATION);
+            let prob_just_above =
+                copula.conditional_default_prob(threshold, &[z], MIN_CORRELATION + 1e-9);
 
+            assert!(
+                (prob_below_floor - prob_at_floor).abs() < 1e-12,
+                "z={z}: below-floor must clamp to the floor value"
+            );
+            assert!(
+                (prob_at_floor - prob_just_above).abs() < 1e-6,
+                "z={z}: no jump crossing the floor (got {prob_at_floor} vs {prob_just_above})"
+            );
+        }
+
+        // And the floor value must retain z-dependence (the old branch lost it).
+        let at_floor_neg = copula.conditional_default_prob(threshold, &[-2.0], 0.005);
+        let at_floor_pos = copula.conditional_default_prob(threshold, &[2.0], 0.005);
         assert!(
-            (prob_below_floor - pd).abs() < 1e-8,
-            "correlations below the smoothing floor should use the unconditional PD"
-        );
-        assert!(
-            (prob_at_floor - pd).abs() < 1e-8,
-            "the exact smoothing floor should take the same unconditional branch"
+            at_floor_neg > at_floor_pos,
+            "conditional PD at the floor must still depend on the factor"
         );
     }
 }

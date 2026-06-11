@@ -25,6 +25,7 @@ fn test_scorecard_extension_with_config() {
             description: Some("Leverage ratio".into()),
         }],
         min_rating: None,
+        period: None,
     };
 
     let extension = CreditScorecardExtension::with_config(config);
@@ -72,6 +73,7 @@ fn test_scorecard_config_validation() {
             description: None,
         }],
         min_rating: None,
+        period: None,
     };
 
     assert!(CreditScorecardExtension::validate_config(&config).is_ok());
@@ -89,6 +91,7 @@ fn test_scorecard_config_validation_invalid_weights() {
             description: None,
         }],
         min_rating: None,
+        period: None,
     };
 
     assert!(CreditScorecardExtension::validate_config(&config).is_err());
@@ -100,6 +103,7 @@ fn test_scorecard_config_validation_invalid_scale() {
         rating_scale: "UnknownScale".into(),
         metrics: vec![],
         min_rating: None,
+        period: None,
     };
 
     assert!(CreditScorecardExtension::validate_config(&config).is_err());
@@ -174,16 +178,22 @@ fn test_scorecard_ttm_formula_uses_full_history() {
         .evaluate(&model)
         .expect("evaluation should succeed");
 
+    // Thresholds must cover the expected value (~2.17): an unmatched factor
+    // is excluded from metric_scores under the NM-exclusion convention.
+    let mut thresholds = indexmap::IndexMap::new();
+    thresholds.insert("A".into(), (2.0, 3.0));
+
     let config = ScorecardConfig {
         rating_scale: "S&P".into(),
         metrics: vec![ScorecardMetric {
             name: "leverage".into(),
             formula: "total_debt / ttm(ebitda)".into(),
             weight: 1.0,
-            thresholds: indexmap::IndexMap::new(),
+            thresholds,
             description: None,
         }],
         min_rating: None,
+        period: None,
     };
     let mut extension = CreditScorecardExtension::with_config(config);
     let report = extension
@@ -243,6 +253,7 @@ fn test_scorecard_warns_when_thresholds_do_not_cover_metric_value() {
             description: None,
         }],
         min_rating: None,
+        period: None,
     };
 
     let mut extension = CreditScorecardExtension::with_config(config);
@@ -250,11 +261,21 @@ fn test_scorecard_warns_when_thresholds_do_not_cover_metric_value() {
         .execute(&model, &results)
         .expect("scorecard should succeed");
 
+    // The unmatched factor is excluded (rating-agency "NM" treatment): no
+    // fallback score, zero weight coverage, and the report is stamped partial.
     assert_eq!(
         report.data.get("total_score").and_then(|v| v.as_f64()),
-        Some(50.0)
+        Some(0.0)
+    );
+    assert_eq!(
+        report.data.get("partial").and_then(|v| v.as_bool()),
+        Some(true)
+    );
+    assert_eq!(
+        report.data.get("weight_coverage").and_then(|v| v.as_f64()),
+        Some(0.0)
     );
     assert_eq!(report.warnings.len(), 1);
     assert!(report.warnings[0].contains("thresholds did not match"));
-    assert!(report.warnings[0].contains("using fallback score"));
+    assert!(report.warnings[0].contains("excluding factor"));
 }

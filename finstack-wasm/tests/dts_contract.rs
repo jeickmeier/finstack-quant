@@ -159,6 +159,36 @@ fn core_dts_exposes_typed_array_math_fast_paths() {
     ));
 }
 
+/// M2.21 — the correlation namespace's `Vec<f64>` returns cross the WASM
+/// boundary as `Float64Array`, and the hand-written d.ts must say so.
+#[test]
+fn valuations_correlation_dts_uses_float64array_returns() {
+    let dts = index_dts();
+
+    assert!(dts.contains("export interface CorrelationNamespace"));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "correlationBounds(p1: number, p2: number): Float64Array;",
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "jointProbabilities(p1: number, p2: number, correlation: number): Float64Array;",
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "validateCorrelationMatrix(matrix: NumericArray, n: number): void;",
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "nearestCorrelation(matrix: NumericArray, n: number, maxIter?: number, tol?: number): Float64Array;",
+    ));
+    // The stale `number[]` declarations must be gone from this namespace.
+    assert!(!dts.contains("correlationBounds(p1: number, p2: number): number[];"));
+    assert!(
+        !dts.contains("jointProbabilities(p1: number, p2: number, correlation: number): number[];")
+    );
+}
+
 #[test]
 fn cashflows_dts_matches_json_bridge_surface() {
     let dts = index_dts();

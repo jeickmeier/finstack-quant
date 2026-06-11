@@ -52,6 +52,10 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
 /// * `instrument` - The instrument to calculate flows for
 /// * `period` - The period to extract flows for
 /// * `opening_balance` - Opening balance at the start of the period
+/// * `toggled_pik_capitalized` - Cumulative principal capitalized via the PIK
+///   *toggle* (see [`crate::capital_structure::CapitalStructureState::cumulative_toggled_pik`]).
+///   Excluded from the scale-clamp basis so toggle-driven PIK compounding is
+///   not frozen by the clamp; pass zero when no toggle state exists.
 /// * `market_ctx` - Market context for pricing
 /// * `as_of` - Valuation date
 ///
@@ -75,6 +79,7 @@ pub fn calculate_period_flows(
     instrument: &dyn CashflowProvider,
     period: &Period,
     opening_balance: Money,
+    toggled_pik_capitalized: Money,
     market_ctx: &MarketContext,
     as_of: Date,
 ) -> Result<(CashflowBreakdown, Money, Vec<EvalWarning>)> {
@@ -86,13 +91,23 @@ pub fn calculate_period_flows(
             opening_balance.currency(),
         ));
     }
+    if toggled_pik_capitalized.amount() != 0.0 && toggled_pik_capitalized.currency() != currency {
+        return Err(crate::error::Error::currency_mismatch(
+            currency,
+            toggled_pik_capitalized.currency(),
+        ));
+    }
     let mut breakdown = CashflowBreakdown::with_currency(currency);
     let mut warnings = Vec::new();
     let snapshot_date = period_snapshot_date(period);
     let outstanding_path = full_schedule.outstanding_by_date()?;
+    // Boundary convention: flows dated exactly on `period.start` belong to
+    // *this* period (half-open `[start, end)`), so the scheduled opening must
+    // be the balance strictly *before* `period.start` to match the
+    // `end - 1 day` closing snapshot of the prior period.
     let scheduled_opening = outstanding_path
         .iter()
-        .filter(|(d, _)| *d <= period.start)
+        .filter(|(d, _)| *d < period.start)
         .map(|(_, balance)| {
             if balance.amount() < 0.0 {
                 Money::new(-balance.amount(), balance.currency())
@@ -123,24 +138,32 @@ pub fn calculate_period_flows(
     } else if scheduled_opening.amount() == 0.0 {
         1.0
     } else {
-        let raw = opening_balance.amount() / scheduled_opening.amount();
-        if raw > SCALE_WARN_THRESHOLD {
-            let clamped = raw.clamp(0.0, SCALE_CLAMP_MAX);
+        // Toggle-driven PIK capitalization grows the stateful balance beyond
+        // the contractual schedule by design. Exclude that increment from the
+        // clamp basis (so legitimate PIK compounding is never frozen by the
+        // clamp) while still accruing interest on the full stateful balance:
+        // scale = clamp((opening - toggled_pik) / scheduled) + toggled_pik / scheduled.
+        let pik_increment = toggled_pik_capitalized.amount().max(0.0);
+        let adjusted_opening = (opening_balance.amount() - pik_increment).max(0.0);
+        let adjusted_ratio = adjusted_opening / scheduled_opening.amount();
+        let pik_part = pik_increment / scheduled_opening.amount();
+        if adjusted_ratio > SCALE_WARN_THRESHOLD {
+            let clamped = adjusted_ratio.clamp(0.0, SCALE_CLAMP_MAX);
             tracing::warn!(
-                raw_scale = raw,
+                raw_scale = adjusted_ratio,
                 clamped_scale = clamped,
                 period = ?period.id,
-                "Scale factor between opening balance and scheduled opening exceeds {SCALE_WARN_THRESHOLD}; \
+                "Scale factor between opening balance (ex toggled-PIK) and scheduled opening exceeds {SCALE_WARN_THRESHOLD}; \
                  clamping to {SCALE_CLAMP_MAX} to prevent cashflow amplification. \
                  This typically indicates an unscheduled paydown / re-draw mismatch — verify the model."
             );
             warnings.push(EvalWarning::CapitalStructureCashflowIgnored {
                 period: period.id,
-                kind: format!("scale_clamped(raw={raw:.4}, clamped={clamped:.4})"),
+                kind: format!("scale_clamped(raw={adjusted_ratio:.4}, clamped={clamped:.4})"),
                 cashflow_date: period.start.to_string(),
             });
         }
-        raw.clamp(0.0, SCALE_CLAMP_MAX)
+        adjusted_ratio.clamp(0.0, SCALE_CLAMP_MAX) + pik_part
     };
 
     // Extract flows that fall within this period
@@ -162,7 +185,16 @@ pub fn calculate_period_flows(
                 CFKind::Notional if cf.amount.amount() > 0.0 => {
                     breakdown.principal_payment += scaled_abs_value;
                 }
-                CFKind::Fee | CFKind::CommitmentFee | CFKind::UsageFee | CFKind::FacilityFee => {
+                CFKind::CommitmentFee | CFKind::FacilityFee => {
+                    // Commitment / facility fees accrue on the undrawn
+                    // commitment or the total facility size, NOT on the drawn
+                    // balance — they must not be scaled by the drawn-balance
+                    // ratio. Pass them through at the scheduled amount.
+                    breakdown.fees += Money::new(cf.amount.amount().abs(), cf.amount.currency());
+                }
+                CFKind::Fee | CFKind::UsageFee => {
+                    // Generic and usage (drawn-balance based) fees scale with
+                    // the stateful/scheduled balance ratio like interest.
                     breakdown.fees += scaled_abs_value;
                 }
                 CFKind::PIK => {
@@ -217,8 +249,22 @@ pub fn calculate_period_flows(
             }
         })
         .unwrap_or_else(|| {
-            // If no outstanding entries yet, use initial notional from schedule
-            // or fall back to opening balance adjusted by flows
+            // No outstanding entry at or before the snapshot. If the
+            // instrument has not been issued yet (forward-dated / delayed
+            // draw), the balance is zero — reporting the full notional
+            // pre-issuance would overstate leverage. Otherwise (an issued
+            // instrument whose first flow lands in a later period) fall back
+            // to the initial notional.
+            let pre_issuance = full_schedule
+                .meta
+                .issue_date
+                .is_some_and(|issue| issue > snapshot_date)
+                && outstanding_path
+                    .first()
+                    .is_some_and(|(date, _)| *date > snapshot_date);
+            if pre_issuance {
+                return Money::new(0.0, currency);
+            }
             let initial = full_schedule.notional.initial;
             if initial.amount() < 0.0 {
                 Money::new(-initial.amount(), initial.currency())
@@ -248,10 +294,23 @@ pub fn calculate_period_flows(
         .sum();
     let closing_balance = if opening_balance.amount() == 0.0 {
         if has_new_funding {
-            Money::new(
-                scheduled_closing_balance.amount().max(net_new_funding),
-                currency,
-            )
+            // The stateful balance is zero (e.g. a revolver fully swept in a
+            // prior period). New draws this period establish a fresh balance
+            // of draws net of in-period repayments — taking the scheduled
+            // closing balance here would resurrect the swept balance.
+            let in_period_repayments: f64 = full_schedule
+                .flows
+                .iter()
+                .filter(|cf| cf.date >= period.start && cf.date < period.end)
+                .filter_map(|cf| match cf.kind {
+                    CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment => {
+                        Some(cf.amount.amount().abs())
+                    }
+                    CFKind::Notional if cf.amount.amount() > 0.0 => Some(cf.amount.amount().abs()),
+                    _ => None,
+                })
+                .sum();
+            Money::new((net_new_funding - in_period_repayments).max(0.0), currency)
         } else {
             Money::new(0.0, currency)
         }
@@ -260,8 +319,12 @@ pub fn calculate_period_flows(
     };
     breakdown.debt_balance = closing_balance;
 
-    // Calculate accrued interest at period end
-    // Note: detailed accrual config (day count, compounding) comes from the schedule itself
+    // Calculate accrued interest at period end.
+    // Note: detailed accrual config (day count, compounding) comes from the schedule itself.
+    // Limitation: `AccrualConfig::default()` leaves `frequency: None`, which is
+    // incorrect for ACT/ACT ISMA schedules (the accrual engine falls back to
+    // ISDA semantics). `CashFlowMeta` does not carry the coupon frequency, so
+    // it cannot be populated from what is visible here.
     let accrued_scalar =
         accrued_interest_amount(&full_schedule, snapshot_date, &AccrualConfig::default())?;
     let accrued_interest = if opening_balance.amount() == 0.0 && !has_new_funding {
@@ -334,6 +397,7 @@ mod tests {
             &instrument,
             &period,
             Money::new(1_000_000.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
             &market_ctx,
             start,
         )
@@ -389,6 +453,7 @@ mod tests {
             &instrument,
             &period,
             Money::new(0.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
             &market_ctx,
             start,
         )
@@ -437,6 +502,7 @@ mod tests {
             &instrument,
             &period,
             Money::new(0.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
             &market_ctx,
             start,
         )
@@ -447,6 +513,307 @@ mod tests {
         assert_eq!(breakdown.principal_payment.amount(), 0.0);
         assert_eq!(breakdown.debt_balance.amount(), 100_000.0);
         assert_eq!(closing_balance.amount(), 100_000.0);
+    }
+
+    /// Regression test for the scale-denominator off-by-one (review B2):
+    /// a quarterly amortizing loan whose payments land exactly on period
+    /// boundaries must produce per-period interest equal to the raw schedule
+    /// with scale = 1.0 and no `scale_clamped` warning. The old
+    /// `*d <= period.start` filter took the post-payment balance as the
+    /// scheduled opening, inflating every flow by opening/post-payment.
+    #[test]
+    fn boundary_dated_amortization_matches_raw_schedule_without_scale_warning() {
+        let q_start = |q: u8| {
+            let month = match q {
+                1 => Month::January,
+                2 => Month::April,
+                3 => Month::July,
+                _ => Month::October,
+            };
+            Date::from_calendar_date(2025, month, 1).expect("valid date")
+        };
+        let issue = q_start(1);
+
+        // Quarterly amortizer: payments dated exactly on the period
+        // boundaries Apr 1 / Jul 1 / Oct 1 (1% coupon on the pre-payment
+        // balance + 100k amortization).
+        let mut flows = Vec::new();
+        let mut outstanding = 1_000_000.0;
+        for q in 2..=4 {
+            flows.push(CashFlow {
+                date: q_start(q),
+                reset_date: None,
+                amount: Money::new(-outstanding * 0.01, Currency::USD),
+                kind: CFKind::Fixed,
+                accrual_factor: 0.25,
+                rate: Some(0.04),
+            });
+            flows.push(CashFlow {
+                date: q_start(q),
+                reset_date: None,
+                amount: Money::new(100_000.0, Currency::USD),
+                kind: CFKind::Amortization,
+                accrual_factor: 0.0,
+                rate: None,
+            });
+            outstanding -= 100_000.0;
+        }
+        let instrument = SignedFlowInstrument {
+            schedule: CashFlowSchedule {
+                flows,
+                notional: Notional::par(1_000_000.0, Currency::USD),
+                day_count: DayCount::Act365F,
+                meta: CashFlowMeta {
+                    issue_date: Some(issue),
+                    ..CashFlowMeta::default()
+                },
+            },
+        };
+
+        let market_ctx = MarketContext::new();
+        let mut opening = Money::new(1_000_000.0, Currency::USD);
+        // Q2..Q4 each contain one boundary-dated coupon + amortization.
+        let expected_interest = [10_000.0, 9_000.0, 8_000.0];
+        for (idx, q) in (2u8..=4).enumerate() {
+            let end = if q == 4 {
+                Date::from_calendar_date(2026, Month::January, 1).expect("valid date")
+            } else {
+                q_start(q + 1)
+            };
+            let period = Period {
+                id: PeriodId::quarter(2025, q),
+                start: q_start(q),
+                end,
+                is_actual: false,
+            };
+            let (breakdown, closing, warnings) = calculate_period_flows(
+                &instrument,
+                &period,
+                opening,
+                Money::new(0.0, Currency::USD),
+                &market_ctx,
+                issue,
+            )
+            .expect("period flow calculation should succeed");
+
+            assert!(
+                warnings.is_empty(),
+                "no scale warning expected in Q{q}, got {warnings:?}"
+            );
+            assert!(
+                (breakdown.interest_expense_cash.amount() - expected_interest[idx]).abs() < 1e-9,
+                "Q{q} interest should equal the raw schedule ({}), got {}",
+                expected_interest[idx],
+                breakdown.interest_expense_cash.amount()
+            );
+            assert!(
+                (breakdown.principal_payment.amount() - 100_000.0).abs() < 1e-9,
+                "Q{q} principal should equal the raw schedule"
+            );
+            opening = closing;
+        }
+    }
+
+    /// Toggle-driven PIK capitalization is excluded from the clamp basis:
+    /// the stateful balance legitimately exceeds the scheduled balance by the
+    /// capitalized PIK, so interest must accrue on the full balance with no
+    /// warning. Without the exclusion the same inputs are clamped at 1.10.
+    #[test]
+    fn toggled_pik_capitalization_is_excluded_from_scale_clamp() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        let period = Period {
+            id: PeriodId::quarter(2025, 1),
+            start,
+            end,
+            is_actual: false,
+        };
+
+        let instrument = SignedFlowInstrument {
+            schedule: CashFlowSchedule {
+                flows: vec![CashFlow {
+                    date: Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    reset_date: None,
+                    amount: Money::new(-20_000.0, Currency::USD),
+                    kind: CFKind::Fixed,
+                    accrual_factor: 0.25,
+                    rate: Some(0.08),
+                }],
+                notional: Notional::par(1_000_000.0, Currency::USD),
+                day_count: DayCount::Act365F,
+                meta: CashFlowMeta {
+                    issue_date: Some(start),
+                    ..CashFlowMeta::default()
+                },
+            },
+        };
+
+        let market_ctx = MarketContext::new();
+        // Opening balance = scheduled 1.0M + 160k of toggle-capitalized PIK
+        // (raw ratio 1.16, beyond the 1.10 clamp).
+        let (breakdown, _, warnings) = calculate_period_flows(
+            &instrument,
+            &period,
+            Money::new(1_160_000.0, Currency::USD),
+            Money::new(160_000.0, Currency::USD),
+            &market_ctx,
+            start,
+        )
+        .expect("period flow calculation should succeed");
+
+        assert!(
+            warnings.is_empty(),
+            "PIK-grown balance must not trigger the scale warning, got {warnings:?}"
+        );
+        assert!(
+            (breakdown.interest_expense_cash.amount() - 23_200.0).abs() < 1e-9,
+            "interest should accrue on the full stateful balance (20k × 1.16), got {}",
+            breakdown.interest_expense_cash.amount()
+        );
+
+        // Without the toggled-PIK exclusion the same inputs are clamped.
+        let (clamped, _, clamp_warnings) = calculate_period_flows(
+            &instrument,
+            &period,
+            Money::new(1_160_000.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
+            &market_ctx,
+            start,
+        )
+        .expect("period flow calculation should succeed");
+        assert_eq!(clamp_warnings.len(), 1);
+        assert!((clamped.interest_expense_cash.amount() - 22_000.0).abs() < 1e-9);
+    }
+
+    /// A revolver whose stateful balance was fully swept must not resurrect
+    /// the scheduled balance on a re-draw: the new closing balance is the
+    /// period's draws net of in-period repayments.
+    #[test]
+    fn revolver_redraw_after_full_sweep_nets_new_funding_against_repayments() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        let period = Period {
+            id: PeriodId::quarter(2025, 1),
+            start,
+            end,
+            is_actual: false,
+        };
+
+        let issue = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
+        let instrument = SignedFlowInstrument {
+            schedule: CashFlowSchedule {
+                flows: vec![
+                    CashFlow {
+                        date: Date::from_calendar_date(2025, Month::February, 15)
+                            .expect("valid date"),
+                        reset_date: None,
+                        amount: Money::new(100_000.0, Currency::USD),
+                        kind: CFKind::RevolvingDraw,
+                        accrual_factor: 0.0,
+                        rate: None,
+                    },
+                    CashFlow {
+                        date: Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                        reset_date: None,
+                        amount: Money::new(30_000.0, Currency::USD),
+                        kind: CFKind::RevolvingRepayment,
+                        accrual_factor: 0.0,
+                        rate: None,
+                    },
+                ],
+                // Scheduled balance is 500k — the stateful balance (zero,
+                // fully swept upstream) takes precedence.
+                notional: Notional::par(500_000.0, Currency::USD),
+                day_count: DayCount::Act365F,
+                meta: CashFlowMeta {
+                    issue_date: Some(issue),
+                    ..CashFlowMeta::default()
+                },
+            },
+        };
+
+        let market_ctx = MarketContext::new();
+        let (breakdown, closing, _) = calculate_period_flows(
+            &instrument,
+            &period,
+            Money::new(0.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
+            &market_ctx,
+            start,
+        )
+        .expect("period flow calculation should succeed");
+
+        assert_eq!(
+            closing.amount(),
+            70_000.0,
+            "closing must be draws (100k) net of repayments (30k), not the scheduled balance"
+        );
+        assert_eq!(breakdown.debt_balance.amount(), 70_000.0);
+    }
+
+    /// Commitment and facility fees accrue on the undrawn commitment / total
+    /// facility, so they must pass through unscaled even when the drawn
+    /// balance has diverged from the schedule.
+    #[test]
+    fn commitment_and_facility_fees_are_not_scaled_by_drawn_balance_ratio() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
+        let period = Period {
+            id: PeriodId::quarter(2025, 1),
+            start,
+            end,
+            is_actual: false,
+        };
+
+        let instrument = SignedFlowInstrument {
+            schedule: CashFlowSchedule {
+                flows: vec![
+                    CashFlow {
+                        date: Date::from_calendar_date(2025, Month::February, 15)
+                            .expect("valid date"),
+                        reset_date: None,
+                        amount: Money::new(-5_000.0, Currency::USD),
+                        kind: CFKind::CommitmentFee,
+                        accrual_factor: 0.25,
+                        rate: None,
+                    },
+                    CashFlow {
+                        date: Date::from_calendar_date(2025, Month::February, 15)
+                            .expect("valid date"),
+                        reset_date: None,
+                        amount: Money::new(-2_000.0, Currency::USD),
+                        kind: CFKind::FacilityFee,
+                        accrual_factor: 0.25,
+                        rate: None,
+                    },
+                ],
+                notional: Notional::par(1_000_000.0, Currency::USD),
+                day_count: DayCount::Act365F,
+                meta: CashFlowMeta {
+                    issue_date: Some(start),
+                    ..CashFlowMeta::default()
+                },
+            },
+        };
+
+        let market_ctx = MarketContext::new();
+        // Stateful balance at half the schedule → interest-like flows scale
+        // by 0.5, but commitment/facility fees must not.
+        let (breakdown, _, _) = calculate_period_flows(
+            &instrument,
+            &period,
+            Money::new(500_000.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
+            &market_ctx,
+            start,
+        )
+        .expect("period flow calculation should succeed");
+
+        assert_eq!(
+            breakdown.fees.amount(),
+            7_000.0,
+            "commitment/facility fees must pass through at the scheduled amount"
+        );
     }
 
     #[test]
@@ -484,6 +851,7 @@ mod tests {
             &instrument,
             &period,
             Money::new(100_000.0, Currency::USD),
+            Money::new(0.0, Currency::USD),
             &market_ctx,
             start,
         )

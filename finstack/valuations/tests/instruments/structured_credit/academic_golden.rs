@@ -218,14 +218,16 @@ fn test_warf_golden_moody_standard() {
         (CreditRating::BBBMinus, 610.0, "BBB- / Baa3"),
         (CreditRating::BBPlus, 940.0, "BB+ / Ba1"),
         (CreditRating::BB, 1350.0, "BB / Ba2"),
-        (CreditRating::BBMinus, 1760.0, "BB- / Ba3"),
+        (CreditRating::BBMinus, 1766.0, "BB- / Ba3"),
         (CreditRating::BPlus, 2220.0, "B+ / B1"),
         (CreditRating::B, 2720.0, "B / B2"),
         (CreditRating::BMinus, 3490.0, "B- / B3"),
         (CreditRating::CCCPlus, 4770.0, "CCC+ / Caa1"),
         (CreditRating::CCC, 6500.0, "CCC / Caa2"),
         (CreditRating::CCCMinus, 8070.0, "CCC- / Caa3"),
-        (CreditRating::CC, 9550.0, "CC / Ca"),
+        // Moody's publishes Ca/C jointly at the 10,000 cap; the previous
+        // 9550 CC entry was unpublished.
+        (CreditRating::CC, 10000.0, "CC / Ca"),
         (CreditRating::C, 10000.0, "C"),
         (CreditRating::D, 10000.0, "D"),
     ];

@@ -72,10 +72,13 @@ fn test_pool_stats_weighted_spread_and_coupon() {
 
     let stats = calculate_pool_stats(&pool, maturity_date());
 
-    let expected_was = (10_000_000.0 * 400.0 + 20_000_000.0 * 600.0) / 30_000_000.0;
+    // Fixed-rate B1 has no explicit spread component, so it is excluded
+    // from WAS (no rate × 10⁴ fallback): only L1's 400bps contributes.
+    let expected_was = 400.0;
     assert!(
         (stats.weighted_avg_spread - expected_was).abs() < 1e-6,
-        "Weighted avg spread should match balance-weighted spreads"
+        "Weighted avg spread should match balance-weighted spreads over \
+         assets that carry a spread"
     );
     assert!(
         stats.weighted_avg_coupon > 0.0,

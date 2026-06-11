@@ -491,3 +491,128 @@ fn test_lognormal_forecast_always_positive() {
     assert!(results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap() > 0.0);
     assert!(results.get("revenue", &PeriodId::quarter(2025, 4)).unwrap() > 0.0);
 }
+
+/// As-of visibility: actual periods hidden by `as_of` must be treated as
+/// forecast periods (no hard error) and the forecast base must come from the
+/// last *visible* actual, never from hidden future actuals (no look-ahead).
+#[test]
+fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
+    use finstack_core::dates::Date;
+    use finstack_core::market_data::context::MarketContext;
+    use time::Month;
+
+    let model = ModelBuilder::new("as-of-forecast")
+        .periods("2025Q1..Q4", Some("2025Q2"))
+        .unwrap()
+        .value(
+            "revenue",
+            &[
+                (
+                    PeriodId::quarter(2025, 1),
+                    AmountOrScalar::scalar(100_000.0),
+                ),
+                // Future actual hidden by as_of: must never anchor the forecast.
+                (
+                    PeriodId::quarter(2025, 2),
+                    AmountOrScalar::scalar(999_000.0),
+                ),
+            ],
+        )
+        .forecast(
+            "revenue",
+            ForecastSpec {
+                method: ForecastMethod::GrowthPct,
+                params: indexmap! { "rate".into() => serde_json::json!(0.10) },
+            },
+        )
+        .build()
+        .unwrap();
+
+    // as_of before Q2's start hides the Q2 actual value.
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let mut evaluator = Evaluator::new();
+    let results = evaluator
+        .evaluate_with_market(&model, &MarketContext::new(), as_of)
+        .expect("hidden actuals must resolve through the forecast, not hard-error");
+
+    // Q1 actual is visible.
+    assert_eq!(
+        results.get("revenue", &PeriodId::quarter(2025, 1)),
+        Some(100_000.0)
+    );
+
+    // Q2 (hidden actual) and Q3/Q4 are forecast from the visible Q1 base:
+    // 110k, 121k, 133.1k. Anchoring on the hidden 999k would leak look-ahead.
+    let q2 = results.get("revenue", &PeriodId::quarter(2025, 2)).unwrap();
+    let q3 = results.get("revenue", &PeriodId::quarter(2025, 3)).unwrap();
+    let q4 = results.get("revenue", &PeriodId::quarter(2025, 4)).unwrap();
+    assert!((q2 - 110_000.0).abs() < 1.0, "got q2={q2}");
+    assert!((q3 - 121_000.0).abs() < 1.0, "got q3={q3}");
+    assert!((q4 - 133_100.0).abs() < 1.0, "got q4={q4}");
+}
+
+/// Two stochastic nodes configured with the same seed must not share
+/// identical shock paths in single-run mode (the node id is mixed into the
+/// effective seed, matching Monte Carlo mode).
+#[test]
+fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
+    let model = ModelBuilder::new("shared-seed")
+        .periods("2025Q1..Q4", Some("2025Q1"))
+        .unwrap()
+        .value(
+            "a",
+            &[(
+                PeriodId::quarter(2025, 1),
+                AmountOrScalar::scalar(100_000.0),
+            )],
+        )
+        .forecast(
+            "a",
+            ForecastSpec {
+                method: ForecastMethod::Normal,
+                params: indexmap! {
+                    "mean".into() => serde_json::json!(0.0),
+                    "std_dev".into() => serde_json::json!(1_000.0),
+                    "seed".into() => serde_json::json!(42),
+                },
+            },
+        )
+        .value(
+            "b",
+            &[(
+                PeriodId::quarter(2025, 1),
+                AmountOrScalar::scalar(100_000.0),
+            )],
+        )
+        .forecast(
+            "b",
+            ForecastSpec {
+                method: ForecastMethod::Normal,
+                params: indexmap! {
+                    "mean".into() => serde_json::json!(0.0),
+                    "std_dev".into() => serde_json::json!(1_000.0),
+                    "seed".into() => serde_json::json!(42),
+                },
+            },
+        )
+        .build()
+        .unwrap();
+
+    let mut evaluator = Evaluator::new();
+    let results = evaluator.evaluate(&model).unwrap();
+
+    let a_q2 = results.get("a", &PeriodId::quarter(2025, 2)).unwrap();
+    let b_q2 = results.get("b", &PeriodId::quarter(2025, 2)).unwrap();
+    assert_ne!(
+        a_q2, b_q2,
+        "independent stochastic nodes sharing a seed must not draw identical shocks"
+    );
+
+    // Determinism is preserved: re-running gives identical values.
+    let mut evaluator2 = Evaluator::new();
+    let results2 = evaluator2.evaluate(&model).unwrap();
+    assert_eq!(
+        results2.get("a", &PeriodId::quarter(2025, 2)).unwrap(),
+        a_q2
+    );
+}

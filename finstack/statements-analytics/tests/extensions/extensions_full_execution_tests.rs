@@ -261,6 +261,7 @@ fn test_scorecard_extension_with_valid_config() {
             },
         ],
         min_rating: Some("BBB".into()),
+        period: None,
     };
 
     let mut extension = CreditScorecardExtension::with_config(config);
@@ -289,6 +290,7 @@ fn test_scorecard_set_config() {
             description: None,
         }],
         min_rating: None,
+        period: None,
     };
 
     extension.set_config(config.clone());
@@ -341,6 +343,7 @@ fn test_scorecard_moodys_rating_scale() {
             description: None,
         }],
         min_rating: None,
+        period: None,
     };
 
     let mut extension = CreditScorecardExtension::with_config(config);
@@ -379,6 +382,7 @@ fn test_scorecard_fitch_rating_scale() {
             description: None,
         }],
         min_rating: None,
+        period: None,
     };
 
     let mut extension = CreditScorecardExtension::with_config(config);
@@ -433,6 +437,7 @@ fn test_scorecard_with_minimum_rating_warning() {
             description: None,
         }],
         min_rating: Some("AAA".into()), // Higher than expected
+        period: None,
     };
 
     let mut extension = CreditScorecardExtension::with_config(config);
@@ -504,6 +509,7 @@ fn test_scorecard_multiple_metrics_weighted() {
             },
         ],
         min_rating: None,
+        period: None,
     };
 
     let mut extension = CreditScorecardExtension::with_config(config);
@@ -542,6 +548,7 @@ fn test_scorecard_metric_evaluation_error_handling() {
             description: None,
         }],
         min_rating: None,
+        period: None,
     };
 
     let mut extension = CreditScorecardExtension::with_config(config);
@@ -551,4 +558,161 @@ fn test_scorecard_metric_evaluation_error_handling() {
     // Should fail due to invalid formula
     assert_eq!(report.status, ScorecardStatus::Failed);
     assert!(!report.errors.is_empty());
+}
+
+// ============================================================================
+// Scorecard NM-exclusion, period selection, and partial stamping
+// ============================================================================
+
+fn two_metric_model() -> (
+    finstack_statements::types::FinancialModelSpec,
+    finstack_statements::evaluator::StatementResult,
+) {
+    let model = ModelBuilder::new("nm_test")
+        .periods("2025Q1..2025Q2", None)
+        .unwrap()
+        .value(
+            "debt",
+            &[
+                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(150.0)),
+                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(150.0)),
+            ],
+        )
+        .value(
+            "ebitda",
+            &[
+                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
+                // EBITDA collapses to zero → debt/ebitda = inf (non-finite).
+                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(0.0)),
+            ],
+        )
+        .value(
+            "coverage",
+            &[
+                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(5.0)),
+                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(5.0)),
+            ],
+        )
+        .build()
+        .unwrap();
+    let mut evaluator = finstack_statements::evaluator::Evaluator::new();
+    let results = evaluator.evaluate(&model).unwrap();
+    (model, results)
+}
+
+fn leverage_coverage_config() -> ScorecardConfig {
+    let mut leverage_thresholds = indexmap::IndexMap::new();
+    leverage_thresholds.insert("AAA".into(), (0.0, 1.0));
+    leverage_thresholds.insert("AA".into(), (1.0, 2.0));
+    leverage_thresholds.insert("A".into(), (2.0, 3.0));
+
+    let mut coverage_thresholds = indexmap::IndexMap::new();
+    coverage_thresholds.insert("AAA".into(), (8.0, 999.0));
+    coverage_thresholds.insert("AA".into(), (4.0, 8.0));
+    coverage_thresholds.insert("A".into(), (2.0, 4.0));
+
+    ScorecardConfig {
+        rating_scale: "S&P".into(),
+        metrics: vec![
+            ScorecardMetric {
+                name: "leverage".into(),
+                formula: "debt / ebitda".into(),
+                weight: 0.5,
+                thresholds: leverage_thresholds,
+                description: None,
+            },
+            ScorecardMetric {
+                name: "coverage".into(),
+                formula: "coverage".into(),
+                weight: 0.5,
+                thresholds: coverage_thresholds,
+                description: None,
+            },
+        ],
+        min_rating: None,
+        period: None,
+    }
+}
+
+#[test]
+fn test_scorecard_non_finite_metric_excluded_and_weights_renormalized() {
+    let (model, results) = two_metric_model();
+
+    // Default period = last (Q2, no actuals): leverage = 150/0 = inf → NM.
+    let mut extension = CreditScorecardExtension::with_config(leverage_coverage_config());
+    let report = extension.execute(&model, &results).unwrap();
+
+    assert_eq!(report.status, ScorecardStatus::Success);
+    // Coverage = 5.0 → AA → score 90; leverage excluded, so the weighted
+    // average renormalizes to coverage alone.
+    assert_eq!(
+        report.data.get("total_score").and_then(|v| v.as_f64()),
+        Some(90.0),
+        "excluded NM factor must renormalize weights, not drag the score to a default"
+    );
+    assert_eq!(
+        report.data.get("partial").and_then(|v| v.as_bool()),
+        Some(true)
+    );
+    assert_eq!(
+        report.data.get("weight_coverage").and_then(|v| v.as_f64()),
+        Some(0.5)
+    );
+    assert!(report
+        .warnings
+        .iter()
+        .any(|w| w.contains("not finite") && w.contains("excluding factor")));
+    // metric_scores only lists the included factor.
+    let metric_scores = report
+        .data
+        .get("metric_scores")
+        .unwrap()
+        .as_array()
+        .unwrap();
+    assert_eq!(metric_scores.len(), 1);
+}
+
+#[test]
+fn test_scorecard_period_selection() {
+    let (model, results) = two_metric_model();
+
+    // Explicitly rate Q1, where leverage = 150/100 = 1.5 → AA (90) and
+    // coverage = 5.0 → AA (90).
+    let mut config = leverage_coverage_config();
+    config.period = Some("2025Q1".into());
+
+    let mut extension = CreditScorecardExtension::with_config(config);
+    let report = extension.execute(&model, &results).unwrap();
+
+    assert_eq!(report.status, ScorecardStatus::Success);
+    assert_eq!(
+        report.data.get("period").and_then(|v| v.as_str()),
+        Some("2025Q1")
+    );
+    assert_eq!(
+        report.data.get("total_score").and_then(|v| v.as_f64()),
+        Some(90.0)
+    );
+    assert_eq!(
+        report.data.get("partial").and_then(|v| v.as_bool()),
+        Some(false)
+    );
+    assert_eq!(
+        report.data.get("weight_coverage").and_then(|v| v.as_f64()),
+        Some(1.0)
+    );
+}
+
+#[test]
+fn test_scorecard_unknown_period_is_error() {
+    let (model, results) = two_metric_model();
+
+    let mut config = leverage_coverage_config();
+    config.period = Some("2030Q4".into());
+
+    let mut extension = CreditScorecardExtension::with_config(config);
+    let err = extension
+        .execute(&model, &results)
+        .expect_err("period absent from the model must be an error");
+    assert!(err.to_string().contains("not found in model periods"));
 }

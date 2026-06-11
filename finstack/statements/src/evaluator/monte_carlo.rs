@@ -36,6 +36,7 @@ use std::collections::HashSet;
 /// minimum—callers choose the path count explicitly so the trade-off between
 /// accuracy and runtime is visible.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MonteCarloConfig {
     /// Number of Monte Carlo paths to simulate.
     pub n_paths: usize,
@@ -182,16 +183,26 @@ impl MonteCarloResults {
     }
 }
 
-fn normalize_percentiles(raw: &[f64]) -> Vec<f64> {
-    let mut v: Vec<f64> = if raw.is_empty() {
-        vec![0.05, 0.5, 0.95]
-    } else {
-        raw.iter().map(|q| q.clamp(0.0, 1.0)).collect()
-    };
+fn normalize_percentiles(raw: &[f64]) -> Result<Vec<f64>> {
+    if raw.is_empty() {
+        return Ok(vec![0.05, 0.5, 0.95]);
+    }
 
+    // Reject out-of-range values instead of silently clamping: a user writing
+    // `5` for the 5th percentile would otherwise get the maximum.
+    for &q in raw {
+        if !q.is_finite() || !(0.0..=1.0).contains(&q) {
+            return Err(Error::eval(format!(
+                "Monte Carlo percentiles must be in [0, 1] (e.g. 0.05 for the \
+                 5th percentile), got {q}"
+            )));
+        }
+    }
+
+    let mut v: Vec<f64> = raw.to_vec();
     v.sort_by(|a, b| a.total_cmp(b));
     v.dedup();
-    v
+    Ok(v)
 }
 
 pub(crate) struct MonteCarloAccumulator {
@@ -228,7 +239,7 @@ impl MonteCarloAccumulator {
         Ok(Self {
             expected_paths: config.n_paths,
             observed_paths: 0,
-            percentiles: normalize_percentiles(&config.percentiles),
+            percentiles: normalize_percentiles(&config.percentiles)?,
             forecast_set: forecast_periods.iter().copied().collect(),
             forecast_periods,
             path_values: IndexMap::new(),
@@ -278,7 +289,7 @@ impl MonteCarloAccumulator {
         Ok(())
     }
 
-    pub(crate) fn finish(self) -> Result<MonteCarloResults> {
+    pub(crate) fn finish(mut self) -> Result<MonteCarloResults> {
         if self.observed_paths == 0 {
             return Err(Error::eval(
                 "Monte Carlo aggregation requires at least one path",
@@ -326,9 +337,28 @@ impl MonteCarloAccumulator {
             percentile_results.insert(metric.clone(), series);
         }
 
+        // Rayon's reduce tree makes the merge order of partitions
+        // nondeterministic, so sort serialized outputs (path-table rows and
+        // warnings) into a canonical order: serial ≡ parallel must hold for
+        // everything that reaches the wire.
+        self.warnings
+            .sort_by_cached_key(|warning| format!("{warning:?}"));
+
         let path_data = if !self.include_path_data || self.path_ids.is_empty() {
             None
         } else {
+            let mut order: Vec<usize> = (0..self.path_ids.len()).collect();
+            order.sort_by(|&a, &b| {
+                (self.path_ids[a], &self.metrics[a], &self.periods[a]).cmp(&(
+                    self.path_ids[b],
+                    &self.metrics[b],
+                    &self.periods[b],
+                ))
+            });
+            self.path_ids = order.iter().map(|&i| self.path_ids[i]).collect();
+            self.periods = order.iter().map(|&i| self.periods[i].clone()).collect();
+            self.metrics = order.iter().map(|&i| self.metrics[i].clone()).collect();
+            self.values = order.iter().map(|&i| self.values[i]).collect();
             let mut metadata = IndexMap::new();
             metadata.insert("layout".to_string(), json!("long"));
             metadata.insert("source".to_string(), json!("statement_monte_carlo_paths"));
@@ -434,10 +464,19 @@ mod tests {
     use indexmap::IndexMap;
 
     #[test]
-    fn normalize_percentiles_clamps_and_dedupes() {
-        let raw = vec![-0.1, 0.05, 0.5, 1.2, 0.5];
-        let norm = normalize_percentiles(&raw);
-        assert_eq!(norm, vec![0.0, 0.05, 0.5, 1.0]);
+    fn normalize_percentiles_sorts_and_dedupes() {
+        let raw = vec![0.95, 0.05, 0.5, 0.5];
+        let norm = normalize_percentiles(&raw).expect("valid percentiles");
+        assert_eq!(norm, vec![0.05, 0.5, 0.95]);
+    }
+
+    #[test]
+    fn normalize_percentiles_rejects_out_of_range() {
+        // A user writing `5` for the 5th percentile must get an error, not a
+        // silent clamp to the maximum.
+        assert!(normalize_percentiles(&[5.0]).is_err());
+        assert!(normalize_percentiles(&[-0.1]).is_err());
+        assert!(normalize_percentiles(&[f64::NAN]).is_err());
     }
 
     #[test]
@@ -527,6 +566,49 @@ mod tests {
             .expect("path should be accepted");
         let results = accumulator.finish().expect("results should finish");
         assert_eq!(results.warnings.len(), 1);
+    }
+
+    #[test]
+    fn monte_carlo_config_rejects_unknown_fields() {
+        let json = r#"{"n_paths": 10, "seed": 7, "bogus_field": true}"#;
+        assert!(serde_json::from_str::<MonteCarloConfig>(json).is_err());
+    }
+
+    #[test]
+    fn path_data_rows_sorted_regardless_of_push_order() {
+        // Rayon merge order is nondeterministic; finish() must emit a
+        // canonical (path_id, metric, period) row order either way.
+        let period = PeriodId::quarter(2025, 1);
+        let model = ModelBuilder::new("mc-sort")
+            .periods("2025Q1..Q1", None)
+            .expect("valid periods")
+            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+            .build()
+            .expect("valid model");
+        let config = MonteCarloConfig::new(2, 7).with_path_data(true);
+
+        let mut acc = MonteCarloAccumulator::new(&model, &config).expect("acc");
+        for path_idx in [1usize, 0] {
+            let mut path = IndexMap::new();
+            path.insert(
+                "revenue".to_string(),
+                [(period, 100.0 + path_idx as f64)].into_iter().collect(),
+            );
+            acc.push_path(path_idx, path, Vec::new()).expect("push");
+        }
+        let results = acc.finish().expect("finish");
+        let table = results.path_data.expect("path data");
+        let path_id_column = table
+            .columns
+            .iter()
+            .find(|c| c.name == "path_id")
+            .expect("path_id column");
+        match &path_id_column.data {
+            finstack_core::table::TableColumnData::UInt32(ids) => {
+                assert_eq!(ids, &vec![0, 1], "rows must be sorted by path_id");
+            }
+            other => panic!("unexpected column type: {other:?}"),
+        }
     }
 
     #[test]

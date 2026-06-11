@@ -340,6 +340,54 @@ def test_wasm_attribution_root_exports_are_triplet_accounted_for() -> None:
     assert not overlap, f"attribution wasm_only overlaps python_js_map values: {sorted(overlap)}"
 
 
+WASM_NAMESPACE_SUBSETS = [
+    ("wasm_statements_subset", "statements", "finstack.statements"),
+    ("wasm_statements_analytics_subset", "statements_analytics", "finstack.statements_analytics"),
+]
+
+
+@pytest.mark.parametrize(("section", "const_name", "python_package"), WASM_NAMESPACE_SUBSETS)
+def test_wasm_namespace_subset_exports_match_contract(section: str, const_name: str, python_package: str) -> None:
+    """`exports/<ns>.js` root keys must match the contract subset section."""
+    assert python_package
+    block = CONTRACT[section]
+    js_path = (CONTRACT_PATH.parent / block["js_export_file"]).resolve()
+    expected = set(block["root_exports"])
+    actual = _parse_exported_const_object_keys(js_path, const_name)
+    assert actual == expected, (
+        f"{const_name}.js exports diverged from contract.\n"
+        f"  missing from JS: {sorted(expected - actual)}\n"
+        f"  unlisted in contract: {sorted(actual - expected)}"
+    )
+
+
+@pytest.mark.parametrize(("section", "const_name", "python_package"), WASM_NAMESPACE_SUBSETS)
+def test_wasm_namespace_subset_root_exports_are_triplet_accounted_for(
+    section: str, const_name: str, python_package: str
+) -> None:
+    """Every subset root export is mapped from Python or listed wasm-only."""
+    assert const_name
+    assert python_package
+    block = CONTRACT[section]
+    root_exports = set(block["root_exports"])
+    wasm_only = set(block.get("wasm_only", {}).get("symbols", []))
+    mapped_js = set(block["python_js_map"].values())
+    unaccounted = root_exports - wasm_only - mapped_js
+    assert not unaccounted, f"{section} exports must be mapped or wasm-only: {sorted(unaccounted)}"
+    overlap = wasm_only & mapped_js
+    assert not overlap, f"{section} wasm_only overlaps python_js_map values: {sorted(overlap)}"
+
+
+@pytest.mark.parametrize(("section", "const_name", "python_package"), WASM_NAMESPACE_SUBSETS)
+def test_wasm_namespace_subset_python_twins_resolve(section: str, const_name: str, python_package: str) -> None:
+    """Each python_js_map key must resolve on the live Python module."""
+    assert const_name
+    block = CONTRACT[section]
+    module = importlib.import_module(python_package)
+    missing = [name for name in block["python_js_map"] if not hasattr(module, name)]
+    assert not missing, f"{python_package} missing python_js_map twins: {missing}"
+
+
 def test_wasm_valuations_nested_exports_match_contract() -> None:
     """Nested `exports/valuations/*.js` facade keys must match the contract."""
     block = CONTRACT["wasm_valuations_subset"]
@@ -439,3 +487,48 @@ def test_core_market_data_public_matches_contract() -> None:
         f"  missing: {sorted(set(expected) - set(module.__all__))}\n"
         f"  unlisted: {sorted(set(module.__all__) - set(expected))}"
     )
+
+
+def test_valuations_correlation_public_matches_contract() -> None:
+    """``finstack.valuations.correlation.__all__`` must match [crates.valuations.correlation].
+
+    Pins the correlation symbol surface so a binding rename (e.g. the
+    Rust-canonical ``LatentFactorKind``) cannot drift from the contract, the
+    package ``__all__``, or the importable surface without failing parity.
+    """
+    block = CONTRACT["crates"]["valuations"]["correlation"]
+    expected = block["public"]
+    module = importlib.import_module(block["python_package"])
+    assert module.__all__ == expected, (
+        f"{block['python_package']}.__all__ diverged from contract.\n"
+        f"  missing: {sorted(set(expected) - set(module.__all__))}\n"
+        f"  unlisted: {sorted(set(module.__all__) - set(expected))}"
+    )
+    for name in expected:
+        assert hasattr(module, name), f"{block['python_package']} does not expose `{name}`"
+
+
+def test_valuations_correlation_member_pins_resolve_in_both_hosts() -> None:
+    """[wasm_valuations_subset.correlation_members] pins shared class members.
+
+    Export-name pins cannot see method drift on classes exposed in both
+    hosts, so each pinned member is checked against (a) the live Python
+    class attribute and (b) the WASM binding source (`js_name = "..."` on
+    the wasm-bindgen attribute, or a plain `pub fn` for identical names).
+    """
+    members = CONTRACT["wasm_valuations_subset"]["correlation_members"]
+    module = importlib.import_module("finstack.valuations.correlation")
+    wasm_src = (
+        CONTRACT_PATH.parent.parent / "finstack-wasm" / "src" / "api" / "valuations" / "correlation" / "mod.rs"
+    ).read_text()
+
+    for key, js_name in members.items():
+        class_name, _, python_member = key.partition(".")
+        cls = getattr(module, class_name, None)
+        assert cls is not None, f"finstack.valuations.correlation missing class {class_name}"
+        assert hasattr(cls, python_member), f"{class_name} missing Python member `{python_member}`"
+        wasm_pin = f"js_name = {js_name}"
+        assert wasm_pin in wasm_src or f"pub fn {js_name}(" in wasm_src, (
+            f"WASM correlation binding missing `{js_name}` (pinned as {key}); "
+            f"expected `{wasm_pin}` in finstack-wasm/src/api/valuations/correlation/mod.rs"
+        )

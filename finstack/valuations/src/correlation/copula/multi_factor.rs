@@ -114,12 +114,17 @@ pub struct MultiFactorCopula {
 
 impl Clone for MultiFactorCopula {
     fn clone(&self) -> Self {
+        // Preserve the configured quadrature order (recover it from the
+        // stored node count) — rebuilding at the fixed internal default
+        // would silently downgrade copulas built via `with_quadrature_order`.
+        let order =
+            u8::try_from(self.quadrature.points.len()).unwrap_or(MULTI_FACTOR_QUADRATURE_ORDER);
         Self {
             num_factors_count: self.num_factors_count,
             default_global_loading: self.default_global_loading,
             default_sector_loading: self.default_sector_loading,
             sector_fraction: self.sector_fraction,
-            quadrature: select_quadrature(MULTI_FACTOR_QUADRATURE_ORDER),
+            quadrature: select_quadrature(order),
         }
     }
 }
@@ -172,19 +177,48 @@ impl MultiFactorCopula {
     /// ```
     #[must_use]
     pub fn new(num_factors: usize) -> Self {
+        Self::with_quadrature_order(num_factors, MULTI_FACTOR_QUADRATURE_ORDER)
+    }
+
+    /// Create a multi-factor copula with an explicit per-dimension quadrature
+    /// order.
+    ///
+    /// Integration cost is `order^{num_factors}`, so callers that configure a
+    /// pricer-level `quadrature_order` should pass it through here rather
+    /// than silently getting the fixed internal default — but be aware that
+    /// orders tuned for 1-dimensional copulas (e.g. 20) are expensive in
+    /// 4-5 dimensions.
+    ///
+    /// # Arguments
+    /// * `num_factors` - Number of factors (1 to 5; capped at `MAX_FACTORS`)
+    /// * `quadrature_order` - Gauss-Hermite points per dimension
+    #[must_use]
+    pub fn with_quadrature_order(num_factors: usize, quadrature_order: u8) -> Self {
         let num_factors = num_factors.clamp(1, MAX_FACTORS);
         Self {
             num_factors_count: num_factors,
             default_global_loading: 0.4,
             default_sector_loading: 0.3,
             sector_fraction: 0.4,
-            quadrature: select_quadrature(MULTI_FACTOR_QUADRATURE_ORDER),
+            quadrature: select_quadrature(quadrature_order),
         }
     }
 
     /// Create with custom loadings.
     ///
     /// Loadings are clamped to ensure β_G² + β_S² ≤ 1 (valid variance).
+    ///
+    /// # Note — loadings are descriptive parameters
+    ///
+    /// The stored default loadings parameterize the copula's *reporting*
+    /// accessors ([`Self::inter_sector_correlation`],
+    /// [`Self::intra_sector_correlation`]). The conditional-PD pricing path
+    /// ([`Copula::conditional_default_prob`]) derives its loadings from the
+    /// **correlation argument** supplied per call (typically base
+    /// correlation) via [`Self::decompose_correlation`] with this copula's
+    /// `sector_fraction` — it does not read the default loadings. Use
+    /// [`Self::with_loadings_and_sector_fraction`] to control how the
+    /// pricing correlation splits between global and sector factors.
     ///
     /// # Arguments
     /// * `num_factors` - Number of factors (1 to 5; capped at `MAX_FACTORS`)
@@ -477,6 +511,31 @@ impl Copula for MultiFactorCopula {
         let systematic = global_loading * z_global + sector_loading * z_sector;
         let conditional_threshold = (default_threshold - systematic) / gamma;
 
+        norm_cdf(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
+    }
+
+    fn conditional_default_prob_given_systematic_and_mixing(
+        &self,
+        default_threshold: f64,
+        systematic: f64,
+        mixing: f64,
+        correlation: f64,
+    ) -> f64 {
+        // Single-Z conditional with the sector factor(s) integrated out. The
+        // latent variable is Aᵢ = β_G·Z_G + β_S·Z_S + γ·εᵢ; conditioning on
+        // Z_G only, the remainder β_S·Z_S + γ·εᵢ is N(0, 1 − β_G²), so
+        //   P(default | Z_G) = Φ((c − β_G·Z_G)/√(1−β_G²)).
+        // There is no mixing variable. Note this is the GLOBAL-factor
+        // conditional only — per-name engines that cannot supply sector
+        // factor realizations must not simulate this copula name-by-name
+        // (see `PerNameCopulaDefault::new`, which rejects multi-factor specs).
+        let _ = mixing;
+        let (global_loading, _) = self.decompose_correlation(correlation, self.sector_fraction);
+        let residual_sd = (1.0 - global_loading * global_loading).max(0.0).sqrt();
+        if residual_sd < 1e-10 {
+            return norm_cdf(default_threshold - global_loading * systematic);
+        }
+        let conditional_threshold = (default_threshold - global_loading * systematic) / residual_sd;
         norm_cdf(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
     }
 

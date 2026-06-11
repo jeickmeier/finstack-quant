@@ -25,8 +25,8 @@
 use super::super::calibrations::{clo_standard, rmbs_standard};
 use super::traits::{MacroCreditFactors, StochasticDefault};
 use crate::correlation::copula::{Copula, CopulaSpec, GaussianCopula};
+use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
 use crate::instruments::fixed_income::structured_credit::utils::rates::cdr_to_mdr;
-use finstack_core::math::distributions::binomial_distribution;
 use finstack_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
 
 /// Seasoning curve specification for default models.
@@ -83,36 +83,14 @@ impl SeasoningCurve {
             SeasoningCurve::Flat => 1.0,
 
             SeasoningCurve::Sda { speed_multiplier } => {
-                // PSA/BMA SDA curve shape: ramp to peak at month 30, flat
-                // plateau through month 60, linear decline to the terminal
-                // level (5% of peak: 0.03%/0.60%) by month 120, flat after.
-                let peak_month = 30;
-                let peak_cdr_mult = 1.0; // Peak at 100% of base at month 30
-                let plateau_end_month = 60;
-                let terminal_month = 120;
-                let terminal_cdr_mult = 0.05; // Terminal at 5% of peak
-
-                let base_mult = if seasoning_months == 0 {
-                    0.0
-                } else if seasoning_months <= peak_month {
-                    // Ramp up to peak
-                    (seasoning_months as f64 / peak_month as f64) * peak_cdr_mult
-                } else if seasoning_months <= plateau_end_month {
-                    // Flat plateau at the peak
-                    peak_cdr_mult
-                } else if seasoning_months <= terminal_month {
-                    // Decline to terminal
-                    let months_past_plateau = (seasoning_months - plateau_end_month) as f64;
-                    let decline_period = (terminal_month - plateau_end_month) as f64;
-                    peak_cdr_mult
-                        - (months_past_plateau / decline_period)
-                            * (peak_cdr_mult - terminal_cdr_mult)
-                } else {
-                    // Terminal rate
-                    terminal_cdr_mult
-                };
-
-                base_mult * speed_multiplier
+                // Canonical PSA/BMA SDA shape (ramp to peak at month 30,
+                // plateau through 60, linear decline to 5% of peak by 120,
+                // flat after) — centralized on `SdaCurveDefaults::multiplier_at`
+                // so every SDA consumer in the crate shares one curve.
+                embedded_registry_or_panic()
+                    .sda_curve()
+                    .multiplier_at(seasoning_months)
+                    * speed_multiplier
             }
 
             SeasoningCurve::Custom { multipliers } => {
@@ -166,7 +144,13 @@ impl Clone for CopulaBasedDefault {
             base_cdr: self.base_cdr,
             copula_spec: self.copula_spec.clone(),
             correlation: self.correlation,
-            copula: Self::build_copula(&self.copula_spec),
+            // The spec was validated at construction, so rebuilding cannot
+            // fail; the Gaussian fallback is unreachable and exists only to
+            // keep `Clone` infallible.
+            copula: self
+                .copula_spec
+                .build()
+                .unwrap_or_else(|_| Box::new(GaussianCopula::new())),
             seasoning_curve: self.seasoning_curve.clone(),
         }
     }
@@ -179,29 +163,32 @@ impl CopulaBasedDefault {
     /// * `base_cdr` - Base annual CDR (unconditional)
     /// * `copula_spec` - Copula model specification
     /// * `correlation` - Asset correlation
-    pub(crate) fn new(base_cdr: f64, copula_spec: CopulaSpec, correlation: f64) -> Self {
-        let copula = Self::build_copula(&copula_spec);
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the copula spec is invalid (e.g. Student-t with
+    /// `dof ≤ 2`). There is deliberately no Gaussian fallback: thresholds
+    /// dispatch on the spec (t-quantiles for Student-t), so silently pricing
+    /// Gaussian-conditionally against t-quantile thresholds would collapse
+    /// conditional PDs by orders of magnitude.
+    pub(crate) fn new(
+        base_cdr: f64,
+        copula_spec: CopulaSpec,
+        correlation: f64,
+    ) -> finstack_core::Result<Self> {
+        let copula = copula_spec.build().map_err(|e| {
+            finstack_core::Error::Validation(format!(
+                "copula construction failed for {copula_spec:?}: {e}"
+            ))
+        })?;
 
-        Self {
+        Ok(Self {
             base_cdr: base_cdr.clamp(0.0, 1.0),
             copula_spec,
             correlation: correlation.clamp(0.0, 0.99),
             copula,
             seasoning_curve: SeasoningCurve::Flat,
-        }
-    }
-
-    fn build_copula(spec: &CopulaSpec) -> Box<dyn Copula> {
-        match spec.build() {
-            Ok(copula) => copula,
-            Err(err) => {
-                tracing::warn!(
-                    %err,
-                    "Invalid copula spec in stochastic default model; using Gaussian copula fallback"
-                );
-                Box::new(GaussianCopula::new())
-            }
-        }
+        })
     }
 
     /// Compute the default threshold appropriate for the copula type.
@@ -219,8 +206,16 @@ impl CopulaBasedDefault {
     }
 
     /// Create with Gaussian copula and specified correlation.
+    ///
+    /// Infallible: the Gaussian spec has no parameters to validate.
     pub(crate) fn gaussian(base_cdr: f64, correlation: f64) -> Self {
-        Self::new(base_cdr, CopulaSpec::Gaussian, correlation)
+        Self {
+            base_cdr: base_cdr.clamp(0.0, 1.0),
+            copula_spec: CopulaSpec::Gaussian,
+            correlation: correlation.clamp(0.0, 0.99),
+            copula: Box::new(GaussianCopula::new()),
+            seasoning_curve: SeasoningCurve::Flat,
+        }
     }
 
     /// Standard RMBS calibration.
@@ -305,27 +300,6 @@ impl StochasticDefault for CopulaBasedDefault {
         monthly_pd.clamp(0.0, 1.0)
     }
 
-    fn default_distribution(
-        &self,
-        n: usize,
-        pds: &[f64],
-        factors: &[f64],
-        correlation: f64,
-    ) -> Vec<f64> {
-        // For homogeneous pool, use binomial distribution
-        // with conditional default probability
-
-        let pd = pds.first().copied().unwrap_or(self.base_cdr);
-        let threshold = self.default_threshold(pd);
-
-        let cond_pd = self
-            .copula
-            .conditional_default_prob(threshold, factors, correlation);
-
-        // Use the core binomial distribution function
-        binomial_distribution(n, cond_pd.clamp(0.0, 1.0))
-    }
-
     fn correlation(&self) -> f64 {
         self.correlation
     }
@@ -382,16 +356,6 @@ mod tests {
         // Negative factor (stress) should increase defaults
         assert!(mdr_neg > mdr_zero, "Negative factor should increase MDR");
         assert!(mdr_pos < mdr_zero, "Positive factor should decrease MDR");
-    }
-
-    #[test]
-    fn test_default_distribution_sums_to_one() {
-        let model = CopulaBasedDefault::gaussian(0.05, 0.20);
-
-        let dist = model.default_distribution(10, &[0.05], &[0.0], 0.20);
-
-        let sum: f64 = dist.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-6);
     }
 
     #[test]

@@ -297,7 +297,23 @@ pub fn aggregate_instrument_cashflows(
                     .rev()
                     .find(|(date, _)| *date <= snapshot_date)
                     .map(|(_, amount)| *amount)
-                    .unwrap_or(full_schedule.notional.initial);
+                    .unwrap_or_else(|| {
+                        // Pre-issuance periods of forward-dated instruments
+                        // carry a zero balance; reporting the full notional
+                        // before the issue date would overstate leverage.
+                        let pre_issuance = full_schedule
+                            .meta
+                            .issue_date
+                            .is_some_and(|issue| issue > snapshot_date)
+                            && outstanding_path
+                                .first()
+                                .is_some_and(|(date, _)| *date > snapshot_date);
+                        if pre_issuance {
+                            Money::new(0.0, currency)
+                        } else {
+                            full_schedule.notional.initial
+                        }
+                    });
 
                 // Keep as Money, use absolute value for issuer perspective
                 let issuer_balance = if outstanding_at_period.amount() < 0.0 {
@@ -312,6 +328,10 @@ pub fn aggregate_instrument_cashflows(
 
                 // Accrued interest is measured at the period snapshot date (`end - 1 day`)
                 // to align with half-open `[start, end)` attribution.
+                // Limitation: `AccrualConfig::default()` leaves `frequency: None`,
+                // which is incorrect for ACT/ACT ISMA schedules (the accrual
+                // engine falls back to ISDA semantics). `CashFlowMeta` does not
+                // carry the coupon frequency, so it cannot be populated here.
                 let accrued_scalar = accrued_interest_amount(
                     &full_schedule,
                     snapshot_date,

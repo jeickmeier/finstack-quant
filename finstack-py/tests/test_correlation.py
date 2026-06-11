@@ -3,6 +3,8 @@
 from finstack.valuations.correlation import (
     CopulaSpec,
     CorrelatedBernoulli,
+    LatentFactorSpec,
+    LatentMultiFactor,
     cholesky_decompose,
     correlation_bounds,
     joint_probabilities,
@@ -40,7 +42,8 @@ class TestCopulaSpec:
         spec = CopulaSpec.student_t(5.0)
         assert spec.is_student_t
         copula = spec.build()
-        assert copula.num_factors == 1
+        # Shared-W t-copula integrates over [Z, W]: 2 quadrature factors.
+        assert copula.num_factors == 2
 
     def test_student_t_invalid_df(self) -> None:
         """Student-t with df <= 2 should raise."""
@@ -138,6 +141,30 @@ class TestValidateCorrelationMatrix:
         """Non-unity diagonal should fail."""
         with pytest.raises(ValueError, match=r"(?i)diagonal|correlation|invalid"):
             validate_correlation_matrix([2.0, 0.0, 0.0, 1.0], 2)
+
+
+class TestLatentMultiFactor:
+    """Multi-factor latent model: correlated factor generation."""
+
+    def test_generate_correlated_factors_roundtrip(self) -> None:
+        """Valid-length input returns one correlated value per factor."""
+        model = LatentMultiFactor.uncorrelated(2, [1.0, 1.0])
+        out = model.generate_correlated_factors([0.5, -0.25])
+        assert len(out) == 2
+
+    def test_generate_correlated_factors_bad_length_raises_value_error(self) -> None:
+        """Wrong-length input raises ValueError, not a Rust panic."""
+        model = LatentMultiFactor.uncorrelated(2, [1.0, 1.0])
+        with pytest.raises(ValueError, match=r"(?i)exactly 2 draws"):
+            model.generate_correlated_factors([0.5])
+        with pytest.raises(ValueError, match=r"(?i)exactly 2 draws"):
+            model.generate_correlated_factors([0.5, 0.1, -0.7])
+
+    def test_latent_factor_kind_is_rust_canonical_name(self) -> None:
+        """LatentFactorSpec.build() returns the Rust-canonical LatentFactorKind."""
+        built = LatentFactorSpec.single_factor(0.2, 0.1).build()
+        assert type(built).__name__ == "LatentFactorKind"
+        assert built.num_factors == 1
 
 
 class TestCholeskyDecompose:

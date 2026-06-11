@@ -54,16 +54,9 @@ pub(crate) fn register_inflation_swap_metrics(registry: &mut MetricRegistry) {
             MetricId::InflationConvexity,
             Arc::new(inflation_convexity::InflationConvexityCalculator),
             &[InstrumentType::InflationSwap],
-        )
-        .register_metric(
-            MetricId::Npv01,
-            Arc::new(crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::InflationSwap,
-            >::new(
-                crate::metrics::Dv01CalculatorConfig::parallel_combined()
-            )),
-            &[InstrumentType::InflationSwap],
         );
+    // Note: `Npv01` is intentionally NOT registered — it was an exact
+    // duplicate of `Dv01` (same `parallel_combined` config). Use `Dv01`.
 
     registry.register_metric(
         MetricId::Inflation01,

@@ -4,9 +4,12 @@ use crate::metrics::MetricContext;
 
 /// CLO WAS calculator - in basis points
 ///
-/// Market standard: WAS should use the **spread component only**, not the all-in coupon.
-/// For floating rate assets: use the spread over the index (e.g., SOFR + 450bps -> 450)
-/// For fixed rate assets: fall back to the all-in rate as a proxy
+/// Market standard: WAS uses the **spread component only**, not the all-in
+/// coupon, over **performing** assets only. Fixed-rate assets without an
+/// explicit `spread_bps` are excluded (no all-in-rate fallback), as are
+/// defaulted assets — see [`AssetPool::weighted_avg_spread`].
+///
+/// [`AssetPool::weighted_avg_spread`]: crate::instruments::fixed_income::structured_credit::types::AssetPool::weighted_avg_spread
 pub struct CloWasCalculator;
 
 impl crate::metrics::MetricCalculator for CloWasCalculator {

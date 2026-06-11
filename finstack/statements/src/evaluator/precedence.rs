@@ -58,15 +58,18 @@ pub(crate) fn resolve_node_value_with_policy(
     // 4. No resolution method available
     match node_spec.node_type {
         NodeType::Value => {
-            let visibility_note = if allow_explicit_values {
-                ""
+            let message = if allow_explicit_values {
+                format!(
+                    "Value node '{}' has no value for period {}",
+                    node_spec.node_id, period_id
+                )
             } else {
-                " visible under the active as_of policy"
+                format!(
+                    "Value node '{}' has no value visible under the active as_of policy for period {}",
+                    node_spec.node_id, period_id
+                )
             };
-            Err(Error::eval(format!(
-                "Value node '{}' has no{} value for period {}",
-                node_spec.node_id, visibility_note, period_id
-            )))
+            Err(Error::eval(message))
         }
         NodeType::Calculated => Err(Error::eval(format!(
             "Calculated node '{}' has no formula",
@@ -140,6 +143,20 @@ mod tests {
 
         // Should error because no value provided
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hidden_value_error_message_is_well_formed() {
+        let node = NodeSpec::new("revenue", NodeType::Value);
+
+        let err = resolve_node_value_with_policy(&node, &PeriodId::quarter(2025, 1), true, false)
+            .expect_err("hidden value node must error");
+
+        assert!(
+            err.to_string()
+                .contains("has no value visible under the active as_of policy for period"),
+            "got: {err}"
+        );
     }
 
     #[test]

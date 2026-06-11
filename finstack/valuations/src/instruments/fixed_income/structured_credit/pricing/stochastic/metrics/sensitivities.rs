@@ -76,9 +76,6 @@ pub(crate) struct CorrelationSensitivities {
     pub recovery_correlation_01: f64,
 
     // === Prepayment sensitivities ===
-    /// Sensitivity to 1% prepayment factor loading bump
-    pub prepay_factor_01: f64,
-
     /// Sensitivity to 1% prepayment volatility bump
     pub prepay_vol_01: f64,
 
@@ -106,7 +103,6 @@ impl CorrelationSensitivities {
             correlation_01_ul: None,
             correlation_01_es99: None,
             recovery_correlation_01: 0.0,
-            prepay_factor_01: 0.0,
             prepay_vol_01: 0.0,
             correlation_gamma: 0.0,
             base_el: 0.0,
@@ -184,7 +180,6 @@ impl CorrelationSensitivities {
             correlation_01_ul,
             correlation_01_es99,
             recovery_correlation_01,
-            prepay_factor_01: 0.0, // Would require bumping factor loading
             prepay_vol_01,
             correlation_gamma,
             base_el: base_metrics.expected_loss,

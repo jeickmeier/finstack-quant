@@ -41,7 +41,7 @@ impl CoverageTest {
     /// Create new OC test with standard settings.
     pub fn new_oc(required_ratio: f64) -> Self {
         Self::OC {
-            id: format!("oc_test_{}", (required_ratio * 100.0) as u32),
+            id: format!("oc_test_{}", (required_ratio * 100.0).round() as u32),
             required_ratio,
             include_cash: true,
             performing_only: true,
@@ -61,7 +61,7 @@ impl CoverageTest {
     /// Create new IC test.
     pub fn new_ic(required_ratio: f64) -> Self {
         Self::IC {
-            id: format!("ic_test_{}", (required_ratio * 100.0) as u32),
+            id: format!("ic_test_{}", (required_ratio * 100.0).round() as u32),
             required_ratio,
         }
     }
@@ -145,8 +145,7 @@ impl CoverageTest {
                 .try_fold(Money::new(0.0, tranche_balance.currency()), |acc, t| {
                     let bal = tb.get(t.id.as_str()).copied().unwrap_or(t.current_balance);
                     acc.checked_add(bal)
-                })
-                .unwrap_or_else(|_| Money::new(0.0, tranche_balance.currency()))
+                })?
         } else {
             context.tranches.senior_balance(context.tranche_id)
         };
@@ -167,9 +166,7 @@ impl CoverageTest {
 
         // OC denominator = test tranche balance + all senior tranche balances
         // i.e., Sum(all tranche balances at this seniority level and above)
-        let denominator = tranche_balance
-            .checked_add(senior_balance)
-            .unwrap_or(tranche_balance);
+        let denominator = tranche_balance.checked_add(senior_balance)?;
 
         let ratio = if denominator.amount() > 0.0 {
             numerator.amount() / denominator.amount()
@@ -186,9 +183,10 @@ impl CoverageTest {
 
         // Cure amount = note paydown needed to restore OC ratio.
         //
-        // W-22: the numerator includes `cash_balance`. Diverting cash to pay
-        // down notes removes that cash from the numerator at the same time it
-        // pays down the denominator, so the cure solves
+        // W-22, `include_cash = true`: the numerator includes `cash_balance`.
+        // Diverting cash to pay down notes removes that cash from the
+        // numerator at the same time it pays down the denominator, so the
+        // cure solves
         //   (numerator - X) / (denominator - X) >= required_ratio
         //   => numerator - X >= required_ratio * (denominator - X)
         //   => X * (required_ratio - 1) >= required_ratio * denominator - numerator
@@ -197,6 +195,11 @@ impl CoverageTest {
         // denominator of this expression carry the same sign, so X is positive).
         // At required_ratio == 1 the diversion never changes the ratio, so the
         // breach is uncurable by self-funding paydown; report a zero cure.
+        //
+        // `include_cash = false`: diverted cash never sat in the numerator, so
+        // a paydown only shrinks the denominator:
+        //   numerator / (denominator - X) >= required_ratio
+        //   => X >= denominator - numerator / required_ratio
         //
         // Item 11 — the `1/(1 − required_ratio)` factor blows up as the
         // trigger approaches 1.0 (a near-par-coverage OC trigger), producing a
@@ -207,11 +210,15 @@ impl CoverageTest {
         // Cap it there: this both bounds the near-1.0 explosion and keeps
         // `denominator − X ≥ 0` in the cured ratio.
         let cure_amount = if !is_passing && required_ratio > 0.0 {
-            let denom = 1.0 - required_ratio;
-            let paydown_needed = if denom.abs() > f64::EPSILON {
-                (numerator.amount() - required_ratio * denominator.amount()) / denom
+            let paydown_needed = if include_cash {
+                let denom = 1.0 - required_ratio;
+                if denom.abs() > f64::EPSILON {
+                    (numerator.amount() - required_ratio * denominator.amount()) / denom
+                } else {
+                    0.0
+                }
             } else {
-                0.0
+                denominator.amount() - numerator.amount() / required_ratio
             };
             let capped = paydown_needed.max(0.0).min(denominator.amount());
             Some(Money::new(capped, denominator.currency()))
@@ -284,9 +291,9 @@ impl CoverageTest {
         );
 
         let senior_tranches = context.tranches.senior_to(context.tranche_id);
-        let senior_interest_due = senior_tranches
-            .iter()
-            .try_fold(Money::new(0.0, interest_due.currency()), |acc, t| {
+        let senior_interest_due = senior_tranches.iter().try_fold(
+            Money::new(0.0, interest_due.currency()),
+            |acc, t| {
                 let rate = if let Some(market) = context.market {
                     t.coupon
                         .try_current_rate_with_index(context.as_of, market)
@@ -312,12 +319,10 @@ impl CoverageTest {
                 };
                 let interest = Money::new(t_bal.amount() * rate * t_accrual, t_bal.currency());
                 acc.checked_add(interest)
-            })
-            .unwrap_or_else(|_| Money::new(0.0, interest_due.currency()));
+            },
+        )?;
 
-        let total_interest_due = interest_due
-            .checked_add(senior_interest_due)
-            .unwrap_or(interest_due);
+        let total_interest_due = interest_due.checked_add(senior_interest_due)?;
 
         let ratio = if total_interest_due.amount() > 0.0 {
             context.interest_collections.amount() / total_interest_due.amount()

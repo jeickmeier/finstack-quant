@@ -13,6 +13,18 @@ use serde::{Deserialize, Serialize};
 /// Payment priorities and optional sweep / PIK controls model common leveraged
 /// finance behavior where scheduled debt service, excess cash flow sweeps, and
 /// equity leakage compete for the same cash pool.
+///
+/// # Limitations
+///
+/// - **No intra-category seniority.** Allocation within a payment category
+///   (e.g. `Interest`, `Amortization`) is single-class **pro-rata** across all
+///   instruments; there is no tranche seniority. A cash shortfall is shared
+///   proportionally between a first-lien term loan and a mezzanine note alike.
+///   Model strict 1L/2L subordination by running separate waterfalls or by
+///   pre-allocating cash upstream.
+/// - **Prepayment penalties, call premiums, and original issue discount (OID)
+///   are unsupported.** Prepayments (sweep, mandatory, voluntary) are applied
+///   at par with no penalty or premium, and no OID accretion is modeled.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WaterfallSpec {
@@ -59,16 +71,51 @@ impl Default for WaterfallSpec {
 impl WaterfallSpec {
     /// Validate that the spec represents an economically consistent waterfall.
     ///
-    /// Currently enforces: when an ECF sweep with a positive `sweep_percentage`
-    /// is configured, `Sweep` MUST precede `Equity` in `priority_of_payments`.
-    /// Otherwise the waterfall engine silently zeros the remaining sweep cash
-    /// (equity has already been paid) and the configured sweep never applies.
+    /// Enforces:
+    /// - `priority_of_payments` contains no duplicate entries.
+    /// - `ecf_sweep.sweep_percentage` (when configured) lies in `[0.0, 1.0]`.
+    /// - When an ECF sweep with a positive `sweep_percentage` is configured,
+    ///   at least one prepayment priority (`Sweep`, `MandatoryPrepayment`, or
+    ///   `VoluntaryPrepayment`) must be present, and `Sweep` MUST precede
+    ///   `Equity` in `priority_of_payments`. Otherwise the waterfall engine
+    ///   silently zeros or never applies the configured sweep.
     pub fn validate(&self) -> Result<()> {
+        for (idx, priority) in self.priority_of_payments.iter().enumerate() {
+            if self.priority_of_payments[..idx].contains(priority) {
+                return Err(Error::build(format!(
+                    "WaterfallSpec: duplicate entry {priority:?} in `priority_of_payments`. \
+                     Each payment priority may appear at most once.",
+                )));
+            }
+        }
+
         let Some(ecf) = &self.ecf_sweep else {
             return Ok(());
         };
+        if !(0.0..=1.0).contains(&ecf.sweep_percentage) {
+            return Err(Error::build(format!(
+                "WaterfallSpec: `ecf_sweep.sweep_percentage` must be in [0.0, 1.0], got {}",
+                ecf.sweep_percentage
+            )));
+        }
         if ecf.sweep_percentage <= 0.0 {
             return Ok(());
+        }
+        let has_prepayment_priority = self.priority_of_payments.iter().any(|p| {
+            matches!(
+                p,
+                PaymentPriority::Sweep
+                    | PaymentPriority::MandatoryPrepayment
+                    | PaymentPriority::VoluntaryPrepayment
+            )
+        });
+        if !has_prepayment_priority {
+            return Err(Error::build(
+                "WaterfallSpec: `ecf_sweep.sweep_percentage > 0` requires at least one \
+                 prepayment priority (`Sweep`, `MandatoryPrepayment`, or \
+                 `VoluntaryPrepayment`) in `priority_of_payments`; otherwise the sweep \
+                 can never be applied.",
+            ));
         }
         let sweep_pos = self
             .priority_of_payments
@@ -192,4 +239,76 @@ pub struct PikToggleSpec {
     /// Default: 0 (no hysteresis, PIK can toggle every period).
     #[serde(default)]
     pub min_periods_in_pik: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sweep_spec(percentage: f64) -> EcfSweepSpec {
+        EcfSweepSpec {
+            ebitda_node: "ebitda".into(),
+            taxes_node: None,
+            capex_node: None,
+            working_capital_node: None,
+            cash_interest_node: None,
+            sweep_percentage: percentage,
+            target_instrument_id: None,
+        }
+    }
+
+    #[test]
+    fn validate_rejects_duplicate_priorities() {
+        let spec = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Fees,
+            ],
+            ..WaterfallSpec::default()
+        };
+        let err = spec.validate().expect_err("duplicates must be rejected");
+        assert!(err.to_string().contains("duplicate"));
+    }
+
+    #[test]
+    fn validate_rejects_sweep_percentage_outside_unit_interval() {
+        for pct in [-0.1, 1.5] {
+            let spec = WaterfallSpec {
+                ecf_sweep: Some(sweep_spec(pct)),
+                ..WaterfallSpec::default()
+            };
+            let err = spec
+                .validate()
+                .expect_err("out-of-range sweep_percentage must be rejected");
+            assert!(err.to_string().contains("sweep_percentage"));
+        }
+    }
+
+    #[test]
+    fn validate_requires_prepayment_priority_for_positive_sweep() {
+        let spec = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::Equity,
+            ],
+            ecf_sweep: Some(sweep_spec(0.5)),
+            ..WaterfallSpec::default()
+        };
+        let err = spec
+            .validate()
+            .expect_err("positive sweep without a prepayment priority must be rejected");
+        assert!(err.to_string().contains("prepayment priority"));
+    }
+
+    #[test]
+    fn validate_accepts_default_spec_with_sweep() {
+        let spec = WaterfallSpec {
+            ecf_sweep: Some(sweep_spec(0.5)),
+            ..WaterfallSpec::default()
+        };
+        assert!(spec.validate().is_ok());
+    }
 }

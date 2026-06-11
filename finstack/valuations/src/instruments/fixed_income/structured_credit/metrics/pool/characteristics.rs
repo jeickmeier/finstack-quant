@@ -169,17 +169,9 @@ fn sda_to_cdr(speed_multiplier: f64, month: u32) -> Result<f64> {
         return Ok(0.0);
     }
 
-    let sda_curve = embedded_registry()?.sda_curve();
-    let cdr = if month <= sda_curve.peak_month {
-        (month as f64 / sda_curve.peak_month as f64) * sda_curve.peak_cdr
-    } else if month <= sda_curve.peak_month * 2 {
-        let months_past_peak = (month - sda_curve.peak_month) as f64;
-        let decline_period = sda_curve.peak_month as f64;
-        sda_curve.peak_cdr
-            - (months_past_peak / decline_period) * (sda_curve.peak_cdr - sda_curve.terminal_cdr)
-    } else {
-        sda_curve.terminal_cdr
-    };
+    // Canonical PSA SDA shape (ramp / plateau / decline / terminal) lives on
+    // `SdaCurveDefaults::cdr_at` — do not re-implement the segments here.
+    let cdr = embedded_registry()?.sda_curve().cdr_at(month);
 
     Ok((cdr * speed_multiplier).clamp(0.0, 1.0))
 }

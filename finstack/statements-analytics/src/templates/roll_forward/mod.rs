@@ -1,14 +1,14 @@
 //! Roll-forward pattern implementation.
 
+use super::fmt_f64;
 use finstack_statements::builder::ModelBuilder;
 use finstack_statements::error::Result;
 use finstack_statements::types::{NodeId, NodeSpec, NodeType};
 
-/// Add a roll-forward structure to the model.
+/// Add a roll-forward structure to the model with a zero opening balance.
 ///
-/// This creates:
-/// - `{name}_beg`: Beginning balance (linked to previous period's ending balance)
-/// - `{name}_end`: Ending balance (Begin + Increases - Decreases)
+/// Equivalent to [`add_roll_forward_with_opening`] with `opening = 0.0`
+/// (the first period opens at zero).
 ///
 /// # Arguments
 /// * `builder` - Model builder
@@ -16,18 +16,44 @@ use finstack_statements::types::{NodeId, NodeSpec, NodeType};
 /// * `increases` - List of node IDs that increase the balance
 /// * `decreases` - List of node IDs that decrease the balance
 pub fn add_roll_forward<State>(
+    builder: ModelBuilder<State>,
+    name: &str,
+    increases: &[&str],
+    decreases: &[&str],
+) -> Result<ModelBuilder<State>> {
+    add_roll_forward_with_opening(builder, name, increases, decreases, 0.0)
+}
+
+/// Add a roll-forward structure to the model with an explicit opening balance.
+///
+/// This creates:
+/// - `{name}_beg`: Beginning balance (linked to previous period's ending
+///   balance; `opening` in the first period)
+/// - `{name}_end`: Ending balance (Begin + Increases - Decreases)
+///
+/// # Arguments
+/// * `builder` - Model builder
+/// * `name` - Base name for the roll-forward (e.g., "arr")
+/// * `increases` - List of node IDs that increase the balance
+/// * `decreases` - List of node IDs that decrease the balance
+/// * `opening` - Opening balance used in the first period (no prior ending
+///   balance exists); emitted as `coalesce(lag({name}_end, 1), {opening})`
+pub fn add_roll_forward_with_opening<State>(
     mut builder: ModelBuilder<State>,
     name: &str,
     increases: &[&str],
     decreases: &[&str],
+    opening: f64,
 ) -> Result<ModelBuilder<State>> {
     let beg_node_id = format!("{}_beg", name);
     let end_node_id = format!("{}_end", name);
 
     // 1. Create Beginning Balance Node
     // Formula: lag(end_node, 1)
-    // Use coalesce to handle the first period (defaults to 0 if no history)
-    let beg_formula = format!("coalesce(lag({}, 1), 0.0)", end_node_id);
+    // Use coalesce to handle the first period (defaults to `opening` if no
+    // history). `{}` formatting is shortest-roundtrip, so the opening value
+    // survives the formula round-trip at full f64 precision.
+    let beg_formula = format!("coalesce(lag({}, 1), {})", end_node_id, fmt_f64(opening));
     let beg_node = NodeSpec::new(beg_node_id.as_str(), NodeType::Calculated)
         .with_name(format!("{} (Beginning)", name))
         .with_formula(beg_formula);

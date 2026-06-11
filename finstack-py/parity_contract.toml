@@ -335,6 +335,31 @@ public = [
     "vg_cos_price",
 ]
 
+# Symbol-level pinning for finstack.valuations.correlation — every name in
+# `finstack.valuations.correlation.__all__` must appear here (alphabetical,
+# matching the package __all__ ordering). Python names mirror the canonical
+# Rust names in finstack_valuations::correlation (LatentFactorKind, not
+# LatentFactor).
+[crates.valuations.correlation]
+python_package = "finstack.valuations.correlation"
+public = [
+    "Copula",
+    "CopulaSpec",
+    "CorrelatedBernoulli",
+    "LatentFactorKind",
+    "LatentFactorSpec",
+    "LatentMultiFactor",
+    "LatentSingleFactor",
+    "LatentTwoFactor",
+    "RecoveryModel",
+    "RecoverySpec",
+    "cholesky_decompose",
+    "correlation_bounds",
+    "joint_probabilities",
+    "nearest_correlation",
+    "validate_correlation_matrix",
+]
+
 
 # ---------------------------------------------------------------------------
 # finstack-attribution  →  finstack.attribution
@@ -424,6 +449,113 @@ analysis                    = { python = "finstack.statements_analytics.analysis
 comps                       = { python = "finstack.statements_analytics",                  status = "flattened", note = "Comparable-company analysis exposed flat on finstack.statements_analytics" }
 extensions                  = { python = "finstack.statements_analytics",                  status = "flattened", note = "Credit-scorecard and corkscrew extensions exposed flat on finstack.statements_analytics (ScorecardMetric/Config/Report, CreditScorecardExtension, AccountType, CorkscrewAccount/Config/Report, CorkscrewExtension, validate_scorecard_config)" }
 templates                   = { python = "finstack.statements_analytics",                  status = "flattened", note = "Vintage, roll-forward, and real-estate templates exposed flat on finstack.statements_analytics (add_vintage_buildup, add_roll_forward, add_noi_buildup, add_ncf_buildup, add_rent_roll, add_rent_roll_rental_revenue, add_property_operating_statement, plus LeaseSpec/SimpleLeaseSpec/RentStepSpec/FreeRentWindowSpec/RenewalSpec/LeaseGrowthConvention/RentRollOutputNodes/ManagementFeeBase/ManagementFeeSpec/PropertyTemplateNodes)" }
+
+# WASM statements subset
+#
+# Python exposes typed wrappers (ModelBuilder, Evaluator, StatementResult,
+# FinancialModelSpec, ...). WASM intentionally exposes a JSON-first subset
+# through `exports/statements.js` with camelCase facade names.
+# ---------------------------------------------------------------------------
+[wasm_statements_subset]
+rust_module_root = "../finstack-wasm/src/api/statements/"
+js_export_file   = "../finstack-wasm/exports/statements.js"
+root_exports = [
+    "validateFinancialModelJson",
+    "modelNodeIds",
+    "validateCheckSuiteSpec",
+    "validateCapitalStructureSpec",
+    "validateWaterfallSpec",
+    "validateEcfSweepSpec",
+    "validatePikToggleSpec",
+    "evaluateModel",
+    "evaluateModelWithMarket",
+    "parseFormula",
+    "validateFormula",
+]
+
+[wasm_statements_subset.python_js_map]
+parse_formula = "parseFormula"
+validate_formula = "validateFormula"
+
+# JSON helpers with no Python snake_case twin — Python uses the typed
+# wrappers (FinancialModelSpec, Evaluator, CheckSuiteSpec, ...) instead.
+[wasm_statements_subset.wasm_only]
+symbols = [
+    "validateFinancialModelJson",
+    "modelNodeIds",
+    "validateCheckSuiteSpec",
+    "validateCapitalStructureSpec",
+    "validateWaterfallSpec",
+    "validateEcfSweepSpec",
+    "validatePikToggleSpec",
+    "evaluateModel",
+    "evaluateModelWithMarket",
+]
+
+# ---------------------------------------------------------------------------
+# WASM statements_analytics subset
+#
+# WASM exposes the JSON analysis surface plus comps helpers through
+# `exports/statements_analytics.js` with camelCase facade names. Python
+# additionally exposes typed extension/template wrappers (scorecards,
+# corkscrew, ECL, real-estate templates) that are intentionally not bound
+# for WASM.
+# ---------------------------------------------------------------------------
+[wasm_statements_analytics_subset]
+rust_module_root = "../finstack-wasm/src/api/statements_analytics/"
+js_export_file   = "../finstack-wasm/exports/statements_analytics.js"
+root_exports = [
+    "runSensitivity",
+    "runVariance",
+    "evaluateScenarioSet",
+    "backtestForecast",
+    "generateTornadoEntries",
+    "runMonteCarlo",
+    "goalSeek",
+    "traceDependencies",
+    "explainFormula",
+    "plSummaryReport",
+    "creditAssessmentReport",
+    "runChecks",
+    "runThreeStatementChecks",
+    "runCreditUnderwritingChecks",
+    "renderCheckReportText",
+    "renderCheckReportHtml",
+    "percentileRank",
+    "zScore",
+    "peerStats",
+    "regressionFairValue",
+    "computeMultiple",
+    "scoreRelativeValue",
+]
+
+[wasm_statements_analytics_subset.python_js_map]
+run_sensitivity = "runSensitivity"
+run_variance = "runVariance"
+evaluate_scenario_set = "evaluateScenarioSet"
+backtest_forecast = "backtestForecast"
+generate_tornado_entries = "generateTornadoEntries"
+run_monte_carlo = "runMonteCarlo"
+goal_seek = "goalSeek"
+explain_formula = "explainFormula"
+pl_summary_report = "plSummaryReport"
+credit_assessment_report = "creditAssessmentReport"
+run_checks = "runChecks"
+run_three_statement_checks = "runThreeStatementChecks"
+run_credit_underwriting_checks = "runCreditUnderwritingChecks"
+render_check_report_text = "renderCheckReportText"
+render_check_report_html = "renderCheckReportHtml"
+percentile_rank = "percentileRank"
+z_score = "zScore"
+peer_stats = "peerStats"
+regression_fair_value = "regressionFairValue"
+compute_multiple = "computeMultiple"
+score_relative_value = "scoreRelativeValue"
+
+# Python exposes the `DependencyTracer` class instead of a freestanding
+# trace function.
+[wasm_statements_analytics_subset.wasm_only]
+symbols = ["traceDependencies"]
 
 # ---------------------------------------------------------------------------
 # finstack-portfolio  →  finstack.portfolio
@@ -820,6 +952,53 @@ instruments = [
     "priceInstrumentWithMetricsAndMarket",
     "validateInstrumentJson",
 ]
+
+# Member-level pinning for the shared valuations.correlation classes.
+#
+# Export-name pins alone cannot detect method drift on classes exposed in
+# both hosts, so every member shared by Python and WASM is pinned here as
+# python_snake_case = "wasmCamelCase" (keys are "ClassName.python_member").
+# Host-managed members (`free`, `__repr__`) are not listed.
+#
+# Intentional exclusions (Rust-only, by design):
+# - Concrete copulas (`GaussianCopula`, `StudentTCopula`,
+#   `RandomFactorLoadingCopula`, `MultiFactorCopula`) and concrete
+#   recoveries (`ConstantRecovery`, `CorrelatedRecovery`): hosts construct
+#   via the spec types only. The RFL-only `stress_correlation_proxy`
+#   diagnostic is surfaced through `Copula.stress_correlation_proxy`
+#   (throws for non-RFL models).
+# - Simulation-oriented `Copula` trait methods
+#   (`conditional_default_prob_with_sector`,
+#   `conditional_default_prob_given_systematic_and_mixing`, `integrate_fn`,
+#   `latent_variable`, `sample_mixing`): MC-engine internals, not part of
+#   the host-facing surface.
+[wasm_valuations_subset.correlation_members]
+"CopulaSpec.gaussian" = "gaussian"
+"CopulaSpec.student_t" = "studentT"
+"CopulaSpec.random_factor_loading" = "randomFactorLoading"
+"CopulaSpec.multi_factor" = "multiFactor"
+"CopulaSpec.build" = "build"
+"CopulaSpec.is_gaussian" = "isGaussian"
+"CopulaSpec.is_student_t" = "isStudentT"
+"CopulaSpec.is_rfl" = "isRfl"
+"CopulaSpec.is_multi_factor" = "isMultiFactor"
+"Copula.conditional_default_prob" = "conditionalDefaultProb"
+"Copula.num_factors" = "numFactors"
+"Copula.model_name" = "modelName"
+"Copula.tail_dependence" = "tailDependence"
+"Copula.stress_correlation_proxy" = "stressCorrelationProxy"
+"RecoverySpec.constant" = "constant"
+"RecoverySpec.market_correlated" = "marketCorrelated"
+"RecoverySpec.market_standard_stochastic" = "marketStandardStochastic"
+"RecoverySpec.expected_recovery" = "expectedRecovery"
+"RecoverySpec.build" = "build"
+"RecoveryModel.expected_recovery" = "expectedRecovery"
+"RecoveryModel.conditional_recovery" = "conditionalRecovery"
+"RecoveryModel.lgd" = "lgd"
+"RecoveryModel.conditional_lgd" = "conditionalLgd"
+"RecoveryModel.recovery_volatility" = "recoveryVolatility"
+"RecoveryModel.is_stochastic" = "isStochastic"
+"RecoveryModel.model_name" = "modelName"
 
 # ---------------------------------------------------------------------------
 # Intentionally NOT covered by parity tests

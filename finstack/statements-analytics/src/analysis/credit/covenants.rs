@@ -290,14 +290,25 @@ fn default_driver_node_id(spec: &CovenantSpec) -> Option<&'static str> {
     }
 }
 
+/// Extract the driver volatility (annualized) and seed from a forecast spec.
+///
+/// Forecast specs quote `std_dev` **per model period**, while
+/// [`CovenantForecastConfig::volatility`] is consumed as an **annualized**
+/// GBM volatility (the forward engine scales shocks by `sigma * sqrt(T_years)`).
+/// The per-period standard deviation is therefore annualized here as
+/// `sigma_annual = sigma_per_period * sqrt(periods_per_year)`, with
+/// `periods_per_year` derived from the model's period cadence
+/// ([`PeriodKind`], e.g. 4 for quarterly, 12 for monthly).
 fn extract_sigma_and_seed(model: &FinancialModelSpec, node_id: &str) -> Option<(f64, u64)> {
     let node = model.nodes.get(node_id)?;
     let spec = node.forecast.as_ref()?;
     match spec.method {
         ForecastMethod::Normal | ForecastMethod::LogNormal => {
-            let sigma = spec.params.get("std_dev")?.as_f64()?;
+            let sigma_per_period = spec.params.get("std_dev")?.as_f64()?;
             let seed = spec.params.get("seed")?.as_u64()?;
-            Some((sigma, seed))
+            let periods_per_year = f64::from(model.periods.first()?.id.kind().periods_per_year());
+            let sigma_annual = sigma_per_period * periods_per_year.sqrt();
+            Some((sigma_annual, seed))
         }
         _ => None,
     }
@@ -430,6 +441,78 @@ mod tests {
             approximate_period_end(&y),
             Date::from_calendar_date(2025, Month::December, 31).expect("valid date")
         );
+    }
+
+    #[test]
+    fn extract_sigma_annualizes_per_period_std_dev() {
+        use finstack_core::dates::Period;
+        use finstack_statements::types::{ForecastSpec, NodeSpec, NodeType};
+
+        // Quarterly model: annualized sigma must be std_dev * sqrt(4) = 2x.
+        let period = Period {
+            id: PeriodId::quarter(2025, 1),
+            start: time::macros::date!(2025 - 01 - 01),
+            end: time::macros::date!(2025 - 04 - 01),
+            is_actual: true,
+        };
+        let mut model = FinancialModelSpec::new("vol_test", vec![period]);
+
+        let mut params = IndexMap::new();
+        params.insert("std_dev".to_string(), serde_json::json!(0.1));
+        params.insert("seed".to_string(), serde_json::json!(7));
+        let node = NodeSpec::new("ebitda", NodeType::Mixed).with_forecast(ForecastSpec {
+            method: ForecastMethod::Normal,
+            params,
+        });
+        model.nodes.insert("ebitda".into(), node);
+
+        let (sigma, seed) =
+            extract_sigma_and_seed(&model, "ebitda").expect("sigma should be extracted");
+        assert_eq!(seed, 7);
+        assert!(
+            (sigma - 0.2).abs() < 1e-12,
+            "quarterly per-period std_dev 0.1 must annualize to 0.2, got {sigma}"
+        );
+    }
+
+    #[test]
+    fn forecast_breaches_with_partial_metric_coverage() {
+        // The period union contains a period the covenant metric doesn't
+        // cover; the forecast must skip it rather than hard-fail.
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(CovenantSpec {
+            covenant: Covenant::new(
+                CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+                Tenor::quarterly(),
+            ),
+            metric_id: Some(CovenantMetricId::from("NetDebtEbitda")),
+            threshold_schedule: None,
+            custom_evaluator: None,
+        });
+
+        let p1 = PeriodId::quarter(2025, 1);
+        let p2 = PeriodId::quarter(2025, 2);
+
+        let mut nodes = IndexMap::new();
+        // The covenant metric only covers p1 (breaching).
+        nodes.insert("NetDebtEbitda".to_string(), IndexMap::from([(p1, 4.5)]));
+        // Another node extends the period union to p2.
+        nodes.insert(
+            "revenue".to_string(),
+            IndexMap::from([(p1, 100.0), (p2, 110.0)]),
+        );
+
+        let results = StatementResult {
+            nodes,
+            ..StatementResult::default()
+        };
+
+        let breaches =
+            forecast_breaches(&results, &engine, None, CovenantForecastConfig::default())
+                .expect("partial coverage must not hard-fail");
+
+        assert_eq!(breaches.len(), 1);
+        assert_eq!(breaches[0].projected_value, 4.5);
     }
 
     #[test]

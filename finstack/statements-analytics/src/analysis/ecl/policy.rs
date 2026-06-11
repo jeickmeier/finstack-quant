@@ -242,6 +242,7 @@ fn ecl_config_from_policy(policy: &Ifrs9PolicyRecord) -> EclConfig {
         }],
         staging: policy.staging.config(),
         lgd_type: policy.ecl.lgd_type,
+        stage3_time_to_recovery_years: super::engine::DEFAULT_STAGE3_TIME_TO_RECOVERY_YEARS,
     }
 }
 
@@ -485,7 +486,10 @@ mod tests {
         assert!(binding_default_classify_stage_dpd_30_trigger());
         assert!(binding_default_classify_stage_dpd_90_trigger());
         assert_eq!(binding_default_cure_periods_stage2_to_1(), 3);
-        assert_eq!(binding_default_cure_periods_stage3_to_2(), 6);
+        // Aligned with the core IFRS 9 staging default (EBA GL 12-month
+        // probation); was previously 6 and diverged from
+        // `ifrs9_policies[0].staging.cure_periods_stage3_to_2`.
+        assert_eq!(binding_default_cure_periods_stage3_to_2(), 12);
         assert_eq!(binding_default_compute_ecl_bucket_width_years(), 0.25);
     }
 }

@@ -43,6 +43,15 @@ pub struct PortfolioEclResult {
 
     /// Per-exposure results.
     pub exposure_results: Vec<ExposureEclResult>,
+
+    /// Exposure ids in `exposure_results` that could not be matched against
+    /// the exposure slice passed to
+    /// [`PortfolioEclResult::from_results_with_exposures`]. Unmatched
+    /// results still contribute their ECL and EAD to the stage totals, but
+    /// carry no segment or migration data. Empty when constructed via
+    /// [`PortfolioEclResult::from_results`].
+    #[serde(default)]
+    pub unmatched_exposure_ids: Vec<String>,
 }
 
 impl PortfolioEclResult {
@@ -69,14 +78,7 @@ impl PortfolioEclResult {
             total_ecl += ecl;
             *ecl_by_stage.entry(stage).or_insert(0.0) += ecl;
             *count_by_stage.entry(stage).or_insert(0) += 1;
-
-            // Sum EAD from scenario breakdown (use first scenario's exposure data)
-            if let Some((_id, _w, ref single_result)) = result.ecl_result.scenario_breakdown.first()
-            {
-                if let Some(bucket) = single_result.buckets.first() {
-                    *ead_by_stage.entry(stage).or_insert(0.0) += bucket.ead;
-                }
-            }
+            *ead_by_stage.entry(stage).or_insert(0.0) += result.ead;
         }
 
         Self {
@@ -87,6 +89,7 @@ impl PortfolioEclResult {
             ecl_by_segment,
             migration_matrix,
             exposure_results: results,
+            unmatched_exposure_ids: Vec::new(),
         }
     }
 
@@ -114,6 +117,8 @@ impl PortfolioEclResult {
         let exposure_map: IndexMap<&str, &super::types::Exposure> =
             exposures.iter().map(|e| (e.id.as_str(), e)).collect();
 
+        let mut unmatched_exposure_ids = Vec::new();
+
         for result in &results {
             let stage = result.stage_result.stage;
             let ecl = result.ecl_result.ecl;
@@ -136,6 +141,12 @@ impl PortfolioEclResult {
                     let inner = migration_matrix.entry(*prev_stage).or_default();
                     *inner.entry(stage).or_insert(0) += 1;
                 }
+            } else {
+                // Surface unmatched ids instead of silently zero-filling
+                // their EAD (which would inflate the coverage ratio). The
+                // result-level EAD still feeds the stage totals.
+                unmatched_exposure_ids.push(exp_id.to_string());
+                *ead_by_stage.entry(stage).or_insert(0.0) += result.ead;
             }
         }
 
@@ -147,6 +158,7 @@ impl PortfolioEclResult {
             ecl_by_segment,
             migration_matrix,
             exposure_results: results,
+            unmatched_exposure_ids,
         }
     }
 
@@ -231,7 +243,10 @@ pub struct ProvisionWaterfall {
 /// Compute the provision waterfall between two portfolio snapshots.
 ///
 /// Matches exposures by ID across periods to track stage movements and
-/// identify new originations and derecognitions.
+/// identify new originations and derecognitions. All disappearing exposures
+/// are reported as derecognitions (`write_offs` stays 0.0); use
+/// [`compute_waterfall_with_write_offs`] to split write-offs onto their own
+/// line.
 ///
 /// # Arguments
 ///
@@ -240,6 +255,27 @@ pub struct ProvisionWaterfall {
 pub fn compute_waterfall(
     previous: &PortfolioEclResult,
     current: &PortfolioEclResult,
+) -> ProvisionWaterfall {
+    compute_waterfall_with_write_offs(previous, current, &[])
+}
+
+/// Compute the provision waterfall, splitting write-offs out of derecognitions.
+///
+/// Identical to [`compute_waterfall`], except that exposures listed in
+/// `written_off_ids` which disappear between the two snapshots are reported
+/// on the `write_offs` line (IFRS 7.35I) instead of being folded into
+/// `derecognitions`. Ids that do not correspond to a disappearing exposure
+/// are ignored.
+///
+/// # Arguments
+///
+/// * `previous` -- Previous period portfolio result
+/// * `current` -- Current period portfolio result
+/// * `written_off_ids` -- Exposure ids written off during the period
+pub fn compute_waterfall_with_write_offs(
+    previous: &PortfolioEclResult,
+    current: &PortfolioEclResult,
+    written_off_ids: &[String],
 ) -> ProvisionWaterfall {
     let opening = previous.total_ecl;
     let closing = current.total_ecl;
@@ -259,6 +295,7 @@ pub fn compute_waterfall(
 
     let mut new_originations = 0.0;
     let mut derecognitions = 0.0;
+    let mut write_offs = 0.0;
     let mut transfers_to_stage2 = 0.0;
     let mut transfers_to_stage3 = 0.0;
     let mut cured_to_stage1 = 0.0;
@@ -272,10 +309,14 @@ pub fn compute_waterfall(
         }
     }
 
-    // Derecognitions: in previous but not in current
+    // Derecognitions / write-offs: in previous but not in current
     for (id, prev_result) in &prev_map {
         if !curr_map.contains_key(id) {
-            derecognitions -= prev_result.ecl_result.ecl; // Negative = release
+            if written_off_ids.iter().any(|w| w == id) {
+                write_offs -= prev_result.ecl_result.ecl; // Negative = utilisation
+            } else {
+                derecognitions -= prev_result.ecl_result.ecl; // Negative = release
+            }
         }
     }
 
@@ -321,7 +362,7 @@ pub fn compute_waterfall(
         cured_to_stage1,
         cured_to_stage2,
         derecognitions,
-        write_offs: 0.0, // Write-offs must be provided externally
+        write_offs,
         remeasurement,
         closing,
     }
@@ -335,6 +376,7 @@ mod tests {
 
     fn make_exposure_result(id: &str, stage: Stage, ecl: f64, ead: f64) -> ExposureEclResult {
         ExposureEclResult {
+            ead,
             stage_result: StageResult {
                 stage,
                 triggers: vec![StagingTrigger::NoTrigger],
@@ -461,6 +503,36 @@ mod tests {
         assert!((waterfall.opening - 300.0).abs() < 1e-10);
         assert!((waterfall.closing - 100.0).abs() < 1e-10);
         assert!((waterfall.derecognitions - (-200.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_provision_waterfall_write_offs_split_from_derecognitions() {
+        let previous = PortfolioEclResult::from_results(vec![
+            make_exposure_result("A", Stage::Stage1, 100.0, 10_000.0),
+            make_exposure_result("B", Stage::Stage3, 400.0, 20_000.0),
+            make_exposure_result("C", Stage::Stage1, 50.0, 5_000.0),
+        ]);
+        let current = PortfolioEclResult::from_results(vec![make_exposure_result(
+            "A",
+            Stage::Stage1,
+            100.0,
+            10_000.0,
+        )]);
+
+        let waterfall = compute_waterfall_with_write_offs(&previous, &current, &["B".to_string()]);
+
+        assert!((waterfall.write_offs - (-400.0)).abs() < 1e-10);
+        assert!((waterfall.derecognitions - (-50.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_unmatched_exposure_ids_surfaced() {
+        let results = vec![make_exposure_result("A", Stage::Stage1, 100.0, 10_000.0)];
+        let portfolio = PortfolioEclResult::from_results_with_exposures(results, &[]);
+
+        assert_eq!(portfolio.unmatched_exposure_ids, vec!["A".to_string()]);
+        // Result-level EAD still feeds the stage totals.
+        assert!((portfolio.ead_by_stage[&Stage::Stage1] - 10_000.0).abs() < 1e-10);
     }
 
     #[test]

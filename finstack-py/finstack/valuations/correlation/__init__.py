@@ -16,7 +16,7 @@ Copula = _corr.Copula
 RecoverySpec = _corr.RecoverySpec
 RecoveryModel = _corr.RecoveryModel
 LatentFactorSpec = _corr.LatentFactorSpec
-LatentFactor = _corr.LatentFactor
+LatentFactorKind = _corr.LatentFactorKind
 LatentSingleFactor = _corr.LatentSingleFactor
 LatentTwoFactor = _corr.LatentTwoFactor
 LatentMultiFactor = _corr.LatentMultiFactor
@@ -31,7 +31,7 @@ __all__: list[str] = [
     "Copula",
     "CopulaSpec",
     "CorrelatedBernoulli",
-    "LatentFactor",
+    "LatentFactorKind",
     "LatentFactorSpec",
     "LatentMultiFactor",
     "LatentSingleFactor",

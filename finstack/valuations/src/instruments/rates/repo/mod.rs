@@ -26,10 +26,11 @@
 //! Repurchase_price = Sale_price × (1 + Repo_rate × τ)
 //! ```
 //!
-//! Present value from cash lender perspective:
+//! Present value from cash lender perspective (cash out at start, repayment
+//! received at maturity):
 //!
 //! ```text
-//! PV = Sale_price - Repurchase_price × DF(maturity)
+//! PV = -Sale_price + Repurchase_price × DF(maturity)
 //! ```
 //!
 //! # Haircut Calculation

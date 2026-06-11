@@ -142,15 +142,26 @@ fn test_default_overrides_use_expected_priority() {
 
     sc.behavior_overrides.cdr_annual = None;
     sc.behavior_overrides.sda_speed_multiplier = Some(1.5);
-    let seasoning = sda_peak_month() + 1;
-    let decline_period = (sda_peak_month() * 2 - sda_peak_month()) as f64;
-    let months_past_peak = (seasoning - sda_peak_month()) as f64;
-    let cdr = (sda_peak_cdr()
-        - (months_past_peak / decline_period) * (sda_peak_cdr() - sda_terminal_cdr()))
-        * 1.5;
-    let expected = 1.0 - (1.0 - cdr).powf(1.0 / 12.0);
-    let sda_rate = sc.calculate_default_rate(test_date(), seasoning).unwrap();
-    assert!((sda_rate - expected).abs() < 1e-12);
+
+    // Canonical PSA SDA shape: months 30-60 sit on the peak plateau.
+    let plateau_seasoning = sda_peak_month() + 1;
+    let plateau_cdr = sda_peak_cdr() * 1.5;
+    let expected_plateau = 1.0 - (1.0 - plateau_cdr).powf(1.0 / 12.0);
+    let plateau_rate = sc
+        .calculate_default_rate(test_date(), plateau_seasoning)
+        .unwrap();
+    assert!((plateau_rate - expected_plateau).abs() < 1e-12);
+
+    // Months 61-120 decline linearly from the peak to the terminal CDR;
+    // month 90 sits halfway through the decline.
+    let decline_seasoning = 90;
+    let frac = f64::from(decline_seasoning - 60) / 60.0;
+    let decline_cdr = (sda_peak_cdr() - frac * (sda_peak_cdr() - sda_terminal_cdr())) * 1.5;
+    let expected_decline = 1.0 - (1.0 - decline_cdr).powf(1.0 / 12.0);
+    let decline_rate = sc
+        .calculate_default_rate(test_date(), decline_seasoning)
+        .unwrap();
+    assert!((decline_rate - expected_decline).abs() < 1e-12);
 }
 
 #[test]

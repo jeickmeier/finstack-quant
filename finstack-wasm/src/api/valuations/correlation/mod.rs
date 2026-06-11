@@ -59,7 +59,10 @@ impl WasmCopulaSpec {
     pub fn build(&self) -> Result<WasmCopula, JsValue> {
         self.inner
             .build()
-            .map(|inner| WasmCopula { inner })
+            .map(|inner| WasmCopula {
+                inner,
+                spec: self.inner.clone(),
+            })
             .map_err(to_js_err)
     }
 
@@ -74,6 +77,18 @@ impl WasmCopulaSpec {
     pub fn is_student_t(&self) -> bool {
         self.inner.is_student_t()
     }
+
+    /// True if this is a Random Factor Loading spec.
+    #[wasm_bindgen(getter, js_name = isRfl)]
+    pub fn is_rfl(&self) -> bool {
+        self.inner.is_rfl()
+    }
+
+    /// True if this is a Multi-factor spec.
+    #[wasm_bindgen(getter, js_name = isMultiFactor)]
+    pub fn is_multi_factor(&self) -> bool {
+        self.inner.is_multi_factor()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +100,10 @@ impl WasmCopulaSpec {
 pub struct WasmCopula {
     #[wasm_bindgen(skip)]
     inner: Box<dyn Copula + Send + Sync>,
+    /// Originating spec, retained so concrete-model-only diagnostics
+    /// (`stressCorrelationProxy`) can be dispatched.
+    #[wasm_bindgen(skip)]
+    spec: CopulaSpec,
 }
 
 #[wasm_bindgen(js_class = Copula)]
@@ -113,10 +132,39 @@ impl WasmCopula {
         self.inner.model_name().to_string()
     }
 
-    /// Lower-tail dependence coefficient at the given correlation.
+    /// Strict lower-tail dependence coefficient `λ_L` at the given
+    /// correlation.
+    ///
+    /// Returns `NaN` when the model has no closed-form `λ_L` (Random Factor
+    /// Loading); check `Number.isNaN()` before using the result. For the
+    /// RFL heuristic stress gauge use `stressCorrelationProxy` instead.
     #[wasm_bindgen(js_name = tailDependence)]
     pub fn tail_dependence(&self, correlation: f64) -> f64 {
         self.inner.tail_dependence(correlation)
+    }
+
+    /// Heuristic stress-correlation proxy for the Random Factor Loading
+    /// copula.
+    ///
+    /// This is **not** the strict copula lower-tail-dependence coefficient
+    /// `λ_L` (which has no closed form for RFL — `tailDependence` returns
+    /// `NaN`). It gauges the extra correlation mass in the high-loading
+    /// tail and vanishes in the Gaussian (`loadingVol = 0`) limit.
+    ///
+    /// Throws for non-RFL copulas.
+    #[wasm_bindgen(js_name = stressCorrelationProxy)]
+    pub fn stress_correlation_proxy(&self, correlation: f64) -> Result<f64, JsValue> {
+        match &self.spec {
+            CopulaSpec::RandomFactorLoading { loading_volatility } => {
+                Ok(corr::RandomFactorLoadingCopula::new(*loading_volatility)
+                    .stress_correlation_proxy(correlation))
+            }
+            _ => Err(JsValue::from_str(&format!(
+                "stressCorrelationProxy is only defined for the Random Factor Loading \
+                 copula, got '{}'",
+                self.inner.model_name()
+            ))),
+        }
     }
 }
 
@@ -158,7 +206,24 @@ impl WasmRecoverySpec {
             .map_err(to_js_err)
     }
 
-    /// Expected (unconditional) recovery rate.
+    /// Market-standard stochastic recovery (40% mean, 25% vol, +40% corr —
+    /// recovery falls in stress under the canonical low-factor-stress
+    /// convention).
+    #[wasm_bindgen(js_name = marketStandardStochastic)]
+    pub fn market_standard_stochastic() -> Self {
+        Self {
+            inner: corr::RecoverySpec::market_standard_stochastic(),
+        }
+    }
+
+    /// Location-parameter recovery rate of this spec.
+    ///
+    /// For a constant spec this is the constant rate. For a
+    /// market-correlated spec this returns the `mean` input — the target
+    /// recovery at factor `Z = 0` — which differs from the Jensen-corrected
+    /// unconditional mean `E_Z[R(Z)]` whenever the factor sensitivity is
+    /// non-zero. For the true unconditional mean call
+    /// `build().expectedRecovery`.
     #[wasm_bindgen(getter, js_name = expectedRecovery)]
     pub fn expected_recovery(&self) -> f64 {
         self.inner.expected_recovery()
@@ -202,6 +267,18 @@ impl WasmRecoveryModel {
     #[wasm_bindgen(getter, js_name = lgd)]
     pub fn lgd(&self) -> f64 {
         self.inner.lgd()
+    }
+
+    /// Conditional LGD given market factor.
+    #[wasm_bindgen(js_name = conditionalLgd)]
+    pub fn conditional_lgd(&self, market_factor: f64) -> f64 {
+        self.inner.conditional_lgd(market_factor)
+    }
+
+    /// Recovery-rate volatility scale (0 for constant models).
+    #[wasm_bindgen(getter, js_name = recoveryVolatility)]
+    pub fn recovery_volatility(&self) -> f64 {
+        self.inner.recovery_volatility()
     }
 
     /// Whether recovery varies with the market factor.
@@ -263,9 +340,12 @@ pub fn nearest_correlation(
     max_iter: Option<usize>,
     tol: Option<f64>,
 ) -> Result<Vec<f64>, JsValue> {
+    // Single source of truth for the defaults: the Rust
+    // `NearestCorrelationOpts::default()` (max_iter = 200, tol = 1e-10).
+    let defaults = corr::NearestCorrelationOpts::default();
     let opts = corr::NearestCorrelationOpts {
-        max_iter: max_iter.unwrap_or(200),
-        tol: tol.unwrap_or(1e-10),
+        max_iter: max_iter.unwrap_or(defaults.max_iter),
+        tol: tol.unwrap_or(defaults.tol),
     };
     corr::nearest_correlation_matrix(&matrix, n, opts).map_err(to_js_err)
 }
@@ -293,12 +373,42 @@ mod tests {
         let rfl = WasmCopulaSpec::random_factor_loading(0.5);
         assert!(!rfl.is_gaussian());
         assert!(!rfl.is_student_t());
+        assert!(rfl.is_rfl());
+        assert!(!rfl.is_multi_factor());
         let rfl_copula = rfl.build().expect("RFL copula should build");
         assert_eq!(rfl_copula.num_factors(), 2);
 
         let mf = WasmCopulaSpec::multi_factor(2);
+        assert!(mf.is_multi_factor());
+        assert!(!mf.is_rfl());
         let mf_copula = mf.build().expect("multi-factor copula should build");
         assert_eq!(mf_copula.num_factors(), 2);
+    }
+
+    #[test]
+    fn wasm_copula_stress_correlation_proxy_rfl_only() {
+        let rfl = WasmCopulaSpec::random_factor_loading(0.2)
+            .build()
+            .expect("RFL copula should build");
+        // RFL has no closed-form λ_L: NaN per the tail-dependence contract.
+        assert!(rfl.tail_dependence(0.3).is_nan());
+        let proxy = rfl
+            .stress_correlation_proxy(0.3)
+            .expect("proxy defined for RFL");
+        assert!(proxy > 0.0, "proxy should be positive for σ_β > 0: {proxy}");
+
+        // The non-RFL error path constructs a `JsValue`, which panics on
+        // non-wasm32 targets, so it can only be asserted in wasm tests.
+        #[cfg(target_arch = "wasm32")]
+        {
+            let gaussian = WasmCopulaSpec::gaussian()
+                .build()
+                .expect("Gaussian copula should build");
+            assert!(
+                gaussian.stress_correlation_proxy(0.3).is_err(),
+                "proxy must throw for non-RFL copulas"
+            );
+        }
     }
 
     #[test]
@@ -332,6 +442,15 @@ mod tests {
             .expect("valid market-correlated spec")
             .build();
         assert!(mc.is_stochastic());
+        assert!(mc.recovery_volatility() > 0.0);
+        assert!(
+            (mc.conditional_lgd(0.0) - (1.0 - mc.conditional_recovery(0.0))).abs() < 1e-12,
+            "conditional_lgd must complement conditional_recovery"
+        );
+
+        let std = WasmRecoverySpec::market_standard_stochastic().build();
+        assert!(std.is_stochastic());
+        assert!((std.recovery_volatility() - 0.25).abs() < 1e-12);
     }
 
     #[test]

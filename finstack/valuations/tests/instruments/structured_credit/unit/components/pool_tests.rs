@@ -371,11 +371,12 @@ fn test_pool_weighted_avg_spread_mixed_assets() {
         finstack_core::dates::DayCount::Act360,
     ));
 
-    // Fixed rate (spread derived from rate)
+    // Fixed rate: carries no explicit spread, so it is EXCLUDED from WAS
+    // (the all-in coupon is not a spread; no rate × 10⁴ fallback).
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "B1",
         Money::new(10_000_000.0, Currency::USD),
-        0.07, // 700bps
+        0.07, // 700bps all-in coupon, no spread component
         maturity_date(),
         finstack_core::dates::DayCount::Thirty360,
     ));
@@ -383,8 +384,36 @@ fn test_pool_weighted_avg_spread_mixed_assets() {
     // Act
     let was = pool.weighted_avg_spread();
 
-    // Assert: (10M * 450 + 10M * 700) / 20M = 575bps
-    assert!((was - 575.0).abs() < 0.01);
+    // Assert: only the floating-rate loan contributes → 450bps
+    assert!((was - 450.0).abs() < 0.01);
+}
+
+#[test]
+fn test_pool_weighted_avg_spread_excludes_defaulted() {
+    let mut pool = AssetPool::new("POOL", DealType::CLO, Currency::USD);
+
+    pool.assets.push(PoolAsset::floating_rate_loan(
+        "L1",
+        Money::new(10_000_000.0, Currency::USD),
+        "SOFR-3M",
+        400.0,
+        maturity_date(),
+        finstack_core::dates::DayCount::Act360,
+    ));
+    let mut defaulted = PoolAsset::floating_rate_loan(
+        "L2",
+        Money::new(10_000_000.0, Currency::USD),
+        "SOFR-3M",
+        900.0,
+        maturity_date(),
+        finstack_core::dates::DayCount::Act360,
+    );
+    defaulted.is_defaulted = true;
+    pool.assets.push(defaulted);
+
+    // Defaulted assets are excluded from numerator AND denominator.
+    let was = pool.weighted_avg_spread();
+    assert!((was - 400.0).abs() < 0.01);
 }
 
 #[test]

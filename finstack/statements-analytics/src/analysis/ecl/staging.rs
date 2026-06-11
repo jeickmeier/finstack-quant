@@ -36,6 +36,15 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{Exposure, PdTermStructure, Stage};
 
+/// Cap on the horizon used for SICR lifetime-PD comparison, in years.
+///
+/// Bounds the PD-delta lookup for very long-dated exposures so the
+/// comparison stays within the range where PD curves are typically
+/// calibrated. The effective SICR horizon is
+/// `min(remaining_maturity_years, MAX_SICR_HORIZON_YEARS)` — SICR is never
+/// assessed beyond the exposure's own remaining maturity.
+pub const MAX_SICR_HORIZON_YEARS: f64 = 30.0;
+
 // ---------------------------------------------------------------------------
 // Staging trigger (audit trail)
 // ---------------------------------------------------------------------------
@@ -75,6 +84,11 @@ pub enum StagingTrigger {
         threshold: f64,
     },
     /// Rating downgraded by N or more notches.
+    ///
+    /// **Not yet implemented**: [`classify_stage`] never emits this trigger
+    /// because the staging engine has no rating-scale notion to count
+    /// notches with. The variant is retained for serde wire stability and
+    /// for callers that construct audit trails externally.
     RatingDowngrade {
         /// Actual downgrade notches.
         notches: u32,
@@ -121,6 +135,7 @@ pub struct StageResult {
 /// Controls the quantitative and qualitative thresholds used in the staging
 /// waterfall, plus curing rules for step-down from higher stages.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StagingConfig {
     /// Absolute PD increase threshold for SICR (e.g., 0.01 = 1 pp).
     /// If the lifetime PD has increased by more than this amount since
@@ -133,6 +148,13 @@ pub struct StagingConfig {
 
     /// Rating downgrade notches that trigger Stage 2.
     /// Example: 3 means a 3-notch downgrade from origination triggers SICR.
+    ///
+    /// **Not yet implemented**: [`classify_stage`] does not evaluate this
+    /// threshold (it has no rating-scale notion to count notches with), so
+    /// the [`StagingTrigger::RatingDowngrade`] trigger never fires. The
+    /// field is retained for serde wire stability; SICR on rating migration
+    /// is captured indirectly via the PD-delta triggers, which compare the
+    /// PD curves of the origination and current ratings.
     pub rating_downgrade_notches: u32,
 
     /// DPD threshold for Stage 2 backstop (IFRS 9 B5.5.19 rebuttable
@@ -244,7 +266,9 @@ pub fn classify_stage(
     if let (Some(orig_rating), Some(curr_rating)) =
         (&exposure.origination_rating, &exposure.current_rating)
     {
-        let horizon = exposure.remaining_maturity_years.clamp(1.0, 30.0);
+        let horizon = exposure
+            .remaining_maturity_years
+            .min(MAX_SICR_HORIZON_YEARS);
         let orig_pd = pd_source.cumulative_pd(orig_rating, horizon)?;
         let curr_pd = pd_source.cumulative_pd(curr_rating, horizon)?;
 
@@ -413,6 +437,7 @@ mod tests {
             qualitative_flags: QualitativeFlags::default(),
             consecutive_performing_periods: 0,
             previous_stage: None,
+            ead_schedule: None,
         }
     }
 

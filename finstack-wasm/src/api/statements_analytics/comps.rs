@@ -64,11 +64,15 @@ pub fn z_score(value: f64, data: JsValue) -> Result<JsValue, JsValue> {
 }
 
 /// Descriptive statistics over a peer distribution.
+///
+/// Returns `null` (matching the other comps helpers) when `data` is empty.
 #[wasm_bindgen(js_name = peerStats)]
 pub fn peer_stats(data: JsValue) -> Result<JsValue, JsValue> {
     let d: Vec<f64> = serde_wasm_bindgen::from_value(data).map_err(to_js_err)?;
-    let stats = fc::peer_stats(&d);
-    serde_wasm_bindgen::to_value(&stats).map_err(to_js_err)
+    match fc::peer_stats(&d) {
+        Some(stats) => serde_wasm_bindgen::to_value(&stats).map_err(to_js_err),
+        None => Ok(JsValue::NULL),
+    }
 }
 
 /// Single-factor OLS fit of `y` on `x` evaluated at the subject observation.
@@ -81,8 +85,10 @@ pub fn regression_fair_value(
 ) -> Result<JsValue, JsValue> {
     let x: Vec<f64> = serde_wasm_bindgen::from_value(x_values).map_err(to_js_err)?;
     let y: Vec<f64> = serde_wasm_bindgen::from_value(y_values).map_err(to_js_err)?;
-    let result = fc::regression_fair_value(&x, &y, subject_x, subject_y);
-    serde_wasm_bindgen::to_value(&result).map_err(to_js_err)
+    match fc::regression_fair_value(&x, &y, subject_x, subject_y) {
+        Some(result) => serde_wasm_bindgen::to_value(&result).map_err(to_js_err),
+        None => Ok(JsValue::NULL),
+    }
 }
 
 /// Compute a canonical valuation multiple for a company-metric bag.
@@ -92,8 +98,10 @@ pub fn compute_multiple(company_metrics: JsValue, multiple: &str) -> Result<JsVa
         serde_wasm_bindgen::from_value(company_metrics).map_err(to_js_err)?;
     let metrics = map_to_company_metrics(metrics_map);
     let multiple = multiple.parse::<fc::Multiple>().map_err(to_js_err)?;
-    let result = fc::compute_multiple(&metrics, multiple);
-    serde_wasm_bindgen::to_value(&result).map_err(to_js_err)
+    match fc::compute_multiple(&metrics, multiple) {
+        Some(result) => serde_wasm_bindgen::to_value(&result).map_err(to_js_err),
+        None => Ok(JsValue::NULL),
+    }
 }
 
 /// Composite rich/cheap scoring across multiple dimensions.

@@ -12,7 +12,10 @@ use finstack_statements::Result;
 /// Flags periods where a coverage ratio (e.g. DSCR, interest coverage)
 /// falls below configurable warning and error floors.
 ///
-/// Periods with non-positive denominators are skipped.
+/// A *negative* denominator makes the coverage ratio undefined and emits a
+/// high-severity finding (consistent with `LeverageRangeCheck`'s treatment
+/// of non-positive EBITDA). A *zero* denominator means there is no debt
+/// service / interest to cover and the period is skipped.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoverageFloorCheck {
     /// Numerator node (e.g. EBITDA, cash flow available for debt service).
@@ -51,7 +54,28 @@ impl Check for CoverageFloorCheck {
                 continue;
             };
 
-            if denom <= 0.0 {
+            if denom < 0.0 {
+                // Negative denominator → ratio undefined; surface explicitly
+                // rather than silently passing (matches LeverageRangeCheck).
+                findings.push(CheckFinding {
+                    check_id: self.id().to_string(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "Coverage ratio undefined in {pid}: denominator = {denom:.2} (< 0)"
+                    ),
+                    period: Some(*pid),
+                    materiality: Some(Materiality {
+                        absolute: denom,
+                        relative_pct: 0.0,
+                        reference_value: denom,
+                        reference_label: "denominator".to_string(),
+                    }),
+                    nodes: vec![self.numerator_node.clone(), self.denominator_node.clone()],
+                });
+                continue;
+            }
+            if denom == 0.0 {
+                // No debt service to cover this period — nothing to test.
                 continue;
             }
 

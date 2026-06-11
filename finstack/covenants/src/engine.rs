@@ -5,6 +5,23 @@
 //! - Manages grace/cure periods
 //! - Applies consequences when covenants are breached
 //! - Supports both financial and non-financial covenants
+//!
+//! # Scope and conventions
+//!
+//! - **Test dates are caller-controlled.** [`Covenant::test_frequency`] is
+//!   descriptive metadata only: the engine evaluates whenever the caller
+//!   invokes [`CovenantEngine::evaluate`] with a `test_date` and does not
+//!   itself generate or enforce a testing schedule.
+//! - **Equity cures are not modeled.** A breach can only be neutralized via
+//!   a [`CovenantWaiver`] (full waiver or amended threshold) or by the metric
+//!   recovering before the cure deadline; there is no mechanism for injecting
+//!   sponsor equity into the tested metric.
+//! - **Metric values are taken as-is (LTM contract).** The engine performs no
+//!   trailing-twelve-month or other window aggregation. If a covenant is
+//!   defined on an LTM basis (as most leverage/coverage covenants are), the
+//!   supplied metric node must already encode it — e.g. a statements node
+//!   defined via `ttm(ebitda)` — before being exposed through
+//!   [`crate::metric::CovenantMetricSource`].
 
 use crate::metric::{CovenantMetricId, CovenantMetricSource};
 use crate::schedule::{threshold_for_date, ThresholdSchedule};
@@ -36,7 +53,11 @@ pub struct SpringingCondition {
 pub struct Covenant {
     /// Type of covenant (leverage, coverage, etc.)
     pub covenant_type: CovenantType,
-    /// How frequently the covenant is tested
+    /// How frequently the covenant is tested.
+    ///
+    /// Descriptive metadata only: the engine does **not** enforce this
+    /// schedule. Callers control test dates by choosing when to invoke
+    /// [`CovenantEngine::evaluate`].
     pub test_frequency: finstack_core::dates::Tenor,
     /// Optional cure period in days before default
     pub cure_period_days: Option<i32>,
@@ -333,6 +354,28 @@ impl CovenantType {
             | CovenantType::Negative { .. }
             | CovenantType::Affirmative { .. } => None,
         }
+    }
+
+    /// Returns true for built-in maximum covenants whose metric is a ratio
+    /// with an earnings-style denominator (leverage-type tests).
+    ///
+    /// For these covenants a *negative* metric value almost always means the
+    /// denominator (EBITDA) has gone negative, i.e. the ratio is not
+    /// meaningful ("NM" in rating-agency parlance) rather than extraordinarily
+    /// good. A naive `value <= threshold` test would let a distressed,
+    /// negative-EBITDA borrower pass a max-leverage covenant with huge
+    /// apparent headroom. The engine therefore treats negative values on
+    /// these covenants as breaches. `Custom` maximum covenants are *not*
+    /// included: their metric semantics are caller-defined and negative
+    /// values may be legitimate.
+    pub(crate) fn is_ratio_max(&self) -> bool {
+        matches!(
+            self,
+            CovenantType::MaxDebtToEBITDA { .. }
+                | CovenantType::MaxTotalLeverage { .. }
+                | CovenantType::MaxSeniorLeverage { .. }
+                | CovenantType::MaxNetDebtToEBITDA { .. }
+        )
     }
 
     /// Stable machine-readable identifier based on the variant discriminant only.
@@ -674,6 +717,26 @@ impl CovenantEngine {
         test_date: Date,
     ) -> finstack_core::Result<IndexMap<String, CovenantReport>> {
         tracing::debug!(spec_count = specs.len(), %test_date, "evaluating covenants");
+
+        // Reject duplicate instance keys up front. Two specs sharing an
+        // identity would silently overwrite each other in the report map and
+        // make consequence resolution ambiguous (e.g. a distribution-lockup
+        // breach resolving to a same-type covenant carrying a Default
+        // consequence). Same-type covenants must be disambiguated via
+        // [`Covenant::with_label`].
+        {
+            let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+            for spec in specs {
+                let key = spec.covenant.instance_key();
+                if !seen.insert(key.clone()) {
+                    return Err(finstack_core::Error::Validation(format!(
+                        "duplicate covenant instance key '{key}': covenants sharing a type must \
+                         be disambiguated with Covenant::with_label",
+                    )));
+                }
+            }
+        }
+
         let mut reports = IndexMap::new();
 
         for spec in specs {
@@ -1017,6 +1080,7 @@ impl CovenantEngine {
             }
         };
 
+        let mut detail = None;
         let passed = if metric_value.is_nan() {
             // Only a NaN metric is genuinely indeterminate → treat as a breach.
             // An infinite metric is *not* a breach per se: e.g. an interest- or
@@ -1025,6 +1089,16 @@ impl CovenantEngine {
             // IEEE ordering already gives the right answer once NaN is excluded:
             // `+∞ >= threshold` passes `AtLeast`, `-∞ <= threshold` passes
             // `AtMost`, and the opposite infinities correctly fail.
+            false
+        } else if covenant_type.is_ratio_max() && metric_value < 0.0 {
+            // Negative leverage-type ratio: the denominator (EBITDA) has gone
+            // negative, so the ratio is not meaningful. Treat as a breach
+            // rather than letting `value <= threshold` pass with huge
+            // apparent headroom. See [`CovenantType::is_ratio_max`].
+            detail = Some(
+                "Negative ratio value (negative denominator) — not meaningful, treated as breach"
+                    .to_string(),
+            );
             false
         } else {
             match covenant_type.bound_kind() {
@@ -1045,7 +1119,7 @@ impl CovenantEngine {
             actual_value: Some(metric_value),
             threshold: Some(threshold),
             headroom,
-            detail: None,
+            detail,
         })
     }
 
@@ -1149,6 +1223,10 @@ struct SpecEvaluation {
     detail: Option<String>,
 }
 
+/// Relative headroom: signed distance from the threshold, normalized by
+/// `|threshold|` so the sign convention (positive = cushion, negative =
+/// deficit) is preserved for negative thresholds too. A zero threshold falls
+/// back to an absolute distance (denominator 1).
 pub(crate) fn headroom_for(bound: Option<BoundKind>, value: f64, threshold: f64) -> f64 {
     if !value.is_finite() || !threshold.is_finite() {
         return f64::NAN;
@@ -1157,7 +1235,7 @@ pub(crate) fn headroom_for(bound: Option<BoundKind>, value: f64, threshold: f64)
     let denom = if threshold.abs() < f64::EPSILON {
         1.0
     } else {
-        threshold
+        threshold.abs()
     };
 
     match bound {

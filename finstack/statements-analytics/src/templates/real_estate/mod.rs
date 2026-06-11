@@ -9,6 +9,22 @@
 //!
 //! The richer rent-roll APIs generate both aggregated property nodes and
 //! per-lease detail nodes so that underwriting outputs remain explainable.
+//!
+//! # Limitations
+//!
+//! The templates cover gross-lease NOI/NCF buildups. The following CRE
+//! features are **not** generated and must be added as explicit model nodes
+//! by the caller when needed:
+//!
+//! - **NNN / expense recoveries**: no reimbursement-income nodes are
+//!   generated from OpEx (triple-net or expense-stop recoveries).
+//! - **Percentage rent**: no sales-breakpoint overage rent.
+//! - **TI / LC**: tenant improvements and leasing commissions on rollover
+//!   are not modeled; include them in the CapEx nodes if material.
+//! - **Valuation/credit metric helpers**: no cap-rate value, DSCR,
+//!   debt-yield, or LTV node generators — the CRE covenant template
+//!   (`finstack_covenants::templates::real_estate`) expects metric nodes
+//!   (`dscr`, `debt_yield`, `ltv`) that the caller must define.
 
 use finstack_core::dates::PeriodId;
 use finstack_statements::builder::{ModelBuilder, Ready};
@@ -891,6 +907,15 @@ fn add_rent_roll_impl(
             } else {
                 (0.0, 0.0, 1.0)
             };
+            // Attribution convention for renewal free-rent periods: the FULL
+            // contractual rent is booked to `free_rent`, not the
+            // probability-weighted (`p × rent`) expected concession. The
+            // renewal-probability discount is then applied to the remaining
+            // (zero) net rent, so no `renewal_loss` is booked in a free
+            // period. The decomposition identity
+            // `pgi − free_rent − vacancy = effective rent` holds exactly
+            // under this convention; only the split between `free_rent` and
+            // `renewal_loss` differs from a probability-weighted attribution.
             let is_free_here = contractual != 0.0 && is_free.get(i).copied().unwrap_or(false);
             let free = if is_free_here { contractual } else { 0.0 };
             let net_after_free = contractual - free;

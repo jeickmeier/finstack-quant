@@ -80,7 +80,10 @@ impl PyCopulaSpec {
     fn build(&self) -> PyResult<PyCopula> {
         self.inner
             .build()
-            .map(|inner| PyCopula { inner })
+            .map(|inner| PyCopula {
+                inner,
+                spec: self.inner.clone(),
+            })
             .map_err(display_to_py)
     }
 
@@ -124,6 +127,9 @@ impl PyCopulaSpec {
 pub struct PyCopula {
     /// Boxed trait object.
     pub(crate) inner: Box<dyn Copula + Send + Sync>,
+    /// Originating spec, retained so concrete-model-only diagnostics
+    /// (`stress_correlation_proxy`) can be dispatched.
+    pub(crate) spec: CopulaSpec,
 }
 
 #[pymethods]
@@ -154,10 +160,41 @@ impl PyCopula {
         self.inner.model_name()
     }
 
-    /// Lower-tail dependence coefficient (or proxy) at the given correlation.
+    /// Strict lower-tail dependence coefficient ``λ_L`` at the given
+    /// correlation.
+    ///
+    /// Returns ``nan`` when the model has no closed-form ``λ_L`` (Random
+    /// Factor Loading); check ``math.isnan()`` before using the result. For
+    /// the RFL heuristic stress gauge use
+    /// :meth:`stress_correlation_proxy` instead.
     #[pyo3(text_signature = "(self, correlation)")]
     fn tail_dependence(&self, correlation: f64) -> f64 {
         self.inner.tail_dependence(correlation)
+    }
+
+    /// Heuristic stress-correlation proxy for the Random Factor Loading
+    /// copula.
+    ///
+    /// This is **not** the strict copula lower-tail-dependence coefficient
+    /// ``λ_L`` (which has no closed form for RFL — ``tail_dependence``
+    /// returns ``nan``). It gauges the extra correlation mass in the
+    /// high-loading tail and vanishes in the Gaussian (``loading_vol = 0``)
+    /// limit.
+    ///
+    /// Raises ``ValueError`` for non-RFL copulas.
+    #[pyo3(text_signature = "(self, correlation)")]
+    fn stress_correlation_proxy(&self, correlation: f64) -> PyResult<f64> {
+        match &self.spec {
+            CopulaSpec::RandomFactorLoading { loading_volatility } => {
+                Ok(corr::RandomFactorLoadingCopula::new(*loading_volatility)
+                    .stress_correlation_proxy(correlation))
+            }
+            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "stress_correlation_proxy is only defined for the Random Factor Loading \
+                 copula, got '{}'",
+                self.inner.model_name()
+            ))),
+        }
     }
 
     fn __repr__(&self) -> String {
@@ -220,13 +257,22 @@ impl PyRecoverySpec {
             .map_err(display_to_py)
     }
 
-    /// Market-standard stochastic recovery (40% mean, 25% vol, −40% corr).
+    /// Market-standard stochastic recovery (40% mean, 25% vol, +40% corr —
+    /// recovery falls in stress under the canonical low-factor-stress
+    /// convention).
     #[classmethod]
     fn market_standard_stochastic(_cls: &Bound<'_, PyType>) -> Self {
         Self::from_inner(RecoverySpec::market_standard_stochastic())
     }
 
-    /// Expected (unconditional) recovery rate implied by this spec.
+    /// Location-parameter recovery rate of this spec.
+    ///
+    /// For a constant spec this is the constant rate. For a
+    /// market-correlated spec this returns the ``mean`` input — the target
+    /// recovery at factor ``Z = 0`` — which differs from the
+    /// Jensen-corrected unconditional mean ``E_Z[R(Z)]`` whenever the factor
+    /// sensitivity is non-zero. For the true unconditional mean call
+    /// ``build().expected_recovery``.
     #[getter]
     fn expected_recovery(&self) -> f64 {
         self.inner.expected_recovery()
@@ -373,10 +419,10 @@ impl PyLatentFactorSpec {
     ///
     /// Raises ``ValueError`` if a multi-factor specification contains an
     /// invalid volatility vector or correlation matrix.
-    fn build(&self) -> PyResult<PyLatentFactor> {
+    fn build(&self) -> PyResult<PyLatentFactorKind> {
         self.inner
             .build()
-            .map(|inner| PyLatentFactor { inner })
+            .map(|inner| PyLatentFactorKind { inner })
             .map_err(display_to_py)
     }
 
@@ -386,24 +432,24 @@ impl PyLatentFactorSpec {
 }
 
 // ---------------------------------------------------------------------------
-// LatentFactor (concrete dispatch wrapper)
+// LatentFactorKind (concrete dispatch wrapper)
 // ---------------------------------------------------------------------------
 
 /// Concrete factor model for correlated behavior.
 ///
 /// Obtain an instance via ``LatentFactorSpec.build()``.
 #[pyclass(
-    name = "LatentFactor",
+    name = "LatentFactorKind",
     module = "finstack.valuations.correlation",
     frozen
 )]
-pub struct PyLatentFactor {
+pub struct PyLatentFactorKind {
     /// Concrete factor-model dispatch enum.
     pub(crate) inner: LatentFactorKind,
 }
 
 #[pymethods]
-impl PyLatentFactor {
+impl PyLatentFactorKind {
     /// Number of factors in the model.
     #[getter]
     fn num_factors(&self) -> usize {
@@ -442,7 +488,7 @@ impl PyLatentFactor {
 
     fn __repr__(&self) -> String {
         format!(
-            "LatentFactor('{}', n={})",
+            "LatentFactorKind('{}', n={})",
             self.inner.model_name(),
             self.inner.num_factors()
         )
@@ -644,9 +690,20 @@ impl PyLatentMultiFactor {
     }
 
     /// Generate correlated factor values from independent standard normal draws.
+    ///
+    /// Raises ``ValueError`` if ``independent_z`` does not contain exactly
+    /// ``num_factors`` draws.
     #[pyo3(text_signature = "(self, independent_z)")]
-    fn generate_correlated_factors(&self, independent_z: Vec<f64>) -> Vec<f64> {
-        self.inner.generate_correlated_factors(&independent_z)
+    fn generate_correlated_factors(&self, independent_z: Vec<f64>) -> PyResult<Vec<f64>> {
+        let expected = self.inner.num_factors();
+        if independent_z.len() != expected {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "independent_z must contain exactly {expected} draws (one per factor), \
+                 got {}",
+                independent_z.len()
+            )));
+        }
+        Ok(self.inner.generate_correlated_factors(&independent_z))
     }
 
     fn __repr__(&self) -> String {
@@ -812,9 +869,11 @@ fn validate_correlation_matrix(matrix: Vec<f64>, n: usize) -> PyResult<()> {
 /// n : int
 ///     Matrix dimension.
 /// max_iter : int, optional
-///     Maximum alternating-projection iterations (default ``200``).
+///     Maximum alternating-projection iterations. Defaults to the Rust
+///     ``NearestCorrelationOpts::default()`` value (currently ``200``).
 /// tol : float, optional
-///     Frobenius-norm tolerance between successive iterates (default
+///     Frobenius-norm tolerance between successive iterates. Defaults to
+///     the Rust ``NearestCorrelationOpts::default()`` value (currently
 ///     ``1e-10``).
 ///
 /// Returns
@@ -829,21 +888,35 @@ fn validate_correlation_matrix(matrix: Vec<f64>, n: usize) -> PyResult<()> {
 ///     If the input is not square, is grossly asymmetric, the diagonal is
 ///     far from 1, or the projection does not converge.
 #[pyfunction]
-#[pyo3(signature = (matrix, n, max_iter=200, tol=1e-10))]
+#[pyo3(signature = (matrix, n, max_iter=None, tol=None))]
 fn nearest_correlation(
     matrix: Vec<f64>,
     n: usize,
-    max_iter: usize,
-    tol: f64,
+    max_iter: Option<usize>,
+    tol: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    let opts = corr::NearestCorrelationOpts { max_iter, tol };
+    // Single source of truth for the defaults: the Rust
+    // `NearestCorrelationOpts::default()` (max_iter = 200, tol = 1e-10).
+    let defaults = corr::NearestCorrelationOpts::default();
+    let opts = corr::NearestCorrelationOpts {
+        max_iter: max_iter.unwrap_or(defaults.max_iter),
+        tol: tol.unwrap_or(defaults.tol),
+    };
     corr::nearest_correlation_matrix(&matrix, n, opts).map_err(display_to_py)
 }
 
-/// Cholesky decomposition of a correlation matrix (flattened row-major).
+/// Pivoted Cholesky decomposition of a correlation matrix (flattened
+/// row-major).
 ///
-/// Returns the lower-triangular factor L as a flat ``list[float]``.
-/// Raises ``ValueError`` if the matrix is invalid.
+/// Returns a factor matrix ``L`` (flat ``list[float]``, row-major, original
+/// variable order) satisfying ``L @ L.T == matrix``. Because diagonal
+/// pivoting is used to handle near-singular and positive-semidefinite
+/// matrices, the unpermuted factor is **not** guaranteed to be lower
+/// triangular — it may contain non-zero entries above the diagonal. The
+/// effective numerical rank is not surfaced through this function.
+///
+/// Raises ``ValueError`` if the matrix shape is wrong or the matrix is
+/// indefinite.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix, n)")]
 fn cholesky_decompose(matrix: Vec<f64>, n: usize) -> PyResult<Vec<f64>> {
@@ -869,7 +942,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyRecoverySpec>()?;
     m.add_class::<PyRecoveryModel>()?;
     m.add_class::<PyLatentFactorSpec>()?;
-    m.add_class::<PyLatentFactor>()?;
+    m.add_class::<PyLatentFactorKind>()?;
     m.add_class::<PyLatentSingleFactor>()?;
     m.add_class::<PyLatentTwoFactor>()?;
     m.add_class::<PyLatentMultiFactor>()?;
@@ -888,7 +961,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "RecoverySpec",
             "RecoveryModel",
             "LatentFactorSpec",
-            "LatentFactor",
+            "LatentFactorKind",
             "LatentSingleFactor",
             "LatentTwoFactor",
             "LatentMultiFactor",

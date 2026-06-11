@@ -64,6 +64,7 @@ add_vintage_buildup = _sa.add_vintage_buildup
 
 # Roll-forward template
 add_roll_forward = _sa.add_roll_forward
+add_roll_forward_with_opening = _sa.add_roll_forward_with_opening
 
 # Real estate templates
 SimpleLeaseSpec = _sa.SimpleLeaseSpec
@@ -110,6 +111,7 @@ __all__: list[str] = [
     "add_rent_roll",
     "add_rent_roll_rental_revenue",
     "add_roll_forward",
+    "add_roll_forward_with_opening",
     "add_vintage_buildup",
     "all_dependencies",
     "backtest_forecast",

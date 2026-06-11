@@ -239,7 +239,7 @@ impl InflationSwap {
         Ok(i_maturity_projected / i_start)
     }
 
-    fn curve_cpi_value(
+    pub(crate) fn curve_cpi_value(
         curve: &finstack_core::market_data::term_structures::InflationCurve,
         fallback_base: Date,
         lookup_date: Date,
@@ -254,6 +254,17 @@ impl InflationSwap {
             // mis-prices the swap with no diagnostic.
             let t = DayCount::Act365F.signed_year_fraction(
                 fallback_base,
+                lookup_date,
+                DayCountContext::default(),
+            )?;
+            Ok(curve.cpi(t))
+        } else if lookup_date < curve.base_date() {
+            // Lagged observation dates can fall before the curve base (e.g. a
+            // 3-month lag at trade inception with no fixing history). Read the
+            // curve at a signed (negative) time so it extrapolates from its
+            // base CPI instead of rejecting the inverted date range.
+            let t = curve.day_count().signed_year_fraction(
+                curve.base_date(),
                 lookup_date,
                 DayCountContext::default(),
             )?;
@@ -380,13 +391,10 @@ impl InflationSwap {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - Discount curve is not found
     /// - Index ratio is non-positive
     /// - Year fraction calculation fails
-    pub fn par_rate(&self, curves: &MarketContext) -> finstack_core::Result<f64> {
-        let disc = curves.get_discount(self.discount_curve_id.as_str())?;
-        let base = disc.base_date();
-        let index_ratio = self.projected_index_ratio(curves, base)?;
+    pub fn par_rate(&self, curves: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
+        let index_ratio = self.projected_index_ratio(curves, as_of)?;
 
         if index_ratio <= 0.0 {
             return Err(finstack_core::InputError::NonPositiveValue.into());
@@ -402,6 +410,39 @@ impl InflationSwap {
         }
 
         Ok(index_ratio.powf(1.0 / tau) - 1.0)
+    }
+
+    /// Raw (unrounded `f64`) present value of the swap from the holder's
+    /// perspective, used by finite-difference metrics (convexity, gamma)
+    /// where Money quantization noise would be amplified by tiny bump sizes.
+    pub fn npv_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
+        let payment_date = self.adjusted_payment_date(self.maturity);
+        if as_of >= payment_date {
+            return Ok(0.0);
+        }
+
+        let disc = curves.get_discount(self.discount_curve_id.as_str())?;
+        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+            disc.as_ref(),
+            as_of,
+            payment_date,
+        )?;
+
+        let tau_accrual = self.day_count.year_fraction(
+            self.start_date,
+            self.maturity,
+            finstack_core::dates::DayCountContext::default(),
+        )?;
+        let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
+        let fixed_pv = self.notional.amount() * ((1.0 + fixed_rate).powf(tau_accrual) - 1.0) * df;
+
+        let index_ratio = self.projected_index_ratio(curves, as_of)?;
+        let inflation_pv = self.notional.amount() * (index_ratio - 1.0) * df;
+
+        Ok(match self.side {
+            PayReceive::Receive => fixed_pv - inflation_pv,
+            PayReceive::Pay => inflation_pv - fixed_pv,
+        })
     }
 }
 
@@ -435,6 +476,14 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
             PayReceive::Receive => pv_fixed.checked_sub(pv_inflation),
             PayReceive::Pay => pv_inflation.checked_sub(pv_fixed),
         }
+    }
+
+    fn value_raw(
+        &self,
+        curves: &finstack_core::market_data::context::MarketContext,
+        as_of: finstack_core::dates::Date,
+    ) -> finstack_core::Result<f64> {
+        self.npv_raw(curves, as_of)
     }
 
     fn expiry(&self) -> Option<finstack_core::dates::Date> {
@@ -637,14 +686,20 @@ impl YoYInflationSwap {
         as_of: Date,
         date: Date,
     ) -> finstack_core::Result<f64> {
-        if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
-            if let Ok(value) = index.value_on(date) {
-                return Ok(value);
+        let lag = self.effective_lag(curves);
+        let lagged_date = Self::apply_lag(date, lag);
+
+        // Only consult realized fixings for observations whose (lagged) fixing
+        // date is on or before the valuation date. Reading later entries from a
+        // fixing series that extends past as_of would introduce look-ahead bias.
+        if lagged_date <= as_of {
+            if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
+                if let Ok(value) = index.value_on(date) {
+                    return Ok(value);
+                }
             }
         }
 
-        let lag = self.effective_lag(curves);
-        let lagged_date = Self::apply_lag(date, lag);
         let curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
         InflationSwap::curve_cpi_value(curve.as_ref(), as_of, lagged_date)
     }
@@ -724,10 +779,13 @@ impl YoYInflationSwap {
                 PayReceive::Receive => fixed_leg - inflation_leg,
             };
 
-            let t_discount =
-                disc.day_count()
-                    .year_fraction(as_of, pay, DayCountContext::default())?;
-            let df = disc.df(t_discount);
+            // Date-based DF from as_of to payment: correct when the curve base
+            // date differs from as_of.
+            let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+                disc.as_ref(),
+                as_of,
+                pay,
+            )?;
             pv += net * df;
         }
 
@@ -767,10 +825,11 @@ impl YoYInflationSwap {
             }
             let cpi_end = self.cpi_value(curves, as_of, end)?;
 
-            let t_discount =
-                disc.day_count()
-                    .year_fraction(as_of, pay, DayCountContext::default())?;
-            let df = disc.df(t_discount);
+            let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+                disc.as_ref(),
+                as_of,
+                pay,
+            )?;
 
             // Inflation leg contribution: DF × (CPI_end / CPI_start - 1)
             sum_infl_pv += df * (cpi_end / cpi_start - 1.0);
@@ -1040,6 +1099,133 @@ mod tests {
         assert!(
             flows[1].1.amount() > 0.0,
             "pay-fixed swap should receive inflation leg"
+        );
+    }
+
+    /// YoY `npv_raw` must discount with DF(as_of → pay) = DF(pay)/DF(as_of)
+    /// (curve-base relative), not DF(yf(as_of, pay)) which silently assumes
+    /// the curve base equals as_of.
+    #[test]
+    fn yoy_npv_raw_discounts_relative_to_as_of_on_rebased_curve() {
+        let curve_base = d(2024, Month::January, 1);
+        let as_of = d(2025, Month::January, 1);
+        let maturity = d(2026, Month::January, 1);
+
+        // Non-trivial DF shape so DF(pay)/DF(as_of) != DF(yf(as_of, pay)).
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(curve_base)
+            .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.88), (3.0, 0.80)])
+            .build()
+            .expect("discount curve should build");
+        // Flat CPI so the inflation leg is exactly zero.
+        let infl = InflationCurve::builder("US-CPI")
+            .base_date(curve_base)
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (3.0, 100.0)])
+            .build()
+            .expect("inflation curve should build");
+        let market = MarketContext::new().insert(disc.clone()).insert(infl);
+
+        let swap = YoYInflationSwap::builder()
+            .id(InstrumentId::new("YOY-REBASE"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .start_date(as_of)
+            .maturity(maturity)
+            .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
+            .frequency(Tenor::annual())
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Receive)
+            .lag_override(InflationLag::None)
+            .attributes(Attributes::new())
+            .build()
+            .expect("yoy swap should build");
+
+        let pv = swap.npv_raw(&market, as_of).expect("npv should compute");
+
+        // Inflation leg is 0 (flat CPI); fixed leg = N * r * accrual * DF.
+        let accrual = DayCount::Act365F
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("accrual");
+        let df_expected = disc.df_between_dates(as_of, maturity).expect("relative df");
+        let expected = 1_000_000.0 * 0.02 * accrual * df_expected;
+        assert!(
+            (pv - expected).abs() < 1e-6,
+            "expected relative-DF PV {expected}, got {pv}"
+        );
+
+        // Sanity: the buggy absolute-time DF would differ materially.
+        let t_wrong = DayCount::Act365F
+            .year_fraction(as_of, maturity, DayCountContext::default())
+            .expect("yf");
+        let df_wrong = disc.df(t_wrong);
+        assert!(
+            (df_expected - df_wrong).abs() > 1e-3,
+            "test setup must distinguish the two discounting conventions"
+        );
+    }
+
+    /// Realized CPI fixings dated after `as_of` must not be consulted
+    /// (look-ahead bias): pricing must match the curve-projection PV.
+    #[test]
+    fn yoy_cpi_value_ignores_fixings_after_as_of() {
+        use finstack_core::market_data::scalars::InflationIndex;
+
+        let as_of = d(2025, Month::January, 1);
+        let maturity = d(2026, Month::January, 1);
+
+        let disc = sample_discount_curve(as_of);
+        let infl = InflationCurve::builder("US-CPI")
+            .base_date(as_of)
+            .base_cpi(100.0)
+            .knots([(0.0, 100.0), (2.0, 110.0)])
+            .build()
+            .expect("inflation curve should build");
+
+        let market_no_index = MarketContext::new()
+            .insert(disc.clone())
+            .insert(infl.clone());
+
+        // Index with a *future* fixing wildly different from the curve.
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![(d(2024, Month::December, 1), 100.0), (maturity, 500.0)],
+            Currency::USD,
+        )
+        .expect("index should build");
+        let market_with_future_fixing = MarketContext::new()
+            .insert(disc)
+            .insert(infl)
+            .insert_inflation_index("US-CPI", index);
+
+        let swap = YoYInflationSwap::builder()
+            .id(InstrumentId::new("YOY-LOOKAHEAD"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .start_date(as_of)
+            .maturity(maturity)
+            .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
+            .frequency(Tenor::annual())
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Pay)
+            .lag_override(InflationLag::None)
+            .attributes(Attributes::new())
+            .build()
+            .expect("yoy swap should build");
+
+        let pv_clean = swap
+            .npv_raw(&market_no_index, as_of)
+            .expect("clean pv should compute");
+        let pv_with_future = swap
+            .npv_raw(&market_with_future_fixing, as_of)
+            .expect("pv with future fixing should compute");
+
+        assert!(
+            (pv_clean - pv_with_future).abs() < 1e-6,
+            "future-dated fixings must not affect PV (look-ahead bias): \
+             clean={pv_clean}, with_future_fixing={pv_with_future}"
         );
     }
 

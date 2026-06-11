@@ -39,7 +39,7 @@ fn test_par_rate_gives_zero_pv() {
         .build()
         .unwrap();
 
-    let par_rate = temp_swap.par_rate(&ctx).unwrap();
+    let par_rate = temp_swap.par_rate(&ctx, as_of).unwrap();
     assert!(
         par_rate > 0.0 && par_rate < 0.1,
         "Par rate should be reasonable"
@@ -239,8 +239,8 @@ fn test_par_rate_increases_with_inflation_expectations() {
         .build()
         .unwrap();
 
-    let par_low = swap.par_rate(&ctx_low_infl).unwrap();
-    let par_high = swap.par_rate(&ctx_high_infl).unwrap();
+    let par_low = swap.par_rate(&ctx_low_infl, as_of).unwrap();
+    let par_high = swap.par_rate(&ctx_high_infl, as_of).unwrap();
 
     assert!(
         par_high > par_low,
@@ -342,7 +342,7 @@ fn test_par_rate_formula_consistency() {
         .build()
         .unwrap();
 
-    let par_rate = swap.par_rate(&ctx).unwrap();
+    let par_rate = swap.par_rate(&ctx, as_of).unwrap();
 
     // For flat 2.5% inflation, par should be close to 2.5%
     // (exact match depends on lag and interpolation)

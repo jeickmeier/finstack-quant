@@ -36,6 +36,15 @@ pub struct MacroCreditFactors {
 /// where:
 /// - Z is the systematic factor realization(s)
 /// - credit_factors include macroeconomic conditions
+///
+/// # Sign Convention
+///
+/// All implementations follow the canonical copula convention: a LOW
+/// systematic factor realization (`Z < 0`) is the stress state, i.e.
+/// `conditional_mdr` is non-increasing in `Z`. Recovery models share the
+/// same factor, so a positive recovery `factor_correlation` makes
+/// recoveries fall in stress — defaults and recoveries co-move negatively
+/// in every engine.
 pub trait StochasticDefault: Send + Sync + std::fmt::Debug {
     /// Conditional MDR (monthly default rate) given factor realizations.
     ///
@@ -49,27 +58,6 @@ pub trait StochasticDefault: Send + Sync + std::fmt::Debug {
         factors: &[f64],
         macro_factors: &MacroCreditFactors,
     ) -> f64;
-
-    /// Generate the default distribution for a portfolio.
-    ///
-    /// Given n loans with individual PDs and a factor realization,
-    /// compute the distribution of number of defaults.
-    ///
-    /// # Arguments
-    /// * `n` - Number of loans
-    /// * `pds` - Individual default probabilities (length n or 1 for homogeneous)
-    /// * `factors` - Systematic factor realizations
-    /// * `correlation` - Asset correlation
-    ///
-    /// # Returns
-    /// Vector of probabilities P(k defaults) for k = 0, 1, ..., n
-    fn default_distribution(
-        &self,
-        n: usize,
-        pds: &[f64],
-        factors: &[f64],
-        correlation: f64,
-    ) -> Vec<f64>;
 
     /// Asset correlation parameter.
     fn correlation(&self) -> f64;

@@ -153,12 +153,21 @@ impl QualitativeFlags {
 // Exposure
 // ---------------------------------------------------------------------------
 
+/// Sanity bound on `remaining_maturity_years`.
+///
+/// The ECL engines allocate one bucket per `bucket_width_years` over the
+/// remaining maturity, so an unbounded maturity translates directly into an
+/// unbounded bucket allocation. 100 years comfortably covers any real
+/// instrument (including perpetuals modelled with a behavioural maturity).
+pub const MAX_REMAINING_MATURITY_YEARS: f64 = 100.0;
+
 /// A single credit exposure for ECL computation.
 ///
 /// Represents one instrument or facility at a reporting date. All monetary
 /// amounts are in the exposure's base currency (currency conversion is the
 /// caller's responsibility).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Exposure {
     /// Unique identifier for the exposure (instrument ID, facility ID, etc.).
     pub id: String,
@@ -202,6 +211,16 @@ pub struct Exposure {
 
     /// Previous reporting period's stage (for migration tracking).
     pub previous_stage: Option<Stage>,
+
+    /// Optional EAD amortization profile as `(time_years, ead)` knots.
+    ///
+    /// When present, the ECL engines evaluate EAD at each bucket midpoint by
+    /// linear interpolation between knots with flat extrapolation at both
+    /// ends. When `None`, the constant [`Exposure::ead`] is used for every
+    /// bucket. Knot times must be strictly increasing, finite, and
+    /// non-negative; EAD values must be finite and non-negative.
+    #[serde(default)]
+    pub ead_schedule: Option<Vec<(f64, f64)>>,
 }
 
 impl Exposure {
@@ -248,7 +267,59 @@ impl Exposure {
                 self.id, self.remaining_maturity_years
             )));
         }
+        if self.remaining_maturity_years > MAX_REMAINING_MATURITY_YEARS {
+            return Err(Error::Validation(format!(
+                "Exposure '{}': remaining maturity must be <= {MAX_REMAINING_MATURITY_YEARS} \
+                 years (got {})",
+                self.id, self.remaining_maturity_years
+            )));
+        }
+        if let Some(schedule) = &self.ead_schedule {
+            if schedule.is_empty() {
+                return Err(Error::Validation(format!(
+                    "Exposure '{}': ead_schedule must not be empty when present",
+                    self.id
+                )));
+            }
+            let mut prev_t = f64::NEG_INFINITY;
+            for &(t, ead) in schedule {
+                if !t.is_finite() || t < 0.0 {
+                    return Err(Error::Validation(format!(
+                        "Exposure '{}': ead_schedule times must be finite and non-negative \
+                         (got {t})",
+                        self.id
+                    )));
+                }
+                if t <= prev_t {
+                    return Err(Error::Validation(format!(
+                        "Exposure '{}': ead_schedule times must be strictly increasing \
+                         (got {t} after {prev_t})",
+                        self.id
+                    )));
+                }
+                if !ead.is_finite() || ead < 0.0 {
+                    return Err(Error::Validation(format!(
+                        "Exposure '{}': ead_schedule EAD values must be finite and \
+                         non-negative (got {ead} at t={t})",
+                        self.id
+                    )));
+                }
+                prev_t = t;
+            }
+        }
         Ok(())
+    }
+
+    /// EAD at time `t` (years from the reporting date).
+    ///
+    /// Uses linear interpolation over [`Exposure::ead_schedule`] with flat
+    /// extrapolation at both ends when a schedule is present; otherwise
+    /// returns the constant [`Exposure::ead`].
+    pub(crate) fn ead_at(&self, t: f64) -> f64 {
+        match &self.ead_schedule {
+            Some(schedule) if !schedule.is_empty() => interp_linear(schedule, t),
+            _ => self.ead,
+        }
     }
 }
 
@@ -305,12 +376,37 @@ pub trait PdTermStructure: Send + Sync {
 /// - For `t` before the first knot, cumulative PD is 0.
 /// - For `t` after the last knot, cumulative PD is flat-extrapolated.
 /// - Between knots, linear interpolation is applied.
+///
+/// # Deserialization
+///
+/// Deserialization is validating: JSON inputs go through the same invariant
+/// checks as [`RawPdCurve::new`] (first knot at `(0.0, 0.0)`, strictly
+/// increasing times, monotone PDs in `[0, 1]`) and unknown fields are
+/// rejected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "RawPdCurveData")]
 pub struct RawPdCurve {
     /// Rating label this curve applies to.
     pub rating: String,
     /// (time_years, cumulative_pd) knots, sorted by time, monotonically increasing.
     pub knots: Vec<(f64, f64)>,
+}
+
+/// Serde shadow type that routes `RawPdCurve` deserialization through
+/// [`RawPdCurve::new`] so JSON inputs cannot bypass the curve invariants.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawPdCurveData {
+    rating: String,
+    knots: Vec<(f64, f64)>,
+}
+
+impl TryFrom<RawPdCurveData> for RawPdCurve {
+    type Error = Error;
+
+    fn try_from(data: RawPdCurveData) -> Result<Self> {
+        RawPdCurve::new(data.rating, data.knots)
+    }
 }
 
 impl RawPdCurve {
@@ -354,6 +450,26 @@ impl RawPdCurve {
             knots,
         })
     }
+
+    /// Anchor a cumulative-PD knot vector at `(0.0, 0.0)`.
+    ///
+    /// Prepends the `(0.0, 0.0)` knot required by [`RawPdCurve::new`] when the
+    /// caller-supplied schedule starts after `t = 0`; schedules that already
+    /// include a `t = 0` knot are returned unchanged. This is the canonical
+    /// convenience for host bindings that accept user PD schedules without
+    /// forcing callers to spell out the zero anchor.
+    #[must_use]
+    pub fn anchor_knots(knots: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
+        match knots.first() {
+            Some(&(t0, _)) if t0 > 0.0 => {
+                let mut anchored = Vec::with_capacity(knots.len() + 1);
+                anchored.push((0.0, 0.0));
+                anchored.extend(knots);
+                anchored
+            }
+            _ => knots,
+        }
+    }
 }
 
 impl PdTermStructure for RawPdCurve {
@@ -386,10 +502,10 @@ pub(crate) fn interp_linear(knots: &[(f64, f64)], t: f64) -> f64 {
     }
     let (t0, y0) = knots[idx - 1];
     let (t1, y1) = knots[idx];
-    // Guard against a zero-width interval. `RawPdCurve::new` rejects
-    // duplicate knot times, but the struct has public fields and derives
-    // `Deserialize`, so a curve built by struct literal or from JSON can
-    // still carry `t1 == t0`. Without this guard the interpolation weight
+    // Guard against a zero-width interval. `RawPdCurve::new` (and the
+    // validating deserializer) reject duplicate knot times, but the struct
+    // has public fields, so a curve built by struct literal can still
+    // carry `t1 == t0`. Without this guard the interpolation weight
     // would be `0.0 / 0.0 = NaN` and poison every downstream ECL figure.
     if t1 <= t0 {
         return y1;
@@ -445,6 +561,89 @@ mod tests {
         assert!(RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 1.5)]).is_err());
         // Valid
         assert!(RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.02), (2.0, 0.04)]).is_ok());
+    }
+
+    #[test]
+    fn test_raw_pd_curve_deserialization_validates() {
+        // Valid JSON round-trips through RawPdCurve::new.
+        let ok: std::result::Result<RawPdCurve, _> =
+            serde_json::from_str(r#"{"rating":"BBB","knots":[[0.0,0.0],[1.0,0.02]]}"#);
+        assert!(ok.is_ok());
+
+        // Invalid knots cannot bypass new() via JSON.
+        let bad: std::result::Result<RawPdCurve, _> =
+            serde_json::from_str(r#"{"rating":"BBB","knots":[[0.0,0.0],[1.0,1.5]]}"#);
+        assert!(bad.is_err());
+
+        // Unknown fields are rejected.
+        let unknown: std::result::Result<RawPdCurve, _> =
+            serde_json::from_str(r#"{"rating":"BBB","knots":[[0.0,0.0],[1.0,0.02]],"extra":1}"#);
+        assert!(unknown.is_err());
+    }
+
+    #[test]
+    fn test_exposure_deserialization_strict_and_defaults() {
+        let json = r#"{
+            "id": "E1", "segments": [], "ead": 100.0, "eir": 0.05,
+            "remaining_maturity_years": 2.0, "lgd": 0.4, "days_past_due": 0,
+            "current_rating": null, "origination_rating": null,
+            "qualitative_flags": {
+                "watchlist": false, "forbearance": false, "adverse_conditions": false,
+                "custom": [], "bankruptcy": false, "distressed_modification": false,
+                "cross_default": false, "other_default_evidence": []
+            },
+            "consecutive_performing_periods": 0, "previous_stage": null
+        }"#;
+        // ead_schedule is optional (serde default) for backwards compatibility.
+        let exposure: Exposure = serde_json::from_str(json).unwrap();
+        assert!(exposure.ead_schedule.is_none());
+
+        // Unknown fields are rejected.
+        let unknown = json.replacen("\"id\": \"E1\",", "\"id\": \"E1\", \"bogus\": 1,", 1);
+        let result: std::result::Result<Exposure, _> = serde_json::from_str(&unknown);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_exposure_validate_maturity_bound_and_ead_schedule() {
+        let mut exposure: Exposure = Exposure {
+            id: "E1".to_string(),
+            segments: vec![],
+            ead: 100.0,
+            eir: 0.05,
+            remaining_maturity_years: 2.0,
+            lgd: 0.4,
+            days_past_due: 0,
+            current_rating: None,
+            origination_rating: None,
+            qualitative_flags: QualitativeFlags::default(),
+            consecutive_performing_periods: 0,
+            previous_stage: None,
+            ead_schedule: None,
+        };
+        assert!(exposure.validate().is_ok());
+
+        exposure.remaining_maturity_years = MAX_REMAINING_MATURITY_YEARS + 1.0;
+        assert!(exposure.validate().is_err());
+        exposure.remaining_maturity_years = 2.0;
+
+        // Valid schedule + interpolation behaviour.
+        exposure.ead_schedule = Some(vec![(0.0, 100.0), (2.0, 0.0)]);
+        assert!(exposure.validate().is_ok());
+        assert!((exposure.ead_at(1.0) - 50.0).abs() < 1e-12);
+        assert!((exposure.ead_at(5.0) - 0.0).abs() < 1e-12); // flat extrapolation
+
+        // Non-increasing times rejected.
+        exposure.ead_schedule = Some(vec![(1.0, 100.0), (1.0, 50.0)]);
+        assert!(exposure.validate().is_err());
+
+        // Negative EAD rejected.
+        exposure.ead_schedule = Some(vec![(0.0, -1.0)]);
+        assert!(exposure.validate().is_err());
+
+        // Empty schedule rejected.
+        exposure.ead_schedule = Some(vec![]);
+        assert!(exposure.validate().is_err());
     }
 
     #[test]

@@ -136,6 +136,7 @@ mod tests {
             valuation_date,
             discount_curve_id: CurveId::new("USD-OIS"),
             mid_year_convention: false,
+            terminal_flow_override: None,
             equity_bridge: None,
             shares_outstanding: None,
             dilution_securities: Vec::new(),

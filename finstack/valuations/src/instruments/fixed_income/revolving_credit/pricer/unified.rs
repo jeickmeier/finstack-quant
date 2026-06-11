@@ -156,6 +156,76 @@ impl RevolvingCreditPricer {
             vec![1.0; path_schedule.schedule.flows.len()]
         };
 
+        // Survival to the valuation date, from the same source as the
+        // cashflow-date survivals. All survival weights are conditioned on
+        // survival to `as_of` (divide by S(as_of)): a facility being priced
+        // has, by definition, not defaulted yet. Using unconditional
+        // survival from commitment/curve-base (the previous behavior)
+        // understates PV for seasoned facilities by the factor S(→as_of) —
+        // the bond hazard engine establishes the same convention.
+        let sp_as_of = if let Some(ref path_data) = path_schedule.path_data {
+            Self::compute_dynamic_survival_at_dates(
+                &path_data.credit_spread_path,
+                &path_data.time_points,
+                &[as_of],
+                facility.recovery_rate,
+                facility.commitment_date,
+                facility.day_count,
+            )?[0]
+        } else if let Some(ref hazard_id) = facility.credit_curve_id {
+            let hazard = market.get_hazard(hazard_id.as_str())?;
+            let t = hazard.day_count().year_fraction(
+                hazard.base_date(),
+                as_of,
+                finstack_core::dates::DayCountContext::default(),
+            )?;
+            hazard.sp(t)
+        } else {
+            1.0
+        };
+        if !sp_as_of.is_finite() || sp_as_of <= 0.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "survival probability to valuation date must be positive and finite, \
+                 got {sp_as_of}"
+            )));
+        }
+
+        // Discounting: static curve by default; pathwise bank account when
+        // the path carries a genuinely stochastic short rate (HW σ > 0).
+        // With stochastic rates the path's coupons are driven by the
+        // simulated r — discounting them on the static curve would erase
+        // every rate-level/rate-correlation effect on PV through the
+        // numeraire. DF(as_of→t) = exp(−∫ r ds) along the path; when rate
+        // vol is zero the static-curve mode is retained exactly as before.
+        let pathwise_rates = path_schedule
+            .path_data
+            .as_ref()
+            .filter(|p| p.stochastic_rates);
+        // Signed so pre-commitment valuation dates do not error; only the
+        // pathwise branch consumes this.
+        let t_asof_path = facility.day_count.signed_year_fraction(
+            facility.commitment_date,
+            as_of,
+            finstack_core::dates::DayCountContext::default(),
+        )?;
+        let df_asof_to = |date: Date| -> Result<f64> {
+            if let Some(p) = pathwise_rates {
+                let t = facility.day_count.signed_year_fraction(
+                    facility.commitment_date,
+                    date,
+                    finstack_core::dates::DayCountContext::default(),
+                )?;
+                Ok(Self::pathwise_bank_account_df(
+                    &p.time_points,
+                    &p.short_rate_path,
+                    t_asof_path,
+                    t,
+                ))
+            } else {
+                disc_curve.df_between_dates(as_of, date)
+            }
+        };
+
         // Discount cashflows with survival weighting.
         // Anchor PV at `as_of` (not the curve base date) so that rolling the
         // valuation date forward shortens the discount path and produces
@@ -165,8 +235,8 @@ impl RevolvingCreditPricer {
             if cf.date < as_of {
                 continue;
             }
-            let df = disc_curve.df_between_dates(as_of, cf.date)?;
-            let survival = survival_probs.get(i).copied().unwrap_or(1.0);
+            let df = df_asof_to(cf.date)?;
+            let survival = survival_probs.get(i).copied().unwrap_or(1.0) / sp_as_of;
             total_pv += cf.amount.amount() * df * survival;
         }
 
@@ -195,26 +265,9 @@ impl RevolvingCreditPricer {
                 let exposure_at_grid =
                     Self::exposure_at_grid(facility, as_of, &future_grid, path_schedule)?;
 
-                let mut prev_sp = if let Some(ref path_data) = path_schedule.path_data {
-                    Self::compute_dynamic_survival_at_dates(
-                        &path_data.credit_spread_path,
-                        &path_data.time_points,
-                        &[as_of],
-                        facility.recovery_rate,
-                        facility.commitment_date,
-                        facility.day_count,
-                    )?[0]
-                } else if let Some(ref hazard_id) = facility.credit_curve_id {
-                    let hazard = market.get_hazard(hazard_id.as_str())?;
-                    let t = hazard.day_count().year_fraction(
-                        hazard.base_date(),
-                        as_of,
-                        finstack_core::dates::DayCountContext::default(),
-                    )?;
-                    hazard.sp(t)
-                } else {
-                    1.0
-                };
+                // Same source as `sp_as_of` above: integration starts at the
+                // valuation date with S(as_of).
+                let mut prev_sp = sp_as_of;
 
                 let mut prev_exposure = if path_schedule.path_data.is_some() {
                     facility.drawn_amount.amount()
@@ -229,10 +282,11 @@ impl RevolvingCreditPricer {
                     let curr_sp = survival_at_grid[i];
                     let curr_exposure = exposure_at_grid[i];
 
-                    let prob_default = (prev_sp - curr_sp).max(0.0);
+                    // Default probability conditional on survival to as_of.
+                    let prob_default = ((prev_sp - curr_sp) / sp_as_of).max(0.0);
 
-                    let df_prev = disc_curve.df_between_dates(as_of, prev_date).unwrap_or(1.0);
-                    let df_curr = disc_curve.df_between_dates(as_of, curr_date).unwrap_or(1.0);
+                    let df_prev = df_asof_to(prev_date).unwrap_or(1.0);
+                    let df_curr = df_asof_to(curr_date).unwrap_or(1.0);
                     let df_avg = (df_prev + df_curr) / 2.0;
                     let exposure_avg = (prev_exposure + curr_exposure) / 2.0;
 
@@ -405,9 +459,15 @@ impl RevolvingCreditPricer {
         let engine = CashflowEngine::new(facility, Some(market), as_of, None)?;
         let payment_dates = super::super::utils::build_payment_dates(facility, false)?;
 
-        // Generate 3-factor paths
-        let paths =
-            generate_three_factor_paths(stoch_spec, mc_config, facility, market, &payment_dates)?;
+        // Generate 3-factor paths (simulation starts at as_of for seasoned facilities)
+        let paths = generate_three_factor_paths(
+            stoch_spec,
+            mc_config,
+            facility,
+            market,
+            &payment_dates,
+            as_of,
+        )?;
 
         // Price each path
         let mut path_results = Vec::with_capacity(paths.len());
@@ -418,16 +478,31 @@ impl RevolvingCreditPricer {
         }
 
         // Compute MC statistics using Bessel-corrected variance (N-1 denominator)
-        // for unbiased standard error estimation
+        // for unbiased standard error estimation.
+        //
+        // Antithetic paths are NOT i.i.d. — each (z, −z) pair is negatively
+        // correlated by construction. Treating the 2N pathwise PVs as
+        // independent overstates the effective sample size and misstates the
+        // standard error. The correct estimator averages each antithetic
+        // pair into ONE i.i.d. sample first (pairs are adjacent in path
+        // order), then applies the usual sample statistics.
         let pvs: Vec<f64> = path_results.iter().map(|r| r.pv.amount()).collect();
-        let n = pvs.len() as f64;
-        let mean = pvs.iter().sum::<f64>() / n;
+        let use_antithetic = stoch_spec.antithetic && !stoch_spec.use_sobol_qmc;
+        let samples: Vec<f64> = if use_antithetic {
+            pvs.chunks(2)
+                .map(|pair| pair.iter().sum::<f64>() / pair.len() as f64)
+                .collect()
+        } else {
+            pvs.clone()
+        };
+        let n = samples.len() as f64;
+        let mean = samples.iter().sum::<f64>() / n;
 
         // Use N-1 for unbiased variance estimation (Bessel's correction)
-        let variance = if pvs.len() > 1 {
-            pvs.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)
+        let variance = if samples.len() > 1 {
+            samples.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)
         } else {
-            0.0 // Single path case
+            0.0 // Single pair/path case
         };
         let stderr = (variance / n).sqrt();
 
@@ -600,6 +675,52 @@ impl RevolvingCreditPricer {
                 })
                 .collect()
         }
+    }
+
+    /// Pathwise bank-account discount factor `exp(−∫_{t_a}^{t_b} r ds)` along
+    /// the simulated short-rate path.
+    ///
+    /// The short rate is linearly interpolated between the recorded path
+    /// points (flat extrapolation beyond the grid) and the integral is taken
+    /// exactly on the resulting piecewise-linear rate (trapezoidal on each
+    /// sub-interval). Returns 1.0 when `t_b <= t_a`.
+    fn pathwise_bank_account_df(
+        time_points: &[f64],
+        short_rates: &[f64],
+        t_a: f64,
+        t_b: f64,
+    ) -> f64 {
+        if t_b <= t_a || time_points.is_empty() || short_rates.len() != time_points.len() {
+            return 1.0;
+        }
+        let rate_at = |t: f64| -> f64 {
+            let n = time_points.len();
+            if t <= time_points[0] {
+                return short_rates[0];
+            }
+            if t >= time_points[n - 1] {
+                return short_rates[n - 1];
+            }
+            let idx = time_points.partition_point(|&tp| tp <= t);
+            let i = idx.saturating_sub(1);
+            let alpha = (t - time_points[i]) / (time_points[i + 1] - time_points[i]).max(1e-12);
+            short_rates[i] + alpha * (short_rates[i + 1] - short_rates[i])
+        };
+
+        // Integration breakpoints: t_a, every interior grid point, t_b.
+        let mut integral = 0.0;
+        let mut prev_t = t_a;
+        let mut prev_r = rate_at(t_a);
+        for &tp in time_points.iter().filter(|&&tp| tp > t_a && tp < t_b) {
+            let r = rate_at(tp);
+            integral += 0.5 * (prev_r + r) * (tp - prev_t);
+            prev_t = tp;
+            prev_r = r;
+        }
+        let r_b = rate_at(t_b);
+        integral += 0.5 * (prev_r + r_b) * (t_b - prev_t);
+
+        (-integral).exp()
     }
 
     /// Linearly interpolate utilization from the MC path at a given calendar date.
@@ -787,6 +908,188 @@ mod tests {
         );
     }
 
+    /// M2.10: survival weighting must be conditioned on survival to `as_of`.
+    ///
+    /// A seasoned zero-coupon facility (flat DF = 1, flat hazard λ = 20%)
+    /// priced one year into a two-year life must be worth
+    /// `D·SP(as_of→T) + R·D·(1−SP(as_of→T))` with `SP(as_of→T) = e^{-0.2}`,
+    /// NOT the unconditional `D·SP(0→T)/1 + …` which understates PV by the
+    /// factor S(0→as_of) = e^{-0.2}.
+    #[test]
+    fn seasoned_facility_survival_is_conditioned_on_as_of() {
+        use finstack_core::market_data::term_structures::HazardCurve;
+
+        let start = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+
+        let facility = RevolvingCredit::builder()
+            .id("RC-SEASONED".into())
+            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
+            .drawn_amount(Money::new(1_000_000.0, Currency::USD))
+            .commitment_date(start)
+            .maturity(end)
+            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.0 })
+            .day_count(DayCount::Act365F)
+            .frequency(Tenor::annual())
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
+            .discount_curve_id("USD-OIS".into())
+            .credit_curve_id("USD-HZ".into())
+            .recovery_rate(0.4)
+            .build()
+            .expect("facility");
+
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(start)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 1.0), (5.0, 1.0)])
+            .build()
+            .expect("curve");
+        let hz = HazardCurve::builder("USD-HZ")
+            .base_date(start)
+            .knots([(1.0, 0.20), (5.0, 0.20)])
+            .build()
+            .expect("hazard");
+        let market = MarketContext::new().insert(disc).insert(hz);
+
+        let pv = RevolvingCreditPricer::price(&facility, &market, as_of)
+            .expect("price")
+            .amount();
+
+        let d = 1_000_000.0_f64;
+        let r = 0.4_f64;
+        // One year remains at λ = 20%, conditional on survival to as_of.
+        let sp_cond = (-0.20_f64).exp();
+        let correct = d * sp_cond + r * d * (1.0 - sp_cond);
+        // Unconditional weighting multiplies the survival leg by an extra
+        // S(0→as_of) = e^{-0.2} and scales the default leg the same way.
+        let sp_uncond_t = (-0.40_f64).exp();
+        let unconditional = d * sp_uncond_t + r * d * ((-0.20_f64).exp() - sp_uncond_t);
+
+        assert!(
+            (pv - correct).abs() < 1.0,
+            "seasoned PV {pv} should equal conditional value {correct} \
+             (unconditional would be {unconditional})"
+        );
+        assert!(
+            (pv - unconditional).abs() > 1.0,
+            "seasoned PV {pv} must NOT equal the unconditional value {unconditional}"
+        );
+    }
+
+    /// M2.8: a deterministic draw/repay event dated on the commitment date is
+    /// rejected — the position at commitment is defined by `drawn_amount`
+    /// and a commitment-date event double-counted principal (interest on 2X,
+    /// 2X terminal repayment).
+    #[test]
+    fn commitment_date_event_is_rejected() {
+        use crate::instruments::fixed_income::revolving_credit::DrawRepayEvent;
+
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+
+        let facility = RevolvingCredit::builder()
+            .id("RC-COMMIT-EVENT".into())
+            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
+            .drawn_amount(Money::new(400_000.0, Currency::USD))
+            .commitment_date(start)
+            .maturity(end)
+            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .day_count(DayCount::Act365F)
+            .frequency(Tenor::quarterly())
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
+                date: start,
+                amount: Money::new(400_000.0, Currency::USD),
+                is_draw: true,
+            }]))
+            .discount_curve_id("USD-OIS".into())
+            .recovery_rate(0.4)
+            .build()
+            .expect("facility");
+
+        // Instrument-level validation rejects it…
+        assert!(
+            facility.validate().is_err(),
+            "validate() must reject a commitment-date event"
+        );
+
+        // …and the pricing path rejects it even if validate() is skipped.
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(start)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (5.0, 1.0)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(disc);
+        assert!(
+            RevolvingCreditPricer::price(&facility, &market, start).is_err(),
+            "pricing must reject a commitment-date event"
+        );
+    }
+
+    /// M2.9: Sobol QMC requires one coordinate per (step, factor). The
+    /// weekly-refined grid of a one-year facility needs ~52×3 dimensions —
+    /// far beyond the supported Sobol table — so `use_sobol_qmc` must be
+    /// rejected rather than silently consuming a 3-dimensional sequence
+    /// once per time step (van-der-Corput anti-correlated, biased paths).
+    #[test]
+    fn sobol_qmc_with_underdimensioned_schedule_is_rejected() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+
+        let facility = RevolvingCredit::builder()
+            .id("RC-SOBOL".into())
+            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
+            .drawn_amount(Money::new(400_000.0, Currency::USD))
+            .commitment_date(start)
+            .maturity(end)
+            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .day_count(DayCount::Act360)
+            .frequency(Tenor::quarterly())
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
+                StochasticUtilizationSpec {
+                    utilization_process: UtilizationProcess::MeanReverting {
+                        target_rate: 0.5,
+                        speed: 0.75,
+                        volatility: 0.05,
+                    },
+                    num_paths: 8,
+                    seed: Some(7),
+                    antithetic: false,
+                    use_sobol_qmc: true,
+                    mc_config: Some(McConfig {
+                        recovery_rate: 0.4,
+                        credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
+                        interest_rate_process: None,
+                        correlation_matrix: None,
+                        util_credit_corr: None,
+                    }),
+                },
+            )))
+            .discount_curve_id("USD-OIS".into())
+            .recovery_rate(0.4)
+            .build()
+            .expect("facility");
+
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(start)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (5.0, 1.0)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(disc);
+
+        let err = RevolvingCreditPricer::price_with_paths(&facility, &market, start)
+            .expect_err("Sobol with num_steps×num_factors > MAX_SOBOL_DIMENSION must error");
+        assert!(
+            err.to_string().contains("use_sobol_qmc"),
+            "error should explain the Sobol dimension contract, got: {err}"
+        );
+    }
+
     #[test]
     fn test_compute_dynamic_survival() {
         let spreads = vec![0.01, 0.02, 0.015, 0.018];
@@ -941,6 +1244,175 @@ mod tests {
         assert!(result.mc_result.estimate.percentile_75.is_none());
         assert!(result.mc_result.estimate.min.is_none());
         assert!(result.mc_result.estimate.max.is_none());
+    }
+
+    /// `num_paths < 2` must be rejected: a single path has no variance
+    /// estimate (previously produced NaN std error downstream).
+    #[test]
+    fn single_path_mc_is_rejected() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
+
+        let facility = RevolvingCredit::builder()
+            .id("RC-ONE-PATH".into())
+            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
+            .drawn_amount(Money::new(400_000.0, Currency::USD))
+            .commitment_date(start)
+            .maturity(end)
+            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .day_count(DayCount::Act360)
+            .frequency(Tenor::quarterly())
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
+                StochasticUtilizationSpec {
+                    utilization_process: UtilizationProcess::MeanReverting {
+                        target_rate: 0.5,
+                        speed: 0.75,
+                        volatility: 0.05,
+                    },
+                    num_paths: 1,
+                    seed: Some(7),
+                    antithetic: false,
+                    use_sobol_qmc: false,
+                    mc_config: None,
+                },
+            )))
+            .discount_curve_id("USD-OIS".into())
+            .recovery_rate(0.4)
+            .build()
+            .expect("facility");
+
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(start)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (5.0, 1.0)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(disc);
+
+        let err = RevolvingCreditPricer::price_with_paths(&facility, &market, start)
+            .expect_err("num_paths = 1 must be rejected");
+        assert!(
+            err.to_string().contains("num_paths"),
+            "error should mention num_paths, got: {err}"
+        );
+    }
+
+    /// Zero utilization volatility must freeze ONLY the utilization factor:
+    /// the credit-spread (and rate) factors keep their own dynamics. The
+    /// previous behavior skipped the discretization step entirely, silently
+    /// freezing all three factors.
+    #[test]
+    fn zero_util_vol_freezes_only_the_utilization_factor() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let end = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
+
+        let facility = RevolvingCredit::builder()
+            .id("RC-ZEROVOL".into())
+            .commitment_amount(Money::new(1_000_000.0, Currency::USD))
+            .drawn_amount(Money::new(400_000.0, Currency::USD))
+            .commitment_date(start)
+            .maturity(end)
+            .base_rate_spec(BaseRateSpec::Fixed { rate: 0.05 })
+            .day_count(DayCount::Act360)
+            .frequency(Tenor::quarterly())
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
+                StochasticUtilizationSpec {
+                    utilization_process: UtilizationProcess::MeanReverting {
+                        target_rate: 0.5,
+                        speed: 0.75,
+                        volatility: 0.0, // zero utilization vol
+                    },
+                    num_paths: 4,
+                    seed: Some(11),
+                    antithetic: false,
+                    use_sobol_qmc: false,
+                    mc_config: Some(McConfig {
+                        recovery_rate: 0.4,
+                        // Genuinely stochastic credit spread.
+                        credit_spread_process: CreditSpreadProcessSpec::Cir {
+                            kappa: 0.5,
+                            theta: 0.02,
+                            sigma: 0.05,
+                            initial: 0.02,
+                        },
+                        interest_rate_process: None,
+                        correlation_matrix: None,
+                        util_credit_corr: None,
+                    }),
+                },
+            )))
+            .discount_curve_id("USD-OIS".into())
+            .recovery_rate(0.4)
+            .build()
+            .expect("facility");
+
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(start)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (5.0, 1.0)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(disc);
+
+        let result = RevolvingCreditPricer::price_with_paths(&facility, &market, start)
+            .expect("should price");
+        let path = result.path_results[0]
+            .path_data
+            .as_ref()
+            .expect("path data");
+
+        // Utilization frozen at its initial value across the whole path…
+        let u0 = path.utilization_path[0];
+        assert!(
+            path.utilization_path
+                .iter()
+                .all(|&u| (u - u0).abs() < 1e-12),
+            "utilization must be frozen with zero vol: {:?}",
+            path.utilization_path
+        );
+        // …while the credit spread still diffuses.
+        let s0 = path.credit_spread_path[0];
+        assert!(
+            path.credit_spread_path
+                .iter()
+                .any(|&s| (s - s0).abs() > 1e-6),
+            "credit spread must keep stepping with zero util vol: {:?}",
+            path.credit_spread_path
+        );
+    }
+
+    /// `ThreeFactorPathData::validate` must reject length mismatches with an
+    /// error instead of letting downstream indexing panic.
+    #[test]
+    fn path_data_validation_rejects_mismatched_lengths() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let d2 = Date::from_calendar_date(2025, Month::July, 1).expect("valid date");
+
+        let bad = ThreeFactorPathData {
+            utilization_path: vec![0.4, 0.5],
+            short_rate_path: vec![0.03], // wrong length
+            credit_spread_path: vec![0.01, 0.01],
+            time_points: vec![0.0, 0.5],
+            payment_dates: vec![start, d2],
+            stochastic_rates: false,
+        };
+        let err = bad.validate().expect_err("length mismatch must error");
+        assert!(err.to_string().contains("short_rate_path"), "got: {err}");
+
+        let non_monotone = ThreeFactorPathData {
+            utilization_path: vec![0.4, 0.5],
+            short_rate_path: vec![0.03, 0.03],
+            credit_spread_path: vec![0.01, 0.01],
+            time_points: vec![0.5, 0.0],
+            payment_dates: vec![start, d2],
+            stochastic_rates: false,
+        };
+        assert!(
+            non_monotone.validate().is_err(),
+            "non-increasing time_points must error"
+        );
     }
 
     /// Regression test for parallel MC determinism.

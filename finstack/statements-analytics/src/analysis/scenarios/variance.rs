@@ -190,6 +190,16 @@ pub struct BridgeChart {
 
     /// Ordered list of driver contributions.
     pub steps: Vec<BridgeStep>,
+
+    /// Residual not explained by the driver deltas:
+    /// `(comparison_value - baseline_value) - Σ steps.contribution`.
+    ///
+    /// Driver contributions are raw deltas in *driver* units, not
+    /// sensitivities of the target metric, so they generally do not sum
+    /// to the target variance; this term makes the gap explicit instead
+    /// of leaving the bridge silently unbalanced.
+    #[serde(default)]
+    pub unexplained: f64,
 }
 
 /// Variance analyzer between two evaluated statement results.
@@ -281,8 +291,11 @@ impl<'a> VarianceAnalyzer<'a> {
     ///
     /// This is intentionally conservative and does **not** attempt to enforce
     /// that the sum of contributions must equal the total variance of the
-    /// target metric. More sophisticated attribution schemes (including
-    /// multiplicative drivers such as volume × price) can be layered on top.
+    /// target metric: contributions are deltas in *driver* units, not
+    /// target-metric sensitivities. The gap is reported explicitly in
+    /// [`BridgeChart::unexplained`]. More sophisticated attribution schemes
+    /// (including multiplicative drivers such as volume × price) can be
+    /// layered on top.
     pub fn bridge_decomposition(
         &self,
         target_metric: &str,
@@ -325,6 +338,9 @@ impl<'a> VarianceAnalyzer<'a> {
             });
         }
 
+        let explained: f64 = steps.iter().map(|step| step.contribution).sum();
+        let unexplained = (comparison_value - baseline_value) - explained;
+
         Ok(BridgeChart {
             target_metric: target_metric.to_string(),
             period,
@@ -333,6 +349,7 @@ impl<'a> VarianceAnalyzer<'a> {
             baseline_value,
             comparison_value,
             steps,
+            unexplained,
         })
     }
 }
@@ -497,6 +514,41 @@ mod tests {
         // The absolute variance is still meaningful; the ratio is not.
         assert_eq!(row.abs_var, 10.0);
         assert!(row.pct_var.is_none());
+    }
+
+    #[test]
+    fn bridge_decomposition_reports_unexplained_residual() {
+        let period = PeriodId::quarter(2025, 1);
+
+        let baseline = make_results(&[
+            ("ebitda", period, 100.0),
+            ("revenue", period, 200.0),
+            ("cogs", period, 80.0),
+        ]);
+        let comparison = make_results(&[
+            ("ebitda", period, 110.0),
+            ("revenue", period, 210.0),
+            ("cogs", period, 75.0),
+        ]);
+
+        let analyzer = VarianceAnalyzer::new(&baseline, &comparison);
+        let chart = analyzer
+            .bridge_decomposition("ebitda", period, &["revenue", "cogs"], "base", "cmp")
+            .expect("bridge");
+
+        // Target delta = 10; driver deltas = +10 (revenue) and -5 (cogs).
+        let explained: f64 = chart.steps.iter().map(|s| s.contribution).sum();
+        assert!((explained - 5.0).abs() < 1e-12);
+        assert!(
+            (chart.unexplained - 5.0).abs() < 1e-12,
+            "unexplained must close the bridge: got {}",
+            chart.unexplained
+        );
+        assert!(
+            ((chart.comparison_value - chart.baseline_value) - (explained + chart.unexplained))
+                .abs()
+                < 1e-12
+        );
     }
 
     #[test]

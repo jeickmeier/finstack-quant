@@ -342,6 +342,8 @@ export interface PeerStatsJson {
   max: number;
   q1: number;
   q3: number;
+  /** Interquartile range (`q3 - q1`). */
+  iqr: number;
 }
 
 /** Single-factor OLS regression result returned by `regressionFairValue`. */
@@ -708,13 +710,35 @@ export interface Copula {
     factorRealization: number[],
     correlation: number
   ): number;
+  /**
+   * Strict lower-tail dependence coefficient `λ_L` at the given correlation.
+   *
+   * Returns `NaN` when the model has no closed-form `λ_L` (Random Factor
+   * Loading); check `Number.isNaN()` before using the result. For the RFL
+   * heuristic stress gauge use `stressCorrelationProxy` instead.
+   */
   tailDependence(correlation: number): number;
+  /**
+   * Heuristic stress-correlation proxy for the Random Factor Loading copula.
+   *
+   * NOT the strict `λ_L` (which has no closed form for RFL — `tailDependence`
+   * returns `NaN`). Gauges the extra correlation mass in the high-loading
+   * tail; vanishes in the Gaussian (`loadingVol = 0`) limit. Throws for
+   * non-RFL copulas.
+   */
+  stressCorrelationProxy(correlation: number): number;
+  /** Release the underlying wasm heap allocation. Do not use this handle after calling `free()`. */
+  free(): void;
 }
 
 export interface CopulaSpec {
   readonly isGaussian: boolean;
   readonly isStudentT: boolean;
+  readonly isRfl: boolean;
+  readonly isMultiFactor: boolean;
   build(): Copula;
+  /** Release the underlying wasm heap allocation. Do not use this handle after calling `free()`. */
+  free(): void;
 }
 
 export interface CopulaSpecConstructor {
@@ -725,21 +749,43 @@ export interface CopulaSpecConstructor {
 }
 
 export interface RecoveryModel {
+  /** Expected (unconditional, Jensen-corrected) recovery rate. */
   readonly expectedRecovery: number;
   readonly lgd: number;
+  /** Recovery-rate volatility scale (0 for constant models). */
+  readonly recoveryVolatility: number;
   readonly isStochastic: boolean;
   readonly modelName: string;
   conditionalRecovery(marketFactor: number): number;
+  /** Conditional LGD (1 − conditional recovery) given the market factor. */
+  conditionalLgd(marketFactor: number): number;
+  /** Release the underlying wasm heap allocation. Do not use this handle after calling `free()`. */
+  free(): void;
 }
 
 export interface RecoverySpec {
+  /**
+   * Location-parameter recovery rate of this spec: the constant rate for a
+   * constant spec, or the `mean` input (target recovery at factor `Z = 0`)
+   * for a market-correlated spec. The latter differs from the
+   * Jensen-corrected unconditional mean — use `build().expectedRecovery`
+   * for the true expected recovery.
+   */
   readonly expectedRecovery: number;
   build(): RecoveryModel;
+  /** Release the underlying wasm heap allocation. Do not use this handle after calling `free()`. */
+  free(): void;
 }
 
 export interface RecoverySpecConstructor {
   constant(rate: number): RecoverySpec;
   marketCorrelated(mean: number, vol: number, correlation: number): RecoverySpec;
+  /**
+   * Market-standard stochastic recovery (40% mean, 25% vol, +40% corr —
+   * recovery falls in stress under the canonical low-factor-stress
+   * convention).
+   */
+  marketStandardStochastic(): RecoverySpec;
 }
 
 /** Exported class; construct instances via `CopulaSpec.build()` (no public `new`). */
@@ -757,24 +803,30 @@ export interface CorrelationNamespace {
   Copula: CopulaClass;
   RecoverySpec: RecoverySpecConstructor;
   RecoveryModel: RecoveryModelClass;
-  correlationBounds(p1: number, p2: number): number[];
-  jointProbabilities(p1: number, p2: number, correlation: number): number[];
+  /** Fréchet-Hoeffding bounds `[rhoMin, rhoMax]` as a `Float64Array` (wasm-bindgen `Vec<f64>` return). */
+  correlationBounds(p1: number, p2: number): Float64Array;
+  /** Joint probabilities `[p11, p10, p01, p00]` as a `Float64Array` (wasm-bindgen `Vec<f64>` return). */
+  jointProbabilities(p1: number, p2: number, correlation: number): Float64Array;
   /**
    * Validate a flat row-major correlation matrix with explicit dimension `n`
    * (finstack_valuations::correlation). Checks unit diagonal, off-diagonal in
    * [-1, 1], symmetry, and positive semi-definiteness; throws a descriptive
    * error otherwise.
    */
-  validateCorrelationMatrix(matrix: number[], n: number): void;
+  validateCorrelationMatrix(matrix: NumericArray, n: number): void;
   /**
    * Nearest correlation matrix (Higham 2002) for a near-PSD input.
    *
    * Projects a symmetric, near-unit-diagonal, near-PSD matrix onto the set of
    * valid correlation matrices in Frobenius norm. Gross input violations
    * (asymmetry > 1e-6 or diagonal far from 1) throw rather than being silently
-   * reshaped.
+   * reshaped. Returns the flat row-major result as a `Float64Array`.
    */
-  nearestCorrelation(matrix: number[], n: number, maxIter?: number, tol?: number): number[];
+  /**
+   * `maxIter` / `tol` default to the Rust `NearestCorrelationOpts::default()`
+   * values (currently 200 and 1e-10).
+   */
+  nearestCorrelation(matrix: NumericArray, n: number, maxIter?: number, tol?: number): Float64Array;
 }
 
 // --- monte_carlo ----------------------------------------------------------
@@ -1306,7 +1358,10 @@ export interface CreditDerivativesNamespace {
 }
 
 export interface ValuationsNamespace {
-  /** Credit-correlation infrastructure (copulas, recovery, factor models). */
+  /**
+ * Credit-correlation infrastructure (copulas, recovery models, and matrix
+ * utilities). Latent factor models are Python-only and not on this facade.
+ */
   correlation: CorrelationNamespace;
   /** Structural credit models and toggle-exercise helpers. */
   credit: ValuationCreditNamespace;

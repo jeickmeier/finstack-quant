@@ -800,24 +800,33 @@ impl AssetPool {
 
     /// Calculate weighted average spread (WAS) in basis points
     ///
-    /// Market standard: uses spread component only for floating rate assets.
+    /// Market standard (CLO indenture convention):
+    /// - performing assets only — defaulted assets are excluded from both the
+    ///   numerator and the denominator;
+    /// - spread component only — fixed-rate assets without an explicit
+    ///   `spread_bps` are skipped rather than counting their all-in coupon as
+    ///   spread (the old `rate × 10⁴` fallback inflated WAS one-sidedly).
+    ///
+    /// The denominator is the balance of the INCLUDED assets, so a pool of
+    /// only fixed-rate or defaulted assets returns 0.
     pub fn weighted_avg_spread(&self) -> f64 {
-        let total_balance = match self.total_balance() {
-            Ok(b) => b.amount(),
-            Err(_) => return 0.0,
-        };
-
-        if total_balance == 0.0 {
-            return 0.0;
+        let mut weighted_spread = 0.0;
+        let mut included_balance = 0.0;
+        for asset in &self.assets {
+            if asset.is_defaulted {
+                continue;
+            }
+            let Some(spread_bps) = asset.spread_bps else {
+                continue;
+            };
+            weighted_spread += spread_bps * asset.balance.amount();
+            included_balance += asset.balance.amount();
         }
 
-        let weighted_spread = self
-            .assets
-            .iter()
-            .map(|a| a.spread_bps() * a.balance.amount())
-            .sum::<f64>();
-
-        weighted_spread / total_balance
+        if included_balance == 0.0 {
+            return 0.0;
+        }
+        weighted_spread / included_balance
     }
 }
 

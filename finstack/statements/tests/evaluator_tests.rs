@@ -1349,3 +1349,172 @@ fn test_ewm_var_insufficient_data() {
         .unwrap()
         .is_nan());
 }
+
+// ============================================================================
+// Quant-review regression tests (2026-06-09 statements review)
+// ============================================================================
+
+/// Nested aggregates under lagged evaluation must not look ahead: the
+/// rolling window evaluated at the lagged period may only see data up to
+/// that period.
+#[test]
+fn test_lagged_rolling_mean_has_no_look_ahead() {
+    let model = ModelBuilder::new("lagged-rolling")
+        .periods("2025Q1..Q4", None)
+        .unwrap()
+        .value(
+            "x",
+            &[
+                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(1.0)),
+                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(2.0)),
+                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(4.0)),
+                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(8.0)),
+            ],
+        )
+        .compute("y", "lag(rolling_mean(x, 2), 2)")
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let mut evaluator = Evaluator::new();
+    let results = evaluator.evaluate(&model).unwrap();
+
+    // At Q4 the lag(.., 2) evaluates rolling_mean(x, 2) as of Q2:
+    // mean(x@Q1, x@Q2) = 1.5. The look-ahead bug returned mean(x@Q2, x@Q3) = 3.
+    let y_q4 = results.get("y", &PeriodId::quarter(2025, 4)).unwrap();
+    assert!(
+        (y_q4 - 1.5).abs() < 1e-12,
+        "lagged rolling mean must only see data up to the lagged period, got {y_q4}"
+    );
+}
+
+/// `lag`/`diff`/`pct_change` with expression (non-column) arguments must
+/// return NaN at period boundaries, matching the column path, instead of
+/// erroring against an empty historical context.
+#[test]
+fn test_timeseries_expression_args_return_nan_at_boundary() {
+    let model = ModelBuilder::new("ts-boundary")
+        .periods("2025Q1..Q2", None)
+        .unwrap()
+        .value(
+            "x",
+            &[
+                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
+                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(110.0)),
+            ],
+        )
+        .compute("lagged", "lag(x * 1, 1)")
+        .unwrap()
+        .compute("diffed", "diff(x * 1, 1)")
+        .unwrap()
+        .compute("pct", "pct_change(x * 1, 1)")
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let mut evaluator = Evaluator::new();
+    let results = evaluator
+        .evaluate(&model)
+        .expect("boundary lags must not abort evaluation");
+
+    let q1 = PeriodId::quarter(2025, 1);
+    let q2 = PeriodId::quarter(2025, 2);
+    assert!(results.get("lagged", &q1).unwrap().is_nan());
+    assert!(results.get("diffed", &q1).unwrap().is_nan());
+    assert!(results.get("pct", &q1).unwrap().is_nan());
+    // Periods with available history behave normally.
+    assert!((results.get("lagged", &q2).unwrap() - 100.0).abs() < 1e-12);
+    assert!((results.get("diffed", &q2).unwrap() - 10.0).abs() < 1e-12);
+    assert!((results.get("pct", &q2).unwrap() - 0.1).abs() < 1e-12);
+}
+
+/// CAGR is undefined for non-positive bases: a negative starting value flips
+/// the sign of the computed rate (improving losses would show negative
+/// growth), so `growth_rate` returns NaN.
+#[test]
+fn test_growth_rate_negative_base_returns_nan() {
+    let model = ModelBuilder::new("growth-negative")
+        .periods("2025Q1..Q2", None)
+        .unwrap()
+        .value(
+            "x",
+            &[
+                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(-100.0)),
+                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(-50.0)),
+            ],
+        )
+        .compute("g", "growth_rate(x, 1)")
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let mut evaluator = Evaluator::new();
+    let results = evaluator.evaluate(&model).unwrap();
+
+    assert!(
+        results
+            .get("g", &PeriodId::quarter(2025, 2))
+            .unwrap()
+            .is_nan(),
+        "growth_rate over a negative base must be NaN, not a sign-flipped rate"
+    );
+}
+
+/// `pct_change(x, 0)` must propagate NaN from the inner expression instead
+/// of masking missing data with 0.0 (mirrors the diff(x, 0) guard).
+#[test]
+fn test_pct_change_zero_periods_propagates_nan() {
+    let model = ModelBuilder::new("pct-zero")
+        .periods("2025Q1..Q1", None)
+        .unwrap()
+        .compute("x", "0 / 0")
+        .unwrap()
+        .compute("y", "pct_change(x, 0)")
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let mut evaluator = Evaluator::new();
+    let results = evaluator.evaluate(&model).unwrap();
+
+    assert!(results
+        .get("y", &PeriodId::quarter(2025, 1))
+        .unwrap()
+        .is_nan());
+}
+
+/// `evaluate_prepared` must use the compiled formulas captured at prepare
+/// time, not whatever a later `evaluate` of a different model (sharing node
+/// ids) left in the evaluator's cache.
+#[test]
+fn test_evaluate_prepared_is_isolated_from_later_evaluations() {
+    let model_a = ModelBuilder::new("model-a")
+        .periods("2025Q1..Q1", None)
+        .unwrap()
+        .compute("x", "1 + 1")
+        .unwrap()
+        .build()
+        .unwrap();
+    let model_b = ModelBuilder::new("model-b")
+        .periods("2025Q1..Q1", None)
+        .unwrap()
+        .compute("x", "5 * 5")
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let mut evaluator = Evaluator::new();
+    let prepared = evaluator.prepare(&model_a).unwrap();
+
+    // Evaluating model_b overwrites the evaluator's mutable compiled cache.
+    let results_b = evaluator.evaluate(&model_b).unwrap();
+    assert_eq!(results_b.get("x", &PeriodId::quarter(2025, 1)), Some(25.0));
+
+    // The prepared evaluation must still produce model_a's formula result.
+    let results_a = evaluator.evaluate_prepared(&model_a, &prepared).unwrap();
+    assert_eq!(
+        results_a.get("x", &PeriodId::quarter(2025, 1)),
+        Some(2.0),
+        "prepared evaluation must use the formulas compiled at prepare time"
+    );
+}

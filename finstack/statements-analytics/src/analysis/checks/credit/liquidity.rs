@@ -9,8 +9,14 @@ use finstack_statements::checks::{
 use finstack_statements::types::NodeId;
 use finstack_statements::Result;
 
-/// Estimates the liquidity runway in months (cash / monthly burn) and flags
-/// periods that fall below configurable warning and error thresholds.
+/// Estimates the liquidity runway in months and flags periods that fall
+/// below configurable warning and error thresholds.
+///
+/// The burn node is interpreted as cash burn **per model period**; the
+/// runway is converted to months using the model's period cadence:
+/// `months = (cash / burn_per_period) * (12 / periods_per_year)` — e.g. a
+/// quarterly model with `cash / burn = 2` periods of runway reports 6
+/// months.
 ///
 /// Periods with non-positive cash burn are skipped (the company is not
 /// burning cash).
@@ -56,7 +62,10 @@ impl Check for LiquidityRunwayCheck {
                 continue;
             }
 
-            let months = cash / burn;
+            // `cash / burn` is the runway in *model periods*; convert to
+            // months using the period cadence (12 / periods_per_year).
+            let periods_per_year = f64::from(pid.kind().periods_per_year());
+            let months = (cash / burn) * (12.0 / periods_per_year);
 
             let severity = if months < self.min_months_error {
                 Some(Severity::Error)

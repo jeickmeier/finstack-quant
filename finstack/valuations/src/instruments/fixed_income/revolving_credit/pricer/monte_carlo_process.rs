@@ -170,8 +170,13 @@ impl RevolvingCreditProcessParams {
     }
 
     /// Set time offset for mapping MC time to market time axis.
+    ///
+    /// The offset may be negative (commitment date before the curve base
+    /// date): market-t = offset + path-t must hold exactly, and clamping a
+    /// negative offset to zero would silently read forwards at the wrong
+    /// abscissa for every step of every path.
     pub fn with_time_offset(mut self, time_offset: f64) -> Self {
-        self.time_offset = time_offset.max(0.0);
+        self.time_offset = time_offset;
         self
     }
 

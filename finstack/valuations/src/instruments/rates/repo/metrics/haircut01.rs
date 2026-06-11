@@ -34,7 +34,7 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::repo::Repo;
-use crate::metrics::{central_diff_by_half_bump, MetricCalculator, MetricContext};
+use crate::metrics::{central_diff_by_width, MetricCalculator, MetricContext};
 use finstack_core::Result;
 
 /// Standard haircut bump: 1bp (0.0001 = 0.01%)
@@ -49,17 +49,22 @@ impl MetricCalculator for Haircut01Calculator {
         let as_of = context.as_of;
 
         // Bump haircut up
+        let haircut_up = repo.haircut + HAIRCUT_BUMP;
         let mut repo_up = repo.clone();
-        repo_up.haircut = (repo.haircut + HAIRCUT_BUMP).max(0.0);
+        repo_up.haircut = haircut_up;
         let pv_up = repo_up.value(context.curves.as_ref(), as_of)?.amount();
 
-        // Bump haircut down
+        // Bump haircut down, clamped at zero (a negative haircut is invalid).
+        let haircut_down = (repo.haircut - HAIRCUT_BUMP).max(0.0);
         let mut repo_down = repo.clone();
-        repo_down.haircut = (repo.haircut - HAIRCUT_BUMP).max(0.0);
+        repo_down.haircut = haircut_down;
         let pv_down = repo_down.value(context.curves.as_ref(), as_of)?.amount();
 
-        // `HAIRCUT_BUMP` is a fixed positive constant, so the bump width is
-        // never degenerate; the helper's error path cannot trigger here.
-        central_diff_by_half_bump(pv_up, pv_down, HAIRCUT_BUMP)
+        // Normalize by the *actual* applied bump width: when the down-bump
+        // clamps at zero (haircut < 1bp), the width is `haircut_up -
+        // haircut_down < 2bp` and dividing by a fixed 2bp would understate
+        // the sensitivity. `haircut_up > haircut_down` always holds, so the
+        // helper's degenerate-width error path cannot trigger here.
+        central_diff_by_width(pv_up, pv_down, haircut_up - haircut_down)
     }
 }

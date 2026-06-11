@@ -233,3 +233,66 @@ fn evaluate_all_preserves_actual_history_when_applying_overrides() {
         Some(90_000.0)
     );
 }
+
+#[test]
+fn comparison_table_emits_null_pct_on_zero_baseline() {
+    use finstack_core::table::TableColumnData;
+
+    let period_q1 = PeriodId::quarter(2025, 1);
+    let period_q2 = PeriodId::quarter(2025, 2);
+
+    // Baseline metric is exactly zero in both periods.
+    let model = ModelBuilder::new("zero_base")
+        .periods("2025Q1..Q2", None)
+        .expect("valid period range")
+        .value(
+            "fcf",
+            &[
+                (period_q1, AmountOrScalar::scalar(0.0)),
+                (period_q2, AmountOrScalar::scalar(0.0)),
+            ],
+        )
+        .build()
+        .expect("valid model");
+
+    let mut scenarios = IndexMap::new();
+    scenarios.insert(
+        "base".to_string(),
+        ScenarioDefinition {
+            model_id: Some(model.id.clone()),
+            parent: None,
+            overrides: IndexMap::new(),
+        },
+    );
+    let mut upside_overrides = IndexMap::new();
+    upside_overrides.insert("fcf".to_string(), 10_000.0);
+    scenarios.insert(
+        "upside".to_string(),
+        ScenarioDefinition {
+            model_id: Some(model.id.clone()),
+            parent: Some("base".to_string()),
+            overrides: upside_overrides,
+        },
+    );
+
+    let set = ScenarioSet { scenarios };
+    let results = set.evaluate_all(&model).expect("scenario evaluation");
+    let table = results
+        .to_comparison_table(&["fcf"])
+        .expect("comparison table");
+
+    let pct_col = table
+        .columns
+        .iter()
+        .find(|c| c.name.contains("_pct"))
+        .expect("pct column present");
+    match &pct_col.data {
+        TableColumnData::NullableFloat64(values) => {
+            assert!(
+                values.iter().all(|v| v.is_none()),
+                "pct change on a zero baseline must be null, got {values:?}"
+            );
+        }
+        other => panic!("pct column should be nullable float, got {other:?}"),
+    }
+}

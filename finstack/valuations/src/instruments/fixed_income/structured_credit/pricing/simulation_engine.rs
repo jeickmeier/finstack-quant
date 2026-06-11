@@ -2047,6 +2047,7 @@ fn simulate_period(
         crate::instruments::fixed_income::structured_credit::pricing::waterfall::WaterfallContext {
             available_cash: total_cash_for_waterfall,
             interest_collections: pool_flows.interest,
+            principal_collections: principal_available_for_waterfall,
             payment_date: pay_date,
             period_start,
             pool_balance: state.pool_outstanding,

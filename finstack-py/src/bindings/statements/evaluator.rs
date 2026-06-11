@@ -3,6 +3,7 @@
 use super::types::PyFinancialModelSpec;
 use crate::bindings::core::dates::utils::py_to_date;
 use crate::bindings::core::market_data::context::PyMarketContext;
+use crate::bindings::core::money::PyMoney;
 use crate::bindings::pandas_utils::{selected_table_to_dataframe, table_to_dataframe};
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
@@ -52,6 +53,44 @@ impl PyStatementResult {
     fn get(&self, node_id: &str, period: &str) -> PyResult<Option<f64>> {
         let pid = parse_period_id(period)?;
         Ok(self.inner.get(node_id, &pid))
+    }
+
+    /// Get the monetary value for a node at a specific period.
+    ///
+    /// Returns the currency-tagged ``Money`` value for ``Money``-typed nodes,
+    /// preserving fixed-point precision and currency. Returns ``None`` when
+    /// the node is not monetary or has no value for this period.
+    ///
+    /// Parameters
+    /// ----------
+    /// node_id : str
+    ///     Node identifier (e.g. ``"revenue"``).
+    /// period : str
+    ///     Period identifier string (e.g. ``"2025Q1"``).
+    #[pyo3(text_signature = "($self, node_id, period)")]
+    fn get_money(&self, node_id: &str, period: &str) -> PyResult<Option<PyMoney>> {
+        let pid = parse_period_id(period)?;
+        Ok(self
+            .inner
+            .get_money(node_id, &pid)
+            .map(|inner| PyMoney { inner }))
+    }
+
+    /// Get the scalar value for a non-monetary node at a specific period.
+    ///
+    /// Returns ``None`` when the node is monetary or has no value for this
+    /// period.
+    ///
+    /// Parameters
+    /// ----------
+    /// node_id : str
+    ///     Node identifier (e.g. ``"gross_margin_pct"``).
+    /// period : str
+    ///     Period identifier string (e.g. ``"2025Q1"``).
+    #[pyo3(text_signature = "($self, node_id, period)")]
+    fn get_scalar(&self, node_id: &str, period: &str) -> PyResult<Option<f64>> {
+        let pid = parse_period_id(period)?;
+        Ok(self.inner.get_scalar(node_id, &pid))
     }
 
     /// Get all period values for a specific node as a dict.
@@ -107,9 +146,10 @@ impl PyStatementResult {
     ///
     /// Columns: ``node_id``, ``period``, ``value``, ``value_money``,
     /// ``currency``, ``value_type``. The monetary columns are populated for
-    /// `Money`-typed nodes and left null for scalar nodes; exposing them here
-    /// matches the Rust schema so currency/fixed-point precision is never
-    /// silently dropped at the Python boundary.
+    /// `Money`-typed nodes and left null for scalar nodes. ``value_money``
+    /// is a float64 mirror of the monetary amount, so it carries f64 (not
+    /// fixed-point Decimal) precision; use ``to_json()`` or ``get_money()``
+    /// when full fixed-point precision is required.
     #[pyo3(text_signature = "($self)")]
     fn to_pandas_long<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let table = self.inner.to_table_long().map_err(display_to_py)?;

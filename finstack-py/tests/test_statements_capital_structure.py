@@ -225,7 +225,7 @@ class TestModelBuilderForecasts:
         b = statements.ModelBuilder("mixed")
         b.periods("2025Q1..Q4", "2025Q1")
         mixed = b.mixed("revenue")
-        mixed.values_scalar([("2025Q1", 100.0)])
+        mixed.values([("2025Q1", 100.0)])
         mixed.forecast(statements.ForecastSpec.forward_fill())
         mixed.formula("lag(revenue, 1)")
         b = mixed.build()

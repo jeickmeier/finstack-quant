@@ -9,7 +9,8 @@
 //! - **Frequency-based**: Monthly, quarterly, annual, or custom day intervals
 //! - **Stub handling**: Short/long stubs at front or back of schedule
 //! - **Business day adjustment**: Modified Following, Following, Preceding
-//! - **End-of-month**: Snap to month-end for month-based frequencies
+//! - **End-of-month**: Snap intermediate roll dates to month-end for
+//!   month-based frequencies (user-provided start/end are never snapped)
 //! - **IMM mode**: Standard IMM quarterly schedules (third Wednesday of Mar/Jun/Sep/Dec)
 //! - **CDS IMM mode**: Credit default swap quarterly schedules (20th of Mar/Jun/Sep/Dec)
 //! - **Deterministic**: Same inputs always produce identical outputs
@@ -97,7 +98,8 @@
 //!
 //! When start/end dates don't align exactly with the frequency:
 //!
-//! - **`StubKind::None`**: No special handling (default)
+//! - **`StubKind::None`**: Requires exact alignment; errors when start/end
+//!   don't divide evenly by the frequency (default)
 //! - **`StubKind::ShortFront`**: Short period at start, regular thereafter
 //! - **`StubKind::ShortBack`**: Regular periods, short period at end
 //! - **`StubKind::LongFront`**: Long period at start, regular thereafter
@@ -115,7 +117,8 @@
 use time::Date;
 
 use super::schedule_gen::{
-    enforce_monotonic_and_dedup, generate_imm_dates, is_cds_roll_date, BuilderInternal,
+    enforce_monotonic_and_dedup, enforce_monotonic_keep_terminal, generate_imm_dates,
+    is_cds_roll_date, BuilderInternal,
 };
 use super::{adjust, next_cds_date, BusinessDayConvention, HolidayCalendar};
 
@@ -175,8 +178,12 @@ use crate::dates::Tenor;
 ///
 /// # Variants
 ///
-/// - **`None`**: No special stub handling (default). Generates regular periods
-///   from start to end, with the final period potentially irregular.
+/// - **`None`**: No stub allowed (default). Generates regular periods from
+///   start to end and returns an error
+///   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
+///   evenly by the frequency. Use a stub variant for misaligned schedules.
+///
+/// [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
 /// - **`ShortFront`**: Short stub period at the start. Schedule is built
 ///   backward from the end date, creating a short first period.
 /// - **`ShortBack`**: Short stub period at the end. Schedule is built forward
@@ -226,7 +233,8 @@ use crate::dates::Tenor;
 )]
 #[non_exhaustive]
 pub enum StubKind {
-    /// No special stub handling.
+    /// No stub allowed: start/end must align exactly with the frequency,
+    /// otherwise schedule generation returns an error.
     #[default]
     None,
     /// Short stub period at the beginning of the schedule.
@@ -672,7 +680,10 @@ impl<'a> ScheduleBuilder<'a> {
     }
 
     /// Enable End-of-Month (EOM) convention.
-    /// When enabled, dates will be adjusted to the last day of each month.
+    ///
+    /// When enabled, computed intermediate roll dates are snapped to the
+    /// last day of their month. The user-provided start and end dates are
+    /// contractual and are never snapped.
     #[must_use]
     pub fn end_of_month(mut self, eom: bool) -> Self {
         self.eom = eom;
@@ -946,7 +957,19 @@ impl<'a> ScheduleBuilder<'a> {
         // Generate dates based on mode
         let mut dates = if self.imm_mode {
             // Standard IMM: generate dates using next_imm to get proper third Wednesdays
-            generate_imm_dates(self.start, self.end)
+            let imm_dates = generate_imm_dates(self.start, self.end);
+            if imm_dates.is_empty() {
+                // No IMM date falls inside [start, end]: a silently empty
+                // schedule means zero cashflows / PV = 0 downstream. Error
+                // in strict mode (graceful policies convert this to an
+                // empty schedule WITH a warning).
+                return Err(crate::error::Error::Validation(format!(
+                    "IMM schedule from {} to {} contains no IMM dates \
+                     (first IMM date after start exceeds end)",
+                    self.start, self.end
+                )));
+            }
+            imm_dates
         } else if self.cds_imm_mode {
             // CDS IMM: 20th of quarterly months
             let adj_start = if is_cds_roll_date(self.start) {
@@ -983,9 +1006,11 @@ impl<'a> ScheduleBuilder<'a> {
                 *d = adjust(*d, conv, cal)?;
             }
 
-            // Adjustment can create duplicates (e.g., both anchors adjust to same business day)
-            // and, in edge cases, non-monotonicities. Enforce again.
-            enforce_monotonic_and_dedup(&mut dates);
+            // Adjustment can create duplicates (e.g., both anchors adjust to
+            // same business day) and, in edge cases, non-monotonicities.
+            // Enforce again, but never drop the adjusted maturity date:
+            // collisions merge into the earlier period.
+            enforce_monotonic_keep_terminal(&mut dates);
         }
 
         Ok(Schedule { dates, warnings })

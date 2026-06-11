@@ -308,11 +308,10 @@ mod property_tests {
     #[test]
     fn test_default_correlation_sensitivity() {
         use super::default::CopulaBasedDefault;
-        use crate::correlation::copula::CopulaSpec;
 
         // Create copula-based default models with different correlations
-        let model_low = CopulaBasedDefault::new(0.02, CopulaSpec::Gaussian, 0.10);
-        let model_high = CopulaBasedDefault::new(0.02, CopulaSpec::Gaussian, 0.40);
+        let model_low = CopulaBasedDefault::gaussian(0.02, 0.10);
+        let model_high = CopulaBasedDefault::gaussian(0.02, 0.40);
 
         // Get default distributions
         let n = 100;

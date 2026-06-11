@@ -1883,6 +1883,14 @@
                 "null"
               ]
             },
+            "terminal_flow_override": {
+              "default": null,
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "terminal_value": {
               "$ref": "#/$defs/TerminalValueSpec"
             },

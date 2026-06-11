@@ -22,6 +22,12 @@
 //! Cashflows are classified by `CFKind` from `finstack-cashflows`. Outstanding
 //! balances use `outstanding_by_date()`.
 //!
+//! ## Limitations
+//! - Waterfall allocation within a payment category is single-class pro-rata;
+//!   there is no intra-category tranche seniority (see [`WaterfallSpec`]).
+//! - Prepayment penalties, call premiums, and original issue discount (OID)
+//!   are not modeled: prepayments apply at par and no OID accretion occurs.
+//!
 //! ## Example
 //! ```ignore
 //! use finstack_core::market_data::{context::MarketContext, DiscountCurve};
@@ -83,5 +89,5 @@ pub use integration::aggregate_instrument_cashflows;
 pub use integration::build_any_instrument_from_spec;
 pub use period_flows::calculate_period_flows;
 pub use state::CapitalStructureState;
-pub use waterfall::execute_waterfall;
+pub use waterfall::{execute_waterfall, WaterfallPeriodResult};
 pub use waterfall_spec::{EcfSweepSpec, PaymentPriority, PikToggleSpec, WaterfallSpec};

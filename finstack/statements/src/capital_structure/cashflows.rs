@@ -53,6 +53,7 @@ use serde::{Deserialize, Serialize};
 /// assert_eq!(cs.get_total_interest(&period).unwrap(), 12_500.0);
 /// ```
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CapitalStructureCashflows {
     /// Map of instrument_id → (period_id → cashflow_type → amount)
     pub by_instrument: IndexMap<String, IndexMap<PeriodId, CashflowBreakdown>>,
@@ -68,6 +69,15 @@ pub struct CapitalStructureCashflows {
     /// Reporting currency used for `totals` (if populated)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reporting_currency: Option<Currency>,
+
+    /// Post-waterfall residual cash distributed to equity per period.
+    ///
+    /// Only populated by waterfall evaluation when `available_cash_node` is
+    /// configured: it is the cash remaining after fees, interest, and
+    /// principal allocations. With the per-period allocations this satisfies
+    /// `fees + cash interest + principal + equity == available cash`.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub equity_distribution: IndexMap<PeriodId, Money>,
 }
 
 /// Breakdown of cashflows by type for a single period.
@@ -80,6 +90,7 @@ pub struct CapitalStructureCashflows {
 /// into non-cash interest accrual. Use `interest_expense_total()` for the
 /// combined value. All monetary fields use the Money type for currency safety.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CashflowBreakdown {
     /// Cash interest payments (coupons, floating resets)
     pub interest_expense_cash: Money,
@@ -204,6 +215,9 @@ impl CapitalStructureCashflows {
             for (pid, breakdown) in period_map {
                 accum_map.insert(pid, breakdown);
             }
+        }
+        for (pid, equity) in period_cs.equity_distribution {
+            self.equity_distribution.insert(pid, equity);
         }
         if self.reporting_currency.is_none() {
             self.reporting_currency = period_cs.reporting_currency;
@@ -578,6 +592,55 @@ mod tests {
         );
 
         assert!(cs_cf.get_interest("NONEXISTENT", &period_id).is_err());
+    }
+
+    #[test]
+    fn cashflow_breakdown_serde_round_trips_and_denies_unknown_fields() {
+        let cf = CashflowBreakdown {
+            interest_expense_cash: Money::new(10_000.0, Currency::USD),
+            interest_expense_pik: Money::new(2_500.0, Currency::USD),
+            ..CashflowBreakdown::with_currency(Currency::USD)
+        };
+        let json = serde_json::to_string(&cf).expect("serialize");
+        let back: CashflowBreakdown = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            back.interest_expense_cash.amount(),
+            cf.interest_expense_cash.amount()
+        );
+        assert_eq!(
+            back.interest_expense_pik.amount(),
+            cf.interest_expense_pik.amount()
+        );
+
+        let mut value: serde_json::Value = serde_json::from_str(&json).expect("json value");
+        value["bogus_field"] = serde_json::json!(1.0);
+        let err = serde_json::from_value::<CashflowBreakdown>(value);
+        assert!(err.is_err(), "unknown fields must be rejected");
+    }
+
+    #[test]
+    fn capital_structure_cashflows_serde_round_trips_and_denies_unknown_fields() {
+        let mut cs = CapitalStructureCashflows::new();
+        let period = PeriodId::quarter(2025, 1);
+        cs.totals
+            .insert(period, CashflowBreakdown::with_currency(Currency::USD));
+        cs.equity_distribution
+            .insert(period, Money::new(680.0, Currency::USD));
+
+        let json = serde_json::to_string(&cs).expect("serialize");
+        let back: CapitalStructureCashflows = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            back.equity_distribution
+                .get(&period)
+                .expect("equity round-trips")
+                .amount(),
+            680.0
+        );
+
+        let mut value: serde_json::Value = serde_json::from_str(&json).expect("json value");
+        value["bogus_field"] = serde_json::json!(1.0);
+        let err = serde_json::from_value::<CapitalStructureCashflows>(value);
+        assert!(err.is_err(), "unknown fields must be rejected");
     }
 
     #[test]

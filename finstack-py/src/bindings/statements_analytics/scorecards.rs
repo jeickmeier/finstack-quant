@@ -126,6 +126,10 @@ impl PyScorecardMetric {
 ///     Scorecard metrics to evaluate.
 /// min_rating : str | None
 ///     Optional minimum acceptable rating.
+/// period : str | None
+///     Optional period to rate, as a parseable period string (e.g.
+///     ``"2025Q4"``). When ``None``, the scorecard rates the last actual
+///     period in the model if any exists, otherwise the last model period.
 #[pyclass(
     name = "ScorecardConfig",
     module = "finstack.statements_analytics",
@@ -139,13 +143,19 @@ pub struct PyScorecardConfig {
 #[pymethods]
 impl PyScorecardConfig {
     #[new]
-    #[pyo3(signature = (rating_scale="S&P", metrics=Vec::new(), min_rating=None))]
-    fn new(rating_scale: &str, metrics: Vec<PyScorecardMetric>, min_rating: Option<&str>) -> Self {
+    #[pyo3(signature = (rating_scale="S&P", metrics=Vec::new(), min_rating=None, period=None))]
+    fn new(
+        rating_scale: &str,
+        metrics: Vec<PyScorecardMetric>,
+        min_rating: Option<&str>,
+        period: Option<&str>,
+    ) -> Self {
         Self {
             inner: rust_scorecards::ScorecardConfig {
                 rating_scale: rating_scale.to_string(),
                 metrics: metrics.into_iter().map(|m| m.inner).collect(),
                 min_rating: min_rating.map(str::to_string),
+                period: period.map(str::to_string),
             },
         }
     }
@@ -158,6 +168,11 @@ impl PyScorecardConfig {
     #[getter]
     fn min_rating(&self) -> Option<&str> {
         self.inner.min_rating.as_deref()
+    }
+
+    #[getter]
+    fn period(&self) -> Option<&str> {
+        self.inner.period.as_deref()
     }
 
     #[getter]
@@ -191,10 +206,11 @@ impl PyScorecardConfig {
 
     fn __repr__(&self) -> String {
         format!(
-            "ScorecardConfig(rating_scale='{}', metrics={}, min_rating={:?})",
+            "ScorecardConfig(rating_scale='{}', metrics={}, min_rating={:?}, period={:?})",
             self.inner.rating_scale,
             self.inner.metrics.len(),
-            self.inner.min_rating
+            self.inner.min_rating,
+            self.inner.period
         )
     }
 }
@@ -241,6 +257,9 @@ impl PyScorecardReport {
     }
 
     /// Return the structured data payload as a JSON string.
+    ///
+    /// Includes the rated ``period``, the ``partial`` flag, and
+    /// ``weight_coverage`` alongside the per-metric scores and rating.
     fn data_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner.data).map_err(display_to_py)
     }

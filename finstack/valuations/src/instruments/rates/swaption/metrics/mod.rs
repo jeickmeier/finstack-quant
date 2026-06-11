@@ -79,7 +79,6 @@ pub(crate) fn register_swaption_metrics(registry: &mut MetricRegistry) {
 /// let mut registry = MetricRegistry::new();
 /// register_bermudan_swaption_metrics(&mut registry, calibrated_params);
 /// ```
-#[allow(dead_code)]
 pub(crate) fn register_bermudan_swaption_metrics(
     registry: &mut MetricRegistry,
     hw_params: crate::calibration::hull_white::HullWhiteParams,
@@ -93,7 +92,12 @@ pub(crate) fn register_bermudan_swaption_metrics(
                 .with_hw_params(hw_params.kappa, hw_params.sigma)),
             (Gamma, BermudanGammaCalculator::new()
                 .with_hw_params(hw_params.kappa, hw_params.sigma)),
-            (Vega, BermudanVegaCalculator::new()
+            // Registered under `HwSigmaVega`, NOT `Vega`: this is a Hull-White
+            // short-rate σ bump (a model-parameter vega) and lives on a
+            // different vol axis than the Black-vol `Vega` reported for
+            // European swaptions. Sharing the `vega` key would silently mix
+            // incomparable units in cross-instrument aggregation.
+            (HwSigmaVega, BermudanVegaCalculator::new()
                 .with_hw_params(hw_params.kappa, hw_params.sigma))
             // Note: UnifiedDv01Calculator and BucketedDv01 are NOT
             // registered here because BermudanSwaption::value() returns Err.

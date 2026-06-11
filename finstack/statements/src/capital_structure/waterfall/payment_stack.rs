@@ -40,7 +40,10 @@ pub(super) fn waterfall_currency(
     currencies.dedup();
     match currencies.as_slice() {
         [currency] => Ok(*currency),
-        [] => Ok(finstack_core::currency::Currency::USD),
+        [] => Err(crate::error::Error::capital_structure(
+            "Waterfall execution requires at least one instrument with contractual flows; \
+             cannot determine the waterfall cash currency from an empty set.",
+        )),
         _ => Err(crate::error::Error::capital_structure(
             "Waterfall execution currently requires a single cash currency. \
              Use one currency per waterfall or add explicit FX allocation semantics.",

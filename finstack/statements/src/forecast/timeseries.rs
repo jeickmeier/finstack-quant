@@ -24,16 +24,38 @@
 //!   near zero. For most credit metrics that are expected to stay positive,
 //!   multiplicative is the safer default.
 //!
-//! * **`season_start`** — set to the zero-based position within the seasonal
-//!   cycle that your first historical observation corresponds to. For example,
-//!   if the fiscal year starts in April and your first data point is Q2 (July),
-//!   use `season_start = 1`.
+//! * **`season_start`** — zero-based position within the seasonal cycle that
+//!   your first historical observation corresponds to (e.g. `1` if the fiscal
+//!   year starts in April and your first data point is Q2/July). The seasonal
+//!   decomposition keys factors by data position, so this parameter is
+//!   descriptive only — the projection continues the positional cycle
+//!   regardless of its value.
 
 use crate::error::{Error, Result};
 use crate::types::SeasonalMode;
 use finstack_core::dates::PeriodId;
 use finstack_core::math::ZERO_TOLERANCE;
 use indexmap::IndexMap;
+
+/// Reject unknown parameter keys so typos (e.g. `seasonstart`) fail loudly
+/// instead of silently falling back to defaults.
+fn validate_param_keys(
+    params: &IndexMap<String, serde_json::Value>,
+    allowed: &[&str],
+    method: &str,
+) -> Result<()> {
+    for key in params.keys() {
+        if !allowed.contains(&key.as_str()) {
+            return Err(Error::forecast(format!(
+                "Unknown parameter '{}' for {} forecast. Allowed parameters: {}",
+                key,
+                method,
+                allowed.join(", ")
+            )));
+        }
+    }
+    Ok(())
+}
 
 fn parse_historical_series(historical: &[serde_json::Value], context: &str) -> Result<Vec<f64>> {
     let mut parsed = Vec::with_capacity(historical.len());
@@ -74,6 +96,12 @@ pub(super) fn timeseries_forecast(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
 ) -> Result<IndexMap<PeriodId, f64>> {
+    validate_param_keys(
+        params,
+        &["historical", "method", "alpha", "beta", "window"],
+        "time-series",
+    )?;
+
     // Get historical data
     let historical = params
         .get("historical")
@@ -218,8 +246,15 @@ pub(super) fn timeseries_forecast(
                     / window as f64;
                 let trend = ma - prev_ma;
 
+                // A trailing moving average is centered (window-1)/2 periods
+                // behind the last observation, so extrapolating from `ma`
+                // alone carries a half-window lag bias of trend*(window-1)/2
+                // at every horizon. Anchor the projection at the last
+                // observation's trend level instead.
+                let half_window_lag = (window as f64 - 1.0) / 2.0;
+
                 for (i, period_id) in forecast_periods.iter().enumerate() {
-                    let value = ma + trend * (i + 1) as f64;
+                    let value = ma + trend * (half_window_lag + (i + 1) as f64);
                     if !value.is_finite() {
                         return Err(Error::forecast(format!(
                             "Moving average forecast produced a non-finite value at period {:?}",
@@ -336,9 +371,11 @@ fn double_exponential_smoothing(data: &[f64], alpha: f64, beta: f64) -> (f64, f6
 ///   top of the historical trend slope—the decomposition already captures the
 ///   historical trajectory in the trend component.
 /// * `mode` - SeasonalMode enum: "additive" or "multiplicative" (required)
-/// * `season_start` - Zero-based offset indicating which season position the
-///   first historical observation corresponds to (default: 0). Set this when
-///   your data does not start at the beginning of a seasonal cycle.
+/// * `season_start` - Zero-based offset indicating which calendar season
+///   position the first historical observation corresponds to (default: 0).
+///   Accepted for descriptive/schema purposes only: the decomposition keys
+///   seasonal factors by data position, so the projection continues the
+///   positional cycle and does not need (or apply) this offset.
 ///
 /// Note: `base_value` is provided for API parity with other forecast methods but
 /// is not used in the seasonal calculation—the historical series establishes
@@ -361,6 +398,18 @@ fn seasonal_forecast_with_decomposition(
     forecast_periods: &[PeriodId],
     params: &IndexMap<String, serde_json::Value>,
 ) -> Result<IndexMap<PeriodId, f64>> {
+    validate_param_keys(
+        params,
+        &[
+            "historical",
+            "season_length",
+            "mode",
+            "growth",
+            "season_start",
+        ],
+        "seasonal",
+    )?;
+
     // Get historical data
     let historical = params
         .get("historical")
@@ -414,12 +463,6 @@ fn seasonal_forecast_with_decomposition(
     // Get growth rate for trend projection
     let growth = params.get("growth").and_then(|v| v.as_f64()).unwrap_or(0.0);
 
-    // Season start offset (default: 0 — data starts at season position 0)
-    let season_start = params
-        .get("season_start")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0) as usize;
-
     // Project forward
     let mut results = IndexMap::new();
     let last_trend = trend
@@ -435,8 +478,12 @@ fn seasonal_forecast_with_decomposition(
             last_trend * (1.0 + growth).powi(i as i32 + 1)
         };
 
-        // Get seasonal component (cycle through pattern, accounting for season_start offset)
-        let season_idx = (season_start + hist_data.len() + i) % season_length;
+        // Get seasonal component. The decomposition keys factors by *data
+        // position* (index 0 of `seasonal` corresponds to the first
+        // historical observation), so the forecast simply continues the
+        // positional cycle. Adding `season_start` here would double-shift
+        // and rotate the pattern (e.g. apply the Q4 uplift to Q1).
+        let season_idx = (hist_data.len() + i) % season_length;
         let seasonal_value = seasonal.get(season_idx).copied().unwrap_or(0.0);
 
         // Combine based on mode (type-safe match)
@@ -788,6 +835,92 @@ mod tests {
             seasonal_max > seasonal_min,
             "Seasonal should have variation"
         );
+    }
+
+    #[test]
+    fn test_seasonal_forecast_season_start_does_not_rotate_pattern() {
+        // Alternating additive pattern: low, high, low, high, ... The data
+        // ends at position 5 (high), so the first forecast (position 6)
+        // continues the cycle with a *low* value and the second with a high
+        // one. Before the double-shift fix, season_start=1 rotated the
+        // pattern and applied the high factor first.
+        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+
+        let mut baseline = None;
+        for season_start in [0u64, 1] {
+            let params = indexmap! {
+                "historical".into() => serde_json::json!([0.0, 10.0, 0.0, 10.0, 0.0, 10.0]),
+                "season_length".into() => serde_json::json!(2),
+                "mode".into() => serde_json::json!("additive"),
+                "season_start".into() => serde_json::json!(season_start),
+            };
+            let result = seasonal_forecast(0.0, &periods, &params)
+                .expect("seasonal_forecast should succeed");
+            let q1 = result[&PeriodId::quarter(2025, 1)];
+            let q2 = result[&PeriodId::quarter(2025, 2)];
+            assert!(
+                q1 < q2,
+                "season_start={season_start}: forecast must continue the positional \
+                 cycle (low then high), got q1={q1}, q2={q2}"
+            );
+            // The factors are keyed by data position, so season_start must
+            // not change the projection at all.
+            match baseline {
+                None => baseline = Some((q1, q2)),
+                Some((b1, b2)) => {
+                    assert_eq!((q1, q2), (b1, b2), "season_start must not shift values");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_moving_average_forecast_has_no_half_window_lag() {
+        // Perfectly linear data y = 10x with window=2: ma = 35, trend = 10.
+        // The trailing MA is centered (window-1)/2 = 0.5 periods behind the
+        // last observation, so the anchored projection must continue the
+        // line exactly: 50, 60 (the unanchored form lagged by trend/2 = 5).
+        let params = indexmap! {
+            "historical".into() => serde_json::json!([10.0, 20.0, 30.0, 40.0]),
+            "method".into() => serde_json::json!("moving_average"),
+            "window".into() => serde_json::json!(2),
+        };
+        let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+
+        let result = timeseries_forecast(40.0, &periods, &params)
+            .expect("timeseries_forecast should succeed");
+
+        assert!((result[&PeriodId::quarter(2025, 1)] - 50.0).abs() < 1e-9);
+        assert!((result[&PeriodId::quarter(2025, 2)] - 60.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_timeseries_forecast_rejects_unknown_param_keys() {
+        let params = indexmap! {
+            "historical".into() => serde_json::json!([100.0, 110.0, 120.0]),
+            "method".into() => serde_json::json!("moving_average"),
+            "windoww".into() => serde_json::json!(2),
+        };
+        let periods = vec![PeriodId::quarter(2025, 1)];
+
+        let err = timeseries_forecast(100.0, &periods, &params)
+            .expect_err("typoed parameter key must be rejected");
+        assert!(err.to_string().contains("windoww"));
+    }
+
+    #[test]
+    fn test_seasonal_forecast_rejects_unknown_param_keys() {
+        let params = indexmap! {
+            "historical".into() => serde_json::json!([100.0, 90.0, 110.0, 85.0]),
+            "season_length".into() => serde_json::json!(2),
+            "mode".into() => serde_json::json!("additive"),
+            "seasonstart".into() => serde_json::json!(1),
+        };
+        let periods = vec![PeriodId::quarter(2025, 1)];
+
+        let err = seasonal_forecast(100.0, &periods, &params)
+            .expect_err("typoed parameter key must be rejected");
+        assert!(err.to_string().contains("seasonstart"));
     }
 
     #[test]

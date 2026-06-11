@@ -731,6 +731,22 @@ impl RevolvingCredit {
             validation::validate_f64_finite(*rate, "RevolvingCredit fixed base rate")?;
         }
 
+        // Deterministic draw/repay events must be dated strictly after the
+        // commitment date: the position at commitment is defined by
+        // drawn_amount, and a commitment-date event would double-count
+        // principal (see CashflowEngine::build_deterministic_schedule).
+        if let DrawRepaySpec::Deterministic(events) = &self.draw_repay_spec {
+            for event in events {
+                validation::require_with(event.date > self.commitment_date, || {
+                    format!(
+                        "RevolvingCredit draw/repay event dated {} must be strictly after the \
+                         commitment date ({}); encode the initial position in drawn_amount",
+                        event.date, self.commitment_date
+                    )
+                })?;
+            }
+        }
+
         Ok(())
     }
 

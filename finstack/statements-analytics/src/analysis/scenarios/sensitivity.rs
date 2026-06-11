@@ -131,6 +131,7 @@ impl<'a> SensitivityAnalyzer<'a> {
         Ok(SensitivityResult {
             config: config.clone(),
             scenarios,
+            baseline: None,
         })
     }
 
@@ -199,6 +200,7 @@ impl<'a> SensitivityAnalyzer<'a> {
         Ok(SensitivityResult {
             config: config.clone(),
             scenarios: scenarios?,
+            baseline: None,
         })
     }
 
@@ -252,6 +254,7 @@ impl<'a> SensitivityAnalyzer<'a> {
         Ok(SensitivityResult {
             config: config.clone(),
             scenarios,
+            baseline: None,
         })
     }
 
@@ -269,6 +272,10 @@ impl<'a> SensitivityAnalyzer<'a> {
             let lhs_impact = max_target_impact(&baseline, &lhs.results, &config.target_metrics);
             descending_f64(lhs_impact, rhs_impact)
         });
+        // Keep the true baseline so tornado chart generation can anchor
+        // impacts even when a parameter's base value is absent from the
+        // perturbation grid.
+        result.baseline = Some(baseline);
         Ok(result)
     }
 
@@ -284,14 +291,16 @@ impl<'a> SensitivityAnalyzer<'a> {
         // history. This mirrors `scenario_set::apply_overrides`, which
         // filters to `!p.is_actual` forecast periods, and prevents
         // sensitivity analyses from silently corrupting reported data.
-        let is_actual = self
-            .model
-            .periods
-            .iter()
-            .find(|p| p.id == period_id)
-            .map(|p| p.is_actual)
-            .unwrap_or(false);
-        if is_actual {
+        let Some(period) = self.model.periods.iter().find(|p| p.id == period_id) else {
+            // A period outside the model grid would silently produce a
+            // no-op scenario (the inserted value is never evaluated).
+            return Err(Error::invalid_input(format!(
+                "Cannot override parameter '{}': period '{}' is not part of the model's \
+                 period grid",
+                node_id, period_id
+            )));
+        };
+        if period.is_actual {
             return Err(Error::invalid_input(format!(
                 "Cannot override parameter '{}' for actual (historical) period '{}'; \
                  sensitivities may only bump forecast periods",
@@ -477,7 +486,17 @@ fn build_tornado_entry(
         }
     }
 
+    // Anchor on the scenario whose parameter equals the configured base
+    // value; otherwise the true unperturbed baseline carried on the result
+    // (tornado runs). Falling back to the min/max scenario would
+    // misattribute the entire swing to one side.
     let base = baseline_metric
+        .or_else(|| {
+            result
+                .baseline
+                .as_ref()
+                .and_then(|baseline| extract_metric_value(baseline, metric_node, period_hint))
+        })
         .or_else(|| min_record.map(|(_, value)| value))
         .or_else(|| max_record.map(|(_, value)| value))?;
 
@@ -719,12 +738,89 @@ mod tests {
             },
         ];
 
-        let result = SensitivityResult { config, scenarios };
+        let result = SensitivityResult {
+            config,
+            scenarios,
+            baseline: None,
+        };
         let entries = generate_tornado_entries(&result, &metric, Some(period));
 
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].parameter_id, "revenue");
         assert_eq!(entries[1].parameter_id, "cogs");
+    }
+
+    #[test]
+    fn override_at_period_outside_model_grid_errors() {
+        let period = PeriodId::quarter(2025, 1);
+        let model = ModelBuilder::new("test")
+            .periods("2025Q1..Q1", None)
+            .expect("valid period range")
+            .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
+            .build()
+            .expect("valid model");
+
+        let analyzer = SensitivityAnalyzer::new(&model);
+        let mut config = SensitivityConfig::new(SensitivityMode::Diagonal);
+        // 2026Q1 is not in the model grid: previously a silent no-op scenario.
+        config.add_parameter(ParameterSpec::new(
+            "revenue",
+            PeriodId::quarter(2026, 1),
+            100_000.0,
+            vec![90_000.0, 110_000.0],
+        ));
+
+        let err = analyzer
+            .run(&config)
+            .expect_err("period outside the grid must error");
+        assert!(
+            err.to_string().contains("not part of the model"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn tornado_entries_anchor_on_true_baseline_when_base_not_in_grid() {
+        let period = PeriodId::quarter(2025, 1);
+        let model = ModelBuilder::new("test")
+            .periods("2025Q1..Q1", None)
+            .expect("valid period range")
+            .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
+            .compute("gross_profit", "revenue * 0.6")
+            .expect("valid formula")
+            .build()
+            .expect("valid model");
+
+        let analyzer = SensitivityAnalyzer::new(&model);
+        let mut config = SensitivityConfig::new(SensitivityMode::Tornado);
+        // The base value (100k) is NOT one of the perturbations.
+        config.add_parameter(ParameterSpec::new(
+            "revenue",
+            period,
+            100_000.0,
+            vec![90_000.0, 110_000.0],
+        ));
+        config.add_target_metric("gross_profit");
+
+        let result = analyzer.run(&config).expect("tornado run");
+        assert!(
+            result.baseline.is_some(),
+            "tornado runs must carry the unperturbed baseline"
+        );
+
+        let entries = generate_tornado_entries(&result, "gross_profit", Some(period));
+        assert_eq!(entries.len(), 1);
+        // Baseline gross profit = 60k; downside 54k, upside 66k.
+        assert!(
+            (entries[0].downside - (-6_000.0)).abs() < 1e-9,
+            "downside must anchor on the true baseline, got {}",
+            entries[0].downside
+        );
+        assert!(
+            (entries[0].upside - 6_000.0).abs() < 1e-9,
+            "upside must anchor on the true baseline, got {}",
+            entries[0].upside
+        );
     }
 
     #[test]

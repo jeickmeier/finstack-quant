@@ -9,6 +9,17 @@
 //! Although delta doesn't involve division by sqrt(T) (unlike gamma), the d1
 //! calculation can become numerically unstable near expiry. We apply a
 //! near-expiry threshold for consistency and to return intrinsic delta.
+//!
+//! # Cash-settled (ParYield) limitation — frozen annuity
+//!
+//! The annuity is taken from `greek_inputs` as a constant. For physically
+//! settled swaptions the annuity is a separate numeraire and this is exact
+//! (Black-76 in the annuity measure). For **cash-settled ParYield**
+//! settlement, the cash annuity `A(F)` is itself a function of the forward
+//! swap rate, so the true delta carries an extra `A'(F)·V/A` term that this
+//! analytic calculator drops (the "frozen annuity" approximation, standard
+//! but increasingly inaccurate for long tails / high vol). Use
+//! bump-and-revalue (e.g. `Dv01`) where the A'(F) contribution matters.
 
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::rates::swaption::{Swaption, VolatilityModel};

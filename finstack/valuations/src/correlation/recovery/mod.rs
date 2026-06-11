@@ -148,7 +148,10 @@ pub enum RecoverySpec {
         mean_recovery: f64,
         /// Recovery volatility (standard deviation)
         recovery_volatility: f64,
-        /// Correlation with systematic factor (typically negative)
+        /// Correlation with the systematic factor. Under the canonical
+        /// low-factor-stress convention this is typically POSITIVE: recovery
+        /// falls when the factor falls, so defaults (high in stress) and
+        /// recoveries co-move negatively.
         factor_correlation: f64,
     },
 }
@@ -183,7 +186,8 @@ impl RecoverySpec {
     /// # Arguments
     /// * `mean` - Mean recovery rate in [0.0, 1.0]. Typical: 0.40
     /// * `vol` - Recovery volatility, clamped to [0.0, 0.5]. Typical: 0.20-0.30
-    /// * `corr` - Correlation with factor, clamped to [-1.0, 1.0]. Typical: -0.30 to -0.50
+    /// * `corr` - Correlation with factor, clamped to [-1.0, 1.0]. Typical: +0.30 to +0.50
+    ///   (positive under the canonical low-factor-stress convention)
     ///
     /// # Returns
     ///
@@ -209,7 +213,8 @@ impl RecoverySpec {
     /// Uses typical calibration from CDX equity tranche:
     /// - Mean: 40%
     /// - Vol: 25%
-    /// - Correlation: -40%
+    /// - Correlation: +40% (recovery falls when the systematic factor falls,
+    ///   per the canonical low-factor-stress convention)
     ///
     /// # Returns
     ///
@@ -219,7 +224,7 @@ impl RecoverySpec {
         RecoverySpec::MarketCorrelated {
             mean_recovery: 0.40,
             recovery_volatility: 0.25,
-            factor_correlation: -0.40,
+            factor_correlation: 0.40,
         }
     }
 
@@ -316,7 +321,7 @@ mod tests {
         assert!((constant.expected_recovery() - 0.35).abs() < 1e-10);
 
         let correlated =
-            RecoverySpec::market_correlated(0.40, 0.25, -0.40).expect("valid recovery inputs");
+            RecoverySpec::market_correlated(0.40, 0.25, 0.40).expect("valid recovery inputs");
         assert!((correlated.expected_recovery() - 0.40).abs() < 1e-10);
 
         let market_std = RecoverySpec::market_standard_stochastic();
@@ -338,7 +343,7 @@ mod tests {
     fn test_recovery_spec_build() {
         let specs = vec![
             RecoverySpec::constant(0.40).expect("valid constant recovery"),
-            RecoverySpec::market_correlated(0.40, 0.25, -0.40)
+            RecoverySpec::market_correlated(0.40, 0.25, 0.40)
                 .expect("valid market-correlated recovery"),
         ];
 

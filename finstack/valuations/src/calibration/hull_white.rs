@@ -200,8 +200,15 @@ pub fn capfloor_hw1f_scalar_keys(curve_id: &str) -> (String, String) {
 
 /// Market quote for a European swaption used in HW1F calibration.
 ///
-/// Represents an ATM (or off-ATM) European swaption with its market volatility.
+/// Represents an **ATM** European swaption with its market volatility. The
+/// quote carries no strike: the calibrator always prices the swaption at the
+/// forward swap rate implied by the supplied curve, so off-ATM quotes cannot
+/// be represented by this type.
+///
+/// Deserialization rejects unknown fields and applies the same validation as
+/// [`SwaptionQuote::try_new`].
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "SwaptionQuoteRaw")]
 pub struct SwaptionQuote {
     /// Swaption expiry in years (T₀).
     pub expiry: f64,
@@ -213,13 +220,42 @@ pub struct SwaptionQuote {
     pub is_normal_vol: bool,
 }
 
+/// Wire shape for [`SwaptionQuote`]: rejects unknown fields, then routes
+/// through [`SwaptionQuote::try_new`] for value validation.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SwaptionQuoteRaw {
+    expiry: f64,
+    tenor: f64,
+    volatility: f64,
+    is_normal_vol: bool,
+}
+
+impl TryFrom<SwaptionQuoteRaw> for SwaptionQuote {
+    type Error = finstack_core::Error;
+
+    fn try_from(raw: SwaptionQuoteRaw) -> Result<Self, Self::Error> {
+        Self::try_new(raw.expiry, raw.tenor, raw.volatility, raw.is_normal_vol)
+    }
+}
+
 /// Market quote for an interest-rate cap/floor used in HW1F calibration.
 ///
 /// The quote represents a flat volatility for a full cap/floor from today to
 /// `maturity`, with caplet/floorlet periods generated from the calibration
 /// frequency. Normal vols are represented in decimal rate units: `0.0088`
 /// means 88bp normal volatility.
+///
+/// Quotes are interpreted as standard market cap/floor quotes: the
+/// spot-start caplet (whose rate fixes at `t = 0` and therefore carries no
+/// optionality) is excluded from both the market and model legs, and each
+/// caplet's option expiry is its fixing date (period start), not its payment
+/// date.
+///
+/// Deserialization rejects unknown fields and applies the same validation as
+/// [`CapFloorQuote::try_new`].
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "CapFloorQuoteRaw")]
 pub struct CapFloorQuote {
     /// Cap/floor maturity in years.
     pub maturity: f64,
@@ -232,6 +268,32 @@ pub struct CapFloorQuote {
     /// `true` for normal (Bachelier) vol. Lognormal cap/floor HW1F
     /// calibration is intentionally not accepted yet.
     pub is_normal_vol: bool,
+}
+
+/// Wire shape for [`CapFloorQuote`]: rejects unknown fields, then routes
+/// through [`CapFloorQuote::try_new`] for value validation.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CapFloorQuoteRaw {
+    maturity: f64,
+    strike: f64,
+    volatility: f64,
+    is_cap: bool,
+    is_normal_vol: bool,
+}
+
+impl TryFrom<CapFloorQuoteRaw> for CapFloorQuote {
+    type Error = finstack_core::Error;
+
+    fn try_from(raw: CapFloorQuoteRaw) -> Result<Self, Self::Error> {
+        Self::try_new(
+            raw.maturity,
+            raw.strike,
+            raw.volatility,
+            raw.is_cap,
+            raw.is_normal_vol,
+        )
+    }
 }
 
 impl CapFloorQuote {
@@ -776,15 +838,27 @@ fn calibrate_hull_white_to_swaptions_core(
     let mut prepared = Vec::with_capacity(n_quotes);
     let mut fwd_swap_rates = Vec::with_capacity(n_quotes);
     let mut vega_floor_hits: Vec<String> = Vec::new();
+    let mut schedule_fallbacks: Vec<String> = Vec::new();
     for (idx, q) in quotes.iter().enumerate() {
-        let accruals_slice = schedules.and_then(|s| {
-            let schedule = &s[idx];
-            if schedule.is_empty() {
-                None
-            } else {
-                Some(schedule.as_slice())
-            }
-        });
+        // Validate the per-quote schedule up-front with the same predicate
+        // the pricer uses (`valid_swap_accruals`), so the metadata stamp
+        // reflects what the calibration actually consumed. A malformed
+        // schedule falls back to the synthetic constant-dt recipe — that
+        // fallback is kept, but it is no longer silent: it is warned about
+        // and stamped per quote in the report metadata.
+        let n_periods = (q.tenor * ppy as f64).round().max(1.0) as usize;
+        let accruals_slice =
+            schedules.and_then(|s| valid_swap_accruals(Some(s[idx].as_slice()), n_periods));
+        if schedules.is_some() && accruals_slice.is_none() {
+            let label = format!("{}Yx{}Y", q.expiry, q.tenor);
+            tracing::warn!(
+                quote = label.as_str(),
+                "HW1F swaption calibration: per-quote accrual schedule is malformed \
+                 (wrong length or non-positive entries); falling back to the synthetic \
+                 constant-dt schedule for this quote"
+            );
+            schedule_fallbacks.push(label);
+        }
         let (annuity, fwd_rate) = if let Some(accruals) = accruals_slice {
             compute_swap_annuity_and_rate_inner(df, q.expiry, q.tenor, ppy, Some(accruals))
         } else {
@@ -860,7 +934,26 @@ fn calibrate_hull_white_to_swaptions_core(
         .with_metadata("swap_frequency", format!("{frequency:?}"))
         .with_metadata("vega_floor_hits", vega_floor_hits.len().to_string());
     if let Some(schedule_source) = schedule_source {
-        report = report.with_metadata("schedule_source", schedule_source.to_string());
+        // Stamp the actual per-basket source: if any quote fell back to the
+        // synthetic schedule, the basket is "mixed" and the fallback quotes
+        // are listed so the analyst can see exactly which quotes were not
+        // priced on real day counts.
+        let actual_source = if schedule_fallbacks.is_empty() {
+            schedule_source.to_string()
+        } else if schedule_fallbacks.len() == quotes.len() {
+            "synthetic_constant_dt".to_string()
+        } else {
+            "mixed".to_string()
+        };
+        report = report.with_metadata("schedule_source", actual_source);
+        if !schedule_fallbacks.is_empty() {
+            report = report
+                .with_metadata(
+                    "schedule_fallback_count",
+                    schedule_fallbacks.len().to_string(),
+                )
+                .with_metadata("schedule_fallback_quotes", schedule_fallbacks.join("; "));
+        }
     }
     if !vega_floor_hits.is_empty() {
         report = report.with_metadata("vega_floor_hits_detail", vega_floor_hits.join("; "));
@@ -898,7 +991,10 @@ fn calibrate_hull_white_to_swaptions_core(
 ///   Must contain `(quotes[i].tenor * frequency.periods_per_year()).round()`
 ///   strictly-positive values; their sum must equal `quotes[i].tenor` to
 ///   within numerical precision. If any schedule is malformed, the calibrator
-///   silently falls back to the constant-`dt` recipe for that quote.
+///   falls back to the constant-`dt` recipe for that quote, emits a
+///   `tracing::warn!`, and stamps the report metadata: `schedule_source`
+///   becomes `"mixed"` (or `"synthetic_constant_dt"` when every quote fell
+///   back) and `schedule_fallback_quotes` lists the affected quotes.
 ///
 /// # OIS-Specific Limitations
 ///
@@ -963,6 +1059,18 @@ pub fn calibrate_hull_white_to_cap_floors(
                 "Invalid cap/floor quote at index {idx}: {err}"
             ))
         })?;
+        // The spot-start caplet is excluded (it has no optionality), so a
+        // quote must span at least two periods to contribute any caplet.
+        let periods = (quote.maturity * config.frequency.periods_per_year() as f64)
+            .round()
+            .max(1.0) as usize;
+        if periods < 2 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Cap/floor quote at index {idx} ({}Y at {:?} frequency) contains only the \
+                 spot-start caplet, which is excluded from calibration; quote a longer maturity",
+                quote.maturity, config.frequency
+            )));
+        }
     }
 
     let frequency = config.frequency;
@@ -1003,9 +1111,22 @@ pub fn calibrate_hull_white_to_cap_floors(
         .collect();
 
     if let Some(fixed_kappa) = config.fixed_kappa {
-        // Single-parameter (σ only) — keep the 1D Brent path. The
-        // generic LM machinery would add no value for a scalar root-find.
+        // Single-parameter (σ only) — keep the 1D path. The generic LM
+        // machinery would add no value for a scalar minimisation.
+        //
+        // Guardrail parity with the two-parameter path: the fixed κ must
+        // satisfy the same band the LM box constraints enforce, the σ search
+        // spans up to SIGMA_MAX (not an arbitrary smaller cap), an at-bound
+        // σ is rejected, and the report residuals are vega-scaled so the
+        // validation tolerance is applied on the vol scale, matching the
+        // two-parameter objective.
         let fixed = HullWhiteParams::new(fixed_kappa, 1e-4)?.kappa;
+        if !(KAPPA_MIN..=KAPPA_MAX).contains(&fixed) {
+            return Err(finstack_core::Error::Validation(format!(
+                "Cap/floor HW1F fixed_kappa = {fixed:.6} outside the bounded range \
+                 [{KAPPA_MIN}, {KAPPA_MAX}]"
+            )));
+        }
         let sigma = solve_cap_floor_sigma_for_fixed_kappa(
             fixed,
             discount_df,
@@ -1014,6 +1135,13 @@ pub fn calibrate_hull_white_to_cap_floors(
             &market_prices,
             frequency,
         )?;
+        if sigma >= SIGMA_MAX * (1.0 - 1e-6) {
+            return Err(finstack_core::Error::Validation(format!(
+                "Cap/floor HW1F sigma calibration hit the upper search bound \
+                 ({sigma:.6} ≈ SIGMA_MAX = {SIGMA_MAX}); the quotes are inconsistent \
+                 with the fixed kappa = {fixed:.6}"
+            )));
+        }
         let mut residuals = BTreeMap::new();
         for (idx, quote) in quotes.iter().enumerate() {
             let spec = CapFloorPriceSpec::from_quote(quote, frequency);
@@ -1025,7 +1153,10 @@ pub fn calibrate_hull_white_to_cap_floors(
                     if quote.is_cap { "cap" } else { "floor" },
                     quote.strike
                 ),
-                model_price - market_prices[idx],
+                // Vega-scaled (vol-units) residual, matching the
+                // two-parameter LM objective so HW_VALIDATION_TOLERANCE
+                // means the same thing on both paths.
+                (model_price - market_prices[idx]) / vegas[idx],
             );
         }
         let moneyness = cap_floor_moneyness_summary(quotes, forward_df, frequency);
@@ -1270,15 +1401,17 @@ fn solve_cap_floor_sigma_for_fixed_kappa(
     };
 
     // Plausible normal-vol search range for cap/floor sigma. The full
-    // interval `[1e-8, 1.0]` is split into three sub-brackets and each is
-    // minimised independently. **Audit P2d**: a single golden-section sweep
-    // assumes the SSE is unimodal in σ, which holds for a single quote
+    // interval `[1e-8, SIGMA_MAX]` is split into three sub-brackets and each
+    // is minimised independently. **Audit P2d**: a single golden-section
+    // sweep assumes the SSE is unimodal in σ, which holds for a single quote
     // (each cap's price is monotone in σ) but **not** for multi-quote
     // baskets at different strikes where individual squared residuals can
     // bottom out at different σ values, creating local minima between
     // them. Multi-start with one bracket per decade catches that case at
     // negligible cost (the pricer runs ~200×3 = 600 times vs ~200×1).
-    let brackets: [(f64, f64); 3] = [(1e-8, 5e-3), (5e-3, 5e-2), (5e-2, 1.0)];
+    // The upper limit matches the two-parameter LM box constraint
+    // (SIGMA_MAX) so both paths search the same σ domain.
+    let brackets: [(f64, f64); 3] = [(1e-8, 5e-3), (5e-3, 5e-2), (5e-2, SIGMA_MAX)];
 
     // Reject the case where the objective is non-finite across the whole range — the
     // pricer cannot produce a usable fit and a silent bogus sigma must not be returned.
@@ -1376,7 +1509,10 @@ pub(crate) fn bachelier_cap_floor_price(
         .map(|(t_start, t_end, accrual)| {
             let forward = forward_rate_from_df(forward_df, t_start, t_end);
             let df = discount_df(t_end);
-            normal_caplet_price(forward, strike, normal_vol, t_end, accrual, df, is_cap)
+            // Option expiry is the fixing time `t_start`, not the payment
+            // time `t_end`: the caplet's rate is fixed at the period start
+            // and accrues no vol afterwards.
+            normal_caplet_price(forward, strike, normal_vol, t_start, accrual, df, is_cap)
         })
         .sum()
 }
@@ -1393,7 +1529,9 @@ fn cap_floor_bachelier_vega(
         .map(|(t_start, t_end, accrual)| {
             let forward = forward_rate_from_df(forward_df, t_start, t_end);
             let df = discount_df(t_end);
-            normal_caplet_vega(forward, strike, normal_vol, t_end) * accrual * df
+            // Vol accrues only to the fixing time `t_start` (see
+            // `bachelier_cap_floor_price`).
+            normal_caplet_vega(forward, strike, normal_vol, t_start) * accrual * df
         })
         .sum()
 }
@@ -1422,7 +1560,22 @@ impl CapFloorPriceSpec {
     }
 }
 
-/// Price a full cap/floor with HW1F-implied normal caplet volatilities.
+/// Price a full cap/floor exactly under HW1F by pricing each caplet as a
+/// zero-coupon bond option.
+///
+/// A caplet fixing at `T`, paying `τ·max(L(T,S) − K, 0)` at `S`, equals
+/// `(1 + τK)` zero-coupon bond **puts** with strike `X = 1/(1 + τK)` on
+/// `P(T,S)`, expiring at `T`; a floorlet is the corresponding bond **call**
+/// (Brigo–Mercurio §2.6 / Hull §31). The ZCB option is priced with the same
+/// HW1F bond-option formula used by the Jamshidian swaption decomposition
+/// ([`hw_bond_vol`]). This replaces the earlier mapping of HW bond vol to an
+/// approximate forward-rate normal vol, which understated the caplet vol by
+/// a `(1 + τF)` factor.
+///
+/// Dual-curve handling: the ZCB option is evaluated on the forward
+/// (projection) curve and scaled by the deterministic discount/projection
+/// basis `P_d(0,S)/P_f(0,S)`; for single-curve calibration the factor is 1
+/// and the price is exact.
 pub(crate) fn hw1f_cap_floor_price(
     kappa: f64,
     sigma: f64,
@@ -1432,20 +1585,82 @@ pub(crate) fn hw1f_cap_floor_price(
 ) -> f64 {
     cap_floor_periods(spec.maturity, spec.frequency)
         .map(|(t_start, t_end, accrual)| {
-            let forward = forward_rate_from_df(forward_df, t_start, t_end);
-            let df = discount_df(t_end);
-            let hw_vol = hw1f_caplet_forward_rate_normal_vol(kappa, sigma, t_end, accrual);
-            normal_caplet_price(
-                forward,
-                spec.strike,
-                hw_vol,
+            hw1f_caplet_price_zcb_option(
+                kappa,
+                sigma,
+                discount_df,
+                forward_df,
+                t_start,
                 t_end,
                 accrual,
-                df,
+                spec.strike,
                 spec.is_cap,
             )
         })
         .sum()
+}
+
+/// Exact HW1F caplet/floorlet price via the ZCB-option equivalence.
+///
+/// Returns NaN on pathological curve inputs (non-finite or non-positive
+/// discount factors) so the calibration objective's non-finite-price error
+/// contract keeps working.
+#[allow(clippy::too_many_arguments)]
+fn hw1f_caplet_price_zcb_option(
+    kappa: f64,
+    sigma: f64,
+    discount_df: &dyn Fn(f64) -> f64,
+    forward_df: &dyn Fn(f64) -> f64,
+    t_fix: f64,
+    t_pay: f64,
+    accrual: f64,
+    strike: f64,
+    is_cap: bool,
+) -> f64 {
+    let pf_fix = forward_df(t_fix);
+    let pf_pay = forward_df(t_pay);
+    let pd_pay = discount_df(t_pay);
+    let valid_df = |p: f64| p.is_finite() && p > 0.0;
+    if !valid_df(pf_fix) || !valid_df(pf_pay) || !valid_df(pd_pay) {
+        return f64::NAN;
+    }
+    // Deterministic multiplicative discount/projection basis; 1.0 when the
+    // two curves coincide (single-curve calibration).
+    let basis = pd_pay / pf_pay;
+
+    let gearing = 1.0 + accrual * strike;
+    if gearing <= 0.0 {
+        // Strike below −1/τ: a cap is always in the money (intrinsic), a
+        // floor is worthless (assuming P(T,S) > 0 ⇔ 1 + τL > 0).
+        if is_cap {
+            let forward = (pf_fix / pf_pay - 1.0) / accrual;
+            return basis * pf_pay * accrual * (forward - strike);
+        }
+        return 0.0;
+    }
+    let x_strike = 1.0 / gearing;
+
+    let sigma_p = hw_bond_vol(kappa, sigma, 0.0, t_fix, t_pay);
+    if sigma_p < 1e-15 {
+        // Degenerate (zero vol or zero time to fixing): intrinsic value.
+        let zcb_intrinsic = if is_cap {
+            (x_strike * pf_fix - pf_pay).max(0.0)
+        } else {
+            (pf_pay - x_strike * pf_fix).max(0.0)
+        };
+        return basis * gearing * zcb_intrinsic;
+    }
+
+    let d1 = (pf_pay / (x_strike * pf_fix)).ln() / sigma_p + 0.5 * sigma_p;
+    let d2 = d1 - sigma_p;
+    // Caplet = (1+τK) × ZBP(0, T, S, X); floorlet = (1+τK) × ZBC(0, T, S, X).
+    let zcb_option = if is_cap {
+        x_strike * pf_fix * norm_cdf(-d2) - pf_pay * norm_cdf(-d1)
+    } else {
+        pf_pay * norm_cdf(d1) - x_strike * pf_fix * norm_cdf(d2)
+    };
+    let zcb_option_clamped = if zcb_option < 0.0 { 0.0 } else { zcb_option };
+    basis * gearing * zcb_option_clamped
 }
 
 /// Return the flat normal vol that reproduces the HW1F cap/floor model price.
@@ -1503,6 +1718,12 @@ pub(crate) fn hw1f_caplet_forward_rate_normal_vol(
     sigma * accrual_factor * (integrated_variance_time / t_fix).sqrt()
 }
 
+/// Caplet periods `(t_start, t_end, accrual)` for a spot-start cap quote.
+///
+/// The first (spot-start) caplet is **excluded**: its rate fixes at `t = 0`,
+/// so it carries no optionality, and standard market cap quotes exclude it.
+/// Both the market (Bachelier) and model (HW1F) legs use this iterator, so
+/// the convention is applied consistently to both sides of the calibration.
 fn cap_floor_periods(
     maturity: f64,
     frequency: SwapFrequency,
@@ -1511,17 +1732,28 @@ fn cap_floor_periods(
         .round()
         .max(1.0) as usize;
     let accrual = maturity / periods as f64;
-    (0..periods).map(move |idx| {
+    (1..periods).map(move |idx| {
         let start = idx as f64 * accrual;
         let end = (idx + 1) as f64 * accrual;
         (start, end, accrual)
     })
 }
 
+/// Simple forward rate between `start` and `end` from a discount-factor
+/// function.
+///
+/// Non-finite or non-positive discount factors propagate as `NaN` instead of
+/// being clamped: callers (`HullWhiteCapFloorTarget::calculate_residuals`,
+/// `solve_cap_floor_sigma_for_fixed_kappa`) rely on the non-finite-price
+/// check to detect broken curves, and `f64::max` would silently absorb a NaN
+/// (`NaN.max(1e-12) == 1e-12`), defeating that error contract.
 fn forward_rate_from_df(df: &dyn Fn(f64) -> f64, start: f64, end: f64) -> f64 {
     let accrual = (end - start).max(1e-12);
-    let p_start = df(start).max(1e-12);
-    let p_end = df(end).max(1e-12);
+    let p_start = df(start);
+    let p_end = df(end);
+    if !p_start.is_finite() || !p_end.is_finite() || p_start <= 0.0 || p_end <= 0.0 {
+        return f64::NAN;
+    }
     (p_start / p_end - 1.0) / accrual
 }
 
@@ -1570,10 +1802,13 @@ fn normal_caplet_vega(forward: f64, strike: f64, vol: f64, expiry: f64) -> f64 {
 /// Returns the adjustment (in rate terms) to convert a futures rate to a forward rate:
 /// `forward = futures_rate - convexity_adjustment`.
 ///
-/// The formula (Hull, 6th ed., Chapter 6):
+/// The full HW1F futures-forward adjustment (Hull, Technical Note #1;
+/// Kirikos-Novak 1997):
 ///
 /// $$
-/// \text{CA} = \tfrac{1}{2} \, \sigma^2 \, B(0, T_1) \, B(T_1, T_2)
+/// \text{CA} = \frac{\sigma^2}{4\kappa} \cdot \frac{B(T_1, T_2)}{T_2 - T_1}
+/// \left[ B(T_1, T_2)\,\bigl(1 - e^{-2\kappa T_1}\bigr)
+///      + 2\kappa\,B(0, T_1)^2 \right]
 /// $$
 ///
 /// where:
@@ -1582,6 +1817,10 @@ fn normal_caplet_vega(forward: f64, strike: f64, vol: f64, expiry: f64) -> f64 {
 /// - $\sigma$ = HW1F short-rate volatility
 /// - $\kappa$ = HW1F mean-reversion speed
 /// - $B(t_1, t_2) = (1 - e^{-\kappa(t_2 - t_1)}) / \kappa$
+///
+/// In the $\kappa \to 0$ (Ho-Lee) limit this reduces to
+/// $\tfrac{1}{2}\sigma^2 T_1 T_2$, which is handled by an explicit branch to
+/// avoid $0/0$ cancellation.
 ///
 /// # Arguments
 /// * `kappa` - Mean-reversion speed
@@ -1592,9 +1831,20 @@ fn normal_caplet_vega(forward: f64, strike: f64, vol: f64, expiry: f64) -> f64 {
 /// # Returns
 /// The convexity adjustment in the same rate units as sigma.
 pub fn hw1f_convexity_adjustment(kappa: f64, sigma: f64, t_settle: f64, t_end: f64) -> f64 {
+    let tau = t_end - t_settle;
+    if t_settle <= 0.0 || tau <= 0.0 {
+        return 0.0;
+    }
+    const SMALL_KAPPA: f64 = 1e-8;
+    if kappa.abs() < SMALL_KAPPA {
+        // Ho-Lee limit: B(t1,t2) -> t2-t1 and the bracket collapses to
+        // 2κ·T1·T2, cancelling the 1/(4κ) prefactor.
+        return 0.5 * sigma * sigma * t_settle * t_end;
+    }
     let b_0s = hw_b(kappa, 0.0, t_settle);
     let b_se = hw_b(kappa, t_settle, t_end);
-    0.5 * sigma * sigma * b_0s * b_se
+    let bracket = b_se * (1.0 - (-2.0 * kappa * t_settle).exp()) + 2.0 * kappa * b_0s * b_0s;
+    sigma * sigma / (4.0 * kappa) * (b_se / tau) * bracket
 }
 
 // =============================================================================
@@ -1626,43 +1876,22 @@ fn hw_bond_vol(kappa: f64, sigma: f64, t: f64, big_t: f64, s: f64) -> f64 {
 /// Compute ln A(t, T) for the HW1F affine bond price model.
 ///
 /// ln A(t,T) = ln(P(0,T)/P(0,t)) + B(t,T) f(0,t) − (σ²/4κ)(1−e^{−2κt}) B(t,T)²
-fn hw_ln_a(kappa: f64, sigma: f64, t: f64, big_t: f64, df: &dyn Fn(f64) -> f64) -> f64 {
-    hw_ln_a_inner(kappa, sigma, t, big_t, df, None)
-}
-
-/// Internal `hw_ln_a` that lets the caller supply an analytical instantaneous
-/// forward `f(0,t)` instead of the central-FD approximation.
 ///
-/// W4 fix: `hw_ln_a`'s 3-point central FD on `ln(df)` smears the
-/// piecewise-constant forward implied by log-linear DF interpolation across
-/// curve knots. Production callers can avoid that by passing the
-/// `DiscountCurve::forward(t1, t2)` evaluated at small tenors, which uses
-/// the curve's own interpolation analytically.
-fn hw_ln_a_inner(
-    kappa: f64,
-    sigma: f64,
-    t: f64,
-    big_t: f64,
-    df: &dyn Fn(f64) -> f64,
-    forward_analytic: Option<&dyn Fn(f64) -> f64>,
-) -> f64 {
+/// The instantaneous forward `f(0,t)` is approximated by a central finite
+/// difference on `ln P(0,t)`. The FD error is benign for the Jamshidian
+/// swaption decomposition: the same `ln A` enters both the strike
+/// `K_i = A_i e^{−B_i r*}` (through the `r*` solve) and the bond-put
+/// moneyness ratio `P(0,T_i)/(K_i P(0,T₀))`, so the `B(t,T)·f(0,t)` term —
+/// and any error in it — cancels exactly between the two. An earlier
+/// `forward_analytic` hook for supplying the curve's analytical forward was
+/// removed for this reason: it was never wired and could not change prices.
+fn hw_ln_a(kappa: f64, sigma: f64, t: f64, big_t: f64, df: &dyn Fn(f64) -> f64) -> f64 {
     let p0t = df(t);
     let p0_big_t = df(big_t);
     let b = hw_b(kappa, t, big_t);
 
     // Instantaneous forward rate: f(0,t) ≈ −d/dt ln P(0,t)
-    let f0t = if let Some(f_analytic) = forward_analytic {
-        let v = f_analytic(t);
-        if v.is_finite() {
-            v
-        } else {
-            // Analytical hook returned non-finite (e.g. tenor below
-            // `min_forward_tenor`); fall back to central FD.
-            fd_forward_rate(df, t)
-        }
-    } else {
-        fd_forward_rate(df, t)
-    };
+    let f0t = fd_forward_rate(df, t);
 
     let var_term = if kappa.abs() < 1e-10 {
         sigma * sigma * t * b * b / 2.0
@@ -2793,5 +3022,376 @@ mod tests {
             (3e-3..=3e-2).contains(&sigma),
             "lognormal-vol σ seed out of order of magnitude: {sigma}"
         );
+    }
+
+    /// M2.17: the HW futures convexity adjustment must reduce to the Ho-Lee
+    /// limit `½σ²T₁T₂` as κ → 0 — both via the explicit small-κ branch and
+    /// continuously through it.
+    #[test]
+    fn convexity_adjustment_ho_lee_limit() {
+        let sigma = 0.01;
+        let t1 = 5.0;
+        let t2 = 5.25;
+        let ho_lee = 0.5 * sigma * sigma * t1 * t2;
+
+        // Explicit small-κ branch.
+        let ca_branch = hw1f_convexity_adjustment(1e-12, sigma, t1, t2);
+        assert!(
+            (ca_branch - ho_lee).abs() < 1e-15,
+            "κ→0 branch must equal ½σ²T₁T₂: got {ca_branch}, want {ho_lee}"
+        );
+
+        // Continuity across the branch threshold.
+        let ca_small = hw1f_convexity_adjustment(1e-6, sigma, t1, t2);
+        assert!(
+            (ca_small - ho_lee).abs() / ho_lee < 1e-4,
+            "full formula at κ=1e-6 must approach the Ho-Lee limit: \
+             got {ca_small}, want {ho_lee}"
+        );
+    }
+
+    /// M2.17: at realistic parameters (κ=0.03, σ=0.01, T₁=5y eurodollar) the
+    /// adjustment is ~11–13bp; the previous formula `½σ²B(0,T₁)B(T₁,T₂)`
+    /// gave ~0.58bp (≈20× understated) because it dropped the `½σ²T₁²` term.
+    #[test]
+    fn convexity_adjustment_magnitude_at_realistic_params() {
+        let kappa = 0.03;
+        let sigma = 0.01;
+        let t1 = 5.0;
+        let t2 = 5.25;
+
+        let ca = hw1f_convexity_adjustment(kappa, sigma, t1, t2);
+        // Below the Ho-Lee bound (mean reversion damps the adjustment)…
+        let ho_lee = 0.5 * sigma * sigma * t1 * t2;
+        assert!(
+            ca < ho_lee,
+            "κ>0 must damp the adjustment: {ca} vs {ho_lee}"
+        );
+        // …but on the same order, not 20× smaller.
+        assert!(
+            (1.0e-3..1.35e-3).contains(&ca),
+            "expected ~11–13bp adjustment, got {ca}"
+        );
+
+        // The dropped-term formula for reference: it must NOT match.
+        let old = 0.5 * sigma * sigma * hw_b(kappa, 0.0, t1) * hw_b(kappa, t1, t2);
+        assert!(
+            ca > 10.0 * old,
+            "fixed adjustment {ca} should dwarf the old understated value {old}"
+        );
+    }
+
+    /// Degenerate inputs return zero adjustment.
+    #[test]
+    fn convexity_adjustment_degenerate_inputs() {
+        assert_eq!(hw1f_convexity_adjustment(0.03, 0.01, 0.0, 0.25), 0.0);
+        assert_eq!(hw1f_convexity_adjustment(0.03, 0.01, 5.0, 5.0), 0.0);
+        assert_eq!(hw1f_convexity_adjustment(0.03, 0.01, 5.0, 4.0), 0.0);
+    }
+
+    /// M2.19: non-finite or non-positive discount factors must propagate as
+    /// NaN — `df.max(1e-12)` silently absorbed NaN (f64::max semantics) and
+    /// produced a finite forward, defeating the non-finite-price error
+    /// contract in the calibration residuals.
+    #[test]
+    fn forward_rate_from_df_propagates_bad_dfs() {
+        let nan_df = |_: f64| f64::NAN;
+        assert!(forward_rate_from_df(&nan_df, 0.25, 0.5).is_nan());
+
+        let neg_df = |t: f64| if t > 0.3 { -1.0 } else { 1.0 };
+        assert!(forward_rate_from_df(&neg_df, 0.25, 0.5).is_nan());
+
+        let zero_df = |t: f64| if t > 0.3 { 0.0 } else { 1.0 };
+        assert!(forward_rate_from_df(&zero_df, 0.25, 0.5).is_nan());
+
+        // Sane curve still produces a sane forward.
+        let df_fn = flat_df(0.03);
+        let fwd = forward_rate_from_df(&df_fn, 0.25, 0.5);
+        assert!((fwd - 0.03).abs() < 1e-3, "flat 3% curve forward: {fwd}");
+    }
+
+    /// M2.18: the spot-start caplet (fixing at t=0, no optionality) is
+    /// excluded from cap decomposition, and caplet expiry is the fixing time
+    /// `t_start`, not the payment time `t_end`.
+    #[test]
+    fn cap_floor_periods_exclude_spot_caplet_and_expiry_is_fixing_time() {
+        let periods: Vec<(f64, f64, f64)> =
+            cap_floor_periods(1.0, SwapFrequency::Quarterly).collect();
+        assert_eq!(
+            periods.len(),
+            3,
+            "1y quarterly cap: 3 caplets, spot excluded"
+        );
+        assert!(
+            (periods[0].0 - 0.25).abs() < 1e-12,
+            "first included caplet fixes at 0.25, got {}",
+            periods[0].0
+        );
+
+        // Expiry convention: a cap priced with vol accruing to t_start must be
+        // strictly cheaper than the same legs priced to t_end (more variance).
+        let df_fn = flat_df(0.03);
+        let price = bachelier_cap_floor_price(
+            &df_fn,
+            &df_fn,
+            2.0,
+            0.03,
+            0.008,
+            true,
+            SwapFrequency::Quarterly,
+        );
+        let price_t_end: f64 = cap_floor_periods(2.0, SwapFrequency::Quarterly)
+            .map(|(t_start, t_end, accrual)| {
+                let forward = forward_rate_from_df(&df_fn, t_start, t_end);
+                normal_caplet_price(forward, 0.03, 0.008, t_end, accrual, df_fn(t_end), true)
+            })
+            .sum();
+        assert!(
+            price < price_t_end,
+            "fixing-time expiry must price below payment-time expiry: \
+             {price} vs {price_t_end}"
+        );
+        assert!(price > 0.0);
+    }
+
+    /// M2.18: a quote spanning only the (excluded) spot-start caplet is
+    /// rejected at validation rather than calibrated against a zero price.
+    #[test]
+    fn cap_floor_single_period_quote_rejected() {
+        let df_fn = flat_df(0.03);
+        let quote = CapFloorQuote {
+            maturity: 0.25,
+            strike: 0.03,
+            volatility: 0.008,
+            is_cap: true,
+            is_normal_vol: true,
+        };
+        let config = CapFloorCalibrationConfig {
+            frequency: SwapFrequency::Quarterly,
+            fixed_kappa: Some(0.05),
+            ..Default::default()
+        };
+        let result = calibrate_hull_white_to_cap_floors(&df_fn, &df_fn, &[quote], config);
+        assert!(
+            result.is_err(),
+            "single-period cap quote must be rejected, got {:?}",
+            result.map(|(p, _)| p)
+        );
+    }
+
+    /// ZCB-option caplet pricing satisfies exact cap/floor parity:
+    /// cap − floor = Σ P_d(0, S_i) · τ_i · (F_i − K).
+    #[test]
+    fn hw1f_cap_floor_zcb_option_parity() {
+        let df_fn = flat_df(0.03);
+        let (kappa, sigma, maturity, strike) = (0.05, 0.012, 5.0, 0.035);
+        let freq = SwapFrequency::Quarterly;
+        let cap = hw1f_cap_floor_price(
+            kappa,
+            sigma,
+            &df_fn,
+            &df_fn,
+            CapFloorPriceSpec::new(maturity, strike, true, freq),
+        );
+        let floor = hw1f_cap_floor_price(
+            kappa,
+            sigma,
+            &df_fn,
+            &df_fn,
+            CapFloorPriceSpec::new(maturity, strike, false, freq),
+        );
+        let forward_leg: f64 = cap_floor_periods(maturity, freq)
+            .map(|(t_start, t_end, accrual)| {
+                let fwd = forward_rate_from_df(&df_fn, t_start, t_end);
+                df_fn(t_end) * accrual * (fwd - strike)
+            })
+            .sum();
+        assert!(
+            (cap - floor - forward_leg).abs() < 1e-12,
+            "cap/floor parity violated: cap={cap}, floor={floor}, fwd_leg={forward_leg}"
+        );
+        assert!(cap > 0.0 && floor > 0.0);
+    }
+
+    /// The exact ZCB-put caplet price exceeds the old forward-rate-normal-vol
+    /// approximation (which understated the caplet vol by ~(1+τF)) and the
+    /// gap matches the (1+τF) vol scaling to first order.
+    #[test]
+    fn hw1f_zcb_option_caplet_prices_above_old_approximation() {
+        let df_fn = flat_df(0.04);
+        let (kappa, sigma) = (0.05, 0.012);
+        let spec = CapFloorPriceSpec::new(5.0, 0.04, true, SwapFrequency::Annual);
+        let exact = hw1f_cap_floor_price(kappa, sigma, &df_fn, &df_fn, spec);
+        let approx: f64 = cap_floor_periods(spec.maturity, spec.frequency)
+            .map(|(t_start, t_end, accrual)| {
+                let forward = forward_rate_from_df(&df_fn, t_start, t_end);
+                let hw_vol = hw1f_caplet_forward_rate_normal_vol(kappa, sigma, t_start, accrual);
+                normal_caplet_price(
+                    forward,
+                    spec.strike,
+                    hw_vol,
+                    t_start,
+                    accrual,
+                    df_fn(t_end),
+                    spec.is_cap,
+                )
+            })
+            .sum();
+        assert!(
+            exact > approx,
+            "exact ZCB-option price must exceed the understated approximation: \
+             {exact} vs {approx}"
+        );
+        // The relative gap is on the order of τF ≈ 4% for annual caplets at
+        // a 4% forward (ATM vega is linear in vol).
+        let rel_gap = (exact - approx) / approx;
+        assert!(
+            rel_gap > 0.01 && rel_gap < 0.10,
+            "expected ~τF vol understatement, got relative price gap {rel_gap}"
+        );
+    }
+
+    /// A malformed per-quote schedule falls back to the synthetic recipe but
+    /// is stamped in the report metadata instead of silently claiming
+    /// real-day-count schedules.
+    #[test]
+    fn swaption_schedule_fallback_is_stamped() {
+        let df_fn = flat_df(0.03);
+        let quotes = vec![
+            SwaptionQuote {
+                expiry: 1.0,
+                tenor: 5.0,
+                volatility: 0.006,
+                is_normal_vol: true,
+            },
+            SwaptionQuote {
+                expiry: 5.0,
+                tenor: 5.0,
+                volatility: 0.006,
+                is_normal_vol: true,
+            },
+        ];
+        // First schedule valid (10 semi-annual accruals), second malformed
+        // (wrong length).
+        let schedules = vec![vec![0.5; 10], vec![0.5; 3]];
+        let (_, report) = calibrate_hull_white_to_swaptions_with_schedules(
+            &df_fn,
+            &quotes,
+            SwapFrequency::SemiAnnual,
+            &schedules,
+            None,
+        )
+        .expect("calibration should succeed with fallback");
+        assert_eq!(
+            report.metadata.get("schedule_source").map(String::as_str),
+            Some("mixed"),
+            "one fallback quote must downgrade schedule_source to 'mixed'"
+        );
+        assert_eq!(
+            report
+                .metadata
+                .get("schedule_fallback_count")
+                .map(String::as_str),
+            Some("1")
+        );
+        assert!(
+            report
+                .metadata
+                .get("schedule_fallback_quotes")
+                .is_some_and(|q| q.contains("5Yx5Y")),
+            "fallback quote label must be listed: {:?}",
+            report.metadata.get("schedule_fallback_quotes")
+        );
+
+        // All-valid schedules keep the real_day_count stamp.
+        let schedules_ok = vec![vec![0.5; 10], vec![0.5; 10]];
+        let (_, report_ok) = calibrate_hull_white_to_swaptions_with_schedules(
+            &df_fn,
+            &quotes,
+            SwapFrequency::SemiAnnual,
+            &schedules_ok,
+            None,
+        )
+        .expect("calibration should succeed");
+        assert_eq!(
+            report_ok
+                .metadata
+                .get("schedule_source")
+                .map(String::as_str),
+            Some("real_day_count")
+        );
+        assert!(!report_ok.metadata.contains_key("schedule_fallback_count"));
+    }
+
+    /// Fixed-κ guardrail parity: κ outside the LM box-constraint band is
+    /// rejected up front.
+    #[test]
+    fn cap_floor_fixed_kappa_out_of_band_rejected() {
+        let df_fn = flat_df(0.03);
+        let quote = CapFloorQuote {
+            maturity: 5.0,
+            strike: 0.03,
+            volatility: 0.008,
+            is_cap: true,
+            is_normal_vol: true,
+        };
+        for bad_kappa in [KAPPA_MAX * 2.0, KAPPA_MIN / 2.0] {
+            let config = CapFloorCalibrationConfig {
+                frequency: SwapFrequency::Quarterly,
+                fixed_kappa: Some(bad_kappa),
+                ..Default::default()
+            };
+            let result = calibrate_hull_white_to_cap_floors(&df_fn, &df_fn, &[quote], config);
+            assert!(
+                result.is_err(),
+                "fixed_kappa={bad_kappa} outside [{KAPPA_MIN}, {KAPPA_MAX}] must be rejected"
+            );
+        }
+    }
+
+    /// Quote deserialization rejects unknown fields and invalid values.
+    #[test]
+    fn quote_deserialization_validates() {
+        // Valid quotes round-trip.
+        let q: SwaptionQuote = serde_json::from_str(
+            r#"{"expiry": 1.0, "tenor": 5.0, "volatility": 0.006, "is_normal_vol": true}"#,
+        )
+        .expect("valid swaption quote");
+        assert!((q.expiry - 1.0).abs() < 1e-15);
+        let c: CapFloorQuote = serde_json::from_str(
+            r#"{"maturity": 5.0, "strike": 0.03, "volatility": 0.008,
+                "is_cap": true, "is_normal_vol": true}"#,
+        )
+        .expect("valid cap quote");
+        assert!((c.maturity - 5.0).abs() < 1e-15);
+
+        // Unknown fields are rejected.
+        assert!(serde_json::from_str::<SwaptionQuote>(
+            r#"{"expiry": 1.0, "tenor": 5.0, "volatility": 0.006,
+                "is_normal_vol": true, "strike": 0.03}"#,
+        )
+        .is_err());
+        assert!(serde_json::from_str::<CapFloorQuote>(
+            r#"{"maturity": 5.0, "strike": 0.03, "volatility": 0.008,
+                "is_cap": true, "is_normal_vol": true, "extra": 1}"#,
+        )
+        .is_err());
+
+        // Invalid values are rejected at deserialization time.
+        assert!(serde_json::from_str::<SwaptionQuote>(
+            r#"{"expiry": -1.0, "tenor": 5.0, "volatility": 0.006, "is_normal_vol": true}"#,
+        )
+        .is_err());
+        assert!(serde_json::from_str::<CapFloorQuote>(
+            r#"{"maturity": 5.0, "strike": 0.03, "volatility": -0.008,
+                "is_cap": true, "is_normal_vol": true}"#,
+        )
+        .is_err());
+        // Lognormal cap/floor quotes are not accepted yet.
+        assert!(serde_json::from_str::<CapFloorQuote>(
+            r#"{"maturity": 5.0, "strike": 0.03, "volatility": 0.2,
+                "is_cap": true, "is_normal_vol": false}"#,
+        )
+        .is_err());
     }
 }

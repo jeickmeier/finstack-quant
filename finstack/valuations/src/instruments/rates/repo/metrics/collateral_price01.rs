@@ -1,18 +1,30 @@
 //! CollateralPrice01 calculator for Repo.
 //!
 //! Computes CollateralPrice01 (collateral price sensitivity) using finite differences.
-//! CollateralPrice01 measures the change in PV for a 1% change in collateral price.
 //!
 //! # Formula
 //! ```text
-//! CollateralPrice01 = (PV(collateral_price * 1.01) - PV(collateral_price * 0.99)) / (2 * bump_size)
+//! CollateralPrice01 = (PV(price × 1.01) - PV(price × 0.99)) / (2 × 0.01)
 //! ```
-//! Where bump_size is 1% (0.01).
+//! i.e. the central difference normalized by the **relative** bump width, so the
+//! result is the PV change per unit relative move in the collateral price
+//! (divide by 100 for a per-1% view).
 //!
-//! # Note
-//! Collateral price is accessed via `collateral.market_value_id` from MarketContext.
-//! This metric bumps the collateral price in MarketContext and reprices the repo.
-//! Changes in collateral price may affect margin requirements and collateral coverage.
+//! # Important Limitation
+//!
+//! In the current simple repo model the collateral price affects collateral
+//! **coverage** metrics (via `collateral.market_value_id`) but does **not**
+//! enter the PV calculation at all. The repo PV is computed from:
+//! - Initial cash outflow at start
+//! - Discounted repayment (principal + interest) at maturity
+//!
+//! Neither cashflow depends on the collateral price, so this metric returns
+//! exactly **zero** for standard repos. It becomes meaningful only in models
+//! that incorporate margin-call cashflows, collateral funding costs, or
+//! default/close-out exposure to the collateral's market value.
+//!
+//! For collateral mark-to-market monitoring, use the `CollateralValue` and
+//! `CollateralCoverage` metrics instead.
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::repo::Repo;
@@ -58,10 +70,11 @@ impl MetricCalculator for CollateralPrice01Calculator {
         );
         let pv_down = repo.value(&ctx_down, as_of)?.amount();
 
-        // CollateralPrice01 = (PV_up - PV_down) / (2 * bump_size)
-        // Result is PV change per 1% change in collateral price
-        // bump_size = current_price * 0.01, so dividing by (2 * bump_size) normalizes
-        // to "per unit price move" and then multiplying by 0.01 gives "per 1% move"
+        // CollateralPrice01 = (PV_up - PV_down) / (2 * 0.01): the central
+        // difference normalized by the relative bump width, i.e. the PV change
+        // per *unit* relative move in the collateral price (divide by 100 for
+        // a per-1% view). Identically zero in the current model — see the
+        // module-level limitation note.
         // `COLLATERAL_PRICE_BUMP_PCT` is a fixed positive constant, so the bump
         // width is never degenerate; the helper's error path cannot trigger here.
         let collateral_price01 = if current_price.abs() > 1e-10 {

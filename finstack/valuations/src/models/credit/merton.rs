@@ -183,6 +183,16 @@ impl MertonModel {
     /// * `barrier_type` - Terminal or first-passage
     /// * `dynamics` - Asset return dynamics
     ///
+    /// # `V <= B` (in-default state)
+    ///
+    /// `asset_value <= debt_barrier` is intentionally accepted: it represents
+    /// a firm at or through its default point (distressed names). Pricing
+    /// then degenerates consistently — first-passage paths default
+    /// immediately, terminal-barrier default probabilities approach 1, and
+    /// the CreditGrades survival formula returns PD = 1 in the
+    /// zero-variance limit. Callers wanting a strictly solvent firm should
+    /// validate `asset_value > debt_barrier` themselves.
+    ///
     /// # Errors
     ///
     /// Returns [`InputError::NonPositiveValue`] if `asset_value`, `asset_vol`,

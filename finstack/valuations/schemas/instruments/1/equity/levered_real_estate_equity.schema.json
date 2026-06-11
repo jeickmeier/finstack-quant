@@ -8549,7 +8549,7 @@
             },
             "DiscountedCashFlow": {
               "additionalProperties": false,
-              "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\nWhen [`equity_bridge`](Self::equity_bridge) is `Some`, it takes precedence over\nthe flat [`net_debt`](Self::net_debt) field for the EV-to-equity conversion.\n\n# Mid-Year Convention\n\nWhen [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are\ndiscounted at `(t - 0.5)` years instead of `t` years, reflecting the assumption\nthat cash flows arrive mid-period (standard IB/PE practice).\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts).",
+              "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\nWhen [`equity_bridge`](Self::equity_bridge) is `Some`, it takes precedence over\nthe flat [`net_debt`](Self::net_debt) field for the EV-to-equity conversion.\n\n# Mid-Year Convention\n\nWhen [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are\ndiscounted at `t` minus half the average flow spacing instead of `t` years,\nreflecting the assumption that cash flows arrive mid-period (standard IB/PE\npractice). For annual grids this is the classic `(t - 0.5)`; for sub-annual\ngrids the shift is half a period. `ExitMultiple` terminal values always\ndiscount at the full horizon (a point-in-time sale price).\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts).",
               "properties": {
                 "attributes": {
                   "$ref": "#/$defs/Attributes"
@@ -8631,6 +8631,14 @@
                   }
                 },
                 "shares_outstanding": {
+                  "default": null,
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "terminal_flow_override": {
                   "default": null,
                   "format": "double",
                   "type": [
@@ -18324,11 +18332,11 @@
               "type": "object"
             },
             "StubKind": {
-              "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No special stub handling (default). Generates regular periods\n  from start to end, with the final period potentially irregular.\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_core::dates::{ScheduleBuilder, Tenor, StubKind};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = ScheduleBuilder::new(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
+              "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_core::dates::{ScheduleBuilder, Tenor, StubKind};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = ScheduleBuilder::new(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
               "oneOf": [
                 {
                   "const": "None",
-                  "description": "No special stub handling.",
+                  "description": "No stub allowed: start/end must align exactly with the frequency,\notherwise schedule generation returns an error.",
                   "type": "string"
                 },
                 {

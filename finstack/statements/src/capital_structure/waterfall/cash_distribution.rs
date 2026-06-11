@@ -19,10 +19,20 @@ pub(super) struct StagedInstrumentFlow {
     pub extra_principal: Money,
     /// Scheduled (contractual) principal payment
     pub scheduled_principal: Money,
+    /// Cash coupon moved into the PIK bucket by the PIK toggle this period.
+    /// Tracked so toggle-driven capitalization can be accumulated in
+    /// `CapitalStructureState::cumulative_toggled_pik`.
+    pub toggled_pik_moved: Money,
 }
 
 /// Cap a single category (fees, interest) across instruments using a pro-rata
 /// allocation of remaining cash.
+///
+/// Negative planned values are treated as zero claims: they receive no
+/// allocation and the category field is set to zero. A negative contractual
+/// amount in an outflow bucket indicates an upstream sign-convention problem
+/// rather than a receivable, so it is neutralized instead of being netted
+/// against other instruments' claims.
 pub(super) fn apply_cash_cap_to_category<F>(
     staged: &mut [StagedInstrumentFlow],
     remaining_cash: &mut Money,

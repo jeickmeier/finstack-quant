@@ -214,14 +214,146 @@ fn test_long_front_stub() {
         .into_iter()
         .collect();
 
-    // Should create regular quarters from end date backwards: Nov, Aug, May, Feb
-    // This creates a long front period from Jan 1 to Feb 1
-    assert_eq!(dates.len(), 5);
+    // Regular quarters backward from the end date are Nov, Aug, May, Feb.
+    // The residual Jan 1 -> Feb 1 stub is MERGED with the first regular
+    // period (Feb -> May), producing a genuinely long 4-month first period
+    // Jan 1 -> May 1. (Keeping the Feb 1 anchor — the previous behavior —
+    // made LongFront identical to ShortFront.)
+    assert_eq!(dates.len(), 4);
     assert_eq!(dates[0], make_date(2025, 1, 1)); // Start date
-    assert_eq!(dates[1], make_date(2025, 2, 1)); // First regular anchor
-    assert_eq!(dates[2], make_date(2025, 5, 1)); // Regular quarter
-    assert_eq!(dates[3], make_date(2025, 8, 1)); // Regular quarter
-    assert_eq!(dates[4], make_date(2025, 11, 1)); // End date
+    assert_eq!(dates[1], make_date(2025, 5, 1)); // End of the long front stub
+    assert_eq!(dates[2], make_date(2025, 8, 1)); // Regular quarter
+    assert_eq!(dates[3], make_date(2025, 11, 1)); // End date
+}
+
+#[test]
+fn test_long_front_stub_aligned_schedule_has_no_stub() {
+    // When the range divides evenly, LongFront must emit all regular dates
+    // (no merge: there is no stub to merge).
+    let start = make_date(2025, 1, 1);
+    let end = make_date(2026, 1, 1); // exactly 4 quarters
+
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .frequency(Tenor::quarterly())
+        .stub_rule(StubKind::LongFront)
+        .build()
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    assert_eq!(dates.len(), 5);
+    assert_eq!(dates[0], make_date(2025, 1, 1));
+    assert_eq!(dates[1], make_date(2025, 4, 1));
+    assert_eq!(dates[2], make_date(2025, 7, 1));
+    assert_eq!(dates[3], make_date(2025, 10, 1));
+    assert_eq!(dates[4], make_date(2026, 1, 1));
+}
+
+#[test]
+fn test_long_front_stub_sub_period_range_is_single_period() {
+    // Range shorter than two tenors: the stub merges with the single regular
+    // period into one long period [start, end].
+    let start = make_date(2025, 1, 15);
+    let end = make_date(2025, 6, 1); // 4.5 months on a quarterly schedule
+
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .frequency(Tenor::quarterly())
+        .stub_rule(StubKind::LongFront)
+        .build()
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    assert_eq!(dates, vec![make_date(2025, 1, 15), make_date(2025, 6, 1)]);
+}
+
+#[test]
+fn test_no_roll_day_drift_backward_through_short_month() {
+    // Backward semi-annual generation from Aug 31 must pass through
+    // Feb 28 and come back to Aug 31 (anchor-based generation), not drift
+    // to Aug 28 (chained generation off the clamped Feb date).
+    let start = make_date(2024, 8, 31);
+    let end = make_date(2026, 8, 31);
+
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .frequency(Tenor::semi_annual())
+        .stub_rule(StubKind::ShortFront)
+        .build()
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    assert_eq!(
+        dates,
+        vec![
+            make_date(2024, 8, 31),
+            make_date(2025, 2, 28),
+            make_date(2025, 8, 31), // not Aug 28
+            make_date(2026, 2, 28),
+            make_date(2026, 8, 31),
+        ]
+    );
+}
+
+#[test]
+fn test_no_roll_day_drift_forward_through_short_month() {
+    // Forward monthly generation from Jan 31 (eom = false) must clamp each
+    // month independently: Feb 28, Mar 31, Apr 30, May 31 — not
+    // Feb 28 -> Mar 28 -> ...
+    let start = make_date(2025, 1, 31);
+    let end = make_date(2025, 5, 31);
+
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .frequency(Tenor::monthly())
+        .stub_rule(StubKind::ShortBack)
+        .build()
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    assert_eq!(
+        dates,
+        vec![
+            make_date(2025, 1, 31),
+            make_date(2025, 2, 28),
+            make_date(2025, 3, 31),
+            make_date(2025, 4, 30),
+            make_date(2025, 5, 31),
+        ]
+    );
+}
+
+#[test]
+fn test_stub_none_accepts_aligned_month_end_schedule() {
+    // StubKind::None must not spuriously error on a schedule whose anchors
+    // are aligned but pass through short months (Jan 31 -> Jul 31 monthly).
+    let start = make_date(2025, 1, 31);
+    let end = make_date(2025, 7, 31);
+
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .frequency(Tenor::monthly())
+        .build()
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    assert_eq!(
+        dates,
+        vec![
+            make_date(2025, 1, 31),
+            make_date(2025, 2, 28),
+            make_date(2025, 3, 31),
+            make_date(2025, 4, 30),
+            make_date(2025, 5, 31),
+            make_date(2025, 6, 30),
+            make_date(2025, 7, 31),
+        ]
+    );
 }
 
 #[test]
@@ -274,7 +406,8 @@ fn test_long_back_even_schedule_emits_all_dates() {
 
 #[test]
 fn test_end_of_month_convention() {
-    // Test EOM convention adjusts dates to month-end
+    // EOM snaps INTERMEDIATE roll dates to month-end; the user-provided
+    // start and end dates are contractual and emitted verbatim.
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 4, 15);
 
@@ -288,15 +421,15 @@ fn test_end_of_month_convention() {
         .collect();
 
     assert_eq!(dates.len(), 4);
-    assert_eq!(dates[0], make_date(2025, 1, 31)); // Jan 15 -> Jan 31
+    assert_eq!(dates[0], make_date(2025, 1, 15)); // start unchanged
     assert_eq!(dates[1], make_date(2025, 2, 28)); // Feb 15 -> Feb 28
     assert_eq!(dates[2], make_date(2025, 3, 31)); // Mar 15 -> Mar 31
-    assert_eq!(dates[3], make_date(2025, 4, 30)); // Apr 15 -> Apr 30
+    assert_eq!(dates[3], make_date(2025, 4, 15)); // end unchanged
 }
 
 #[test]
 fn test_end_of_month_with_leap_year() {
-    // Test EOM convention with leap year
+    // Test EOM convention with leap year (intermediate snapping only)
     let start = make_date(2024, 1, 15); // 2024 is a leap year
     let end = make_date(2024, 3, 15);
 
@@ -310,14 +443,14 @@ fn test_end_of_month_with_leap_year() {
         .collect();
 
     assert_eq!(dates.len(), 3);
-    assert_eq!(dates[0], make_date(2024, 1, 31)); // Jan 31
+    assert_eq!(dates[0], make_date(2024, 1, 15)); // start unchanged
     assert_eq!(dates[1], make_date(2024, 2, 29)); // Feb 29 (leap year)
-    assert_eq!(dates[2], make_date(2024, 3, 31)); // Mar 31
+    assert_eq!(dates[2], make_date(2024, 3, 15)); // end unchanged
 }
 
 #[test]
 fn test_eom_with_stub_conventions() {
-    // Test that EOM works with stub conventions
+    // EOM with stubs: intermediates snap, user start/end do not
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 5, 15);
 
@@ -332,14 +465,14 @@ fn test_eom_with_stub_conventions() {
         .collect();
 
     assert_eq!(dates.len(), 3);
-    assert_eq!(dates[0], make_date(2025, 1, 31)); // Start -> Jan 31
+    assert_eq!(dates[0], make_date(2025, 1, 15)); // start unchanged
     assert_eq!(dates[1], make_date(2025, 4, 30)); // Regular quarter -> Apr 30
-    assert_eq!(dates[2], make_date(2025, 5, 31)); // End -> May 31
+    assert_eq!(dates[2], make_date(2025, 5, 15)); // end unchanged
 }
 
 #[test]
 fn test_eom_jan30_roll_to_feb_leap_year() {
-    // EOM: Jan 30 should roll to month-end including Feb 29 in leap year
+    // EOM: intermediate Feb roll snaps to month-end (Feb 29 in leap year)
     let start = make_date(2024, 1, 30);
     let end = make_date(2024, 3, 30);
 
@@ -353,14 +486,14 @@ fn test_eom_jan30_roll_to_feb_leap_year() {
         .collect();
 
     assert_eq!(dates.len(), 3);
-    assert_eq!(dates[0], make_date(2024, 1, 31)); // Jan 30 -> 31
+    assert_eq!(dates[0], make_date(2024, 1, 30)); // start unchanged
     assert_eq!(dates[1], make_date(2024, 2, 29)); // Feb -> 29 (leap)
-    assert_eq!(dates[2], make_date(2024, 3, 31)); // Mar -> 31
+    assert_eq!(dates[2], make_date(2024, 3, 30)); // end unchanged
 }
 
 #[test]
 fn test_eom_jan30_roll_to_feb_non_leap() {
-    // EOM: Jan 30 should roll to month-end, Feb 28 in non-leap year
+    // EOM: intermediate Feb roll snaps to month-end, Feb 28 in non-leap year
     let start = make_date(2025, 1, 30);
     let end = make_date(2025, 3, 30);
 
@@ -374,9 +507,9 @@ fn test_eom_jan30_roll_to_feb_non_leap() {
         .collect();
 
     assert_eq!(dates.len(), 3);
-    assert_eq!(dates[0], make_date(2025, 1, 31)); // Jan 30 -> 31
+    assert_eq!(dates[0], make_date(2025, 1, 30)); // start unchanged
     assert_eq!(dates[1], make_date(2025, 2, 28)); // Feb -> 28 (non-leap)
-    assert_eq!(dates[2], make_date(2025, 3, 31)); // Mar -> 31
+    assert_eq!(dates[2], make_date(2025, 3, 30)); // end unchanged
 }
 
 #[test]
@@ -398,6 +531,33 @@ fn test_eom_quarterly_through_feb() {
     assert_eq!(dates[0], make_date(2024, 1, 31)); // Jan 31
     assert_eq!(dates[1], make_date(2024, 4, 30)); // Apr 30 (not 31)
     assert_eq!(dates[2], make_date(2024, 7, 31)); // Jul 31
+}
+
+#[test]
+fn test_adjustment_collision_keeps_maturity_date() {
+    // Daily schedule ending Fri Mar 29 2024 with Mar 27 + Mar 28 holidays:
+    // Following adjusts all three of Mar 27/28/29 to Mar 29. The maturity
+    // date must survive the post-adjustment dedup.
+    let start = make_date(2024, 3, 26);
+    let end = make_date(2024, 3, 29);
+    let cal = TestCal::new()
+        .with_holiday(make_date(2024, 3, 27))
+        .with_holiday(make_date(2024, 3, 28));
+
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .frequency(Tenor::daily())
+        .adjust_with(BusinessDayConvention::Following, &cal)
+        .build()
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    assert_eq!(dates.last().copied(), Some(end), "maturity must survive");
+    assert!(
+        dates.windows(2).all(|w| w[0] < w[1]),
+        "dates must be strictly increasing: {dates:?}"
+    );
 }
 
 // ============================================================================
@@ -465,6 +625,27 @@ fn test_imm_schedule_start_after_first_imm() {
     assert_eq!(dates.len(), 2);
     assert_eq!(dates[0], make_date(2025, 6, 18)); // June IMM
     assert_eq!(dates[1], make_date(2025, 9, 17)); // September IMM
+}
+
+#[test]
+fn test_imm_schedule_empty_range_errors() {
+    // No IMM date between start and end: error instead of a silent empty
+    // schedule (which would mean zero cashflows / PV = 0 downstream).
+    let start = make_date(2025, 3, 20); // day after the Mar 19 IMM date
+    let end = make_date(2025, 4, 30); // before the Jun 18 IMM date
+
+    let result = ScheduleBuilder::new(start, end).unwrap().imm().build();
+    assert!(result.is_err(), "empty IMM range must error in strict mode");
+
+    // Graceful policy converts the error to an empty schedule WITH warning.
+    let sched = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .imm()
+        .error_policy(ScheduleErrorPolicy::GracefulEmpty)
+        .build()
+        .unwrap();
+    assert!(sched.dates.is_empty());
+    assert!(sched.used_graceful_fallback());
 }
 
 #[test]

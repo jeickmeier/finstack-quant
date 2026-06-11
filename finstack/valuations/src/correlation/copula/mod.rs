@@ -129,25 +129,27 @@ pub trait Copula: Send + Sync {
     ///   variable). The default implementation ignores it.
     /// * `correlation` — the asset correlation `ρ`.
     ///
-    /// # Default implementation
+    /// # Implementation requirement
     ///
-    /// Copulas whose latent variable is `Aᵢ = √ρ·Z + √(1−ρ)·εᵢ` with a
-    /// Gaussian systematic `Z` (Gaussian, RFL, multi-factor) have
-    /// `P(default | Z) = Φ((c − √ρ·Z)/√(1−ρ))`, which is exactly what
-    /// [`Self::conditional_default_prob`] already computes from a single
-    /// factor — so the default implementation delegates to it and ignores
-    /// `mixing`. The Student-t copula, whose latent variable divides by `√W`,
-    /// overrides this with the `W`-conditional closed form.
+    /// This method is deliberately **required** (no trait default). A default
+    /// forwarding `&[systematic]` to [`Self::conditional_default_prob`] is
+    /// only correct for single-slot Gaussian-systematic copulas; for any
+    /// multi-slot copula (`num_factors() > 1`, e.g. RFL or multi-factor) it
+    /// silently passes a wrong-length factor vector — debug panic / biased
+    /// release pricing. Each copula must state its own `(Z, W)` conditional:
+    ///
+    /// - Gaussian: `Φ((c − √ρ·Z)/√(1−ρ))`, mixing ignored.
+    /// - Student-t: `Φ((c·√W − √ρ·Z)/√(1−ρ))`.
+    /// - RFL: `Φ((c − β(η)·Z)/√(1−β(η)²))` with `mixing = η`.
+    /// - Multi-factor: sector factor integrated out,
+    ///   `Φ((c − β_G·Z)/√(1−β_G²))`.
     fn conditional_default_prob_given_systematic_and_mixing(
         &self,
         default_threshold: f64,
         systematic: f64,
         mixing: f64,
         correlation: f64,
-    ) -> f64 {
-        let _ = mixing;
-        self.conditional_default_prob(default_threshold, &[systematic], correlation)
-    }
+    ) -> f64;
 
     /// Integrate expected value E[f(L)] over the factor distribution.
     ///
@@ -204,7 +206,10 @@ pub trait Copula: Send + Sync {
     /// `u01` is a uniform `[0,1)` draw. The default implementation returns
     /// `1.0` (no mixing — Gaussian). The Student-t copula overrides this to
     /// sample `W ~ Gamma(ν/2, ν/2)` so that `M = Z/√W` is `t(ν)`-distributed
-    /// and the shared `W` induces tail dependence across every name.
+    /// and the shared `W` induces tail dependence across every name. The RFL
+    /// copula overrides it to sample the loading shock `η = Φ⁻¹(u01)`, drawn
+    /// once per period and shared so the realized loading `β(η)` is common
+    /// across the pool.
     fn sample_mixing(&self, u01: f64) -> f64 {
         let _ = u01;
         1.0
@@ -451,17 +456,51 @@ fn get_cached_quadrature(order: u8) -> std::sync::Arc<GaussHermiteQuadrature> {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
     };
-    map.entry(order)
-        .or_insert_with(|| std::sync::Arc::new(select_quadrature(order)))
-        .clone()
+    if let Some(q) = map.get(&order) {
+        return q.clone();
+    }
+    // Resolve the order BEFORE caching: an unsupported order falls back to
+    // the default, and the result must be cached under the *substituted*
+    // order — caching the default-order quadrature under the requested key
+    // would silently serve the wrong order to later callers that request it
+    // once it becomes supported, and hides the substitution entirely.
+    match GaussHermiteQuadrature::new(order as usize) {
+        Ok(q) => {
+            let q = std::sync::Arc::new(q);
+            map.insert(order, q.clone());
+            q
+        }
+        Err(_) => {
+            warn_unsupported_quadrature_order(order);
+            map.entry(DEFAULT_QUADRATURE_ORDER)
+                .or_insert_with(|| std::sync::Arc::new(default_quadrature()))
+                .clone()
+        }
+    }
+}
+
+fn warn_unsupported_quadrature_order(order: u8) {
+    tracing::warn!(
+        requested_order = order,
+        substituted_order = DEFAULT_QUADRATURE_ORDER,
+        "unsupported Gauss-Hermite quadrature order; substituting the default order"
+    );
+}
+
+fn default_quadrature() -> GaussHermiteQuadrature {
+    GaussHermiteQuadrature::new(DEFAULT_QUADRATURE_ORDER as usize).unwrap_or_else(|_| {
+        unreachable!("DEFAULT_QUADRATURE_ORDER must be a valid Gauss-Hermite order")
+    })
 }
 
 /// Select quadrature based on order (uncached — used to populate the cache).
+///
+/// Emits a warning and substitutes the default order when the requested
+/// order is unsupported, so the substitution is never silent.
 pub(crate) fn select_quadrature(order: u8) -> GaussHermiteQuadrature {
     GaussHermiteQuadrature::new(order as usize).unwrap_or_else(|_| {
-        GaussHermiteQuadrature::new(DEFAULT_QUADRATURE_ORDER as usize).unwrap_or_else(|_| {
-            unreachable!("DEFAULT_QUADRATURE_ORDER must be a valid Gauss-Hermite order")
-        })
+        warn_unsupported_quadrature_order(order);
+        default_quadrature()
     })
 }
 
@@ -517,7 +556,8 @@ mod tests {
         let student_t = CopulaSpec::student_t(5.0).expect("valid Student-t df");
         assert!(student_t.is_student_t());
         let t_copula = student_t.build().expect("Student-t copula should build");
-        assert_eq!(t_copula.num_factors(), 1);
+        // [Z, W]: Gaussian systematic factor plus the shared mixing variable.
+        assert_eq!(t_copula.num_factors(), 2);
 
         // Test RFL
         let rfl = CopulaSpec::random_factor_loading(0.1);

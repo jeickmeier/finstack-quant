@@ -51,6 +51,7 @@ use super::types::{Exposure, PdTermStructure, RawPdCurve, Stage};
 ///
 /// Used for probability-weighted ECL calculation per IFRS 9 B5.5.42.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MacroScenario {
     /// Scenario identifier (e.g., "base", "upside", "downside").
     pub id: String,
@@ -67,6 +68,14 @@ pub struct MacroScenario {
 // ---------------------------------------------------------------------------
 
 /// LGD methodology selection.
+///
+/// **Not yet implemented**: the ECL engines always use the LGD carried on
+/// each [`Exposure`] (optionally overridden per scenario via
+/// [`MacroScenario::lgd_override`]); no TTC averaging or downturn stress is
+/// applied. The enum is retained for serde wire stability.
+/// [`EclConfig::validate`] rejects any value other than
+/// [`LgdType::PointInTime`] so the unimplemented methodologies cannot be
+/// silently stamped into results.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LgdType {
     /// Point-in-time LGD from the exposure.
@@ -86,20 +95,43 @@ pub enum LgdType {
 /// Controls time bucket granularity, scenario specifications, staging
 /// parameters, and LGD methodology.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EclConfig {
     /// Time bucket width in years for the PD-LGD-EAD integration.
     /// Default: quarterly (0.25).
     pub bucket_width_years: f64,
 
     /// Macro scenario specifications with probability weights.
-    /// Weights must sum to 1.0.
+    /// Weights must sum to 1.0 and each weight must lie in \[0, 1\].
+    ///
+    /// **Note**: this field is informational for callers that store their
+    /// scenario set alongside the config. The probability weights actually
+    /// applied by [`compute_ecl_weighted`] (and [`EclEngine`]) are the ones
+    /// carried in the `pd_sources` argument, which are validated
+    /// independently; the two sets are not cross-checked.
     pub scenarios: Vec<MacroScenario>,
 
     /// Staging configuration for IFRS 9.
     pub staging: StagingConfig,
 
-    /// Whether to use point-in-time LGD or through-the-cycle.
+    /// LGD methodology label. Only [`LgdType::PointInTime`] is supported;
+    /// see [`LgdType`] for details.
     pub lgd_type: LgdType,
+
+    /// Assumed time (in years) from the reporting date to recovery
+    /// realisation for Stage 3 (credit-impaired) exposures. Used to
+    /// discount the `LGD x EAD` shortfall at the EIR per IFRS 9 5.5.33 /
+    /// B5.5.33. Default: 1.0 year, a common practical recovery-lag
+    /// assumption.
+    #[serde(default = "default_stage3_time_to_recovery_years")]
+    pub stage3_time_to_recovery_years: f64,
+}
+
+/// Default Stage 3 time-to-recovery assumption in years.
+pub const DEFAULT_STAGE3_TIME_TO_RECOVERY_YEARS: f64 = 1.0;
+
+fn default_stage3_time_to_recovery_years() -> f64 {
+    DEFAULT_STAGE3_TIME_TO_RECOVERY_YEARS
 }
 
 impl Default for EclConfig {
@@ -123,7 +155,16 @@ impl EclConfig {
     ///
     /// Returns [`Error::Validation`] when any invariant is violated.
     pub fn validate(&self) -> Result<()> {
-        let total_weight: f64 = self.scenarios.iter().map(|s| s.weight).sum();
+        let mut total_weight = 0.0;
+        for scenario in &self.scenarios {
+            if !scenario.weight.is_finite() || !(0.0..=1.0).contains(&scenario.weight) {
+                return Err(Error::Validation(format!(
+                    "scenario '{}' weight must be in [0, 1], got {}",
+                    scenario.id, scenario.weight
+                )));
+            }
+            total_weight += scenario.weight;
+        }
         if (total_weight - 1.0).abs() > 1e-6 {
             return Err(Error::Validation(format!(
                 "Scenario weights must sum to 1.0, got {total_weight:.6}"
@@ -138,6 +179,20 @@ impl EclConfig {
             return Err(Error::Validation(
                 "At least one scenario is required".to_string(),
             ));
+        }
+        if self.lgd_type != LgdType::PointInTime {
+            return Err(Error::Validation(format!(
+                "lgd_type {:?} is not implemented; only PointInTime is supported",
+                self.lgd_type
+            )));
+        }
+        if !self.stage3_time_to_recovery_years.is_finite()
+            || self.stage3_time_to_recovery_years < 0.0
+        {
+            return Err(Error::Validation(format!(
+                "stage3_time_to_recovery_years must be finite and non-negative, got {}",
+                self.stage3_time_to_recovery_years
+            )));
         }
         Ok(())
     }
@@ -249,6 +304,9 @@ impl EclConfigBuilder {
 
     /// Set the LGD methodology.
     ///
+    /// Only [`LgdType::PointInTime`] is currently supported; `build()`
+    /// rejects any other value (see [`LgdType`]).
+    ///
     /// # Arguments
     ///
     /// * `lgd_type` - LGD methodology label to store in the configuration.
@@ -258,6 +316,21 @@ impl EclConfigBuilder {
     /// The updated builder.
     pub fn lgd_type(mut self, lgd_type: LgdType) -> Self {
         self.config.lgd_type = lgd_type;
+        self
+    }
+
+    /// Set the Stage 3 time-to-recovery assumption in years.
+    ///
+    /// # Arguments
+    ///
+    /// * `years` - Time from reporting date to expected recovery realisation
+    ///   used to discount the Stage 3 shortfall (default 1.0).
+    ///
+    /// # Returns
+    ///
+    /// The updated builder.
+    pub fn stage3_time_to_recovery(mut self, years: f64) -> Self {
+        self.config.stage3_time_to_recovery_years = years;
         self
     }
 
@@ -344,6 +417,11 @@ pub struct ExposureEclResult {
     pub stage_result: StageResult,
     /// Probability-weighted ECL result.
     pub ecl_result: WeightedEclResult,
+    /// Reporting-date EAD of the exposure (copied from [`Exposure::ead`]).
+    /// Used by portfolio aggregation; defaults to 0.0 when deserializing
+    /// results produced before this field existed.
+    #[serde(default)]
+    pub ead: f64,
 }
 
 // ---------------------------------------------------------------------------
@@ -354,7 +432,19 @@ pub struct ExposureEclResult {
 ///
 /// Integrates marginal PD x LGD x EAD x DF over time buckets up to the
 /// appropriate horizon (12 months for Stage 1, remaining maturity for
-/// Stage 2/3).
+/// Stage 2).
+///
+/// # Stage 3 (credit-impaired)
+///
+/// For Stage 3 exposures the obligor has already defaulted, so the
+/// performing PD curve does not apply: the allowance is measured as the
+/// present value of the expected cash shortfall with PD ≡ 1, i.e.
+/// `ECL = LGD x EAD x DF(t_recovery)` where `t_recovery` is
+/// [`EclConfig::stage3_time_to_recovery_years`]. This matches IFRS 9
+/// 5.5.33 / B5.5.33 (allowance = gross carrying amount − PV of expected
+/// recoveries discounted at the EIR). The result carries a single bucket
+/// with `marginal_pd = 1.0`. Note this also means a Stage 3 exposure with
+/// zero remaining maturity still carries a positive allowance.
 ///
 /// # Arguments
 ///
@@ -394,6 +484,7 @@ pub struct ExposureEclResult {
 ///     qualitative_flags: QualitativeFlags::default(),
 ///     consecutive_performing_periods: 0,
 ///     previous_stage: None,
+///     ead_schedule: None,
 /// };
 /// let pd_curve = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.02)])?;
 ///
@@ -415,6 +506,33 @@ pub fn compute_ecl_single(
 ) -> Result<EclResult> {
     exposure.validate()?;
     config.validate()?;
+
+    // Stage 3: credit-impaired, PD ≡ 1. The allowance is the discounted
+    // expected shortfall LGD x EAD x DF(t_recovery) per IFRS 9 5.5.33 /
+    // B5.5.33; the performing PD curve is not consulted.
+    if stage == Stage::Stage3 {
+        let t_recovery = config.stage3_time_to_recovery_years;
+        let lgd = exposure.lgd;
+        let ead = exposure.ead_at(0.0);
+        let df = 1.0 / (1.0 + exposure.eir).powf(t_recovery);
+        let ecl = lgd * ead * df;
+        return Ok(EclResult {
+            exposure_id: exposure.id.clone(),
+            stage,
+            ecl,
+            horizon: t_recovery,
+            buckets: vec![EclBucket {
+                t_start: 0.0,
+                t_end: t_recovery,
+                marginal_pd: 1.0,
+                lgd,
+                ead,
+                discount_factor: df,
+                ecl,
+            }],
+        });
+    }
+
     let horizon = match stage {
         Stage::Stage1 => 1.0_f64.min(exposure.remaining_maturity_years),
         Stage::Stage2 | Stage::Stage3 => exposure.remaining_maturity_years,
@@ -443,7 +561,7 @@ pub fn compute_ecl_single(
         let pd_end = pd_source.cumulative_pd(rating, t_end)?;
         let uncond_mpd = (pd_end - pd_start).max(0.0);
         let lgd = exposure.lgd;
-        let ead = exposure.ead;
+        let ead = exposure.ead_at(t_mid);
         let df = 1.0 / (1.0 + exposure.eir).powf(t_mid);
 
         let bucket_ecl = uncond_mpd * lgd * ead * df;
@@ -514,6 +632,7 @@ pub fn compute_ecl_single(
 ///     qualitative_flags: QualitativeFlags::default(),
 ///     consecutive_performing_periods: 0,
 ///     previous_stage: None,
+///     ead_schedule: None,
 /// };
 /// let pd_curve = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.02)])?;
 /// let scenario = MacroScenario { id: "base".to_string(), weight: 1.0, lgd_override: None };
@@ -570,6 +689,11 @@ pub fn compute_ecl_weighted(
 /// each macro scenario as `(weight, raw_pd_curve)` pairs rather than
 /// lifetime-bound `(&MacroScenario, &dyn PdTermStructure)` references.
 ///
+/// Each scenario curve is labelled with the exposure's own rating
+/// (`current_rating`, or `"NR"` when unrated) so the lookup performed by
+/// [`compute_ecl_single`] matches without requiring any magic rating label
+/// on the exposure.
+///
 /// # Errors
 ///
 /// Returns an error if scenario weights are invalid, any raw PD curve is
@@ -595,9 +719,10 @@ pub fn compute_ecl_weighted_from_schedules(
             lgd_override: None,
         })
         .collect::<Vec<_>>();
+    let rating = exposure.current_rating.as_deref().unwrap_or("NR");
     let curves = scenarios
         .iter()
-        .map(|(_, schedule)| RawPdCurve::new("scenario", schedule.clone()))
+        .map(|(_, schedule)| RawPdCurve::new(rating, schedule.clone()))
         .collect::<Result<Vec<_>>>()?;
     let pd_sources = scenario_defs
         .iter()
@@ -608,7 +733,11 @@ pub fn compute_ecl_weighted_from_schedules(
     compute_ecl_weighted(exposure, stage, &pd_sources, config)
 }
 
-fn validate_scenario_weights<'a>(
+/// Validate that scenario weights are finite, non-negative, and sum to 1.0.
+///
+/// Shared by the IFRS 9 weighted path and the CECL engine so both apply the
+/// same checks to the `pd_sources` weights actually used in pricing.
+pub(crate) fn validate_scenario_weights<'a>(
     scenarios: impl IntoIterator<Item = &'a MacroScenario>,
 ) -> Result<()> {
     let mut total_weight = 0.0;
@@ -718,6 +847,7 @@ impl<'a> EclEngine<'a> {
         Ok(ExposureEclResult {
             stage_result,
             ecl_result,
+            ead: exposure.ead,
         })
     }
 
@@ -750,6 +880,7 @@ mod tests {
             qualitative_flags: QualitativeFlags::default(),
             consecutive_performing_periods: 0,
             previous_stage: None,
+            ead_schedule: None,
         }
     }
 
@@ -837,6 +968,99 @@ mod tests {
     }
 
     #[test]
+    fn test_compute_ecl_single_stage3_is_discounted_lgd_ead() {
+        let exposure = make_exposure();
+        let curve = make_pd_curve();
+        let config = EclConfig::default();
+
+        let result = compute_ecl_single(&exposure, Stage::Stage3, &curve, &config).unwrap();
+
+        // PD ≡ 1: ECL = LGD x EAD x DF(t_recovery), default t_recovery = 1.0
+        let expected = 0.45 * 1_000_000.0 / 1.05_f64;
+        assert!(
+            (result.ecl - expected).abs() < 1e-6,
+            "Stage 3 ECL {} vs expected {}",
+            result.ecl,
+            expected
+        );
+        assert_eq!(result.buckets.len(), 1);
+        assert!((result.buckets[0].marginal_pd - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_stage3_zero_maturity_still_has_allowance() {
+        let mut exposure = make_exposure();
+        exposure.remaining_maturity_years = 0.0;
+        let curve = make_pd_curve();
+        let config = EclConfig::default();
+
+        let result = compute_ecl_single(&exposure, Stage::Stage3, &curve, &config).unwrap();
+        assert!(
+            result.ecl > 0.0,
+            "Stage 3 with zero remaining maturity must not produce ECL = 0"
+        );
+    }
+
+    #[test]
+    fn test_stage3_time_to_recovery_configurable() {
+        let exposure = make_exposure();
+        let curve = make_pd_curve();
+        let config = EclConfigBuilder::new()
+            .stage3_time_to_recovery(2.0)
+            .build()
+            .unwrap();
+
+        let result = compute_ecl_single(&exposure, Stage::Stage3, &curve, &config).unwrap();
+        let expected = 0.45 * 1_000_000.0 / 1.05_f64.powi(2);
+        assert!((result.ecl - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_ead_schedule_reduces_lifetime_ecl() {
+        let curve = make_pd_curve();
+        let config = EclConfig::default();
+
+        let constant = make_exposure();
+        let mut amortizing = make_exposure();
+        // Level amortization from 1,000,000 down to 0 at maturity.
+        amortizing.ead_schedule = Some(vec![(0.0, 1_000_000.0), (5.0, 0.0)]);
+
+        let ecl_constant = compute_ecl_single(&constant, Stage::Stage2, &curve, &config).unwrap();
+        let ecl_amortizing =
+            compute_ecl_single(&amortizing, Stage::Stage2, &curve, &config).unwrap();
+
+        assert!(
+            ecl_amortizing.ecl < ecl_constant.ecl,
+            "Amortizing profile ({}) must reduce lifetime ECL vs constant ({})",
+            ecl_amortizing.ecl,
+            ecl_constant.ecl
+        );
+        // First bucket midpoint EAD reflects the schedule.
+        let first = &ecl_amortizing.buckets[0];
+        let expected_ead = 1_000_000.0 * (1.0 - (first.t_start + first.t_end) / 2.0 / 5.0);
+        assert!((first.ead - expected_ead).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_invalid_ead_schedule_rejected() {
+        let curve = make_pd_curve();
+        let config = EclConfig::default();
+
+        let mut exposure = make_exposure();
+        exposure.ead_schedule = Some(vec![(1.0, 100.0), (1.0, 50.0)]);
+        assert!(compute_ecl_single(&exposure, Stage::Stage1, &curve, &config).is_err());
+
+        exposure.ead_schedule = Some(vec![(0.0, -1.0)]);
+        assert!(compute_ecl_single(&exposure, Stage::Stage1, &curve, &config).is_err());
+    }
+
+    #[test]
+    fn test_lgd_type_non_default_rejected() {
+        let config = EclConfigBuilder::new().lgd_type(LgdType::Downturn).build();
+        assert!(config.is_err());
+    }
+
+    #[test]
     fn test_stage1_ecl_less_than_stage2() {
         let exposure = make_exposure();
         let curve = make_pd_curve();
@@ -875,6 +1099,7 @@ mod tests {
             qualitative_flags: QualitativeFlags::default(),
             consecutive_performing_periods: 0,
             previous_stage: None,
+            ead_schedule: None,
         };
 
         let config = EclConfigBuilder::new().bucket_width(0.5).build().unwrap();

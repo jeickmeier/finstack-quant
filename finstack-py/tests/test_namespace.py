@@ -194,7 +194,7 @@ class TestCorrelationNamespace:
             Copula,
             CopulaSpec,
             CorrelatedBernoulli,
-            LatentFactor,
+            LatentFactorKind,
             LatentFactorSpec,
             LatentMultiFactor,
             LatentSingleFactor,

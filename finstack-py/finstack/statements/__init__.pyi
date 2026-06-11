@@ -660,10 +660,6 @@ class MixedNodeBuilder:
         """Set scalar explicit values."""
         ...
 
-    def values_scalar(self, values: list[tuple[str, float]]) -> None:
-        """Set scalar explicit values."""
-        ...
-
     def values_money(self, values: list[tuple[str, Money]]) -> None:
         """Set monetary explicit values."""
         ...
@@ -806,6 +802,56 @@ class StatementResult:
         """
         ...
 
+    def get_money(self, node_id: str, period: str) -> Money | None:
+        """Return the currency-tagged ``Money`` value for a monetary node.
+
+        Preserves fixed-point precision and currency. Returns ``None`` when
+        the node is not monetary or has no value for this period.
+
+        Parameters
+        ----------
+        node_id:
+            Node identifier.
+        period:
+            Period label such as ``\"2025Q1\"``.
+
+        Returns
+        -------
+        Money | None
+            Monetary value when found, otherwise ``None``.
+
+        Raises
+        ------
+        ValueError
+            If ``period`` cannot be parsed as a period id.
+        """
+        ...
+
+    def get_scalar(self, node_id: str, period: str) -> float | None:
+        """Return the scalar value for a non-monetary node.
+
+        Returns ``None`` when the node is monetary or has no value for this
+        period.
+
+        Parameters
+        ----------
+        node_id:
+            Node identifier.
+        period:
+            Period label such as ``\"2025Q1\"``.
+
+        Returns
+        -------
+        float | None
+            Scalar value when found, otherwise ``None``.
+
+        Raises
+        ------
+        ValueError
+            If ``period`` cannot be parsed as a period id.
+        """
+        ...
+
     def get_node(self, node_id: str) -> dict[str, float] | None:
         """Return all period values for a node as a mapping.
 
@@ -869,6 +915,9 @@ class StatementResult:
         Columns: ``node_id``, ``period``, ``value``, ``value_money``,
         ``currency``, ``value_type``. The monetary columns are populated for
         nodes carrying currency information and are otherwise null.
+        ``value_money`` is a float64 mirror of the monetary amount (f64, not
+        fixed-point Decimal, precision); use ``to_json()`` or ``get_money()``
+        when full fixed-point precision is required.
 
         Returns
         -------

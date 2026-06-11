@@ -66,6 +66,12 @@ impl StochasticPricer {
         instrument: &StructuredCredit,
         context: &MarketContext,
     ) -> Result<StochasticPricingResult> {
+        // Fail fast on invalid default specs (e.g. Student-t dof ≤ 2) so the
+        // per-path hot loops can assume a validated, buildable spec.
+        self.config
+            .tree_config
+            .default_spec
+            .build_with_seasoning_offset(self.config.tree_config.initial_seasoning)?;
         match &self.config.pricing_mode {
             PricingMode::Tree => self.price_tree(instrument, context),
             PricingMode::MonteCarlo {
@@ -537,11 +543,71 @@ impl StochasticPricer {
         factors
     }
 
+    /// Configured systematic-factor mean-reversion speed κ, when positive.
+    ///
+    /// Only [`LatentFactorSpec::SingleFactor`] carries a mean-reversion
+    /// parameter; other factor specs (and κ = 0) keep the i.i.d. monthly
+    /// factor behavior.
+    fn factor_mean_reversion(&self) -> Option<f64> {
+        match &self.config.tree_config.factor_spec {
+            LatentFactorSpec::SingleFactor { mean_reversion, .. } if *mean_reversion > 0.0 => {
+                Some(*mean_reversion)
+            }
+            _ => None,
+        }
+    }
+
+    /// Evolve monthly factor innovations into a stationary AR(1)/OU path.
+    ///
+    /// The raw draws `ε_m ~ N(0,1)` are treated as innovations of the exact
+    /// OU discretization with monthly step `Δt = 1/12`:
+    ///
+    /// ```text
+    /// Z_1 = ε_1,    Z_m = φ·Z_{m−1} + √(1−φ²)·ε_m,    φ = e^{−κΔt}
+    /// ```
+    ///
+    /// Each `Z_m` keeps the stationary `N(0,1)` marginal, so the conditional
+    /// MDR/SMM models and the copula barriers `Φ⁻¹(PD)` stay correctly
+    /// calibrated. The factor autocorrelation at lag `h` months is
+    /// `φ^h = e^{−κh/12}`; the effective correlation half-life is
+    /// `12·ln 2 / κ` months (e.g. κ = 0.5 → ≈ 16.6 months). κ → ∞ recovers
+    /// the previous i.i.d.-per-month behavior.
+    ///
+    /// The transform is linear in the innovations, so antithetic negation of
+    /// the raw draws negates the whole evolved path and the variance
+    /// reduction is preserved.
+    fn evolved_factors(innovations: &[f64], kappa: f64) -> Vec<f64> {
+        let phi = (-kappa / 12.0).exp();
+        let innovation_scale = (1.0 - phi * phi).max(0.0).sqrt();
+        let mut evolved = Vec::with_capacity(innovations.len());
+        let mut state = 0.0;
+        for (month, eps) in innovations.iter().enumerate() {
+            state = if month == 0 {
+                *eps
+            } else {
+                phi * state + innovation_scale * eps
+            };
+            evolved.push(state);
+        }
+        evolved
+    }
+
     fn path_shocks_from_factors(
         &self,
         instrument: &StructuredCredit,
         factors: &[f64],
     ) -> Result<Vec<PeriodPoolShock>> {
+        // AR(1)/OU persistence (single chokepoint for MC, tree, and hybrid
+        // paths): when a positive mean-reversion speed is configured the
+        // monthly draws are innovations, not the factor itself.
+        let evolved_storage;
+        let factors: &[f64] = match self.factor_mean_reversion() {
+            Some(kappa) if self.has_stochastic_rates() => {
+                evolved_storage = Self::evolved_factors(factors, kappa);
+                &evolved_storage
+            }
+            _ => factors,
+        };
         let months_per_period = instrument.frequency.months().ok_or_else(|| {
             finstack_core::Error::Validation(
                 "Structured credit stochastic pricing requires month-based payment frequencies"
@@ -556,7 +622,10 @@ impl StochasticPricer {
         // per-period *unconditional* marginal default probability used to set
         // each name's copula barrier `Φ⁻¹(PDₜ)`.
         let copula_model = if self.copula_default().is_some() {
-            self.config.tree_config.default_spec.build()
+            self.config
+                .tree_config
+                .default_spec
+                .build_with_seasoning_offset(self.config.tree_config.initial_seasoning)?
         } else {
             None
         };
@@ -697,7 +766,17 @@ impl StochasticPricer {
     }
 
     fn conditional_mdr(&self, seasoning: u32, factors: &[f64]) -> f64 {
-        if let Some(model) = self.config.tree_config.default_spec.build() {
+        // The spec is validated up-front in `price()`, so an `Err` here is
+        // unreachable; `.ok().flatten()` only strips the already-checked
+        // Result layer.
+        if let Some(model) = self
+            .config
+            .tree_config
+            .default_spec
+            .build_with_seasoning_offset(self.config.tree_config.initial_seasoning)
+            .ok()
+            .flatten()
+        {
             return model
                 .conditional_mdr(seasoning, factors, &MacroCreditFactors::default())
                 .clamp(0.0, 0.50);
@@ -1381,6 +1460,115 @@ mod tests {
             reported <= iid,
             "antithetic SE {reported} must not exceed the i.i.d. SE {iid}"
         );
+    }
+
+    /// M2.16 — `evolved_factors` must implement the exact stationary AR(1)/OU
+    /// recursion `Z_m = φ·Z_{m−1} + √(1−φ²)·ε_m` with `φ = e^{−κ/12}`.
+    #[test]
+    fn evolved_factors_applies_stationary_ar1_recursion() {
+        let kappa = 1.5_f64;
+        let phi = (-kappa / 12.0).exp();
+        let scale = (1.0 - phi * phi).sqrt();
+        let innovations = [0.3, -1.2, 0.7];
+
+        let evolved = StochasticPricer::evolved_factors(&innovations, kappa);
+
+        assert!((evolved[0] - 0.3).abs() < 1e-15, "Z_1 = ε_1");
+        let expected_1 = phi * evolved[0] + scale * innovations[1];
+        assert!((evolved[1] - expected_1).abs() < 1e-15);
+        let expected_2 = phi * evolved[1] + scale * innovations[2];
+        assert!((evolved[2] - expected_2).abs() < 1e-15);
+
+        // Antithetic linearity: negated innovations give the negated path.
+        let negated: Vec<f64> = innovations.iter().map(|e| -e).collect();
+        let evolved_neg = StochasticPricer::evolved_factors(&negated, kappa);
+        for (a, b) in evolved.iter().zip(&evolved_neg) {
+            assert!((a + b).abs() < 1e-15, "AR(1) must commute with negation");
+        }
+    }
+
+    /// M2.16 — the configured `mean_reversion` must actually change Monte
+    /// Carlo path statistics. With identical seeds and configs differing
+    /// only in κ, the results must NOT be bit-identical (κ was previously a
+    /// dead parameter).
+    #[test]
+    fn mean_reversion_changes_path_statistics() {
+        use crate::instruments::fixed_income::structured_credit::pricing::stochastic::default::StochasticDefaultSpec;
+
+        let instrument = test_instrument();
+        let market = MarketContext::new().insert((*test_discount_curve()).clone());
+        let price_with_kappa = |kappa: f64| {
+            let mut tree_config = ScenarioTreeConfig::new(24, 2.0, BranchingSpec::fixed(2));
+            tree_config.factor_spec = LatentFactorSpec::single_factor(1.0, kappa);
+            tree_config.default_spec =
+                StochasticDefaultSpec::intensity_process(0.10, 1.0, 0.5, 0.8);
+            let config =
+                StochasticPricerConfig::new(test_date(), test_discount_curve(), tree_config)
+                    .with_pricing_mode(PricingMode::MonteCarlo {
+                        num_paths: 64,
+                        antithetic: false,
+                    });
+            StochasticPricer::new(config)
+                .price(&instrument, &market)
+                .expect("MC price")
+        };
+
+        let iid = price_with_kappa(0.0);
+        let persistent = price_with_kappa(2.0);
+
+        assert!(
+            (iid.npv.amount() - persistent.npv.amount()).abs() > 0.0
+                || (iid.pv_std_error - persistent.pv_std_error).abs() > 0.0,
+            "mean_reversion must change MC path statistics: \
+             npv {} vs {}, std_error {} vs {}",
+            iid.npv.amount(),
+            persistent.npv.amount(),
+            iid.pv_std_error,
+            persistent.pv_std_error
+        );
+    }
+
+    /// M2.13 — canonical sign convention invariant for the MC engine: on the
+    /// shipped RMBS/CLO configs, defaults and recoveries must co-move
+    /// NEGATIVELY across systematic-factor realizations (stress = low factor
+    /// ⇒ high MDR and low recovery).
+    #[test]
+    fn mc_engine_defaults_and_recoveries_co_move_negatively() {
+        for (label, tree_config) in [
+            ("rmbs", ScenarioTreeConfig::rmbs_standard(2.0, 0.045)),
+            ("clo", ScenarioTreeConfig::clo_standard(2.0)),
+        ] {
+            let config =
+                StochasticPricerConfig::new(test_date(), test_discount_curve(), tree_config);
+            let pricer = StochasticPricer::new(config);
+
+            let zs = [-2.0, -1.0, 0.0, 1.0, 2.0];
+            let shocks: Vec<_> = zs.iter().map(|&z| pricer.monthly_shock(36, z)).collect();
+            let mdrs: Vec<f64> = shocks.iter().map(|s| s.mdr).collect();
+            let recoveries: Vec<f64> = shocks.iter().map(|s| s.recovery_rate).collect();
+
+            let corr = pearson(&mdrs, &recoveries);
+            assert!(
+                corr < 0.0,
+                "{label}: corr(MDR, recovery) across factor realizations must be \
+                 negative, got {corr} (mdrs {mdrs:?}, recoveries {recoveries:?})"
+            );
+        }
+    }
+
+    fn pearson(xs: &[f64], ys: &[f64]) -> f64 {
+        let n = xs.len() as f64;
+        let mean_x = xs.iter().sum::<f64>() / n;
+        let mean_y = ys.iter().sum::<f64>() / n;
+        let mut cov = 0.0;
+        let mut var_x = 0.0;
+        let mut var_y = 0.0;
+        for (x, y) in xs.iter().zip(ys) {
+            cov += (x - mean_x) * (y - mean_y);
+            var_x += (x - mean_x).powi(2);
+            var_y += (y - mean_y).powi(2);
+        }
+        cov / (var_x.sqrt() * var_y.sqrt()).max(f64::MIN_POSITIVE)
     }
 }
 

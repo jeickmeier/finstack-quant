@@ -249,9 +249,10 @@ fn test_funding_risk_metric() {
 
     let funding_risk = results.get(&MetricId::FundingRisk).unwrap();
 
-    // Increasing repo rate typically increases PV (more interest earned)
-    // So funding risk (base - bumped) should be negative
-    assert!(*funding_risk <= 0.0);
+    // Increasing repo rate typically increases PV (more interest earned).
+    // FundingRisk follows the dPV/dy convention (bumped − base), so it must
+    // be positive for the cash lender.
+    assert!(*funding_risk >= 0.0);
 }
 
 #[test]

@@ -35,7 +35,7 @@ fn test_inflation_convexity_par_swap_nonzero() {
         .build()
         .unwrap();
 
-    let par_rate = temp_swap.par_rate(&ctx).unwrap();
+    let par_rate = temp_swap.par_rate(&ctx, as_of).unwrap();
 
     // Create a swap at par rate (should have ~zero PV)
     let par_swap = InflationSwapBuilder::new()

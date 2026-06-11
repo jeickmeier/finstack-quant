@@ -39,10 +39,19 @@
 //!
 //! # Integration Approach
 //!
-//! Uses variance-gamma mixing representation:
+//! Uses the variance-gamma mixing representation with **two factor slots**
+//! `[Z, W]` so the semi-analytic engine prices the true shared-W t-copula:
 //! - Outer integral over W ~ Gamma(ν/2, ν/2) using Gauss-Laguerre quadrature
-//! - Inner Gaussian integration conditional on W
-//! - Factor transformation: M = Z / √W converts Gaussian to t-distributed
+//! - Inner Gaussian integration over Z conditional on W
+//! - [`Copula::integrate_fn`] passes `[z, w]` to the integrand and
+//!   [`Copula::conditional_default_prob`] dispatches a 2-length realization
+//!   to the (Z, W)-conditional `Φ((c·√W − √ρ·Z)/√(1−ρ))`
+//!
+//! Conditional independence across names holds only given **both** Z and W.
+//! Conditioning on the t-variate `M = Z/√W` alone (the historical 1-factor
+//! quadrature) understates joint-default clustering: it integrates W out
+//! before imposing conditional independence, which prices a different model
+//! than the per-name MC path samples.
 //!
 //! # References
 //!
@@ -293,22 +302,42 @@ impl Copula for StudentTCopula {
         factor_realization: &[f64],
         correlation: f64,
     ) -> f64 {
-        // Length mismatch is a programmer error. In debug, fail loudly; in
-        // release, return the unconditional PD t_ν(c) rather than a biased
-        // M=0 assumption. See gaussian.rs for the rationale.
-        debug_assert_eq!(
-            factor_realization.len(),
-            1,
-            "StudentTCopula expects exactly 1 factor, got {}",
-            factor_realization.len()
-        );
-        if factor_realization.len() != 1 {
-            tracing::error!(
-                expected = 1,
-                actual = factor_realization.len(),
-                "StudentTCopula: factor length mismatch; returning unconditional PD"
-            );
-            return student_t_cdf(default_threshold, self.degrees_of_freedom);
+        // Two accepted shapes:
+        //
+        // * `[z, w]` — the canonical 2-factor realization produced by
+        //   `integrate_fn` (Gaussian Z plus shared mixing W). Dispatches the
+        //   exact (Z, W)-conditional so the quadrature engine prices the same
+        //   shared-W model the per-name MC samples.
+        // * `[m]` — the t-distributed systematic factor M = Z/√W with W
+        //   integrated out. This is the correct *single-name* conditional
+        //   P(default | M) (Demarta & McNeil ν+1 form), retained for scalar-Z
+        //   engines; it must NOT be used as a conditional-independence factor
+        //   for pool-loss integration.
+        //
+        // Anything else is a programmer error: fail loudly in debug, return
+        // the unconditional PD t_ν(c) in release.
+        match factor_realization {
+            [z, w] => {
+                return self.conditional_default_prob_given_systematic_and_mixing(
+                    default_threshold,
+                    *z,
+                    *w,
+                    correlation,
+                );
+            }
+            [_] => {}
+            _ => {
+                debug_assert!(
+                    false,
+                    "StudentTCopula expects [z, w] or [m], got {} factors",
+                    factor_realization.len()
+                );
+                tracing::error!(
+                    actual = factor_realization.len(),
+                    "StudentTCopula: factor length mismatch; returning unconditional PD"
+                );
+                return student_t_cdf(default_threshold, self.degrees_of_freedom);
+            }
         }
         let [m] = factor_realization else {
             return student_t_cdf(default_threshold, self.degrees_of_freedom);
@@ -381,22 +410,22 @@ impl Copula for StudentTCopula {
     }
 
     fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
-        // Two-layer integration using variance-gamma mixing:
-        // M ~ t(ν) can be represented as M = Z/√W where Z ~ N(0,1), W ~ Gamma(ν/2, ν/2)
+        // Two-layer integration over BOTH latent factor slots [Z, W]:
         //
-        // E[g(M)] = E_W[ E_Z[ g(Z/√W) | W ] ]
+        // E[g(Z, W)] = E_W[ E_Z[ g(Z, W) | W ] ]
         //
-        // Outer: over W using Gauss-Laguerre with Gamma density correction
-        // Inner: over Z using Gauss-Hermite (standard normal)
-
+        // Outer: over W ~ Gamma(ν/2, ν/2) using Gauss-Laguerre with the
+        // Gamma density correction; inner: over Z ~ N(0,1) using
+        // Gauss-Hermite. The integrand receives the raw pair `[z, w]` —
+        // NOT the collapsed t-variate `m = z/√w` — so pool-loss engines
+        // impose conditional independence in the correct (Z, W)
+        // sigma-algebra (names are NOT conditionally independent given M
+        // alone).
         let mut result = 0.0;
         for &(w_val, w_weight) in &self.gamma_quadrature {
-            let inv_sqrt_w = 1.0 / w_val.sqrt();
-
-            let inner = self.inner_quadrature.integrate(|z_gauss| {
-                let m = z_gauss * inv_sqrt_w;
-                f(&[m])
-            });
+            let inner = self
+                .inner_quadrature
+                .integrate(|z_gauss| f(&[z_gauss, w_val]));
 
             result += w_weight * inner;
         }
@@ -439,7 +468,9 @@ impl Copula for StudentTCopula {
     }
 
     fn num_factors(&self) -> usize {
-        1
+        // [Z, W]: Gaussian systematic factor plus the shared mixing variable.
+        // Conditional independence across names requires conditioning on both.
+        2
     }
 
     fn model_name(&self) -> &'static str {
@@ -464,7 +495,9 @@ mod tests {
     #[test]
     fn test_student_t_creation() {
         let copula = StudentTCopula::new(5.0);
-        assert_eq!(copula.num_factors(), 1);
+        // [Z, W]: the quadrature engine must integrate over both the Gaussian
+        // systematic factor and the shared mixing variable.
+        assert_eq!(copula.num_factors(), 2);
         assert!((copula.df() - 5.0).abs() < 1e-10);
         assert_eq!(copula.model_name(), "Student-t Copula");
     }
@@ -794,8 +827,60 @@ mod tests {
             }
         };
 
+        // Valid shapes are [m] (single-name conditional given M) and [z, w]
+        // (quadrature realization); everything else violates the contract.
         assert_contract(&[]);
-        assert_contract(&[0.5, 1.0]);
+        assert_contract(&[0.5, 1.0, 2.0]);
+    }
+
+    /// M2.3 anchor: the semi-analytic quadrature and a per-name Monte Carlo
+    /// simulation must price the SAME shared-W t-copula. We compare the
+    /// joint default probability of two names sharing (Z, W):
+    ///
+    ///   P(A₁ ≤ c, A₂ ≤ c) = E_{Z,W}[ P(default | Z, W)² ]
+    ///
+    /// Quadrature computes the right-hand side via `integrate_fn` (now over
+    /// `[z, w]`); MC simulates pairs via `latent_variable` with a shared
+    /// (Z, W) and independent ε₁, ε₂. The historical 1-factor quadrature
+    /// (conditioning on M = Z/√W alone) understates this joint probability
+    /// and fails the tolerance.
+    #[test]
+    fn quadrature_matches_per_name_mc_joint_default_prob() {
+        use finstack_monte_carlo::rng::philox::PhiloxRng;
+        use finstack_monte_carlo::traits::RandomStream;
+
+        let nu = 5.0;
+        let copula = StudentTCopula::with_quadrature_order(nu, 40);
+        let pd = 0.05;
+        let threshold = student_t_inv_cdf(pd, nu);
+        let rho = 0.30;
+
+        let quad_joint = copula.integrate_fn(&|factors| {
+            let p = copula.conditional_default_prob(threshold, factors, rho);
+            p * p
+        });
+
+        let mut rng = PhiloxRng::new(31337);
+        let trials = 2_000_000usize;
+        let mut joint = 0usize;
+        for _ in 0..trials {
+            let w = copula.sample_mixing(rng.next_u01());
+            let z = rng.next_std_normal();
+            let a1 = copula.latent_variable(z, rng.next_std_normal(), w, rho);
+            let a2 = copula.latent_variable(z, rng.next_std_normal(), w, rho);
+            if a1 <= threshold && a2 <= threshold {
+                joint += 1;
+            }
+        }
+        let mc_joint = joint as f64 / trials as f64;
+
+        // p_joint ≈ 0.008; 3σ MC error at n=2e6 ≈ 1.9e-4.
+        assert!(
+            (quad_joint - mc_joint).abs() < 3e-4,
+            "shared-W t-copula joint default prob: quadrature {quad_joint} must \
+             match per-name MC {mc_joint} — a mismatch means the quadrature \
+             engine prices a different model than the MC engine samples"
+        );
     }
 
     #[test]

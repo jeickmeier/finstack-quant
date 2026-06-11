@@ -48,6 +48,14 @@ pub struct CreditContextMetrics {
     pub dscr_total_min: Option<f64>,
     /// Minimum interest coverage across all periods.
     pub interest_coverage_min: Option<f64>,
+    /// Periods requested but excluded from one or more coverage series
+    /// (`dscr`, `dscr_total`, `interest_coverage`) — e.g. missing cashflow
+    /// data, currency mismatch, missing coverage-node value, or a
+    /// non-positive denominator. The min/max statistics above only reflect
+    /// the periods *not* listed here, so consumers can assess coverage of
+    /// the computed metrics.
+    #[serde(default)]
+    pub skipped_periods: Vec<PeriodId>,
 }
 
 /// Compute credit context metrics for a specific instrument.
@@ -185,6 +193,27 @@ pub fn compute_credit_context(
     let dscr_total_min = dscr_total.iter().map(|(_, v)| *v).reduce(f64::min);
     let interest_coverage_min = interest_coverage.iter().map(|(_, v)| *v).reduce(f64::min);
 
+    // Surface coverage gaps: any requested period absent from at least one
+    // of the coverage series was (partially) skipped and is excluded from
+    // the min statistics above.
+    let skipped_periods: Vec<PeriodId> = periods
+        .iter()
+        .map(|p| p.id)
+        .filter(|pid| {
+            !(dscr.iter().any(|(p, _)| p == pid)
+                && dscr_total.iter().any(|(p, _)| p == pid)
+                && interest_coverage.iter().any(|(p, _)| p == pid))
+        })
+        .collect();
+    if !skipped_periods.is_empty() {
+        tracing::warn!(
+            instrument_id,
+            skipped = skipped_periods.len(),
+            requested = periods.len(),
+            "credit context: some periods excluded from coverage metrics",
+        );
+    }
+
     CreditContextMetrics {
         dscr,
         dscr_total,
@@ -193,6 +222,7 @@ pub fn compute_credit_context(
         dscr_min,
         dscr_total_min,
         interest_coverage_min,
+        skipped_periods,
     }
 }
 
@@ -310,6 +340,15 @@ mod tests {
         assert!(
             (metrics.dscr_min.expect("dscr_min should be set") - metrics.dscr[0].1).abs() < 1e-12
         );
+        // The dropped period must be surfaced rather than silently omitted.
+        assert_eq!(metrics.skipped_periods, vec![PeriodId::quarter(2025, 2)]);
+    }
+
+    #[test]
+    fn test_full_coverage_reports_no_skipped_periods() {
+        let (result, cs, periods) = make_result_and_cs();
+        let metrics = compute_credit_context(&result, &cs, "BOND-001", "ebitda", &periods, None);
+        assert!(metrics.skipped_periods.is_empty());
     }
 
     #[test]

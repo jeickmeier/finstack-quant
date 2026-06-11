@@ -148,6 +148,12 @@ pub struct SensitivityResult {
 
     /// All scenario results
     pub scenarios: Vec<SensitivityScenario>,
+
+    /// Unperturbed baseline evaluation of the model (populated by tornado
+    /// runs). Used by tornado chart generation as the reference metric
+    /// when a parameter's base value is not part of the perturbation grid.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline: Option<StatementResult>,
 }
 
 impl SensitivityResult {

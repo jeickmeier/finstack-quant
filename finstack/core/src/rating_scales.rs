@@ -263,6 +263,26 @@ fn validate_scorecard_scale(scale: &ScorecardScale, scale_label: &str) -> Result
             other => other,
         })?;
     }
+
+    // Ratings must be ordered best-to-worst: `determine_rating`-style lookups
+    // scan in order and return the first level whose `min_score` is met, so a
+    // shuffled scale silently mis-rates. Enforce strictly descending `score`
+    // and `min_score`.
+    for pair in scale.ratings.windows(2) {
+        let (prev, next) = (&pair[0], &pair[1]);
+        if next.score >= prev.score {
+            return Err(Error::Validation(format!(
+                "rating scale '{scale_label}' is not ordered best-to-worst: level '{}' has score {} >= preceding level '{}' score {}",
+                next.name, next.score, prev.name, prev.score
+            )));
+        }
+        if next.min_score >= prev.min_score {
+            return Err(Error::Validation(format!(
+                "rating scale '{scale_label}' is not ordered best-to-worst: level '{}' has min_score {} >= preceding level '{}' min_score {}",
+                next.name, next.min_score, prev.name, prev.min_score
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -418,6 +438,41 @@ mod tests {
         let json = r#"{"name":"BB","score":150.0,"min_score":50.0}"#;
         let err = RatingLevel::from_json(json).expect_err("score out of range must be rejected");
         assert!(matches!(err, Error::Validation(_)));
+    }
+
+    #[test]
+    fn scorecard_scale_from_json_rejects_shuffled_ordering() {
+        // Levels out of best-to-worst order must be rejected: ordered lookups
+        // (first level whose min_score is met) depend on monotonicity.
+        let json = r#"{"scale_name":"Test","ratings":[
+            {"name":"A","score":75.0,"min_score":70.0},
+            {"name":"AAA","score":100.0,"min_score":95.0},
+            {"name":"BBB","score":60.0,"min_score":55.0}
+        ]}"#;
+        let err = ScorecardScale::from_json(json).expect_err("shuffled scale must be rejected");
+        assert!(matches!(err, Error::Validation(_)));
+        assert!(err.to_string().contains("not ordered best-to-worst"));
+    }
+
+    #[test]
+    fn scorecard_scale_from_json_rejects_non_descending_min_score() {
+        let json = r#"{"scale_name":"Test","ratings":[
+            {"name":"AAA","score":100.0,"min_score":95.0},
+            {"name":"AA","score":90.0,"min_score":95.0}
+        ]}"#;
+        let err = ScorecardScale::from_json(json).expect_err("tied min_score must be rejected");
+        assert!(err.to_string().contains("min_score"));
+    }
+
+    #[test]
+    fn scorecard_scale_from_json_accepts_descending_scale() {
+        let json = r#"{"scale_name":"Test","ratings":[
+            {"name":"AAA","score":100.0,"min_score":95.0},
+            {"name":"AA","score":90.0,"min_score":85.0},
+            {"name":"A","score":75.0,"min_score":70.0}
+        ]}"#;
+        let scale = ScorecardScale::from_json(json).expect("descending scale should validate");
+        assert_eq!(scale.ratings.len(), 3);
     }
 
     #[test]

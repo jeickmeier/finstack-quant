@@ -38,6 +38,20 @@ pub struct CapitalStructureState {
     /// Number of consecutive periods each instrument has been in PIK mode.
     /// Used for hysteresis: PIK stays active until `min_periods_in_pik` is met.
     pub pik_periods_active: IndexMap<String, usize>,
+
+    /// Cumulative principal capitalized via the PIK *toggle* per instrument.
+    ///
+    /// Toggle-driven capitalization grows the stateful balance beyond the
+    /// contractual schedule's notional path. This increment is excluded from
+    /// the scale-clamp basis in `calculate_period_flows` so PIK compounding
+    /// is not frozen by `SCALE_CLAMP_MAX`, while interest still accrues on
+    /// the full stateful balance.
+    pub cumulative_toggled_pik: IndexMap<String, Money>,
+
+    /// Unpaid interest/fee shortfall per instrument from the prior period's
+    /// available-cash cap. Carried forward as a claim in the next period's
+    /// interest category and re-recorded if it remains unpaid.
+    pub interest_shortfall: IndexMap<String, Money>,
 }
 
 impl CapitalStructureState {

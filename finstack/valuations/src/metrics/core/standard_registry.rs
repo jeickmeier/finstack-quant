@@ -133,6 +133,18 @@ fn register_rates_instrument_metrics(registry: &mut MetricRegistry) {
     );
     crate::instruments::rates::cap_floor::metrics::register_cap_floor_metrics(registry);
     crate::instruments::rates::swaption::metrics::register_swaption_metrics(registry);
+    // Bermudan greeks use the documented default HW parameters (κ = 3%,
+    // σ = 1%). For production risk, calibrate HW params to co-terminal
+    // European swaptions and re-register on a cloned registry via
+    // `register_bermudan_swaption_metrics`.
+    if let Ok(default_hw) = crate::calibration::hull_white::HullWhiteParams::new(
+        crate::instruments::rates::swaption::metrics::bermudan_greeks::DEFAULT_KAPPA,
+        crate::instruments::rates::swaption::metrics::bermudan_greeks::DEFAULT_SIGMA,
+    ) {
+        crate::instruments::rates::swaption::metrics::register_bermudan_swaption_metrics(
+            registry, default_hw,
+        );
+    }
     crate::instruments::rates::xccy_swap::metrics::register_xccy_swap_metrics(registry);
     crate::instruments::rates::repo::metrics::register_repo_metrics(registry);
     crate::instruments::rates::basis_swap::metrics::register_basis_swap_metrics(registry);

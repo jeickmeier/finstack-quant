@@ -88,6 +88,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "add_vintage_buildup",
             // Roll-forward template
             "add_roll_forward",
+            "add_roll_forward_with_opening",
             // Real-estate template
             "SimpleLeaseSpec",
             "RentStepSpec",

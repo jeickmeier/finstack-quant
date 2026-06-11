@@ -607,6 +607,16 @@ impl MetricId {
     /// Units: currency per 1 vol point.
     pub const Vega: Self = Self(Cow::Borrowed("vega"));
 
+    /// Hull-White short-rate volatility sensitivity (model vega).
+    ///
+    /// Measures the PV change for a **0.01 absolute move in the Hull-White
+    /// short-rate σ**. This is a *model-parameter* vega, not a Black/market
+    /// vol vega — it lives on a different vol axis than [`MetricId::Vega`]
+    /// and must not be aggregated with Black vegas.
+    ///
+    /// Units: currency per 0.01 HW σ.
+    pub const HwSigmaVega: Self = Self(Cow::Borrowed("hw_sigma_vega"));
+
     /// Bucketed vega by volatility-surface point or node.
     ///
     /// Represents vega decomposed by surface location rather than as a single
@@ -1277,6 +1287,7 @@ impl MetricId {
         MetricId::DeltaPremiumAdjusted,
         MetricId::Gamma,
         MetricId::Vega,
+        MetricId::HwSigmaVega,
         MetricId::BucketedVega,
         MetricId::Vanna,
         MetricId::Volga,
@@ -1526,7 +1537,7 @@ impl MetricGroup {
             MetricGroup::Fx => (122, 129),
             MetricGroup::Equity => (129, 147),
             MetricGroup::StructuredCredit => (147, 176),
-            MetricGroup::Alternatives => (176, 200),
+            MetricGroup::Alternatives => (176, 201),
         }
     }
 }

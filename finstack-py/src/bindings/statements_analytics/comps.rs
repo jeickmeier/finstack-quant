@@ -11,14 +11,17 @@
 //! The scoring API takes plain dicts/lists from Python rather than the
 //! strongly-typed `CompanyMetrics`/`PeerSet` structs used in Rust. Each
 //! peer is a dict keyed by metric name; dimensions are either `(name, weight)`
-//! tuples for univariate scoring or dicts with `label`, `y`, optional `x`, and
-//! `weight` keys for regression-based scoring.
+//! tuples for univariate scoring or dicts with `label`, `y`, optional `x`
+//! (one or more selectors), optional `direction`, and `weight` keys for
+//! regression-based scoring. Metric selectors map 1:1 onto the Rust
+//! `MetricExtractor` enum: named fields, custom keys, and
+//! `"multiple:<id>"` for canonical valuation multiples.
 
 use finstack_statements_analytics::analysis::{
     compute_multiple as core_compute_multiple, peer_stats as core_peer_stats,
     percentile_rank as core_percentile_rank, regression_fair_value as core_regression,
     score_relative_value as core_score, z_score as core_z_score, CompanyMetrics, MetricExtractor,
-    Multiple, PeerSet, PeriodBasis, ScoringDimension,
+    Multiple, PeerSet, PeriodBasis, ScoreDirection, ScoringDimension,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
@@ -70,8 +73,8 @@ fn z_score(value: f64, peer_values: Vec<f64>) -> Option<f64> {
 ///
 /// Returns:
 ///     Dict with keys ``{"mean", "median", "q1", "q3", "iqr", "std_dev",
-///     "min", "max", "n"}``. Returns an empty dict when ``peer_values``
-///     is empty.
+///     "min", "max", "count"}`` mirroring the Rust ``PeerStats`` field
+///     names. Returns an empty dict when ``peer_values`` is empty.
 #[pyfunction]
 #[pyo3(text_signature = "(peer_values)")]
 fn peer_stats<'py>(py: Python<'py>, peer_values: Vec<f64>) -> PyResult<Bound<'py, PyDict>> {
@@ -81,11 +84,11 @@ fn peer_stats<'py>(py: Python<'py>, peer_values: Vec<f64>) -> PyResult<Bound<'py
         d.set_item("median", stats.median)?;
         d.set_item("q1", stats.q1)?;
         d.set_item("q3", stats.q3)?;
-        d.set_item("iqr", stats.q3 - stats.q1)?;
+        d.set_item("iqr", stats.iqr)?;
         d.set_item("std_dev", stats.std_dev)?;
         d.set_item("min", stats.min)?;
         d.set_item("max", stats.max)?;
-        d.set_item("n", stats.count)?;
+        d.set_item("count", stats.count)?;
     }
     Ok(d)
 }
@@ -163,13 +166,23 @@ fn compute_multiple(company_metrics: &Bound<'_, PyDict>, multiple: &str) -> PyRe
 ///
 /// Known field names (e.g. ``"leverage"``, ``"oas_bps"``, ``"ebitda"``)
 /// are mapped onto their dedicated optional fields; everything else is
-/// stored in the `custom` map. Non-numeric entries are skipped.
+/// stored in the `custom` map. ``None`` values are treated as missing;
+/// any other non-numeric value raises ``ValueError`` naming the key.
 fn dict_to_company_metrics(id: &str, d: &Bound<'_, PyDict>) -> PyResult<CompanyMetrics> {
     let mut m = CompanyMetrics::new(id);
     for (key, val) in d.iter() {
         let name: String = key.extract()?;
-        let Ok(v) = val.extract::<f64>() else {
+        if val.is_none() {
             continue;
+        }
+        let Ok(v) = val.extract::<f64>() else {
+            return Err(crate::errors::value_error(format!(
+                "metric '{name}' for company '{id}' must be a number or None, got {}",
+                val.get_type().name().map_or_else(
+                    |_| "unknown".to_string(),
+                    |t| t.to_string_lossy().into_owned()
+                )
+            )));
         };
         match name.as_str() {
             "enterprise_value" => m.enterprise_value = Some(v),
@@ -224,11 +237,39 @@ fn is_named_field(name: &str) -> bool {
     )
 }
 
-fn metric_extractor(name: &str) -> MetricExtractor {
-    if is_named_field(name) {
-        MetricExtractor::Named(name.to_string())
+/// Map a metric selector string onto a `MetricExtractor`.
+///
+/// - ``"multiple:<id>"`` (e.g. ``"multiple:ev_ebitda"``) selects a canonical
+///   valuation multiple computed on the fly from `CompanyMetrics`.
+/// - Known field names select the dedicated optional field.
+/// - Anything else selects an entry in the `custom` map.
+fn metric_extractor(name: &str) -> PyResult<MetricExtractor> {
+    if let Some(multiple) = name.strip_prefix("multiple:") {
+        let multiple: Multiple = multiple.parse().map_err(display_to_py)?;
+        Ok(MetricExtractor::Multiple(multiple))
+    } else if is_named_field(name) {
+        Ok(MetricExtractor::Named(name.to_string()))
     } else {
-        MetricExtractor::Custom(name.to_string())
+        Ok(MetricExtractor::Custom(name.to_string()))
+    }
+}
+
+/// Parse an optional ``direction`` key (``"higher_is_cheap"`` /
+/// ``"higher_is_rich"``) from a dimension dict; defaults to the Rust
+/// `ScoreDirection` default (`HigherIsCheap`).
+fn parse_direction(dict: &Bound<'_, PyDict>) -> PyResult<ScoreDirection> {
+    match dict.get_item("direction")? {
+        None => Ok(ScoreDirection::default()),
+        Some(value) => {
+            let s: String = value.extract()?;
+            match s.as_str() {
+                "higher_is_cheap" => Ok(ScoreDirection::HigherIsCheap),
+                "higher_is_rich" => Ok(ScoreDirection::HigherIsRich),
+                other => Err(crate::errors::value_error(format!(
+                    "unknown direction '{other}' (expected 'higher_is_cheap' or 'higher_is_rich')"
+                ))),
+            }
+        }
     }
 }
 
@@ -245,15 +286,17 @@ fn parse_scoring_dimension(obj: &Bound<'_, PyAny>) -> PyResult<ScoringDimension>
     if let Ok((name, weight)) = obj.extract::<(String, f64)>() {
         return Ok(ScoringDimension {
             label: name.clone(),
-            y_extractor: metric_extractor(&name),
+            y_extractor: metric_extractor(&name)?,
             x_extractors: vec![],
             weight,
+            direction: ScoreDirection::default(),
         });
     }
 
     let dict = obj.cast::<PyDict>().map_err(|_| {
         crate::errors::value_error(
-            "dimension must be a (metric_name, weight) tuple or a dict with label/y/x/weight",
+            "dimension must be a (metric_name, weight) tuple or a dict with \
+             label/y/x/weight/direction",
         )
     })?;
 
@@ -267,13 +310,13 @@ fn parse_scoring_dimension(obj: &Bound<'_, PyAny>) -> PyResult<ScoringDimension>
     let x_extractors = match dict.get_item("x")?.or(dict.get_item("x_extractors")?) {
         Some(value) => {
             if let Ok(name) = value.extract::<String>() {
-                vec![metric_extractor(&name)]
+                vec![metric_extractor(&name)?]
             } else {
                 let names = value.extract::<Vec<String>>()?;
                 names
                     .into_iter()
                     .map(|name| metric_extractor(&name))
-                    .collect()
+                    .collect::<PyResult<_>>()?
             }
         }
         None => vec![],
@@ -281,9 +324,10 @@ fn parse_scoring_dimension(obj: &Bound<'_, PyAny>) -> PyResult<ScoringDimension>
 
     Ok(ScoringDimension {
         label,
-        y_extractor: metric_extractor(&y_name),
+        y_extractor: metric_extractor(&y_name)?,
         x_extractors,
         weight,
+        direction: parse_direction(dict)?,
     })
 }
 
@@ -291,8 +335,16 @@ fn parse_scoring_dimension(obj: &Bound<'_, PyAny>) -> PyResult<ScoringDimension>
 ///
 /// Dimensions may be ``(metric_name, weight)`` tuples for univariate
 /// scoring or dicts of the form ``{"label": str, "y": str, "x": [str],
-/// "weight": float}`` for regression-based fair-value scoring. The
-/// composite is the weighted average where positive = cheap, negative = rich.
+/// "weight": float, "direction": str}`` for regression-based fair-value
+/// scoring. Metric selectors are plain metric names (named field or custom
+/// key) or ``"multiple:<id>"`` (e.g. ``"multiple:ev_ebitda"``) for canonical
+/// valuation multiples — the same capabilities as the Rust
+/// ``MetricExtractor`` enum. ``direction`` is ``"higher_is_cheap"``
+/// (default, spread-like: higher Y than peers scores positive = cheap) or
+/// ``"higher_is_rich"`` (multiple-like: higher Y scores negative = rich);
+/// it applies consistently to both the univariate z-score path and the
+/// regression-residual path. The composite is the weighted average where
+/// positive = cheap, negative = rich.
 ///
 /// Arguments:
 ///     subject_metrics: Dict of ``{metric_name: value}`` for the subject.

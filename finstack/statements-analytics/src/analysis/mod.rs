@@ -80,8 +80,9 @@ pub use valuation::{
 // ---- Check-framework re-exports ----
 
 pub use checks::{
-    corkscrew_as_checks, credit_underwriting_checks, lbo_model_checks, three_statement_checks,
-    CheckReportRenderer, CreditMapping, FormulaCheck, ThreeStatementMapping, TrendDirection,
+    corkscrew_as_checks, credit_underwriting_checks, lbo_model_checks, resolve_check_suite,
+    three_statement_checks, CheckReportRenderer, CreditMapping, FormulaCheck,
+    ThreeStatementMapping, TrendDirection,
 };
 
 // ---- ECL re-exports ----
@@ -106,5 +107,5 @@ pub use comps::{
     compute_multiple, compute_peer_multiples, peer_stats, percentile_rank, regression_fair_value,
     score_relative_value, z_score, CompanyId, CompanyMetrics, DimensionScore, MetricExtractor,
     Multiple, PeerFilter, PeerSet, PeerStats, PeriodBasis, RegressionResult, RelativeValueResult,
-    ScoringDimension,
+    ScoreDirection, ScoringDimension,
 };

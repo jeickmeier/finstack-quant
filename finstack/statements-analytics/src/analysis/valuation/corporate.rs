@@ -77,6 +77,17 @@ pub struct DcfOptions {
     /// e.g. `Relative(0.10)` for ±10% of the base multiple. Absolute
     /// bumps are clamped at zero on the downside.
     pub exit_multiple_bump: ExitMultipleBump,
+    /// Explicit discount curve id stamped on the DCF instrument (default:
+    /// `None`).
+    ///
+    /// The curve is used for *risk attribution only* — all DCF components
+    /// (explicit flows, terminal value, equity) always discount at the
+    /// WACC on a single consistent basis. When `None`, a model-scoped
+    /// placeholder id (`"{model_id}-DCF-WACC"`) is used instead of the
+    /// conventional `"{CCY}-DISCOUNT"` name, so a market context that
+    /// happens to contain a curve with the conventional name cannot be
+    /// mistaken for the discounting basis.
+    pub discount_curve_id: Option<CurveId>,
 }
 
 impl Default for DcfOptions {
@@ -89,6 +100,7 @@ impl Default for DcfOptions {
             wacc_sensitivity_bump: 0.01,
             wacc_denominator_epsilon: 0.005,
             exit_multiple_bump: ExitMultipleBump::default(),
+            discount_curve_id: None,
         }
     }
 }
@@ -286,9 +298,14 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         )));
     }
 
-    // Validate terminal value constraints.
+    // Validate terminal value constraints. Guards are written fail-closed
+    // (negated comparisons) so NaN parameters error instead of silently
+    // producing NaN valuations.
+    use std::cmp::Ordering;
     match &terminal_value {
-        TerminalValueSpec::GordonGrowth { growth_rate } if *growth_rate >= wacc => {
+        TerminalValueSpec::GordonGrowth { growth_rate }
+            if growth_rate.partial_cmp(&wacc) != Some(Ordering::Less) =>
+        {
             return Err(finstack_statements::error::Error::Eval(format!(
                 "Gordon Growth terminal value requires growth_rate ({:.4}) < WACC ({:.4}). \
                  A growth rate >= WACC produces an infinite terminal value.",
@@ -300,19 +317,22 @@ pub(crate) fn evaluate_dcf_from_results_impl(
             stable_growth_rate,
             half_life_years,
         } => {
-            if *stable_growth_rate >= wacc {
+            if stable_growth_rate.partial_cmp(&wacc) != Some(Ordering::Less) {
                 return Err(finstack_statements::error::Error::Eval(format!(
                     "H-Model terminal value requires stable_growth_rate ({:.4}) < WACC ({:.4}).",
                     stable_growth_rate, wacc
                 )));
             }
-            if *high_growth_rate < *stable_growth_rate {
+            if !matches!(
+                high_growth_rate.partial_cmp(stable_growth_rate),
+                Some(Ordering::Greater | Ordering::Equal)
+            ) {
                 return Err(finstack_statements::error::Error::Eval(format!(
                     "H-Model requires high_growth_rate ({:.4}) >= stable_growth_rate ({:.4}).",
                     high_growth_rate, stable_growth_rate
                 )));
             }
-            if *half_life_years <= 0.0 {
+            if half_life_years.partial_cmp(&0.0) != Some(Ordering::Greater) {
                 return Err(finstack_statements::error::Error::Eval(format!(
                     "H-Model requires half_life_years > 0, got {:.4}.",
                     half_life_years
@@ -321,6 +341,53 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         }
         _ => {}
     }
+
+    // Growth-perpetuity terminal values (Gordon, H-Model) capitalize an
+    // *annual* flow with annual WACC/g. When the model's period grid is
+    // sub-annual, annualize the terminal flow as the trailing sum of the
+    // final year's period flows (standard trailing-twelve-month
+    // convention; Koller et al., Damodaran). If fewer than a full year of
+    // forecast flows exists, the trailing sum is scaled up pro-rata.
+    // Annual grids pass the last flow through unchanged.
+    let terminal_flow_override = match &terminal_value {
+        TerminalValueSpec::GordonGrowth { .. } | TerminalValueSpec::HModel { .. } => {
+            let periods_per_year = model
+                .periods
+                .iter()
+                .rfind(|period| !period.is_actual)
+                .map(|period| usize::from(period.id.periods_per_year()))
+                .unwrap_or(1);
+            if periods_per_year > 1 {
+                let trailing = flows.len().min(periods_per_year);
+                let trailing_sum: f64 = flows
+                    .iter()
+                    .rev()
+                    .take(trailing)
+                    .map(|(_, amount)| amount)
+                    .sum();
+                let annualized = trailing_sum * (periods_per_year as f64 / trailing as f64);
+                trace.push(
+                    TraceEntry::ComputationStep {
+                        name: "terminal_flow_annualization".to_string(),
+                        description: "Trailing-year annualization of the terminal flow for a \
+                                      growth-perpetuity terminal value on a sub-annual grid"
+                            .to_string(),
+                        metadata: Some(json!({
+                            "periods_per_year": periods_per_year,
+                            "trailing_periods_used": trailing,
+                            "trailing_sum": trailing_sum,
+                            "annualized_terminal_flow": annualized,
+                        })),
+                    },
+                    None,
+                );
+                Some(annualized)
+            } else {
+                None
+            }
+        }
+        TerminalValueSpec::ExitMultiple { .. } => None,
+    };
 
     // Determine net debt
     let net_debt_period = last_actual_period
@@ -344,9 +411,20 @@ pub(crate) fn evaluate_dcf_from_results_impl(
             .start
     };
 
-    // Create DCF instrument
-    // Use a default discount curve ID - DCF uses WACC internally, but still needs a curve ID
-    let discount_curve_id = CurveId::new(format!("{}-DISCOUNT", currency));
+    // Create DCF instrument.
+    //
+    // The discount curve id is risk-attribution metadata only: the DCF
+    // pricer always discounts every component (explicit flows, terminal
+    // value, equity) at the WACC. The conventional "{CCY}-DISCOUNT" name
+    // is no longer synthesized by default — callers opt in via
+    // `DcfOptions::discount_curve_id`; otherwise a model-scoped
+    // placeholder keeps the instrument id-complete without colliding
+    // with any market curve.
+    let discount_curve_id = context
+        .options
+        .discount_curve_id
+        .clone()
+        .unwrap_or_else(|| CurveId::new(format!("{}-DCF-WACC", model.id)));
     let mut builder = DiscountedCashFlow::builder()
         .id(InstrumentId::new(format!("{}-DCF", model.id)))
         .currency(currency)
@@ -357,6 +435,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         .valuation_date(valuation_date)
         .discount_curve_id(discount_curve_id)
         .mid_year_convention(context.options.mid_year_convention)
+        .terminal_flow_override_opt(terminal_flow_override)
         .attributes(Attributes::new());
 
     if let Some(ref bridge) = context.options.equity_bridge {

@@ -237,5 +237,7 @@ fn test_funding_risk_sign() {
         .compute(&[MetricId::FundingRisk], &mut mctx)
         .expect("should succeed");
     let fr = *res.get(&MetricId::FundingRisk).expect("should succeed");
-    assert!(fr <= 0.0);
+    // dPV/dy convention: a +1bp repo-rate bump raises the lender's repurchase
+    // payment, so ΔPV must be positive for a cash lender.
+    assert!(fr >= 0.0);
 }

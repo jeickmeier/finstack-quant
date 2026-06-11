@@ -17,7 +17,9 @@ impl crate::metrics::MetricCalculator for CloWarfCalculator {
         let mut weighted_sum = 0.0;
         let mut total_balance = 0.0;
 
-        for asset in &clo.pool.assets {
+        // Performing par only: defaulted assets are carried at recovery in
+        // OC haircuts, not in the rating-factor average.
+        for asset in clo.pool.assets.iter().filter(|a| !a.is_defaulted) {
             let balance = asset.balance.amount();
             let rating_factor = asset
                 .credit_quality

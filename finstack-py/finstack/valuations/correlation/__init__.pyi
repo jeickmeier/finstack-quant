@@ -13,7 +13,7 @@ __all__ = [
     "RecoverySpec",
     "RecoveryModel",
     "LatentFactorSpec",
-    "LatentFactor",
+    "LatentFactorKind",
     "LatentSingleFactor",
     "LatentTwoFactor",
     "LatentMultiFactor",
@@ -37,7 +37,7 @@ class CopulaSpec:
     >>> spec = CopulaSpec.gaussian()
     >>> copula = spec.build()
     >>> copula.model_name
-    'Gaussian'
+    'One-Factor Gaussian Copula'
     """
 
     @classmethod
@@ -149,8 +149,10 @@ class Copula:
     -------
     >>> from finstack.valuations.correlation import CopulaSpec
     >>> copula = CopulaSpec.gaussian().build()
+    >>> # P(default | Z=0) = norm.cdf(-2.33 / sqrt(1 - 0.3)) ≈ 0.0027,
+    >>> # below the unconditional PD of norm.cdf(-2.33) ≈ 0.0099.
     >>> copula.conditional_default_prob(-2.33, [0.0], 0.3)
-    0.009...
+    0.002...
     """
 
     def conditional_default_prob(
@@ -190,7 +192,13 @@ class Copula:
         ...
 
     def tail_dependence(self, correlation: float) -> float:
-        """Lower-tail dependence coefficient (or proxy) at the given correlation.
+        """Strict lower-tail dependence coefficient ``λ_L`` at the given correlation.
+
+        Returns ``nan`` when the model has no closed-form ``λ_L`` (Random
+        Factor Loading); check ``math.isnan()`` before using the result.
+        Gaussian and multi-factor Gaussian copulas return ``0.0``; Student-t
+        returns the closed-form positive ``λ_L``. For the RFL heuristic
+        stress gauge use :meth:`stress_correlation_proxy` instead.
 
         Parameters
         ----------
@@ -200,7 +208,33 @@ class Copula:
         Returns
         -------
         float
-            Tail dependence measure.
+            The strict ``λ_L``, or ``nan`` if the model has no closed form.
+        """
+        ...
+
+    def stress_correlation_proxy(self, correlation: float) -> float:
+        """Heuristic stress-correlation proxy for the Random Factor Loading copula.
+
+        This is **not** the strict copula lower-tail-dependence coefficient
+        ``λ_L`` (which has no closed form for RFL — :meth:`tail_dependence`
+        returns ``nan``). It gauges the extra correlation mass in the
+        high-loading tail and vanishes in the Gaussian (``loading_vol = 0``)
+        limit.
+
+        Parameters
+        ----------
+        correlation : float
+            Asset correlation.
+
+        Returns
+        -------
+        float
+            Non-negative stress-correlation proxy.
+
+        Raises
+        ------
+        ValueError
+            If the copula is not a Random Factor Loading copula.
         """
         ...
 
@@ -254,7 +288,10 @@ class RecoverySpec:
 
     @classmethod
     def market_standard_stochastic(cls) -> RecoverySpec:
-        """Market-standard stochastic recovery (40% mean, 25% vol, −40% corr).
+        """Market-standard stochastic recovery (40% mean, 25% vol, +40% corr).
+
+        Recovery falls in stress under the canonical low-factor-stress
+        convention.
 
         Returns
         -------
@@ -265,7 +302,15 @@ class RecoverySpec:
 
     @property
     def expected_recovery(self) -> float:
-        """Expected (unconditional) recovery rate implied by this spec."""
+        """Location-parameter recovery rate of this spec.
+
+        For a constant spec this is the constant rate. For a
+        market-correlated spec this returns the ``mean`` input — the target
+        recovery at factor ``Z = 0`` — which differs from the
+        Jensen-corrected unconditional mean ``E_Z[R(Z)]`` whenever the
+        factor sensitivity is non-zero. For the true unconditional mean call
+        ``build().expected_recovery``.
+        """
         ...
 
     def build(self) -> RecoveryModel:
@@ -394,12 +439,12 @@ class LatentFactorSpec:
         """Number of factors implied by this specification."""
         ...
 
-    def build(self) -> LatentFactor:
-        """Build a concrete :class:`LatentFactor` from this specification.
+    def build(self) -> LatentFactorKind:
+        """Build a concrete :class:`LatentFactorKind` from this specification.
 
         Returns
         -------
-        LatentFactor
+        LatentFactorKind
             Concrete factor model.
 
         Raises
@@ -410,7 +455,7 @@ class LatentFactorSpec:
         """
         ...
 
-class LatentFactor:
+class LatentFactorKind:
     """Concrete factor model for correlated behavior.
 
     Obtain an instance via :meth:`LatentFactorSpec.build`.
@@ -657,6 +702,12 @@ class LatentMultiFactor:
         -------
         list[float]
             Correlated factor realizations.
+
+        Raises
+        ------
+        ValueError
+            If ``independent_z`` does not contain exactly ``num_factors``
+            draws.
         """
         ...
 
@@ -824,8 +875,8 @@ def validate_correlation_matrix(matrix: Sequence[float], n: int) -> None:
 def nearest_correlation(
     matrix: Sequence[float],
     n: int,
-    max_iter: int = 200,
-    tol: float = 1e-10,
+    max_iter: int | None = None,
+    tol: float | None = None,
 ) -> list[float]:
     """Nearest correlation matrix (Higham 2002) for a near-PSD input.
 
@@ -841,9 +892,12 @@ def nearest_correlation(
     n
         Matrix dimension.
     max_iter
-        Maximum alternating-projection iterations.
+        Maximum alternating-projection iterations. Defaults to the Rust
+        ``NearestCorrelationOpts::default()`` value (currently ``200``).
     tol
-        Frobenius-norm tolerance between successive iterates.
+        Frobenius-norm tolerance between successive iterates. Defaults to
+        the Rust ``NearestCorrelationOpts::default()`` value (currently
+        ``1e-10``).
 
     Returns
     -------
@@ -859,7 +913,10 @@ def nearest_correlation(
     ...
 
 def cholesky_decompose(matrix: Sequence[float], n: int) -> list[float]:
-    """Cholesky decomposition of a correlation matrix (flattened row-major).
+    """Pivoted Cholesky decomposition of a correlation matrix (flattened row-major).
+
+    Uses diagonal pivoting to handle near-singular and positive-semidefinite
+    matrices gracefully.
 
     Parameters
     ----------
@@ -871,11 +928,15 @@ def cholesky_decompose(matrix: Sequence[float], n: int) -> list[float]:
     Returns
     -------
     list[float]
-        Lower-triangular factor L as a flat list (row-major).
+        Factor matrix ``L`` as a flat list (row-major, original variable
+        order) satisfying ``L @ L.T == matrix``. Because of pivoting, the
+        unpermuted factor is **not** guaranteed to be lower triangular — it
+        may contain non-zero entries above the diagonal. The effective
+        numerical rank is not surfaced through this function.
 
     Raises
     ------
     ValueError
-        If the matrix is invalid.
+        If the matrix shape is wrong or the matrix is indefinite.
     """
     ...

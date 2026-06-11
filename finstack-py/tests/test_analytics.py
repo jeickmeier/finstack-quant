@@ -357,3 +357,56 @@ class TestCompsBindings:
             [{"label": "Spread vs Leverage", "y": "oas_bps", "x": ["leverage"], "weight": 1.0}],
         )
         assert result["composite_score"] > 0.0
+
+    def test_peer_stats_uses_rust_field_names(self) -> None:
+        from finstack.statements_analytics import peer_stats
+
+        stats = peer_stats([1.0, 2.0, 3.0, 4.0, 5.0])
+        assert stats["count"] == 5
+        assert "n" not in stats
+        assert stats["iqr"] == pytest.approx(stats["q3"] - stats["q1"])
+        assert peer_stats([]) == {}
+
+    def test_score_relative_value_direction_flips_sign(self) -> None:
+        subject = {"pe": 30.0}
+        peers = [{"pe": 10.0}, {"pe": 15.0}, {"pe": 20.0}]
+        cheap_convention = score_relative_value(subject, peers, [("pe", 1.0)])
+        rich_convention = score_relative_value(
+            subject, peers, [{"y": "pe", "weight": 1.0, "direction": "higher_is_rich"}]
+        )
+        # High multiple vs peers: rich (negative) under higher_is_rich, cheap
+        # (positive) under the default higher_is_cheap convention.
+        assert cheap_convention["composite_score"] > 0.0
+        assert rich_convention["composite_score"] < 0.0
+        assert rich_convention["composite_score"] == pytest.approx(-cheap_convention["composite_score"])
+
+    def test_score_relative_value_rejects_unknown_direction(self) -> None:
+        with pytest.raises(ValueError, match="unknown direction"):
+            score_relative_value(
+                {"pe": 30.0},
+                [{"pe": 10.0}, {"pe": 15.0}, {"pe": 20.0}],
+                [{"y": "pe", "direction": "down_is_up"}],
+            )
+
+    def test_score_relative_value_multiple_extractor(self) -> None:
+        subject = {"enterprise_value": 12_000.0, "ebitda": 1_000.0}
+        peers = [
+            {"enterprise_value": 8_000.0, "ebitda": 1_000.0},
+            {"enterprise_value": 9_000.0, "ebitda": 1_000.0},
+            {"enterprise_value": 10_000.0, "ebitda": 1_000.0},
+        ]
+        result = score_relative_value(subject, peers, [("multiple:ev_ebitda", 1.0)])
+        assert result["peer_count"] == 3
+        assert "multiple:ev_ebitda" in result["by_dimension"]
+
+    def test_non_numeric_metric_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="oas_bps"):
+            score_relative_value(
+                {"oas_bps": "wide"},
+                [{"oas_bps": 100.0}],
+                [("oas_bps", 1.0)],
+            )
+
+    def test_none_metric_treated_as_missing(self) -> None:
+        metrics = {"enterprise_value": 8_500.0, "ebitda": 1_000.0, "revenue": None}
+        assert compute_multiple(metrics, "EvEbitda") == pytest.approx(8.5)

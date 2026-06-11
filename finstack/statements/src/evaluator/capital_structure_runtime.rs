@@ -113,7 +113,7 @@ impl Evaluator {
 
         if let Some(cs_spec) = &model.capital_structure {
             if let Some(waterfall_spec) = &cs_spec.waterfall {
-                let updated_flows = crate::capital_structure::waterfall::execute_waterfall(
+                let waterfall_result = crate::capital_structure::waterfall::execute_waterfall(
                     &period_id,
                     &context,
                     waterfall_spec,
@@ -121,8 +121,12 @@ impl Evaluator {
                     &contractual_flows,
                 )?;
 
-                merge_updated_flows(&mut cs_cashflows, &updated_flows, period_id);
+                merge_updated_flows(&mut cs_cashflows, &waterfall_result.flows, period_id);
                 recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
+                if let Some(equity) = waterfall_result.equity_distribution {
+                    cs_cashflows.equity_distribution.insert(period_id, equity);
+                }
+                contractual_warnings.extend(waterfall_result.warnings);
                 context.capital_structure_cashflows = Some(cs_cashflows);
             }
         }
@@ -146,6 +150,12 @@ impl Evaluator {
             .take()
             .unwrap_or_default();
         let (values, mut warnings) = context.into_results();
+        // The second `evaluate_nodes_in_order` pass re-evaluates cs-affected
+        // nodes into the same context, so node-level warnings (e.g.
+        // DivisionByZero) can be pushed twice for the same node/period.
+        // Deduplicate while preserving first-occurrence order.
+        let mut seen: HashSet<String> = HashSet::with_capacity(warnings.len());
+        warnings.retain(|w| seen.insert(format!("{w:?}")));
         warnings.append(&mut contractual_warnings);
         Ok((values, warnings, period_cs_cashflows))
     }
@@ -192,6 +202,22 @@ pub(crate) fn resolve_opening_balance(
         return Ok(abs_money(m));
     }
 
+    // No outstanding entry at or before the period start. A forward-dated /
+    // delayed-draw instrument (issue date after the period start) carries a
+    // zero balance pre-issuance — falling back to the first *future* entry
+    // would report the full notional before the debt exists. Only use the
+    // first entry for issued instruments whose first flow lands later.
+    let pre_issuance = schedule
+        .meta
+        .issue_date
+        .is_some_and(|issue| issue > period_start)
+        && outstanding_path
+            .first()
+            .is_some_and(|(d, _)| *d > period_start);
+    if pre_issuance {
+        return Ok(Money::new(0.0, schedule.notional.initial.currency()));
+    }
+
     if let Some((_, m)) = outstanding_path.first() {
         return Ok(abs_money(m));
     }
@@ -227,10 +253,18 @@ fn compute_contractual_flows(
                 Money::new(0.0, schedule.notional.initial.currency())
             };
 
+        // Toggle-driven PIK capitalization accumulated in state is excluded
+        // from the scale-clamp basis so PIK compounding is not frozen.
+        let toggled_pik = cs_state
+            .cumulative_toggled_pik
+            .get(instrument_id.as_str())
+            .copied()
+            .unwrap_or_else(|| Money::new(0.0, opening_balance.currency()));
         let (breakdown, closing_balance, period_warnings) = integration::calculate_period_flows(
             instrument.as_ref(),
             period,
             opening_balance,
+            toggled_pik,
             market_ctx,
             as_of,
         )?;

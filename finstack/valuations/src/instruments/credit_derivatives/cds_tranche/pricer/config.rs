@@ -280,7 +280,8 @@ impl CDSTranchePricerConfig {
     /// Enable stochastic recovery with market-standard calibration.
     ///
     /// Uses typical calibration from CDX equity tranche:
-    /// - Mean: 40%, Vol: 25%, Correlation: -40%
+    /// - Mean: 40%, Vol: 25%, Correlation: +40% (canonical low-factor-stress
+    ///   convention: recovery falls when the systematic factor falls)
     pub fn with_stochastic_recovery(mut self) -> Self {
         self.recovery_spec = Some(RecoverySpec::market_standard_stochastic());
         self
@@ -291,7 +292,8 @@ impl CDSTranchePricerConfig {
     /// # Arguments
     /// * `mean` - Mean recovery rate (typical: 0.40)
     /// * `vol` - Recovery volatility (typical: 0.20-0.30)
-    /// * `corr` - Correlation with factor (typical: -0.30 to -0.50)
+    /// * `corr` - Correlation with factor (typical: +0.30 to +0.50 under the
+    ///   canonical low-factor-stress convention)
     pub fn with_custom_stochastic_recovery(mut self, mean: f64, vol: f64, corr: f64) -> Self {
         self.recovery_spec = Some(RecoverySpec::MarketCorrelated {
             mean_recovery: mean.clamp(0.0, 1.0),

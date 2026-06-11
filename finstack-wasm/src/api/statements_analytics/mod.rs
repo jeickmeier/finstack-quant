@@ -147,10 +147,7 @@ pub fn goal_seek(
         serde_json::from_str(model_json).map_err(to_js_err)?;
     let tp: finstack_core::dates::PeriodId = target_period.parse().map_err(to_js_err)?;
     let dp: finstack_core::dates::PeriodId = driver_period.parse().map_err(to_js_err)?;
-    let bounds = match (bounds_lo, bounds_hi) {
-        (Some(lo), Some(hi)) => Some((lo, hi)),
-        _ => None,
-    };
+    let bounds = goal_seek_bounds(bounds_lo, bounds_hi).map_err(|e| JsValue::from_str(&e))?;
 
     let result = finstack_statements_analytics::analysis::goal_seek(
         &mut model,
@@ -177,6 +174,25 @@ pub fn goal_seek(
         serde_json::json!({ "solved_value": result })
     };
     to_js_value(&out)
+}
+
+/// Validate that goal-seek bounds are either both present or both absent.
+///
+/// Kept JsValue-free so the rejection logic is unit-testable on native
+/// targets (constructing a `JsValue` aborts off-wasm32).
+fn goal_seek_bounds(
+    bounds_lo: Option<f64>,
+    bounds_hi: Option<f64>,
+) -> Result<Option<(f64, f64)>, String> {
+    match (bounds_lo, bounds_hi) {
+        (Some(lo), Some(hi)) => Ok(Some((lo, hi))),
+        (None, None) => Ok(None),
+        _ => Err(
+            "goalSeek: bounds_lo and bounds_hi must be provided together \
+             (got exactly one bound)"
+                .to_string(),
+        ),
+    }
 }
 
 /// Trace dependencies for a node and return ASCII tree.
@@ -249,15 +265,17 @@ pub fn credit_assessment_report(results_json: &str, as_of: &str) -> Result<Strin
 
 /// Run checks from a suite spec against a model (JSON in/out).
 ///
-/// Evaluates the model, resolves the suite spec into runnable checks,
-/// and returns a JSON check report.
+/// Evaluates the model, resolves the suite spec into runnable checks
+/// (built-in **and** user-defined formula checks), and returns a JSON
+/// check report.
 #[wasm_bindgen(js_name = runChecks)]
 pub fn run_checks(model_json: &str, suite_spec_json: &str) -> Result<String, JsValue> {
     let model: finstack_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
     let spec: finstack_statements::checks::CheckSuiteSpec =
         serde_json::from_str(suite_spec_json).map_err(to_js_err)?;
-    let suite = spec.resolve().map_err(to_js_err)?;
+    let suite =
+        finstack_statements_analytics::analysis::resolve_check_suite(&spec).map_err(to_js_err)?;
     let mut evaluator = finstack_statements::evaluator::Evaluator::new();
     let results = evaluator.evaluate(&model).map_err(to_js_err)?;
     let report = suite.run(&model, &results).map_err(to_js_err)?;
@@ -472,6 +490,47 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result).expect("parse");
         assert!(parsed.is_object());
         assert!(parsed.get("upside").is_some());
+    }
+
+    #[test]
+    fn run_checks_includes_formula_checks() {
+        let model_json = test_model_json();
+        let spec_json = serde_json::json!({
+            "name": "formula suite",
+            "builtin_checks": [],
+            "formula_checks": [{
+                "id": "revenue_positive",
+                "name": "Revenue must be positive",
+                "category": "internal_consistency",
+                "severity": "error",
+                "formula": "revenue > 0",
+                "message_template": "Revenue not positive in {period}",
+                "tolerance": null
+            }]
+        })
+        .to_string();
+        let report_json = run_checks(&model_json, &spec_json).expect("run checks");
+        let report: serde_json::Value = serde_json::from_str(&report_json).expect("parse report");
+        // The formula check must appear in the report's executed results,
+        // not be silently dropped.
+        assert!(
+            report_json.contains("revenue_positive"),
+            "formula check missing from report: {report_json}"
+        );
+        assert!(report.is_object());
+    }
+
+    #[test]
+    fn goal_seek_rejects_half_specified_bounds() {
+        let msg = goal_seek_bounds(Some(0.0), None).expect_err("half-specified bounds must error");
+        assert!(msg.contains("bounds_lo and bounds_hi"), "got: {msg}");
+        let msg = goal_seek_bounds(None, Some(1.0)).expect_err("half-specified bounds must error");
+        assert!(msg.contains("bounds_lo and bounds_hi"), "got: {msg}");
+        assert_eq!(
+            goal_seek_bounds(Some(0.0), Some(1.0)).expect("both bounds valid"),
+            Some((0.0, 1.0))
+        );
+        assert_eq!(goal_seek_bounds(None, None).expect("no bounds valid"), None);
     }
 
     #[test]

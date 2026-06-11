@@ -90,6 +90,9 @@ impl DiversionRule {
                 .get(test_id)
                 .map(|&passed| !passed)
                 .unwrap_or(false),
+            // No expression engine exists; `DiversionEngine::validate` rejects
+            // rules carrying this condition so it is unreachable in a
+            // validated engine.
             DiversionCondition::CustomExpression { .. } => false,
             DiversionCondition::Always => true,
         }
@@ -131,12 +134,25 @@ impl DiversionEngine {
     /// - Circular references (A → B → A)
     /// - Self-referencing rules (A → A)
     /// - Duplicate rule IDs
+    /// - `CustomExpression` conditions (no expression engine exists to
+    ///   evaluate them; silently treating them as inactive would hide a
+    ///   misconfigured deal)
     pub fn validate(&self) -> Result<()> {
         let mut seen_ids: HashSet<&str> = HashSet::default();
         for rule in &self.rules {
             validation::require_with(seen_ids.insert(&rule.id), || {
                 format!("Duplicate diversion rule ID: {}", rule.id)
             })?;
+        }
+
+        for rule in &self.rules {
+            if let DiversionCondition::CustomExpression { expr } = &rule.condition {
+                return Err(finstack_core::Error::Validation(format!(
+                    "Diversion rule '{}' uses CustomExpression ({expr:?}), but no \
+                     expression engine is available to evaluate it",
+                    rule.id
+                )));
+            }
         }
 
         for rule in &self.rules {
@@ -229,15 +245,22 @@ impl DiversionEngine {
     }
 
     /// Get active diversions based on test results.
+    ///
+    /// When multiple active rules share a source tier, the highest-priority
+    /// rule (lowest `priority` value) wins; lower-priority duplicates are
+    /// ignored rather than silently overwriting the senior rule.
     pub fn get_active_diversions(
         &self,
         test_results: &HashMap<String, bool>,
     ) -> HashMap<String, String> {
-        let mut active = HashMap::default();
+        let mut active: HashMap<String, String> = HashMap::default();
 
+        // `rules` is kept sorted by ascending priority in `add_rule`.
         for rule in &self.rules {
             if rule.is_active(test_results) {
-                active.insert(rule.source_tier_id.clone(), rule.target_tier_id.clone());
+                active
+                    .entry(rule.source_tier_id.clone())
+                    .or_insert_with(|| rule.target_tier_id.clone());
             }
         }
 
@@ -366,5 +389,57 @@ mod tests {
         assert_eq!(active.len(), 1);
         assert_eq!(active.get("tier_a"), Some(&"tier_b".to_string()));
         assert_eq!(active.get("tier_c"), None);
+    }
+
+    /// Two active rules on the same source tier: the highest-priority rule
+    /// (lowest priority value) must win, regardless of insertion order.
+    #[test]
+    fn test_duplicate_source_highest_priority_wins() {
+        let engine = DiversionEngine::new()
+            .add_rule(DiversionRule::on_test_failure(
+                "low_prio",
+                "tier_a",
+                "tier_junk",
+                "test1",
+                5,
+            ))
+            .add_rule(DiversionRule::on_test_failure(
+                "high_prio",
+                "tier_a",
+                "tier_senior",
+                "test1",
+                1,
+            ));
+
+        let mut test_results = HashMap::default();
+        test_results.insert("test1".to_string(), false);
+
+        let active = engine.get_active_diversions(&test_results);
+        assert_eq!(active.len(), 1);
+        assert_eq!(
+            active.get("tier_a"),
+            Some(&"tier_senior".to_string()),
+            "highest-priority rule must win on duplicate source tiers"
+        );
+    }
+
+    /// `CustomExpression` has no evaluation engine; validation must reject it
+    /// instead of letting it silently evaluate to inactive.
+    #[test]
+    fn test_custom_expression_rejected_at_validation() {
+        let engine = DiversionEngine::new().add_rule(DiversionRule::new(
+            "rule1",
+            "tier_a",
+            "tier_b",
+            DiversionCondition::CustomExpression {
+                expr: "oc_ratio < 1.2".into(),
+            },
+            1,
+        ));
+
+        let result = engine.validate();
+        assert!(result.is_err());
+        let err_msg = result.expect_err("should fail validation").to_string();
+        assert!(err_msg.contains("CustomExpression"));
     }
 }

@@ -615,12 +615,57 @@ mod tests {
         )
         .expect("ewm_var without adjust");
 
-        // n=2, alpha=0.5: sum_wt=1.5, sum_wt2=1.25
-        // correction = 2.25 / (2.25 - 1.25) = 2.25
-        // bias-corrected = 0.25 * 2.25 = 0.5625
-        assert!((value_default - 0.5625).abs() < 1e-9);
+        // pandas reference: pd.Series([1, 2]).ewm(alpha=0.5, adjust=False).var()
+        // Normalized recursion weights ŵ = [0.5, 0.5] ⇒ Σŵ² = 0.5,
+        // correction = 1 / (1 − 0.5) = 2; biased var = 0.25 ⇒ 0.25 * 2 = 0.5
+        // (bias=False). bias=True leaves the biased 0.25.
+        assert!((value_default - 0.5).abs() < 1e-9);
         assert!((value_no_adjust - 0.25).abs() < 1e-9);
         assert!(value_default > value_no_adjust);
+    }
+
+    #[test]
+    fn ewm_var_matches_pandas_adjust_false_bias_false() {
+        // pandas reference:
+        // pd.Series([1, 2, 3]).ewm(alpha=0.5, adjust=False).var(bias=False) → 1.1
+        // Hand check: ŵ = [0.25, 0.25, 0.5], mean = 2.25, biased var = 0.6875,
+        // Σŵ² = 0.375, correction = 1 / (1 − 0.375) = 1.6, 0.6875 * 1.6 = 1.1.
+        let p1 = PeriodId::quarter(2025, 1);
+        let p2 = PeriodId::quarter(2025, 2);
+        let p3 = PeriodId::quarter(2025, 3);
+
+        let mut context = build_context_with_history(p3, "series", vec![(p1, 1.0), (p2, 2.0)], 3.0);
+        let value = evaluate_function(
+            &Function::EwmVar,
+            &[Expr::column("series"), Expr::literal(0.5)],
+            &mut context,
+            Some("ewm_var"),
+        )
+        .expect("ewm_var");
+
+        assert!((value - 1.1).abs() < 1e-9, "got {value}");
+    }
+
+    #[test]
+    fn ewm_mean_skips_non_finite_values() {
+        // NaN history entries are dropped (retain-finite policy, matching the
+        // other aggregates), so the EWM runs over [1, 3] only:
+        // 0.5 * 3 + 0.5 * 1 = 2.0.
+        let p1 = PeriodId::quarter(2025, 1);
+        let p2 = PeriodId::quarter(2025, 2);
+        let p3 = PeriodId::quarter(2025, 3);
+
+        let mut context =
+            build_context_with_history(p3, "series", vec![(p1, 1.0), (p2, f64::NAN)], 3.0);
+        let value = evaluate_function(
+            &Function::EwmMean,
+            &[Expr::column("series"), Expr::literal(0.5)],
+            &mut context,
+            Some("ewm_mean"),
+        )
+        .expect("ewm_mean");
+
+        assert!((value - 2.0).abs() < 1e-12, "got {value}");
     }
 
     #[test]

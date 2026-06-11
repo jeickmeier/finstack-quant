@@ -53,7 +53,7 @@
 //!   `docs/REFERENCES.md#andersen-sidenius-2005-rfl`
 
 use super::{select_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
-use finstack_core::math::{norm_cdf, GaussHermiteQuadrature};
+use finstack_core::math::{norm_cdf, standard_normal_inv_cdf, GaussHermiteQuadrature};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Minimum loading (ensures √(1-β²) is well-defined).
@@ -341,11 +341,56 @@ impl Copula for RandomFactorLoadingCopula {
         norm_cdf(conditional_threshold.clamp(-CDF_CLIP, CDF_CLIP))
     }
 
+    fn conditional_default_prob_given_systematic_and_mixing(
+        &self,
+        default_threshold: f64,
+        systematic: f64,
+        mixing: f64,
+        correlation: f64,
+    ) -> f64 {
+        // For RFL the mixing variable is the shared loading shock η (drawn
+        // via `sample_mixing`). The (Z, η) conditional is exactly the
+        // 2-factor conditional: P(default | Z, η) = Φ((c − β(η)·Z)/√(1−β(η)²)).
+        self.conditional_default_prob(default_threshold, &[systematic, mixing], correlation)
+    }
+
     fn integrate_fn(&self, f: &dyn Fn(&[f64]) -> f64) -> f64 {
         // Double integral: outer over loading shock η, inner over market Z
         // Uses cached quadrature for performance
         self.outer_quadrature
             .integrate(|eta| self.inner_quadrature.integrate(|z| f(&[z, eta])))
+    }
+
+    fn latent_variable(
+        &self,
+        systematic: f64,
+        idiosyncratic: f64,
+        mixing: f64,
+        correlation: f64,
+    ) -> f64 {
+        // Andersen-Sidenius RFL latent variable, the sampling counterpart of
+        // `conditional_default_prob`:
+        //   β(η) = clamp(β̄ + σ_β·η),  Aᵢ = β(η)·Z + √(1−β(η)²)·εᵢ
+        // with the loading shock η (= `mixing`) drawn ONCE per period via
+        // `sample_mixing` and shared across the pool. Without this override
+        // the trait-default Gaussian construction √ρ·Z + √(1−ρ)·εᵢ silently
+        // degenerates the finite-pool MC to a plain Gaussian copula —
+        // dropping the stochastic-correlation channel the quadrature engine
+        // prices.
+        let rho = correlation.clamp(0.0, 1.0);
+        let variance_of_loading = self.loading_volatility * self.loading_volatility;
+        let mean_loading = (rho - variance_of_loading).max(0.0).sqrt();
+        let beta = self.effective_loading(mean_loading, mixing);
+        let gamma = self.idiosyncratic_loading(beta);
+        beta * systematic + gamma * idiosyncratic
+    }
+
+    fn sample_mixing(&self, u01: f64) -> f64 {
+        // The shared per-period mixing variable for RFL is the loading shock
+        // η ~ N(0,1): one inverse-CDF draw keeps the realization
+        // deterministic and order-stable, mirroring the Student-t W draw.
+        let p = u01.clamp(1e-12, 1.0 - 1e-12);
+        standard_normal_inv_cdf(p)
     }
 
     fn num_factors(&self) -> usize {

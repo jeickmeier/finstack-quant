@@ -35,15 +35,20 @@ pub fn add_vintage_buildup(
             continue;
         }
 
+        // Coefficients are embedded at full shortest-roundtrip precision
+        // (`{}` formatting) — fixed-precision truncation (e.g. `{:.6}`) would
+        // silently distort long-tail decay curves.
         let term = if lag == 0 {
             // Current period term: New * c0
-            format!("{} * {:.6}", new_volume_node, rate)
+            format!("{} * {}", new_volume_node, super::fmt_f64(rate))
         } else {
             // Lagged term: lag(New, k) * ck
             // We use coalesce(lag(...), 0) to handle boundaries gracefully
             format!(
-                "coalesce(lag({}, {}), 0.0) * {:.6}",
-                new_volume_node, lag, rate
+                "coalesce(lag({}, {}), 0.0) * {}",
+                new_volume_node,
+                lag,
+                super::fmt_f64(rate)
             )
         };
 

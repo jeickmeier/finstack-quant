@@ -109,7 +109,11 @@ pub struct CorkscrewAccount {
     /// Account type (asset, liability, equity)
     pub account_type: AccountType,
 
-    /// Node IDs representing changes to the balance
+    /// Node IDs representing changes to the balance.
+    ///
+    /// Sign convention: every change node is **added** to the prior balance
+    /// (`expected = prev_balance + Σ changes`), so reductions (repayments,
+    /// outflows, disposals) must be stored as negative values in the model.
     #[serde(default)]
     pub changes: Vec<String>,
 
@@ -130,10 +134,12 @@ pub enum AccountType {
     Equity,
 }
 
-/// Default tolerance for corkscrew validation (basis points).
+/// Default absolute tolerance for corkscrew validation.
 ///
-/// Set to 0.01 (1 cent or 1 basis point) to accommodate normal rounding differences
-/// in financial calculations while catching meaningful discrepancies.
+/// Set to 0.01 **currency units** (e.g. 1 cent for USD-denominated models)
+/// to accommodate normal rounding differences in financial calculations
+/// while catching meaningful discrepancies. This is an absolute amount, not
+/// a relative measure such as a basis point.
 const DEFAULT_CORKSCREW_TOLERANCE: f64 = 0.01;
 
 fn default_tolerance() -> f64 {
@@ -240,7 +246,29 @@ impl CorkscrewExtension {
         // Process each configured account
         for account in &config.accounts {
             match self.validate_account(account, model, results, config.tolerance) {
-                Ok(validation) => validations.push(validation),
+                Ok(validation) => {
+                    // A failed roll-forward identity must surface in the
+                    // report (and fail it in strict mode), not just sit in
+                    // `data.validations[].is_valid`.
+                    if !validation.is_valid {
+                        let msg = format!(
+                            "Account '{}': roll-forward identity failed (max error {:.6} > tolerance {:.6})",
+                            account.node_id, validation.max_error, config.tolerance
+                        );
+                        if config.fail_on_error {
+                            errors.push(msg);
+                        } else {
+                            warnings.push(msg);
+                        }
+                    }
+                    if validation.periods_validated == 0 {
+                        warnings.push(format!(
+                            "Account '{}': single-period model — no roll-forward transitions to validate",
+                            account.node_id
+                        ));
+                    }
+                    validations.push(validation);
+                }
                 Err(e) => {
                     if config.fail_on_error {
                         return Err(e);
@@ -386,7 +414,10 @@ impl CorkscrewExtension {
                 expected_balance += change;
             }
 
-            // Check if beginning balance override is used
+            // Check if beginning balance override is used. A missing period
+            // value is a hard error, consistent with the other missing-value
+            // checks above — silently falling back to `prev_balance` could
+            // mask a real roll-forward break.
             if let Some(beginning_node) = &account.beginning_balance_node {
                 let beginning_values = results.nodes.get(beginning_node).ok_or_else(|| {
                     finstack_statements::error::Error::registry(format!(
@@ -394,9 +425,12 @@ impl CorkscrewExtension {
                         account.node_id
                     ))
                 })?;
-                if let Some(beginning) = beginning_values.get(curr_period) {
-                    expected_balance = beginning + expected_balance - prev_balance;
-                }
+                let beginning = beginning_values.get(curr_period).ok_or_else(|| {
+                    finstack_statements::error::Error::registry(format!(
+                        "Beginning-balance node '{beginning_node}' has no value for period '{curr_period}'"
+                    ))
+                })?;
+                expected_balance = beginning + expected_balance - prev_balance;
             }
 
             // Validate the roll-forward using an absolute tolerance.
@@ -414,9 +448,11 @@ impl CorkscrewExtension {
 
     /// Check balance sheet articulation (A = L + E) using actual balances.
     ///
-    /// Sums the most recent period's balance for each configured account,
-    /// grouped by account type, and checks that Assets = Liabilities + Equity.
-    /// Uses an absolute tolerance matching the configured rounding threshold.
+    /// Checks every model period: for each period, sums the configured
+    /// accounts grouped by account type and verifies
+    /// Assets = Liabilities + Equity. Reports the worst (maximum absolute)
+    /// imbalance across periods. Uses an absolute tolerance matching the
+    /// configured rounding threshold.
     fn check_articulation(
         &self,
         model: &FinancialModelSpec,
@@ -424,45 +460,45 @@ impl CorkscrewExtension {
         config: &CorkscrewConfig,
         tolerance: f64,
     ) -> Result<Option<ArticulationResult>> {
-        let Some(last_period) = model.periods.last() else {
+        if config.accounts.is_empty() || model.periods.is_empty() {
             return Ok(None);
-        };
-        let period_id = &last_period.id;
+        }
 
-        let mut assets = 0.0;
-        let mut liabilities = 0.0;
-        let mut equity = 0.0;
+        let mut max_imbalance = 0.0f64;
 
-        for account in &config.accounts {
-            let node_values = results.nodes.get(&account.node_id).ok_or_else(|| {
-                finstack_statements::error::Error::registry(format!(
-                    "Articulation account '{}' not found in results",
-                    account.node_id
-                ))
-            })?;
-            let balance = node_values.get(period_id).ok_or_else(|| {
-                finstack_statements::error::Error::registry(format!(
-                    "Articulation account '{}' has no value for period '{period_id}'",
-                    account.node_id
-                ))
-            })?;
-            match account.account_type {
-                AccountType::Asset => assets += balance,
-                AccountType::Liability => liabilities += balance,
-                AccountType::Equity => equity += balance,
+        for period in &model.periods {
+            let period_id = &period.id;
+            let mut assets = 0.0;
+            let mut liabilities = 0.0;
+            let mut equity = 0.0;
+
+            for account in &config.accounts {
+                let node_values = results.nodes.get(&account.node_id).ok_or_else(|| {
+                    finstack_statements::error::Error::registry(format!(
+                        "Articulation account '{}' not found in results",
+                        account.node_id
+                    ))
+                })?;
+                let balance = node_values.get(period_id).ok_or_else(|| {
+                    finstack_statements::error::Error::registry(format!(
+                        "Articulation account '{}' has no value for period '{period_id}'",
+                        account.node_id
+                    ))
+                })?;
+                match account.account_type {
+                    AccountType::Asset => assets += balance,
+                    AccountType::Liability => liabilities += balance,
+                    AccountType::Equity => equity += balance,
+                }
             }
-        }
 
-        if config.accounts.is_empty() {
-            return Ok(None);
+            let imbalance = (assets - (liabilities + equity)).abs();
+            max_imbalance = max_imbalance.max(imbalance);
         }
-
-        let imbalance = assets - (liabilities + equity);
-        let is_balanced = imbalance.abs() <= tolerance;
 
         Ok(Some(ArticulationResult {
-            total_imbalance: imbalance.abs(),
-            is_balanced,
+            total_imbalance: max_imbalance,
+            is_balanced: max_imbalance <= tolerance,
         }))
     }
 }
@@ -580,6 +616,233 @@ mod tests {
 
         let deserialized: AccountType = serde_json::from_str(&json).expect("test should succeed");
         assert_eq!(deserialized, AccountType::Asset);
+    }
+
+    fn broken_rollforward_model() -> (FinancialModelSpec, StatementResult) {
+        // cash: 100 → 250 with only +100 of inflows → 50 break.
+        let model = ModelBuilder::new("rollforward_break")
+            .periods("2025Q1..Q2", None)
+            .expect("valid periods")
+            .value(
+                "cash",
+                &[
+                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
+                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(250.0)),
+                ],
+            )
+            .value(
+                "inflows",
+                &[
+                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(0.0)),
+                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(100.0)),
+                ],
+            )
+            .build()
+            .expect("model should build");
+        let mut evaluator = Evaluator::new();
+        let results = evaluator
+            .evaluate(&model)
+            .expect("evaluation should succeed");
+        (model, results)
+    }
+
+    #[test]
+    fn rollforward_break_fails_report_in_strict_mode() {
+        let (model, results) = broken_rollforward_model();
+
+        let config = CorkscrewConfig {
+            accounts: vec![CorkscrewAccount {
+                node_id: "cash".into(),
+                account_type: AccountType::Asset,
+                changes: vec!["inflows".into()],
+                beginning_balance_node: None,
+            }],
+            tolerance: 0.01,
+            fail_on_error: true,
+        };
+
+        let mut extension = CorkscrewExtension::with_config(config);
+        let report = extension
+            .execute(&model, &results)
+            .expect("extension should execute");
+
+        assert_eq!(
+            report.status,
+            CorkscrewStatus::Failed,
+            "a roll-forward identity break must fail the report in strict mode"
+        );
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| e.contains("roll-forward identity failed")));
+    }
+
+    #[test]
+    fn rollforward_break_warns_in_lenient_mode() {
+        let (model, results) = broken_rollforward_model();
+
+        let config = CorkscrewConfig {
+            accounts: vec![CorkscrewAccount {
+                node_id: "cash".into(),
+                account_type: AccountType::Asset,
+                changes: vec!["inflows".into()],
+                beginning_balance_node: None,
+            }],
+            tolerance: 0.01,
+            fail_on_error: false,
+        };
+
+        let mut extension = CorkscrewExtension::with_config(config);
+        let report = extension
+            .execute(&model, &results)
+            .expect("extension should execute");
+
+        assert_eq!(report.status, CorkscrewStatus::Success);
+        assert!(
+            report
+                .warnings
+                .iter()
+                .any(|w| w.contains("roll-forward identity failed")),
+            "break must surface as a warning, got {:?}",
+            report.warnings
+        );
+    }
+
+    #[test]
+    fn missing_beginning_balance_period_value_is_hard_error() {
+        let (model, mut results) = broken_rollforward_model();
+        // Add a beginning-balance node with NO value in Q2.
+        results.nodes.insert(
+            "cash_beg".to_string(),
+            indexmap::IndexMap::from([(PeriodId::quarter(2025, 1), 100.0)]),
+        );
+
+        let config = CorkscrewConfig {
+            accounts: vec![CorkscrewAccount {
+                node_id: "cash".into(),
+                account_type: AccountType::Asset,
+                changes: vec!["inflows".into()],
+                beginning_balance_node: Some("cash_beg".into()),
+            }],
+            tolerance: 0.01,
+            fail_on_error: false,
+        };
+
+        let mut extension = CorkscrewExtension::with_config(config);
+        let report = extension
+            .execute(&model, &results)
+            .expect("extension should execute in lenient mode");
+
+        assert_eq!(report.status, CorkscrewStatus::Failed);
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.contains("cash_beg") && e.contains("no value")),
+            "missing beginning-balance period value must be an error, got {:?}",
+            report.errors
+        );
+    }
+
+    #[test]
+    fn single_period_model_flags_nothing_to_validate() {
+        let model = ModelBuilder::new("single_period")
+            .periods("2025Q1..Q1", None)
+            .expect("valid periods")
+            .value(
+                "cash",
+                &[(PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0))],
+            )
+            .build()
+            .expect("model should build");
+        let mut evaluator = Evaluator::new();
+        let results = evaluator
+            .evaluate(&model)
+            .expect("evaluation should succeed");
+
+        let config = CorkscrewConfig {
+            accounts: vec![CorkscrewAccount {
+                node_id: "cash".into(),
+                account_type: AccountType::Asset,
+                changes: vec![],
+                beginning_balance_node: None,
+            }],
+            tolerance: 0.01,
+            fail_on_error: false,
+        };
+
+        let mut extension = CorkscrewExtension::with_config(config);
+        let report = extension
+            .execute(&model, &results)
+            .expect("extension should execute");
+
+        assert!(
+            report
+                .warnings
+                .iter()
+                .any(|w| w.contains("no roll-forward transitions")),
+            "single-period run must be flagged as vacuous, got {:?}",
+            report.warnings
+        );
+    }
+
+    #[test]
+    fn articulation_checked_at_every_period() {
+        // Balanced in the last period but imbalanced in the first — the
+        // check must catch the earlier imbalance.
+        let model = ModelBuilder::new("articulation_all_periods")
+            .periods("2025Q1..Q2", None)
+            .expect("valid periods")
+            .value(
+                "assets",
+                &[
+                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(110.0)),
+                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(100.0)),
+                ],
+            )
+            .value(
+                "liabilities",
+                &[
+                    (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(100.0)),
+                    (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(100.0)),
+                ],
+            )
+            .build()
+            .expect("model should build");
+        let mut evaluator = Evaluator::new();
+        let results = evaluator
+            .evaluate(&model)
+            .expect("evaluation should succeed");
+
+        let config = CorkscrewConfig {
+            accounts: vec![
+                CorkscrewAccount {
+                    node_id: "assets".into(),
+                    account_type: AccountType::Asset,
+                    changes: vec![],
+                    beginning_balance_node: None,
+                },
+                CorkscrewAccount {
+                    node_id: "liabilities".into(),
+                    account_type: AccountType::Liability,
+                    changes: vec![],
+                    beginning_balance_node: None,
+                },
+            ],
+            tolerance: 0.01,
+            fail_on_error: true,
+        };
+
+        let mut extension = CorkscrewExtension::with_config(config);
+        let report = extension
+            .execute(&model, &results)
+            .expect("extension should execute");
+
+        assert_eq!(report.status, CorkscrewStatus::Failed);
+        assert!(report
+            .errors
+            .iter()
+            .any(|e| e.contains("Balance sheet not articulated")));
     }
 
     #[test]

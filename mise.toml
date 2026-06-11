@@ -80,10 +80,7 @@ depends = ["rust-update", "python-update"]
 
 [tasks.all-clean]
 description = "Remove build artifacts and virtualenvs"
-run = [
-  "cargo clean",
-  '''python3 scripts/clean_workspace.py''',
-]
+run = ["cargo clean", '''python3 scripts/clean_workspace.py''']
 
 [tasks.all-ci]
 description = "Run CI-equivalent checks locally (wasm-build + pre-commit + all-test)"

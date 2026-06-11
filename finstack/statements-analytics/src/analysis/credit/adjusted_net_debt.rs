@@ -48,6 +48,22 @@
 //! still follow-up work, but consumers that already have the component
 //! nodes in their model can pipe them through this helper to produce a
 //! consistent adjusted-debt series.
+//!
+//! # Limitations
+//!
+//! Several rating-agency refinements are **not** modeled here and must be
+//! pre-applied by the caller in the component nodes if desired:
+//!
+//! - **Restricted-cash haircut**: all cash supplied via the cash node is
+//!   netted in full. Agencies typically exclude (or haircut) restricted or
+//!   trapped cash; pass an already-haircut cash node to replicate that.
+//! - **Pension tax-effecting**: the pension-deficit node is added gross.
+//!   S&P/Moody's commonly tax-effect the unfunded obligation (deficit ×
+//!   (1 − tax rate)); supply a tax-effected node to match.
+//! - **Lease capitalization helper**: there is no built-in multiple-of-rent
+//!   or discounted-lease capitalization; the capitalized-leases node must
+//!   already contain the capitalized amount (e.g. 8× rent or the IFRS 16
+//!   lease liability).
 
 use finstack_core::dates::PeriodId;
 use finstack_statements::evaluator::StatementResult;

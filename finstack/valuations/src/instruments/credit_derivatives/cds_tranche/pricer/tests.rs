@@ -951,6 +951,53 @@ fn test_smooth_correlation_boundary_transitions() {
     }
 }
 
+/// The soft clamp must be value- and slope-continuous (C¹) at both seams:
+/// exactly the identity at `min+w` / `max−w`, with unit one-sided slope.
+/// The previous tanh construction jumped by ≈ 0.12·w at each seam, which
+/// correlation finite differences straddling the seam picked up as a
+/// spurious sensitivity.
+#[test]
+fn test_smooth_correlation_boundary_c1_at_seams() {
+    let model = CDSTranchePricer::new();
+    let cfg = model.config();
+    let (min_c, max_c, w) = (
+        cfg.min_correlation,
+        cfg.max_correlation,
+        cfg.corr_boundary_width,
+    );
+
+    for seam in [min_c + w, max_c - w] {
+        // Value continuity: at the seam the map must equal the identity.
+        let at_seam = model.smooth_correlation_boundary(seam);
+        assert!(
+            (at_seam - seam).abs() < 1e-12,
+            "seam {seam}: smoothing must equal identity, got {at_seam}"
+        );
+
+        // C¹: one-sided difference quotients on both sides must both be ~1.
+        let h = 1e-7;
+        let slope_out = (model.smooth_correlation_boundary(seam)
+            - model.smooth_correlation_boundary(seam - h))
+            / h;
+        let slope_in = (model.smooth_correlation_boundary(seam + h)
+            - model.smooth_correlation_boundary(seam))
+            / h;
+        assert!(
+            (slope_out - 1.0).abs() < 1e-4 && (slope_in - 1.0).abs() < 1e-4,
+            "seam {seam}: one-sided slopes must both be ~1 (got {slope_out}, {slope_in})"
+        );
+    }
+
+    // Wings decay toward the bounds and never overshoot them. Far in the
+    // wing the exponential underflows to exactly the bound in f64, so the
+    // mathematical strict inequality is asserted only near the seam.
+    assert!(model.smooth_correlation_boundary(min_c) > min_c);
+    assert!(model.smooth_correlation_boundary(max_c) < max_c);
+    assert!(model.smooth_correlation_boundary(-0.5) >= min_c);
+    assert!(model.smooth_correlation_boundary(0.999_9) <= max_c);
+    assert!(model.smooth_correlation_boundary(1.5) <= max_c);
+}
+
 #[test]
 fn test_conditional_default_probability_enhanced() {
     let model = CDSTranchePricer::new();

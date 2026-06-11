@@ -8,14 +8,23 @@
 //!
 //! The adapter applies factor-based shocks to the hazard curve's survival probability:
 //! ```text
-//! λ_shocked(t) = λ_base(t) × exp(β × Z × σ)
+//! λ_shocked(t) = λ_base(t) × exp(−β × Z × σ − ½β²σ²)
 //! ```
+//!
+//! The `−½β²σ²` term is the lognormal compensator: with `Z ~ N(0, 1)` the
+//! shock has unit mean, so the simulated mean hazard equals the base curve
+//! and `expected_mdr` matches the simulated average.
 //!
 //! where:
 //! - λ_base(t) is the hazard rate from the HazardCurve
 //! - β is the factor sensitivity parameter
 //! - Z is the systematic factor realization
 //! - σ is the volatility of the intensity shock
+//!
+//! The sign follows the canonical copula convention: a LOW systematic factor
+//! (`Z < 0`) is the stress state, so a positive `β` raises the hazard rate
+//! when `Z` falls. This matches the copula default models and keeps defaults
+//! and market-correlated recoveries negatively co-moving in every engine.
 //!
 //! # Use Cases
 //!
@@ -32,7 +41,6 @@
 
 use super::traits::{MacroCreditFactors, StochasticDefault};
 use finstack_core::market_data::term_structures::HazardCurve;
-use finstack_core::math::distributions::binomial_distribution;
 
 /// Adapter that wraps a HazardCurve to provide a [`StochasticDefault`] interface.
 ///
@@ -72,6 +80,14 @@ pub(crate) struct HazardCurveDefault {
     volatility: f64,
     /// Asset correlation for default distribution calculation
     correlation: f64,
+    /// Pool seasoning at the valuation date, in months.
+    ///
+    /// The engines pass `seasoning = initial_seasoning + months_from_valuation`
+    /// (loan age), but the hazard curve is anchored at the VALUATION date —
+    /// CDS-calibrated hazards at `t` years mean `t` years from today, not
+    /// from loan origination. The adapter subtracts this offset so the curve
+    /// is indexed by time-from-valuation.
+    seasoning_offset_months: u32,
 }
 
 impl HazardCurveDefault {
@@ -87,7 +103,15 @@ impl HazardCurveDefault {
             factor_sensitivity: factor_sensitivity.clamp(-2.0, 2.0),
             volatility: 0.30,  // Default volatility
             correlation: 0.20, // Default correlation
+            seasoning_offset_months: 0,
         }
+    }
+
+    /// Set the pool's seasoning at valuation (months) so curve lookups use
+    /// time-from-valuation instead of loan age.
+    pub(crate) fn with_seasoning_offset(mut self, seasoning_offset_months: u32) -> Self {
+        self.seasoning_offset_months = seasoning_offset_months;
+        self
     }
 
     /// Create with specified volatility.
@@ -141,9 +165,19 @@ impl HazardCurveDefault {
 
     /// Calculate the shocked hazard rate at a given time and factor realization.
     ///
-    /// The shock is multiplicative: λ_shocked = λ_base × exp(β × Z × σ)
+    /// The shock is multiplicative:
+    /// λ_shocked = λ_base × exp(−β × Z × σ − ½β²σ²), following the canonical
+    /// low-factor-stress convention. The `−½β²σ²` lognormal compensator gives
+    /// the shock unit mean under `Z ~ N(0, 1)`, so the simulated mean hazard
+    /// equals the base curve.
     fn shocked_hazard_multiplier(&self, factor: f64) -> f64 {
-        (self.factor_sensitivity * factor * self.volatility).exp()
+        let beta_sigma = self.factor_sensitivity * self.volatility;
+        (-beta_sigma * factor - 0.5 * beta_sigma * beta_sigma).exp()
+    }
+
+    /// Curve lookup time in years: time-from-valuation, not loan age.
+    fn curve_time_years(&self, seasoning: u32) -> f64 {
+        seasoning.saturating_sub(self.seasoning_offset_months) as f64 / 12.0
     }
 
     /// Convert hazard rate to monthly default rate.
@@ -162,8 +196,8 @@ impl StochasticDefault for HazardCurveDefault {
         factors: &[f64],
         _macro_factors: &MacroCreditFactors,
     ) -> f64 {
-        // Convert seasoning (months) to years
-        let t_years = seasoning as f64 / 12.0;
+        // Curve is anchored at valuation: index by time-from-valuation.
+        let t_years = self.curve_time_years(seasoning);
 
         // Get base hazard rate from curve
         let base_hazard = self.hazard_curve.hazard_rate(t_years);
@@ -177,30 +211,6 @@ impl StochasticDefault for HazardCurveDefault {
         Self::hazard_to_mdr(shocked_hazard)
     }
 
-    fn default_distribution(
-        &self,
-        n: usize,
-        pds: &[f64],
-        factors: &[f64],
-        _correlation: f64,
-    ) -> Vec<f64> {
-        // Get base PD or use curve-implied default probability
-        let z = factors.first().copied().unwrap_or(0.0);
-        let shock_multiplier = self.shocked_hazard_multiplier(z);
-
-        let cond_pd = if !pds.is_empty() {
-            // Scale provided PD by shock
-            (pds[0] * shock_multiplier).min(0.9999)
-        } else {
-            // Use 1-year default probability from curve
-            let base_1y_dp = 1.0 - self.hazard_curve.sp(1.0);
-            (base_1y_dp * shock_multiplier).min(0.9999)
-        };
-
-        // Use the core binomial distribution function
-        binomial_distribution(n, cond_pd.clamp(0.0, 1.0))
-    }
-
     fn correlation(&self) -> f64 {
         self.correlation
     }
@@ -210,8 +220,9 @@ impl StochasticDefault for HazardCurveDefault {
     }
 
     fn expected_mdr(&self, seasoning: u32) -> f64 {
-        // Unconditional MDR (no factor shock, Z=0)
-        let t_years = seasoning as f64 / 12.0;
+        // Unconditional MDR: the shock is compensated to unit mean, so the
+        // expected hazard is exactly the base curve hazard.
+        let t_years = self.curve_time_years(seasoning);
         let base_hazard = self.hazard_curve.hazard_rate(t_years);
         Self::hazard_to_mdr(base_hazard)
     }
@@ -265,31 +276,20 @@ mod tests {
         let mdr_zero = model.conditional_mdr(12, &[0.0], &factors);
         let mdr_pos = model.conditional_mdr(12, &[2.0], &factors);
 
-        // Positive factor with positive sensitivity should increase MDR
-        // (exp(β * Z * σ) > 1 when β, Z, σ > 0)
+        // Canonical convention: low latent factor = stress.
+        // exp(−β·Z·σ) > 1 when β, σ > 0 and Z < 0.
         assert!(
-            mdr_pos > mdr_zero,
-            "Positive factor should increase MDR: {} > {}",
-            mdr_pos,
-            mdr_zero
-        );
-        assert!(
-            mdr_neg < mdr_zero,
-            "Negative factor should decrease MDR: {} < {}",
+            mdr_neg > mdr_zero,
+            "Negative factor should increase MDR: {} > {}",
             mdr_neg,
             mdr_zero
         );
-    }
-
-    #[test]
-    fn test_default_distribution_sums_to_one() {
-        let hc = test_hazard_curve();
-        let model = HazardCurveDefault::new(hc, 0.5);
-
-        let dist = model.default_distribution(10, &[0.05], &[0.0], 0.20);
-
-        let sum: f64 = dist.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-6, "Distribution should sum to 1");
+        assert!(
+            mdr_pos < mdr_zero,
+            "Positive factor should decrease MDR: {} < {}",
+            mdr_pos,
+            mdr_zero
+        );
     }
 
     #[test]
@@ -320,13 +320,52 @@ mod tests {
 
         let expected = model.expected_mdr(12);
 
-        // Expected MDR should match conditional MDR at Z=0
+        // The shock is compensated to unit MEAN, so expected_mdr (based on
+        // the base hazard) sits slightly ABOVE the conditional MDR at Z=0
+        // (the shock's median, exp(−½β²σ²) < 1).
         let factors = MacroCreditFactors::default();
         let conditional = model.conditional_mdr(12, &[0.0], &factors);
 
         assert!(
-            (expected - conditional).abs() < 1e-10,
-            "Expected MDR should equal conditional at Z=0"
+            expected > conditional,
+            "Expected (mean) MDR {expected} should exceed conditional at Z=0 \
+             {conditional} (lognormal mean > median)"
         );
+        // And they agree once the compensator is undone.
+        let beta_sigma = 0.5 * 0.30;
+        let base_hazard = model.hazard_curve().hazard_rate(1.0);
+        let z0_hazard = base_hazard * (-0.5_f64 * beta_sigma * beta_sigma).exp();
+        let z0_mdr = 1.0 - (-z0_hazard / 12.0_f64).exp();
+        assert!((conditional - z0_mdr).abs() < 1e-12);
+    }
+
+    /// Seasoned pools must read the hazard curve at time-from-valuation, not
+    /// loan age: with a 72-month seasoning offset, `seasoning = 72` (the
+    /// pool's age at the valuation date) reads the curve at t ≈ 0, not t = 6y.
+    #[test]
+    fn test_seasoning_offset_indexes_curve_from_valuation() {
+        let hc = test_hazard_curve();
+        let seasoned = HazardCurveDefault::new(hc.clone(), 0.5).with_seasoning_offset(72);
+        let unseasoned = HazardCurveDefault::new(hc, 0.5);
+        let factors = MacroCreditFactors::default();
+
+        // Seasoned model at loan age 72 months == unseasoned model at t=0.
+        let seasoned_mdr = seasoned.conditional_mdr(72, &[0.0], &factors);
+        let unseasoned_mdr = unseasoned.conditional_mdr(0, &[0.0], &factors);
+        assert!(
+            (seasoned_mdr - unseasoned_mdr).abs() < 1e-12,
+            "seasoned lookup must start at the curve base: {seasoned_mdr} vs \
+             {unseasoned_mdr}"
+        );
+
+        // Without the offset, loan age 72 reads the 6y point on the curve —
+        // a materially different hazard for an upward-sloping curve.
+        let wrong = unseasoned.conditional_mdr(72, &[0.0], &factors);
+        assert!(
+            (wrong - seasoned_mdr).abs() > 1e-6,
+            "test curve must distinguish t=0 from t=6y lookups"
+        );
+
+        assert!((seasoned.expected_mdr(72) - unseasoned.expected_mdr(0)).abs() < 1e-12);
     }
 }

@@ -68,40 +68,52 @@ fn rebuild_with_recovery(original: &CreditIndexData, new_recovery: f64) -> Resul
     builder.build()
 }
 
-/// Build a market with both the index recovery bumped AND (where possible)
-/// the index hazard curve re-bootstrapped from par spreads at the new
-/// recovery. Falls back to bumping the recovery field alone when the curve
-/// carries no stored par spreads.
-fn market_at_bumped_recovery(
+/// Build a market with the index recovery bumped and the index hazard curve
+/// **frozen** (reused unchanged).
+fn frozen_market_at_bumped_recovery(
     base_market: &MarketContext,
     tranche: &CDSTranche,
     original_index: &CreditIndexData,
     new_recovery: f64,
 ) -> Result<MarketContext> {
-    let mut bumped_index = rebuild_with_recovery(original_index, new_recovery)?;
-
-    let original_curve = &original_index.index_credit_curve;
-    let has_par_quotes = original_curve.par_spread_points().next().is_some();
-
-    if has_par_quotes {
-        // Recalibrate the index hazard curve so the observed CDS index par
-        // spreads stay consistent under the new recovery assumption. This
-        // captures the dominant h ≈ S/(1-R) effect.
-        if let Ok(recalibrated) = recalibrate_hazard_with_recovery(
-            original_curve.as_ref(),
-            new_recovery,
-            base_market,
-            Some(&tranche.discount_curve_id),
-        ) {
-            bumped_index.index_credit_curve = Arc::new(recalibrated);
-        }
-        // If recalibration fails (e.g. degenerate spreads), fall through to
-        // the frozen-curve path so the metric still produces a number.
-    }
-
+    let bumped_index = rebuild_with_recovery(original_index, new_recovery)?;
     Ok(base_market
         .clone()
         .insert_credit_index(&tranche.credit_index_id, bumped_index))
+}
+
+/// Build a market with both the index recovery bumped AND the index hazard
+/// curve re-bootstrapped from par spreads at the new recovery.
+///
+/// Returns `None` when the curve recalibration fails (e.g. degenerate
+/// spreads); the caller decides how to fall back — both legs must use the
+/// same treatment, so the fallback cannot live inside this per-leg helper.
+fn recalibrated_market_at_bumped_recovery(
+    base_market: &MarketContext,
+    tranche: &CDSTranche,
+    original_index: &CreditIndexData,
+    new_recovery: f64,
+) -> Result<Option<MarketContext>> {
+    let mut bumped_index = rebuild_with_recovery(original_index, new_recovery)?;
+
+    // Recalibrate the index hazard curve so the observed CDS index par
+    // spreads stay consistent under the new recovery assumption. This
+    // captures the dominant h ≈ S/(1-R) effect.
+    match recalibrate_hazard_with_recovery(
+        original_index.index_credit_curve.as_ref(),
+        new_recovery,
+        base_market,
+        Some(&tranche.discount_curve_id),
+    ) {
+        Ok(recalibrated) => {
+            bumped_index.index_credit_curve = Arc::new(recalibrated);
+            Ok(Some(base_market.clone().insert_credit_index(
+                &tranche.credit_index_id,
+                bumped_index,
+            )))
+        }
+        Err(_) => Ok(None),
+    }
 }
 
 impl MetricCalculator for Recovery01Calculator {
@@ -115,22 +127,69 @@ impl MetricCalculator for Recovery01Calculator {
 
         let bumped_recovery_up = (base_recovery + RECOVERY_BUMP).clamp(0.0, 1.0);
         let up_delta = bumped_recovery_up - base_recovery;
-        let curves_up = market_at_bumped_recovery(
-            market,
-            tranche,
-            original_index.as_ref(),
-            bumped_recovery_up,
-        )?;
-        let pv_up = tranche.value(&curves_up, as_of)?.amount();
-
         let bumped_recovery_down = (base_recovery - RECOVERY_BUMP).clamp(0.0, 1.0);
         let down_delta = base_recovery - bumped_recovery_down;
-        let curves_down = market_at_bumped_recovery(
-            market,
-            tranche,
-            original_index.as_ref(),
-            bumped_recovery_down,
-        )?;
+
+        let has_par_quotes = original_index
+            .index_credit_curve
+            .par_spread_points()
+            .next()
+            .is_some();
+
+        // Both legs must use the SAME curve treatment. Mixing a recalibrated
+        // leg with a frozen leg (e.g. when only one recalibration fails)
+        // turns the central difference into a one-sided artifact dominated by
+        // the recalibration shift rather than the recovery sensitivity.
+        let legs = if has_par_quotes {
+            let up = recalibrated_market_at_bumped_recovery(
+                market,
+                tranche,
+                original_index.as_ref(),
+                bumped_recovery_up,
+            )?;
+            let down = recalibrated_market_at_bumped_recovery(
+                market,
+                tranche,
+                original_index.as_ref(),
+                bumped_recovery_down,
+            )?;
+            match (up, down) {
+                (Some(up), Some(down)) => Some((up, down)),
+                _ => {
+                    tracing::warn!(
+                        tranche_id = %tranche.id,
+                        credit_index = %tranche.credit_index_id,
+                        "Recovery01: hazard-curve recalibration failed for at least one bump \
+                         leg; falling back to a symmetric frozen-curve bump on BOTH legs. The \
+                         result omits the h ≈ S/(1-R) re-bootstrap effect and may understate \
+                         the true recovery sensitivity."
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        let (curves_up, curves_down) = match legs {
+            Some(pair) => pair,
+            None => (
+                frozen_market_at_bumped_recovery(
+                    market,
+                    tranche,
+                    original_index.as_ref(),
+                    bumped_recovery_up,
+                )?,
+                frozen_market_at_bumped_recovery(
+                    market,
+                    tranche,
+                    original_index.as_ref(),
+                    bumped_recovery_down,
+                )?,
+            ),
+        };
+
+        let pv_up = tranche.value(&curves_up, as_of)?.amount();
         let pv_down = tranche.value(&curves_down, as_of)?.amount();
 
         let span = up_delta + down_delta;

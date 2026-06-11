@@ -259,6 +259,50 @@ fn bond_price_merton_mc_api() {
     );
 }
 
+/// M2.11: the Merton MC engine assumes a constant notional with bullet
+/// redemption; amortizing bonds must be rejected, not silently priced as
+/// bullets off the base coupon spec.
+#[test]
+fn bond_price_merton_mc_rejects_amortizing() {
+    use crate::cashflow::builder::AmortizationSpec;
+    use crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig;
+    use crate::models::credit::MertonModel;
+    use finstack_core::types::CurveId;
+
+    let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid");
+    let maturity = Date::from_calendar_date(2028, Month::January, 1).expect("valid");
+    let step1 = Date::from_calendar_date(2026, Month::January, 1).expect("valid");
+
+    let base = CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("spec");
+    let amort = AmortizationSpec::StepRemaining {
+        schedule: vec![
+            (step1, Money::new(500_000.0, Currency::USD)),
+            (maturity, Money::new(0.0, Currency::USD)),
+        ],
+    };
+    let bond = Bond::builder()
+        .id("AMORT-MERTON".into())
+        .notional(Money::new(1_000_000.0, Currency::USD))
+        .issue_date(issue)
+        .maturity(maturity)
+        .cashflow_spec(CashflowSpec::amortizing(base, amort))
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .pricing_overrides(crate::instruments::PricingOverrides::default())
+        .attributes(Attributes::new())
+        .build()
+        .expect("bond builds");
+
+    let merton = MertonModel::new(200.0, 0.25, 100.0, 0.04).expect("valid");
+    let config = MertonMcConfig::new(merton).num_paths(100).seed(42);
+    let err = bond
+        .price_merton_mc(&config, 0.04, issue)
+        .expect_err("amortizing bonds must be rejected by Merton MC");
+    assert!(
+        err.to_string().contains("amortizing"),
+        "error should explain the amortization limitation, got: {err}"
+    );
+}
+
 #[test]
 fn pricing_cashflows_discount_only() {
     use finstack_core::types::CurveId;

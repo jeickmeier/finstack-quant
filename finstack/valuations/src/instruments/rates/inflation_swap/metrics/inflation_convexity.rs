@@ -20,7 +20,12 @@
 //! # Units
 //!
 //! The bump is applied as a percentage shift to the inflation curve (0.01% = 1bp).
-//! The convexity result is normalized per (basis point)² = per (0.01%)².
+//! The result is the raw second derivative `d²PV/dπ²` per unit² of inflation
+//! rate (consistent with the workspace raw-derivative convention; divide by
+//! 1e8 for a per-bp² view).
+//!
+//! All three PVs are computed via `value_raw` (unrounded `f64`) so Money
+//! quantization noise is not amplified by the `h² = 1e-8` divisor.
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::inflation_swap::InflationSwap;
@@ -45,8 +50,9 @@ impl MetricCalculator for InflationConvexityCalculator {
         let swap: &InflationSwap = context.instrument_as()?;
         let as_of = context.as_of;
 
-        // Get base value
-        let base_pv = context.base_value.amount();
+        // Unrounded base PV: Money-quantized values divided by h² = 1e-8
+        // would turn sub-cent rounding into large convexity noise.
+        let base_pv = swap.value_raw(context.curves.as_ref(), as_of)?;
 
         // Get the inflation index/curve ID
         let inflation_curve_id = &swap.inflation_index_id;
@@ -57,7 +63,7 @@ impl MetricCalculator for InflationConvexityCalculator {
             id: inflation_curve_id.clone(),
             spec: bump_spec_up,
         }])?;
-        let pv_up = swap.value(&curves_up, as_of)?.amount();
+        let pv_up = swap.value_raw(&curves_up, as_of)?;
 
         // Create bumped curves (down by 1bp = 0.01%)
         let bump_spec_down = BumpSpec::inflation_shift_pct(-INFLATION_BUMP_PCT);
@@ -65,12 +71,12 @@ impl MetricCalculator for InflationConvexityCalculator {
             id: inflation_curve_id.clone(),
             spec: bump_spec_down,
         }])?;
-        let pv_down = swap.value(&curves_down, as_of)?.amount();
+        let pv_down = swap.value_raw(&curves_down, as_of)?;
 
         // InflationConvexity = (PV_up + PV_down - 2×PV_base) / (bump²)
         //
-        // The bump is 1bp = 0.01% = 0.0001 in decimal form.
-        // For convexity per bp², we divide by (0.0001)² = 1e-8.
+        // The bump is 1bp = 0.01% = 0.0001 in decimal form; dividing by
+        // bump² yields the raw second derivative d²PV/dπ² (per unit²).
         //
         // Note: This formula is valid even when base_pv = 0 (par swaps).
         // Convexity measures curvature, not absolute level.

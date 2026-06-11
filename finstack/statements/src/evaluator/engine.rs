@@ -30,6 +30,10 @@ pub struct PreparedEvaluation {
     node_to_column: std::sync::Arc<IndexMap<NodeId, usize>>,
     /// Dependency graph retained for downstream consumers such as capital structure affected-node computation.
     dag: DependencyGraph,
+    /// Compiled expressions snapshotted at prepare time so prepared
+    /// evaluations are independent of the evaluator's mutable compiled cache
+    /// (which other `evaluate` calls may overwrite).
+    compiled_cache: std::sync::Arc<IndexMap<NodeId, Expr>>,
 }
 
 /// Evaluator for financial models.
@@ -67,6 +71,11 @@ pub struct Evaluator {
 
     /// Optional check suite run after evaluation to produce inline validation
     check_suite: Option<std::sync::Arc<crate::checks::CheckSuite>>,
+
+    /// As-of visibility cutoff for the current evaluation run. Actual periods
+    /// starting after this date have hidden explicit values and are treated as
+    /// forecast periods by forecast evaluation.
+    visibility_cutoff: Option<finstack_core::dates::Date>,
 }
 
 impl Evaluator {
@@ -77,6 +86,7 @@ impl Evaluator {
             compiled_cache: std::sync::Arc::new(IndexMap::new()),
             forecast_cache: IndexMap::new(),
             check_suite: None,
+            visibility_cutoff: None,
         }
     }
 
@@ -161,6 +171,7 @@ impl Evaluator {
         let start = Instant::now();
 
         let prepared = self.init_eval_plan(model)?;
+        self.visibility_cutoff = as_of;
 
         let cs_seed_nodes: HashSet<NodeId> = model
             .nodes
@@ -394,6 +405,12 @@ impl Evaluator {
         )
         .entered();
         self.forecast_cache.clear();
+        self.visibility_cutoff = None;
+        // Use the compiled expressions captured at prepare time, not whatever
+        // the evaluator's mutable cache currently holds (a later `evaluate` of
+        // a different model sharing node ids would otherwise leak its formulas
+        // into this prepared evaluation).
+        self.compiled_cache = std::sync::Arc::clone(&prepared.compiled_cache);
 
         let mut historical: std::sync::Arc<IndexMap<PeriodId, IndexMap<String, f64>>> =
             std::sync::Arc::new(IndexMap::new());
@@ -581,6 +598,7 @@ impl Evaluator {
     fn init_eval_plan(&mut self, model: &FinancialModelSpec) -> Result<PreparedEvaluation> {
         self.compiled_cache = std::sync::Arc::new(IndexMap::new());
         self.forecast_cache.clear();
+        self.visibility_cutoff = None;
         let dag = DependencyGraph::from_model(model)?;
         dag.detect_cycles()?;
         let eval_order = evaluate_order(&dag)?;
@@ -596,6 +614,7 @@ impl Evaluator {
             eval_order,
             node_to_column,
             dag,
+            compiled_cache: std::sync::Arc::clone(&self.compiled_cache),
         })
     }
 
@@ -643,6 +662,7 @@ impl Evaluator {
         node_filter: Option<&HashSet<NodeId>>,
         mut mc_z_cache: Option<&mut IndexMap<NodeId, IndexMap<PeriodId, f64>>>,
     ) -> Result<()> {
+        let visibility_cutoff = self.visibility_cutoff;
         for node_id in eval_order {
             if let Some(filter) = node_filter {
                 if !filter.contains(node_id.as_str()) {
@@ -685,6 +705,7 @@ impl Evaluator {
                         &mut self.forecast_cache,
                         seed_offset,
                         &mut mc_z_wrapper,
+                        visibility_cutoff,
                     ),
                     NodeValueSource::Formula => {
                         let expr = self.compiled_cache.get(node_id).ok_or_else(|| {

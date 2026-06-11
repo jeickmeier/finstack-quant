@@ -260,27 +260,30 @@ impl InflationCapFloor {
         as_of: Date,
         date: Date,
     ) -> finstack_core::Result<f64> {
-        // First try to get historical fixing from the index
-        if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
-            if let Ok(value) = index.value_on(date) {
-                return Self::validate_cpi_value(value, date);
+        let lagged_date = self.lagged_fixing_date(curves, date);
+
+        // Only consult realized fixings for observations whose (lagged) fixing
+        // date is on or before the valuation date. Reading later entries from a
+        // fixing series that extends past as_of would introduce look-ahead bias.
+        if lagged_date <= as_of {
+            if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
+                if let Ok(value) = index.value_on(date) {
+                    return Self::validate_cpi_value(value, date);
+                }
             }
         }
 
-        // Fall back to curve projection with lag adjustment.
-        //
-        // A failed day-count calculation must be PROPAGATED, not silently
-        // collapsed to `t = 0` (the curve anchor). `unwrap_or(0.0)` masked a
-        // genuine error — e.g. an inverted/invalid date — by quietly returning
-        // the base CPI, which mis-prices the whole leg with no diagnostic.
-        let lagged_date = self.lagged_fixing_date(curves, date);
+        // Fall back to curve projection with lag adjustment, honoring the
+        // curve's anchor convention: epoch-anchored ("1970-01-01" default
+        // anchor) curves are read at Act365F(as_of -> lagged) while date-based
+        // (rebased) curves are read via `cpi_on_date` — the same anchor-aware
+        // branch the inflation swaps use.
         let curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
-        let t = DayCount::Act365F.signed_year_fraction(
+        let value = crate::instruments::rates::inflation_swap::InflationSwap::curve_cpi_value(
+            curve.as_ref(),
             as_of,
             lagged_date,
-            DayCountContext::default(),
         )?;
-        let value = curve.cpi(t);
         Self::validate_cpi_value(value, date)
     }
 
@@ -368,10 +371,23 @@ impl InflationCapFloor {
         as_of: Date,
         model: ModelKey,
     ) -> finstack_core::Result<Money> {
+        let pv = self.npv_raw_with_model(curves, as_of, model)?;
+        Ok(Money::new(pv, self.notional.currency()))
+    }
+
+    /// Raw (unrounded `f64`) present value, used by finite-difference metrics
+    /// (gamma) where Money quantization noise would be amplified by tiny bump
+    /// sizes.
+    pub fn npv_raw_with_model(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+        model: ModelKey,
+    ) -> finstack_core::Result<f64> {
         let strike = self.strike_f64()?;
         let disc = curves.get_discount(self.discount_curve_id.as_str())?;
 
-        let mut total_pv = Money::new(0.0, self.notional.currency());
+        let mut total_pv = 0.0_f64;
 
         for (start, end, pay) in self.schedule()? {
             if pay <= as_of {
@@ -409,10 +425,13 @@ impl InflationCapFloor {
                 DayCountContext::default(),
             )?;
 
-            let t_pay = disc
-                .day_count()
-                .year_fraction(as_of, pay, DayCountContext::default())?;
-            let df = disc.df(t_pay);
+            // Date-based DF from as_of to payment: correct when the curve base
+            // date differs from as_of.
+            let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+                disc.as_ref(),
+                as_of,
+                pay,
+            )?;
 
             // Volatility at the option strike (smile) prices the Black-76 /
             // Bachelier payoff.
@@ -504,7 +523,7 @@ impl InflationCapFloor {
                 }
             };
 
-            total_pv = total_pv.checked_add(leg_pv)?;
+            total_pv += leg_pv.amount();
         }
 
         Ok(total_pv)
@@ -599,6 +618,10 @@ impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
 
     fn base_value(&self, curves: &MarketContext, as_of: Date) -> finstack_core::Result<Money> {
         self.npv_with_model(curves, as_of, crate::pricer::ModelKey::Black76)
+    }
+
+    fn value_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_core::Result<f64> {
+        self.npv_raw_with_model(curves, as_of, crate::pricer::ModelKey::Black76)
     }
 
     fn effective_start_date(&self) -> Option<Date> {

@@ -38,7 +38,9 @@ pub use corkscrew_adapter::corkscrew_as_checks;
 pub use formula_check::FormulaCheck;
 pub use mappings::{CreditMapping, ThreeStatementMapping};
 pub use renderer::CheckReportRenderer;
-pub use suites::{credit_underwriting_checks, lbo_model_checks, three_statement_checks};
+pub use suites::{
+    credit_underwriting_checks, lbo_model_checks, resolve_check_suite, three_statement_checks,
+};
 
 use finstack_core::dates::PeriodId;
 use finstack_statements::evaluator::StatementResult;

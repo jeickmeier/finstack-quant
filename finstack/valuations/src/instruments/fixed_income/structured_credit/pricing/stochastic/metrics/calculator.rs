@@ -128,7 +128,9 @@ impl StochasticMetrics {
         }
     }
 
-    /// Get loss severity (EL / Expected Defaults).
+    /// Loss severity = LGD on defaulted balance:
+    /// `(expected_defaults − expected_recoveries) / expected_defaults`,
+    /// i.e. 1 − recovery rate — NOT `EL / expected_defaults`.
     pub(crate) fn loss_severity(&self) -> f64 {
         if self.expected_defaults > 1e-10 {
             (self.expected_defaults - self.expected_recoveries) / self.expected_defaults

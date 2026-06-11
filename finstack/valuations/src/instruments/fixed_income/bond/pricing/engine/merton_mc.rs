@@ -202,6 +202,13 @@ pub struct MertonMcConfig {
     /// Optional endogenous (leverage-dependent) hazard rate model.
     pub endogenous_hazard: Option<EndogenousHazardSpec>,
     /// Optional dynamic (notional-dependent) recovery rate model.
+    ///
+    /// Recovery on default is evaluated pathwise as
+    /// `DynamicRecoverySpec::recovery_at_notional(N(τ))`, which hard-clamps
+    /// the result to `[0, base_recovery]`. The clamp introduces a small kink
+    /// in recovery as a function of the accreted notional; paths far into
+    /// the clamped region all contribute the same (floored/capped) recovery.
+    /// No smoothed (e.g. logistic) recovery rule is applied.
     pub dynamic_recovery: Option<DynamicRecoverySpec>,
     /// Optional toggle exercise model for PIK/cash coupon decisions.
     /// Active only for coupon dates where [`PikSchedule`] resolves to
@@ -415,6 +422,15 @@ pub struct PathStatistics {
 // Engine
 // ---------------------------------------------------------------------------
 
+/// Bond parameters for the PIK-aware risk-free leg (no-default scenario).
+struct RiskFreeLeg {
+    notional: f64,
+    coupon_rate: f64,
+    maturity_years: f64,
+    coupon_frequency: usize,
+    discount_rate: f64,
+}
+
 /// Merton Monte Carlo pricing engine for PIK bonds.
 pub struct MertonMcEngine;
 
@@ -460,22 +476,35 @@ impl MertonMcEngine {
             return Err(InputError::Invalid.into());
         }
         Self::validate_pik_schedule(&config.pik_schedule)?;
+        // A single path has no variance estimate (division by n-1 = 0) and
+        // no meaningful MC statistics.
+        if config.num_paths < 2 {
+            return Err(finstack_core::Error::Validation(format!(
+                "Merton MC requires num_paths >= 2 (got {}); a single path has \
+                 no variance estimate",
+                config.num_paths
+            )));
+        }
 
         let num_paths = config.num_paths;
-        let dt = 1.0 / config.time_steps_per_year as f64;
+        // Size the grid so it ends EXACTLY at maturity: rounding the step
+        // count against a fixed dt = 1/steps_per_year left stub maturities
+        // with a horizon ≠ maturity (coupons placed beyond the simulated
+        // horizon, first-passage defaults triggering after maturity).
+        let total_steps = (maturity_years * config.time_steps_per_year as f64)
+            .ceil()
+            .max(1.0) as usize;
+        let dt = maturity_years / total_steps as f64;
         let sqrt_dt = dt.sqrt();
-        let total_steps = (maturity_years * config.time_steps_per_year as f64).round() as usize;
-        let coupon_period = 1.0 / coupon_frequency as f64;
         let accrual_factor = coupon_rate / coupon_frequency as f64;
         let sigma = config.merton.asset_vol();
         let r = config.merton.risk_free_rate();
         let mu = r - config.merton.payout_rate() - 0.5 * sigma * sigma;
 
-        // Pre-compute exact coupon times to avoid floating-point alignment issues
-        let num_coupons = (maturity_years * coupon_frequency as f64).round() as usize;
-        let coupon_times: Vec<f64> = (1..=num_coupons)
-            .map(|i| i as f64 * coupon_period)
-            .collect();
+        // Coupon schedule anchored backward from maturity (floor + stub),
+        // shared with the risk-free leg.
+        let coupon_schedule = Self::coupon_schedule(maturity_years, coupon_frequency);
+        let num_coupons = coupon_schedule.len();
 
         let dfs_ref = config.cashflow_dfs.as_deref();
 
@@ -653,11 +682,11 @@ impl MertonMcEngine {
                     }
 
                     // 3. At coupon dates (using pre-computed schedule)
-                    while coupon_idx < coupon_times.len()
-                        && t >= coupon_times[coupon_idx] - dt * 0.5
+                    while coupon_idx < coupon_schedule.len()
+                        && t >= coupon_schedule[coupon_idx].0 - dt * 0.5
                     {
-                        let coupon_t = coupon_times[coupon_idx];
-                        let coupon_amount = n_current * accrual_factor;
+                        let (coupon_t, period_frac) = coupon_schedule[coupon_idx];
+                        let coupon_amount = n_current * accrual_factor * period_frac;
                         path_coupon_periods += 1;
                         let df = Self::df_at_time(dfs_ref, coupon_t, discount_rate);
 
@@ -773,19 +802,26 @@ impl MertonMcEngine {
             0.0
         };
 
-        // Effective spread: solve for constant spread s such that
-        // risk_free_pv_pik_aware(discount_rate + s) = mean_pv
+        // Effective spread: solve for the constant spread s such that the
+        // risk-free PV with every cashflow's discount factor bumped by
+        // e^{-s·t} equals mean_pv. Solving on the SAME discount basis as
+        // mean_pv (term-structure DFs when set) keeps curve shape out of the
+        // spread.
         let effective_spread_bp = Self::solve_effective_spread(
-            notional,
-            coupon_rate,
-            maturity_years,
-            coupon_frequency,
-            discount_rate,
+            &RiskFreeLeg {
+                notional,
+                coupon_rate,
+                maturity_years,
+                coupon_frequency,
+                discount_rate,
+            },
             mean_pv,
             &config.pik_schedule,
+            dfs_ref,
         );
 
-        // Unexpected loss (std dev of path PVs / notional)
+        // Unexpected loss (std dev of path PVs / notional) — a distribution
+        // measure over individual paths, so it always uses the raw PVs.
         let variance = path_pvs
             .iter()
             .map(|&pv| (pv - mean_pv).powi(2))
@@ -793,7 +829,31 @@ impl MertonMcEngine {
             / (actual_paths - 1.0);
         let std_dev = variance.sqrt();
         let unexpected_loss = std_dev / notional;
-        let standard_error = std_dev / actual_paths.sqrt() / notional * 100.0;
+
+        // Standard error of the MEAN estimate. Antithetic legs are
+        // negatively correlated by construction, so the i.i.d. samples are
+        // the PAIR AVERAGES (adjacent in path order), not the individual
+        // legs — treating 2N legs as independent misstates the SE.
+        let standard_error = if config.antithetic {
+            let pair_means: Vec<f64> = path_pvs
+                .chunks(2)
+                .map(|pair| pair.iter().sum::<f64>() / pair.len() as f64)
+                .collect();
+            let m = pair_means.len() as f64;
+            let pair_mean = pair_means.iter().sum::<f64>() / m;
+            let pair_var = if pair_means.len() > 1 {
+                pair_means
+                    .iter()
+                    .map(|&x| (x - pair_mean).powi(2))
+                    .sum::<f64>()
+                    / (m - 1.0)
+            } else {
+                0.0
+            };
+            (pair_var / m).sqrt() / notional * 100.0
+        } else {
+            std_dev / actual_paths.sqrt() / notional * 100.0
+        };
 
         // Expected shortfall at 95% (average of worst 5% of paths)
         // Sort in place — mean_pv and variance are already computed above.
@@ -853,7 +913,10 @@ impl MertonMcEngine {
     // Helper methods
     // -----------------------------------------------------------------------
 
-    /// Validate PIK split fractions: non-negative, summing to 1.
+    /// Validate PIK split fractions (non-negative, summing to 1) and, for
+    /// `Stepped` schedules, that step times are finite and strictly
+    /// ascending — `mode_at` does a linear scan that silently returns the
+    /// wrong mode for out-of-order entries.
     fn validate_pik_schedule(schedule: &PikSchedule) -> Result<()> {
         let check = |mode: &PikMode| -> Result<()> {
             if let PikMode::Split {
@@ -873,7 +936,15 @@ impl MertonMcEngine {
         match schedule {
             PikSchedule::Uniform(mode) => check(mode)?,
             PikSchedule::Stepped(steps) => {
-                for (_, mode) in steps {
+                let mut prev_t = f64::NEG_INFINITY;
+                for &(t, ref mode) in steps {
+                    if !t.is_finite() || t <= prev_t {
+                        return Err(finstack_core::Error::Validation(format!(
+                            "PikSchedule::Stepped times must be finite and strictly \
+                             ascending; entry at t = {t} follows t = {prev_t}"
+                        )));
+                    }
+                    prev_t = t;
                     check(mode)?;
                 }
             }
@@ -916,6 +987,35 @@ impl MertonMcEngine {
         (df0.ln() * (1.0 - w) + df1.ln() * w).exp()
     }
 
+    /// Coupon times anchored backward from maturity (standard back-generated
+    /// schedule), with a short front stub when the maturity is not an integer
+    /// number of periods.
+    ///
+    /// Returns `(time, period_fraction)` pairs where `period_fraction` is the
+    /// coupon's accrual as a fraction of a full period (1.0 for regular
+    /// coupons, < 1.0 for the stub). Anchoring at maturity keeps every coupon
+    /// inside the simulated horizon and gives seasoned bonds the correct
+    /// remaining-coupon timing; `round(maturity·freq)` from the valuation
+    /// date (the previous behavior) dropped stub coupons and could place the
+    /// final coupon beyond the simulated horizon.
+    ///
+    /// Shared by the MC pricing loop and the risk-free leg so expected loss
+    /// is a like-for-like difference.
+    fn coupon_schedule(maturity_years: f64, coupon_frequency: usize) -> Vec<(f64, f64)> {
+        let period = 1.0 / coupon_frequency as f64;
+        // floor + stub, with an FP tolerance so aligned maturities (e.g.
+        // exactly 10 semi-annual periods) do not gain a zero-length stub.
+        let n = ((maturity_years / period) - 1e-9).ceil().max(1.0) as usize;
+        (1..=n)
+            .map(|k| {
+                let t = maturity_years - (n - k) as f64 * period;
+                let t_prev = (t - period).max(0.0);
+                let frac = ((t - t_prev) / period).clamp(0.0, 1.0);
+                (t, frac)
+            })
+            .collect()
+    }
+
     /// PIK-aware risk-free PV (no-default scenario).
     ///
     /// For Toggle periods the risk-free scenario assumes cash payment
@@ -929,16 +1029,36 @@ impl MertonMcEngine {
         pik_schedule: &PikSchedule,
         cashflow_dfs: Option<&[(f64, f64)]>,
     ) -> f64 {
-        let accrual_factor = coupon_rate / coupon_frequency as f64;
-        let coupon_period = 1.0 / coupon_frequency as f64;
-        let num_coupons = (maturity_years * coupon_frequency as f64).round() as usize;
-        let mut pv = 0.0;
-        let mut n = notional;
+        Self::risk_free_pv_spread(
+            &RiskFreeLeg {
+                notional,
+                coupon_rate,
+                maturity_years,
+                coupon_frequency,
+                discount_rate,
+            },
+            pik_schedule,
+            cashflow_dfs,
+            0.0,
+        )
+    }
 
-        for i in 1..=num_coupons {
-            let t = i as f64 * coupon_period;
-            let df = Self::df_at_time(cashflow_dfs, t, discount_rate);
-            let coupon = n * accrual_factor;
+    /// PIK-aware risk-free PV with each cashflow's discount factor bumped by
+    /// `e^{-spread·t}` on top of the base discount basis (term-structure DFs
+    /// when set, flat rate otherwise).
+    fn risk_free_pv_spread(
+        leg: &RiskFreeLeg,
+        pik_schedule: &PikSchedule,
+        cashflow_dfs: Option<&[(f64, f64)]>,
+        spread: f64,
+    ) -> f64 {
+        let accrual_factor = leg.coupon_rate / leg.coupon_frequency as f64;
+        let mut pv = 0.0;
+        let mut n = leg.notional;
+
+        for &(t, period_frac) in &Self::coupon_schedule(leg.maturity_years, leg.coupon_frequency) {
+            let df = Self::df_at_time(cashflow_dfs, t, leg.discount_rate) * (-spread * t).exp();
+            let coupon = n * accrual_factor * period_frac;
 
             match pik_schedule.mode_at(t) {
                 PikMode::Cash | PikMode::Toggle => {
@@ -956,33 +1076,31 @@ impl MertonMcEngine {
                 }
             }
         }
-        pv += n * Self::df_at_time(cashflow_dfs, maturity_years, discount_rate);
+        pv += n
+            * Self::df_at_time(cashflow_dfs, leg.maturity_years, leg.discount_rate)
+            * (-spread * leg.maturity_years).exp();
         pv
     }
 
-    /// Solve for the constant spread `s` (in bp) such that
-    /// `risk_free_pv_pik_aware(discount_rate + s) ≈ target_pv`.
+    /// Solve for the constant spread `s` (in bp) such that the PIK-aware
+    /// risk-free PV with every cashflow's discount factor bumped by
+    /// `e^{-s·t}` equals `target_pv`.
+    ///
+    /// The base discount basis (term-structure `cashflow_dfs` when set) is
+    /// the SAME one used to compute `target_pv`, so curve shape cancels out
+    /// of the spread instead of leaking into it.
     fn solve_effective_spread(
-        notional: f64,
-        coupon_rate: f64,
-        maturity_years: f64,
-        coupon_frequency: usize,
-        discount_rate: f64,
+        leg: &RiskFreeLeg,
         target_pv: f64,
         pik_schedule: &PikSchedule,
+        cashflow_dfs: Option<&[(f64, f64)]>,
     ) -> f64 {
+        let (notional, maturity_years) = (leg.notional, leg.maturity_years);
         if target_pv <= 0.0 || maturity_years <= 0.0 {
             return 0.0;
         }
-        let rf_pv = Self::risk_free_pv_pik_aware(
-            notional,
-            coupon_rate,
-            maturity_years,
-            coupon_frequency,
-            discount_rate,
-            pik_schedule,
-            None,
-        );
+        let pv_at = |s: f64| Self::risk_free_pv_spread(leg, pik_schedule, cashflow_dfs, s);
+        let rf_pv = pv_at(0.0);
         if target_pv >= rf_pv {
             return 0.0;
         }
@@ -991,28 +1109,12 @@ impl MertonMcEngine {
         let mut s = (rf_pv / target_pv).ln() / maturity_years;
         let bump = 1e-4;
         for _ in 0..50 {
-            let pv = Self::risk_free_pv_pik_aware(
-                notional,
-                coupon_rate,
-                maturity_years,
-                coupon_frequency,
-                discount_rate + s,
-                pik_schedule,
-                None,
-            );
+            let pv = pv_at(s);
             let f = pv - target_pv;
             if f.abs() < 1e-10 * notional {
                 break;
             }
-            let pv_up = Self::risk_free_pv_pik_aware(
-                notional,
-                coupon_rate,
-                maturity_years,
-                coupon_frequency,
-                discount_rate + s + bump,
-                pik_schedule,
-                None,
-            );
+            let pv_up = pv_at(s + bump);
             let dpv = (pv_up - pv) / bump;
             if dpv.abs() < 1e-15 {
                 break;
@@ -1217,7 +1319,7 @@ pub mod calibration {
                 as_of,
                 discount_rate,
                 base_config,
-                spec.low_paths.max(1),
+                spec.low_paths.max(2),
                 spec.seed,
                 m,
             )?;
@@ -1263,6 +1365,7 @@ pub mod calibration {
         let mut mid = 0.5 * (lo + hi);
         let mut pv_mid = 0.0;
         let mut f_mid = 0.0;
+        let mut converged = false;
 
         for i in 0..spec.max_iter.max(1) {
             iterations = i + 1;
@@ -1272,6 +1375,7 @@ pub mod calibration {
             f_mid = f;
 
             if f_mid.abs() <= spec.tolerance_pv.max(0.0) {
+                converged = true;
                 break;
             }
 
@@ -1281,6 +1385,20 @@ pub mod calibration {
             } else {
                 hi = mid;
             }
+        }
+
+        if !converged {
+            return Err(InputError::SolverConvergenceFailed {
+                iterations,
+                residual: f_mid.abs(),
+                last_x: mid,
+                reason: format!(
+                    "Merton MC calibration did not meet tolerance_pv = {} after {} \
+                     iterations: residual_pv = {f_mid:.6e}",
+                    spec.tolerance_pv, iterations
+                ),
+            }
+            .into());
         }
 
         let calibrated_merton = with_parameter(base_merton, spec.parameter, mid)?;
@@ -1708,6 +1826,78 @@ mod tests {
         );
     }
 
+    /// M2.12: the coupon schedule is anchored backward from maturity with a
+    /// floor + stub count, so stub maturities keep every coupon inside the
+    /// simulated horizon and aligned maturities stay regular.
+    #[test]
+    fn coupon_schedule_handles_stub_and_aligned_maturities() {
+        // 4.6y semi-annual: 10 coupons, first is a 0.1y stub (fraction 0.2),
+        // last lands exactly at maturity.
+        let sched = MertonMcEngine::coupon_schedule(4.6, 2);
+        assert_eq!(sched.len(), 10);
+        let (t_first, frac_first) = sched[0];
+        assert!((t_first - 0.1).abs() < 1e-9, "stub time: {t_first}");
+        assert!(
+            (frac_first - 0.2).abs() < 1e-9,
+            "stub fraction: {frac_first}"
+        );
+        let (t_last, frac_last) = sched[sched.len() - 1];
+        assert!(
+            (t_last - 4.6).abs() < 1e-12,
+            "final coupon at maturity: {t_last}"
+        );
+        assert!((frac_last - 1.0).abs() < 1e-9);
+
+        // Aligned 5.0y semi-annual: 10 full coupons at 0.5, 1.0, …, 5.0.
+        let aligned = MertonMcEngine::coupon_schedule(5.0, 2);
+        assert_eq!(aligned.len(), 10);
+        for (i, &(t, frac)) in aligned.iter().enumerate() {
+            assert!((t - 0.5 * (i + 1) as f64).abs() < 1e-9);
+            assert!((frac - 1.0).abs() < 1e-9);
+        }
+    }
+
+    /// M2.12: with default risk switched off (asset value far above the
+    /// barrier, negligible vol) the MC price of a stub-maturity bond must
+    /// reproduce the risk-free PV — i.e. every coupon in the risk-free leg is
+    /// reachable on the simulation grid and the grid ends exactly at
+    /// maturity. Before the fix, `round(maturity·freq)` and a fixed
+    /// `dt = 1/steps_per_year` let the legs disagree on stub maturities.
+    #[test]
+    fn stub_maturity_mc_matches_risk_free_pv_without_default_risk() {
+        let merton = MertonModel::new_with_dynamics(
+            1.0e9, // asset value far above the barrier: no defaults
+            1e-8,  // negligible asset vol: deterministic paths
+            100.0,
+            0.04,
+            0.0,
+            BarrierType::FirstPassage {
+                barrier_growth_rate: 0.0,
+            },
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid merton");
+        let config = MertonMcConfig::new(merton).num_paths(64).seed(42);
+
+        for maturity in [4.6, 4.8, 5.0] {
+            let result = MertonMcEngine::price(100.0, 0.08, maturity, 2, &config, 0.04)
+                .expect("price succeeds");
+            assert_eq!(
+                result.path_statistics.default_rate, 0.0,
+                "no defaults expected at maturity {maturity}"
+            );
+            // expected_loss = 1 − mean_mc_pv / risk_free_pv: with default
+            // risk off, the two legs must agree (shared coupon schedule,
+            // grid ending exactly at maturity).
+            assert!(
+                result.expected_loss.abs() < 1e-6,
+                "default-free MC price must equal the risk-free PV at maturity \
+                 {maturity}: expected_loss = {}",
+                result.expected_loss
+            );
+        }
+    }
+
     #[test]
     fn mc_is_deterministic_with_seed() {
         let config = MertonMcConfig::new(test_merton())
@@ -2014,6 +2204,99 @@ mod tests {
         assert!(
             result.is_err(),
             "Negative split fractions should be rejected"
+        );
+    }
+
+    #[test]
+    fn unsorted_stepped_schedule_rejected() {
+        let config = MertonMcConfig::new(test_merton())
+            .pik_schedule(PikSchedule::Stepped(vec![
+                (2.0, PikMode::Cash),
+                (0.0, PikMode::Pik),
+            ]))
+            .num_paths(100)
+            .seed(42);
+        let result = MertonMcEngine::price(100.0, 0.08, 5.0, 2, &config, 0.04);
+        assert!(
+            result.is_err(),
+            "Out-of-order Stepped times must be rejected"
+        );
+
+        let dup = MertonMcConfig::new(test_merton())
+            .pik_schedule(PikSchedule::Stepped(vec![
+                (1.0, PikMode::Pik),
+                (1.0, PikMode::Cash),
+            ]))
+            .num_paths(100)
+            .seed(42);
+        assert!(
+            MertonMcEngine::price(100.0, 0.08, 5.0, 2, &dup, 0.04).is_err(),
+            "Duplicate Stepped times must be rejected"
+        );
+    }
+
+    #[test]
+    fn single_path_rejected() {
+        let config = MertonMcConfig::new(test_merton()).num_paths(1).seed(42);
+        assert!(
+            MertonMcEngine::price(100.0, 0.08, 5.0, 2, &config, 0.04).is_err(),
+            "num_paths < 2 must be rejected"
+        );
+    }
+
+    /// Antithetic SE must be computed over pair averages, not individual
+    /// legs: pairs are negatively correlated, so the pair-based SE differs
+    /// from the naive 2N-independent-legs SE (and is typically smaller).
+    #[test]
+    fn antithetic_se_uses_pair_averages() {
+        let config = MertonMcConfig::new(test_merton())
+            .num_paths(10_000)
+            .antithetic(true)
+            .seed(7);
+        let result = MertonMcEngine::price(100.0, 0.08, 5.0, 2, &config, 0.04).expect("ok");
+
+        // Naive SE treating all legs as i.i.d.
+        let naive_se = result.unexpected_loss * 100.0 / (result.num_paths as f64).sqrt();
+        assert!(
+            result.standard_error > 0.0 && (result.standard_error - naive_se).abs() > 1e-12,
+            "pair-aware SE ({}) should differ from naive per-leg SE ({naive_se})",
+            result.standard_error
+        );
+    }
+
+    /// The effective spread must be solved on the same discount basis as the
+    /// MC PV: with term-structure DFs set, a default-free bond must imply a
+    /// ~zero spread even when the curve shape differs from the flat rate.
+    #[test]
+    fn effective_spread_zero_for_default_free_bond_on_term_structure_basis() {
+        let merton = MertonModel::new_with_dynamics(
+            1.0e9,
+            1e-8,
+            100.0,
+            0.04,
+            0.0,
+            BarrierType::FirstPassage {
+                barrier_growth_rate: 0.0,
+            },
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid merton");
+        let steep_dfs: Vec<(f64, f64)> = (1..=60)
+            .map(|i| {
+                let t = i as f64 / 12.0;
+                let r = 0.05 - 0.002 * t;
+                (t, (-r * t).exp())
+            })
+            .collect();
+        let config = MertonMcConfig::new(merton)
+            .num_paths(64)
+            .seed(42)
+            .cashflow_dfs(steep_dfs);
+        let result = MertonMcEngine::price(100.0, 0.08, 5.0, 2, &config, 0.04).expect("ok");
+        assert!(
+            result.effective_spread_bp.abs() < 0.1,
+            "default-free bond must imply ~zero spread on the curve basis, got {} bp",
+            result.effective_spread_bp
         );
     }
 

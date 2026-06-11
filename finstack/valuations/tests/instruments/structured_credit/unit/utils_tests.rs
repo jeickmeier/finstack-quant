@@ -117,7 +117,7 @@ fn test_rating_factor_monotonicity() {
 #[test]
 fn test_moodys_warf_factor_notches() {
     assert_eq!(moodys_warf_factor(CreditRating::BBPlus).unwrap(), 940.0);
-    assert_eq!(moodys_warf_factor(CreditRating::BBMinus).unwrap(), 1760.0);
+    assert_eq!(moodys_warf_factor(CreditRating::BBMinus).unwrap(), 1766.0);
     assert_eq!(moodys_warf_factor(CreditRating::BBB).unwrap(), 360.0);
 }
 

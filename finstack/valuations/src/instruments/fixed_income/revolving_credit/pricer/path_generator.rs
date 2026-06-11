@@ -52,6 +52,9 @@ type RateCurveData = Option<(Vec<f64>, Vec<f64>)>;
 /// * `facility` - Revolving credit facility
 /// * `market` - Market context for curves
 /// * `payment_dates` - Payment schedule dates
+/// * `as_of` - Valuation date; simulation starts here (not at the commitment
+///   date) with the facility's current utilization as the known t₀ state.
+///   Payment dates at or before `as_of` record the t₀ state.
 ///
 /// # Variance Reduction
 ///
@@ -67,7 +70,16 @@ pub fn generate_three_factor_paths(
     facility: &RevolvingCredit,
     market: &MarketContext,
     payment_dates: &[Date],
+    as_of: Date,
 ) -> Result<Vec<ThreeFactorPathData>> {
+    if stoch_spec.num_paths < 2 {
+        return Err(finstack_core::Error::Validation(format!(
+            "stochastic revolving-credit pricing requires num_paths >= 2 \
+             (a single path has no variance estimate), got {}",
+            stoch_spec.num_paths
+        )));
+    }
+
     // Use facility's day count for consistent time calculations
     let day_count = facility.day_count;
     // Build utilization parameters
@@ -128,6 +140,12 @@ pub fn generate_three_factor_paths(
 
     if let Some(corr_matrix) = &mc_config.correlation_matrix {
         process_params = process_params.with_correlation(*corr_matrix);
+    } else if let Some(rho) = mc_config.util_credit_corr {
+        // Documented 2-factor shorthand: utilization–credit correlation ρ
+        // with the rate factor uncorrelated. Previously this field was
+        // accepted, validated, and then silently ignored.
+        process_params =
+            process_params.with_correlation([[1.0, 0.0, rho], [0.0, 1.0, 0.0], [rho, 0.0, 1.0]]);
     }
 
     // Compute time offset for market curve alignment
@@ -143,11 +161,47 @@ pub fn generate_three_factor_paths(
 
     let process = RevolvingCreditProcess::new(process_params);
 
+    // Whether the short-rate trajectory is genuinely stochastic (Hull-White
+    // with σ > 0). The pricer uses this to choose pathwise bank-account
+    // discounting over the static curve.
+    let stochastic_rates = matches!(
+        &process.params().interest_rate,
+        InterestRateSpec::Floating { params, .. } if params.sigma > 0.0
+    );
+
     // Convert payment dates to time points using facility's day count
     let raw_time_points = dates_to_times(payment_dates, facility.commitment_date, day_count)?;
 
+    // Seasoned facilities simulate from the VALUATION date, not the
+    // commitment date: the current utilization is a KNOWN t₀ state, and
+    // re-simulating the elapsed history would overstate dispersion at every
+    // future date. Payment dates at or before `as_of` simply record the t₀
+    // state.
+    let t_asof = if as_of > facility.commitment_date {
+        day_count.year_fraction(facility.commitment_date, as_of, DayCountContext::default())?
+    } else {
+        0.0
+    };
+    // Payment dates at/before as_of record the initial state (at least the
+    // first payment date, which is the commitment date itself).
+    let num_initial = raw_time_points
+        .iter()
+        .filter(|&&t| t <= t_asof)
+        .count()
+        .max(1);
+    let sim_start = t_asof.max(raw_time_points[0]);
+    let mut sim_times = Vec::with_capacity(raw_time_points.len() + 1);
+    sim_times.push(sim_start);
+    sim_times.extend(raw_time_points.iter().copied().filter(|&t| t > sim_start));
+    if sim_times.len() < 2 {
+        // Everything is in the past — add a dummy step so the grid is valid;
+        // recordings are capped at the payment-date count so the dummy is
+        // never recorded.
+        sim_times.push(sim_start + 1e-6);
+    }
+
     // Refine grid to ensure no step exceeds MAX_MC_TIME_STEP for numerical stability
-    let refined = refine_time_grid(&raw_time_points);
+    let refined = refine_time_grid(&sim_times);
     let time_grid = TimeGrid::from_times(refined.times.clone())?;
 
     // Set up discretization scheme
@@ -165,59 +219,88 @@ pub fn generate_three_factor_paths(
     let use_sobol = stoch_spec.use_sobol_qmc;
     let use_antithetic = stoch_spec.antithetic && !use_sobol; // Antithetic not compatible with Sobol
 
-    // Allocate reusable buffers (used by the serial Sobol path; the parallel
+    // Reusable scratch buffer (used by the serial Sobol path; the parallel
     // Philox path allocates per-thread inside the rayon closure).
-    let mut z = vec![0.0; num_factors];
     let mut work = vec![0.0; disc.work_size(&process)];
 
     if use_sobol {
-        let mut rng = SobolRng::try_new(num_factors, seed)
-            .map_err(|err| finstack_core::Error::Validation(err.to_string()))?;
+        // One Sobol point per PATH: each path consumes a
+        // `num_steps × num_factors`-dimensional coordinate, per the Sobol
+        // dimension contract (see `monte_carlo::rng::sobol`). Drawing a
+        // 3-dimensional point per time step (the previous behavior) feeds
+        // van-der-Corput anti-correlated consecutive coordinates into
+        // successive time steps — statistically invalid path dynamics, not
+        // just reduced efficiency. Schedules whose refined grid exceeds the
+        // supported Sobol dimension are rejected; use pseudorandom paths
+        // (`use_sobol_qmc = false`) instead.
+        let sobol_dim = num_steps.saturating_mul(num_factors);
+        let mut rng = SobolRng::try_new(sobol_dim, seed).map_err(|err| {
+            finstack_core::Error::Validation(format!(
+                "use_sobol_qmc requires one Sobol coordinate per (step, factor): \
+                 num_steps ({num_steps}) × num_factors ({num_factors}) = {sobol_dim}, \
+                 which is not supported ({err}); disable use_sobol_qmc for this schedule"
+            ))
+        })?;
+        let mut z_path = vec![0.0; sobol_dim];
 
         for _path_idx in 0..num_paths {
+            // Draw the full path's coordinate vector up front.
+            rng.fill_std_normals(&mut z_path);
             let mut state = initial_state.to_vec();
             // Only record states at payment dates, not at intermediate simulation steps
             let mut utilization_path = Vec::with_capacity(num_payment_dates);
             let mut short_rate_path = Vec::with_capacity(num_payment_dates);
             let mut credit_spread_path = Vec::with_capacity(num_payment_dates);
 
-            // For deterministic forward, set initial rate from curve
+            // For deterministic forward, set initial rate from curve on the
+            // CURVE's time axis (market-t = time_offset + path-t).
             if let Some((ref times, ref rates)) = rate_curve_opt {
-                state[1] = interpolate_rate(time_grid.times()[0], times, rates);
+                state[1] = interpolate_rate(t_start + time_grid.times()[0], times, rates);
             }
 
-            // Record initial state (first payment date)
-            utilization_path.push(state[0].clamp(0.0, 1.0));
-            short_rate_path.push(state[1]);
-            credit_spread_path.push(state[2].max(0.0));
+            // Record the t₀ state for every payment date at/before as_of
+            // (at least the first).
+            for _ in 0..num_initial {
+                utilization_path.push(state[0].clamp(0.0, 1.0));
+                short_rate_path.push(state[1]);
+                credit_spread_path.push(state[2].max(0.0));
+            }
 
-            // Track which payment date index we're recording next
+            // Track which simulation anchor we're recording next
             let mut next_payment_idx = 1;
 
             // Evolve through time on the refined grid
             for i in 0..num_steps {
                 let t_next = time_grid.times()[i + 1];
 
-                if !is_zero_vol {
+                {
                     let t = time_grid.times()[i];
                     let dt = t_next - t;
 
-                    // Generate random normal variates
-                    rng.fill_std_normals(&mut z);
+                    // Slice this step's factors out of the path's Sobol point
+                    let z = &z_path[i * num_factors..(i + 1) * num_factors];
 
-                    // Apply discretization scheme to evolve state
-                    disc.step(&process, t, dt, &mut state, &z, &mut work);
+                    // Apply discretization scheme to evolve state. Zero
+                    // utilization vol freezes ONLY the utilization factor —
+                    // rate and credit-spread dynamics must keep stepping
+                    // (the previous behavior froze all three factors).
+                    let u_frozen = state[0];
+                    disc.step(&process, t, dt, &mut state, z, &mut work);
+                    if is_zero_vol {
+                        state[0] = u_frozen;
+                    }
                 }
-                // else: keep state constant for zero volatility
 
-                // For deterministic forward, manually update short rate from curve
+                // For deterministic forward, manually update short rate from
+                // the curve on its own axis (market-t = time_offset + path-t).
                 if let Some((ref times, ref rates)) = rate_curve_opt {
-                    state[1] = interpolate_rate(t_next, times, rates);
+                    state[1] = interpolate_rate(t_start + t_next, times, rates);
                 }
 
                 // Only record state at payment dates (not intermediate steps)
                 if next_payment_idx < refined.payment_indices.len()
                     && i + 1 == refined.payment_indices[next_payment_idx]
+                    && utilization_path.len() < num_payment_dates
                 {
                     utilization_path.push(state[0].clamp(0.0, 1.0));
                     short_rate_path.push(state[1]);
@@ -232,6 +315,7 @@ pub fn generate_three_factor_paths(
                 credit_spread_path,
                 time_points: raw_time_points.clone(),
                 payment_dates: payment_dates.to_vec(),
+                stochastic_rates,
             });
         }
     } else {
@@ -287,22 +371,29 @@ pub fn generate_three_factor_paths(
                     let mut credit_spread_path = Vec::with_capacity(num_payment_dates);
 
                     if let Some((ref times, ref rates)) = rate_curve_opt {
-                        state[1] = interpolate_rate(times_ref[0], times, rates);
+                        state[1] = interpolate_rate(t_start + times_ref[0], times, rates);
                     }
 
-                    utilization_path.push(state[0].clamp(0.0, 1.0));
-                    short_rate_path.push(state[1]);
-                    credit_spread_path.push(state[2].max(0.0));
+                    // Record the t₀ state for every payment date at/before
+                    // as_of (at least the first).
+                    for _ in 0..num_initial {
+                        utilization_path.push(state[0].clamp(0.0, 1.0));
+                        short_rate_path.push(state[1]);
+                        credit_spread_path.push(state[2].max(0.0));
+                    }
 
                     let mut next_payment_idx = 1;
 
                     for (i, z_seq) in z_sequences.iter().enumerate().take(num_steps) {
                         let t_next = times_ref[i + 1];
 
-                        if !is_zero_vol {
+                        {
                             let t = times_ref[i];
                             let dt = t_next - t;
 
+                            // Zero utilization vol freezes ONLY the
+                            // utilization factor; rate/spread keep stepping.
+                            let u_frozen = state[0];
                             if sign_idx == 0 {
                                 disc.step(&process, t, dt, &mut state, z_seq, &mut work);
                             } else {
@@ -311,14 +402,18 @@ pub fn generate_three_factor_paths(
                                 }
                                 disc.step(&process, t, dt, &mut state, &z_neg, &mut work);
                             }
+                            if is_zero_vol {
+                                state[0] = u_frozen;
+                            }
                         }
 
                         if let Some((ref times, ref rates)) = rate_curve_opt {
-                            state[1] = interpolate_rate(t_next, times, rates);
+                            state[1] = interpolate_rate(t_start + t_next, times, rates);
                         }
 
                         if next_payment_idx < payment_indices_ref.len()
                             && i + 1 == payment_indices_ref[next_payment_idx]
+                            && utilization_path.len() < num_payment_dates
                         {
                             utilization_path.push(state[0].clamp(0.0, 1.0));
                             short_rate_path.push(state[1]);
@@ -333,6 +428,7 @@ pub fn generate_three_factor_paths(
                         credit_spread_path,
                         time_points: raw_time_points_ref.clone(),
                         payment_dates: payment_dates_ref.to_vec(),
+                        stochastic_rates,
                     });
                 }
                 local_paths
@@ -355,7 +451,7 @@ pub fn generate_three_factor_paths(
         }
     }
 
-    let _ = (z, work); // suppress unused-mut warnings for the Sobol-only buffers
+    let _ = work; // suppress unused-mut warning for the Sobol-only scratch buffer
     Ok(paths)
 }
 

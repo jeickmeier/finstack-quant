@@ -269,9 +269,33 @@ impl StochasticDefaultSpec {
 
     /// Build the stochastic default model from this specification.
     ///
-    /// Returns None for deterministic specs.
-    pub fn build(&self) -> Option<Box<dyn StochasticDefault>> {
-        match self {
+    /// Returns `Ok(None)` for deterministic specs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid copula specs (e.g. Student-t with
+    /// `dof ≤ 2`) instead of silently falling back to a Gaussian copula
+    /// against t-quantile thresholds.
+    ///
+    /// Engines pricing a SEASONED pool should use
+    /// [`Self::build_with_seasoning_offset`] so hazard-curve-based models
+    /// index the curve by time-from-valuation instead of loan age.
+    pub fn build(&self) -> finstack_core::Result<Option<Box<dyn StochasticDefault>>> {
+        self.build_with_seasoning_offset(0)
+    }
+
+    /// Build the model with the pool's seasoning at valuation (months).
+    ///
+    /// Only `HazardCurveBased` consumes the offset: its curve is anchored at
+    /// the valuation date, so lookups must subtract the initial seasoning
+    /// from the loan-age `seasoning` the engines pass in. The other models
+    /// are seasoning-curve based (loan age is the correct index) and ignore
+    /// the offset.
+    pub fn build_with_seasoning_offset(
+        &self,
+        seasoning_offset_months: u32,
+    ) -> finstack_core::Result<Option<Box<dyn StochasticDefault>>> {
+        Ok(match self {
             StochasticDefaultSpec::Deterministic(_) => None,
 
             StochasticDefaultSpec::Copula {
@@ -282,7 +306,7 @@ impl StochasticDefaultSpec {
                 *base_cdr,
                 copula_spec.clone(),
                 *correlation,
-            ))),
+            )?)),
 
             StochasticDefaultSpec::IntensityProcess {
                 base_hazard,
@@ -318,9 +342,10 @@ impl StochasticDefaultSpec {
             } => Some(Box::new(
                 HazardCurveDefault::new((**hazard_curve).clone(), *factor_sensitivity)
                     .with_volatility(*volatility)
-                    .with_correlation(*correlation),
+                    .with_correlation(*correlation)
+                    .with_seasoning_offset(seasoning_offset_months),
             )),
-        }
+        })
     }
 
     /// Check if this is a stochastic specification.
@@ -329,6 +354,10 @@ impl StochasticDefaultSpec {
     }
 
     /// Get the correlation if this is a stochastic model.
+    ///
+    /// For `FactorCorrelated` this returns the factor loading as a proxy —
+    /// the model has no separate asset-correlation parameter (see
+    /// `FactorCorrelatedDefault::correlation`).
     pub fn correlation(&self) -> Option<f64> {
         match self {
             StochasticDefaultSpec::Deterministic(_) => None,
@@ -388,8 +417,25 @@ mod tests {
         assert_eq!(spec.correlation(), Some(0.20));
         assert!((spec.base_rate() - 0.02).abs() < 1e-10);
 
-        let model = spec.build();
+        let model = spec.build().expect("valid Gaussian copula spec");
         assert!(model.is_some());
+    }
+
+    #[test]
+    fn test_invalid_student_t_dof_fails_to_build() {
+        let spec: StochasticDefaultSpec = serde_json::from_str(
+            r#"{
+                "model": "Copula",
+                "base_cdr": 0.02,
+                "copula_spec": {"type": "StudentT", "degrees_of_freedom": 2.0},
+                "correlation": 0.20
+            }"#,
+        )
+        .expect("spec deserializes; validation happens at build");
+        assert!(
+            spec.build().is_err(),
+            "Student-t dof <= 2 must be a hard error, not a Gaussian fallback"
+        );
     }
 
     #[test]
@@ -398,9 +444,10 @@ mod tests {
 
         assert!(spec.is_stochastic());
 
-        let model = spec.build();
-        assert!(model.is_some());
-        let model = model.expect("Should build intensity process model");
+        let model = spec
+            .build()
+            .expect("valid spec")
+            .expect("Should build intensity process model");
         assert_eq!(model.model_name(), "Intensity Process Default Model");
     }
 
@@ -415,9 +462,14 @@ mod tests {
         assert!(spec.is_stochastic());
         assert_eq!(spec.correlation(), Some(0.4));
 
-        let model = spec.build().expect("factor-correlated model should build");
+        let model = spec
+            .build()
+            .expect("valid spec")
+            .expect("factor-correlated model should build");
         assert_eq!(model.model_name(), "Factor-Correlated Default");
-        assert!(model.conditional_mdr(12, &[2.0], &Default::default()) > model.expected_mdr(12));
+        // Canonical convention: low factor = stress, so a negative factor
+        // realization must raise the conditional MDR above its expectation.
+        assert!(model.conditional_mdr(12, &[-2.0], &Default::default()) > model.expected_mdr(12));
     }
 
     #[test]
@@ -437,6 +489,6 @@ mod tests {
         let spec = StochasticDefaultSpec::deterministic(DefaultModelSpec::constant_cdr(0.02));
 
         assert!(!spec.is_stochastic());
-        assert!(spec.build().is_none());
+        assert!(spec.build().expect("deterministic spec is valid").is_none());
     }
 }

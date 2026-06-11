@@ -33,6 +33,14 @@ use finstack_core::Result;
 /// Default bump size for parallel rate shift (1 basis point).
 pub(crate) const DEFAULT_RATE_BUMP_BP: f64 = 1.0;
 
+/// Default bump size for the second-order (gamma) rate shift (10 basis points).
+///
+/// Gamma divides by `bump²`; with a ±1bp bump on a recalibrated 50-step tree
+/// the exercise-boundary/discretization noise is divided by 1e-8 and dominates
+/// the estimate. A 10bp bump trades a small O(bump²) truncation error for a
+/// 100× reduction in noise amplification.
+pub(crate) const DEFAULT_GAMMA_BUMP_BP: f64 = 10.0;
+
 /// Default bump size for volatility (1% relative).
 pub(crate) const DEFAULT_VOL_BUMP_PCT: f64 = 0.01;
 
@@ -317,7 +325,7 @@ pub(crate) struct BermudanGammaCalculator {
 impl Default for BermudanGammaCalculator {
     fn default() -> Self {
         Self {
-            bump_bp: DEFAULT_RATE_BUMP_BP,
+            bump_bp: DEFAULT_GAMMA_BUMP_BP,
             kappa: DEFAULT_KAPPA,
             sigma: DEFAULT_SIGMA,
             tree_steps: DEFAULT_TREE_STEPS,
@@ -420,7 +428,7 @@ impl MetricCalculator for BermudanGammaCalculator {
 /// Exercise timing summary for Bermudan swaptions.
 #[derive(Debug, Clone)]
 pub(crate) struct ExerciseProbabilityProfile {
-    /// Expected exercise time
+    /// Expected exercise time **conditional on exercise**: `E[τ | exercise]`.
     pub(crate) expected_exercise_time: f64,
 }
 
@@ -431,12 +439,20 @@ impl ExerciseProbabilityProfile {
     /// induction in the Hull-White tree. These probabilities represent the
     /// optimal exercise strategy under the risk-neutral measure.
     ///
+    /// The reported time is **conditional on exercise**:
+    /// `E[τ | exercise] = Σ tᵢ·pᵢ / Σ pᵢ`. The unconditional sum
+    /// `Σ tᵢ·pᵢ = E[τ·1{exercised}]` drops the surviving (never-exercised)
+    /// probability mass and is biased toward 0 for OTM swaptions; normalizing
+    /// by the total exercise probability removes that bias. If the swaption
+    /// never exercises on the tree (`Σ pᵢ = 0`), the conditional expectation
+    /// is undefined and 0.0 is reported.
+    ///
     /// # Arguments
     /// * `valuator` - The tree valuator that has computed the optimal exercise boundary
     /// * `exercise_times` - Exercise dates as year fractions (used for validation)
     ///
     /// # Returns
-    /// An `ExerciseProbabilityProfile` with the expected exercise time.
+    /// An `ExerciseProbabilityProfile` with the conditional expected exercise time.
     pub(crate) fn from_valuator(
         valuator: &BermudanSwaptionTreeValuator,
         exercise_times: Vec<f64>,
@@ -451,9 +467,14 @@ impl ExerciseProbabilityProfile {
             };
         }
 
-        // Expected exercise time = Σ t_i × P(exercise at t_i)
-        // For non-exercised paths, we include remaining probability at terminal date
-        let expected_exercise_time: f64 = tree_probs.iter().map(|(t, p)| t * p).sum();
+        // E[τ | exercise] = Σ tᵢ·pᵢ / Σ pᵢ (conditional on exercising).
+        let total_exercise_prob: f64 = tree_probs.iter().map(|(_, p)| p).sum();
+        let weighted_time: f64 = tree_probs.iter().map(|(t, p)| t * p).sum();
+        let expected_exercise_time = if total_exercise_prob > 1e-12 {
+            weighted_time / total_exercise_prob
+        } else {
+            0.0
+        };
 
         Self {
             expected_exercise_time,

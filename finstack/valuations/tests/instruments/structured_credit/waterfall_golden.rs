@@ -141,9 +141,14 @@ fn run_waterfall(
     market: &MarketContext,
 ) -> WaterfallDistribution {
     let period_start = period_start_override.unwrap_or_else(|| payment_date.add_months(-3));
+    // Tests treat everything above interest as principal proceeds.
+    let principal_collections = available_cash
+        .checked_sub(interest_collections)
+        .unwrap_or(Money::new(0.0, available_cash.currency()));
     let context = WaterfallContext {
         available_cash,
         interest_collections,
+        principal_collections,
         payment_date,
         period_start,
         pool_balance,
@@ -342,14 +347,22 @@ fn test_golden_clo_oc_breach_diversion() {
                 .add_recipient(Recipient::tranche_interest("class_b_int", "CLASS_B")),
         )
         .add_tier(
-            WaterfallTier::new("principal", 3, PaymentType::Principal)
+            // Senior principal: small scheduled paydown (target balance just
+            // below par) so the regular pass leaves cash for the junior tier.
+            WaterfallTier::new("senior_principal", 3, PaymentType::Principal)
                 .allocation_mode(AllocationMode::Sequential)
-                .divertible(true)
                 .add_recipient(Recipient::tranche_principal(
                     "class_a_prin",
                     "CLASS_A",
-                    None,
-                ))
+                    Some(Money::new(174_500_000.0, currency)),
+                )),
+        )
+        .add_tier(
+            // Junior principal is the divertible tier: on an OC breach its
+            // cash is redirected to the senior principal tier above it.
+            WaterfallTier::new("junior_principal", 4, PaymentType::Principal)
+                .allocation_mode(AllocationMode::Sequential)
+                .divertible(true)
                 .add_recipient(Recipient::tranche_principal(
                     "class_b_prin",
                     "CLASS_B",
@@ -357,7 +370,7 @@ fn test_golden_clo_oc_breach_diversion() {
                 )),
         )
         .add_tier(
-            WaterfallTier::new("equity", 4, PaymentType::Residual).add_recipient(Recipient::new(
+            WaterfallTier::new("equity", 5, PaymentType::Residual).add_recipient(Recipient::new(
                 "equity",
                 RecipientType::Equity,
                 PaymentCalculation::ResidualCash,

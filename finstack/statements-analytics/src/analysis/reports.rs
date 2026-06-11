@@ -373,8 +373,13 @@ impl Report for PLSummaryReport<'_> {
         for line_item in &self.line_items {
             let mut row = vec![line_item.clone()];
             for period in &self.periods {
-                let value = self.results.get(line_item, period).unwrap_or(0.0);
-                row.push(format!("{:.2}", value));
+                // Render missing line items as "-" rather than a misleading
+                // 0.00 (zero is a legitimate value, absence is not).
+                let cell = match self.results.get(line_item, period) {
+                    Some(value) => format!("{:.2}", value),
+                    None => "-".to_string(),
+                };
+                row.push(cell);
             }
             table.add_row(row);
         }
@@ -555,6 +560,36 @@ mod tests {
         let widths = table.calculate_column_widths();
         assert_eq!(widths[0], 5); // "short" is longer than "A"
         assert_eq!(widths[1], 16); // "much longer text" is longer than "B"
+    }
+
+    #[test]
+    fn pl_summary_renders_dash_for_missing_values() {
+        let q1 = PeriodId::quarter(2025, 1);
+        let q2 = PeriodId::quarter(2025, 2);
+
+        let mut results = StatementResult::new();
+        // revenue only exists in Q1; Q2 is missing (not zero).
+        results
+            .nodes
+            .entry("revenue".to_string())
+            .or_default()
+            .insert(q1, 1234.5);
+
+        let report = PLSummaryReport::new(&results, vec!["revenue"], vec![q1, q2]);
+        let output = Report::to_string(&report);
+
+        assert!(
+            output.contains("1234.50"),
+            "present value renders: {output}"
+        );
+        assert!(
+            output.contains('-'),
+            "missing value renders as dash: {output}"
+        );
+        assert!(
+            !output.contains("0.00"),
+            "missing value must not render as 0.00: {output}"
+        );
     }
 
     #[test]

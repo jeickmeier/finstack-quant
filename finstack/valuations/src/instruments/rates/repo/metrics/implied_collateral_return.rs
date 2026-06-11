@@ -23,16 +23,29 @@ impl MetricCalculator for ImpliedCollateralReturnCalculator {
 
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let repo = context.instrument_as::<crate::instruments::rates::repo::Repo>()?;
+        // Dependencies are declared above, so missing entries indicate a
+        // registry/dependency-resolution bug — propagate instead of silently
+        // substituting zeros.
         let collateral_value = context
             .computed
             .get(&MetricId::CollateralValue)
             .copied()
-            .unwrap_or(0.0);
+            .ok_or_else(|| {
+                finstack_core::Error::Validation(
+                    "ImpliedCollateralReturn requires CollateralValue to be computed first"
+                        .to_string(),
+                )
+            })?;
         let required_value = context
             .computed
             .get(&MetricId::RequiredCollateral)
             .copied()
-            .unwrap_or(0.0);
+            .ok_or_else(|| {
+                finstack_core::Error::Validation(
+                    "ImpliedCollateralReturn requires RequiredCollateral to be computed first"
+                        .to_string(),
+                )
+            })?;
 
         // Use adjusted maturity for consistency with PV and interest calculations
         let (_, adj_maturity) = repo.adjusted_dates()?;

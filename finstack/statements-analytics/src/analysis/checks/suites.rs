@@ -8,9 +8,12 @@ use finstack_statements::checks::builtins::{
     BalanceSheetArticulation, CashReconciliation, MissingValueCheck, NonFiniteCheck,
     RetainedEarningsReconciliation,
 };
-use finstack_statements::checks::{CheckSuite, PeriodScope, Severity, SignConventionPolicy};
+use finstack_statements::checks::{
+    CheckSuite, CheckSuiteSpec, PeriodScope, Severity, SignConventionPolicy,
+};
 
 use super::credit::{CoverageFloorCheck, FcfSignCheck, LeverageRangeCheck, TrendCheck};
+use super::formula_check::FormulaCheck;
 use super::reconciliation::DepreciationReconciliation;
 use super::{CreditMapping, ThreeStatementMapping, TrendDirection};
 
@@ -192,4 +195,40 @@ pub fn lbo_model_checks(mapping: ThreeStatementMapping, credit: CreditMapping) -
     let credit_suite = credit_underwriting_checks(credit_override);
 
     ts_suite.merge(credit_suite)
+}
+
+// ---------------------------------------------------------------------------
+// Spec resolution
+// ---------------------------------------------------------------------------
+
+/// Resolve a serialized [`CheckSuiteSpec`] into a runnable [`CheckSuite`],
+/// materializing both built-in checks **and** user-defined formula checks.
+///
+/// This is the canonical entry point for hosts (Python/WASM bindings) that
+/// accept a `CheckSuiteSpec` JSON document: [`CheckSuiteSpec::resolve`] alone
+/// only materializes built-in checks because `FormulaCheck` lives in this
+/// crate. Calling this function instead guarantees the same spec produces the
+/// same check report on every host.
+///
+/// # Errors
+///
+/// Returns an error if built-in check resolution fails.
+pub fn resolve_check_suite(spec: &CheckSuiteSpec) -> finstack_statements::Result<CheckSuite> {
+    let mut suite = spec.resolve()?;
+    if !spec.formula_checks.is_empty() {
+        let mut builder = CheckSuite::builder("_formula_checks");
+        for fc in &spec.formula_checks {
+            builder = builder.add_check(FormulaCheck {
+                id: fc.id.clone(),
+                name: fc.name.clone(),
+                category: fc.category,
+                severity: fc.severity,
+                formula: fc.formula.clone(),
+                message_template: fc.message_template.clone(),
+                tolerance: fc.tolerance,
+            });
+        }
+        suite = suite.merge(builder.build());
+    }
+    Ok(suite)
 }

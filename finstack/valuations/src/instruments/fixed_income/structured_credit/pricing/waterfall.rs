@@ -67,6 +67,11 @@ pub struct WaterfallContext<'a> {
     pub available_cash: Money,
     /// Interest collections from the pool for this period.
     pub interest_collections: Money,
+    /// Principal collections (scheduled + prepayments + recoveries) for this
+    /// period. Standard CLO par-OC: only principal proceeds count toward the
+    /// OC numerator's cash component (`include_cash = true`); interest
+    /// proceeds belong to the interest waterfall and must not flatter OC.
+    pub principal_collections: Money,
     /// Payment date for this waterfall period.
     pub payment_date: Date,
     /// Start date of the accrual period.
@@ -143,7 +148,7 @@ fn execute_waterfall_core(
         pool,
         context.payment_date,
         context.period_start,
-        context.available_cash,
+        context.principal_collections,
         context.interest_collections,
         context.pool_balance,
         context.market,
@@ -295,7 +300,11 @@ fn execute_waterfall_core(
         .iter()
         .map(|r| (r.test_id.clone(), r.current_ratio, r.is_passing))
         .collect();
-    let mut diverted_amounts: Vec<DiversionRecord> = allocation_output
+    // DiversionRecords are built only from payments that actually moved cash.
+    // A failing coverage test with no cash to divert (e.g. an empty waterfall
+    // period) must NOT fabricate records carrying the theoretical cure amount;
+    // `had_diversions` / `coverage_tests` already report the breach itself.
+    let diverted_amounts: Vec<DiversionRecord> = allocation_output
         .payment_records
         .iter()
         .filter(|record| record.diverted && record.paid_amount.amount() > 0.0)
@@ -308,34 +317,6 @@ fn execute_waterfall_core(
                 .unwrap_or_else(|| "Waterfall diversion".to_string()),
         })
         .collect();
-    if diverted_amounts.is_empty() && diversion_active {
-        let mut per_tranche_max: HashMap<&str, (f64, &'static str)> = HashMap::default();
-        for result in &coverage_test_results {
-            if let Some(cure) = result.cure_amount {
-                if cure.amount() > 0.0 {
-                    let tranche_id = result.tranche_id.as_str();
-                    let reason = if result.test_id.starts_with("OC_") {
-                        "OC cure"
-                    } else {
-                        "IC cure"
-                    };
-                    let entry = per_tranche_max.entry(tranche_id).or_insert((0.0, reason));
-                    if cure.amount() > entry.0 {
-                        *entry = (cure.amount(), reason);
-                    }
-                }
-            }
-        }
-        diverted_amounts = per_tranche_max
-            .into_iter()
-            .map(|(tranche_id, (amount, reason))| DiversionRecord {
-                source_tier: "coverage_diversion".to_string(),
-                target_tranche: tranche_id.to_string(),
-                amount: Money::new(amount, waterfall.base_currency),
-                reason: reason.to_string(),
-            })
-            .collect();
-    }
 
     // Build the final distribution result
     let distribution = WaterfallDistribution {
@@ -788,6 +769,9 @@ fn allocate_pro_rata(
 // ============================================================================
 
 /// Evaluate coverage tests.
+///
+/// `principal_collections` is the cash component of the OC numerator
+/// (standard CLO par-OC counts only principal proceeds, never interest).
 #[allow(clippy::too_many_arguments)]
 fn evaluate_coverage_tests(
     waterfall: &Waterfall,
@@ -795,7 +779,7 @@ fn evaluate_coverage_tests(
     pool: &AssetPool,
     as_of: Date,
     period_start: Date,
-    available_cash: Money,
+    principal_collections: Money,
     interest_collections: Money,
     current_pool_balance: Money,
     market: &MarketContext,
@@ -823,7 +807,7 @@ fn evaluate_coverage_tests(
                 tranche_id: &trigger.tranche_id,
                 as_of,
                 period_start: Some(period_start),
-                cash_balance: available_cash,
+                cash_balance: principal_collections,
                 interest_collections,
                 haircuts,
                 par_value_threshold,
@@ -836,7 +820,6 @@ fn evaluate_coverage_tests(
             let result = oc_test.calculate(&ctx)?;
             results.push(CoverageTestResult {
                 test_id: format!("OC_{}", trigger.tranche_id),
-                tranche_id: result.tranche_id,
                 current_ratio: result.current_ratio,
                 is_passing: result.is_passing,
                 cure_amount: result.cure_amount,
@@ -850,7 +833,7 @@ fn evaluate_coverage_tests(
                 tranche_id: &trigger.tranche_id,
                 as_of,
                 period_start: Some(period_start),
-                cash_balance: available_cash,
+                cash_balance: principal_collections,
                 interest_collections,
                 haircuts,
                 par_value_threshold,
@@ -863,7 +846,6 @@ fn evaluate_coverage_tests(
             let result = ic_test.calculate(&ctx)?;
             results.push(CoverageTestResult {
                 test_id: format!("IC_{}", trigger.tranche_id),
-                tranche_id: result.tranche_id,
                 current_ratio: result.current_ratio,
                 is_passing: result.is_passing,
                 cure_amount: result.cure_amount,
@@ -878,7 +860,6 @@ fn evaluate_coverage_tests(
 #[derive(Debug, Clone)]
 struct CoverageTestResult {
     test_id: String,
-    tranche_id: String,
     current_ratio: f64,
     is_passing: bool,
     /// Amount needed to cure the breach (divert to senior principal).
@@ -1227,6 +1208,7 @@ mod ic_diversion_tests {
         let context = WaterfallContext {
             available_cash: Money::new(20_000_000.0, currency),
             interest_collections: Money::new(100_000.0, currency),
+            principal_collections: Money::new(19_900_000.0, currency),
             payment_date,
             period_start,
             pool_balance: Money::new(500_000_000.0, currency),
@@ -1405,10 +1387,10 @@ mod ic_diversion_tests {
                         PaymentCalculation::ResidualCash,
                     )),
             )
-            // Two OC triggers. CLASS_A denominator = 100M (ratio 158/100 =
-            // 1.58); CLASS_B denominator = 130M (ratio 158/130 = 1.215).
-            // Triggers set just above each ratio so BOTH breach, with
-            // materially different cure amounts.
+            // Two OC triggers. Numerator = 118M collateral + 20M principal
+            // cash = 138M. CLASS_A denominator = 100M (ratio 1.38); CLASS_B
+            // denominator = 130M (ratio 1.06). Triggers set above each ratio
+            // so BOTH breach, with materially different cure amounts.
             .add_coverage_trigger(CoverageTrigger {
                 tranche_id: "CLASS_A".into(),
                 oc_trigger: Some(1.70),
@@ -1429,6 +1411,7 @@ mod ic_diversion_tests {
         let context = WaterfallContext {
             available_cash: Money::new(40_000_000.0, currency),
             interest_collections: Money::new(20_000_000.0, currency),
+            principal_collections: Money::new(20_000_000.0, currency),
             payment_date,
             period_start,
             pool_balance: Money::new(118_000_000.0, currency),
@@ -1456,11 +1439,12 @@ mod ic_diversion_tests {
         );
 
         // Independently derive the two OC cures.
-        // numerator = collateral + cash that remains in the numerator. The OC
-        // numerator includes cash; diverting X removes X from the numerator
-        // and pays down X of the (shared) senior denominator:
+        // numerator = collateral + principal collections (par-OC: only the
+        // principal cash component enters the numerator). Diverting X removes
+        // X from the numerator and pays down X of the (shared) senior
+        // denominator:
         //   X = (numerator − ratio·denominator) / (1 − ratio)
-        let numerator = 118_000_000.0_f64 + 40_000_000.0; // collateral + cash
+        let numerator = 118_000_000.0_f64 + 20_000_000.0; // collateral + principal cash
         let cure = |ratio: f64, denom: f64| (numerator - ratio * denom) / (1.0 - ratio);
         let cure_a = cure(1.70, 100_000_000.0);
         let cure_b = cure(1.30, 130_000_000.0);
@@ -1607,6 +1591,7 @@ mod ic_diversion_tests {
         let context = WaterfallContext {
             available_cash: Money::new(10_000_000.0, currency),
             interest_collections: Money::new(1_000_000.0, currency),
+            principal_collections: Money::new(9_000_000.0, currency),
             payment_date,
             period_start,
             pool_balance: Money::new(20_000_000.0, currency),

@@ -15,15 +15,26 @@ use finstack_core::math::ZERO_TOLERANCE;
 /// Collect chronologically-sorted (period, value) pairs for a column reference,
 /// including the current period's value if set. Returns `None` if `args[0]` is
 /// not a column reference.
+///
+/// Only periods at or before the context's evaluation period are included so
+/// lagged evaluation cannot look ahead, and non-finite values are skipped to
+/// match the retain-finite policy used by the other aggregates.
 fn collect_column_series(column_name: &str, context: &EvaluationContext) -> Vec<(PeriodId, f64)> {
     let mut values = Vec::with_capacity(context.historical_results.len() + 1);
     for (period_id, period_results) in context.historical_results.iter() {
+        if *period_id >= context.period_id {
+            continue;
+        }
         if let Some(value) = period_results.get(column_name) {
-            values.push((*period_id, *value));
+            if value.is_finite() {
+                values.push((*period_id, *value));
+            }
         }
     }
     if let Ok(current) = context.get_value(column_name) {
-        values.push((context.period_id, current));
+        if current.is_finite() {
+            values.push((context.period_id, current));
+        }
     }
     values.sort_by_key(|(period, _)| *period);
     values
@@ -80,12 +91,14 @@ pub(crate) fn eval_ewm_mean(
 /// variance directly or its square root.
 ///
 /// Arguments:
-/// - 2 args: `(series, alpha)` — bias-corrected (pandas `adjust=True`, market standard)
+/// - 2 args: `(series, alpha)` — bias-corrected (pandas `adjust=False, bias=False`)
 /// - 3 args: `(series, alpha, adjust)` — bias correction enabled when `adjust != 0.0`
 ///
-/// Bias correction applies pandas-compatible `sum_w² / (sum_w² - sum_w2)`
-/// scaling at the end, which converges to the standard Bessel correction
-/// `n/(n-1)` as alpha → 0 (equal weighting).
+/// The recursion is the pandas `adjust=False` form, so the matching unbiased
+/// correction is `1 / (1 − Σŵ²)` over the normalized recursion weights
+/// (RiskMetrics TD4 convention; pandas `adjust=False, bias=False`). It
+/// converges to the standard Bessel correction `n/(n-1)` as alpha → 0
+/// (equal weighting).
 pub(crate) fn eval_ewm_std_or_var(
     func: &Function,
     args: &[Expr],
@@ -104,7 +117,7 @@ pub(crate) fn eval_ewm_std_or_var(
         return Err(eval_error(node_id, "ewm alpha must be between 0 and 1"));
     }
 
-    // Default to pandas `adjust=True` (market standard for ewm variance).
+    // Default to bias-corrected output (pandas `adjust=False, bias=False`).
     let adjust = if args.len() == 3 {
         evaluate_expr(&args[2], context, node_id)? != 0.0
     } else {
@@ -130,17 +143,18 @@ pub(crate) fn eval_ewm_std_or_var(
     }
 
     if adjust {
+        // Σŵ² of the normalized `adjust=False` recursion weights, computed
+        // recursively: after each new observation the previous weights scale
+        // by (1 − α) and the newest gets α, so s₂ ← (1−α)²·s₂ + α².
         let n = values.len();
         let one_minus_alpha = 1.0 - alpha;
-        let mut sum_wt = 1.0_f64;
-        let mut sum_wt2 = 1.0_f64;
+        let mut sum_w2 = 1.0_f64;
         for _ in 1..n {
-            sum_wt = one_minus_alpha * sum_wt + 1.0;
-            sum_wt2 = one_minus_alpha * one_minus_alpha * sum_wt2 + 1.0;
+            sum_w2 = one_minus_alpha * one_minus_alpha * sum_w2 + alpha * alpha;
         }
-        let denom = sum_wt * sum_wt - sum_wt2;
+        let denom = 1.0 - sum_w2;
         if denom.abs() > ZERO_TOLERANCE {
-            ewm_var *= sum_wt * sum_wt / denom;
+            ewm_var /= denom;
         }
     }
 

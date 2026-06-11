@@ -120,7 +120,22 @@ impl PerNameCopulaDefault {
     /// Propagates copula construction failures (e.g. invalid Student-t
     /// degrees of freedom) instead of silently substituting a Gaussian
     /// copula, which would drop the requested tail dependence.
+    ///
+    /// Rejects [`CopulaSpec::MultiFactor`]: the per-name engine supplies a
+    /// single systematic factor `Z` per period and has no channel for sector
+    /// factor realizations, so a multi-factor copula cannot be simulated
+    /// name-by-name here — the trait-level latent construction would silently
+    /// collapse it to a one-factor Gaussian.
     pub(crate) fn new(copula_spec: &CopulaSpec, correlation: f64) -> Result<Self> {
+        if matches!(copula_spec, CopulaSpec::MultiFactor { .. }) {
+            return Err(finstack_core::Error::Validation(
+                "per-name default simulation does not support multi-factor copulas: the \
+                 engine provides a single systematic factor per period and cannot resolve \
+                 sector factor realizations; use a Gaussian, Student-t, or RFL copula, or \
+                 price through the semi-analytic tranche engine"
+                    .into(),
+            ));
+        }
         Ok(Self {
             copula: copula_spec.build().map_err(|e| {
                 finstack_core::Error::Validation(format!(
@@ -513,6 +528,87 @@ mod tests {
                 *n, *a,
                 "name {i}: antithetic mask must be the complement of the \
                  normal mask at a zero barrier (normal={n}, antithetic={a})"
+            );
+        }
+    }
+
+    /// M2.4: multi-factor copulas must be rejected — the per-name engine has
+    /// no sector-factor channel, and the trait-level latent construction
+    /// would silently collapse the model to a one-factor Gaussian.
+    #[test]
+    fn multi_factor_copula_is_rejected() {
+        let Err(err) = PerNameCopulaDefault::new(&CopulaSpec::MultiFactor { num_factors: 2 }, 0.30)
+        else {
+            panic!("multi-factor copulas must be rejected by the per-name engine");
+        };
+        assert!(
+            err.to_string().contains("multi-factor"),
+            "error should explain the limitation, got: {err}"
+        );
+    }
+
+    /// M2.5: RFL per-name simulation must draw the shared loading shock η
+    /// and use the stochastic loading β(η) — the marginal still recovers PD
+    /// (E[Aᵢ ≤ Φ⁻¹(PD)] = PD because Var(Aᵢ | η) = 1 for every η).
+    #[test]
+    fn rfl_per_name_marginal_recovers_pd() {
+        let sim = PerNameCopulaDefault::new(
+            &CopulaSpec::RandomFactorLoading {
+                loading_volatility: 0.20,
+            },
+            0.30,
+        )
+        .expect("copula builds");
+        let pd = 0.05;
+        let names = vec![pd; 128];
+        let mut rng = PhiloxRng::new(777);
+        let mut out = Vec::new();
+
+        let periods = 5_000usize;
+        let mut total = 0usize;
+        for _ in 0..periods {
+            let z = rng.next_std_normal();
+            sim.simulate_period(z, &names, &mut rng, &mut out);
+            total += out.iter().filter(|d| **d).count();
+        }
+        let realized = total as f64 / (periods * names.len()) as f64;
+        assert!(
+            (realized - pd).abs() < 0.004,
+            "RFL per-name marginal {realized} should recover PD {pd}"
+        );
+    }
+
+    /// M2.5 convergence anchor: a large RFL pool simulated per-name must
+    /// converge to the RFL LHP conditional — both realize the same (Z, η)
+    /// latent construction `Aᵢ = β(η)·Z + √(1−β(η)²)·εᵢ`. On the pre-fix
+    /// engine the per-name path ignored η entirely (plain Gaussian with the
+    /// full ρ), so the conditional default fractions disagreed with the LHP
+    /// fast-path whenever η ≠ 0.
+    #[test]
+    fn rfl_large_pool_converges_to_lhp_conditional() {
+        let spec = CopulaSpec::RandomFactorLoading {
+            loading_volatility: 0.20,
+        };
+        let sim = PerNameCopulaDefault::new(&spec, 0.30).expect("copula builds");
+        let pd = 0.05;
+        let n = 20_000usize;
+        let names = vec![pd; n];
+
+        for (seed, z) in [(11_u64, -1.5_f64), (12, 0.0), (13, 1.5)] {
+            // Both paths must consume the SAME shared mixing draw (η), so
+            // give them identical RNG streams positioned identically.
+            let mut pn_rng = PhiloxRng::new(seed);
+            let mut lhp_rng = PhiloxRng::new(seed);
+            let mut out = Vec::new();
+
+            sim.simulate_period(z, &names, &mut pn_rng, &mut out);
+            let realized = out.iter().filter(|d| **d).count() as f64 / n as f64;
+            let lhp = sim.conditional_default_prob(z, pd, &mut lhp_rng);
+            assert!(
+                (realized - lhp).abs() < 0.01,
+                "z={z}: RFL realized fraction {realized} should converge to \
+                 LHP {lhp} — a mismatch means per-name MC and the LHP \
+                 fast-path realize different models"
             );
         }
     }

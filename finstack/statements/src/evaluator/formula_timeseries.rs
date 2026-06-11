@@ -63,6 +63,10 @@ pub(crate) fn eval_lag(
         } else {
             Ok(f64::NAN)
         }
+    } else if !context.historical_results.contains_key(&target_period) {
+        // Target period precedes the model history: return NaN like the
+        // column path instead of erroring against an empty context.
+        Ok(f64::NAN)
     } else {
         let mut hist_ctx = build_context_for_period(target_period, context)?;
         evaluate_expr(&args[0], &mut hist_ctx, node_id)
@@ -121,6 +125,10 @@ pub(crate) fn eval_diff(
         if current_value.is_nan() {
             return Ok(f64::NAN);
         }
+        if !context.historical_results.contains_key(&target_period) {
+            // Mirror the column path: missing history yields NaN, not an error.
+            return Ok(f64::NAN);
+        }
         let mut hist_ctx = build_context_for_period(target_period, context)?;
         let lagged_value = evaluate_expr(&args[0], &mut hist_ctx, node_id)?;
         Ok(current_value - lagged_value)
@@ -146,7 +154,11 @@ pub(crate) fn eval_pct_change(
     };
 
     if lag_periods == 0 {
-        return Ok(0.0);
+        // pct_change(x, 0) == (x - x) / x. Propagate NaN from the inner
+        // expression rather than collapsing to 0.0 so missing data is not
+        // silently masked (mirrors the diff(x, 0) guard).
+        let v = evaluate_expr(&args[0], context, node_id)?;
+        return Ok(if v.is_finite() { 0.0 } else { f64::NAN });
     }
 
     let target_period = offset_period(context.period_id, -lag_periods, node_id)?;
@@ -158,6 +170,10 @@ pub(crate) fn eval_pct_change(
         (current, lagged)
     } else {
         let current = evaluate_expr(&args[0], context, node_id)?;
+        if !context.historical_results.contains_key(&target_period) {
+            // Mirror the column path: missing history yields NaN, not an error.
+            return Ok(f64::NAN);
+        }
         let mut hist_ctx = build_context_for_period(target_period, context)?;
         let lagged = evaluate_expr(&args[0], &mut hist_ctx, node_id)?;
         (current, lagged)
@@ -241,6 +257,13 @@ pub(crate) fn eval_growth_rate(
                         period: context.period_id,
                     });
                 }
+                return Ok(f64::NAN);
+            }
+            // CAGR is undefined for non-positive bases: with a negative start
+            // value the ratio sign flips, so improving losses would report
+            // negative growth (and vice versa). Policy: return NaN whenever
+            // start_value <= 0.
+            if start_value < 0.0 {
                 return Ok(f64::NAN);
             }
             let ratio = current_value / start_value;

@@ -178,6 +178,7 @@ impl PyExposure {
             qualitative_flags: rust_ecl::QualitativeFlags::default(),
             consecutive_performing_periods: 0,
             previous_stage: None,
+            ead_schedule: None,
         }
     }
 }
@@ -282,22 +283,22 @@ fn classify_stage(
 // ECL computation
 // ---------------------------------------------------------------------------
 
-fn build_pd_curve(pd_schedule: &[(f64, f64)]) -> PyResult<rust_ecl::RawPdCurve> {
-    // Ensure the curve starts at (0.0, 0.0) so marginal PDs are well-defined
-    // from the reporting date. If the caller already supplied t=0, keep it.
-    let mut knots = Vec::with_capacity(pd_schedule.len() + 1);
-    if pd_schedule.first().map(|(t, _)| *t).unwrap_or(1.0) > 0.0 {
-        knots.push((0.0, 0.0));
-    }
-    knots.extend_from_slice(pd_schedule);
+fn build_pd_curve(pd_schedule: Vec<(f64, f64)>) -> PyResult<rust_ecl::RawPdCurve> {
+    // Anchor the curve at (0.0, 0.0) via the canonical Rust helper so
+    // marginal PDs are well-defined from the reporting date.
+    let knots = rust_ecl::RawPdCurve::anchor_knots(pd_schedule);
     rust_ecl::RawPdCurve::new("scenario", knots).map_err(display_to_py)
 }
 
-fn build_ecl_config(bucket_width_years: f64) -> PyResult<rust_ecl::EclConfig> {
-    rust_ecl::EclConfigBuilder::new()
-        .bucket_width(bucket_width_years)
-        .build()
-        .map_err(display_to_py)
+fn build_ecl_config(
+    bucket_width_years: f64,
+    stage3_time_to_recovery_years: Option<f64>,
+) -> PyResult<rust_ecl::EclConfig> {
+    let mut builder = rust_ecl::EclConfigBuilder::new().bucket_width(bucket_width_years);
+    if let Some(years) = stage3_time_to_recovery_years {
+        builder = builder.stage3_time_to_recovery(years);
+    }
+    builder.build().map_err(display_to_py)
 }
 
 fn cap_maturity(exposure: &rust_ecl::Exposure, max_horizon_years: f64) -> rust_ecl::Exposure {
@@ -327,13 +328,19 @@ fn cap_maturity(exposure: &rust_ecl::Exposure, max_horizon_years: f64) -> rust_e
 ///     Width of each time bucket (e.g. ``0.25`` for quarterly).
 /// stage : str
 ///     ``"stage1"`` (12-month ECL) or ``"stage2"``/``"stage3"`` (lifetime ECL).
+/// ead_schedule : list[tuple[float, float]] | None
+///     Optional EAD amortization profile as ``[(time_years, ead), ...]``
+///     knots; linear interpolation with flat extrapolation.
+/// stage3_time_to_recovery_years : float | None
+///     Stage 3 discounting horizon to expected recovery, in years.
 ///
 /// Returns
 /// -------
 /// float
 ///     ECL amount in the exposure's base currency.
 #[pyfunction]
-#[pyo3(signature = (ead, pd_schedule, lgd, eir, max_horizon_years, bucket_width_years=None, stage="stage1"))]
+#[pyo3(signature = (ead, pd_schedule, lgd, eir, max_horizon_years, bucket_width_years=None, stage="stage1", ead_schedule=None, stage3_time_to_recovery_years=None))]
+#[allow(clippy::too_many_arguments)]
 fn compute_ecl(
     ead: f64,
     pd_schedule: Vec<(f64, f64)>,
@@ -342,11 +349,14 @@ fn compute_ecl(
     max_horizon_years: f64,
     bucket_width_years: Option<f64>,
     stage: &str,
+    ead_schedule: Option<Vec<(f64, f64)>>,
+    stage3_time_to_recovery_years: Option<f64>,
 ) -> PyResult<f64> {
     let stage = parse_stage(stage)?;
-    let curve = build_pd_curve(&pd_schedule)?;
+    let curve = build_pd_curve(pd_schedule)?;
     let config = build_ecl_config(
         bucket_width_years.unwrap_or_else(rust_ecl::binding_default_compute_ecl_bucket_width_years),
+        stage3_time_to_recovery_years,
     )?;
 
     let exposure = rust_ecl::Exposure {
@@ -362,6 +372,7 @@ fn compute_ecl(
         qualitative_flags: rust_ecl::QualitativeFlags::default(),
         consecutive_performing_periods: 0,
         previous_stage: None,
+        ead_schedule,
     };
     let exposure = cap_maturity(&exposure, max_horizon_years);
 
@@ -378,6 +389,8 @@ fn compute_ecl(
 ///     Exposure at default.
 /// scenarios : list[tuple[float, list[tuple[float, float]]]]
 ///     List of ``(weight, pd_schedule)`` pairs. Weights must sum to 1.0.
+///     A ``(0.0, 0.0)`` knot is inserted automatically into each schedule
+///     if not present (same convention as ``compute_ecl``).
 /// lgd : float
 ///     Loss given default (decimal).
 /// eir : float
@@ -386,13 +399,19 @@ fn compute_ecl(
 ///     Remaining maturity cap.
 /// stage : str
 ///     ``"stage1"``, ``"stage2"``, or ``"stage3"``.
+/// ead_schedule : list[tuple[float, float]] | None
+///     Optional EAD amortization profile as ``[(time_years, ead), ...]``
+///     knots; linear interpolation with flat extrapolation.
+/// stage3_time_to_recovery_years : float | None
+///     Stage 3 discounting horizon to expected recovery, in years.
 ///
 /// Returns
 /// -------
 /// float
 ///     Probability-weighted ECL in the exposure's base currency.
 #[pyfunction]
-#[pyo3(signature = (ead, scenarios, lgd, eir, max_horizon, stage="stage1"))]
+#[pyo3(signature = (ead, scenarios, lgd, eir, max_horizon, stage="stage1", ead_schedule=None, stage3_time_to_recovery_years=None))]
+#[allow(clippy::too_many_arguments)]
 fn compute_ecl_weighted(
     ead: f64,
     scenarios: Vec<(f64, Vec<(f64, f64)>)>,
@@ -400,10 +419,22 @@ fn compute_ecl_weighted(
     eir: f64,
     max_horizon: f64,
     stage: &str,
+    ead_schedule: Option<Vec<(f64, f64)>>,
+    stage3_time_to_recovery_years: Option<f64>,
 ) -> PyResult<f64> {
     let stage = parse_stage(stage)?;
 
-    let config = build_ecl_config(rust_ecl::binding_default_compute_ecl_bucket_width_years())?;
+    let config = build_ecl_config(
+        rust_ecl::binding_default_compute_ecl_bucket_width_years(),
+        stage3_time_to_recovery_years,
+    )?;
+    // Anchor each scenario PD schedule at (0.0, 0.0) via the same canonical
+    // helper used by `compute_ecl`, so both entry points accept identical
+    // curve inputs.
+    let scenarios: Vec<(f64, Vec<(f64, f64)>)> = scenarios
+        .into_iter()
+        .map(|(weight, schedule)| (weight, rust_ecl::RawPdCurve::anchor_knots(schedule)))
+        .collect();
     let exposure = rust_ecl::Exposure {
         id: "weighted".to_string(),
         segments: vec![],
@@ -417,6 +448,7 @@ fn compute_ecl_weighted(
         qualitative_flags: rust_ecl::QualitativeFlags::default(),
         consecutive_performing_periods: 0,
         previous_stage: None,
+        ead_schedule,
     };
 
     let result =

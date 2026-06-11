@@ -12,6 +12,6 @@ pub(crate) struct BreakevenCalculator;
 impl MetricCalculator for BreakevenCalculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let s: &InflationSwap = context.instrument_as()?;
-        s.par_rate(context.curves.as_ref())
+        s.par_rate(context.curves.as_ref(), context.as_of)
     }
 }

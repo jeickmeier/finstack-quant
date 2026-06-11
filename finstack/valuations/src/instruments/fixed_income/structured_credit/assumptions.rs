@@ -432,6 +432,49 @@ pub(crate) struct SdaCurveDefaults {
     pub(crate) terminal_cdr: f64,
 }
 
+impl SdaCurveDefaults {
+    /// Standard PSA/BMA SDA shape as a multiplier of the peak CDR.
+    ///
+    /// This is THE canonical SDA shape for the crate — every SDA consumer
+    /// (pool characteristics, behavior overrides, the copula-based seasoning
+    /// curve) must derive from it rather than re-implementing the piecewise
+    /// segments. With the standard registry values (`peak_month = 30`):
+    ///
+    /// - months 1..=30: linear ramp from 0 to 1
+    /// - months 31..=60: flat plateau at 1 (the segment historical
+    ///   re-implementations omitted)
+    /// - months 61..=120: linear decline to `terminal_cdr / peak_cdr`
+    /// - months 121+: flat at `terminal_cdr / peak_cdr`
+    pub(crate) fn multiplier_at(&self, month: u32) -> f64 {
+        let peak = self.peak_month.max(1);
+        let plateau_end = peak * 2;
+        let terminal_month = peak * 4;
+        let terminal_mult = if self.peak_cdr > 0.0 {
+            (self.terminal_cdr / self.peak_cdr).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        if month == 0 {
+            0.0
+        } else if month <= peak {
+            month as f64 / peak as f64
+        } else if month <= plateau_end {
+            1.0
+        } else if month <= terminal_month {
+            let months_past_plateau = (month - plateau_end) as f64;
+            let decline_period = (terminal_month - plateau_end) as f64;
+            1.0 - (months_past_plateau / decline_period) * (1.0 - terminal_mult)
+        } else {
+            terminal_mult
+        }
+    }
+
+    /// Annual CDR at the given seasoning month for 100% SDA.
+    pub(crate) fn cdr_at(&self, month: u32) -> f64 {
+        self.multiplier_at(month) * self.peak_cdr
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SimulationDefaults {
     pub(crate) pool_balance_cleanup_threshold: f64,
@@ -1035,4 +1078,45 @@ fn has_id(ids: &[String], id: &str) -> bool {
 
 fn not_found(kind: &str, id: &str) -> Error {
     Error::Validation(format!("{kind} '{id}' not found"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// M2.14 golden values: the canonical SDA shape at 100% SDA with the
+    /// standard registry curve (peak 0.60% at month 30, plateau through 60,
+    /// decline to 0.03% by 120, flat after). Historical re-implementations
+    /// omitted the plateau and ended the decline at month 60, giving 0.315%
+    /// at month 45 and 0.03% at month 90.
+    #[test]
+    fn sda_curve_golden_values() {
+        let curve = embedded_registry().expect("embedded registry").sda_curve();
+
+        // Month 45: on the plateau — full peak CDR.
+        assert!(
+            (curve.cdr_at(45) - 0.006).abs() < 1e-12,
+            "month 45 must be on the 30-60 plateau at 0.60%, got {}",
+            curve.cdr_at(45)
+        );
+        // Month 90: halfway down the 61-120 decline — 0.006 − 0.5·(0.006−0.0003).
+        assert!(
+            (curve.cdr_at(90) - 0.00315).abs() < 1e-12,
+            "month 90 must be mid-decline at 0.315%, got {}",
+            curve.cdr_at(90)
+        );
+        // Month 130: past the decline — terminal CDR.
+        assert!(
+            (curve.cdr_at(130) - 0.0003).abs() < 1e-12,
+            "month 130 must be at the 0.03% terminal rate, got {}",
+            curve.cdr_at(130)
+        );
+
+        // Shape anchors: zero at month 0, linear ramp, peak exactly at 30.
+        assert_eq!(curve.multiplier_at(0), 0.0);
+        assert!((curve.multiplier_at(15) - 0.5).abs() < 1e-12);
+        assert!((curve.multiplier_at(30) - 1.0).abs() < 1e-12);
+        assert!((curve.multiplier_at(60) - 1.0).abs() < 1e-12);
+        assert!((curve.multiplier_at(120) - 0.05).abs() < 1e-12);
+    }
 }

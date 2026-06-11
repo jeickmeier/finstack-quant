@@ -108,11 +108,6 @@ impl PyMixedNodeBuilder {
         Ok(())
     }
 
-    /// Set scalar explicit values for the mixed node.
-    fn values_scalar(&mut self, values: Vec<(String, f64)>) -> PyResult<()> {
-        self.values(values)
-    }
-
     /// Set monetary explicit values for the mixed node.
     fn values_money(&mut self, values: Vec<(String, PyMoney)>) -> PyResult<()> {
         let builder = self.take()?;

@@ -143,14 +143,20 @@ pub fn real_estate(min_dscr: f64, min_debt_yield: f64, max_ltv: f64) -> Vec<Cove
                 });
             s
         },
-        maintenance(
-            CovenantType::Custom {
-                metric: "debt_yield".to_string(),
-                test: ThresholdTest::Minimum(min_debt_yield),
-            },
-            Tenor::quarterly(),
-            "debt_yield",
-        ),
+        {
+            let mut s = maintenance(
+                CovenantType::Custom {
+                    metric: "debt_yield".to_string(),
+                    test: ThresholdTest::Minimum(min_debt_yield),
+                },
+                Tenor::quarterly(),
+                "debt_yield",
+            );
+            // Two Custom covenants share covenant_id "custom"; label them so
+            // their reports/breaches don't collide.
+            s.covenant = s.covenant.with_label("min_debt_yield");
+            s
+        },
         {
             let mut s = maintenance(
                 CovenantType::Custom {
@@ -160,6 +166,7 @@ pub fn real_estate(min_dscr: f64, min_debt_yield: f64, max_ltv: f64) -> Vec<Cove
                 Tenor::quarterly(),
                 "ltv",
             );
+            s.covenant = s.covenant.with_label("max_ltv");
             s.covenant
                 .consequences
                 .push(CovenantConsequence::CashSweep {
@@ -173,10 +180,15 @@ pub fn real_estate(min_dscr: f64, min_debt_yield: f64, max_ltv: f64) -> Vec<Cove
 /// Infrastructure / project finance covenant package.
 ///
 /// Standard for long-dated project finance with:
-/// - Min DSCR (primary maintenance)
-/// - Min DSCR for distribution lock-up (higher threshold)
+/// - Min DSCR (primary maintenance) — labeled `min_dscr_default`
+/// - Min DSCR for distribution lock-up (higher threshold) — labeled `min_dscr_lockup`
 /// - Min Liquidity (debt service reserve)
 /// - Max Net Debt / EBITDA
+///
+/// The two `MinDSCR` covenants share a type but carry distinct instance
+/// labels so their reports, breaches, and consequences never collide: a
+/// lock-up breach blocks distributions only and can never resolve to the
+/// primary covenant's Event-of-Default consequence.
 pub fn project_finance(
     min_dscr: f64,
     distribution_lockup_dscr: f64,
@@ -192,6 +204,7 @@ pub fn project_finance(
                 Tenor::quarterly(),
                 "dscr",
             );
+            s.covenant = s.covenant.with_label("min_dscr_default");
             s.covenant.cure_period_days = Some(60);
             s.covenant.consequences.push(CovenantConsequence::Default);
             s
@@ -204,6 +217,7 @@ pub fn project_finance(
                 Tenor::quarterly(),
                 "dscr",
             );
+            s.covenant = s.covenant.with_label("min_dscr_lockup");
             s.covenant
                 .consequences
                 .push(CovenantConsequence::BlockDistributions);

@@ -227,6 +227,65 @@ fn coverage_below_error_flags() {
     assert_eq!(result.findings[0].severity, Severity::Error);
 }
 
+#[test]
+fn coverage_negative_denominator_is_error() {
+    // Negative debt service makes the ratio undefined — must surface as an
+    // Error finding (consistent with LeverageRangeCheck), not a silent skip.
+    let model = ModelBuilder::new("test")
+        .periods("2025Q1..Q1", None)
+        .unwrap()
+        .value("ebitda", &[(q(1), s(300.0))])
+        .value("debt_service", &[(q(1), s(-100.0))])
+        .build()
+        .unwrap();
+
+    let mut ev = Evaluator::new();
+    let results = ev.evaluate(&model).unwrap();
+
+    let check = CoverageFloorCheck {
+        numerator_node: NodeId::new("ebitda"),
+        denominator_node: NodeId::new("debt_service"),
+        min_warning: 1.5,
+        min_error: 1.0,
+    };
+
+    let ctx = CheckContext::new(&model, &results);
+    let result = check.execute(&ctx).unwrap();
+
+    assert!(!result.passed);
+    assert_eq!(result.findings.len(), 1);
+    assert_eq!(result.findings[0].severity, Severity::Error);
+    assert!(result.findings[0].message.contains("undefined"));
+}
+
+#[test]
+fn coverage_zero_denominator_is_skipped() {
+    // Zero debt service: nothing to cover — documented skip.
+    let model = ModelBuilder::new("test")
+        .periods("2025Q1..Q1", None)
+        .unwrap()
+        .value("ebitda", &[(q(1), s(300.0))])
+        .value("debt_service", &[(q(1), s(0.0))])
+        .build()
+        .unwrap();
+
+    let mut ev = Evaluator::new();
+    let results = ev.evaluate(&model).unwrap();
+
+    let check = CoverageFloorCheck {
+        numerator_node: NodeId::new("ebitda"),
+        denominator_node: NodeId::new("debt_service"),
+        min_warning: 1.5,
+        min_error: 1.0,
+    };
+
+    let ctx = CheckContext::new(&model, &results);
+    let result = check.execute(&ctx).unwrap();
+
+    assert!(result.passed);
+    assert!(result.findings.is_empty());
+}
+
 // ============================================================================
 // FcfSignCheck
 // ============================================================================
@@ -453,7 +512,8 @@ fn trend_decreasing_is_good_deterioration() {
 
 #[test]
 fn liquidity_runway_adequate_passes() {
-    // months = 1200 / 100 = 12 months, above both thresholds
+    // Quarterly model: runway = (1200 / 100) quarters * 3 months = 36 months,
+    // above both thresholds.
     let model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .unwrap()
@@ -481,11 +541,12 @@ fn liquidity_runway_adequate_passes() {
 
 #[test]
 fn liquidity_runway_below_warning() {
-    // months = 400 / 100 = 4 months, below 6 warning but above 3 error
+    // Quarterly model: runway = (150 / 100) quarters * 3 months = 4.5
+    // months, below 6 warning but above 3 error.
     let model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .unwrap()
-        .value("cash", &[(q(1), s(400.0))])
+        .value("cash", &[(q(1), s(150.0))])
         .value("burn", &[(q(1), s(100.0))])
         .build()
         .unwrap();
@@ -510,7 +571,38 @@ fn liquidity_runway_below_warning() {
 
 #[test]
 fn liquidity_runway_below_error() {
-    // months = 200 / 100 = 2 months, below 3 error
+    // Quarterly model: runway = (50 / 100) quarters * 3 months = 1.5
+    // months, below 3 error.
+    let model = ModelBuilder::new("test")
+        .periods("2025Q1..Q1", None)
+        .unwrap()
+        .value("cash", &[(q(1), s(50.0))])
+        .value("burn", &[(q(1), s(100.0))])
+        .build()
+        .unwrap();
+
+    let mut ev = Evaluator::new();
+    let results = ev.evaluate(&model).unwrap();
+
+    let check = LiquidityRunwayCheck {
+        cash_node: NodeId::new("cash"),
+        cash_burn_node: NodeId::new("burn"),
+        min_months_warning: 6.0,
+        min_months_error: 3.0,
+    };
+
+    let ctx = CheckContext::new(&model, &results);
+    let result = check.execute(&ctx).unwrap();
+
+    assert!(!result.passed);
+    assert_eq!(result.findings[0].severity, Severity::Error);
+}
+
+#[test]
+fn liquidity_runway_converts_periods_to_months() {
+    // Regression for periods-as-months bug: a quarterly model with exactly
+    // 2 periods of runway has 6 months — at the 6-month warning floor it
+    // must pass (not be treated as "2 months" and error).
     let model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .unwrap()
@@ -532,8 +624,15 @@ fn liquidity_runway_below_error() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
-    assert_eq!(result.findings[0].severity, Severity::Error);
+    assert!(
+        result.passed,
+        "6 months runway must not breach a 3-month error floor"
+    );
+    assert!(
+        result.findings.is_empty(),
+        "6 months runway is not below the 6-month warning floor: {:?}",
+        result.findings
+    );
 }
 
 #[test]

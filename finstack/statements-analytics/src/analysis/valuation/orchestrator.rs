@@ -38,6 +38,12 @@ pub struct CorporateAnalysis {
 pub struct CreditInstrumentAnalysis {
     /// Coverage and leverage metrics from statement context
     pub coverage: CreditContextMetrics,
+    /// `true` when a DCF enterprise value was computed but suppressed as
+    /// the LTV reference because it was non-positive. LTV-style metrics
+    /// in [`coverage`](Self::coverage) are then computed without an EV
+    /// reference and should be interpreted accordingly.
+    #[serde(default)]
+    pub ev_suppressed_non_positive: bool,
 }
 
 /// Equity valuation mode.
@@ -378,10 +384,18 @@ impl CorporateAnalysisBuilder {
 
         // Step 3: Compute credit context for each instrument (single pass)
         // Use enterprise value as LTV reference when available from equity step.
-        let ev_for_ltv = equity
-            .as_ref()
-            .map(|eq| eq.enterprise_value.amount())
-            .filter(|ev| *ev > 0.0);
+        let ev_raw = equity.as_ref().map(|eq| eq.enterprise_value.amount());
+        let ev_for_ltv = ev_raw.filter(|ev| *ev > 0.0);
+        // Surface (rather than silently drop) a non-positive EV: LTV-style
+        // metrics will be computed without an EV reference.
+        let ev_suppressed_non_positive = ev_raw.is_some_and(|ev| ev <= 0.0);
+        if ev_suppressed_non_positive {
+            tracing::warn!(
+                enterprise_value = ev_raw,
+                "non-positive DCF enterprise value suppressed as LTV reference; \
+                 credit metrics computed without an EV reference"
+            );
+        }
 
         let mut credit = IndexMap::new();
         if let Some(ref cs) = statement.cs_cashflows {
@@ -394,7 +408,13 @@ impl CorporateAnalysisBuilder {
                     &self.model.periods,
                     ev_for_ltv,
                 );
-                credit.insert(instrument_id.clone(), CreditInstrumentAnalysis { coverage });
+                credit.insert(
+                    instrument_id.clone(),
+                    CreditInstrumentAnalysis {
+                        coverage,
+                        ev_suppressed_non_positive,
+                    },
+                );
             }
         }
 

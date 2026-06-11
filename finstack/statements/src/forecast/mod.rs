@@ -16,8 +16,10 @@
 //! - Same seed → identical forecast values across runs
 //! - Different seeds → different (but still deterministic) values
 //!
-//! In Monte Carlo mode, per-path seeds are mixed with a stable hash of the node
-//! identifier so independent stochastic nodes do not share identical shock draws.
+//! Both single-run evaluation and Monte Carlo mode mix a stable hash of the
+//! node identifier into the configured seed so independent stochastic nodes do
+//! not share identical shock draws (Monte Carlo additionally layers a per-path
+//! seed offset).
 //! Optional `correlation_with` / `correlation` parameters pair nodes for correlated
 //! shocks (see `forecast::statistical::parse_correlation_params`). The peer node must
 //! appear earlier in the evaluation order (for example via a formula dependency) so its
@@ -81,6 +83,37 @@ pub fn apply_forecast(
     forecast_periods: &[PeriodId],
 ) -> Result<indexmap::IndexMap<PeriodId, f64>> {
     apply_forecast_internal(spec, base_value, forecast_periods, None)
+}
+
+/// Apply a forecast for a specific node in single-run (non-Monte-Carlo) mode.
+///
+/// Behaves like [`apply_forecast`] but mixes a stable hash of `node_id` into
+/// the seed of statistical methods (Normal, LogNormal), matching Monte Carlo
+/// mode. Without this mix, two stochastic nodes configured with the same
+/// `seed` would receive identical shock paths within a single evaluation run.
+/// This changes single-run stochastic sequences relative to earlier releases
+/// that seeded purely from the configured `seed`. Deterministic methods are
+/// unaffected.
+pub(crate) fn apply_forecast_for_node(
+    spec: &ForecastSpec,
+    base_value: f64,
+    forecast_periods: &[PeriodId],
+    node_id: &str,
+) -> Result<indexmap::IndexMap<PeriodId, f64>> {
+    use crate::types::ForecastMethod;
+    use statistical::{parse_seed_json, stable_hash_u64};
+
+    match spec.method {
+        ForecastMethod::Normal | ForecastMethod::LogNormal => {
+            let params = mix_node_seed(&spec.params, node_id, parse_seed_json, stable_hash_u64);
+            let spec = ForecastSpec {
+                method: spec.method,
+                params,
+            };
+            apply_forecast_internal(&spec, base_value, forecast_periods, None)
+        }
+        _ => apply_forecast_internal(spec, base_value, forecast_periods, None),
+    }
 }
 
 /// Apply a forecast method with an additional seed offset for statistical

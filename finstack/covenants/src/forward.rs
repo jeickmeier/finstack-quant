@@ -215,12 +215,19 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
         .map(|(&v, &t)| headroom_for(covenant.covenant.covenant_type.bound_kind(), v, t))
         .collect();
 
+    // A NaN projected metric (e.g. a leverage ratio whose EBITDA denominator
+    // collapsed through zero) is indeterminate. Mirror the point-in-time
+    // engine convention (`CovenantEngine::evaluate_spec`): NaN ⇒ breached.
     let mut deterministic_breach_prob: Vec<f64> = values
         .iter()
         .zip(thresholds.iter())
-        .map(|(&v, &t)| match bound_kind {
-            BoundKind::AtMost => (v > t) as u8 as f64,
-            BoundKind::AtLeast => (v < t) as u8 as f64,
+        .map(|(&v, &t)| {
+            let breached = v.is_nan()
+                || match bound_kind {
+                    BoundKind::AtMost => v > t,
+                    BoundKind::AtLeast => v < t,
+                };
+            breached as u8 as f64
         })
         .collect();
 
@@ -289,12 +296,15 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
             // a non-positive base (e.g. a distressed name with negative EBITDA →
             // negative coverage/leverage) the sign can never cross zero and the
             // shock direction inverts, producing a backwards breach probability.
-            // Fall back to a deterministic assessment in that regime.
+            // Fall back to a deterministic assessment in that regime. A NaN
+            // base is indeterminate and follows the engine convention
+            // (NaN ⇒ breached, probability 1).
             if !base.is_finite() || base <= 0.0 {
-                let breached = match bound_kind {
-                    BoundKind::AtMost => base > thr,
-                    BoundKind::AtLeast => base < thr,
-                };
+                let breached = base.is_nan()
+                    || match bound_kind {
+                        BoundKind::AtMost => base > thr,
+                        BoundKind::AtLeast => base < thr,
+                    };
                 breach_probability[i] = if breached { 1.0 } else { 0.0 };
                 breach_probability_stderr_mc[i] = 0.0;
                 continue;
@@ -356,10 +366,12 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
         if !activation_flags[i] {
             return None;
         }
-        match bound_kind {
-            BoundKind::AtMost => (v > t).then_some(test_dates[i]),
-            BoundKind::AtLeast => (v < t).then_some(test_dates[i]),
-        }
+        let breached = v.is_nan()
+            || match bound_kind {
+                BoundKind::AtMost => v > t,
+                BoundKind::AtLeast => v < t,
+            };
+        breached.then_some(test_dates[i])
     });
 
     let comparator = bound_kind;
@@ -386,6 +398,12 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
 }
 
 /// Forecast breaches for all covenants in an engine.
+///
+/// For each covenant the period set is restricted to the periods where its
+/// metric actually resolves in the model; periods where the metric is missing
+/// are skipped (with a `tracing::warn!`) instead of failing the whole batch.
+/// A covenant whose projected metric is NaN in a period is reported as a
+/// breach in that period, mirroring the point-in-time engine convention.
 pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
     engine: &crate::engine::CovenantEngine,
     model: &MTS,
@@ -400,11 +418,32 @@ pub fn forecast_breaches_generic<MTS: ModelTimeSeries>(
             continue;
         }
 
-        let forecast = forecast_covenant_generic(spec, model, periods, config.clone())?;
+        // Restrict to periods where this covenant's metric resolves. The
+        // caller-supplied set is typically the union over all model nodes, so
+        // a metric covering fewer periods must not hard-fail the batch.
+        let covered: Vec<PeriodId> = periods
+            .iter()
+            .filter(|pid| metric_value_for_spec(spec, model, pid).is_some())
+            .copied()
+            .collect();
+        if covered.len() < periods.len() {
+            tracing::warn!(
+                covenant = %spec.covenant.description(),
+                skipped = periods.len() - covered.len(),
+                total = periods.len(),
+                "covenant metric missing for some periods — skipping them in breach forecast",
+            );
+        }
+        if covered.is_empty() {
+            continue;
+        }
+
+        let forecast = forecast_covenant_generic(spec, model, &covered, config.clone())?;
 
         for (i, &headroom) in forecast.headroom.iter().enumerate() {
-            // Check for breach (headroom < 0) or high probability of breach
-            let is_breach = headroom < 0.0;
+            // Check for breach: negative headroom, or a NaN metric (NaN
+            // headroom) which is indeterminate and treated as breached.
+            let is_breach = headroom < 0.0 || forecast.projected_values[i].is_nan();
             let prob = forecast.breach_probability[i];
 
             // We report if it's a deterministic breach OR if there's a non-zero probability in stochastic mode
@@ -586,6 +625,140 @@ mod tests {
         let p = fc.breach_probability[0];
         assert!(p > 0.2 && p < 0.8, "unexpected breach probability: {p}");
     }
+    #[test]
+    fn nan_metric_is_breached_deterministic() {
+        // EBITDA through zero → ratio NaN. Must mirror the engine convention:
+        // NaN ⇒ breached (probability 1), not a clean 0% path.
+        let spec = CovenantSpec::with_metric(
+            crate::engine::Covenant::new(
+                CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+                finstack_core::dates::Tenor::quarterly(),
+            ),
+            "debt_to_ebitda",
+        );
+
+        let periods = vec![q(2025, 1), q(2025, 2)];
+        let mts = MockTs::new().with("debt_to_ebitda", periods[0], 3.0).with(
+            "debt_to_ebitda",
+            periods[1],
+            f64::NAN,
+        );
+
+        let fc =
+            forecast_covenant_generic(&spec, &mts, &periods, CovenantForecastConfig::default())
+                .expect("forecast should succeed");
+
+        assert_eq!(fc.breach_probability[0], 0.0);
+        assert_eq!(fc.breach_probability[1], 1.0, "NaN metric must be breached");
+        assert_eq!(
+            fc.first_breach_date,
+            Some(mts.period_end_date(&periods[1])),
+            "NaN period must register as the first breach"
+        );
+    }
+
+    #[test]
+    fn nan_metric_is_breached_stochastic() {
+        let spec = CovenantSpec::with_metric(
+            crate::engine::Covenant::new(
+                CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+                finstack_core::dates::Tenor::quarterly(),
+            ),
+            "debt_to_ebitda",
+        );
+
+        let periods = vec![q(2025, 1)];
+        let mts = MockTs::new().with("debt_to_ebitda", periods[0], f64::NAN);
+
+        let cfg = CovenantForecastConfig {
+            stochastic: true,
+            num_paths: 1_000,
+            volatility: Some(0.25),
+            random_seed: Some(42),
+            antithetic: false,
+            reference_date: None,
+        };
+        let fc =
+            forecast_covenant_generic(&spec, &mts, &periods, cfg).expect("forecast should succeed");
+        assert_eq!(
+            fc.breach_probability[0], 1.0,
+            "NaN base must produce MC breach probability 1.0"
+        );
+    }
+
+    #[test]
+    fn forecast_breaches_generic_reports_nan_periods_as_breaches() {
+        use crate::engine::CovenantEngine;
+
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(CovenantSpec::with_metric(
+            crate::engine::Covenant::new(
+                CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+                finstack_core::dates::Tenor::quarterly(),
+            ),
+            "debt_to_ebitda",
+        ));
+
+        let p1 = q(2025, 1);
+        let p2 = q(2025, 2);
+        let mts =
+            MockTs::new()
+                .with("debt_to_ebitda", p1, 3.0)
+                .with("debt_to_ebitda", p2, f64::NAN);
+
+        let breaches =
+            forecast_breaches_generic(&engine, &mts, &[p1, p2], CovenantForecastConfig::default())
+                .expect("forecast should succeed");
+
+        assert_eq!(breaches.len(), 1, "NaN period must be reported as breach");
+        assert!(breaches[0].projected_value.is_nan());
+        assert_eq!(breaches[0].breach_probability, 1.0);
+    }
+
+    #[test]
+    fn forecast_breaches_generic_skips_uncovered_periods() {
+        use crate::engine::CovenantEngine;
+
+        // Two covenants on different metrics with different period coverage:
+        // the union period set must not hard-fail the narrower covenant.
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(CovenantSpec::with_metric(
+            crate::engine::Covenant::new(
+                CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+                finstack_core::dates::Tenor::quarterly(),
+            ),
+            "debt_to_ebitda",
+        ));
+        engine.add_spec(CovenantSpec::with_metric(
+            crate::engine::Covenant::new(
+                CovenantType::MinInterestCoverage { threshold: 2.0 },
+                finstack_core::dates::Tenor::quarterly(),
+            ),
+            "interest_coverage",
+        ));
+
+        let p1 = q(2025, 1);
+        let p2 = q(2025, 2);
+        // interest_coverage only covers p1 (and breaches there);
+        // debt_to_ebitda covers both and breaches in p2.
+        let mts = MockTs::new()
+            .with("debt_to_ebitda", p1, 3.0)
+            .with("debt_to_ebitda", p2, 5.0)
+            .with("interest_coverage", p1, 1.5);
+
+        let breaches =
+            forecast_breaches_generic(&engine, &mts, &[p1, p2], CovenantForecastConfig::default())
+                .expect("partial metric coverage must not hard-fail");
+
+        assert_eq!(breaches.len(), 2);
+        assert!(breaches
+            .iter()
+            .any(|b| b.covenant_id.contains("Interest Coverage")));
+        assert!(breaches
+            .iter()
+            .any(|b| b.covenant_id.contains("Debt/EBITDA")));
+    }
+
     #[test]
     fn test_forecast_breaches_generic() {
         use crate::engine::CovenantEngine;

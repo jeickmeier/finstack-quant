@@ -7,13 +7,26 @@
 //!
 //! The default intensity λ follows:
 //! ```text
-//! λ(t) = λ₀ × exp(β × X(t))
+//! λ(t) = λ₀ × exp(−β × X(t) − ½β²σ²)
 //! ```
+//!
+//! The `−½β²σ²` term is the lognormal compensator: with `X ~ N(0, 1)` the
+//! shock `exp(−βσX − ½β²σ²)` has unit mean, so the simulated mean hazard
+//! equals λ₀ and `expected_mdr` matches the simulated average.
 //!
 //! where X(t) is an Ornstein-Uhlenbeck process:
 //! ```text
 //! dX = κ(θ - X)dt + σ dW
 //! ```
+//!
+//! # Sign Convention
+//!
+//! The systematic factor follows the canonical copula convention: a LOW
+//! latent factor realization (`Z < 0`) is the stress state. With a positive
+//! factor sensitivity `β`, intensity therefore *rises* as `Z` falls
+//! (`exp(−β·σ·Z)`), matching the Gaussian-copula barrier `Φ⁻¹(PD) − √ρ·Z`
+//! used by the copula default models and ensuring defaults and
+//! market-correlated recoveries co-move negatively across every engine.
 //!
 //! The conditional default probability over [t, t+dt]:
 //! ```text
@@ -29,8 +42,6 @@
 
 use super::super::calibrations::{clo_standard, rmbs_standard};
 use super::traits::{MacroCreditFactors, StochasticDefault};
-use crate::instruments::fixed_income::structured_credit::utils::rates::cdr_to_mdr;
-use finstack_core::math::distributions::binomial_distribution;
 
 /// Intensity process (Cox model) default model.
 ///
@@ -134,9 +145,19 @@ impl IntensityProcessDefault {
 
     /// Calculate intensity at given factor value.
     ///
-    /// λ(Z) = λ₀ × exp(β × Z × σ)
+    /// λ(Z) = λ₀ × exp(−β × Z × σ − ½β²σ²): the canonical low-factor-stress
+    /// convention — intensity rises as the systematic factor falls. The
+    /// `−½β²σ²` lognormal compensator gives the shock unit mean under
+    /// `Z ~ N(0, 1)`, so E[λ(Z)] = λ₀ and the simulated mean hazard matches
+    /// the base curve (and `expected_mdr`).
     fn intensity(&self, factor: f64) -> f64 {
-        self.base_hazard * (self.factor_sensitivity * factor * self.volatility).exp()
+        self.base_hazard * self.shock_multiplier(factor)
+    }
+
+    /// Compensated lognormal shock `exp(−βσZ − ½β²σ²)` with unit mean.
+    fn shock_multiplier(&self, factor: f64) -> f64 {
+        let beta_sigma = self.factor_sensitivity * self.volatility;
+        (-beta_sigma * factor - 0.5 * beta_sigma * beta_sigma).exp()
     }
 }
 
@@ -170,29 +191,6 @@ impl StochasticDefault for IntensityProcessDefault {
         (1.0 - survival_prob).clamp(0.0, 1.0)
     }
 
-    fn default_distribution(
-        &self,
-        n: usize,
-        pds: &[f64],
-        factors: &[f64],
-        _correlation: f64,
-    ) -> Vec<f64> {
-        // Use conditional MDR to compute binomial distribution
-        let z = factors.first().copied().unwrap_or(0.0);
-        let cond_pd = if !pds.is_empty() {
-            // Scale base PD by intensity ratio
-            let intensity_ratio = (self.factor_sensitivity * z * self.volatility).exp();
-            (pds[0] * intensity_ratio).min(0.9999)
-        } else {
-            let intensity = self.intensity(z);
-            let monthly_intensity = intensity / 12.0;
-            (1.0 - (-monthly_intensity).exp()).min(0.9999)
-        };
-
-        // Use the core binomial distribution function
-        binomial_distribution(n, cond_pd.clamp(0.0, 1.0))
-    }
-
     fn correlation(&self) -> f64 {
         self.correlation
     }
@@ -208,7 +206,11 @@ impl StochasticDefault for IntensityProcessDefault {
         } else {
             1.0
         };
-        cdr_to_mdr(self.base_hazard * seasoning_factor)
+        // Same continuous-compounding conversion as `conditional_mdr`
+        // (MDR = 1 − exp(−λ/12)); the shock is compensated to unit mean, so
+        // the expected hazard is the seasoning-adjusted base hazard.
+        let expected_hazard = self.base_hazard * seasoning_factor;
+        (1.0 - (-expected_hazard / 12.0).exp()).clamp(0.0, 1.0)
     }
 }
 
@@ -231,16 +233,47 @@ mod tests {
 
         let mdr = model.conditional_mdr(12, &[0.0], &factors);
 
-        // At Z=0, intensity equals base_hazard.
+        // At Z=0 the compensated shock is exp(−½β²σ²), so the intensity is
+        // base_hazard × exp(−½β²σ²) (the shock has unit MEAN, not unit mode).
         // With seasoning ramp (24 months), factor at month 12 = 12/24 = 0.5.
-        // MDR = 1 - exp(-(base_hazard * seasoning_factor) / 12)
+        let beta_sigma = 0.5 * 0.30;
+        let intensity = 0.02 * (-0.5_f64 * beta_sigma * beta_sigma).exp();
         let seasoning_factor = 12.0 / 24.0;
-        let expected = 1.0 - (-0.02 * seasoning_factor / 12.0_f64).exp();
+        let expected = 1.0 - (-intensity * seasoning_factor / 12.0_f64).exp();
         assert!(
             (mdr - expected).abs() < 1e-6,
             "MDR {} should equal expected {}",
             mdr,
             expected
+        );
+    }
+
+    /// The compensated shock `exp(−βσZ − ½β²σ²)` must have unit mean under
+    /// `Z ~ N(0,1)`, so the simulated mean hazard equals the base hazard and
+    /// `expected_mdr` matches the simulated average (Gauss-Hermite check).
+    #[test]
+    fn test_compensated_shock_has_unit_mean() {
+        let model = IntensityProcessDefault::new(0.05, 0.8, 0.5, 0.40);
+
+        // E[g(Z)] ≈ (1/√π) Σ wᵢ g(√2 xᵢ) over Gauss-Hermite nodes.
+        let nodes = [
+            (-2.350_604_973_674_492_3, 0.002_530_410_604_089_597_4),
+            (-1.335_849_074_013_697, 0.157_067_320_322_856_64),
+            (-0.436_077_411_927_616_5, 0.724_629_595_224_392_4),
+            (0.436_077_411_927_616_5, 0.724_629_595_224_392_4),
+            (1.335_849_074_013_697, 0.157_067_320_322_856_64),
+            (2.350_604_973_674_492_3, 0.002_530_410_604_089_597_4),
+        ];
+        let mean_shock: f64 = nodes
+            .iter()
+            .map(|&(x, w)| w * model.shock_multiplier(std::f64::consts::SQRT_2 * x))
+            .sum::<f64>()
+            / std::f64::consts::PI.sqrt();
+        // 6-node Gauss-Hermite truncates the lognormal tail slightly; the
+        // residual quadrature error at βσ = 0.32 is ~3.5e-3.
+        assert!(
+            (mean_shock - 1.0).abs() < 5e-3,
+            "compensated shock mean {mean_shock} should be 1"
         );
     }
 
@@ -253,25 +286,27 @@ mod tests {
         let mdr_zero = model.conditional_mdr(12, &[0.0], &factors);
         let mdr_pos = model.conditional_mdr(12, &[2.0], &factors);
 
-        // With positive factor_sensitivity:
-        // Negative factor decreases intensity -> lower MDR
-        // Positive factor increases intensity -> higher MDR
-        assert!(mdr_pos > mdr_zero, "Positive factor should increase MDR");
-        assert!(mdr_neg < mdr_zero, "Negative factor should decrease MDR");
+        // Canonical convention: low latent factor = stress.
+        // Negative factor increases intensity -> higher MDR
+        // Positive factor decreases intensity -> lower MDR
+        assert!(mdr_neg > mdr_zero, "Negative factor should increase MDR");
+        assert!(mdr_pos < mdr_zero, "Positive factor should decrease MDR");
     }
 
     #[test]
     fn test_intensity_calculation() {
         let model = IntensityProcessDefault::new(0.02, 1.0, 0.5, 1.0);
 
-        // At Z=0: intensity = base
+        // At Z=0: intensity = base × exp(−½β²σ²) (compensated shock)
         let int_zero = model.intensity(0.0);
-        assert!((int_zero - 0.02).abs() < 1e-10);
+        let expected_zero = 0.02 * (-0.5_f64).exp();
+        assert!((int_zero - expected_zero).abs() < 1e-10);
 
-        // At Z=1: intensity = base * exp(1 * 1 * 1) ≈ base * 2.718
-        let int_pos = model.intensity(1.0);
-        assert!(int_pos > int_zero);
-        assert!((int_pos / int_zero - 1.0_f64.exp()).abs() < 1e-6);
+        // At Z=-1 (stress): intensity ratio to Z=0 is exp(βσ) ≈ 2.718
+        // (the compensator cancels in the ratio).
+        let int_stress = model.intensity(-1.0);
+        assert!(int_stress > int_zero);
+        assert!((int_stress / int_zero - 1.0_f64.exp()).abs() < 1e-6);
     }
 
     #[test]

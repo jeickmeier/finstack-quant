@@ -16,7 +16,8 @@ mod types;
 pub use multiples::{compute_multiple, compute_peer_multiples};
 pub use peer_set::{PeerFilter, PeerSet};
 pub use scoring::{
-    score_relative_value, DimensionScore, MetricExtractor, RelativeValueResult, ScoringDimension,
+    score_relative_value, DimensionScore, MetricExtractor, RelativeValueResult, ScoreDirection,
+    ScoringDimension,
 };
 pub use stats::{
     peer_stats, percentile_rank, regression_fair_value, z_score, PeerStats, RegressionResult,
@@ -444,6 +445,7 @@ mod tests {
             y_extractor: MetricExtractor::Named("oas_bps".to_string()),
             x_extractors: vec![],
             weight: 1.0,
+            direction: ScoreDirection::default(),
         }];
 
         let result = score_relative_value(&peer_set, &dimensions).expect("scoring should succeed");
@@ -468,6 +470,7 @@ mod tests {
             y_extractor: MetricExtractor::Named("oas_bps".to_string()),
             x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
             weight: 1.0,
+            direction: ScoreDirection::default(),
         }];
 
         let result = score_relative_value(&peer_set, &dimensions).expect("scoring should succeed");
@@ -496,6 +499,7 @@ mod tests {
             y_extractor: MetricExtractor::Named("oas_bps".to_string()),
             x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
             weight: 1.0,
+            direction: ScoreDirection::default(),
         }];
 
         let result = score_relative_value(&peer_set, &dimensions).expect("scoring should succeed");
@@ -529,18 +533,21 @@ mod tests {
                 y_extractor: MetricExtractor::Named("oas_bps".to_string()),
                 x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
                 weight: 0.5,
+                direction: ScoreDirection::default(),
             },
             ScoringDimension {
                 label: "Spread Level".to_string(),
                 y_extractor: MetricExtractor::Named("oas_bps".to_string()),
                 x_extractors: vec![],
                 weight: 0.3,
+                direction: ScoreDirection::default(),
             },
             ScoringDimension {
                 label: "EV/EBITDA".to_string(),
                 y_extractor: MetricExtractor::Multiple(Multiple::EvEbitda),
                 x_extractors: vec![],
                 weight: 0.2,
+                direction: ScoreDirection::default(),
             },
         ];
 
@@ -607,6 +614,7 @@ mod tests {
             y_extractor: MetricExtractor::Named("oas_bps".to_string()),
             x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
             weight: 1.0,
+            direction: ScoreDirection::default(),
         }];
 
         let result = score_relative_value(&peer_set, &dimensions).expect("scoring");
@@ -641,5 +649,178 @@ mod tests {
         let m = finstack_core::math::stats::mean(&values);
         let z = z_score(&values, m).expect("z-score of mean");
         assert!(z.abs() < 1e-10, "z-score of mean should be ~0, got {z}");
+    }
+
+    // -----------------------------------------------------------------------
+    // Regression alignment / standardization / direction tests
+    // -----------------------------------------------------------------------
+
+    /// Four peers with both metrics plus one peer missing leverage but
+    /// carrying a poison OAS value: misaligned x/y pairing would drag the
+    /// regression toward the poison value; pairwise extraction must drop
+    /// that peer entirely and reproduce the hand-computed aligned OLS.
+    #[test]
+    fn scoring_regression_aligns_pairs_when_peer_missing_one_metric() {
+        let mut peers = vec![
+            make_company("P1", "Energy", "BB", "US", 1.0, 100.0, 5_000.0),
+            make_company("P2", "Energy", "BB", "US", 2.0, 200.0, 5_000.0),
+            make_company("P3", "Energy", "BB", "US", 3.0, 310.0, 5_000.0),
+            make_company("P4", "Energy", "BB", "US", 4.0, 380.0, 5_000.0),
+            make_company("P5", "Energy", "BB", "US", 9.9, 9_999.0, 5_000.0),
+        ];
+        // P5 has the y metric (oas) but is missing the x metric (leverage).
+        peers[4].leverage = None;
+
+        let subject = make_company("SUBJECT", "Energy", "BB", "US", 2.5, 300.0, 5_000.0);
+        let peer_set = PeerSet::new(subject, peers, PeriodBasis::Ltm);
+
+        let dimensions = vec![ScoringDimension {
+            label: "Spread vs Leverage".to_string(),
+            y_extractor: MetricExtractor::Named("oas_bps".to_string()),
+            x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
+            weight: 1.0,
+            direction: ScoreDirection::default(),
+        }];
+
+        let result = score_relative_value(&peer_set, &dimensions).expect("scoring");
+        let dim = &result.dimensions[0];
+
+        // Hand-computed OLS over the aligned pairs (1,100),(2,200),(3,310),(4,380):
+        // slope = 95, intercept = 10, fitted(2.5) = 247.5, residual = 52.5.
+        let residual = dim.regression_residual.expect("regression should run");
+        assert!(
+            (residual - 52.5).abs() < 1e-9,
+            "aligned OLS residual should be 52.5, got {residual}"
+        );
+    }
+
+    /// The composite uses the *standardized* residual: subject residual
+    /// divided by the sample std dev of peer residuals around the fitted
+    /// line (here sqrt(350/3)).
+    #[test]
+    fn scoring_composite_is_standardized_residual() {
+        let peers = vec![
+            make_company("P1", "Energy", "BB", "US", 1.0, 100.0, 5_000.0),
+            make_company("P2", "Energy", "BB", "US", 2.0, 200.0, 5_000.0),
+            make_company("P3", "Energy", "BB", "US", 3.0, 310.0, 5_000.0),
+            make_company("P4", "Energy", "BB", "US", 4.0, 380.0, 5_000.0),
+        ];
+        let subject = make_company("SUBJECT", "Energy", "BB", "US", 2.5, 300.0, 5_000.0);
+        let peer_set = PeerSet::new(subject, peers, PeriodBasis::Ltm);
+
+        let dimensions = vec![ScoringDimension {
+            label: "Spread vs Leverage".to_string(),
+            y_extractor: MetricExtractor::Named("oas_bps".to_string()),
+            x_extractors: vec![MetricExtractor::Named("leverage".to_string())],
+            weight: 1.0,
+            direction: ScoreDirection::default(),
+        }];
+
+        let result = score_relative_value(&peer_set, &dimensions).expect("scoring");
+
+        // Peer residuals from the fitted line y = 10 + 95x: [-5, 0, 15, -10];
+        // sample std = sqrt(350/3). Subject residual = 52.5.
+        let expected = 52.5 / (350.0_f64 / 3.0).sqrt();
+        assert!(
+            (result.composite_score - expected).abs() < 1e-9,
+            "composite should be the standardized residual {expected}, got {}",
+            result.composite_score
+        );
+    }
+
+    /// The direction flag must apply consistently to both scoring paths:
+    /// univariate (z-score) and regression (standardized residual).
+    #[test]
+    fn scoring_direction_flag_flips_sign_consistently() {
+        let universe = make_universe();
+        let subject = make_company("SUBJECT", "Energy", "BB", "US", 4.0, 500.0, 6_500.0);
+
+        for x_extractors in [vec![], vec![MetricExtractor::Named("leverage".to_string())]] {
+            let peer_set = PeerSet::new(subject.clone(), universe.clone(), PeriodBasis::Ltm);
+            let dims_cheap = vec![ScoringDimension {
+                label: "dim".to_string(),
+                y_extractor: MetricExtractor::Named("oas_bps".to_string()),
+                x_extractors: x_extractors.clone(),
+                weight: 1.0,
+                direction: ScoreDirection::HigherIsCheap,
+            }];
+            let dims_rich = vec![ScoringDimension {
+                label: "dim".to_string(),
+                y_extractor: MetricExtractor::Named("oas_bps".to_string()),
+                x_extractors: x_extractors.clone(),
+                weight: 1.0,
+                direction: ScoreDirection::HigherIsRich,
+            }];
+
+            let cheap = score_relative_value(&peer_set, &dims_cheap).expect("scoring");
+            let rich = score_relative_value(&peer_set, &dims_rich).expect("scoring");
+
+            assert!(
+                cheap.composite_score != 0.0,
+                "test setup should produce a non-zero signal"
+            );
+            assert!(
+                (cheap.composite_score + rich.composite_score).abs() < 1e-12,
+                "directions must negate each other: cheap={} rich={}",
+                cheap.composite_score,
+                rich.composite_score
+            );
+        }
+    }
+
+    #[test]
+    fn scoring_dimension_direction_serde_default_and_names() {
+        // Old payloads without `direction` deserialize to the default.
+        let json = r#"{
+            "label": "dim",
+            "y_extractor": {"Named": "oas_bps"},
+            "x_extractors": [],
+            "weight": 1.0
+        }"#;
+        let dim: ScoringDimension = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(dim.direction, ScoreDirection::HigherIsCheap);
+
+        // Stable lowercase serde names.
+        assert_eq!(
+            serde_json::to_string(&ScoreDirection::HigherIsCheap).expect("serialize"),
+            "\"higher_is_cheap\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ScoreDirection::HigherIsRich).expect("serialize"),
+            "\"higher_is_rich\""
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // NaN hardening and PeerStats.iqr
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn peer_stats_filters_non_finite_and_reports_iqr() {
+        let values = [1.0, f64::NAN, 2.0, 3.0, f64::INFINITY, 4.0, 5.0];
+        let stats = peer_stats(&values).expect("stats over finite subset");
+
+        assert_eq!(stats.count, 5);
+        assert!((stats.mean - 3.0).abs() < 1e-12);
+        assert_eq!(stats.min, 1.0);
+        assert_eq!(stats.max, 5.0);
+        assert!((stats.iqr - (stats.q3 - stats.q1)).abs() < 1e-12);
+        assert!(stats.std_dev.is_finite());
+
+        // All-NaN input has no usable observations.
+        assert!(peer_stats(&[f64::NAN, f64::NAN]).is_none());
+    }
+
+    #[test]
+    fn z_score_and_percentile_rank_ignore_non_finite_peers() {
+        let clean = [1.0, 2.0, 3.0, 4.0, 5.0];
+        let dirty = [1.0, f64::NAN, 2.0, 3.0, 4.0, f64::NEG_INFINITY, 5.0];
+
+        assert_eq!(z_score(&clean, 4.0), z_score(&dirty, 4.0));
+        assert_eq!(percentile_rank(&clean, 4.0), percentile_rank(&dirty, 4.0));
+
+        // Non-finite subject value is undefined.
+        assert_eq!(z_score(&clean, f64::NAN), None);
+        assert_eq!(percentile_rank(&clean, f64::NAN), None);
     }
 }

@@ -14,25 +14,37 @@ use finstack_core::{Error, Result};
 impl CDSTranchePricer {
     /// Apply smooth correlation boundary handling to avoid numerical discontinuities.
     ///
-    /// Uses a smooth transition function near the boundaries to maintain numerical
-    /// stability while preserving the underlying mathematical relationships.
+    /// A C¹ soft clamp into `(min_corr, max_corr)`:
+    ///
+    /// - Interior (`min+w ≤ ρ ≤ max−w`): identity (no adjustment).
+    /// - Lower wing (`ρ < min+w`): `min + w·exp((ρ − min)/w − 1)`, which
+    ///   equals `min+w` with unit slope at the seam (value- and
+    ///   derivative-continuous with the identity) and decays smoothly toward
+    ///   the open bound `min` as `ρ → −∞`.
+    /// - Upper wing (`ρ > max−w`): mirrored, approaching `max` from below.
+    ///
+    /// Both seams are exactly continuous in value and first derivative —
+    /// correlation-sensitivity finite differences that straddle a seam see no
+    /// spurious jump (the previous tanh patches were discontinuous at both
+    /// seams by ≈ 0.12·w).
     pub(super) fn smooth_correlation_boundary(&self, correlation: f64) -> f64 {
         let min_corr = self.params.min_correlation;
         let max_corr = self.params.max_correlation;
         let width = self.params.corr_boundary_width;
 
-        if correlation <= min_corr + width {
-            // Lower boundary: smooth transition using tanh
-            let x = (correlation - min_corr) / width;
-            min_corr + width * (1.0 + x.tanh()) / 2.0
-        } else if correlation >= max_corr - width {
-            // Upper boundary: smooth transition using tanh
-            let x = (correlation - (max_corr - width)) / width;
-            max_corr - width * (1.0 - x.tanh()) / 2.0
+        if correlation < min_corr + width {
+            // Lower wing: u = (ρ − min)/w ≤ 1; g = min + w·e^{u−1}.
+            // g(min+w) = min+w, g'(min+w) = 1, g → min as ρ → −∞.
+            let u = (correlation - min_corr) / width;
+            min_corr + width * (u - 1.0).exp()
+        } else if correlation > max_corr - width {
+            // Upper wing (mirror): u = (max − ρ)/w ≤ 1; g = max − w·e^{u−1}.
+            let u = (max_corr - correlation) / width;
+            max_corr - width * (u - 1.0).exp()
         } else {
             // Normal range: the branch conditions already guarantee
-            // `min_corr + width < correlation < max_corr - width`, so no adjustment
-            // (and no clamp) is needed here.
+            // `min_corr + width ≤ correlation ≤ max_corr - width`, so no
+            // adjustment (and no clamp) is needed here.
             correlation
         }
     }

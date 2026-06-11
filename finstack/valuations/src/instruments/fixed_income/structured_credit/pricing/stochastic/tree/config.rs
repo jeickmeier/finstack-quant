@@ -210,7 +210,9 @@ impl ScenarioTreeConfig {
             recovery_spec: RecoverySpec::MarketCorrelated {
                 mean_recovery: 0.40,
                 recovery_volatility: 0.30,
-                factor_correlation: -0.50,
+                // Canonical low-factor-stress convention: positive
+                // correlation makes recovery fall when the factor falls.
+                factor_correlation: 0.50,
             },
             correlation: CorrelationStructure::clo_standard(),
             seed: 42,

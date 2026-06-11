@@ -8,12 +8,23 @@ use finstack_statements::error::Result;
 
 /// Extension methods for `ModelBuilder` to support high-level modeling templates.
 pub trait TemplatesExtension<State> {
-    /// Add a roll-forward structure (Beginning + Increases - Decreases = Ending).
+    /// Add a roll-forward structure (Beginning + Increases - Decreases = Ending)
+    /// with a zero opening balance in the first period.
     fn add_roll_forward(
         self,
         name: &str,
         increases: &[&str],
         decreases: &[&str],
+    ) -> Result<ModelBuilder<State>>;
+
+    /// Add a roll-forward structure with an explicit opening balance used in
+    /// the first period (where no prior ending balance exists).
+    fn add_roll_forward_with_opening(
+        self,
+        name: &str,
+        increases: &[&str],
+        decreases: &[&str],
+        opening: f64,
     ) -> Result<ModelBuilder<State>>;
 }
 
@@ -25,6 +36,16 @@ impl<State> TemplatesExtension<State> for ModelBuilder<State> {
         decreases: &[&str],
     ) -> Result<ModelBuilder<State>> {
         roll_forward::add_roll_forward(self, name, increases, decreases)
+    }
+
+    fn add_roll_forward_with_opening(
+        self,
+        name: &str,
+        increases: &[&str],
+        decreases: &[&str],
+        opening: f64,
+    ) -> Result<ModelBuilder<State>> {
+        roll_forward::add_roll_forward_with_opening(self, name, increases, decreases, opening)
     }
 }
 

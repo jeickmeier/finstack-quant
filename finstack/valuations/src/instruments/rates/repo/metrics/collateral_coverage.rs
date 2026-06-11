@@ -14,19 +14,33 @@ impl MetricCalculator for CollateralCoverageCalculator {
     }
 
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
+        // Dependencies are declared above, so missing entries indicate a
+        // registry/dependency-resolution bug — propagate instead of silently
+        // substituting defaults that would fabricate a coverage ratio.
         let collateral_value = context
             .computed
             .get(&MetricId::CollateralValue)
             .copied()
-            .unwrap_or(0.0);
+            .ok_or_else(|| {
+                finstack_core::Error::Validation(
+                    "CollateralCoverage requires CollateralValue to be computed first".to_string(),
+                )
+            })?;
         let required_value = context
             .computed
             .get(&MetricId::RequiredCollateral)
             .copied()
-            .unwrap_or(1.0);
+            .ok_or_else(|| {
+                finstack_core::Error::Validation(
+                    "CollateralCoverage requires RequiredCollateral to be computed first"
+                        .to_string(),
+                )
+            })?;
 
         if required_value == 0.0 {
-            return Ok(f64::INFINITY);
+            return Err(finstack_core::Error::Validation(
+                "CollateralCoverage is undefined: required collateral is zero".to_string(),
+            ));
         }
 
         Ok(collateral_value / required_value)

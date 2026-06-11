@@ -818,19 +818,9 @@ impl StructuredCredit {
         }
 
         if let Some(sda_mult) = self.behavior_overrides.sda_speed_multiplier {
-            let sda_curve = embedded_registry_or_panic().sda_curve();
-            let decline_period = sda_curve.peak_month as f64;
-
-            let cdr = if seasoning <= sda_curve.peak_month {
-                (seasoning as f64 / sda_curve.peak_month as f64) * sda_curve.peak_cdr
-            } else if seasoning <= sda_curve.peak_month * 2 {
-                let months_past_peak = (seasoning - sda_curve.peak_month) as f64;
-                sda_curve.peak_cdr
-                    - (months_past_peak / decline_period)
-                        * (sda_curve.peak_cdr - sda_curve.terminal_cdr)
-            } else {
-                sda_curve.terminal_cdr
-            } * sda_mult;
+            // Canonical PSA SDA shape (ramp / plateau / decline / terminal)
+            // lives on `SdaCurveDefaults::cdr_at`.
+            let cdr = embedded_registry_or_panic().sda_curve().cdr_at(seasoning) * sda_mult;
 
             return Some(1.0 - (1.0 - cdr).powf(1.0 / 12.0));
         }
