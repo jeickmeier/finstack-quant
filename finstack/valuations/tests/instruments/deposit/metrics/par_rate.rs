@@ -30,6 +30,19 @@ fn test_par_rate_makes_pv_zero() {
         npv.abs() < 0.01,
         "trade NPV at par rate should be < $0.01, got: {npv}",
     );
+
+    // Holder-view position value at par for a T+0 deposit: the start-date
+    // outflow is excluded, so value = (1 + par·yf)·notional·DF(end)
+    // = notional·DF(start) = notional exactly (DF(0)=1). Pins the
+    // pricing-view vs holder-view split adopted with the 2026-06-09 review
+    // NPV cutoff.
+    use finstack_valuations::instruments::Instrument;
+    let value = dep_par.base_value(&ctx, base).unwrap();
+    assert!(
+        (value.amount() - 1_000_000.0).abs() < 0.01,
+        "holder-view value of a par T+0 deposit should be ≈ +notional, got: {}",
+        value.amount(),
+    );
 }
 
 #[test]
