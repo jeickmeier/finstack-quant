@@ -155,10 +155,18 @@ impl VolSurfaceTarget {
             spot * ((r - div_yield) * t).exp()
         };
 
-        // Calibrate SABR per expiry
-        let sabr_calibrator = SABRCalibrator::new()
-            .with_tolerance(config.solver.tolerance())
-            .with_max_iterations(config.solver.max_iterations());
+        // Calibrate SABR per expiry.
+        //
+        // Note: `config.solver` is the Brent *root-finding* configuration for
+        // the 1D bootstrap (price-space tolerance, default 1e-12). That is not
+        // a meaningful tolerance for the vega-weighted SSE objective minimized
+        // by the SABR Levenberg-Marquardt calibrator: reusing it previously
+        // "worked" only because the LM solver silently returned its best
+        // iterate on MaxIterations. Since the 2026-06-09 core quant review,
+        // `core::math::solver_multi::minimize` errors loudly on
+        // non-convergence, so the SABR fit uses the calibrator's attainable
+        // production defaults (tolerance 1e-4 on the SSE, 2000 iterations).
+        let sabr_calibrator = SABRCalibrator::new();
 
         let mut sabr_params_by_expiry: BTreeMap<OrderedF64, SABRParameters> = BTreeMap::new();
         let mut residuals = BTreeMap::new();
@@ -417,6 +425,7 @@ Set params.expiry_extrapolation='clamp' to allow flat extrapolation.",
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::calibration::SolverConfig;
     use crate::instruments::OptionType;
     use crate::market::conventions::ids::OptionConventionId;
     use crate::market::quotes::ids::QuoteId;
@@ -618,9 +627,15 @@ mod tests {
             }),
         ];
 
+        // Review 2026-06-09 (core math): SABR calibration now fails loudly on
+        // non-convergence. The SABR LM fit uses the calibrator's production
+        // defaults (1e-4 SSE tolerance, 2000 iterations) rather than the
+        // envelope's Brent root-finding config, so the 1Y bucket calibrates
+        // (its vega-weighted SSE stagnates around 2e-5) and only the strike=0
+        // expiry fails.
+        let config = CalibrationConfig::default();
         let (_surface, report) =
-            VolSurfaceTarget::solve(&params, &quotes, &ctx, &CalibrationConfig::default())
-                .expect("calibrate");
+            VolSurfaceTarget::solve(&params, &quotes, &ctx, &config).expect("calibrate");
 
         assert_eq!(
             report

@@ -68,6 +68,7 @@ use super::{
 /// assert!((atm - 0.08).abs() < 1e-12);
 /// ```
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "RawFxDeltaVolSurface")]
 pub struct FxDeltaVolSurface {
     id: CurveId,
     /// Expiry times in years (strictly increasing, all positive).
@@ -82,6 +83,54 @@ pub struct FxDeltaVolSurface {
     rr_10d: Option<Vec<f64>>,
     /// Optional 10-delta butterfly per expiry.
     bf_10d: Option<Vec<f64>>,
+}
+
+/// Raw deserialization state of [`FxDeltaVolSurface`].
+///
+/// Mirrors the serialized field layout exactly so the wire format is
+/// unchanged; conversion runs the same validation as the public
+/// constructors and rejects unknown fields.
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawFxDeltaVolSurface {
+    /// Surface identifier.
+    id: CurveId,
+    /// Expiry times in years.
+    expiries: Vec<f64>,
+    /// ATM delta-neutral straddle vols per expiry.
+    atm_vols: Vec<f64>,
+    /// 25-delta risk reversal per expiry.
+    rr_25d: Vec<f64>,
+    /// 25-delta butterfly per expiry.
+    bf_25d: Vec<f64>,
+    /// Optional 10-delta risk reversal per expiry.
+    rr_10d: Option<Vec<f64>>,
+    /// Optional 10-delta butterfly per expiry.
+    bf_10d: Option<Vec<f64>>,
+}
+
+impl TryFrom<RawFxDeltaVolSurface> for FxDeltaVolSurface {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawFxDeltaVolSurface) -> crate::Result<Self> {
+        FxDeltaVolSurface::validate(
+            &raw.expiries,
+            &raw.atm_vols,
+            &raw.rr_25d,
+            &raw.bf_25d,
+            raw.rr_10d.as_deref(),
+            raw.bf_10d.as_deref(),
+        )?;
+        Ok(Self {
+            id: raw.id,
+            expiries: raw.expiries,
+            atm_vols: raw.atm_vols,
+            rr_25d: raw.rr_25d,
+            bf_25d: raw.bf_25d,
+            rr_10d: raw.rr_10d,
+            bf_10d: raw.bf_10d,
+        })
+    }
 }
 
 impl FxDeltaVolSurface {

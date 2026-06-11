@@ -125,7 +125,13 @@ fn test_sabr_calibration() {
     let time_to_expiry = 1.0;
     let beta = 0.5; // Fixed beta
 
-    let calibrator = SABRCalibrator::new();
+    // Review 2026-06-09 (core math): minimize() now fails loudly instead of
+    // silently returning the best iterate on MaxIterations. This smile is not
+    // SABR-exact (positive SSE minimum), so allow a realistic gradient
+    // tolerance and iteration budget for formal convergence.
+    let calibrator = SABRCalibrator::new()
+        .with_tolerance(1e-4)
+        .with_max_iterations(2000);
     let params = calibrator
         .calibrate(forward, &strikes, &market_vols, time_to_expiry, beta)
         .expect("Volatility calculation should succeed in test");
@@ -1002,9 +1008,13 @@ fn test_sabr_atm_pinning_interpolates_when_grid_lacks_forward() {
         "test setup: nearest-strike quote {nearest_vol} must be off true ATM {true_atm}"
     );
 
+    // Review 2026-06-09 (core math): non-convergence is now a hard error, and
+    // a 1e-10 gradient tolerance is unattainable for the scalar LM
+    // formulation (the vega-weighted SSE stagnates around 6e-7); use an
+    // attainable tolerance with a larger budget.
     let calibrated = SABRCalibrator::new()
-        .with_tolerance(1e-10)
-        .with_max_iterations(200)
+        .with_tolerance(1e-5)
+        .with_max_iterations(1000)
         .calibrate_with_atm_pinning(forward, &strikes, &market_vols, expiry, 0.5)
         .expect("ATM-pinned calibration should succeed");
     let calibrated_model = SABRModel::new(calibrated);
@@ -1088,9 +1098,13 @@ fn test_sabr_calibrate_with_derivatives_recovers_known_smile() {
         })
         .collect();
 
+    // Review 2026-06-09 (core math): non-convergence is now a hard error;
+    // 1e-9 within 200 evals previously "passed" via the silent best-guess
+    // fallback (the vega-weighted SSE stagnates around 2e-6). Use an
+    // attainable tolerance and budget.
     let params = SABRCalibrator::new()
-        .with_tolerance(1e-9)
-        .with_max_iterations(200)
+        .with_tolerance(1e-5)
+        .with_max_iterations(1000)
         .calibrate_with_derivatives(forward, &strikes, &market_vols, expiry, beta)
         .expect("derivative calibration should succeed");
 
@@ -1314,9 +1328,12 @@ fn test_sabr_calibrate_and_calibrate_with_derivatives_agree() {
         })
         .collect();
 
+    // Review 2026-06-09 (core math): non-convergence is now a hard error;
+    // 1e-10 previously "passed" via the silent best-guess fallback. Use an
+    // attainable tolerance and budget.
     let calibrator = SABRCalibrator::new()
-        .with_tolerance(1e-10)
-        .with_max_iterations(300);
+        .with_tolerance(1e-7)
+        .with_max_iterations(1000);
 
     let fd_free = calibrator
         .calibrate(forward, &strikes, &market_vols, expiry, beta)

@@ -199,6 +199,37 @@ pub(crate) fn vol_parallel_effects(
     Ok(effects)
 }
 
+/// Maximum slack when snapping a tenor-derived year fraction to a surface
+/// grid expiry: the larger of ~7 calendar days or 2% of the grid value covers
+/// day-count and holiday-adjustment drift without bridging distinct expiries.
+const GRID_EXPIRY_SNAP_TOLERANCE_YEARS: f64 = 0.02;
+
+/// Snap a tenor-derived year fraction to the nearest surface grid expiry.
+///
+/// Returns the exact grid value when one lies within
+/// [`GRID_EXPIRY_SNAP_TOLERANCE_YEARS`] (absolute, or the same fraction
+/// relative for long tenors); errors when no grid expiry is close enough so a
+/// mistyped tenor cannot silently bump nothing.
+fn snap_to_grid_expiry(
+    years: f64,
+    grid: &[f64],
+    tenor: &str,
+) -> std::result::Result<f64, finstack_core::Error> {
+    let nearest = grid
+        .iter()
+        .copied()
+        .min_by(|a, b| (a - years).abs().total_cmp(&(b - years).abs()));
+    if let Some(g) = nearest {
+        let tol = GRID_EXPIRY_SNAP_TOLERANCE_YEARS.max(GRID_EXPIRY_SNAP_TOLERANCE_YEARS * g);
+        if (g - years).abs() <= tol {
+            return Ok(g);
+        }
+    }
+    Err(finstack_core::Error::Validation(format!(
+        "vol bucket expiry tenor '{tenor}' (= {years:.6}y) matches no surface grid expiry within snap tolerance"
+    )))
+}
+
 /// Generate effects for a bucketed vol-surface percent shock.
 pub(crate) fn vol_bucket_effects(
     surface_id: &CurveId,
@@ -231,7 +262,18 @@ pub(crate) fn vol_bucket_effects(
                 )
             })
             .collect();
-        Some(parsed?)
+        // Tenor-derived year fractions carry day-count/calendar slack (e.g.
+        // "6M" under Act/365F is ~0.4959, not 0.5), while the core bucket bump
+        // matches grid expiries exactly. Snap each parsed value to the nearest
+        // surface expiry so the emitted bump carries exact grid values; fail
+        // loudly when no grid expiry is close enough rather than silently
+        // bumping nothing.
+        let snapped: std::result::Result<Vec<f64>, finstack_core::Error> = parsed?
+            .into_iter()
+            .zip(t.iter())
+            .map(|(years, tenor)| snap_to_grid_expiry(years, surface.expiries(), tenor))
+            .collect();
+        Some(snapped?)
     } else {
         None
     };

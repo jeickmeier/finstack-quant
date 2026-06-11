@@ -158,7 +158,10 @@ impl SobolRng {
 
     /// Get the next point in the Sobol sequence.
     ///
-    /// Returns a vector of `dimension` values in \[0, 1).
+    /// Returns a vector of `dimension` values in (0, 1): raw Sobol integers
+    /// `k ∈ [0, 2^32)` are mapped to `(k + 0.5) / 2^32` (grid-centred, same
+    /// as [`fill_std_normals`](Self::fill_std_normals)), so exactly 0.0 is
+    /// never emitted.
     /// For allocation-free usage in tight loops, prefer [`fill_point`](Self::fill_point).
     pub fn next_point(&mut self) -> Vec<f64> {
         let mut point = vec![0.0; self.dimension];
@@ -223,7 +226,10 @@ impl SobolRng {
     /// - Owen, A. B. (1995). "Randomly Permuted (t,m,s)-Nets and (t,s)-Sequences."
     /// - Owen, A. B. (1997). "Scrambled Net Variance for Integrals of Smooth Functions."
     fn owen_scramble(&self, value: u32, d: usize) -> f64 {
-        (self.owen_scramble_int(value, d) as f64) / (u32::MAX as f64 + 1.0)
+        // Grid-centred (k + 0.5) / 2^32 mapping, matching
+        // `fill_std_normals`: never emits exactly 0.0 (or 1.0), so downstream
+        // inverse-CDF / log transforms stay finite.
+        (self.owen_scramble_int(value, d) as f64 + 0.5) / (u32::MAX as f64 + 1.0)
     }
 
     /// Apply Owen scrambling and return the scrambled integer in [0, 2^32).
@@ -288,9 +294,10 @@ impl SobolRng {
         self.index += n;
     }
 
-    /// Fill buffer with uniform random numbers in [0, 1).
+    /// Fill buffer with uniform random numbers in (0, 1).
     ///
-    /// This fills with consecutive Sobol points (row-major by dimension).
+    /// This fills with consecutive Sobol points (row-major by dimension),
+    /// using the grid-centred `(k + 0.5) / 2^32` mapping (never exactly 0.0).
     pub fn fill_u01(&mut self, out: &mut [f64]) {
         debug_assert!(
             out.len().is_multiple_of(self.dimension),

@@ -230,8 +230,8 @@ impl PyScorecardScale {
     }
 
     /// Ordered list of rating levels from best to worst.
-    #[pyo3(text_signature = "(self)")]
-    fn get_ratings(&self) -> Vec<PyRatingLevel> {
+    #[getter]
+    fn ratings(&self) -> Vec<PyRatingLevel> {
         self.inner
             .ratings
             .iter()
@@ -294,19 +294,19 @@ impl PyRatingScaleRegistry {
 impl PyRatingScaleRegistry {
     /// Configured default scorecard score for threshold gaps.
     #[pyo3(text_signature = "(self)")]
-    fn get_default_scorecard_score(&self) -> f64 {
+    fn default_scorecard_score(&self) -> f64 {
         self.inner.default_scorecard_score()
     }
 
     /// Configured default rating-scale id.
     #[pyo3(text_signature = "(self)")]
-    fn get_default_scale_id(&self) -> &str {
+    fn default_scale_id(&self) -> &str {
         self.inner.default_scale_id()
     }
 
     /// Configured unknown-scale policy.
     #[pyo3(text_signature = "(self)")]
-    fn get_unknown_scale_policy(&self) -> PyUnknownScalePolicy {
+    fn unknown_scale_policy(&self) -> PyUnknownScalePolicy {
         PyUnknownScalePolicy::from_inner(self.inner.unknown_scale_policy())
     }
 

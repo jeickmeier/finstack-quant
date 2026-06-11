@@ -148,7 +148,10 @@ impl FxProvider for SimpleFxProvider {
     /// - [`InputError::NotFound`](crate::error::InputError::NotFound): No direct quote
     ///   exists for `from→to` and no reciprocal `to→from` is available
     /// - [`InputError::NonFiniteValue`](crate::error::InputError::NonFiniteValue): The
-    ///   stored rate or its reciprocal is non-finite
+    ///   stored rate is non-finite
+    /// - [`InputError::InvalidFxRate`](crate::error::InputError::InvalidFxRate): The
+    ///   computed reciprocal is non-finite or non-positive (e.g. the stored
+    ///   rate is subnormal, so `1/rate` overflows to infinity)
     ///
     /// # Examples
     /// ```rust
@@ -200,56 +203,76 @@ impl FxProvider for SimpleFxProvider {
     }
 }
 
-/// Wrapper provider that overrides a specific FX rate while delegating others.
+/// Wrapper provider that applies a relative bump to one FX pair while
+/// delegating all other pairs (and the unbumped per-date rate) to the
+/// original provider.
 ///
-/// This is useful for bumping FX rates in scenario analysis without
-/// losing the rest of the FX matrix state.
+/// This is useful for bumping FX rates in finite-difference greeks or
+/// scenario analysis without losing the rest of the FX matrix state. The
+/// bump is **term-structure preserving**: for the bumped pair the provider
+/// returns `original.rate(query) * (1 + bump_pct)`, so a date-aware
+/// provider keeps its date/policy structure under the bump (2026-06-09 core
+/// quant review: the previous implementation returned one frozen absolute
+/// rate for every date/policy).
 pub struct BumpedFxProvider {
     /// Original provider to delegate to
     original: Arc<dyn FxProvider>,
-    /// Override rate for specific pair
+    /// Bumped pair base currency
     override_from: Currency,
-    /// Override rate for specific pair
+    /// Bumped pair quote currency
     override_to: Currency,
-    /// Override rate value
-    override_rate: f64,
+    /// Relative bump multiplier (`1 + bump_pct`), validated positive and finite.
+    bump_multiplier: f64,
 }
 
 impl BumpedFxProvider {
-    /// Create a new bumped provider that overrides one rate.
+    /// Create a new bumped provider that relatively bumps one pair.
     ///
     /// # Parameters
     /// - `original`: Original FX provider to delegate to
-    /// - `from`: Currency to override
-    /// - `to`: Currency to override
-    /// - `bumped_rate`: New rate for the overridden pair
+    /// - `from`: Base currency of the bumped pair
+    /// - `to`: Quote currency of the bumped pair
+    /// - `bump_pct`: Relative bump size (e.g., `0.01` for a 1% increase)
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(Error::Validation)` when `bump_pct` is non-finite or the
+    /// resulting multiplier `1 + bump_pct` is not strictly positive (such a
+    /// bump would produce zero/negative FX rates).
     pub fn new(
         original: Arc<dyn FxProvider>,
         from: Currency,
         to: Currency,
-        bumped_rate: f64,
-    ) -> Self {
-        Self {
+        bump_pct: f64,
+    ) -> crate::Result<Self> {
+        let bump_multiplier = 1.0 + bump_pct;
+        if !bump_pct.is_finite() || bump_multiplier <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "BumpedFxProvider bump_pct must be finite with 1 + bump_pct > 0 (got {bump_pct})"
+            )));
+        }
+        Ok(Self {
             original,
             override_from: from,
             override_to: to,
-            override_rate: bumped_rate,
-        }
+            bump_multiplier,
+        })
     }
 }
 
 impl FxProvider for BumpedFxProvider {
-    /// Return an FX rate, using the bumped value for the overridden pair.
+    /// Return an FX rate, relatively bumping the overridden pair.
     ///
     /// The provider:
-    /// 1. Returns the bumped rate if querying the overridden `from→to` pair
-    /// 2. Returns the reciprocal of the bumped rate for `to→from`
+    /// 1. Returns `original_rate * (1 + bump_pct)` for the bumped `from→to` pair
+    /// 2. Returns the reciprocal of the bumped direct rate for `to→from`
     /// 3. Delegates to the original provider for all other pairs
     ///
     /// # Errors
     ///
     /// Returns `Err` when:
-    /// - The original provider fails for non-overridden pairs
+    /// - The original provider fails for the queried pair
+    /// - The bumped rate is non-finite or non-positive
     /// - Any error propagated from [`FxProvider::rate`] on the underlying provider
     fn rate(
         &self,
@@ -260,14 +283,19 @@ impl FxProvider for BumpedFxProvider {
     ) -> crate::Result<f64> {
         // Check if this is the overridden pair (or its reciprocal)
         if from == self.override_from && to == self.override_to {
-            return Ok(self.override_rate);
+            let base = self.original.rate(from, to, on, policy)?;
+            return super::validate_fx_rate(from, to, base * self.bump_multiplier);
         }
         if from == self.override_to && to == self.override_from {
-            return super::reciprocal_rate_or_err(
-                self.override_rate,
-                self.override_to,
+            let base = self
+                .original
+                .rate(self.override_from, self.override_to, on, policy)?;
+            let bumped = super::validate_fx_rate(
                 self.override_from,
-            );
+                self.override_to,
+                base * self.bump_multiplier,
+            )?;
+            return super::reciprocal_rate_or_err(bumped, self.override_to, self.override_from);
         }
 
         // Delegate to original provider for all other pairs
@@ -381,7 +409,7 @@ mod tests {
     }
 
     #[test]
-    fn bumped_provider_overrides_rate() {
+    fn bumped_provider_applies_relative_bump() {
         let original = Arc::new(SimpleFxProvider::new());
         original
             .set_quote(Currency::EUR, Currency::USD, 1.1)
@@ -390,10 +418,11 @@ mod tests {
             .set_quote(Currency::GBP, Currency::USD, 1.25)
             .expect("valid test quote");
 
-        // Create bumped provider that overrides EUR/USD
-        let bumped = BumpedFxProvider::new(original.clone(), Currency::EUR, Currency::USD, 1.2);
+        // Create bumped provider that bumps EUR/USD by 1% (relative).
+        let bumped = BumpedFxProvider::new(original.clone(), Currency::EUR, Currency::USD, 0.01)
+            .expect("valid bump");
 
-        // Overridden rate should return bumped value
+        // Bumped pair returns the delegated rate scaled by (1 + bump_pct).
         let eur_usd = bumped
             .rate(
                 Currency::EUR,
@@ -402,7 +431,18 @@ mod tests {
                 FxConversionPolicy::CashflowDate,
             )
             .expect("FX rate query should succeed in test");
-        assert_eq!(eur_usd, 1.2);
+        assert!((eur_usd - 1.1 * 1.01).abs() < 1e-12);
+
+        // Reciprocal direction is the inverse of the bumped direct rate.
+        let usd_eur = bumped
+            .rate(
+                Currency::USD,
+                Currency::EUR,
+                test_date(),
+                FxConversionPolicy::CashflowDate,
+            )
+            .expect("FX rate query should succeed in test");
+        assert!((usd_eur - 1.0 / (1.1 * 1.01)).abs() < 1e-12);
 
         // Other rates should delegate to original
         let gbp_usd = bumped
@@ -414,5 +454,68 @@ mod tests {
             )
             .expect("FX rate query should succeed in test");
         assert_eq!(gbp_usd, 1.25);
+    }
+
+    #[test]
+    fn bumped_provider_preserves_term_structure() {
+        // 2026-06-09 core quant review: bumping must not flatten a date-aware
+        // provider's FX term structure. Both dates must move by the same
+        // relative bump, not collapse to one frozen absolute rate.
+        struct DateAwareFx;
+        impl FxProvider for DateAwareFx {
+            fn rate(
+                &self,
+                _from: Currency,
+                _to: Currency,
+                on: Date,
+                _policy: FxConversionPolicy,
+            ) -> crate::Result<f64> {
+                if on == Date::from_calendar_date(2024, Month::January, 2).expect("valid") {
+                    Ok(1.10)
+                } else {
+                    Ok(1.20)
+                }
+            }
+        }
+
+        let bumped =
+            BumpedFxProvider::new(Arc::new(DateAwareFx), Currency::EUR, Currency::USD, 0.01)
+                .expect("valid bump");
+
+        let d1 = Date::from_calendar_date(2024, Month::January, 2).expect("valid");
+        let d2 = Date::from_calendar_date(2024, Month::June, 2).expect("valid");
+        let r1 = bumped
+            .rate(
+                Currency::EUR,
+                Currency::USD,
+                d1,
+                FxConversionPolicy::CashflowDate,
+            )
+            .expect("rate on d1");
+        let r2 = bumped
+            .rate(
+                Currency::EUR,
+                Currency::USD,
+                d2,
+                FxConversionPolicy::CashflowDate,
+            )
+            .expect("rate on d2");
+        assert!((r1 - 1.10 * 1.01).abs() < 1e-12);
+        assert!((r2 - 1.20 * 1.01).abs() < 1e-12);
+        assert!(
+            (r1 - r2).abs() > 1e-6,
+            "term structure must not be flattened"
+        );
+    }
+
+    #[test]
+    fn bumped_provider_rejects_invalid_bumps() {
+        let original: Arc<dyn FxProvider> = Arc::new(SimpleFxProvider::new());
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, -1.5] {
+            assert!(
+                BumpedFxProvider::new(original.clone(), Currency::EUR, Currency::USD, bad).is_err(),
+                "bump_pct {bad} must be rejected"
+            );
+        }
     }
 }

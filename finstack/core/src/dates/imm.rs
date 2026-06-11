@@ -108,6 +108,7 @@ where
 #[must_use]
 pub fn third_wednesday(month: Month, year: i32) -> Date {
     nth_weekday_of_month(year, month, Weekday::Wednesday, 3)
+        .unwrap_or_else(|| unreachable!("every month has at least four Wednesdays"))
 }
 
 /// Return the **next IMM date** (third Wednesday of Mar/Jun/Sep/Dec) **strictly
@@ -179,6 +180,45 @@ pub fn next_cds_date(date: Date) -> Date {
     })
 }
 
+/// Return the **previous CDS roll date** (20-Mar/20-Jun/20-Sep/20-Dec)
+/// **strictly before** `date`.
+///
+/// Post-Big-Bang (2009) standard CDS contracts accrue their first premium
+/// period from the CDS roll date immediately preceding the trade/effective
+/// date, so schedule construction anchors on this date.
+///
+/// # Examples
+/// ```rust
+/// use finstack_core::dates::prev_cds_date;
+/// use time::{Date, Month};
+///
+/// let d = Date::from_calendar_date(2025, Month::January, 15)?;
+/// assert_eq!(
+///     prev_cds_date(d),
+///     Date::from_calendar_date(2024, Month::December, 20)?
+/// );
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+#[must_use]
+pub fn prev_cds_date(date: Date) -> Date {
+    let mut year = date.year();
+    loop {
+        for &m in QUARTERLY_MONTHS.iter().rev() {
+            let candidate = Date::from_calendar_date(year, m, 20).unwrap_or_else(|_| {
+                if year > Date::MAX.year() {
+                    Date::MAX
+                } else {
+                    Date::MIN
+                }
+            });
+            if candidate < date {
+                return candidate;
+            }
+        }
+        year -= 1;
+    }
+}
+
 /// Return the **IMM option expiry date** (Friday before the third Wednesday) for
 /// `month` in `year`.
 ///
@@ -205,6 +245,7 @@ pub fn imm_option_expiry(month: Month, year: i32) -> Date {
 #[must_use]
 pub fn third_friday(month: Month, year: i32) -> Date {
     nth_weekday_of_month(year, month, Weekday::Friday, 3)
+        .unwrap_or_else(|| unreachable!("every month has at least four Fridays"))
 }
 
 /// Return the **next IMM option expiry date** (Friday before third Wednesday of
@@ -301,6 +342,7 @@ fn sifma_base_date(month: Month, year: i32, class: SifmaSettlementClass) -> Date
         SifmaSettlementClass::C => nth_weekday_of_month(year, month, Weekday::Thursday, 3),
         SifmaSettlementClass::D => nth_weekday_of_month(year, month, Weekday::Wednesday, 4),
     }
+    .unwrap_or_else(|| unreachable!("every month has at least four of each weekday"))
 }
 
 /// Compute the SIFMA settlement date for a given class using a provided holiday calendar.

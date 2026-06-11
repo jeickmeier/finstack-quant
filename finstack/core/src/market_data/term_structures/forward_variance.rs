@@ -32,11 +32,42 @@
 /// Used as input to rBergomi and related rough vol models where the initial
 /// forward variance curve determines the term structure of variance.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "RawForwardVarianceCurve")]
 pub struct ForwardVarianceCurve {
     /// Knot times (year fractions, strictly increasing, >= 0).
     times: Vec<f64>,
     /// Forward variance values at knot times (all > 0).
     values: Vec<f64>,
+}
+
+/// Raw deserialization state of [`ForwardVarianceCurve`].
+///
+/// Mirrors the serialized field layout exactly; conversion routes through
+/// [`ForwardVarianceCurve::from_points`] so deserialized curves satisfy the
+/// same invariants as constructed ones, and unknown fields are rejected.
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawForwardVarianceCurve {
+    /// Knot times (year fractions).
+    times: Vec<f64>,
+    /// Forward variance values at knot times.
+    values: Vec<f64>,
+}
+
+impl TryFrom<RawForwardVarianceCurve> for ForwardVarianceCurve {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawForwardVarianceCurve) -> crate::Result<Self> {
+        if raw.times.len() != raw.values.len() {
+            return Err(crate::Error::Validation(format!(
+                "ForwardVarianceCurve: times/values length mismatch ({} vs {})",
+                raw.times.len(),
+                raw.values.len()
+            )));
+        }
+        let points: Vec<(f64, f64)> = raw.times.into_iter().zip(raw.values).collect();
+        ForwardVarianceCurve::from_points(&points)
+    }
 }
 
 impl Default for ForwardVarianceCurve {

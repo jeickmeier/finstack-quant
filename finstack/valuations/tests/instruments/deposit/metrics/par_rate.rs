@@ -19,14 +19,16 @@ fn test_par_rate_makes_pv_zero() {
         .quote_rate(par_rate)
         .build();
 
-    let pv = dep_par.value(&ctx, base).unwrap();
+    // Par rate zeroes the *trade* NPV (pricing view, includes the T+0 initial
+    // exchange via `npv_raw`). Holder-view `value` excludes flows on `as_of`
+    // and is ≈ +notional regardless of the quote rate.
+    let npv = dep_par.npv_raw(&ctx, base).unwrap();
 
-    // Validate - PV should be essentially zero for deposit at par rate
+    // Validate - trade NPV should be essentially zero for deposit at par rate
     // Market standard: < $0.01 on $1M notional (< 0.001bp numerical precision)
     assert!(
-        pv.amount().abs() < 0.01,
-        "PV at par rate should be < $0.01, got: {}",
-        pv.amount()
+        npv.abs() < 0.01,
+        "trade NPV at par rate should be < $0.01, got: {npv}",
     );
 }
 

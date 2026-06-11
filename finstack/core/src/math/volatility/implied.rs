@@ -15,10 +15,13 @@
 //! Both solvers achieve machine-precision accuracy (< 10⁻¹² relative error
 //! on volatility) within 2–4 Householder iterations from the initial guess.
 //!
+//! The method is a robust bracketed bisection followed by Halley polishing —
+//! simpler (and slower in the worst case) than rational-approximation
+//! initial-guess schemes such as Jäckel's "Let's Be Rational", which is not
+//! implemented here.
+//!
 //! # References
 //!
-//! - Jäckel, P. (2017). "Let's Be Rational." *Wilmott*, 2017(89), 40–53.
-//!   DOI: 10.1002/wilm.10578
 //! - Brenner, M., & Subrahmanyam, M. G. (1988). "A Simple Formula to Compute
 //!   the Implied Standard Deviation." *Financial Analysts Journal*, 44(5), 80–83.
 //! - Manaster, S., & Koehler, G. (1982). "The Calculation of Implied Variances
@@ -48,7 +51,11 @@ const VOL_FLOOR: f64 = 1e-16;
 /// Ceiling for Black-76 implied vol (1000%).
 const VOL_CEIL_BLACK: f64 = 10.0;
 
-/// Ceiling for Bachelier implied vol (generous bound for normal model).
+/// Ceiling multiplier for Bachelier implied vol.
+///
+/// Normal vol is in *price units*, so a fixed absolute ceiling would reject
+/// price-quoted underlyings (e.g. equities near 100). The effective ceiling is
+/// `max(|F|, |K|, 1) × VOL_CEIL_BACH`, i.e. 1000% of the price scale.
 const VOL_CEIL_BACH: f64 = 10.0;
 
 /// Number of bisection steps used to narrow the bracket before Householder.
@@ -124,9 +131,10 @@ const BISECTION_STEPS: usize = 20;
 ///
 /// # References
 ///
-/// - Jäckel, P. (2017). "Let's Be Rational." *Wilmott*, 2017(89), 40–53.
 /// - Brenner, M., & Subrahmanyam, M. G. (1988). "A Simple Formula to Compute
 ///   the Implied Standard Deviation." *Financial Analysts Journal*, 44(5), 80–83.
+/// - Manaster, S., & Koehler, G. (1982). "The Calculation of Implied Variances
+///   from the Black-Scholes Model." *Journal of Finance*, 37(1), 227–230.
 pub fn implied_vol_black(
     price: f64,
     forward: f64,
@@ -334,7 +342,10 @@ pub fn implied_vol_bachelier(
     };
     let two_pi = 2.0 * std::f64::consts::PI;
     let analytical = (otm_price * (two_pi / t).sqrt()).max(VOL_FLOOR);
-    let mut sigma = bracket_and_bisect(otm_price, &price_fn, analytical, VOL_CEIL_BACH);
+    // Normal vol scales with the price level: bound it relative to the
+    // forward/strike magnitude so price-quoted underlyings invert.
+    let vol_ceil = forward.abs().max(strike.abs()).max(1.0) * VOL_CEIL_BACH;
+    let mut sigma = bracket_and_bisect(otm_price, &price_fn, analytical, vol_ceil);
 
     // ── 5. Householder (Halley) refinement ───────────────────────────────
     //
@@ -376,7 +387,7 @@ pub fn implied_vol_bachelier(
         } else {
             sigma - newton_step
         };
-        sigma = sigma.clamp(VOL_FLOOR, VOL_CEIL_BACH);
+        sigma = sigma.clamp(VOL_FLOOR, vol_ceil);
     }
 
     // ── 6. Final convergence verification ────────────────────────────────
@@ -959,6 +970,17 @@ mod tests {
         for &k in &[0.035, 0.04] {
             assert_rt_bach(f, k, sigma, t, false);
         }
+    }
+
+    #[test]
+    fn bach_rt_price_quoted_underlying() {
+        // Normal vol in price units: F = K = 100 with σ_n = 20 (20% of spot).
+        // The pre-fix absolute ceiling VOL_CEIL_BACH = 10.0 made this fail.
+        assert_rt_bach(100.0, 100.0, 20.0, 1.0, true);
+        assert_rt_bach(100.0, 100.0, 20.0, 1.0, false);
+        // OTM/ITM variants at price scale
+        assert_rt_bach(100.0, 110.0, 15.0, 0.5, true);
+        assert_rt_bach(100.0, 90.0, 15.0, 0.5, false);
     }
 
     #[test]

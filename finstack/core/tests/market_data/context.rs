@@ -1098,7 +1098,7 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
         }])
         .is_err());
 
-    // VolBucketPct parallel fallback (no filters) path
+    // VolBucketPct with no filters ("all buckets") path
     let surface = sample_vol_surface();
     let base_vol = surface.value_checked(0.5, 1.0).unwrap();
     let ctx = MarketContext::new().insert_surface(surface);
@@ -1115,8 +1115,10 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
         .unwrap()
         .value_checked(0.5, 1.0)
         .unwrap();
-    // Parallel vol bump via BumpSpec(Additive/Percent) adds +0.10
-    assert!((bumped_vol - (base_vol + 0.10)).abs() < 1e-12);
+    // Canonical VolBucketPct semantics are MULTIPLICATIVE (vol × (1 + pct/100)),
+    // matching the filtered path and the scenarios adapter preview
+    // (2026-06-09 core quant review, Blocker #3).
+    assert!((bumped_vol - base_vol * 1.10).abs() < 1e-12);
 
     // VolBucketPct missing surface error branch
     let ctx = MarketContext::new();

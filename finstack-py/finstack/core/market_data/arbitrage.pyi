@@ -9,13 +9,13 @@ from __future__ import annotations
 from typing import Any, Optional
 
 __all__ = [
-    "check_butterfly",
-    "check_calendar_spread",
-    "check_local_vol_density",
-    "check_all",
+    "check_butterfly_grid",
+    "check_calendar_spread_grid",
+    "check_local_vol_density_grid",
+    "check_surface_grid",
 ]
 
-def check_butterfly(
+def check_butterfly_grid(
     strikes: list[float],
     expiries: list[float],
     vols: list[list[float]],
@@ -25,7 +25,7 @@ def check_butterfly(
     """Check butterfly arbitrage on an implied-vol grid."""
     ...
 
-def check_calendar_spread(
+def check_calendar_spread_grid(
     strikes: list[float],
     expiries: list[float],
     vols: list[list[float]],
@@ -35,7 +35,7 @@ def check_calendar_spread(
     """Check calendar-spread arbitrage (total-variance monotonicity)."""
     ...
 
-def check_local_vol_density(
+def check_local_vol_density_grid(
     strikes: list[float],
     expiries: list[float],
     vols: list[list[float]],
@@ -44,7 +44,7 @@ def check_local_vol_density(
     """Check Dupire local-vol density positivity."""
     ...
 
-def check_all(
+def check_surface_grid(
     strikes: list[float],
     expiries: list[float],
     vols: list[list[float]],

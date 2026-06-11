@@ -83,8 +83,13 @@
 //!     Distributions, Volume 1* (2nd ed.). Wiley. Chapter 13.
 //!
 //! - **Inverse Normal CDF**:
-//!   - Wichura, M. J. (1988). "Algorithm AS 241: The Percentage Points of the
-//!     Normal Distribution." *Applied Statistics*, 37(3), 477-484.
+//!   - statrs 0.18 computes `inverse_cdf` via a Boost-Math-derived inverse
+//!     complementary error function (`erfc_inv`) rational approximation, not
+//!     Wichura's AS 241. Observed accuracy: ~5e-12 absolute on round-trips in
+//!     the central region, ~1e-6 *relative* accuracy on the quantile in the
+//!     far tails (p ≲ 1e-10).
+//!   - Boost Math Toolkit, `erf_inv`/`erfc_inv` documentation:
+//!     <https://www.boost.org/doc/libs/release/libs/math/doc/html/math_toolkit/sf_erf/error_inv.html>
 
 use std::sync::LazyLock;
 
@@ -316,6 +321,15 @@ pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 /// # Returns
 /// x such that Φ(x) = p
 ///
+/// # Domain-edge convention
+///
+/// Out-of-domain inputs follow the standard saturating quantile convention
+/// instead of panicking (the underlying `statrs` implementation panics for
+/// `p ∉ [0, 1]`, including NaN):
+/// - `p <= 0.0` → `f64::NEG_INFINITY`
+/// - `p >= 1.0` → `f64::INFINITY`
+/// - `p.is_nan()` → `f64::NAN`
+///
 /// # Examples
 ///
 /// ```rust
@@ -328,14 +342,33 @@ pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 /// let x = standard_normal_inv_cdf(0.84);
 /// let p_back = norm_cdf(x);
 /// assert!((p_back - 0.84).abs() < 1e-6);
+///
+/// // Domain edges saturate instead of panicking
+/// assert_eq!(standard_normal_inv_cdf(0.0), f64::NEG_INFINITY);
+/// assert_eq!(standard_normal_inv_cdf(1.0), f64::INFINITY);
+/// assert!(standard_normal_inv_cdf(f64::NAN).is_nan());
 /// ```
 ///
 /// # Implementation
 ///
-/// Uses a static standard normal distribution instance for performance in hot paths.
+/// Uses a static standard normal distribution instance for performance in hot
+/// paths. statrs 0.18 evaluates the quantile via a Boost-Math-derived
+/// `erfc_inv` rational approximation (not Wichura's AS 241). Delivered
+/// accuracy: round-trips `norm_cdf(standard_normal_inv_cdf(p))` agree to
+/// ~5e-12 absolute in the central region, and the quantile itself is accurate
+/// to ~1e-6 relative in the far tails (p down to ~1e-300).
 #[inline]
 pub fn standard_normal_inv_cdf(p: f64) -> f64 {
     use statrs::distribution::ContinuousCDF;
+    if p.is_nan() {
+        return f64::NAN;
+    }
+    if p <= 0.0 {
+        return f64::NEG_INFINITY;
+    }
+    if p >= 1.0 {
+        return f64::INFINITY;
+    }
     STANDARD_NORMAL.inverse_cdf(p)
 }
 
@@ -416,6 +449,12 @@ pub fn student_t_cdf(x: f64, df: f64) -> f64 {
 ///
 /// x such that F(x; df) = p
 ///
+/// # Domain-edge convention
+///
+/// Mirrors [`standard_normal_inv_cdf`]: out-of-domain `p` saturates instead
+/// of panicking — `p <= 0.0` → `f64::NEG_INFINITY`, `p >= 1.0` →
+/// `f64::INFINITY`, `NaN` → `NaN`.
+///
 /// # Examples
 ///
 /// ```rust
@@ -435,10 +474,15 @@ pub fn student_t_cdf(x: f64, df: f64) -> f64 {
 /// This is a thin wrapper around `statrs::distribution::StudentsT::inverse_cdf`.
 pub fn student_t_inv_cdf(p: f64, df: f64) -> f64 {
     debug_assert!(df > 0.0, "student_t_inv_cdf requires df > 0, got {df}");
-    debug_assert!(
-        (0.0..1.0).contains(&p),
-        "student_t_inv_cdf requires p in (0, 1), got {p}"
-    );
+    if p.is_nan() {
+        return f64::NAN;
+    }
+    if p <= 0.0 {
+        return f64::NEG_INFINITY;
+    }
+    if p >= 1.0 {
+        return f64::INFINITY;
+    }
     if df > 100.0 {
         // High df (including +inf): normal approximation.
         // The approximation error decays as O(1/df).
@@ -455,6 +499,35 @@ pub fn student_t_inv_cdf(p: f64, df: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_standard_normal_inv_cdf_out_of_domain_saturates() {
+        // Review 2026-06-09 (core math): statrs panics for p outside [0, 1]
+        // (including NaN); release builds had no guard. Saturating convention:
+        assert!(standard_normal_inv_cdf(f64::NAN).is_nan());
+        assert_eq!(standard_normal_inv_cdf(-0.1), f64::NEG_INFINITY);
+        assert_eq!(standard_normal_inv_cdf(0.0), f64::NEG_INFINITY);
+        assert_eq!(standard_normal_inv_cdf(1.0), f64::INFINITY);
+        assert_eq!(
+            standard_normal_inv_cdf(1.000_000_000_000_000_2),
+            f64::INFINITY
+        );
+    }
+
+    #[test]
+    fn test_student_t_inv_cdf_out_of_domain_saturates() {
+        for df in [5.0, 1000.0] {
+            assert!(student_t_inv_cdf(f64::NAN, df).is_nan(), "df={df}");
+            assert_eq!(student_t_inv_cdf(-0.1, df), f64::NEG_INFINITY, "df={df}");
+            assert_eq!(student_t_inv_cdf(0.0, df), f64::NEG_INFINITY, "df={df}");
+            assert_eq!(student_t_inv_cdf(1.0, df), f64::INFINITY, "df={df}");
+            assert_eq!(
+                student_t_inv_cdf(1.000_000_000_000_000_2, df),
+                f64::INFINITY,
+                "df={df}"
+            );
+        }
+    }
 
     #[test]
     fn test_erf() {
@@ -503,25 +576,43 @@ mod tests {
 
     #[test]
     fn test_standard_normal_inv_cdf() {
-        // Test known values
-        assert!((standard_normal_inv_cdf(0.5) - 0.0).abs() < 1e-6);
-        assert!((standard_normal_inv_cdf(0.8413447460685429) - 1.0).abs() < 1e-3);
-        assert!((standard_normal_inv_cdf(0.15865525393145705) - (-1.0)).abs() < 1e-3);
+        // Known values at the precision the Boost-derived erfc_inv delivers.
+        assert!((standard_normal_inv_cdf(0.5) - 0.0).abs() < 1e-12);
+        assert!((standard_normal_inv_cdf(0.8413447460685429) - 1.0).abs() < 1e-9);
+        assert!((standard_normal_inv_cdf(0.15865525393145705) - (-1.0)).abs() < 1e-9);
 
-        // Test extreme values
-        assert!(standard_normal_inv_cdf(1e-10) < -5.0);
-        assert!(standard_normal_inv_cdf(1.0 - 1e-10) > 5.0);
+        // Tail quantiles: reference values from scipy.special.ndtri
+        // (double-precision evaluation of Φ⁻¹). The implementation delivers
+        // ~1e-6 *relative* accuracy in the far tails; assert at 1e-7 relative
+        // so a precision regression would be caught.
+        let tail_cases: [(f64, f64); 4] = [
+            (1e-12, -7.034483825301131),
+            (1e-10, -6.361340902404056),
+            (1e-8, -5.612001244174789),
+            (1e-6, -4.753424308822899),
+        ];
+        for &(p, x_ref) in &tail_cases {
+            let x = standard_normal_inv_cdf(p);
+            let rel_err = ((x - x_ref) / x_ref).abs();
+            assert!(
+                rel_err < 1e-7,
+                "tail quantile regression: p={p}, x={x}, ref={x_ref}, rel_err={rel_err:.3e}"
+            );
+        }
     }
 
     #[test]
     fn test_normal_cdf_inv_cdf_roundtrip() {
-        let test_values = [0.1, 0.25, 0.5, 0.75, 0.9]; // Skip extreme values for robustness
+        // Central region: the implementation delivers ~5e-12 absolute
+        // round-trip accuracy (measured: 4.6e-12 at p = 0.1); pin at 1e-11
+        // so precision regressions are visible.
+        let test_values = [0.1, 0.25, 0.5, 0.75, 0.9];
 
         for &p in &test_values {
             let x = standard_normal_inv_cdf(p);
             let p_back = norm_cdf(x);
             assert!(
-                (p - p_back).abs() < 1e-3, // Relaxed tolerance for enhanced tail behavior
+                (p - p_back).abs() < 1e-11,
                 "Failed roundtrip for p={}, got x={}, p_back={}",
                 p,
                 x,
@@ -551,15 +642,21 @@ mod tests {
                 1.0 - p
             );
 
-            // Should maintain approximate symmetry (allow for numerical precision limits)
+            // Symmetry Φ⁻¹(p) = −Φ⁻¹(1−p): limited by the representation of
+            // 1−p in f64 (absolute error ~ε/φ(x) ≈ 1e-16·1e12 ≈ 1e-4 at
+            // p = 1e-12), not by the algorithm. Assert proportionally to the
+            // quantile's tail sensitivity rather than a flat 0.01.
             let symmetry_error = (x_low + x_high).abs();
+            let one_minus_p_resolution = f64::EPSILON / norm_pdf(x_low).max(f64::MIN_POSITIVE);
+            let symmetry_tol = (1e-6 * x_low.abs()).max(4.0 * one_minus_p_resolution);
             assert!(
-                symmetry_error < 0.01, // Relaxed tolerance for extreme tail behavior
-                "Symmetry violated: x_low={}, x_high={} for p={}, error={}",
+                symmetry_error < symmetry_tol,
+                "Symmetry violated: x_low={}, x_high={} for p={}, error={}, tol={}",
                 x_low,
                 x_high,
                 p,
-                symmetry_error
+                symmetry_error,
+                symmetry_tol
             );
 
             // CDF should be stable in extreme tails
@@ -581,28 +678,30 @@ mod tests {
             assert!((0.0..=1.0).contains(&p_back_low));
             assert!((0.0..=1.0).contains(&p_back_high));
 
-            // Test roundtrip accuracy in tail regions (more forgiving tolerance)
-            if p >= 1e-10 {
-                let roundtrip_error_low = (p - p_back_low).abs() / p; // Relative error
-                let roundtrip_error_high = ((1.0 - p) - p_back_high).abs() / (1.0 - p);
+            // Round-trip accuracy in tail regions. A quantile error of δx
+            // amplifies to a relative probability error of ~|x|·δx, so the
+            // ~1e-6 relative quantile accuracy implies a p-relative round-trip
+            // error of ~|x|²·1e-6 ≈ 5e-5 at p = 1e-12. Assert at 1e-4 so a
+            // precision regression (e.g. to the old 10% level) is caught.
+            let roundtrip_error_low = (p - p_back_low).abs() / p; // Relative error
+            let roundtrip_error_high = ((1.0 - p) - p_back_high).abs() / (1.0 - p);
 
-                assert!(
-                    roundtrip_error_low < 0.1, // 10% relative error tolerance in extreme tails
-                    "Poor roundtrip accuracy in tail: p={}, x={}, p_back={}, rel_error={}",
-                    p,
-                    x_low,
-                    p_back_low,
-                    roundtrip_error_low
-                );
-                assert!(
-                    roundtrip_error_high < 0.1,
-                    "Poor roundtrip accuracy in tail: p={}, x={}, p_back={}, rel_error={}",
-                    1.0 - p,
-                    x_high,
-                    p_back_high,
-                    roundtrip_error_high
-                );
-            }
+            assert!(
+                roundtrip_error_low < 1e-4,
+                "Poor roundtrip accuracy in tail: p={}, x={}, p_back={}, rel_error={}",
+                p,
+                x_low,
+                p_back_low,
+                roundtrip_error_low
+            );
+            assert!(
+                roundtrip_error_high < 1e-4,
+                "Poor roundtrip accuracy in tail: p={}, x={}, p_back={}, rel_error={}",
+                1.0 - p,
+                x_high,
+                p_back_high,
+                roundtrip_error_high
+            );
         }
     }
 

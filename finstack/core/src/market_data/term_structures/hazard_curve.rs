@@ -144,12 +144,12 @@ pub struct HazardCurve {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawHazardCurve {
-    #[serde(flatten)]
-    common_id: super::common::StateId,
+    /// Curve identifier
+    pub id: String,
     /// Base date
     pub base: Date,
-    #[serde(flatten)]
-    points: super::common::StateKnotPoints,
+    /// Time/value pairs used to construct the curve
+    pub knot_points: Vec<(f64, f64)>,
     /// Recovery rate
     pub recovery_rate: f64,
     /// Optional issuer
@@ -197,11 +197,9 @@ impl From<HazardCurve> for RawHazardCurve {
             .collect();
 
         RawHazardCurve {
-            common_id: super::common::StateId {
-                id: curve.id.to_string(),
-            },
+            id: curve.id.to_string(),
             base: curve.base,
-            points: super::common::StateKnotPoints { knot_points },
+            knot_points,
             recovery_rate: curve.recovery_rate,
             issuer: curve.issuer,
             seniority: curve.seniority,
@@ -219,11 +217,11 @@ impl TryFrom<RawHazardCurve> for HazardCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawHazardCurve) -> crate::Result<Self> {
-        HazardCurve::builder(state.common_id.id)
+        HazardCurve::builder(state.id)
             .base_date(state.base)
             .recovery_rate(state.recovery_rate)
             .day_count(state.day_count)
-            .knots(state.points.knot_points)
+            .knots(state.knot_points)
             .par_spreads(state.par_points)
             .par_interp(state.par_interp)
             .interp(state.survival_interp)
@@ -490,6 +488,16 @@ impl HazardCurve {
     /// Create a builder with this curve's parameters, using a new ID.
     /// Useful for creating modified versions of the curve.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> HazardCurveBuilder {
+        self.metadata_builder(new_id)
+            .knots(self.knot_points())
+            .par_spreads(self.par_spread_points())
+    }
+
+    /// Builder pre-populated with this curve's full metadata but **no** knots
+    /// or par spreads. Shared by all rebuild-style operations (bumps, rolls)
+    /// so that no metadata field (issuer, seniority, currency, day-count,
+    /// par interpolation, survival interpolation style, fx_policy) is dropped.
+    pub(crate) fn metadata_builder(&self, new_id: impl Into<CurveId>) -> HazardCurveBuilder {
         HazardCurve::builder(new_id)
             .base_date(self.base)
             .recovery_rate(self.recovery_rate)
@@ -500,32 +508,11 @@ impl HazardCurve {
             .seniority_opt(self.seniority)
             .currency_opt(self.currency)
             .fx_policy_opt(self.fx_policy.clone())
-            .knots(self.knot_points())
-            .par_spreads(self.par_spread_points())
     }
 
     /// Recompute the survival-probability interpolator from current knots/lambdas.
     fn rebuild_interp(&mut self) -> crate::Result<()> {
-        use crate::math::interp::ExtrapolationPolicy;
-
-        let mut interp_knots = Vec::with_capacity(self.knots.len() + 1);
-        let mut interp_sp = Vec::with_capacity(self.knots.len() + 1);
-        interp_knots.push(0.0);
-        interp_sp.push(1.0);
-
-        let mut accum = 0.0;
-        let mut prev_t = 0.0;
-        for (&t, &lambda) in self.knots.iter().zip(self.lambdas.iter()) {
-            if t <= 1e-9 {
-                prev_t = t;
-                continue;
-            }
-            accum += lambda * (t - prev_t);
-            interp_knots.push(t);
-            interp_sp.push((-accum).exp());
-            prev_t = t;
-        }
-
+        let (interp_knots, interp_sp) = survival_pillars(&self.knots, &self.lambdas);
         self.interp = super::common::build_interp(
             self.survival_interp_style,
             interp_knots.into_boxed_slice(),
@@ -549,7 +536,19 @@ impl HazardCurve {
             .into());
         }
 
+        // Recovery must be within [0, 1) for the par spread ⇢ hazard
+        // conversion below; recovery == 1.0 would divide by zero and yield an
+        // infinite shift. Mirrors the guard in `Bumpable::apply_bump`.
         let recovery = self.recovery_rate;
+        if !recovery.is_finite() || !(0.0..1.0).contains(&recovery) {
+            return Err(crate::error::InputError::UnsupportedBump {
+                reason: format!(
+                    "HazardCurve bump requires recovery rate in [0, 1), got {}",
+                    recovery
+                ),
+            }
+            .into());
+        }
         let (spread, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
             crate::error::InputError::UnsupportedBump {
                 reason: format!(
@@ -576,6 +575,12 @@ impl HazardCurve {
             }
             *lambda = shifted;
         }
+        // The stored par-spread quotes were calibrated to the *unbumped*
+        // hazards; keeping them would make `cds_quote_bp` report stale quotes.
+        // Clear them so `cds_quote_bp` falls back to the hazard-based
+        // approximation λ·(1−R)·1e4, which reflects the bumped curve.
+        self.par_tenors = Box::new([]);
+        self.par_spreads_bp = Box::new([]);
         self.rebuild_interp()
     }
 
@@ -604,17 +609,11 @@ impl HazardCurve {
         // In practice, the caller will manage IDs when building market contexts
         let temp_id = format!("{}_bump_{:.4}bp", self.id(), shift * 10_000.0);
 
-        HazardCurve::builder(temp_id)
-            .base_date(self.base)
-            .recovery_rate(self.recovery_rate)
-            .day_count(self.day_count)
-            .knots(shifted_points)
-            .par_interp(self.par_interp)
-            .issuer_opt(self.issuer.clone())
-            .seniority_opt(self.seniority)
-            .currency_opt(self.currency)
-            .par_spreads(self.par_spread_points())
-            .build()
+        // Full metadata is preserved via `metadata_builder`; the stored
+        // par-spread quotes are NOT carried over because they were calibrated
+        // to the unbumped hazards — `cds_quote_bp` falls back to the
+        // hazard-based approximation, which reflects the bumped curve.
+        self.metadata_builder(temp_id).knots(shifted_points).build()
     }
 
     /// Roll the curve forward by a specified number of days.
@@ -654,15 +653,12 @@ impl HazardCurve {
         let rolled_par_points =
             super::common::roll_knots(&self.par_tenors, &self.par_spreads_bp, dt_years);
 
-        let mut builder = HazardCurve::builder(self.id.clone())
+        // Thread the full metadata (issuer, seniority, currency, day-count,
+        // par/survival interpolation styles, fx_policy) and override the base.
+        let mut builder = self
+            .metadata_builder(self.id.clone())
             .base_date(new_base)
-            .recovery_rate(self.recovery_rate)
-            .day_count(self.day_count)
-            .knots(rolled_points)
-            .par_interp(self.par_interp)
-            .issuer_opt(self.issuer.clone())
-            .seniority_opt(self.seniority)
-            .currency_opt(self.currency);
+            .knots(rolled_points);
 
         // Add rolled par spread points if any
         if !rolled_par_points.is_empty() {
@@ -969,37 +965,9 @@ impl HazardCurveBuilder {
         let (p_ten, p_spd): (Vec<f64>, Vec<f64>) = par_pts.into_iter().unzip();
 
         // Convert hazard rates to survival probabilities for interpolation
-        // S(t_i) = exp(- sum(lambda_j * dt_j))
-        // We anchor at (0.0, 1.0) ensuring we always have at least 2 points (if N >= 1)
-        // and that S(0) = 1.
-        let mut interp_kvec = Vec::with_capacity(kvec.len() + 1);
-        let mut interp_svec = Vec::with_capacity(kvec.len() + 1);
-
-        interp_kvec.push(0.0);
-        interp_svec.push(1.0);
-
-        let mut accum = 0.0;
-        let mut prev_t = 0.0;
-        let mut has_zero_anchor = false;
-        let mut prev_lambda = None;
-
-        for (&t, &lambda) in kvec.iter().zip(lvec.iter()) {
-            if t <= 1e-9 {
-                has_zero_anchor = true;
-                prev_lambda = Some(lambda);
-                continue;
-            }
-            let segment_lambda = if has_zero_anchor {
-                prev_lambda.unwrap_or(lambda)
-            } else {
-                lambda
-            };
-            accum += segment_lambda * (t - prev_t);
-            interp_kvec.push(t);
-            interp_svec.push((-accum).exp());
-            prev_t = t;
-            prev_lambda = Some(lambda);
-        }
+        // using the single canonical λ-attribution convention shared with
+        // `rebuild_interp` (see `survival_pillars`).
+        let (interp_kvec, interp_svec) = survival_pillars(&kvec, &lvec);
 
         // Build interpolator over survival probabilities. The default
         // LogLinear style implies a piecewise-constant hazard rate.
@@ -1029,6 +997,55 @@ impl HazardCurveBuilder {
             fx_policy: self.fx_policy,
         })
     }
+}
+
+/// Convert piecewise-constant hazard knots `(tᵢ, λᵢ)` into survival-probability
+/// interpolation pillars `(tᵢ, S(tᵢ))` anchored at `(0, 1)`.
+///
+/// This is the **single canonical λ-attribution convention** used by both the
+/// builder (`HazardCurveBuilder::build`) and in-place rebuilds
+/// (`HazardCurve::rebuild_interp`, the `MarketContext::bump` / CS01 path):
+///
+/// - **No zero-time anchor knot**: λᵢ applies to the segment *ending* at tᵢ
+///   (segment `[tᵢ₋₁, tᵢ]` accrues `λᵢ·(tᵢ − tᵢ₋₁)`; segment `[0, t₁]` uses λ₁).
+/// - **Explicit t≈0 anchor knot**: λᵢ applies to the segment *starting* at tᵢ
+///   (segment `[0, t₁]` uses λ₀, segment `[t₁, t₂]` uses λ₁, …). The last λ
+///   does not affect survival within the knot range; it is reported by
+///   `hazard_rate` beyond the last knot.
+///
+/// Sharing this function guarantees that bumping a curve in place with a
+/// zero-size bump is an exact no-op (no silent re-attribution of base hazards
+/// into spurious CS01 components).
+fn survival_pillars(knots: &[f64], lambdas: &[f64]) -> (Vec<f64>, Vec<f64>) {
+    let mut interp_knots = Vec::with_capacity(knots.len() + 1);
+    let mut interp_sp = Vec::with_capacity(knots.len() + 1);
+    interp_knots.push(0.0);
+    interp_sp.push(1.0);
+
+    let mut accum = 0.0;
+    let mut prev_t = 0.0;
+    let mut has_zero_anchor = false;
+    let mut prev_lambda = None;
+
+    for (&t, &lambda) in knots.iter().zip(lambdas.iter()) {
+        if t <= 1e-9 {
+            has_zero_anchor = true;
+            prev_lambda = Some(lambda);
+            continue;
+        }
+        let segment_lambda = if has_zero_anchor {
+            prev_lambda.unwrap_or(lambda)
+        } else {
+            lambda
+        };
+        accum += segment_lambda * (t - prev_t);
+        interp_knots.push(t);
+        interp_sp.push((-accum).exp());
+        prev_t = t;
+        prev_lambda = Some(lambda);
+    }
+
+    (interp_knots, interp_sp)
 }
 
 // -----------------------------------------------------------------------------
@@ -1187,6 +1204,110 @@ mod tests {
         assert_eq!(hc.hazard_rate(-1.0), 0.01);
         assert_eq!(hc.hazard_rate(0.0), 0.01);
         assert_eq!(hc.hazard_rate(10.0), 0.02);
+    }
+
+    /// Regression test (2026-06-09 core quant review, "Major — market data"
+    /// item 2): `build()` and `rebuild_interp` (the `MarketContext::bump` /
+    /// CS01 path via `bump_in_place`) must share one λ-segment attribution
+    /// convention. A zero-size bump must be an exact no-op even for curves
+    /// with an explicit t=0 anchor knot.
+    #[test]
+    fn zero_size_bump_in_place_is_noop_for_zero_anchored_curve() {
+        use crate::market_data::bumps::BumpSpec;
+
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+        let curve = HazardCurve::builder("ZERO-ANCHORED")
+            .base_date(base)
+            .recovery_rate(0.40)
+            .knots([(0.0, 0.01), (1.0, 0.02), (5.0, 0.015)])
+            .build()
+            .expect("zero-anchored hazard curve builds");
+
+        let mut bumped = curve.clone();
+        bumped
+            .bump_in_place(&BumpSpec::parallel_bp(0.0))
+            .expect("zero bump succeeds");
+
+        for t in [0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0] {
+            assert!(
+                (bumped.sp(t) - curve.sp(t)).abs() < 1e-15,
+                "zero bump must not change survival at t={t}: \
+                 bumped {} vs base {}",
+                bumped.sp(t),
+                curve.sp(t)
+            );
+        }
+    }
+
+    /// A small parallel spread bump on a zero-anchored curve must shift the
+    /// average hazard −ln(S(t))/t by exactly spread/(1−R) at every t inside
+    /// the knot range — with no spurious re-attribution of base hazards.
+    #[test]
+    fn small_bump_in_place_shifts_average_hazard_uniformly() {
+        use crate::market_data::bumps::BumpSpec;
+
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+        let recovery = 0.40;
+        let curve = HazardCurve::builder("ZERO-ANCHORED-SMALL")
+            .base_date(base)
+            .recovery_rate(recovery)
+            .knots([(0.0, 0.01), (1.0, 0.02), (5.0, 0.015)])
+            .build()
+            .expect("zero-anchored hazard curve builds");
+
+        let spread_bp = 10.0;
+        let expected_shift = (spread_bp / 10_000.0) / (1.0 - recovery);
+
+        let mut bumped = curve.clone();
+        bumped
+            .bump_in_place(&BumpSpec::parallel_bp(spread_bp))
+            .expect("small bump succeeds");
+
+        for t in [0.5, 1.0, 2.0, 3.0, 5.0] {
+            let base_avg = -curve.sp(t).ln() / t;
+            let bumped_avg = -bumped.sp(t).ln() / t;
+            assert!(
+                (bumped_avg - base_avg - expected_shift).abs() < 1e-12,
+                "average hazard change at t={t} must equal the bump: \
+                 got {}, expected {}",
+                bumped_avg - base_avg,
+                expected_shift
+            );
+        }
+    }
+
+    /// `bump_in_place` clears stored par-spread quotes (they were calibrated
+    /// to the unbumped hazards); `cds_quote_bp` then falls back to the
+    /// hazard-based approximation λ·(1−R)·1e4 reflecting the bumped curve.
+    #[test]
+    fn bump_in_place_clears_stale_par_spread_quotes() {
+        use crate::market_data::bumps::BumpSpec;
+
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+        let recovery = 0.40;
+        let mut curve = HazardCurve::builder("QUOTED")
+            .base_date(base)
+            .recovery_rate(recovery)
+            .knots([(1.0, 0.01), (5.0, 0.01)])
+            .par_spreads([(1.0, 60.0), (5.0, 60.0)])
+            .build()
+            .expect("quoted hazard curve builds");
+
+        curve
+            .bump_in_place(&BumpSpec::parallel_bp(10.0))
+            .expect("bump succeeds");
+
+        assert_eq!(
+            curve.par_spread_points().count(),
+            0,
+            "stale par quotes must be cleared on bump"
+        );
+        // Fallback quote reflects the bumped hazard: (0.01 + 0.001/0.6)·0.6·1e4 = 70bp.
+        let quote = curve.cds_quote_bp(3.0, ParInterp::Linear);
+        assert!(
+            (quote - 70.0).abs() < 1e-9,
+            "fallback quote must reflect bumped hazards, got {quote}"
+        );
     }
 
     #[test]

@@ -53,6 +53,7 @@ const DEFAULT_LAMBDA: f64 = 0.7308;
 ///
 /// See module-level documentation for model details.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "RawDieboldLi")]
 pub struct DieboldLi {
     /// Decay parameter lambda (fixed, not estimated).
     lambda: f64,
@@ -66,6 +67,48 @@ pub struct DieboldLi {
     q_cov: Option<DMatrix<f64>>,
     /// Tenor grid from the input panel.
     tenors: Vec<f64>,
+}
+
+/// Raw deserialization state of [`DieboldLi`].
+///
+/// Mirrors the serialized field layout exactly; conversion re-applies the
+/// builder's lambda validation and rejects unknown fields.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawDieboldLi {
+    /// Decay parameter lambda.
+    lambda: f64,
+    /// Extracted factor time series.
+    factors: Option<FactorTimeSeries>,
+    /// VAR(1) intercept vector mu.
+    mu: Option<DVector<f64>>,
+    /// VAR(1) coefficient matrix Phi.
+    phi: Option<DMatrix<f64>>,
+    /// VAR(1) residual covariance Q.
+    q_cov: Option<DMatrix<f64>>,
+    /// Tenor grid from the input panel.
+    tenors: Vec<f64>,
+}
+
+impl TryFrom<RawDieboldLi> for DieboldLi {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawDieboldLi) -> crate::Result<Self> {
+        if !raw.lambda.is_finite() || raw.lambda <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "Lambda must be positive and finite, got {}",
+                raw.lambda
+            )));
+        }
+        Ok(Self {
+            lambda: raw.lambda,
+            factors: raw.factors,
+            mu: raw.mu,
+            phi: raw.phi,
+            q_cov: raw.q_cov,
+            tenors: raw.tenors,
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -88,7 +88,7 @@ impl DiscountCurve {
     /// `"cubic_hermite"`, `"piecewise_quadratic_forward"`.
     /// @param extrapolation - Extrapolation policy (default
     /// `"flat_forward"`). One of `"flat_zero"`, `"flat_forward"`, `"nan"`.
-    /// @param dayCount - Day-count convention (default `"act_365f"`).
+    /// @param dayCount - Day-count convention (defaults to curve-ID inference).
     /// @returns The constructed `DiscountCurve`.
     /// @throws If `knots` length is odd, the date is malformed, the
     /// interpolation style is unknown, or any `df` is non-positive.
@@ -180,7 +180,7 @@ impl ForwardCurve {
     /// * `tenor` - Index tenor in years.
     /// * `baseDate` - ISO date string.
     /// * `knots` - Flat `[t0, rate0, t1, rate1, …]` array.
-    /// * `dayCount` - Day-count convention (default ``"act_360"``).
+    /// * `dayCount` - Day-count convention (defaults to curve-ID inference).
     /// * `interp` - Interpolation style (default ``"linear"``).
     /// * `extrapolation` - Extrapolation policy (default ``"flat_forward"``).
     #[wasm_bindgen(constructor)]
@@ -194,10 +194,6 @@ impl ForwardCurve {
         extrapolation: Option<String>,
     ) -> Result<ForwardCurve, JsValue> {
         let base = parse_iso_date(base_date)?;
-        let dc = match day_count {
-            Some(ref s) => parse_day_count(s)?,
-            None => DayCount::Act360,
-        };
         let style = match interp {
             Some(ref s) => parse_interp_style(s)?,
             None => InterpStyle::Linear,
@@ -214,14 +210,16 @@ impl ForwardCurve {
         }
         let pairs: Vec<(f64, f64)> = knots.chunks_exact(2).map(|c| (c[0], c[1])).collect();
 
-        let curve = RustForwardCurve::builder(id, tenor)
+        let mut builder = RustForwardCurve::builder(id, tenor)
             .base_date(base)
-            .day_count(dc)
             .knots(pairs)
             .interp(style)
-            .extrapolation(extrap)
-            .build()
-            .map_err(to_js_err)?;
+            .extrapolation(extrap);
+        if let Some(ref s) = day_count {
+            builder = builder.day_count(parse_day_count(s)?);
+        }
+
+        let curve = builder.build().map_err(to_js_err)?;
 
         Ok(Self {
             inner: Arc::new(curve),
@@ -311,27 +309,20 @@ impl FxConversionPolicy {
 #[wasm_bindgen(js_name = FxRateResult)]
 pub struct FxRateResult {
     inner: RustFxRateResult,
-    policy: RustFxConversionPolicy,
 }
 
 #[wasm_bindgen(js_class = FxRateResult)]
 impl FxRateResult {
     /// The FX conversion rate.
-    #[wasm_bindgen(js_name = getRate)]
-    pub fn get_rate(&self) -> f64 {
+    #[wasm_bindgen(getter, js_name = rate)]
+    pub fn rate(&self) -> f64 {
         self.inner.rate
     }
 
     /// Whether the rate was obtained via triangulation.
-    #[wasm_bindgen(js_name = getTriangulated)]
-    pub fn get_triangulated(&self) -> bool {
+    #[wasm_bindgen(getter, js_name = triangulated)]
+    pub fn triangulated(&self) -> bool {
         self.inner.triangulated
-    }
-
-    /// The applied conversion policy.
-    #[wasm_bindgen(js_name = getPolicy)]
-    pub fn get_policy(&self) -> FxConversionPolicy {
-        FxConversionPolicy { inner: self.policy }
     }
 }
 
@@ -399,10 +390,7 @@ impl FxMatrix {
 
         let query = FxQuery::with_policy(base_ccy, quote_ccy, d, pol);
         let result = self.inner.rate(query).map_err(to_js_err)?;
-        Ok(FxRateResult {
-            inner: result,
-            policy: pol,
-        })
+        Ok(FxRateResult { inner: result })
     }
 }
 
@@ -727,9 +715,8 @@ mod tests {
         let m = FxMatrix::new();
         m.set_quote("USD", "EUR", 0.92).expect("set quote");
         let r = m.rate("USD", "EUR", "2024-01-15", None).expect("fx rate");
-        assert!((r.get_rate() - 0.92).abs() < 1e-9);
-        assert!(!r.get_triangulated());
-        assert_eq!(r.get_policy().to_string(), "cashflow_date");
+        assert!((r.rate() - 0.92).abs() < 1e-9);
+        assert!(!r.triangulated());
     }
 
     // VolCube tests require a WASM runtime (JsValue) — run via wasm-pack test.

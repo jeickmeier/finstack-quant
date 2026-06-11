@@ -224,7 +224,9 @@ impl Tenor {
         } else {
             // Convert to days
             let days = match day_count {
-                DayCount::Thirty360 | DayCount::ThirtyE360 => (years * 360.0).round(),
+                DayCount::Thirty360 | DayCount::ThirtyE360 | DayCount::ThirtyE360Isda => {
+                    (years * 360.0).round()
+                }
                 DayCount::Act360 => (years * 360.0).round(),
                 DayCount::Act365F => (years * 365.0).round(),
                 _ => (years * 365.25).round(),

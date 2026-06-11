@@ -85,9 +85,12 @@ fn test_cashflow_conservation_of_value() {
         .quote_rate(0.03)
         .build();
 
-    // Execute
+    // Execute - compare against the pricing-view trade NPV (`npv_raw`), which
+    // discounts every scheduled flow including the T+0 initial exchange. The
+    // holder-view `value` excludes flows on `as_of` and would differ by the
+    // initial notional.
     let flows = dep.dated_cashflows(&ctx, base).unwrap();
-    let pv = dep.value(&ctx, base).unwrap();
+    let npv = dep.npv_raw(&ctx, base).unwrap();
 
     // Manually discount flows
     let disc = ctx.get_discount("USD-OIS").unwrap();
@@ -99,15 +102,15 @@ fn test_cashflow_conservation_of_value() {
         manual_pv += amount.amount() * df;
     }
 
-    // Validate - manual calculation should match npv() within machine epsilon
+    // Validate - manual calculation should match npv_raw() within machine epsilon
     // Both calculations discount the same cashflows using the same curve,
     // so residual should be at floating-point precision, not basis points.
     assert!(
-        (manual_pv - pv.amount()).abs() < 1e-6,
+        (manual_pv - npv).abs() < 1e-6,
         "Cashflow conservation violated: manual_pv={}, npv={}, diff={}",
         manual_pv,
-        pv.amount(),
-        (manual_pv - pv.amount()).abs()
+        npv,
+        (manual_pv - npv).abs()
     );
 }
 

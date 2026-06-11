@@ -61,9 +61,11 @@ fn unflatten_matrix(flat: Vec<f64>, n: usize) -> Vec<Vec<f64>> {
 /// or has mismatched dimensions.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix)")]
-fn cholesky_decomposition(matrix: Vec<Vec<f64>>) -> PyResult<Vec<Vec<f64>>> {
+fn cholesky_decomposition(py: Python<'_>, matrix: Vec<Vec<f64>>) -> PyResult<Vec<Vec<f64>>> {
     let (flat, n) = flatten_matrix(matrix)?;
-    let result = linalg::cholesky_decomposition(&flat, n).map_err(cholesky_err)?;
+    let result = py
+        .detach(|| linalg::cholesky_decomposition(&flat, n))
+        .map_err(cholesky_err)?;
     Ok(unflatten_matrix(result, n))
 }
 
@@ -75,7 +77,7 @@ fn cholesky_decomposition(matrix: Vec<Vec<f64>>) -> PyResult<Vec<Vec<f64>>> {
 /// Raises ``CholeskyError`` on dimension mismatch or singular factor.
 #[pyfunction]
 #[pyo3(text_signature = "(chol, b)")]
-fn cholesky_solve(chol: Vec<Vec<f64>>, b: Vec<f64>) -> PyResult<Vec<f64>> {
+fn cholesky_solve(py: Python<'_>, chol: Vec<Vec<f64>>, b: Vec<f64>) -> PyResult<Vec<f64>> {
     let (flat, n) = flatten_matrix(chol)?;
     if b.len() != n {
         return Err(crate::errors::value_error(format!(
@@ -84,7 +86,8 @@ fn cholesky_solve(chol: Vec<Vec<f64>>, b: Vec<f64>) -> PyResult<Vec<f64>> {
         )));
     }
     let mut x = vec![0.0; n];
-    linalg::cholesky_solve(&flat, &b, &mut x).map_err(cholesky_err)?;
+    py.detach(|| linalg::cholesky_solve(&flat, &b, &mut x))
+        .map_err(cholesky_err)?;
     Ok(x)
 }
 

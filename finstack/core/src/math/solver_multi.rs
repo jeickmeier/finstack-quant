@@ -200,6 +200,15 @@ pub const LAMBDA_MAX: f64 = 1e15;
 /// an ill-conditioned problem or poor initial guess.
 pub const LAMBDA_BOUND_WARNING_THRESHOLD: usize = 5;
 
+/// Relative floor applied to the `JᵀJ` diagonal in Marquardt damping.
+///
+/// The damping term is `λ · max(JᵀJ_ii, floor)` with
+/// `floor = MARQUARDT_DIAG_FLOOR_REL × max_i(JᵀJ_ii)`, so a parameter with
+/// (numerically) zero curvature still receives a small positive damping and
+/// cannot make the damped normal-equations matrix singular or produce an
+/// unbounded step.
+pub const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
+
 /// Levenberg-Marquardt solver for non-linear least squares.
 ///
 /// Combines Gauss-Newton and gradient descent methods using a damping parameter
@@ -210,7 +219,7 @@ pub const LAMBDA_BOUND_WARNING_THRESHOLD: usize = 5;
 ///
 /// At each iteration, solves:
 /// ```text
-/// (J^T J + λI) δ = -J^T r
+/// (J^T J + λ·diag(J^T J)) δ = -J^T r
 ///
 /// where:
 ///   J = Jacobian matrix
@@ -218,6 +227,10 @@ pub const LAMBDA_BOUND_WARNING_THRESHOLD: usize = 5;
 ///   λ = damping parameter (adaptive)
 ///   δ = parameter update
 /// ```
+///
+/// The damping uses Marquardt's diagonal scaling `λ·diag(JᵀJ)` (with a small
+/// relative floor, see [`MARQUARDT_DIAG_FLOOR_REL`]) rather than the unscaled
+/// Levenberg `+λI`, so steps are invariant to per-parameter rescaling.
 ///
 /// - **λ → 0**: Gauss-Newton (fast near solution)
 /// - **λ → ∞**: Gradient descent (robust far from solution)
@@ -257,7 +270,12 @@ pub struct LevenbergMarquardtSolver {
     pub lambda_init: f64,
     /// Factor for adjusting lambda (increase on failure, decrease on success)
     pub lambda_factor: f64,
-    /// Finite difference step size for Jacobian approximation
+    /// Base finite difference step for the central-difference Jacobian.
+    ///
+    /// The per-component step is `h_j = fd_step × max(1, |x_j|)`. The default
+    /// is `ε^(1/3) ≈ 6.06e-6`, the optimal step for central differences
+    /// (truncation error O(h²) balanced against rounding error O(ε/h);
+    /// Press et al. (2007), *Numerical Recipes*, Section 5.7).
     pub fd_step: f64,
     /// Minimum allowed step size (for numerical stability)
     pub min_step_size: f64,
@@ -270,7 +288,9 @@ impl Default for LevenbergMarquardtSolver {
             max_iterations: 100,
             lambda_init: 1e-3,
             lambda_factor: 10.0,
-            fd_step: 1e-8,
+            // ε^(1/3): optimal base step for central differences (the 1e-8
+            // forward-difference step loses ~half the achievable accuracy).
+            fd_step: f64::EPSILON.cbrt(),
             min_step_size: 1e-12,
         }
     }
@@ -308,6 +328,17 @@ impl LevenbergMarquardtSolver {
 
     /// Minimize objective function starting from an initial guess.
     ///
+    /// # Scalar-objective formulation (important)
+    ///
+    /// This routine wraps the scalar objective as a single LM "residual", so the
+    /// update step targets `f(x) = 0`, **not** `∇f(x) = 0`. It is only suitable
+    /// for objectives whose minimum value is approximately zero — e.g.
+    /// least-squares residual norms / sums of squared errors. Objectives with
+    /// strictly positive minima may stall near the optimum, and objectives that
+    /// can go negative may have improving steps rejected. See
+    /// `docs/reviews/2026-06-09-core-quant-review.md` ("Scalar-objective LM is
+    /// a root-finder for f(x)=0").
+    ///
     /// # Arguments
     /// * `objective` - Function to minimize, takes a parameter vector and returns a scalar.
     /// * `initial` - Initial parameter guess.
@@ -315,6 +346,16 @@ impl LevenbergMarquardtSolver {
     ///
     /// # Returns
     /// Optimal parameter vector that minimizes the objective.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InputError::SolverConvergenceFailed`] when the solver
+    /// encounters a numerical failure, or terminates (iteration budget
+    /// exhausted, or step below `min_step_size`) at a point that satisfies
+    /// neither the residual nor the (bounds-projected) gradient tolerance.
+    /// Termination at a genuinely converged point — objective within
+    /// `tolerance` of zero, or projected gradient below `tolerance` (e.g. a
+    /// box-constrained minimum on the boundary) — still returns `Ok`.
     pub fn minimize<Obj>(
         &self,
         objective: Obj,
@@ -344,16 +385,66 @@ impl LevenbergMarquardtSolver {
                 }
             };
 
-        Ok(self
-            .solve_lm_core_with_stats(
-                initial.to_vec(),
-                &residuals_func,
-                jacobian_func,
-                convergence_check,
-                1, // n_residuals
-                bounds,
-            )?
-            .params)
+        let solution = self.solve_lm_core_with_stats(
+            initial.to_vec(),
+            &residuals_func,
+            jacobian_func,
+            convergence_check,
+            1, // n_residuals
+            bounds,
+        )?;
+        self.scalar_solution_to_result(solution, |p| self.compute_jacobian(&objective, p), bounds)
+    }
+
+    /// Map a scalar-objective [`LmSolution`] to either the parameter vector or
+    /// a structured convergence error.
+    ///
+    /// `NumericalFailure` always becomes
+    /// [`InputError::SolverConvergenceFailed`]. `MaxIterations` and
+    /// `StepTooSmall` are accepted only when the iterate is converged in
+    /// substance: the final residual (objective value) is within tolerance, or
+    /// the bounds-projected gradient norm is within tolerance (a genuine
+    /// stationary point, possibly on a box-constraint boundary). A budget
+    /// exhaustion or pure stall away from any such point is an error — the
+    /// previous behaviour of silently returning the best iterate is gone
+    /// (review 2026-06-09, core math).
+    fn scalar_solution_to_result<G>(
+        &self,
+        solution: LmSolution,
+        gradient_at: G,
+        bounds: Option<&[(f64, f64)]>,
+    ) -> Result<Vec<f64>>
+    where
+        G: FnOnce(&[f64]) -> Vec<f64>,
+    {
+        use LmTerminationReason as Reason;
+        let converged = match solution.stats.termination_reason {
+            Reason::ConvergedResidualNorm
+            | Reason::ConvergedRelativeReduction
+            | Reason::ConvergedGradient => true,
+            Reason::NumericalFailure => false,
+            Reason::MaxIterations | Reason::StepTooSmall => {
+                solution.stats.final_residual_norm.abs() <= self.tolerance || {
+                    let gradient = gradient_at(&solution.params);
+                    projected_gradient_norm(&gradient, &solution.params, bounds) < self.tolerance
+                }
+            }
+        };
+        if converged {
+            Ok(solution.params)
+        } else {
+            Err(InputError::SolverConvergenceFailed {
+                iterations: solution.stats.iterations,
+                residual: solution.stats.final_residual_norm,
+                last_x: solution.stats.final_step_norm,
+                reason: format!(
+                    "Levenberg-Marquardt minimize terminated with {:?} before reaching \
+                     tolerance {:.1e} (last_x reports the final step norm)",
+                    solution.stats.termination_reason, self.tolerance
+                ),
+            }
+            .into())
+        }
     }
 
     /// Compute Jacobian matrix using finite differences.
@@ -442,7 +533,14 @@ impl LevenbergMarquardtSolver {
         }
     }
 
-    /// Solve the normal equations (J^T J + λI) δ = -J^T r into pre-allocated workspace.
+    /// Solve the damped normal equations `(JᵀJ + λ·diag(JᵀJ)) δ = -Jᵀr` into
+    /// pre-allocated workspace.
+    ///
+    /// Uses Marquardt's diagonal scaling (Marquardt 1963) rather than the
+    /// unscaled Levenberg `+λI`, making the step invariant to per-parameter
+    /// rescaling. Diagonal entries are floored at
+    /// [`MARQUARDT_DIAG_FLOOR_REL`]` × max_i(JᵀJ_ii)` so zero-curvature
+    /// components cannot stall the factorisation or produce unbounded steps.
     fn solve_normal_equations_into(
         &self,
         jacobian: &[f64],
@@ -472,8 +570,32 @@ impl LevenbergMarquardtSolver {
             }
         }
 
+        // Damping term λ·max(JᵀJ_ii, floor).
+        //
+        // For a genuine least-squares system (m ≥ n) the floor is a tiny
+        // fraction of the largest diagonal entry, giving Marquardt's
+        // scale-invariant λ·diag(JᵀJ) damping (Marquardt 1963).
+        //
+        // For rank-deficient formulations (m < n, e.g. the scalar-objective
+        // wrapper where JᵀJ = ggᵀ is rank 1) true Marquardt damping is
+        // pathological: in the large-λ limit the step components scale as
+        // -f/(λ·g_i), *diverging* exactly where the gradient is small, and
+        // the iteration zigzags to a stall. There the floor is raised to
+        // max_diag itself, i.e. scale-invariant Levenberg damping
+        // λ·max_diag·I (still invariant under uniform rescaling of the
+        // objective, unlike the historical unscaled +λI).
+        let max_diag = (0..n).map(|i| ws.matrix[i * n + i]).fold(0.0_f64, f64::max);
+        let diag_floor = if max_diag <= 0.0 {
+            // Degenerate all-zero Jacobian: fall back to unit Levenberg +λI.
+            1.0
+        } else if m < n {
+            max_diag
+        } else {
+            MARQUARDT_DIAG_FLOOR_REL * max_diag
+        };
         for i in 0..n {
-            ws.matrix[i * n + i] += lambda;
+            let d = ws.matrix[i * n + i];
+            ws.matrix[i * n + i] = d + lambda * d.max(diag_floor);
             for j in 0..i {
                 ws.matrix[j * n + i] = ws.matrix[i * n + j];
             }
@@ -672,6 +794,12 @@ impl LevenbergMarquardtSolver {
 
     /// Minimize objective function with analytical derivatives.
     ///
+    /// The same scalar-objective formulation caveat and error semantics as
+    /// [`Self::minimize`] apply: the step targets `f(x) = 0`, and
+    /// non-convergent terminations return
+    /// [`InputError::SolverConvergenceFailed`] instead of silently handing back
+    /// the best iterate.
+    ///
     /// # Arguments
     /// * `objective` - Function to minimize
     /// * `derivatives` - Provider of analytical derivatives
@@ -680,6 +808,12 @@ impl LevenbergMarquardtSolver {
     ///
     /// # Returns
     /// Optimal parameter vector
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InputError::SolverConvergenceFailed`] on `MaxIterations`,
+    /// `NumericalFailure`, or a stall at a non-converged point (see
+    /// [`Self::minimize`]).
     pub fn minimize_with_derivatives<Obj, D>(
         &self,
         objective: Obj,
@@ -711,16 +845,19 @@ impl LevenbergMarquardtSolver {
                 }
             };
 
-        Ok(self
-            .solve_lm_core_with_stats(
-                initial.to_vec(),
-                &residuals_func,
-                jacobian_func,
-                convergence_check,
-                1, // n_residuals
-                bounds,
-            )?
-            .params)
+        let solution = self.solve_lm_core_with_stats(
+            initial.to_vec(),
+            &residuals_func,
+            jacobian_func,
+            convergence_check,
+            1, // n_residuals
+            bounds,
+        )?;
+        self.scalar_solution_to_result(
+            solution,
+            |p| self.compute_gradient_with_analytical(&objective, p, Some(derivatives)),
+            bounds,
+        )
     }
 
     /// Solve system of equations with explicit residual dimension and stats.
@@ -838,13 +975,38 @@ impl LevenbergMarquardtSolver {
     }
 }
 
+/// Norm of the gradient projected onto the feasible directions of box bounds.
+///
+/// Gradient components that push a parameter further into an active bound
+/// (lower bound with positive gradient, upper bound with negative gradient —
+/// for a minimization step `-g`) are zeroed: at such points the objective
+/// cannot be reduced without leaving the box, so they do not count against
+/// stationarity. Without bounds this is the plain Euclidean gradient norm.
+fn projected_gradient_norm(gradient: &[f64], params: &[f64], bounds: Option<&[(f64, f64)]>) -> f64 {
+    let mut sum_sq = 0.0;
+    for (i, &g) in gradient.iter().enumerate() {
+        let blocked = bounds
+            .and_then(|b| b.get(i))
+            .is_some_and(|&(lo, hi)| (params[i] <= lo && g > 0.0) || (params[i] >= hi && g < 0.0));
+        if !blocked {
+            sum_sq += g * g;
+        }
+    }
+    sum_sq.sqrt()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_levenberg_marquardt_simple_minimum() {
-        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-10);
+        // Review 2026-06-09 (core math): this test previously passed via the
+        // silent best-guess-on-MaxIterations behaviour with tolerance 1e-10
+        // (the scalar root-finder formulation stalls at gradient ~1e-9 once
+        // the residual underflows toward f64 epsilon). Use an attainable
+        // gradient tolerance now that non-convergence is a hard error.
+        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-8);
 
         // Minimize (x-2)^2 + (y-3)^2
         let objective =
@@ -876,6 +1038,68 @@ mod tests {
         // Solution should be at boundary (3, 3)
         assert!((result[0] - 3.0).abs() < 1e-6);
         assert!((result[1] - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_minimize_errors_on_max_iterations() {
+        // Review 2026-06-09 (core math): minimize() used to silently return the
+        // best iterate on MaxIterations; it must now fail loudly.
+        let solver = LevenbergMarquardtSolver::new()
+            .with_tolerance(1e-12)
+            .with_max_iterations(0);
+
+        let objective = |params: &[f64]| -> f64 { (params[0] - 2.0).powi(2) };
+        let result = solver.minimize(objective, &[0.0], None);
+
+        match result {
+            Err(crate::Error::Input(InputError::SolverConvergenceFailed { reason, .. })) => {
+                assert!(reason.contains("MaxIterations"), "reason: {reason}");
+            }
+            other => panic!("expected SolverConvergenceFailed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_minimize_with_derivatives_errors_on_max_iterations() {
+        struct QuadraticDerivatives;
+        impl AnalyticalDerivatives for QuadraticDerivatives {
+            fn gradient(&self, params: &[f64], gradient: &mut [f64]) {
+                gradient[0] = 2.0 * (params[0] - 2.0);
+            }
+        }
+
+        let solver = LevenbergMarquardtSolver::new()
+            .with_tolerance(1e-12)
+            .with_max_iterations(0);
+
+        let objective = |params: &[f64]| -> f64 { (params[0] - 2.0).powi(2) };
+        let result =
+            solver.minimize_with_derivatives(objective, &QuadraticDerivatives, &[0.0], None);
+        assert!(
+            matches!(
+                result,
+                Err(crate::Error::Input(
+                    InputError::SolverConvergenceFailed { .. }
+                ))
+            ),
+            "expected SolverConvergenceFailed, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_projected_gradient_norm_zeroes_active_bounds() {
+        // At the upper bound with a negative gradient (descent direction blocked
+        // by the box), the component must not count against stationarity.
+        let gradient = [-4.0, -4.0];
+        let params = [3.0, 3.0];
+        let bounds = [(0.0, 3.0), (0.0, 3.0)];
+        assert_eq!(
+            projected_gradient_norm(&gradient, &params, Some(&bounds)),
+            0.0
+        );
+        // Without bounds the full norm applies.
+        let norm = projected_gradient_norm(&gradient, &params, None);
+        assert!((norm - 32.0_f64.sqrt()).abs() < 1e-12);
     }
 
     #[test]
@@ -924,9 +1148,13 @@ mod tests {
 
     #[test]
     fn test_least_squares_fitting() {
+        // Review 2026-06-09 (core math): previously passed via silent
+        // best-guess-on-MaxIterations (residual ~5e-5 after 100 evals). The
+        // scalar formulation converges linearly here, so give it an adequate
+        // budget and an attainable gradient tolerance.
         let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-8)
-            .with_max_iterations(100);
+            .with_tolerance(1e-6)
+            .with_max_iterations(2000);
 
         // Fit a quadratic y = a*x^2 + b*x + c to some data points
         // True parameters: a=1, b=-2, c=3
@@ -985,7 +1213,9 @@ mod tests {
             }
         }
 
-        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-10);
+        // Review 2026-06-09 (core math): tolerance loosened from 1e-10 to an
+        // attainable gradient norm now that MaxIterations is a hard error.
+        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-8);
 
         let objective =
             |params: &[f64]| -> f64 { (params[0] - 2.0).powi(2) + (params[1] - 3.0).powi(2) };
@@ -1163,7 +1393,9 @@ mod tests {
             }
         }
 
-        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-10);
+        // Review 2026-06-09 (core math): tolerance loosened from 1e-10 to an
+        // attainable gradient norm now that MaxIterations is a hard error.
+        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-8);
         let objective =
             |params: &[f64]| -> f64 { (params[0] - 2.0).powi(2) + (params[1] - 3.0).powi(2) };
         let derivatives = SimpleGradient;

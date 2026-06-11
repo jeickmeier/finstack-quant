@@ -6,8 +6,7 @@
 //! building a `VolSurface` wrapper.
 
 use finstack_core::market_data::arbitrage::{
-    check_butterfly_grid, check_calendar_spread_grid, check_local_vol_density_grid,
-    check_surface_grid, ArbitrageSeverity, ArbitrageType, ArbitrageViolation,
+    self as core_arbitrage, ArbitrageSeverity, ArbitrageType, ArbitrageViolation,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
@@ -95,7 +94,7 @@ fn violations_to_pylist<'py>(
 ///     ``message``, ``description``.
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = 1e-6))]
-fn check_butterfly<'py>(
+fn check_butterfly_grid<'py>(
     py: Python<'py>,
     strikes: Vec<f64>,
     expiries: Vec<f64>,
@@ -103,8 +102,9 @@ fn check_butterfly<'py>(
     forward_prices: Vec<f64>,
     tolerance: f64,
 ) -> PyResult<Bound<'py, PyList>> {
-    let violations = check_butterfly_grid(&strikes, &expiries, &vols, forward_prices, tolerance)
-        .map_err(core_to_py)?;
+    let violations =
+        core_arbitrage::check_butterfly_grid(&strikes, &expiries, &vols, forward_prices, tolerance)
+            .map_err(core_to_py)?;
     violations_to_pylist(py, &violations)
 }
 
@@ -130,7 +130,7 @@ fn check_butterfly<'py>(
 ///     One dict per violation.
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = 1e-6))]
-fn check_calendar_spread<'py>(
+fn check_calendar_spread_grid<'py>(
     py: Python<'py>,
     strikes: Vec<f64>,
     expiries: Vec<f64>,
@@ -138,9 +138,14 @@ fn check_calendar_spread<'py>(
     forward_prices: Vec<f64>,
     tolerance: f64,
 ) -> PyResult<Bound<'py, PyList>> {
-    let violations =
-        check_calendar_spread_grid(&strikes, &expiries, &vols, forward_prices, tolerance)
-            .map_err(core_to_py)?;
+    let violations = core_arbitrage::check_calendar_spread_grid(
+        &strikes,
+        &expiries,
+        &vols,
+        forward_prices,
+        tolerance,
+    )
+    .map_err(core_to_py)?;
     violations_to_pylist(py, &violations)
 }
 
@@ -165,15 +170,16 @@ fn check_calendar_spread<'py>(
 /// equivalent to the scalar case when all forwards are identical.
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward_prices))]
-fn check_local_vol_density<'py>(
+fn check_local_vol_density_grid<'py>(
     py: Python<'py>,
     strikes: Vec<f64>,
     expiries: Vec<f64>,
     vols: Vec<Vec<f64>>,
     forward_prices: Vec<f64>,
 ) -> PyResult<Bound<'py, PyList>> {
-    let violations = check_local_vol_density_grid(&strikes, &expiries, &vols, forward_prices)
-        .map_err(core_to_py)?;
+    let violations =
+        core_arbitrage::check_local_vol_density_grid(&strikes, &expiries, &vols, forward_prices)
+            .map_err(core_to_py)?;
     violations_to_pylist(py, &violations)
 }
 
@@ -204,7 +210,7 @@ fn check_local_vol_density<'py>(
 ///     (dict ``type -> count``), and ``violations`` (list[dict]).
 #[pyfunction]
 #[pyo3(signature = (strikes, expiries, vols, forward = None, forward_prices = None, tolerance = 1e-6))]
-fn check_all<'py>(
+fn check_surface_grid<'py>(
     py: Python<'py>,
     strikes: Vec<f64>,
     expiries: Vec<f64>,
@@ -213,7 +219,7 @@ fn check_all<'py>(
     forward_prices: Option<Vec<f64>>,
     tolerance: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let report = check_surface_grid(
+    let report = core_arbitrage::check_surface_grid(
         &strikes,
         &expiries,
         &vols,
@@ -271,18 +277,18 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Volatility surface arbitrage detection: butterfly, calendar spread, local-vol density.",
     )?;
 
-    m.add_function(wrap_pyfunction!(check_butterfly, &m)?)?;
-    m.add_function(wrap_pyfunction!(check_calendar_spread, &m)?)?;
-    m.add_function(wrap_pyfunction!(check_local_vol_density, &m)?)?;
-    m.add_function(wrap_pyfunction!(check_all, &m)?)?;
+    m.add_function(wrap_pyfunction!(check_butterfly_grid, &m)?)?;
+    m.add_function(wrap_pyfunction!(check_calendar_spread_grid, &m)?)?;
+    m.add_function(wrap_pyfunction!(check_local_vol_density_grid, &m)?)?;
+    m.add_function(wrap_pyfunction!(check_surface_grid, &m)?)?;
 
     let all = PyList::new(
         py,
         [
-            "check_butterfly",
-            "check_calendar_spread",
-            "check_local_vol_density",
-            "check_all",
+            "check_butterfly_grid",
+            "check_calendar_spread_grid",
+            "check_local_vol_density_grid",
+            "check_surface_grid",
         ],
     )?;
     m.setattr("__all__", all)?;

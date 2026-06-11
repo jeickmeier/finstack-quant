@@ -12,7 +12,7 @@ use finstack_core::credit::lgd;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
 
-use crate::errors::display_to_py;
+use crate::errors::core_to_py;
 
 // ---------------------------------------------------------------------------
 // Seniority recovery stats
@@ -41,7 +41,7 @@ fn seniority_recovery_stats<'py>(
         Some(agency) => lgd::seniority_recovery_stats(seniority, agency),
         None => lgd::seniority_recovery_stats_default(seniority),
     }
-    .map_err(display_to_py)?;
+    .map_err(core_to_py)?;
 
     let d = PyDict::new(py);
     d.set_item("mean", br.mean())?;
@@ -66,7 +66,7 @@ fn seniority_recovery_stats<'py>(
 #[pyfunction]
 #[pyo3(text_signature = "(mean, std, n_samples, seed)")]
 fn beta_recovery_sample(mean: f64, std: f64, n_samples: usize, seed: u64) -> PyResult<Vec<f64>> {
-    lgd::beta_recovery_sample(mean, std, n_samples, seed).map_err(display_to_py)
+    lgd::beta_recovery_sample(mean, std, n_samples, seed).map_err(core_to_py)
 }
 
 /// Return the value at quantile ``q`` for a Beta recovery distribution
@@ -79,7 +79,7 @@ fn beta_recovery_sample(mean: f64, std: f64, n_samples: usize, seed: u64) -> PyR
 #[pyfunction]
 #[pyo3(text_signature = "(mean, std, q)")]
 fn beta_recovery_quantile(mean: f64, std: f64, q: f64) -> PyResult<f64> {
-    lgd::beta_recovery_quantile(mean, std, q).map_err(display_to_py)
+    lgd::beta_recovery_quantile(mean, std, q).map_err(core_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -122,34 +122,47 @@ fn workout_lgd(
         time_to_resolution_years,
         discount_rate,
     )
-    .map_err(display_to_py)
+    .map_err(core_to_py)
 }
 
 // ---------------------------------------------------------------------------
 // Downturn LGD
 // ---------------------------------------------------------------------------
 
-/// Apply a Frye-Jacobs (2012) downturn adjustment to a base LGD.
+/// Apply a stressed downturn adjustment to a base LGD.
+///
+/// Proprietary mean-plus-multiple-of-Bernoulli-stdev approximation (this is
+/// NOT the Frye-Jacobs 2012 model, whose LGD function is
+/// ``cLGD = Phi(Phi^-1(cDR) - k) / cDR``):
 ///
 /// ```text
-/// LGD_downturn = LGD_base + sqrt(rho) * Phi^-1(q) * sqrt(LGD_base * (1 - LGD_base))
+/// LGD_downturn = LGD_base + lgd_sensitivity * sqrt(rho) * Phi^-1(q)
+///              * sqrt(LGD_base * (1 - LGD_base))
 /// ```
 ///
-/// with the LGD sensitivity fixed at 1.0. The result is clamped to [0, 1].
+/// The result is clamped to [0, 1].
 ///
 /// Arguments:
 ///     base_lgd: Through-the-cycle LGD in [0, 1].
 ///     asset_correlation: Asset correlation rho in (0, 1). Basel: 0.12-0.24.
+///     lgd_sensitivity: LGD sensitivity to the systematic factor (>= 0).
+///         Typical: 0.3-0.5.
 ///     stress_quantile: Downturn quantile in (0, 1), e.g. 0.999.
 #[pyfunction]
-#[pyo3(text_signature = "(base_lgd, asset_correlation, stress_quantile)")]
-fn downturn_lgd_frye_jacobs(
+#[pyo3(text_signature = "(base_lgd, asset_correlation, lgd_sensitivity, stress_quantile)")]
+fn downturn_lgd_stressed(
     base_lgd: f64,
     asset_correlation: f64,
+    lgd_sensitivity: f64,
     stress_quantile: f64,
 ) -> PyResult<f64> {
-    lgd::downturn_lgd_frye_jacobs(base_lgd, asset_correlation, stress_quantile)
-        .map_err(display_to_py)
+    lgd::downturn_lgd_stressed(
+        base_lgd,
+        asset_correlation,
+        lgd_sensitivity,
+        stress_quantile,
+    )
+    .map_err(core_to_py)
 }
 
 /// Apply a regulatory floor downturn adjustment to a base LGD.
@@ -167,7 +180,7 @@ fn downturn_lgd_frye_jacobs(
 #[pyfunction]
 #[pyo3(text_signature = "(base_lgd, add_on, floor)")]
 fn downturn_lgd_regulatory_floor(base_lgd: f64, add_on: f64, floor: f64) -> PyResult<f64> {
-    lgd::downturn_lgd_regulatory_floor(base_lgd, add_on, floor).map_err(display_to_py)
+    lgd::downturn_lgd_regulatory_floor(base_lgd, add_on, floor).map_err(core_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +193,7 @@ fn downturn_lgd_regulatory_floor(base_lgd: f64, add_on: f64, floor: f64) -> PyRe
 #[pyfunction]
 #[pyo3(text_signature = "(principal)")]
 fn ead_term_loan(principal: f64) -> PyResult<f64> {
-    lgd::ead_term_loan(principal).map_err(display_to_py)
+    lgd::ead_term_loan(principal).map_err(core_to_py)
 }
 
 /// Exposure at default for a revolving facility.
@@ -196,7 +209,7 @@ fn ead_term_loan(principal: f64) -> PyResult<f64> {
 #[pyfunction]
 #[pyo3(text_signature = "(drawn, undrawn, ccf)")]
 fn ead_revolver(drawn: f64, undrawn: f64, ccf: f64) -> PyResult<f64> {
-    lgd::ead_revolver(drawn, undrawn, ccf).map_err(display_to_py)
+    lgd::ead_revolver(drawn, undrawn, ccf).map_err(core_to_py)
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +228,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(beta_recovery_sample, &m)?)?;
     m.add_function(wrap_pyfunction!(beta_recovery_quantile, &m)?)?;
     m.add_function(wrap_pyfunction!(workout_lgd, &m)?)?;
-    m.add_function(wrap_pyfunction!(downturn_lgd_frye_jacobs, &m)?)?;
+    m.add_function(wrap_pyfunction!(downturn_lgd_stressed, &m)?)?;
     m.add_function(wrap_pyfunction!(downturn_lgd_regulatory_floor, &m)?)?;
     m.add_function(wrap_pyfunction!(ead_term_loan, &m)?)?;
     m.add_function(wrap_pyfunction!(ead_revolver, &m)?)?;
@@ -227,7 +240,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "beta_recovery_sample",
             "beta_recovery_quantile",
             "workout_lgd",
-            "downturn_lgd_frye_jacobs",
+            "downturn_lgd_stressed",
             "downturn_lgd_regulatory_floor",
             "ead_term_loan",
             "ead_revolver",

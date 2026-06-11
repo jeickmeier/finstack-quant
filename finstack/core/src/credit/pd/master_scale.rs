@@ -14,7 +14,8 @@ use super::error::PdCalibrationError;
 ///
 /// Each grade has an upper bound, a label, and an associated central PD.
 /// Grades are ordered from best (lowest PD) to worst (highest PD).
-/// A PD is mapped to the first grade whose `upper_pd` it does not exceed.
+/// A PD is mapped to the first grade whose **inclusive** `upper_pd` it does
+/// not exceed (`pd <= upper_pd`).
 ///
 /// # Examples
 ///
@@ -22,7 +23,7 @@ use super::error::PdCalibrationError;
 /// use finstack_core::credit::pd::MasterScale;
 ///
 /// let scale = MasterScale::sp_empirical().unwrap();
-/// let result = scale.map_pd(0.0015);
+/// let result = scale.map_pd(0.0015).unwrap();
 /// assert_eq!(result.grade, "BBB");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,9 +36,10 @@ pub struct MasterScale {
 pub struct MasterScaleGrade {
     /// Grade label (e.g., "AAA", "Aaa", "1", etc.).
     pub label: String,
-    /// Upper PD boundary for this grade (exclusive).
+    /// Upper PD boundary for this grade (**inclusive**).
     ///
-    /// A PD <= this value maps to this grade (checked in order).
+    /// A PD <= this value maps to this grade (checked in order), so a PD
+    /// exactly on the boundary maps to the better grade.
     pub upper_pd: f64,
     /// Central (representative) PD for the grade.
     ///
@@ -104,34 +106,49 @@ impl MasterScale {
 
     /// Map a PD to the corresponding grade.
     ///
-    /// Returns the first grade whose `upper_pd >= input_pd`.
+    /// Returns the first grade whose inclusive `upper_pd >= input_pd`.
     /// If `input_pd` exceeds all grades, returns the worst (last) grade.
-    #[must_use]
-    pub fn map_pd(&self, pd: f64) -> MasterScaleResult {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PdCalibrationError::NonFiniteValue`] if `pd` is NaN or
+    /// infinite (2026-06-09 core quant review: NaN previously fell through
+    /// every comparison and silently mapped to the worst grade).
+    pub fn map_pd(&self, pd: f64) -> Result<MasterScaleResult, PdCalibrationError> {
+        if !pd.is_finite() {
+            return Err(PdCalibrationError::NonFiniteValue { value: pd });
+        }
         for (i, grade) in self.grades.iter().enumerate() {
             if pd <= grade.upper_pd {
-                return MasterScaleResult {
+                return Ok(MasterScaleResult {
                     grade: grade.label.clone(),
                     central_pd: grade.central_pd,
                     input_pd: pd,
                     grade_index: i,
-                };
+                });
             }
         }
 
         // PD exceeds all grades: return worst
         let last = self.grades.len() - 1;
-        MasterScaleResult {
+        Ok(MasterScaleResult {
             grade: self.grades[last].label.clone(),
             central_pd: self.grades[last].central_pd,
             input_pd: pd,
             grade_index: last,
-        }
+        })
     }
 
     /// Map a [`ScoringResult`] to a grade, using the result's `implied_pd`.
-    #[must_use]
-    pub fn map_score(&self, result: &ScoringResult) -> MasterScaleResult {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PdCalibrationError::NonFiniteValue`] if the result's
+    /// `implied_pd` is NaN or infinite.
+    pub fn map_score(
+        &self,
+        result: &ScoringResult,
+    ) -> Result<MasterScaleResult, PdCalibrationError> {
         self.map_pd(result.implied_pd)
     }
 

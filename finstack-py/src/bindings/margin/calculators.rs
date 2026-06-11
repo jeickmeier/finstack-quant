@@ -97,8 +97,10 @@ impl PyVmCalculator {
         day: u8,
     ) -> PyResult<PyVmResult> {
         let ccy: finstack_core::currency::Currency = currency.parse().map_err(display_to_py)?;
-        let exp = finstack_core::money::Money::new(exposure, ccy);
-        let posted = finstack_core::money::Money::new(posted_collateral, ccy);
+        let exp = finstack_core::money::Money::try_new(exposure, ccy)
+            .map_err(crate::errors::core_to_py)?;
+        let posted = finstack_core::money::Money::try_new(posted_collateral, ccy)
+            .map_err(crate::errors::core_to_py)?;
         let m = time::Month::try_from(month)
             .map_err(|e| crate::errors::value_error(format!("invalid month: {e}")))?;
         let as_of = finstack_core::dates::Date::from_calendar_date(year, m, day)

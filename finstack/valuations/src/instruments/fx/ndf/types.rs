@@ -628,13 +628,18 @@ impl Ndf {
         bdc: finstack_core::dates::BusinessDayConvention,
     ) -> finstack_core::Result<Self> {
         use crate::instruments::common_impl::fx_dates::{
-            adjust_joint_calendar, roll_spot_date, ResolvedCalendarPair,
+            adjust_joint_calendar, fx_spot_date_for_pair, ResolvedCalendarPair,
         };
 
-        let spot_date = roll_spot_date(
+        // CLS-consistent spot roll: a US holiday on an intermediate day does not
+        // delay a USD pair's spot date (2026-06-09 core quant review, FX spot
+        // finding). For NDFs the settlement currency (typically USD) is the
+        // quote side of the pair.
+        let spot_date = fx_spot_date_for_pair(
             trade_date,
             spot_lag_days,
-            bdc,
+            base_currency,
+            settlement_currency,
             base_calendar_id.as_deref(),
             quote_calendar_id.as_deref(),
         )?;

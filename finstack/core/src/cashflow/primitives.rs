@@ -345,8 +345,15 @@ pub struct CashFlow {
 impl CashFlow {
     /// Validate cashflow amount and fields.
     ///
+    /// Zero amounts are valid: floored coupons (e.g. a floating coupon with
+    /// a 0% floor in a negative-rate environment) legitimately produce
+    /// zero-amount cashflows (2026-06-09 core quant review minor finding —
+    /// zero amounts were previously rejected).
+    ///
     /// # Errors
-    /// Returns [`crate::Error::Input`] if the `amount` is zero.
+    /// Returns [`crate::Error::Input`] if the `amount`, accrual factor, or
+    /// rate is non-finite, or [`crate::Error::Validation`] if the accrual
+    /// factor is negative or the reset date is after the payment date.
     ///
     /// # Example
     /// ```rust
@@ -368,6 +375,7 @@ impl CashFlow {
     /// };
     /// assert!(cf.validate().is_ok());
     ///
+    /// // Zero amounts are valid (e.g. floored coupons).
     /// let zero_cf = CashFlow {
     ///     date,
     ///     reset_date: None,
@@ -376,23 +384,16 @@ impl CashFlow {
     ///     accrual_factor: 0.0,
     ///     rate: None,
     /// };
-    /// assert!(zero_cf.validate().is_err());
+    /// assert!(zero_cf.validate().is_ok());
     /// ```
     ///
     /// # Validation Rules
     ///
-    /// - Amount must be non-zero and finite (not NaN or Infinity)
+    /// - Amount must be finite (not NaN or Infinity); zero is allowed
     /// - Accrual factor must be finite (not NaN or Infinity)
     /// - Rate (if present) must be finite (not NaN or Infinity)
     /// - Reset date (if present) must not be after the payment date
     pub fn validate(&self) -> crate::Result<()> {
-        // Check for zero amount
-        if self.amount.amount() == 0.0 {
-            return Err(crate::Error::Validation(
-                "CashFlow: amount must be non-zero".into(),
-            ));
-        }
-
         // Check for non-finite amount (NaN or Infinity)
         if !self.amount.amount().is_finite() {
             let kind = non_finite_kind(self.amount.amount());
@@ -559,7 +560,8 @@ mod tests {
         assert_eq!(amort.kind, CFKind::Amortization);
         assert!(amort.validate().is_ok());
 
-        // Zero amount returns error on validation
+        // Zero amounts validate (floored coupons are legitimate;
+        // 2026-06-09 core quant review minor finding).
         let zero = Money::new(0.0, Currency::EUR);
         let zero_cf = CashFlow {
             date,
@@ -569,7 +571,7 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
         };
-        assert!(zero_cf.validate().is_err());
+        assert!(zero_cf.validate().is_ok());
     }
 
     #[test]

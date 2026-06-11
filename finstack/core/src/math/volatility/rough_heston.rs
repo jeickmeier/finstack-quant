@@ -270,6 +270,7 @@ impl FractionalRiccatiSolver {
 /// assert!(call > 0.0 && call < 100.0);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "RawRoughHestonFourierParams")]
 pub struct RoughHestonFourierParams {
     /// Initial variance (v₀ > 0).
     pub v0: f64,
@@ -289,6 +290,36 @@ pub struct RoughHestonFourierParams {
     pub rho: f64,
     /// Hurst exponent (0 < H < 0.5 for rough regime).
     pub hurst: f64,
+}
+
+/// Raw deserialization state of [`RoughHestonFourierParams`].
+///
+/// Mirrors the serialized field layout exactly so the wire format is
+/// unchanged; conversion runs [`RoughHestonFourierParams::new`] validation
+/// and rejects unknown fields.
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawRoughHestonFourierParams {
+    /// Initial variance.
+    v0: f64,
+    /// Mean reversion speed.
+    kappa: f64,
+    /// Long-run variance.
+    theta: f64,
+    /// Vol-of-vol.
+    sigma: f64,
+    /// Spot-vol correlation.
+    rho: f64,
+    /// Hurst exponent.
+    hurst: f64,
+}
+
+impl TryFrom<RawRoughHestonFourierParams> for RoughHestonFourierParams {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawRoughHestonFourierParams) -> crate::Result<Self> {
+        Self::new(raw.v0, raw.kappa, raw.theta, raw.sigma, raw.rho, raw.hurst)
+    }
 }
 
 /// Default number of time steps for the fractional Riccati solver.
@@ -613,6 +644,29 @@ mod tests {
         assert!(RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, -0.1).is_err());
         assert!(RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, 0.6).is_err());
         assert!(RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, f64::NAN).is_err());
+    }
+
+    #[test]
+    fn rough_heston_params_serde_validates_on_deserialize() {
+        // Valid JSON round-trips.
+        let p = RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, 0.1).expect("valid");
+        let json = serde_json::to_string(&p).expect("serialize");
+        let back: RoughHestonFourierParams = serde_json::from_str(&json).expect("round-trip");
+        assert_eq!(p, back);
+
+        // Out-of-range rho rejected.
+        let bad_rho = r#"{"v0":0.04,"kappa":2.0,"theta":0.04,"sigma":0.3,"rho":1.5,"hurst":0.1}"#;
+        assert!(serde_json::from_str::<RoughHestonFourierParams>(bad_rho).is_err());
+
+        // Out-of-range hurst rejected (H must be in (0, 0.5)).
+        let bad_hurst =
+            r#"{"v0":0.04,"kappa":2.0,"theta":0.04,"sigma":0.3,"rho":-0.7,"hurst":0.7}"#;
+        assert!(serde_json::from_str::<RoughHestonFourierParams>(bad_hurst).is_err());
+
+        // Unknown field rejected.
+        let unknown =
+            r#"{"v0":0.04,"kappa":2.0,"theta":0.04,"sigma":0.3,"rho":-0.7,"hurst":0.1,"x":1}"#;
+        assert!(serde_json::from_str::<RoughHestonFourierParams>(unknown).is_err());
     }
 
     // -----------------------------------------------------------------------

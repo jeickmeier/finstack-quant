@@ -10,7 +10,7 @@
     { "type": "fixed", "name": "Nossa Senhora Aparecida", "month": "october", "day": 12 },
     { "type": "fixed", "name": "Finados (All Souls' Day)", "month": "november", "day": 2 },
     { "type": "fixed", "name": "Proclamação da República", "month": "november", "day": 15 },
-    { "type": "fixed", "name": "Dia da Consciência Negra", "month": "november", "day": 20 },
+    { "type": "fixed", "name": "Dia da Consciência Negra (national holiday since Law 14.759/2023; B3 traded Nov 20 in 2023 and earlier)", "month": "november", "day": 20, "from_year": 2024 },
     { "type": "fixed", "name": "Natal (Christmas)", "month": "december", "day": 25 },
     { "type": "easter_offset", "name": "Sexta-feira Santa (Good Friday)", "days": -3 },
     { "type": "easter_offset", "name": "Carnaval (Carnival Monday)", "days": -49 },

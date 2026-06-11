@@ -14,6 +14,15 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{check_finite, CreditScoringError, ScoringResult, ScoringZone};
 
+/// Ohlson's published optimal probability cutoff P* = 0.038 (O ≈ −3.23),
+/// the Distress zone boundary. Source: Ohlson (1980), Table 6 — the cutoff
+/// minimizing total misclassification on the estimation sample.
+pub const OHLSON_OPTIMAL_CUTOFF_PD: f64 = 0.038;
+
+/// Safe/Grey boundary at P*/2 (house convention caution band below
+/// Ohlson's optimal cutoff).
+pub const OHLSON_GREY_PD: f64 = OHLSON_OPTIMAL_CUTOFF_PD / 2.0;
+
 /// Input for the Ohlson O-Score logistic model (1980).
 ///
 /// Nine predictors capturing size, leverage, performance, and liquidity.
@@ -79,10 +88,18 @@ pub struct OhlsonOScoreInput {
 ///
 /// PD = 1 / (1 + exp(-O))    (logistic transform)
 ///
-/// Zone classification:
-/// - O < 0.38: Safe (PD < ~60% historical bankruptcy boundary)
-/// - 0.38 <= O <= 0.50: Grey
-/// - O > 0.50: Distress
+/// Zone classification on implied PD (mirrors the PD-based zoning used by
+/// [`zmijewski_score`](super::zmijewski_score)):
+/// - PD < 0.019: Safe
+/// - 0.019 <= PD <= 0.038: Grey
+/// - PD > 0.038: Distress
+///
+/// The Distress boundary is Ohlson's published optimal cutoff P* = 0.038
+/// (O ≈ −3.23), which minimized total misclassification in Ohlson (1980,
+/// Table 6). The Safe/Grey boundary at P*/2 = 0.019 is a house convention
+/// creating a caution band below the cutoff. (Re-based per the 2026-06-09
+/// core quant review: the previous raw-O cutoffs {0.38, 0.50} labeled
+/// PD ≈ 59% firms "Safe" and were unrelated to Ohlson's published cutoff.)
 ///
 /// # Errors
 ///
@@ -112,10 +129,11 @@ pub struct OhlsonOScoreInput {
 ///     net_income_change: 0.10,
 /// };
 /// let result = ohlson_o_score(&healthy)?;
-/// assert!(result.score < 0.38);
+/// // Well below Ohlson's optimal cutoff O ≈ −3.23 (P* = 0.038)
+/// assert!(result.score < -3.23);
 /// assert_eq!(result.zone, ScoringZone::Safe);
 /// // Implied PD via logistic transform: 1 / (1 + exp(-O))
-/// assert!(result.implied_pd < 0.05);
+/// assert!(result.implied_pd < 0.019);
 /// # Ok::<_, finstack_core::credit::scoring::CreditScoringError>(())
 /// ```
 pub fn ohlson_o_score(input: &OhlsonOScoreInput) -> Result<ScoringResult, CreditScoringError> {
@@ -160,10 +178,12 @@ pub fn ohlson_o_score(input: &OhlsonOScoreInput) -> Result<ScoringResult, Credit
     // Logistic transform: PD = 1 / (1 + exp(-O))
     let implied_pd = logistic(o);
 
-    // Zone classification based on O-Score value
-    let zone = if o < 0.38 {
+    // Zone classification based on implied PD (consistent with zmijewski.rs).
+    // Distress boundary: Ohlson's published optimal cutoff P* = 0.038
+    // (O ≈ −3.23). Safe/Grey boundary: P*/2 (house convention caution band).
+    let zone = if implied_pd < OHLSON_GREY_PD {
         ScoringZone::Safe
-    } else if o > 0.50 {
+    } else if implied_pd > OHLSON_OPTIMAL_CUTOFF_PD {
         ScoringZone::Distress
     } else {
         ScoringZone::Grey

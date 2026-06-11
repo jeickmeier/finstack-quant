@@ -88,7 +88,7 @@ impl PyHazardCurve {
 
     /// Survival probability at year fraction `t`.
     #[pyo3(text_signature = "(self, t)")]
-    fn survival(&self, t: f64) -> f64 {
+    fn sp(&self, t: f64) -> f64 {
         self.inner.sp(t)
     }
 

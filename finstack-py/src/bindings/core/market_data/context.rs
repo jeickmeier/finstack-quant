@@ -123,7 +123,7 @@ impl PyMarketContext {
             let currency = Currency::from_str(raw_currency).map_err(|err| {
                 crate::errors::value_error(format!("invalid currency '{raw_currency}': {err}"))
             })?;
-            MarketScalar::Price(Money::new(value, currency))
+            MarketScalar::Price(Money::try_new(value, currency).map_err(core_to_py)?)
         } else {
             MarketScalar::Unitless(value)
         };
@@ -139,7 +139,7 @@ impl PyMarketContext {
 
     /// Retrieve a discount curve by identifier.
     ///
-    /// Raises ``ValueError`` if the curve does not exist or is not a discount curve.
+    /// Raises ``KeyError`` if the curve does not exist, ``ValueError`` if it is not a discount curve.
     #[pyo3(text_signature = "(self, id)")]
     fn get_discount(&self, id: &str) -> PyResult<PyDiscountCurve> {
         let arc = self.inner.get_discount(id).map_err(core_to_py)?;
@@ -148,7 +148,7 @@ impl PyMarketContext {
 
     /// Retrieve a forward curve by identifier.
     ///
-    /// Raises ``ValueError`` if the curve does not exist or is not a forward curve.
+    /// Raises ``KeyError`` if the curve does not exist, ``ValueError`` if it is not a forward curve.
     #[pyo3(text_signature = "(self, id)")]
     fn get_forward(&self, id: &str) -> PyResult<PyForwardCurve> {
         let arc = self.inner.get_forward(id).map_err(core_to_py)?;
@@ -157,7 +157,7 @@ impl PyMarketContext {
 
     /// Retrieve a hazard curve by identifier.
     ///
-    /// Raises ``ValueError`` if the curve does not exist or is not a hazard curve.
+    /// Raises ``KeyError`` if the curve does not exist, ``ValueError`` if it is not a hazard curve.
     #[pyo3(text_signature = "(self, id)")]
     fn get_hazard(&self, id: &str) -> PyResult<PyHazardCurve> {
         let arc = self.inner.get_hazard(id).map_err(core_to_py)?;
@@ -166,7 +166,7 @@ impl PyMarketContext {
 
     /// Retrieve an inflation curve by identifier.
     ///
-    /// Raises ``ValueError`` if the curve does not exist or is not an inflation curve.
+    /// Raises ``KeyError`` if the curve does not exist, ``ValueError`` if it is not an inflation curve.
     #[pyo3(text_signature = "(self, id)")]
     fn get_inflation_curve(&self, id: &str) -> PyResult<PyInflationCurve> {
         let arc = self.inner.get_inflation_curve(id).map_err(core_to_py)?;
@@ -175,7 +175,7 @@ impl PyMarketContext {
 
     /// Retrieve a price curve by identifier.
     ///
-    /// Raises ``ValueError`` if the curve does not exist or is not a price curve.
+    /// Raises ``KeyError`` if the curve does not exist, ``ValueError`` if it is not a price curve.
     #[pyo3(text_signature = "(self, id)")]
     fn get_price_curve(&self, id: &str) -> PyResult<PyPriceCurve> {
         let arc = self.inner.get_price_curve(id).map_err(core_to_py)?;
@@ -184,7 +184,7 @@ impl PyMarketContext {
 
     /// Retrieve a vol surface by identifier.
     ///
-    /// Raises ``ValueError`` if the surface does not exist.
+    /// Raises ``KeyError`` if the surface does not exist.
     #[pyo3(text_signature = "(self, id)")]
     fn get_surface(&self, id: &str) -> PyResult<PyVolSurface> {
         let arc = self.inner.get_surface(id).map_err(core_to_py)?;
@@ -193,8 +193,8 @@ impl PyMarketContext {
 
     /// Retrieve a delta-quoted FX vol surface by identifier.
     ///
-    /// Raises ``ValueError`` if the surface does not exist or is not a
-    /// delta-quoted FX surface.
+    /// Raises ``KeyError`` if the surface does not exist, ``ValueError`` if it
+    /// is not a delta-quoted FX surface.
     #[pyo3(text_signature = "(self, id)")]
     fn get_fx_delta_vol_surface(&self, id: &str) -> PyResult<PyFxDeltaVolSurface> {
         let arc = self
@@ -206,7 +206,7 @@ impl PyMarketContext {
 
     /// Retrieve a vol cube by identifier.
     ///
-    /// Raises ``ValueError`` if the cube does not exist.
+    /// Raises ``KeyError`` if the cube does not exist.
     #[pyo3(text_signature = "(self, id)")]
     fn get_vol_cube(&self, id: &str) -> PyResult<PyVolCube> {
         let arc = self.inner.get_vol_cube(id).map_err(core_to_py)?;
@@ -215,7 +215,7 @@ impl PyMarketContext {
 
     /// Retrieve a volatility index curve by identifier.
     ///
-    /// Raises ``ValueError`` if the curve does not exist or is not a vol-index curve.
+    /// Raises ``KeyError`` if the curve does not exist, ``ValueError`` if it is not a vol-index curve.
     #[pyo3(text_signature = "(self, id)")]
     fn get_vol_index_curve(&self, id: &str) -> PyResult<PyVolatilityIndexCurve> {
         let arc = self.inner.get_vol_index_curve(id).map_err(core_to_py)?;

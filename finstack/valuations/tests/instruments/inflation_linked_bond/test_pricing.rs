@@ -202,8 +202,10 @@ fn test_npv_at_maturity() {
     // Act
     let pv = ilb.value(&ctx, as_of).unwrap();
 
-    // Assert - at maturity, should have one principal payment worth notional * index_ratio
-    assert!(pv.amount() > 0.0);
+    // Assert - holder-view position value: the final principal payment
+    // (notional * index_ratio) settles on `as_of` (= maturity) and is
+    // excluded from PV, so the matured position is worth 0.
+    assert_eq!(pv.amount(), 0.0);
 }
 
 #[test]

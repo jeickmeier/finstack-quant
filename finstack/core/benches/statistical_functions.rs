@@ -227,7 +227,7 @@ fn bench_binomial_distribution(c: &mut Criterion) {
     for n in [10, 50, 100, 500] {
         group.bench_with_input(BenchmarkId::new("full_dist", n), &n, |b, &n| {
             b.iter(|| {
-                let dist = binomial_distribution(black_box(n), black_box(0.5));
+                let dist = binomial_distribution(black_box(n), black_box(0.5)).unwrap();
                 black_box(dist);
             })
         });
@@ -236,7 +236,7 @@ fn bench_binomial_distribution(c: &mut Criterion) {
     // Credit portfolio distribution
     group.bench_function("credit_portfolio_100", |b| {
         b.iter(|| {
-            let dist = binomial_distribution(black_box(100), black_box(0.05));
+            let dist = binomial_distribution(black_box(100), black_box(0.05)).unwrap();
             black_box(dist);
         })
     });

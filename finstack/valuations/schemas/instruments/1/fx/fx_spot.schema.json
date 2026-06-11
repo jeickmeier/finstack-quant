@@ -328,6 +328,11 @@
                   "type": "string"
                 },
                 {
+                  "const": "CLF",
+                  "description": "Unidad de Fomento (990)",
+                  "type": "string"
+                },
+                {
                   "const": "CLP",
                   "description": "Chilean Peso (152)",
                   "type": "string"
@@ -820,6 +825,11 @@
                 {
                   "const": "SRD",
                   "description": "Surinam Dollar (968)",
+                  "type": "string"
+                },
+                {
+                  "const": "SSP",
+                  "description": "South Sudanese Pound (728)",
                   "type": "string"
                 },
                 {

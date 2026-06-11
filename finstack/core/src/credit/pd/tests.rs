@@ -172,22 +172,28 @@ mod central_tendency_tests {
     }
 
     #[test]
-    fn geometric_mean() {
-        // Geometric mean of [0.01, 0.04] = sqrt(0.01 * 0.04) = sqrt(0.0004) = 0.02
+    fn arithmetic_mean() {
+        // Arithmetic mean per Basel IRB / EBA GL/2017/16 (long-run average
+        // default rate); previously pinned the geometric mean 0.02
+        // (see docs/reviews/2026-06-09-core-quant-review.md, Major — credit).
         let result = central_tendency(&[0.01, 0.04]).unwrap();
         assert!(
-            (result - 0.02).abs() < 1e-10,
-            "expected=0.02, got={}",
+            (result - 0.025).abs() < 1e-12,
+            "expected=0.025, got={}",
             result
         );
     }
 
     #[test]
-    fn zero_rate_is_rejected() {
-        assert!(matches!(
-            central_tendency(&[0.0, 0.0, 0.0]),
-            Err(PdCalibrationError::ZeroAnnualDefaultRate)
-        ));
+    fn zero_rate_years_are_included() {
+        // Zero-default years are valid observations in the arithmetic
+        // long-run average (previously rejected under the geometric mean;
+        // see docs/reviews/2026-06-09-core-quant-review.md).
+        let result = central_tendency(&[0.0, 0.0, 0.0]).unwrap();
+        assert!(result.abs() < 1e-15);
+
+        let result = central_tendency(&[0.0, 0.02, 0.04]).unwrap();
+        assert!((result - 0.02).abs() < 1e-12, "got={}", result);
     }
 
     #[test]
@@ -305,6 +311,116 @@ mod term_structure_tests {
         }
     }
 
+    /// Regression test for the broken pairwise-averaging "PAV"
+    /// (docs/reviews/2026-06-09-core-quant-review.md, Blocker #4): input
+    /// [0.05, 0.03, 0.03] used to produce the *decreasing* output
+    /// [0.0375, 0.0375, 0.035]. True weighted PAV pools all three points
+    /// into one block with mean 0.11/3.
+    #[test]
+    fn pav_pools_decreasing_run_into_single_block() {
+        let ts = PdTermStructureBuilder::new()
+            .with_cumulative_pds(&[(1.0, 0.05), (2.0, 0.03), (3.0, 0.03)])
+            .build()
+            .unwrap();
+
+        let expected = 0.11 / 3.0;
+        for &pd in ts.cumulative_pds() {
+            assert!(
+                (pd - expected).abs() < 1e-12,
+                "pd={}, expected={}",
+                pd,
+                expected
+            );
+        }
+    }
+
+    /// Second verified failing input from the review:
+    /// [0.06, 0.05, 0.01, 0.02] used to yield [0.0394, 0.0394, 0.035, 0.0263]
+    /// (decreasing). True PAV pools everything to mean 0.14/4 = 0.035.
+    #[test]
+    fn pav_merges_backward_across_blocks() {
+        let ts = PdTermStructureBuilder::new()
+            .with_cumulative_pds(&[(1.0, 0.06), (2.0, 0.05), (3.0, 0.01), (4.0, 0.02)])
+            .build()
+            .unwrap();
+
+        for &pd in ts.cumulative_pds() {
+            assert!((pd - 0.035).abs() < 1e-12, "pd={}", pd);
+        }
+    }
+
+    /// PAV pooled-block values: scaled version of the canonical [3, 1, 1]
+    /// example whose correct output is [5/3, 5/3, 5/3] (here /10 to stay in
+    /// PD space): [0.3, 0.1, 0.1] -> [0.5/3, 0.5/3, 0.5/3].
+    #[test]
+    fn pav_canonical_pooled_average() {
+        let ts = PdTermStructureBuilder::new()
+            .with_cumulative_pds(&[(1.0, 0.3), (2.0, 0.1), (3.0, 0.1)])
+            .build()
+            .unwrap();
+
+        let expected = 0.5 / 3.0;
+        for &pd in ts.cumulative_pds() {
+            assert!((pd - expected).abs() < 1e-12, "pd={}", pd);
+        }
+    }
+
+    /// Property-style check over fixed non-monotone inputs: output must be
+    /// monotone non-decreasing, and marginal PDs / hazard rates non-negative.
+    #[test]
+    fn pav_monotone_and_nonnegative_hazards_on_fixed_vectors() {
+        let cases: [&[f64]; 5] = [
+            &[0.05, 0.03, 0.03],
+            &[0.06, 0.05, 0.01, 0.02],
+            &[0.10, 0.02, 0.08, 0.04, 0.12],
+            &[0.01, 0.01, 0.005, 0.02, 0.015, 0.03],
+            &[0.20, 0.10, 0.30, 0.05, 0.25, 0.15, 0.35],
+        ];
+
+        for case in cases {
+            let pairs: Vec<(f64, f64)> = case
+                .iter()
+                .enumerate()
+                .map(|(i, &pd)| ((i + 1) as f64, pd))
+                .collect();
+            let ts = PdTermStructureBuilder::new()
+                .with_cumulative_pds(&pairs)
+                .build()
+                .unwrap();
+
+            let pds = ts.cumulative_pds();
+            for i in 1..pds.len() {
+                assert!(
+                    pds[i] >= pds[i - 1],
+                    "case {:?}: pds[{}]={} < pds[{}]={}",
+                    case,
+                    i,
+                    pds[i],
+                    i - 1,
+                    pds[i - 1]
+                );
+            }
+
+            for i in 1..pds.len() {
+                let t1 = i as f64;
+                let t2 = (i + 1) as f64;
+                assert!(
+                    ts.marginal_pd(t1, t2) >= 0.0,
+                    "case {:?}: negative marginal PD on [{}, {}]",
+                    case,
+                    t1,
+                    t2
+                );
+                assert!(
+                    ts.hazard_rate(t1 + 0.5) >= 0.0,
+                    "case {:?}: negative hazard at {}",
+                    case,
+                    t1 + 0.5
+                );
+            }
+        }
+    }
+
     #[test]
     fn empty_builder_fails() {
         assert!(matches!(
@@ -379,6 +495,71 @@ mod term_structure_from_matrix_tests {
         assert!(ts.cumulative_pd(2.0) > ts.cumulative_pd(1.0));
         assert!(ts.cumulative_pd(5.0) > ts.cumulative_pd(2.0));
     }
+
+    #[rustfmt::skip]
+    const SIMPLE_3STATE: &[f64] = &[
+        0.95, 0.04, 0.01,
+        0.05, 0.90, 0.05,
+        0.00, 0.00, 1.00,
+    ];
+
+    fn simple_scale() -> RatingScale {
+        RatingScale::custom(vec!["AAA".to_string(), "BBB".to_string(), "D".to_string()]).unwrap()
+    }
+
+    /// 2026-06-09 core quant review: `from_transition_matrix` must scale
+    /// tenors by `tm.horizon()`. A 6-month matrix reaches the 1y tenor via
+    /// P^2 and the 0.5y tenor via P^1.
+    #[test]
+    fn from_transition_matrix_respects_horizon() {
+        let tm_6m = TransitionMatrix::new(simple_scale(), SIMPLE_3STATE, 0.5).unwrap();
+
+        let ts = PdTermStructureBuilder::new()
+            .from_transition_matrix(&tm_6m, "AAA", &[0.5, 1.0, 2.0])
+            .unwrap()
+            .build()
+            .unwrap();
+
+        // 0.5y = one step: PD = P[AAA, D] = 0.01.
+        assert!(
+            (ts.cumulative_pd(0.5) - 0.01).abs() < 1e-12,
+            "0.5y pd={}",
+            ts.cumulative_pd(0.5)
+        );
+        // 1y = two steps: PD = (P^2)[AAA, D]
+        //   = 0.95*0.01 + 0.04*0.05 + 0.01*1.0 = 0.0215.
+        assert!(
+            (ts.cumulative_pd(1.0) - 0.0215).abs() < 1e-12,
+            "1y pd={}",
+            ts.cumulative_pd(1.0)
+        );
+        assert!(ts.cumulative_pd(2.0) > ts.cumulative_pd(1.0));
+    }
+
+    /// 2026-06-09 core quant review: tenors that are not integer multiples
+    /// of the horizon must error (no silent rounding); the error suggests
+    /// the generator-based `project` instead.
+    #[test]
+    fn from_transition_matrix_rejects_non_integer_multiple_tenor() {
+        let tm_annual = TransitionMatrix::new(simple_scale(), SIMPLE_3STATE, 1.0).unwrap();
+
+        let err = PdTermStructureBuilder::new()
+            .from_transition_matrix(&tm_annual, "AAA", &[2.5])
+            .expect_err("tenor 2.5 with an annual matrix must error");
+
+        let message = err.to_string();
+        match err {
+            crate::credit::pd::PdCalibrationError::TenorNotMultipleOfHorizon { tenor, horizon } => {
+                assert!((tenor - 2.5).abs() < 1e-12);
+                assert!((horizon - 1.0).abs() < 1e-12);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+        assert!(
+            message.contains("project"),
+            "error should suggest the generator-based projection: {message}"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -391,22 +572,22 @@ mod master_scale_tests {
         assert_eq!(scale.n_grades(), 8);
 
         // AAA: PD <= 0.0001
-        let aaa = scale.map_pd(0.00005);
+        let aaa = scale.map_pd(0.00005).unwrap();
         assert_eq!(aaa.grade, "AAA");
         assert_eq!(aaa.grade_index, 0);
 
         // BBB: PD <= 0.005
-        let bbb = scale.map_pd(0.0015);
+        let bbb = scale.map_pd(0.0015).unwrap();
         assert_eq!(bbb.grade, "BBB");
         assert_eq!(bbb.grade_index, 3);
 
         // B: PD <= 0.07
-        let b = scale.map_pd(0.05);
+        let b = scale.map_pd(0.05).unwrap();
         assert_eq!(b.grade, "B");
         assert_eq!(b.grade_index, 5);
 
         // CC/C: PD > 0.25
-        let ccc_plus = scale.map_pd(0.30);
+        let ccc_plus = scale.map_pd(0.30).unwrap();
         assert_eq!(ccc_plus.grade, "CC/C");
         assert_eq!(ccc_plus.grade_index, 7);
     }
@@ -416,14 +597,14 @@ mod master_scale_tests {
         let scale = MasterScale::moodys_empirical().expect("registry scale");
         assert_eq!(scale.n_grades(), 8);
 
-        let baa = scale.map_pd(0.003);
+        let baa = scale.map_pd(0.003).unwrap();
         assert_eq!(baa.grade, "Baa");
     }
 
     #[test]
     fn pd_exceeds_all_grades() {
         let scale = MasterScale::sp_empirical().expect("registry scale");
-        let result = scale.map_pd(1.5);
+        let result = scale.map_pd(1.5).unwrap();
         assert_eq!(result.grade, "CC/C");
         assert_eq!(result.grade_index, 7);
     }
@@ -432,11 +613,11 @@ mod master_scale_tests {
     fn pd_at_boundary() {
         let scale = MasterScale::sp_empirical().expect("registry scale");
         // Exactly at AAA upper boundary (0.0001)
-        let result = scale.map_pd(0.0001);
+        let result = scale.map_pd(0.0001).unwrap();
         assert_eq!(result.grade, "AAA");
 
         // Just above AAA boundary
-        let result = scale.map_pd(0.00011);
+        let result = scale.map_pd(0.00011).unwrap();
         assert_eq!(result.grade, "AA");
     }
 
@@ -461,9 +642,9 @@ mod master_scale_tests {
         ];
         let scale = MasterScale::new(grades).unwrap();
         assert_eq!(scale.n_grades(), 3);
-        assert_eq!(scale.map_pd(0.005).grade, "Good");
-        assert_eq!(scale.map_pd(0.05).grade, "Medium");
-        assert_eq!(scale.map_pd(0.80).grade, "Bad");
+        assert_eq!(scale.map_pd(0.005).unwrap().grade, "Good");
+        assert_eq!(scale.map_pd(0.05).unwrap().grade, "Medium");
+        assert_eq!(scale.map_pd(0.80).unwrap().grade, "Bad");
     }
 
     #[test]
@@ -507,7 +688,7 @@ mod master_scale_tests {
         };
         let scoring_result = altman_z_score(&input).unwrap();
         let scale = MasterScale::sp_empirical().expect("registry scale");
-        let mapped = scale.map_score(&scoring_result);
+        let mapped = scale.map_score(&scoring_result).unwrap();
         // The implied PD from a safe Z-score (Z~3.595) maps based on the
         // empirical PD mapping. Verify that map_score actually uses implied_pd.
         assert_eq!(mapped.input_pd, scoring_result.implied_pd);
@@ -526,5 +707,19 @@ mod master_scale_tests {
         assert_eq!(grades.len(), 8);
         assert_eq!(grades[0].label, "AAA");
         assert_eq!(grades[7].label, "CC/C");
+    }
+
+    /// 2026-06-09 core quant review minor: a NaN PD previously fell through
+    /// every comparison and silently mapped to the worst grade; it must now
+    /// be a validation error.
+    #[test]
+    fn map_pd_rejects_non_finite() {
+        let scale = MasterScale::sp_empirical().expect("registry scale");
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(matches!(
+                scale.map_pd(bad),
+                Err(PdCalibrationError::NonFiniteValue { .. })
+            ));
+        }
     }
 }

@@ -1147,6 +1147,11 @@
                   "type": "string"
                 },
                 {
+                  "const": "CLF",
+                  "description": "Unidad de Fomento (990)",
+                  "type": "string"
+                },
+                {
                   "const": "CLP",
                   "description": "Chilean Peso (152)",
                   "type": "string"
@@ -1642,6 +1647,11 @@
                   "type": "string"
                 },
                 {
+                  "const": "SSP",
+                  "description": "South Sudanese Pound (728)",
+                  "type": "string"
+                },
+                {
                   "const": "STN",
                   "description": "Dobra (930)",
                   "type": "string"
@@ -1808,7 +1818,7 @@
                 },
                 {
                   "const": "Act365L",
-                  "description": "Actual/365 Leap day count convention (Actual/365L or AFB).\n\nYear fraction = (actual days) / (366 if Feb 29 in period else 365)\n\n# Standards Reference\n\n- **AFB**: Association Française des Banques (French Bankers Association)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, AFB, ISMA-Year\n\n# Usage\n\nUsed in:\n- French government bonds (OATs)\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```",
+                  "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency supplied via [`DayCountContext`]:\n\n- **Annual** (or no frequency supplied): 366 if February 29 falls in\n  the interval `(start, end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the period END date falls in a leap year,\n  else 365.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\n(2026-06-09 core quant review, Moderate/Dates).\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```",
                   "type": "string"
                 },
                 {
@@ -1819,6 +1829,16 @@
                 {
                   "const": "ThirtyE360",
                   "description": "30E/360 (Eurobond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with European adjustments.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **ISO 20022**: Day Count Fraction Code \"30E/360\" (A002)\n- **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere:\n  D₁' = min(D₁, 30)\n  D₂' = min(D₂, 30)\n```\n\n# Usage\n\nStandard for:\n- Eurobonds\n- International bonds\n- Some interest rate swaps\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::March, 31).expect(\"Valid date\");\n\nlet yf = DayCount::ThirtyE360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats both 31st as day 30: 60 days / 360\nassert_eq!(yf, 60.0 / 360.0);\n```",
+                  "type": "string"
+                },
+                {
+                  "const": "ThirtyE360Isda",
+                  "description": "30E/360 (ISDA) day count convention.\n\nAssumes 30 days per month and 360 days per year with the ISDA 2006\n§4.16(h) last-day-of-month adjustments (including end-of-February).\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - \"30E/360 (ISDA)\"\n- **Also known as**: 30E/360 ISDA, German, Eurobond Basis (ISDA 2006)\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere:\n  D₁' = 30 if D₁ is the last day of its month (incl. end of February)\n  D₂' = 30 if D₂ is 31, or if D₂ is the last day of February and the\n        period does not end on the termination (maturity) date\n```\n\n# Termination-date exception\n\nISDA §4.16(h) keeps D₂ unadjusted when the period ends on the\ntermination date and that date is the last day of February. Because\n[`DayCountContext`] carries no termination flag, this enum variant\nalways applies the end-of-February rule (i.e. treats `end` as a\nnon-terminal coupon date). For the final period to maturity, use\n[`days_30e_360_isda`] with `end_is_termination_date = true`.\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// ISDA §4.16(h): both end-of-Feb and Aug 31 count as day 30.\nlet start = Date::from_calendar_date(2011, Month::August, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2012, Month::February, 29).expect(\"Valid date\");\n\nlet yf = DayCount::ThirtyE360Isda.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 180.0 / 360.0);\n```",
+                  "type": "string"
+                },
+                {
+                  "const": "Nl365",
+                  "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `[start, end)` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```",
                   "type": "string"
                 },
                 {

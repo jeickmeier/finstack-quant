@@ -82,8 +82,8 @@ pub use date_extensions::{DateExt, OffsetDateTimeExt};
 mod daycount;
 
 pub use daycount::{
-    act_act_isma_year_fraction_with_reference_period, DayCount, DayCountContext,
-    DayCountContextState, Thirty360Convention,
+    act_act_isma_year_fraction_with_reference_period, days_30_360, days_30e_360_isda, DayCount,
+    DayCountContext, DayCountContextState, Thirty360Convention,
 };
 
 // Re-export new holiday calendars at the top level for convenience
@@ -112,7 +112,7 @@ pub use tenor::{Tenor, TenorUnit};
 
 pub use imm::{
     imm_option_expiry, is_cds_date, is_imm_date, next_cds_date, next_equity_option_expiry,
-    next_imm, next_imm_option_expiry, next_sifma_settlement, sifma_settlement_date,
+    next_imm, next_imm_option_expiry, next_sifma_settlement, prev_cds_date, sifma_settlement_date,
     sifma_settlement_date_for_class, third_friday, third_wednesday, SifmaSettlementClass,
 };
 

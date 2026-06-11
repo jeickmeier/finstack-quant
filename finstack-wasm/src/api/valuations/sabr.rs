@@ -345,7 +345,11 @@ mod tests {
         let smile = WasmSabrSmile::new(&p, 0.03, 1.0);
         let vols = smile.generate_smile(strikes.clone()).expect("smile");
 
-        let calibrator = WasmSabrCalibrator::new().with_tolerance(1e-8);
+        // 1e-6 on the vega-weighted SSE objective is attainable within the
+        // default iteration budget; tighter tolerances fail loudly under the
+        // strict non-convergence semantics of core `minimize` because rho is
+        // weakly identified on this near-symmetric strike set.
+        let calibrator = WasmSabrCalibrator::new().with_tolerance(1e-6);
         let fitted = calibrator
             .calibrate(0.03, strikes, vols, 1.0, 0.5)
             .expect("calibrate");

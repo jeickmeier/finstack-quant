@@ -582,3 +582,176 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
     assert!(rebuilt.get_price("EQ-SPOT").is_ok());
     assert!(rebuilt.get_collateral("USD-CSA").is_ok());
 }
+
+// =============================================================================
+// Strict serde: unknown fields rejected on inbound curve/surface states
+// =============================================================================
+
+/// Asserts `value` round-trips through JSON and that adding one unknown
+/// top-level field makes deserialization fail (deny_unknown_fields works).
+fn assert_strict_inbound<T>(value: &T)
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+{
+    let json = serde_json::to_value(value).unwrap();
+
+    // Original valid JSON still deserializes (wire format unchanged).
+    let _: T = serde_json::from_value(json.clone()).unwrap();
+
+    // Unknown top-level field is rejected.
+    let mut tampered = json;
+    tampered
+        .as_object_mut()
+        .expect("serialized state should be a JSON object")
+        .insert("typo_field".to_string(), serde_json::json!(1));
+    assert!(
+        serde_json::from_value::<T>(tampered).is_err(),
+        "unknown top-level field should be rejected"
+    );
+}
+
+#[test]
+fn discount_curve_rejects_unknown_fields() {
+    let curve = DiscountCurve::builder("USD-OIS")
+        .base_date(test_date())
+        .knots([(0.0, 1.0), (5.0, 0.9)])
+        .build()
+        .unwrap();
+    assert_strict_inbound(&curve);
+}
+
+#[test]
+fn forward_curve_rejects_unknown_fields() {
+    let curve = ForwardCurve::builder("USD-SOFR", 0.25)
+        .base_date(test_date())
+        .knots([(0.0, 0.03), (5.0, 0.04)])
+        .build()
+        .unwrap();
+    assert_strict_inbound(&curve);
+}
+
+#[test]
+fn hazard_curve_rejects_unknown_fields() {
+    let curve = HazardCurve::builder("CDX-HAZ")
+        .base_date(test_date())
+        .knots([(1.0, 0.01), (5.0, 0.02)])
+        .build()
+        .unwrap();
+    assert_strict_inbound(&curve);
+}
+
+#[test]
+fn inflation_curve_rejects_unknown_fields() {
+    use finstack_core::market_data::term_structures::InflationCurve;
+    let curve = InflationCurve::builder("US-CPI-CURVE")
+        .base_cpi(100.0)
+        .base_date(test_date())
+        .knots([(0.0, 100.0), (1.0, 101.0)])
+        .build()
+        .unwrap();
+    assert_strict_inbound(&curve);
+}
+
+#[test]
+fn price_curve_rejects_unknown_fields() {
+    use finstack_core::market_data::term_structures::PriceCurve;
+    let curve = PriceCurve::builder("WTI")
+        .base_date(test_date())
+        .spot_price(70.0)
+        .knots([(0.0, 70.0), (1.0, 72.0)])
+        .build()
+        .unwrap();
+    assert_strict_inbound(&curve);
+}
+
+#[test]
+fn volatility_index_curve_rejects_unknown_fields() {
+    use finstack_core::market_data::term_structures::VolatilityIndexCurve;
+    let curve = VolatilityIndexCurve::builder("VIX")
+        .base_date(test_date())
+        .spot_level(15.0)
+        .knots([(0.0, 15.0), (1.0, 18.0)])
+        .build()
+        .unwrap();
+    assert_strict_inbound(&curve);
+}
+
+#[test]
+fn basis_spread_curve_rejects_unknown_fields() {
+    use finstack_core::market_data::term_structures::BasisSpreadCurve;
+    let curve = BasisSpreadCurve::builder("EURUSD-XCCY")
+        .base_date(test_date())
+        .knots([(0.0, -0.001), (5.0, -0.002)])
+        .build()
+        .unwrap();
+    assert_strict_inbound(&curve);
+}
+
+#[test]
+fn forward_variance_curve_rejects_unknown_fields() {
+    use finstack_core::market_data::term_structures::ForwardVarianceCurve;
+    let curve = ForwardVarianceCurve::from_points(&[(0.0, 0.04), (1.0, 0.05)]).unwrap();
+    assert_strict_inbound(&curve);
+}
+
+#[test]
+fn forward_variance_curve_rejects_invalid_values_on_deserialize() {
+    use finstack_core::market_data::term_structures::ForwardVarianceCurve;
+    // Structurally valid but semantically invalid: non-positive variance.
+    let json = serde_json::json!({ "times": [0.0, 1.0], "values": [0.04, -0.05] });
+    assert!(serde_json::from_value::<ForwardVarianceCurve>(json).is_err());
+    // Mismatched lengths are also rejected.
+    let json = serde_json::json!({ "times": [0.0, 1.0], "values": [0.04] });
+    assert!(serde_json::from_value::<ForwardVarianceCurve>(json).is_err());
+}
+
+#[test]
+fn diebold_li_rejects_unknown_fields() {
+    use finstack_core::market_data::dtsm::DieboldLi;
+    let model = DieboldLi::builder().build().unwrap();
+    assert_strict_inbound(&model);
+}
+
+#[test]
+fn diebold_li_rejects_invalid_lambda_on_deserialize() {
+    use finstack_core::market_data::dtsm::DieboldLi;
+    let model = DieboldLi::builder().build().unwrap();
+    let mut json = serde_json::to_value(&model).unwrap();
+    json.as_object_mut()
+        .unwrap()
+        .insert("lambda".to_string(), serde_json::json!(-1.0));
+    assert!(serde_json::from_value::<DieboldLi>(json).is_err());
+}
+
+#[test]
+fn fx_delta_vol_surface_rejects_unknown_fields() {
+    use finstack_core::market_data::surfaces::FxDeltaVolSurface;
+    let surface = FxDeltaVolSurface::new(
+        "EURUSD-DELTA-VOL",
+        vec![0.25, 0.5, 1.0],
+        vec![0.08, 0.085, 0.09],
+        vec![0.01, 0.012, 0.015],
+        vec![0.005, 0.006, 0.007],
+    )
+    .unwrap();
+    assert_strict_inbound(&surface);
+}
+
+#[test]
+fn fx_delta_vol_surface_rejects_invalid_data_on_deserialize() {
+    use finstack_core::market_data::surfaces::FxDeltaVolSurface;
+    let surface = FxDeltaVolSurface::new(
+        "EURUSD-DELTA-VOL",
+        vec![0.25, 0.5, 1.0],
+        vec![0.08, 0.085, 0.09],
+        vec![0.01, 0.012, 0.015],
+        vec![0.005, 0.006, 0.007],
+    )
+    .unwrap();
+    let mut json = serde_json::to_value(&surface).unwrap();
+    // Structurally valid but semantically invalid: non-monotonic expiries.
+    json.as_object_mut()
+        .unwrap()
+        .insert("expiries".to_string(), serde_json::json!([1.0, 0.5, 2.0]));
+    assert!(serde_json::from_value::<FxDeltaVolSurface>(json).is_err());
+}

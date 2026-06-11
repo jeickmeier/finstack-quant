@@ -54,6 +54,39 @@ pub mod fx_delta_vol_surface;
 mod vol_cube;
 mod vol_surface;
 
+/// Minimum vol substituted when a SABR expansion yields a non-finite or
+/// non-positive value (degenerate parameters or extreme strikes).
+pub(crate) const SABR_VOL_FLOOR: f64 = 0.001;
+
+/// Floor a SABR-expanded vol at [`SABR_VOL_FLOOR`], counting replacements so
+/// callers can emit one aggregated warning via [`warn_sabr_vol_floored`].
+#[inline]
+pub(crate) fn floor_sabr_vol(v: f64, floored: &mut usize) -> f64 {
+    if v.is_finite() && v > 0.0 {
+        v
+    } else {
+        *floored += 1;
+        SABR_VOL_FLOOR
+    }
+}
+
+/// Emit a single aggregated warning when SABR expansion vols were floored.
+#[inline]
+pub(crate) fn warn_sabr_vol_floored(context: &str, id: &crate::types::CurveId, floored: usize) {
+    if floored > 0 {
+        tracing::warn!(
+            surface_id = %id,
+            count = floored,
+            floor = SABR_VOL_FLOOR,
+            context = context,
+            "SABR expansion produced non-finite or non-positive vols; floored to minimum"
+        );
+    }
+}
+
+/// Recover 25d/10d wing vols from ATM/RR/BF quotes, treating BF as a
+/// **smile (broker) strangle**: `sigma_wing = ATM + BF ± RR/2` exactly.
+/// No market-strangle consistency solve is performed.
 #[inline]
 pub(crate) fn recover_fx_wing_vols(atm: f64, rr: f64, bf: f64) -> (f64, f64) {
     let sigma_call = atm + bf + 0.5 * rr;
@@ -61,16 +94,24 @@ pub(crate) fn recover_fx_wing_vols(atm: f64, rr: f64, bf: f64) -> (f64, f64) {
     (sigma_put, sigma_call)
 }
 
+/// Garman-Kohlhagen FX forward `F = S * exp((r_d - r_f) * T)` with
+/// continuously compounded rates.
 #[inline]
 pub(crate) fn fx_forward(spot: f64, domestic_rate: f64, foreign_rate: f64, expiry: f64) -> f64 {
     spot * ((domestic_rate - foreign_rate) * expiry).exp()
 }
 
+/// Delta-neutral-straddle ATM strike `K = F * exp(sigma^2 T / 2)` under the
+/// premium-unadjusted **forward delta** convention.
 #[inline]
 pub(crate) fn fx_atm_dns_strike(forward: f64, vol: f64, expiry: f64) -> f64 {
     forward * (0.5 * vol * vol * expiry).exp()
 }
 
+/// Strikes for put/call at absolute delta `delta_abs` using the
+/// premium-unadjusted **forward delta** convention (`Delta_call = N(d1)`),
+/// i.e. `K = F * exp(∓ N⁻¹(Δ) σ √T + σ² T / 2)`. Spot-delta and
+/// premium-adjusted conventions are intentionally not supported here.
 #[inline]
 pub(crate) fn fx_put_call_delta_strikes(
     forward: f64,

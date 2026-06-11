@@ -332,8 +332,9 @@ impl Default for PySabrCalibrator {
 
 #[pymethods]
 impl PySabrCalibrator {
-    /// Construct a calibrator with production defaults (tolerance ``1e-6``,
-    /// ``max_iter=100``, finite-difference gradients).
+    /// Construct a calibrator with production defaults (tolerance ``1e-4``
+    /// on the vega-weighted SSE objective, ``max_iter=2000``,
+    /// finite-difference gradients).
     #[new]
     fn new() -> Self {
         Self::default()

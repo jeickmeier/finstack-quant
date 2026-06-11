@@ -46,12 +46,14 @@ fn diebold_li_fit_factors<'py>(
     yields_matrix: Vec<Vec<f64>>,
     lambda: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let panel = YieldPanel::from_rows(tenors, yields_matrix, None).map_err(core_to_py)?;
-    let model = DieboldLi::builder()
-        .lambda(lambda)
-        .build()
-        .map_err(core_to_py)?
-        .extract_factors(&panel)
+    let model = py
+        .detach(|| {
+            let panel = YieldPanel::from_rows(tenors, yields_matrix, None)?;
+            DieboldLi::builder()
+                .lambda(lambda)
+                .build()?
+                .extract_factors(&panel)
+        })
         .map_err(core_to_py)?;
 
     let fts = model
@@ -111,17 +113,17 @@ fn diebold_li_forecast<'py>(
     horizon: usize,
     lambda: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let panel = YieldPanel::from_rows(tenors, yields_matrix, None).map_err(core_to_py)?;
-    let model = DieboldLi::builder()
-        .lambda(lambda)
-        .build()
-        .map_err(core_to_py)?
-        .extract_factors(&panel)
-        .map_err(core_to_py)?
-        .fit_var()
+    let fc = py
+        .detach(|| {
+            let panel = YieldPanel::from_rows(tenors, yields_matrix, None)?;
+            DieboldLi::builder()
+                .lambda(lambda)
+                .build()?
+                .extract_factors(&panel)?
+                .fit_var()?
+                .forecast(horizon)
+        })
         .map_err(core_to_py)?;
-
-    let fc = model.forecast(horizon).map_err(core_to_py)?;
 
     let bands = PyDict::new(py);
     bands.set_item("lower_95", fc.lower_95.clone())?;
@@ -173,7 +175,9 @@ fn yield_pca_fit<'py>(
     yield_changes: Vec<Vec<f64>>,
     n_components: usize,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let pca = YieldPca::fit_yield_changes(yield_changes).map_err(core_to_py)?;
+    let pca = py
+        .detach(|| YieldPca::fit_yield_changes(yield_changes))
+        .map_err(core_to_py)?;
     let n = pca.tenors().len();
     if n_components == 0 || n_components > pca.num_components() {
         return Err(crate::errors::value_error(format!(

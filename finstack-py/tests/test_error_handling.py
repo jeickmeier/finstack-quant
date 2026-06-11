@@ -59,7 +59,10 @@ class TestFxErrors:
     def test_missing_pair(self) -> None:
         """Looking up an unset pair should raise."""
         fx = FxMatrix()
-        with pytest.raises(ValueError, match=r"(?i)rate|pair|not found|missing"):
+        # Missing-pair lookups now raise KeyError (InputError::NotFound).
+        # NOTE: expectation updated alongside the binding change; not yet
+        # executed against a rebuilt wheel.
+        with pytest.raises(KeyError, match=r"(?i)rate|pair|not found|missing"):
             fx.rate(
                 Currency("EUR"),
                 Currency("GBP"),

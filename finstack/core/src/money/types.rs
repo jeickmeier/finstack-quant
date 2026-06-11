@@ -294,7 +294,13 @@ impl Money {
             let (dp, mode) = Self::ingest_rounding_params(currency, Some(cfg));
             round_f64(amount, dp as i32, mode)
         } else {
-            AmountRepr::from_f64_retain(amount).expect("finite f64 amount must convert to Decimal")
+            // Shortest round-trip conversion (`Decimal::from_f64`) per the
+            // 2026-06-09 core quant review and user decision: `0.1_f64`
+            // ingests as `0.1`, not the 28-digit IEEE expansion that
+            // `from_f64_retain` would embed. `from_f64` only fails on
+            // non-finite inputs, which the caller contract already rejects.
+            <AmountRepr as rust_decimal::prelude::FromPrimitive>::from_f64(amount)
+                .expect("finite f64 amount must convert to Decimal")
         };
         Self {
             amount: rounded,
@@ -349,6 +355,26 @@ impl Money {
     #[inline]
     pub fn amount(&self) -> f64 {
         (*self).into_amount()
+    }
+
+    /// Lossless amount accessor as the internal [`rust_decimal::Decimal`].
+    ///
+    /// Unlike [`Money::amount`], no `Decimal -> f64` conversion happens, so
+    /// the full accounting-grade precision of the stored amount is preserved.
+    /// Prefer this accessor when feeding downstream Decimal-based pipelines
+    /// (e.g. Python `decimal.Decimal`, database fixed-point columns).
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_core::money::Money;
+    /// use finstack_core::currency::Currency;
+    ///
+    /// let m = Money::new(1234.56, Currency::USD);
+    /// assert_eq!(m.amount_decimal().to_string(), "1234.56");
+    /// ```
+    #[inline]
+    pub const fn amount_decimal(&self) -> rust_decimal::Decimal {
+        self.amount
     }
 
     /// Currency accessor.
@@ -566,15 +592,11 @@ impl Money {
 impl fmt::Display for Money {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Default formatting uses ISO-4217 minor units and bankers rounding.
-        let dp = self.currency.decimals() as usize;
-        // Format with currency-specific minor units using Decimal precision
-        write!(
-            f,
-            "{} {val:.prec$}",
-            self.currency,
-            val = self.amount,
-            prec = dp
-        )
+        // Route through the canonical formatter so `Display` always agrees with
+        // `format(currency_decimals, true)` (a raw `{:.prec$}` on the Decimal
+        // would truncate instead of round).
+        let dp = usize::from(self.currency.decimals());
+        f.write_str(&self.format(dp, true))
     }
 }
 
@@ -646,18 +668,32 @@ impl Div<f64> for Money {
 // Conversions
 // -------------------------------------------------------------------------
 // Generic tuple conversions for common numeric primitives.
-macro_rules! from_numeric_tuple {
+//
+// Integer conversions route through `Decimal::from`, which is exact for the
+// full i64/u64 range; casting through `as f64` would silently lose precision
+// above 2^53 (2026-06-09 core quant review, minor).
+macro_rules! from_integer_tuple {
     ($($t:ty),+) => { $(
         impl From<($t, Currency)> for Money {
             #[inline]
             fn from(value: ($t, Currency)) -> Self {
-                Self::new(value.0 as f64, value.1)
+                Self {
+                    amount: AmountRepr::from(value.0),
+                    currency: value.1,
+                }
             }
         }
     )+ };
 }
 
-from_numeric_tuple!(f64, i64, u64);
+from_integer_tuple!(i64, u64);
+
+impl From<(f64, Currency)> for Money {
+    #[inline]
+    fn from(value: (f64, Currency)) -> Self {
+        Self::new(value.0, value.1)
+    }
+}
 
 // -------------------------------------------------------------------------
 // Convenience macro

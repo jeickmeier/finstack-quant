@@ -157,7 +157,8 @@ pub mod cashflow_export {
 }
 
 pub use common_impl::fx_dates::{
-    add_joint_business_days, adjust_joint_calendar, roll_spot_date, ResolvedCalendarPair,
+    add_joint_business_days, adjust_joint_calendar, fx_spot_date_for_pair, roll_spot_date,
+    ResolvedCalendarPair,
 };
 pub use finstack_core::dates::fx::resolve_calendar;
 

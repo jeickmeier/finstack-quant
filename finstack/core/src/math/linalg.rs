@@ -113,6 +113,16 @@ pub enum CholeskyError {
         /// Actual number of elements
         actual: usize,
     },
+    /// Matrix contains a non-finite entry (NaN or infinity).
+    #[error("Matrix contains non-finite entry {value} at position [{row}, {col}]")]
+    NonFiniteInput {
+        /// The offending value
+        value: f64,
+        /// The row index
+        row: usize,
+        /// The column index
+        col: usize,
+    },
 }
 
 // ─── Pivoted correlation Cholesky ─────────────────────────────────────────────
@@ -276,6 +286,7 @@ impl CorrelationFactor {
 /// # Errors
 ///
 /// - [`CholeskyError::DimensionMismatch`] if `matrix.len() != n * n`
+/// - [`CholeskyError::NonFiniteInput`] if any entry is NaN or infinite
 /// - [`CholeskyError::NotPositiveDefinite`] if a pivot is significantly negative
 ///
 /// # Example
@@ -305,6 +316,18 @@ pub fn cholesky_correlation(
     }
     if n == 0 {
         return Ok(CorrelationFactor::from_parts(vec![], 0, 0));
+    }
+
+    // Reject non-finite inputs up front: NaN otherwise propagates through the
+    // pivot selection (`total_cmp` orders NaN above all numbers) and would be
+    // absorbed into an Ok(NaN factor).
+    for row in 0..n {
+        for col in 0..n {
+            let value = matrix[row * n + col];
+            if !value.is_finite() {
+                return Err(CholeskyError::NonFiniteInput { value, row, col });
+            }
+        }
     }
 
     // Maximum diagonal value — used to set relative tolerance.
@@ -411,8 +434,9 @@ pub fn cholesky_correlation(
 /// eigenvector index, matching the convention used by
 /// [`apply_correlation`] and by most linear-algebra references.
 ///
-/// The routine delegates to `nalgebra::SymmetricEigen` (divide-and-conquer
-/// tridiagonal QR, `O(n³)`), which is numerically stable for the symmetric-
+/// The routine delegates to `nalgebra::SymmetricEigen` (Householder
+/// tridiagonalization followed by symmetric QR iteration, `O(n³)`), which is
+/// numerically stable for the symmetric-
 /// matrix case and significantly faster than hand-rolled Jacobi sweeps for
 /// `n > 30`. It tolerates non-positive-definite input — callers that need
 /// the PSD projection step can clamp negative eigenvalues before
@@ -1039,6 +1063,29 @@ mod tests {
 
         assert!((z_corr[0] - 0.5).abs() < 1e-12, "z_corr[0] = {}", z_corr[0]);
         assert!((z_corr[1] - 1.0).abs() < 1e-12, "z_corr[1] = {}", z_corr[1]);
+    }
+
+    #[test]
+    fn pivoted_cholesky_rejects_nan_diagonal() {
+        // NaN must surface as a validation error, not Ok(NaN factor):
+        // total_cmp orders NaN above all numbers so it would be picked as the
+        // pivot and silently absorbed.
+        let corr = vec![f64::NAN, 0.5, 0.5, 1.0];
+        match cholesky_correlation(&corr, 2) {
+            Err(CholeskyError::NonFiniteInput { row, col, .. }) => {
+                assert_eq!((row, col), (0, 0));
+            }
+            other => panic!("expected NonFiniteInput, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pivoted_cholesky_rejects_infinite_off_diagonal() {
+        let corr = vec![1.0, f64::INFINITY, f64::INFINITY, 1.0];
+        assert!(matches!(
+            cholesky_correlation(&corr, 2),
+            Err(CholeskyError::NonFiniteInput { .. })
+        ));
     }
 
     #[test]

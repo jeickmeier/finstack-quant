@@ -138,9 +138,17 @@ pub fn median_or_nan(xs: &[f64]) -> f64 {
     }
 }
 
-/// Linear-interpolation quantile (R-7 / NumPy / Excel style), returning [`f64::NAN`] for empty input.
+/// Linear-interpolation quantile (R-7 / NumPy / Excel style), returning [`f64::NAN`] for
+/// empty input or when any input value is non-finite (matching the mutating
+/// [`quantile`] variant's NaN policy).
 pub fn quantile_linear_or_nan(xs: &[f64], q: f64) -> f64 {
     if xs.is_empty() {
+        return f64::NAN;
+    }
+    // Same non-finite policy as `quantile`: NaN/±inf entries have no
+    // meaningful order statistics, so reject them instead of letting
+    // total_cmp sort NaN to the top.
+    if xs.iter().any(|x| !x.is_finite()) {
         return f64::NAN;
     }
     let mut sorted = xs.to_vec();
@@ -241,8 +249,15 @@ pub fn moment_match(samples: &mut [f64], target_mean: f64, target_std: f64) {
     let current_var = population_variance(samples);
     let current_std = current_var.sqrt();
 
+    // Degenerate-spread guard, relative to the sample scale: a flat 1e-10
+    // would wrongly treat genuinely dispersed dollar-scale samples (std 1e-9
+    // of a 1e6 mean is degenerate) and tiny-scale samples (std 1e-11 around
+    // a 1e-10 mean is meaningful spread) the same way.
+    let scale = samples.iter().fold(0.0_f64, |m, x| m.max(x.abs()));
+    let degenerate_threshold = 1e-10 * scale.max(1.0);
+
     // Adjust samples
-    if current_std > 1e-10 {
+    if current_std > degenerate_threshold {
         for x in samples.iter_mut() {
             *x = (*x - current_mean) * (target_std / current_std) + target_mean;
         }
@@ -611,8 +626,14 @@ pub fn realized_variance_ohlc(
                 sum_rs += hc * ho + lc * lo;
             }
 
+            // Number of return observations (periods): n bars yield n−1
+            // overnight/open-close/RS observations (bar 0 has no previous
+            // close). Yang & Zhang (2000), Eq. (10), define
+            // k = 0.34 / (1.34 + (n+1)/(n−1)) in terms of the number of
+            // *periods* in the estimator, so we use m = n−1 here.
+            let m = n - 1;
             let k = YANG_ZHANG_K_NUMERATOR
-                / (YANG_ZHANG_K_DENOMINATOR_BASE + (n + 1) as f64 / (n - 1) as f64);
+                / (YANG_ZHANG_K_DENOMINATOR_BASE + (m + 1) as f64 / (m - 1) as f64);
             let mean_overnight =
                 overnight_returns.iter().sum::<f64>() / overnight_returns.len() as f64;
             let mean_open_close =
@@ -633,7 +654,11 @@ pub fn realized_variance_ohlc(
                 })
                 .sum::<f64>()
                 / (open_close_returns.len() - 1) as f64;
-            let var_rs = sum_rs / n as f64;
+            // RS component averages over the same m = n−1 periods that
+            // contribute overnight and open-close returns (Yang & Zhang 2000,
+            // Eq. (4)); dividing by the bar count n would bias it down by
+            // (n−1)/n.
+            let var_rs = sum_rs / m as f64;
 
             Ok((var_overnight + k * var_open_close + (1.0 - k) * var_rs) * annualization_factor)
         }

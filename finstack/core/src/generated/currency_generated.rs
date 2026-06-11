@@ -78,6 +78,8 @@ pub enum Currency {
     CDF = 976,
     /// Swiss Franc (756)
     CHF = 756,
+    /// Unidad de Fomento (990)
+    CLF = 990,
     /// Chilean Peso (152)
     CLP = 152,
     /// Yuan Renminbi (156)
@@ -276,6 +278,8 @@ pub enum Currency {
     SOS = 706,
     /// Surinam Dollar (968)
     SRD = 968,
+    /// South Sudanese Pound (728)
+    SSP = 728,
     /// Dobra (930)
     STN = 930,
     /// Syrian Pound (760)
@@ -368,6 +372,7 @@ pub static MINOR_UNITS: phf::Map<u16, u8> = phf::phf_map! {
     124u16 => 2,
     976u16 => 2,
     756u16 => 2,
+    990u16 => 4,
     152u16 => 0,
     156u16 => 2,
     170u16 => 2,
@@ -467,6 +472,7 @@ pub static MINOR_UNITS: phf::Map<u16, u8> = phf::phf_map! {
     694u16 => 2,
     706u16 => 2,
     968u16 => 2,
+    728u16 => 2,
     930u16 => 2,
     760u16 => 2,
     748u16 => 2,
@@ -560,6 +566,7 @@ impl TryFrom<u16> for Currency {
             124 => Ok(Currency::CAD),
             976 => Ok(Currency::CDF),
             756 => Ok(Currency::CHF),
+            990 => Ok(Currency::CLF),
             152 => Ok(Currency::CLP),
             156 => Ok(Currency::CNY),
             170 => Ok(Currency::COP),
@@ -659,6 +666,7 @@ impl TryFrom<u16> for Currency {
             694 => Ok(Currency::SLL),
             706 => Ok(Currency::SOS),
             968 => Ok(Currency::SRD),
+            728 => Ok(Currency::SSP),
             930 => Ok(Currency::STN),
             760 => Ok(Currency::SYP),
             748 => Ok(Currency::SZL),

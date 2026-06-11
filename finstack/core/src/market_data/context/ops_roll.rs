@@ -1,8 +1,13 @@
 //! Time-roll helpers for [`MarketContext`](super::MarketContext).
 //!
-//! These methods advance market-data curves forward in time without applying
-//! carry or theta adjustments, which is useful for roll-down and constant-curve
-//! scenario analysis.
+//! These methods advance market-data curves forward in time with
+//! **realized-forward** semantics: every curve type realizes its forwards as
+//! the base date advances (discount curves renormalize by `DF(dt)`, hazard
+//! curves preserve hazard rates via conditional survival, forward curves
+//! preserve forwards, inflation curves rebase the base CPI, and price /
+//! vol-index curves pin the rolled spot to the old forward). This makes a
+//! roll-then-reprice theta capture both carry and roll-down. Vol surfaces,
+//! FX spot rates, and historical fixings remain static across the roll.
 
 use crate::collections::HashMap;
 use std::sync::Arc;
@@ -19,9 +24,15 @@ impl MarketContext {
     /// This creates a new `MarketContext` with all curves rolled forward:
     /// - Base dates advanced by `days`
     /// - Knot times shifted backwards (expired points filtered out)
-    /// - Curve values preserved (no carry/theta adjustment)
+    /// - Forwards realized on every curve type: discount curves renormalize
+    ///   by `DF(dt)`, hazard curves preserve hazard rates (conditional
+    ///   survival), forward curves preserve forwards, inflation curves rebase
+    ///   the base CPI, and price / vol-index curves set the rolled spot to
+    ///   the old curve's forward at `dt`
     ///
-    /// This is the "constant curves" scenario used for roll-down P&L calculations.
+    /// A roll-then-reprice therefore captures carry plus roll-down P&L.
+    /// Vol surfaces, FX spot rates, and historical fixings remain static
+    /// (see Notes below).
     ///
     /// # Arguments
     /// * `days` - Number of days to roll forward

@@ -65,12 +65,19 @@ impl Rate {
         if !pct.is_finite() {
             return Err(to_js_err("percent must be finite"));
         }
-        RustRate::try_from_decimal(pct / 100.0)
-            .map(|inner| Rate { inner })
-            .map_err(to_js_err)
+        Ok(Rate {
+            inner: RustRate::from_percent(pct),
+        })
     }
 
     /// Create a rate from basis points.
+    ///
+    /// The canonical Rust `Rate::from_bps` takes an integer (`i32`) number
+    /// of basis points. Because JavaScript numbers are `f64`, this binding
+    /// accepts a float and rounds it to the nearest integer basis point
+    /// before delegating (banker-free half-away rounding via `Bps`).
+    /// Fractional inputs therefore lose sub-bp precision; use
+    /// `new Rate(decimal)` or `Rate.fromPercent` for sub-bp rates.
     ///
     /// @param bps - Rate in basis points (e.g. `500` for 5%). Rounded to the
     /// nearest integer bp.

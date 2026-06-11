@@ -11,7 +11,7 @@ use finstack_valuations::instruments::Instrument;
 
 #[test]
 fn test_zero_rate_deposit_negative_pv() {
-    // Setup - deposit with 0% rate should have negative PV (time value)
+    // Setup - deposit with 0% rate should have negative *trade* NPV (time value)
     let base = date(2025, 1, 1);
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
 
@@ -21,10 +21,13 @@ fn test_zero_rate_deposit_negative_pv() {
         .quote_rate(0.0)
         .build();
 
-    let pv = dep.value(&ctx, base).unwrap();
+    // `value` is holder-view position value (PV of remaining flows; the T+0
+    // initial exchange on `as_of` is excluded). Trade-NPV semantics live in
+    // the pricing-view `npv_raw`, which includes the initial exchange.
+    let npv = dep.npv_raw(&ctx, base).unwrap();
 
     // Validate - Should be negative (pay notional, get back same amount discounted)
-    assert!(pv.amount() < 0.0);
+    assert!(npv < 0.0);
 }
 
 #[test]
@@ -67,14 +70,17 @@ fn test_par_rate_gives_zero_pv() {
         .quote_rate(par_rate)
         .build();
 
-    let pv = dep_par.value(&ctx, base).unwrap();
+    // Par rate zeroes the *trade* NPV (pricing view, includes the T+0 initial
+    // exchange). Holder-view `value` excludes the initial exchange and is
+    // ≈ +notional for any quote rate, so the par identity is asserted on
+    // `npv_raw`.
+    let npv = dep_par.npv_raw(&ctx, base).unwrap();
 
-    // Validate - PV should be essentially zero for deposit at par rate
+    // Validate - trade NPV should be essentially zero for deposit at par rate
     // Market standard: < $0.01 on $1M notional (< 0.001bp numerical precision)
     assert!(
-        pv.amount().abs() < 0.01,
-        "PV at par rate should be < $0.01, got: {}",
-        pv.amount()
+        npv.abs() < 0.01,
+        "trade NPV at par rate should be < $0.01, got: {npv}",
     );
 }
 

@@ -161,10 +161,11 @@ pub struct LogLinearStrategy {
 
 impl InterpolationStrategy for LogLinearStrategy {
     fn from_raw(
-        _knots: &[f64],
+        knots: &[f64],
         values: &[f64],
         _extrapolation: ExtrapolationPolicy,
     ) -> crate::Result<Self> {
+        validate_knot_spacing(knots, MIN_RELATIVE_KNOT_GAP)?;
         validate_positive_series(values)?;
         // Precompute log(values) for efficiency
         let log_values: Vec<f64> = values.iter().map(|v| v.ln()).collect();
@@ -955,6 +956,8 @@ impl MonotoneConvexStrategy {
             return Err(InputError::Invalid.into());
         }
 
+        // Same knot-spacing validation as the other strategy constructors.
+        validate_knot_spacing(knots, MIN_RELATIVE_KNOT_GAP)?;
         // Validate monotone non-increasing
         validate_monotone_nonincreasing(values)?;
 
@@ -1093,61 +1096,81 @@ impl MonotoneConvexStrategy {
     /// Hagan, P. S., & West, G. (2006). "Interpolation Methods for
     /// Curve Construction." *Applied Mathematical Finance*, 13(2), §6
     /// and Figure 6.
+    ///
+    /// # Fixpoint sweep
+    ///
+    /// Knot value `f[i+1]` is shared between segments `i` and `i+1`, so the
+    /// projection of a later segment can re-violate an earlier one. The
+    /// sequential sweep is therefore repeated (bounded number of passes)
+    /// until no segment requires projection.
     fn apply_monotonicity_constraints(f: &mut [f64], fd: &[f64], _epsilon: f64) {
         // Numerical floor protecting the `η = fd_i / (fd_i - min_f)`
         // division from pathologically tiny denominators.
         const DENOM_EPS: f64 = 1e-300;
+        // Bounded fixpoint iteration: projecting segment i mutates the shared
+        // knot value f[i+1], which can re-violate the previously projected
+        // segment i (its β changes). Each projection only shrinks |α|, |β|
+        // towards the feasible flat point, so the sweep is a contraction and
+        // a small number of passes suffices in practice.
+        const MAX_PROJECTION_PASSES: usize = 3;
 
         let n = f.len();
-        for i in 0..n - 1 {
-            let fd_i = fd[i];
-            let alpha = f[i] - fd_i;
-            let beta = f[i + 1] - fd_i;
+        for _pass in 0..MAX_PROJECTION_PASSES {
+            let mut mutated = false;
+            for i in 0..n - 1 {
+                let fd_i = fd[i];
+                let alpha = f[i] - fd_i;
+                let beta = f[i + 1] - fd_i;
 
-            // Trivially feasible: already flat within this segment.
-            if alpha == 0.0 && beta == 0.0 {
-                continue;
+                // Trivially feasible: already flat within this segment.
+                if alpha == 0.0 && beta == 0.0 {
+                    continue;
+                }
+
+                // Check whether f(x) = fd_i + g(x) ever goes negative on [0, 1].
+                let min_f = Self::segment_min_forward(alpha, beta, fd_i);
+                if min_f >= 0.0 {
+                    continue;
+                }
+                mutated = true;
+
+                // The non-negative-forward invariant is infeasible when
+                // fd_i ≤ 0: any non-zero (α, β) will push the segment below
+                // zero somewhere and no η > 0 can rescue it. Flatten. Callers
+                // running on genuine negative-rate curves should use a
+                // shifted-lognormal / displaced interpolator rather than
+                // monotone-convex.
+                if fd_i <= 0.0 {
+                    f[i] = fd_i;
+                    f[i + 1] = fd_i;
+                    continue;
+                }
+
+                // Scalar-η projection onto the boundary min(f) = 0.
+                let denom = fd_i - min_f; // strictly > 0 because min_f < 0 < fd_i
+                if denom <= DENOM_EPS {
+                    f[i] = fd_i;
+                    f[i + 1] = fd_i;
+                    continue;
+                }
+
+                let eta = (fd_i / denom).clamp(0.0, 1.0);
+                f[i] = fd_i + eta * alpha;
+                f[i + 1] = fd_i + eta * beta;
+
+                // Numerical safety: after projection the segment minimum is 0
+                // analytically. Floating-point can still produce a tiny
+                // negative value at a knot — clamp to the H&W non-negativity
+                // invariant.
+                if f[i] < 0.0 {
+                    f[i] = 0.0;
+                }
+                if f[i + 1] < 0.0 {
+                    f[i + 1] = 0.0;
+                }
             }
-
-            // Check whether f(x) = fd_i + g(x) ever goes negative on [0, 1].
-            let min_f = Self::segment_min_forward(alpha, beta, fd_i);
-            if min_f >= 0.0 {
-                continue;
-            }
-
-            // The non-negative-forward invariant is infeasible when
-            // fd_i ≤ 0: any non-zero (α, β) will push the segment below
-            // zero somewhere and no η > 0 can rescue it. Flatten. Callers
-            // running on genuine negative-rate curves should use a
-            // shifted-lognormal / displaced interpolator rather than
-            // monotone-convex.
-            if fd_i <= 0.0 {
-                f[i] = fd_i;
-                f[i + 1] = fd_i;
-                continue;
-            }
-
-            // Scalar-η projection onto the boundary min(f) = 0.
-            let denom = fd_i - min_f; // strictly > 0 because min_f < 0 < fd_i
-            if denom <= DENOM_EPS {
-                f[i] = fd_i;
-                f[i + 1] = fd_i;
-                continue;
-            }
-
-            let eta = (fd_i / denom).clamp(0.0, 1.0);
-            f[i] = fd_i + eta * alpha;
-            f[i + 1] = fd_i + eta * beta;
-
-            // Numerical safety: after projection the segment minimum is 0
-            // analytically. Floating-point can still produce a tiny
-            // negative value at a knot — clamp to the H&W non-negativity
-            // invariant.
-            if f[i] < 0.0 {
-                f[i] = 0.0;
-            }
-            if f[i + 1] < 0.0 {
-                f[i + 1] = 0.0;
+            if !mutated {
+                break;
             }
         }
     }

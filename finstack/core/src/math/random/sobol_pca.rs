@@ -125,13 +125,20 @@ pub fn effective_dimension(eigenvalues: &[f64]) -> f64 {
 
 /// Apply PCA transformation to random shocks.
 ///
-/// Transforms shocks from PCA space back to original asset space.
+/// Transforms shocks from PCA space back to original asset space via
+/// `z_out = Q_sorted · z_pca`. The rows of the sorted eigenvector matrix are
+/// already indexed by original asset (only the *columns* were reordered by the
+/// eigenvalue sort), so the eigen-sort permutation must **not** be applied to
+/// the asset axis — doing so would scramble the output covariance to
+/// `P·ρ·Pᵀ ≠ ρ` (see `docs/reviews/2026-06-09-core-quant-review.md`,
+/// "transform_pca_to_assets scrambles the asset axis"). The permutation
+/// argument is retained for API stability and dimension validation only.
 ///
 /// # Arguments
 ///
-/// * `z_pca` - Shocks in PCA-ordered space
-/// * `eigenvectors` - Eigenvector matrix from PCA
-/// * `permutation` - Permutation from PCA ordering
+/// * `z_pca` - Shocks in PCA-ordered space (component `j` scaled by `√λ_j`)
+/// * `eigenvectors` - Sorted eigenvector matrix from [`pca_ordering`] (column-major)
+/// * `permutation` - Permutation from [`pca_ordering`] (validated, not applied)
 /// * `z_out` - Output shocks in original asset order
 pub fn transform_pca_to_assets(
     z_pca: &[f64],
@@ -144,7 +151,9 @@ pub fn transform_pca_to_assets(
         return Err(InputError::DimensionMismatch.into());
     }
 
-    // z_temp = Q * z_pca (where Q is eigenvector matrix)
+    // z_out = Q * z_pca (where Q is the sorted eigenvector matrix).
+    // Rows of Q are original asset indices, so the result is already in
+    // original asset order; no permutation of the asset axis is applied.
     let mut z_temp: SmallVec<[f64; 64]> = smallvec::smallvec![0.0; n];
     for i in 0..n {
         let mut sum = 0.0;
@@ -153,10 +162,7 @@ pub fn transform_pca_to_assets(
         }
         z_temp[i] = sum;
     }
-    // Apply permutation: permutation[i] = original asset index for sorted PCA dim i
-    for i in 0..n {
-        z_out[permutation[i]] = z_temp[i];
-    }
+    z_out.copy_from_slice(&z_temp);
 
     Ok(())
 }
@@ -274,33 +280,65 @@ mod tests {
     }
 
     #[test]
-    fn test_transform_pca_to_assets_applies_permutation() {
-        // 2x2 identity eigenvector matrix with permutation [1, 0]
-        // should reverse the output
+    fn test_transform_pca_to_assets_ignores_permutation_on_asset_axis() {
+        // Review 2026-06-09 (core math): `z_temp = Q · z_pca` is already in
+        // original asset order; re-applying the eigen-sort permutation to the
+        // asset axis produced Cov(z_out) = P·ρ·Pᵀ ≠ ρ. With an identity Q the
+        // output must equal z_pca regardless of the permutation argument.
         let z_pca = [1.0, 2.0];
         let eigenvectors = [
             1.0, 0.0, // column 0
             0.0, 1.0, // column 1
         ];
-        let permutation = [1, 0]; // swap asset indices
+        let permutation = [1, 0]; // non-identity eigen-sort permutation
         let mut z_out = [0.0; 2];
 
         transform_pca_to_assets(&z_pca, &eigenvectors, &permutation, &mut z_out)
             .expect("matching dimensions should succeed");
 
-        // Without permutation z_out would be [1.0, 2.0].
-        // With permutation [1,0]: z_out[permutation[0]]=z_temp[0] => z_out[1]=1.0
-        //                         z_out[permutation[1]]=z_temp[1] => z_out[0]=2.0
         assert!(
-            (z_out[0] - 2.0).abs() < 1e-12,
-            "z_out[0] should be 2.0, got {}",
-            z_out[0]
+            (z_out[0] - 1.0).abs() < 1e-12 && (z_out[1] - 2.0).abs() < 1e-12,
+            "output must be Q·z_pca = z_pca for identity Q, got {z_out:?}"
         );
-        assert!(
-            (z_out[1] - 1.0).abs() < 1e-12,
-            "z_out[1] should be 1.0, got {}",
-            z_out[1]
-        );
+    }
+
+    #[test]
+    fn test_transform_pca_to_assets_output_covariance_matches_correlation() {
+        // Analytic covariance check through the public transform: feeding the
+        // PCA-space "shock columns" √λ_j·e_j and summing the outer products of
+        // the outputs reconstructs Cov(z_out) = Q·Λ·Qᵀ, which must equal the
+        // input correlation matrix in original asset order.
+        let n = 3;
+        let correlation = vec![
+            1.0, 0.9, 0.8, //
+            0.9, 1.0, 0.7, //
+            0.8, 0.7, 1.0,
+        ];
+        let (eigenvalues, eigenvectors, permutation) =
+            pca_ordering(&correlation, n).expect("3x3 matrix should succeed");
+
+        let mut covariance = vec![0.0; n * n];
+        for (j, &lambda) in eigenvalues.iter().enumerate() {
+            // z_pca = √λ_j · e_j (unit shock in sorted PCA dimension j)
+            let mut z_pca = vec![0.0; n];
+            z_pca[j] = lambda.max(0.0).sqrt();
+            let mut z_out = vec![0.0; n];
+            transform_pca_to_assets(&z_pca, &eigenvectors, &permutation, &mut z_out)
+                .expect("matching dimensions should succeed");
+
+            for row in 0..n {
+                for col in 0..n {
+                    covariance[row * n + col] += z_out[row] * z_out[col];
+                }
+            }
+        }
+
+        for (actual, expected) in covariance.iter().zip(correlation.iter()) {
+            assert!(
+                (actual - expected).abs() < 1e-10,
+                "output covariance mismatch: {actual} vs {expected}"
+            );
+        }
     }
 
     #[test]

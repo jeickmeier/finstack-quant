@@ -13,6 +13,27 @@
 //! - Serialization support with stable serde field names
 //! - Zero-cost abstractions (2-byte size)
 //!
+//! # Scope: deliverable currencies only
+//!
+//! The enum covers ISO 4217 **deliverable national currencies** (including
+//! indexed units of account such as CLF, the Chilean Unidad de Fomento).
+//! Non-currency ISO 4217 codes are intentionally excluded:
+//!
+//! - `XXX` (no currency) — use an `Option<Currency>` instead of a sentinel
+//! - `XAU`/`XAG`/`XPT`/`XPD` (precious metals) — commodities, not money
+//! - `XDR` (IMF Special Drawing Rights) — a basket claim, not a deliverable
+//!   settlement currency
+//!
+//! Parsing these codes returns an error by design.
+//!
+//! # `decimals()` fallback
+//!
+//! [`Currency::decimals`] returns the ISO 4217 minor-unit count from the
+//! generated table (`data/iso_4217.csv`). If a currency's numeric code were
+//! ever missing from that table, the accessor falls back to **2 decimal
+//! places** rather than panicking; the table is generated from the full ISO
+//! list precisely so this fallback never fires in practice.
+//!
 //! # Examples
 //!
 //! ## Creating and using currencies

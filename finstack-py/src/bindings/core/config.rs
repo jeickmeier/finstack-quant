@@ -137,14 +137,14 @@ impl PyToleranceConfig {
     }
 
     /// Epsilon used for rate-style comparisons.
-    #[pyo3(text_signature = "(self)")]
-    fn get_rate_epsilon(&self) -> f64 {
+    #[getter]
+    fn rate_epsilon(&self) -> f64 {
         self.inner.rate_epsilon
     }
 
     /// Epsilon used for generic floating-point comparisons.
-    #[pyo3(text_signature = "(self)")]
-    fn get_generic_epsilon(&self) -> f64 {
+    #[getter]
+    fn generic_epsilon(&self) -> f64 {
         self.inner.generic_epsilon
     }
 
@@ -198,7 +198,7 @@ impl PyFinstackConfig {
 
     /// Effective output decimal scale for `currency` (ISO-4217 code).
     #[pyo3(text_signature = "(self, currency)")]
-    fn get_output_scale(&self, currency: &str) -> PyResult<u32> {
+    fn output_scale(&self, currency: &str) -> PyResult<u32> {
         let ccy: Currency = currency
             .parse()
             .map_err(|_| core_to_py(InputError::UnknownCurrency.into()))?;
@@ -207,7 +207,7 @@ impl PyFinstackConfig {
 
     /// Effective ingest decimal scale for `currency` (ISO-4217 code).
     #[pyo3(text_signature = "(self, currency)")]
-    fn get_ingest_scale(&self, currency: &str) -> PyResult<u32> {
+    fn ingest_scale(&self, currency: &str) -> PyResult<u32> {
         let ccy: Currency = currency
             .parse()
             .map_err(|_| core_to_py(InputError::UnknownCurrency.into()))?;

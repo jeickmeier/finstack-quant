@@ -176,10 +176,13 @@ impl Compounding {
         }
         match self {
             Compounding::Continuous => (-rate * t).exp(),
-            Compounding::Annual => (1.0 + rate).powf(-t),
+            // ln_1p formulations: (1 + r)^(-t) = exp(-t·ln(1+r)). Forming
+            // 1 + r explicitly rounds away rates below ~1e-16; ln_1p keeps
+            // full precision for small rates.
+            Compounding::Annual => (-t * rate.ln_1p()).exp(),
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
-                (1.0 + rate / n).powf(-n * t)
+                (-n * t * (rate / n).ln_1p()).exp()
             }
             Compounding::Simple => {
                 let denominator = 1.0 + rate * t;
@@ -223,12 +226,61 @@ impl Compounding {
         }
         match self {
             Compounding::Continuous => -df.ln() / t,
-            Compounding::Annual => df.powf(-1.0 / t) - 1.0,
+            // exp_m1 formulations avoid cancellation when the exponent is
+            // small (DF near 1 and/or short tenors): exp(x) - 1 loses all
+            // significant digits for |x| ≲ 1e-8 while exp_m1 is exact.
+            Compounding::Annual => (-df.ln() / t).exp_m1(),
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
-                n * (df.powf(-1.0 / (n * t)) - 1.0)
+                n * (-df.ln() / (n * t)).exp_m1()
             }
             Compounding::Simple => (1.0 / df - 1.0) / t,
+        }
+    }
+
+    /// Continuous-equivalent (instantaneous) rate of `rate` quoted under `self`.
+    ///
+    /// This is the `t → 0` limit of the conversion to continuous compounding:
+    ///
+    /// ```text
+    /// Continuous:   c = r
+    /// Annual:       c = ln(1 + r)
+    /// Periodic(n):  c = n × ln(1 + r/n)
+    /// Simple:       c = r        (DF = 1/(1 + r t) → e^(-r t) as t → 0)
+    /// ```
+    #[must_use]
+    #[inline]
+    fn instantaneous_rate(&self, rate: f64) -> f64 {
+        match self {
+            Compounding::Continuous | Compounding::Simple => rate,
+            Compounding::Annual => rate.ln_1p(),
+            Compounding::Periodic(n) => {
+                let n = f64::from(n.get());
+                n * (rate / n).ln_1p()
+            }
+        }
+    }
+
+    /// Rate quoted under `self` equivalent to the continuous rate `c` as `t → 0`.
+    ///
+    /// Inverse of [`instantaneous_rate`](Self::instantaneous_rate):
+    ///
+    /// ```text
+    /// Continuous:   r = c
+    /// Annual:       r = e^c − 1
+    /// Periodic(n):  r = n × (e^(c/n) − 1)
+    /// Simple:       r = c
+    /// ```
+    #[must_use]
+    #[inline]
+    fn rate_from_instantaneous(&self, c: f64) -> f64 {
+        match self {
+            Compounding::Continuous | Compounding::Simple => c,
+            Compounding::Annual => c.exp_m1(),
+            Compounding::Periodic(n) => {
+                let n = f64::from(n.get());
+                n * (c / n).exp_m1()
+            }
         }
     }
 
@@ -242,7 +294,12 @@ impl Compounding {
     /// r_to = to.rate_from_df(self.df_from_rate(r_from, t), t)
     /// ```
     ///
-    /// When `t == 0.0`, returns `0.0`.
+    /// When `t == 0.0`, returns the `t → 0` limit of the conversion: the
+    /// source rate is mapped to its continuous-equivalent
+    /// (`ln(1+r)` for annual, `n·ln(1+r/n)` for periodic, identity for
+    /// continuous/simple) and then back out under the target convention
+    /// (`e^c − 1` for annual, `n·(e^(c/n) − 1)` for periodic). For example,
+    /// continuous → annual at `t = 0` returns `e^r − 1`, not `0.0`.
     ///
     /// # References
     ///
@@ -252,7 +309,8 @@ impl Compounding {
     #[inline]
     pub fn convert_rate(&self, rate: f64, t: f64, to: &Compounding) -> f64 {
         if t == 0.0 {
-            return 0.0;
+            // t → 0 limit: route through the continuous-equivalent rate.
+            return to.rate_from_instantaneous(self.instantaneous_rate(rate));
         }
         let df = self.df_from_rate(rate, t);
         to.rate_from_df(df, t)
@@ -525,11 +583,46 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_rate_t_zero_returns_zero() {
+    fn test_convert_rate_t_zero_returns_limit() {
+        // t → 0 limit of the conversion, not the old 0.0 sentinel.
         let rate = 0.05;
         let t = 0.0;
+
+        // continuous → annual: e^r − 1
         let result = Compounding::Continuous.convert_rate(rate, t, &Compounding::Annual);
-        assert_eq!(result, 0.0, "convert_rate at t=0 should return 0.0");
+        assert!(
+            (result - rate.exp_m1()).abs() < 1e-15,
+            "continuous→annual at t=0 should be e^r - 1, got {result}"
+        );
+
+        // annual → continuous: ln(1 + r)
+        let result = Compounding::Annual.convert_rate(rate, t, &Compounding::Continuous);
+        assert!(
+            (result - rate.ln_1p()).abs() < 1e-15,
+            "annual→continuous at t=0 should be ln(1+r), got {result}"
+        );
+
+        // continuous → semi-annual: 2(e^{r/2} − 1)
+        let result = Compounding::Continuous.convert_rate(rate, t, &Compounding::SEMI_ANNUAL);
+        assert!(
+            (result - 2.0 * (rate / 2.0).exp_m1()).abs() < 1e-15,
+            "continuous→semi-annual at t=0 should be 2(e^(r/2)-1), got {result}"
+        );
+
+        // same convention: identity
+        let result = Compounding::Continuous.convert_rate(rate, t, &Compounding::Continuous);
+        assert!((result - rate).abs() < 1e-15);
+
+        // Consistency: the t=0 limit matches the conversion at a tiny tenor.
+        // The tiny-tenor path itself loses ~ε/(r·t) relative precision in
+        // ln(DF), so the comparison tolerance is looser than the exact-limit
+        // assertions above.
+        let at_tiny_t = Compounding::Continuous.convert_rate(rate, 1e-9, &Compounding::Annual);
+        let at_zero = Compounding::Continuous.convert_rate(rate, 0.0, &Compounding::Annual);
+        assert!(
+            (at_tiny_t - at_zero).abs() < 1e-7,
+            "t=0 limit {at_zero} should match tiny-tenor conversion {at_tiny_t}"
+        );
     }
 
     #[test]

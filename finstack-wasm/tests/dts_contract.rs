@@ -399,3 +399,61 @@ fn factor_model_dts_exposes_credit_namespace() {
     assert!(!factor_model.contains("decomposeLevels"));
     assert!(dts.contains("export declare const factor_model: FactorModelNamespace;"));
 }
+
+#[test]
+fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
+    let dts = index_dts();
+
+    // FxDeltaVolSurface instance + constructor interfaces.
+    let surface = interface_block(&dts, "FxDeltaVolSurface ");
+    assert!(contains_signature(surface, "readonly id: string;"));
+    assert!(contains_signature(surface, "readonly expiries: number[];"));
+    assert!(contains_signature(surface, "readonly numExpiries: number;"));
+    assert!(contains_signature(
+        surface,
+        "pillarVols(expiryIdx: number): number[];"
+    ));
+    assert!(contains_signature(
+        surface,
+        "impliedVol(expiry: number, strike: number, forward: number, rD: number, rF: number): number;"
+    ));
+
+    let ctor = interface_block(&dts, "FxDeltaVolSurfaceConstructor");
+    assert!(contains_signature(
+        ctor,
+        "deltaToStrike(delta: number, forward: number, vol: number, expiry: number, rF: number): number;"
+    ));
+    assert!(contains_signature(
+        ctor,
+        "strikeToDelta(strike: number, forward: number, vol: number, expiry: number, rF: number): number;"
+    ));
+
+    // Registered on the core namespace.
+    let core_ns = interface_block(&dts, "CoreNamespace");
+    assert!(contains_signature(
+        core_ns,
+        "FxDeltaVolSurface: FxDeltaVolSurfaceConstructor;"
+    ));
+
+    // FxRateResult exposes getter-style properties matching Python, and no
+    // invented binding-side policy state.
+    let fx_result = interface_block(&dts, "FxRateResult");
+    assert!(contains_signature(fx_result, "readonly rate: number;"));
+    assert!(contains_signature(
+        fx_result,
+        "readonly triangulated: boolean;"
+    ));
+    assert!(!fx_result.contains("getPolicy"));
+    assert!(!fx_result.contains("getRate"));
+
+    // Money exposes the lossless decimal-string accessor.
+    let money = interface_block(&dts, "Money ");
+    assert!(contains_signature(money, "amountDecimal(): string;"));
+
+    // DayCountContext exposes the coupon-period builder.
+    let ctx = interface_block(&dts, "DayCountContext ");
+    assert!(contains_signature(
+        ctx,
+        "withCouponPeriod(startEpochDays: number, endEpochDays: number): DayCountContext;"
+    ));
+}

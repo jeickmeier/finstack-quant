@@ -6,11 +6,11 @@
     "description": "Phase-1 smoke fixture: same deposit + expected outputs as deposit/usd_deposit_3m.json, but the discount curve is built via market_envelope rather than a materialized snapshot.",
     "valuation_date": "2026-04-30",
     "source": "quantlib",
-    "source_detail": "Phase-1 smoke: same QuantLib-Python 1.42.1 oracle values as deposit/usd_deposit_3m.json; discount curve carried through initial_market with no calibration steps to produce byte-identical pricing",
+    "source_detail": "Phase-1 smoke: same QuantLib-Python 1.42.1 oracle values as deposit/usd_deposit_3m.json; discount curve carried through initial_market with no calibration steps to produce byte-identical pricing Regenerated 2026-06-11 (docs/reviews/2026-06-09-core-quant-review.md): core npv now excludes flows on or before the valuation date (market-standard holder-view position value), so the T+0 initial -10MM notional exchange on the 2026-04-30 valuation date is no longer part of npv. New expected npv = prior QuantLib trade NPV (2877.927119438455) + 10,000,000 excluded initial flow at DF=1; equivalently QuantLib CashFlows.npv with includeSettlementDateFlows=False. deposit_par_rate and dv01 are unchanged (the t=0 flow has DF=1 and no rate sensitivity).",
     "captured_by": "jeickmeier",
     "captured_on": "2026-04-30",
     "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-04-30",
+    "last_reviewed_on": "2026-06-11",
     "review_interval_months": 6,
     "regen_command": "manual QuantLib-Python oracle; see inputs.source_reference for reproduction formulas and intermediate values",
     "screenshots": []
@@ -104,7 +104,7 @@
     }
   },
   "expected": {
-    "npv": 2877.927119438455,
+    "npv": 10002877.927119438,
     "deposit_par_rate": 0.03985001083863061,
     "dv01": -249.38681957910967
   },

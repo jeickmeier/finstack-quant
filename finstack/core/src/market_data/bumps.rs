@@ -429,19 +429,36 @@ pub enum MarketBump {
 // ID formatting helpers
 // -----------------------------------------------------------------------------
 
+/// Format a bump magnitude for embedding in a derived curve ID.
+///
+/// Integral values keep the compact `{:.0}` form (`25bp`, `-10bp`); fractional
+/// values keep one decimal so distinct bumps yield distinct IDs (`0.4bp` vs
+/// `-0.4bp` vs `0bp`). A rounded `-0` is normalized to `0`.
+#[inline]
+fn format_bump_magnitude(value: f64) -> String {
+    let rounded = value.round();
+    if (value - rounded).abs() < 1e-9 {
+        // Normalize -0.0 so "+0" and "-0" bumps share one ID.
+        let normalized = if rounded == 0.0 { 0.0 } else { rounded };
+        format!("{:.0}", normalized)
+    } else {
+        format!("{:.1}", value)
+    }
+}
+
 #[inline]
 pub(crate) fn id_bump_bp(id: &str, bp: f64) -> CurveId {
-    CurveId::new(format!("{}_bump_{:.0}bp", id, bp))
+    CurveId::new(format!("{}_bump_{}bp", id, format_bump_magnitude(bp)))
 }
 
 #[inline]
 pub(crate) fn id_spread_bp(id: &str, bp: f64) -> CurveId {
-    CurveId::new(format!("{}_spread_{:.0}bp", id, bp))
+    CurveId::new(format!("{}_spread_{}bp", id, format_bump_magnitude(bp)))
 }
 
 #[inline]
 pub(crate) fn id_bump_pct(id: &str, pct: f64) -> CurveId {
-    CurveId::new(format!("{}_bump_{:.0}pct", id, pct))
+    CurveId::new(format!("{}_bump_{}pct", id, format_bump_magnitude(pct)))
 }
 
 // -----------------------------------------------------------------------------
@@ -531,14 +548,9 @@ impl Bumpable for ForwardCurve {
                     bumped_rates.push((t, new_rate));
                 }
 
-                ForwardCurve::builder(bumped_id, self.tenor())
-                    .base_date(self.base_date())
-                    .reset_lag(self.reset_lag())
-                    .day_count(self.day_count())
-                    .knots(bumped_rates)
-                    .interp(self.interp_style())
-                    .extrapolation(self.extrapolation())
-                    .build()
+                // Thread the full metadata (rate_calibration, fx_policy, …)
+                // via the shared metadata builder.
+                self.metadata_builder(bumped_id).knots(bumped_rates).build()
             }
             BumpType::TriangularKeyRate {
                 prev_bucket,
@@ -586,7 +598,6 @@ impl Bumpable for HazardCurve {
         }
 
         // Interpret RateBp/Percent as **par spread** shocks; convert to hazard using 1/(1 - recovery).
-        // Interpret RateBp/Percent as **par spread** shocks; convert to hazard using 1/(1 - recovery).
         let (spread, is_multiplicative) = spec.resolve_standard_values_or_error(
             "HazardCurve",
             "only supports Additive/{RateBp,Percent,Fraction} bumps",
@@ -603,32 +614,38 @@ impl Bumpable for HazardCurve {
 
         let bumped_id = spec.hazard_shift_id(self.id());
 
-        for (t, lambda) in self.knot_points() {
-            let shifted = lambda + shift;
-            if shifted < 0.0 {
-                tracing::warn!(
-                    curve_id = %self.id(),
-                    time = t,
-                    hazard_rate = lambda,
-                    hazard_shift = shift,
-                    "Hazard curve bump clamped negative hazard rate to zero"
-                );
-            }
-        }
-
+        // Reject bumps that would drive any hazard rate negative. This matches
+        // `HazardCurve::bump_in_place` so two-sided risk runs (e.g. CS01) fail
+        // loudly instead of producing a silently asymmetric down-bump from a
+        // clamped curve.
         let knot_points = self.knot_points();
         let mut shifted_points = Vec::with_capacity(knot_points.size_hint().0);
         for (t, lambda) in knot_points {
-            shifted_points.push((t, (lambda + shift).max(0.0)));
+            let shifted = lambda + shift;
+            if shifted < 0.0 {
+                return Err(InputError::UnsupportedBump {
+                    reason: format!(
+                        "negative hazard rate after bump on curve '{}' at t={} (lambda={}, shift={})",
+                        self.id(),
+                        t,
+                        lambda,
+                        shift
+                    ),
+                }
+                .into());
+            }
+            shifted_points.push((t, shifted));
         }
 
-        // Rebuild a proper curve with the bumped ID, preserving key metadata
-        HazardCurve::builder(bumped_id)
-            .base_date(self.base_date())
-            .recovery_rate(self.recovery_rate())
-            .day_count(self.day_count())
+        // Rebuild with the bumped ID, preserving the FULL metadata (issuer,
+        // seniority, currency, day-count, par/survival interp styles,
+        // fx_policy) via the shared metadata builder. The stored par-spread
+        // quotes are intentionally NOT carried over: they were calibrated to
+        // the unbumped hazards and would make `cds_quote_bp` report stale
+        // quotes. With no stored quotes, `cds_quote_bp` falls back to the
+        // hazard-based approximation λ·(1−R)·1e4, which reflects the bump.
+        self.metadata_builder(bumped_id)
             .knots(shifted_points)
-            .par_spreads(self.par_spread_points())
             .build()
     }
 }
@@ -1079,7 +1096,11 @@ mod tests {
     }
 
     #[test]
-    fn test_hazard_curve_negative_bump_clamps_to_zero() -> crate::Result<()> {
+    fn test_hazard_curve_negative_bump_errors() -> crate::Result<()> {
+        // A down-bump that would push a hazard rate negative now fails loudly
+        // instead of clamping to zero (clamping made two-sided CS01 silently
+        // asymmetric for tight names) — unified with `bump_in_place`; see
+        // docs/reviews/2026-06-09-core-quant-review.md.
         use crate::dates::Date;
         use crate::market_data::term_structures::HazardCurve;
         use time::Month;
@@ -1098,9 +1119,11 @@ mod tests {
             .build()?;
 
         let spec = BumpSpec::parallel_bp(-20.0);
-        let bumped = hc.apply_bump(spec)?;
-
-        assert_eq!(bumped.hazard_rate(1.0), 0.0);
+        let err = hc.apply_bump(spec).expect_err("negative hazard must error");
+        assert!(
+            err.to_string().contains("negative hazard rate after bump"),
+            "unexpected error: {err}"
+        );
         Ok(())
     }
 

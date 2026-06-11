@@ -306,6 +306,52 @@ mod generator_tests {
         GeneratorMatrix::from_transition_matrix(&p)
             .expect("Kreinin-Sidenius should produce valid generator");
     }
+
+    /// Policy-visibility stamping (2026-06-09 core quant review): a matrix
+    /// whose log requires Kreinin-Sidenius clamping must report non-zero
+    /// `regularization_l1`, and the round-trip error must be stamped.
+    #[test]
+    fn regularization_and_round_trip_error_are_stamped() {
+        // 3-state downgrade chain with distinct eigenvalues (0.90, 0.85, 1):
+        // A can only reach D through B over one period, so log(P) has a
+        // negative (A, D) entry (≈ −0.009), forcing K-S clamping.
+        let scale =
+            RatingScale::custom(vec!["A".to_string(), "B".to_string(), "D".to_string()]).unwrap();
+        #[rustfmt::skip]
+        let data = &[
+            0.90, 0.10, 0.00,
+            0.00, 0.85, 0.15,
+            0.00, 0.00, 1.00,
+        ];
+        let p = TransitionMatrix::new(scale, data, 1.0).unwrap();
+        // K-S clamping perturbs the generator enough that the round-trip
+        // error (~0.022) exceeds the default 1e-2 tolerance — exactly the
+        // distortion the stamps make visible. Use a loosened tolerance to
+        // obtain the regularized generator and inspect the stamps.
+        let gen = GeneratorMatrix::from_transition_matrix_with_tol(&p, 5e-2)
+            .expect("generator extraction should succeed");
+
+        assert!(
+            gen.regularization_l1() > 0.0,
+            "K-S clamping occurred but regularization_l1 = {}",
+            gen.regularization_l1()
+        );
+        assert!(
+            gen.round_trip_error() > 0.0 && gen.round_trip_error() <= 5e-2,
+            "round-trip error must be stamped and within the requested \
+             tolerance: {}",
+            gen.round_trip_error()
+        );
+    }
+
+    /// Directly constructed generators are unregularized: both stamps are zero.
+    #[test]
+    fn direct_construction_stamps_zero_regularization() {
+        let scale = two_state_scale();
+        let gen = GeneratorMatrix::new(scale, &[-0.05, 0.05, 0.0, 0.0]).unwrap();
+        assert_eq!(gen.regularization_l1(), 0.0);
+        assert_eq!(gen.round_trip_error(), 0.0);
+    }
 }
 
 #[cfg(test)]

@@ -70,6 +70,7 @@ const HESTON_EXPONENT_REAL_LIMIT: f64 = 700.0;
 /// assert!(call > 0.0 && call < 100.0);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "RawHestonParams")]
 pub struct HestonParams {
     /// Initial variance (v₀ > 0).
     pub v0: f64,
@@ -81,6 +82,34 @@ pub struct HestonParams {
     pub sigma: f64,
     /// Correlation between spot and variance (-1 < ρ < 1).
     pub rho: f64,
+}
+
+/// Raw deserialization state of [`HestonParams`].
+///
+/// Mirrors the serialized field layout exactly so the wire format is
+/// unchanged; conversion runs [`HestonParams::new`] validation and rejects
+/// unknown fields.
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawHestonParams {
+    /// Initial variance.
+    v0: f64,
+    /// Mean reversion speed.
+    kappa: f64,
+    /// Long-run variance.
+    theta: f64,
+    /// Vol-of-vol.
+    sigma: f64,
+    /// Spot-variance correlation.
+    rho: f64,
+}
+
+impl TryFrom<RawHestonParams> for HestonParams {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawHestonParams) -> crate::Result<Self> {
+        Self::new(raw.v0, raw.kappa, raw.theta, raw.sigma, raw.rho)
+    }
 }
 
 /// Log-space spot/strike and discounting inputs shared by Gil–Pelaez \(P_j\) integration.
@@ -435,9 +464,18 @@ impl HestonParams {
             return f64::NAN;
         }
 
-        // Degenerate case: very small vol-of-vol → use Black-Scholes
+        // Degenerate case: very small vol-of-vol → use Black-Scholes with the
+        // time-averaged deterministic variance (σ_v → 0 limit of CIR).
         if self.sigma < 1e-10 {
-            return bs_call_fallback(spot, strike, r, q, t, self.v0.sqrt(), is_call);
+            return bs_call_fallback(
+                spot,
+                strike,
+                r,
+                q,
+                t,
+                self.deterministic_avg_vol(t),
+                is_call,
+            );
         }
 
         let (p1, p2) = self.compute_p1_p2(spot, strike, r, q, t);
@@ -445,14 +483,39 @@ impl HestonParams {
             return f64::NAN;
         }
 
-        let call = (spot * (-q * t).exp() * p1 - strike * (-r * t).exp() * p2).max(0.0);
+        // Compute the put via parity from the UNclamped call, then clamp each
+        // result once at the end. Clamping the call before applying parity
+        // would shift the put by the clamped amount and break parity.
+        let call = spot * (-q * t).exp() * p1 - strike * (-r * t).exp() * p2;
 
         if is_call {
-            call
+            call.max(0.0)
         } else {
             // Put-call parity
             (call - spot * (-q * t).exp() + strike * (-r * t).exp()).max(0.0)
         }
+    }
+
+    /// Volatility of the σ_v → 0 deterministic-variance limit over `[0, t]`.
+    ///
+    /// When vol-of-vol vanishes, the CIR variance follows the deterministic
+    /// path `v(s) = θ + (v₀ − θ)e^{−κs}`. The Black-Scholes-equivalent
+    /// volatility is the square root of the time-averaged variance:
+    ///
+    /// ```text
+    /// v̄ = θ + (v₀ − θ)(1 − e^{−κT}) / (κT),   σ = √v̄
+    /// ```
+    ///
+    /// Using `√v₀` instead (the pre-fix behaviour) ignores mean reversion and
+    /// is correct only when `v₀ = θ`.
+    fn deterministic_avg_vol(&self, t: f64) -> f64 {
+        let kt = self.kappa * t;
+        let v_bar = if kt > 1e-12 {
+            self.theta + (self.v0 - self.theta) * (1.0 - (-kt).exp()) / kt
+        } else {
+            self.v0
+        };
+        v_bar.max(0.0).sqrt()
     }
 
     /// Price a strip of European options sharing the same expiry and model inputs.
@@ -502,9 +565,10 @@ impl HestonParams {
         }
 
         if self.sigma < 1e-10 {
+            let vol = self.deterministic_avg_vol(t);
             return strikes
                 .iter()
-                .map(|&strike| bs_call_fallback(spot, strike, r, q, t, self.v0.sqrt(), is_call))
+                .map(|&strike| bs_call_fallback(spot, strike, r, q, t, vol, is_call))
                 .collect();
         }
 
@@ -568,10 +632,11 @@ impl HestonParams {
 
                 let p1 = cache.probability(log_strike, &cache.psi1_over_iphi);
                 let p2 = cache.probability(log_strike, &cache.psi2_over_iphi);
-                let call = (spot * (-q * t).exp() * p1 - strike * (-r * t).exp() * p2).max(0.0);
+                // Parity is applied to the unclamped call; clamp once at the end.
+                let call = spot * (-q * t).exp() * p1 - strike * (-r * t).exp() * p2;
 
                 if is_call {
-                    call
+                    call.max(0.0)
                 } else {
                     (call - spot * (-q * t).exp() + strike * (-r * t).exp()).max(0.0)
                 }
@@ -782,9 +847,18 @@ impl HestonParams {
         }
     }
 
+    /// Heuristic upper integration limit for the Gil-Pelaez inversion.
+    ///
+    /// Estimates where the characteristic function decays below ~1e-12,
+    /// assuming Gaussian-like tail decay of the CF driven by `σ²t`. Two
+    /// caveats: (1) the heuristic relies on that tail-decay assumption, which
+    /// can be optimistic for low-vol/short-dated parameter sets (the tail
+    /// check in `compute_p1_p2` refines the bound when residual mass remains);
+    /// (2) deep wings (|ln(F/K)| ≳ 2) make the integrand increasingly
+    /// oscillatory, so the fixed 128-node grid approaches under-resolution
+    /// there even with an adequate upper limit.
     fn integration_upper_limit(&self, t: f64) -> f64 {
         if self.sigma > 0.0 && t > 0.0 {
-            // Estimate where characteristic function decays below ~1e-12
             (2.0 * 28.0_f64.ln() / (self.sigma.powi(2) * t))
                 .sqrt()
                 .clamp(50.0, 500.0)
@@ -1236,6 +1310,103 @@ mod tests {
             (heston - bs).abs() < 0.01,
             "Heston → BS limit: Heston={heston:.4}, BS={bs:.4}"
         );
+    }
+
+    #[test]
+    fn sigma_v_zero_fallback_uses_time_averaged_variance() {
+        // v0 ≠ θ: the σ_v → 0 limit is the time-averaged deterministic CIR
+        // variance, NOT v0. v̄ = θ + (v0−θ)(1−e^{−κT})/(κT).
+        let v0 = 0.01;
+        let theta = 0.09;
+        let kappa = 2.0;
+        let t = 1.0;
+        let p = HestonParams::new(v0, kappa, theta, 1e-12, 0.0).expect("valid");
+
+        // Closed form
+        let v_bar = theta + (v0 - theta) * (1.0 - (-kappa * t).exp()) / (kappa * t);
+        assert!(
+            (v_bar - 0.0554134).abs() < 1e-6,
+            "expected v̄ ≈ 0.0554, got {v_bar:.6}"
+        );
+
+        // Brute-force average of the deterministic variance path
+        // v(s) = θ + (v0−θ)e^{−κs} via fine trapezoidal integration.
+        let n = 100_000;
+        let h = t / n as f64;
+        let v = |s: f64| theta + (v0 - theta) * (-kappa * s).exp();
+        let mut integral = 0.0;
+        for j in 0..n {
+            integral += 0.5 * (v(j as f64 * h) + v((j + 1) as f64 * h)) * h;
+        }
+        let v_bar_numeric = integral / t;
+        assert!(
+            (v_bar - v_bar_numeric).abs() < 1e-9,
+            "closed form v̄={v_bar:.10} vs brute force {v_bar_numeric:.10}"
+        );
+
+        // The fallback price must match Black-Scholes at σ = √v̄ (≈ 23.5%),
+        // not at √v0 = 10%.
+        let heston = p.price_european(100.0, 100.0, 0.05, 0.0, t, true);
+        let bs_avg = bs_call_fallback(100.0, 100.0, 0.05, 0.0, t, v_bar.sqrt(), true);
+        let bs_v0 = bs_call_fallback(100.0, 100.0, 0.05, 0.0, t, v0.sqrt(), true);
+        assert!(
+            (heston - bs_avg).abs() < 1e-10,
+            "fallback should use √v̄: heston={heston:.6}, bs(√v̄)={bs_avg:.6}"
+        );
+        assert!(
+            (heston - bs_v0).abs() > 1.0,
+            "fallback must not collapse to √v0: heston={heston:.6}, bs(√v0)={bs_v0:.6}"
+        );
+    }
+
+    #[test]
+    fn put_call_parity_survives_clamping_in_extreme_region() {
+        // Deep-OTM call / deep-ITM put region (~5-8 stddevs OTM) where the
+        // raw call is ≈ 0 and quadrature noise can push it slightly negative.
+        // The put is derived from the UNclamped call, so parity holds up to
+        // the clamped noise rather than drifting by the full clamped amount.
+        let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
+        let spot: f64 = 100.0;
+        let r: f64 = 0.05;
+        let q: f64 = 0.0;
+        let t: f64 = 0.5;
+
+        for &strike in &[220.0_f64, 260.0, 300.0] {
+            let call = p.price_european(spot, strike, r, q, t, true);
+            let put = p.price_european(spot, strike, r, q, t, false);
+            // call clamps to ~0 here; the put is derived from the UNclamped
+            // call, so the parity residual is bounded by the clamped
+            // quadrature noise on the raw call (~1e-7 in this region).
+            let parity_residual = call - put - (spot * (-q * t).exp() - strike * (-r * t).exp());
+            assert!(
+                parity_residual.abs() < 1e-5,
+                "K={strike}: parity residual {parity_residual:.2e} too large \
+                 (call={call:.10}, put={put:.10})"
+            );
+            let intrinsic_fwd = strike * (-r * t).exp() - spot * (-q * t).exp();
+            assert!(
+                (put - intrinsic_fwd).abs() < 1e-5,
+                "K={strike}: deep ITM put should be ≈ forward intrinsic: \
+                 put={put:.8}, intrinsic={intrinsic_fwd:.8}"
+            );
+        }
+    }
+
+    #[test]
+    fn heston_params_serde_validates_on_deserialize() {
+        // Valid JSON round-trips.
+        let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
+        let json = serde_json::to_string(&p).expect("serialize");
+        let back: HestonParams = serde_json::from_str(&json).expect("round-trip");
+        assert_eq!(p, back);
+
+        // Out-of-range rho rejected.
+        let bad = r#"{"v0":0.04,"kappa":2.0,"theta":0.04,"sigma":0.3,"rho":1.5}"#;
+        assert!(serde_json::from_str::<HestonParams>(bad).is_err());
+
+        // Unknown field rejected.
+        let unknown = r#"{"v0":0.04,"kappa":2.0,"theta":0.04,"sigma":0.3,"rho":-0.5,"extra":1.0}"#;
+        assert!(serde_json::from_str::<HestonParams>(unknown).is_err());
     }
 
     #[test]

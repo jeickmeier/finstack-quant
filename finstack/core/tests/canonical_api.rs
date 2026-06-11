@@ -10,8 +10,9 @@
 //! - **IRR**: Tests for `irr()` and `irr_with_daycount()`
 //! - **Quadrature**: Tests for `GaussHermiteQuadrature::new()`
 
-use finstack_core::cashflow::{irr, npv, xirr, xirr_with_daycount};
+use finstack_core::cashflow::{irr, npv, npv_with_options, xirr, xirr_with_daycount, NpvOptions};
 use finstack_core::currency::Currency;
+use finstack_core::dates::DayCountContext;
 use finstack_core::dates::{Date, DayCount};
 use finstack_core::market_data::term_structures::FlatCurve;
 use finstack_core::math::GaussHermiteQuadrature;
@@ -50,7 +51,18 @@ mod npv_tests {
         // Convert annual rate to continuous rate
         let continuous_rate = (1.0 + rate).ln();
         let curve = FlatCurve::new(continuous_rate, base, dc, "TEST");
-        let pv = npv(&curve, base, Some(dc), &flows).unwrap();
+        // Investment-NPV view: the day-0 outlay is intentional, so opt back in
+        // (the default now excludes flows on/before the valuation date — see
+        // docs/reviews/2026-06-09-core-quant-review.md).
+        let pv = npv_with_options(
+            &curve,
+            base,
+            Some(dc),
+            DayCountContext::default(),
+            NpvOptions::default().include_past_flows(true),
+            &flows,
+        )
+        .unwrap();
 
         // NPV should be approximately 110000/1.05 - 100000 ≈ 4761.90
         assert!(
@@ -74,7 +86,17 @@ mod npv_tests {
             let dc = DayCount::Act365F;
             let continuous_rate = (1.0 + rate).ln();
             let curve = FlatCurve::new(continuous_rate, base, dc, "TEST");
-            let pv = npv(&curve, base, Some(dc), &flows).unwrap();
+            // Investment-NPV view: include the day-0 outlay explicitly (the
+            // default excludes flows on/before the valuation date).
+            let pv = npv_with_options(
+                &curve,
+                base,
+                Some(dc),
+                DayCountContext::default(),
+                NpvOptions::default().include_past_flows(true),
+                &flows,
+            )
+            .unwrap();
 
             // At 0% rate, NPV should be sum of flows = 5000
             if rate == 0.0 {

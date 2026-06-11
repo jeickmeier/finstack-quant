@@ -751,6 +751,17 @@ mod tests {
         assert_eq!(table.get_factor(CreditRating::A).expect("A"), 120.0);
         assert_eq!(table.get_factor(CreditRating::BMinus).expect("B-"), 3490.0);
         assert_eq!(table.get_factor(CreditRating::CCC).expect("CCC"), 6500.0);
+
+        // 2026-06-09 core quant review + user decision: pin published
+        // Moody's values — Ba3 (BB-) = 1766 (was 1760) and CC = 10000
+        // (Ca/C bucket; the previous 9550 was unpublished).
+        assert_eq!(
+            table.get_factor(CreditRating::BBMinus).expect("BB-"),
+            1766.0
+        );
+        assert_eq!(table.get_factor(CreditRating::CC).expect("CC"), 10000.0);
+        assert_eq!(table.get_factor(CreditRating::C).expect("C"), 10000.0);
+        assert_eq!(table.get_factor(CreditRating::D).expect("D"), 10000.0);
     }
 
     #[test]

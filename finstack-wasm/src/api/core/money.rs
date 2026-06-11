@@ -62,6 +62,17 @@ impl Money {
         self.inner.amount()
     }
 
+    /// Lossless amount as a decimal string (e.g. `"1234.56"`).
+    ///
+    /// Renders the internal Rust `Decimal` directly, so no `f64` round-trip
+    /// occurs. Parse with a JavaScript decimal library for exact arithmetic.
+    ///
+    /// @returns The exact decimal amount as a string.
+    #[wasm_bindgen(js_name = amountDecimal)]
+    pub fn amount_decimal(&self) -> String {
+        self.inner.amount_decimal().to_string()
+    }
+
     /// Currency of this amount.
     ///
     /// @returns The [`Currency`] this amount is tagged with.

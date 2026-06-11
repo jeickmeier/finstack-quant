@@ -6,11 +6,11 @@
     "description": "QuantLib-parity USD 3M money-market deposit on a committed discount curve.",
     "valuation_date": "2026-04-30",
     "source": "quantlib",
-    "source_detail": "QuantLib-Python 1.42.1 parity check using IborIndex forecast fixing for deposit par rate, CashFlows.npv for start and maturity flows, and central finite-difference DV01 on a deterministic USD discount curve. Phase-2 envelope migration (2026-05-09): wrapped in market_envelope with the curve carried in initial_market.curves and an empty plan.steps. The QuantLib oracle's synthetic time pillars are not bootstrap-reproducible; true-calibration migration would require >1e-12 par_rate tolerance. The envelope wrap still routes through engine::execute_with_diagnostics, so the fixture exercises the calibration entry point's plumbing.",
+    "source_detail": "QuantLib-Python 1.42.1 parity check using IborIndex forecast fixing for deposit par rate, CashFlows.npv for start and maturity flows, and central finite-difference DV01 on a deterministic USD discount curve. Phase-2 envelope migration (2026-05-09): wrapped in market_envelope with the curve carried in initial_market.curves and an empty plan.steps. The QuantLib oracle's synthetic time pillars are not bootstrap-reproducible; true-calibration migration would require >1e-12 par_rate tolerance. The envelope wrap still routes through engine::execute_with_diagnostics, so the fixture exercises the calibration entry point's plumbing. Regenerated 2026-06-11 (docs/reviews/2026-06-09-core-quant-review.md): core npv now excludes flows on or before the valuation date (market-standard holder-view position value), so the T+0 initial -10MM notional exchange on the 2026-04-30 valuation date is no longer part of npv. New expected npv = prior QuantLib trade NPV (2877.927119438455) + 10,000,000 excluded initial flow at DF=1; equivalently QuantLib CashFlows.npv with includeSettlementDateFlows=False. deposit_par_rate and dv01 are unchanged (the t=0 flow has DF=1 and no rate sensitivity).",
     "captured_by": "jeickmeier",
     "captured_on": "2026-04-30",
     "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_on": "2026-06-11",
     "review_interval_months": 6,
     "regen_command": "manual QuantLib-Python oracle; see inputs.source_reference for reproduction formulas and intermediate values",
     "screenshots": []
@@ -104,7 +104,7 @@
     }
   },
   "expected": {
-    "npv": 2877.927119438455,
+    "npv": 10002877.927119438,
     "deposit_par_rate": 0.03985001083863061,
     "dv01": -249.38681957910967
   },

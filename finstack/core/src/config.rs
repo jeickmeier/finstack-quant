@@ -144,10 +144,54 @@ pub struct FinstackConfig {
 // Default derived above
 
 /// Versioned, namespaced extension map carried alongside the core config.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+///
+/// Keys must match the `{crate}.{domain}.v{N}` pattern (one or more
+/// dot-separated `snake_case` segments followed by a `v{N}` version segment,
+/// e.g. `valuations.calibration.v2` or
+/// `valuations.structured_credit.ytm.v1`). Deserialization rejects keys that
+/// do not match, so obvious typos fail loudly instead of being silently
+/// carried along (2026-06-09 core quant review, minor).
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct ConfigExtensions {
     #[serde(flatten)]
     pub(crate) inner: BTreeMap<String, JsonValue>,
+}
+
+/// Returns true if `key` matches the `{crate}.{domain}.v{N}` extension-key
+/// pattern: at least two leading `snake_case` segments and a trailing
+/// `v{digits}` version segment.
+fn is_valid_extension_key(key: &str) -> bool {
+    fn is_ident(s: &str) -> bool {
+        !s.is_empty()
+            && s.chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+    }
+    let segments: Vec<&str> = key.split('.').collect();
+    let Some((version, idents)) = segments.split_last() else {
+        return false;
+    };
+    if idents.len() < 2 {
+        return false;
+    }
+    let version_ok = version
+        .strip_prefix('v')
+        .is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()));
+    version_ok && idents.iter().all(|s| is_ident(s))
+}
+
+impl<'de> Deserialize<'de> for ConfigExtensions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let inner = BTreeMap::<String, JsonValue>::deserialize(deserializer)?;
+        if let Some(bad) = inner.keys().find(|k| !is_valid_extension_key(k)) {
+            return Err(serde::de::Error::custom(format!(
+                "invalid config extension key '{bad}': keys must match '{{crate}}.{{domain}}.v{{N}}' (e.g. 'valuations.calibration.v2')"
+            )));
+        }
+        Ok(Self { inner })
+    }
 }
 
 impl ConfigExtensions {
@@ -368,10 +412,25 @@ impl RoundingContext {
 /// Numeric engine mode compiled into the crate.
 ///
 /// Currently single-variant (F64); exists as `#[non_exhaustive]` for forward-compatible extension.
+///
+/// # What the stamp asserts (and what it does not)
+///
+/// `F64` asserts that **curve, rate, and analytics arithmetic** (discounting,
+/// interpolation, risk metrics, scenario math, FX rates as scalars) runs on
+/// 64-bit IEEE 754 floating point. It does **not** describe the [`Money`]
+/// layer: monetary amounts are stored and combined on a Decimal-backed
+/// representation (`rust_decimal::Decimal`) regardless of this stamp, with
+/// f64 appearing only at ingest/accessor boundaries. Auditors reading
+/// `numeric_mode: F64` in [`ResultsMeta`] should therefore interpret it as
+/// "non-monetary numerics are f64", not "monetary amounts were accumulated
+/// in floating point". (Clarified per the 2026-06-09 core quant review.)
+///
+/// [`Money`]: crate::money::Money
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[non_exhaustive]
 pub enum NumericMode {
-    /// Floating-point f64 engine.
+    /// Floating-point f64 engine for curve/rate/analytics arithmetic.
+    /// Monetary amounts remain Decimal-backed independent of this variant.
     F64,
 }
 
@@ -460,14 +519,26 @@ pub fn rounding_context_from(cfg: &FinstackConfig) -> RoundingContext {
 
 /// Active numeric mode used by the engine.
 ///
-/// This compile-time constant indicates the numeric representation used throughout
-/// Finstack. Currently fixed to [`NumericMode::F64`] (64-bit IEEE 754 floating point).
+/// This compile-time constant indicates the numeric representation used for
+/// **curve, rate, and analytics arithmetic** in Finstack. Currently fixed to
+/// [`NumericMode::F64`] (64-bit IEEE 754 floating point).
+///
+/// # Scope of the stamp
+///
+/// The constant — and the `numeric_mode` field it stamps into
+/// [`ResultsMeta`] — covers non-monetary numerics only. The
+/// [`Money`](crate::money::Money) layer is Decimal-backed
+/// (`rust_decimal::Decimal`) independent of this stamp: monetary amounts are
+/// ingested, rounded, and combined in Decimal, with f64 used only at the
+/// `Money::amount()` accessor and f64-input constructors. See
+/// [`NumericMode`] for the full audit-stamp semantics (clarified per the
+/// 2026-06-09 core quant review).
 ///
 /// # Rationale
 ///
 /// F64 provides:
 /// - ~15-17 significant decimal digits of precision
-/// - Sufficient for all practical financial calculations
+/// - Sufficient for curve/rate/analytics calculations
 /// - Hardware-accelerated operations on modern CPUs
 /// - Wide ecosystem compatibility (Python, JavaScript, databases)
 ///
@@ -537,6 +608,44 @@ pub fn results_meta_with_timestamp(
 #[cfg(test)]
 mod tests {
     use super::RoundingMode;
+
+    #[test]
+    fn config_extensions_accept_valid_versioned_keys() {
+        // 2026-06-09 core quant review (minor): extension keys are validated
+        // against `{crate}.{domain}.v{N}` at deserialization.
+        for key in [
+            "valuations.calibration.v2",
+            "core.dummy_registry.v1",
+            "valuations.structured_credit.ytm.v1",
+        ] {
+            let json = format!(
+                r#"{{"rounding":{{"mode":"Bankers","ingest_scale":{{"overrides":{{}}}},"output_scale":{{"overrides":{{}}}}}},"extensions":{{"{key}":{{}}}}}}"#
+            );
+            let cfg: super::FinstackConfig =
+                serde_json::from_str(&json).unwrap_or_else(|e| panic!("{key} rejected: {e}"));
+            assert!(cfg.extensions.get(key).is_some());
+        }
+    }
+
+    #[test]
+    fn config_extensions_reject_malformed_keys() {
+        for key in [
+            "valuationscalibration",     // no namespacing at all
+            "valuations.v1",             // missing domain segment
+            "valuations.calibration",    // missing version segment
+            "valuations.calibration.2",  // version missing the `v` prefix
+            "valuations.calibration.vX", // non-numeric version
+            "Valuations.Calibration.v1", // not snake_case
+        ] {
+            let json = format!(
+                r#"{{"rounding":{{"mode":"Bankers","ingest_scale":{{"overrides":{{}}}},"output_scale":{{"overrides":{{}}}}}},"extensions":{{"{key}":{{}}}}}}"#
+            );
+            assert!(
+                serde_json::from_str::<super::FinstackConfig>(&json).is_err(),
+                "malformed extension key '{key}' must be rejected"
+            );
+        }
+    }
 
     fn assert_parses_to(label: &str, expected: RoundingMode) {
         assert!(matches!(label.parse::<RoundingMode>(), Ok(value) if value == expected));

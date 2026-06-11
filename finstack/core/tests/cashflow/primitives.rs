@@ -120,12 +120,15 @@ fn money_new_rejects_negative_infinity() {
 }
 
 #[test]
-fn cashflow_rejects_zero_amount() {
+fn cashflow_accepts_zero_amount() {
+    // Zero amounts are legitimate (e.g. a floating coupon floored at 0% in a
+    // negative-rate environment); previously rejected — fixed per the
+    // 2026-06-09 core quant review minor finding.
     let cf = CashFlow {
         amount: Money::new(0.0, Currency::USD),
         ..valid_cashflow()
     };
-    assert!(cf.validate().is_err(), "Zero amount should be rejected");
+    assert!(cf.validate().is_ok(), "Zero amount should be accepted");
 }
 
 #[test]
@@ -149,9 +152,9 @@ fn cashflow_accepts_large_amount() {
 
 #[test]
 fn cashflow_accepts_small_but_nonzero_amount() {
-    // Note: Money rounds to currency decimal places (2 for USD)
-    // Very small amounts like 1e-10 would round to 0.0 and fail validation
-    // Use a value that survives rounding: 0.01 is the minimum for USD
+    // Note: Money rounds to currency decimal places (2 for USD).
+    // Very small amounts like 1e-10 round to 0.0 (now still valid).
+    // 0.01 is the smallest representable non-zero USD amount.
     let cf = CashFlow {
         amount: Money::new(0.01, Currency::USD),
         ..valid_cashflow()

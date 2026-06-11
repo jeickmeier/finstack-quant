@@ -9,6 +9,7 @@
 
 use crate::config::RoundingMode;
 use crate::error::{Error, InputError};
+use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 
 /// Internal numeric representation for `Money` amounts.
@@ -87,7 +88,9 @@ pub(crate) fn try_repr_mul_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Er
         };
         return Err(InputError::NonFiniteValue { kind }.into());
     }
-    let Some(rhs_decimal) = Decimal::from_f64_retain(rhs) else {
+    // Shortest round-trip conversion per the 2026-06-09 core quant review
+    // (user decision): avoids embedding IEEE noise digits in the Decimal.
+    let Some(rhs_decimal) = Decimal::from_f64(rhs) else {
         return Err(InputError::ConversionOverflow.into());
     };
     // Checked Decimal multiply: a finite, representable scalar can still drive
@@ -120,7 +123,9 @@ pub(crate) fn try_repr_div_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Er
     if is_zero {
         return Err(InputError::Invalid.into());
     }
-    let Some(rhs_decimal) = Decimal::from_f64_retain(rhs) else {
+    // Shortest round-trip conversion per the 2026-06-09 core quant review
+    // (user decision): avoids embedding IEEE noise digits in the Decimal.
+    let Some(rhs_decimal) = Decimal::from_f64(rhs) else {
         return Err(InputError::ConversionOverflow.into());
     };
     // Checked Decimal divide: dividing by a tiny scalar can overflow Decimal's
@@ -142,7 +147,9 @@ pub(crate) fn try_round_f64(x: f64, dp: i32, mode: RoundingMode) -> Result<Decim
         };
         return Err(InputError::NonFiniteValue { kind }.into());
     }
-    let Some(decimal) = Decimal::from_f64_retain(x) else {
+    // Shortest round-trip conversion per the 2026-06-09 core quant review
+    // (user decision): avoids embedding IEEE noise digits in the Decimal.
+    let Some(decimal) = Decimal::from_f64(x) else {
         return Err(InputError::ConversionOverflow.into());
     };
     Ok(round_decimal(decimal, dp, mode))

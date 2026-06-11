@@ -1,6 +1,6 @@
 //! Builders for cross-currency swap instruments from market quotes.
 
-use crate::instruments::common_impl::fx_dates::{adjust_joint_calendar, roll_spot_date};
+use crate::instruments::common_impl::fx_dates::{adjust_joint_calendar, fx_spot_date_for_pair};
 use crate::instruments::rates::xccy_swap::{LegSide, XccySwap, XccySwapLeg};
 use crate::instruments::Instrument;
 use crate::market::conventions::registry::ConventionRegistry;
@@ -70,10 +70,14 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dy
                 return Err(finstack_core::InputError::NonFiniteValue { kind }.into());
             }
 
-            let spot = roll_spot_date(
+            // CLS-consistent spot roll: a US holiday on an intermediate day does
+            // not delay a USD pair's spot date (2026-06-09 core quant review,
+            // FX spot finding).
+            let spot = fx_spot_date_for_pair(
                 ctx.as_of(),
                 conv.spot_lag_days as u32,
-                conv.business_day_convention,
+                conv.base_currency,
+                conv.quote_currency,
                 Some(&conv.base_calendar_id),
                 Some(&conv.quote_calendar_id),
             )?;

@@ -1177,3 +1177,80 @@ mod serde_tests {
         );
     }
 }
+
+mod roll_forward_realized_forward {
+    //! Realized-forward roll semantics (2026-06-09 core quant review):
+    //! `DF_new(T - dt) = DF_old(T) / DF_old(dt)`, so forwards realize and a
+    //! flat curve stays flat under roll.
+
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use time::macros::date;
+
+    /// Synthetic IDs (no market hint) default to Act365F, so rolling 365
+    /// days corresponds to exactly dt = 1.0 in the curve's time basis.
+    fn flat_curve(rate: f64, knots: &[f64]) -> DiscountCurve {
+        let points: Vec<(f64, f64)> = knots.iter().map(|&t| (t, (-rate * t).exp())).collect();
+        DiscountCurve::builder("TEST-FLAT")
+            .base_date(date!(2025 - 01 - 01))
+            .knots(points)
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn flat_curve_stays_flat_under_roll_forward() {
+        let knots = [0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0];
+        let rate = 0.05;
+        let curve = flat_curve(rate, &knots);
+
+        // Roll 365 days = 1.0y under Act365F.
+        let rolled = curve.roll_forward(365).unwrap();
+
+        // Fresh flat 5% curve on the rolled knot grid.
+        let fresh_knots = [1.0, 2.0, 4.0, 6.0, 9.0];
+        let fresh = flat_curve(rate, &fresh_knots);
+
+        // Knot-aligned probes (interpolation-exact at knots).
+        for &t in &fresh_knots {
+            assert!(
+                (rolled.df(t) - fresh.df(t)).abs() < 1e-12,
+                "flat curve must stay flat under roll at t={t}: rolled={} fresh={}",
+                rolled.df(t),
+                fresh.df(t)
+            );
+        }
+        // DF(0) = 1 exactly (prepended knot is correct after renormalization).
+        assert!((rolled.df(0.0) - 1.0).abs() < 1e-14);
+    }
+
+    #[test]
+    fn roll_forward_realizes_forwards() {
+        // Non-flat curve.
+        let curve = DiscountCurve::builder("TEST-ROLL")
+            .base_date(date!(2025 - 01 - 01))
+            .knots([
+                (0.5, 0.995),
+                (1.0, 0.985),
+                (2.0, 0.955),
+                (5.0, 0.86),
+                (10.0, 0.70),
+            ])
+            .build()
+            .unwrap();
+
+        // Roll 365 days = dt = 1.0y under Act365F.
+        let dt = 1.0;
+        let rolled = curve.roll_forward(365).unwrap();
+        let df_dt = curve.df(dt);
+
+        for &t_old in &[2.0_f64, 5.0, 10.0] {
+            let expected = curve.df(t_old) / df_dt;
+            let actual = rolled.df(t_old - dt);
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "DF_rolled({}) must equal DF_old({t_old})/DF_old({dt}): {actual} vs {expected}",
+                t_old - dt
+            );
+        }
+    }
+}

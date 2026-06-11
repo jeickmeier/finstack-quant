@@ -214,7 +214,11 @@ pub fn build_snapshot_fx_matrix(
     config: crate::money::fx::FxConfig,
     quotes: Vec<(crate::currency::Currency, crate::currency::Currency, f64)>,
 ) -> crate::Result<Arc<FxMatrix>> {
-    let state = FxMatrixState { config, quotes };
+    let state = FxMatrixState {
+        config,
+        quotes,
+        pinned_quotes: Vec::new(),
+    };
     let provider: Arc<dyn FxProvider> = Arc::new(SnapshotFxProvider::from_state(&state));
     let matrix = FxMatrix::try_with_config(provider, state.config)?;
     matrix.load_from_state(&state)?;

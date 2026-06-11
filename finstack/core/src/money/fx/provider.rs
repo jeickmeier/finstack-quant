@@ -3,10 +3,14 @@ use crate::dates::Date;
 
 use super::types::FxConversionPolicy;
 
-/// Helper to compute reciprocal rate safely, checking for zero division.
+/// Helper to compute reciprocal rate safely, validating the output.
 ///
-/// Returns `1.0 / rate` if `rate != 0.0`, otherwise returns an error.
-/// This consolidates the reciprocal logic used across FX providers and matrix lookups.
+/// Returns `1.0 / rate` if the reciprocal is a valid FX rate (finite and
+/// strictly positive), otherwise returns an error. Validating the **output**
+/// matters: a subnormal input such as `1e-320` passes a finiteness check on
+/// the input but its reciprocal overflows to `+inf` (2026-06-09 core quant
+/// review). This consolidates the reciprocal logic used across FX providers
+/// and matrix lookups.
 #[inline]
 pub(crate) fn reciprocal_rate_or_err(
     rate: f64,
@@ -23,14 +27,16 @@ pub(crate) fn reciprocal_rate_or_err(
         };
         return Err(crate::error::InputError::NonFiniteValue { kind }.into());
     }
-    if rate != 0.0 {
-        Ok(1.0 / rate)
-    } else {
-        Err(crate::error::InputError::NotFound {
+    if rate == 0.0 {
+        return Err(crate::error::InputError::NotFound {
             id: format!("FX:{from}->{to} (zero reciprocal)"),
         }
-        .into())
+        .into());
     }
+    let reciprocal = 1.0 / rate;
+    // Validate the OUTPUT: tiny (subnormal) or negative inputs produce a
+    // reciprocal that is infinite, zero, or negative — never a valid FX rate.
+    validate_fx_rate(to, from, reciprocal)
 }
 
 #[inline]

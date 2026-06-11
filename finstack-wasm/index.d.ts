@@ -72,6 +72,8 @@ export interface CurrencyConstructor {
 export interface Money {
   readonly amount: number;
   readonly currency: Currency;
+  /** Lossless amount as a decimal string (exact Rust Decimal rendering). */
+  amountDecimal(): string;
   add(other: Money): Money;
   sub(other: Money): Money;
   mulScalar(factor: number): Money;
@@ -140,6 +142,8 @@ export interface DayCountContext {
   withCalendar(calendarCode: string): DayCountContext;
   withFrequency(frequency: Tenor): DayCountContext;
   withBusBasis(busBasis: number): DayCountContext;
+  /** Reference coupon period (epoch days) for Act/Act ICMA. */
+  withCouponPeriod(startEpochDays: number, endEpochDays: number): DayCountContext;
 }
 
 export interface DayCountContextConstructor {
@@ -228,9 +232,13 @@ export interface FxConversionPolicyConstructor {
 }
 
 export interface FxRateResult {
-  getRate(): number;
-  getTriangulated(): boolean;
-  getPolicy(): FxConversionPolicy;
+  readonly rate: number;
+  readonly triangulated: boolean;
+}
+
+/** `FxRateResult` has no public constructor; instances come from `FxMatrix.rate`. */
+export interface FxRateResultConstructor {
+  readonly prototype: FxRateResult;
 }
 
 export interface FxMatrix {
@@ -240,6 +248,32 @@ export interface FxMatrix {
 
 export interface FxMatrixConstructor {
   new (): FxMatrix;
+}
+
+/** FX vol surface quoted in delta space (ATM, 25-delta RR/BF, optional 10-delta wings). */
+export interface FxDeltaVolSurface {
+  readonly id: string;
+  readonly expiries: number[];
+  readonly numExpiries: number;
+  /** Pillar vols at an expiry index as `[atm, put25dVol, call25dVol]`. */
+  pillarVols(expiryIdx: number): number[];
+  impliedVol(expiry: number, strike: number, forward: number, rD: number, rF: number): number;
+}
+
+export interface FxDeltaVolSurfaceConstructor {
+  new (
+    id: string,
+    expiries: number[],
+    atmVols: number[],
+    rr25d: number[],
+    bf25d: number[],
+    rr10d?: number[],
+    bf10d?: number[]
+  ): FxDeltaVolSurface;
+  /** Convert a forward delta to a strike (Garman-Kohlhagen, premium-unadjusted). */
+  deltaToStrike(delta: number, forward: number, vol: number, expiry: number, rF: number): number;
+  /** Convert a strike to forward (call) delta. */
+  strikeToDelta(strike: number, forward: number, vol: number, expiry: number, rF: number): number;
 }
 
 /** Monte Carlo European pricer result (JSON object from Rust). */
@@ -290,7 +324,9 @@ export interface CoreNamespace {
   DiscountCurve: DiscountCurveConstructor;
   ForwardCurve: ForwardCurveConstructor;
   VolCube: VolCubeConstructor;
+  FxDeltaVolSurface: FxDeltaVolSurfaceConstructor;
   FxConversionPolicy: FxConversionPolicyConstructor;
+  FxRateResult: FxRateResultConstructor;
   FxMatrix: FxMatrixConstructor;
   choleskyDecomposition(matrix: number[][]): number[][];
   choleskySolve(chol: number[][], b: number[]): number[];

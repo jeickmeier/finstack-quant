@@ -409,7 +409,7 @@ impl PathDependentPricer {
                 bridge.as_ref(),
                 &time_grid,
                 num_factors,
-            );
+            )?;
 
             // Auxiliary uniforms are drawn from a per-path Philox so the Sobol
             // stream only carries asset-dimension normals.
@@ -787,15 +787,15 @@ fn fill_sobol_increments(
     bridge: Option<&BrownianBridge>,
     time_grid: &TimeGrid,
     num_factors: usize,
-) {
+) -> Result<()> {
     let num_steps = time_grid.num_steps();
     match bridge {
         Some(bridge) => {
             debug_assert_eq!(num_factors, 1, "Brownian bridge only supports 1 factor");
             if time_grid.is_uniform() {
-                bridge.construct_path(z_path, w_path, time_grid.dt(0));
+                bridge.construct_path(z_path, w_path, time_grid.dt(0))?;
             } else {
-                bridge.construct_path_irregular(z_path, w_path, time_grid.times());
+                bridge.construct_path_irregular(z_path, w_path, time_grid.times())?;
             }
             for step in 0..num_steps {
                 let dt = time_grid.dt(step);
@@ -806,6 +806,7 @@ fn fill_sobol_increments(
             z_increments.copy_from_slice(&z_path[..num_steps * num_factors]);
         }
     }
+    Ok(())
 }
 
 /// Per-path [`RandomStream`] adapter that feeds pre-computed standard normals

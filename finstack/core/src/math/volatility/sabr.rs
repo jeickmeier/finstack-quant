@@ -74,6 +74,7 @@
 /// assert!(vol > 0.0);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "RawSabrParams")]
 pub struct SabrParams {
     /// Alpha (α): initial volatility level.
     pub alpha: f64,
@@ -87,6 +88,42 @@ pub struct SabrParams {
     /// `K+shift` internally, keeping both arguments positive.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shift: Option<f64>,
+}
+
+/// Raw deserialization state of [`SabrParams`].
+///
+/// Mirrors the serialized field layout exactly so the wire format is
+/// unchanged; conversion runs [`SabrParams::new`] validation and rejects
+/// unknown fields.
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSabrParams {
+    /// Initial volatility level.
+    alpha: f64,
+    /// CEV exponent.
+    beta: f64,
+    /// Forward-vol correlation.
+    rho: f64,
+    /// Vol-of-vol.
+    nu: f64,
+    /// Optional shift for negative rate support.
+    #[serde(default)]
+    shift: Option<f64>,
+}
+
+impl TryFrom<RawSabrParams> for SabrParams {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawSabrParams) -> crate::Result<Self> {
+        let params = SabrParams::new(raw.alpha, raw.beta, raw.rho, raw.nu)?;
+        match raw.shift {
+            None => Ok(params),
+            Some(shift) if shift.is_finite() => Ok(params.with_shift(shift)),
+            Some(shift) => Err(crate::Error::Validation(format!(
+                "SABR shift must be finite, got {shift}"
+            ))),
+        }
+    }
 }
 
 /// Warning about negative implied probability density at a specific strike.
@@ -213,13 +250,11 @@ impl SabrParams {
             return f64::NAN;
         }
 
-        // When vol-of-vol is negligible, the SABR model degenerates to CEV.
-        // The Hagan expansion divides by ν, so bypass it and return the
-        // pure CEV backbone volatility directly.
-        if nu < 1e-10 {
-            let f_safe = f.max(1e-10);
-            return alpha / f_safe.powf(1.0 - beta);
-        }
+        // No special-case for ν → 0: the general Hagan expansion is continuous
+        // in ν. z = (ν/α)(FK)^((1-β)/2) ln(F/K) → 0 and z/χ(z) → 1 (handled by
+        // the small-z Taylor branch in `chi`), while the (1 + [...]T) correction
+        // smoothly degenerates to the pure CEV correction. A hard ν threshold
+        // with a corrections-free CEV formula introduced a vol discontinuity.
 
         let fk = f * k;
         let one_minus_beta = 1.0 - beta;
@@ -282,8 +317,13 @@ impl SabrParams {
     /// # Returns
     ///
     /// Normal/Bachelier implied volatility, or `f64::NAN` for non-positive
-    /// expiry or a χ(z) breakdown. Guard with `is_finite()` or use the fallible
-    /// [`try_implied_vol_normal`](Self::try_implied_vol_normal) on pricing paths.
+    /// expiry, a χ(z) breakdown, or cross-zero inputs (`f·k ≤ 0` after any
+    /// configured shift) with `beta > 0` — the CEV backbone is not
+    /// shift-invariant, so such quotes require an explicit
+    /// [`with_shift`](Self::with_shift). β = 0 (normal SABR) is shift-invariant
+    /// and prices cross-zero quotes directly. Guard with `is_finite()` or use
+    /// the fallible [`try_implied_vol_normal`](Self::try_implied_vol_normal)
+    /// on pricing paths.
     pub fn implied_vol_normal(&self, f: f64, k: f64, t: f64) -> f64 {
         let alpha = self.alpha;
         let beta = self.beta;
@@ -301,12 +341,9 @@ impl SabrParams {
             return f64::NAN;
         }
 
-        // When vol-of-vol is negligible, the SABR model degenerates to CEV.
-        // Return the pure CEV backbone normal volatility directly.
-        if nu < 1e-10 {
-            let f_abs = f.abs().max(1e-10);
-            return alpha * f_abs.powf(beta);
-        }
+        // No special-case for ν → 0: as in the lognormal expansion, the general
+        // formula is continuous in ν (z → 0, z/χ(z) → 1) and retains the full
+        // (1 + [...]T) correction in the CEV limit.
 
         // ATM case
         if (f - k).abs() < 1e-12 * f.abs().max(1e-10) {
@@ -317,13 +354,21 @@ impl SabrParams {
         let one_minus_beta = 1.0 - beta;
 
         if fk <= 0.0 {
-            // Cross-zero quotes are better handled by a shifted SABR-style
-            // approximation than by collapsing the smile to midpoint ATM.
-            let shift_scale = (f - k).abs().max(f.abs()).max(k.abs()).max(1.0e-4);
-            let shift = (-f.min(k)).max(0.0) + shift_scale;
-            let shifted_f = f + shift;
-            let shifted_k = k + shift;
-            return self.implied_vol_normal(shifted_f, shifted_k, t);
+            // β = 0 (normal SABR) is shift-invariant: dF = σ dW₁ is unaffected
+            // by translating F and K, so an internal shift recovers the correct
+            // smile from the log-moneyness expansion.
+            if beta == 0.0 {
+                let shift_scale = (f - k).abs().max(f.abs()).max(k.abs()).max(1.0e-4);
+                let shift = (-f.min(k)).max(0.0) + shift_scale;
+                let shifted_f = f + shift;
+                let shifted_k = k + shift;
+                return self.implied_vol_normal(shifted_f, shifted_k, t);
+            }
+            // β > 0: the CEV backbone F^β is NOT shift-invariant, so any
+            // internal shift silently changes the model. Refuse (NaN here;
+            // a descriptive error from `try_implied_vol_normal`) and require
+            // an explicit, calibrated shift via `with_shift`.
+            return f64::NAN;
         }
 
         let fk_mid = fk.powf(one_minus_beta / 2.0);
@@ -387,9 +432,23 @@ impl SabrParams {
     ///
     /// # Errors
     ///
-    /// Returns [`InputError::Invalid`](crate::error::InputError::Invalid) when
-    /// the underlying expansion yields a non-finite volatility.
+    /// - Returns a [`Validation`](crate::Error::Validation) error when
+    ///   `f·k ≤ 0` (after any configured shift) with `beta > 0`: the CEV
+    ///   backbone is not shift-invariant, so cross-zero quotes require an
+    ///   explicit shift via [`with_shift`](Self::with_shift).
+    /// - Returns [`InputError::Invalid`](crate::error::InputError::Invalid)
+    ///   when the underlying expansion yields a non-finite volatility.
     pub fn try_implied_vol_normal(&self, f: f64, k: f64, t: f64) -> crate::Result<f64> {
+        let shift = self.shift.unwrap_or(0.0);
+        let (sf, sk) = (f + shift, k + shift);
+        if sf * sk <= 0.0 && self.beta > 0.0 && (sf - sk).abs() > 1e-12 * sf.abs().max(1e-10) {
+            return Err(crate::Error::Validation(format!(
+                "SABR implied_vol_normal: forward*strike <= 0 (F={sf}, K={sk} after shift) with \
+                 beta = {} > 0. The CEV backbone is not shift-invariant; configure an explicit \
+                 shift via SabrParams::with_shift for negative/cross-zero rates.",
+                self.beta
+            )));
+        }
         let v = self.implied_vol_normal(f, k, t);
         if v.is_finite() {
             Ok(v)
@@ -926,7 +985,9 @@ mod tests {
         assert!(params.try_implied_vol_lognormal(-0.05, 0.06, 1.0).is_err());
         assert!(params.try_implied_vol_lognormal(0.05, 0.06, 0.0).is_err());
         assert!(params.try_implied_vol_normal(0.05, 0.06, 0.0).is_err());
-        assert!(params.try_implied_vol_normal(0.01, -0.01, 1.0).is_ok());
+        // Cross-zero with beta > 0 now errors (CEV backbone is not
+        // shift-invariant); use with_shift for negative-rate quotes.
+        assert!(params.try_implied_vol_normal(0.01, -0.01, 1.0).is_err());
     }
 
     #[test]
@@ -1209,6 +1270,160 @@ mod tests {
             warnings.is_empty(),
             "Normal params should produce no density warnings"
         );
+    }
+
+    #[test]
+    fn sabr_cross_zero_beta_positive_refuses_silent_shift() {
+        // β > 0: the CEV backbone is not shift-invariant, so cross-zero
+        // quotes must NOT be priced with a silently invented internal shift.
+        let params = SabrParams::new(0.01, 0.5, -0.2, 0.4).expect("valid params");
+        let fwd = -0.01;
+        let strike = 0.02;
+        let t = 1.0;
+
+        assert!(
+            params.implied_vol_normal(fwd, strike, t).is_nan(),
+            "cross-zero with beta > 0 must return NaN"
+        );
+        let err = params
+            .try_implied_vol_normal(fwd, strike, t)
+            .expect_err("cross-zero with beta > 0 must error");
+        assert!(
+            err.to_string().contains("with_shift"),
+            "error should direct users to with_shift: {err}"
+        );
+
+        // With an explicit shift the same quote prices fine.
+        let shifted = params.with_shift(0.03);
+        let vol = shifted
+            .try_implied_vol_normal(fwd, strike, t)
+            .expect("shifted SABR should price cross-zero quotes");
+        assert!(vol.is_finite() && vol > 0.0);
+    }
+
+    #[test]
+    fn sabr_cross_zero_beta_zero_is_shift_invariant() {
+        // β = 0 (normal SABR) is shift-invariant: cross-zero quotes price
+        // directly and the result is insensitive to the internal shift choice.
+        let params = SabrParams::new(0.01, 0.0, -0.2, 0.4).expect("valid params");
+        let fwd = -0.01;
+        let strike = 0.02;
+        let t = 1.0;
+
+        let vol = params.implied_vol_normal(fwd, strike, t);
+        assert!(
+            vol.is_finite() && vol > 0.0,
+            "beta = 0 cross-zero quote should price: {vol}"
+        );
+
+        // Shift invariance of the exact normal SABR model: explicit shifts of
+        // different sizes agree closely (the log-moneyness expansion is only
+        // asymptotically shift-invariant, hence the modest tolerance).
+        let vol_s1 = params.with_shift(0.05).implied_vol_normal(fwd, strike, t);
+        let vol_s2 = params.with_shift(0.10).implied_vol_normal(fwd, strike, t);
+        assert!(
+            (vol_s1 - vol_s2).abs() / vol_s1 < 5e-2,
+            "normal SABR should be (approximately) shift-invariant: \
+             s=0.05 → {vol_s1:.6}, s=0.10 → {vol_s2:.6}"
+        );
+    }
+
+    #[test]
+    fn sabr_vol_is_continuous_across_tiny_nu() {
+        // The old ν < 1e-10 CEV fallback dropped the (1 + [...]T) correction
+        // terms, creating a vol jump across the threshold. The general path
+        // now degenerates smoothly.
+        let f = 0.05;
+        let t = 2.0;
+        for &beta in &[0.0, 0.5, 1.0] {
+            for &k in &[0.04, 0.05, 0.06] {
+                let below = SabrParams {
+                    alpha: 0.03,
+                    beta,
+                    rho: -0.2,
+                    nu: 1e-10 - 1e-12,
+                    shift: None,
+                };
+                let above = SabrParams {
+                    alpha: 0.03,
+                    beta,
+                    rho: -0.2,
+                    nu: 1e-10 + 1e-12,
+                    shift: None,
+                };
+                // Tolerance: the χ(z) evaluation carries ~1e-16/z relative
+                // cancellation noise for z ≈ 1e-10, i.e. ~1e-7 on the vol.
+                // The pre-fix discontinuity (dropped correction terms) was
+                // orders of magnitude larger (~1e-3 relative).
+                let v_below = below.implied_vol_lognormal(f, k, t);
+                let v_above = above.implied_vol_lognormal(f, k, t);
+                assert!(
+                    (v_below - v_above).abs() < 1e-7,
+                    "lognormal vol discontinuity at ν=1e-10 (β={beta}, K={k}): \
+                     below={v_below:.12}, above={v_above:.12}"
+                );
+
+                let n_below = below.implied_vol_normal(f, k, t);
+                let n_above = above.implied_vol_normal(f, k, t);
+                assert!(
+                    (n_below - n_above).abs() < 1e-7,
+                    "normal vol discontinuity at ν=1e-10 (β={beta}, K={k}): \
+                     below={n_below:.12}, above={n_above:.12}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sabr_tiny_nu_includes_hagan_time_correction() {
+        // In the ν → 0 CEV limit the lognormal vol must retain the
+        // (1 + (1−β)²/24 · α²/(FK)^(1−β) · T) correction (Hagan 2002), which
+        // the old fallback dropped.
+        let alpha = 0.3;
+        let beta = 0.5;
+        let f: f64 = 0.05;
+        let t = 5.0;
+        let p = SabrParams {
+            alpha,
+            beta,
+            rho: 0.0,
+            nu: 1e-12,
+            shift: None,
+        };
+        let got = p.implied_vol_lognormal(f, f, t);
+        let omb = 1.0 - beta;
+        let f_omb = f.powf(omb);
+        let want = alpha / f_omb * (1.0 + omb * omb / 24.0 * alpha * alpha / (f_omb * f_omb) * t);
+        assert!(
+            (got - want).abs() < 1e-9,
+            "CEV limit must keep the time correction: got {got:.10}, want {want:.10}"
+        );
+    }
+
+    #[test]
+    fn sabr_params_serde_validates_on_deserialize() {
+        // Valid JSON round-trips, including the optional shift.
+        let p = SabrParams::new(0.035, 0.5, -0.2, 0.4)
+            .expect("valid")
+            .with_shift(0.03);
+        let json = serde_json::to_string(&p).expect("serialize");
+        let back: SabrParams = serde_json::from_str(&json).expect("round-trip");
+        assert_eq!(p, back);
+
+        // Shift omitted on the wire when None.
+        let p_no_shift = SabrParams::new(0.035, 0.5, -0.2, 0.4).expect("valid");
+        let json_no_shift = serde_json::to_string(&p_no_shift).expect("serialize");
+        assert!(!json_no_shift.contains("shift"));
+        let back2: SabrParams = serde_json::from_str(&json_no_shift).expect("round-trip");
+        assert_eq!(p_no_shift, back2);
+
+        // Out-of-range rho rejected.
+        let bad = r#"{"alpha":0.035,"beta":0.5,"rho":1.5,"nu":0.4}"#;
+        assert!(serde_json::from_str::<SabrParams>(bad).is_err());
+
+        // Unknown field rejected.
+        let unknown = r#"{"alpha":0.035,"beta":0.5,"rho":-0.2,"nu":0.4,"extra":1.0}"#;
+        assert!(serde_json::from_str::<SabrParams>(unknown).is_err());
     }
 
     #[test]

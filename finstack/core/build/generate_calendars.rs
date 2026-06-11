@@ -58,6 +58,8 @@ enum RuleDef {
 enum ObservedName {
     NextMonday,
     FriIfSatMonIfSun,
+    MonIfSun,
+    MonIfSatTueIfSun,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -159,6 +161,8 @@ impl<'de> Deserialize<'de> for ObservedName {
         match s.as_str() {
             "next_monday" => Ok(Self::NextMonday),
             "fri_if_sat_mon_if_sun" => Ok(Self::FriIfSatMonIfSun),
+            "mon_if_sun" => Ok(Self::MonIfSun),
+            "mon_if_sat_tue_if_sun" => Ok(Self::MonIfSatTueIfSun),
             _ => Err(serde::de::Error::custom(format!("Unknown observed: {s}"))),
         }
     }
@@ -211,6 +215,8 @@ impl ObservedName {
         match self {
             Self::NextMonday => "Observed::NextMonday",
             Self::FriIfSatMonIfSun => "Observed::FriIfSatMonIfSun",
+            Self::MonIfSun => "Observed::MonIfSun",
+            Self::MonIfSatTueIfSun => "Observed::MonIfSatTueIfSun",
         }
     }
 }

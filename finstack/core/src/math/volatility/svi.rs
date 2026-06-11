@@ -60,6 +60,7 @@
 /// assert!(vol > 0.0);
 /// ```
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "RawSviParams")]
 pub struct SviParams {
     /// Overall variance level.
     pub a: f64,
@@ -71,6 +72,42 @@ pub struct SviParams {
     pub m: f64,
     /// Smoothing parameter (minimum curvature at vertex), must be > 0.
     pub sigma: f64,
+}
+
+/// Raw deserialization state of [`SviParams`].
+///
+/// Mirrors the serialized field layout exactly so the wire format is
+/// unchanged; conversion runs [`SviParams::validate`] (no-arbitrage and range
+/// checks) and rejects unknown fields.
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSviParams {
+    /// Overall variance level.
+    a: f64,
+    /// Slope of the wings.
+    b: f64,
+    /// Rotation / asymmetry parameter.
+    rho: f64,
+    /// Translation.
+    m: f64,
+    /// Smoothing parameter.
+    sigma: f64,
+}
+
+impl TryFrom<RawSviParams> for SviParams {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawSviParams) -> crate::Result<Self> {
+        let params = Self {
+            a: raw.a,
+            b: raw.b,
+            rho: raw.rho,
+            m: raw.m,
+            sigma: raw.sigma,
+        };
+        params.validate()?;
+        Ok(params)
+    }
 }
 
 impl SviParams {
@@ -683,6 +720,37 @@ mod tests {
             err.to_string().to_lowercase().contains("vol"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn svi_params_serde_validates_on_deserialize() {
+        // Valid JSON round-trips.
+        let p = SviParams {
+            a: 0.04,
+            b: 0.4,
+            rho: -0.4,
+            m: 0.0,
+            sigma: 0.1,
+        };
+        let json = serde_json::to_string(&p).expect("serialize");
+        let back: SviParams = serde_json::from_str(&json).expect("round-trip");
+        assert_eq!(p.a, back.a);
+        assert_eq!(p.b, back.b);
+        assert_eq!(p.rho, back.rho);
+        assert_eq!(p.m, back.m);
+        assert_eq!(p.sigma, back.sigma);
+
+        // Out-of-range rho rejected.
+        let bad = r#"{"a":0.04,"b":0.4,"rho":1.5,"m":0.0,"sigma":0.1}"#;
+        assert!(serde_json::from_str::<SviParams>(bad).is_err());
+
+        // No-arbitrage violation rejected.
+        let bad_arb = r#"{"a":-0.5,"b":0.1,"rho":0.0,"m":0.0,"sigma":0.1}"#;
+        assert!(serde_json::from_str::<SviParams>(bad_arb).is_err());
+
+        // Unknown field rejected.
+        let unknown = r#"{"a":0.04,"b":0.4,"rho":-0.4,"m":0.0,"sigma":0.1,"extra":1.0}"#;
+        assert!(serde_json::from_str::<SviParams>(unknown).is_err());
     }
 
     #[test]

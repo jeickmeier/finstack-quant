@@ -257,6 +257,27 @@ fn test_adaptive_simpson_discontinuous_function() {
 }
 
 #[test]
+fn test_gauss_legendre_adaptive_max_depth_returns_convergence_error() {
+    use finstack_core::{Error, InputError};
+
+    // tol=0.0 cannot be met for a non-polynomial integrand; with max_depth=0
+    // the routine must error (matching adaptive_simpson) instead of silently
+    // returning the unconverged estimate.
+    let f = |x: f64| (10.0 * x).sin() / (1.0 + x * x);
+    let result = gauss_legendre_integrate_adaptive(f, 0.0, 5.0, 2, 0.0, 0);
+
+    assert!(
+        result.is_err(),
+        "expected convergence error but got Ok({:?})",
+        result.ok()
+    );
+    assert!(matches!(
+        result.unwrap_err(),
+        Error::Input(InputError::SolverConvergenceFailed { .. })
+    ));
+}
+
+#[test]
 fn test_adaptive_simpson_max_depth_returns_convergence_error() {
     use finstack_core::{Error, InputError};
 

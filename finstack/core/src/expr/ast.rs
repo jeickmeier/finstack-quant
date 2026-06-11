@@ -5,7 +5,7 @@
 //!
 //! # Components
 //!
-//! - [`Expr`]: Top-level expression with optional ID for caching
+//! - [`Expr`]: Top-level expression with optional ID for DAG planning
 //! - [`ExprNode`]: Core expression variants (columns, literals, calls, operators)
 //! - [`Function`]: Built-in function registry (lag, diff, rolling operations)
 //! - [`BinOp`], [`UnaryOp`]: Arithmetic, comparison, and logical operators
@@ -22,17 +22,25 @@ use core::hash::{Hash, Hasher};
 
 // DurationSpec removed: time-window API was unused in evaluation
 
-/// Expression AST with optional unique ID for DAG planning and caching.
+/// Expression AST with optional unique ID for DAG planning.
+///
+/// Deserialization is strict (`deny_unknown_fields`): unknown fields on
+/// inbound payloads are rejected rather than silently ignored.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Expr {
-    /// Unique identifier for this expression node (for caching and DAG planning).
+    /// Unique identifier for this expression node (for DAG planning).
     pub id: Option<u64>,
     /// The actual expression node.
     pub node: ExprNode,
 }
 
 /// The core expression node types.
+///
+/// Deserialization is strict (`deny_unknown_fields`): unknown fields inside
+/// struct variants (`CSRef`, `BinOp`, `UnaryOp`, `IfThenElse`) are rejected.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum ExprNode {
     /// Reference a column by name.
     Column(String),
@@ -190,7 +198,7 @@ impl Expr {
         }
     }
 
-    /// Assign a unique ID to this expression for caching/DAG purposes.
+    /// Assign a unique ID to this expression for DAG planning purposes.
     pub fn with_id(mut self, id: u64) -> Self {
         self.id = Some(id);
         self

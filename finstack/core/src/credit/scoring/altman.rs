@@ -1,5 +1,6 @@
 //! Altman Z-Score family: original (1968), Z'-Score (private firms),
-//! and Z''-Score (non-manufacturing / emerging markets).
+//! and Z''-Score (non-manufacturing firms; the emerging-market EM-Score
+//! variant with the +3.25 constant is not implemented).
 //!
 //! # References
 //!
@@ -59,15 +60,19 @@ pub struct AltmanZPrimeInput {
     pub sales_to_total_assets: f64,
 }
 
-/// Input ratios for the Altman Z''-Score (non-manufacturing / emerging markets).
+/// Input ratios for the Altman Z''-Score (non-manufacturing firms).
 ///
-/// Drops the Sales/Total Assets ratio to remove industry bias. Includes
-/// a constant term.
+/// Drops the Sales/Total Assets ratio to remove industry bias. The
+/// implemented model is the constant-free non-EM Z''; the emerging-market
+/// "EM-Score" (+3.25 constant, cutoffs 5.85/4.35) is not implemented.
 ///
 /// # References
 ///
-/// Altman, E. I. (2005). "An Emerging Market Credit Scoring System for
-/// Corporate Bonds." *Emerging Markets Review*, 6(4), 311-323.
+/// - Altman, E. I. (1993). *Corporate Financial Distress and Bankruptcy*.
+///   Wiley. (Four-variable Z'' for non-manufacturers.)
+/// - Altman, E. I. (2005). "An Emerging Market Credit Scoring System for
+///   Corporate Bonds." *Emerging Markets Review*, 6(4), 311-323. (EM-Score
+///   variant, not implemented.)
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct AltmanZDoublePrimeInput {
     /// X1: Working Capital / Total Assets.
@@ -239,14 +244,20 @@ pub fn altman_z_prime(input: &AltmanZPrimeInput) -> Result<ScoringResult, Credit
     })
 }
 
-/// Compute the Altman Z''-Score for non-manufacturing / emerging markets.
+/// Compute the Altman Z''-Score for non-manufacturing firms.
 ///
-/// Z'' = 3.25 + 6.56 * X1 + 3.26 * X2 + 6.72 * X3 + 1.05 * X4
+/// Z'' = 6.56 * X1 + 3.26 * X2 + 6.72 * X3 + 1.05 * X4
 ///
 /// Zone cutoffs:
 /// - Z'' > 2.60: Safe
 /// - 1.10 <= Z'' <= 2.60: Grey
 /// - Z'' < 1.10: Distress
+///
+/// This is the non-emerging-market four-variable Z'' model (Altman 1993;
+/// Altman, Hartzell & Peck 1995), whose 2.60 / 1.10 zone cutoffs are
+/// defined on the constant-free scale. The emerging-market "EM-Score"
+/// variant, which adds a +3.25 constant and uses cutoffs
+/// Safe > 5.85 / Distress < 4.35, is *not* implemented.
 ///
 /// # Errors
 ///
@@ -255,7 +266,7 @@ pub fn altman_z_prime(input: &AltmanZPrimeInput) -> Result<ScoringResult, Credit
 /// # Examples
 ///
 /// The Z''-Score drops the Sales/Total Assets ratio (X5) to remove industry bias,
-/// making it suitable for non-manufacturing and emerging-market firms:
+/// making it suitable for non-manufacturing firms:
 ///
 /// ```
 /// use finstack_core::credit::scoring::{altman_z_double_prime, AltmanZDoublePrimeInput, ScoringZone};
@@ -288,8 +299,9 @@ pub fn altman_z_double_prime(
         input.book_equity_to_total_liabilities,
     )?;
 
-    let z = 3.25
-        + 6.56 * input.working_capital_to_total_assets
+    // Non-EM Z'' has no constant term; the +3.25 constant belongs to the
+    // EM-Score variant with cutoffs 5.85/4.35 (see 2026-06-09 quant review).
+    let z = 6.56 * input.working_capital_to_total_assets
         + 3.26 * input.retained_earnings_to_total_assets
         + 6.72 * input.ebit_to_total_assets
         + 1.05 * input.book_equity_to_total_liabilities;
@@ -301,7 +313,7 @@ pub fn altman_z_double_prime(
         score: z,
         zone,
         implied_pd,
-        model: "Altman Z''-Score (Emerging)",
+        model: "Altman Z''-Score (Non-Manufacturer)",
     })
 }
 

@@ -133,6 +133,16 @@ impl PyMoney {
         self.inner.amount()
     }
 
+    /// Lossless amount as a Python ``decimal.Decimal``.
+    ///
+    /// The internal Rust ``Decimal`` is rendered to a string and parsed by
+    /// ``decimal.Decimal``, so no ``float`` round-trip occurs.
+    #[getter]
+    fn amount_decimal<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let s = self.inner.amount_decimal().to_string();
+        Ok(decimal_type(py)?.call1((s,))?.into_any())
+    }
+
     /// Currency tag.
     #[getter]
     fn currency(&self, py: Python<'_>) -> PyResult<Py<PyCurrency>> {

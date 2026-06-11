@@ -18,6 +18,7 @@ export const core = {
   VolCube: wasm.VolCube,
   FxDeltaVolSurface: wasm.FxDeltaVolSurface,
   FxConversionPolicy: wasm.FxConversionPolicy,
+  FxRateResult: wasm.FxRateResult,
   FxMatrix: wasm.FxMatrix,
   choleskyDecomposition: wasm.choleskyDecomposition,
   choleskySolve: wasm.choleskySolve,

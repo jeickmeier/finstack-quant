@@ -208,7 +208,11 @@ fn yang_zhang_includes_open_to_close_component() {
     .expect("YangZhang should succeed for valid OHLC input");
 
     let n = open.len();
-    let k = 0.34 / (1.34 + (n + 1) as f64 / (n - 1) as f64);
+    // Yang & Zhang (2000): both k and the RS average are defined in terms of
+    // the number of return periods m = n − 1 (bar 0 has no previous close),
+    // not the bar count n.
+    let m = n - 1;
+    let k = 0.34 / (1.34 + (m + 1) as f64 / (m - 1) as f64);
     let overnight: Vec<f64> = (1..n).map(|i| (open[i] / close[i - 1]).ln()).collect();
     let open_close: Vec<f64> = (1..n).map(|i| (close[i] / open[i]).ln()).collect();
     let rs_sum: f64 = (1..n)
@@ -239,7 +243,7 @@ fn yang_zhang_includes_open_to_close_component() {
         })
         .sum::<f64>()
         / (open_close.len() - 1) as f64;
-    let var_rs = rs_sum / n as f64;
+    let var_rs = rs_sum / m as f64;
     let expected = (var_overnight + k * var_open_close + (1.0 - k) * var_rs) * annualization;
 
     assert!((yz - expected).abs() < 1e-12, "Yang-Zhang formula mismatch");

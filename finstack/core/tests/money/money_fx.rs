@@ -524,3 +524,318 @@ fn triangulation_missing_leg_only_queries_provider_once_per_leg() {
         "lookup should perform one direct probe and one first-leg probe, without a duplicate retry"
     );
 }
+
+/// Provider for triangulation tests: serves only the listed legs, errors on
+/// everything else (in particular the EUR→GBP cross itself).
+struct LegFx {
+    /// `(from, to, rate)` legs the provider can serve.
+    legs: Vec<(Currency, Currency, f64)>,
+}
+
+impl FxProvider for LegFx {
+    fn rate(
+        &self,
+        from: Currency,
+        to: Currency,
+        _on: Date,
+        _policy: FxConversionPolicy,
+    ) -> finstack_core::Result<f64> {
+        self.legs
+            .iter()
+            .find(|(f, t, _)| *f == from && *t == to)
+            .map(|(_, _, r)| *r)
+            .ok_or_else(|| {
+                finstack_core::InputError::NotFound {
+                    id: format!("FX:{from}->{to}"),
+                }
+                .into()
+            })
+    }
+}
+
+#[test]
+fn fx_triangulation_honors_pinned_leg() {
+    // Provider knows both pivot legs; a pinned EUR→USD fixing must override the
+    // provider's leg inside triangulation, exactly as it does for direct
+    // lookups — otherwise the cross contradicts the pinned fixing (internal
+    // triangular arbitrage on the same date/policy).
+    let matrix = FxMatrix::try_with_config(
+        Arc::new(LegFx {
+            legs: vec![
+                (Currency::EUR, Currency::USD, 1.10),
+                (Currency::USD, Currency::GBP, 0.80),
+            ],
+        }),
+        FxConfig {
+            enable_triangulation: true,
+            pivot_currency: Currency::USD,
+            ..Default::default()
+        },
+    )
+    .expect("valid FxConfig");
+    let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+
+    matrix
+        .set_quote_on(
+            Currency::EUR,
+            Currency::USD,
+            jan_1,
+            FxConversionPolicy::CashflowDate,
+            1.25,
+        )
+        .expect("pin EUR->USD fixing");
+
+    let cross = matrix
+        .rate(FxQuery::new(Currency::EUR, Currency::GBP, jan_1))
+        .unwrap();
+
+    let pinned_product = 1.25 * 0.80;
+    let provider_product = 1.10 * 0.80;
+    assert!(
+        (cross.rate - pinned_product).abs() < 1e-12,
+        "cross must use the pinned leg: expected {pinned_product}, got {}",
+        cross.rate
+    );
+    assert!(
+        (cross.rate - provider_product).abs() > 1e-6,
+        "cross must not silently use the provider leg over the pinned fixing"
+    );
+    assert!(cross.triangulated, "cross is derived via the pivot");
+
+    // Direct lookup of the pinned leg agrees with the leg used in the cross.
+    let leg = matrix
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, jan_1))
+        .unwrap();
+    assert!((cross.rate - leg.rate * 0.80).abs() < 1e-12);
+}
+
+#[test]
+fn fx_triangulation_succeeds_when_leg_exists_only_as_pinned_quote() {
+    // Provider has no EUR→USD leg at all; the pinned fixing must be enough for
+    // triangulation to succeed.
+    let matrix = FxMatrix::try_with_config(
+        Arc::new(LegFx {
+            legs: vec![(Currency::USD, Currency::GBP, 0.80)],
+        }),
+        FxConfig {
+            enable_triangulation: true,
+            pivot_currency: Currency::USD,
+            ..Default::default()
+        },
+    )
+    .expect("valid FxConfig");
+    let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+
+    matrix
+        .set_quote_on(
+            Currency::EUR,
+            Currency::USD,
+            jan_1,
+            FxConversionPolicy::CashflowDate,
+            1.25,
+        )
+        .expect("pin EUR->USD fixing");
+
+    let cross = matrix
+        .rate(FxQuery::new(Currency::EUR, Currency::GBP, jan_1))
+        .unwrap();
+    assert!(
+        (cross.rate - 1.25 * 0.80).abs() < 1e-12,
+        "triangulation must succeed via the pinned leg, got {}",
+        cross.rate
+    );
+    assert!(cross.triangulated);
+}
+
+#[test]
+fn fx_triangulated_flag_is_stable_across_repeat_queries() {
+    // Regression: the first lookup of a missing cross returned
+    // `triangulated: true` and cached the derived rate; the second identical
+    // query hit the observed cache and flipped to `triangulated: false`.
+    // Stamped metadata must not depend on call history.
+    let matrix = FxMatrix::try_with_config(
+        Arc::new(LegFx {
+            legs: vec![
+                (Currency::EUR, Currency::USD, 1.10),
+                (Currency::USD, Currency::GBP, 0.80),
+            ],
+        }),
+        FxConfig {
+            enable_triangulation: true,
+            pivot_currency: Currency::USD,
+            ..Default::default()
+        },
+    )
+    .expect("valid FxConfig");
+    let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    let query = FxQuery::new(Currency::EUR, Currency::GBP, jan_1);
+
+    let first = matrix.rate(query).unwrap();
+    let second = matrix.rate(query).unwrap();
+
+    assert!(first.triangulated, "first lookup is derived via the pivot");
+    assert!(
+        second.triangulated,
+        "repeat lookup must stamp the same provenance as the first"
+    );
+    assert!((first.rate - second.rate).abs() < 1e-15);
+    assert!((first.rate - 1.10 * 0.80).abs() < 1e-12);
+}
+
+#[test]
+fn with_bumped_rate_preserves_fx_term_structure() {
+    // 2026-06-09 core quant review: `with_bumped_rate` previously froze one
+    // absolute rate for every date, flattening a date-aware provider's term
+    // structure. The bump must be relative and per-date.
+    struct DateAwareFx;
+    impl FxProvider for DateAwareFx {
+        fn rate(
+            &self,
+            _from: Currency,
+            _to: Currency,
+            on: Date,
+            _policy: FxConversionPolicy,
+        ) -> finstack_core::Result<f64> {
+            if on == Date::from_calendar_date(2025, time::Month::January, 1).unwrap() {
+                Ok(1.10)
+            } else {
+                Ok(1.20)
+            }
+        }
+    }
+
+    let matrix = FxMatrix::new(Arc::new(DateAwareFx));
+    let d1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    let d2 = Date::from_calendar_date(2025, time::Month::June, 1).unwrap();
+
+    let bumped = matrix
+        .with_bumped_rate(Currency::EUR, Currency::USD, 0.01, d1)
+        .expect("valid bump");
+
+    let r1 = bumped
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, d1))
+        .unwrap()
+        .rate;
+    let r2 = bumped
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, d2))
+        .unwrap()
+        .rate;
+
+    assert!((r1 - 1.10 * 1.01).abs() < 1e-12, "d1 bumped 1%, got {r1}");
+    assert!((r2 - 1.20 * 1.01).abs() < 1e-12, "d2 bumped 1%, got {r2}");
+    assert!(
+        (r1 - r2).abs() > 1e-6,
+        "bump must not flatten the FX term structure"
+    );
+}
+
+#[test]
+fn with_bumped_rate_rejects_invalid_bumps() {
+    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.1 }));
+    let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    for bad in [f64::NAN, f64::INFINITY, -1.0, -2.0] {
+        assert!(
+            matrix
+                .with_bumped_rate(Currency::EUR, Currency::USD, bad, d)
+                .is_err(),
+            "bump_pct {bad} must be rejected"
+        );
+    }
+}
+
+#[test]
+fn fx_matrix_state_round_trips_pinned_quotes() {
+    // 2026-06-09 core quant review: persistence previously dropped pinned
+    // (date/policy-scoped) quotes. After snapshot + restore, a pinned fixing
+    // must still win over the provider for its (on, policy).
+    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
+    let fixing_date = Date::from_calendar_date(2025, time::Month::March, 14).unwrap();
+    matrix
+        .set_quote_on(
+            Currency::EUR,
+            Currency::USD,
+            fixing_date,
+            FxConversionPolicy::CashflowDate,
+            1.2345,
+        )
+        .expect("valid pinned fixing");
+    matrix
+        .set_quote(Currency::GBP, Currency::USD, 1.25)
+        .expect("valid explicit quote");
+
+    let state = matrix.get_serializable_state();
+    assert_eq!(state.pinned_quotes.len(), 1);
+
+    // Serde round-trip too (the state is the persistence format).
+    let json = serde_json::to_string(&state).unwrap();
+    let state: finstack_core::money::fx::FxMatrixState = serde_json::from_str(&json).unwrap();
+
+    let restored = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
+    restored.load_from_state(&state).expect("restore");
+
+    let pinned = restored
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, fixing_date))
+        .unwrap()
+        .rate;
+    assert!(
+        (pinned - 1.2345).abs() < 1e-12,
+        "restored pinned fixing must win over the provider, got {pinned}"
+    );
+
+    // Other dates still come from the provider.
+    let other = Date::from_calendar_date(2025, time::Month::March, 17).unwrap();
+    let provider_rate = restored
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, other))
+        .unwrap()
+        .rate;
+    assert!((provider_rate - 1.10).abs() < 1e-12);
+
+    // Older payloads without the new field still deserialize (serde-additive).
+    let legacy = r#"{"config":{"pivot_currency":"USD","enable_triangulation":true,"cache_capacity":256},"quotes":[]}"#;
+    let legacy_state: finstack_core::money::fx::FxMatrixState =
+        serde_json::from_str(legacy).unwrap();
+    assert!(legacy_state.pinned_quotes.is_empty());
+}
+
+#[test]
+fn reciprocal_of_subnormal_rate_is_rejected() {
+    // 2026-06-09 core quant review: a pinned 1e-320 passed input checks but
+    // its reciprocal overflowed to +inf. The reciprocal OUTPUT must be
+    // validated (finite, positive).
+    struct MissingFx;
+    impl FxProvider for MissingFx {
+        fn rate(
+            &self,
+            from: Currency,
+            to: Currency,
+            _on: Date,
+            _policy: FxConversionPolicy,
+        ) -> finstack_core::Result<f64> {
+            Err(finstack_core::InputError::NotFound {
+                id: format!("FX:{from}->{to}"),
+            }
+            .into())
+        }
+    }
+
+    let matrix = FxMatrix::try_with_config(
+        Arc::new(MissingFx),
+        FxConfig {
+            enable_triangulation: false,
+            ..Default::default()
+        },
+    )
+    .expect("valid FxConfig");
+    matrix
+        .set_quote(Currency::EUR, Currency::USD, 1e-320)
+        .expect("subnormal but positive quote is accepted at insert");
+    let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+
+    // Reverse-direction lookup goes through the reciprocal: 1/1e-320 = +inf,
+    // which must now be rejected rather than served.
+    let result = matrix.rate(FxQuery::new(Currency::USD, Currency::EUR, d));
+    assert!(
+        result.is_err(),
+        "infinite reciprocal must be rejected, got {result:?}"
+    );
+}

@@ -13,18 +13,25 @@
 //! This module converts those quotes to a standard strike-based [`VolSurface`]
 //! using the Garman-Kohlhagen framework for FX options.
 //!
-//! # Delta-to-Strike Conversion
+//! # Delta Convention: Premium-Unadjusted Forward Delta
 //!
-//! The Garman-Kohlhagen delta for an FX call option is:
+//! All delta-to-strike conversions here use the **premium-unadjusted forward
+//! delta**:
 //!
 //! ```text
-//! Delta_call = exp(-r_f * T) * N(d1)
+//! Delta_fwd_call = N(d1)
 //! ```
 //!
 //! where `d1 = [ln(F/K) + 0.5 * sigma^2 * T] / (sigma * sqrt(T))` and
-//! `F = S * exp((r_d - r_f) * T)` is the forward rate.
+//! `F = S * exp((r_d - r_f) * T)` is the forward rate. The spot delta
+//! `exp(-r_f * T) * N(d1)` and premium-adjusted deltas are **not** used.
+//! This matches interbank convention for long-dated G10 pairs; markets that
+//! quote premium-adjusted spot delta (notably EM pairs such as USD/TRY,
+//! USD/BRL, and short-dated G10 spot-delta quotes) will see strike placement
+//! biased relative to their convention — convert quotes to forward delta
+//! before using this builder.
 //!
-//! Inverting this relationship gives the strike as a function of delta:
+//! Inverting the forward delta gives the strike:
 //!
 //! ```text
 //! K(Delta) = F * exp(-N_inv(Delta) * sigma * sqrt(T) + 0.5 * sigma^2 * T)
@@ -35,6 +42,22 @@
 //! ```text
 //! K_ATM = F * exp(0.5 * sigma^2 * T)
 //! ```
+//!
+//! # Quote and Interpolation Conventions
+//!
+//! - **Butterfly quotes are treated as smile (broker) strangles**:
+//!   `sigma_wing = ATM + BF ± 0.5 * RR` exactly. No market-strangle
+//!   (single-vol strangle) consistency solve is performed; if your BF quotes
+//!   are market strangles the wings will be slightly misplaced for skewed
+//!   smiles.
+//! - **Expiry interpolation is linear in vol** on the resulting
+//!   [`VolSurface`] grid, not linear in total variance, so calendar
+//!   interpolation between pillars is only approximate.
+//! - **Merged strike grid limitation**: strikes from all expiries are merged
+//!   into one global grid and each expiry row is flat-extrapolated beyond its
+//!   own quoted wings. Short-expiry smiles therefore appear flattened at
+//!   strikes that are only relevant for long expiries. A per-expiry smile
+//!   representation is deferred.
 //!
 //! # References
 //!

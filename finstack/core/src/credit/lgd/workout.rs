@@ -4,9 +4,14 @@
 //!
 //! ```text
 //! gross_recovery = sum(collateral_i.book_value * (1 - haircut_i))
-//! net_recovery   = gross_recovery * DF(workout_years) - costs * EAD
+//! net_recovery   = (gross_recovery - costs * EAD) * DF(workout_years)
 //! LGD            = 1 - clamp(net_recovery / EAD, 0, 1)
 //! ```
+//!
+//! Both recoveries and workout costs are realized during the workout period
+//! and are discounted back to the default date with the same discount factor,
+//! per the Basel workout-LGD methodology (costs were previously left
+//! undiscounted; fixed per the 2026-06-09 core quant review).
 //!
 //! # References
 //!
@@ -171,17 +176,19 @@ impl WorkoutCosts {
     }
 
     /// Standard workout costs from the credit assumptions registry.
+    ///
+    /// # Errors
+    ///
+    /// Propagates registry load/validation errors. There is intentionally no
+    /// `Default` impl for this type: a `Default` that swallowed registry
+    /// errors silently zeroed the costs (2026-06-09 core quant review minor
+    /// finding). Use [`WorkoutCosts::standard`] and handle the `Result`, or
+    /// [`WorkoutCosts::zero`] when costs are deliberately zero.
     pub fn standard() -> Result<Self> {
         let defaults = crate::credit::registry::embedded_registry()?.workout_lgd_defaults(
             crate::credit::registry::embedded_registry()?.default_workout_lgd_id(),
         )?;
         Self::new(defaults.direct_cost_rate, defaults.indirect_cost_rate)
-    }
-}
-
-impl Default for WorkoutCosts {
-    fn default() -> Self {
-        Self::standard().unwrap_or_else(|_| Self::zero())
     }
 }
 
@@ -191,13 +198,14 @@ impl Default for WorkoutCosts {
 ///
 /// ```text
 /// gross_recovery = sum(collateral_i.book_value * (1 - haircut_i))
-/// net_recovery   = gross_recovery * DF(workout_years) - costs * EAD
+/// net_recovery   = (gross_recovery - costs * EAD) * DF(workout_years)
 /// LGD            = 1 - clamp(net_recovery / EAD, 0, 1)
 /// ```
 ///
 /// where `DF` is the discount factor for the expected time-to-resolution
 /// and costs include both direct (legal, administrative) and indirect
-/// (opportunity cost) components.
+/// (opportunity cost) components. Costs are discounted to the default date
+/// with the same factor as recoveries (Basel workout-LGD methodology).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct WorkoutLgd {
     /// Ordered collateral waterfall (highest priority first).
@@ -251,7 +259,10 @@ impl WorkoutLgd {
 
         let df = (1.0 + self.discount_rate).powf(-self.workout_years);
         let total_costs = self.costs.total_rate() * ead;
-        let net_recovery = (gross_recovery * df - total_costs).max(0.0);
+        // Discount both recoveries and workout costs to the default date
+        // (Basel workout-LGD; 2026-06-09 core quant review minor finding —
+        // costs were previously left undiscounted).
+        let net_recovery = ((gross_recovery - total_costs) * df).max(0.0);
 
         Ok(net_recovery)
     }
@@ -403,11 +414,13 @@ mod tests {
 
         // gross_recovery = 80 * 0.70 = 56.0 (capped at 100)
         // df = (1.05)^-2 = 0.907029...
-        // net = 56.0 * 0.907029 - 8.0 = 50.7936 - 8.0 = 42.7936
-        // LGD = 1 - 42.7936 / 100 = 0.572064
+        // Costs are discounted alongside recoveries (Basel workout-LGD;
+        // 2026-06-09 core quant review — previously net = 56*df − 8.0):
+        // net = (56.0 - 8.0) * 0.907029 = 43.5374
+        // LGD = 1 - 43.5374 / 100 = 0.564626
         let expected_gross = 56.0;
         let df = 1.05_f64.powf(-2.0);
-        let expected_net = expected_gross * df - 8.0;
+        let expected_net = (expected_gross - 8.0) * df;
         let expected_lgd = 1.0 - expected_net / ead;
 
         assert!(

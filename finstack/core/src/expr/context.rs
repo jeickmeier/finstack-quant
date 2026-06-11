@@ -12,7 +12,11 @@ use crate::collections::HashMap;
 /// Construct it from any ordered iterator of column names; the index of each
 /// name in the iterator becomes its column index in the data arrays passed to
 /// `eval`.
+///
+/// Deserialization is strict (`deny_unknown_fields`): unknown fields on
+/// inbound payloads are rejected rather than silently ignored.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SimpleContext {
     /// Column name to index mapping for O(1) resolution.
     column_indices: HashMap<String, usize>,

@@ -78,7 +78,8 @@ class ScorecardScale:
     def description(self) -> str | None:
         """Optional human-readable description."""
 
-    def get_ratings(self) -> list[RatingLevel]:
+    @property
+    def ratings(self) -> list[RatingLevel]:
         """Ordered rating levels from best to worst."""
 
     def to_json(self) -> str: ...
@@ -90,13 +91,13 @@ class ScorecardScale:
 class RatingScaleRegistry:
     """Versioned registry of scorecard scales and policy."""
 
-    def get_default_scorecard_score(self) -> float:
+    def default_scorecard_score(self) -> float:
         """Configured default scorecard score for threshold gaps."""
 
-    def get_default_scale_id(self) -> str:
+    def default_scale_id(self) -> str:
         """Configured default rating-scale id."""
 
-    def get_unknown_scale_policy(self) -> UnknownScalePolicy:
+    def unknown_scale_policy(self) -> UnknownScalePolicy:
         """Configured policy for unknown scale names."""
 
     def is_known_rating_scale(self, name: str) -> bool:

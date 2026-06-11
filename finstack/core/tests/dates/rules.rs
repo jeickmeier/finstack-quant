@@ -993,3 +993,80 @@ fn rule_multiple_rules_combine() {
     // Regular day
     assert!(!rules.is_holiday(make_date(2025, 6, 15)));
 }
+
+// ============================================
+// Year-boundary observance (2026-06-09 core quant review, Moderate/Dates)
+// ============================================
+
+#[test]
+fn rule_fixed_observance_crosses_year_boundary() {
+    // OPM-style Fri-if-Sat rule on Jan 1: when Jan 1 falls on a Saturday
+    // (e.g. 2022), the holiday is observed on Friday Dec 31 of the PRIOR
+    // year. `applies()` must agree with `materialize_year()` for that date.
+    let rule = Rule::Fixed {
+        month: Month::January,
+        day: 1,
+        observed: Observed::FriIfSatMonIfSun,
+    };
+
+    // Jan 1, 2022 is a Saturday.
+    assert_eq!(make_date(2022, 1, 1).weekday(), Weekday::Saturday);
+
+    // materialize_year(2022) yields the observed date Dec 31, 2021.
+    let mut out: SmallVec<[Date; 8]> = SmallVec::new();
+    rule.materialize_year(2022, &mut out);
+    assert_eq!(out.as_slice(), &[make_date(2021, 12, 31)]);
+
+    // applies() on the materialized date must agree (previously false because
+    // the base was reconstructed only from date.year() == 2021).
+    assert!(rule.applies(make_date(2021, 12, 31)));
+
+    // The unobserved Saturday itself is not a holiday under this rule.
+    assert!(!rule.applies(make_date(2022, 1, 1)));
+
+    // Sanity: a year where Jan 1 is a weekday is unaffected.
+    assert!(rule.applies(make_date(2025, 1, 1)));
+    assert!(!rule.applies(make_date(2024, 12, 31)));
+}
+
+// ============================================
+// Nth weekday occurrence overflow (2026-06-09 core quant review, Minor/Dates)
+// ============================================
+
+#[test]
+fn rule_nth_weekday_overflow_does_not_spill_into_next_month() {
+    // February 2025 has exactly four Mondays (3, 10, 17, 24). A "5th Monday
+    // of February" rule must match nothing — previously the raw arithmetic
+    // spilled to Monday Mar 3, 2025 and marked it a phantom holiday.
+    let rule = Rule::NthWeekday {
+        n: 5,
+        weekday: Weekday::Monday,
+        month: Month::February,
+    };
+
+    assert!(!rule.applies(make_date(2025, 3, 3)));
+
+    let mut out: SmallVec<[Date; 8]> = SmallVec::new();
+    rule.materialize_year(2025, &mut out);
+    assert!(out.is_empty(), "no 5th Monday exists in Feb 2025: {out:?}");
+
+    // A month that DOES have five Mondays still works (June 2025: 2, 9, 16,
+    // 23, 30).
+    let rule_june = Rule::NthWeekday {
+        n: 5,
+        weekday: Weekday::Monday,
+        month: Month::June,
+    };
+    assert!(rule_june.applies(make_date(2025, 6, 30)));
+
+    // Negative overflow: "-5th Monday" of Feb 2025 must not reach January.
+    let rule_neg = Rule::NthWeekday {
+        n: -5,
+        weekday: Weekday::Monday,
+        month: Month::February,
+    };
+    assert!(!rule_neg.applies(make_date(2025, 1, 27)));
+    let mut out_neg: SmallVec<[Date; 8]> = SmallVec::new();
+    rule_neg.materialize_year(2025, &mut out_neg);
+    assert!(out_neg.is_empty());
+}

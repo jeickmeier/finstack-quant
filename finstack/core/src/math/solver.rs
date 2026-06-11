@@ -203,7 +203,15 @@ impl BracketHint {
 ///             }
 ///             x -= fx * 0.01; // Simple step
 ///         }
-///         Ok(x)
+///         // Per the trait contract: error on non-convergence rather than
+///         // returning the unconverged iterate.
+///         Err(finstack_core::error::InputError::SolverConvergenceFailed {
+///             iterations: self.max_iterations,
+///             residual: f(x).abs(),
+///             last_x: x,
+///             reason: "max iterations reached without convergence".to_string(),
+///         }
+///         .into())
 ///     }
 /// }
 /// ```
@@ -223,7 +231,12 @@ pub trait Solver: Send + Sync {
     ///
     /// # Returns
     ///
-    /// A value `x` such that `|f(x)| < tolerance` (solver-dependent).
+    /// A value `x` accepted by the solver's convergence criteria. These are
+    /// solver-dependent: [`NewtonSolver`] accepts on a small residual
+    /// (`|f(x)| < tol × residual_scale`) or a small step, while [`BrentSolver`]
+    /// accepts on a small residual *or* a sufficiently narrow bracket — so the
+    /// returned `x` is not guaranteed to satisfy `|f(x)| < tolerance` in
+    /// f-units for Brent's method.
     ///
     /// # Errors
     ///
@@ -302,10 +315,15 @@ pub trait Solver: Send + Sync {
 pub struct NewtonSolver {
     /// Convergence tolerance.
     ///
-    /// Convergence uses dual tolerances: the residual (`|f(x)| < tol`) and the
-    /// step size (`|x_new - x_old| < tol`). The default `1e-12` is stricter
-    /// than the `1e-8` commonly used for market-standard pricing helpers and is
-    /// intended for generic numerical root-finding inside core math routines.
+    /// Convergence uses dual tolerances:
+    /// - residual: `|f(x)| < tol × residual_scale` (absolute in f-units, with an
+    ///   optional caller-supplied scale; see [`residual_scale`](Self::residual_scale)),
+    /// - step: `|x_new - x_old| < tol × max(1, |x_new|)` (relative for large `|x|`,
+    ///   absolute near zero).
+    ///
+    /// The default `1e-12` is stricter than the `1e-8` commonly used for
+    /// market-standard pricing helpers and is intended for generic numerical
+    /// root-finding inside core math routines.
     pub tolerance: f64,
     /// Maximum iterations
     pub max_iterations: usize,
@@ -315,6 +333,14 @@ pub struct NewtonSolver {
     pub min_derivative: f64,
     /// Relative minimum derivative threshold (derivative / function value)
     pub min_derivative_rel: f64,
+    /// Scale applied to the residual convergence test: `|f(x)| < tolerance × residual_scale`.
+    ///
+    /// Defaults to `1.0` (purely absolute residual test). Set this to the natural
+    /// magnitude of `f` (e.g. a notional, or a reference price) when residuals are
+    /// expressed in units far from O(1) — for dollar-scale objectives an absolute
+    /// `1e-12` residual is unattainable in `f64` and the solver would otherwise
+    /// rely solely on the step test.
+    pub residual_scale: f64,
 }
 
 impl Default for NewtonSolver {
@@ -325,6 +351,7 @@ impl Default for NewtonSolver {
             fd_step: f64::EPSILON.cbrt(),
             min_derivative: 1e-14,
             min_derivative_rel: 1e-6,
+            residual_scale: 1.0,
         }
     }
 }
@@ -360,6 +387,17 @@ impl NewtonSolver {
     #[must_use]
     pub fn min_derivative_rel(mut self, min_derivative_rel: f64) -> Self {
         self.min_derivative_rel = min_derivative_rel;
+        self
+    }
+
+    /// Set the residual scale used in the residual convergence test.
+    ///
+    /// The residual test becomes `|f(x)| < tolerance × residual_scale`. Use the
+    /// natural magnitude of the objective (e.g. notional or reference price) when
+    /// residuals are not O(1). Defaults to `1.0`.
+    #[must_use]
+    pub fn residual_scale(mut self, residual_scale: f64) -> Self {
+        self.residual_scale = residual_scale;
         self
     }
 
@@ -505,7 +543,9 @@ impl NewtonSolver {
                 .into());
             }
 
-            if fx.abs() < self.tolerance {
+            // Residual test: absolute in f-units, scaled by the optional
+            // caller-supplied residual_scale (default 1.0).
+            if fx.abs() < self.tolerance * self.residual_scale {
                 tracing::debug!(iteration, x, residual = fx.abs(), "newton: converged");
                 return Ok(x);
             }
@@ -560,8 +600,11 @@ impl NewtonSolver {
 
             let x_new = x - fx / fpx;
 
-            // Check for convergence in x
-            if (x_new - x).abs() < self.tolerance {
+            // Check for convergence in x. Scale-aware: relative for |x| > 1
+            // (a 1e-12 absolute step is below f64 resolution at x ≈ 1e6),
+            // absolute near zero so tiny-scale roots are not declared
+            // converged prematurely.
+            if (x_new - x).abs() < self.tolerance * x_new.abs().max(1.0) {
                 return Ok(x_new);
             }
 
@@ -982,7 +1025,7 @@ impl BrentSolver {
         let mut d = b - a;
         let mut e = d;
 
-        for _ in 0..self.max_iterations {
+        for iteration in 0..self.max_iterations {
             if fb.signum() == fc.signum() {
                 c = a;
                 fc = fa;
@@ -1052,7 +1095,7 @@ impl BrentSolver {
             fb = f(b);
             if !fb.is_finite() {
                 return Err(InputError::SolverConvergenceFailed {
-                    iterations: self.max_iterations,
+                    iterations: iteration + 1,
                     residual: fa.abs(),
                     last_x: b,
                     reason: format!("iteration produced non-finite value: f({b:.6e}) = {fb}"),
@@ -1181,6 +1224,52 @@ mod tests {
 
         assert!((f(root)).abs() < 1e-12, "Residual: {}", f(root));
         assert!((root - 0.01).abs() < 1e-6, "Root: {}", root);
+    }
+
+    #[test]
+    fn test_newton_relative_step_converges_at_large_scale() {
+        // Root at x = 1e6. With a purely absolute 1e-12 step test the Newton
+        // step |dx| can never get below 1e-12 at x ≈ 1e6 (f64 resolution there
+        // is ~1.2e-10), so the solver would exhaust iterations. The scale-aware
+        // step test |dx| < tol·max(1, |x|) converges.
+        let solver = NewtonSolver::new().residual_scale(1e12);
+        let f = |x: f64| x * x - 1e12; // root at 1e6, dollar-scale residuals
+        let root = solver
+            .solve(f, 9.0e5)
+            .expect("scale-aware Newton should converge for a root at 1e6");
+        assert!((root - 1e6).abs() < 1e-4, "root {root} should be near 1e6");
+    }
+
+    #[test]
+    fn test_newton_tiny_scale_root_not_falsely_converged() {
+        // Root at x = 1e-8. The step test is absolute (tol·max(1,|x|) = tol)
+        // near zero, so a tiny-scale problem must still resolve the root
+        // accurately rather than declaring convergence on a relatively-large
+        // step. residual_scale stays at the default 1.0.
+        let solver = NewtonSolver::new();
+        let f = |x: f64| x - 1e-8;
+        let root = solver
+            .solve(f, 1.0)
+            .expect("Newton should converge for tiny-scale linear root");
+        assert!(
+            (root - 1e-8).abs() < 1e-12,
+            "root {root} must resolve the tiny-scale root, not stop early"
+        );
+    }
+
+    #[test]
+    fn test_newton_residual_scale_builder() {
+        // residual_scale loosens only the residual test, in f-units.
+        let f = |x: f64| 1e6 * (x - 2.0);
+        // Default residual_scale=1.0: residual test needs |f| < 1e-12 which is
+        // achievable here via the step test; both should agree on the root.
+        let strict = NewtonSolver::new().solve(f, 1.0).expect("converges");
+        let scaled = NewtonSolver::new()
+            .residual_scale(1e6)
+            .solve(f, 1.0)
+            .expect("converges");
+        assert!((strict - 2.0).abs() < 1e-9);
+        assert!((scaled - 2.0).abs() < 1e-9);
     }
 
     #[test]

@@ -15,11 +15,11 @@ class scoring:
 
     @staticmethod
     def altman_z_score(
-        working_capital_to_ta: float,
-        retained_earnings_to_ta: float,
-        ebit_to_ta: float,
-        market_equity_to_book_liab: float,
-        sales_to_ta: float,
+        working_capital_to_total_assets: float,
+        retained_earnings_to_total_assets: float,
+        ebit_to_total_assets: float,
+        market_equity_to_total_liabilities: float,
+        sales_to_total_assets: float,
     ) -> tuple[float, str, float]:
         """Original Altman Z-Score (1968) for publicly traded manufacturers.
 
@@ -30,23 +30,23 @@ class scoring:
 
     @staticmethod
     def altman_z_prime(
-        working_capital_to_ta: float,
-        retained_earnings_to_ta: float,
-        ebit_to_ta: float,
-        book_equity_to_book_liab: float,
-        sales_to_ta: float,
+        working_capital_to_total_assets: float,
+        retained_earnings_to_total_assets: float,
+        ebit_to_total_assets: float,
+        book_equity_to_total_liabilities: float,
+        sales_to_total_assets: float,
     ) -> tuple[float, str, float]:
         """Altman Z'-Score for private firms. Returns ``(score, zone, implied_pd)``."""
         ...
 
     @staticmethod
     def altman_z_double_prime(
-        working_capital_to_ta: float,
-        retained_earnings_to_ta: float,
-        ebit_to_ta: float,
-        book_equity_to_book_liab: float,
+        working_capital_to_total_assets: float,
+        retained_earnings_to_total_assets: float,
+        ebit_to_total_assets: float,
+        book_equity_to_total_liabilities: float,
     ) -> tuple[float, str, float]:
-        """Altman Z''-Score for non-manufacturing / emerging markets.
+        """Altman Z''-Score for non-manufacturing firms (non-EM model, no constant).
 
         Returns ``(score, zone, implied_pd)``.
         """
@@ -55,13 +55,13 @@ class scoring:
     @staticmethod
     def ohlson_o_score(
         log_total_assets_adjusted: float,
-        total_liab_to_ta: float,
-        working_capital_to_ta: float,
-        current_liab_to_current_assets: float,
-        liab_exceed_assets: float,
-        net_income_to_ta: float,
-        ffo_to_total_liab: float,
-        negative_ni_two_years: float,
+        total_liabilities_to_total_assets: float,
+        working_capital_to_total_assets: float,
+        current_liabilities_to_current_assets: float,
+        liabilities_exceed_assets: float,
+        net_income_to_total_assets: float,
+        funds_from_operations_to_total_liabilities: float,
+        negative_net_income_two_years: float,
         net_income_change: float,
     ) -> tuple[float, str, float]:
         """Ohlson O-Score (1980) logistic bankruptcy model.
@@ -72,13 +72,13 @@ class scoring:
 
     @staticmethod
     def zmijewski_score(
-        roa: float,
-        debt_ratio: float,
-        current_ratio: float,
-    ) -> tuple[float, float]:
+        net_income_to_total_assets: float,
+        total_liabilities_to_total_assets: float,
+        current_assets_to_current_liabilities: float,
+    ) -> tuple[float, str, float]:
         """Zmijewski (1984) probit bankruptcy score.
 
-        Returns ``(score, implied_pd)``.
+        Returns ``(score, zone, implied_pd)``.
         """
         ...
 
@@ -103,7 +103,7 @@ class pd:
 
     @staticmethod
     def central_tendency(annual_default_rates: list[float]) -> float:
-        """Geometric-mean long-run PD from annual default rates (regulatory TtC)."""
+        """Arithmetic-mean long-run PD from annual default rates (regulatory TtC)."""
         ...
 
 class lgd:
@@ -154,12 +154,18 @@ class lgd:
         ...
 
     @staticmethod
-    def downturn_lgd_frye_jacobs(
+    def downturn_lgd_stressed(
         base_lgd: float,
         asset_correlation: float,
+        lgd_sensitivity: float,
         stress_quantile: float,
     ) -> float:
-        """Frye-Jacobs (2012) downturn LGD adjustment, clamped to ``[0, 1]``."""
+        """Stressed downturn LGD adjustment, clamped to ``[0, 1]``.
+
+        Proprietary mean-plus-multiple-of-Bernoulli-stdev approximation
+        (not the Frye-Jacobs 2012 model). Typical ``lgd_sensitivity``:
+        0.3-0.5.
+        """
         ...
 
     @staticmethod

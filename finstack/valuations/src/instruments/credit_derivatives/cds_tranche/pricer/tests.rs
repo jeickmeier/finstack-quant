@@ -1830,19 +1830,20 @@ fn well_formed_base_correlation_prices_without_arbitrage_error() {
 ///    after the fix the EL is finite.
 #[test]
 fn homogeneous_path_boundary_default_prob_does_not_panic() {
-    // ── Part 1: confirm `statrs` panics on a negative argument ───────────────
+    // ── Part 1: confirm the probit saturates (no panic) on a negative input ──
     //
     // This is the precise condition that would be triggered in the unfixed pricer
     // when `sp > 1.0` (floating-point rounding near t = 0).
-    // `catch_unwind` returns `Err` on a panic, `Ok` on success.
-    let raw_probit_panics =
-        std::panic::catch_unwind(|| standard_normal_inv_cdf(-1e-15_f64)).is_err();
-    // Assert the panic is real — our guard is only meaningful if the underlying
-    // function actually panics on out-of-range input.
-    assert!(
-        raw_probit_panics,
-        "statrs::Normal::inverse_cdf must panic for p < 0; the guard added by \
-         Task C2 would be vacuous if this is no longer true"
+    //
+    // Review 2026-06-09 (core math): `standard_normal_inv_cdf` now guards the
+    // raw `statrs` panic itself and saturates out-of-domain inputs
+    // (p <= 0 → −∞). The pricer-side clamp added by Task C2 remains
+    // load-bearing for *numerics* (−∞ would still poison the quadrature), but
+    // the panic itself is gone by design.
+    assert_eq!(
+        standard_normal_inv_cdf(-1e-15_f64),
+        f64::NEG_INFINITY,
+        "standard_normal_inv_cdf must saturate to -inf (not panic) for p < 0"
     );
 
     // ── Part 2: homogeneous pricer must not panic and must return finite EL ──

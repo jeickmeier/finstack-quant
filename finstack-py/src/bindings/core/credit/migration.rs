@@ -8,7 +8,7 @@ use pyo3::types::{PyList, PyModule};
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 
-use crate::errors::display_to_py;
+use crate::errors::migration_to_py;
 
 fn matrix_rows(data: &nalgebra::DMatrix<f64>) -> Vec<Vec<f64>> {
     (0..data.nrows())
@@ -54,14 +54,14 @@ impl PyRatingScale {
     fn custom(labels: Vec<String>) -> PyResult<Self> {
         RatingScale::custom(labels)
             .map(Self::from_inner)
-            .map_err(display_to_py)
+            .map_err(migration_to_py)
     }
 
     #[staticmethod]
     fn custom_with_default(labels: Vec<String>, default_label: String) -> PyResult<Self> {
         RatingScale::custom_with_default(labels, default_label)
             .map(Self::from_inner)
-            .map_err(display_to_py)
+            .map_err(migration_to_py)
     }
 
     fn n_states(&self) -> usize {
@@ -81,14 +81,14 @@ impl PyRatingScale {
     }
 
     fn warf(&self, label: &str) -> PyResult<f64> {
-        self.inner.warf(label).map_err(display_to_py)
+        self.inner.warf(label).map_err(migration_to_py)
     }
 
     fn rating_from_warf(&self, warf: f64) -> PyResult<String> {
         self.inner
             .rating_from_warf(warf)
             .map(str::to_owned)
-            .map_err(display_to_py)
+            .map_err(migration_to_py)
     }
 }
 
@@ -115,15 +115,15 @@ impl PyTransitionMatrix {
     fn new(scale: &PyRatingScale, data: Vec<f64>, horizon: f64) -> PyResult<Self> {
         TransitionMatrix::new(scale.inner.clone(), &data, horizon)
             .map(Self::from_inner)
-            .map_err(display_to_py)
+            .map_err(migration_to_py)
     }
 
     fn probability(&self, from: &str, to: &str) -> PyResult<f64> {
-        self.inner.probability(from, to).map_err(display_to_py)
+        self.inner.probability(from, to).map_err(migration_to_py)
     }
 
     fn row(&self, from: &str) -> PyResult<Vec<f64>> {
-        self.inner.row(from).map_err(display_to_py)
+        self.inner.row(from).map_err(migration_to_py)
     }
 
     fn to_matrix(&self) -> Vec<Vec<f64>> {
@@ -166,22 +166,22 @@ impl PyGeneratorMatrix {
     fn new(scale: &PyRatingScale, data: Vec<f64>) -> PyResult<Self> {
         GeneratorMatrix::new(scale.inner.clone(), &data)
             .map(Self::from_inner)
-            .map_err(display_to_py)
+            .map_err(migration_to_py)
     }
 
     #[staticmethod]
     fn from_transition_matrix(p: &PyTransitionMatrix) -> PyResult<Self> {
         GeneratorMatrix::from_transition_matrix(&p.inner)
             .map(Self::from_inner)
-            .map_err(display_to_py)
+            .map_err(migration_to_py)
     }
 
     fn intensity(&self, from: &str, to: &str) -> PyResult<f64> {
-        self.inner.intensity(from, to).map_err(display_to_py)
+        self.inner.intensity(from, to).map_err(migration_to_py)
     }
 
     fn exit_rate(&self, state: &str) -> PyResult<f64> {
-        self.inner.exit_rate(state).map_err(display_to_py)
+        self.inner.exit_rate(state).map_err(migration_to_py)
     }
 
     fn to_matrix(&self) -> Vec<Vec<f64>> {
@@ -264,21 +264,46 @@ impl PyMigrationSimulator {
     fn new(generator: &PyGeneratorMatrix, horizon: f64) -> PyResult<Self> {
         MigrationSimulator::new(generator.inner.clone(), horizon)
             .map(Self::from_inner)
-            .map_err(display_to_py)
+            .map_err(migration_to_py)
     }
 
-    fn simulate(&self, initial_state: usize, n_paths: usize, seed: u64) -> Vec<PyRatingPath> {
-        let mut rng = Pcg64::seed_from_u64(seed);
-        self.inner
-            .simulate(initial_state, n_paths, &mut rng)
-            .into_iter()
-            .map(PyRatingPath::from_inner)
-            .collect()
+    /// Simulate rating paths from `initial_state`.
+    ///
+    /// Determinism: paths are generated with the canonical `Pcg64` RNG
+    /// (rand_pcg) seeded from `seed`, matching the Rust simulator's
+    /// reference RNG; identical seeds reproduce identical paths.
+    /// Releases the GIL (detaches) during simulation.
+    fn simulate(
+        &self,
+        py: Python<'_>,
+        initial_state: usize,
+        n_paths: usize,
+        seed: u64,
+    ) -> Vec<PyRatingPath> {
+        py.detach(|| {
+            let mut rng = Pcg64::seed_from_u64(seed);
+            self.inner.simulate(initial_state, n_paths, &mut rng)
+        })
+        .into_iter()
+        .map(PyRatingPath::from_inner)
+        .collect()
     }
 
-    fn empirical_matrix(&self, n_paths_per_state: usize, seed: u64) -> PyTransitionMatrix {
-        let mut rng = Pcg64::seed_from_u64(seed);
-        PyTransitionMatrix::from_inner(self.inner.empirical_matrix(n_paths_per_state, &mut rng))
+    /// Build an empirical transition matrix by simulation.
+    ///
+    /// Uses the canonical seeded `Pcg64` RNG (see [`Self::simulate`]) and
+    /// releases the GIL during simulation.
+    fn empirical_matrix(
+        &self,
+        py: Python<'_>,
+        n_paths_per_state: usize,
+        seed: u64,
+    ) -> PyTransitionMatrix {
+        let matrix = py.detach(|| {
+            let mut rng = Pcg64::seed_from_u64(seed);
+            self.inner.empirical_matrix(n_paths_per_state, &mut rng)
+        });
+        PyTransitionMatrix::from_inner(matrix)
     }
 
     fn horizon(&self) -> f64 {
@@ -291,7 +316,7 @@ impl PyMigrationSimulator {
 fn project(generator: &PyGeneratorMatrix, t: f64) -> PyResult<PyTransitionMatrix> {
     projection::project(&generator.inner, t)
         .map(PyTransitionMatrix::from_inner)
-        .map_err(display_to_py)
+        .map_err(migration_to_py)
 }
 
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

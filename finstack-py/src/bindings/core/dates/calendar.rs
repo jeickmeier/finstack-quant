@@ -108,7 +108,7 @@ pub(crate) fn extract_bdc(obj: &Bound<'_, PyAny>) -> PyResult<BusinessDayConvent
             .parse::<BusinessDayConvention>()
             .map_err(crate::errors::value_error);
     }
-    Err(crate::errors::value_error(
+    Err(pyo3::exceptions::PyTypeError::new_err(
         "expected BusinessDayConvention or str",
     ))
 }
@@ -197,7 +197,7 @@ impl PyHolidayCalendar {
     fn new(code: &str) -> PyResult<Self> {
         let registry = CalendarRegistry::global();
         if registry.resolve_str(code).is_none() {
-            return Err(crate::errors::value_error(format!(
+            return Err(pyo3::exceptions::PyKeyError::new_err(format!(
                 "unknown calendar code: {code:?}"
             )));
         }
@@ -250,7 +250,10 @@ impl PyHolidayCalendar {
         CalendarRegistry::global()
             .resolve_str(&self.code)
             .ok_or_else(|| {
-                crate::errors::value_error(format!("calendar not found: {:?}", self.code))
+                pyo3::exceptions::PyKeyError::new_err(format!(
+                    "calendar not found: {:?}",
+                    self.code
+                ))
             })
     }
 }
@@ -278,9 +281,11 @@ fn py_adjust<'py>(
         } else if let Ok(code) = calendar.extract::<String>() {
             CalendarRegistry::global()
                 .resolve_str(&code)
-                .ok_or_else(|| crate::errors::value_error(format!("unknown calendar: {code:?}")))?
+                .ok_or_else(|| {
+                    pyo3::exceptions::PyKeyError::new_err(format!("unknown calendar: {code:?}"))
+                })?
         } else {
-            return Err(crate::errors::value_error(
+            return Err(pyo3::exceptions::PyTypeError::new_err(
                 "expected HolidayCalendar or str calendar code",
             ));
         };

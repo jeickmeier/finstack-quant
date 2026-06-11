@@ -282,50 +282,60 @@ fn build_envelope(
 
         let year_fraction = curve_dc.signed_year_fraction(as_of_date, flow.date, dc_ctx)?;
 
-        // Past-dated flows (date < as_of) are already settled. Discounting them
-        // would extrapolate the curve backwards and can return DF > 1,
-        // overstating the export's PV column. Survival probability has the same
-        // problem. Treat past flows as undiscounted face value with no default
-        // adjustment so the audit trail matches the holder-view PV semantics
-        // used by `Instrument::value`.
-        let (discount_factor, survival_probability, conditional_default_prob) =
-            if year_fraction < 0.0 {
-                let sp = if hazard_arc.is_some() {
-                    Some(1.0)
-                } else {
-                    None
-                };
-                let cond_pd = sp.map(|_| 0.0);
-                (1.0, sp, cond_pd)
+        // Flows on or before `as_of` are already settled (holder view): they
+        // are not part of present value, matching `core::cashflow::npv` and
+        // therefore `Instrument::value` / `base_value` (2026-06-09 core quant
+        // review: market-standard position value excludes flows with
+        // `date <= as_of`). Discounting them would also extrapolate the curve
+        // backwards and can return DF > 1. The rows stay in the export for the
+        // audit trail (face amount, DF 1, no default adjustment) but carry
+        // `pv = 0` so `total_pv` reconciles with `base_value` — including for
+        // T+0 instruments like a deposit valued on its effective date, whose
+        // initial notional exchange settles on `as_of`.
+        let settled = flow.date <= as_of_date;
+        let (discount_factor, survival_probability, conditional_default_prob) = if settled {
+            let sp = if hazard_arc.is_some() {
+                Some(1.0)
             } else {
-                // Date-based discounting: `DiscountCurve::df` expects time from
-                // the curve's own `base_date`, not from `as_of`. For a seasoned
-                // instrument (`as_of != base_date`), feeding an `as_of`-relative
-                // year fraction into `df` lands on the wrong time origin and
-                // breaks reconciliation with `Instrument::value`, which uses
-                // `df_between_dates`. Use the same date-based helper here.
-                let df = discount.df_between_dates(as_of_date, flow.date)?;
-                let (sp, cond_pd) = match (hazard_arc.as_ref(), survival_at_as_of) {
-                    (Some(h), Some(s0)) => {
-                        // Conditional survival Q(as_of, T) = S(T) / S(as_of).
-                        let s_t = h.sp_on_date(flow.date)?;
-                        let sp = (s_t / s0).clamp(0.0, 1.0);
-                        let cond_pd = (prev_sp - sp).max(0.0);
-                        prev_sp = sp;
-                        (Some(sp), Some(cond_pd))
-                    }
-                    _ => (None, None),
-                };
-                (df, sp, cond_pd)
+                None
             };
+            let cond_pd = sp.map(|_| 0.0);
+            (1.0, sp, cond_pd)
+        } else {
+            // Date-based discounting: `DiscountCurve::df` expects time from
+            // the curve's own `base_date`, not from `as_of`. For a seasoned
+            // instrument (`as_of != base_date`), feeding an `as_of`-relative
+            // year fraction into `df` lands on the wrong time origin and
+            // breaks reconciliation with `Instrument::value`, which uses
+            // `df_between_dates`. Use the same date-based helper here.
+            let df = discount.df_between_dates(as_of_date, flow.date)?;
+            let (sp, cond_pd) = match (hazard_arc.as_ref(), survival_at_as_of) {
+                (Some(h), Some(s0)) => {
+                    // Conditional survival Q(as_of, T) = S(T) / S(as_of).
+                    let s_t = h.sp_on_date(flow.date)?;
+                    let sp = (s_t / s0).clamp(0.0, 1.0);
+                    let cond_pd = (prev_sp - sp).max(0.0);
+                    prev_sp = sp;
+                    (Some(sp), Some(cond_pd))
+                }
+                _ => (None, None),
+            };
+            (df, sp, cond_pd)
+        };
 
-        let pv = compute_pv(
-            flow.kind,
-            flow.amount.amount(),
-            discount_factor,
-            survival_probability,
-            recovery_rate,
-        )?;
+        let pv = if settled {
+            // Settled flows (date <= as_of) carry no present value under the
+            // holder-view semantics used by `base_value`.
+            0.0
+        } else {
+            compute_pv(
+                flow.kind,
+                flow.amount.amount(),
+                discount_factor,
+                survival_probability,
+                recovery_rate,
+            )?
+        };
 
         let mbs_row = mbs_state.as_ref().and_then(|m| m.get(&flow.date));
 

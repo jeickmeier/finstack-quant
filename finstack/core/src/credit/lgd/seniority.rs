@@ -168,37 +168,67 @@ impl BetaRecovery {
     }
 
     /// Sample a single recovery rate draw using the `statrs` Beta distribution.
-    pub fn sample(&self, rng: &mut dyn crate::math::RandomNumberGenerator) -> f64 {
+    ///
+    /// # Errors
+    ///
+    /// Propagates sampling errors instead of silently falling back to the
+    /// mean (2026-06-09 core quant review minor finding). With the shape
+    /// parameters validated by [`BetaRecovery::new`] this is near-unreachable,
+    /// but a silent mean fallback would corrupt tail statistics undetected.
+    pub fn sample(&self, rng: &mut dyn crate::math::RandomNumberGenerator) -> Result<f64> {
         crate::math::distributions::sample_beta(rng, self.alpha, self.beta_param)
-            .unwrap_or(self.mean)
     }
 
     /// Sample N recovery rate draws into the provided buffer.
-    pub fn sample_n(&self, rng: &mut dyn crate::math::RandomNumberGenerator, out: &mut [f64]) {
+    ///
+    /// # Errors
+    ///
+    /// Propagates the first sampling error (see [`BetaRecovery::sample`]).
+    pub fn sample_n(
+        &self,
+        rng: &mut dyn crate::math::RandomNumberGenerator,
+        out: &mut [f64],
+    ) -> Result<()> {
         for v in out.iter_mut() {
-            *v = self.sample(rng);
+            *v = self.sample(rng)?;
         }
+        Ok(())
     }
 
     /// Sample N recovery rates with a deterministic PCG64 seed.
-    #[must_use]
-    pub fn sample_seeded(&self, n_samples: usize, seed: u64) -> Vec<f64> {
+    ///
+    /// # Errors
+    ///
+    /// Propagates sampling errors (see [`BetaRecovery::sample`]).
+    pub fn sample_seeded(&self, n_samples: usize, seed: u64) -> Result<Vec<f64>> {
         let mut rng = Pcg64Rng::new(seed);
         let mut out = vec![0.0_f64; n_samples];
-        self.sample_n(&mut rng as &mut dyn RandomNumberGenerator, &mut out);
-        out
+        self.sample_n(&mut rng as &mut dyn RandomNumberGenerator, &mut out)?;
+        Ok(out)
     }
 
     /// Quantile function (inverse CDF) of the Beta distribution.
     ///
     /// Returns the value x such that P(X <= x) = p.
-    pub fn quantile(&self, p: f64) -> f64 {
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the Beta distribution cannot be
+    /// constructed from the precomputed shape parameters. This is
+    /// near-unreachable (the parameters are validated positive and finite by
+    /// [`BetaRecovery::new`]); it previously fell back silently to the mean,
+    /// which would corrupt quantile-based tail measures undetected
+    /// (2026-06-09 core quant review minor finding).
+    pub fn quantile(&self, p: f64) -> Result<f64> {
         use statrs::distribution::{Beta, ContinuousCDF};
         let p_clamped = p.clamp(1e-15, 1.0 - 1e-15);
-        match Beta::new(self.alpha, self.beta_param) {
-            Ok(dist) => dist.inverse_cdf(p_clamped),
-            Err(_) => self.mean,
-        }
+        let dist = Beta::new(self.alpha, self.beta_param).map_err(|e| {
+            crate::Error::Validation(format!(
+                "BetaRecovery::quantile: invalid Beta(alpha={}, beta={}): {e}",
+                self.alpha, self.beta_param
+            ))
+        })?;
+        Ok(dist.inverse_cdf(p_clamped))
     }
 
     /// Expected recovery rate (same as mean).
@@ -339,7 +369,11 @@ impl SeniorityRecovery {
     ///
     /// This creates systematic variation while preserving the marginal
     /// Beta distribution.
-    pub fn conditional_recovery(&self, market_factor: f64) -> f64 {
+    ///
+    /// # Errors
+    ///
+    /// Propagates quantile errors (see [`BetaRecovery::quantile`]).
+    pub fn conditional_recovery(&self, market_factor: f64) -> Result<f64> {
         let p = norm_cdf(market_factor).clamp(1e-10, 1.0 - 1e-10);
         self.dist.quantile(p)
     }
@@ -424,7 +458,9 @@ mod tests {
         let mut rng = Pcg64Rng::new(42);
 
         for _ in 0..1000 {
-            let s = br.sample(&mut rng as &mut dyn RandomNumberGenerator);
+            let s = br
+                .sample(&mut rng as &mut dyn RandomNumberGenerator)
+                .expect("sampling should succeed");
             assert!((0.0..=1.0).contains(&s), "sample {} out of [0,1]", s);
         }
     }
@@ -436,7 +472,8 @@ mod tests {
         let mut rng = Pcg64Rng::new(12345);
         let n = 50_000;
         let mut buf = vec![0.0; n];
-        br.sample_n(&mut rng as &mut dyn RandomNumberGenerator, &mut buf);
+        br.sample_n(&mut rng as &mut dyn RandomNumberGenerator, &mut buf)
+            .expect("sampling should succeed");
 
         let sample_mean = buf.iter().sum::<f64>() / n as f64;
         assert!(
@@ -451,13 +488,13 @@ mod tests {
     fn beta_recovery_quantile_roundtrip() {
         let br = BetaRecovery::new(0.45, 0.20).expect("valid params");
         // quantile(0.5) should be near the median
-        let median = br.quantile(0.5);
+        let median = br.quantile(0.5).expect("quantile");
         assert!(median > 0.0 && median < 1.0);
 
         // quantile ordering
-        let q10 = br.quantile(0.10);
-        let q50 = br.quantile(0.50);
-        let q90 = br.quantile(0.90);
+        let q10 = br.quantile(0.10).expect("quantile");
+        let q50 = br.quantile(0.50).expect("quantile");
+        let q90 = br.quantile(0.90).expect("quantile");
         assert!(q10 < q50);
         assert!(q50 < q90);
     }
@@ -532,9 +569,9 @@ mod tests {
         let sr = SeniorityRecovery::new(SeniorityClass::SeniorUnsecured, br);
 
         // Stress scenario (negative market factor) should give lower recovery
-        let r_stress = sr.conditional_recovery(-3.0);
-        let r_base = sr.conditional_recovery(0.0);
-        let r_boom = sr.conditional_recovery(3.0);
+        let r_stress = sr.conditional_recovery(-3.0).expect("conditional");
+        let r_base = sr.conditional_recovery(0.0).expect("conditional");
+        let r_boom = sr.conditional_recovery(3.0).expect("conditional");
 
         assert!(
             r_stress < r_base,
@@ -556,8 +593,8 @@ mod tests {
         let sr = SeniorityRecovery::new(SeniorityClass::SeniorUnsecured, br);
 
         // At market_factor = 0, Phi(0) = 0.5, so conditional = Beta median
-        let r0 = sr.conditional_recovery(0.0);
-        let median = br.quantile(0.5);
+        let r0 = sr.conditional_recovery(0.0).expect("conditional");
+        let median = br.quantile(0.5).expect("quantile");
         assert!(
             (r0 - median).abs() < 1e-6,
             "conditional at 0 = {}, median = {}",

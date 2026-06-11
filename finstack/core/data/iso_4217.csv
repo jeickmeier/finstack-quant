@@ -27,6 +27,7 @@ BZD,84,2,Belize Dollar
 CAD,124,2,Canadian Dollar
 CDF,976,2,Congolese Franc
 CHF,756,2,Swiss Franc
+CLF,990,4,Unidad de Fomento
 CLP,152,0,Chilean Peso
 CNY,156,2,Yuan Renminbi
 COP,170,2,Colombian Peso
@@ -126,6 +127,7 @@ SLE,925,2,Leone
 SLL,694,2,Leone
 SOS,706,2,Somali Shilling
 SRD,968,2,Surinam Dollar
+SSP,728,2,South Sudanese Pound
 STN,930,2,Dobra
 SYP,760,2,Syrian Pound
 SZL,748,2,Lilangeni

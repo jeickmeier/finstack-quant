@@ -152,8 +152,12 @@ fn bps_from_conversions() {
     let i: i32 = b.into();
     assert_eq!(i, 250);
 
-    let f: f64 = b.into();
-    assert!((f - 0.025).abs() < 1e-10);
+    // `From<Bps> for f64` was removed (2026-06-09 core quant review): the
+    // implicit decimal-out direction was asymmetric with `TryFrom<f64>`
+    // (which reads a bp count), so a 25bp round-trip through f64 became 0bp.
+    // Use the explicit accessors instead.
+    assert!((b.as_decimal() - 0.025).abs() < 1e-10);
+    assert!((b.as_percent() - 2.5).abs() < 1e-10);
 }
 
 #[test]

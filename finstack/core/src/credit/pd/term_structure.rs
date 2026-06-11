@@ -225,6 +225,7 @@ impl PdTermStructure {
 /// let pd_2y = ts.cumulative_pd(2.0);
 /// assert!(pd_2y > 0.002 && pd_2y < 0.008);
 /// ```
+#[derive(Debug)]
 pub struct PdTermStructureBuilder {
     points: Vec<(f64, f64)>,
 }
@@ -244,15 +245,25 @@ impl PdTermStructureBuilder {
     }
 
     /// Extract cumulative PDs from a [`TransitionMatrix`] for a given
-    /// initial rating, at specified tenors (integer years).
+    /// initial rating, at tenors that are integer multiples of the matrix's
+    /// horizon.
     ///
-    /// Uses matrix powers: P(n) = P^n, PD(n) = P(n)[rating, default].
-    /// Requires the transition matrix to have a defined default state.
+    /// Uses matrix powers: with horizon `h`, `P(k·h) = P^k` and
+    /// `PD(k·h) = P^k[rating, default]`. Each tenor must satisfy
+    /// `tenor = k·h` for some non-negative integer `k` (within `1e-9` on the
+    /// step count `tenor / h`); tenors are **not** silently rounded. For example,
+    /// a 6-month matrix (`h = 0.5`) supports tenors 0.5, 1.0, 1.5, …
+    /// (2026-06-09 core quant review: previously `tm.horizon()` was ignored
+    /// and tenors were silently rounded to integer powers.)
     ///
     /// # Errors
     ///
     /// - [`PdCalibrationError::NoDefaultState`] if the matrix has no default state.
     /// - [`PdCalibrationError::UnknownRating`] if `initial_rating` is not in the scale.
+    /// - [`PdCalibrationError::InvalidTenor`] if any tenor is negative or non-finite.
+    /// - [`PdCalibrationError::TenorNotMultipleOfHorizon`] if any tenor is not
+    ///   an integer multiple of `tm.horizon()`; use a generator-based
+    ///   projection (`GeneratorMatrix` + `project`) for such tenors.
     pub fn from_transition_matrix(
         mut self,
         tm: &TransitionMatrix,
@@ -270,12 +281,26 @@ impl PdTermStructureBuilder {
                     rating: initial_rating.to_owned(),
                 })?;
 
-        // Compute matrix powers for integer tenors
+        // Compute matrix powers for tenors that are integer multiples of the
+        // matrix horizon.
         let base = tm.as_matrix().clone();
         let n = base.nrows();
+        let horizon = tm.horizon();
+
+        /// Absolute tolerance on the step count `tenor / horizon` for
+        /// accepting a tenor as an integer multiple of the matrix horizon.
+        const MULTIPLE_TOL: f64 = 1e-9;
 
         for &tenor in tenors {
-            let power = tenor.round() as u32;
+            if !tenor.is_finite() || tenor < 0.0 {
+                return Err(PdCalibrationError::InvalidTenor { value: tenor });
+            }
+            let steps = tenor / horizon;
+            let power_f = steps.round();
+            if (steps - power_f).abs() > MULTIPLE_TOL {
+                return Err(PdCalibrationError::TenorNotMultipleOfHorizon { tenor, horizon });
+            }
+            let power = power_f as u32;
             if power == 0 {
                 self.points.push((tenor, 0.0));
                 continue;
@@ -309,6 +334,9 @@ impl PdTermStructureBuilder {
     ///
     /// - [`PdCalibrationError::EmptyTermStructure`] if no points were added.
     /// - [`PdCalibrationError::InvalidTenor`] if any tenor is <= 0.
+    /// - [`PdCalibrationError::NonMonotonicCumulativePds`] if the cumulative
+    ///   PDs are still decreasing after isotonic regression (defensive check;
+    ///   should be unreachable).
     pub fn build(self) -> Result<PdTermStructure, PdCalibrationError> {
         if self.points.is_empty() {
             return Err(PdCalibrationError::EmptyTermStructure);
@@ -350,6 +378,11 @@ impl PdTermStructureBuilder {
         let mut pds: Vec<f64> = merged.iter().map(|p| p.1).collect();
         isotonic_regression(&mut pds);
 
+        // Belt and braces: validate the documented monotonicity invariant.
+        if pds.windows(2).any(|w| w[1] < w[0]) {
+            return Err(PdCalibrationError::NonMonotonicCumulativePds);
+        }
+
         let tenors: Vec<f64> = merged.iter().map(|p| p.0).collect();
 
         Ok(PdTermStructure {
@@ -366,34 +399,54 @@ impl Default for PdTermStructureBuilder {
 }
 
 /// Pool-adjacent-violators algorithm for isotonic (non-decreasing) regression.
+///
+/// Maintains blocks of `(value_sum, count)`. Scanning forward, each new point
+/// starts its own block; while the previous block's mean exceeds the new
+/// block's mean, the blocks are merged (weighted average). Finally each
+/// block's mean is expanded back over its member positions, guaranteeing a
+/// monotone non-decreasing result (e.g. input `[3, 1, 1]` pools to
+/// `[5/3, 5/3, 5/3]`).
+///
+/// # References
+///
+/// - Barlow, Bartholomew, Bremner & Brunk (1972). *Statistical Inference
+///   Under Order Restrictions*. Wiley. Chapter 1 (PAV algorithm).
 fn isotonic_regression(values: &mut [f64]) {
     let n = values.len();
     if n <= 1 {
         return;
     }
 
-    // Forward pass: enforce non-decreasing
-    let mut i = 1;
-    while i < n {
-        if values[i] < values[i - 1] {
-            // Pool: average with previous
-            let avg = (values[i - 1] + values[i]) / 2.0;
-            values[i - 1] = avg;
-            values[i] = avg;
-            // Walk back to fix earlier violations
-            let mut j = i - 1;
-            while j > 0 && values[j] < values[j - 1] {
-                let pool_avg = (values[j - 1] + values[j]) / 2.0;
-                values[j - 1] = pool_avg;
-                values[j] = pool_avg;
-                j -= 1;
+    // Blocks of pooled values: (sum of member values, member count).
+    let mut sums: Vec<f64> = Vec::with_capacity(n);
+    let mut counts: Vec<usize> = Vec::with_capacity(n);
+
+    for &v in values.iter() {
+        sums.push(v);
+        counts.push(1);
+        // Merge backward while the previous block's mean violates monotonicity.
+        while sums.len() > 1 {
+            let last = sums.len() - 1;
+            let mean_last = sums[last] / counts[last] as f64;
+            let mean_prev = sums[last - 1] / counts[last - 1] as f64;
+            if mean_prev > mean_last {
+                sums[last - 1] += sums[last];
+                counts[last - 1] += counts[last];
+                sums.pop();
+                counts.pop();
+            } else {
+                break;
             }
         }
-        i += 1;
     }
 
-    // Ensure all values are still in [0, 1]
-    for v in values.iter_mut() {
-        *v = v.clamp(0.0, 1.0);
+    // Expand block means back over their member positions, clamped to [0, 1].
+    let mut idx = 0;
+    for (sum, count) in sums.iter().zip(counts.iter()) {
+        let mean = (sum / *count as f64).clamp(0.0, 1.0);
+        for _ in 0..*count {
+            values[idx] = mean;
+            idx += 1;
+        }
     }
 }

@@ -1,11 +1,12 @@
 //! Python bindings for day-count conventions from [`finstack_core::dates`].
 
 use crate::bindings::core::dates::tenor::PyTenor;
-use crate::bindings::core::dates::utils::py_to_date;
+use crate::bindings::core::dates::utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 use finstack_core::dates::{
     CalendarRegistry, DayCount, DayCountContext, DayCountContextState, Tenor, Thirty360Convention,
 };
+use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
 
@@ -95,7 +96,7 @@ impl PyDayCount {
         let s = py_to_date(start)?;
         let e = py_to_date(end)?;
         let context = match ctx {
-            Some(c) => c.to_rust_ctx(),
+            Some(c) => c.to_rust_ctx()?,
             None => DayCountContext::default(),
         };
         self.inner.year_fraction(s, e, context).map_err(core_to_py)
@@ -112,7 +113,7 @@ impl PyDayCount {
         let s = py_to_date(start)?;
         let e = py_to_date(end)?;
         let context = match ctx {
-            Some(c) => c.to_rust_ctx(),
+            Some(c) => c.to_rust_ctx()?,
             None => DayCountContext::default(),
         };
         self.inner
@@ -179,40 +180,59 @@ pub struct PyDayCountContext {
     frequency: Option<Tenor>,
     /// Custom business-day divisor (defaults to 252 when omitted).
     bus_basis: Option<u16>,
+    /// Reference coupon period ``(start, end)`` for ACT/ACT (ICMA).
+    coupon_period: Option<(finstack_core::dates::Date, finstack_core::dates::Date)>,
 }
 
 impl PyDayCountContext {
     /// Resolve to a runtime [`DayCountContext`] using the global calendar registry.
-    fn to_rust_ctx(&self) -> DayCountContext<'static> {
+    ///
+    /// # Errors
+    ///
+    /// Raises ``KeyError`` when ``calendar_id`` is set but cannot be resolved
+    /// in the global calendar registry.
+    fn to_rust_ctx(&self) -> PyResult<DayCountContext<'static>> {
         let registry = CalendarRegistry::global();
-        let calendar = self
-            .calendar_id
-            .as_deref()
-            .and_then(|code| registry.resolve_str(code));
-        DayCountContext {
+        let calendar =
+            match self.calendar_id.as_deref() {
+                Some(code) => Some(registry.resolve_str(code).ok_or_else(|| {
+                    PyKeyError::new_err(format!("unknown calendar id: {code:?}"))
+                })?),
+                None => None,
+            };
+        Ok(DayCountContext {
             calendar,
             frequency: self.frequency,
             bus_basis: self.bus_basis,
-            coupon_period: None,
-        }
+            coupon_period: self.coupon_period,
+        })
     }
 }
 
 #[pymethods]
 impl PyDayCountContext {
     /// Create a day-count context.
+    ///
+    /// ``coupon_period`` is an optional ``(start, end)`` pair of
+    /// ``datetime.date`` giving the reference coupon period for
+    /// ACT/ACT (ICMA).
     #[new]
-    #[pyo3(signature = (calendar_id=None, frequency=None, bus_basis=None))]
+    #[pyo3(signature = (calendar_id=None, frequency=None, bus_basis=None, coupon_period=None))]
     fn new(
         calendar_id: Option<String>,
         frequency: Option<PyRef<PyTenor>>,
         bus_basis: Option<u16>,
-    ) -> Self {
-        Self {
+        coupon_period: Option<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
+    ) -> PyResult<Self> {
+        let coupon_period = coupon_period
+            .map(|(s, e)| Ok::<_, PyErr>((py_to_date(&s)?, py_to_date(&e)?)))
+            .transpose()?;
+        Ok(Self {
             calendar_id,
             frequency: frequency.map(|f| f.inner),
             bus_basis,
-        }
+            coupon_period,
+        })
     }
 
     /// Optional calendar identifier.
@@ -233,6 +253,17 @@ impl PyDayCountContext {
         self.bus_basis
     }
 
+    /// Optional reference coupon period as ``(start, end)`` dates.
+    #[getter]
+    fn coupon_period<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
+        self.coupon_period
+            .map(|(s, e)| Ok((date_to_py(py, s)?, date_to_py(py, e)?)))
+            .transpose()
+    }
+
     /// Convert to a serializable state snapshot.
     fn to_state(&self) -> PyDayCountContextState {
         PyDayCountContextState {
@@ -240,14 +271,15 @@ impl PyDayCountContext {
                 calendar_id: self.calendar_id.clone(),
                 frequency: self.frequency,
                 bus_basis: self.bus_basis,
+                coupon_period: self.coupon_period,
             },
         }
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "DayCountContext(calendar_id={:?}, frequency={:?}, bus_basis={:?})",
-            self.calendar_id, self.frequency, self.bus_basis,
+            "DayCountContext(calendar_id={:?}, frequency={:?}, bus_basis={:?}, coupon_period={:?})",
+            self.calendar_id, self.frequency, self.bus_basis, self.coupon_period,
         )
     }
 }
@@ -276,20 +308,28 @@ impl PyDayCountContextState {
 #[pymethods]
 impl PyDayCountContextState {
     /// Create a context state.
+    ///
+    /// ``coupon_period`` is an optional ``(start, end)`` pair of
+    /// ``datetime.date``.
     #[new]
-    #[pyo3(signature = (calendar_id=None, frequency=None, bus_basis=None))]
+    #[pyo3(signature = (calendar_id=None, frequency=None, bus_basis=None, coupon_period=None))]
     fn new(
         calendar_id: Option<String>,
         frequency: Option<PyRef<PyTenor>>,
         bus_basis: Option<u16>,
-    ) -> Self {
-        Self {
+        coupon_period: Option<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
+    ) -> PyResult<Self> {
+        let coupon_period = coupon_period
+            .map(|(s, e)| Ok::<_, PyErr>((py_to_date(&s)?, py_to_date(&e)?)))
+            .transpose()?;
+        Ok(Self {
             inner: DayCountContextState {
                 calendar_id,
                 frequency: frequency.map(|f| f.inner),
                 bus_basis,
+                coupon_period,
             },
-        }
+        })
     }
 
     /// Reconstruct a live [`DayCountContext`] from this state.
@@ -298,6 +338,7 @@ impl PyDayCountContextState {
             calendar_id: self.inner.calendar_id.clone(),
             frequency: self.inner.frequency,
             bus_basis: self.inner.bus_basis,
+            coupon_period: self.inner.coupon_period,
         }
     }
 
@@ -319,10 +360,23 @@ impl PyDayCountContextState {
         self.inner.bus_basis
     }
 
+    /// Optional reference coupon period as ``(start, end)`` dates.
+    #[getter]
+    fn coupon_period<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
+        self.inner
+            .coupon_period
+            .map(|(s, e)| Ok((date_to_py(py, s)?, date_to_py(py, e)?)))
+            .transpose()
+    }
+
     fn __repr__(&self) -> String {
         format!(
-            "DayCountContextState(calendar_id={:?}, frequency={:?}, bus_basis={:?})",
+            "DayCountContextState(calendar_id={:?}, frequency={:?}, bus_basis={:?}, coupon_period={:?})",
             self.inner.calendar_id, self.inner.frequency, self.inner.bus_basis,
+            self.inner.coupon_period,
         )
     }
 }

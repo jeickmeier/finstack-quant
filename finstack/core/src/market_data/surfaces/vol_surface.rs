@@ -682,8 +682,29 @@ impl Bumpable for VolSurface {
     }
 }
 
+/// Relative tolerance used by [`VolSurface::apply_bucket_bump`] when matching
+/// filter values against the surface's own expiry/strike grid.
+///
+/// Filter values are expected to be the surface's exact grid values; the
+/// tolerance only absorbs floating-point round-off (mirroring
+/// `BASE_CORR_DETACHMENT_MATCH_TOLERANCE` in `base_correlation.rs`). It scales
+/// as `tol * max(1, |grid_value|)` so it works for both rate strikes (~0.01)
+/// and price strikes (~100.0).
+pub const BUCKET_BUMP_MATCH_TOLERANCE: f64 = 1.0e-9;
+
+/// True when `filter_value` matches `grid_value` within
+/// [`BUCKET_BUMP_MATCH_TOLERANCE`] relative tolerance.
+#[inline]
+fn bucket_filter_matches(filter_value: f64, grid_value: f64) -> bool {
+    (filter_value - grid_value).abs() <= BUCKET_BUMP_MATCH_TOLERANCE * grid_value.abs().max(1.0)
+}
+
 impl VolSurface {
     /// Apply a filtered bucket bump (percentage) to matching expiry/strike cells.
+    ///
+    /// Filter values must equal the surface's own grid values (a tiny relative
+    /// tolerance of [`BUCKET_BUMP_MATCH_TOLERANCE`] absorbs floating-point
+    /// round-off only); values that fall between grid points match nothing.
     pub fn apply_bucket_bump(
         &self,
         expiries_filter: Option<&[f64]>,
@@ -704,10 +725,10 @@ impl VolSurface {
             for (si, &strike) in self.strikes.iter().enumerate().take(n_strikes) {
                 let val = self.vols[ei * n_strikes + si];
                 let expiry_match = expiries_filter
-                    .map(|flt| flt.iter().any(|e| (e - expiry).abs() < 0.01))
+                    .map(|flt| flt.iter().any(|&e| bucket_filter_matches(e, expiry)))
                     .unwrap_or(true);
                 let strike_match = strikes_filter
-                    .map(|flt| flt.iter().any(|s| (s - strike).abs() < 0.01))
+                    .map(|flt| flt.iter().any(|&s| bucket_filter_matches(s, strike)))
                     .unwrap_or(true);
 
                 if expiry_match && strike_match {
@@ -1154,8 +1175,12 @@ impl VolSurface {
         expiries: &[f64],
         strikes: &[f64],
     ) -> crate::Result<Self> {
-        let mut builder = VolSurface::builder(id).expiries(expiries).strikes(strikes);
+        let id: CurveId = id.into();
+        let mut builder = VolSurface::builder(id.clone())
+            .expiries(expiries)
+            .strikes(strikes);
 
+        let mut floored = 0usize;
         for &t in expiries {
             let row: Vec<f64> = strikes
                 .iter()
@@ -1163,15 +1188,12 @@ impl VolSurface {
                     let vol = params.implied_vol_lognormal(forward, k, t);
                     // Floor for invalid params: use a small positive vol instead of
                     // NaN/negative which would fail builder validation.
-                    if vol.is_finite() && vol > 0.0 {
-                        vol
-                    } else {
-                        0.001
-                    }
+                    super::floor_sabr_vol(vol, &mut floored)
                 })
                 .collect();
             builder = builder.row(&row);
         }
+        super::warn_sabr_vol_floored("VolSurface::from_sabr", &id, floored);
 
         builder.build()
     }

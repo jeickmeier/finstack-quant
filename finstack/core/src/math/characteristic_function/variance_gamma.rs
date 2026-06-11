@@ -127,7 +127,9 @@ impl CharacteristicFunction for VarianceGammaCf {
         let s2 = self.sigma * self.sigma;
         let omega = self.omega();
         Cumulants {
-            c1: (self.r - self.q + omega) * t,
+            // c1 = (r − q + ω + θ)t: the subordinated-BM drift θ contributes
+            // to the mean of the log-price (Fang & Oosterlee 2008, Table 2).
+            c1: (self.r - self.q + omega + self.theta) * t,
             c2: (s2 + self.nu * self.theta * self.theta) * t,
             c3: (2.0 * self.theta.powi(3) * self.nu * self.nu + 3.0 * s2 * self.theta * self.nu)
                 * t,
@@ -170,6 +172,29 @@ mod tests {
     fn new_rejects_non_positive_nu() {
         assert!(VarianceGammaCf::new(0.05, 0.0, 0.12, 0.0, -0.14).is_err());
         assert!(VarianceGammaCf::new(0.05, 0.0, 0.12, -0.2, -0.14).is_err());
+    }
+
+    #[test]
+    fn cumulants_match_numerical_differentiation_of_cf() {
+        // Locks in c1 = (r − q + ω + θ)t (Fang & Oosterlee 2008, Table 2):
+        // the pre-fix code dropped the +θt term, mis-centering the COS
+        // truncation range for skewed (θ ≠ 0) VG parameters.
+        let vg = VarianceGammaCf::new(0.05, 0.01, 0.12, 0.2, -0.14).expect("valid VG");
+        let t = 1.5;
+        let closed = vg.cumulants(t);
+        let numerical = super::super::cumulants_from_cf(&vg, t);
+        assert!(
+            (closed.c1 - numerical.c1).abs() < 1e-6,
+            "c1: closed={}, numerical={}",
+            closed.c1,
+            numerical.c1
+        );
+        assert!(
+            (closed.c2 - numerical.c2).abs() < 1e-6,
+            "c2: closed={}, numerical={}",
+            closed.c2,
+            numerical.c2
+        );
     }
 
     #[test]

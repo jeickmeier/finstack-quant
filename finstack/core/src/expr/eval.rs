@@ -2,18 +2,18 @@
 //!
 //! Provides the `CompiledExpr` type that evaluates expression trees using
 //! optimized scalar algorithms. Supports DAG planning for shared sub-expression
-//! elimination and LRU caching for intermediate results.
+//! elimination: structurally identical sub-trees are deduplicated and each DAG
+//! node is evaluated exactly once per `eval()` call.
 //!
 //! # Evaluation Strategy
 //!
 //! - **Simple mode**: Direct recursive evaluation (no planning)
-//! - **DAG mode**: Topological order execution with caching
+//! - **DAG mode**: Topological order execution with sub-expression dedup
 //! - **Scratch buffers**: Reused to minimize allocations
 //! - **Deterministic**: Identical results across runs
 
 use super::{
     ast::*,
-    cache::{CacheManager, CachedResult},
     context::SimpleContext,
     dag::{DagBuilder, ExecutionPlan},
 };
@@ -22,18 +22,25 @@ use smallvec::SmallVec;
 use std::sync::{Mutex, OnceLock};
 use std::vec::Vec;
 
-/// Options controlling expression evaluation strategy and caching.
+/// Options controlling expression evaluation strategy.
 ///
-/// Allows callers to override the execution plan and cache budget for a single
-/// evaluation. Useful for scenario analysis where different cache sizes or
-/// plans may be beneficial.
+/// Allows callers to override the execution plan for a single evaluation.
+/// Useful for scenario analysis where different plans may be beneficial.
 ///
 /// # Fields
 ///
 /// - `plan`: Internal optional pre-built execution plan, exposed through
-///   [`EvalOpts::has_plan`].
-/// - `cache_budget_mb`: Optional cache size in megabytes
+///   [`EvalOpts::has_plan`]. **Not part of the wire format** — the field is
+///   `#[serde(skip)]` so a deserialized `EvalOpts` can never inject an
+///   arbitrary execution plan that `eval()` would execute in place of the
+///   compiled AST; plans can only be attached in-process.
+/// - `cache_budget_mb`: Retained for API/serde compatibility; no-op (see below)
 /// - `max_arena_bytes`: Maximum scratch arena allocation in bytes
+///
+/// # Serde
+///
+/// Deserialization is strict (`deny_unknown_fields`): unknown fields —
+/// including `plan`, which older versions serialized — are rejected.
 ///
 /// # Examples
 ///
@@ -45,21 +52,29 @@ use std::vec::Vec;
 /// let cols: [&[f64]; 1] = [&x];
 /// let expr = CompiledExpr::new(Expr::column("x"));
 ///
-/// // Evaluate with custom cache
-/// let mut opts = EvalOpts::default();
-/// opts.cache_budget_mb = Some(16);
-/// let out = expr.eval(&ctx, &cols, opts).expect("column lookup should succeed");
+/// let out = expr.eval(&ctx, &cols, EvalOpts::default()).expect("column lookup should succeed");
 /// assert_eq!(out.values, vec![1.0, 2.0, 3.0]);
 /// ```
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EvalOpts {
     /// Optional pre-built execution plan to follow. If not provided, the
     /// evaluator will either use the internal plan (if present) or fallback to
     /// a minimal evaluation path for the expression.
+    ///
+    /// Skipped by serde: the plan (with its internal `DagNode` topology) is
+    /// not wire format, and a deserialized `EvalOpts` must not be able to
+    /// inject a plan that `eval()` executes instead of the compiled AST.
+    #[serde(skip)]
     pub(crate) plan: Option<ExecutionPlan>,
-    /// Optional cache budget in megabytes. When provided, a cache will be
-    /// instantiated (and sized for the plan when available) and cache stats
-    /// will be embedded in the returned metadata.
+    /// No-op, retained for API and serde compatibility.
+    ///
+    /// The cross-evaluation result cache was removed: it keyed entries on
+    /// `(dag_node_id, len)` with no input fingerprint, so re-evaluating the
+    /// same expression on different same-length data returned stale results
+    /// (see `docs/reviews/2026-06-09-core-quant-review.md`, Blocker #2).
+    /// Within a single `eval()` call each deduplicated DAG node already
+    /// executes exactly once, so no per-evaluation cache is needed either.
     pub cache_budget_mb: Option<usize>,
     /// Maximum arena allocation in bytes. Defaults to 1 GB.
     /// Set to 0 to disable the check.
@@ -88,29 +103,27 @@ impl EvalOpts {
     }
 }
 
-/// Compiled expression with optimized evaluation and caching.
+/// Compiled expression with optimized evaluation.
 ///
-/// Wraps an expression AST with optional DAG planning and result caching for
-/// efficient evaluation of complex formulas. Used extensively in financial
-/// statement models where hundreds of interdependent formulas must be evaluated.
+/// Wraps an expression AST with optional DAG planning for efficient evaluation
+/// of complex formulas. Used extensively in financial statement models where
+/// hundreds of interdependent formulas must be evaluated.
 ///
 /// # Components
 ///
 /// - **AST**: Expression tree to evaluate
-/// - **Plan**: Optional execution plan (topological order, cache strategy)
-/// - **Cache**: LRU cache for intermediate results
+/// - **Plan**: Optional execution plan (topological order)
 /// - **Scratch buffers**: Reused temporary storage to minimize allocations
 ///
 /// # Evaluation Modes
 ///
 /// - **Simple**: Direct recursive evaluation (fast for simple expressions)
 /// - **DAG-optimized**: Shared sub-expression elimination (best for complex graphs)
-/// - **Cached**: LRU caching of intermediate results (best for repeated patterns)
 ///
 /// # Thread Safety
 ///
-/// `CompiledExpr` is both `Send` and `Sync`. Internal scratch buffers and
-/// caches are protected by `Mutex`. For parallel evaluation, either share a
+/// `CompiledExpr` is both `Send` and `Sync`. Internal scratch buffers are
+/// protected by `Mutex`. For parallel evaluation, either share a
 /// single instance (concurrent `eval()` calls will serialize on the scratch
 /// `Mutex`) or clone for independent scratch buffers per thread.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -119,9 +132,6 @@ pub struct CompiledExpr {
     pub ast: Expr,
     /// Optional execution plan for complex expressions.
     pub(crate) plan: Option<ExecutionPlan>,
-    /// Cache manager for intermediate results.
-    #[serde(skip)]
-    pub(crate) cache: Option<CacheManager>,
     /// Small scratch arena to reuse temporary buffers within hot paths.
     #[serde(skip, default = "default_scratch")]
     pub(super) scratch: Mutex<ScratchArena>,
@@ -149,7 +159,6 @@ impl Clone for CompiledExpr {
         Self {
             ast: self.ast.clone(),
             plan: self.plan.clone(),
-            cache: self.cache.clone(),
             // Fresh scratch and lazy_plan for clones; per-instance reuse only.
             scratch: Mutex::new(ScratchArena::default()),
             lazy_plan: OnceLock::new(),
@@ -168,7 +177,6 @@ impl CompiledExpr {
         Self {
             ast,
             plan: None,
-            cache: None,
             scratch: Mutex::new(ScratchArena::default()),
             lazy_plan: OnceLock::new(),
         }
@@ -187,33 +195,39 @@ impl CompiledExpr {
     }
 
     /// Construct with DAG planning enabled.
+    ///
+    /// The provided `meta` is stored on the execution plan and stamped into
+    /// each [`EvaluationResult`] produced by [`Self::eval`].
     pub fn with_planning(ast: Expr, meta: crate::config::ResultsMeta) -> crate::Result<Self> {
         let mut builder = DagBuilder::new();
         let plan = builder.build_plan(vec![ast.clone()], meta)?;
-        let cache = CacheManager::for_plan(&plan, 100); // 100MB default
 
         Ok(Self {
             ast,
             plan: Some(plan),
-            cache: Some(cache),
             scratch: Mutex::new(ScratchArena::default()),
             lazy_plan: OnceLock::new(),
         })
     }
 
-    /// Enable caching with the given budget.
-    pub fn with_cache(mut self, budget_mb: usize) -> Self {
-        if let Some(ref plan) = self.plan {
-            self.cache = Some(CacheManager::for_plan(plan, budget_mb));
-        } else {
-            self.cache = Some(CacheManager::new(budget_mb));
-        }
+    /// No-op, retained for API compatibility.
+    ///
+    /// The cross-evaluation result cache was removed because it keyed entries
+    /// on `(dag_node_id, len)` without an input fingerprint, returning stale
+    /// values when the same expression was re-evaluated on different
+    /// same-length data (see `docs/reviews/2026-06-09-core-quant-review.md`,
+    /// Blocker #2). Within one `eval()` call each deduplicated DAG node is
+    /// already evaluated exactly once.
+    pub fn with_cache(self, _budget_mb: usize) -> Self {
         self
     }
 
     /// Return whether this compiled expression currently has an attached cache.
+    ///
+    /// Always `false`: the cross-evaluation cache was removed (see
+    /// [`Self::with_cache`]).
     pub fn has_cache(&self) -> bool {
-        self.cache.is_some()
+        false
     }
 
     /// Return whether this compiled expression has a pre-built execution plan.
@@ -224,7 +238,14 @@ impl CompiledExpr {
     /// Unified evaluation entrypoint returning values with execution metadata.
     ///
     /// Uses scalar implementations for all functions, with optional DAG planning
-    /// and caching for complex expressions.
+    /// for complex expressions.
+    ///
+    /// # Column length handling
+    ///
+    /// The output length is the length of the **first** column in `cols`.
+    /// Columns shorter than that are NaN-padded at the tail; columns longer
+    /// than that are truncated. Missing tail values therefore propagate as
+    /// NaN rather than being silently zero-filled.
     pub fn eval(
         &self,
         ctx: &SimpleContext,
@@ -247,10 +268,11 @@ impl CompiledExpr {
             let plan = builder.build_plan(vec![self.ast.clone()], meta)?;
             // Try to cache for future calls; if a racing thread beat us, use theirs.
             match self.lazy_plan.set(plan) {
-                Ok(()) => self
-                    .lazy_plan
-                    .get()
-                    .ok_or(crate::Error::from(crate::InputError::Invalid))?,
+                Ok(()) => self.lazy_plan.get().ok_or_else(|| {
+                    crate::Error::Internal(
+                        "expression lazy plan missing immediately after OnceLock::set".to_string(),
+                    )
+                })?,
                 Err(plan) => {
                     // Race: another thread set it first. Use theirs (already cached).
                     // Keep our plan alive for this call as a fallback.
@@ -260,17 +282,9 @@ impl CompiledExpr {
             }
         };
 
-        // Decide on cache to use for this evaluation
-        let eval_cache: Option<CacheManager> = if let Some(budget) = opts.cache_budget_mb {
-            Some(CacheManager::for_plan(plan_to_use, budget))
-        } else {
-            self.cache.clone()
-        };
-
         tracing::debug!(
             row_count = cols.first().map(|c| c.len()).unwrap_or(0),
             plan_nodes = plan_to_use.nodes.len(),
-            cache_enabled = eval_cache.is_some(),
             "evaluating compiled expression"
         );
 
@@ -302,22 +316,6 @@ impl CompiledExpr {
             let mut cursor = 0;
 
             for node in &plan_to_use.nodes {
-                // Cache lookup
-                if let Some(ref cache) = eval_cache {
-                    if let Some(cached) = cache.get(node.id, len) {
-                        let scalar_result = cached.as_scalar_slice();
-                        // Copy cached result into arena without materializing an
-                        // intermediate Vec on every cache hit.
-                        debug_assert_eq!(scalar_result.len(), len);
-                        let start = cursor;
-                        let end = cursor + len;
-                        arena[start..end].copy_from_slice(&scalar_result[..len]);
-                        offsets.insert(node.id, (start, end));
-                        cursor = end;
-                        continue;
-                    }
-                }
-
                 // Allocate space in arena for this node's result
                 let start = cursor;
                 let end = cursor + len;
@@ -327,14 +325,6 @@ impl CompiledExpr {
                 let (arena_deps, arena_out) = arena.split_at_mut(start);
                 let out_slice = &mut arena_out[..len];
                 self.eval_node_into(ctx, cols, node, arena_deps, &offsets, out_slice)?;
-
-                // Cache store
-                if let Some(ref cache) = eval_cache {
-                    if plan_to_use.cache_strategy.cache_nodes.contains(&node.id) {
-                        let arc = std::sync::Arc::<[f64]>::from(&arena[start..end]);
-                        cache.put(node.id, CachedResult::Scalar(arc));
-                    }
-                }
 
                 offsets.insert(node.id, (start, end));
                 cursor = end;
@@ -349,8 +339,11 @@ impl CompiledExpr {
                 .unwrap_or_default()
         };
 
-        // Stamp minimal metadata only at IO boundaries; evaluator does not record timings/cache/parallel
-        let meta = crate::config::results_meta(&crate::config::FinstackConfig::default());
+        // Stamp the metadata carried by the execution plan (set by the caller
+        // via `with_planning` or `EvalOpts.plan`); auto-built plans carry the
+        // default-config snapshot. The evaluator does not record
+        // timings/cache/parallel.
+        let meta = plan_to_use.meta.clone();
 
         Ok(EvaluationResult {
             values,
@@ -663,9 +656,9 @@ impl CompiledExpr {
                 if copy_len < out.len() {
                     out[copy_len..].fill(f64::NAN);
                 }
+                Ok(())
             }
         }
-        Ok(())
     }
 }
 #[cfg(test)]

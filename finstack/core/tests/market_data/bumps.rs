@@ -58,7 +58,9 @@ fn forward_curve_supports_additive_and_multiplicative_bumps() {
             bump_type: BumpType::Parallel,
         })
         .expect("percent bumps supported");
-    assert_eq!(additive.id().as_str(), "USD-LIBOR_bump_2pct"); // percent formatted with rounding
+    // Fractional magnitudes keep one decimal so ±0.4bp-style bumps get
+    // distinct IDs instead of colliding at "{:.0}" rounding.
+    assert_eq!(additive.id().as_str(), "USD-LIBOR_bump_1.5pct");
 
     let multiplicative = curve
         .apply_bump(BumpSpec::multiplier(1.1))
@@ -184,4 +186,124 @@ fn base_correlation_curve_uses_percent_bumps() {
         .apply_bump(BumpSpec::correlation_shift_pct(5.0))
         .expect("base correlation supports percent bump");
     assert_eq!(bumped.id().as_str(), "CDX_bump_5pct");
+}
+
+// =============================================================================
+// Metadata threading through rebuild paths (2026-06-09 core quant review,
+// "Major — market data" item 4): bumps and rolls must preserve fx_policy and
+// hazard issuer/seniority/currency metadata.
+// =============================================================================
+
+#[test]
+fn discount_curve_rebuild_paths_preserve_fx_policy() {
+    use finstack_core::market_data::term_structures::DiscountCurve;
+
+    let curve = DiscountCurve::builder("USD-OIS-FX")
+        .base_date(sample_base_date())
+        .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.96), (5.0, 0.90)])
+        .fx_policy("triangulate_via_usd")
+        .build()
+        .unwrap();
+
+    let bumped = curve.with_parallel_bump(10.0).unwrap();
+    assert_eq!(bumped.fx_policy(), Some("triangulate_via_usd"));
+
+    let key_rate = curve
+        .with_triangular_key_rate_bump_neighbors(Some(1.0), 2.0, Some(5.0), 10.0)
+        .unwrap();
+    assert_eq!(key_rate.fx_policy(), Some("triangulate_via_usd"));
+
+    let rolled = curve.roll_forward(183).unwrap();
+    assert_eq!(rolled.fx_policy(), Some("triangulate_via_usd"));
+
+    let via_trait = curve.apply_bump(BumpSpec::parallel_bp(10.0)).unwrap();
+    assert_eq!(via_trait.fx_policy(), Some("triangulate_via_usd"));
+}
+
+#[test]
+fn forward_curve_rebuild_paths_preserve_fx_policy() {
+    let curve = ForwardCurve::builder("USD-SOFR-3M-FX", 0.25)
+        .base_date(sample_base_date())
+        .knots([(0.0, 0.02), (1.0, 0.021), (2.0, 0.022), (5.0, 0.025)])
+        .fx_policy("triangulate_via_usd")
+        .build()
+        .unwrap();
+
+    let bumped = curve.with_parallel_bump(10.0).unwrap();
+    assert_eq!(bumped.fx_policy(), Some("triangulate_via_usd"));
+
+    let key_rate = curve
+        .with_triangular_key_rate_bump_neighbors(Some(1.0), 2.0, Some(5.0), 10.0)
+        .unwrap();
+    assert_eq!(key_rate.fx_policy(), Some("triangulate_via_usd"));
+
+    let rolled = curve.roll_forward(183).unwrap();
+    assert_eq!(rolled.fx_policy(), Some("triangulate_via_usd"));
+
+    let via_trait = curve.apply_bump(BumpSpec::parallel_bp(10.0)).unwrap();
+    assert_eq!(via_trait.fx_policy(), Some("triangulate_via_usd"));
+
+    let via_trait_mult = curve.apply_bump(BumpSpec::multiplier(1.1)).unwrap();
+    assert_eq!(via_trait_mult.fx_policy(), Some("triangulate_via_usd"));
+}
+
+#[test]
+fn hazard_curve_apply_bump_preserves_metadata_and_drops_stale_quotes() {
+    use finstack_core::currency::Currency;
+    use finstack_core::market_data::term_structures::{ParInterp, Seniority};
+
+    let recovery = 0.40;
+    let curve = HazardCurve::builder("ACME-SNR")
+        .base_date(sample_base_date())
+        .recovery_rate(recovery)
+        .issuer("ACME Corp")
+        .seniority(Seniority::Senior)
+        .currency(Currency::USD)
+        .fx_policy("triangulate_via_usd")
+        .knots([(1.0, 0.01), (5.0, 0.01)])
+        .par_spreads([(1.0, 60.0), (5.0, 60.0)])
+        .build()
+        .unwrap();
+
+    let bumped = curve.apply_bump(BumpSpec::parallel_bp(10.0)).unwrap();
+
+    // Full metadata threaded through the rebuild.
+    assert_eq!(bumped.issuer(), Some("ACME Corp"));
+    assert_eq!(bumped.seniority, Some(Seniority::Senior));
+    assert_eq!(bumped.currency(), Some(Currency::USD));
+    assert_eq!(bumped.fx_policy(), Some("triangulate_via_usd"));
+    assert_eq!(bumped.day_count(), curve.day_count());
+    assert_eq!(bumped.recovery_rate(), recovery);
+
+    // Stale par quotes are cleared: cds_quote_bp falls back to the
+    // hazard-based approximation λ·(1−R)·1e4 reflecting the bumped curve:
+    // (0.01 + 0.001/0.6)·0.6·1e4 = 70bp (vs the stale stored 60bp).
+    assert_eq!(bumped.par_spread_points().count(), 0);
+    let quote = bumped.cds_quote_bp(3.0, ParInterp::Linear);
+    assert!(
+        (quote - 70.0).abs() < 1e-9,
+        "bumped quote must reflect bumped hazards, got {quote}"
+    );
+}
+
+#[test]
+fn hazard_curve_roll_forward_preserves_metadata() {
+    use finstack_core::currency::Currency;
+    use finstack_core::market_data::term_structures::Seniority;
+
+    let curve = HazardCurve::builder("ACME-ROLL")
+        .base_date(sample_base_date())
+        .issuer("ACME Corp")
+        .seniority(Seniority::Senior)
+        .currency(Currency::USD)
+        .fx_policy("triangulate_via_usd")
+        .knots([(1.0, 0.01), (3.0, 0.015), (5.0, 0.02)])
+        .build()
+        .unwrap();
+
+    let rolled = curve.roll_forward(183).unwrap();
+    assert_eq!(rolled.issuer(), Some("ACME Corp"));
+    assert_eq!(rolled.seniority, Some(Seniority::Senior));
+    assert_eq!(rolled.currency(), Some(Currency::USD));
+    assert_eq!(rolled.fx_policy(), Some("triangulate_via_usd"));
 }

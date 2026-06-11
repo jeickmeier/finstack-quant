@@ -91,15 +91,18 @@ impl HurstExponent {
 // MolchanGolosovKernel
 // ---------------------------------------------------------------------------
 
-/// Molchan-Golosov power-law kernel.
+/// Riemann–Liouville power-law kernel.
 ///
 /// $$K(t,s) = c_H (t - s)^{H - 1/2}, \quad s < t$$
 ///
 /// where c_H = √(2H). Returns 0 when t ≤ s.
 ///
-/// This is the simplest Volterra kernel that reproduces the correct fBM
-/// covariance structure. Rough-volatility models that require the
-/// Riemann-Liouville Volterra process (e.g. rough Bergomi) use the dedicated
+/// This is the Riemann–Liouville (type II) Volterra kernel. The resulting
+/// process matches the fBM *variance* `t^{2H}` but not the full fBM
+/// covariance structure — the true Molchan–Golosov kernel additionally
+/// involves an incomplete-beta/hypergeometric correction term. Rough
+/// volatility models that require the Riemann-Liouville Volterra process
+/// (e.g. rough Bergomi) use the dedicated
 /// `finstack_monte_carlo::rng::volterra` generator rather than this kernel.
 #[derive(Debug, Clone, Copy)]
 pub struct MolchanGolosovKernel {
@@ -194,6 +197,26 @@ const ML_MAX_TERMS: usize = 200;
 /// Relative convergence tolerance for Mittag-Leffler series.
 const ML_TOL: f64 = 1e-15;
 
+/// Series-validity bound on `|z|` for the Taylor evaluation when `α < 1`.
+///
+/// The series terms `|z|^k / Γ(αk + β)` grow before the Gamma function takes
+/// over, peaking near `k* ≈ |z|^{1/α}/α` with peak magnitude roughly
+/// `exp(α⁻¹·|z|^{1/α})`. For negative real `z` (the rough-Heston regime) the
+/// result is O(1/|z|) while intermediate terms reach that peak, so roughly
+/// `|z|^{1/α}/(α·ln 10)` decimal digits are lost to cancellation. For `α < 1`
+/// the exponent `1/α > 1` makes this loss explode quickly; `|z| = 10` is a
+/// conservative cutoff keeping the evaluation meaningful in `f64`. Larger
+/// arguments require the Gorenflo–Loutchko–Luchko integral representation
+/// (not implemented here).
+const ML_SERIES_RADIUS_ALPHA_LT_1: f64 = 10.0;
+
+/// Maximum tolerated absolute rounding-error estimate for the series sum.
+///
+/// The absolute error of the summation is bounded by roughly
+/// `max_k |term_k| × ε` (machine epsilon); evaluations whose estimated
+/// absolute error exceeds this cap are rejected as numerically meaningless.
+const ML_MAX_ABS_ERROR: f64 = 1e-8;
+
 /// Generalized Mittag-Leffler function E_{α,β}(z).
 ///
 /// $$E_{\alpha,\beta}(z) = \sum_{k=0}^{\infty} \frac{z^k}{\Gamma(\alpha k + \beta)}$$
@@ -203,19 +226,65 @@ const ML_TOL: f64 = 1e-15;
 /// term count or when the relative contribution falls below an internal
 /// tolerance (both defined as private constants in this module).
 ///
+/// # Domain of validity
+///
+/// The raw Taylor series suffers catastrophic cancellation for moderately
+/// large `|z|` with negative real part: intermediate terms peak near
+/// `exp(α⁻¹·|z|^{1/α})` while the result is O(1/|z|). For `α < 1` (the rough
+/// volatility regime) arguments with `|z| > 10` are rejected outright; for
+/// any parameters, an evaluation whose estimated absolute rounding error
+/// (peak term × machine ε) exceeds an internal cap (1e-8) is rejected.
+/// Evaluating larger arguments requires the
+/// integral-representation algorithm of Gorenflo, Loutchko & Luchko (2002),
+/// which is not implemented here.
+///
 /// # Arguments
 ///
 /// * `z` — complex argument
-/// * `alpha` — first Mittag-Leffler parameter (must be > 0)
-/// * `beta` — second Mittag-Leffler parameter (must be > 0)
-pub fn mittag_leffler(z: Complex64, alpha: f64, beta: f64) -> Complex64 {
+/// * `alpha` — first Mittag-Leffler parameter (must be > 0 and finite)
+/// * `beta` — second Mittag-Leffler parameter (must be > 0 and finite)
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] when:
+/// - `alpha` or `beta` is non-positive or non-finite, or `z` is non-finite
+/// - `alpha < 1` and `|z|` exceeds the series-validity bound (10)
+/// - the summation loses too many digits to cancellation to be meaningful
+///
+/// # References
+///
+/// - Gorenflo, R., Loutchko, J. & Luchko, Yu. (2002). Computation of the
+///   Mittag-Leffler function E_{α,β}(z) and its derivative. *Fractional
+///   Calculus and Applied Analysis*, 5(4), 491–518.
+pub fn mittag_leffler(z: Complex64, alpha: f64, beta: f64) -> Result<Complex64> {
+    if !alpha.is_finite() || alpha <= 0.0 || !beta.is_finite() || beta <= 0.0 {
+        return Err(Error::Validation(format!(
+            "Mittag-Leffler parameters must be finite and positive, got alpha={alpha}, beta={beta}"
+        )));
+    }
+    if !z.re.is_finite() || !z.im.is_finite() {
+        return Err(Error::Validation(format!(
+            "Mittag-Leffler argument must be finite, got z={z}"
+        )));
+    }
+    if alpha < 1.0 && z.norm() > ML_SERIES_RADIUS_ALPHA_LT_1 {
+        return Err(Error::Validation(format!(
+            "Mittag-Leffler Taylor series is unreliable for alpha < 1 with |z| = {:.3e} > {}; \
+             the integral representation (Gorenflo et al. 2002) is required for this regime",
+            z.norm(),
+            ML_SERIES_RADIUS_ALPHA_LT_1
+        )));
+    }
+
     let mut sum = Complex64::new(0.0, 0.0);
     let mut z_pow = Complex64::new(1.0, 0.0); // z^0 = 1
+    let mut max_term_norm = 0.0_f64;
 
     for k in 0..ML_MAX_TERMS {
         let log_gamma = ln_gamma(alpha * k as f64 + beta);
         let inv_gamma = (-log_gamma).exp();
         let term = z_pow * inv_gamma;
+        max_term_norm = max_term_norm.max(term.norm());
 
         sum += term;
 
@@ -228,7 +297,19 @@ pub fn mittag_leffler(z: Complex64, alpha: f64, beta: f64) -> Complex64 {
         z_pow *= z;
     }
 
-    sum
+    // Catastrophic-cancellation guard: the absolute rounding error of the
+    // summation is ~ max_k |term_k| × ε. If intermediate terms were so large
+    // that this estimate exceeds the cap, the digits of the result are noise.
+    let abs_error_estimate = max_term_norm * f64::EPSILON;
+    if abs_error_estimate > ML_MAX_ABS_ERROR {
+        return Err(Error::Validation(format!(
+            "Mittag-Leffler series lost too many digits to cancellation for z={z}, \
+             alpha={alpha}, beta={beta} (peak term {max_term_norm:.3e}, estimated \
+             absolute error {abs_error_estimate:.3e})"
+        )));
+    }
+
+    Ok(sum)
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +476,7 @@ mod tests {
         // E_{1,1}(z) = exp(z) for real z
         for &x in &[0.0, 0.5, 1.0, -1.0, 2.0] {
             let z = Complex64::new(x, 0.0);
-            let ml = mittag_leffler(z, 1.0, 1.0);
+            let ml = mittag_leffler(z, 1.0, 1.0).unwrap();
             let expected = x.exp();
             assert!(
                 (ml.re - expected).abs() < 1e-8,
@@ -411,7 +492,7 @@ mod tests {
         // E_{2,1}(-z^2) = cos(z) for real z
         for &x in &[0.0, 0.5, 1.0, PI / 4.0, PI / 2.0] {
             let z = Complex64::new(-x * x, 0.0);
-            let ml = mittag_leffler(z, 2.0, 1.0);
+            let ml = mittag_leffler(z, 2.0, 1.0).unwrap();
             let expected = x.cos();
             assert!(
                 (ml.re - expected).abs() < 1e-8,
@@ -419,5 +500,49 @@ mod tests {
                 ml.re
             );
         }
+    }
+
+    #[test]
+    fn mittag_leffler_rejects_invalid_parameters() {
+        let z = Complex64::new(1.0, 0.0);
+        assert!(mittag_leffler(z, 0.0, 1.0).is_err());
+        assert!(mittag_leffler(z, -0.5, 1.0).is_err());
+        assert!(mittag_leffler(z, 1.0, 0.0).is_err());
+        assert!(mittag_leffler(z, f64::NAN, 1.0).is_err());
+        assert!(mittag_leffler(Complex64::new(f64::NAN, 0.0), 1.0, 1.0).is_err());
+    }
+
+    #[test]
+    fn mittag_leffler_guard_fires_for_large_z_alpha_lt_1() {
+        // The rough-volatility regime alpha < 1 with large negative real z is
+        // exactly where the raw Taylor series produces garbage; the domain
+        // guard must reject it rather than return a meaningless value.
+        let z = Complex64::new(-50.0, 0.0);
+        let result = mittag_leffler(z, 0.6, 1.0);
+        assert!(
+            result.is_err(),
+            "expected domain guard error, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn mittag_leffler_small_z_alpha_lt_1_still_works() {
+        // E_{0.5,1}(z) for small real z: cross-check against the known identity
+        // E_{1/2,1}(z) = exp(z^2) * erfc(-z), here just sanity-check the series
+        // against a direct high-precision partial sum for |z| well inside the
+        // validity bound.
+        let z = Complex64::new(-0.5, 0.0);
+        let ml = mittag_leffler(z, 0.5, 1.0).unwrap();
+        // Direct reference sum (f64, small |z| so no cancellation issue).
+        let mut reference = 0.0_f64;
+        for k in 0..60 {
+            reference += (-0.5_f64).powi(k) * (-ln_gamma(0.5 * f64::from(k) + 1.0)).exp();
+        }
+        assert!(
+            (ml.re - reference).abs() < 1e-12,
+            "series mismatch: {} vs {reference}",
+            ml.re
+        );
+        assert!(ml.im.abs() < 1e-14);
     }
 }

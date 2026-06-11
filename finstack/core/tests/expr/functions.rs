@@ -844,6 +844,184 @@ mod ewm_operations {
     }
 
     #[test]
+    fn ewm_std_leading_nan_does_not_poison_state() {
+        // Regression: ema/ema_sq previously seeded from base[0] unconditionally,
+        // so a leading NaN poisoned the recursion and `.max(0.0)` converted the
+        // NaN variance to 0.0 — ewm_std([NaN,1,5,9,2]) returned all zeros
+        // (docs/reviews/2026-06-09-core-quant-review.md).
+        let ctx = SimpleContext::new(["x"]).expect("unique columns");
+        let x = vec![f64::NAN, 1.0, 5.0, 9.0, 2.0];
+        let cols: Vec<&[f64]> = vec![x.as_slice()];
+
+        let std_expr = CompiledExpr::new(Expr::call(
+            Function::EwmStd,
+            vec![Expr::column("x"), Expr::literal(0.5), Expr::literal(1.0)],
+        ));
+        let result = std_expr
+            .eval(&ctx, &cols, EvalOpts::default())
+            .unwrap()
+            .values;
+
+        assert_eq!(result.len(), 5);
+        // Leading NaN stays NaN; seed point (first non-NaN obs) is 0.0.
+        assert!(result[0].is_nan());
+        assert_eq!(result[1], 0.0);
+        // Post-seed values must be finite and strictly positive (the data varies).
+        for (i, &v) in result.iter().enumerate().skip(2) {
+            assert!(v.is_finite(), "ewm_std[{i}] should be finite, got {v}");
+            assert!(v > 0.0, "ewm_std[{i}] should be positive, got {v}");
+        }
+
+        // The result must match evaluating the same series without the
+        // leading NaN, shifted by one position.
+        let x_tail = vec![1.0, 5.0, 9.0, 2.0];
+        let cols_tail: Vec<&[f64]> = vec![x_tail.as_slice()];
+        let tail_expr = CompiledExpr::new(Expr::call(
+            Function::EwmStd,
+            vec![Expr::column("x"), Expr::literal(0.5), Expr::literal(1.0)],
+        ));
+        let tail = tail_expr
+            .eval(&ctx, &cols_tail, EvalOpts::default())
+            .unwrap()
+            .values;
+        for i in 0..4 {
+            assert!(
+                (result[i + 1] - tail[i]).abs() < 1e-12,
+                "ewm_std with leading NaN[{}]: {} != {}",
+                i + 1,
+                result[i + 1],
+                tail[i]
+            );
+        }
+    }
+
+    #[test]
+    fn ewm_var_all_nan_input_returns_all_nan() {
+        let ctx = SimpleContext::new(["x"]).expect("unique columns");
+        let x = vec![f64::NAN, f64::NAN, f64::NAN];
+        let cols: Vec<&[f64]> = vec![x.as_slice()];
+
+        let var_expr = CompiledExpr::new(Expr::call(
+            Function::EwmVar,
+            vec![Expr::column("x"), Expr::literal(0.5)],
+        ));
+        let result = var_expr
+            .eval(&ctx, &cols, EvalOpts::default())
+            .unwrap()
+            .values;
+
+        assert_eq!(result.len(), 3);
+        assert!(result.iter().all(|v| v.is_nan()));
+    }
+
+    #[test]
+    fn ewm_mean_leading_nan_does_not_poison_state() {
+        // Regression: prev/weighted_sum previously seeded from base[0]
+        // unconditionally, so a leading NaN made every subsequent output NaN
+        // (docs/reviews/2026-06-09-core-quant-review.md). The seeding now
+        // matches eval_ewm_variance_core: leading NaNs emit NaN, the first
+        // non-NaN observation seeds the state and emits the input value, and
+        // interior NaNs emit NaN without updating the state.
+        let ctx = SimpleContext::new(["x"]).expect("unique columns");
+        let x = vec![f64::NAN, 1.0, 5.0, 9.0, 2.0];
+        let cols: Vec<&[f64]> = vec![x.as_slice()];
+
+        for adjust in [0.0, 1.0] {
+            let mean_expr = CompiledExpr::new(Expr::call(
+                Function::EwmMean,
+                vec![Expr::column("x"), Expr::literal(0.5), Expr::literal(adjust)],
+            ));
+            let result = mean_expr
+                .eval(&ctx, &cols, EvalOpts::default())
+                .unwrap()
+                .values;
+
+            assert_eq!(result.len(), 5);
+            // Leading NaN stays NaN; seed point emits the input value.
+            assert!(result[0].is_nan(), "adjust={adjust}: leading NaN lost");
+            assert_eq!(result[1], 1.0, "adjust={adjust}: seed point");
+            for (i, &v) in result.iter().enumerate().skip(2) {
+                assert!(
+                    v.is_finite(),
+                    "adjust={adjust}: ewm_mean[{i}] should be finite, got {v}"
+                );
+            }
+
+            // The result must match evaluating the same series without the
+            // leading NaN, shifted by one position.
+            let x_tail = vec![1.0, 5.0, 9.0, 2.0];
+            let cols_tail: Vec<&[f64]> = vec![x_tail.as_slice()];
+            let tail = mean_expr
+                .eval(&ctx, &cols_tail, EvalOpts::default())
+                .unwrap()
+                .values;
+            for i in 0..4 {
+                assert!(
+                    (result[i + 1] - tail[i]).abs() < 1e-12,
+                    "adjust={adjust}: ewm_mean with leading NaN[{}]: {} != {}",
+                    i + 1,
+                    result[i + 1],
+                    tail[i]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn ewm_mean_interior_nan_is_skipped_without_updating_state() {
+        // Interior NaNs now match ewm_var/ewm_std: NaN is emitted and the
+        // recursion state is unchanged (previously an interior NaN poisoned
+        // every subsequent output).
+        let ctx = SimpleContext::new(["x"]).expect("unique columns");
+        let x = vec![1.0, f64::NAN, 5.0, 9.0];
+        let x_dense = vec![1.0, 5.0, 9.0];
+        let cols: Vec<&[f64]> = vec![x.as_slice()];
+        let cols_dense: Vec<&[f64]> = vec![x_dense.as_slice()];
+
+        let mean_expr = CompiledExpr::new(Expr::call(
+            Function::EwmMean,
+            vec![Expr::column("x"), Expr::literal(0.5)],
+        ));
+        let result = mean_expr
+            .eval(&ctx, &cols, EvalOpts::default())
+            .unwrap()
+            .values;
+        let dense = mean_expr
+            .eval(&ctx, &cols_dense, EvalOpts::default())
+            .unwrap()
+            .values;
+
+        assert_eq!(result[0], 1.0);
+        assert!(result[1].is_nan());
+        assert!(
+            (result[2] - dense[1]).abs() < 1e-12,
+            "state must be unchanged across the interior NaN: {} != {}",
+            result[2],
+            dense[1]
+        );
+        assert!((result[3] - dense[2]).abs() < 1e-12);
+    }
+
+    #[test]
+    fn ewm_mean_all_nan_input_returns_all_nan() {
+        let ctx = SimpleContext::new(["x"]).expect("unique columns");
+        let x = vec![f64::NAN, f64::NAN, f64::NAN];
+        let cols: Vec<&[f64]> = vec![x.as_slice()];
+
+        let mean_expr = CompiledExpr::new(Expr::call(
+            Function::EwmMean,
+            vec![Expr::column("x"), Expr::literal(0.5)],
+        ));
+        let result = mean_expr
+            .eval(&ctx, &cols, EvalOpts::default())
+            .unwrap()
+            .values;
+
+        assert_eq!(result.len(), 3);
+        assert!(result.iter().all(|v| v.is_nan()));
+    }
+
+    #[test]
     fn ewm_std_var_consistency() {
         let ctx = SimpleContext::new(["x"]).expect("unique columns");
         let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
@@ -1085,6 +1263,155 @@ mod statistical_operations {
 
         // Median of [10,20,30,40,50] = 30
         assert!(result.iter().all(|&v| (v - 30.0).abs() < 1e-12));
+    }
+
+    #[test]
+    fn median_skips_nan() {
+        // Unified reducer NaN policy: NaNs are excluded from the sample and
+        // the count (same as quantile). Previously NaN sorted as the largest
+        // value, so median([1,2,3,NaN]) wrongly returned 2.5.
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![1.0, 2.0, 3.0, f64::NAN];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        let median = CompiledExpr::new(Expr::call(Function::Median, vec![Expr::column("v")]));
+        let result = median
+            .eval(&ctx, &cols, EvalOpts::default())
+            .unwrap()
+            .values;
+
+        // Median of the valid values [1,2,3] is 2.0
+        assert!(result.iter().all(|&r| (r - 2.0).abs() < 1e-12));
+    }
+
+    #[test]
+    fn median_all_nan_returns_nan() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![f64::NAN, f64::NAN, f64::NAN];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        let median = CompiledExpr::new(Expr::call(Function::Median, vec![Expr::column("v")]));
+        let result = median
+            .eval(&ctx, &cols, EvalOpts::default())
+            .unwrap()
+            .values;
+
+        assert!(result.iter().all(|r| r.is_nan()));
+    }
+
+    #[test]
+    fn rolling_median_skips_nan_in_window() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![1.0, f64::NAN, 3.0, 5.0];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        let rmed = CompiledExpr::new(Expr::call(
+            Function::RollingMedian,
+            vec![Expr::column("v"), Expr::literal(3.0)],
+        ));
+        let result = rmed.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+
+        assert!(result[0].is_nan());
+        assert!(result[1].is_nan());
+        // Window [1, NaN, 3] → valid [1,3] → median 2.0
+        assert!((result[2] - 2.0).abs() < 1e-12);
+        // Window [NaN, 3, 5] → valid [3,5] → median 4.0
+        assert!((result[3] - 4.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rolling_median_all_nan_window_returns_nan() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![f64::NAN, f64::NAN, 1.0];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        let rmed = CompiledExpr::new(Expr::call(
+            Function::RollingMedian,
+            vec![Expr::column("v"), Expr::literal(2.0)],
+        ));
+        let result = rmed.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+
+        assert!(result[0].is_nan());
+        assert!(result[1].is_nan()); // window all-NaN
+        assert!((result[2] - 1.0).abs() < 1e-12); // window [NaN, 1] → 1.0
+    }
+
+    #[test]
+    fn std_and_var_skip_nan() {
+        // Global reducers skip NaN (aligned with median/quantile and the
+        // statements-layer reducers).
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![1.0, f64::NAN, 2.0, 3.0, f64::NAN];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        let var = CompiledExpr::new(Expr::call(Function::Var, vec![Expr::column("v")]));
+        let var_result = var.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+        // Population variance of [1,2,3] = 2/3
+        let expected_var = 2.0 / 3.0;
+        assert!(var_result.iter().all(|&r| (r - expected_var).abs() < 1e-12));
+
+        let std = CompiledExpr::new(Expr::call(Function::Std, vec![Expr::column("v")]));
+        let std_result = std.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+        assert!(std_result
+            .iter()
+            .all(|&r| (r - expected_var.sqrt()).abs() < 1e-12));
+    }
+
+    #[test]
+    fn std_with_fewer_than_two_valid_values_returns_nan() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![f64::NAN, 7.0, f64::NAN];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        let std = CompiledExpr::new(Expr::call(Function::Std, vec![Expr::column("v")]));
+        let result = std.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+        assert!(result.iter().all(|r| r.is_nan()));
+    }
+
+    #[test]
+    fn rolling_var_is_stable_for_large_means() {
+        // Two-pass per-window variance: the old E[x^2]-E[x]^2 fast path
+        // catastrophically cancels for large means with tiny spread.
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let base = 1.0e8;
+        let v = vec![base + 1.0, base + 2.0, base + 3.0, base + 4.0];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        let rvar = CompiledExpr::new(Expr::call(
+            Function::RollingVar,
+            vec![Expr::column("v"), Expr::literal(2.0)],
+        ));
+        let result = rvar.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+
+        assert!(result[0].is_nan());
+        for r in &result[1..] {
+            assert!(
+                (r - 0.25).abs() < 1e-12,
+                "rolling_var should be exactly 0.25, got {r}"
+            );
+        }
+    }
+
+    #[test]
+    fn window_argument_must_be_constant_series() {
+        // Passing a data column as the window/step parameter is a validation
+        // error instead of silently using only the first element.
+        let ctx = SimpleContext::new(["v", "w"]).expect("unique columns");
+        let v = vec![1.0, 2.0, 3.0, 4.0];
+        let w = vec![2.0, 3.0, 2.0, 2.0]; // non-constant
+        let cols: Vec<&[f64]> = vec![v.as_slice(), w.as_slice()];
+
+        let expr = CompiledExpr::new(Expr::call(
+            Function::RollingMean,
+            vec![Expr::column("v"), Expr::column("w")],
+        ));
+        let err = expr
+            .eval(&ctx, &cols, EvalOpts::default())
+            .expect_err("non-constant window argument should be rejected");
+        assert!(
+            err.to_string().contains("constant"),
+            "unexpected error: {err}"
+        );
     }
 }
 

@@ -173,6 +173,12 @@ impl Pcg64Rng {
     /// The same seed will always produce the same sequence of random numbers,
     /// making simulations deterministic and reproducible.
     ///
+    /// Note: `new(seed)` and [`new_with_stream(seed, 0)`](Self::new_with_stream)
+    /// produce *different* sequences — `new` seeds the generator via
+    /// `Pcg64::seed_from_u64` (which expands the seed through SplitMix64),
+    /// while `new_with_stream` constructs the 128-bit state directly from the
+    /// (seed, stream) pair.
+    ///
     /// # Arguments
     ///
     /// * `seed` - 64-bit seed value. Different seeds produce different sequences.
@@ -200,8 +206,17 @@ impl Pcg64Rng {
 
     /// Create a new RNG with seed and stream for parallel simulations.
     ///
-    /// Each (seed, stream) pair produces a unique, independent sequence.
-    /// Streams are guaranteed to be non-overlapping for at least 2^64 samples.
+    /// Each (seed, stream) pair selects a distinct PCG64 stream via a unique
+    /// odd increment, so different streams traverse different permutations of
+    /// the state space. This makes overlap between streams statistically
+    /// negligible for practical sample counts, but — unlike generators with
+    /// explicitly partitioned counters (e.g. Philox) — there is no *hard*
+    /// mathematical guarantee that two streams never share a state window.
+    /// Use `finstack_core::math::random::PhiloxRng` when provable
+    /// non-overlap is required.
+    ///
+    /// Note: `new_with_stream(seed, 0)` is not the same sequence as
+    /// [`new(seed)`](Self::new); see the constructor docs.
     ///
     /// # Arguments
     ///

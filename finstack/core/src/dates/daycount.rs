@@ -47,9 +47,11 @@
 //!
 //! - [`DayCount::Act360`] - Actual/360
 //! - [`DayCount::Act365F`] - Actual/365 Fixed
-//! - [`DayCount::Act365L`] - Actual/365 Leap (AFB)
+//! - [`DayCount::Act365L`] - Actual/365 Leap (ICMA Rule 251)
+//! - [`DayCount::Nl365`] - NL/365 (Actual/365 No Leap)
 //! - [`DayCount::Thirty360`] - 30/360 US (Bond Basis)
 //! - [`DayCount::ThirtyE360`] - 30E/360 (Eurobond Basis)
+//! - [`DayCount::ThirtyE360Isda`] - 30E/360 (ISDA), ISDA 2006 §4.16(h)
 //! - [`DayCount::ActAct`] - Actual/Actual (ISDA)
 //! - [`DayCount::ActActIsma`] - Actual/Actual (ICMA) regular-period helper
 //! - [`DayCount::Bus252`] - Business/252 (Brazilian and some equity markets)
@@ -120,11 +122,11 @@
 
 use crate::dates::date_extensions::DateExt;
 use smallvec::SmallVec;
-use time::{Date, Duration, Month};
+use time::{Date, Month};
 
 use crate::dates::date_extensions::BusinessDayIter;
 use crate::dates::tenor::TenorUnit;
-use crate::dates::{BusinessDayConvention, CalendarRegistry, HolidayCalendar, Tenor};
+use crate::dates::{CalendarRegistry, HolidayCalendar, Tenor};
 use crate::error::InputError;
 
 /// Optional context for day-count year-fraction calculations.
@@ -172,6 +174,16 @@ pub struct DayCountContextState {
     pub frequency: Option<Tenor>,
     /// Optional custom business-day divisor (defaults to 252 when `None`).
     pub bus_basis: Option<u16>,
+    /// Optional reference coupon period `(start, end)` for ACT/ACT ISMA,
+    /// serialized as two ISO dates.
+    ///
+    /// Previously this field was silently dropped on serialization, downgrading
+    /// exact ICMA accrual to the drifting frequency-only path on round-trip
+    /// (2026-06-09 core quant review, Moderate/Dates). The `#[serde(default)]`
+    /// keeps the addition wire-compatible: payloads written before this field
+    /// existed deserialize with `None`.
+    #[serde(default)]
+    pub coupon_period: Option<(Date, Date)>,
 }
 
 impl DayCountContextState {
@@ -185,7 +197,7 @@ impl DayCountContextState {
             calendar,
             frequency: self.frequency,
             bus_basis: self.bus_basis,
-            coupon_period: None,
+            coupon_period: self.coupon_period,
         }
     }
 }
@@ -199,6 +211,7 @@ impl<'a> From<DayCountContext<'a>> for DayCountContextState {
             calendar_id,
             frequency: value.frequency,
             bus_basis: value.bus_basis,
+            coupon_period: value.coupon_period,
         }
     }
 }
@@ -302,20 +315,32 @@ pub enum DayCount {
     /// ```
     Act365F,
 
-    /// Actual/365 Leap day count convention (Actual/365L or AFB).
+    /// Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.
     ///
-    /// Year fraction = (actual days) / (366 if Feb 29 in period else 365)
+    /// Year fraction = (actual days) / (365 or 366), where the denominator
+    /// rule depends on the coupon frequency supplied via [`DayCountContext`]:
+    ///
+    /// - **Annual** (or no frequency supplied): 366 if February 29 falls in
+    ///   the interval `(start, end]` (exclusive of start, inclusive of end),
+    ///   else 365.
+    /// - **Non-annual**: 366 if the period END date falls in a leap year,
+    ///   else 365.
     ///
     /// # Standards Reference
     ///
-    /// - **AFB**: Association Française des Banques (French Bankers Association)
+    /// - **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)
     /// - **ISO 20022**: Day Count Fraction Code "Actual/365L" (A008)
-    /// - **Also known as**: Act/365L, AFB, ISMA-Year
+    /// - **Also known as**: Act/365L, ISMA-Year
+    ///
+    /// Note: this is **not** ACT/ACT AFB (Association Française des Banques),
+    /// which uses a different (sub-period splitting) algorithm. The former
+    /// `act_365afb` parse alias was removed because it conflated the two
+    /// (2026-06-09 core quant review, Moderate/Dates).
     ///
     /// # Usage
     ///
     /// Used in:
-    /// - French government bonds (OATs)
+    /// - GBP floating-rate notes
     /// - Some European bond markets
     ///
     /// # Examples
@@ -431,6 +456,83 @@ pub enum DayCount {
     /// assert_eq!(yf, 60.0 / 360.0);
     /// ```
     ThirtyE360,
+
+    /// 30E/360 (ISDA) day count convention.
+    ///
+    /// Assumes 30 days per month and 360 days per year with the ISDA 2006
+    /// §4.16(h) last-day-of-month adjustments (including end-of-February).
+    ///
+    /// # Standards Reference
+    ///
+    /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - "30E/360 (ISDA)"
+    /// - **Also known as**: 30E/360 ISDA, German, Eurobond Basis (ISDA 2006)
+    ///
+    /// # Formula
+    ///
+    /// ```text
+    /// Days = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')
+    ///
+    /// where:
+    ///   D₁' = 30 if D₁ is the last day of its month (incl. end of February)
+    ///   D₂' = 30 if D₂ is 31, or if D₂ is the last day of February and the
+    ///         period does not end on the termination (maturity) date
+    /// ```
+    ///
+    /// # Termination-date exception
+    ///
+    /// ISDA §4.16(h) keeps D₂ unadjusted when the period ends on the
+    /// termination date and that date is the last day of February. Because
+    /// [`DayCountContext`] carries no termination flag, this enum variant
+    /// always applies the end-of-February rule (i.e. treats `end` as a
+    /// non-terminal coupon date). For the final period to maturity, use
+    /// [`days_30e_360_isda`] with `end_is_termination_date = true`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_core::dates::{Date, DayCount, DayCountContext};
+    /// use time::Month;
+    ///
+    /// // ISDA §4.16(h): both end-of-Feb and Aug 31 count as day 30.
+    /// let start = Date::from_calendar_date(2011, Month::August, 31).expect("Valid date");
+    /// let end = Date::from_calendar_date(2012, Month::February, 29).expect("Valid date");
+    ///
+    /// let yf = DayCount::ThirtyE360Isda.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
+    /// assert_eq!(yf, 180.0 / 360.0);
+    /// ```
+    ThirtyE360Isda,
+
+    /// NL/365 (Actual/365 No Leap) day count convention.
+    ///
+    /// Year fraction = (actual days excluding any February 29) / 365
+    ///
+    /// # Standards Reference
+    ///
+    /// - **Also known as**: Act/365 No Leap, NL365, Actual/365NL
+    /// - Counts the actual calendar days in `[start, end)` and removes every
+    ///   February 29 that falls in the period, so a full leap year still
+    ///   yields exactly 1.0.
+    ///
+    /// # Usage
+    ///
+    /// Used in:
+    /// - Some Canadian money-market and mortgage instruments
+    /// - Legacy systems that ignore leap days for accrual
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_core::dates::{Date, DayCount, DayCountContext};
+    /// use time::Month;
+    ///
+    /// // Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0
+    /// let start = Date::from_calendar_date(2024, Month::January, 1).expect("Valid date");
+    /// let end = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
+    ///
+    /// let yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
+    /// assert_eq!(yf, 1.0);
+    /// ```
+    Nl365,
 
     /// Actual/Actual (ISDA) day count convention.
     ///
@@ -652,13 +754,15 @@ impl DayCount {
         match self {
             DayCount::Act360 => Ok(days / 360.0),
             DayCount::Act365F => Ok(days / 365.0),
-            DayCount::Act365L => Ok(year_fraction_act_365l(start, end)),
+            DayCount::Act365L => Ok(year_fraction_act_365l(start, end, ctx)),
             DayCount::Thirty360 => {
                 Ok(days_30_360(start, end, Thirty360Convention::UsSia) as f64 / 360.0)
             }
             DayCount::ThirtyE360 => {
                 Ok(days_30_360(start, end, Thirty360Convention::European) as f64 / 360.0)
             }
+            DayCount::ThirtyE360Isda => Ok(f64::from(days_30e_360_isda(start, end, false)) / 360.0),
+            DayCount::Nl365 => Ok(year_fraction_nl_365(start, end)),
             DayCount::ActAct => year_fraction_act_act_isda(start, end),
             DayCount::ActActIsma => year_fraction_act_act_isma_with_ctx(start, end, ctx),
             DayCount::Bus252 => year_fraction_bus252(start, end, ctx),
@@ -923,7 +1027,11 @@ pub enum Thirty360Convention {
     /// 30U/360 (US SIA / Bond Basis).
     #[serde(rename = "Us", alias = "us")]
     UsSia,
-    /// 30/360 ISDA (no February EOM rule).
+    /// 30/360 ISDA bond basis (ISDA 2006 §4.16(f); no February EOM rule).
+    ///
+    /// Reachable via the public [`days_30_360`] helper; the [`DayCount`] enum
+    /// exposes the SIA/PSA ([`DayCount::Thirty360`]) and 30E/360 variants
+    /// instead.
     Isda,
     /// 30E/360 (European).
     European,
@@ -933,8 +1041,21 @@ pub enum Thirty360Convention {
 ///
 /// Precondition: `start <= end`. If violated, the returned value will be negative.
 /// This helper is panic-free and allocation-free.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_core::dates::{days_30_360, Thirty360Convention};
+/// use time::{Date, Month};
+///
+/// let start = Date::from_calendar_date(2025, Month::January, 31).expect("Valid date");
+/// let end = Date::from_calendar_date(2025, Month::March, 31).expect("Valid date");
+///
+/// // ISDA 2006 §4.16(f): D1 31 → 30, then D2 31 → 30.
+/// assert_eq!(days_30_360(start, end, Thirty360Convention::Isda), 60);
+/// ```
 #[inline]
-pub(crate) fn days_30_360(start: Date, end: Date, convention: Thirty360Convention) -> i32 {
+pub fn days_30_360(start: Date, end: Date, convention: Thirty360Convention) -> i32 {
     let (y1, m1, d1) = (start.year(), start.month() as i32, start.day() as i32);
     let (y2, m2, d2) = (end.year(), end.month() as i32, end.day() as i32);
 
@@ -985,6 +1106,62 @@ pub(crate) fn days_30_360(start: Date, end: Date, convention: Thirty360Conventio
 #[inline]
 fn is_last_day_of_february(date: Date) -> bool {
     date.month() == Month::February && date.day() == date.month().length(date.year())
+}
+
+/// Check if a date is the last calendar day of its month.
+#[inline]
+fn is_last_day_of_month(date: Date) -> bool {
+    date.day() == date.month().length(date.year())
+}
+
+/// Compute the 30E/360 (ISDA) day count per ISDA 2006 §4.16(h).
+///
+/// Adjustment rules:
+/// - D₁ becomes 30 when `start` is the last day of its month (including the
+///   last day of February).
+/// - D₂ becomes 30 when `end` is day 31, or when `end` is the last day of
+///   February **and** `end_is_termination_date` is `false`.
+///
+/// The termination-date exception means the final accrual period of an
+/// instrument maturing on the last day of February keeps the actual day
+/// number (28/29); pass `end_is_termination_date = true` for that period.
+/// [`DayCount::ThirtyE360Isda`] always passes `false` because
+/// [`DayCountContext`] carries no termination flag.
+///
+/// Precondition: `start <= end`. If violated, the returned value will be
+/// negative. This helper is panic-free and allocation-free.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_core::dates::days_30e_360_isda;
+/// use time::{Date, Month};
+///
+/// let start = Date::from_calendar_date(2012, Month::January, 28).expect("Valid date");
+/// let end = Date::from_calendar_date(2012, Month::February, 29).expect("Valid date");
+///
+/// // Intermediate coupon: end-of-Feb → 30; 30 + (30 - 28) = 32
+/// assert_eq!(days_30e_360_isda(start, end, false), 32);
+/// // Final period to maturity: Feb 29 kept; 30 + (29 - 28) = 31
+/// assert_eq!(days_30e_360_isda(start, end, true), 31);
+/// ```
+///
+/// # References
+///
+/// - ISDA (2006). "2006 ISDA Definitions." Section 4.16(h).
+#[inline]
+pub fn days_30e_360_isda(start: Date, end: Date, end_is_termination_date: bool) -> i32 {
+    let (y1, m1, d1) = (start.year(), start.month() as i32, start.day() as i32);
+    let (y2, m2, d2) = (end.year(), end.month() as i32, end.day() as i32);
+
+    let d1_adj = if is_last_day_of_month(start) { 30 } else { d1 };
+    let d2_adj = if d2 == 31 || (is_last_day_of_february(end) && !end_is_termination_date) {
+        30
+    } else {
+        d2
+    };
+
+    (y2 - y1) * 360 + (m2 - m1) * 30 + (d2_adj - d1_adj)
 }
 
 // (Wrappers removed in favor of the public `days_30_360` with `Thirty360Convention`.)
@@ -1079,34 +1256,50 @@ fn year_fraction_act_act_isma(start: Date, end: Date, freq: Tenor) -> crate::Res
         }
     };
 
-    // For ISMA, we need to work with quasi-coupon periods
-    // We'll generate a schedule that encompasses the period and then
-    // calculate the year fraction for each sub-period
+    // For ISMA, we need to work with quasi-coupon periods.
+    //
+    // The quasi-coupon grid is anchored on `start` itself: each boundary is
+    // `start + k·freq` computed directly from the unadjusted anchor
+    // (k-multiples, roll-day preserved with per-month clamping), NOT by
+    // chaining `prev + freq`. Chained stepping from `start - freq` (the
+    // previous implementation) lost the roll day for month-end starts: a
+    // regular EOM semi-annual period [2025-08-31, 2026-02-28) drifted to a
+    // grid ending Aug 28 and returned 181/184 × 0.5 ≈ 0.49185 instead of
+    // exactly 0.5 (2026-06-09 core quant review).
+    let months_per_period = match freq.unit {
+        TenorUnit::Months => freq.count as i32,
+        TenorUnit::Years => freq.count as i32 * 12,
+        // Unreachable: rejected above when computing `coupon_length_years`.
+        TenorUnit::Weeks | TenorUnit::Days => {
+            return Err(InputError::ActActIsmaUnsupportedFrequency {
+                frequency: freq.to_string(),
+            }
+            .into());
+        }
+    };
+    if months_per_period <= 0 {
+        return Err(InputError::ActActIsmaUnsupportedFrequency {
+            frequency: freq.to_string(),
+        }
+        .into());
+    }
 
     let mut total_fraction = 0.0;
-
-    // Generate schedule to find quasi-coupon periods
-    // We need to extend backward/forward to capture the full coupon periods
-    let extended_start = extend_backward_for_coupon_period(start, freq);
-    let extended_end = extend_forward_for_coupon_period(end, freq)?;
 
     // Optimization: Manually generate dates to avoid heap allocation of ScheduleBuilder
     // Most ISMA calculations involve very few periods, but long-dated bonds (15+ years)
     // with semi-annual coupons can have 30+ periods. Using 32 elements covers ~16 years
     // of semi-annual coupons without heap allocation.
     let mut periods: SmallVec<[Date; 32]> = SmallVec::new();
-    let mut current = extended_start;
-    periods.push(current);
-
-    while current < extended_end {
-        let next = freq.add_to_date(current, None, BusinessDayConvention::Unadjusted)?;
-
-        current = if next > extended_end {
-            extended_end
-        } else {
-            next
-        };
-        periods.push(current);
+    periods.push(start);
+    let mut k: i32 = 1;
+    loop {
+        let boundary = start.add_months(k * months_per_period);
+        periods.push(boundary);
+        if boundary >= end {
+            break;
+        }
+        k += 1;
     }
 
     // Find the periods that overlap with our [start, end) interval
@@ -1136,61 +1329,91 @@ fn year_fraction_act_act_isma(start: Date, end: Date, freq: Tenor) -> crate::Res
     Ok(total_fraction)
 }
 
-/// Extend start date backward to find the beginning of its coupon period.
-fn extend_backward_for_coupon_period(date: Date, freq: Tenor) -> Date {
-    match freq.unit {
-        TenorUnit::Months => date.add_months(-(freq.count as i32)),
-        TenorUnit::Years => date.add_months(-(freq.count as i32) * 12),
-        TenorUnit::Weeks => date - Duration::weeks(freq.count as i64),
-        TenorUnit::Days => date - Duration::days(freq.count as i64),
-    }
-}
-
-/// Extend end date forward to find the end of its coupon period.
-fn extend_forward_for_coupon_period(date: Date, freq: Tenor) -> crate::Result<Date> {
-    // ISMA uses unadjusted quasi-coupon periods. This call should be infallible for
-    // valid tenor inputs, but we keep it fallible to avoid silently degrading results.
-    freq.add_to_date(date, None, BusinessDayConvention::Unadjusted)
-}
-
 // -------------------------------------------------------------------------------------------------
 // ACT/365L helper
 // -------------------------------------------------------------------------------------------------
-/// Calculate year fraction for Act/365L convention.
+/// Calculate year fraction for Act/365L convention per ICMA Rule 251.1(i)(c).
 ///
-/// Act/365L uses 366 as denominator if February 29 falls in the half-open
-/// interval `[start, end)`, otherwise uses 365.
-fn year_fraction_act_365l(start: Date, end: Date) -> f64 {
+/// The denominator rule depends on the coupon frequency supplied via
+/// [`DayCountContext`]:
+///
+/// - **Annual** (or no frequency supplied): 366 if February 29 falls in the
+///   interval `(start, end]` (exclusive of start, inclusive of end), else 365.
+/// - **Non-annual**: 366 if the period END date falls in a leap year, else 365.
+///
+/// Previously the Feb-29 window was `[start, end)` and the frequency rule was
+/// ignored (2026-06-09 core quant review, Moderate/Dates).
+fn year_fraction_act_365l(start: Date, end: Date, ctx: DayCountContext<'_>) -> f64 {
     if start == end {
         return 0.0;
     }
 
     let actual_days = (end - start).whole_days() as f64;
 
-    let denominator = if contains_feb_29(start, end) {
-        366.0
-    } else {
-        365.0
+    // ICMA Rule 251: the Feb-29 rule applies to annual-pay instruments; for
+    // any other frequency the leap-year status of the period end date decides.
+    // With no frequency in context, default to the annual rule.
+    let annual = match ctx.frequency {
+        Some(freq) => matches!(
+            (freq.unit, freq.count),
+            (TenorUnit::Years, 1) | (TenorUnit::Months, 12)
+        ),
+        None => true,
     };
 
-    actual_days / denominator
+    let leap = if annual {
+        interval_contains_feb_29(start, end)
+    } else {
+        time::util::is_leap_year(end.year())
+    };
+
+    actual_days / if leap { 366.0 } else { 365.0 }
 }
 
-/// Check if February 29 falls in the half-open interval `[start, end)`.
-fn contains_feb_29(start: Date, end: Date) -> bool {
+/// Check if February 29 falls in the interval `(start, end]` (exclusive of
+/// start, inclusive of end) per ICMA Rule 251.
+fn interval_contains_feb_29(start: Date, end: Date) -> bool {
     let start_year = start.year();
     let end_year = end.year();
 
     for year in start_year..=end_year {
         if time::util::is_leap_year(year) {
             if let Ok(feb_29) = Date::from_calendar_date(year, Month::February, 29) {
-                if feb_29 >= start && feb_29 < end {
+                if feb_29 > start && feb_29 <= end {
                     return true;
                 }
             }
         }
     }
     false
+}
+
+// -------------------------------------------------------------------------------------------------
+// NL/365 helper
+// -------------------------------------------------------------------------------------------------
+/// Calculate year fraction for NL/365 (Actual/365 No Leap).
+///
+/// Counts actual days in `[start, end)` excluding any February 29, divided by
+/// a fixed 365-day year.
+fn year_fraction_nl_365(start: Date, end: Date) -> f64 {
+    if start == end {
+        return 0.0;
+    }
+
+    let actual_days = (end - start).whole_days();
+    let mut leap_days: i64 = 0;
+    for year in start.year()..=end.year() {
+        if time::util::is_leap_year(year) {
+            if let Ok(feb_29) = Date::from_calendar_date(year, Month::February, 29) {
+                // Day-count intervals are [start, end): exclude Feb 29 when it
+                // is an accrued day of the period.
+                if feb_29 >= start && feb_29 < end {
+                    leap_days += 1;
+                }
+            }
+        }
+    }
+    (actual_days - leap_days) as f64 / 365.0
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1220,8 +1443,10 @@ impl std::fmt::Display for DayCount {
             DayCount::Act360 => "act_360",
             DayCount::Act365F => "act_365f",
             DayCount::Act365L => "act_365l",
+            DayCount::Nl365 => "nl_365",
             DayCount::Thirty360 => "30_360",
             DayCount::ThirtyE360 => "30e_360",
+            DayCount::ThirtyE360Isda => "30e_360_isda",
             DayCount::ActAct => "act_act",
             DayCount::ActActIsma => "act_act_isma",
             DayCount::Bus252 => "bus_252",
@@ -1241,7 +1466,12 @@ impl crate::parse::NormalizedEnum for DayCount {
         ("act_365l", Self::Act365L),
         ("act365l", Self::Act365L),
         ("actual_365l", Self::Act365L),
-        ("act_365afb", Self::Act365L),
+        // NOTE: the former "act_365afb" alias was removed: ACT/ACT AFB is a
+        // different convention from Act/365L (2026-06-09 core quant review).
+        ("nl_365", Self::Nl365),
+        ("nl365", Self::Nl365),
+        ("act_365_nl", Self::Nl365),
+        ("actual_365_nl", Self::Nl365),
         ("30_360", Self::Thirty360),
         ("thirty_360", Self::Thirty360),
         ("thirty360", Self::Thirty360),
@@ -1252,6 +1482,9 @@ impl crate::parse::NormalizedEnum for DayCount {
         ("30e360", Self::ThirtyE360),
         ("30_360e", Self::ThirtyE360),
         ("eurobond_basis", Self::ThirtyE360),
+        ("30e_360_isda", Self::ThirtyE360Isda),
+        ("30e360_isda", Self::ThirtyE360Isda),
+        ("30e_360isda", Self::ThirtyE360Isda),
         ("act_act", Self::ActAct),
         ("actact", Self::ActAct),
         ("actual_actual", Self::ActAct),
@@ -1309,8 +1542,10 @@ mod tests {
             super::DayCount::Act360,
             super::DayCount::Act365F,
             super::DayCount::Act365L,
+            super::DayCount::Nl365,
             super::DayCount::Thirty360,
             super::DayCount::ThirtyE360,
+            super::DayCount::ThirtyE360Isda,
             super::DayCount::ActAct,
             super::DayCount::ActActIsma,
             super::DayCount::Bus252,
@@ -1339,8 +1574,15 @@ mod tests {
         assert_parses_to("actual_365f", DayCount::Act365F);
 
         // Act365L
-        assert_parses_to("act_365afb", DayCount::Act365L);
         assert_parses_to("actual_365l", DayCount::Act365L);
+        // The "act_365afb" alias was removed: ACT/ACT AFB is a different
+        // convention from Act/365L (2026-06-09 core quant review).
+        assert!("act_365afb".parse::<DayCount>().is_err());
+
+        // Nl365
+        assert_parses_to("nl_365", DayCount::Nl365);
+        assert_parses_to("NL/365", DayCount::Nl365);
+        assert_parses_to("act_365_nl", DayCount::Nl365);
 
         // Thirty360
         assert_parses_to("30/360", DayCount::Thirty360);
@@ -1351,6 +1593,10 @@ mod tests {
         // ThirtyE360
         assert_parses_to("30E/360", DayCount::ThirtyE360);
         assert_parses_to("eurobond_basis", DayCount::ThirtyE360);
+
+        // ThirtyE360Isda
+        assert_parses_to("30E/360 ISDA", DayCount::ThirtyE360Isda);
+        assert_parses_to("30e_360_isda", DayCount::ThirtyE360Isda);
 
         // ActAct
         assert_parses_to("act_act", DayCount::ActAct);
@@ -1372,15 +1618,21 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // Act/365L half-open interval regression tests
+    // Act/365L ICMA Rule 251 boundary tests
+    //
+    // Updated per the 2026-06-09 core quant review (Moderate/Dates): the
+    // Feb-29 window for the annual rule is (start, end] per ICMA Rule 251,
+    // not [start, end), and a non-annual coupon frequency switches the
+    // denominator rule to "366 iff the period END falls in a leap year".
     // -----------------------------------------------------------------------
 
     #[test]
-    fn act365l_period_ending_on_feb29_uses_365() {
+    fn act365l_period_ending_on_feb29_uses_366() {
         use super::{DayCount, DayCountContext};
 
-        // [2024-02-01, 2024-02-29): end date is Feb 29 but excluded from the
-        // half-open interval, so Feb 29 is NOT in the period → denominator 365.
+        // (2024-02-01, 2024-02-29]: end date Feb 29 is INCLUDED in the ICMA
+        // window → denominator 366. (Previously pinned to 365 under the
+        // incorrect [start, end) window.)
         let start = date!(2024 - 02 - 01);
         let end = date!(2024 - 02 - 29);
         let yf = DayCount::Act365L
@@ -1390,8 +1642,29 @@ mod tests {
         let days = (end - start).whole_days() as f64;
         assert_eq!(
             yf,
+            days / 366.0,
+            "denominator should be 366 when end == Feb 29 (included per ICMA Rule 251)"
+        );
+    }
+
+    #[test]
+    fn act365l_period_starting_on_feb29_uses_365() {
+        use super::{DayCount, DayCountContext};
+
+        // (2024-02-29, 2024-03-15]: Feb 29 is the start, excluded from the
+        // ICMA window → denominator 365. (Previously the [start, end) window
+        // wrongly included it.)
+        let start = date!(2024 - 02 - 29);
+        let end = date!(2024 - 03 - 15);
+        let yf = DayCount::Act365L
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("should succeed");
+
+        let days = (end - start).whole_days() as f64;
+        assert_eq!(
+            yf,
             days / 365.0,
-            "denominator should be 365 when end == Feb 29 (excluded)"
+            "denominator should be 365 when Feb 29 == start (excluded per ICMA Rule 251)"
         );
     }
 
@@ -1399,7 +1672,7 @@ mod tests {
     fn act365l_period_containing_feb29_uses_366() {
         use super::{DayCount, DayCountContext};
 
-        // [2024-02-01, 2024-03-01): Feb 29 is strictly inside → denominator 366.
+        // (2024-02-01, 2024-03-01]: Feb 29 is strictly inside → denominator 366.
         let start = date!(2024 - 02 - 01);
         let end = date!(2024 - 03 - 01);
         let yf = DayCount::Act365L
@@ -1412,6 +1685,178 @@ mod tests {
             days / 366.0,
             "denominator should be 366 when Feb 29 is in interior"
         );
+    }
+
+    #[test]
+    fn act365l_non_annual_frequency_uses_end_year_leap_rule() {
+        use super::{DayCount, DayCountContext, Tenor};
+
+        // ICMA Rule 251 non-annual rule: 366 iff the period END is in a leap
+        // year, regardless of whether Feb 29 is in the period.
+        let semi = DayCountContext {
+            frequency: Some(Tenor::semi_annual()),
+            ..Default::default()
+        };
+
+        // Period entirely after Feb 29, ending in leap year 2024 → 366.
+        let start = date!(2024 - 06 - 01);
+        let end = date!(2024 - 12 - 01);
+        let yf = DayCount::Act365L
+            .year_fraction(start, end, semi)
+            .expect("should succeed");
+        let days = (end - start).whole_days() as f64;
+        assert_eq!(yf, days / 366.0, "semi-annual, end in leap year → 366");
+
+        // Period containing Feb 29 2024 but ending in non-leap 2025... not
+        // constructible for a 6M period ending after Dec; instead: period
+        // ending in non-leap 2025 → 365 even though it starts in a leap year.
+        let start = date!(2024 - 09 - 01);
+        let end = date!(2025 - 03 - 01);
+        let yf = DayCount::Act365L
+            .year_fraction(start, end, semi)
+            .expect("should succeed");
+        let days = (end - start).whole_days() as f64;
+        assert_eq!(yf, days / 365.0, "semi-annual, end in non-leap year → 365");
+
+        // Annual frequency keeps the Feb-29 (start, end] rule: same dates,
+        // annual context, no Feb 29 in (start, end] → 365.
+        let annual = DayCountContext {
+            frequency: Some(Tenor::annual()),
+            ..Default::default()
+        };
+        let start = date!(2024 - 06 - 01);
+        let end = date!(2024 - 12 - 01);
+        let yf = DayCount::Act365L
+            .year_fraction(start, end, annual)
+            .expect("should succeed");
+        let days = (end - start).whole_days() as f64;
+        assert_eq!(yf, days / 365.0, "annual, no Feb 29 in (start,end] → 365");
+    }
+
+    // -----------------------------------------------------------------------
+    // 30E/360 (ISDA) — ISDA 2006 §4.16(h) examples
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn thirty_e_360_isda_last_day_of_month_rules() {
+        use super::{days_30e_360_isda, DayCount, DayCountContext};
+
+        // Aug 31 → 30 (last day of month), Feb 29 → 30 (last day of Feb,
+        // not termination): 360 + 30·(2-8) + (30-30) = 180.
+        let start = date!(2011 - 08 - 31);
+        let end = date!(2012 - 02 - 29);
+        assert_eq!(days_30e_360_isda(start, end, false), 180);
+
+        // Same period as the final period to maturity: Feb 29 kept → 179.
+        assert_eq!(days_30e_360_isda(start, end, true), 179);
+
+        // Feb 29 2012 → 30 (last day of Feb as D1), Aug 31 → 30:
+        // 30·(8-2) + (30-30) = 180.
+        let start = date!(2012 - 02 - 29);
+        let end = date!(2012 - 08 - 31);
+        assert_eq!(days_30e_360_isda(start, end, false), 180);
+
+        // Non-leap end-of-Feb: Jan 28 (not last day) kept, Feb 28 → 30
+        // (intermediate): 30 + (30-28) = 32; termination: 30 + (28-28) = 30.
+        let start = date!(2011 - 01 - 28);
+        let end = date!(2011 - 02 - 28);
+        assert_eq!(days_30e_360_isda(start, end, false), 32);
+        assert_eq!(days_30e_360_isda(start, end, true), 30);
+
+        // The enum variant routes through the non-termination form.
+        let start = date!(2011 - 08 - 31);
+        let end = date!(2012 - 02 - 29);
+        let yf = DayCount::ThirtyE360Isda
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("should succeed");
+        assert_eq!(yf, 180.0 / 360.0);
+    }
+
+    #[test]
+    fn thirty_e_360_isda_differs_from_european_on_end_of_february() {
+        use super::{days_30_360, days_30e_360_isda, Thirty360Convention};
+
+        // 30E/360 (European, §4.16(g)) has NO end-of-February rule;
+        // 30E/360 (ISDA, §4.16(h)) adjusts end-of-Feb to 30.
+        let start = date!(2012 - 02 - 29);
+        let end = date!(2012 - 03 - 31);
+        // European: D1=29 kept, D2=31→30: 30 + (30-29) = 31.
+        assert_eq!(days_30_360(start, end, Thirty360Convention::European), 31);
+        // ISDA: D1=29→30 (last day of Feb), D2=31→30: 30 + (30-30) = 30.
+        assert_eq!(days_30e_360_isda(start, end, false), 30);
+    }
+
+    // -----------------------------------------------------------------------
+    // NL/365
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn nl365_excludes_feb_29() {
+        use super::{DayCount, DayCountContext};
+
+        // Full leap year: 366 actual days − 1 leap day = 365 → exactly 1.0.
+        let start = date!(2024 - 01 - 01);
+        let end = date!(2025 - 01 - 01);
+        let yf = DayCount::Nl365
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("should succeed");
+        assert_eq!(yf, 1.0);
+
+        // Feb 28 → Mar 1 in a leap year: 2 actual days − Feb 29 = 1 day.
+        let start = date!(2024 - 02 - 28);
+        let end = date!(2024 - 03 - 01);
+        let yf = DayCount::Nl365
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("should succeed");
+        assert_eq!(yf, 1.0 / 365.0);
+
+        // Non-leap year: identical to Act/365F.
+        let start = date!(2025 - 01 - 01);
+        let end = date!(2025 - 07 - 01);
+        let nl = DayCount::Nl365
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("should succeed");
+        let act365f = DayCount::Act365F
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("should succeed");
+        assert_eq!(nl, act365f);
+    }
+
+    // -----------------------------------------------------------------------
+    // DayCountContextState coupon_period round-trip
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn daycount_context_state_roundtrips_coupon_period() {
+        use super::{DayCountContext, DayCountContextState};
+        use crate::dates::Tenor;
+
+        let coupon = (date!(2025 - 01 - 15), date!(2025 - 07 - 15));
+        let ctx = DayCountContext {
+            frequency: Some(Tenor::semi_annual()),
+            coupon_period: Some(coupon),
+            ..Default::default()
+        };
+
+        // Context → state → JSON → state → context preserves coupon_period
+        // (previously silently dropped; 2026-06-09 core quant review).
+        let state: DayCountContextState = ctx.into();
+        assert_eq!(state.coupon_period, Some(coupon));
+
+        let json = serde_json::to_string(&state).expect("serialize");
+        let restored: DayCountContextState = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.coupon_period, Some(coupon));
+
+        let registry = crate::dates::CalendarRegistry::global();
+        let restored_ctx = restored.to_ctx(registry);
+        assert_eq!(restored_ctx.coupon_period, Some(coupon));
+
+        // Serde-additive: payloads written before the field existed still
+        // deserialize (coupon_period defaults to None).
+        let legacy = r#"{"calendar_id":null,"frequency":null,"bus_basis":null}"#;
+        let legacy_state: DayCountContextState =
+            serde_json::from_str(legacy).expect("legacy payload deserializes");
+        assert_eq!(legacy_state.coupon_period, None);
     }
 
     // -----------------------------------------------------------------------

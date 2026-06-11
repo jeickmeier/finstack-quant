@@ -257,7 +257,7 @@ impl PyScheduleBuilder {
             spec: ScheduleSpec {
                 start: s,
                 end: e,
-                frequency: finstack_core::dates::Tenor::quarterly(),
+                frequency: finstack_core::dates::Tenor::monthly(),
                 stub: StubKind::None,
                 business_day_convention: None,
                 calendar_id: None,
@@ -302,7 +302,8 @@ impl PyScheduleBuilder {
         self.spec.imm_mode = true;
     }
 
-    /// Set the error policy.
+    /// Set the error policy. Setting a policy fully replaces any previous
+    /// policy (calls are order-independent and idempotent).
     fn error_policy(&mut self, policy: &PyScheduleErrorPolicy) {
         match policy.inner {
             ScheduleErrorPolicy::Strict => {
@@ -310,18 +311,26 @@ impl PyScheduleBuilder {
                 self.spec.allow_missing_calendar = false;
             }
             ScheduleErrorPolicy::MissingCalendarWarning => {
+                self.spec.graceful = false;
                 self.spec.allow_missing_calendar = true;
             }
             ScheduleErrorPolicy::GracefulEmpty => {
                 self.spec.graceful = true;
+                self.spec.allow_missing_calendar = false;
             }
         }
     }
 
     /// Build the schedule.
+    ///
+    /// Under the default ``STRICT`` policy any build warnings raise
+    /// ``ValueError``. Under ``MISSING_CALENDAR_WARNING`` or
+    /// ``GRACEFUL_EMPTY`` the schedule is returned carrying its warnings
+    /// (inspect via ``Schedule.warnings`` / ``Schedule.has_warnings()``).
     fn build(&self) -> PyResult<PySchedule> {
         let schedule = self.spec.build().map_err(core_to_py)?;
-        if schedule.has_warnings() {
+        let strict = !self.spec.graceful && !self.spec.allow_missing_calendar;
+        if strict && schedule.has_warnings() {
             let warnings = schedule
                 .warnings
                 .iter()
@@ -329,7 +338,7 @@ impl PyScheduleBuilder {
                 .collect::<Vec<_>>()
                 .join("; ");
             return Err(crate::errors::value_error(format!(
-                "schedule build produced warnings; Python bindings fail closed: {warnings}"
+                "schedule build produced warnings; strict policy fails closed: {warnings}"
             )));
         }
         Ok(PySchedule::from_inner(schedule))

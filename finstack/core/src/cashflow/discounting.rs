@@ -17,6 +17,22 @@
 //! where DF(t) is the discount factor from the market curve
 //! ```
 //!
+//! # Valuation-Date Cutoff (IMPORTANT)
+//!
+//! [`npv`], [`npv_with_ctx`], and the [`Discountable`] trait follow
+//! **market-standard pricing semantics**: cashflows dated **on or before** the
+//! valuation date are excluded (only strictly-future flows are discounted).
+//! A flow that has already paid is not part of the instrument's present value.
+//! This default changed per the 2026-06-09 core quant review — previously,
+//! past flows were silently future-valued using curve extrapolation.
+//!
+//! To include flows on or before the valuation date (e.g. for project/
+//! investment NPV where the time-0 outlay belongs in the result), opt in via
+//! [`NpvOptions::include_past_flows`] and [`npv_with_options`]. The scalar
+//! helper [`npv_amounts`] retains the investment-NPV convention (all flows
+//! included, signed year fractions) since its default base date is the
+//! earliest flow.
+//!
 //! # Use Cases
 //!
 //! - **Bond pricing**: Government and corporate bonds
@@ -120,6 +136,10 @@ pub trait Discountable {
 
     /// Compute present value using the given discount curve.
     ///
+    /// Follows market-standard pricing semantics: flows dated on or before
+    /// `base` are excluded. See the module docs ("Valuation-Date Cutoff")
+    /// and [`npv_with_options`] for the opt-in include-past behavior.
+    ///
     /// # Arguments
     ///
     /// * `disc` - Discount curve implementing the `Discounting` trait
@@ -129,7 +149,7 @@ pub trait Discountable {
     ///
     /// # Returns
     ///
-    /// Present value of all cashflows discounted to the base date.
+    /// Present value of all strictly-future cashflows discounted to the base date.
     ///
     /// # Errors
     ///
@@ -143,6 +163,14 @@ pub trait Discountable {
 ///
 /// By default, uses the curve's own day count convention for year fraction calculations.
 /// This ensures consistency between NPV and metric calculations (e.g., par rate).
+///
+/// # Valuation-Date Cutoff
+///
+/// Flows dated **on or before** `base` are excluded (market-standard pricing
+/// semantics; default changed per the 2026-06-09 core quant review). If every
+/// flow is on or before `base`, the result is zero in the flows' currency.
+/// Use [`npv_with_options`] with [`NpvOptions::include_past_flows`] for the
+/// legacy include-everything behavior.
 ///
 /// # Arguments
 ///
@@ -212,12 +240,89 @@ pub fn npv<D: Discounting + ?Sized>(
     npv_with_ctx(disc, base, dc, DayCountContext::default(), flows)
 }
 
+/// Options controlling NPV flow selection (Tier-2 builder style).
+///
+/// The default excludes flows dated on or before the valuation date
+/// (market-standard pricing semantics). See the module docs
+/// ("Valuation-Date Cutoff").
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_core::cashflow::NpvOptions;
+///
+/// // Default: strictly-future flows only.
+/// let pricing = NpvOptions::default();
+///
+/// // Investment/project NPV: keep the time-0 outlay and any past flows.
+/// let investment = NpvOptions::default().include_past_flows(true);
+/// # let _ = (pricing, investment);
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct NpvOptions {
+    include_past_flows: bool,
+}
+
+impl NpvOptions {
+    /// Create options with the market-standard default (exclude flows on or
+    /// before the valuation date).
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Include flows dated on or before the valuation date.
+    ///
+    /// Past flows are then valued with the curve's discount factor at their
+    /// (negative or zero) year fraction, i.e. future-valued to the valuation
+    /// date — the pre-2026-06-09-review legacy behavior, appropriate for
+    /// project/investment NPV that must contain the time-0 outlay.
+    #[must_use]
+    pub fn include_past_flows(mut self, include: bool) -> Self {
+        self.include_past_flows = include;
+        self
+    }
+}
+
 /// Compute NPV of dated `Money` cashflows using an explicit day-count context.
+///
+/// Flows dated on or before `base` are excluded (see the module docs,
+/// "Valuation-Date Cutoff"). Use [`npv_with_options`] to opt in to the
+/// legacy include-everything behavior.
+///
+/// # Errors
+///
+/// Same error conditions as [`npv`].
 pub fn npv_with_ctx<D: Discounting + ?Sized>(
     disc: &D,
     base: Date,
     dc: Option<DayCount>,
     ctx: DayCountContext<'_>,
+    flows: &[(Date, Money)],
+) -> crate::Result<Money> {
+    npv_with_options(disc, base, dc, ctx, NpvOptions::default(), flows)
+}
+
+/// Compute NPV of dated `Money` cashflows with explicit [`NpvOptions`].
+///
+/// This is the most general entry point: it accepts a day-count context and
+/// options controlling whether flows on or before the valuation date are
+/// included (see [`NpvOptions::include_past_flows`]).
+///
+/// # Errors
+///
+/// Returns `Err` when:
+/// - [`InputError::TooFewPoints`](crate::error::InputError::TooFewPoints): The `flows`
+///   slice is empty
+/// - Day count year fraction calculation fails
+/// - [`Error::CurrencyMismatch`](crate::Error::CurrencyMismatch): Mixed currencies
+/// - The discount factor at the valuation date is non-finite or non-positive
+pub fn npv_with_options<D: Discounting + ?Sized>(
+    disc: &D,
+    base: Date,
+    dc: Option<DayCount>,
+    ctx: DayCountContext<'_>,
+    options: NpvOptions,
     flows: &[(Date, Money)],
 ) -> crate::Result<Money> {
     if flows.is_empty() {
@@ -260,6 +365,13 @@ pub fn npv_with_ctx<D: Discounting + ?Sized>(
 
     let mut total = Money::new(0.0, ccy);
     for (d, amt) in flows {
+        // Market-standard pricing semantics (2026-06-09 core quant review):
+        // flows on or before the valuation date have already paid and are
+        // not part of present value. `include_past_flows` opts back in to
+        // the legacy include-everything behavior.
+        if !options.include_past_flows && *d <= base {
+            continue;
+        }
         let t = day_count.signed_year_fraction(curve_base, *d, ctx)?;
         let df = disc.df(t) / df_base;
         let disc_amt = *amt * df;
@@ -311,6 +423,13 @@ pub fn npv_prediscounted_money(flows: &[(Date, Money)]) -> crate::Result<Money> 
 /// Defaults (when the optional arguments are `None`):
 /// - `base_date`: first cashflow date
 /// - `day_count`: [`DayCount::Act365F`]
+///
+/// # Flow Convention
+///
+/// Unlike [`npv`], this helper follows the **investment-NPV convention**: all
+/// flows are included, with signed year fractions relative to the base date.
+/// The time-0 outlay (a flow on the base date) is part of the result, which
+/// is what project/return analytics expect.
 ///
 /// # Errors
 /// - [`InputError::TooFewPoints`](crate::error::InputError::TooFewPoints) when `cash_flows` is empty
@@ -519,9 +638,12 @@ mod tests {
             id: CurveId::new("USD-OIS"),
         };
         let base = curve.base_date();
+        // Flows must be strictly after the valuation date to be included
+        // (2026-06-09 core quant review: npv excludes flows on/before base).
+        let pay = base + time::Duration::days(1);
         let flows = vec![
-            (base, Money::new(10.0, crate::currency::Currency::USD)),
-            (base, Money::new(5.0, crate::currency::Currency::USD)),
+            (pay, Money::new(10.0, crate::currency::Currency::USD)),
+            (pay, Money::new(5.0, crate::currency::Currency::USD)),
         ];
         // Use None to use curve's default day count
         let pv = flows
@@ -536,9 +658,10 @@ mod tests {
             id: CurveId::new("USD-OIS"),
         };
         let base = curve.base_date();
+        let pay = base + time::Duration::days(1);
         let flows = vec![
-            (base, Money::new(10.0, crate::currency::Currency::USD)),
-            (base, Money::new(5.0, crate::currency::Currency::USD)),
+            (pay, Money::new(10.0, crate::currency::Currency::USD)),
+            (pay, Money::new(5.0, crate::currency::Currency::USD)),
         ];
         // Use explicit day count
         let pv = flows
@@ -575,12 +698,26 @@ mod tests {
         let continuous_rate = (1.0 + rate).ln();
         let curve = FlatCurve::new(continuous_rate, base, dc, "NPV-TEST");
 
+        // 2026-06-09 core quant review + user decision: the default npv now
+        // excludes flows on or before the valuation date, so the time-0
+        // outlay (-100000 at base) is NOT part of the pricing PV.
         let pv =
             npv(&curve, base, Some(dc), &flows).expect("NPV calculation should succeed in test");
+        // Approximately: 110000/(1.05) ≈ 104761.90 (initial outlay excluded)
+        assert!(pv.amount() > 104700.0 && pv.amount() < 104800.0);
 
-        // NPV should be positive (profitable at 5% discount rate)
+        // Investment-NPV semantics (legacy default) via explicit opt-in.
+        let pv_investment = npv_with_options(
+            &curve,
+            base,
+            Some(dc),
+            DayCountContext::default(),
+            NpvOptions::default().include_past_flows(true),
+            &flows,
+        )
+        .expect("NPV with include_past_flows should succeed");
         // Approximately: -100000 + 110000/(1.05) ≈ 4761.90
-        assert!(pv.amount() > 4700.0 && pv.amount() < 4800.0);
+        assert!(pv_investment.amount() > 4700.0 && pv_investment.amount() < 4800.0);
     }
 
     #[test]
@@ -601,16 +738,26 @@ mod tests {
         let rate: f64 = 0.05;
         let dc = DayCount::Act365F;
 
-        // Scalar NPV via npv_amounts
+        // Scalar NPV via npv_amounts (investment convention: includes the
+        // base-date flow). Compare against npv_with_options with
+        // include_past_flows, since the default npv now excludes flows on
+        // or before the valuation date (2026-06-09 core quant review).
         let pv_amounts =
             npv_amounts(&amount_flows, rate, None, None).expect("npv_amounts should succeed");
 
-        // Money NPV via npv with FlatCurve
+        // Money NPV via npv_with_options with FlatCurve
         let continuous_rate = (1.0 + rate).ln();
         let curve = FlatCurve::new(continuous_rate, base, dc, "TEST");
-        let pv_money = npv(&curve, base, Some(dc), &money_flows)
-            .expect("npv should succeed")
-            .amount();
+        let pv_money = npv_with_options(
+            &curve,
+            base,
+            Some(dc),
+            DayCountContext::default(),
+            NpvOptions::default().include_past_flows(true),
+            &money_flows,
+        )
+        .expect("npv should succeed")
+        .amount();
 
         assert!(
             (pv_amounts - pv_money).abs() < 1e-10,
@@ -635,23 +782,37 @@ mod tests {
         // Create FlatCurve with 0% rate (continuous rate = ln(1) = 0)
         let curve = FlatCurve::new(0.0, base, dc, "ZERO-RATE");
 
+        // Default pricing semantics exclude the base-date flow
+        // (2026-06-09 core quant review), so only the +100 remains.
         let pv =
             npv(&curve, base, Some(dc), &flows).expect("NPV calculation should succeed in test");
-        assert_eq!(pv.amount(), 0.0);
+        assert_eq!(pv.amount(), 100.0);
+
+        // With include_past_flows the legacy result (0.0) is recovered.
+        let pv_all = npv_with_options(
+            &curve,
+            base,
+            Some(dc),
+            DayCountContext::default(),
+            NpvOptions::default().include_past_flows(true),
+            &flows,
+        )
+        .expect("NPV with include_past_flows should succeed");
+        assert_eq!(pv_all.amount(), 0.0);
     }
 
+    /// Default pricing semantics exclude flows on or before the valuation
+    /// date; `include_past_flows` restores the legacy include-everything
+    /// behavior (2026-06-09 core quant review + user decision).
     #[test]
-    fn test_npv_allows_past_and_future_dates() {
+    fn test_npv_excludes_past_flows_by_default() {
         let base = create_date(2025, Month::January, 1).expect("Valid test date");
+        let past = create_date(2024, Month::July, 1).expect("Valid test date");
+        let future = create_date(2025, Month::July, 1).expect("Valid test date");
         let flows = vec![
-            (
-                create_date(2024, Month::July, 1).expect("Valid test date"),
-                Money::new(-50.0, Currency::USD),
-            ), // past relative to base
-            (
-                create_date(2025, Month::July, 1).expect("Valid test date"),
-                Money::new(55.0, Currency::USD),
-            ), // future relative to base
+            (past, Money::new(-50.0, Currency::USD)), // past relative to base
+            (base, Money::new(-25.0, Currency::USD)), // on the valuation date
+            (future, Money::new(55.0, Currency::USD)), // future relative to base
         ];
         let rate: f64 = 0.05;
         let dc = DayCount::Act365F;
@@ -659,11 +820,46 @@ mod tests {
         let continuous_rate = (1.0 + rate).ln();
         let curve = FlatCurve::new(continuous_rate, base, dc, "TEST");
 
-        // Should not error; just compute signed year fractions
+        // Default: only the strictly-future +55 flow is priced.
         let pv =
             npv(&curve, base, Some(dc), &flows).expect("NPV calculation should succeed in test");
-        // With positive rate and inflow slightly bigger than outflow, PV should be > 0
-        assert!(pv.amount() > 0.0);
+        let only_future = npv(&curve, base, Some(dc), &flows[2..])
+            .expect("future-only NPV should succeed in test");
+        assert_eq!(pv.amount(), only_future.amount());
+        assert!(pv.amount() > 0.0 && pv.amount() < 55.0);
+
+        // Opt-in: past and on-date flows are included (future-valued at the
+        // curve's signed year fraction), reproducing the legacy behavior.
+        let pv_all = npv_with_options(
+            &curve,
+            base,
+            Some(dc),
+            DayCountContext::default(),
+            NpvOptions::default().include_past_flows(true),
+            &flows,
+        )
+        .expect("NPV with include_past_flows should succeed");
+        assert!(pv_all.amount() < pv.amount());
+    }
+
+    /// If every flow is on or before the valuation date, the default
+    /// pricing NPV is zero in the flows' currency (nothing left to price).
+    #[test]
+    fn test_npv_all_past_flows_is_zero() {
+        let base = create_date(2025, Month::January, 1).expect("Valid test date");
+        let flows = vec![
+            (
+                create_date(2024, Month::July, 1).expect("Valid test date"),
+                Money::new(100.0, Currency::USD),
+            ),
+            (base, Money::new(50.0, Currency::USD)),
+        ];
+        let dc = DayCount::Act365F;
+        let curve = FlatCurve::new((1.05_f64).ln(), base, dc, "TEST");
+
+        let pv = npv(&curve, base, Some(dc), &flows).expect("NPV should succeed");
+        assert_eq!(pv.amount(), 0.0);
+        assert_eq!(pv.currency(), Currency::USD);
     }
 
     #[test]

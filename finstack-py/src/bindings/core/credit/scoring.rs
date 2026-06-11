@@ -38,21 +38,21 @@ fn zone_to_str(zone: ScoringZone) -> &'static str {
 /// ``"safe"``, ``"grey"``, ``"distress"``.
 #[pyfunction]
 #[pyo3(
-    text_signature = "(working_capital_to_ta, retained_earnings_to_ta, ebit_to_ta, market_equity_to_book_liab, sales_to_ta)"
+    text_signature = "(working_capital_to_total_assets, retained_earnings_to_total_assets, ebit_to_total_assets, market_equity_to_total_liabilities, sales_to_total_assets)"
 )]
 fn altman_z_score(
-    working_capital_to_ta: f64,
-    retained_earnings_to_ta: f64,
-    ebit_to_ta: f64,
-    market_equity_to_book_liab: f64,
-    sales_to_ta: f64,
+    working_capital_to_total_assets: f64,
+    retained_earnings_to_total_assets: f64,
+    ebit_to_total_assets: f64,
+    market_equity_to_total_liabilities: f64,
+    sales_to_total_assets: f64,
 ) -> PyResult<(f64, String, f64)> {
     let input = AltmanZScoreInput {
-        working_capital_to_total_assets: working_capital_to_ta,
-        retained_earnings_to_total_assets: retained_earnings_to_ta,
-        ebit_to_total_assets: ebit_to_ta,
-        market_equity_to_total_liabilities: market_equity_to_book_liab,
-        sales_to_total_assets: sales_to_ta,
+        working_capital_to_total_assets,
+        retained_earnings_to_total_assets,
+        ebit_to_total_assets,
+        market_equity_to_total_liabilities,
+        sales_to_total_assets,
     };
     let r = core_altman_z_score(&input).map_err(display_to_py)?;
     Ok((r.score, zone_to_str(r.zone).to_string(), r.implied_pd))
@@ -67,48 +67,50 @@ fn altman_z_score(
 /// Returns a tuple ``(score, zone, implied_pd)``.
 #[pyfunction]
 #[pyo3(
-    text_signature = "(working_capital_to_ta, retained_earnings_to_ta, ebit_to_ta, book_equity_to_book_liab, sales_to_ta)"
+    text_signature = "(working_capital_to_total_assets, retained_earnings_to_total_assets, ebit_to_total_assets, book_equity_to_total_liabilities, sales_to_total_assets)"
 )]
 fn altman_z_prime(
-    working_capital_to_ta: f64,
-    retained_earnings_to_ta: f64,
-    ebit_to_ta: f64,
-    book_equity_to_book_liab: f64,
-    sales_to_ta: f64,
+    working_capital_to_total_assets: f64,
+    retained_earnings_to_total_assets: f64,
+    ebit_to_total_assets: f64,
+    book_equity_to_total_liabilities: f64,
+    sales_to_total_assets: f64,
 ) -> PyResult<(f64, String, f64)> {
     let input = AltmanZPrimeInput {
-        working_capital_to_total_assets: working_capital_to_ta,
-        retained_earnings_to_total_assets: retained_earnings_to_ta,
-        ebit_to_total_assets: ebit_to_ta,
-        book_equity_to_total_liabilities: book_equity_to_book_liab,
-        sales_to_total_assets: sales_to_ta,
+        working_capital_to_total_assets,
+        retained_earnings_to_total_assets,
+        ebit_to_total_assets,
+        book_equity_to_total_liabilities,
+        sales_to_total_assets,
     };
     let r = core_altman_z_prime(&input).map_err(display_to_py)?;
     Ok((r.score, zone_to_str(r.zone).to_string(), r.implied_pd))
 }
 
-/// Compute the Altman Z''-Score for non-manufacturing / emerging markets.
+/// Compute the Altman Z''-Score for non-manufacturing firms (non-EM model;
+/// the emerging-market EM-Score variant with the +3.25 constant is not
+/// implemented).
 ///
-/// Z'' = 3.25 + 6.56 * X1 + 3.26 * X2 + 6.72 * X3 + 1.05 * X4
+/// Z'' = 6.56 * X1 + 3.26 * X2 + 6.72 * X3 + 1.05 * X4
 ///
 /// Zone cutoffs: Z'' > 2.60 Safe, 1.10 <= Z'' <= 2.60 Grey, Z'' < 1.10 Distress.
 ///
 /// Returns a tuple ``(score, zone, implied_pd)``.
 #[pyfunction]
 #[pyo3(
-    text_signature = "(working_capital_to_ta, retained_earnings_to_ta, ebit_to_ta, book_equity_to_book_liab)"
+    text_signature = "(working_capital_to_total_assets, retained_earnings_to_total_assets, ebit_to_total_assets, book_equity_to_total_liabilities)"
 )]
 fn altman_z_double_prime(
-    working_capital_to_ta: f64,
-    retained_earnings_to_ta: f64,
-    ebit_to_ta: f64,
-    book_equity_to_book_liab: f64,
+    working_capital_to_total_assets: f64,
+    retained_earnings_to_total_assets: f64,
+    ebit_to_total_assets: f64,
+    book_equity_to_total_liabilities: f64,
 ) -> PyResult<(f64, String, f64)> {
     let input = AltmanZDoublePrimeInput {
-        working_capital_to_total_assets: working_capital_to_ta,
-        retained_earnings_to_total_assets: retained_earnings_to_ta,
-        ebit_to_total_assets: ebit_to_ta,
-        book_equity_to_total_liabilities: book_equity_to_book_liab,
+        working_capital_to_total_assets,
+        retained_earnings_to_total_assets,
+        ebit_to_total_assets,
+        book_equity_to_total_liabilities,
     };
     let r = core_altman_z_double_prime(&input).map_err(display_to_py)?;
     Ok((r.score, zone_to_str(r.zone).to_string(), r.implied_pd))
@@ -123,34 +125,36 @@ fn altman_z_double_prime(
 /// O = -1.32 - 0.407 * X1 + 6.03 * X2 - 1.43 * X3 + 0.0757 * X4
 ///     - 1.72 * X5 - 2.37 * X6 - 1.83 * X7 + 0.285 * X8 - 0.521 * X9
 ///
-/// PD = 1 / (1 + exp(-O)).  Zone: O < 0.38 Safe, 0.38 <= O <= 0.50 Grey, O > 0.50 Distress.
+/// PD = 1 / (1 + exp(-O)).  Zone based on implied PD: < 0.019 Safe,
+/// [0.019, 0.038] Grey, > 0.038 Distress (Ohlson's published optimal cutoff
+/// P* = 0.038, O ≈ -3.23, is the Distress boundary).
 ///
 /// Returns a tuple ``(score, zone, implied_pd)``.
 #[pyfunction]
 #[pyo3(
-    text_signature = "(log_total_assets_adjusted, total_liab_to_ta, working_capital_to_ta, current_liab_to_current_assets, liab_exceed_assets, net_income_to_ta, ffo_to_total_liab, negative_ni_two_years, net_income_change)"
+    text_signature = "(log_total_assets_adjusted, total_liabilities_to_total_assets, working_capital_to_total_assets, current_liabilities_to_current_assets, liabilities_exceed_assets, net_income_to_total_assets, funds_from_operations_to_total_liabilities, negative_net_income_two_years, net_income_change)"
 )]
 #[allow(clippy::too_many_arguments)]
 fn ohlson_o_score(
     log_total_assets_adjusted: f64,
-    total_liab_to_ta: f64,
-    working_capital_to_ta: f64,
-    current_liab_to_current_assets: f64,
-    liab_exceed_assets: f64,
-    net_income_to_ta: f64,
-    ffo_to_total_liab: f64,
-    negative_ni_two_years: f64,
+    total_liabilities_to_total_assets: f64,
+    working_capital_to_total_assets: f64,
+    current_liabilities_to_current_assets: f64,
+    liabilities_exceed_assets: f64,
+    net_income_to_total_assets: f64,
+    funds_from_operations_to_total_liabilities: f64,
+    negative_net_income_two_years: f64,
     net_income_change: f64,
 ) -> PyResult<(f64, String, f64)> {
     let input = OhlsonOScoreInput {
         log_total_assets_adjusted,
-        total_liabilities_to_total_assets: total_liab_to_ta,
-        working_capital_to_total_assets: working_capital_to_ta,
-        current_liabilities_to_current_assets: current_liab_to_current_assets,
-        liabilities_exceed_assets: liab_exceed_assets,
-        net_income_to_total_assets: net_income_to_ta,
-        funds_from_operations_to_total_liabilities: ffo_to_total_liab,
-        negative_net_income_two_years: negative_ni_two_years,
+        total_liabilities_to_total_assets,
+        working_capital_to_total_assets,
+        current_liabilities_to_current_assets,
+        liabilities_exceed_assets,
+        net_income_to_total_assets,
+        funds_from_operations_to_total_liabilities,
+        negative_net_income_two_years,
         net_income_change,
     };
     let r = core_ohlson_o_score(&input).map_err(display_to_py)?;
@@ -167,19 +171,24 @@ fn ohlson_o_score(
 ///
 /// PD = Phi(Y).  Zone based on implied PD: < 0.10 Safe, [0.10, 0.50] Grey, > 0.50 Distress.
 ///
-/// Returns a tuple ``(score, pd)``.  The ``zone`` string is omitted here to
-/// match the documented minimum-viable signature; to retrieve it, compute it
-/// from the PD value (or use the Altman / Ohlson bindings which include it).
+/// Returns a tuple ``(score, zone, implied_pd)`` matching the Altman / Ohlson
+/// bindings.
 #[pyfunction]
-#[pyo3(text_signature = "(roa, debt_ratio, current_ratio)")]
-fn zmijewski_score(roa: f64, debt_ratio: f64, current_ratio: f64) -> PyResult<(f64, f64)> {
+#[pyo3(
+    text_signature = "(net_income_to_total_assets, total_liabilities_to_total_assets, current_assets_to_current_liabilities)"
+)]
+fn zmijewski_score(
+    net_income_to_total_assets: f64,
+    total_liabilities_to_total_assets: f64,
+    current_assets_to_current_liabilities: f64,
+) -> PyResult<(f64, String, f64)> {
     let input = ZmijewskiInput {
-        net_income_to_total_assets: roa,
-        total_liabilities_to_total_assets: debt_ratio,
-        current_assets_to_current_liabilities: current_ratio,
+        net_income_to_total_assets,
+        total_liabilities_to_total_assets,
+        current_assets_to_current_liabilities,
     };
     let r = core_zmijewski_score(&input).map_err(display_to_py)?;
-    Ok((r.score, r.implied_pd))
+    Ok((r.score, zone_to_str(r.zone).to_string(), r.implied_pd))
 }
 
 // ---------------------------------------------------------------------------

@@ -99,7 +99,7 @@ impl PyDiscountCurve {
 
     /// Continuously-compounded forward rate between `t1` and `t2`.
     #[pyo3(text_signature = "(self, t1, t2)")]
-    fn forward_rate(&self, t1: f64, t2: f64) -> PyResult<f64> {
+    fn forward(&self, t1: f64, t2: f64) -> PyResult<f64> {
         self.inner.forward(t1, t2).map_err(core_to_py)
     }
 

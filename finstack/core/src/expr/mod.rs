@@ -1,4 +1,4 @@
-//! Expression engine with DAG planning, caching, and scalar evaluation.
+//! Expression engine with DAG planning and scalar evaluation.
 //!
 //! Supported functions:
 //! - lag(expr, n) / lead(expr, n)
@@ -15,8 +15,8 @@
 //! - ewm_std / ewm_var
 //!
 //! Evaluation supports:
-//! - DAG planning with shared sub-expression detection
-//! - Optional caching for intermediate results
+//! - DAG planning with shared sub-expression detection (each deduplicated
+//!   node is evaluated exactly once per `eval()` call)
 //! - Scalar implementations over `&[f64]` inputs
 //! - Deterministic execution
 //! - Metadata stamping for results
@@ -73,7 +73,6 @@
 
 mod ast;
 mod ast_walk;
-pub(crate) mod cache;
 mod context;
 mod dag;
 mod eval;

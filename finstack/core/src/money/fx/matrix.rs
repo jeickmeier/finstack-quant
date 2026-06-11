@@ -24,6 +24,14 @@ struct QueryKey {
     policy: FxConversionPolicy,
 }
 
+/// Provider-observed quote stored with its provenance, so the `triangulated`
+/// flag stamped on [`FxRateResult`] does not depend on cache state/call history.
+#[derive(Clone, Copy, Debug)]
+struct ObservedQuote {
+    rate: f64,
+    triangulated: bool,
+}
+
 /// Simplified FX matrix that stores quotes and computes cross rates on demand.
 ///
 /// Note: `FxMatrix` cannot be directly serialized due to the trait object
@@ -47,7 +55,7 @@ pub struct FxMatrix {
     quotes: Mutex<HashMap<Pair, f64>>,
     /// Query-sensitive quotes observed from providers or triangulation. This is
     /// the only genuinely bounded cache (governed by `config.cache_capacity`).
-    observed_quotes: Mutex<LruCache<QueryKey, f64>>,
+    observed_quotes: Mutex<LruCache<QueryKey, ObservedQuote>>,
     /// Authoritative date/policy-scoped quotes pinned via [`FxMatrix::set_quote_on`].
     /// Unlike `observed_quotes`, this map never evicts, so a pinned fixing is
     /// never silently replaced by the provider under cache pressure.
@@ -213,17 +221,17 @@ impl FxMatrix {
                 triangulated: false,
             });
         }
-        if let Some(rate) = observed_direct_opt {
-            let rate = validate_fx_rate(from, to, rate)?;
+        if let Some(q) = observed_direct_opt {
+            let rate = validate_fx_rate(from, to, q.rate)?;
             return Ok(FxRateResult {
                 rate,
-                triangulated: false,
+                triangulated: q.triangulated,
             });
         }
-        if let Some(r_rev) = observed_reciprocal_opt {
+        if let Some(q_rev) = observed_reciprocal_opt {
             return Ok(FxRateResult {
-                rate: reciprocal_rate_or_err(r_rev, to, from)?,
-                triangulated: false,
+                rate: reciprocal_rate_or_err(q_rev.rate, to, from)?,
+                triangulated: q_rev.triangulated,
             });
         }
 
@@ -231,7 +239,7 @@ impl FxMatrix {
         match self.provider.rate(from, to, on, policy) {
             Ok(rate) => {
                 let rate = validate_fx_rate(from, to, rate)?;
-                self.insert_observed_quote(from, to, on, policy, rate);
+                self.insert_observed_quote(from, to, on, policy, rate, false);
                 Ok(FxRateResult {
                     rate,
                     triangulated: false,
@@ -402,7 +410,10 @@ impl FxMatrix {
     pub fn cache_stats(&self) -> usize {
         let quotes = self.quotes.lock();
         let observed_quotes = self.observed_quotes.lock();
-        quotes.len() + observed_quotes.len()
+        // Pinned (date/policy-scoped) quotes are included so diagnostics
+        // reflect every stored quote (2026-06-09 core quant review, minor).
+        let pinned_quotes = self.pinned_quotes.lock();
+        quotes.len() + observed_quotes.len() + pinned_quotes.len()
     }
 
     /// Extract serializable state from the matrix.
@@ -446,11 +457,30 @@ impl FxMatrix {
             }
         }
 
+        // Pinned (date/policy-scoped) fixings are authoritative state and must
+        // survive a snapshot/restore round-trip (2026-06-09 core quant review:
+        // persistence previously dropped pinned fixings).
+        let mut pinned_vec: Vec<(
+            Currency,
+            Currency,
+            Date,
+            super::types::FxConversionPolicy,
+            f64,
+        )> = {
+            let pinned = self.pinned_quotes.lock();
+            pinned
+                .iter()
+                .map(|(key, &rate)| (key.from, key.to, key.on, key.policy, rate))
+                .collect()
+        };
+
         // Deterministic snapshots: sort by pair key, not by LRU order.
         quote_vec.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        pinned_vec.sort_by_key(|q| (q.0, q.1, q.2, q.3 as u8));
         FxMatrixState {
             config: self.config,
             quotes: quote_vec,
+            pinned_quotes: pinned_vec,
         }
     }
 
@@ -471,30 +501,51 @@ impl FxMatrix {
     /// #         -> finstack_core::Result<f64> { Ok(1.0) }
     /// # }
     /// let matrix = FxMatrix::new(Arc::new(StaticFx));
-    /// let state = FxMatrixState { config: matrix.get_serializable_state().config, quotes: vec![] };
+    /// let state = FxMatrixState {
+    ///     config: matrix.get_serializable_state().config,
+    ///     quotes: vec![],
+    ///     pinned_quotes: vec![],
+    /// };
     /// matrix.load_from_state(&state).expect("valid snapshot state");
     /// ```
     pub fn load_from_state(&self, state: &FxMatrixState) -> crate::Result<()> {
-        self.set_quotes(&state.quotes)
+        self.set_quotes(&state.quotes)?;
+        // Restore pinned (date/policy-scoped) fixings so they keep outranking
+        // the provider after a snapshot/restore round-trip.
+        for &(from, to, on, policy, rate) in &state.pinned_quotes {
+            self.set_quote_on(from, to, on, policy, rate)?;
+        }
+        Ok(())
     }
 
-    /// Create a new FX matrix with a bumped rate for a specific currency pair.
+    /// Create a new FX matrix with a relatively bumped rate for a currency pair.
     ///
     /// This is useful for finite difference greek calculations where we need
-    /// to bump FX spot while preserving all other market data. Creates a
-    /// wrapper provider that overrides the specified rate.
+    /// to bump FX spot while preserving all other market data. The bump is
+    /// **relative and term-structure preserving**: the wrapper provider applies
+    /// `rate(query) * (1 + bump_pct)` to the delegated per-date rate, so a
+    /// date-aware provider keeps its term structure under the bump
+    /// (2026-06-09 core quant review: the previous implementation froze one
+    /// absolute rate for every date/policy, flattening the FX term structure).
+    ///
+    /// Explicit pair-global quotes and pinned (date/policy-scoped) fixings for
+    /// the bumped pair are carried over **scaled by the same multiplier**
+    /// (reciprocal-direction quotes are divided), so every source of the
+    /// bumped pair moves coherently. Quotes for other pairs are carried over
+    /// unchanged.
     ///
     /// # Parameters
     /// - `from`: Base currency
     /// - `to`: Quote currency
     /// - `bump_pct`: Relative bump size (e.g., 0.01 for 1% increase)
-    /// - `on`: Date for rate lookup (typically as_of date from valuation context)
+    /// - `on`: Date used to verify a rate exists and the bumped value is valid
     ///
     /// # Returns
-    /// New FxMatrix with bumped rate
+    /// New FxMatrix with the relatively bumped pair
     ///
     /// # Errors
-    /// Returns error if rate lookup fails
+    /// Returns an error if the rate lookup on `on` fails, if `bump_pct` is
+    /// non-finite, or if the bump multiplier `1 + bump_pct` is not positive.
     pub fn with_bumped_rate(
         &self,
         from: Currency,
@@ -502,53 +553,59 @@ impl FxMatrix {
         bump_pct: f64,
         on: Date,
     ) -> crate::Result<Self> {
-        // Get current rate
+        // Verify a rate exists on the reference date and the bumped value is valid.
         let query = FxQuery::new(from, to, on);
         let current_rate = self.rate(query)?.rate;
+        validate_fx_rate(from, to, current_rate * (1.0 + bump_pct))?;
 
-        // Calculate bumped rate
-        let bumped_rate = validate_fx_rate(from, to, current_rate * (1.0 + bump_pct))?;
-
-        // Create bumped provider
+        // Create bumped provider applying the relative bump per query.
         use super::providers::BumpedFxProvider;
         use std::sync::Arc;
         let bumped_provider = Arc::new(BumpedFxProvider::new(
             self.provider.clone(),
             from,
             to,
-            bumped_rate,
-        ));
+            bump_pct,
+        )?);
+        let multiplier = 1.0 + bump_pct;
 
         // Create new FX matrix with same config and carry over cached quotes so lookups that
-        // rely on seeded values keep working after the bump.
+        // rely on seeded values keep working after the bump. Quotes on the
+        // bumped pair are scaled so they stay consistent with the bumped provider.
         let bumped = Self::try_with_config(bumped_provider, self.config)?;
         {
             let src = self.quotes.lock();
             let mut dst = bumped.quotes.lock();
             for (pair, rate) in src.iter() {
-                if (pair.0 == from && pair.1 == to) || (pair.0 == to && pair.1 == from) {
-                    continue;
-                }
-                dst.insert(*pair, *rate);
+                let rate = if pair.0 == from && pair.1 == to {
+                    *rate * multiplier
+                } else if pair.0 == to && pair.1 == from {
+                    *rate / multiplier
+                } else {
+                    *rate
+                };
+                dst.insert(*pair, rate);
             }
         }
-        // Carry over authoritative pinned fixings (except the bumped pair, both
-        // directions): they are independent market fixings, not crosses derived
-        // from the bumped leg, so the bumped matrix must keep pricing with them.
+        // Carry over authoritative pinned fixings; fixings on the bumped pair
+        // are scaled by the bump multiplier so the relative bump applies on
+        // every date, not only where the provider answers.
         {
             let src = self.pinned_quotes.lock();
             let mut dst = bumped.pinned_quotes.lock();
             for (key, rate) in src.iter() {
-                if (key.from == from && key.to == to) || (key.from == to && key.to == from) {
-                    continue;
-                }
-                dst.insert(*key, *rate);
+                let rate = if key.from == from && key.to == to {
+                    *rate * multiplier
+                } else if key.from == to && key.to == from {
+                    *rate / multiplier
+                } else {
+                    *rate
+                };
+                dst.insert(*key, rate);
             }
         }
         // Do not carry over provider-observed quotes. They may be date/policy-sensitive
         // or derived crosses that depend transitively on the bumped leg.
-        // IMPORTANT: ensure the bumped pair is not shadowed by copied explicit quotes.
-        bumped.set_quote(from, to, bumped_rate)?;
 
         Ok(bumped)
     }
@@ -577,9 +634,9 @@ impl FxMatrix {
 
         {
             let quotes = self.observed_quotes.lock();
-            for (query, &rate) in quotes.iter() {
-                if rate.is_finite() && rate > 0.0 {
-                    rates.entry((query.from, query.to)).or_insert(rate);
+            for (query, &quote) in quotes.iter() {
+                if quote.rate.is_finite() && quote.rate > 0.0 {
+                    rates.entry((query.from, query.to)).or_insert(quote.rate);
                     currencies.insert(query.from);
                     currencies.insert(query.to);
                 }
@@ -597,7 +654,10 @@ impl FxMatrix {
             }
         }
 
-        let currencies: Vec<Currency> = currencies.into_iter().collect();
+        // Deterministic iteration order so a violating cycle is reported
+        // identically across runs (2026-06-09 core quant review, minor).
+        let mut currencies: Vec<Currency> = currencies.into_iter().collect();
+        currencies.sort();
         for &a in &currencies {
             for &b in &currencies {
                 if a == b {
@@ -676,7 +736,9 @@ impl FxMatrix {
 
         let rate = a * b;
         let rate = validate_fx_rate(from, to, rate)?;
-        self.insert_observed_quote(from, to, on, policy, rate);
+        // Cache the derived rate together with its triangulated provenance so
+        // repeat queries stamp the same metadata as the first lookup.
+        self.insert_observed_quote(from, to, on, policy, rate, true);
         Ok(rate)
     }
 
@@ -692,7 +754,8 @@ impl FxMatrix {
         quotes.insert(Pair(from, to), rate);
     }
 
-    /// Insert a query-sensitive provider-observed quote.
+    /// Insert a query-sensitive provider-observed quote, recording whether the
+    /// rate was derived via triangulation.
     fn insert_observed_quote(
         &self,
         from: Currency,
@@ -700,6 +763,7 @@ impl FxMatrix {
         on: Date,
         policy: FxConversionPolicy,
         rate: f64,
+        triangulated: bool,
     ) {
         let checked = validate_fx_rate(from, to, rate);
         assert!(
@@ -714,7 +778,7 @@ impl FxMatrix {
                 on,
                 policy,
             },
-            rate,
+            ObservedQuote { rate, triangulated },
         );
     }
 
@@ -770,7 +834,13 @@ impl FxMatrix {
         (direct, rev)
     }
 
-    /// Get rate preferring explicit quotes, then provider, then reciprocal.
+    /// Get a single-leg rate using the same precedence as [`rate`](Self::rate):
+    /// explicit → pinned → observed → provider (each with reciprocal fallback).
+    ///
+    /// Pinned fixings are authoritative for their `(on, policy)`, so triangulated
+    /// crosses must honor them exactly like direct lookups do — otherwise a
+    /// cross would contradict a pinned leg (internal triangular arbitrage), and
+    /// triangulation would fail when the only source for a leg is a pinned quote.
     fn get_or_fetch(
         &self,
         from: Currency,
@@ -781,33 +851,39 @@ impl FxMatrix {
         if from == to {
             return Ok(1.0);
         }
-        // Read both direct and reciprocal under a single lock, then drop before any further work
+        // Read direct and reciprocal under a single lock per store, then drop
+        // the locks before any further work.
         let (direct_opt, reciprocal_opt) = self.read_cached_pair_bidir(from, to);
+        let (pinned_direct_opt, pinned_reciprocal_opt) =
+            self.read_pinned_pair_bidir(from, to, on, policy);
         let (observed_direct_opt, observed_reciprocal_opt) =
             self.read_observed_pair_bidir(from, to, on, policy);
-        // 1) Explicit quote wins
+        // 1) Explicit pair-global quote wins
         if let Some(r) = direct_opt {
             return validate_fx_rate(from, to, r);
         }
-        if let Some(r) = observed_direct_opt {
-            return validate_fx_rate(from, to, r);
-        }
-        // 2) Try provider for direct
-        let provider_direct = self.provider.rate(from, to, on, policy);
-        if let Ok(r) = provider_direct {
-            let r = validate_fx_rate(from, to, r)?;
-            self.insert_observed_quote(from, to, on, policy, r);
-            return Ok(r);
-        }
-        // 3) Reciprocal fallback if available
         if let Some(r_rev) = reciprocal_opt {
             return reciprocal_rate_or_err(r_rev, to, from);
         }
-        if let Some(r_rev) = observed_reciprocal_opt {
+        // 2) Pinned fixings outrank the transient observed cache and provider
+        if let Some(r) = pinned_direct_opt {
+            return validate_fx_rate(from, to, r);
+        }
+        if let Some(r_rev) = pinned_reciprocal_opt {
             return reciprocal_rate_or_err(r_rev, to, from);
         }
-        // 4) As last resort, propagate provider error
-        provider_direct
+        // 3) Provider-observed cache
+        if let Some(q) = observed_direct_opt {
+            return validate_fx_rate(from, to, q.rate);
+        }
+        if let Some(q_rev) = observed_reciprocal_opt {
+            return reciprocal_rate_or_err(q_rev.rate, to, from);
+        }
+        // 4) Fetch from the provider
+        let r = self.provider.rate(from, to, on, policy)?;
+        let r = validate_fx_rate(from, to, r)?;
+        self.insert_observed_quote(from, to, on, policy, r, false);
+        Ok(r)
     }
 
     /// Read direct and reciprocal cached quotes for a pair under a single lock.
@@ -845,7 +921,7 @@ impl FxMatrix {
         to: Currency,
         on: Date,
         policy: FxConversionPolicy,
-    ) -> (Option<f64>, Option<f64>) {
+    ) -> (Option<ObservedQuote>, Option<ObservedQuote>) {
         let mut quotes = self.observed_quotes.lock();
         let direct_key = QueryKey {
             from,
@@ -860,17 +936,17 @@ impl FxMatrix {
             policy,
         };
 
-        let direct = quotes.get(&direct_key).copied().and_then(|r| {
-            if r.is_finite() && r > 0.0 {
-                Some(r)
+        let direct = quotes.get(&direct_key).copied().and_then(|q| {
+            if q.rate.is_finite() && q.rate > 0.0 {
+                Some(q)
             } else {
                 let _ = quotes.pop(&direct_key);
                 None
             }
         });
-        let rev = quotes.get(&rev_key).copied().and_then(|r| {
-            if r.is_finite() && r > 0.0 {
-                Some(r)
+        let rev = quotes.get(&rev_key).copied().and_then(|q| {
+            if q.rate.is_finite() && q.rate > 0.0 {
+                Some(q)
             } else {
                 let _ = quotes.pop(&rev_key);
                 None

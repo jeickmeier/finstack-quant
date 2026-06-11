@@ -228,7 +228,9 @@ impl FxSpot {
     /// currencies' calendars. This matches professional FX settlement conventions.
     ///
     pub fn effective_settlement_date(&self, as_of: Date) -> Result<Date> {
-        use crate::instruments::common_impl::fx_dates::{adjust_joint_calendar, roll_spot_date};
+        use crate::instruments::common_impl::fx_dates::{
+            adjust_joint_calendar, fx_spot_date_for_pair,
+        };
 
         // Check if we should use joint calendar logic
         let use_joint_calendar =
@@ -251,11 +253,14 @@ impl FxSpot {
             let lag_days = self.settlement_lag_days.unwrap_or(2);
 
             if use_joint_calendar {
-                // Use joint calendar spot roll
-                roll_spot_date(
+                // CLS-consistent spot roll: a US holiday on an intermediate day
+                // does not delay a USD pair's spot date (2026-06-09 core quant
+                // review, FX spot finding).
+                fx_spot_date_for_pair(
                     as_of,
                     lag_days as u32,
-                    self.bdc,
+                    self.base_currency,
+                    self.quote_currency,
                     self.base_calendar_id.as_deref(),
                     self.quote_calendar_id.as_deref(),
                 )

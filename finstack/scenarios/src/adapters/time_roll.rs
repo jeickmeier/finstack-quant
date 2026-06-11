@@ -158,9 +158,13 @@ pub fn apply_time_roll_forward(
             (Vec::new(), IndexMap::new(), Vec::new())
         };
 
-    // Roll all curves forward (adjusts base dates, shifts knots, filters expired)
-    // This is the "constant curves" scenario - rates at calendar dates stay the same,
-    // but maturities are re-measured from the new base date
+    // Roll all curves forward (adjusts base dates, shifts knots, filters expired).
+    // Realized-forward semantics (2026-06-09 core quant review): every curve
+    // realizes its forwards as the base date advances (discount curves
+    // renormalize by DF(dt), hazard curves preserve hazard rates, forward
+    // curves preserve forwards, inflation rebases CPI, price/vol-index curves
+    // set spot to the old forward). Vol surfaces, FX spot, and fixings stay
+    // static.
     let rolled_market = ctx.market.roll_forward(day_shift)?;
 
     // Replace market context with rolled version
@@ -432,5 +436,53 @@ mod tests {
             .get("theta")
             .expect("theta at rolled horizon");
         assert!(theta.is_finite());
+    }
+
+    /// Realized-forward roll semantics (2026-06-09 core quant review): after
+    /// `TimeRollForward`, the rolled discount curve satisfies
+    /// `DF_rolled(T - dt) = DF_old(T) / DF_old(dt)`, so the booked carry
+    /// equals the PV move and the post-roll market state is consistent.
+    #[test]
+    fn apply_time_roll_forward_realizes_discount_forwards() {
+        use finstack_core::dates::DayCountContext;
+
+        let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots(vec![(0.0, 1.0), (1.0, 0.98), (2.0, 0.955), (5.0, 0.90)])
+            .build()
+            .expect("valid discount curve");
+        let old_curve = curve.clone();
+
+        let mut market = MarketContext::new().insert(curve);
+        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: Some(&mut model),
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of: base_date,
+        };
+
+        let report = apply_time_roll_forward(&mut ctx, "1M", TimeRollMode::CalendarDays)
+            .expect("time roll succeeds");
+
+        let rolled_curve = market.get_discount("USD-OIS").expect("rolled curve");
+        let dt = old_curve
+            .day_count()
+            .year_fraction(base_date, report.new_date, DayCountContext::default())
+            .expect("year fraction");
+        let df_dt = old_curve.df(dt);
+
+        for t_old in [1.0_f64, 2.0, 5.0] {
+            let expected = old_curve.df(t_old) / df_dt;
+            let actual = rolled_curve.df(t_old - dt);
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "DF_rolled({}) should equal DF_old({t_old})/DF_old(dt): {actual} vs {expected}",
+                t_old - dt
+            );
+        }
     }
 }

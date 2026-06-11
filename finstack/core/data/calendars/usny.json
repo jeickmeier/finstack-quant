@@ -2,17 +2,18 @@
   "id": "usny",
   "name": "United States (New York Federal) Holidays",
   "ignore_weekends": false,
+  "notes": "Federal Reserve observance convention (basis for SOFR/Fedwire business days): a holiday falling on Sunday is observed the following Monday; a holiday falling on Saturday has NO substitute (Federal Reserve Banks are open the preceding Friday). Source: Federal Reserve Board, 'K.8 Holidays Observed by the Federal Reserve System'. This differs from the OPM/NYSE rule (fri_if_sat_mon_if_sun) used by nyse.json and sifma.json.",
   "rules": [
-    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "fri_if_sat_mon_if_sun" },
+    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "mon_if_sun" },
     { "type": "nth_weekday", "name": "Martin Luther King Jr. Day", "n": 3, "weekday": "monday", "month": "january", "from_year": 1986 },
     { "type": "nth_weekday", "name": "Washington's Birthday", "n": 3, "weekday": "monday", "month": "february" },
     { "type": "nth_weekday", "name": "Memorial Day", "n": -1, "weekday": "monday", "month": "may" },
-    { "type": "fixed", "name": "Juneteenth National Independence Day", "month": "june", "day": 19, "observed": "fri_if_sat_mon_if_sun", "from_year": 2021 },
-    { "type": "fixed", "name": "Independence Day", "month": "july", "day": 4, "observed": "fri_if_sat_mon_if_sun" },
+    { "type": "fixed", "name": "Juneteenth National Independence Day", "month": "june", "day": 19, "observed": "mon_if_sun", "from_year": 2021 },
+    { "type": "fixed", "name": "Independence Day", "month": "july", "day": 4, "observed": "mon_if_sun" },
     { "type": "nth_weekday", "name": "Labor Day", "n": 1, "weekday": "monday", "month": "september" },
     { "type": "nth_weekday", "name": "Columbus Day", "n": 2, "weekday": "monday", "month": "october" },
-    { "type": "fixed", "name": "Veterans Day", "month": "november", "day": 11, "observed": "fri_if_sat_mon_if_sun" },
+    { "type": "fixed", "name": "Veterans Day", "month": "november", "day": 11, "observed": "mon_if_sun" },
     { "type": "nth_weekday", "name": "Thanksgiving Day", "n": 4, "weekday": "thursday", "month": "november" },
-    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "fri_if_sat_mon_if_sun" }
+    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "mon_if_sun" }
   ]
 }

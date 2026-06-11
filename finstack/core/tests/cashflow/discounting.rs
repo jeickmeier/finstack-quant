@@ -64,6 +64,11 @@ impl Discounting for FlatRateCurve {
     }
 
     fn df(&self, t: f64) -> f64 {
+        // The t <= 0 clamp only matters for direct df() property tests below
+        // (and for npv_with_options with include_past_flows): since the
+        // 2026-06-09 review, the default npv excludes flows on/before the
+        // valuation date and never requests a non-positive abscissa relative
+        // to the valuation date.
         if t <= 0.0 {
             1.0
         } else {
@@ -83,8 +88,9 @@ fn npv_100_cashflows_maintains_precision() {
     let dc = DayCount::Act365F;
     let ctx = DayCountContext::default();
 
-    // 100 monthly cashflows of $1000 each
-    let flows: Vec<(Date, Money)> = (0..100)
+    // 100 monthly cashflows of $1000 each, all strictly after the valuation
+    // date (npv excludes flows on/before base per the 2026-06-09 review).
+    let flows: Vec<(Date, Money)> = (1..=100)
         .map(|i| {
             let year = 2025 + (i / 12);
             let month = (i % 12) + 1;
@@ -121,8 +127,9 @@ fn npv_500_cashflows_maintains_precision() {
     let dc = DayCount::Act365F;
     let ctx = DayCountContext::default();
 
-    // 500 weekly cashflows of $100 each (~10 years)
-    let flows: Vec<(Date, Money)> = (0..500)
+    // 500 weekly cashflows of $100 each (~10 years), all strictly after the
+    // valuation date (npv excludes flows on/before base per the 2026-06-09 review).
+    let flows: Vec<(Date, Money)> = (1..=500)
         .map(|i| {
             let days = i * 7;
             let date = base + time::Duration::days(days as i64);
@@ -218,18 +225,35 @@ fn npv_100_year_cashflow_is_tiny_but_positive() {
 }
 
 #[test]
-fn npv_cashflow_at_base_date_equals_notional() {
+fn npv_cashflow_at_base_date_is_excluded_by_default() {
+    // 2026-06-09 core quant review + user decision: npv follows
+    // market-standard pricing semantics — flows on or before the valuation
+    // date are excluded. A flow on the base date therefore prices to zero;
+    // NpvOptions::include_past_flows restores the legacy notional-at-par.
     let base = d(2025, 1, 1);
     let curve = FlatRateCurve::new("TEST", base, 0.05);
 
-    // Cashflow at t=0 should have PV = notional (DF=1.0)
     let flows = vec![(base, Money::new(100_000.0, Currency::USD))];
     let pv = npv(&curve, base, Some(DayCount::Act365F), &flows).expect("NPV should succeed");
+    assert_eq!(
+        pv.amount(),
+        0.0,
+        "flow on the valuation date must be excluded by default"
+    );
 
+    let pv_incl = finstack_core::cashflow::npv_with_options(
+        &curve,
+        base,
+        Some(DayCount::Act365F),
+        DayCountContext::default(),
+        finstack_core::cashflow::NpvOptions::default().include_past_flows(true),
+        &flows,
+    )
+    .expect("NPV with include_past_flows should succeed");
     assert!(
-        (pv.amount() - 100_000.0).abs() < financial_tolerance(100_000.0),
-        "PV at t=0 should equal notional, got {}",
-        pv.amount()
+        (pv_incl.amount() - 100_000.0).abs() < financial_tolerance(100_000.0),
+        "PV at t=0 with include_past_flows should equal notional, got {}",
+        pv_incl.amount()
     );
 }
 

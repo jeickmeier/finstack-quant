@@ -26,19 +26,19 @@ fn test_standard_usd_3m_deposit() {
         .discount_curve_id("USD-OIS")
         .build();
 
-    // Execute
-    let pv = dep.value(&ctx, base).unwrap();
+    // Execute - trade NPV (pricing view via `npv_raw`, includes the T+0
+    // initial exchange); holder-view `value` excludes it and is ≈ +notional.
+    let npv = dep.npv_raw(&ctx, base).unwrap();
     let par = compute_metric(&dep, &ctx, base, MetricId::DepositParRate);
 
-    // Validate - at market rate, PV should be near zero
-    // For a $10mm deposit at par rate, PV should be < $1000 (< 10bp of notional).
+    // Validate - at market rate, trade NPV should be near zero
+    // For a $10mm deposit at par rate, trade NPV should be < $1000 (< 10bp of notional).
     // Note: We use 10bp tolerance because the test curve uses continuous compounding
     // while deposits use simple interest (ACT/360), creating a small basis.
     // In production, curves would be calibrated to reprice deposits exactly.
     assert!(
-        pv.amount().abs() < 1000.0,
-        "PV at market rate should be < $1000 (10bp), got: {}",
-        pv.amount()
+        npv.abs() < 1000.0,
+        "trade NPV at market rate should be < $1000 (10bp), got: {npv}",
     );
     assert!((par - 0.02).abs() < 0.005, "Par rate: {}", par);
 }
@@ -58,16 +58,17 @@ fn test_standard_eur_6m_deposit() {
         .discount_curve_id("EUR-OIS")
         .build();
 
-    // Execute
+    // Execute - trade NPV (pricing view via `npv_raw`); holder-view `value`
+    // excludes the T+0 initial exchange and is ≈ +notional.
     let pv = dep.value(&ctx, base).unwrap();
+    let npv = dep.npv_raw(&ctx, base).unwrap();
 
-    // Validate: at market rate, PV should be near zero
+    // Validate: at market rate, trade NPV should be near zero
     // Small basis from continuous OIS curve vs simple ACT/360 deposit convention
     assert!(pv.currency() == Currency::EUR);
     assert!(
-        pv.amount().abs() < 5_000.0,
-        "EUR 6M deposit at par rate PV: {}",
-        pv.amount()
+        npv.abs() < 5_000.0,
+        "EUR 6M deposit at par rate trade NPV: {npv}",
     );
 }
 
@@ -249,19 +250,19 @@ fn test_rate_quote_vs_price_quote() {
         .quote_rate(par)
         .build();
 
-    // Execute
-    let pv_rate = dep_rate.value(&ctx, base).unwrap();
-    let pv_par = dep_par.value(&ctx, base).unwrap();
+    // Execute - trade NPVs (pricing view via `npv_raw`, includes the T+0
+    // initial exchange); holder-view `value` is ≈ +notional for both.
+    let npv_rate = dep_rate.npv_raw(&ctx, base).unwrap();
+    let npv_par = dep_par.npv_raw(&ctx, base).unwrap();
 
-    // Validate - par deposit should have essentially zero PV
+    // Validate - par deposit should have essentially zero trade NPV
     // Market standard: < $0.01 on $1M notional (< 0.001bp numerical precision)
     assert!(
-        pv_par.amount().abs() < 0.01,
-        "PV at par rate should be < $0.01, got: {}",
-        pv_par.amount()
+        npv_par.abs() < 0.01,
+        "trade NPV at par rate should be < $0.01, got: {npv_par}",
     );
-    // Off-market rate should have non-zero PV
-    assert!(pv_rate.amount().abs() > 10.0);
+    // Off-market rate should have non-zero trade NPV
+    assert!(npv_rate.abs() > 10.0);
 }
 
 /// Test T+2 spot lag with NYSE calendar.

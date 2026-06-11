@@ -43,11 +43,12 @@ fn test_zero_rate_deposit() {
         .quote_rate(0.0)
         .build();
 
-    // Execute
-    let pv = dep.value(&ctx, base).unwrap();
+    // Execute - trade NPV (pricing view, includes the T+0 initial exchange).
+    // Holder-view `value` excludes the initial exchange and is ≈ +notional·DF.
+    let npv = dep.npv_raw(&ctx, base).unwrap();
 
     // Validate - should be negative (time value of money)
-    assert!(pv.amount() < 0.0);
+    assert!(npv < 0.0);
 }
 
 #[test]
@@ -159,14 +160,15 @@ fn test_negative_rate_environment() {
         .quote_rate(-0.005)
         .build();
 
-    // Execute
+    // Execute - trade NPV (pricing view, includes the T+0 initial exchange).
     let pv = dep.value(&ctx, base).unwrap();
+    let npv = dep.npv_raw(&ctx, base).unwrap();
 
     // Validate - should compute correctly
     assert!(pv.currency() == Currency::USD);
     assert!(pv.amount().is_finite());
-    // With negative rate, get back less than principal
-    assert!(pv.amount() < 0.0);
+    // With negative rate, get back less than principal: trade NPV < 0.
+    assert!(npv < 0.0);
 }
 
 #[test]
@@ -322,14 +324,15 @@ fn test_rate_exactly_equal_to_par() {
         .quote_rate(par)
         .build();
 
-    let pv = dep_at_par.value(&ctx, base).unwrap();
+    // Par rate zeroes the *trade* NPV (pricing view via `npv_raw`); the
+    // holder-view `value` excludes the T+0 initial exchange.
+    let npv = dep_at_par.npv_raw(&ctx, base).unwrap();
 
-    // Validate - PV should be essentially zero for deposit at par rate
+    // Validate - trade NPV should be essentially zero for deposit at par rate
     // Market standard: < $0.01 on $1M notional (< 0.001bp)
     assert!(
-        pv.amount().abs() < 0.01,
-        "PV at par rate should be < $0.01, got: {}",
-        pv.amount()
+        npv.abs() < 0.01,
+        "trade NPV at par rate should be < $0.01, got: {npv}",
     );
 }
 

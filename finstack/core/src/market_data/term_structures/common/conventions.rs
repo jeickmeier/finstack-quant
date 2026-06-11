@@ -48,32 +48,48 @@ fn inferred_currency_day_count(currency: &str) -> DayCount {
 
 /// Infer a market-standard day-count basis from a curve identifier.
 ///
-/// The fallback remains `Act365F` for synthetic IDs that carry no market hint.
+/// Matching is by substring on the normalized (trimmed, upper-cased) ID:
+/// known index names first (e.g. `SOFR` ⇒ Act/360, `SONIA` ⇒ Act/365F), then
+/// a leading currency code (e.g. `USD-...` ⇒ Act/360). The fallback remains
+/// `Act365F` for synthetic IDs that carry no market hint.
+///
+/// **Build-vs-query basis trap**: the inferred basis only affects how knot
+/// *dates* are converted to year fractions when a curve is built from dated
+/// pillars, and how query dates are converted back. If the ID is renamed
+/// (e.g. `USD-SOFR` → `USD-OIS-1`) the inferred basis can silently change
+/// from Act/360 to Act/365F, shifting every pillar time by ~1.4%. Callers
+/// that care about the basis should set `day_count(...)` explicitly on the
+/// builder rather than relying on inference. Each inference is logged at
+/// `debug` level for auditability.
 #[inline]
 pub(crate) fn infer_discount_curve_day_count(id: &str) -> DayCount {
     let normalized_id = normalize_curve_id(id);
 
-    if contains_any(
+    let inferred = if contains_any(
         &normalized_id,
         &["SOFR", "FEDFUNDS", "EFFR", "ESTR", "EURIBOR", "SARON"],
     ) {
-        return DayCount::Act360;
-    }
-
-    if contains_any(
+        DayCount::Act360
+    } else if contains_any(
         &normalized_id,
         &[
             "SONIA", "TONAR", "TONA", "TIBOR", "CORRA", "CDOR", "AONIA", "BBSW", "BKBM",
         ],
     ) {
-        return DayCount::Act365F;
-    }
+        DayCount::Act365F
+    } else if let Some(currency) = leading_currency_code(&normalized_id) {
+        inferred_currency_day_count(currency)
+    } else {
+        DayCount::Act365F
+    };
 
-    if let Some(currency) = leading_currency_code(&normalized_id) {
-        return inferred_currency_day_count(currency);
-    }
+    tracing::debug!(
+        curve_id = id,
+        day_count = ?inferred,
+        "Inferred day-count basis from curve ID; set day_count explicitly on the builder to override"
+    );
 
-    DayCount::Act365F
+    inferred
 }
 
 /// Infer forward-curve day-count and reset-lag defaults from an index identifier.

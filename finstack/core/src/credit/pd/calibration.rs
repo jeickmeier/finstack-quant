@@ -96,8 +96,11 @@ pub fn pit_to_ttc(pd_pit: f64, params: &PdCycleParams) -> Result<f64, PdCalibrat
 /// Calibrate the central tendency (long-run average PD) from observed
 /// default rates over multiple years.
 ///
-/// Computes the geometric mean of annual default rates, which is the
-/// standard regulatory approach for TtC PD estimation.
+/// Computes the arithmetic mean of annual one-year default rates, which is
+/// the standard regulatory approach for TtC PD estimation: Basel IRB and
+/// EBA GL/2017/16 define the long-run average default rate as the
+/// (arithmetic) average of observed one-year default rates.
+/// Zero-default years are valid observations and are included in the average.
 ///
 /// # Arguments
 ///
@@ -108,7 +111,6 @@ pub fn pit_to_ttc(pd_pit: f64, params: &PdCycleParams) -> Result<f64, PdCalibrat
 ///
 /// - [`PdCalibrationError::EmptyInput`] if `annual_default_rates` is empty.
 /// - [`PdCalibrationError::ValueOutOfRange`] if any rate is outside [0, 1].
-/// - [`PdCalibrationError::ZeroAnnualDefaultRate`] if any rate is exactly zero.
 pub fn central_tendency(annual_default_rates: &[f64]) -> Result<f64, PdCalibrationError> {
     if annual_default_rates.is_empty() {
         return Err(PdCalibrationError::EmptyInput);
@@ -124,17 +126,10 @@ pub fn central_tendency(annual_default_rates: &[f64]) -> Result<f64, PdCalibrati
         }
     }
 
-    // Reject zero explicitly: a zero default year makes the geometric mean
-    // degenerate and should be handled by a caller-specific smoothing policy.
-    if annual_default_rates.contains(&0.0) {
-        return Err(PdCalibrationError::ZeroAnnualDefaultRate);
-    }
-
     let n = annual_default_rates.len() as f64;
-    let log_sum: f64 = annual_default_rates.iter().map(|&r| r.ln()).sum();
-    let geometric_mean = (log_sum / n).exp();
+    let sum: f64 = annual_default_rates.iter().sum();
 
-    Ok(geometric_mean)
+    Ok(sum / n)
 }
 
 // ---------------------------------------------------------------------------

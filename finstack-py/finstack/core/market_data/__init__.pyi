@@ -161,7 +161,7 @@ class DiscountCurve:
         """
         ...
 
-    def forward_rate(self, t1: float, t2: float) -> float:
+    def forward(self, t1: float, t2: float) -> float:
         """Continuously-compounded forward rate between *t1* and *t2*.
 
         Parameters
@@ -220,8 +220,8 @@ class ForwardCurve:
         ``(time_years, forward_rate)`` pairs.
     base_date : datetime.date
         Valuation date.
-    day_count : str
-        Day-count convention (default ``"act_360"``).
+    day_count : str, optional
+        Day-count convention. When omitted, Rust infers a market default from the curve ID.
     interp : str
         Interpolation style (default ``"linear"``).
     extrapolation : str
@@ -239,7 +239,7 @@ class ForwardCurve:
         tenor: float,
         knots: list[tuple[float, float]],
         base_date: datetime.date,
-        day_count: str = "act_360",
+        day_count: str | None = None,
         interp: str = "linear",
         extrapolation: str = "flat_forward",
     ) -> None:
@@ -255,8 +255,8 @@ class ForwardCurve:
             ``(time_years, forward_rate)`` pairs.
         base_date : datetime.date
             Valuation date.
-        day_count : str
-            Day-count convention (default ``"act_360"``).
+        day_count : str, optional
+            Day-count convention. When omitted, Rust infers a market default from the curve ID.
         interp : str
             Interpolation style (default ``"linear"``).
         extrapolation : str
@@ -365,7 +365,7 @@ class HazardCurve:
         """
         ...
 
-    def survival(self, t: float) -> float:
+    def sp(self, t: float) -> float:
         """Survival probability at year fraction *t*.
 
         Parameters
@@ -1103,8 +1103,11 @@ class FxMatrix:
 
         Raises
         ------
+        KeyError
+            If no rate is available for the requested pair.
         ValueError
-            If the rate cannot be determined.
+            If the rate cannot be determined for another reason
+            (e.g. invalid or non-finite quotes).
         """
         ...
 
@@ -1219,7 +1222,7 @@ class MarketContext:
 
         Raises
         ------
-        ValueError
+        KeyError
             If no discount curve with this *id* exists.
         """
         ...
@@ -1238,7 +1241,7 @@ class MarketContext:
 
         Raises
         ------
-        ValueError
+        KeyError
             If no forward curve with this *id* exists.
         """
         ...
@@ -1257,7 +1260,7 @@ class MarketContext:
 
         Raises
         ------
-        ValueError
+        KeyError
             If no hazard curve with this *id* exists.
         """
         ...
@@ -1276,7 +1279,7 @@ class MarketContext:
 
         Raises
         ------
-        ValueError
+        KeyError
             If no inflation curve with this *id* exists.
         """
         ...
@@ -1295,7 +1298,7 @@ class MarketContext:
 
         Raises
         ------
-        ValueError
+        KeyError
             If no price curve with this *id* exists.
         """
         ...
@@ -1314,7 +1317,7 @@ class MarketContext:
 
         Raises
         ------
-        ValueError
+        KeyError
             If no surface with this *id* exists.
         """
         ...
@@ -1333,7 +1336,7 @@ class MarketContext:
 
         Raises
         ------
-        ValueError
+        KeyError
             If no delta-quoted FX surface with this *id* exists.
         """
         ...
@@ -1352,7 +1355,7 @@ class MarketContext:
 
         Raises
         ------
-        ValueError
+        KeyError
             If no vol cube with this *id* exists.
         """
         ...
@@ -1371,7 +1374,7 @@ class MarketContext:
 
         Raises
         ------
-        ValueError
+        KeyError
             If no vol-index curve with this *id* exists.
         """
         ...

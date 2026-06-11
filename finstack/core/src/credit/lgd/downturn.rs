@@ -1,12 +1,24 @@
 //! Downturn LGD adjustments.
 //!
-//! Provides Frye-Jacobs and regulatory-floor methods for computing
-//! stressed LGD from base (through-the-cycle) estimates.
+//! Provides a stressed-LGD approximation and a regulatory-floor method for
+//! computing downturn LGD from base (through-the-cycle) estimates.
 //!
-//! # References
+//! # Methodology Note
+//!
+//! The stressed method here is a **proprietary mean-plus-multiple-of-
+//! Bernoulli-standard-deviation approximation**: it adds
+//! `sensitivity · sqrt(rho) · Phi⁻¹(q) · sqrt(LGD·(1−LGD))` to the base LGD,
+//! where `sqrt(LGD·(1−LGD))` is the standard deviation of a Bernoulli loss
+//! indicator with mean LGD. It is **not** the Frye-Jacobs (2012) model: the
+//! true F-J LGD function is `cLGD = Φ(Φ⁻¹(cDR) − k) / cDR`, which links
+//! conditional LGD to the conditional default rate through a single
+//! "LGD risk index" k — that model is not implemented here.
+//!
+//! # Related Literature
 //!
 //! - Frye, J. & Jacobs, M. (2012). "Credit Loss and Systematic Loss Given
-//!   Default." Journal of Credit Risk, 8(1), 109-140.
+//!   Default." Journal of Credit Risk, 8(1), 109-140. (Related literature
+//!   only; see Methodology Note above.)
 
 use crate::error::InputError;
 use crate::math::special_functions::standard_normal_inv_cdf;
@@ -15,15 +27,24 @@ use crate::Result;
 /// Method for computing downturn LGD from base (through-the-cycle) LGD.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub enum DownturnMethod {
-    /// Frye-Jacobs (2012) model.
+    /// Proprietary stressed-LGD approximation (mean plus a multiple of the
+    /// Bernoulli standard deviation).
     ///
     /// ```text
     /// LGD_downturn = LGD_base + sensitivity * sqrt(asset_correlation)
     ///              * Phi_inv(stress_quantile) * sqrt(LGD_base * (1 - LGD_base))
     /// ```
     ///
-    /// Captures the systematic component: in downturns, recoveries fall because
-    /// the same macro factor driving defaults also depresses asset values.
+    /// `sqrt(LGD_base * (1 - LGD_base))` is the standard deviation of a
+    /// Bernoulli loss indicator with mean `LGD_base`. The adjustment captures
+    /// the systematic component heuristically: in downturns, recoveries fall
+    /// because the same macro factor driving defaults also depresses asset
+    /// values.
+    ///
+    /// **Naming note:** the variant name is retained for serde stability, but
+    /// this is *not* the Frye-Jacobs (2012) model (whose LGD function is
+    /// `cLGD = Φ(Φ⁻¹(cDR) − k) / cDR`); Frye & Jacobs (2012) is related
+    /// literature only. See the module-level Methodology Note.
     FryeJacobs {
         /// Asset correlation (rho). Typical: 0.10-0.24 per Basel.
         asset_correlation: f64,
@@ -56,7 +77,9 @@ pub struct DownturnLgd {
 }
 
 impl DownturnLgd {
-    /// Create a Frye-Jacobs downturn adjuster.
+    /// Create a stressed-LGD downturn adjuster (proprietary mean-plus-
+    /// multiple-of-Bernoulli-stdev approximation; see
+    /// [`DownturnMethod::FryeJacobs`] for the formula and naming note).
     ///
     /// # Errors
     ///

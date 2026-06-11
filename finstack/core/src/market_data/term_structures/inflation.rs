@@ -83,9 +83,12 @@ use crate::{
 /// Default indexation lag in months for inflation-linked securities.
 ///
 /// Most inflation-linked bonds (US TIPS, UK IL Gilts, Euro ILBs, JGBi) use a
-/// 3-month lag per the Canadian model (ISDA standard). This means the CPI index
-/// ratio for a given settlement date is based on CPI values published 3 months
-/// prior, with linear interpolation between monthly values.
+/// 3-month lag per the Canadian model (ISDA standard): the CPI reference for
+/// a settlement date is based on CPI values published 3 months prior. Note
+/// that [`InflationCurve::cpi_with_lag`] applies this lag as a continuous
+/// `lag/12`-year time shift on the curve's own interpolation; the
+/// Canadian-model linear interpolation between *monthly* prints lives in the
+/// historical `InflationIndex` scalar.
 pub(crate) const DEFAULT_INDEXATION_LAG_MONTHS: u32 = 3;
 
 /// Inflation curve representing CPI/RPI index levels over time.
@@ -104,11 +107,15 @@ pub(crate) const DEFAULT_INDEXATION_LAG_MONTHS: u32 = 3;
 ///
 /// # Indexation Lag
 ///
-/// Inflation-linked bonds use a publication lag (default: 3 months). When
-/// computing the CPI index ratio for a settlement date, the curve applies
-/// this lag and linearly interpolates between the lagged monthly CPI values.
-/// Use [`cpi_with_lag`](Self::cpi_with_lag) for lag-adjusted lookups, or
-/// [`cpi`](Self::cpi) for raw (no-lag) lookups.
+/// Inflation-linked bonds use a publication lag (default: 3 months).
+/// [`cpi_with_lag`](Self::cpi_with_lag) applies the lag as a **continuous
+/// time shift** of `lag_months / 12` years and evaluates the curve's own
+/// interpolation at the shifted time. This is *not* the Canadian-model
+/// reference-index convention, which interpolates linearly between two
+/// specific *monthly* CPI prints by day-of-month weight; that month-grid
+/// interpolation lives in the historical `InflationIndex` scalar (see
+/// `market_data::scalars`). Use [`cpi`](Self::cpi) for raw (no-lag) lookups.
+/// The curve has no seasonality adjustment support.
 ///
 /// # Use Cases
 ///
@@ -138,8 +145,8 @@ pub struct InflationCurve {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawInflationCurve {
-    #[serde(flatten)]
-    common_id: super::common::StateId,
+    /// Curve identifier
+    pub id: String,
     /// Base CPI level at t=0
     pub base_cpi: f64,
     /// Base date
@@ -150,10 +157,12 @@ struct RawInflationCurve {
     /// Indexation lag in months
     #[serde(default = "default_lag")]
     pub indexation_lag_months: u32,
-    #[serde(flatten)]
-    points: super::common::StateKnotPoints,
-    #[serde(flatten)]
-    interp: super::common::StateInterp,
+    /// Time/value pairs used to construct the curve
+    pub knot_points: Vec<(f64, f64)>,
+    /// Interpolation style
+    pub interp_style: InterpStyle,
+    /// Extrapolation policy
+    pub extrapolation: ExtrapolationPolicy,
 }
 
 fn default_day_count() -> DayCount {
@@ -174,18 +183,14 @@ impl From<InflationCurve> for RawInflationCurve {
             .collect();
 
         RawInflationCurve {
-            common_id: super::common::StateId {
-                id: curve.id.to_string(),
-            },
+            id: curve.id.to_string(),
             base_cpi: curve.base_cpi,
             base_date: curve.base_date,
             day_count: curve.day_count,
             indexation_lag_months: curve.indexation_lag_months,
-            points: super::common::StateKnotPoints { knot_points },
-            interp: super::common::StateInterp {
-                interp_style: curve.interp.style(),
-                extrapolation: curve.interp.extrapolation(),
-            },
+            knot_points,
+            interp_style: curve.interp.style(),
+            extrapolation: curve.interp.extrapolation(),
         }
     }
 }
@@ -194,13 +199,13 @@ impl TryFrom<RawInflationCurve> for InflationCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawInflationCurve) -> crate::Result<Self> {
-        InflationCurve::builder(state.common_id.id)
+        InflationCurve::builder(state.id)
             .base_cpi(state.base_cpi)
             .base_date(state.base_date)
             .day_count(state.day_count)
             .indexation_lag_months(state.indexation_lag_months)
-            .knots(state.points.knot_points)
-            .interp(state.interp.interp_style)
+            .knots(state.knot_points)
+            .interp(state.interp_style)
             .build()
     }
 }
@@ -252,16 +257,23 @@ impl InflationCurve {
 
     /// CPI level at time `t` (years), adjusted for the indexation lag.
     ///
-    /// For TIPS/linker pricing, the CPI value at settlement is actually the
-    /// CPI value from `indexation_lag_months` earlier, linearly interpolated
-    /// between monthly CPI values. This method applies that lag.
+    /// Applies the lag as a **continuous shift**: evaluates the curve's own
+    /// interpolation (LogLinear by default) at `t - indexation_lag_months/12`.
+    /// This is *not* the Canadian-model reference-index calculation used for
+    /// bond settlement, which interpolates linearly between the two lagged
+    /// *monthly* CPI prints weighted by day of month; that month-grid
+    /// interpolation is provided by the historical `InflationIndex` scalar.
+    /// For projected curve lookups the continuous shift is a smooth
+    /// approximation that coincides with the monthly convention only when the
+    /// curve's knots sit on the monthly grid with linear interpolation. No
+    /// seasonality adjustment is applied.
     ///
     /// # Arguments
     /// * `t` - Time in years from base date (the settlement date)
     ///
     /// # Returns
     /// CPI level corresponding to `t - lag`, where lag is the configured
-    /// indexation lag in years.
+    /// indexation lag in years (`indexation_lag_months / 12`).
     #[must_use]
     pub fn cpi_with_lag(&self, t: f64) -> f64 {
         let lag_years = self.indexation_lag_months as f64 / 12.0;
@@ -270,7 +282,12 @@ impl InflationCurve {
 
     /// Annualised inflation rate between `t1` and `t2` using CAGR formula.
     ///
-    /// Returns [`f64::NAN`] when `t2 <= t1`, or when `t1` / `t2` are non-finite.
+    /// # NaN contract
+    ///
+    /// Returns [`f64::NAN`] (rather than an error) when `t2 <= t1` or when
+    /// `t1` / `t2` are non-finite — misuse is a caller bug and a `Result`
+    /// signature would be too breaking. A `debug_assert` fires in debug
+    /// builds; callers must be prepared for NaN to propagate otherwise.
     ///
     /// Uses the Compound Annual Growth Rate, which is the market-standard
     /// formula for annualised inflation:
@@ -283,6 +300,10 @@ impl InflationCurve {
     /// rather than the simple linear approximation `(I2/I1 - 1) / dt`.
     #[must_use]
     pub fn inflation_rate(&self, t1: f64, t2: f64) -> f64 {
+        debug_assert!(
+            t1.is_finite() && t2.is_finite() && t2 > t1,
+            "InflationCurve::inflation_rate requires finite t1 < t2 (got t1={t1}, t2={t2})"
+        );
         if !(t1.is_finite() && t2.is_finite()) || t2 <= t1 {
             return f64::NAN;
         }
@@ -294,13 +315,21 @@ impl InflationCurve {
 
     /// Simple (non-compounded) inflation rate between `t1` and `t2`.
     ///
-    /// Returns [`f64::NAN`] when `t2 <= t1`, or when `t1` / `t2` are non-finite.
+    /// # NaN contract
+    ///
+    /// Returns [`f64::NAN`] (rather than an error) when `t2 <= t1` or when
+    /// `t1` / `t2` are non-finite; see [`inflation_rate`](Self::inflation_rate)
+    /// for the rationale. A `debug_assert` fires in debug builds.
     ///
     /// Returns `(I(t2) / I(t1) - 1) / (t2 - t1)`, which is the simple
     /// linear approximation. For most applications, prefer [`inflation_rate`](Self::inflation_rate)
     /// which uses the correct CAGR formula.
     #[must_use]
     pub fn inflation_rate_simple(&self, t1: f64, t2: f64) -> f64 {
+        debug_assert!(
+            t1.is_finite() && t2.is_finite() && t2 > t1,
+            "InflationCurve::inflation_rate_simple requires finite t1 < t2 (got t1={t1}, t2={t2})"
+        );
         if !(t1.is_finite() && t2.is_finite()) || t2 <= t1 {
             return f64::NAN;
         }
@@ -641,6 +670,17 @@ mod tests {
         assert!(r > 0.0);
     }
 
+    // Misordered/non-finite times are caller bugs: debug builds fire a
+    // `debug_assert`, release builds return NaN (documented NaN contract).
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "inflation_rate requires finite t1 < t2")]
+    fn inflation_rate_non_increasing_times_debug_asserts() {
+        let ic = sample_curve();
+        let _ = ic.inflation_rate(1.0, 0.0);
+    }
+
+    #[cfg(not(debug_assertions))]
     #[test]
     fn inflation_rate_rejects_non_increasing_times_with_nan() {
         let ic = sample_curve();
@@ -648,6 +688,15 @@ mod tests {
         assert!(ic.inflation_rate(1.0, 1.0).is_nan());
     }
 
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "inflation_rate_simple requires finite t1 < t2")]
+    fn inflation_rate_simple_non_increasing_times_debug_asserts() {
+        let ic = sample_curve();
+        let _ = ic.inflation_rate_simple(1.0, 0.0);
+    }
+
+    #[cfg(not(debug_assertions))]
     #[test]
     fn inflation_rate_simple_rejects_non_increasing_times_with_nan() {
         let ic = sample_curve();
@@ -655,6 +704,15 @@ mod tests {
         assert!(ic.inflation_rate_simple(1.0, 1.0).is_nan());
     }
 
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "inflation_rate requires finite t1 < t2")]
+    fn inflation_rate_non_finite_times_debug_asserts() {
+        let ic = sample_curve();
+        let _ = ic.inflation_rate(f64::NAN, 1.0);
+    }
+
+    #[cfg(not(debug_assertions))]
     #[test]
     fn inflation_rate_rejects_non_finite_times_with_nan() {
         let ic = sample_curve();

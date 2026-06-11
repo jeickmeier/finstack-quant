@@ -99,9 +99,9 @@
       },
       "expected": {
         "annualized_variance": {
-          "value": 3.166331675400162,
+          "value": 3.226893321551188,
           "tolerance_abs": 1e-10,
-          "notes": "Yang-Zhang (2000) original paper uses n divisor for RS component"
+          "notes": "Yang-Zhang (2000): k and the RS average use the period count m = n-1 (bar 0 has no previous close); value recomputed 2026-06-11 after fixing the n-bar divisor bias"
         }
       }
     }

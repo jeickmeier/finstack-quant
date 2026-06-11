@@ -84,7 +84,10 @@ pub fn get_fixing_series<'a>(
 /// Require a fixing value from an already-resolved optional series.
 ///
 /// Uses `value_on()` (step interpolation / LOCF), appropriate for overnight
-/// RFR fixings in the compounded path.
+/// RFR fixings in the compounded path. The carry-forward is **unbounded**: a
+/// fixing arbitrarily far before `date` is silently used. When a staleness
+/// limit is required (e.g. data-quality gates around long market closures),
+/// use [`require_fixing_value_bounded`] instead.
 ///
 /// Returns a clear error when the series is `None` or the date is missing.
 pub fn require_fixing_value(
@@ -104,6 +107,37 @@ pub fn require_fixing_value(
         crate::Error::Validation(format!(
             "Missing fixing for '{forward_curve_id}' on {date} (valuation date: {as_of}). \
              The fixing series exists but lookup failed: {e}"
+        ))
+    })
+}
+
+/// Require a fixing value with a bounded last-observation-carried-forward
+/// window.
+///
+/// Like [`require_fixing_value`] but uses
+/// `value_on_or_before(date, max_staleness_days)`, so a prior observation is
+/// only accepted when it is at most `max_staleness_days` calendar days before
+/// `date`. Errors when the most recent observation is older than the bound
+/// (or when the series is `None` / has no observation on or before `date`).
+pub fn require_fixing_value_bounded(
+    series: Option<&ScalarTimeSeries>,
+    forward_curve_id: &str,
+    date: Date,
+    as_of: Date,
+    max_staleness_days: u32,
+) -> Result<f64> {
+    let s = series.ok_or_else(|| {
+        crate::Error::Validation(format!(
+            "Seasoned instrument requires fixings for index '{forward_curve_id}' on {date} \
+             (valuation date: {as_of}). Provide a ScalarTimeSeries with id '{}'.",
+            fixing_series_id(forward_curve_id)
+        ))
+    })?;
+    s.value_on_or_before(date, max_staleness_days).map_err(|e| {
+        crate::Error::Validation(format!(
+            "Missing fixing for '{forward_curve_id}' on {date} within {max_staleness_days} \
+             calendar days (valuation date: {as_of}). The fixing series exists but lookup \
+             failed: {e}"
         ))
     })
 }

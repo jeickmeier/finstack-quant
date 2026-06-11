@@ -212,17 +212,19 @@ pub struct DiscountCurve {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawDiscountCurve {
-    #[serde(flatten)]
-    common_id: super::common::StateId,
+    /// Curve identifier
+    pub id: String,
     /// Base date
     pub base: Date,
     /// Day count convention for discount time basis
     #[serde(default = "default_day_count")]
     pub day_count: DayCount,
-    #[serde(flatten)]
-    points: super::common::StateKnotPoints,
-    #[serde(flatten)]
-    interp: super::common::StateInterp,
+    /// Time/value pairs used to construct the curve
+    pub knot_points: Vec<(f64, f64)>,
+    /// Interpolation style
+    pub interp_style: InterpStyle,
+    /// Extrapolation policy
+    pub extrapolation: ExtrapolationPolicy,
     /// Minimum forward rate floor (if set)
     #[serde(default)]
     pub min_forward_rate: Option<f64>,
@@ -259,16 +261,12 @@ impl From<DiscountCurve> for RawDiscountCurve {
             .collect();
 
         RawDiscountCurve {
-            common_id: super::common::StateId {
-                id: curve.id.to_string(),
-            },
+            id: curve.id.to_string(),
             base: curve.base,
             day_count: curve.day_count,
-            points: super::common::StateKnotPoints { knot_points },
-            interp: super::common::StateInterp {
-                interp_style: curve.style,
-                extrapolation: curve.extrapolation,
-            },
+            knot_points,
+            interp_style: curve.style,
+            extrapolation: curve.extrapolation,
             min_forward_rate: curve.min_forward_rate,
             allow_non_monotonic: curve.allow_non_monotonic,
             min_forward_tenor: curve.min_forward_tenor,
@@ -283,12 +281,12 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawDiscountCurve) -> crate::Result<Self> {
-        DiscountCurve::builder(state.common_id.id)
+        DiscountCurve::builder(state.id)
             .base_date(state.base)
             .day_count(state.day_count)
-            .knots(state.points.knot_points)
-            .interp(state.interp.interp_style)
-            .extrapolation(state.interp.extrapolation)
+            .knots(state.knot_points)
+            .interp(state.interp_style)
+            .extrapolation(state.extrapolation)
             .min_forward_tenor(state.min_forward_tenor)
             .rate_calibration_opt(state.rate_calibration)
             .calibration_ois_cutoff_days_opt(state.calibration_ois_cutoff_days)
@@ -849,19 +847,9 @@ impl DiscountCurve {
         // Derive new ID with suffix
         let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bp);
 
-        // Rebuild preserving base date, interpolation, extrapolation, and forward tenor policies
-        // Use allow_non_monotonic to handle negative rate environments
-        DiscountCurve::builder(new_id)
-            .base_date(self.base)
-            .day_count(self.day_count)
-            .knots(bumped_points)
-            .interp(self.style)
-            .extrapolation(self.extrapolation)
-            .min_forward_tenor(self.min_forward_tenor)
-            .rate_calibration_opt(self.rate_calibration.clone())
-            .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
-            .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
-            .build()
+        // Rebuild preserving the full metadata (interpolation, extrapolation,
+        // calibration settings, fx_policy, non-monotonic settings).
+        self.metadata_builder(new_id).knots(bumped_points).build()
     }
 
     /// Create a new curve with a triangular key-rate bump using explicit bucket neighbors.
@@ -973,39 +961,38 @@ impl DiscountCurve {
             .collect();
 
         let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bp);
-        DiscountCurve::builder(new_id)
-            .base_date(self.base)
-            .day_count(self.day_count)
-            .knots(bumped_points)
-            .interp(self.style)
-            .extrapolation(self.extrapolation)
-            .min_forward_tenor(self.min_forward_tenor)
-            .rate_calibration_opt(self.rate_calibration.clone())
-            .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
-            .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
-            .build()
+        // Rebuild preserving the full metadata (including fx_policy).
+        self.metadata_builder(new_id).knots(bumped_points).build()
     }
 
-    /// Roll the curve forward by a specified number of days.
+    /// Roll the curve forward by a specified number of days, realizing forwards.
     ///
     /// This creates a new curve with:
     /// - Base date advanced by `days`
     /// - Knot times shifted backwards (t' = t - dt_years)
     /// - Points with t' <= 0 are filtered out (expired)
-    /// - Discount factors are preserved (no carry/theta adjustment)
+    /// - Discount factors renormalized by the realized forward:
+    ///   `DF_new(t - dt) = DF_old(t) / DF_old(dt)`
     ///
-    /// This is the "constant curves" or "pure roll-down" scenario where discount
-    /// factors at each calendar date remain the same, but maturity times are
-    /// re-measured from the new base date.
+    /// These are **realized-forward** semantics (per the 2026-06-09 core quant
+    /// review): forwards realize as the curve rolls, so a flat curve stays
+    /// flat under roll, and a roll-then-reprice theta captures both carry and
+    /// roll-down. The relationship to present values is
+    /// `PV(rolled curve, T - dt) = PV(old curve, T) / DF_old(dt)` — i.e. the
+    /// rolled PV is the forward value of the old PV to the new base date.
+    /// This aligns the discount curve with the hazard, forward, inflation,
+    /// and price/vol-index curve rolls, which already realize forwards.
     ///
     /// # Arguments
     /// * `days` - Number of days to roll forward
     ///
     /// # Returns
-    /// A new discount curve with updated base date and shifted knots.
+    /// A new discount curve with updated base date and renormalized knots.
     ///
     /// # Errors
-    /// Returns an error if fewer than 2 knot points remain after filtering expired points.
+    /// Returns an error if fewer than 2 knot points remain after filtering
+    /// expired points, or if `DF_old(dt)` is not positive and finite (which
+    /// can only happen if extrapolation past the last knot misbehaves).
     ///
     /// # Examples
     /// ```ignore
@@ -1032,22 +1019,31 @@ impl DiscountCurve {
             self.day_count
                 .year_fraction(self.base, new_base, DayCountContext::default())?;
 
-        let rolled_points = roll_knots(&self.knots, &self.dfs, dt_years);
+        // Realized-forward renormalization: divide every rolled DF by the
+        // old curve's DF at the roll horizon, interpolated in the curve's own
+        // time basis (the same `dt_years` the knots are shifted by).
+        let df_dt = self.df(dt_years);
+        if !df_dt.is_finite() || df_dt <= 0.0 {
+            return Err(crate::error::InputError::NonPositiveValue.into());
+        }
+
+        let rolled_points: Vec<(f64, f64)> = roll_knots(&self.knots, &self.dfs, dt_years)
+            .into_iter()
+            .map(|(t, df)| (t, df / df_dt))
+            .collect();
 
         if rolled_points.len() < 2 {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
 
-        DiscountCurve::builder(self.id.clone())
+        // Note: knots inside (0, dt] are dropped by `roll_knots` (expired).
+        // `build()` re-prepends a (0.0, 1.0) knot, which is now exactly
+        // correct: DF_new(0) = DF_old(dt) / DF_old(dt) = 1.
+
+        // Thread the full metadata (including fx_policy) and override the base.
+        self.metadata_builder(self.id.clone())
             .base_date(new_base)
-            .day_count(self.day_count)
             .knots(rolled_points)
-            .interp(self.style)
-            .extrapolation(self.extrapolation)
-            .min_forward_tenor(self.min_forward_tenor)
-            .rate_calibration_opt(self.rate_calibration.clone())
-            .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
-            .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
             .build()
     }
 
@@ -1096,6 +1092,20 @@ impl DiscountCurve {
     /// possible (for example `USD-OIS -> Act360`, `GBP-SONIA -> Act365F`). Synthetic
     /// IDs without a market hint fall back to `Act365F`. Interpolation defaults to
     /// MonotoneConvex with FlatForward extrapolation.
+    ///
+    /// **Build-vs-query basis trap:** the day-count basis is used both to convert
+    /// dated pillars to year fractions at build time and to convert query dates
+    /// back at lookup time. Because inference is substring-based, *renaming* the
+    /// curve ID (e.g. `USD-SOFR` → `OIS-1`) can silently change the inferred
+    /// basis and shift every pillar time by ~1.4% (Act/360 vs Act/365F). When the
+    /// basis matters, set [`DiscountCurveBuilder::day_count`] explicitly instead
+    /// of relying on inference; each inference is logged at `debug` level.
+    ///
+    /// **Negative rates:** the default [`ValidationMode::MarketStandard`] enforces
+    /// monotonic discount factors with a -50bp implied-forward floor. For deeply
+    /// negative-rate markets (CHF, JPY, EUR historical), pass
+    /// [`ValidationMode::NegativeRateFriendly`] (or `Raw`) via
+    /// [`DiscountCurveBuilder::validation`].
     #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> DiscountCurveBuilder {
         let id: CurveId = id.into();
@@ -1118,6 +1128,15 @@ impl DiscountCurve {
 
     /// Create a builder pre-populated with this curve's data but a new ID.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> DiscountCurveBuilder {
+        self.metadata_builder(new_id)
+            .knots(self.knots.iter().copied().zip(self.dfs.iter().copied()))
+    }
+
+    /// Builder pre-populated with this curve's full metadata but **no** knots.
+    /// Shared by all rebuild-style operations (bumps, rolls) so that no
+    /// metadata field (day-count, interpolation, extrapolation, calibration
+    /// settings, fx_policy, non-monotonic settings) is dropped.
+    pub(crate) fn metadata_builder(&self, new_id: impl Into<CurveId>) -> DiscountCurveBuilder {
         DiscountCurve::builder(new_id)
             .base_date(self.base)
             .day_count(self.day_count)
@@ -1128,7 +1147,6 @@ impl DiscountCurve {
             .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
             .fx_policy_opt(self.fx_policy.clone())
             .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
-            .knots(self.knots.iter().copied().zip(self.dfs.iter().copied()))
     }
 
     /// Create a forward curve from this discount curve.

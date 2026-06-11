@@ -110,6 +110,16 @@ debug = 1           # Line info for profiling tools (flamegraph, perf)
 [workspace.metadata.clippy]
 profile = "finstack-strict"
 
+# NOTE: This lint table is currently ASPIRATIONAL ONLY. No crate in the
+# workspace opts in via `[lints] workspace = true`, so nothing below is
+# enforced by `cargo clippy` today (e.g. `unreachable`/`indexing_slicing` are
+# enforced nowhere). What is actually enforced are the per-crate `#![warn]`/
+# `#![deny]` attributes in each crate's `lib.rs` (typically `missing_docs`,
+# `clippy::unwrap_used`, `clippy::expect_used`, `clippy::panic`) plus the
+# project lint tasks (`mise run rust-lint`). The table is kept as the target
+# lint set for when crates opt in; enabling inheritance workspace-wide is a
+# deliberate churn decision left for a dedicated change. Keep this table in
+# sync with the lib.rs attributes when editing either.
 [workspace.lints.clippy]
 # ---- SAFETY / NO PANICS ----
 # Never allow panicking in library code.

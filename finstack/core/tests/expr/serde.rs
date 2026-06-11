@@ -154,12 +154,68 @@ fn test_eval_opts_serde() {
     opts.max_arena_bytes = 1_073_741_824;
 
     let json = serde_json::to_string(&opts).expect("Failed to serialize EvalOpts");
+
+    // `plan` is #[serde(skip)]: the internal execution plan (DagNode topology,
+    // CacheStrategy, etc.) is intentionally NOT part of the wire format, so a
+    // deserialized EvalOpts can never inject an arbitrary plan that eval()
+    // would execute instead of the compiled AST. This pins the field's
+    // absence from the serialized form.
+    assert!(
+        !json.contains("\"plan\""),
+        "EvalOpts.plan must not be serialized, got: {json}"
+    );
+
     let deserialized: EvalOpts =
         serde_json::from_str(&json).expect("Failed to deserialize EvalOpts");
 
     assert_eq!(opts.cache_budget_mb, deserialized.cache_budget_mb);
     assert_eq!(opts.max_arena_bytes, deserialized.max_arena_bytes);
     assert!(!deserialized.has_plan());
+}
+
+#[test]
+fn test_eval_opts_rejects_inbound_plan_field() {
+    // EvalOpts is strict (deny_unknown_fields) and `plan` is serde-skipped:
+    // payloads carrying a `plan` field (as serialized by older versions) must
+    // be rejected rather than silently executing an injected plan.
+    let json = r#"{"plan":null,"cache_budget_mb":null,"max_arena_bytes":1024}"#;
+    let result: Result<EvalOpts, _> = serde_json::from_str(json);
+    assert!(result.is_err(), "inbound `plan` field must be rejected");
+}
+
+#[test]
+fn test_eval_opts_rejects_unknown_fields() {
+    let json = r#"{"cache_budget_mb":null,"max_arena_bytes":1024,"bogus":1}"#;
+    let result: Result<EvalOpts, _> = serde_json::from_str(json);
+    assert!(result.is_err(), "unknown fields must be rejected");
+}
+
+#[test]
+fn test_expr_rejects_unknown_fields() {
+    let json = r#"{"id":null,"node":{"Column":"x"},"bogus":1}"#;
+    let result: Result<Expr, _> = serde_json::from_str(json);
+    assert!(result.is_err(), "unknown Expr fields must be rejected");
+}
+
+#[test]
+fn test_expr_node_rejects_unknown_variant_fields() {
+    // Struct variants of ExprNode are strict too.
+    let json = r#"{"CSRef":{"component":"debt","instrument_or_total":"total","bogus":1}}"#;
+    let result: Result<ExprNode, _> = serde_json::from_str(json);
+    assert!(
+        result.is_err(),
+        "unknown fields inside ExprNode struct variants must be rejected"
+    );
+}
+
+#[test]
+fn test_simple_context_rejects_unknown_fields() {
+    let json = r#"{"column_indices":{"x":0},"bogus":1}"#;
+    let result: Result<SimpleContext, _> = serde_json::from_str(json);
+    assert!(
+        result.is_err(),
+        "unknown SimpleContext fields must be rejected"
+    );
 }
 
 #[test]

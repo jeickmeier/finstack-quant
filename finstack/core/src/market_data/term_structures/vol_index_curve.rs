@@ -112,18 +112,20 @@ pub struct VolatilityIndexCurve {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawVolatilityIndexCurve {
-    #[serde(flatten)]
-    common_id: super::common::StateId,
+    /// Curve identifier
+    pub id: String,
     /// Base date
     pub base: Date,
     /// Day count convention
     pub day_count: DayCount,
     /// Spot index level
     pub spot_level: f64,
-    #[serde(flatten)]
-    points: super::common::StateKnotPoints,
-    #[serde(flatten)]
-    interp: super::common::StateInterp,
+    /// Time/value pairs used to construct the curve
+    pub knot_points: Vec<(f64, f64)>,
+    /// Interpolation style
+    pub interp_style: InterpStyle,
+    /// Extrapolation policy
+    pub extrapolation: ExtrapolationPolicy,
 }
 
 impl From<VolatilityIndexCurve> for RawVolatilityIndexCurve {
@@ -136,17 +138,13 @@ impl From<VolatilityIndexCurve> for RawVolatilityIndexCurve {
             .collect();
 
         RawVolatilityIndexCurve {
-            common_id: super::common::StateId {
-                id: curve.id.to_string(),
-            },
+            id: curve.id.to_string(),
             base: curve.base,
             day_count: curve.day_count,
             spot_level: curve.spot_level,
-            points: super::common::StateKnotPoints { knot_points },
-            interp: super::common::StateInterp {
-                interp_style: curve.interp.style(),
-                extrapolation: curve.interp.extrapolation(),
-            },
+            knot_points,
+            interp_style: curve.interp.style(),
+            extrapolation: curve.interp.extrapolation(),
         }
     }
 }
@@ -155,13 +153,13 @@ impl TryFrom<RawVolatilityIndexCurve> for VolatilityIndexCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawVolatilityIndexCurve) -> crate::Result<Self> {
-        VolatilityIndexCurve::builder(state.common_id.id)
+        VolatilityIndexCurve::builder(state.id)
             .base_date(state.base)
             .day_count(state.day_count)
             .spot_level(state.spot_level)
-            .knots(state.points.knot_points)
-            .interp(state.interp.interp_style)
-            .extrapolation(state.interp.extrapolation)
+            .knots(state.knot_points)
+            .interp(state.interp_style)
+            .extrapolation(state.extrapolation)
             .build()
     }
 }

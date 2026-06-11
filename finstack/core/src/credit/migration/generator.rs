@@ -49,6 +49,20 @@ use super::{
 pub struct GeneratorMatrix {
     pub(crate) data: DMatrix<f64>,
     pub(crate) scale: RatingScale,
+    /// Total negative off-diagonal mass clamped to zero by Kreinin-Sidenius
+    /// regularization, summed over the whole matrix (L1 norm of the clamped
+    /// entries). Zero for directly constructed generators.
+    ///
+    /// Stamped per the policy-visibility invariant (2026-06-09 core quant
+    /// review): K-S regularization changes the economics of the generator,
+    /// so the magnitude of the adjustment must be observable.
+    #[serde(default)]
+    pub(crate) regularization_l1: f64,
+    /// Round-trip reconstruction error ‖exp(Q) − P‖∞ measured during
+    /// extraction from a transition matrix. Zero for directly constructed
+    /// generators.
+    #[serde(default)]
+    pub(crate) round_trip_error: f64,
 }
 
 impl GeneratorMatrix {
@@ -78,6 +92,8 @@ impl GeneratorMatrix {
         Ok(Self {
             data: matrix,
             scale,
+            regularization_l1: 0.0,
+            round_trip_error: 0.0,
         })
     }
 
@@ -117,11 +133,15 @@ impl GeneratorMatrix {
         let q_data = matrix_log(&p.data)?;
 
         // Kreinin-Sidenius post-processing: clamp negative off-diagonals.
-        let q_corrected = kreinin_sidenius(q_data, &p.scale);
+        // The total clamped mass is stamped on the result for policy
+        // visibility (regularization changes the generator's economics).
+        let (q_corrected, regularization_l1) = kreinin_sidenius(q_data, &p.scale);
 
-        let gen = GeneratorMatrix {
+        let mut gen = GeneratorMatrix {
             data: q_corrected,
             scale: p.scale.clone(),
+            regularization_l1,
+            round_trip_error: 0.0,
         };
 
         // Round-trip validation: ||exp(Q) - P||_inf < tol
@@ -133,6 +153,7 @@ impl GeneratorMatrix {
                 tolerance: round_trip_tol,
             });
         }
+        gen.round_trip_error = inf_err;
 
         Ok(gen)
     }
@@ -174,6 +195,29 @@ impl GeneratorMatrix {
     #[must_use]
     pub fn n_states(&self) -> usize {
         self.scale.n_states()
+    }
+
+    /// Total negative off-diagonal mass clamped to zero by Kreinin-Sidenius
+    /// regularization during extraction (L1 norm of the clamped entries,
+    /// summed over the whole matrix).
+    ///
+    /// Returns `0.0` for generators constructed directly via
+    /// [`GeneratorMatrix::new`]. A non-zero value means the extracted
+    /// generator does not exactly reproduce the input transition matrix;
+    /// see also [`round_trip_error`](Self::round_trip_error).
+    #[must_use]
+    pub fn regularization_l1(&self) -> f64 {
+        self.regularization_l1
+    }
+
+    /// Round-trip reconstruction error `‖exp(Q) − P‖∞` measured against the
+    /// source transition matrix during extraction.
+    ///
+    /// Returns `0.0` for generators constructed directly via
+    /// [`GeneratorMatrix::new`].
+    #[must_use]
+    pub fn round_trip_error(&self) -> f64 {
+        self.round_trip_error
     }
 }
 
@@ -218,10 +262,16 @@ pub(crate) fn matrix_log(m: &DMatrix<f64>) -> Result<DMatrix<f64>, MigrationErro
 
 /// Parlett's recurrence for the logarithm of an upper-triangular matrix.
 ///
-/// For f(T) = log(T), the $(i,j)$ entry (i < j) satisfies the Sylvester equation:
+/// For f(T) = log(T), commutativity L·T = T·L gives, for the $(i,j)$ entry
+/// (i < j):
 ///
 /// $$L_{ij} = T_{ij} \cdot \frac{L_{jj} - L_{ii}}{T_{jj} - T_{ii}}
-///           + \frac{\sum_{k=i+1}^{j-1}(L_{ik} T_{kj} - T_{ik} L_{kj})}{T_{jj} - T_{ii}}$$
+///           + \frac{\sum_{k=i+1}^{j-1}(T_{ik} L_{kj} - L_{ik} T_{kj})}{T_{jj} - T_{ii}}$$
+///
+/// (Cross-term sign verified against `scipy.linalg.logm`; it was previously
+/// implemented negated, which produced spurious round-trip error and masked
+/// genuine negative off-diagonals from Kreinin-Sidenius clamping —
+/// 2026-06-09 core quant review follow-up.)
 ///
 /// Reference: Higham, N. J. (2008). *Functions of Matrices: Theory and Computation*.
 /// SIAM. Equation (4.19).
@@ -243,14 +293,30 @@ fn upper_triangular_log(
             let j = i + k;
             let denom = eigenvalues[j] - eigenvalues[i];
 
-            // Accumulate off-diagonal cross terms.
+            // Accumulate off-diagonal cross terms: Σ (T_ik L_kj − L_ik T_kj).
             let mut cross = 0.0;
             for m in (i + 1)..j {
-                cross += l[(i, m)] * t[(m, j)] - t[(i, m)] * l[(m, j)];
+                cross += t[(i, m)] * l[(m, j)] - l[(i, m)] * t[(m, j)];
             }
 
             if denom.abs() < 1e-12 {
-                // Degenerate (repeated eigenvalue): limit gives L_ij = T_ij / T_ii + cross
+                // Degenerate (repeated eigenvalue): limit gives L_ij = T_ij / T_ii + cross.
+                //
+                // Limitations of this branch (doc-only note, 2026-06-09 core
+                // quant review):
+                // - It is exact only for the leading term of the log series.
+                //   For repeated eigenvalues with nontrivial nilpotent
+                //   structure (Jordan blocks of size > 2), higher-order terms
+                //   T_ij²/(2 T_ii²)… are dropped, so log(T) is approximate.
+                // - For *near*-repeated eigenvalues just above the 1e-12
+                //   threshold, the standard Parlett formula divides by a tiny
+                //   `denom` and suffers catastrophic cancellation; accuracy
+                //   degrades smoothly as eigenvalues coalesce. Higham (2008,
+                //   §11.6) recommends blocked Schur-Parlett with
+                //   inverse-scaling-and-squaring per block for such cases.
+                // Empirical annual transition matrices have well-separated
+                // eigenvalues, so this branch is rarely exercised; the
+                // round-trip ‖exp(Q) − P‖∞ check guards the final result.
                 l[(i, j)] = t[(i, j)] / eigenvalues[i] + cross / eigenvalues[i];
             } else {
                 // Standard Parlett formula.
@@ -270,7 +336,11 @@ fn upper_triangular_log(
 /// 1. Set any negative off-diagonal entry to zero.
 /// 2. Recompute diagonal as -Σ_{j≠i} q_ij.
 /// 3. If a default state exists and is absorbing, zero its entire row.
-fn kreinin_sidenius(mut q: DMatrix<f64>, scale: &RatingScale) -> DMatrix<f64> {
+///
+/// Returns the corrected matrix together with the total clamped mass
+/// (L1 norm of the negative off-diagonal entries set to zero), which is
+/// stamped on the resulting [`GeneratorMatrix`] for policy visibility.
+fn kreinin_sidenius(mut q: DMatrix<f64>, scale: &RatingScale) -> (DMatrix<f64>, f64) {
     let n = q.nrows();
 
     // If default state row should be all-zero, enforce it first.
@@ -280,11 +350,13 @@ fn kreinin_sidenius(mut q: DMatrix<f64>, scale: &RatingScale) -> DMatrix<f64> {
         }
     }
 
+    let mut clamped_l1 = 0.0;
     for i in 0..n {
         let mut row_sum = 0.0;
         for j in 0..n {
             if j != i {
                 if q[(i, j)] < 0.0 {
+                    clamped_l1 += -q[(i, j)];
                     q[(i, j)] = 0.0;
                 }
                 row_sum += q[(i, j)];
@@ -293,7 +365,7 @@ fn kreinin_sidenius(mut q: DMatrix<f64>, scale: &RatingScale) -> DMatrix<f64> {
         q[(i, i)] = -row_sum;
     }
 
-    q
+    (q, clamped_l1)
 }
 
 // ---------------------------------------------------------------------------

@@ -321,7 +321,7 @@ where
     // 1. Validation (sign change)
     // 2. Solving (NPV / dNPV evaluation)
     // So we collect into a vector.
-    let data: Vec<(f64, f64)> = flows.into_iter().collect();
+    let mut data: Vec<(f64, f64)> = flows.into_iter().collect();
 
     // Validate inputs
     if data.len() < 2 {
@@ -336,8 +336,24 @@ where
         tracing::warn!(
             num_flows = data.len(),
             algorithm = "newton_then_brent",
-            "xirr: cashflows contain multiple sign changes; IRR may be non-unique, returning the first converged solution"
+            "xirr: cashflows contain multiple sign changes; IRR may be non-unique, returning the valid root closest to 0.0"
         );
+    }
+
+    // Normalize amounts by max |amount| so the absolute NPV acceptance
+    // tolerance (DEFAULT_TOLERANCE, in currency units) is scale-free.
+    // The IRR root is scale-invariant (NPV(r) = 0 ⇔ k·NPV(r) = 0), so the
+    // result is identical; without this, a 1e9-notional stream could fail
+    // the Newton acceptance check that a 1.0-notional stream passes
+    // (2026-06-09 core quant review, cashflow/xirr.rs finding).
+    let max_abs = data
+        .iter()
+        .map(|&(_, amt)| amt.abs())
+        .fold(0.0_f64, f64::max);
+    if max_abs > 0.0 && max_abs.is_finite() {
+        for entry in &mut data {
+            entry.1 /= max_abs;
+        }
     }
 
     // Define NPV function: Σ C_t / (1+r)^t using Neumaier compensated summation.
@@ -552,8 +568,11 @@ mod tests {
         let rate = irr(&amounts, None).expect("IRR calculation should succeed in test");
         assert!(rate > 0.07 && rate < 0.08);
 
+        // The solver normalizes flows by max |amount| (2026-06-09 core quant
+        // review: scale-free acceptance tolerance), so the residual bound is
+        // relative to the largest flow rather than absolute currency units.
         let npv_at_irr = compute_periodic_npv(&amounts, rate);
-        assert!(npv_at_irr.abs() < 1e-6);
+        assert!(npv_at_irr.abs() / 1000.0 < 1e-6);
     }
 
     #[test]
@@ -743,6 +762,49 @@ mod tests {
         assert!(result_365 > 0.0);
         assert!(result_360 > 0.0);
         assert!((result_360 - result_365).abs() < 0.015);
+    }
+
+    /// IRR is scale-invariant: a 1e9-notional stream must converge to the
+    /// same rate as the identical stream scaled to 1.0. Before amounts were
+    /// normalized by max |amount|, the absolute NPV acceptance tolerance was
+    /// scale-dependent and large notionals could lose Newton roots
+    /// (2026-06-09 core quant review, cashflow/xirr.rs finding).
+    #[test]
+    fn test_xirr_scale_invariant_large_notional() {
+        let d0 = create_date(2024, Month::January, 1).expect("Valid test date");
+        let d1 = create_date(2024, Month::July, 1).expect("Valid test date");
+        let d2 = create_date(2025, Month::January, 1).expect("Valid test date");
+
+        let unit = [(d0, -1.0), (d1, 0.03), (d2, 1.05)];
+        let large = [(d0, -1.0e9), (d1, 0.03e9), (d2, 1.05e9)];
+
+        let r_unit = xirr(&unit, None).expect("unit-scale XIRR should converge");
+        let r_large = xirr(&large, None).expect("1e9-notional XIRR should converge");
+
+        assert!(
+            (r_unit - r_large).abs() < 1e-10,
+            "XIRR must be scale-invariant: unit={r_unit}, large={r_large}"
+        );
+    }
+
+    /// High-rate streams must also be scale-invariant (the review noted
+    /// >1000% IRRs being lost to the bounded Brent fallback at large scale).
+    #[test]
+    fn test_xirr_scale_invariant_high_rate() {
+        let d0 = create_date(2024, Month::January, 1).expect("Valid test date");
+        let d1 = create_date(2025, Month::January, 1).expect("Valid test date");
+
+        let unit = [(d0, -1.0), (d1, 12.0)]; // ~1100% annual return
+        let large = [(d0, -1.0e9), (d1, 12.0e9)];
+
+        let r_unit = xirr(&unit, None).expect("unit-scale XIRR should converge");
+        let r_large = xirr(&large, None).expect("large-scale XIRR should converge");
+
+        assert!(r_unit > 10.0, "expected ~1100% IRR, got {r_unit}");
+        assert!(
+            (r_unit - r_large).abs() < 1e-8,
+            "high-rate XIRR must be scale-invariant: unit={r_unit}, large={r_large}"
+        );
     }
 
     #[test]

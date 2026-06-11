@@ -93,17 +93,25 @@ fn standard_shift(min_rate: f64) -> Result<f64> {
 ///
 /// # Tolerance Considerations
 ///
-/// The default tolerance of 1e-6 provides a balance between speed and accuracy:
+/// The tolerance applies to the vega-weighted sum-of-squared-errors (SSE)
+/// objective minimized by the Levenberg-Marquardt solver. Since the core
+/// `minimize` now errors loudly on non-convergence (instead of silently
+/// returning the best iterate), the default must be attainable for typical
+/// market smiles: SABR's `rho` is weakly identified on near-symmetric strike
+/// sets, producing long shallow valleys the solver traverses slowly. The
+/// default of 1e-4 (SSE) with a 2000-iteration budget converges reliably on
+/// such inputs while keeping the refit smile within a fraction of a vol point
+/// of the market quotes:
 ///
-/// | Tolerance | Use Case | Accuracy | Speed |
-/// |-----------|----------|----------|-------|
-/// | 1e-4 | Quick screening | ~0.5 vol bp | Fast |
-/// | 1e-6 | Standard production | ~0.01 vol bp | Moderate |
-/// | 1e-8 | High-precision (BBG VCUB) | ~0.0001 vol bp | Slow |
-/// | 1e-10 | Research/validation | Machine precision | Very slow |
+/// | Tolerance (SSE) | Use Case | Speed |
+/// |-----------------|----------|-------|
+/// | 1e-4 | Standard production (default) | Moderate |
+/// | 1e-6 | Tight fits on well-identified smiles | Slow |
+/// | 1e-8 | High-precision (BBG VCUB); needs a large iteration budget | Very slow |
 ///
-/// For production vol surfaces where Greeks are computed from the surface,
-/// consider using tighter tolerance (1e-8) to ensure smooth Greeks.
+/// Tighter tolerances may fail with a solver-convergence error on smiles
+/// where `rho` is weakly identified; pair them with a larger
+/// [`Self::with_max_iterations`] budget.
 ///
 /// # Gradient Method
 ///
@@ -126,14 +134,21 @@ impl SABRCalibrator {
     /// Create new calibrator with production-ready defaults.
     ///
     /// Default settings:
-    /// - **Tolerance**: 1e-6 (standard production accuracy)
-    /// - **Max iterations**: 100
+    /// - **Tolerance**: 1e-4 on the vega-weighted SSE objective
+    /// - **Max iterations**: 2000
     /// - **Gradient method**: Finite difference (more robust)
+    ///
+    /// These defaults are attainable for typical market smiles under the
+    /// strict non-convergence semantics of `core::math::solver_multi::
+    /// LevenbergMarquardtSolver::minimize` (2026-06-09 core quant review):
+    /// the solver now errors instead of silently returning its best iterate,
+    /// so the prior defaults (1e-6 / 100 iterations) failed loudly on smiles
+    /// where `rho` is weakly identified.
     ///
     /// # Production Usage
     ///
     /// For high-precision applications (e.g., Greeks computation from vol surface),
-    /// consider using tighter tolerance:
+    /// consider using tighter tolerance with a larger iteration budget:
     ///
     /// ```ignore
     /// use finstack_valuations::models::volatility::sabr::SABRCalibrator;
@@ -142,12 +157,12 @@ impl SABRCalibrator {
     ///
     /// let _precise_calibrator = SABRCalibrator::new()
     ///     .with_tolerance(1e-8)
-    ///     .with_max_iterations(200);
+    ///     .with_max_iterations(5000);
     /// ```
     pub fn new() -> Self {
         Self {
-            tolerance: 1e-6,
-            max_iterations: 100,
+            tolerance: 1e-4,
+            max_iterations: 2000,
         }
     }
 

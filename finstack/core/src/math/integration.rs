@@ -110,8 +110,10 @@ impl<'de> serde::Deserialize<'de> for GaussHermiteQuadrature {
 }
 
 // Pre-computed Gauss-Hermite quadrature points and weights.
-// Nodes and weights computed using numpy.polynomial.hermite.hermgauss(N)
-// then adjusted for probabilist's Hermite (physicist's nodes / sqrt(2), weights / sqrt(pi))
+// Nodes and weights are the RAW physicist's values from
+// numpy.polynomial.hermite.hermgauss(N) (weight function exp(-x^2)).
+// The probabilist's conversion (x -> sqrt(2)·z, result / sqrt(pi)) is applied
+// at evaluation time inside `integrate()`, not baked into these tables.
 
 static GAUSS_HERMITE_5_POINTS: &[f64] = &[
     -2.0201828704560856,
@@ -385,12 +387,9 @@ impl GaussHermiteQuadrature {
                     points: GAUSS_HERMITE_20_POINTS,
                     weights: GAUSS_HERMITE_20_WEIGHTS,
                 };
-                let v20 = gh20.integrate(f);
-                if (v20 - base).abs() <= tolerance {
-                    base
-                } else {
-                    v20
-                }
+                // Return the higher-order estimate in both branches, consistent
+                // with the other refinement paths below.
+                gh20.integrate(f)
             }
             10 => {
                 let gh15 = GaussHermiteQuadrature {
@@ -870,8 +869,15 @@ where
 /// At each level:
 /// 1. Compute integral over `[a, b]` using single Gauss-Legendre
 /// 2. Compute integral over `[a, mid]` + `[mid, b]`
-/// 3. If difference ≤ `tol` or depth ≥ `max_depth`, return composite result
-/// 4. Otherwise, recursively refine each half
+/// 3. If difference ≤ `tol` (halved per side at each level so the leaf
+///    budgets sum to the caller's tolerance), return composite result
+/// 4. If depth ≥ `max_depth`: accept the composite result only when the
+///    error estimate is still within the caller's *original* (un-halved)
+///    tolerance — a leaf that is locally unconverged against its halved
+///    budget but within the global tolerance is not meaningfully wrong;
+///    otherwise return `SolverConvergenceFailed` (matching
+///    [`adaptive_simpson`]'s fail-loud behaviour)
+/// 5. Otherwise, recursively refine each half
 ///
 /// # Complexity
 ///
@@ -906,12 +912,14 @@ pub fn gauss_legendre_integrate_adaptive<F2>(
 where
     F2: Fn(f64) -> f64 + Copy,
 {
+    #[allow(clippy::too_many_arguments)]
     fn recurse<F2>(
         f: F2,
         a: f64,
         b: f64,
         order: usize,
         tol: f64,
+        orig_tol: f64,
         depth: usize,
         max_depth: usize,
     ) -> Result<f64, Error>
@@ -924,15 +932,34 @@ where
         let i2_right = gauss_legendre_integrate(f, mid, b, order)?;
         let i2 = i2_left + i2_right;
         let err = (i2 - i1).abs();
-        if err <= tol || depth >= max_depth {
+        if err <= tol {
             return Ok(i2);
         }
-        let left = recurse(f, a, mid, order, tol * 0.5, depth + 1, max_depth)?;
-        let right = recurse(f, mid, b, order, tol * 0.5, depth + 1, max_depth)?;
+        if depth >= max_depth {
+            // Locally unconverged against the halved per-leaf budget. Accept
+            // when still within the caller's original tolerance (the result
+            // is not meaningfully wrong at the requested accuracy); fail
+            // loudly otherwise instead of silently returning a bad estimate.
+            if err <= orig_tol {
+                return Ok(i2);
+            }
+            return Err(crate::error::InputError::SolverConvergenceFailed {
+                iterations: depth,
+                residual: err,
+                last_x: a + 0.5 * (b - a),
+                reason: format!(
+                    "gauss_legendre_integrate_adaptive did not meet tolerance {orig_tol:.2e} at \
+                     max_depth {max_depth} (interval [{a:.6e}, {b:.6e}], error estimate {err:.2e})"
+                ),
+            }
+            .into());
+        }
+        let left = recurse(f, a, mid, order, tol * 0.5, orig_tol, depth + 1, max_depth)?;
+        let right = recurse(f, mid, b, order, tol * 0.5, orig_tol, depth + 1, max_depth)?;
         Ok(left + right)
     }
 
-    recurse(f, a, b, order, tol, 0, max_depth)
+    recurse(f, a, b, order, tol, tol, 0, max_depth)
 }
 
 /// Trapezoidal rule for numerical integration.

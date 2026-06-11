@@ -178,8 +178,8 @@ pub struct ForwardCurve {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawForwardCurve {
-    #[serde(flatten)]
-    common_id: super::common::StateId,
+    /// Curve identifier
+    pub id: String,
     /// Base date
     pub base: Date,
     /// Reset lag in business days
@@ -188,10 +188,12 @@ struct RawForwardCurve {
     pub day_count: DayCount,
     /// Index tenor in years
     pub tenor: f64,
-    #[serde(flatten)]
-    points: super::common::StateKnotPoints,
-    #[serde(flatten)]
-    interp: super::common::StateInterp,
+    /// Time/value pairs used to construct the curve
+    pub knot_points: Vec<(f64, f64)>,
+    /// Interpolation style
+    pub interp_style: InterpStyle,
+    /// Extrapolation policy
+    pub extrapolation: ExtrapolationPolicy,
     /// Optional market quotes used to bootstrap this curve.
     #[serde(default)]
     pub rate_calibration: Option<ForwardCurveRateCalibration>,
@@ -210,18 +212,14 @@ impl From<ForwardCurve> for RawForwardCurve {
             .collect();
 
         RawForwardCurve {
-            common_id: super::common::StateId {
-                id: curve.id.to_string(),
-            },
+            id: curve.id.to_string(),
             base: curve.base,
             reset_lag: curve.reset_lag,
             day_count: curve.day_count,
             tenor: curve.tenor,
-            points: super::common::StateKnotPoints { knot_points },
-            interp: super::common::StateInterp {
-                interp_style: curve.interp.style(),
-                extrapolation: curve.interp.extrapolation(),
-            },
+            knot_points,
+            interp_style: curve.interp.style(),
+            extrapolation: curve.interp.extrapolation(),
             rate_calibration: curve.rate_calibration,
             fx_policy: curve.fx_policy,
         }
@@ -232,13 +230,13 @@ impl TryFrom<RawForwardCurve> for ForwardCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawForwardCurve) -> crate::Result<Self> {
-        ForwardCurve::builder(state.common_id.id, state.tenor)
+        ForwardCurve::builder(state.id, state.tenor)
             .base_date(state.base)
             .reset_lag(state.reset_lag)
             .day_count(state.day_count)
-            .knots(state.points.knot_points)
-            .interp(state.interp.interp_style)
-            .extrapolation(state.interp.extrapolation)
+            .knots(state.knot_points)
+            .interp(state.interp_style)
+            .extrapolation(state.extrapolation)
             .rate_calibration_opt(state.rate_calibration)
             .fx_policy_opt(state.fx_policy)
             .build()
@@ -251,6 +249,14 @@ impl ForwardCurve {
     /// **Defaults:** The builder infers day-count and reset-lag conventions from
     /// the curve ID when possible, then uses Linear interpolation with FlatForward
     /// extrapolation.
+    ///
+    /// **Build-vs-query basis trap:** the inferred day-count converts dated
+    /// pillars to year fractions at build time and query dates back at lookup
+    /// time. Because inference is substring-based, renaming the curve ID can
+    /// silently change the basis (Act/360 vs Act/365F shifts every pillar time
+    /// by ~1.4%) and the reset lag. Set [`ForwardCurveBuilder::day_count`] and
+    /// [`ForwardCurveBuilder::reset_lag`] explicitly when conventions matter;
+    /// each day-count inference is logged at `debug` level.
     #[must_use]
     pub fn builder(id: impl Into<CurveId>, tenor_years: f64) -> ForwardCurveBuilder {
         let id: CurveId = id.into();
@@ -363,10 +369,20 @@ impl ForwardCurve {
 
     /// Average rate over `[t1, t2]`.
     ///
-    /// Returns [`f64::NAN`] if `t2 < t1`.
+    /// # NaN contract
+    ///
+    /// Returns [`f64::NAN`] (rather than an error) if `t2 < t1` — misordered
+    /// arguments are a caller bug, and changing the signature to `Result`
+    /// would be too breaking. A `debug_assert` fires in debug builds and a
+    /// `tracing` warning is emitted in release builds; callers must be
+    /// prepared for NaN to propagate if they pass misordered times.
     #[inline]
     #[must_use]
     pub fn rate_period(&self, t1: f64, t2: f64) -> f64 {
+        debug_assert!(
+            t2 >= t1,
+            "ForwardCurve::rate_period requires t1 <= t2 (got t1={t1}, t2={t2})"
+        );
         if t2 < t1 {
             tracing::warn!(
                 curve_id = %self.id,
@@ -499,6 +515,19 @@ impl ForwardCurve {
 
     /// Create a builder pre-populated with this curve's data but a new ID.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> ForwardCurveBuilder {
+        self.metadata_builder(new_id).knots(
+            self.knots
+                .iter()
+                .copied()
+                .zip(self.forwards.iter().copied()),
+        )
+    }
+
+    /// Builder pre-populated with this curve's full metadata but **no** knots.
+    /// Shared by all rebuild-style operations (bumps, rolls) so that no
+    /// metadata field (reset lag, day-count, interpolation, extrapolation,
+    /// rate_calibration, fx_policy) is dropped.
+    pub(crate) fn metadata_builder(&self, new_id: impl Into<CurveId>) -> ForwardCurveBuilder {
         ForwardCurve::builder(new_id, self.tenor)
             .base_date(self.base)
             .reset_lag(self.reset_lag)
@@ -507,12 +536,6 @@ impl ForwardCurve {
             .extrapolation(self.interp.extrapolation())
             .rate_calibration_opt(self.rate_calibration.clone())
             .fx_policy_opt(self.fx_policy.clone())
-            .knots(
-                self.knots
-                    .iter()
-                    .copied()
-                    .zip(self.forwards.iter().copied()),
-            )
     }
 
     /// Create a new curve with a key-rate bump applied at a target time `t` (in years) (fallible).
@@ -601,14 +624,8 @@ impl ForwardCurve {
             .collect();
 
         let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bp);
-        ForwardCurve::builder(new_id, self.tenor)
-            .base_date(self.base)
-            .reset_lag(self.reset_lag)
-            .day_count(self.day_count)
-            .knots(bumped_rates)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
-            .build()
+        // Thread the full metadata (rate_calibration, fx_policy, …).
+        self.metadata_builder(new_id).knots(bumped_rates).build()
     }
 
     /// Rebuild only the interpolator from the current knots and forward rates.
@@ -690,16 +707,9 @@ impl ForwardCurve {
         // Derive new ID with suffix
         let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bp);
 
-        // Rebuild preserving base date, interpolation, and extrapolation policies
-        ForwardCurve::builder(new_id, self.tenor)
-            .base_date(self.base)
-            .reset_lag(self.reset_lag)
-            .day_count(self.day_count)
-            .knots(bumped_points)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
-            .rate_calibration_opt(self.rate_calibration.clone())
-            .build()
+        // Rebuild preserving the full metadata (interpolation, extrapolation,
+        // rate_calibration, fx_policy, …).
+        self.metadata_builder(new_id).knots(bumped_points).build()
     }
 
     /// Roll the curve forward by a specified number of days.
@@ -754,14 +764,10 @@ impl ForwardCurve {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
 
-        ForwardCurve::builder(self.id.clone(), self.tenor)
+        // Thread the full metadata and override the base date.
+        self.metadata_builder(self.id.clone())
             .base_date(new_base)
-            .reset_lag(self.reset_lag)
-            .day_count(self.day_count)
             .knots(rolled_points)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
-            .rate_calibration_opt(self.rate_calibration.clone())
             .build()
     }
 }
@@ -965,6 +971,17 @@ mod tests {
         assert!((fc.rate(0.5) - 0.035).abs() < 1e-12);
     }
 
+    // Reversed times are a caller bug: debug builds fire a `debug_assert`,
+    // release builds return NaN (documented NaN contract on `rate_period`).
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "rate_period requires t1 <= t2")]
+    fn rate_period_reversed_times_debug_asserts() {
+        let fc = sample_forward();
+        let _ = fc.rate_period(1.0, 0.5);
+    }
+
+    #[cfg(not(debug_assertions))]
     #[test]
     fn rate_period_reversed_times_returns_nan() {
         let fc = sample_forward();

@@ -133,18 +133,22 @@ use super::random::RandomNumberGenerator;
 /// - **Portfolio analytics**: Number of defaults given conditional default probability
 /// - **Structured credit**: Default distribution for CDO/CLO tranches
 ///
+/// # Errors
+///
+/// Returns [`Error::Validation`](crate::Error::Validation) if `p` is NaN.
+///
 /// # Examples
 ///
 /// ```rust
 /// use finstack_core::math::distributions::binomial_distribution;
 ///
 /// // Fair coin: distribution of heads in 10 flips
-/// let dist = binomial_distribution(10, 0.5);
+/// let dist = binomial_distribution(10, 0.5).unwrap();
 /// assert_eq!(dist.len(), 11); // P(X=0), P(X=1), ..., P(X=10)
 /// assert!((dist[5] - 0.24609375).abs() < 1e-6); // P(X=5)
 ///
 /// // Credit portfolio: default distribution with 5% PD
-/// let loss_dist = binomial_distribution(100, 0.05);
+/// let loss_dist = binomial_distribution(100, 0.05).unwrap();
 /// assert_eq!(loss_dist.len(), 101);
 /// // Most probability mass around 5 defaults
 /// assert!(loss_dist[5] > loss_dist[0]);
@@ -155,34 +159,39 @@ use super::random::RandomNumberGenerator;
 ///
 /// - Johnson, N. L., Kotz, S., & Kemp, A. W. (1993). *Univariate Discrete Distributions*
 ///   (2nd ed.). Wiley. Chapter 3.
-pub fn binomial_distribution(n: usize, p: f64) -> Vec<f64> {
+pub fn binomial_distribution(n: usize, p: f64) -> crate::Result<Vec<f64>> {
     use statrs::distribution::{Binomial, Discrete};
+
+    // NaN must surface as a validation error, not a silent point mass at 0.
+    if p.is_nan() {
+        return Err(crate::Error::Validation(
+            "binomial_distribution: success probability p must not be NaN".to_string(),
+        ));
+    }
 
     // Handle edge cases that would require special treatment
     if p <= 0.0 {
         // All probability on k=0
         let mut dist = vec![0.0; n + 1];
         dist[0] = 1.0;
-        return dist;
+        return Ok(dist);
     }
     if p >= 1.0 {
         // All probability on k=n
         let mut dist = vec![0.0; n + 1];
         dist[n] = 1.0;
-        return dist;
+        return Ok(dist);
     }
 
     // Create the Binomial distribution once and reuse for all k values
     // This avoids n+1 allocations of the distribution object
-    let mut dist = match Binomial::new(p, n as u64) {
-        Ok(binom) => (0..=n as u64).map(|k| binom.pmf(k)).collect::<Vec<_>>(),
-        Err(_) => {
-            // Fallback: shouldn't happen after edge case checks, but be defensive
-            let mut fallback = vec![0.0; n + 1];
-            fallback[0] = 1.0;
-            return fallback;
-        }
-    };
+    let mut dist = Binomial::new(p, n as u64)
+        .map(|binom| (0..=n as u64).map(|k| binom.pmf(k)).collect::<Vec<_>>())
+        .map_err(|e| {
+            crate::Error::Validation(format!(
+                "binomial_distribution: invalid parameters n={n}, p={p}: {e}"
+            ))
+        })?;
 
     // Normalize (should already sum to ~1, but defensive for numerical edge cases)
     let sum: f64 = dist.iter().sum();
@@ -191,7 +200,7 @@ pub fn binomial_distribution(n: usize, p: f64) -> Vec<f64> {
             *prob /= sum;
         }
     }
-    dist
+    Ok(dist)
 }
 
 /// Calculate binomial probability P(X = k) where X ~ Binomial(n, p).
@@ -507,9 +516,14 @@ pub fn sample_beta(
 
     // Guard against division by zero or near-zero denominator.
     // Both gamma samples can underflow to 0 for very small shape parameters.
+    // In the α, β → 0 limit Beta(α, β) converges to the two-point
+    // distribution on {0, 1} with P(1) = α/(α+β) (Johnson, Kotz &
+    // Balakrishnan 1995, Ch. 25), so sample that limit rather than
+    // collapsing to the mean 0.5.
     let sum = x + y;
     if !sum.is_finite() || sum <= 0.0 {
-        return Ok(0.5); // Fallback to mean for degenerate case
+        let p_one = alpha / (alpha + beta);
+        return Ok(if rng.uniform() < p_one { 1.0 } else { 0.0 });
     }
     Ok(x / sum)
 }
@@ -1588,7 +1602,7 @@ mod tests {
     #[test]
     fn test_binomial_distribution() {
         // Test basic distribution
-        let dist = binomial_distribution(10, 0.5);
+        let dist = binomial_distribution(10, 0.5).unwrap();
         assert_eq!(dist.len(), 11);
 
         // Test P(X=5) for fair coin
@@ -1622,29 +1636,34 @@ mod tests {
     #[test]
     fn test_binomial_distribution_edge_cases() {
         // p = 0: all probability on k=0
-        let dist_zero = binomial_distribution(5, 0.0);
+        let dist_zero = binomial_distribution(5, 0.0).unwrap();
         assert!((dist_zero[0] - 1.0).abs() < 1e-10);
         for val in dist_zero.iter().skip(1) {
             assert!(*val < 1e-10);
         }
 
         // p = 1: all probability on k=n
-        let dist_one = binomial_distribution(5, 1.0);
+        let dist_one = binomial_distribution(5, 1.0).unwrap();
         assert!((dist_one[5] - 1.0).abs() < 1e-10);
         for val in dist_one.iter().take(5) {
             assert!(*val < 1e-10);
         }
 
         // n = 0: single element
-        let dist_n0 = binomial_distribution(0, 0.5);
+        let dist_n0 = binomial_distribution(0, 0.5).unwrap();
         assert_eq!(dist_n0.len(), 1);
         assert!((dist_n0[0] - 1.0).abs() < 1e-10);
     }
 
     #[test]
+    fn test_binomial_distribution_rejects_nan_p() {
+        assert!(binomial_distribution(10, f64::NAN).is_err());
+    }
+
+    #[test]
     fn test_binomial_distribution_credit_portfolio() {
         // Typical credit portfolio: 100 names with 5% PD
-        let dist = binomial_distribution(100, 0.05);
+        let dist = binomial_distribution(100, 0.05).unwrap();
         assert_eq!(dist.len(), 101);
 
         // Expected number of defaults = n * p = 5

@@ -1754,3 +1754,74 @@ mod interp_style_eq_tests {
         assert_ne!(InterpStyle::MonotoneConvex, InterpStyle::CubicHermite);
     }
 }
+
+// ============================================================================
+// Hagan-West forward non-negativity property tests (seeded)
+// ============================================================================
+
+mod monotone_convex_positivity {
+    use super::*;
+    use finstack_core::math::random::{Pcg64Rng, RandomNumberGenerator};
+
+    /// Randomized-but-seeded property test: monotone-convex forwards must be
+    /// non-negative on stressed curves where steep segments sit next to
+    /// near-zero segments. Regression test for the sequential Hagan-West
+    /// positivity projection re-violating earlier segments (fixed by the
+    /// bounded fixpoint sweep in `apply_monotonicity_constraints`).
+    #[test]
+    fn forwards_non_negative_on_stressed_curves() {
+        // Fixed seeds per testing standards: deterministic and reproducible.
+        for seed in [7_u64, 42, 1234, 987_654] {
+            let mut rng = Pcg64Rng::new(seed);
+
+            for curve_idx in 0..50 {
+                // 4..=10 knots with random spacing.
+                let n = 4 + (rng.uniform() * 7.0) as usize;
+                let mut knots = Vec::with_capacity(n);
+                let mut t = 0.0;
+                knots.push(t);
+                for _ in 1..n {
+                    t += 0.05 + 1.95 * rng.uniform();
+                    knots.push(t);
+                }
+
+                // Stressed discrete forwards: alternate steep and near-zero
+                // regimes so the boundary/interior forward estimates overshoot.
+                let mut dfs = Vec::with_capacity(n);
+                dfs.push(1.0_f64);
+                for i in 1..n {
+                    let fd = if rng.uniform() < 0.5 {
+                        0.0005 + 0.002 * rng.uniform() // near-ZIRP segment
+                    } else {
+                        0.08 + 0.12 * rng.uniform() // steep segment
+                    };
+                    let dt = knots[i] - knots[i - 1];
+                    dfs.push(dfs[i - 1] * (-fd * dt).exp());
+                }
+
+                let interp = new_strict!(
+                    Interpolator<MonotoneConvexStrategy>,
+                    knots.clone().into(),
+                    dfs.into(),
+                    ExtrapolationPolicy::FlatForward
+                )
+                .expect("stressed curve should build");
+
+                // Dense sampling of the instantaneous forward
+                // f(t) = -DF'(t)/DF(t) across the interpolation domain.
+                let t_max = knots[n - 1];
+                let samples = 400;
+                for s in 0..=samples {
+                    let x = t_max * (s as f64) / (samples as f64);
+                    let df = interp.interp(x);
+                    let df_prime = interp.interp_prime(x);
+                    let fwd = -df_prime / df;
+                    assert!(
+                        fwd >= -1e-10,
+                        "negative forward {fwd} at t={x} (seed={seed}, curve={curve_idx}, knots={knots:?})"
+                    );
+                }
+            }
+        }
+    }
+}

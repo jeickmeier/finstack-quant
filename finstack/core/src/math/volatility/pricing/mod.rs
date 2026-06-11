@@ -181,6 +181,33 @@ mod tests {
     }
 
     #[test]
+    fn test_d1_black76_degenerate_inputs_match_delta_digital_limit() {
+        use crate::math::special_functions::norm_cdf;
+
+        // Degenerate inputs (T = 0 here): d1 returns ±∞ by moneyness so that
+        // N(d1) reproduces black_delta_call's intrinsic digital limit.
+        let sigma = 0.2;
+
+        // ITM / ATM: forward >= strike → +∞ → N(d1) = 1.0
+        let d1_itm = d1_black76(0.05, 0.04, sigma, 0.0);
+        assert!(d1_itm.is_infinite() && d1_itm > 0.0);
+        assert_eq!(norm_cdf(d1_itm), black_delta_call(0.05, 0.04, sigma, 0.0));
+
+        let d1_atm = d1_black76(0.05, 0.05, sigma, 0.0);
+        assert!(d1_atm.is_infinite() && d1_atm > 0.0);
+        assert_eq!(norm_cdf(d1_atm), black_delta_call(0.05, 0.05, sigma, 0.0));
+
+        // OTM: forward < strike → −∞ → N(d1) = 0.0
+        let d1_otm = d1_black76(0.04, 0.05, sigma, 0.0);
+        assert!(d1_otm.is_infinite() && d1_otm < 0.0);
+        assert_eq!(norm_cdf(d1_otm), black_delta_call(0.04, 0.05, sigma, 0.0));
+
+        // Other degenerate domains follow the same convention.
+        assert!(d1_black76(0.05, 0.04, 0.0, 1.0).is_infinite());
+        assert!(d1_black76(-0.05, 0.04, sigma, 1.0) == f64::NEG_INFINITY);
+    }
+
+    #[test]
     fn test_bachelier_gamma_positive() {
         let forward = 0.03;
         let strike = 0.025;

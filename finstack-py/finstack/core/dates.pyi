@@ -214,6 +214,7 @@ class DayCountContext:
         calendar_id: Optional[str] = None,
         frequency: Optional[Tenor] = None,
         bus_basis: Optional[int] = None,
+        coupon_period: Optional[tuple[datetime.date, datetime.date]] = None,
     ) -> None:
         """Create a day-count context.
 
@@ -225,6 +226,8 @@ class DayCountContext:
             Coupon frequency.
         bus_basis : int | None
             Custom business-day divisor.
+        coupon_period : tuple[datetime.date, datetime.date] | None
+            Reference coupon period ``(start, end)`` for ACT/ACT (ICMA).
         """
         ...
 
@@ -258,6 +261,16 @@ class DayCountContext:
         """
         ...
 
+    @property
+    def coupon_period(self) -> Optional[tuple[datetime.date, datetime.date]]:
+        """Optional reference coupon period as ``(start, end)`` dates.
+
+        Returns
+        -------
+        tuple[datetime.date, datetime.date] | None
+        """
+        ...
+
     def to_state(self) -> DayCountContextState:
         """Convert to a serializable state snapshot.
 
@@ -287,6 +300,7 @@ class DayCountContextState:
         calendar_id: Optional[str] = None,
         frequency: Optional[Tenor] = None,
         bus_basis: Optional[int] = None,
+        coupon_period: Optional[tuple[datetime.date, datetime.date]] = None,
     ) -> None:
         """Create a context state.
 
@@ -298,6 +312,8 @@ class DayCountContextState:
             Coupon frequency.
         bus_basis : int | None
             Custom business-day divisor.
+        coupon_period : tuple[datetime.date, datetime.date] | None
+            Reference coupon period ``(start, end)``.
         """
         ...
 
@@ -337,6 +353,16 @@ class DayCountContextState:
         Returns
         -------
         int | None
+        """
+        ...
+
+    @property
+    def coupon_period(self) -> Optional[tuple[datetime.date, datetime.date]]:
+        """Optional reference coupon period as ``(start, end)`` dates.
+
+        Returns
+        -------
+        tuple[datetime.date, datetime.date] | None
         """
         ...
 
@@ -1575,6 +1601,9 @@ class ScheduleBuilder:
     def error_policy(self, policy: ScheduleErrorPolicy) -> None:
         """Set the error policy.
 
+        Setting a policy fully replaces any previous policy; calls are
+        order-independent and idempotent.
+
         Parameters
         ----------
         policy : ScheduleErrorPolicy
@@ -1585,6 +1614,11 @@ class ScheduleBuilder:
     def build(self) -> Schedule:
         """Build the schedule.
 
+        Under the default ``STRICT`` policy any build warnings raise
+        ``ValueError``. Under ``MISSING_CALENDAR_WARNING`` or
+        ``GRACEFUL_EMPTY`` the schedule is returned carrying its warnings
+        (inspect via ``Schedule.warnings`` / ``Schedule.has_warnings()``).
+
         Returns
         -------
         Schedule
@@ -1593,7 +1627,8 @@ class ScheduleBuilder:
         Raises
         ------
         ValueError
-            If the schedule cannot be built with the given parameters.
+            If the schedule cannot be built with the given parameters, or
+            if warnings occur under the strict policy.
         """
         ...
 

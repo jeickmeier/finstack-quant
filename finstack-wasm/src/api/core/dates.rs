@@ -18,21 +18,30 @@ pub struct DayCountContext {
     calendar_code: Option<String>,
     frequency: Option<RustTenor>,
     bus_basis: Option<u16>,
+    coupon_period: Option<(time::Date, time::Date)>,
 }
 
 impl DayCountContext {
-    fn to_rust_ctx(&self) -> RustDayCountContext<'static> {
+    /// Resolve to a runtime context.
+    ///
+    /// Errors when `calendar_code` is set but unknown to the global calendar
+    /// registry, instead of silently dropping the calendar.
+    fn to_rust_ctx(&self) -> Result<RustDayCountContext<'static>, JsValue> {
         let registry = CalendarRegistry::global();
-        let calendar = self
-            .calendar_code
-            .as_deref()
-            .and_then(|code| registry.resolve_str(code));
-        RustDayCountContext {
+        let calendar = match self.calendar_code.as_deref() {
+            Some(code) => Some(
+                registry
+                    .resolve_str(code)
+                    .ok_or_else(|| JsValue::from_str(&format!("unknown calendar id: {code:?}")))?,
+            ),
+            None => None,
+        };
+        Ok(RustDayCountContext {
             calendar,
             frequency: self.frequency,
             bus_basis: self.bus_basis,
-            coupon_period: None,
-        }
+            coupon_period: self.coupon_period,
+        })
     }
 }
 
@@ -66,6 +75,25 @@ impl DayCountContext {
         let mut next = self.clone();
         next.bus_basis = Some(bus_basis);
         next
+    }
+
+    /// Return a copy with the reference coupon period (epoch days) used by
+    /// Act/Act ICMA. Errors when either date is out of range or
+    /// `start >= end`.
+    #[wasm_bindgen(js_name = withCouponPeriod)]
+    pub fn with_coupon_period(
+        &self,
+        start_epoch_days: i32,
+        end_epoch_days: i32,
+    ) -> Result<DayCountContext, JsValue> {
+        let start = epoch_to_date(start_epoch_days)?;
+        let end = epoch_to_date(end_epoch_days)?;
+        if start >= end {
+            return Err(JsValue::from_str("coupon period start must be before end"));
+        }
+        let mut next = self.clone();
+        next.coupon_period = Some((start, end));
+        Ok(next)
     }
 }
 
@@ -217,7 +245,7 @@ impl DayCount {
         let start = epoch_to_date(start_epoch_days)?;
         let end = epoch_to_date(end_epoch_days)?;
         self.inner
-            .year_fraction(start, end, ctx.to_rust_ctx())
+            .year_fraction(start, end, ctx.to_rust_ctx()?)
             .map_err(to_js_err)
     }
 

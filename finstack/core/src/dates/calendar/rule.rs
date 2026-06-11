@@ -68,7 +68,10 @@ use time::{Date, Duration, Month, Weekday};
 ///
 /// - **`None`**: No adjustment—holiday observed only on exact calendar date
 /// - **`NextMonday`**: Weekend holidays observed on following Monday
-/// - **`FriIfSatMonIfSun`**: Saturday → Friday, Sunday → Monday (US convention)
+/// - **`FriIfSatMonIfSun`**: Saturday → Friday, Sunday → Monday (OPM/NYSE convention)
+/// - **`MonIfSun`**: Sunday → Monday only; no substitute for Saturday (Federal Reserve convention)
+/// - **`MonIfSatTueIfSun`**: Saturday → Monday, Sunday → Tuesday (two days later;
+///   UK Christmas/Boxing Day chained substitution)
 ///
 /// # Examples
 ///
@@ -93,8 +96,13 @@ use time::{Date, Duration, Month, Weekday};
 ///
 /// # Standards Reference
 ///
-/// - **US markets**: FriIfSatMonIfSun (NYSE, NASDAQ, US Treasury)
+/// - **US exchanges / OPM**: FriIfSatMonIfSun (NYSE, NASDAQ, federal workforce)
+/// - **Federal Reserve / SOFR / Fedwire**: MonIfSun (Sunday → Monday only; banks
+///   are open the Friday before a Saturday holiday — see Federal Reserve Board,
+///   "K.8 Holidays Observed by the Federal Reserve System")
 /// - **UK markets**: NextMonday (LSE, UK Bank Holidays)
+/// - **UK Christmas/Boxing Day**: MonIfSatTueIfSun (chained substitution so the
+///   two observed days never collide)
 /// - **European markets**: Mixed; often NextMonday or None
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -113,8 +121,33 @@ pub enum Observed {
 
     /// Saturday → previous Friday; Sunday → following Monday.
     ///
-    /// Standard US market convention (NYSE, NASDAQ, Federal Reserve).
+    /// US exchange/OPM convention (NYSE, NASDAQ).
     FriIfSatMonIfSun,
+
+    /// Sunday → following Monday; Saturday → **no substitute**.
+    ///
+    /// Federal Reserve convention (basis for SOFR/Fedwire business days): when a
+    /// fixed holiday falls on a Saturday, banks remain open the preceding
+    /// Friday; only Sunday holidays move to Monday.
+    ///
+    /// # Reference
+    /// Federal Reserve Board, "K.8 Holidays Observed by the Federal Reserve
+    /// System": "For holidays falling on Saturday, Federal Reserve Banks and
+    /// Branches will be open the preceding Friday."
+    MonIfSun,
+
+    /// Saturday → following Monday (+2 days); Sunday → following Tuesday (+2 days).
+    ///
+    /// UK chained-substitution convention for Christmas Day (Dec 25 → observed
+    /// Dec 27 when on a weekend) and Boxing Day (Dec 26 → observed Dec 28 when
+    /// on a weekend), so the two substitute days never collide:
+    ///
+    /// - 2021 (Dec 25 Sat): observed Mon Dec 27 + Tue Dec 28
+    /// - 2022 (Dec 25 Sun): observed Mon Dec 26 (Boxing, actual day) + Tue Dec 27
+    ///
+    /// Matches UK government bank-holiday history and QuantLib's
+    /// `UnitedKingdom` calendar.
+    MonIfSatTueIfSun,
 }
 
 /// Search direction for weekday shift rules.
@@ -586,6 +619,21 @@ fn apply_observed(mut base: Date, observed: Observed) -> Date {
                 base += Duration::days(1);
             }
         }
+        Observed::MonIfSun => {
+            // Federal Reserve convention: Sunday → Monday; Saturday holidays
+            // are not substituted (banks open the preceding Friday).
+            if matches!(base.weekday(), Weekday::Sunday) {
+                base += Duration::days(1);
+            }
+        }
+        Observed::MonIfSatTueIfSun => {
+            // UK chained substitution: weekend holiday observed two calendar
+            // days later (Sat → Mon, Sun → Tue), so paired holidays such as
+            // Christmas/Boxing Day map to distinct substitute days.
+            if matches!(base.weekday(), Weekday::Saturday | Weekday::Sunday) {
+                base += Duration::days(2);
+            }
+        }
     }
     base
 }
@@ -645,18 +693,31 @@ impl Rule {
                 month,
                 day,
                 observed,
-            } => Date::from_calendar_date(date.year(), *month, *day)
-                .ok()
-                .map(|base| apply_observed(base, *observed) == date)
-                .unwrap_or(false),
+            } => {
+                // Observance can cross a year boundary: e.g. Jan-1-on-Saturday
+                // observed Friday Dec 31 of the PRIOR year under
+                // FriIfSatMonIfSun. Reconstructing the base only from
+                // `date.year()` made `applies()` diverge from
+                // `materialize_year()` for those dates (2026-06-09 core quant
+                // review, Moderate/Dates), so test the rule materialized from
+                // the adjacent years as well (observance shifts at most 2
+                // days, so ±1 year is sufficient).
+                [date.year() - 1, date.year(), date.year() + 1]
+                    .iter()
+                    .any(|&y| {
+                        Date::from_calendar_date(y, *month, *day)
+                            .ok()
+                            .map(|base| apply_observed(base, *observed) == date)
+                            .unwrap_or(false)
+                    })
+            }
             Rule::NthWeekday { n, weekday, month } => {
-                let target = crate::dates::calendar::generated::nth_weekday_of_month(
+                crate::dates::calendar::generated::nth_weekday_of_month(
                     date.year(),
                     *month,
                     *weekday,
                     *n,
-                );
-                target == date
+                ) == Some(date)
             }
             Rule::WeekdayShift {
                 weekday,
@@ -725,10 +786,11 @@ impl Rule {
                 }
             }
             Rule::NthWeekday { n, weekday, month } => {
-                let d = crate::dates::calendar::generated::nth_weekday_of_month(
+                if let Some(d) = crate::dates::calendar::generated::nth_weekday_of_month(
                     year, *month, *weekday, *n,
-                );
-                out.push(d);
+                ) {
+                    out.push(d);
+                }
             }
             Rule::WeekdayShift {
                 weekday,

@@ -1196,17 +1196,18 @@ pub fn calculate_convertible_greeks(
     {
         if inputs.time_to_maturity > 1.0 / 365.25 {
             if let Some(next_day) = as_of.next_day() {
-                // Theta must roll the discount/credit curves forward by one
-                // day, not just advance the valuation date. Repricing at
-                // `t+1d` with the *same* market context leaves the curves
-                // anchored at `t`, so theta omits curve roll-down (the change
-                // in discount factors as the curve's own base date advances).
-                // `roll_forward(1)` re-anchors every curve to `t+1d`.
+                // `roll_forward(1)` realizes one day of forwards on every
+                // curve (discount curves renormalize by DF(1d), hazard
+                // curves preserve hazard rates via conditional survival), so
+                // theta = price(rolled, t+1d) - price(t) captures both carry
+                // and roll-down. See the 2026-06-09 core quant review
+                // (realized-forward roll semantics).
                 //
                 // A roll can fail when a curve is too sparse to retain ≥ 2
                 // knots after the shift; in that case we fall back to a
-                // no-roll reprice (still a valid theta estimate, just without
-                // curve roll-down) rather than failing the whole Greeks call.
+                // no-roll reprice. Because the pricer discounts relative to
+                // `as_of`, the fallback yields nearly the same discounting
+                // effect, but leaves curve base dates anchored at `t`.
                 let rolled_market = match market_context.roll_forward(1) {
                     Ok(m) => m,
                     Err(_) => market_context.clone(),

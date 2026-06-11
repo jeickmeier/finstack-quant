@@ -61,5 +61,5 @@ pub use pricing::{
     brenner_subrahmanyam_approx, implied_vol_initial_guess, manaster_koehler_approx,
 };
 
-// Implied volatility solvers (Jäckel 2017-inspired)
+// Implied volatility solvers (bracketed bisection + Halley refinement)
 pub use implied::{implied_vol_bachelier, implied_vol_black};

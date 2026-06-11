@@ -384,7 +384,7 @@ class CurveId:
         """
         ...
 
-    def get_as_str(self) -> str:
+    def as_str(self) -> str:
         """Underlying string value.
 
         Returns
@@ -420,7 +420,7 @@ class InstrumentId:
         """
         ...
 
-    def get_as_str(self) -> str:
+    def as_str(self) -> str:
         """Underlying string value.
 
         Returns
@@ -486,21 +486,12 @@ class Attributes:
         """
         ...
 
-    def get_keys(self) -> list[str]:
+    def keys(self) -> list[str]:
         """Metadata keys in sorted order.
 
         Returns
         -------
         list[str]
-        """
-        ...
-
-    def get_len(self) -> int:
-        """Number of metadata entries.
-
-        Returns
-        -------
-        int
         """
         ...
 

@@ -15,9 +15,11 @@
 //! σ_local²(K, T) = (∂C/∂T + rKC_K + qC) / ((1/2)K²∂²C/∂K²)
 //! ```
 //!
-//! This implementation works in the Black-76 / forward-measure setting, where
-//! discounting and carry are already embedded in the supplied forward price and
-//! discount factor. In that measure the spot-formula drift terms cancel.
+//! This implementation works in the Black-76 / forward-measure setting on
+//! **undiscounted** forward call prices C̃(T, K) = Black_Call(F, K, σ, T). In
+//! that measure the spot-formula drift terms cancel and the ratio reduces to
+//! σ² = (∂C̃/∂T) / (½K²∂²C̃/∂K²). Discounting the prices would inject a
+//! spurious −r·C̃ term into the time derivative and bias the local vol low.
 //!
 //! For zero dividends and zero rates (the simplest special case):
 //!
@@ -92,7 +94,10 @@ impl LocalVolSurface {
     ///
     /// * `surface` — implied volatility surface (bilinear-interpolated)
     /// * `forward` — forward price under the forward measure (assumed constant across expiries for simplicity)
-    /// * `rate` — continuously compounded risk-free rate used only for discounting Black-76 prices
+    /// * `_rate` — unused; retained for signature stability. The Dupire ratio
+    ///   is evaluated on **undiscounted** forward call prices — discounting
+    ///   would inject a spurious −r·C̃ term into ∂C̃/∂T (it cancels in the
+    ///   strike derivatives but not in the time derivative)
     ///
     /// # Returns
     ///
@@ -102,7 +107,7 @@ impl LocalVolSurface {
     ///
     /// Returns an error if the surface has fewer than 2 expiries or 3 strikes
     /// (insufficient for finite differences).
-    pub fn from_implied_vol(surface: &VolSurface, forward: f64, rate: f64) -> crate::Result<Self> {
+    pub fn from_implied_vol(surface: &VolSurface, forward: f64, _rate: f64) -> crate::Result<Self> {
         let expiries = surface.expiries().to_vec();
         let strikes = surface.strikes().to_vec();
         let n_exp = expiries.len();
@@ -115,24 +120,30 @@ impl LocalVolSurface {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
 
-        // Step 1: Compute Black-76 call prices at each grid point
-        // C(T, K) = e^{-rT} × Black_Call(F, K, σ(T,K), T)
+        // Step 1: Compute undiscounted Black-76 forward call prices at each
+        // grid point: C̃(T, K) = Black_Call(F, K, σ(T,K), T). No discount
+        // factor: the forward-measure Dupire ratio requires undiscounted
+        // prices (the e^{-rT} factor cancels in the strike derivatives but
+        // corrupts ∂C̃/∂T with a −r·C̃ term, biasing local vol low for r > 0).
         let mut call_prices = vec![0.0; n_exp * n_str];
         for (ei, &t) in expiries.iter().enumerate() {
-            let df = (-rate * t).exp();
             for (si, &k) in strikes.iter().enumerate() {
                 let iv = surface
                     .value_checked(t, k)
                     .unwrap_or_else(|_| surface.value_clamped(t, k));
-                call_prices[ei * n_str + si] = df * black_call(forward, k, iv, t);
+                call_prices[ei * n_str + si] = black_call(forward, k, iv, t);
             }
         }
 
         // Step 2: Apply Dupire formula using finite differences
         let mut local_vols = vec![0.0; n_exp * n_str];
 
-        // Floor to prevent division by zero in gamma
+        // Floor to prevent division by zero in gamma. The denominator
+        // ½K²·∂²C/∂K² has price units, so the floor is scaled by the forward
+        // (the natural price scale of the undiscounted call grid) rather than
+        // being a fixed absolute threshold.
         const GAMMA_FLOOR: f64 = 1e-14;
+        let denom_floor = GAMMA_FLOOR * forward.abs().max(1.0);
 
         for ei in 0..n_exp {
             let t = expiries[ei];
@@ -225,8 +236,17 @@ impl LocalVolSurface {
                 let denominator = 0.5 * k * k * d2c_dk2;
 
                 // Compute local variance
-                let local_var = if denominator.abs() < GAMMA_FLOOR {
+                let local_var = if denominator.abs() < denom_floor {
                     // Gamma is too small — fall back to implied vol
+                    tracing::warn!(
+                        expiry = t,
+                        strike = k,
+                        forward = forward,
+                        denominator = denominator,
+                        floor = denom_floor,
+                        "local_vol: Dupire denominator (gamma) below floor; \
+                         falling back to implied vol at this grid point",
+                    );
                     let iv = surface
                         .value_checked(t, k)
                         .unwrap_or_else(|_| surface.value_clamped(t, k));
@@ -235,6 +255,15 @@ impl LocalVolSurface {
                     let lv2 = numerator / denominator;
                     if lv2 < 0.0 {
                         // Negative local variance — use implied vol as fallback
+                        tracing::warn!(
+                            expiry = t,
+                            strike = k,
+                            forward = forward,
+                            local_variance = lv2,
+                            "local_vol: negative Dupire local variance (calendar \
+                             arbitrage in the input surface); falling back to \
+                             implied vol at this grid point",
+                        );
                         let iv = surface
                             .value_checked(t, k)
                             .unwrap_or_else(|_| surface.value_clamped(t, k));
@@ -271,7 +300,8 @@ impl LocalVolSurface {
     ///
     /// * `surface` — implied volatility surface
     /// * `forward` — forward price
-    /// * `rate` — risk-free rate for discounting
+    /// * `rate` — unused; retained for signature stability (see
+    ///   [`from_implied_vol`](Self::from_implied_vol))
     /// * `sigma_strikes` — Gaussian kernel width in strike-space units (≥ 0)
     ///
     /// # Errors
@@ -565,6 +595,41 @@ mod tests {
             (vol_mid - 0.20).abs() < 0.05,
             "Flat surface local vol should be ~0.20, got {vol_mid:.4}"
         );
+    }
+
+    /// Regression for the review finding "Dupire local-vol extraction biased
+    /// low whenever r≠0": discounting the call prices fed into the
+    /// forward-measure Dupire ratio injected a spurious −r·C̃ theta term
+    /// (flat 20% surface with r=3% extracted 18.9% ATM / 16.4% at K=80 at
+    /// T=1). With undiscounted prices the rate must not bias the result.
+    #[test]
+    fn local_vol_flat_surface_is_flat_with_nonzero_rate() {
+        // Dense grid so the finite-difference discretization error is well
+        // below the 0.5-vol-pt assertion tolerance.
+        let expiries: Vec<f64> = (0..29).map(|i| 0.25 + 0.0625 * i as f64).collect();
+        let strikes: Vec<f64> = (0..25).map(|i| 70.0 + 2.5 * i as f64).collect();
+        let mut builder = VolSurface::builder("FLAT-R3")
+            .expiries(&expiries)
+            .strikes(&strikes);
+        let flat_row = vec![0.20; strikes.len()];
+        for _ in 0..expiries.len() {
+            builder = builder.row(&flat_row);
+        }
+        let flat = builder.build().expect("flat surface should build");
+
+        let lv = LocalVolSurface::from_implied_vol(&flat, 100.0, 0.03)
+            .expect("extraction should succeed");
+
+        for &t in &[0.5, 1.0, 1.5] {
+            for &k in &[80.0, 90.0, 100.0, 110.0, 120.0] {
+                let vol = lv.value(t, k);
+                assert!(
+                    (vol - 0.20).abs() < 0.005,
+                    "Flat 20% surface with r=3% must extract ~20% local vol \
+                     at (T={t}, K={k}), got {vol:.4}"
+                );
+            }
+        }
     }
 
     #[test]

@@ -284,6 +284,88 @@ fn with_cache_configuration() {
     assert!((result[3] - 7.0).abs() < 1e-12);
 }
 
+#[test]
+fn repeated_eval_on_different_same_length_inputs_returns_fresh_results() {
+    // Regression for the stale cross-eval cache (Blocker #2 in
+    // docs/reviews/2026-06-09-core-quant-review.md): the persistent cache
+    // keyed on (dag_node_id, len) with no input fingerprint, so re-evaluating
+    // the same CompiledExpr on different same-length data returned the FIRST
+    // dataset's values. The shared rolling_std sub-expression below was a
+    // cache node under the old strategy.
+    let ctx = SimpleContext::new(["x"]).expect("unique columns");
+    let rolling = Expr::call(
+        Function::RollingStd,
+        vec![Expr::column("x"), Expr::literal(2.0)],
+    );
+    let expr = Expr::bin_op(BinOp::Add, rolling.clone(), rolling);
+
+    let meta = results_meta(&FinstackConfig::default());
+    let compiled = CompiledExpr::with_planning(expr.clone(), meta.clone())
+        .unwrap()
+        .with_cache(8);
+
+    let a = vec![1.0, 2.0, 3.0, 4.0];
+    let cols_a: Vec<&[f64]> = vec![a.as_slice()];
+    let first = compiled
+        .eval(&ctx, &cols_a, EvalOpts::default())
+        .unwrap()
+        .values;
+
+    let b = vec![10.0, 40.0, 90.0, 160.0];
+    let cols_b: Vec<&[f64]> = vec![b.as_slice()];
+    let second = compiled
+        .eval(&ctx, &cols_b, EvalOpts::default())
+        .unwrap()
+        .values;
+
+    // Expected: result for dataset b computed by a fresh evaluator.
+    let fresh = CompiledExpr::with_planning(expr, meta)
+        .unwrap()
+        .eval(&ctx, &cols_b, EvalOpts::default())
+        .unwrap()
+        .values;
+
+    assert_eq!(second.len(), 4);
+    assert!(second[0].is_nan());
+    for i in 1..4 {
+        assert!(
+            (second[i] - fresh[i]).abs() < 1e-12,
+            "second eval [{}]: {} != fresh {}",
+            i,
+            second[i],
+            fresh[i]
+        );
+        // Sanity: dataset b results must differ from dataset a results.
+        assert!(
+            (second[i] - first[i]).abs() > 1.0,
+            "second eval [{}] returned stale first-dataset value {}",
+            i,
+            second[i]
+        );
+    }
+}
+
+#[test]
+fn eval_stamps_metadata_from_planning_meta() {
+    // Regression: eval() previously stamped results_meta(&FinstackConfig::default()),
+    // ignoring the caller's meta passed to with_planning
+    // (docs/reviews/2026-06-09-core-quant-review.md, "Major — expression engine").
+    use finstack_core::config::RoundingMode;
+
+    let (ctx, data) = create_test_data();
+    let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
+
+    let mut meta = results_meta(&FinstackConfig::default());
+    meta.rounding.mode = RoundingMode::AwayFromZero;
+
+    let expr = Expr::bin_op(BinOp::Add, Expr::column("x"), Expr::literal(1.0));
+    let compiled = CompiledExpr::with_planning(expr, meta).unwrap();
+    let result = compiled.eval(&ctx, &cols, EvalOpts::default()).unwrap();
+
+    assert_eq!(result.values, vec![2.0, 3.0, 4.0, 5.0, 6.0]);
+    assert_eq!(result.metadata.rounding.mode, RoundingMode::AwayFromZero);
+}
+
 // =============================================================================
 // Edge Cases
 // =============================================================================

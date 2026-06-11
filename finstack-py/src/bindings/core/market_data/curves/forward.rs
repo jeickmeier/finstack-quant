@@ -51,35 +51,36 @@ impl PyForwardCurve {
     /// base_date : datetime.date
     ///     Valuation date.
     /// day_count : str, optional
-    ///     Day-count convention (default ``"act_360"``).
+    ///     Day-count convention. When omitted, Rust infers a market default from the curve ID.
     /// interp : str, optional
     ///     Interpolation style (default ``"linear"``).
     /// extrapolation : str, optional
     ///     Extrapolation policy (default ``"flat_forward"``).
     #[new]
-    #[pyo3(signature = (id, tenor, knots, base_date, day_count="act_360", interp="linear", extrapolation="flat_forward"))]
+    #[pyo3(signature = (id, tenor, knots, base_date, day_count=None, interp="linear", extrapolation="flat_forward"))]
     fn new(
         id: &str,
         tenor: f64,
         knots: Vec<(f64, f64)>,
         base_date: &Bound<'_, PyAny>,
-        day_count: &str,
+        day_count: Option<&str>,
         interp: &str,
         extrapolation: &str,
     ) -> PyResult<Self> {
         let base = py_to_date(base_date)?;
-        let dc = parse_day_count(day_count)?;
         let style = parse_interp_style(interp)?;
         let extrap = parse_extrapolation(extrapolation)?;
 
-        let curve = ForwardCurve::builder(id, tenor)
+        let mut builder = ForwardCurve::builder(id, tenor)
             .base_date(base)
-            .day_count(dc)
             .knots(knots)
             .interp(style)
-            .extrapolation(extrap)
-            .build()
-            .map_err(core_to_py)?;
+            .extrapolation(extrap);
+        if let Some(day_count) = day_count {
+            builder = builder.day_count(parse_day_count(day_count)?);
+        }
+
+        let curve = builder.build().map_err(core_to_py)?;
 
         Ok(Self {
             inner: Arc::new(curve),

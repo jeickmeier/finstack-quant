@@ -54,7 +54,16 @@ pub fn year_fraction(dc: DayCount, start: Date, end: Date) -> finstack_core::Res
 /// - Metric calculations (e.g., par rate using `df_on_date_curve`)
 /// - NPV calculations
 ///
-/// **Use this when pricing at par rate should yield zero PV** (e.g., deposits, FRAs).
+/// # Cashflow-on-as_of Policy: HOLDER-VIEW (Excludes `date <= as_of`)
+///
+/// Routes through `core::cashflow::npv`, which excludes flows on or before
+/// the valuation date (market-standard position value; 2026-06-09 core quant
+/// review). For a T+0 deposit valued on its effective date, the initial
+/// notional exchange settles on `as_of` and is excluded: `base_value` is the
+/// PV of the *remaining* flows (≈ +notional·DF), not the trade NPV (≈ 0 at
+/// inception). For pricing-view semantics that include `date == as_of` flows
+/// (needed for calibration bracketing of T+0 instruments), use
+/// [`schedule_pv_using_curve_dc_raw`].
 ///
 /// # Arguments
 ///

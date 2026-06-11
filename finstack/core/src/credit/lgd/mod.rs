@@ -58,23 +58,23 @@ pub fn seniority_recovery_stats_default(seniority: &str) -> crate::Result<BetaRe
 ///
 /// # Errors
 /// Returns an error if the mean or standard deviation cannot parameterize a
-/// valid Beta recovery distribution.
+/// valid Beta recovery distribution, or if sampling fails.
 pub fn beta_recovery_sample(
     mean: f64,
     std: f64,
     n_samples: usize,
     seed: u64,
 ) -> crate::Result<Vec<f64>> {
-    Ok(BetaRecovery::new(mean, std)?.sample_seeded(n_samples, seed))
+    BetaRecovery::new(mean, std)?.sample_seeded(n_samples, seed)
 }
 
 /// Return the value at quantile `q` for a Beta recovery distribution.
 ///
 /// # Errors
 /// Returns an error if the mean or standard deviation cannot parameterize a
-/// valid Beta recovery distribution.
+/// valid Beta recovery distribution, or if the quantile evaluation fails.
 pub fn beta_recovery_quantile(mean: f64, std: f64, q: f64) -> crate::Result<f64> {
-    Ok(BetaRecovery::new(mean, std)?.quantile(q))
+    BetaRecovery::new(mean, std)?.quantile(q)
 }
 
 /// Compute workout net recovery and LGD from collateral specs.
@@ -110,16 +110,35 @@ pub fn workout_lgd(
     Ok((model.net_recovery(ead)?, model.lgd(ead)?))
 }
 
-/// Apply a Frye-Jacobs downturn adjustment to base LGD.
+/// Apply a stressed downturn adjustment to base LGD.
+///
+/// Uses the proprietary mean-plus-multiple-of-Bernoulli-stdev approximation
+/// (see [`DownturnMethod::FryeJacobs`](downturn::DownturnMethod::FryeJacobs)
+/// for the formula and naming note — this is *not* the Frye-Jacobs (2012)
+/// model):
+///
+/// ```text
+/// LGD_downturn = LGD_base + lgd_sensitivity * sqrt(rho)
+///              * Phi_inv(stress_quantile) * sqrt(LGD_base * (1 - LGD_base))
+/// ```
+///
+/// # Arguments
+///
+/// * `base_lgd` - Through-the-cycle LGD in \[0, 1\].
+/// * `asset_correlation` - Asset correlation rho in (0, 1). Basel: 0.12-0.24.
+/// * `lgd_sensitivity` - LGD sensitivity to the systematic factor (>= 0).
+///   Typical: 0.3-0.5.
+/// * `stress_quantile` - Downturn quantile in (0, 1), e.g. 0.999.
 ///
 /// # Errors
 /// Returns an error if the downturn model parameters or base LGD are invalid.
-pub fn downturn_lgd_frye_jacobs(
+pub fn downturn_lgd_stressed(
     base_lgd: f64,
     asset_correlation: f64,
+    lgd_sensitivity: f64,
     stress_quantile: f64,
 ) -> crate::Result<f64> {
-    DownturnLgd::frye_jacobs(asset_correlation, 1.0, stress_quantile)?.adjust(base_lgd)
+    DownturnLgd::frye_jacobs(asset_correlation, lgd_sensitivity, stress_quantile)?.adjust(base_lgd)
 }
 
 /// Apply a regulatory-floor downturn adjustment to base LGD.
@@ -184,7 +203,11 @@ mod tests {
         )
         .unwrap();
 
-        assert!((net_recovery - 42.7936507936508).abs() < 1e-12);
-        assert!((lgd - 0.572063492063492).abs() < 1e-12);
+        // net = (gross − costs·EAD) · DF = (56 − 8) / 1.05² — workout costs
+        // are discounted alongside recoveries per the Basel workout-LGD
+        // methodology (2026-06-09 core quant review; previously 56·DF − 8).
+        let expected_net = 48.0 / (1.05_f64 * 1.05);
+        assert!((net_recovery - expected_net).abs() < 1e-12);
+        assert!((lgd - (1.0 - expected_net / 100.0)).abs() < 1e-12);
     }
 }

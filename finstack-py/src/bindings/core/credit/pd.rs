@@ -7,7 +7,7 @@ use finstack_core::credit::pd::{
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
-use crate::errors::display_to_py;
+use crate::errors::pd_calibration_to_py;
 
 // ---------------------------------------------------------------------------
 // PiT / TtC conversion
@@ -30,7 +30,7 @@ fn pit_to_ttc(pit_pd: f64, asset_correlation: f64, cycle_index: f64) -> PyResult
         asset_correlation,
         cycle_index,
     };
-    core_pit_to_ttc(pit_pd, &params).map_err(display_to_py)
+    core_pit_to_ttc(pit_pd, &params).map_err(pd_calibration_to_py)
 }
 
 /// Convert a Through-the-Cycle PD to a Point-in-Time PD.
@@ -50,20 +50,20 @@ fn ttc_to_pit(ttc_pd: f64, asset_correlation: f64, cycle_index: f64) -> PyResult
         asset_correlation,
         cycle_index,
     };
-    core_ttc_to_pit(ttc_pd, &params).map_err(display_to_py)
+    core_ttc_to_pit(ttc_pd, &params).map_err(pd_calibration_to_py)
 }
 
 /// Calibrate a central tendency (long-run average PD) from annual default rates
-/// using the geometric mean (the standard regulatory TtC approach).
+/// using the arithmetic mean (the standard regulatory TtC approach per
+/// Basel IRB / EBA GL/2017/16).
 ///
-/// Zero annual default rates are rejected; callers should apply an explicit
-/// smoothing policy before calibration when zero-default years are present.
+/// Zero-default years are valid observations and are included in the average.
 ///
-/// Returns the geometric mean in [0, 1].
+/// Returns the arithmetic mean in [0, 1].
 #[pyfunction]
 #[pyo3(text_signature = "(annual_default_rates)")]
 fn central_tendency(annual_default_rates: Vec<f64>) -> PyResult<f64> {
-    core_central_tendency(&annual_default_rates).map_err(display_to_py)
+    core_central_tendency(&annual_default_rates).map_err(pd_calibration_to_py)
 }
 
 // ---------------------------------------------------------------------------

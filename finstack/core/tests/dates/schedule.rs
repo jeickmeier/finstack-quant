@@ -671,7 +671,11 @@ fn test_imm_schedule_year_rollover() {
 
 #[test]
 fn test_cds_imm_schedule_basic() {
-    // CDS IMM schedule: 20th of Mar/Jun/Sep/Dec
+    // CDS IMM schedule: 20th of Mar/Jun/Sep/Dec.
+    //
+    // Post-Big-Bang convention (2026-06-09 core quant review, Moderate/Dates):
+    // the schedule anchors at the CDS roll PRECEDING the start date, so the
+    // first period carries the standard front accrual from 2024-12-20.
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 12, 20);
 
@@ -683,11 +687,32 @@ fn test_cds_imm_schedule_basic() {
         .into_iter()
         .collect();
 
-    // Should get 4 dates: Mar 20, Jun 20, Sep 20, Dec 20
+    // Should get 5 dates: Dec 20 (prior roll), Mar 20, Jun 20, Sep 20, Dec 20
+    assert_eq!(dates.len(), 5);
+    assert_eq!(dates[0], make_date(2024, 12, 20));
+    assert_eq!(dates[1], make_date(2025, 3, 20));
+    assert_eq!(dates[2], make_date(2025, 6, 20));
+    assert_eq!(dates[3], make_date(2025, 9, 20));
+    assert_eq!(dates[4], make_date(2025, 12, 20));
+}
+
+#[test]
+fn test_cds_imm_schedule_start_on_roll_date_has_no_front_accrual() {
+    // When the start date IS a CDS roll date, the schedule anchors on it
+    // directly (no prior-roll front accrual period).
+    let start = make_date(2025, 3, 20);
+    let end = make_date(2025, 12, 20);
+
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .cds_imm()
+        .build()
+        .unwrap()
+        .into_iter()
+        .collect();
+
     assert_eq!(dates.len(), 4);
     assert_eq!(dates[0], make_date(2025, 3, 20));
-    assert_eq!(dates[1], make_date(2025, 6, 20));
-    assert_eq!(dates[2], make_date(2025, 9, 20));
     assert_eq!(dates[3], make_date(2025, 12, 20));
 }
 
@@ -714,16 +739,18 @@ fn test_imm_vs_cds_imm_difference() {
         .into_iter()
         .collect();
 
-    // Both should have 2 dates
+    // IMM snaps forward (2 dates); CDS anchors at the prior roll for the
+    // standard front accrual (3 dates) — 2026-06-09 core quant review.
     assert_eq!(imm_dates.len(), 2);
-    assert_eq!(cds_dates.len(), 2);
+    assert_eq!(cds_dates.len(), 3);
 
     // IMM: third Wednesday (Mar 19, Jun 18)
-    // CDS: 20th (Mar 20, Jun 20)
+    // CDS: 20th, anchored at prior roll (Dec 20 2024, Mar 20, Jun 20)
     assert_eq!(imm_dates[0], make_date(2025, 3, 19));
-    assert_eq!(cds_dates[0], make_date(2025, 3, 20));
+    assert_eq!(cds_dates[0], make_date(2024, 12, 20));
     assert_eq!(imm_dates[1], make_date(2025, 6, 18));
-    assert_eq!(cds_dates[1], make_date(2025, 6, 20));
+    assert_eq!(cds_dates[1], make_date(2025, 3, 20));
+    assert_eq!(cds_dates[2], make_date(2025, 6, 20));
 }
 
 #[test]

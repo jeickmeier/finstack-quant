@@ -6,7 +6,7 @@
 //! they bypass this module and break the error-chain-preservation contract
 //! the helpers below provide.
 
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyKeyError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 pyo3::create_exception!(
@@ -70,8 +70,64 @@ fn format_chain(err: &dyn std::error::Error) -> String {
 /// The full error source chain (via [`std::error::Error::source`]) is flattened
 /// into the Python message. This preserves context from wrappers like
 /// `finstack_valuations::Error::Calibration(core_err)`.
+///
+/// Exception mapping:
+/// - Missing id/lookup failures (`InputError::{MissingCurve, NotFound,
+///   CalendarNotFound, FxTriangulationFailed}`) → `KeyError`
+/// - Calibration, solver, and operational failures (`Error::{Calibration,
+///   Internal}`, `InputError::SolverConvergenceFailed`) → `RuntimeError`
+/// - Everything else → `ValueError`
 pub fn core_to_py(e: finstack_core::Error) -> PyErr {
-    PyValueError::new_err(format_chain(&e))
+    use finstack_core::error::InputError;
+    use finstack_core::Error;
+
+    let message = format_chain(&e);
+    match &e {
+        Error::Input(
+            InputError::MissingCurve { .. }
+            | InputError::NotFound { .. }
+            | InputError::CalendarNotFound { .. }
+            | InputError::FxTriangulationFailed { .. },
+        ) => PyKeyError::new_err(message),
+        Error::Calibration { .. }
+        | Error::Internal(_)
+        | Error::Input(InputError::SolverConvergenceFailed { .. }) => {
+            PyRuntimeError::new_err(message)
+        }
+        _ => PyValueError::new_err(message),
+    }
+}
+
+/// Convert a `PdCalibrationError` into a Python exception.
+///
+/// Mirrors [`core_to_py`]: unknown-rating lookups raise `KeyError`, all other
+/// (validation) failures raise `ValueError`.
+pub fn pd_calibration_to_py(e: finstack_core::credit::pd::PdCalibrationError) -> PyErr {
+    use finstack_core::credit::pd::PdCalibrationError as E;
+    let message = format_chain(&e);
+    match &e {
+        E::UnknownRating { .. } => PyKeyError::new_err(message),
+        _ => PyValueError::new_err(message),
+    }
+}
+
+/// Convert a `MigrationError` into a Python exception.
+///
+/// Mirrors [`core_to_py`]: label/state lookup misses raise `KeyError`,
+/// numerical/operational failures raise `RuntimeError`, validation failures
+/// raise `ValueError`.
+pub fn migration_to_py(e: finstack_core::credit::migration::MigrationError) -> PyErr {
+    use finstack_core::credit::migration::MigrationError as E;
+    let message = format_chain(&e);
+    match &e {
+        E::UnknownState { .. } | E::NoWarfFactor { .. } => PyKeyError::new_err(message),
+        E::NoValidGenerator { .. }
+        | E::ComplexEigenvalues
+        | E::RoundTripError { .. }
+        | E::SingularMatrix
+        | E::Internal(_) => PyRuntimeError::new_err(message),
+        _ => PyValueError::new_err(message),
+    }
 }
 
 /// Convert an analytics-domain core error into a Python `AnalyticsError`.

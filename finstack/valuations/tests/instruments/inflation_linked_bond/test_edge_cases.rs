@@ -43,8 +43,9 @@ fn test_valuation_at_maturity() {
     // Act
     let pv = ilb.value(&ctx, as_of).unwrap();
 
-    // Assert - should have value (principal payment)
-    assert!(pv.amount() > 0.0);
+    // Assert - holder-view position value: the principal payment settles on
+    // `as_of` (= maturity) and is excluded, so the matured position is worth 0.
+    assert_eq!(pv.amount(), 0.0);
 }
 
 #[test]

@@ -130,6 +130,40 @@ mod tests {
     }
 
     #[test]
+    fn dag_build_plan_rejects_deeply_nested_ast() {
+        // A programmatic AST nested just past the limit must return the
+        // structured depth error from process_expression instead of
+        // overflowing the stack during plan construction.
+        let mut expr = Expr::column("x");
+        for _ in 0..MAX_DAG_RECURSION_DEPTH + 1 {
+            expr = Expr::unary_op(UnaryOp::Neg, expr);
+        }
+
+        let mut builder = DagBuilder::new();
+        let err = builder
+            .build_plan(vec![expr], meta())
+            .expect_err("deeply nested AST should fail with a depth guard");
+        assert!(
+            err.to_string().contains("maximum DAG recursion depth"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn dag_build_plan_accepts_ast_below_depth_limit() {
+        let mut expr = Expr::column("x");
+        for _ in 0..MAX_DAG_RECURSION_DEPTH - 2 {
+            expr = Expr::unary_op(UnaryOp::Neg, expr);
+        }
+
+        let mut builder = DagBuilder::new();
+        let plan = builder
+            .build_plan(vec![expr], meta())
+            .expect("AST below the depth limit should build a plan");
+        assert_eq!(plan.nodes.len(), MAX_DAG_RECURSION_DEPTH - 1);
+    }
+
+    #[test]
     fn dag_builder_tracks_shared_subexpressions() {
         let mut builder = DagBuilder::new();
         let col_x = Expr::column("x");
@@ -299,14 +333,28 @@ pub(crate) struct ExecutionPlan {
     pub cache_strategy: CacheStrategy,
 }
 
-/// Cache strategy for the execution plan.
+/// Vestigial cache-strategy statistics carried by [`ExecutionPlan`].
+///
+/// The cross-evaluation result cache these recommendations fed was removed
+/// (see `docs/reviews/2026-06-09-core-quant-review.md`, Blocker #2): nothing
+/// consults any of these fields at evaluation time. The type is retained only
+/// because `ExecutionPlan` remains part of the serialized form of
+/// [`super::eval::CompiledExpr`]; deleting the field would silently change
+/// that wire format.
+///
+/// Field semantics (advisory only):
+/// - `cache_nodes`: nodes a per-node result cache *would* have retained
+///   (high ref count or expensive).
+/// - `expected_hit_rate`: estimated fraction of total node cost such a cache
+///   would have deduplicated — a cost share, not a literal hit rate.
+/// - `memory_budget`: rough unit-less size estimate; never consulted.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct CacheStrategy {
     /// Nodes that should be cached (high ref count or expensive).
     pub cache_nodes: HashSet<u64>,
-    /// Expected cache hit rate.
+    /// Estimated fraction of total node cost a cache would deduplicate.
     pub expected_hit_rate: f64,
-    /// Memory budget estimate (arbitrary units).
+    /// Memory budget estimate (arbitrary units); never consulted.
     pub memory_budget: usize,
 }
 
@@ -341,7 +389,7 @@ impl DagBuilder {
         // Process each root expression
         let mut root_ids = Vec::new();
         for expr in exprs {
-            let id = self.process_expression(expr);
+            let id = self.process_expression(expr, 0)?;
             root_ids.push(id);
         }
 
@@ -363,10 +411,24 @@ impl DagBuilder {
     }
 
     /// Process an expression tree, deduplicating shared sub-expressions.
-    fn process_expression(&mut self, expr: Expr) -> u64 {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] when the expression nests deeper
+    /// than [`MAX_DAG_RECURSION_DEPTH`]. The same guard protects
+    /// `topological_sort` and `calculate_ref_counts`; without it here, a
+    /// deeply nested programmatic AST would overflow the stack during plan
+    /// construction before either of those guards is reached.
+    fn process_expression(&mut self, expr: Expr, depth: usize) -> crate::Result<u64> {
+        if depth >= MAX_DAG_RECURSION_DEPTH {
+            return Err(crate::Error::Validation(format!(
+                "Execution plan exceeded maximum DAG recursion depth of {MAX_DAG_RECURSION_DEPTH}"
+            )));
+        }
+
         // Check if we've already seen this expression
         if let Some(&existing_id) = self.expr_cache.get(&expr) {
-            return existing_id;
+            return Ok(existing_id);
         }
 
         // Generate new ID and process dependencies
@@ -377,16 +439,16 @@ impl DagBuilder {
             ExprNode::Column(_) | ExprNode::CSRef { .. } | ExprNode::Literal(_) => Vec::new(),
             ExprNode::Call(_, args) => args
                 .iter()
-                .map(|arg| self.process_expression(arg.clone()))
-                .collect(),
+                .map(|arg| self.process_expression(arg.clone(), depth + 1))
+                .collect::<crate::Result<Vec<_>>>()?,
             ExprNode::BinOp { left, right, .. } => {
                 vec![
-                    self.process_expression((**left).clone()),
-                    self.process_expression((**right).clone()),
+                    self.process_expression((**left).clone(), depth + 1)?,
+                    self.process_expression((**right).clone(), depth + 1)?,
                 ]
             }
             ExprNode::UnaryOp { operand, .. } => {
-                vec![self.process_expression((**operand).clone())]
+                vec![self.process_expression((**operand).clone(), depth + 1)?]
             }
             ExprNode::IfThenElse {
                 condition,
@@ -394,9 +456,9 @@ impl DagBuilder {
                 else_expr,
             } => {
                 vec![
-                    self.process_expression((**condition).clone()),
-                    self.process_expression((**then_expr).clone()),
-                    self.process_expression((**else_expr).clone()),
+                    self.process_expression((**condition).clone(), depth + 1)?,
+                    self.process_expression((**then_expr).clone(), depth + 1)?,
+                    self.process_expression((**else_expr).clone(), depth + 1)?,
                 ]
             }
         };
@@ -417,7 +479,7 @@ impl DagBuilder {
         self.nodes.insert(id, node);
         self.expr_cache.insert(expr, id);
 
-        id
+        Ok(id)
     }
 
     /// Calculate reference counts for all nodes.

@@ -143,6 +143,67 @@ fn test_vol_bucket_filtering_by_strike() {
 }
 
 #[test]
+fn test_vol_bucket_unfiltered_is_multiplicative() {
+    // No tenor/strike filters means "all buckets". Execution must match the
+    // adapter's multiplicative preview: vol × (1 + pct/100)
+    // (2026-06-09 core quant review, Blocker #3).
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+
+    let surface = VolSurface::builder("SPX")
+        .expiries(&[0.5, 1.0])
+        .strikes(&[90.0, 100.0, 110.0])
+        .row(&[0.21, 0.19, 0.23]) // 6M row
+        .row(&[0.22, 0.20, 0.24]) // 1Y row
+        .build()
+        .unwrap();
+    let preview = surface.apply_bucket_bump(None, None, 10.0).unwrap();
+
+    let mut market = MarketContext::new().insert_surface(surface);
+    let mut model = FinancialModelSpec::new("test", vec![]);
+
+    let scenario = ScenarioSpec {
+        id: "vol_bucket_all".into(),
+        name: Some("Vol Bucket All".into()),
+        description: None,
+        operations: vec![OperationSpec::VolSurfaceBucketPct {
+            surface_kind: VolSurfaceKind::Equity,
+            surface_id: "SPX".into(),
+            tenors: None,
+            strikes: None,
+            pct: 10.0,
+        }],
+        priority: 0,
+        resolution_mode: Default::default(),
+    };
+
+    let engine = ScenarioEngine::new();
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: Some(&mut model),
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: base_date,
+    };
+
+    let report = engine.apply(&scenario, &mut ctx).unwrap();
+    assert_eq!(report.operations_applied, 1);
+
+    let shocked_surface = market.get_surface("SPX").unwrap();
+    for &(expiry, strike, base) in &[(0.5, 90.0, 0.21), (0.5, 100.0, 0.19), (1.0, 110.0, 0.24)] {
+        let shocked = shocked_surface.value_checked(expiry, strike).unwrap();
+        assert!(
+            (shocked - base * 1.10).abs() < 1e-12,
+            "expected multiplicative shock at ({expiry}, {strike}): {}, got {shocked}",
+            base * 1.10
+        );
+        // Preview ≡ execution
+        let previewed = preview.value_checked(expiry, strike).unwrap();
+        assert!((shocked - previewed).abs() < 1e-12);
+    }
+}
+
+#[test]
 fn test_basecorr_bucket_filtering() {
     // Create base correlation curve
     let basecorr = BaseCorrelationCurve::builder("CDX_IG")

@@ -31,8 +31,14 @@
 //! - Bloomberg FXFA function for spot date verification
 //! - ECB TARGET2 calendar: https://www.ecb.europa.eu/paym/target/target2/profuse/calendar/html/index.en.html
 
-use finstack_core::dates::fx::{add_joint_business_days, resolve_calendar, roll_spot_date};
+use finstack_core::currency::Currency;
+use finstack_core::dates::fx::{
+    add_joint_business_days, fx_spot_date, resolve_calendar, roll_spot_date,
+};
 use finstack_core::dates::{create_date, BusinessDayConvention};
+use finstack_core::money::Money;
+use finstack_core::types::InstrumentId;
+use finstack_valuations::instruments::FxSpot;
 use time::Month;
 
 /// Test USD/EUR spot settlement around New Year's Day 2024
@@ -65,12 +71,15 @@ fn test_usd_eur_spot_new_year_2024() {
     // Trade on Friday before New Year's Day
     let trade_date = create_date(2023, Month::December, 29).expect("Valid date");
 
-    let spot = roll_spot_date(
+    // CLS-consistent rule: USD calendar gates only the final value date
+    // (2026-06-09 core quant review, FX spot finding). Same result here since
+    // Jan 1 is a joint closure.
+    let spot = fx_spot_date(
         trade_date,
-        2, // T+2
-        BusinessDayConvention::Following,
+        2,               // T+2
         Some("nyse"),    // USD calendar
         Some("target2"), // EUR calendar
+        Some("nyse"),    // USD side
     )
     .expect("Valid calendars");
 
@@ -110,14 +119,10 @@ fn test_usd_eur_spot_new_year_2024() {
 fn test_usd_eur_spot_christmas_2024() {
     let trade_date = create_date(2024, Month::December, 23).expect("Valid date");
 
-    let spot = roll_spot_date(
-        trade_date,
-        2,
-        BusinessDayConvention::Following,
-        Some("nyse"),
-        Some("target2"),
-    )
-    .expect("Valid calendars");
+    // CLS-consistent rule (2026-06-09 core quant review): same result here
+    // since the skipped days are TARGET2 (non-USD) closures.
+    let spot = fx_spot_date(trade_date, 2, Some("nyse"), Some("target2"), Some("nyse"))
+        .expect("Valid calendars");
 
     // Expected: Friday, December 27, 2024
     let expected = create_date(2024, Month::December, 27).expect("Valid expected date");
@@ -228,24 +233,21 @@ fn test_gbp_jpy_spot_spring_bank_holiday_2025() {
 /// - Base Calendar: NYSE
 /// - Quote Calendar: GBLO
 ///
-/// # Expected Settlement
+/// # Expected Settlement (CLS-consistent rule)
 /// From Wednesday July 2, 2025:
 /// - Count: Thu July 3 (business day 1 - **both open**)
-/// - Skip: Fri July 4 (Independence Day - **NYSE closed, joint skip**)
+/// - Count: Fri July 4 (Independence Day - USD does not gate intermediate days,
+///   GBLO open, so it counts as business day 2) — but the **final value date**
+///   must be a good USD day, so spot rolls forward
 /// - Skip: Sat July 5, Sun July 6 (weekend)
-/// - Count: Mon July 7 (business day 2) ← **Spot Date**
+/// - Settle: Mon July 7 ← **Spot Date** (first day good in all calendars)
 #[test]
 fn test_usd_gbp_spot_july_4th_2025() {
     let trade_date = create_date(2025, Month::July, 2).expect("Valid date");
 
-    let spot = roll_spot_date(
-        trade_date,
-        2,
-        BusinessDayConvention::Following,
-        Some("nyse"),
-        Some("gblo"),
-    )
-    .expect("Valid calendars");
+    // CLS-consistent rule (2026-06-09 core quant review, FX spot finding).
+    let spot = fx_spot_date(trade_date, 2, Some("nyse"), Some("gblo"), Some("nyse"))
+        .expect("Valid calendars");
 
     // Expected: Monday, July 7, 2025
     let expected = create_date(2025, Month::July, 7).expect("Valid expected date");
@@ -306,31 +308,29 @@ fn test_add_joint_business_days_christmas_week_2024() {
 /// - Currency Pair: USD/GBP
 /// - Spot Lag: T+2
 ///
-/// # Expected Settlement
+/// # Expected Settlement (CLS-consistent rule)
 /// From Friday Jan 17, 2025:
 /// - Skip: Sat Jan 18, Sun Jan 19 (weekend)
-/// - Skip: Mon Jan 20 (MLK Day - **NYSE closed**)
-/// - Count: Tue Jan 21 (business day 1)
-/// - Count: Wed Jan 22 (business day 2) ← **Spot Date**
+/// - Count: Mon Jan 20 (MLK Day - NYSE closed, but USD does **not** gate
+///   intermediate days; GBLO open → business day 1)
+/// - Count: Tue Jan 21 (business day 2, good in all calendars) ← **Spot Date**
+///
+/// Expectation updated from Jan 22 to Jan 21 per the CLS-consistent FX spot
+/// rule (2026-06-09 core quant review, "Major — schedules" FX spot finding):
+/// a US holiday on an intermediate day must not delay a USD pair's spot date.
 #[test]
 fn test_usd_gbp_spot_mlk_day_2025() {
     let trade_date = create_date(2025, Month::January, 17).expect("Valid date");
 
-    let spot = roll_spot_date(
-        trade_date,
-        2,
-        BusinessDayConvention::Following,
-        Some("nyse"),
-        Some("gblo"),
-    )
-    .expect("Valid calendars");
+    let spot = fx_spot_date(trade_date, 2, Some("nyse"), Some("gblo"), Some("nyse"))
+        .expect("Valid calendars");
 
-    // Expected: Wednesday, January 22, 2025
-    let expected = create_date(2025, Month::January, 22).expect("Valid expected date");
+    // Expected: Tuesday, January 21, 2025
+    let expected = create_date(2025, Month::January, 21).expect("Valid expected date");
 
     assert_eq!(
         spot, expected,
-        "USD/GBP T+2 from Jan 17, 2025 should be Jan 22 (skips MLK Day)"
+        "USD/GBP T+2 from Jan 17, 2025 should be Jan 21 (MLK Day at T+1 does not delay spot)"
     );
 }
 
@@ -487,5 +487,66 @@ fn test_add_joint_business_days_iteration_limit() {
         computed.month() == Month::January || computed.month() == Month::February,
         "20 business days from Jan 1 should be in Jan or Feb, got: {:?}",
         computed
+    );
+}
+
+/// Instrument-level regression: EUR/USD traded the business day before a US
+/// holiday must NOT settle one day late.
+///
+/// EUR/USD traded Thu 2025-07-03; Fri 2025-07-04 (US Independence Day) is a
+/// good EUR (TARGET2) day, so under the CLS-consistent rule it counts as the
+/// first intermediate day and spot is Mon 2025-07-07 — not Tue 2025-07-08 as
+/// the old symmetric joint-calendar roll produced.
+///
+/// Reference: docs/reviews/2026-06-09-core-quant-review.md,
+/// "Major — schedules" FX spot finding.
+#[test]
+fn test_fx_spot_instrument_eur_usd_us_holiday_intermediate_2025() {
+    let trade_date = create_date(2025, Month::July, 3).expect("Valid date");
+
+    let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
+        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .expect("valid notional")
+        .with_base_calendar_id("target2")
+        .with_quote_calendar_id("usny")
+        .with_settlement_lag_days(2);
+
+    let settlement = fx
+        .effective_settlement_date(trade_date)
+        .expect("settlement date");
+
+    let expected = create_date(2025, Month::July, 7).expect("Valid expected date");
+    assert_eq!(
+        settlement, expected,
+        "EUR/USD traded 2025-07-03 must settle Mon 2025-07-07; a US holiday at \
+         T+1 must not delay spot (2026-06-09 core quant review)"
+    );
+}
+
+/// Instrument-level check: a US holiday on the FINAL value date still rolls
+/// spot forward.
+///
+/// EUR/USD traded Wed 2025-07-02: the T+2 candidate is Fri 2025-07-04 (good
+/// EUR day), but the value date itself must be good in USD, so spot rolls to
+/// Mon 2025-07-07.
+#[test]
+fn test_fx_spot_instrument_eur_usd_us_holiday_final_date_2025() {
+    let trade_date = create_date(2025, Month::July, 2).expect("Valid date");
+
+    let fx = FxSpot::new(InstrumentId::new("EURUSD"), Currency::EUR, Currency::USD)
+        .with_notional(Money::new(1_000_000.0, Currency::EUR))
+        .expect("valid notional")
+        .with_base_calendar_id("target2")
+        .with_quote_calendar_id("usny")
+        .with_settlement_lag_days(2);
+
+    let settlement = fx
+        .effective_settlement_date(trade_date)
+        .expect("settlement date");
+
+    let expected = create_date(2025, Month::July, 7).expect("Valid expected date");
+    assert_eq!(
+        settlement, expected,
+        "a US holiday on the final value date must roll EUR/USD spot forward"
     );
 }

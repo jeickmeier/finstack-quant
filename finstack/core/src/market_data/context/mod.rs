@@ -903,7 +903,9 @@ impl MarketContext {
         crate::error::InputError::NotFound { id: id.to_string() }.into()
     }
     fn missing_curve_error(&self, id: &str) -> crate::Error {
-        let available: Vec<&str> = self.curves.keys().map(|k| k.as_str()).collect();
+        // Sort for deterministic error messages (HashMap iteration order varies).
+        let mut available: Vec<&str> = self.curves.keys().map(|k| k.as_str()).collect();
+        available.sort_unstable();
         crate::error::Error::missing_curve_with_suggestions(id, &available)
     }
     #[inline]

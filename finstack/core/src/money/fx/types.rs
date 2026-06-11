@@ -173,9 +173,18 @@ pub struct FxRateResult {
 /// Serializable state of an FxMatrix.
 /// Contains the configuration and cached quotes that can be persisted and restored.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FxMatrixState {
     /// FX configuration
     pub config: FxConfig,
     /// Cached FX quotes as (from, to, rate) tuples
     pub quotes: Vec<(Currency, Currency, f64)>,
+    /// Pinned, date/policy-scoped quotes as `(from, to, on, policy, rate)`.
+    ///
+    /// Added per the 2026-06-09 core quant review: snapshots previously
+    /// dropped pinned fixings, so a restored matrix silently re-derived
+    /// those dates from the provider. The field is serde-additive
+    /// (`default`), so older payloads without it still deserialize.
+    #[serde(default)]
+    pub pinned_quotes: Vec<(Currency, Currency, Date, FxConversionPolicy, f64)>,
 }

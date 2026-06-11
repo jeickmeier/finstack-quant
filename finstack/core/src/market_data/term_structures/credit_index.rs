@@ -82,10 +82,14 @@ impl CreditIndexData {
             .is_some_and(|curves| !curves.is_empty())
     }
 
-    /// Get all available issuer identifiers.
+    /// Get all available issuer identifiers, sorted for deterministic output.
     pub fn issuer_ids(&self) -> Vec<String> {
         match &self.issuer_credit_curves {
-            Some(curves) => curves.keys().cloned().collect(),
+            Some(curves) => {
+                let mut ids: Vec<String> = curves.keys().cloned().collect();
+                ids.sort_unstable();
+                ids
+            }
             None => Vec::new(),
         }
     }

@@ -164,11 +164,13 @@ mod altman_tests {
         assert_eq!(result.zone, ScoringZone::Safe);
     }
 
-    /// Z''-Score for an emerging market firm.
-    /// Z'' = 3.25 + 6.56(0.10) + 3.26(0.20) + 6.72(0.15) + 1.05(1.00)
-    ///     = 3.25 + 0.656 + 0.652 + 1.008 + 1.05 = 6.616
+    /// Z''-Score for a healthy non-manufacturer (constant-free non-EM model;
+    /// the +3.25 EM-Score constant was removed per
+    /// docs/reviews/2026-06-09-core-quant-review.md, Major — credit).
+    /// Z'' = 6.56(0.10) + 3.26(0.20) + 6.72(0.15) + 1.05(1.00)
+    ///     = 0.656 + 0.652 + 1.008 + 1.05 = 3.366
     #[test]
-    fn z_double_prime_emerging_market() {
+    fn z_double_prime_non_manufacturer() {
         let input = AltmanZDoublePrimeInput {
             working_capital_to_total_assets: 0.10,
             retained_earnings_to_total_assets: 0.20,
@@ -177,7 +179,7 @@ mod altman_tests {
         };
         let result = altman_z_double_prime(&input).unwrap();
         assert!(
-            (result.score - 6.616).abs() < 1e-10,
+            (result.score - 3.366).abs() < 1e-10,
             "score={}",
             result.score
         );
@@ -196,6 +198,23 @@ mod altman_tests {
         let result = altman_z_double_prime(&input).unwrap();
         assert!(result.score < 1.10, "score={}", result.score);
         assert_eq!(result.zone, ScoringZone::Distress);
+    }
+
+    /// Regression: a firm with all ratios at zero must NOT be classified
+    /// Safe. Under the old +3.25-constant/non-EM-cutoff mix it scored
+    /// 3.25 -> Safe (docs/reviews/2026-06-09-core-quant-review.md).
+    #[test]
+    fn z_double_prime_all_zero_ratios_is_distress() {
+        let input = AltmanZDoublePrimeInput {
+            working_capital_to_total_assets: 0.0,
+            retained_earnings_to_total_assets: 0.0,
+            ebit_to_total_assets: 0.0,
+            book_equity_to_total_liabilities: 0.0,
+        };
+        let result = altman_z_double_prime(&input).unwrap();
+        assert!(result.score.abs() < 1e-12, "score={}", result.score);
+        assert_eq!(result.zone, ScoringZone::Distress);
+        assert!(result.implied_pd > 0.5, "implied_pd={}", result.implied_pd);
     }
 
     /// Implied PD is always in [0, 1].
@@ -265,6 +284,59 @@ mod ohlson_tests {
         };
         let result = ohlson_o_score(&input).unwrap();
         assert!(result.implied_pd > 0.50, "pd={}", result.implied_pd);
+        // PD far above Ohlson's optimal cutoff P* = 0.038 → Distress
+        // (PD-based zones per the 2026-06-09 core quant review).
+        assert_eq!(result.zone, crate::credit::scoring::ScoringZone::Distress);
+    }
+
+    /// Zone cutoffs are PD-based (2026-06-09 core quant review): Distress
+    /// boundary at Ohlson's published optimal cutoff P* = 0.038 (O ≈ −3.23),
+    /// Safe/Grey boundary at P*/2 = 0.019. The previous raw-O cutoffs
+    /// {0.38, 0.50} labeled PD ≈ 59% firms "Safe".
+    #[test]
+    fn o_score_pd_based_zone_cutoffs() {
+        use crate::credit::scoring::ScoringZone;
+
+        let base = OhlsonOScoreInput {
+            log_total_assets_adjusted: 8.0,
+            total_liabilities_to_total_assets: 0.40,
+            working_capital_to_total_assets: 0.20,
+            current_liabilities_to_current_assets: 0.50,
+            liabilities_exceed_assets: 0.0,
+            net_income_to_total_assets: 0.10,
+            funds_from_operations_to_total_liabilities: 0.30,
+            negative_net_income_two_years: 0.0,
+            net_income_change: 0.10,
+        };
+
+        // O ≈ −3.250 → PD ≈ 0.0373 ∈ [0.019, 0.038] → Grey.
+        let grey = ohlson_o_score(&base).unwrap();
+        assert!(
+            grey.implied_pd > 0.019 && grey.implied_pd < 0.038,
+            "pd={}",
+            grey.implied_pd
+        );
+        assert_eq!(grey.zone, ScoringZone::Grey);
+
+        // Larger firm: O ≈ −4.064 → PD ≈ 0.0169 < 0.019 → Safe.
+        let safe = ohlson_o_score(&OhlsonOScoreInput {
+            log_total_assets_adjusted: 10.0,
+            ..base
+        })
+        .unwrap();
+        assert!(safe.implied_pd < 0.019, "pd={}", safe.implied_pd);
+        assert_eq!(safe.zone, ScoringZone::Safe);
+
+        // More levered firm: O ≈ −2.045 → PD ≈ 0.115 > 0.038 → Distress
+        // (the old raw-O cutoffs would have labeled this O < 0.38 "Safe").
+        let distress = ohlson_o_score(&OhlsonOScoreInput {
+            total_liabilities_to_total_assets: 0.60,
+            ..base
+        })
+        .unwrap();
+        assert!(distress.implied_pd > 0.038, "pd={}", distress.implied_pd);
+        assert!(distress.score < 0.38, "score={}", distress.score);
+        assert_eq!(distress.zone, ScoringZone::Distress);
     }
 
     /// PD is always in [0, 1] for the logistic transform.

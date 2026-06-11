@@ -44,12 +44,12 @@
 //! let end = Date::from_calendar_date(2025, Month::December, 20)?;
 //!
 //! let sched = ScheduleBuilder::new(start, end)?
-//!     .cds_imm()  // Auto-adjusts start to next CDS roll date
+//!     .cds_imm()  // Anchors at the CDS roll preceding start (front accrual)
 //!     .build()?;
 //!
 //! let dates: Vec<_> = sched.into_iter().collect();
-//! // Mar-20, Jun-20, Sep-20, Dec-20 (2025)
-//! assert_eq!(dates.len(), 4);
+//! // Dec-20-2024 (prior roll), Mar-20, Jun-20, Sep-20, Dec-20 (2025)
+//! assert_eq!(dates.len(), 5);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -120,7 +120,7 @@ use super::schedule_gen::{
     enforce_monotonic_and_dedup, enforce_monotonic_keep_terminal, generate_imm_dates,
     is_cds_roll_date, BuilderInternal,
 };
-use super::{adjust, next_cds_date, BusinessDayConvention, HolidayCalendar};
+use super::{adjust, prev_cds_date, BusinessDayConvention, HolidayCalendar};
 
 /// Payment or coupon frequency for schedule generation.
 ///
@@ -693,6 +693,19 @@ impl<'a> ScheduleBuilder<'a> {
     /// Create a CDS IMM schedule (quarterly on the 20th: 20-Mar, 20-Jun, 20-Sep, 20-Dec).
     /// This is a convenience method for credit default swap schedules that follow
     /// standard CDS roll dates.
+    ///
+    /// # Front accrual
+    ///
+    /// Per post-Big-Bang (2009) market convention, when the start date is not
+    /// itself a CDS roll date the schedule is anchored at the roll date
+    /// immediately **preceding** the start, so the first period carries the
+    /// standard front accrual (the first generated date lies before `start`).
+    ///
+    /// # Adjustment
+    ///
+    /// The generated 20ths are **unadjusted** roll dates; payment-date
+    /// business-day adjustment is applied separately via
+    /// [`adjust_with`](Self::adjust_with) / [`adjust_with_id`](Self::adjust_with_id).
     #[must_use]
     pub fn cds_imm(mut self) -> Self {
         self.freq = Tenor::quarterly();
@@ -971,11 +984,19 @@ impl<'a> ScheduleBuilder<'a> {
             }
             imm_dates
         } else if self.cds_imm_mode {
-            // CDS IMM: 20th of quarterly months
+            // CDS IMM: 20th of quarterly months (unadjusted; any business-day
+            // adjustment configured on the builder is applied separately below).
+            //
+            // Post-Big-Bang (2009) standard CDS contracts include a FRONT
+            // ACCRUAL period: the first premium period accrues from the CDS
+            // roll date immediately PRECEDING the start date, not the next
+            // one. Snapping the start forward (the previous behavior) dropped
+            // that initial accrual period (2026-06-09 core quant review,
+            // Moderate/Dates).
             let adj_start = if is_cds_roll_date(self.start) {
                 self.start
             } else {
-                next_cds_date(self.start)
+                prev_cds_date(self.start)
             };
 
             let builder = BuilderInternal {
@@ -998,7 +1019,14 @@ impl<'a> ScheduleBuilder<'a> {
         };
 
         // Enforce monotonicity and remove duplicates produced by EOM/stub handling
+        let pre_dedup_len = dates.len();
         enforce_monotonic_and_dedup(&mut dates);
+        if dates.len() != pre_dedup_len {
+            tracing::warn!(
+                dropped = pre_dedup_len - dates.len(),
+                "schedule generation dropped duplicate or non-monotonic dates"
+            );
+        }
 
         // Apply business day adjustment if configured
         if let (Some(conv), Some(cal)) = (self.conv, resolved_cal) {
@@ -1010,7 +1038,14 @@ impl<'a> ScheduleBuilder<'a> {
             // same business day) and, in edge cases, non-monotonicities.
             // Enforce again, but never drop the adjusted maturity date:
             // collisions merge into the earlier period.
+            let pre_adjust_len = dates.len();
             enforce_monotonic_keep_terminal(&mut dates);
+            if dates.len() != pre_adjust_len {
+                tracing::warn!(
+                    dropped = pre_adjust_len - dates.len(),
+                    "business-day adjustment collided schedule dates; periods merged"
+                );
+            }
         }
 
         Ok(Schedule { dates, warnings })

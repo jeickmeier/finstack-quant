@@ -150,9 +150,25 @@ fn non_finite_kind(v: f64) -> NonFiniteKind {
 ///
 /// `Rate` is `Copy` and contains only a single `f64`, making it trivially
 /// `Send + Sync`.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+///
+/// # Serde
+///
+/// Serialized transparently as the inner `f64` decimal. Deserialization
+/// routes through [`Rate::try_from_decimal`], so non-finite values (NaN,
+/// ±Infinity) are rejected even for binary formats that can encode them
+/// (JSON already rejects them at the parser level).
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize)]
 pub struct Rate(f64);
+
+impl<'de> Deserialize<'de> for Rate {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let decimal = f64::deserialize(deserializer)?;
+        Rate::try_from_decimal(decimal).map_err(serde::de::Error::custom)
+    }
+}
 
 impl Rate {
     /// Create a rate from a decimal value (0.05 = 5%).
@@ -381,7 +397,6 @@ impl Neg for Rate {
 /// assert_eq!(annual_fee, 500_000.0);
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Bps(i32);
 
 impl Bps {
@@ -514,11 +529,14 @@ impl From<Bps> for i32 {
     }
 }
 
-impl From<Bps> for f64 {
-    fn from(bps: Bps) -> Self {
-        bps.as_decimal()
-    }
-}
+// NOTE: There is intentionally no `impl From<Bps> for f64`.
+//
+// `TryFrom<f64> for Bps` reads a basis-point *count* (25.0 → 25bp), so a
+// `From<Bps> for f64` returning the *decimal* (25bp → 0.0025) made the f64
+// conversions asymmetric: round-tripping 25bp through f64 yielded 0bp
+// (2026-06-09 core quant review, types/rates.rs finding). Use the explicit
+// accessors instead: [`Bps::as_decimal`], [`Bps::as_percent`], or
+// `f64::from(bps.as_bps())` for the raw bp count.
 
 // Arithmetic operations for Bps
 impl Add for Bps {
@@ -586,9 +604,25 @@ impl Neg for Bps {
 /// // Display formatting
 /// assert_eq!(format!("{}", vol), "20.00%");
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+///
+/// # Serde
+///
+/// Serialized transparently as the inner `f64` percentage value.
+/// Deserialization routes through [`Percentage::try_new`], so non-finite
+/// values (NaN, ±Infinity) are rejected even for binary formats that can
+/// encode them.
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize)]
 pub struct Percentage(f64);
+
+impl<'de> Deserialize<'de> for Percentage {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let percent = f64::deserialize(deserializer)?;
+        Percentage::try_new(percent).map_err(serde::de::Error::custom)
+    }
+}
 
 impl Percentage {
     /// Create a new percentage (12.5 = 12.5%).
@@ -956,5 +990,30 @@ mod tests {
         let deserialized: Percentage =
             serde_json::from_str(&json).expect("JSON deserialization should succeed in test");
         assert_eq!(pct, deserialized);
+    }
+
+    /// Deserialization must route through the validating constructors so
+    /// non-finite values cannot enter via formats that can encode them
+    /// (JSON rejects NaN at the parser level, but binary formats do not).
+    /// 2026-06-09 core quant review, types/rates.rs minor finding.
+    #[test]
+    fn deserialize_rejects_non_finite() {
+        use serde::de::value::Error as ValueError;
+        use serde::de::IntoDeserializer;
+
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let rate: std::result::Result<Rate, ValueError> =
+                Rate::deserialize(bad.into_deserializer());
+            assert!(rate.is_err(), "Rate must reject {bad}");
+
+            let pct: std::result::Result<Percentage, ValueError> =
+                Percentage::deserialize(bad.into_deserializer());
+            assert!(pct.is_err(), "Percentage must reject {bad}");
+        }
+
+        // Finite values still deserialize.
+        let rate: std::result::Result<Rate, ValueError> =
+            Rate::deserialize(0.05_f64.into_deserializer());
+        assert_eq!(rate.expect("finite rate"), Rate::from_decimal(0.05));
     }
 }

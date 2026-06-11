@@ -714,6 +714,7 @@ excluded = [
     "expr",          # Expression engine not exposed to WASM
     "explain",       # Trace/audit helpers are server/notebook-side concerns
     "prelude",       # Re-export bag; no host-language meaning
+    "rating_scales", # Rating-scale registry is config-driven / Python-only for now
     "validation",    # Internal validation helpers
 ]
 
@@ -736,6 +737,7 @@ root_exports = [
     "VolCube",
     "FxDeltaVolSurface",
     "FxConversionPolicy",
+    "FxRateResult",
     "FxMatrix",
     "choleskyDecomposition",
     "choleskySolve",
@@ -783,7 +785,6 @@ python_only_market_data = [
     "PriceCurve",
     "VolSurface",
     "VolatilityIndexCurve",
-    "FxRateResult",
     "MarketContext",
 ]
 

@@ -528,7 +528,7 @@ impl PyCurveId {
 
     /// Underlying string value.
     #[pyo3(text_signature = "(self)")]
-    fn get_as_str(&self) -> &str {
+    fn as_str(&self) -> &str {
         self.inner.as_str()
     }
 
@@ -576,7 +576,7 @@ impl PyInstrumentId {
 
     /// Underlying string value.
     #[pyo3(text_signature = "(self)")]
-    fn get_as_str(&self) -> &str {
+    fn as_str(&self) -> &str {
         self.inner.as_str()
     }
 
@@ -637,13 +637,8 @@ impl PyAttributes {
     }
 
     /// Metadata keys in sorted order.
-    fn get_keys(&self) -> Vec<String> {
+    fn keys(&self) -> Vec<String> {
         self.inner.meta.keys().cloned().collect()
-    }
-
-    /// Number of metadata entries.
-    fn get_len(&self) -> usize {
-        self.inner.meta.len()
     }
 
     /// Return ``repr(self)``.
@@ -655,7 +650,7 @@ impl PyAttributes {
         )
     }
 
-    /// Number of metadata entries; ``len(attrs) == len(attrs.meta_keys())``.
+    /// Number of metadata entries; ``len(attrs) == len(attrs.keys())``.
     fn __len__(&self) -> usize {
         self.inner.meta.len()
     }
